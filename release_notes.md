@@ -16,7 +16,24 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Support for setting and getting thread names (`util::Thread::set_name()` and
+  `util::Thread::get_name()`) when the platform supports
+  it. `util::Thread::set_name()` is now used by the test harness as a help while
+  debugging. Also, the terminate handler (in `util/terminate.cpp`) writes out
+  the name of the terminating thread if the name is available.
+
+----------------------------------------------
+
+# 1.5.1 Release notes
+
+### Bugfixes
+
+* Fixed java bug #3144 / Core #2014. Management of Descriptor class was
+  not thread safe with respect to destruction/creation/management of
+  accessor tree. Bug could be triggered by destruction of TableView on
+  one thread, while new TableViews where created on a different thread.
+* Fixed incorrect results when updating a backlink TableView after inserting
+  new columns into the source table.
 
 ----------------------------------------------
 

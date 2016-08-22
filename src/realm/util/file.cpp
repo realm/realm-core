@@ -118,7 +118,7 @@ bool try_make_dir(const std::string& path)
         case EROFS:
             throw File::PermissionDenied(msg, path);
         default:
-            throw File::AccessError(msg, path);
+            throw File::AccessError(msg, path);         // LCOV_EXCL_LINE
     }
 }
 
@@ -154,7 +154,7 @@ void remove_dir(const std::string& path)
         case ENOENT:
             throw File::NotFound(msg, path);
         default:
-            throw File::AccessError(msg, path);
+            throw File::AccessError(msg, path);   // LCOV_EXCL_LINE
     }
 }
 
@@ -186,7 +186,7 @@ std::string make_temp_dir()
     StringBuffer buffer;
     buffer.append_c_str(P_tmpdir "/realm_XXXXXX");
     if (mkdtemp(buffer.c_str()) == 0)
-        throw std::runtime_error("mkdtemp() failed");
+        throw std::runtime_error("mkdtemp() failed");   // LCOV_EXCL_LINE
     return buffer.str();
 
 #endif
@@ -325,7 +325,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case EEXIST:
             throw Exists(msg, path);
         default:
-            throw AccessError(msg, path);
+            throw AccessError(msg, path);   // LCOV_EXCL_LINE
     }
 
 #endif
@@ -405,7 +405,7 @@ error:
         if (r == 0)
             break;
         if (r < 0)
-            goto error;
+            goto error;     // LCOV_EXCL_LINE
         REALM_ASSERT_RELEASE(size_t(r) <= n);
         size -= size_t(r);
         data += size_t(r);
@@ -413,10 +413,11 @@ error:
     return data - data_0;
 
 error:
+    // LCOV_EXCL_START
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("read(): failed: ", err);
     throw std::runtime_error(msg);
-
+    // LCOV_EXCL_STOP
 #endif
 }
 
@@ -452,7 +453,6 @@ error:
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
         Map<char> write_map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
-        // FIXME: Expect this to fail due to assert asking for a read first! This FIXME seems to be made by Finn who does not remember it.
         realm::util::encryption_read_barrier(write_map, pos, size);
         memcpy(write_map.get_addr() + pos, data, size);
         realm::util::encryption_write_barrier(write_map, pos, size);
@@ -465,7 +465,7 @@ error:
         size_t n = std::min(size, size_t(SSIZE_MAX));
         ssize_t r = ::write(m_fd, data, n);
         if (r < 0)
-            goto error;
+            goto error;     // LCOV_EXCL_LINE
         REALM_ASSERT_RELEASE(r != 0);
         REALM_ASSERT_RELEASE(size_t(r) <= n);
         size -= size_t(r);
@@ -474,9 +474,11 @@ error:
     return;
 
 error:
+  // LCOV_EXCL_START
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("write(): failed: ", err);
     throw std::runtime_error(msg);
+    // LCOV_EXCL_STOP
 
 #endif
 }
@@ -648,22 +650,18 @@ void File::seek(SizeType position)
 
 // We might be able to use lseek() with offset=0 as cross platform method, because we fortunatly
 // do not require to operate on files larger than 4 GB on 32-bit platforms
+#ifdef _WIN32 // Windows version
 File::SizeType File::get_file_position()
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
     LARGE_INTEGER liOfs = { 0 };
     LARGE_INTEGER liNew = { 0 };
     if (!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
         throw std::runtime_error("SetFilePointerEx() failed");
     return liNew.QuadPart;
-#else
-    // POSIX version not needed because it's only used by Windows version of resize().
-    REALM_ASSERT(false);
-    return 0;
-#endif
 }
+#endif
 
 
 // FIXME: The current implementation may not guarantee that data is

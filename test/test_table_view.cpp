@@ -1885,6 +1885,52 @@ TEST(TableView_BacklinksWhenTargetRowMovedOrDeleted)
     CHECK(tv_linklist.is_in_sync());
 }
 
+TEST(TableView_BacklinksWithColumnInsertion)
+{
+    Group g;
+    TableRef target = g.add_table("target");
+    target->add_column(type_Int, "int");
+    target->add_empty_row(2);
+    target->set_int(0, 1, 10);
+
+    TableRef origin = g.add_table("origin");
+    origin->add_column_link(type_Link, "link", *target);
+    origin->add_column_link(type_LinkList, "linklist", *target);
+    origin->add_empty_row(2);
+    origin->set_link(0, 1, 1);
+    origin->get_linklist(1, 1)->add(1);
+
+    auto tv1 = target->get_backlink_view(1, origin.get(), 0);
+    CHECK_EQUAL(tv1.size(), 1);
+    CHECK_EQUAL(tv1.get_source_ndx(0), 1);
+
+    auto tv2 = target->get_backlink_view(1, origin.get(), 1);
+    CHECK_EQUAL(tv2.size(), 1);
+    CHECK_EQUAL(tv1.get_source_ndx(0), 1);
+
+    target->insert_column(0, type_String, "string");
+    target->insert_empty_row(0);
+
+    tv1.sync_if_needed();
+    CHECK_EQUAL(tv1.size(), 1);
+    CHECK_EQUAL(tv1.get_source_ndx(0), 1);
+
+    tv2.sync_if_needed();
+    CHECK_EQUAL(tv2.size(), 1);
+    CHECK_EQUAL(tv2.get_source_ndx(0), 1);
+
+    origin->insert_column(0, type_String, "string");
+    target->insert_empty_row(0);
+    origin->insert_empty_row(0);
+
+    tv1.sync_if_needed();
+    CHECK_EQUAL(tv1.size(), 1);
+    CHECK_EQUAL(tv1.get_source_ndx(0), 2);
+
+    tv2.sync_if_needed();
+    CHECK_EQUAL(tv2.size(), 1);
+    CHECK_EQUAL(tv2.get_source_ndx(0), 2);
+}
 
 namespace {
 struct DistinctDirect {

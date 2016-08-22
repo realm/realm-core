@@ -323,52 +323,6 @@ TEST(Shared_CompactingOnTheFly)
 }
 
 
-
-#ifdef LOCKFILE_CLEANUP
-// The following two tests are now disabled, as we have abandoned the requirement to
-// clean up the .lock file after use.
-TEST(Shared_NoCreateCleanupLockFileAfterFailure)
-{
-    SHARED_GROUP_TEST_PATH(path);
-
-    bool no_create = true;
-    CHECK_THROW(SharedGroup(path, no_create, SharedGroup::durability_Full), File::NotFound);
-
-    CHECK(!File::exists(path));
-
-    // Verify that the `lock` file is not left behind
-    CHECK(!File::exists(path.get_lock_path()));
-}
-
-
-// FIXME: The following test seems really weird. The previous test
-// checks that no `lock` file is left behind, yet this test seems to
-// anticipate a case where it is left behind. What is going on?
-TEST(Shared_NoCreateCleanupLockFileAfterFailure2)
-{
-    SHARED_GROUP_TEST_PATH(path);
-
-    bool no_create = true;
-    CHECK_THROW(SharedGroup(path, no_create, SharedGroup::durability_Full), File::NotFound);
-
-    CHECK(!File::exists(path));
-
-    if (!File::exists(path.get_lock_path())) {
-        try {
-            // Let's see if any leftover `lock` file is correctly removed or reinitialized
-            no_create = false;
-            SharedGroup sg(path, no_create, SharedGroup::durability_Full);
-        }
-        catch (runtime_error&) {
-            CHECK(false);
-        }
-    }
-
-    // Verify that the `lock` file is not left behind
-    CHECK(!File::exists(path.get_lock_path()));
-}
-#endif
-
 TEST(Shared_Initial)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -383,67 +337,8 @@ TEST(Shared_Initial)
         }
 
     }
-
-#ifdef LOCKFILE_CLEANUP
-    // Verify that the `lock` file is not left behind
-    CHECK(!File::exists(path.get_lock_path()));
-#endif
 }
 
-
-#ifdef LOCKFILE_CLEANUP
-TEST(Shared_StaleLockFileFaked)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    {
-        // create fake lock file
-        File lock(path.get_lock_path(), File::mode_Write);
-        const char buf[] = { 0, 0, 0, 0 };
-        lock.write(buf);
-    }
-    bool no_create = false;
-    CHECK_THROW(SharedGroup(path, no_create, SharedGroup::durability_Full),
-                SharedGroup::PresumablyStaleLockFile);
-    File::try_remove(path.get_lock_path());
-}
-
-
-// FIXME:
-// At the moment this test does not work on windows when run as a virtual machine.
-TEST(Shared_StaleLockFileRenamed)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    std::string lock_path   = path.get_lock_path();
-    std::string lock_path_2 = path.get_lock_path() + ".backup";
-    File::try_remove(lock_path_2);
-    bool no_create = false;
-    {
-        // create lock file
-        SharedGroup sg(path, no_create, SharedGroup::durability_Full, crypt_key());
-#ifdef _WIN32
-        // Requires ntfs to work
-        if (!CreateHardLinkA(lock_path_2.c_str(), lock_path.c_str(), 0)) {
-            std::cerr << "Creating a hard link failed, test abandoned" << std::endl;
-            return;
-        }
-#else
-        if (link(lock_path.c_str(), lock_path_2.c_str())) {
-            std::cerr << "Creating a hard link failed, test abandoned" << std::endl;
-            return;
-        }
-#endif
-    }
-    File::move(lock_path_2, lock_path);
-    // FIXME: Why is it ok to replace the lock file with a new file?
-    // Why must it be ok? Explanation is needed here!
-    {
-        SharedGroup sg(path, no_create, SharedGroup::durability_Full, crypt_key());
-    }
-
-    // Verify that the `lock` file is not left behind
-    CHECK(!File::exists(lock_path));
-}
-#endif
 
 TEST(Shared_InitialMem)
 {
@@ -464,11 +359,6 @@ TEST(Shared_InitialMem)
     // In MemOnly mode, the database file must be automatically
     // removed.
     CHECK(!File::exists(path));
-
-#ifdef LOCKFILE_CLEANUP
-    // Verify that the `lock` file is not left behind
-    CHECK(!File::exists(path.get_lock_path()));
-#endif
 }
 
 
@@ -549,11 +439,6 @@ TEST(Shared_Initial2)
             CHECK_EQUAL("test", t1[0].fourth);
         }
     }
-
-#ifdef LOCKFILE_CLEANUP
-    // Verify that the `lock` file is not left behind
-    CHECK(!File::exists(path.get_lock_path()));
-#endif
 }
 
 
@@ -597,11 +482,6 @@ TEST(Shared_Initial2_Mem)
             CHECK_EQUAL("test", t1[0].fourth);
         }
     }
-
-#ifdef LOCKFILE_CLEANUP
-    // Verify that the `lock` file is not left behind
-    CHECK(!File::exists(path.get_lock_path()));
-#endif
 }
 
 
@@ -700,11 +580,6 @@ TEST(Shared_1)
             CHECK_EQUAL(third_timestamp_value, t3[2].fifth);
         }
     }
-
-#ifdef LOCKFILE_CLEANUP
-    // Verify that lock file was deleted after use
-    CHECK(!File::exists(path.get_lock_path()));
-#endif
 }
 
 
@@ -773,11 +648,6 @@ TEST(Shared_Rollback)
             CHECK_EQUAL("test", t[0].fourth);
         }
     }
-
-#ifdef LOCKFILE_CLEANUP
-    // Verify that lock file was deleted after use
-    CHECK(!File::exists(path.get_lock_path()));
-#endif
 }
 
 
@@ -815,11 +685,6 @@ TEST(Shared_Writes)
             CHECK_EQUAL(100, v);
         }
     }
-
-#ifdef LOCKFILE_CLEANUP
-    // Verify that lock file was deleted after use
-    CHECK(!File::exists(path.get_lock_path()));
-#endif
 }
 
 
@@ -1251,7 +1116,7 @@ TEST(Shared_WritesSpecialOrder)
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
 
-    const int num_rows = 5; // FIXME: Should be strictly greater than REALM_MAX_BPNODE_SIZE, but that takes a loooooong time!
+    const int num_rows = 5; // FIXME: Should be strictly greater than REALM_MAX_BPNODE_SIZE, but that takes too long time.
     const int num_reps = 25;
 
     {
@@ -1366,11 +1231,6 @@ TEST(Shared_WriterThreads)
             }
         }
     }
-
-#ifdef LOCKFILE_CLEANUP
-    // Verify that lock file was deleted after use
-    CHECK(!File::exists(path.get_lock_path()));
-#endif
 }
 
 
@@ -2114,7 +1974,7 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
     SHARED_GROUP_TEST_PATH(alone_path);
 
     // wait for any daemon hanging around to exit
-    usleep(100); // FIXME: Weird! Is this really acceptable?
+    usleep(100); // FIXME: Is this really acceptable?
 
 #if TEST_DURATION < 1
     multiprocess_make_table(path, path.get_lock_path(), alone_path, 4);

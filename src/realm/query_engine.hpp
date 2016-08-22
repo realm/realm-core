@@ -993,7 +993,7 @@ public:
 protected:
     util::Optional<std::string> m_value;
 
-    const ColumnBase* m_condition_column;
+    const ColumnBase* m_condition_column = nullptr;
     ColumnType m_column_type;
 
     // Used for linear scan through short/long-string

@@ -134,7 +134,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
             // If item is in middle of the column, we just clear it to avoid
             // having to adjust refs to following items
             //
-            // FIXME: this is a leak. We should adjust
+            // FIXME: this is a leak. We should adjust (not important, Mixed is not officially supported)
             size_t data_ndx = size_t(uint64_t(m_data->get(row_ndx)) >> 1);
             const bool is_last = data_ndx == m_binary_data->size() - 1;
             if (is_last) {
@@ -142,7 +142,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
             }
             else {
                 // FIXME: But this will lead to unbounded in-file leaking in
-                // for(;;) { insert_binary(i, ...); erase(i); }
+                // for(;;) { insert_binary(i, ...); erase(i); }  (not important, Mixed is not officially supported)
                 m_binary_data->set(data_ndx, BinaryData());
             }
             goto carry_on;
@@ -155,7 +155,8 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
             }
             else {
                 // FIXME: But this will lead to unbounded in-file leaking in
-                // for(;;) { insert_binary(i, ...); erase(i); }
+                // for(;;) { insert_binary(i, ...); erase(i); }  
+                // (not important because Mixed is not officially supported)
                 m_timestamp_data->set(data_row_ndx, Timestamp(null{}));
             }
             goto carry_on;
@@ -421,13 +422,13 @@ ref_type MixedColumn::create(Allocator& alloc, size_t size)
     {
         int_fast64_t v = mixcol_Int;
         ref_type ref = IntegerColumn::create(alloc, Array::type_Normal, size, v); // Throws
-        v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
+        v = from_ref(ref);
         top.add(v); // Throws
     }
     {
         int_fast64_t v = 1; // 1 + 2*value where value is 0
         ref_type ref = IntegerColumn::create(alloc, Array::type_HasRefs, size, v); // Throws
-        v = int_fast64_t(ref); // FIXME: Dangerous cast (unsigned -> signed)
+        v = from_ref(ref);
         top.add(v); // Throws
     }
 
@@ -438,7 +439,7 @@ ref_type MixedColumn::create(Allocator& alloc, size_t size)
 ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
                             size_t table_size, _impl::OutputStream& out) const
 {
-    // FIXME: Oops, there is no reasonably efficient way to implement this. The
+    // FIXME:There is no reasonably efficient way to implement this. The
     // problem is that we have no guarantees about how the order of entries in
     // m_binary_data relate to the order of entries in the column.
     //
@@ -454,9 +455,10 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
     //
     // Unfortunately this will break the file format compatibility.
     //
-    // The fact that the current design has other serious flaws (se FIXMEs in
+    // The fact that the current design has other flaws (se FIXMEs in
     // MixedColumn::clear_value()) makes it even more urgent to change the
-    // representation and implementation of MixedColumn.
+    // representation and implementation of MixedColumn. Note however, that
+    // Mixed is not currently publicly supported.
     //
     // In fact, there is yet another problem with the current design, it relies
     // on the ability of a column to know its own size. While this is not an
@@ -480,15 +482,15 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
     _impl::ShallowArrayDestroyGuard dg(&top);
     top.create(Array::type_HasRefs); // Throws
     {
-        int_fast64_t v(types_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(from_ref(types_ref));
         top.add(v); // Throws
     }
     {
-        int_fast64_t v(data_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(from_ref(data_ref));
         top.add(v); // Throws
     }
     if (binary_data_ref != 0) {
-        int_fast64_t v(binary_data_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(from_ref(binary_data_ref));
         top.add(v); // Throws
     }
 

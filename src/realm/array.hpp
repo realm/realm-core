@@ -240,7 +240,7 @@ protected:
 ///
 /// FIXME: This class currently has fragments of ownership, in particular the
 /// constructors that allocate underlying memory. On the other hand, the
-/// destructor never frees the memory. This is a disastrous situation, because
+/// destructor never frees the memory. This is a problematic situation, because
 /// it so easily becomes an obscure source of leaks. There are three options for
 /// a fix of which the third is most attractive but hardest to implement: (1)
 /// Remove all traces of ownership semantics, that is, remove the constructors
@@ -328,8 +328,6 @@ public:
     /// the specified target allocator and return just the reference to the
     /// underlying memory.
     MemRef clone_deep(Allocator& target_alloc) const;
-
-    void move_assign(Array&) noexcept; // Move semantics for assignment
 
     /// Construct an empty integer array of the specified type, and return just
     /// the reference to the underlying memory.
@@ -2089,22 +2087,6 @@ inline MemRef Array::clone_deep(Allocator& target_alloc) const
     return clone(MemRef(header, m_ref, m_alloc), m_alloc, target_alloc); // Throws
 }
 
-inline void Array::move_assign(Array& a) noexcept
-{
-    REALM_ASSERT_3(&get_alloc(), ==, &a.get_alloc());
-    // FIXME: Be carefull with the old parent info here. Should it be
-    // copied?
-
-    // FIXME: It will likely be a lot better for the optimizer if we
-    // did a member-wise copy, rather than recreating the state from
-    // the referenced data. This is important because TableView efficiency, for
-    // example, relies on long chains of moves to be optimized away
-    // completely. This change should be a 'no-brainer'.
-    destroy_deep();
-    init_from_ref(a.get_ref());
-    a.detach();
-}
-
 inline MemRef Array::create_empty_array(Type type, bool context_flag, Allocator& alloc)
 {
     size_t size = 0;
@@ -2182,7 +2164,7 @@ inline bool Array::is_empty() const noexcept
 inline size_t Array::get_max_byte_size(size_t num_elems) noexcept
 {
     int max_bytes_per_elem = 8;
-    return header_size + num_elems * max_bytes_per_elem; // FIXME: Prone to overflow
+    return header_size + num_elems * max_bytes_per_elem;
 }
 
 inline void Array::update_parent()
@@ -2919,7 +2901,6 @@ bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, siz
         chunk >>= 2;
     }
     else if (width == 4) {
-        // 128 ms:
         if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
         if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
@@ -2953,12 +2934,8 @@ bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, siz
         chunk >>= 4;
         if (gt ? static_cast<int64_t>(chunk & 0xf) > v : static_cast<int64_t>(chunk & 0xf) < v) {if (!find_action<action, Callback>( 15 + baseindex, static_cast<int64_t>(chunk & 0xf), state, callback)) return false;}
         chunk >>= 4;
-
-        // 187 ms:
-        // if (gt ? static_cast<int64_t>(chunk >> 0*4) & 0xf > v : static_cast<int64_t>(chunk >> 0*4) & 0xf < v) return 0;
     }
     else if (width == 8) {
-        // 88 ms:
         if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
         chunk >>= 8;
         if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
@@ -2975,9 +2952,6 @@ bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, siz
         chunk >>= 8;
         if (gt ? static_cast<int8_t>(chunk) > v : static_cast<int8_t>(chunk) < v) {if (!find_action<action, Callback>( 7 + baseindex, static_cast<int8_t>(chunk), state, callback)) return false;}
         chunk >>= 8;
-
-        //97 ms ms:
-        // if (gt ? static_cast<int8_t>(chunk >> 0*8) > v : static_cast<int8_t>(chunk >> 0*8) < v) return 0;
     }
     else if (width == 16) {
 
@@ -2985,55 +2959,6 @@ bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, siz
         if (gt ? static_cast<short int>(chunk >> 1 * 16) > v : static_cast<short int>(chunk >> 1 * 16) < v) {if (!find_action<action, Callback>( 1 + baseindex, static_cast<short int>(chunk >> 1 * 16), state, callback)) return false;};
         if (gt ? static_cast<short int>(chunk >> 2 * 16) > v : static_cast<short int>(chunk >> 2 * 16) < v) {if (!find_action<action, Callback>( 2 + baseindex, static_cast<short int>(chunk >> 2 * 16), state, callback)) return false;};
         if (gt ? static_cast<short int>(chunk >> 3 * 16) > v : static_cast<short int>(chunk >> 3 * 16) < v) {if (!find_action<action, Callback>( 3 + baseindex, static_cast<short int>(chunk >> 3 * 16), state, callback)) return false;};
-
-        /*
-        // Faster but disabled due to bug in VC2010 compiler (fixed in 2012 toolchain) where last 'if' is errorneously optimized away
-        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(0 + baseindex); else return 0;} chunk >>= 16;
-        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(1 + baseindex); else return 1;} chunk >>= 16;
-        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(2 + baseindex); else return 2;} chunk >>= 16;
-        if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {if (!state->add_positive_local(3 + baseindex); else return 3;} chunk >>= 16;
-
-        // Following illustrates it:
-        #include <stdint.h>
-        #include <stdio.h>
-        #include <stdlib.h>
-
-        size_t bug(int64_t v, uint64_t chunk)
-        {
-            bool gt = true;
-
-            if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {return 0;} chunk >>= 16;
-            if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {return 1;} chunk >>= 16;
-            if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {return 2;} chunk >>= 16;
-            if (gt ? static_cast<short int>chunk > v : static_cast<short int>chunk < v) {return 3;} chunk >>= 16;
-
-            return -1;
-        }
-
-        int main(int argc, char const *const argv[])
-        {
-            int64_t v;
-            FIXME: We cannot use rand() as it is not thread-safe.
-            if (rand()*rand() == 3) {
-                v = rand()*rand()*rand()*rand()*rand();
-                printf("Change '3' to something else and run test again\n");
-            }
-            else {
-                v = 0x2222000000000000ULL;
-            }
-
-            size_t idx;
-
-            idx = bug(200, v);
-            if (idx != 3)
-                printf("Compiler failed: idx == %d (expected idx == 3)\n", idx);
-
-            v = 0x2222000000000000ULL;
-            idx = bug(200, v);
-            if (idx == 3)
-                printf("Touching v made it work\n", idx);
-        }
-        */
     }
     else if (width == 32) {
         if (gt ? static_cast<int>(chunk) > v : static_cast<int>(chunk) < v) {if (!find_action<action, Callback>( 0 + baseindex, static_cast<int>(chunk), state, callback)) return false;}
@@ -3049,11 +2974,10 @@ bool Array::find_gtlt(int64_t v, uint64_t chunk, QueryState<int64_t>* state, siz
 }
 
 
+/// Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
 template<bool eq, Action action, size_t width, class Callback>
 inline bool Array::compare_equality(int64_t value, size_t start, size_t end, size_t baseindex, QueryState<int64_t>* state, Callback callback) const
 {
-    // Find items in this Array that are equal (eq == true) or different (eq = false) from 'value'
-
     REALM_ASSERT_DEBUG(start <= m_size && (end <= m_size || end == size_t(-1)) && start <= end);
 
     size_t ee = round_up(start, 64 / no0(width));
@@ -3147,9 +3071,8 @@ bool Array::find_sse(int64_t value, __m128i* data, size_t items, QueryState<int6
 {
     __m128i search = {0};
 
-    // FIXME: Lasse, should these casts not be to int8_t, int16_t, int32_t respecitvely?
     if (width == 8)
-        search = _mm_set1_epi8(static_cast<char>(value)); // FIXME: Lasse, Should this not be a cast to 'signed char'?
+        search = _mm_set1_epi8(static_cast<char>(value));
     else if (width == 16)
         search = _mm_set1_epi16(static_cast<short int>(value));
     else if (width == 32)
@@ -3216,9 +3139,6 @@ REALM_FORCEINLINE bool Array::find_sse_intern(__m128i* action_data, __m128i* dat
 
         if (std::is_same<cond, NotEqual>::value)
             resmask = ~resmask & 0x0000ffff;
-
-//        if (resmask != 0)
-//            printf("resmask=%d\n", resmask);
 
         size_t s = i * sizeof (__m128i) * 8 / no0(width);
 
@@ -3354,97 +3274,6 @@ bool Array::compare_leafs_4(const Array* foreign, size_t start, size_t end, size
         }
     }
 #endif
-
-
-#if 0 // this method turned out to be 33% slower than a naive loop. Find out why
-
-    // index from which both arrays are 64-bit aligned
-    size_t a = round_up(start, 8 * sizeof (int64_t) / (width < foreign_width ? width : foreign_width));
-
-    while (start < end && start < a) {
-        int64_t v = get_universal<width>(m_data, start);
-        int64_t fv = get_universal<foreign_width>(foreign_m_data, start);
-
-        if (v == fv)
-            r++;
-
-        start++;
-    }
-
-    if (start >= end)
-        return r;
-
-    uint64_t chunk;
-    uint64_t fchunk;
-
-    size_t unroll_outer = (foreign_width > width ? foreign_width : width) / (foreign_width < width ? foreign_width : width);
-    size_t unroll_inner = 64 / (foreign_width > width ? foreign_width : width);
-
-    while (start + unroll_outer * unroll_inner < end) {
-
-        // fetch new most narrow chunk
-        if (foreign_width <= width)
-            fchunk = *reinterpret_cast<int64_t*>(foreign_m_data + start * foreign_width / 8);
-        else
-            chunk = *reinterpret_cast<int64_t*>(m_data + start * width / 8);
-
-        for (size_t uo = 0; uo < unroll_outer; uo++) {
-
-            // fetch new widest chunk
-            if (foreign_width > width)
-                fchunk = *reinterpret_cast<int64_t*>(foreign_m_data + start * foreign_width / 8);
-            else
-                chunk = *reinterpret_cast<int64_t*>(m_data + start * width / 8);
-
-            size_t newstart = start + unroll_inner;
-            while (start < newstart) {
-
-                // Isolate first value from chunk
-                int64_t v = (chunk << (64 - width)) >> (64 - width);
-                int64_t fv = (fchunk << (64 - foreign_width)) >> (64 - foreign_width);
-                chunk >>= width;
-                fchunk >>= foreign_width;
-
-                // Sign extend if required
-                v = (width <= 4) ? v : (width == 8) ? int8_t(v) : (width == 16) ? int16_t(v) : (width == 32) ? int32_t(v) : int64_t(v);
-                fv = (foreign_width <= 4) ? fv : (foreign_width == 8) ? int8_t(fv) : (foreign_width == 16) ? int16_t(fv) : (foreign_width == 32) ? int32_t(fv) : int64_t(fv);
-
-                if (v == fv)
-                    r++;
-
-                start++;
-
-            }
-
-
-        }
-    }
-#endif
-
-
-
-    /*
-        // Unrolling helped less than 2% (non-frequent matches). Todo, investigate further
-        while (start + 1 < end) {
-            int64_t v = get_universal<width>(m_data, start);
-            int64_t v2 = get_universal<width>(m_data, start + 1);
-
-            int64_t fv = get_universal<foreign_width>(foreign_m_data, start);
-            int64_t fv2 = get_universal<foreign_width>(foreign_m_data, start + 1);
-
-            if (c(v, fv)) {
-                if (!find_action<action, Callback>(start + baseindex, v, state, callback))
-                    return false;
-            }
-
-            if (c(v2, fv2)) {
-                if (!find_action<action, Callback>(start + 1 + baseindex, v2, state, callback))
-                    return false;
-            }
-
-            start += 2;
-        }
-     */
 
     while (start < end) {
         int64_t v = get_universal<width>(m_data, start);

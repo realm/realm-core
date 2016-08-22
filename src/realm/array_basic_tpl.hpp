@@ -132,6 +132,7 @@ template<class T>
 inline bool BasicArray<T>::is_null(size_t ndx) const noexcept
 {
     // FIXME: This assumes BasicArray will only ever be instantiated for float-like T.
+    static_assert(realm::is_any<T, float, double>::value, "T can only be float or double");
     auto x = get(ndx);
     return null::is_null_float(x);
 }
@@ -141,10 +142,8 @@ template<class T>
 inline T BasicArray<T>::get(const char* header, size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
-    // FIXME: This casting assumes that T can be aliged on an 8-bype
-    // boundary (since data is aligned on an 8-byte boundary.) This
-    // restricts portability. The same problem recurs several times in
-    // the remainder of this file.
+    // This casting assumes that T can be aliged on an 8-bype
+    // boundary (since data is aligned on an 8-byte boundary.) 
     return *(reinterpret_cast<const T*>(data) + ndx);
 }
 
@@ -257,14 +256,12 @@ size_t BasicArray<T>::calc_byte_len(size_t for_size, size_t) const
     // is done by returning the aligned version, and most callers of
     // calc_byte_len() will actually benefit if calc_byte_len() was
     // changed to always return the aligned byte size.
-    return header_size + for_size * sizeof (T); // FIXME: Prone to overflow
+    return header_size + for_size * sizeof (T); 
 }
 
 template<class T>
 size_t BasicArray<T>::calc_item_count(size_t bytes, size_t) const noexcept
 {
-    // FIXME: ??? what about width = 0? return -1?
-
     size_t bytes_without_header = bytes - header_size;
     return bytes_without_header / sizeof (T);
 }
@@ -421,6 +418,7 @@ inline size_t BasicArray<T>::calc_aligned_byte_size(size_t size)
 
 #ifdef REALM_DEBUG
 
+// LCOV_EXCL_START
 template<class T>
 void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
 {
@@ -451,6 +449,7 @@ void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
 
     to_dot_parent_edge(out);
 }
+// LCOV_EXCL_STOP
 
 #endif // REALM_DEBUG
 

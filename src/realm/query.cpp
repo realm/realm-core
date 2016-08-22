@@ -140,7 +140,7 @@ Query::~Query() noexcept = default;
 Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
     : m_table(TableRef()), m_source_link_view(LinkViewRef())
 {
-    Table::generate_patch(source.m_table, patch.m_table);
+    Table::generate_patch(source.m_table.get(), patch.m_table);
     if (source.m_source_table_view) {
         m_owned_source_table_view =
             source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
@@ -160,7 +160,7 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
 Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
     : m_table(TableRef()), m_source_link_view(LinkViewRef())
 {
-    Table::generate_patch(source.m_table, patch.m_table);
+    Table::generate_patch(source.m_table.get(), patch.m_table);
     if (source.m_source_table_view) {
         m_owned_source_table_view =
             source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
@@ -195,7 +195,7 @@ void Query::set_table(TableRef tr)
             root->set_table(*m_table);
     }
     else {
-        m_current_descriptor.reset(nullptr);
+        m_current_descriptor.reset();
     }
 }
 

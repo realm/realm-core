@@ -254,9 +254,6 @@ public:
     /// offsets, as long as the cucrrent process is not forked.
     void seek(SizeType);
 
-    // Return file position (like ftell())
-    SizeType get_file_position();
-
     /// Flush in-kernel buffers to disk. This blocks the caller until the
     /// synchronization operation is complete. On POSIX systems this function
     /// calls `fsync()`. On Apple platforms if calls `fcntl()` with command
@@ -422,7 +419,7 @@ public:
     /// not, this function has undefined behavior.
     bool is_same_file(const File&) const;
 
-    // FIXME: Can we get rid of this one please!!!
+    // FIXME: Get rid of this method
     bool is_removed() const;
 
     /// Resolve the specified path against the specified base directory.
@@ -495,6 +492,8 @@ private:
 #ifdef _WIN32
     void* m_handle;
     bool m_have_lock; // Only valid when m_handle is not null
+
+    SizeType get_file_position();  // POSIX version not needed because it's only used by Windows version of resize().
 #else
     int m_fd;
 #endif

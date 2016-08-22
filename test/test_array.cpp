@@ -601,6 +601,15 @@ TEST(Array_FindAllInt0)
         a.add(0);
     }
 
+    r.clear();
+    a.find_all(&r, 1, 0, 0, 0);
+    CHECK_EQUAL(0, r.size());
+
+    r.clear();
+    a.find_all(&r, 1, 0, vReps - 1, vReps - 1);
+    CHECK_EQUAL(0, r.size());
+
+    r.clear();
     a.find_all(&r, value);
     CHECK_EQUAL(vReps, r.size());
 

@@ -476,6 +476,12 @@ bool TestList::run(Config config)
         // First execute regular (concurrent) tests
         {
             auto thread = [&](int i) {
+                {
+                    std::ostringstream out;
+                    out.imbue(std::locale::classic());
+                    out << "test-thread-"<<(i+1);
+                    Thread::set_name(out.str());
+                }
                 thread_contexts[i]->run();
             };
             std::unique_ptr<Thread[]> threads(new Thread[num_threads]);

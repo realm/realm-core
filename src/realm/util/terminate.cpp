@@ -21,6 +21,7 @@
 #include <iostream>
 #include <sstream>
 #include <realm/util/features.h>
+#include <realm/util/thread.hpp>
 
 #if REALM_PLATFORM_APPLE
     #include <asl.h>
@@ -111,6 +112,9 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
     ss << "IMPORTANT: if you see this error, please send this log to help@realm.io.";
 #ifdef REALM_DEBUG
     std::cerr << ss.rdbuf() << '\n';
+    std::string thread_name;
+    if (Thread::get_name(thread_name))
+        std::cerr << "Thread name: "<<thread_name<<"\n";
 #endif
 
     if (termination_notification_callback) {

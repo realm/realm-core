@@ -424,16 +424,13 @@ DescriptorRef Table::get_descriptor()
         return parent->get_descriptor()->get_subdescriptor(col_ndx); // Throws
     }
 
-    DescriptorRef desc;
-    if (!m_descriptor) {
+    DescriptorRef desc = m_descriptor.lock();
+    if (!desc) {
         typedef _impl::DescriptorFriend df;
-        desc.reset(df::create()); // Throws
-        Descriptor* parent = nullptr;
+        desc = df::create(); // Throws
+        DescriptorRef parent = nullptr;
         df::attach(*desc, this, parent, &m_spec);
-        m_descriptor = desc.get();
-    }
-    else {
-        desc.reset(m_descriptor);
+        m_descriptor = desc;
     }
     return desc;
 }
@@ -1376,12 +1373,12 @@ void Table::discard_child_accessors() noexcept
 
 void Table::discard_desc_accessor() noexcept
 {
-    if (m_descriptor) {
-        // Must hold a reliable reference count while detaching
-        DescriptorRef desc(m_descriptor);
+    // Must hold a reliable reference count while detaching
+    DescriptorRef desc = m_descriptor.lock();
+    if (desc) {
         typedef _impl::DescriptorFriend df;
         df::detach(*desc);
-        m_descriptor = nullptr;
+        m_descriptor.reset();
     }
 }
 
@@ -1995,7 +1992,7 @@ ref_type Table::create_empty_table(Allocator& alloc)
     {
         MemRef mem = Spec::create_empty_spec(alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous case (unsigned -> signed)
+        int_fast64_t v(from_ref(mem.get_ref()));
         top.add(v); // Throws
         dg_2.release();
     }
@@ -2003,7 +2000,7 @@ ref_type Table::create_empty_table(Allocator& alloc)
         bool context_flag = false;
         MemRef mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous case (unsigned -> signed)
+        int_fast64_t v(from_ref(mem.get_ref()));
         top.add(v); // Throws
         dg_2.release();
     }
@@ -2084,14 +2081,14 @@ ref_type Table::clone(Allocator& alloc) const
     {
         MemRef mem = m_spec.m_top.clone_deep(alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(from_ref(mem.get_ref()));
         new_top.add(v); // Throws
         dg_2.release();
     }
     {
         MemRef mem = m_columns.clone_deep(alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(from_ref(mem.get_ref()));
         new_top.add(v); // Throws
         dg_2.release();
     }
@@ -4289,7 +4286,8 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
 
 TableView Table::get_backlink_view(size_t row_ndx, Table* src_table, size_t src_col_ndx)
 {
-    TableView tv(src_table, this, src_col_ndx, get(row_ndx));
+    REALM_ASSERT(&src_table->get_column_link_base(src_col_ndx).get_target_table() == this);
+    TableView tv(src_table, src_col_ndx, get(row_ndx));
     tv.do_sync();
     return tv;
 }
@@ -4497,7 +4495,7 @@ public:
             size_t table_size = m_table.size();
             for (auto& column : m_table.m_cols) {
                 ref_type ref = column->write(m_offset, m_size, table_size, out); // Throws
-                int_fast64_t ref_2(ref); // FIXME: Dangerous cast (unsigned -> signed)
+                int_fast64_t ref_2(from_ref(ref));
                 column_refs.add(ref_2); // Throws
             }
             bool deep = false; // Shallow
@@ -4511,9 +4509,9 @@ public:
             Array table_top(alloc);
             table_top.create(Array::type_HasRefs); // Throws
             _impl::ShallowArrayDestroyGuard dg(&table_top);
-            int_fast64_t spec_ref_2(spec_ref); // FIXME: Dangerous cast (unsigned -> signed)
+            int_fast64_t spec_ref_2(from_ref(spec_ref));
             table_top.add(spec_ref_2); // Throws
-            int_fast64_t columns_ref_2(columns_ref); // FIXME: Dangerous cast (unsigned -> signed)
+            int_fast64_t columns_ref_2(from_ref(columns_ref));
             table_top.add(columns_ref_2); // Throws
             bool deep = false; // Shallow
             bool only_if_modified = false; // Always
@@ -4524,7 +4522,7 @@ public:
         Array tables(alloc);
         tables.create(Array::type_HasRefs); // Throws
         _impl::ShallowArrayDestroyGuard dg(&tables);
-        int_fast64_t table_top_ref_2(table_top_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t table_top_ref_2(from_ref(table_top_ref));
         tables.add(table_top_ref_2); // Throws
         bool deep = false; // Shallow
         bool only_if_modified = false; // Always
@@ -5781,11 +5779,11 @@ bool Table::is_cross_table_link_target() const noexcept
 }
 
 
-void Table::generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch)
+void Table::generate_patch(const Table* table, std::unique_ptr<HandoverPatch>& patch)
 {
-    if (ref.get()) {
+    if (table) {
         patch.reset(new Table::HandoverPatch);
-        patch->m_table_num = ref.get()->get_index_in_group();
+        patch->m_table_num = table->get_index_in_group();
         // must be group level table!
         if (patch->m_table_num == npos) {
             throw std::runtime_error("Table handover failed: not a group level table");

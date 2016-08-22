@@ -54,23 +54,17 @@ void BpTreeBase::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertB
     // root is still on the compact form.
     REALM_ASSERT(!compact_form || is_append);
     if (compact_form) {
-        // FIXME: Dangerous cast here (unsigned -> signed)
         int_fast64_t v = state.m_split_offset; // elems_per_child
         new_root->add(1 + 2 * v); // Throws
     }
     else {
         Array new_offsets(alloc);
         new_offsets.create(Array::type_Normal); // Throws
-        // FIXME: Dangerous cast here (unsigned -> signed)
         new_offsets.add(state.m_split_offset); // Throws
-        // FIXME: Dangerous cast here (unsigned -> signed)
-        new_root->add(new_offsets.get_ref()); // Throws
+        new_root->add(from_ref(new_offsets.get_ref())); // Throws
     }
-    // FIXME: Dangerous cast here (unsigned -> signed)
     new_root->add(orig_root->get_ref()); // Throws
-    // FIXME: Dangerous cast here (unsigned -> signed)
     new_root->add(new_sibling_ref); // Throws
-    // FIXME: Dangerous cast here (unsigned -> signed)
     int_fast64_t v = state.m_split_size; // total_elems_in_tree
     new_root->add(1 + 2 * v); // Throws
     replace_root(std::move(new_root));
@@ -167,18 +161,18 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
         if (!m_is_on_general_form && force_general_form) {
             if (!m_offsets.is_attached())
                 m_offsets.create(Array::type_Normal); // Throws
-            int_fast64_t v(m_max_elems_per_child); // FIXME: Dangerous cast (unsigned -> signed)
+            int_fast64_t v(m_max_elems_per_child);
             size_t n = m_main.size();
             for (size_t i = 1; i != n; ++i)
                 m_offsets.add(v); // Throws
             m_is_on_general_form = true;
         }
         {
-            int_fast64_t v(child_ref); // FIXME: Dangerous cast (unsigned -> signed)
+            int_fast64_t v(from_ref(child_ref)); 
             m_main.add(v); // Throws
         }
         if (m_is_on_general_form) {
-            int_fast64_t v(m_elems_in_parent); // FIXME: Dangerous cast (unsigned -> signed)
+            int_fast64_t v(m_elems_in_parent); 
             m_offsets.add(v); // Throws
         }
         m_elems_in_parent += elems_in_child;
@@ -187,7 +181,7 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
     }
     else { // First child in this node
         m_main.add(0); // Placeholder for `elems_per_child` or `offsets_ref`
-        int_fast64_t v(child_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(from_ref(child_ref)); 
         m_main.add(v); // Throws
         m_elems_in_parent = elems_in_child;
         m_is_on_general_form = force_general_form; // `invar:bptree-node-form`
@@ -201,18 +195,18 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
 
     // Write this inner node to the output stream
     if (!m_is_on_general_form) {
-        int_fast64_t v(m_max_elems_per_child); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(m_max_elems_per_child);
         m_main.set(0, 1 + 2 * v); // Throws
     }
     else {
         bool deep = true; // Deep
         bool only_if_modified = false; // Always
         ref_type ref = m_offsets.write(m_out, deep, only_if_modified); // Throws
-        int_fast64_t v(ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(from_ref(ref)); 
         m_main.set(0, v); // Throws
     }
     {
-        int_fast64_t v(m_elems_in_parent); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(m_elems_in_parent);
         m_main.add(1 + 2 * v); // Throws
     }
     bool deep = false; // Shallow

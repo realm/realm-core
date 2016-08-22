@@ -109,9 +109,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
             // Hash collisions are okay here because they just result in doing
             // extra work, as opposed to correctness problems
             std::ostringstream ss;
-            // FIXME: getenv() is not classified as thread safe, but I'm
-            // leaving it as is for now.
-            // FIXME: Let's create our own thread-safe version in util.
+            // FIXME: getenv() is not classified as thread safe
             ss << getenv("TMPDIR");
             ss << "realm_" << std::hash<std::string>()(m_resource_path) << ".cv";
             m_resource_path = ss.str();
