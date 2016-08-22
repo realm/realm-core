@@ -58,7 +58,8 @@ struct SharedGroupOptions {
     /// upgrade (rollback the transaction) but the SharedGroup will not be opened.
     std::function<void(int,int)> upgrade_callback = std::function<void(int,int)>();
 
-    /// A directory where Realm can write temporary files or pipes to.
+    /// A path to a directory where Realm can write temporary files or pipes to.
+    /// This string should include a trailing slash '/'.
     std::string temp_dir = sys_tmp_dir;
 private:
     const static std::string sys_tmp_dir;

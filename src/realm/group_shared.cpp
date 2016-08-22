@@ -1047,11 +1047,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file,
             }
 
 #ifndef _WIN32
-            m_new_commit_available.set_shared_part(info->new_commit_available,m_lockfile_prefix,"new_commit");
+            m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit", options.temp_dir);
 #ifdef REALM_ASYNC_DAEMON
-            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready,m_lockfile_prefix,"daemon_ready");
-            m_work_to_do.set_shared_part(info->work_to_do,m_lockfile_prefix,"work_ready");
-            m_room_to_write.set_shared_part(info->room_to_write,m_lockfile_prefix,"allow_write");
+            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix, "daemon_ready", options.temp_dir);
+            m_work_to_do.set_shared_part(info->work_to_do, m_lockfile_prefix, "work_ready", options.temp_dir);
+            m_room_to_write.set_shared_part(info->room_to_write, m_lockfile_prefix, "allow_write", options.temp_dir);
             // In async mode, we need to make sure the daemon is running and ready:
             if (options.durability == SharedGroupOptions::durability_Async && !is_backend) {
                 while (info->daemon_ready == 0) {

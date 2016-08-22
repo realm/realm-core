@@ -89,7 +89,7 @@ InterprocessCondVar::~InterprocessCondVar() noexcept
 
 
 void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path,
-                                          std::string condvar_name)
+                                          std::string condvar_name, std::string tmp_path)
 {
     close();
     uses_emulation = true;
@@ -109,8 +109,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
             // Hash collisions are okay here because they just result in doing
             // extra work, as opposed to correctness problems
             std::ostringstream ss;
-            // FIXME: getenv() is not classified as thread safe
-            ss << getenv("TMPDIR");
+            ss << tmp_path;
             ss << "realm_" << std::hash<std::string>()(m_resource_path) << ".cv";
             m_resource_path = ss.str();
             ret = mkfifo(m_resource_path.c_str(), 0600);
