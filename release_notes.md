@@ -1,18 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
+# 2.0.0-rc0 Release notes
 
 ### Internals
 
