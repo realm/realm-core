@@ -181,8 +181,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         std::unique_ptr<Replication> hist_r(make_client_history(path, key));
         std::unique_ptr<Replication> hist_w(make_client_history(path, key));
 
-        SharedGroup sg_r(*hist_r, {Durability::durability_Full, key});
-        SharedGroup sg_w(*hist_w, {Durability::durability_Full, key});
+        SharedGroup sg_r(*hist_r, {SharedGroupOptions::durability_Full, key});
+        SharedGroup sg_w(*hist_w, {SharedGroupOptions::durability_Full, key});
         Group& g = const_cast<Group&>(sg_w.begin_write());
         Group& g_r = const_cast<Group&>(sg_r.begin_read());
         std::vector<TableView> table_views;

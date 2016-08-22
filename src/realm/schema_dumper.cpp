@@ -247,7 +247,7 @@ void SchemaDumper::open()
     }
 
     m_sg.open(m_config.path, dont_create,
-            {realm::Durability::durability_Full, encryption_key, upgrade_file_format});
+            {realm::SharedGroupOptions::durability_Full, encryption_key, upgrade_file_format});
 }
 
 } // unnamed namespace

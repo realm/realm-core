@@ -9426,8 +9426,8 @@ TEST(Query_TableInitialization)
 
     auto repl = make_in_realm_history(path);
     auto repl2 = make_in_realm_history(path);
-    SharedGroup sg(*repl, {Durability::durability_MemOnly});
-    SharedGroup sg2(*repl2, {Durability::durability_MemOnly});
+    SharedGroup sg(*repl, {SharedGroupOptions::durability_MemOnly});
+    SharedGroup sg2(*repl2, {SharedGroupOptions::durability_MemOnly});
     Group& g = const_cast<Group&>(sg.begin_read());
     LangBindHelper::promote_to_write(sg);
 

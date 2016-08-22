@@ -6846,7 +6846,7 @@ TEST(Table_StaleLinkIndexOnTableRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist, {Durability::durability_Full, crypt_key()});
+    SharedGroup sg_w(*hist, {SharedGroupOptions::durability_Full, crypt_key()});
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);

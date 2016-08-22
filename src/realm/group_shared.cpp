@@ -51,7 +51,7 @@
 
 using namespace realm;
 using namespace realm::util;
-
+using Durability = SharedGroupOptions::Durability;
 
 namespace {
 
@@ -505,7 +505,7 @@ struct alignas(8) SharedGroup::SharedInfo {
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
 
-    SharedInfo(Durability::Level, Replication::HistoryType);
+    SharedInfo(Durability, Replication::HistoryType);
     ~SharedInfo() noexcept {}
 
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
@@ -524,7 +524,7 @@ struct alignas(8) SharedGroup::SharedInfo {
 };
 
 
-SharedGroup::SharedInfo::SharedInfo(Durability::Level dura, Replication::HistoryType hist_type):
+SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType hist_type):
     size_of_mutex(sizeof(shared_writemutex)),
 #ifndef _WIN32
     size_of_condvar(sizeof(room_to_write)),
@@ -931,7 +931,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file,
             // if we're opening a MemOnly file that isn't already opened by
             // someone else then it's a file which should have been deleted on
             // close previously, but wasn't (perhaps due to the process crashing)
-            cfg.clear_file = options.durability == Durability::durability_MemOnly && begin_new_session;
+            cfg.clear_file = options.durability == SharedGroupOptions::durability_MemOnly && begin_new_session;
 
             cfg.encryption_key = options.encryption_key;
             ref_type top_ref;
@@ -1053,7 +1053,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file,
             m_work_to_do.set_shared_part(info->work_to_do,m_lockfile_prefix,"work_ready");
             m_room_to_write.set_shared_part(info->room_to_write,m_lockfile_prefix,"allow_write");
             // In async mode, we need to make sure the daemon is running and ready:
-            if (options.durability == Durability::durability_Async && !is_backend) {
+            if (options.durability == SharedGroupOptions::durability_Async && !is_backend) {
                 while (info->daemon_ready == 0) {
                     if (info->daemon_started == 0) {
                         spawn_daemon(path);
@@ -1092,7 +1092,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file,
     // std::cerr << "open completed" << std::endl;
 
 #ifdef REALM_ASYNC_DAEMON
-    if (options.durability == Durability::durability_Async) {
+    if (options.durability == SharedGroupOptions::durability_Async) {
         if (is_backend) {
             do_async_commits();
         }
@@ -1139,7 +1139,7 @@ bool SharedGroup::compact()
     if (m_transact_stage != transact_Ready) {
         throw std::runtime_error(m_db_path + ": compact is not supported whithin a transaction");
     }
-    Durability::Level dura;
+    Durability dura;
     {
         std::string tmp_path = m_db_path + ".tmp_compaction_space";
         SharedInfo* info = m_file_map.get_addr();
@@ -1174,7 +1174,7 @@ bool SharedGroup::compact()
             static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
         }
         end_read();
-        dura = Durability::Level(info->durability);
+        dura = Durability(info->durability);
         // We need to release any shared mapping *before* releasing the control mutex.
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
@@ -1182,7 +1182,7 @@ bool SharedGroup::compact()
     }
     close();
 
-    SharedGroupOptions new_options{ dura, m_key, false };
+    SharedGroupOptions new_options{dura, m_key, false};
     do_open(m_db_path, true, false, new_options);
     return true;
 }
@@ -1234,7 +1234,7 @@ void SharedGroup::close() noexcept
 
             // If the db file is just backing for a transient data structure,
             // we can delete it when done.
-            if (info->durability == Durability::durability_MemOnly) {
+            if (info->durability == SharedGroupOptions::durability_MemOnly) {
                 try {
                     util::File::remove(m_db_path.c_str());
                 }
@@ -1878,12 +1878,12 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     ref_type new_top_ref = out.write_group(); // Throws
     // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
     //     << " Read lock at version " << oldest_version << std::endl;
-    switch (Durability::Level(info->durability)) {
-        case Durability::durability_Full:
+    switch (Durability(info->durability)) {
+        case SharedGroupOptions::durability_Full:
             out.commit(new_top_ref); // Throws
             break;
-        case Durability::durability_MemOnly:
-        case Durability::durability_Async:
+        case SharedGroupOptions::durability_MemOnly:
+        case SharedGroupOptions::durability_Async:
             // In durability_MemOnly mode, we just use the file as backing for
             // the shared memory. So we never actually flush the data to disk
             // (the OS may do so opportinisticly, or when swapping). So in this

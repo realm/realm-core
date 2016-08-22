@@ -32,6 +32,7 @@
 #endif
 #include <realm/util/interprocess_mutex.hpp>
 #include <realm/group.hpp>
+#include <realm/group_shared_options.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/impl/transact_log.hpp>
 #include <realm/replication.hpp>
@@ -51,24 +52,6 @@ struct IncompatibleLockFile: std::runtime_error {
         std::runtime_error("Incompatible lock file. " + msg)
     {
     }
-};
-
-namespace Durability {
-enum Level {
-    durability_Full,
-    durability_MemOnly,
-    durability_Async    ///< Not yet supported on windows.
-};
-} // end namespace Durability
-
-struct SharedGroupOptions {
-    Durability::Level durability = Durability::durability_Full;
-    const char* encryption_key = nullptr;
-    bool allow_file_format_upgrade = true;
-    std::function<void(int,int)> upgrade_callback = std::function<void(int,int)>();
-    std::string temp_dir = sys_tmp_dir;
-private:
-    const static std::string sys_tmp_dir;
 };
 
 
@@ -159,14 +142,13 @@ public:
     /// `upgrade_callback` throws, then the file will be closed properly and the
     /// upgrade will be aborted.
     explicit SharedGroup(const std::string& file, bool no_create = false,
-                         SharedGroupOptions options = SharedGroupOptions());
+                         SharedGroupOptions options = {});
 
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and
     /// the upgrade will be aborted.
-    explicit SharedGroup(Replication& repl,
-                         SharedGroupOptions options = SharedGroupOptions());
+    explicit SharedGroup(Replication& repl, SharedGroupOptions options = {});
 
     struct unattached_tag {};
 
@@ -220,11 +202,11 @@ public:
     ///
     /// \throw FileFormatUpgradeRequired only if \a allow_upgrade is `false`
     ///        and an upgrade is required.
-    void open(const std::string& file, bool no_create = false, SharedGroupOptions options = SharedGroupOptions());
+    void open(const std::string& file, bool no_create = false, SharedGroupOptions options = {});
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in existence for as long as the SharedGroup.
-    void open(Replication&, SharedGroupOptions options);
+    void open(Replication&, SharedGroupOptions options = {});
 
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
@@ -772,7 +754,7 @@ struct SharedGroup::BadVersion: std::exception {};
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
                                 SharedGroupOptions options):
     m_group(Group::shared_tag()),
-    m_upgrade_callback(options.upgrade_callback)
+    m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(file, no_create, options); // Throws
 }
@@ -784,7 +766,7 @@ inline SharedGroup::SharedGroup(unattached_tag) noexcept:
 
 inline SharedGroup::SharedGroup(Replication& repl, SharedGroupOptions options):
     m_group(Group::shared_tag()),
-    m_upgrade_callback(options.upgrade_callback)
+    m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(repl, options); // Throws
 }
@@ -1116,11 +1098,11 @@ public:
     static void async_daemon_open(SharedGroup& sg, const std::string& file)
     {
         bool no_create = true;
-        Durability::Level durability = Durability::durability_Async;
         bool is_backend = true;
-        const char* encryption_key = nullptr;
-        bool allow_file_format_upgrade = false;
-        SharedGroupOptions options{ durability, encryption_key, allow_file_format_upgrade };
+        SharedGroupOptions options;
+        options.durability = SharedGroupOptions::durability_Async;
+        options.encryption_key = nullptr;
+        options.allow_file_format_upgrade = false;
         sg.do_open(file, no_create, is_backend, options); // Throws
     }
 
