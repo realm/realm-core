@@ -67,11 +67,16 @@ else()
     list(APPEND SOURCES impl/generic/external_commit_helper.cpp)
 endif()
 
-set(INCLUDE_DIRS ${REALM_CORE_INCLUDE_DIR} ${PEGTL_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+set(INCLUDE_DIRS
+    ${REALM_CORE_INCLUDE_DIR}
+    ${PEGTL_INCLUDE_DIR}
+    ${UV_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR})
 
 # An object library to group together the compilation of the source files.
 add_library(realm-object-store-objects OBJECT ${SOURCES} ${HEADERS})
 add_dependencies(realm-object-store-objects realm)
+target_compile_definitions(realm-object-store-objects PRIVATE ${PLATFORM_DEFINES})
 set_target_properties(realm-object-store-objects PROPERTIES POSITION_INDEPENDENT_CODE 1)
 target_include_directories(realm-object-store-objects PUBLIC ${INCLUDE_DIRS})
 

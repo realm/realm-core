@@ -22,6 +22,7 @@ set(SOURCES
 )
 
 add_executable(tests ${SOURCES} ${HEADERS})
+target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
 target_link_libraries(tests realm-object-store realm ${PLATFORM_LIBRARIES})
 
 create_coverage_target(generate-coverage tests)
