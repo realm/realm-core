@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include <atomic>
+#include <memory>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -32,7 +33,7 @@
 namespace realm {
 namespace util {
 template<typename Callback>
-class EventLoopSignal : std::enable_shared_from_this() {
+class EventLoopSignal : public std::enable_shared_from_this<EventLoopSignal<Callback>> {
 public:
     EventLoopSignal(Callback&& callback)
     : m_callback(std::move(callback))
@@ -50,7 +51,7 @@ public:
         }
 
         if (ALooper_addFd(looper, message_pipe[0], 3 /* LOOPER_ID_USER */,
-                          LOOPER_EVENT_INPUT | ALOOPER_EVENT_HANGUP,
+                          ALOOPER_EVENT_INPUT | ALOOPER_EVENT_HANGUP,
                           &looper_callback, nullptr) != 1) {
             LOGE("Error adding WeakRealmNotifier callback to looper.");
             ::close(message_pipe[0]);
@@ -85,7 +86,7 @@ public:
             // Pass ourself over the pipe so that we can od work on the target
             // thread. This requires forming a new shared_ptr to ensure we
             // continue to exist until then.
-            auto ptr = new shared_ptr<EventLoopSignal>(shared_from_this());
+            auto ptr = new std::shared_ptr<EventLoopSignal>(this->shared_from_this());
             if (write(m_message_pipe.write, &ptr, sizeof(ptr)) != sizeof(ptr)) {
                 delete ptr;
                 LOGE("Buffer overrun when writing to WeakRealmNotifier's ALooper message pipe.");
@@ -108,7 +109,7 @@ private:
         if ((events & ALOOPER_EVENT_INPUT) != 0) {
             std::shared_ptr<EventLoopSignal>* ptr = nullptr;
             while (read(fd, &ptr, sizeof(ptr)) == sizeof(ptr)) {
-                ptr->m_callback();
+                (*ptr)->m_callback();
                 delete ptr;
             }
         }
