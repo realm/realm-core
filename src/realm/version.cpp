@@ -49,6 +49,8 @@ bool Version::is_at_least(int major, int minor, int patch, StringData extra)
 
     if(get_patch() > patch)
         return true;
+    if(get_patch() < patch)
+        return false;
 
     return (get_extra() >= extra);
 }
