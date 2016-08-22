@@ -2364,14 +2364,20 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
     }
 
     // Copy linklist contents from row_ndx to new_row_ndx. row_ndx and
-    // new_row_ndx represent the loser and winner of a PK merge conflict, and
-    // the winner should end up with all the links. If the rule that list
-    // modifications may not be carried out before setting the primary key is
-    // followed, only the winner or the loser will have any list elements at the
-    // time of applying this instruction, but never both. This makes it safe for
-    // the merge algorithm to redirect linklist instructions, because it can
-    // make do with simply redirecting `SetLinkList` instructions, without
-    // having to resynthesize the whole instruction sequence on both sides.
+    // new_row_ndx represent the loser and winner of a PK merge conflict
+    // (respectively), and the winner should end up with all the links.
+    //
+    // A precondition for this logic is that linklist modifications always come
+    // strictly after the primary key has been set, and that the primary key
+    // never changes. This ensures that we never have to merge linklists outside
+    // of operational transform, which we cannot do because we don't have enough
+    // information in Core to perform such a merge.
+    //
+    // Instead, by relying on this invariant it follows that at the point when
+    // a primary key merge conflict is resolved, all linklists of either the
+    // winning or the losing row are empty. This means we can "merge" the rows
+    // by simply moving all elements to the winning row, and rely on OT to
+    // redirect any subsequent linklist operations to the winner.
     for (size_t col_ndx = 0; col_ndx < backlink_col_start; ++col_ndx) {
         if (m_spec.get_column_type(col_ndx) == col_type_LinkList) {
             auto& col = get_column_link_list(col_ndx);
