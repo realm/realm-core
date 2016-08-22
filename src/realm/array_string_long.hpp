@@ -156,9 +156,6 @@ inline StringData ArrayStringLong::get(size_t ndx) const noexcept
 
     size_t begin, end;
     if (0 < ndx) {
-        // FIXME: Consider how much of a performance problem it is,
-        // that we have to issue two separate calls to read two
-        // consecutive values from an array.
         begin = to_size_t(m_offsets.get(ndx-1));
         end   = to_size_t(m_offsets.get(ndx));
     }

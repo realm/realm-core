@@ -209,12 +209,7 @@ void Group::open(BinaryData buffer, bool take_ownership)
     if (is_attached() || m_is_shared)
         throw LogicError(LogicError::wrong_group_state);
 
-    // FIXME: Why do we have to pass a const-unqualified data pointer
-    // to SlabAlloc::attach_buffer()? It seems unnecessary given that
-    // the data is going to become the immutable part of its managed
-    // memory.
-    char* data = const_cast<char*>(buffer.data());
-    ref_type top_ref = m_alloc.attach_buffer(data, buffer.size()); // Throws
+    ref_type top_ref = m_alloc.attach_buffer(buffer.data(), buffer.size()); // Throws
     SlabAlloc::DetachGuard dg(m_alloc);
 
     // Select file format if it is still undecided.
@@ -299,7 +294,6 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
         size_t top_size = m_top.size();
         static_cast<void>(top_size);
 
-        // FIXME: Use a future REALM_ASSERT_EX
         if (top_size < 8) {
             REALM_ASSERT_11(top_size, ==, 3, ||, top_size, ==, 5, ||, top_size, ==, 7);
         }
@@ -862,8 +856,8 @@ void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_
         top.create(Array::type_HasRefs); // Throws
         _impl::ShallowArrayDestroyGuard dg_top(&top);
         // FIXME: We really need an alternative to Array::truncate() that is able to expand.
-        int_fast64_t value_1 = int_fast64_t(names_ref); // FIXME: Problematic unsigned -> signed conversion
-        int_fast64_t value_2 = int_fast64_t(tables_ref); // FIXME: Problematic unsigned -> signed conversion
+        int_fast64_t value_1 = from_ref(names_ref);
+        int_fast64_t value_2 = from_ref(tables_ref);
         top.add(value_1); // Throws
         top.add(value_2); // Throws
         top.add(0); // Throws
@@ -1507,8 +1501,9 @@ public:
                     m_desc = desc;
                     break;
                 }
+                typedef _impl::DescriptorFriend df;
                 size_t col_ndx = path[i];
-                desc = desc->get_subdescriptor(col_ndx);
+                desc = df::get_subdesc_accessor(*desc, col_ndx);
                 ++i;
             }
             m_desc_path_begin = path;
@@ -1528,9 +1523,8 @@ public:
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
         typedef _impl::DescriptorFriend df;
-        DescriptorRef desc = m_desc.lock();
-        if (desc)
-            df::adj_insert_column(*desc, col_ndx);
+        if (m_desc)
+            df::adj_insert_column(*m_desc, col_ndx);
 
         m_schema_changed = true;
 
@@ -1560,10 +1554,9 @@ public:
                 tf::mark(*target);
             }
         }
-        DescriptorRef desc = m_desc.lock();
-        if (desc) {
+        if (m_desc) {
             using df = _impl::DescriptorFriend;
-            df::adj_insert_column(*desc, col_ndx);
+            df::adj_insert_column(*m_desc, col_ndx);
         }
 
         m_schema_changed = true;
@@ -1578,11 +1571,9 @@ public:
             EraseColumnUpdater updater(col_ndx);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
-        DescriptorRef desc = m_desc.lock();
-        if (desc) {
-            using df = _impl::DescriptorFriend;
-            df::adj_erase_column(*desc, col_ndx);
-        }
+        typedef _impl::DescriptorFriend df;
+        if (m_desc)
+            df::adj_erase_column(*m_desc, col_ndx);
 
         m_schema_changed = true;
 
@@ -1610,10 +1601,9 @@ public:
             using tf = _impl::TableFriend;
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
-        DescriptorRef desc = m_desc.lock();
-        if (desc) {
+        if (m_desc) {
             using df = _impl::DescriptorFriend;
-            df::adj_erase_column(*desc, col_ndx);
+            df::adj_erase_column(*m_desc, col_ndx);
         }
 
         m_schema_changed = true;
@@ -1634,10 +1624,9 @@ public:
             MoveColumnUpdater updater(col_ndx_1, col_ndx_2);
             tf::update_accessors(*m_table, m_desc_path_begin, m_desc_path_end, updater);
         }
-        DescriptorRef desc = m_desc.lock();
         typedef _impl::DescriptorFriend df;
-        if (desc)
-            df::adj_move_column(*desc, col_ndx_1, col_ndx_2);
+        if (m_desc)
+            df::adj_move_column(*m_desc, col_ndx_1, col_ndx_2);
 
         m_schema_changed = true;
 
@@ -1723,8 +1712,7 @@ public:
 private:
     Group& m_group;
     TableRef m_table;
-    // Table has the ownership of Descriptor. Use weak ref to avoid circular refs.
-    std::weak_ptr<Descriptor> m_desc;
+    DescriptorRef m_desc;
     const size_t* m_desc_path_begin;
     const size_t* m_desc_path_end;
     bool& m_schema_changed;

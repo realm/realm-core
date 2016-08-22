@@ -81,14 +81,14 @@ struct QueryGroup {
     State m_state = State::Default;
 };
 
-class Query {
+class Query final {
 public:
     Query(const Table& table, TableViewBase* tv = nullptr);
     Query(const Table& table, std::unique_ptr<TableViewBase>);
     Query(const Table& table, const LinkViewRef& lv);
     Query();
     Query(std::unique_ptr<Expression>);
-    virtual ~Query() noexcept;
+    ~Query() noexcept;
 
     Query(const Query& copy);
     Query& operator = (const Query& source);
@@ -163,6 +163,7 @@ public:
     Query& less_double(size_t column_ndx1, size_t column_ndx2);
     Query& less_equal_double(size_t column_ndx1, size_t column_ndx2);
 
+    // Conditions: timestamp
     Query& equal(size_t column_ndx, Timestamp value);
     Query& not_equal(size_t column_ndx, Timestamp value);
     Query& greater(size_t column_ndx, Timestamp value);
@@ -285,7 +286,7 @@ public:
     int            set_threads(unsigned int threadcount);
 #endif
 
-    TableRef& get_table() {return m_table;}
+    const TableRef& get_table() { return m_table; }
 
     // True if matching rows are guaranteed to be returned in table order.
     bool produces_results_in_table_order() const { return !m_view; }
@@ -297,12 +298,11 @@ public:
 
     std::string validate();
 
-protected:
+private:
     Query(Table& table, TableViewBase* tv = nullptr);
     void create();
 
-    void   init(const Table& table) const;
-    bool   is_initialized() const;
+    void   init() const;
     size_t find_internal(size_t start = 0, size_t end=size_t(-1)) const;
     size_t peek_tableview(size_t tv_index) const;
     void handle_pending_not();
@@ -313,23 +313,21 @@ protected:
 public:
     using HandoverPatch = QueryHandoverPatch;
 
-    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                      ConstSourcePayload mode) const
+    std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
+                                              ConstSourcePayload mode) const
     {
         patch.reset(new HandoverPatch);
-        std::unique_ptr<Query> retval(new Query(*this, *patch, mode));
-        return retval;
+        return std::make_unique<Query>(*this, *patch, mode);
     }
 
-    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                      MutableSourcePayload mode)
+    std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
+                                              MutableSourcePayload mode)
     {
         patch.reset(new HandoverPatch);
-        std::unique_ptr<Query> retval(new Query(*this, *patch, mode));
-        return retval;
+        return std::make_unique<Query>(*this, *patch, mode);
     }
 
-    virtual void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& dest_group)
+    void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& dest_group)
     {
         apply_patch(*patch, dest_group);
         patch.reset();
@@ -399,9 +397,7 @@ private:
     // Used to access schema while building query:
     std::vector<size_t> m_subtable_path;
 
-    // Query doesn't own the Descriptor, Table does. To avoid the circular refs,
-    // hold a weak ref only. It is valid as long as the TableRef is not released.
-    std::weak_ptr<const Descriptor> m_current_descriptor;
+    ConstDescriptorRef m_current_descriptor;
     TableRef m_table;
 
     // points to the base class of the restricting view. If the restricting

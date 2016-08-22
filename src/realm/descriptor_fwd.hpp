@@ -21,11 +21,12 @@
 
 #include <memory>
 
+
 namespace realm {
 
 class Descriptor;
-using DescriptorRef = std::shared_ptr<Descriptor>;
-using ConstDescriptorRef = std::shared_ptr<const Descriptor>;
+typedef std::shared_ptr<Descriptor> DescriptorRef;
+typedef std::shared_ptr<const Descriptor> ConstDescriptorRef;
 
 } // namespace realm
 

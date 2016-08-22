@@ -27,8 +27,6 @@
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
-#include <realm/util/tuple.hpp>
-#include <realm/column_fwd.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/link_view_fwd.hpp>
 #include <realm/row.hpp>
@@ -37,21 +35,22 @@
 #include <realm/mixed.hpp>
 #include <realm/query.hpp>
 #include <realm/column.hpp>
-#include <realm/column_binary.hpp>
-#include <realm/column_timestamp.hpp>
 
 namespace realm {
 
-class TableView;
-class LinkView;
-class TableViewBase;
-class ConstTableView;
-class StringIndex;
-class Group;
-class LinkColumnBase;
-class LinkColumn;
-class LinkListColumn;
 class BacklinkColumn;
+class BinaryColumy;
+class ConstTableView;
+class Group;
+class LinkColumn;
+class LinkColumnBase;
+class LinkListColumn;
+class LinkView;
+class SortDescriptor;
+class StringIndex;
+class TableView;
+class TableViewBase;
+class TimestampColumn;
 template<class>
 class Columns;
 template<class>
@@ -450,6 +449,13 @@ public:
     /// Users intending to implement primary keys must therefore manually check
     /// for duplicates if they want to raise an error instead.
     ///
+    /// NOTE:  It is an error to call either function after adding elements to a
+    /// linklist in the object. In general, calling set_int_unique() or
+    /// set_string_unique() should be the first thing that happens after
+    /// creating a row. These limitations are imposed by limitations in the
+    /// Realm Object Server and may be relaxed in the future. A violation of
+    /// these rules results in a LogicError being thrown.
+    ///
     /// insert_substring() inserts the specified string into the currently
     /// stored string at the specified position. The position must be less than
     /// or equal to the size of the currently stored string.
@@ -609,8 +615,8 @@ public:
     TableView      get_sorted_view(size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(size_t column_ndx, bool ascending = true) const;
 
-    TableView      get_sorted_view(std::vector<size_t> column_ndx, std::vector<bool> ascending);
-    ConstTableView get_sorted_view(std::vector<size_t> column_ndx, std::vector<bool> ascending) const;
+    TableView      get_sorted_view(SortDescriptor order);
+    ConstTableView get_sorted_view(SortDescriptor order) const;
 
     TableView      get_range_view(size_t begin, size_t end);
     ConstTableView get_range_view(size_t begin, size_t end) const;
@@ -794,7 +800,7 @@ public:
 
     class Parent;
     using HandoverPatch = TableHandoverPatch;
-    static void generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch);
+    static void generate_patch(const Table* ref, std::unique_ptr<HandoverPatch>& patch);
     static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
 
 protected:
@@ -814,6 +820,8 @@ protected:
     bool compare_rows(const Table&) const;
 
     void set_into_mixed(Table* parent, size_t col_ndx, size_t row_ndx) const;
+
+    void check_lists_are_empty(size_t row_ndx) const;
 
 private:
     class SliceWriter;
@@ -875,9 +883,7 @@ private:
     // point in time. Subdescriptors are kept unique by means of a
     // registry in the parent descriptor. Table::m_descriptor is
     // always null for tables with shared descriptor.
-    // The root table owns the Descriptor by means it is created by
-    // Table and supposed to be released by the Table.
-    mutable std::shared_ptr<Descriptor> m_descriptor;
+    mutable std::weak_ptr<Descriptor> m_descriptor;
 
     // Table view instances
     // Access needs to be protected by m_accessor_mutex
@@ -2315,12 +2321,9 @@ public:
         table.mark_opposite_link_tables();
     }
 
-    // root_table owns a shared ref of returned Descriptor.
-    // It lives as long as the table. So don't hold the shared ref to the returned
-    // Descriptor if it is not really needed to avoid circular refs.
     static DescriptorRef get_root_table_desc_accessor(Table& root_table) noexcept
     {
-        return root_table.m_descriptor;
+        return root_table.m_descriptor.lock();
     }
 
     typedef Table::AccessorUpdater AccessorUpdater;

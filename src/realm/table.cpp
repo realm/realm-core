@@ -318,7 +318,7 @@ void Table::connect_opposite_link_columns(size_t link_col_ndx, Table& target_tab
     link_col.set_target_table(target_table);
     link_col.set_backlink_column(backlink_col);
     backlink_col.set_origin_table(*this);
-    backlink_col.set_origin_column(link_col, link_col_ndx);
+    backlink_col.set_origin_column(link_col);
 }
 
 
@@ -424,11 +424,15 @@ DescriptorRef Table::get_descriptor()
         return parent->get_descriptor()->get_subdescriptor(col_ndx); // Throws
     }
 
-    if (!m_descriptor) {
-        using df = _impl::DescriptorFriend;
-        m_descriptor.reset(df::create(this, &m_spec));
+    DescriptorRef desc = m_descriptor.lock();
+    if (!desc) {
+        typedef _impl::DescriptorFriend df;
+        desc = df::create(); // Throws
+        DescriptorRef parent = nullptr;
+        df::attach(*desc, this, parent, &m_spec);
+        m_descriptor = desc;
     }
-    return m_descriptor;
+    return desc;
 }
 
 
@@ -1367,9 +1371,11 @@ void Table::discard_child_accessors() noexcept
 
 void Table::discard_desc_accessor() noexcept
 {
-    if (m_descriptor) {
+    // Must hold a reliable reference count while detaching
+    DescriptorRef desc = m_descriptor.lock();
+    if (desc) {
         typedef _impl::DescriptorFriend df;
-        df::detach(*m_descriptor);
+        df::detach(*desc);
         m_descriptor.reset();
     }
 }
@@ -1407,30 +1413,30 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
         case col_type_Bool:
         case col_type_OldDateTime:
             if (nullable) {
-                col = new IntNullColumn(alloc, ref); // Throws
+                col = new IntNullColumn(alloc, ref, col_ndx); // Throws
             }
             else {
-                col = new IntegerColumn(alloc, ref); // Throws
+                col = new IntegerColumn(alloc, ref, col_ndx); // Throws
             }
             break;
         case col_type_Float:
-            col = new FloatColumn(alloc, ref); // Throws
+            col = new FloatColumn(alloc, ref, col_ndx); // Throws
             break;
         case col_type_Double:
-            col = new DoubleColumn(alloc, ref); // Throws
+            col = new DoubleColumn(alloc, ref, col_ndx); // Throws
             break;
         case col_type_String:
-            col = new StringColumn(alloc, ref, nullable); // Throws
+            col = new StringColumn(alloc, ref, nullable, col_ndx); // Throws
             break;
         case col_type_Binary:
-            col = new BinaryColumn(alloc, ref, nullable); // Throws
+            col = new BinaryColumn(alloc, ref, nullable, col_ndx); // Throws
             break;
         case col_type_StringEnum: {
             ArrayParent* keys_parent;
             size_t keys_ndx_in_parent;
             ref_type keys_ref =
                 m_spec.get_enumkeys_ref(col_ndx, &keys_parent, &keys_ndx_in_parent);
-            StringEnumColumn* col_2 = new StringEnumColumn(alloc, ref, keys_ref, nullable); // Throws
+            StringEnumColumn* col_2 = new StringEnumColumn(alloc, ref, keys_ref, nullable, col_ndx); // Throws
             col_2->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             col = col_2;
             break;
@@ -1451,11 +1457,11 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             break;
         case col_type_BackLink:
             // Origin table will be set by group after entire table has been created
-            col = new BacklinkColumn(alloc, ref); // Throws
+            col = new BacklinkColumn(alloc, ref, col_ndx); // Throws
             break;
         case col_type_Timestamp:
             // Origin table will be set by group after entire table has been created
-            col = new TimestampColumn(alloc, ref); // Throws
+            col = new TimestampColumn(alloc, ref, col_ndx); // Throws
             break;
         case col_type_Reserved4:
             // These have no function yet and are therefore unexpected.
@@ -1984,7 +1990,7 @@ ref_type Table::create_empty_table(Allocator& alloc)
     {
         MemRef mem = Spec::create_empty_spec(alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous case (unsigned -> signed)
+        int_fast64_t v(from_ref(mem.get_ref()));
         top.add(v); // Throws
         dg_2.release();
     }
@@ -1992,7 +1998,7 @@ ref_type Table::create_empty_table(Allocator& alloc)
         bool context_flag = false;
         MemRef mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous case (unsigned -> signed)
+        int_fast64_t v(from_ref(mem.get_ref()));
         top.add(v); // Throws
         dg_2.release();
     }
@@ -2073,14 +2079,14 @@ ref_type Table::clone(Allocator& alloc) const
     {
         MemRef mem = m_spec.m_top.clone_deep(alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(from_ref(mem.get_ref()));
         new_top.add(v); // Throws
         dg_2.release();
     }
     {
         MemRef mem = m_columns.clone_deep(alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int_fast64_t v(mem.get_ref()); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t v(from_ref(mem.get_ref()));
         new_top.add(v); // Throws
         dg_2.release();
     }
@@ -2870,6 +2876,10 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
         throw LogicError{LogicError::no_search_index};
     }
 
+    // FIXME: See the definition of check_lists_are_empty() for an explanation
+    // of why this is needed.
+    check_lists_are_empty(ndx); // Throws
+
     if (is_nullable(col_ndx)) {
         auto& col = get_column_int_null(col_ndx);
         ndx = do_set_unique(col, ndx, value); // Throws
@@ -3082,6 +3092,10 @@ void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
 
     if (!has_search_index(col_ndx))
         throw LogicError(LogicError::no_search_index);
+
+    // FIXME: See the definition of check_lists_are_empty() for an explanation
+    // of why this is needed
+    check_lists_are_empty(ndx); // Throws
 
     bump_version();
 
@@ -3952,16 +3966,16 @@ ConstTableView Table::get_sorted_view(size_t col_ndx, bool ascending) const
     return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
 }
 
-TableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<bool> ascending)
+TableView Table::get_sorted_view(SortDescriptor order)
 {
     TableView tv = where().find_all();
-    tv.sort(col_ndx, ascending);
+    tv.sort(std::move(order));
     return tv;
 }
 
-ConstTableView Table::get_sorted_view(std::vector<size_t> col_ndx, std::vector<bool> ascending) const
+ConstTableView Table::get_sorted_view(SortDescriptor order) const
 {
-    return const_cast<Table*>(this)->get_sorted_view(col_ndx, ascending);
+    return const_cast<Table*>(this)->get_sorted_view(std::move(order));
 }
 
 const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain) const
@@ -4323,7 +4337,8 @@ ConstTableView Table::get_range_view(size_t begin, size_t end) const
 
 TableView Table::get_backlink_view(size_t row_ndx, Table *src_table, size_t src_col_ndx)
 {
-    TableView tv(src_table, this, src_col_ndx, get(row_ndx));
+    REALM_ASSERT(&src_table->get_column_link_base(src_col_ndx).get_target_table() == this);
+    TableView tv(src_table, src_col_ndx, get(row_ndx));
     tv.do_sync();
     return tv;
 }
@@ -4452,7 +4467,7 @@ void Table::optimize(bool enforce)
             size_t ndx_in_parent = m_spec.get_column_ndx_in_parent(i);
 
             // Replace column
-            StringEnumColumn* e = new StringEnumColumn(alloc, ref, keys_ref, is_nullable(i)); // Throws
+            StringEnumColumn* e = new StringEnumColumn(alloc, ref, keys_ref, is_nullable(i), i); // Throws
             e->set_parent(&m_columns, ndx_in_parent);
             e->get_keys().set_parent(keys_parent, keys_ndx_in_parent);
             m_cols[i] = e;
@@ -4531,7 +4546,7 @@ public:
             size_t table_size = m_table.size();
             for (auto& column : m_table.m_cols) {
                 ref_type ref = column->write(m_offset, m_size, table_size, out); // Throws
-                int_fast64_t ref_2(ref); // FIXME: Dangerous cast (unsigned -> signed)
+                int_fast64_t ref_2(from_ref(ref));
                 column_refs.add(ref_2); // Throws
             }
             bool deep = false; // Shallow
@@ -4545,9 +4560,9 @@ public:
             Array table_top(alloc);
             table_top.create(Array::type_HasRefs); // Throws
             _impl::ShallowArrayDestroyGuard dg(&table_top);
-            int_fast64_t spec_ref_2(spec_ref); // FIXME: Dangerous cast (unsigned -> signed)
+            int_fast64_t spec_ref_2(from_ref(spec_ref));
             table_top.add(spec_ref_2); // Throws
-            int_fast64_t columns_ref_2(columns_ref); // FIXME: Dangerous cast (unsigned -> signed)
+            int_fast64_t columns_ref_2(from_ref(columns_ref));
             table_top.add(columns_ref_2); // Throws
             bool deep = false; // Shallow
             bool only_if_modified = false; // Always
@@ -4558,7 +4573,7 @@ public:
         Array tables(alloc);
         tables.create(Array::type_HasRefs); // Throws
         _impl::ShallowArrayDestroyGuard dg(&tables);
-        int_fast64_t table_top_ref_2(table_top_ref); // FIXME: Dangerous cast (unsigned -> signed)
+        int_fast64_t table_top_ref_2(from_ref(table_top_ref));
         tables.add(table_top_ref_2); // Throws
         bool deep = false; // Shallow
         bool only_if_modified = false; // Always
@@ -5293,6 +5308,27 @@ bool Table::compare_rows(const Table& t) const
 }
 
 
+void Table::check_lists_are_empty(size_t row_ndx) const
+{
+    // FIXME: Due to a limitation in Sync, it is not legal to change the primary
+    // key of a row that contains lists (including linklists) after those lists
+    // have been populated. This limitation may be lifted in the future, but for
+    // now it is necessary to ensure that all lists are empty before setting a
+    // primary key (by way of set_int_unique() or set_string_unique()).
+
+    for (size_t i = 0; i < get_column_count(); ++i) {
+        if (get_column_type(i) == type_LinkList) {
+            const LinkListColumn& col = get_column_link_list(i);
+            if (col.get_link_count(row_ndx) != 0) {
+                // Violation of the rule that an object receiving a primary key
+                // may not contain any non-empty lists.
+                throw LogicError{LogicError::illegal_combination};
+            }
+        }
+    }
+}
+
+
 StringData Table::Parent::get_child_name(size_t) const noexcept
 {
     return StringData("");
@@ -5807,11 +5843,11 @@ bool Table::is_cross_table_link_target() const noexcept
 }
 
 
-void Table::generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch)
+void Table::generate_patch(const Table* table, std::unique_ptr<HandoverPatch>& patch)
 {
-    if (ref.get()) {
+    if (table) {
         patch.reset(new Table::HandoverPatch);
-        patch->m_table_num = ref.get()->get_index_in_group();
+        patch->m_table_num = table->get_index_in_group();
         // must be group level table!
         if (patch->m_table_num == npos) {
             throw std::runtime_error("Table handover failed: not a group level table");
