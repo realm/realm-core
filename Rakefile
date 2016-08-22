@@ -50,16 +50,16 @@ REALM_CONFIGURATIONS.each do |configuration, build_type|
     desc "Run tests in #{configuration} mode"
     task "check-#{configuration}" => "build-#{configuration}" do
         ENV['UNITTEST_THREADS'] ||= @num_processors
-        Dir.chdir("#{dir}/test") do
-            sh "./realm-tests"
+        Dir.chdir("test") do
+            sh "../#{dir}/test/realm-tests"
         end
     end
 
     desc "Run Valgrind for tests in #{configuration} mode"
     task "memcheck-#{configuration}" => "build-#{configuration}" do
         ENV['UNITTEST_THREADS'] ||= @num_processors
-        Dir.chdir("#{dir}/test") do
-            sh "valgrind #{@valgrind_flags} ./realm-tests"
+        Dir.chdir("test") do
+            sh "valgrind #{@valgrind_flags} ../#{dir}/test/realm-tests"
         end
     end
 end
