@@ -136,18 +136,12 @@ void cpuid_init()
 // allow inlining.
 void* round_up(void* p, size_t align)
 {
-    // FIXME: The C++ standard does not guarantee that a pointer can
-    // be stored in size_t. Use uintptr_t instead. The problem with
-    // uintptr_t, is that is is not part of C++03.
     size_t r = size_t(p) % align == 0 ? 0 : align - size_t(p) % align;
     return static_cast<char *>(p) + r;
 }
 
 void* round_down(void* p, size_t align)
 {
-    // FIXME: The C++ standard does not guarantee that a pointer can
-    // be stored in size_t. Use uintptr_t instead. The problem with
-    // uintptr_t, is that is is not part of C++03.
     size_t r = size_t(p);
     return reinterpret_cast<void *>(r & ~(align - 1));
 }
@@ -238,6 +232,10 @@ int fast_popcount64(int64_t x)
 // A fast, thread safe, mediocre-quality random number generator named Xorshift
 uint64_t fastrand(uint64_t max, bool is_seed)
 {
+    // Mutex only to make Helgrind happy
+    static util::Mutex m;
+    util::LockGuard lg(m);
+
     // All the atomics (except the add) may be eliminated completely by the compiler on x64
     static std::atomic<uint64_t> state(is_seed ? max : 1);
 

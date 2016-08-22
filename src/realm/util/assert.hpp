@@ -29,7 +29,7 @@
 #endif
 
 #define REALM_ASSERT_RELEASE(condition) \
-    ((condition) ? static_cast<void>(0) : \
+    (REALM_LIKELY(condition) ? static_cast<void>(0) : \
     realm::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
 
 #if REALM_ASSERTIONS_ENABLED
@@ -47,7 +47,7 @@
 #define REALM_STRINGIFY(X) #X
 
 #define REALM_ASSERT_RELEASE_EX(condition, ...) \
-    ((condition) ? static_cast<void>(0) : \
+    (REALM_LIKELY(condition) ? static_cast<void>(0) : \
     realm::util::terminate_with_info("Assertion failed: " # condition, __LINE__, __FILE__, \
                                      REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
 
@@ -65,20 +65,20 @@
 #  define REALM_ASSERT_EX REALM_ASSERT_RELEASE_EX
 
 #  define REALM_ASSERT_3(left, cmp, right) \
-    (((left) cmp (right)) ? static_cast<void>(0) : \
+    (REALM_LIKELY((left) cmp (right)) ? static_cast<void>(0) : \
      realm::util::terminate("Assertion failed: " \
                             "" #left " " #cmp " " #right, \
                             __FILE__, __LINE__, left, right))
 
 #  define REALM_ASSERT_7(left1, cmp1, right1, logical, left2, cmp2, right2) \
-    ((((left1) cmp1 (right1)) logical ((left2) cmp2 (right2))) ? static_cast<void>(0) : \
+    (REALM_LIKELY(((left1) cmp1 (right1)) logical ((left2) cmp2 (right2))) ? static_cast<void>(0) : \
      realm::util::terminate("Assertion failed: " \
                             "" #left1 " " #cmp1 " " #right1 " " #logical " " \
                             "" #left2 " " #cmp2 " " #right2, \
                             __FILE__, __LINE__, left1, right1, left2, right2))
 
 #  define REALM_ASSERT_11(left1, cmp1, right1, logical1, left2, cmp2, right2, logical2, left3, cmp3, right3) \
-    ((((left1) cmp1 (right1)) logical1 ((left2) cmp2 (right2)) logical2 ((left3) cmp3 (right3))) ? static_cast<void>(0) : \
+    (REALM_LIKELY(((left1) cmp1 (right1)) logical1 ((left2) cmp2 (right2)) logical2 ((left3) cmp3 (right3))) ? static_cast<void>(0) : \
      realm::util::terminate("Assertion failed: " \
                             "" #left1 " " #cmp1 " " #right1 " " #logical1 " " \
                             "" #left2 " " #cmp2 " " #right2 " " #logical2 " " \

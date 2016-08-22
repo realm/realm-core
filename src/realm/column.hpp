@@ -180,6 +180,10 @@ public:
     virtual ref_type write(size_t slice_offset, size_t slice_size,
                            size_t table_size, _impl::OutputStream&) const = 0;
 
+    /// Get this column's logical index within the containing table, or npos
+    /// for free-standing or non-top-level columns.
+    size_t get_column_index() const noexcept { return m_column_ndx; }
+
     virtual void set_parent(ArrayParent*, size_t ndx_in_parent) noexcept = 0;
     virtual size_t get_ndx_in_parent() const noexcept = 0;
     virtual void set_ndx_in_parent(size_t ndx_in_parent) noexcept = 0;
@@ -261,7 +265,7 @@ public:
     ///
     ///  - The 'index in parent' property of the cached root array
     ///    (`root->m_ndx_in_parent`) is valid.
-    virtual void refresh_accessor_tree(size_t new_col_ndx, const Spec&) = 0;
+    virtual void refresh_accessor_tree(size_t new_col_ndx, const Spec&);
 
 #ifdef REALM_DEBUG
     virtual void verify() const = 0;
@@ -275,7 +279,7 @@ public:
 protected:
     using SliceHandler = BpTreeBase::SliceHandler;
 
-    ColumnBase() {}
+    ColumnBase(size_t column_ndx=npos) : m_column_ndx(column_ndx) {}
     ColumnBase(ColumnBase&&) = default;
 
     // Must not assume more than minimal consistency (see
@@ -312,6 +316,8 @@ protected:
     static int compare_values(const Column* column, size_t row1, size_t row2) noexcept;
 
 private:
+    size_t m_column_ndx = npos;
+
     static ref_type build(size_t* rest_size_ptr, size_t fixed_height,
                           Allocator&, CreateHandler&);
 };
@@ -342,7 +348,7 @@ public:
     MemRef clone_deep(Allocator& alloc) const override { return m_array->clone_deep(alloc); }
 
 protected:
-    ColumnBaseSimple() {}
+    ColumnBaseSimple(size_t column_ndx) : ColumnBase(column_ndx) {}
     ColumnBaseSimple(Array* root) : m_array(root) {}
     std::unique_ptr<Array> m_array;
 
@@ -380,7 +386,7 @@ public:
             size_t ndx_in_parent, bool allow_duplicate_valaues) final;
     StringIndex* create_search_index() override = 0;
 protected:
-    ColumnBaseWithIndex() {}
+    using ColumnBase::ColumnBase;
     ColumnBaseWithIndex(ColumnBaseWithIndex&&) = default;
     std::unique_ptr<StringIndex> m_search_index;
 };
@@ -399,9 +405,9 @@ public:
 
     struct unattached_root_tag {};
 
-    explicit Column() noexcept : m_tree(Allocator::get_default()) {}
+    explicit Column() noexcept : ColumnBaseWithIndex(npos), m_tree(Allocator::get_default()) {}
     explicit Column(std::unique_ptr<Array> root) noexcept;
-    Column(Allocator&, ref_type);
+    Column(Allocator&, ref_type, size_t column_ndx=npos);
     Column(unattached_root_tag, Allocator&);
     Column(Column&&) noexcept = default;
     ~Column() noexcept override;
@@ -948,14 +954,15 @@ inline ref_type ColumnBase::create(Allocator& alloc, size_t column_size, CreateH
 }
 
 template<class T>
-Column<T>::Column(Allocator& alloc, ref_type ref) : m_tree(BpTreeBase::unattached_tag{})
+Column<T>::Column(Allocator& alloc, ref_type ref, size_t column_ndx)
+: ColumnBaseWithIndex(column_ndx), m_tree(BpTreeBase::unattached_tag{})
 {
     // fixme, must m_search_index be copied here?
     m_tree.init_from_ref(alloc, ref);
 }
 
 template<class T>
-Column<T>::Column(unattached_root_tag, Allocator& alloc) : m_tree(alloc)
+Column<T>::Column(unattached_root_tag, Allocator& alloc) : ColumnBaseWithIndex(npos), m_tree(alloc)
 {
 }
 
@@ -1084,7 +1091,7 @@ T Column<T>::get(size_t ndx) const noexcept
 template<class T>
 bool Column<T>::is_null(size_t ndx) const noexcept
 {
-    return m_tree.is_null(ndx);
+    return nullable && m_tree.is_null(ndx);
 }
 
 template<class T>

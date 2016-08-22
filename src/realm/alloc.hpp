@@ -21,6 +21,7 @@
 
 #include <stdint.h>
 #include <cstddef>
+#include <atomic>
 
 #include <realm/util/features.h>
 #include <realm/util/terminate.hpp>
@@ -37,6 +38,7 @@ using ref_type = size_t;
 
 int_fast64_t from_ref(ref_type) noexcept;
 ref_type to_ref(int_fast64_t) noexcept;
+int64_t to_int64(size_t value) noexcept;
 
 class MemRef {
 public:
@@ -176,7 +178,7 @@ public:
     ///
     ///   1 Initial file format version
     ///
-    ///   2 FIXME: Does anybody remember what happened here?
+    ///   2 Various changes.
     ///
     ///   3 Supporting null on string columns broke the file format in following
     ///     way: Index appends an 'X' character to all strings except the null
@@ -246,7 +248,12 @@ protected:
     // place for now, because every table has a pointer leading here. It would
     // be more obvious to place it in Group, but that would add a runtime overhead,
     // and access is time critical.
-    uint_fast64_t m_table_versioning_counter;
+    //
+    // This means that multiple threads that allocate Realm objects through the 
+    // default allocator will share this variable, which is a logical design flaw 
+    // that can make sync_if_needed() re-run queries even though it is not required.
+    // It must be atomic because it's shared.
+    std::atomic<uint_fast64_t> m_table_versioning_counter;
 
     /// Bump the global version counter. This method should be called when
     /// version bumping is initiated. Then following calls to should_propagate_version()
@@ -298,6 +305,14 @@ inline ref_type to_ref(int_fast64_t v) noexcept
     REALM_ASSERT_DEBUG(v % 8 == 0);
     return ref_type(v);
 }
+
+inline int64_t to_int64(size_t value) noexcept
+{
+//    FIXME: Enable once we get clang warning flags correct
+//    REALM_ASSERT_DEBUG(value <= std::numeric_limits<int64_t>::max());
+    return static_cast<int64_t>(value);
+}
+
 
 inline MemRef::MemRef() noexcept:
     m_addr(nullptr),

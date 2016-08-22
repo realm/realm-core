@@ -52,7 +52,7 @@ class StringEnumColumn: public IntegerColumn {
 public:
     typedef StringData value_type;
 
-    StringEnumColumn(Allocator&, ref_type ref, ref_type keys_ref, bool nullable);
+    StringEnumColumn(Allocator&, ref_type ref, ref_type keys_ref, bool nullable, size_t column_ndx = npos);
     ~StringEnumColumn() noexcept override;
     void destroy() noexcept override;
     MemRef clone_deep(Allocator& alloc) const override;
@@ -184,7 +184,7 @@ inline StringData StringEnumColumn::get(size_t ndx) const noexcept
 
 inline bool StringEnumColumn::is_null(size_t ndx) const noexcept
 {
-    return is_nullable() ? get(ndx).is_null() : false;
+    return is_nullable() && get(ndx).is_null();
 }
 
 inline void StringEnumColumn::add()

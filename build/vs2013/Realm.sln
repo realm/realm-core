@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.22310.1
+# Blend for Visual Studio 14
+VisualStudioVersion = 14.0.25123.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{ED0C49D7-6CFD-4B05-BA18-7C6E98A994C8}"
 EndProject
@@ -33,6 +33,8 @@ Global
 		Debug|x64 = Debug|x64
 		Release|Win32 = Release|Win32
 		Release|x64 = Release|x64
+		Schema dumper|Win32 = Schema dumper|Win32
+		Schema dumper|x64 = Schema dumper|x64
 		Static lib, debug|Win32 = Static lib, debug|Win32
 		Static lib, debug|x64 = Static lib, debug|x64
 		Static lib, release|Win32 = Static lib, release|Win32
@@ -55,6 +57,10 @@ Global
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Release|Win32.Build.0 = Release|Win32
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Release|x64.ActiveCfg = Release|x64
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Release|x64.Build.0 = Release|x64
+		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Schema dumper|Win32.ActiveCfg = Schema dumper|Win32
+		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Schema dumper|Win32.Build.0 = Schema dumper|Win32
+		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Schema dumper|x64.ActiveCfg = Schema dumper|x64
+		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Schema dumper|x64.Build.0 = Schema dumper|x64
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Static lib, debug|Win32.ActiveCfg = Static library, debug|Win32
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Static lib, debug|Win32.Build.0 = Static library, debug|Win32
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Static lib, debug|x64.ActiveCfg = Static library, debug|x64
@@ -77,6 +83,10 @@ Global
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Release|Win32.Build.0 = Release|Win32
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Release|x64.ActiveCfg = Release|x64
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Release|x64.Build.0 = Release|x64
+		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Schema dumper|Win32.ActiveCfg = Schema dumper|Win32
+		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Schema dumper|Win32.Build.0 = Schema dumper|Win32
+		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Schema dumper|x64.ActiveCfg = Schema dumper|x64
+		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Schema dumper|x64.Build.0 = Schema dumper|x64
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Static lib, debug|Win32.ActiveCfg = Static library, debug|Win32
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Static lib, debug|x64.ActiveCfg = Static library, debug|x64
 		{6DF07480-ECC6-4116-860A-818B9D2BA7B3}.Static lib, release|Win32.ActiveCfg = Static library, release|Win32
@@ -95,6 +105,10 @@ Global
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Release|Win32.Build.0 = Release|Win32
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Release|x64.ActiveCfg = Release|x64
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Release|x64.Build.0 = Release|x64
+		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Schema dumper|Win32.ActiveCfg = Schema dumper|Win32
+		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Schema dumper|Win32.Build.0 = Schema dumper|Win32
+		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Schema dumper|x64.ActiveCfg = Schema dumper|x64
+		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Schema dumper|x64.Build.0 = Schema dumper|x64
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Static lib, debug|Win32.ActiveCfg = Release|x64
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Static lib, debug|x64.ActiveCfg = Release|x64
 		{9C49632F-A4C9-471E-B643-42472DBF13B9}.Static lib, debug|x64.Build.0 = Release|x64
@@ -115,6 +129,10 @@ Global
 		{C485A179-016D-4A21-AA14-1970BA070154}.Release|Win32.Build.0 = Release|Win32
 		{C485A179-016D-4A21-AA14-1970BA070154}.Release|x64.ActiveCfg = Release|x64
 		{C485A179-016D-4A21-AA14-1970BA070154}.Release|x64.Build.0 = Release|x64
+		{C485A179-016D-4A21-AA14-1970BA070154}.Schema dumper|Win32.ActiveCfg = Schema dumper|Win32
+		{C485A179-016D-4A21-AA14-1970BA070154}.Schema dumper|Win32.Build.0 = Schema dumper|Win32
+		{C485A179-016D-4A21-AA14-1970BA070154}.Schema dumper|x64.ActiveCfg = Schema dumper|x64
+		{C485A179-016D-4A21-AA14-1970BA070154}.Schema dumper|x64.Build.0 = Schema dumper|x64
 		{C485A179-016D-4A21-AA14-1970BA070154}.Static lib, debug|Win32.ActiveCfg = Release|x64
 		{C485A179-016D-4A21-AA14-1970BA070154}.Static lib, debug|x64.ActiveCfg = Release|x64
 		{C485A179-016D-4A21-AA14-1970BA070154}.Static lib, debug|x64.Build.0 = Release|x64

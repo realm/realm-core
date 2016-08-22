@@ -3595,8 +3595,7 @@ private:
 };
 
 // Background thread for test below.
-void deleter_thread(TestContext& test_context,
-                    ConcurrentQueue<LinkViewRef>& queue)
+void deleter_thread(ConcurrentQueue<LinkViewRef>& queue)
 {
     Random random(random_int<unsigned long>());
     bool closed = false;
@@ -3609,8 +3608,6 @@ void deleter_thread(TestContext& test_context,
         // after the potentially synchronizing locking
         // operation inside queue.get()
         while (delay > 0) delay--;
-        if (!closed)
-            CHECK(r->is_attached());
         // just let 'r' die
     }
 }
@@ -3670,18 +3667,29 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     // later deletion.
     util::Thread deleter;
     ConcurrentQueue<LinkViewRef> queue(buffer_size);
-    deleter.start([&] { deleter_thread(test_context, queue); });
+    deleter.start([&] { deleter_thread(queue); });
     for (int i=0; i<max_refs; ++i) {
         TableRef origin = g.get_table("origin");
         TableRef target = g.get_table("target");
         int ndx = random.draw_int_mod(table_size);
         LinkViewRef lw = origin->get_linklist(0,ndx);
-        bool will_modify = 
-            change_frequency_per_mill > random.draw_int_mod(1000000);
+        bool will_modify = change_frequency_per_mill > random.draw_int_mod(1000000);
         if (will_modify) {
-            LangBindHelper::promote_to_write(sg);
-            lw->add(ndx);
-            LangBindHelper::commit_and_continue_as_read(sg);
+            int modification_type = random.draw_int_mod(2);
+            switch (modification_type) {
+                case 0: {
+                    LangBindHelper::promote_to_write(sg);
+                    lw->add(ndx);
+                    LangBindHelper::commit_and_continue_as_read(sg);
+                    break;
+                }
+                case 1: {
+                    LangBindHelper::promote_to_write(sg);
+                    origin->move_last_over(random.draw_int_mod(table_size));
+                    origin->add_empty_row();
+                    LangBindHelper::commit_and_continue_as_read(sg);
+                }
+            }
         }
         queue.put(lw);
     }
@@ -8902,7 +8910,7 @@ void multiple_trackers_reader_thread(TestContext& test_context, std::string path
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 7;
-    const int read_thread_count = 3; // must be less than 42 for correct operation (really?)
+    const int read_thread_count = 3; // must be less than 42 for correct operation
 
     SHARED_GROUP_TEST_PATH(path);
 
@@ -10404,7 +10412,7 @@ TEST(LangBindHelper_HandoverDistinctView)
             CHECK_EQUAL(tv2->get_source_ndx(0), 0);
 
             // Remove distinct property
-            tv2->distinct(std::vector<size_t>());
+            tv2->distinct(SortDescriptor{});
             tv2->sync_if_needed();
             CHECK_EQUAL(tv2->size(), 2);
         }
@@ -10468,45 +10476,37 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
-    SharedGroup::VersionID vid;
-    {
-        // Untyped interface
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover1;
-        {
-            LangBindHelper::promote_to_write(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
 
-            TableRef source = group_w.add_table("source");
-            source->add_column(type_Int, "int");
+    TableRef source = group_w.add_table("source");
+    source->add_column(type_Int, "int");
 
-            TableRef links = group_w.add_table("links");
-            links->add_column_link(type_Link, "link", *source);
+    TableRef links = group_w.add_table("links");
+    links->add_column_link(type_Link, "link", *source);
 
+    source->add_empty_row(100);
+    links->add_empty_row(100);
+    for (int i = 0; i < 100; ++i) {
+        source->set_int(0, i, i);
+        links->set_link(0, i, i);
+    }
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    auto vid = sg_w.get_version_of_current_transaction();
 
-            for (int i = 0; i < 100; ++i) {
-                source->add_empty_row();
-                source->set_int(0, i, i);
+    for (int i = 0; i < 100; ++i) {
+        TableView tv = source->get_backlink_view(i, links.get(), 0);
+        CHECK(tv.is_attached());
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(i, tv.get_link(0, 0));
+        auto handover1 = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
+        CHECK(tv.is_attached());
 
-                links->add_empty_row();
-                links->set_link(0, i, i);
-            }
-            LangBindHelper::commit_and_continue_as_read(sg_w);
-            vid = sg_w.get_version_of_current_transaction();
-
-            for (int i = 0; i < 100; ++i) {
-                TableView tv = source->get_backlink_view(i, links.get(), 0);
-                CHECK(tv.is_attached());
-                CHECK_EQUAL(1, tv.size());
-                CHECK_EQUAL(i, tv.get_link(0, 0));
-                handover1 = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
-                CHECK(tv.is_attached());
-                sg.begin_read(vid);
-                auto tv2 = sg.import_from_handover(std::move(handover1));
-                CHECK(tv2->is_attached());
-                CHECK_EQUAL(1, tv2->size());
-                CHECK_EQUAL(i, tv2->get_link(0, 0));
-                sg.end_read();
-            }
-        }
+        sg.begin_read(vid);
+        auto tv2 = sg.import_from_handover(std::move(handover1));
+        CHECK(tv2->is_attached());
+        CHECK_EQUAL(1, tv2->size());
+        CHECK_EQUAL(i, tv2->get_link(0, 0));
+        sg.end_read();
     }
 }
 

@@ -202,8 +202,6 @@ void ArrayString::erase(size_t ndx)
 
 size_t ArrayString::calc_byte_len(size_t num_items, size_t width) const
 {
-    // FIXME: This arithemtic could overflow. Consider using one of
-    // the functions in <realm/util/safe_int_ops.hpp>
     return header_size + (num_items * width);
 }
 

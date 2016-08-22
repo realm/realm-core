@@ -68,7 +68,8 @@ void copy_leaf(const ArrayStringLong& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-StringColumn::StringColumn(Allocator& alloc, ref_type ref, bool nullable):
+StringColumn::StringColumn(Allocator& alloc, ref_type ref, bool nullable, size_t column_ndx):
+    ColumnBaseSimple(column_ndx),
     m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
@@ -180,9 +181,13 @@ StringData StringColumn::get(size_t ndx) const noexcept
 
 bool StringColumn::is_null(size_t ndx) const noexcept
 {
+#ifdef REALM_DEBUG
     StringData sd = get(ndx);
-    REALM_ASSERT_DEBUG(!(!m_nullable && sd.is_null()));
+    REALM_ASSERT_DEBUG(m_nullable || !sd.is_null());
     return sd.is_null();
+#else
+    return m_nullable && get(ndx).is_null();
+#endif
 }
 
 StringData StringColumn::get_index_data(size_t ndx, StringIndex::StringConversionBuffer&) const noexcept
@@ -1402,6 +1407,7 @@ ref_type StringColumn::write(size_t slice_offset, size_t slice_size,
 
 void StringColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
+    ColumnBaseSimple::refresh_accessor_tree(col_ndx, spec);
     refresh_root_accessor(); // Throws
 
     // Refresh search index

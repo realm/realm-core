@@ -171,6 +171,19 @@
 // superflous. However, to allow for exception safety during element
 // insertion and removal, this shall not be guaranteed.
 
+// LIMITATION: The code below makes the non-portable assumption that
+// negative number are represented using two's complement. This is not
+// guaranteed by C++03, but holds for all known target platforms.
+//
+// LIMITATION: The code below makes the non-portable assumption that
+// the types `int8_t`, `int16_t`, `int32_t`, and `int64_t`
+// exist. This is not guaranteed by C++03, but holds for all
+// known target platforms.
+//
+// LIMITATION: The code below makes the assumption that a reference into
+// a realm file will never grow in size above what can be represented in 
+// a size_t, which is 2^31-1 on a 32-bit platform, and 2^63-1 on a 64 bit
+// platform.
 
 using namespace realm;
 using namespace realm::util;
@@ -179,8 +192,7 @@ size_t Array::bit_width(int64_t v)
 {
     // FIXME: Assuming there is a 64-bit CPU reverse bitscan
     // instruction and it is fast, then this function could be
-    // implemented simply as (v<2 ? v :
-    // 2<<rev_bitscan(rev_bitscan(v))).
+    // implemented as a table lookup on the result of the scan
 
     if ((uint64_t(v) >> 4) == 0) {
         static const int8_t bits[] = {0, 1, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
@@ -319,7 +331,7 @@ MemRef Array::slice_and_clone_children(size_t offset, size_t slice_size, Allocat
         Allocator& allocator = get_alloc();
         MemRef new_mem = clone(MemRef(ref, allocator), allocator, target_alloc); // Throws
         dg_2.reset(new_mem.get_ref());
-        value = new_mem.get_ref(); // FIXME: Dangerous cast (unsigned -> signed)
+        value = from_ref(new_mem.get_ref());
         new_slice.add(value); // Throws
         dg_2.release();
     }
@@ -395,7 +407,7 @@ ref_type Array::do_write_deep(_impl::ArrayWriterBase& out, bool only_if_modified
         if (is_ref) {
             ref_type subref = to_ref(value);
             ref_type new_subref = write(subref, m_alloc, out, only_if_modified); // Throws
-            value = int_fast64_t(new_subref); // FIXME: Problematic unsigned -> signed conversion
+            value = from_ref(new_subref); 
         }
         new_array.add(value); // Throws
     }
@@ -614,7 +626,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
     }
     else if (ndx != m_size) {
         // when byte sized and no expansion, use memmove
-// FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
+        // FIXME: Optimize by simply dividing by 8 (or shifting right by 3 bit positions)
         size_t w = (m_width == 64) ? 8 : (m_width == 32) ? 4 : (m_width == 16) ? 2 : 1;
         char* src_begin = m_data + ndx*w;
         char* src_end   = m_data + m_size*w;
@@ -879,7 +891,7 @@ size_t Array::find_gte(const int64_t target, size_t start, Array const* indirect
     size_t orig_high;
     orig_high = high;
     while (high - start > 1) {
-        size_t probe = (start + high) / 2; // FIXME: Prone to overflow - see lower_bound() for a solution
+        size_t probe = (start + high) / 2; // FIXME: see lower_bound() for better approach wrt overflow
         int64_t v = get<w>(indirection ? to_size_t(indirection->get(probe)) : probe);
         if (v < target)
             start = probe;
@@ -1506,7 +1518,6 @@ size_t Array::calc_byte_len(size_t num_items, size_t width) const
     // calc_byte_len() will actually benefit if calc_byte_len() was
     // changed to always return the aligned byte size.
 
-    // FIXME: This arithemtic could overflow. Consider using <realm/util/safe_int_ops.hpp>
     size_t bits = num_items * width;
     size_t bytes = (bits+7) / 8; // round up
     return bytes + header_size; // add room for 8 byte header
@@ -1578,7 +1589,7 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
         ref_type ref = to_ref(value);
         MemRef new_mem = clone(MemRef(ref, alloc), alloc, target_alloc); // Throws
         dg_2.reset(new_mem.get_ref());
-        value = new_mem.get_ref(); // FIXME: Dangerous cast (unsigned -> signed)
+        value = from_ref(new_mem.get_ref()); 
         new_array.add(value); // Throws
         dg_2.release();
     }
@@ -1645,14 +1656,6 @@ namespace {
 template<size_t width>
 void set_direct(char* data, size_t ndx, int_fast64_t value) noexcept
 {
-    // FIXME: The code below makes the non-portable assumption that
-    // negative number are represented using two's complement. See
-    // Replication::encode_int() for a possible solution. This is not
-    // guaranteed by C++03.
-    //
-    // FIXME: The code below makes the non-portable assumption that
-    // the types `int8_t`, `int16_t`, `int32_t`, and `int64_t`
-    // exist. This is not guaranteed by C++03.
     if (width == 0) {
         REALM_ASSERT_DEBUG(value == 0);
         return;
@@ -2047,8 +2050,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
     if (offsets.is_attached()) {
         new_offsets.set_parent(&new_sibling, 0);
         new_offsets.create(type_Normal); // Throws
-        // FIXME: Dangerous cast here (unsigned -> signed)
-        new_sibling.add(new_offsets.get_ref()); // Throws
+        new_sibling.add(from_ref(new_offsets.get_ref())); // Throws
     }
     else {
         int_fast64_t v = get(0); // v = 1 + 2 * elems_per_child
@@ -2083,21 +2085,16 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx,
         size_t offsets_end = num_children - 1;
         for (size_t i = orig_child_ndx+1; i != offsets_end; ++i) {
             size_t offset = to_size_t(offsets.get(i));
-            // FIXME: Dangerous cast here (unsigned -> signed)
             new_offsets.add(offset - (new_split_offset-1)); // Throws
         }
         // Update original parent
         erase(insert_ndx+1, child_refs_end);
-        // FIXME: Dangerous cast here (unsigned -> signed)
-        set(insert_ndx, new_sibling_ref); // Throws
+        set(insert_ndx, from_ref(new_sibling_ref)); // Throws
         offsets.erase(orig_child_ndx+1, offsets_end);
-        // FIXME: Dangerous cast here (unsigned -> signed)
         offsets.set(orig_child_ndx, elem_ndx_offset + state.m_split_offset); // Throws
     }
-    // FIXME: Dangerous cast here (unsigned -> signed)
     int_fast64_t v = new_split_offset; // total_elems_in_subtree
     set(size() - 1, 1 + 2*v); // Throws
-    // FIXME: Dangerous cast here (unsigned -> signed)
     v = new_split_size - new_split_offset; // total_elems_in_subtree
     new_sibling.add(1 + 2*v); // Throws
     state.m_split_offset = new_split_offset;
@@ -2535,7 +2532,7 @@ int64_t get_direct(const char* data, size_t ndx) noexcept
         return (data[offset] >> ((ndx & 1) << 2)) & 0x0F;
     }
     if (w == 8) {
-        return *reinterpret_cast<const signed char*>(data + ndx); // FIXME: Lasse, should this not be a cast to 'const int8_t*'?
+        return *reinterpret_cast<const signed char*>(data + ndx); 
     }
     if (w == 16) {
         size_t offset = ndx * 2;
@@ -2758,9 +2755,6 @@ void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, si
 
     if (end == npos)
         end = m_size;
-
-    if (begin == end)
-        return; // FIXME: Why do we have to check and early-out here?
 
     QueryState<int64_t> state;
     state.init(act_FindAll, result, static_cast<size_t>(-1));
@@ -3596,7 +3590,6 @@ void Array::create_bptree_offsets(Array& offsets, int_fast64_t first_value)
         accum_num_elems += elems_per_child;
         offsets.add(accum_num_elems); // Throws
     }
-    // FIXME: Dangerous cast here (unsigned -> signed)
     set(0, offsets.get_ref()); // Throws
 }
 

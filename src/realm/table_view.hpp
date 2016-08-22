@@ -291,14 +291,11 @@ public:
     // Set this undetached TableView to be a distinct view, and sync immediately.
     void sync_distinct_view(size_t column_ndx);
 
-    // Re-sort view according to last used criterias
-    void re_sort();
-
     // Sort m_row_indexes according to one column
     void sort(size_t column, bool ascending = true);
 
     // Sort m_row_indexes according to multiple columns
-    void sort(std::vector<size_t> columns, std::vector<bool> ascending);
+    void sort(SortDescriptor order);
 
     // Remove rows that are duplicated with respect to the column set passed as argument.
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
@@ -307,7 +304,7 @@ public:
     // Each time you call distinct() it will first fetch the full original TableView contents and then apply
     // distinct() on that. So it distinct() does not filter the result of the previous distinct().
     void distinct(size_t column);
-    void distinct(std::vector<size_t> columns);
+    void distinct(SortDescriptor columns);
 
     // Returns whether the rows are guaranteed to be in table order.
     // This is true only of unsorted TableViews created from either:
@@ -317,10 +314,7 @@ public:
 
     virtual ~TableViewBase() noexcept;
 
-    virtual std::unique_ptr<TableViewBase> clone() const
-    {
-        return std::unique_ptr<TableViewBase>(new TableViewBase(*this));
-    }
+    virtual std::unique_ptr<TableViewBase> clone() const = 0;
 
 protected:
     // This TableView can be "born" from 5 different sources:
@@ -334,17 +328,11 @@ protected:
 
     void do_sync();
 
-    // Actual sorting facility is provided by the base class:
-    using RowIndexes::sort;
-
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
 
-    // Contains a reference to the table that is the target of the link.
-    // Null unless this TableView was created using Table::get_backlink_view.
-    mutable TableRef m_linked_table;
-    // The index of the link column that this view contain backlinks for.
-    size_t m_linked_column;
+    // The link column that this view contain backlinks for.
+    const BacklinkColumn* m_linked_column = nullptr;
     // The target row that rows in this view link to.
     ConstRow m_linked_row;
 
@@ -354,12 +342,11 @@ protected:
     // m_distinct_column_source != npos if this view was created from distinct values in a column of m_table.
     size_t m_distinct_column_source = npos;
 
-    // If m_distinct_columns.size() > 0, it means that this TableView has had called TableView::distinct() and
-    // must only contain unique rows with respect to that column set of the parent table
-    std::vector<size_t> m_distinct_columns;
+    // If not empty, this TableView has had TableView::distinct() called and must
+    // only contain unique rows with respect to that column set of the parent table
+    SortDescriptor m_distinct_predicate;
 
-    Sorter m_sorting_predicate; // Stores sorting criterias (columns + ascending)
-    bool m_auto_sort = false;
+    SortDescriptor m_sorting_predicate; // Stores sorting criterias (columns + ascending)
 
 
     // A valid query holds a reference to its table which must match our m_table.
@@ -380,7 +367,7 @@ protected:
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
-    TableViewBase(Table *parent, Table *linked_table, size_t column, BasicRowExpr<const Table> row);
+    TableViewBase(Table *parent, size_t column, BasicRowExpr<const Table> row);
 
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
@@ -409,22 +396,12 @@ protected:
     // a) forward their calls to the static type entry points.
     // b) new/delete patch data structures.
     virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                              ConstSourcePayload mode) const
-    {
-        patch.reset(new HandoverPatch);
-        std::unique_ptr<TableViewBase> retval(new TableViewBase(*this, *patch, mode));
-        return retval;
-    }
+                                                              ConstSourcePayload mode) const=0;
 
     virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                              MutableSourcePayload mode)
-    {
-        patch.reset(new HandoverPatch);
-        std::unique_ptr<TableViewBase> retval(new TableViewBase(*this, *patch, mode));
-        return retval;
-    }
+                                                              MutableSourcePayload mode)=0;
 
-    virtual void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
+    void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
     {
         apply_patch(*patch, group);
         patch.reset();
@@ -482,12 +459,9 @@ enum class RemoveMode {
 /// A TableView is both copyable and movable.
 class TableView: public TableViewBase {
 public:
-    TableView();
-    TableView(const TableView&) = default;
-    TableView(TableView&&) = default;
-    ~TableView() noexcept;
-    TableView& operator=(const TableView&) = default;
-    TableView& operator=(TableView&&) = default;
+    using TableViewBase::TableViewBase;
+
+    TableView() = default;
 
     // Rows
     typedef BasicRowExpr<Table> RowExpr;
@@ -595,36 +569,9 @@ public:
         return retval;
     }
 
-    // this one is here to follow the general scheme, it is not really needed, the
-    // one in the base class would be sufficient
-    void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group) override
-    {
-        apply_patch(*patch, group);
-        patch.reset();
-    }
-
-    TableView(const TableView& src, HandoverPatch& patch, ConstSourcePayload mode)
-        : TableViewBase(src, patch, mode)
-    {
-        // empty
-    }
-
-    TableView(TableView& src, HandoverPatch& patch, MutableSourcePayload mode)
-        : TableViewBase(src, patch, mode)
-    {
-        // empty
-    }
-
-    // only here to follow the general scheme, base class method could be used instead
-    void apply_patch(HandoverPatch& patch, Group& group)
-    {
-        TableViewBase::apply_patch(patch, group);
-    }
-
 private:
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
-    TableView(Table *parent, Table *linked_table, size_t column, ConstRowExpr row);
 
     TableView find_all_integer(size_t column_ndx, int64_t value);
     ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
@@ -633,7 +580,6 @@ private:
     friend class Table;
     friend class Query;
     friend class TableViewBase;
-    friend class ListviewNode;
     friend class LinkView;
     template<typename, typename, typename>
     friend class BasicTableViewBase;
@@ -654,12 +600,10 @@ private:
 /// for more on this.
 class ConstTableView: public TableViewBase {
 public:
-    ConstTableView();
-    ~ConstTableView() noexcept;
-    ConstTableView(const ConstTableView&) = default;
-    ConstTableView(ConstTableView&&) = default;
-    ConstTableView& operator=(const ConstTableView&) = default;
-    ConstTableView& operator=(ConstTableView&&) = default;
+    using TableViewBase::TableViewBase;
+
+    ConstTableView() = default;
+    ~ConstTableView() noexcept = default;
 
     ConstTableView(const TableView&);
     ConstTableView(TableView&&);
@@ -708,32 +652,6 @@ public:
         patch.reset(new HandoverPatch);
         std::unique_ptr<TableViewBase> retval(new ConstTableView(*this, *patch, mode));
         return retval;
-    }
-
-    // this one is here to follow the general scheme, it is not really needed, the
-    // one in the base class would be sufficient
-    void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group) override
-    {
-        apply_patch(*patch, group);
-        patch.reset();
-    }
-
-    ConstTableView(const ConstTableView& src, HandoverPatch& patch, ConstSourcePayload mode)
-        : TableViewBase(src, patch, mode)
-    {
-        // empty
-    }
-
-    ConstTableView(ConstTableView& src, HandoverPatch& patch, MutableSourcePayload mode)
-        : TableViewBase(src, patch, mode)
-    {
-        // empty
-    }
-
-    // only here to follow the general scheme, base class method could be used instead
-    void apply_patch(HandoverPatch& patch, Group& group)
-    {
-        TableViewBase::apply_patch(patch, group);
     }
 
 private:
@@ -833,11 +751,10 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
 }
 
-inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t column, BasicRowExpr<const Table> row):
+inline TableViewBase::TableViewBase(Table *parent, size_t column, BasicRowExpr<const Table> row):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(parent->get_table_ref()), // Throws
-    m_linked_table(linked_table->get_table_ref()), // Throws
-    m_linked_column(column),
+    m_linked_column(&parent->get_column_link_base(column).get_backlink_column()),
     m_linked_row(row),
     m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
 {
@@ -854,14 +771,12 @@ inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t c
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(tv.m_table),
-    m_linked_table(tv.m_linked_table),
     m_linked_column(tv.m_linked_column),
     m_linked_row(tv.m_linked_row),
     m_linkview_source(tv.m_linkview_source),
     m_distinct_column_source(tv.m_distinct_column_source),
-    m_distinct_columns(std::move(tv.m_distinct_columns)),
+    m_distinct_predicate(std::move(tv.m_distinct_predicate)),
     m_sorting_predicate(std::move(tv.m_sorting_predicate)),
-    m_auto_sort(tv.m_auto_sort),
     m_query(tv.m_query),
     m_start(tv.m_start),
     m_end(tv.m_end),
@@ -884,14 +799,12 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept:
     RowIndexes(std::move(tv.m_row_indexes)),
     m_table(std::move(tv.m_table)),
-    m_linked_table(std::move(tv.m_linked_table)),
     m_linked_column(tv.m_linked_column),
     m_linked_row(tv.m_linked_row),
     m_linkview_source(std::move(tv.m_linkview_source)),
     m_distinct_column_source(tv.m_distinct_column_source),
-    m_distinct_columns(std::move(tv.m_distinct_columns)),
+    m_distinct_predicate(std::move(tv.m_distinct_predicate)),
     m_sorting_predicate(std::move(tv.m_sorting_predicate)),
-    m_auto_sort(tv.m_auto_sort),
     m_query(std::move(tv.m_query)),
     m_start(tv.m_start),
     m_end(tv.m_end),
@@ -926,15 +839,13 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
     m_query = std::move(tv.m_query);
     m_num_detached_refs = tv.m_num_detached_refs;
     m_last_seen_version = tv.m_last_seen_version;
-    m_auto_sort = tv.m_auto_sort;
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_linked_table = std::move(tv.m_linked_table);
     m_linked_column = tv.m_linked_column;
     m_linked_row = tv.m_linked_row;
     m_linkview_source = std::move(tv.m_linkview_source);
-    m_distinct_columns = std::move(tv.m_distinct_columns);
+    m_distinct_predicate = std::move(tv.m_distinct_predicate);
     m_distinct_column_source = tv.m_distinct_column_source;
     m_sorting_predicate = std::move(tv.m_sorting_predicate);
 
@@ -964,15 +875,13 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     m_query = tv.m_query;
     m_num_detached_refs = tv.m_num_detached_refs;
     m_last_seen_version = tv.m_last_seen_version;
-    m_auto_sort = tv.m_auto_sort;
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_linked_table = tv.m_linked_table;
     m_linked_column = tv.m_linked_column;
     m_linked_row = tv.m_linked_row;
     m_linkview_source = tv.m_linkview_source;
-    m_distinct_columns = tv.m_distinct_columns;
+    m_distinct_predicate = tv.m_distinct_predicate;
     m_distinct_column_source = tv.m_distinct_column_source;
     m_sorting_predicate = tv.m_sorting_predicate;
 
@@ -1233,14 +1142,6 @@ R TableViewBase::find_all_string(V* view, size_t column_ndx, StringData value)
 
 //-------------------------- TableView, ConstTableView implementation:
 
-inline TableView::TableView()
-{
-}
-
-inline ConstTableView::ConstTableView()
-{
-}
-
 inline ConstTableView::ConstTableView(const TableView& tv):
     TableViewBase(tv)
 {
@@ -1248,14 +1149,6 @@ inline ConstTableView::ConstTableView(const TableView& tv):
 
 inline ConstTableView::ConstTableView(TableView&& tv):
     TableViewBase(std::move(tv))
-{
-}
-
-inline TableView::~TableView() noexcept
-{
-}
-
-inline ConstTableView::~ConstTableView() noexcept
 {
 }
 
@@ -1287,11 +1180,6 @@ inline TableView::TableView(Table& parent):
 
 inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit):
     TableViewBase(&parent, query, start, end, limit)
-{
-}
-
-inline TableView::TableView(Table *parent, Table *linked_table, size_t column, ConstRowExpr row):
-    TableViewBase(parent, linked_table, column, row)
 {
 }
 

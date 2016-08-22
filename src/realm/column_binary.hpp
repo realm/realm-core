@@ -34,7 +34,7 @@ class BinaryColumn: public ColumnBaseSimple {
 public:
     typedef BinaryData value_type;
 
-    BinaryColumn(Allocator&, ref_type, bool nullable = false);
+    BinaryColumn(Allocator&, ref_type, bool nullable = false, size_t column_ndx = npos);
 
     size_t size() const noexcept final;
     bool is_empty() const noexcept { return size() == 0; }
@@ -137,11 +137,13 @@ private:
 
 // Implementation
 
+// LCOV_EXCL_START
 inline StringData BinaryColumn::get_index_data(size_t, StringIndex::StringConversionBuffer&) const noexcept
 {
     REALM_ASSERT(false && "Index not implemented for BinaryColumn.");
     REALM_UNREACHABLE();
 }
+// LCOV_EXCL_STOP
 
 inline size_t BinaryColumn::size() const noexcept
 {
@@ -223,7 +225,7 @@ inline BinaryData BinaryColumn::get(size_t ndx) const noexcept
 
 inline bool BinaryColumn::is_null(size_t ndx) const noexcept
 {
-    return get(ndx).is_null();
+    return m_nullable && get(ndx).is_null();
 }
 
 inline StringData BinaryColumn::get_string(size_t ndx) const noexcept
