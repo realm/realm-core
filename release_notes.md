@@ -6,11 +6,14 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Refactored the `SharedGroup` constructors and open methods to use a new
+  `SharedGroupOptions` parameter which stores all options together.
 
 ### Enhancements
 
-* Lorem ipsum.
+* When creating a `SharedGroup`, optionally allow setting the temporary 
+  directory to when making named pipes fails. This is to fix a bug
+  involving mkfifo on recent android devices (#1959).
 
 -----------
 
