@@ -22,6 +22,7 @@
 #include "schema.hpp"
 
 #include <realm/util/optional.hpp>
+
 #include <realm/sync/client.hpp>
 
 #include <memory>
@@ -38,10 +39,6 @@ class SharedGroup;
 class StringData;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
-
-namespace util {
-    class RootLogger;
-}
 
 namespace _impl {
     class AnyHandover;
@@ -167,8 +164,6 @@ public:
         LoginFunction sync_login_function;
 
         SyncErrorHandler sync_error_handler;
-
-        util::RootLogger *logger = nullptr;
     };
 
     // Get a cached Realm or create a new one if no cached copies exists
@@ -311,9 +306,6 @@ public:
     static bool refresh_sync_access_token(std::string access_token,
                                           StringData path,
                                           util::Optional<std::string> sync_url);
-
-    // FIXME: this should be moved out of the Realm code once we separate sync from the object store
-    static void set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler, realm::util::Logger *logger);
 
 private:
     // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead

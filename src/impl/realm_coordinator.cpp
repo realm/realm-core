@@ -26,68 +26,19 @@
 #include "object_store.hpp"
 #include "schema.hpp"
 
+#include "sync_manager.hpp"
+#include "sync_session.hpp"
+
 #include <realm/commit_log.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/string_data.hpp>
-#include <realm/sync/client.hpp>
-#include <realm/sync/history.hpp>
 
 #include <unordered_map>
 #include <algorithm>
 
 using namespace realm;
 using namespace realm::_impl;
-
-namespace realm {
-namespace _impl {
-
-struct SyncClient {
-    sync::Client client;
-    std::function<sync::Client::ErrorHandler> handler;
-
-    SyncClient(sync::Client client, std::function<sync::Client::ErrorHandler> handler)
-    : client(std::move(client))
-    , handler(std::move(handler))
-    , m_thread([this]{
-        this->client.set_error_handler(this->handler);
-        this->client.run();
-    })
-    {
-    }
-
-    ~SyncClient()
-    {
-        client.stop();
-        m_thread.join();
-    }
-
-private:
-    std::thread m_thread;
-};
-
-}
-}
-
-static std::mutex g_sync_client_mutex;
-static std::shared_ptr<SyncClient> g_sync_client;
-
-static std::shared_ptr<SyncClient> get_sync_client()
-{
-    std::lock_guard<std::mutex> lock(g_sync_client_mutex);
-    REALM_ASSERT(g_sync_client);
-    return g_sync_client;
-}
-
-static void create_sync_client(std::function<sync::Client::ErrorHandler> handler,
-                                                      realm::util::Logger* logger)
-{
-    std::lock_guard<std::mutex> lock(g_sync_client_mutex);
-    REALM_ASSERT(!g_sync_client);   // Object store should never call this more than once.
-    sync::Client::Config client_config;
-    client_config.logger = logger;
-    g_sync_client = std::make_shared<SyncClient>(sync::Client(client_config), std::move(handler));
-}
 
 static std::mutex s_coordinator_mutex;
 static std::unordered_map<std::string, std::weak_ptr<RealmCoordinator>> s_coordinators_per_path;
@@ -154,9 +105,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     }
 
     if (config.sync_login_function && !m_sync_session) {
-        m_sync_client = get_sync_client();
-
-        m_sync_session = std::make_unique<sync::Session>(m_sync_client->client, config.path);
+        m_sync_session = SyncManager::shared().create_session(config.path);
         m_sync_session->set_sync_transact_callback([this] (sync::Session::version_type) {
             if (m_notifier)
                 m_notifier->notify_others();
@@ -205,11 +154,6 @@ void RealmCoordinator::update_schema(Schema const& schema, uint64_t schema_versi
     m_schema_version = schema_version;
 
     // FIXME: notify realms of the schema change
-}
-
-void RealmCoordinator::set_up_sync_client(std::function<sync::Client::ErrorHandler> errorHandler,
-                                         realm::util::Logger* logger) {
-    create_sync_client(errorHandler, logger);
 }
 
 RealmCoordinator::RealmCoordinator() = default;
@@ -294,14 +238,7 @@ void RealmCoordinator::send_commit_notifications(Realm& source_realm)
     if (m_sync_session) {
         auto& sg = Realm::Internal::get_shared_group(source_realm);
         auto version = LangBindHelper::get_version_of_latest_snapshot(sg);
-        if (!m_sync_awaits_user_token) {
-            // Fully ready sync session, notify immediately.
-            m_sync_session->nonsync_transact_notify(version);
-        }
-        else {
-            // FIXME: This deference might be moved into the sync::Session object.
-            m_sync_deferred_commit_notification = version;
-        }
+        m_sync_session->nonsync_transact_notify(version);
     }
 }
 
@@ -698,26 +635,6 @@ void RealmCoordinator::notify_others()
 
 void RealmCoordinator::refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url)
 {
-    if (!server_url && !sync_server_url) {
-        return;
-    }
-    if (m_sync_awaits_user_token) {
-        m_sync_awaits_user_token = false;
-
-        // Since the sync session was previously unbound, it's safe to do this from the
-        // calling thread.
-        if (!sync_server_url) {
-            // First time calling this -- move the resolved URL into the configuration
-            sync_server_url = std::move(server_url);
-        }
-        m_sync_session->bind(*sync_server_url, std::move(access_token));
-
-        if (m_sync_deferred_commit_notification) {
-            m_sync_session->nonsync_transact_notify(*m_sync_deferred_commit_notification);
-            m_sync_deferred_commit_notification = util::none;
-        }
-    }
-    else {
-        m_sync_session->refresh(std::move(access_token));
-    }
+    REALM_ASSERT(m_sync_session);
+    m_sync_session->refresh_sync_access_token(std::move(access_token), std::move(server_url));
 }
