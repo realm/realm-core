@@ -15,6 +15,7 @@ set(SOURCES
     impl/realm_coordinator.cpp
     impl/results_notifier.cpp
     impl/transact_log_handler.cpp
+    impl/weak_realm_notifier.cpp
     parser/parser.cpp
     parser/query_builder.cpp
     util/format.cpp)
@@ -30,6 +31,11 @@ set(HEADERS
     schema.hpp
     shared_realm.hpp
     thread_confined.hpp
+
+    impl/android/external_commit_helper.hpp
+    impl/apple/external_commit_helper.hpp
+    impl/generic/external_commit_helper.hpp
+
     impl/collection_change_builder.hpp
     impl/collection_notifier.hpp
     impl/external_commit_helper.hpp
@@ -39,27 +45,27 @@ set(HEADERS
     impl/results_notifier.hpp
     impl/transact_log_handler.hpp
     impl/weak_realm_notifier.hpp
-    impl/weak_realm_notifier_base.hpp
+
     parser/parser.hpp
     parser/query_builder.hpp
+
+    util/android/event_loop_signal.hpp
+    util/apple/event_loop_signal.hpp
+    util/generic/event_loop_signal.hpp
+    util/node/event_loop_signal.hpp
+
     util/atomic_shared_ptr.hpp
     util/compiler.hpp
+    util/event_loop_signal.hpp
     util/format.hpp)
 
 if(APPLE)
     list(APPEND SOURCES
-        impl/apple/weak_realm_notifier.cpp
         impl/apple/external_commit_helper.cpp)
-    list(APPEND HEADERS
-        impl/apple/weak_realm_notifier.hpp
-        impl/apple/external_commit_helper.hpp)
     find_library(CF_LIBRARY CoreFoundation)
 else()
     list(APPEND SOURCES
         impl/generic/external_commit_helper.cpp)
-    list(APPEND HEADERS
-        impl/generic/weak_realm_notifier.hpp
-        impl/generic/external_commit_helper.hpp)
 endif()
 
 set(INCLUDE_DIRS ${REALM_CORE_INCLUDE_DIR} ${PEGTL_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
