@@ -11015,7 +11015,7 @@ TEST(LangBindHelper_LinkListCrash)
     }
 
     std::unique_ptr<Replication> hist2(make_in_realm_history(path));
-    SharedGroup sg2(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg2(*hist2, SharedGroup::durability_Full, crypt_key());
     Group& g2 = const_cast<Group&>(sg2.begin_read());
     for (int i = 0; i < 2; ++i) {
         WriteTransaction wt(sg);
