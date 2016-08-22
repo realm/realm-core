@@ -60,12 +60,11 @@ set(HEADERS
     util/format.hpp)
 
 if(APPLE)
-    list(APPEND SOURCES
-        impl/apple/external_commit_helper.cpp)
-    find_library(CF_LIBRARY CoreFoundation)
+    list(APPEND SOURCES impl/apple/external_commit_helper.cpp)
+elseif(REALM_PLATFORM STREQUAL "Android")
+    list(APPEND SOURCES impl/android/external_commit_helper.cpp)
 else()
-    list(APPEND SOURCES
-        impl/generic/external_commit_helper.cpp)
+    list(APPEND SOURCES impl/generic/external_commit_helper.cpp)
 endif()
 
 set(INCLUDE_DIRS ${REALM_CORE_INCLUDE_DIR} ${PEGTL_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
@@ -79,9 +78,9 @@ target_include_directories(realm-object-store-objects PUBLIC ${INCLUDE_DIRS})
 # A static library, aggregating the prebuilt object files.
 add_library(realm-object-store-static STATIC $<TARGET_OBJECTS:realm-object-store-objects>)
 target_include_directories(realm-object-store-static PUBLIC ${INCLUDE_DIRS})
-target_link_libraries(realm-object-store-static PUBLIC realm ${CF_LIBRARY})
+target_link_libraries(realm-object-store-static PUBLIC realm ${PLATFORM_LIBRARIES})
 
 # A dynamic library, linking together the prebuilt object files.
 add_library(realm-object-store SHARED $<TARGET_OBJECTS:realm-object-store-objects> placeholder.cpp)
 target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
-target_link_libraries(realm-object-store PRIVATE realm ${CF_LIBRARY})
+target_link_libraries(realm-object-store PRIVATE realm ${PLATFORM_LIBRARIES})

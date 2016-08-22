@@ -101,8 +101,8 @@ SharedRealm AnyThreadConfined::get_realm() const
         case Type::Results:
             return m_results.get_realm();
     }
+    REALM_UNREACHABLE();
 }
-
 
 _impl::AnyHandover AnyThreadConfined::export_for_handover() const
 {
@@ -122,4 +122,5 @@ _impl::AnyHandover AnyThreadConfined::export_for_handover() const
                                       std::move(sort_order));
         }
     }
+    REALM_UNREACHABLE();
 }

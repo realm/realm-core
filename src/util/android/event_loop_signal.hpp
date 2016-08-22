@@ -104,7 +104,7 @@ private:
       int write = -1;
     } m_message_pipe;
 
-    static int looper_callback(int fd, int events, void* data)
+    static int looper_callback(int fd, int events, void*)
     {
         if ((events & ALOOPER_EVENT_INPUT) != 0) {
             std::shared_ptr<EventLoopSignal>* ptr = nullptr;

@@ -440,6 +440,7 @@ TEST_CASE("results: notifications") {
     }
 }
 
+#if REALM_PLATFORM_APPLE
 TEST_CASE("results: async error handling") {
     InMemoryTestFile config;
     config.cache = false;
@@ -554,6 +555,7 @@ TEST_CASE("results: async error handling") {
         }
     }
 }
+#endif
 
 TEST_CASE("results: notifications after move") {
     InMemoryTestFile config;
