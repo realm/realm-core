@@ -53,6 +53,25 @@ struct IncompatibleLockFile: std::runtime_error {
     }
 };
 
+namespace Durability {
+enum Level {
+    durability_Full,
+    durability_MemOnly,
+    durability_Async    ///< Not yet supported on windows.
+};
+} // end namespace Durability
+
+struct SharedGroupOptions {
+    Durability::Level durability = Durability::durability_Full;
+    const char* encryption_key = nullptr;
+    bool allow_file_format_upgrade = true;
+    std::function<void(int,int)> upgrade_callback = std::function<void(int,int)>();
+    std::string temp_dir = sys_tmp_dir;
+private:
+    const static std::string sys_tmp_dir;
+};
+
+
 /// A SharedGroup facilitates transactions.
 ///
 /// When multiple threads or processes need to access a database
@@ -134,31 +153,20 @@ struct IncompatibleLockFile: std::runtime_error {
 ///    in progress"
 class SharedGroup {
 public:
-    enum DurabilityLevel {
-        durability_Full,
-        durability_MemOnly,
-        durability_Async    ///< Not yet supported on windows.
-    };
 
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and the
     /// upgrade will be aborted.
     explicit SharedGroup(const std::string& file, bool no_create = false,
-                         DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = nullptr,
-                         bool allow_file_format_upgrade = true,
-                         std::function<void(int,int)> upgrade_callback = std::function<void(int,int)>());
+                         SharedGroupOptions options = SharedGroupOptions());
 
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and
     /// the upgrade will be aborted.
     explicit SharedGroup(Replication& repl,
-                         DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = nullptr,
-                         bool allow_file_format_upgrade = true,
-                         std::function<void(int,int)> upgrade_callback = std::function<void(int,int)>());
+                         SharedGroupOptions options = SharedGroupOptions());
 
     struct unattached_tag {};
 
@@ -212,14 +220,11 @@ public:
     ///
     /// \throw FileFormatUpgradeRequired only if \a allow_upgrade is `false`
     ///        and an upgrade is required.
-    void open(const std::string& file, bool no_create = false,
-              DurabilityLevel = durability_Full,
-              const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
+    void open(const std::string& file, bool no_create = false, SharedGroupOptions options = SharedGroupOptions());
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in existence for as long as the SharedGroup.
-    void open(Replication&, DurabilityLevel = durability_Full,
-              const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
+    void open(Replication&, SharedGroupOptions options);
 
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
@@ -546,8 +551,8 @@ private:
 #endif
     std::function<void(int,int)> m_upgrade_callback;
 
-    void do_open(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,
-                 const char* encryption_key, bool allow_file_format_upgrade);
+    void do_open(const std::string& file, bool no_create, bool is_backend,
+                 SharedGroupOptions options);
 
     // Ring buffer management
     bool        ringbuf_is_empty() const noexcept;
@@ -627,7 +632,6 @@ private:
 
     friend class _impl::SharedGroupFriend;
 };
-
 
 
 class ReadTransaction {
@@ -766,12 +770,11 @@ private:
 struct SharedGroup::BadVersion: std::exception {};
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
-                                DurabilityLevel durability, const char* encryption_key,
-                                bool allow_file_format_upgrade, std::function<void(int,int)> upgrade_callback):
+                                SharedGroupOptions options):
     m_group(Group::shared_tag()),
-    m_upgrade_callback(std::move(upgrade_callback))
+    m_upgrade_callback(options.upgrade_callback)
 {
-    open(file, no_create, durability, encryption_key, allow_file_format_upgrade); // Throws
+    open(file, no_create, options); // Throws
 }
 
 inline SharedGroup::SharedGroup(unattached_tag) noexcept:
@@ -779,29 +782,24 @@ inline SharedGroup::SharedGroup(unattached_tag) noexcept:
 {
 }
 
-inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability,
-                                const char* encryption_key, bool allow_file_format_upgrade,
-                                std::function<void(int,int)> upgrade_callback):
+inline SharedGroup::SharedGroup(Replication& repl, SharedGroupOptions options):
     m_group(Group::shared_tag()),
-    m_upgrade_callback(std::move(upgrade_callback))
+    m_upgrade_callback(options.upgrade_callback)
 {
-    open(repl, durability, encryption_key, allow_file_format_upgrade); // Throws
+    open(repl, options); // Throws
 }
 
 inline void SharedGroup::open(const std::string& path, bool no_create_file,
-                              DurabilityLevel durability, const char* encryption_key,
-                              bool allow_file_format_upgrade)
+                              SharedGroupOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
 
     bool is_backend = false;
-    do_open(path, no_create_file, durability, is_backend, encryption_key,
-            allow_file_format_upgrade); // Throws
+    do_open(path, no_create_file, is_backend, options); // Throws
 }
 
-inline void SharedGroup::open(Replication& repl, DurabilityLevel durability,
-                              const char* encryption_key, bool allow_file_format_upgrade)
+inline void SharedGroup::open(Replication& repl, SharedGroupOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -816,8 +814,7 @@ inline void SharedGroup::open(Replication& repl, DurabilityLevel durability,
     std::string file = repl.get_database_path();
     bool no_create   = false;
     bool is_backend  = false;
-    do_open(file, no_create, durability, is_backend, encryption_key,
-            allow_file_format_upgrade); // Throws
+    do_open(file, no_create, is_backend, options); // Throws
 }
 
 inline bool SharedGroup::is_attached() const noexcept
@@ -1119,12 +1116,12 @@ public:
     static void async_daemon_open(SharedGroup& sg, const std::string& file)
     {
         bool no_create = true;
-        SharedGroup::DurabilityLevel durability = SharedGroup::durability_Async;
+        Durability::Level durability = Durability::durability_Async;
         bool is_backend = true;
         const char* encryption_key = nullptr;
         bool allow_file_format_upgrade = false;
-        sg.do_open(file, no_create, durability, is_backend, encryption_key,
-                   allow_file_format_upgrade); // Throws
+        SharedGroupOptions options{ durability, encryption_key, allow_file_format_upgrade };
+        sg.do_open(file, no_create, is_backend, options); // Throws
     }
 
     static int get_file_format_version(const SharedGroup& sg) noexcept
