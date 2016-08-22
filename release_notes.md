@@ -16,7 +16,10 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Changed instruction log format of Set instructions to be more amenable to the
+addition of future variants.
+* Changed instruction log format of LinkList instructions to include information
+about the size of the list in question prior to carrying out the instruction.
 
 ----------------------------------------------
 
@@ -59,10 +62,6 @@
 ### Internals
 
 * Updated the header license to prepare for open sourcing the code.
-* Changed instruction log format of Set instructions to be more amenable to the
-  addition of future variants.
-* Changed instruction log format of LinkList instructions to include information
-  about the size of the list in question prior to carrying out the instruction.
 
 ----------------------------------------------
 
