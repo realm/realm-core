@@ -48,38 +48,32 @@ public:
         m_logger = logger;
     }
 
-    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
-    {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            log("table->set_int(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_int(col_ndx, row_ndx, value); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool set_int_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, int_fast64_t value)
+    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value,
+                 _impl::Instruction variant, size_t prior_num_rows)
     {
         static_cast<void>(prior_num_rows);
+        static_cast<void>(variant);
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_num_rows != m_table->size()))) {
-                return false;
+            if (REALM_UNLIKELY(REALM_COVER_NEVER(variant == _impl::instr_SetUnique))) {
+                if (REALM_UNLIKELY(prior_num_rows != m_table->size())) {
+                    return false;
+                }
             }
-
-            // Here it is acceptable to call the regular version of set_int(), because
-            // we presume that the side-effects of set_int_unique() are already documented
-            // as other instructions preceding this. Calling the set_int_unique() here
-            // would be a waste of time, because all possible side-effects have already
-            // been carried out.
             log("table->set_int(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
+            // Set and SetDefault are identical in this context.
+            // For SetUnique, it is acceptable to call the regular version of
+            // set_int(), because we presume that the side-effects of
+            // set_int_unique() are already documented as other instructions
+            // preceding this. Calling the set_int_unique() here would be a
+            // waste of time, because all possible side-effects have already
+            // been carried out.
             m_table->set_int(col_ndx, row_ndx, value); // Throws
-
             return true;
         }
         return false;
     }
 
-    bool set_bool(size_t col_ndx, size_t row_ndx, bool value)
+    bool set_bool(size_t col_ndx, size_t row_ndx, bool value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_bool(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
@@ -89,7 +83,7 @@ public:
         return false;
     }
 
-    bool set_float(size_t col_ndx, size_t row_ndx, float value)
+    bool set_float(size_t col_ndx, size_t row_ndx, float value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_float(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
@@ -99,7 +93,7 @@ public:
         return false;
     }
 
-    bool set_double(size_t col_ndx, size_t row_ndx, double value)
+    bool set_double(size_t col_ndx, size_t row_ndx, double value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_double(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
@@ -109,38 +103,32 @@ public:
         return false;
     }
 
-    bool set_string(size_t col_ndx, size_t row_ndx, StringData value)
-    {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            log("table->set_string(%1, %2, \"%3\");", col_ndx, row_ndx, value); // Throws
-            m_table->set_string(col_ndx, row_ndx, value); // Throws
-            return true;
-        }
-        return false;
-    }
-
-    bool set_string_unique(size_t col_ndx, size_t row_ndx, size_t prior_num_rows, StringData value)
+    bool set_string(size_t col_ndx, size_t row_ndx, StringData value,
+                    _impl::Instruction variant, size_t prior_num_rows)
     {
         static_cast<void>(prior_num_rows);
+        static_cast<void>(variant);
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
-            if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_num_rows != m_table->size()))) {
-                return false;
+            if (REALM_UNLIKELY(REALM_COVER_NEVER(variant == _impl::instr_SetUnique))) {
+                if (REALM_UNLIKELY(prior_num_rows != m_table->size())) {
+                    return false;
+                }
             }
-
-            // Here it is acceptable to call the regular version of set_string(), because
-            // we presume that the side-effects of set_string_unique() are already documented
-            // as other instructions preceding this. Calling the set_string_unique() here
-            // would be a waste of time, because all possible side-effects have already
-            // been carried out.
             log("table->set_string(%1, %2, \"%3\");", col_ndx, row_ndx, value); // Throws
+            // Set and SetDefault are identical in this context.
+            // For SetUnique, it is acceptable to call the regular version of
+            // set_int(), because we presume that the side-effects of
+            // set_int_unique() are already documented as other instructions
+            // preceding this. Calling the set_int_unique() here would be a
+            // waste of time, because all possible side-effects have already
+            // been carried out.
             m_table->set_string(col_ndx, row_ndx, value); // Throws
-
             return true;
         }
         return false;
     }
 
-    bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData value)
+    bool set_binary(size_t col_ndx, size_t row_ndx, BinaryData value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_binary(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
@@ -150,7 +138,7 @@ public:
         return false;
     }
 
-    bool set_olddatetime(size_t col_ndx, size_t row_ndx, OldDateTime value)
+    bool set_olddatetime(size_t col_ndx, size_t row_ndx, OldDateTime value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_olddatetime(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
@@ -160,7 +148,7 @@ public:
         return false;
     }
 
-    bool set_timestamp(size_t col_ndx, size_t row_ndx, Timestamp value)
+    bool set_timestamp(size_t col_ndx, size_t row_ndx, Timestamp value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_timestamp(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
@@ -170,7 +158,7 @@ public:
         return false;
     }
 
-    bool set_table(size_t col_ndx, size_t row_ndx)
+    bool set_table(size_t col_ndx, size_t row_ndx, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->clear_subtable(%1, %2);", col_ndx, row_ndx); // Throws
@@ -180,7 +168,7 @@ public:
         return false;
     }
 
-    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value)
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed& value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_mixed(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
@@ -190,17 +178,19 @@ public:
         return false;
     }
 
-    bool set_null(size_t col_ndx, size_t row_ndx)
+    bool set_null(size_t col_ndx, size_t row_ndx, _impl::Instruction, size_t)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_null(%1, %2);", col_ndx, row_ndx); // Throws
+            // FIXME: Support "set_null_unique"
             m_table->set_null(col_ndx, row_ndx); // Throws
             return true;
         }
         return false;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, size_t)
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, size_t,
+                  _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             if (target_row_ndx == realm::npos) {
@@ -385,9 +375,8 @@ public:
 
     bool set_link_type(size_t col_ndx, LinkType link_type)
     {
-        DescriptorRef desc = m_desc.lock();
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && desc))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < desc->get_column_count()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
                 using tf = _impl::TableFriend;
                 DataType type = m_table->get_column_type(col_ndx);
                 static_cast<void>(type);
@@ -404,14 +393,13 @@ public:
 
     bool insert_column(size_t col_ndx, DataType type, StringData name, bool nullable)
     {
-        DescriptorRef desc = m_desc.lock();
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(desc))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= desc->get_column_count()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= m_desc->get_column_count()))) {
                 log("desc->insert_column(%1, %2, \"%3\", %4);", col_ndx, data_type_to_str(type),
                     name, nullable); // Throws
                 LinkTargetInfo invalid_link;
                 using tf = _impl::TableFriend;
-                tf::insert_column_unless_exists(*desc, col_ndx, type, name, invalid_link, nullable); // Throws
+                tf::insert_column_unless_exists(*m_desc, col_ndx, type, name, invalid_link, nullable); // Throws
                 return true;
             }
         }
@@ -421,16 +409,15 @@ public:
     bool insert_link_column(size_t col_ndx, DataType type, StringData name,
                        size_t link_target_table_ndx, size_t backlink_col_ndx)
     {
-        DescriptorRef desc = m_desc.lock();
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(desc))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= desc->get_column_count()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= m_desc->get_column_count()))) {
                 log("desc->insert_column_link(%1, %2, \"%3\", LinkTargetInfo(group->get_table(%4), %5));",
                     col_ndx, data_type_to_str(type), name, link_target_table_ndx, backlink_col_ndx); // Throws
                 using gf = _impl::GroupFriend;
                 using tf = _impl::TableFriend;
                 Table* link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
                 LinkTargetInfo link(link_target_table, backlink_col_ndx);
-                tf::insert_column(*desc, col_ndx, type, name, link); // Throws
+                tf::insert_column(*m_desc, col_ndx, type, name, link); // Throws
                 return true;
             }
         }
@@ -439,12 +426,11 @@ public:
 
     bool erase_column(size_t col_ndx)
     {
-        DescriptorRef desc = m_desc.lock();
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(desc))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < desc->get_column_count()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
                 log("desc->remove_column(%1);", col_ndx); // Throws
                 typedef _impl::TableFriend tf;
-                tf::erase_column(*desc, col_ndx); // Throws
+                tf::erase_column(*m_desc, col_ndx); // Throws
                 return true;
             }
         }
@@ -453,12 +439,11 @@ public:
 
     bool erase_link_column(size_t col_ndx, size_t, size_t)
     {
-        DescriptorRef desc = m_desc.lock();
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(desc))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < desc->get_column_count()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
                 log("desc->remove_column(%1);", col_ndx); // Throws
                 typedef _impl::TableFriend tf;
-                tf::erase_column(*desc, col_ndx); // Throws
+                tf::erase_column(*m_desc, col_ndx); // Throws
                 return true;
             }
         }
@@ -467,12 +452,11 @@ public:
 
     bool rename_column(size_t col_ndx, StringData name)
     {
-        DescriptorRef desc = m_desc.lock();
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(desc))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < desc->get_column_count()))) {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
                 log("desc->rename_column(%1, \"%2\");", col_ndx, name); // Throws
                 typedef _impl::TableFriend tf;
-                tf::rename_column(*desc, col_ndx, name); // Throws
+                tf::rename_column(*m_desc, col_ndx, name); // Throws
                 return true;
             }
         }
@@ -481,14 +465,13 @@ public:
 
     bool move_column(size_t col_ndx_1, size_t col_ndx_2)
     {
-        DescriptorRef desc = m_desc.lock();
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(desc))) {
-            size_t column_count = desc->get_column_count();
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
+            size_t column_count = m_desc->get_column_count();
             static_cast<void>(column_count);
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx_1 < column_count && col_ndx_2 < column_count))) {
                 log("desc->move_column(%1, %2);", col_ndx_1, col_ndx_2); // Throws
                 typedef _impl::TableFriend tf;
-                tf::move_column(*desc, col_ndx_1, col_ndx_2); // Throws
+                tf::move_column(*m_desc, col_ndx_1, col_ndx_2); // Throws
                 return true;
             }
         }
@@ -505,17 +488,16 @@ public:
             return false;
         log("desc = table->get_descriptor();"); // Throws
         m_link_list.reset();
-        DescriptorRef desc = m_table->get_descriptor(); // Throws
+        m_desc = m_table->get_descriptor(); // Throws
         for (int i = 0; i < levels; ++i) {
             size_t col_ndx = path[i];
-            if (REALM_UNLIKELY(REALM_COVER_NEVER(col_ndx >= desc->get_column_count())))
+            if (REALM_UNLIKELY(REALM_COVER_NEVER(col_ndx >= m_desc->get_column_count())))
                 return false;
-            if (REALM_UNLIKELY(REALM_COVER_NEVER(desc->get_column_type(col_ndx) != type_Table)))
+            if (REALM_UNLIKELY(REALM_COVER_NEVER(m_desc->get_column_type(col_ndx) != type_Table)))
                 return false;
             log("desc = desc->get_subdescriptor(%1);", col_ndx); // Throws
-            desc = desc->get_subdescriptor(col_ndx);
+            m_desc = m_desc->get_subdescriptor(col_ndx);
         }
-        m_desc = desc;
         return true;
     }
 
@@ -603,24 +585,30 @@ public:
         return true;
     }
 
-    bool link_list_set(size_t link_ndx, size_t value)
+    bool link_list_set(size_t link_ndx, size_t value, size_t prior_size)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx >= m_link_list->size())))
             return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_link_list->size())))
+            return false;
+        static_cast<void>(prior_size);
         log("link_list->set(%1, %2);", link_ndx, value); // Throws
         typedef _impl::LinkListFriend llf;
         llf::do_set(*m_link_list, link_ndx, value); // Throws
         return true;
     }
 
-    bool link_list_insert(size_t link_ndx, size_t value)
+    bool link_list_insert(size_t link_ndx, size_t value, size_t prior_size)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx > m_link_list->size())))
             return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_link_list->size())))
+            return false;
+        static_cast<void>(prior_size);
         log("link_list->insert(%1, %2);", link_ndx, value); // Throws
         m_link_list->insert(link_ndx, value); // Throws
         return true;
@@ -658,12 +646,15 @@ public:
         return true;
     }
 
-    bool link_list_erase(size_t link_ndx)
+    bool link_list_erase(size_t link_ndx, size_t prior_size)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_link_list)))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(link_ndx >= m_link_list->size())))
             return false;
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(prior_size != m_link_list->size())))
+            return false;
+        static_cast<void>(prior_size);
         log("link_list->remove(%1);", link_ndx); // Throws
         typedef _impl::LinkListFriend llf;
         llf::do_remove(*m_link_list, link_ndx); // Throws
@@ -682,19 +673,18 @@ public:
 
     bool nullify_link(size_t col_ndx, size_t row_ndx, size_t target_group_level_ndx)
     {
-        return set_link(col_ndx, row_ndx, realm::npos, target_group_level_ndx);
+        return set_link(col_ndx, row_ndx, realm::npos, target_group_level_ndx, _impl::instr_Set);
     }
 
-    bool link_list_nullify(size_t link_ndx)
+    bool link_list_nullify(size_t link_ndx, size_t prior_size)
     {
-        return link_list_erase(link_ndx);
+        return link_list_erase(link_ndx, prior_size);
     }
 
 private:
     Group& m_group;
     TableRef m_table;
-    // Table has the ownership of Descriptor. Use weak ref to avoid circular refs.
-    std::weak_ptr<Descriptor> m_desc;
+    DescriptorRef m_desc;
     LinkViewRef m_link_list;
     util::Logger* m_logger = nullptr;
 
@@ -727,7 +717,7 @@ private:
             case type_Binary:
                 return "type_Binary";
             case type_OldDateTime:
-                return "type_DataTime"; // FIXME? Can we fix this spelling mistake?
+                return "type_DateTime";
             case type_Timestamp:
                 return "type_Timestamp";
             case type_Table:

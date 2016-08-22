@@ -7575,27 +7575,25 @@ public:
     bool swap_rows(size_t, size_t) { return false; }
     bool change_link_targets(size_t, size_t) { return false; }
     bool clear_table() noexcept { return false; }
-    bool link_list_set(size_t, size_t) { return false; }
-    bool link_list_insert(size_t, size_t) { return false; }
-    bool link_list_erase(size_t) { return false; }
-    bool link_list_nullify(size_t) { return false; }
+    bool link_list_set(size_t, size_t, size_t) { return false; }
+    bool link_list_insert(size_t, size_t, size_t) { return false; }
+    bool link_list_erase(size_t, size_t) { return false; }
+    bool link_list_nullify(size_t, size_t) { return false; }
     bool link_list_clear(size_t) { return false; }
     bool link_list_move(size_t, size_t) { return false; }
     bool link_list_swap(size_t, size_t) { return false; }
-    bool set_int(size_t, size_t, int_fast64_t) { return false; }
-    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return false; }
-    bool set_bool(size_t, size_t, bool) { return false; }
-    bool set_float(size_t, size_t, float) { return false; }
-    bool set_double(size_t, size_t, double) { return false; }
-    bool set_string(size_t, size_t, StringData) { return false; }
-    bool set_string_unique(size_t, size_t, size_t, StringData) { return false; }
-    bool set_binary(size_t, size_t, BinaryData) { return false; }
-    bool set_olddatetime(size_t, size_t, OldDateTime) { return false; }
-    bool set_timestamp(size_t, size_t, Timestamp) { return false; }
-    bool set_table(size_t, size_t) { return false; }
-    bool set_mixed(size_t, size_t, const Mixed&) { return false; }
-    bool set_link(size_t, size_t, size_t, size_t) { return false; }
-    bool set_null(size_t, size_t) { return false; }
+    bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) { return false; }
+    bool set_bool(size_t, size_t, bool, _impl::Instruction) { return false; }
+    bool set_float(size_t, size_t, float, _impl::Instruction) { return false; }
+    bool set_double(size_t, size_t, double, _impl::Instruction) { return false; }
+    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t) { return false; }
+    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction) { return false; }
+    bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction) { return false; }
+    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction) { return false; }
+    bool set_table(size_t, size_t, _impl::Instruction) { return false; }
+    bool set_mixed(size_t, size_t, const Mixed&, _impl::Instruction) { return false; }
+    bool set_link(size_t, size_t, size_t, size_t, _impl::Instruction) { return false; }
+    bool set_null(size_t, size_t, _impl::Instruction, size_t) { return false; }
     bool nullify_link(size_t, size_t, size_t) { return false; }
     bool insert_substring(size_t, size_t, size_t, StringData) { return false; }
     bool erase_substring(size_t, size_t, size_t, size_t) { return false; }
@@ -7729,7 +7727,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 return true;
             }
 
-            bool link_list_nullify(size_t ndx)
+            bool link_list_nullify(size_t ndx, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
@@ -7818,7 +7816,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool set_int(size_t, size_t, int_fast64_t) const
+            bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) const
             {
                 throw ObserverError();
             }
@@ -8708,7 +8706,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 return true;
             }
 
-            bool link_list_insert(size_t ndx, size_t value)
+            bool link_list_insert(size_t ndx, size_t value, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
@@ -8721,7 +8719,8 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 return true;
             }
 
-            bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t)
+            bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t,
+                          _impl::Instruction)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(0, col_ndx);
@@ -8760,7 +8759,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 
             size_t list_ndx = 0;
 
-            bool link_list_insert(size_t ndx, size_t)
+            bool link_list_insert(size_t ndx, size_t, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
@@ -8909,7 +8908,7 @@ void multiple_trackers_reader_thread(TestContext& test_context, std::string path
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 7;
-    const int read_thread_count = 3; // must be less than 42 for correct operation (really?)
+    const int read_thread_count = 3; // must be less than 42 for correct operation
 
     SHARED_GROUP_TEST_PATH(path);
 
@@ -10411,7 +10410,7 @@ TEST(LangBindHelper_HandoverDistinctView)
             CHECK_EQUAL(tv2->get_source_ndx(0), 0);
 
             // Remove distinct property
-            tv2->distinct(std::vector<size_t>());
+            tv2->distinct(SortDescriptor{});
             tv2->sync_if_needed();
             CHECK_EQUAL(tv2->size(), 2);
         }
@@ -10475,45 +10474,37 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
-    SharedGroup::VersionID vid;
-    {
-        // Untyped interface
-        std::unique_ptr<SharedGroup::Handover<TableView> > handover1;
-        {
-            LangBindHelper::promote_to_write(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
 
-            TableRef source = group_w.add_table("source");
-            source->add_column(type_Int, "int");
+    TableRef source = group_w.add_table("source");
+    source->add_column(type_Int, "int");
 
-            TableRef links = group_w.add_table("links");
-            links->add_column_link(type_Link, "link", *source);
+    TableRef links = group_w.add_table("links");
+    links->add_column_link(type_Link, "link", *source);
 
+    source->add_empty_row(100);
+    links->add_empty_row(100);
+    for (int i = 0; i < 100; ++i) {
+        source->set_int(0, i, i);
+        links->set_link(0, i, i);
+    }
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    auto vid = sg_w.get_version_of_current_transaction();
 
-            for (int i = 0; i < 100; ++i) {
-                source->add_empty_row();
-                source->set_int(0, i, i);
+    for (int i = 0; i < 100; ++i) {
+        TableView tv = source->get_backlink_view(i, links.get(), 0);
+        CHECK(tv.is_attached());
+        CHECK_EQUAL(1, tv.size());
+        CHECK_EQUAL(i, tv.get_link(0, 0));
+        auto handover1 = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
+        CHECK(tv.is_attached());
 
-                links->add_empty_row();
-                links->set_link(0, i, i);
-            }
-            LangBindHelper::commit_and_continue_as_read(sg_w);
-            vid = sg_w.get_version_of_current_transaction();
-
-            for (int i = 0; i < 100; ++i) {
-                TableView tv = source->get_backlink_view(i, links.get(), 0);
-                CHECK(tv.is_attached());
-                CHECK_EQUAL(1, tv.size());
-                CHECK_EQUAL(i, tv.get_link(0, 0));
-                handover1 = sg_w.export_for_handover(tv, ConstSourcePayload::Copy);
-                CHECK(tv.is_attached());
-                sg.begin_read(vid);
-                auto tv2 = sg.import_from_handover(std::move(handover1));
-                CHECK(tv2->is_attached());
-                CHECK_EQUAL(1, tv2->size());
-                CHECK_EQUAL(i, tv2->get_link(0, 0));
-                sg.end_read();
-            }
-        }
+        sg.begin_read(vid);
+        auto tv2 = sg.import_from_handover(std::move(handover1));
+        CHECK(tv2->is_attached());
+        CHECK_EQUAL(1, tv2->size());
+        CHECK_EQUAL(i, tv2->get_link(0, 0));
+        sg.end_read();
     }
 }
 

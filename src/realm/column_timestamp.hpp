@@ -28,8 +28,7 @@ namespace realm {
 // column type
 class TimestampColumn : public ColumnBaseSimple {
 public:
-    TimestampColumn(Allocator& alloc, ref_type ref);
-    ~TimestampColumn() noexcept override;
+    TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx = npos);
 
     static ref_type create(Allocator& alloc, size_t size, bool nullable);
 
@@ -89,7 +88,7 @@ public:
     size_t find(Timestamp value, size_t begin, size_t end) const noexcept
     {
         // FIXME: Here we can do all sorts of clever optimizations. Use bithack-search on seconds, then for each match check
-        // nanoseconds, etc, etc, etc. Lots of possibilities. Below code is naive and slow but works.
+        // nanoseconds, etc. Lots of possibilities. Below code is naive and slow but works.
 
         Condition cond;
         for (size_t t = begin; t < end; t++) {

@@ -127,6 +127,8 @@ public:
         return m_path + ".lock"; // ".management/access_control";
     }
     ~SharedGroupTestPathGuard() noexcept;
+private:
+    void cleanup() const noexcept;
 };
 
 } // namespace test_util

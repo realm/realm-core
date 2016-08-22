@@ -78,10 +78,10 @@ public:
     void clear();
 
     void sort(size_t column, bool ascending = true);
-    void sort(std::vector<size_t> columns, std::vector<bool> ascending);
+    void sort(const SortDescriptor& order);
 
-    TableView get_sorted_view(std::vector<size_t> column_indexes, std::vector<bool> ascending) const;
     TableView get_sorted_view(size_t column_index, bool ascending = true) const;
+    TableView get_sorted_view(SortDescriptor order) const;
 
     /// Remove the target row of the specified link from the target table. This
     /// also removes the specified link from this link list, and any other link
@@ -126,6 +126,7 @@ private:
     void detach();
     void set_origin_row_index(size_t row_ndx) noexcept;
 
+    void do_insert(size_t link_ndx, size_t target_row_ndx);
     size_t do_set(size_t link_ndx, size_t target_row_ndx);
     size_t do_remove(size_t link_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
@@ -369,6 +370,11 @@ public:
     {
         bool broken_reciprocal_backlinks = false;
         list.do_clear(broken_reciprocal_backlinks);
+    }
+
+    static void do_insert(LinkView& list, size_t link_ndx, size_t target_row_ndx)
+    {
+        list.do_insert(link_ndx, target_row_ndx);
     }
 };
 

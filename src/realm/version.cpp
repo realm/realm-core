@@ -58,5 +58,5 @@ bool Version::has_feature(Feature feature)
         case feature_Replication:
             return true;
     }
-    return false;
+    return false;  // LCOV_EXCL_LINE
 }

@@ -371,7 +371,7 @@ void BacklinkColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& st
     if (state.track_link_nullifications) {
         bool do_destroy = false;
         for_each_link(row_ndx, do_destroy, [&](size_t origin_row_ndx) {
-            state.links.push_back({m_origin_table.get(), m_origin_column_ndx, origin_row_ndx, row_ndx});
+            state.links.push_back({m_origin_table.get(), get_origin_column_index(), origin_row_ndx, row_ndx});
         });
     }
 }
@@ -383,17 +383,10 @@ void BacklinkColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
             // IntegerColumn::clear() handles the destruction of subtrees
             bool do_destroy = false;
             for_each_link(row_ndx, do_destroy, [&](size_t origin_row_ndx) {
-                state.links.push_back({m_origin_table.get(), m_origin_column_ndx, origin_row_ndx, row_ndx});
+                state.links.push_back({m_origin_table.get(), get_origin_column_index(), origin_row_ndx, row_ndx});
             });
         }
     }
-}
-
-void BacklinkColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
-{
-    IntegerColumn::refresh_accessor_tree(col_ndx, spec); // Throws
-    size_t origin_col_ndx = spec.get_origin_column_ndx(col_ndx);
-    m_origin_column_ndx = origin_col_ndx;
 }
 
 int BacklinkColumn::compare_values(size_t, size_t) const noexcept
