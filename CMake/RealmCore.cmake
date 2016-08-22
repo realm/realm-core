@@ -34,7 +34,7 @@ endif()
 
 function(use_realm_core version_or_path_to_source)
     if("${version_or_path_to_source}" MATCHES "^[0-9]+(\\.[0-9])+")
-        if(APPLE)
+        if(APPLE OR REALM_PLATFORM STREQUAL "Android")
             download_realm_core(${version_or_path_to_source})
         else()
             clone_and_build_realm_core("v${version_or_path_to_source}")
@@ -46,11 +46,20 @@ function(use_realm_core version_or_path_to_source)
 endfunction()
 
 function(download_realm_core core_version)
-    set(core_url "https://static.realm.io/downloads/core/realm-core-${core_version}.tar.xz")
-    set(core_tarball_name "realm-core-${core_version}.tar.xz")
+    if(APPLE)
+        set(core_basename "realm-core")
+        set(core_compression "xz")
+        set(core_platform "")
+    elseif(REALM_PLATFORM STREQUAL "Android")
+        set(core_basename "realm-core-android")
+        set(core_compression "gz")
+        set(core_platform "-android-x86_64")
+    endif()
+    set(core_tarball_name "${core_basename}-${core_version}.tar.${core_compression}")
+    set(core_url "https://static.realm.io/downloads/core/${core_tarball_name}")
     set(core_temp_tarball "/tmp/${core_tarball_name}")
     set(core_directory_parent "${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}")
-    set(core_directory "${core_directory_parent}/realm-core-${core_version}")
+    set(core_directory "${core_directory_parent}/${core_basename}-${core_version}")
     set(core_tarball "${core_directory_parent}/${core_tarball_name}")
 
     if (NOT EXISTS ${core_tarball})
@@ -62,18 +71,28 @@ function(download_realm_core core_version)
         file(COPY ${core_temp_tarball} DESTINATION ${core_directory_parent})
     endif()
 
-    set(core_library_debug ${core_directory}/librealm-dbg.a)
-    set(core_library_release ${core_directory}/librealm.a)
+    set(core_library_debug ${core_directory}/librealm${core_platform}-dbg.a)
+    set(core_library_release ${core_directory}/librealm${core_platform}.a)
     set(core_libraries ${core_library_debug} ${core_library_release})
 
-    add_custom_command(
-        COMMENT "Extracting ${core_tarball_name}"
-        OUTPUT ${core_libraries}
-        DEPENDS ${core_tarball}
-        COMMAND ${CMAKE_COMMAND} -E tar xf ${core_tarball}
-        COMMAND ${CMAKE_COMMAND} -E remove_directory ${core_directory}
-        COMMAND ${CMAKE_COMMAND} -E rename core ${core_directory}
-        COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${core_libraries})
+    if(APPLE)
+        add_custom_command(
+            COMMENT "Extracting ${core_tarball_name}"
+            OUTPUT ${core_libraries}
+            DEPENDS ${core_tarball}
+            COMMAND ${CMAKE_COMMAND} -E tar xf ${core_tarball}
+            COMMAND ${CMAKE_COMMAND} -E remove_directory ${core_directory}
+            COMMAND ${CMAKE_COMMAND} -E rename core ${core_directory}
+            COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${core_libraries})
+    elseif(REALM_PLATFORM STREQUAL "Android")
+        add_custom_command(
+            COMMENT "Extracting ${core_tarball_name}"
+            OUTPUT ${core_libraries}
+            DEPENDS ${core_tarball}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${core_directory}
+            COMMAND ${CMAKE_COMMAND} -E chdir ${core_directory} tar xf ${core_tarball}
+            COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${core_libraries})
+    endif()
 
     add_custom_target(realm-core DEPENDS ${core_libraries})
 

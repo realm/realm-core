@@ -87,4 +87,5 @@ AnyThreadConfined AnyHandover::import_from_handover(SharedRealm realm) &&
                                              SortDescriptor::create_from_and_consume_patch(m_results.sort_order, table)));
         }
     }
+    REALM_UNREACHABLE();
 }
