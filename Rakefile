@@ -222,7 +222,7 @@ end
 REALM_COCOA_SUPPORTED_PLATFORMS = %w(macosx iphone watchos tvos)
 REALM_DOTNET_COCOA_SUPPORTED_PLATFORMS = %w(iphone-no-bitcode)
 
-def platforms supported, requested
+def platforms(supported, requested)
     return supported unless requested
 
     requested = requested.gsub('ios', 'iphone').gsub(/\bosx\b/, 'macosx').split
