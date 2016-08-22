@@ -50,6 +50,7 @@ public:
     static StringData get_extra();
     static std::string get_version();
     static bool is_at_least(int major, int minor, int patch, StringData extra);
+    static bool is_at_least(int major, int minor, int patch);
     static bool has_feature(Feature feature);
 };
 

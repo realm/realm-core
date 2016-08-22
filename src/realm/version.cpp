@@ -53,6 +53,10 @@ bool Version::is_at_least(int major, int minor, int patch, StringData extra)
     return (get_extra() >= extra);
 }
 
+bool Version::is_at_least(int major, int minor, int patch)
+{
+    return is_at_least(major, minor, patch, "");
+}
 
 bool Version::has_feature(Feature feature)
 {
