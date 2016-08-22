@@ -1,4 +1,4 @@
-# 2.0.0 Release notes
+# 2.0.0-rc0 Release notes
 
 ### Internals
 
