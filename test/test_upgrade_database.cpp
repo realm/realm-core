@@ -32,7 +32,6 @@
 #include <realm.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/file.hpp>
-#include <realm/commit_log.hpp>
 #include <realm/version.hpp>
 #include <realm/history.hpp>
 
