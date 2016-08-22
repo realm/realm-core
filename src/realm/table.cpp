@@ -2369,6 +2369,37 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
         }
     }
 
+    // Copy linklist contents from row_ndx to new_row_ndx. row_ndx and
+    // new_row_ndx represent the loser and winner of a PK merge conflict
+    // (respectively), and the winner should end up with all the links.
+    //
+    // A precondition for this logic is that linklist modifications always come
+    // strictly after the primary key has been set, and that the primary key
+    // never changes. This ensures that we never have to merge linklists outside
+    // of operational transform, which we cannot do because we don't have enough
+    // information in Core to perform such a merge.
+    //
+    // Instead, by relying on this invariant it follows that at the point when
+    // a primary key merge conflict is resolved, all linklists of either the
+    // winning or the losing row are empty. This means we can "merge" the rows
+    // by simply moving all elements to the winning row, and rely on OT to
+    // redirect any subsequent linklist operations to the winner.
+    for (size_t col_ndx = 0; col_ndx < backlink_col_start; ++col_ndx) {
+        if (m_spec.get_column_type(col_ndx) == col_type_LinkList) {
+            auto& col = get_column_link_list(col_ndx);
+            LinkViewRef from = col.get(row_ndx);
+            LinkViewRef to = col.get(new_row_ndx);
+            REALM_ASSERT_EX(to->size() == 0 || from->size() == 0, to->size(), from->size());
+            if (from->size() != 0) {
+                using llf = _impl::LinkListFriend;
+                for (size_t i = 0; i < from->size(); ++i) {
+                    llf::do_insert(*to, i, from->get(i).get_index());
+                }
+                llf::do_clear(*from);
+            }
+        }
+    }
+
     bump_version();
 }
 
