@@ -535,11 +535,38 @@ TEST(ColumnString_UpperLowerBounds)
     c.add("ghij");
     c.add("klmop");
 
+    // Create StringEnum
+    ref_type keys;
+    ref_type values;
+    bool res = c.auto_enumerate(keys, values, true);
+    CHECK(res);
+    StringEnumColumn e(Allocator::get_default(), values, keys, false);
+
+    CHECK_EQUAL(e.lower_bound_string("baboo"), 1);
+    CHECK_EQUAL(e.upper_bound_string("baboo"), 1);
+
+    c.destroy();
+    e.destroy();
+}
+
+TEST(StringEnumColumn_UpperLowerBounds)
+{
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn c(Allocator::get_default(), ref);
+
+    c.add("a");
+    c.add("bc");
+    c.add("def");
+    c.add("ghij");
+    c.add("klmop");
+
     CHECK_EQUAL(c.lower_bound_string("baboo"), 1);
     CHECK_EQUAL(c.upper_bound_string("baboo"), 1);
+    // Medium size
     c.add("mnbvcxzlkjhgfdsa");
     CHECK_EQUAL(c.lower_bound_string("def"), 2);
     CHECK_EQUAL(c.upper_bound_string("def"), 3);
+    // Big size
     c.add("qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio qwertyuio ");
     CHECK_EQUAL(c.upper_bound_string("oops"), 6);
 
@@ -568,7 +595,7 @@ TEST_TYPES(ColumnString_AutoEnumerate, non_nullable, nullable)
     ref_type values;
     bool res = c.auto_enumerate(keys, values);
     CHECK(res);
-    StringEnumColumn e(Allocator::get_default(), values, keys, false);
+    StringEnumColumn e(Allocator::get_default(), values, keys, nullable);
 
     // Verify that all entries match source
     CHECK_EQUAL(c.size(), e.size());
@@ -585,6 +612,11 @@ TEST_TYPES(ColumnString_AutoEnumerate, non_nullable, nullable)
     // Search for an existing value
     size_t res2 = e.find_first("klmop");
     CHECK_EQUAL(4, res2);
+
+    if (nullable) {
+        e.set_null(0);
+        CHECK(e.is_null(0));
+    }
 
     // Cleanup
     c.destroy();
@@ -679,6 +711,11 @@ TEST_TYPES(ColumnString_AutoEnumerateIndex, non_nullable, nullable)
     size_t res6 = e.count("newval");
     CHECK_EQUAL(2, res6);
 
+    // Append a value
+    e.add("lastval");
+    auto last_val = e.get(e.size()-1);
+    CHECK_EQUAL("lastval", last_val);
+
     // Delete values
     e.erase(1);
     e.erase(0);
@@ -743,6 +780,41 @@ TEST_TYPES(ColumnString_AutoEnumerateIndexReuse, non_nullable, nullable)
 }
 
 #endif // !defined DISABLE_INDEX
+
+TEST(StringEnumColumn_CloneDeep)
+{
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn o(Allocator::get_default(), ref, false);
+
+    o.add("black");
+    o.add("white");
+    o.add("grey");
+    o.add("white");
+    o.add("black");
+    o.add("black");
+
+    // Create StringEnum
+    ref_type keys;
+    ref_type values;
+    bool res = o.auto_enumerate(keys, values);
+    CHECK(res);
+    StringEnumColumn e(Allocator::get_default(), values, keys, false);
+
+    auto new_ref = e.clone_deep(Allocator::get_default());
+    StringColumn c(Allocator::get_default(), new_ref.get_ref(), false);
+
+    // Verify that all entries match source
+    CHECK_EQUAL(o.size(), e.size());
+    for (size_t i = 0; i < o.size(); ++i) {
+        StringData s1 = o.get(i);
+        StringData s2 = c.get(i);
+        CHECK_EQUAL(s1, s2);
+    }
+
+    o.destroy();
+    e.destroy();
+    c.destroy();
+}
 
 // First test if width expansion (nulls->empty string, nulls->non-empty string, empty string->non-empty string, etc)
 // works. Then do a fuzzy test at the end.
@@ -1549,4 +1621,5 @@ TEST(ColumnString_NonLeafRoot)
         c.destroy();
     }
 }
+
 #endif // TEST_COLUMN_STRING

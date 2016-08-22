@@ -27,8 +27,6 @@
 
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
-#include <realm/util/tuple.hpp>
-#include <realm/column_fwd.hpp>
 #include <realm/table_ref.hpp>
 #include <realm/link_view_fwd.hpp>
 #include <realm/row.hpp>
@@ -37,21 +35,22 @@
 #include <realm/mixed.hpp>
 #include <realm/query.hpp>
 #include <realm/column.hpp>
-#include <realm/column_binary.hpp>
-#include <realm/column_timestamp.hpp>
 
 namespace realm {
 
-class TableView;
-class LinkView;
-class TableViewBase;
-class ConstTableView;
-class StringIndex;
-class Group;
-class LinkColumnBase;
-class LinkColumn;
-class LinkListColumn;
 class BacklinkColumn;
+class BinaryColumy;
+class ConstTableView;
+class Group;
+class LinkColumn;
+class LinkColumnBase;
+class LinkListColumn;
+class LinkView;
+class SortDescriptor;
+class StringIndex;
+class TableView;
+class TableViewBase;
+class TimestampColumn;
 template<class>
 class Columns;
 template<class>
@@ -475,22 +474,22 @@ public:
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
-    void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
+    void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value, bool is_default = false);
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
-    void set_bool(size_t column_ndx, size_t row_ndx, bool value);
-    void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value);
-    void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value);
+    void set_bool(size_t column_ndx, size_t row_ndx, bool value, bool is_default = false);
+    void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value, bool is_default = false);
+    void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value, bool is_default = false);
     template<class E>
     void set_enum(size_t column_ndx, size_t row_ndx, E value);
-    void set_float(size_t column_ndx, size_t row_ndx, float value);
-    void set_double(size_t column_ndx, size_t row_ndx, double value);
-    void set_string(size_t column_ndx, size_t row_ndx, StringData value);
+    void set_float(size_t column_ndx, size_t row_ndx, float value, bool is_default = false);
+    void set_double(size_t column_ndx, size_t row_ndx, double value, bool is_default = false);
+    void set_string(size_t column_ndx, size_t row_ndx, StringData value, bool is_default = false);
     void set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
-    void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
-    void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
-    void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx);
+    void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default = false);
+    void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value, bool is_default = false);
+    void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default = false);
     void nullify_link(size_t column_ndx, size_t row_ndx);
-    void set_null(size_t column_ndx, size_t row_ndx);
+    void set_null(size_t column_ndx, size_t row_ndx, bool is_default = false);
 
     void insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
     void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t substring_size = realm::npos);
@@ -616,8 +615,8 @@ public:
     TableView      get_sorted_view(size_t column_ndx, bool ascending = true);
     ConstTableView get_sorted_view(size_t column_ndx, bool ascending = true) const;
 
-    TableView      get_sorted_view(std::vector<size_t> column_ndx, std::vector<bool> ascending);
-    ConstTableView get_sorted_view(std::vector<size_t> column_ndx, std::vector<bool> ascending) const;
+    TableView      get_sorted_view(SortDescriptor order);
+    ConstTableView get_sorted_view(SortDescriptor order) const;
 
     TableView      get_range_view(size_t begin, size_t end);
     ConstTableView get_range_view(size_t begin, size_t end) const;
@@ -801,7 +800,7 @@ public:
 
     class Parent;
     using HandoverPatch = TableHandoverPatch;
-    static void generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch);
+    static void generate_patch(const Table* ref, std::unique_ptr<HandoverPatch>& patch);
     static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
 
 protected:
@@ -884,7 +883,7 @@ private:
     // point in time. Subdescriptors are kept unique by means of a
     // registry in the parent descriptor. Table::m_descriptor is
     // always null for tables with shared descriptor.
-    mutable Descriptor* m_descriptor;
+    mutable std::weak_ptr<Descriptor> m_descriptor;
 
     // Table view instances
     // Access needs to be protected by m_accessor_mutex
@@ -1648,7 +1647,6 @@ inline Table::Table(Allocator& alloc):
     m_spec(alloc)
 {
     m_ref_count = 1; // Explicitely managed lifetime
-    m_descriptor = nullptr;
 
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = nullptr;
@@ -1662,7 +1660,6 @@ inline Table::Table(const Table& t, Allocator& alloc):
     m_spec(alloc)
 {
     m_ref_count = 1; // Explicitely managed lifetime
-    m_descriptor = nullptr;
 
     ref_type ref = t.clone(alloc); // Throws
     Parent* parent = nullptr;
@@ -1676,7 +1673,6 @@ inline Table::Table(ref_count_tag, Allocator& alloc):
     m_spec(alloc)
 {
     m_ref_count = 0; // Lifetime managed by reference counting
-    m_descriptor = nullptr;
 }
 
 inline Allocator& Table::get_alloc() const
@@ -2225,12 +2221,6 @@ public:
         table.batch_erase_rows(row_indexes, is_move_last_over); // Throws
     }
 
-    static void clear_root_table_desc(const Table& root_table) noexcept
-    {
-        REALM_ASSERT(!root_table.has_shared_type());
-        root_table.m_descriptor = nullptr;
-    }
-
     static Table* get_subtable_accessor(Table& table, size_t col_ndx,
                                         size_t row_ndx) noexcept
     {
@@ -2331,9 +2321,9 @@ public:
         table.mark_opposite_link_tables();
     }
 
-    static Descriptor* get_root_table_desc_accessor(Table& root_table) noexcept
+    static DescriptorRef get_root_table_desc_accessor(Table& root_table) noexcept
     {
-        return root_table.m_descriptor;
+        return root_table.m_descriptor.lock();
     }
 
     typedef Table::AccessorUpdater AccessorUpdater;
