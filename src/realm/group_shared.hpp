@@ -177,19 +177,6 @@ public:
     /// specify the same durability level, otherwise an exception will be
     /// thrown.
     ///
-    /// If \a allow_file_format_upgrade is set to `true`, this function will
-    /// automatically upgrade the file format used in the specified Realm file
-    /// if necessary (and if it is possible). In order to prevent this, set \a
-    /// allow_upgrade to `false`.
-    ///
-    /// If \a allow_upgrade is set to `false`, only two outcomes are possible:
-    ///
-    /// - the specified Realm file is already using the latest file format, and
-    ///   can be used, or
-    ///
-    /// - the specified Realm file uses a deprecated file format, resulting a
-    ///   the throwing of FileFormatUpgradeRequired.
-    ///
     /// Calling open() on a SharedGroup instance that is already in the attached
     /// state has undefined behavior.
     ///
@@ -200,8 +187,8 @@ public:
     /// util::File::AccessError, the derived exception type is thrown. Note that
     /// InvalidDatabase is among these derived exception types.
     ///
-    /// \throw FileFormatUpgradeRequired only if \a allow_upgrade is `false`
-    ///        and an upgrade is required.
+    /// \throw FileFormatUpgradeRequired only if \a SharedGroupOptions::allow_upgrade
+    /// is `false` and an upgrade is required.
     void open(const std::string& file, bool no_create = false, SharedGroupOptions options = {});
 
     /// Open this group in replication mode. The specified Replication instance
