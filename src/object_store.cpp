@@ -136,7 +136,13 @@ void copy_property_values(Property const& prop, Table& table)
 {
     auto copy_property_values = [&](auto getter, auto setter) {
         for (size_t i = 0, count = table.size(); i < count; i++) {
+#if REALM_VER_MAJOR >= 2
+            bool is_default = false;
+            (table.*setter)(prop.table_column, i, (table.*getter)(prop.table_column + 1, i),
+                            is_default);
+#else
             (table.*setter)(prop.table_column, i, (table.*getter)(prop.table_column + 1, i));
+#endif
         }
     };
 
