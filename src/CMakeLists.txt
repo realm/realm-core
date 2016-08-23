@@ -64,6 +64,12 @@ endif()
 
 set(INCLUDE_DIRS ${REALM_CORE_INCLUDE_DIR} ${PEGTL_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
+# Add the sync files separately to reduce merge conflicts.
+list(APPEND HEADERS sync_manager.cpp impl/sync_session.cpp)
+list(APPEND SOURCES sync_manager.cpp impl/sync_session.hpp)
+find_package(ZLIB REQUIRED)
+list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
+
 # An object library to group together the compilation of the source files.
 add_library(realm-object-store-objects OBJECT ${SOURCES} ${HEADERS})
 add_dependencies(realm-object-store-objects realm)
@@ -79,3 +85,7 @@ target_link_libraries(realm-object-store-static PUBLIC realm ${CF_LIBRARY})
 add_library(realm-object-store SHARED $<TARGET_OBJECTS:realm-object-store-objects> placeholder.cpp)
 target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
 target_link_libraries(realm-object-store PRIVATE realm ${CF_LIBRARY})
+
+# Add the sync libraries separately to reduce merge conflicts.
+target_link_libraries(realm-object-store-static PUBLIC realm-sync ${ZLIB_LIBRARIES})
+target_link_libraries(realm-object-store PRIVATE realm-sync ${ZLIB_LIBRARIES})

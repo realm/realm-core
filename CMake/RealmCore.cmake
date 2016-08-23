@@ -142,3 +142,37 @@ function(build_existing_realm_core core_directory)
 
     define_built_realm_core_target(${core_directory})
 endfunction()
+
+function(build_realm_sync sync_directory)
+    get_filename_component(sync_directory ${sync_directory} ABSOLUTE)
+    ExternalProject_Add(realm-sync-lib
+        URL ""
+        PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
+        SOURCE_DIR ${sync_directory}
+        BUILD_IN_SOURCE 1
+        BUILD_ALWAYS 1
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND make -C src/realm librealm-sync.a librealm-sync-dbg.a ${MAKE_FLAGS}
+        INSTALL_COMMAND ""
+        ${USES_TERMINAL_BUILD}
+        )
+    set(sync_library_debug ${sync_directory}/src/realm/librealm-sync-dbg.a)
+    set(sync_library_release ${sync_directory}/src/realm/librealm-sync.a)
+    set(sync_libraries ${sync_library_debug} ${sync_library_release})
+
+    ExternalProject_Add_Step(realm-sync-lib ensure-libraries
+        COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${sync_libraries}
+        OUTPUT ${sync_libraries}
+        DEPENDEES build
+        )
+
+    add_library(realm-sync STATIC IMPORTED)
+    add_dependencies(realm-sync realm-sync-lib)
+
+    set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_DEBUG ${sync_library_debug})
+    set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_COVERAGE ${sync_library_debug})
+    set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_RELEASE ${sync_library_release})
+    set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION ${sync_library_release})
+
+    set(REALM_SYNC_INCLUDE_DIR ${sync_directory}/src PARENT_SCOPE)
+endfunction()

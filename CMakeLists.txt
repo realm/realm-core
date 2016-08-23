@@ -12,6 +12,7 @@ include(Sanitizers)
 include(RealmCore)
 set(REALM_CORE_VERSION "1.5.0" CACHE STRING "")
 use_realm_core(${REALM_CORE_VERSION})
+build_realm_sync(${REALM_SYNC_PREFIX})
 
 set(PEGTL_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pegtl)
 
