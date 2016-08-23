@@ -34,6 +34,9 @@ try {
         setBuildName("Tag ${gitTag}")
       }
     }
+
+    rpmVersion = dependencies.VERSION.replaceAll("-", "_")
+    echo "rpm version: ${rpmVersion}"
   }
 
   stage 'check'
@@ -75,7 +78,7 @@ try {
       stage 'trigger release'
       build job: 'sync_release/realm-core-rpm-release',
         wait: false,
-        parameters: [[$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"]]
+        parameters: [[$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${rpmVersion}-${env.BUILD_NUMBER}"]]
     }
   }
 } catch(Exception e) {
@@ -461,9 +464,8 @@ def environment() {
 def readGitTag() {
   sh "git describe --exact-match --tags HEAD | tail -n 1 > tag.txt 2>&1 || true"
   def tag = readFile('tag.txt').trim()
-  return "v2.0.0-rc0"
-/*  return tag
-*/}
+  return tag
+}
 
 def readGitSha() {
   sh "git rev-parse HEAD | cut -b1-8 > sha.txt"
