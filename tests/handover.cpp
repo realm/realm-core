@@ -20,12 +20,12 @@
 
 #include "util/test_file.hpp"
 
-#include "thread_confined.hpp"
 #include "list.hpp"
 #include "object_accessor.hpp"
 #include "object_schema.hpp"
 #include "property.hpp"
 #include "schema.hpp"
+#include "thread_confined.hpp"
 
 #include <realm/commit_log.hpp>
 #include <realm/util/optional.hpp>
@@ -154,7 +154,7 @@ TEST_CASE("handover") {
 
             REQUIRE(num.row().get_int(0) == 7);
             auto h = r->package_for_handover({{{num}}});
-            std::thread([h{std::move(h)}, config]() mutable {
+            std::thread([h = std::move(h), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
                 auto results = Results(r, get_table(*r, int_object)->where());
                 REQUIRE(results.size() == 1);
@@ -190,7 +190,7 @@ TEST_CASE("handover") {
 
             auto h1 = r->package_for_handover({{{commit_new_num(1)}}});
             auto h2 = r->package_for_handover({{{commit_new_num(2)}}});
-            std::thread([h1{std::move(h1)}, h2{std::move(h2)}, config]() mutable {
+            std::thread([h1 = std::move(h1), h2 = std::move(h2), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
                 auto h2_import = r->accept_handover(std::move(h2));
                 auto h1_import = r->accept_handover(std::move(h1));
@@ -251,7 +251,7 @@ TEST_CASE("handover") {
             auto results = Results(r, get_table(*r, int_object)->where());
             REQUIRE(results.size() == 1);
             auto h = r->package_for_handover({});
-            std::thread([h{std::move(h)}, config]() mutable {
+            std::thread([h = std::move(h), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
                 auto h_import = r->accept_handover(std::move(h));
 
@@ -276,7 +276,7 @@ TEST_CASE("handover") {
             REQUIRE(str.row().get_string(0).is_null());
             REQUIRE(num.row().get_int(0) == 0);
             auto h = r->package_for_handover({{str}, {num}});
-            std::thread([h{std::move(h)}, config]() mutable {
+            std::thread([h = std::move(h), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
                 auto h_import = r->accept_handover(std::move(h));
                 Object str = h_import[0].get_object();
@@ -310,7 +310,7 @@ TEST_CASE("handover") {
             REQUIRE(lst.size() == 1);
             REQUIRE(lst.get(0).get_int(0) == 0);
             auto h = r->package_for_handover({{lst}});
-            std::thread([h{std::move(h)}, config]() mutable {
+            std::thread([h = std::move(h), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
                 auto h_import = r->accept_handover(std::move(h));
                 List lst = h_import[0].get_list();
@@ -359,7 +359,7 @@ TEST_CASE("handover") {
             REQUIRE(results.get(1).get_string(0) == "B");
             REQUIRE(results.get(2).get_string(0) == "A");
             auto h = r->package_for_handover({{results}});
-            std::thread([h{std::move(h)}, config]() mutable {
+            std::thread([h = std::move(h), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
                 auto h_import = r->accept_handover(std::move(h));
                 Results results = h_import[0].get_results();
@@ -402,7 +402,7 @@ TEST_CASE("handover") {
             REQUIRE(results.size() == 1);
             REQUIRE(results.get(0).get_int(0) == 5);
             auto h = r->package_for_handover({{num}, {lst}, {results}});
-            std::thread([h{std::move(h)}, config]() mutable {
+            std::thread([h = std::move(h), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
                 auto h_import = r->accept_handover(std::move(h));
                 Object num = h_import[0].get_object();
@@ -446,7 +446,7 @@ TEST_CASE("handover") {
         r->commit_transaction();
         REQUIRE(num.get_object_schema().name == "int_object");
         auto h = r->package_for_handover({{num}});
-        std::thread([h{std::move(h)}, config]() mutable {
+        std::thread([h = std::move(h), config]() mutable {
             SharedRealm r = Realm::get_shared_realm(config);
             auto h_import = r->accept_handover(std::move(h));
             Object num = h_import[0].get_object();

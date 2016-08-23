@@ -15,6 +15,7 @@ set(SOURCES
     impl/realm_coordinator.cpp
     impl/results_notifier.cpp
     impl/transact_log_handler.cpp
+    impl/weak_realm_notifier.cpp
     parser/parser.cpp
     parser/query_builder.cpp
     util/format.cpp)
@@ -30,6 +31,11 @@ set(HEADERS
     schema.hpp
     shared_realm.hpp
     thread_confined.hpp
+
+    impl/android/external_commit_helper.hpp
+    impl/apple/external_commit_helper.hpp
+    impl/generic/external_commit_helper.hpp
+
     impl/collection_change_builder.hpp
     impl/collection_notifier.hpp
     impl/external_commit_helper.hpp
@@ -39,27 +45,26 @@ set(HEADERS
     impl/results_notifier.hpp
     impl/transact_log_handler.hpp
     impl/weak_realm_notifier.hpp
-    impl/weak_realm_notifier_base.hpp
+
     parser/parser.hpp
     parser/query_builder.hpp
+
+    util/android/event_loop_signal.hpp
+    util/apple/event_loop_signal.hpp
+    util/generic/event_loop_signal.hpp
+    util/node/event_loop_signal.hpp
+
     util/atomic_shared_ptr.hpp
     util/compiler.hpp
+    util/event_loop_signal.hpp
     util/format.hpp)
 
 if(APPLE)
-    list(APPEND SOURCES
-        impl/apple/weak_realm_notifier.cpp
-        impl/apple/external_commit_helper.cpp)
-    list(APPEND HEADERS
-        impl/apple/weak_realm_notifier.hpp
-        impl/apple/external_commit_helper.hpp)
-    find_library(CF_LIBRARY CoreFoundation)
+    list(APPEND SOURCES impl/apple/external_commit_helper.cpp)
+elseif(REALM_PLATFORM STREQUAL "Android")
+    list(APPEND SOURCES impl/android/external_commit_helper.cpp)
 else()
-    list(APPEND SOURCES
-        impl/generic/external_commit_helper.cpp)
-    list(APPEND HEADERS
-        impl/generic/weak_realm_notifier.hpp
-        impl/generic/external_commit_helper.hpp)
+    list(APPEND SOURCES impl/generic/external_commit_helper.cpp)
 endif()
 
 set(INCLUDE_DIRS ${REALM_CORE_INCLUDE_DIR} ${PEGTL_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
@@ -79,12 +84,12 @@ target_include_directories(realm-object-store-objects PUBLIC ${INCLUDE_DIRS})
 # A static library, aggregating the prebuilt object files.
 add_library(realm-object-store-static STATIC $<TARGET_OBJECTS:realm-object-store-objects>)
 target_include_directories(realm-object-store-static PUBLIC ${INCLUDE_DIRS})
-target_link_libraries(realm-object-store-static PUBLIC realm ${CF_LIBRARY})
+target_link_libraries(realm-object-store-static PUBLIC realm ${PLATFORM_LIBRARIES})
 
 # A dynamic library, linking together the prebuilt object files.
 add_library(realm-object-store SHARED $<TARGET_OBJECTS:realm-object-store-objects> placeholder.cpp)
 target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
-target_link_libraries(realm-object-store PRIVATE realm ${CF_LIBRARY})
+target_link_libraries(realm-object-store PRIVATE realm ${PLATFORM_LIBRARIES})
 
 # Add the sync libraries separately to reduce merge conflicts.
 target_link_libraries(realm-object-store-static PUBLIC realm-sync ${ZLIB_LIBRARIES})

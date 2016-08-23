@@ -16,32 +16,17 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/weak_realm_notifier_base.hpp"
+#include "catch.hpp"
+#include "object_store.hpp"
+#include <realm/string_data.hpp>
 
-typedef struct uv_async_s uv_async_t;
+using namespace realm;
 
-namespace realm {
-class Realm;
+TEST_CASE("ObjectStore: table_name_for_object_type()") {
 
-namespace _impl {
-
-class WeakRealmNotifier : public WeakRealmNotifierBase {
-public:
-    WeakRealmNotifier(const std::shared_ptr<Realm>& realm, bool cache);
-    ~WeakRealmNotifier();
-
-    WeakRealmNotifier(WeakRealmNotifier&&);
-    WeakRealmNotifier& operator=(WeakRealmNotifier&&);
-
-    WeakRealmNotifier(const WeakRealmNotifier&) = delete;
-    WeakRealmNotifier& operator=(const WeakRealmNotifier&) = delete;
-
-    // Asynchronously call notify() on the Realm on the main thread.
-    void notify();
-
-private:
-    uv_async_t* m_handle;
-};
-
-} // namespace _impl
-} // namespace realm
+    SECTION("should work with strings that aren't null-terminated") {
+        auto input = StringData("good_no_bad", 4);
+        auto result = ObjectStore::table_name_for_object_type(input);
+        REQUIRE(result == "class_good");
+    }
+}

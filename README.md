@@ -22,7 +22,7 @@ Please report bugs against the Realm product that you're using:
 
 ## Supported Platforms
 
-The object store's CMake build system currently only suports building for OS X and Linux. Building for Linux requires
+The object store's CMake build system currently only suports building for OS X, Linux, and Android. Building for Linux requires
 [building against a local version of core](#building-against-a-local-version-of-core).
 
 The object store code supports being built for all Apple platforms, Linux and Android when used along with the relevant Realm product's build system.
@@ -43,6 +43,12 @@ The object store code supports being built for all Apple platforms, Linux and An
 
     ```
     cmake .
+    ```
+
+    If building for Android, the path for the Android NDK must be specified. For example, if it was installed with homebrew:
+
+    ```
+    cmake -DREALM_PLATFORM=Android -DANDROID_NDK=/usr/local/Cellar/android-ndk-r10e/r10e/ .
     ```
 
 4. Build:

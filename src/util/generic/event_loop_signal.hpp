@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2015 Realm Inc.
+// Copyright 2016 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,35 +16,17 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/weak_realm_notifier_base.hpp"
-
-#include <CoreFoundation/CFRunLoop.h>
-
 namespace realm {
-class Realm;
+namespace util {
 
-namespace _impl {
-
-class WeakRealmNotifier : public WeakRealmNotifierBase {
+template<typename Callback>
+class EventLoopSignal {
 public:
-    WeakRealmNotifier(const std::shared_ptr<Realm>& realm, bool cache);
-    ~WeakRealmNotifier();
-
-    WeakRealmNotifier(WeakRealmNotifier&&);
-    WeakRealmNotifier& operator=(WeakRealmNotifier&&);
-
-    WeakRealmNotifier(const WeakRealmNotifier&) = delete;
-    WeakRealmNotifier& operator=(const WeakRealmNotifier&) = delete;
-
-    // Asynchronously call notify() on the Realm on the appropriate thread
-    void notify();
-
-private:
-    void invalidate();
-
-    CFRunLoopRef m_runloop;
-    CFRunLoopSourceRef m_signal;
+    EventLoopSignal(Callback&&) { }
+    // Do nothing, as this can't be implemented portably
+    void notify() { }
 };
 
-} // namespace _impl
+} // namespace util
 } // namespace realm
+

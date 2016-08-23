@@ -34,6 +34,20 @@ template<typename Derived>
 struct MarkDirtyMixin  {
     bool mark_dirty(size_t row, size_t col) { static_cast<Derived *>(this)->mark_dirty(row, col); return true; }
 
+#if REALM_VER_MAJOR >= 2
+    bool set_int(size_t col, size_t row, int_fast64_t, _impl::Instruction, size_t) { return mark_dirty(row, col); }
+    bool set_bool(size_t col, size_t row, bool, _impl::Instruction) { return mark_dirty(row, col); }
+    bool set_float(size_t col, size_t row, float, _impl::Instruction) { return mark_dirty(row, col); }
+    bool set_double(size_t col, size_t row, double, _impl::Instruction) { return mark_dirty(row, col); }
+    bool set_string(size_t col, size_t row, StringData, _impl::Instruction, size_t) { return mark_dirty(row, col); }
+    bool set_binary(size_t col, size_t row, BinaryData, _impl::Instruction) { return mark_dirty(row, col); }
+    bool set_olddatetime(size_t col, size_t row, OldDateTime, _impl::Instruction) { return mark_dirty(row, col); }
+    bool set_timestamp(size_t col, size_t row, Timestamp, _impl::Instruction) { return mark_dirty(row, col); }
+    bool set_table(size_t col, size_t row, _impl::Instruction) { return mark_dirty(row, col); }
+    bool set_mixed(size_t col, size_t row, const Mixed&, _impl::Instruction) { return mark_dirty(row, col); }
+    bool set_link(size_t col, size_t row, size_t, size_t, _impl::Instruction) { return mark_dirty(row, col); }
+    bool set_null(size_t col, size_t row, _impl::Instruction, size_t) { return mark_dirty(row, col); }
+#else
     bool set_int(size_t col, size_t row, int_fast64_t) { return mark_dirty(row, col); }
     bool set_bool(size_t col, size_t row, bool) { return mark_dirty(row, col); }
     bool set_float(size_t col, size_t row, float) { return mark_dirty(row, col); }
@@ -46,6 +60,7 @@ struct MarkDirtyMixin  {
     bool set_mixed(size_t col, size_t row, const Mixed&) { return mark_dirty(row, col); }
     bool set_link(size_t col, size_t row, size_t, size_t) { return mark_dirty(row, col); }
     bool set_null(size_t col, size_t row) { return mark_dirty(row, col); }
+#endif
     bool nullify_link(size_t col, size_t row, size_t) { return mark_dirty(row, col); }
     bool set_int_unique(size_t col, size_t row, size_t, int_fast64_t) { return mark_dirty(row, col); }
     bool set_string_unique(size_t col, size_t row, size_t, StringData) { return mark_dirty(row, col); }
@@ -139,15 +154,24 @@ public:
     bool erase_rows(size_t, size_t, size_t, bool) { return true; }
     bool swap_rows(size_t, size_t) { return true; }
     bool clear_table() noexcept { return true; }
-    bool link_list_set(size_t, size_t) { return true; }
-    bool link_list_insert(size_t, size_t) { return true; }
-    bool link_list_erase(size_t) { return true; }
-    bool link_list_nullify(size_t) { return true; }
+    bool link_list_set(size_t, size_t, size_t) { return true; }
+    bool link_list_insert(size_t, size_t, size_t) { return true; }
+    bool link_list_erase(size_t, size_t) { return true; }
+    bool link_list_nullify(size_t, size_t) { return true; }
     bool link_list_clear(size_t) { return true; }
     bool link_list_move(size_t, size_t) { return true; }
     bool link_list_swap(size_t, size_t) { return true; }
     bool change_link_targets(size_t, size_t) { return true; }
     bool optimize_table() { return true; }
+
+#if REALM_VER_MAJOR < 2
+    // Translate calls into their modern equivalents, relying on the fact that we do not
+    // care about the value of the new `prior_size` argument.
+    bool link_list_set(size_t index, size_t value) { return link_list_set(index, value, npos); }
+    bool link_list_insert(size_t index, size_t value) {  return link_list_insert(index, value, npos); }
+    bool link_list_erase(size_t index) { return link_list_erase(index, npos); }
+    bool link_list_nullify(size_t index) { return link_list_nullify(index, npos); }
+#endif
 };
 
 
@@ -375,25 +399,25 @@ public:
         }
     }
 
-    bool link_list_set(size_t index, size_t)
+    bool link_list_set(size_t index, size_t, size_t)
     {
         append_link_list_change(ColumnInfo::Kind::Set, index);
         return true;
     }
 
-    bool link_list_insert(size_t index, size_t)
+    bool link_list_insert(size_t index, size_t, size_t)
     {
         append_link_list_change(ColumnInfo::Kind::Insert, index);
         return true;
     }
 
-    bool link_list_erase(size_t index)
+    bool link_list_erase(size_t index, size_t)
     {
         append_link_list_change(ColumnInfo::Kind::Remove, index);
         return true;
     }
 
-    bool link_list_nullify(size_t index)
+    bool link_list_nullify(size_t index, size_t)
     {
         append_link_list_change(ColumnInfo::Kind::Remove, index);
         return true;
@@ -480,6 +504,15 @@ public:
     }
 
     bool insert_link_column(size_t ndx, DataType type, StringData name, size_t, size_t) { return insert_column(ndx, type, name, false); }
+
+#if REALM_VER_MAJOR < 2
+    // Translate calls into their modern equivalents, relying on the fact that we do not
+    // care about the value of the new `prior_size` argument.
+    bool link_list_set(size_t index, size_t value) { return link_list_set(index, value, npos); }
+    bool link_list_insert(size_t index, size_t value) {  return link_list_insert(index, value, npos); }
+    bool link_list_erase(size_t index) { return link_list_erase(index, npos); }
+    bool link_list_nullify(size_t index) { return link_list_nullify(index, npos); }
+#endif
 };
 
 // Extends TransactLogValidator to track changes made to LinkViews
@@ -541,36 +574,36 @@ public:
         return true;
     }
 
-    bool link_list_set(size_t index, size_t)
+    bool link_list_set(size_t index, size_t, size_t)
     {
         if (m_active)
             m_active->modify(index);
         return true;
     }
 
-    bool link_list_insert(size_t index, size_t)
+    bool link_list_insert(size_t index, size_t, size_t)
     {
         if (m_active)
             m_active->insert(index);
         return true;
     }
 
-    bool link_list_erase(size_t index)
+    bool link_list_erase(size_t index, size_t)
     {
         if (m_active)
             m_active->erase(index);
         return true;
     }
 
-    bool link_list_nullify(size_t index)
+    bool link_list_nullify(size_t index, size_t prior_size)
     {
-        return link_list_erase(index);
+        return link_list_erase(index, prior_size);
     }
 
     bool link_list_swap(size_t index1, size_t index2)
     {
-        link_list_set(index1, 0);
-        link_list_set(index2, 0);
+        link_list_set(index1, 0, npos);
+        link_list_set(index2, 0, npos);
         return true;
     }
 
@@ -672,6 +705,15 @@ public:
     }
 
     bool insert_link_column(size_t ndx, DataType type, StringData name, size_t, size_t) { return insert_column(ndx, type, name, false); }
+
+#if REALM_VER_MAJOR < 2
+    // Translate calls into their modern equivalents, relying on the fact that we do not
+    // care about the value of the new `prior_size` argument.
+    bool link_list_set(size_t index, size_t value) { return link_list_set(index, value, npos); }
+    bool link_list_insert(size_t index, size_t value) {  return link_list_insert(index, value, npos); }
+    bool link_list_erase(size_t index) { return link_list_erase(index, npos); }
+    bool link_list_nullify(size_t index) { return link_list_nullify(index, npos); }
+#endif
 };
 } // anonymous namespace
 

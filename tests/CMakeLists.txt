@@ -17,11 +17,12 @@ set(SOURCES
     results.cpp
     schema.cpp
     transaction_log_parsing.cpp
+    object_store.cpp
     util/test_file.cpp
 )
 
 add_executable(tests ${SOURCES} ${HEADERS})
-target_link_libraries(tests realm-object-store)
+target_link_libraries(tests realm-object-store realm ${PLATFORM_LIBRARIES})
 
 create_coverage_target(generate-coverage tests)
 
