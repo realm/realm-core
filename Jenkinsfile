@@ -33,7 +33,8 @@ parallel (
   buildCocoa: doBuildCocoa(),
   buildNodeLinux: doBuildNodeInDocker(),
   buildNodeOsx: doBuildNodeInOsx(),
-  buildDotnetOsx: doBuildDotNetOsx()
+  buildDotnetOsx: doBuildDotNetOsx(),
+  buildAndroid: doBuildAndroid()
 )
 
 stage 'build-packages'
@@ -236,6 +237,86 @@ def doBuildNodeInOsx() {
       }
     }
   }
+}
+
+def doBuildAndroid() {
+    def target = 'build-android'
+    def buildName = "android-${target}-with-encryption"
+
+    def environment = environment()
+    environment << "REALM_ENABLE_ENCRYPTION=yes"
+    environment << "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin:/usr/local/bin:/opt/android-sdk-linux/tools:/opt/android-sdk-linux/platform-tools:/opt/android-ndk-r10e"
+    environment << "ANDROID_NDK_HOME=/opt/android-ndk-r10e"
+
+    return {
+        node('fastlinux') {
+            checkout scm
+            sh 'git clean -ffdx -e .????????'
+
+            withEnv(environment) {
+              sh "sh build.sh config '${pwd()}/install'"
+              sh "sh build.sh ${target}"
+            }
+
+            dir('test/android') {
+                sh '$ANDROID_HOME/tools/android update project -p . --target android-9'
+                environment << "NDK_PROJECT_PATH=${pwd()}"
+                withEnv(environment) {
+                    dir('jni') {
+                        sh "${env.ANDROID_NDK_HOME}/ndk-build V=1"
+                    }
+                    sh 'ant debug'
+                    dir('bin') {
+                        stash includes: 'NativeActivity-debug.apk', name: 'android'
+                    }
+                }
+            }
+            collectCompilerWarnings('gcc')
+        }
+
+        node('android-hub') {
+            sh 'rm -rf *'
+            unstash 'android'
+
+            sh 'adb devices | tee devices.txt'
+            def adbDevices = readFile('devices.txt')
+            def devices = getDeviceNames(adbDevices)
+
+            if (!devices) {
+                throw new IllegalStateException('No devices were found')
+            }
+
+            def device = devices[0] // Run the tests only on one device
+
+            timeout(10) {
+                sh """
+                set -ex
+                adb -s ${device} uninstall io.realm.coretest
+                adb -s ${device} install NativeActivity-debug.apk
+                adb -s ${device} logcat -c
+                adb -s ${device} shell am start -a android.intent.action.MAIN -n io.realm.coretest/android.app.NativeActivity
+                """
+
+                sh """
+                set -ex
+                prefix="The XML file is located in "
+                while [ true ]; do
+                    sleep 10
+                    line=\$(adb -s ${device} logcat -d -s native-activity 2>/dev/null | grep -m 1 -oE "\$prefix.*\\\$" | tr -d "\r")
+                    if [ ! -z "\${line}" ]; then
+                    	xml_file="\$(echo \$line | cut -d' ' -f7)"
+                        adb -s ${device} pull "\$xml_file"
+                        adb -s ${device} shell am force-stop io.realm.coretest
+                    	break
+                    fi
+                done
+                mkdir -p test
+                cp unit-test-report.xml test/unit-test-report.xml
+                """
+            }
+            recordTests('android-device')
+        }
+    }
 }
 
 def recordTests(tag) {
