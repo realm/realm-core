@@ -87,6 +87,12 @@ void SyncManager::set_error_handler(std::function<sync::Client::ErrorHandler> ha
     m_error_handler = std::move(handler);
 }
 
+void SyncManager::set_login_function(SyncLoginFunction login_function)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_login_function = std::move(login_function);
+}
+
 std::unique_ptr<SyncSession> SyncManager::create_session(std::string realm_path) const
 {
     auto& client = get_sync_client(); // Throws
@@ -99,6 +105,14 @@ sync::Client& SyncManager::get_sync_client() const
     if (!m_sync_client)
         m_sync_client = create_sync_client(); // Throws
     return m_sync_client->client;
+}
+
+SyncLoginFunction& SyncManager::get_sync_login_function()
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    // Precondition: binding must set a login callback before connecting any synced Realms.
+    REALM_ASSERT(m_login_function);
+    return m_login_function;
 }
 
 std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
