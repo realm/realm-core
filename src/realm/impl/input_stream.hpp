@@ -189,11 +189,10 @@ private:
 class ChangesetInputStream: public NoCopyInputStream {
 public:
     using version_type = History::version_type;
-    static constexpr unsigned BUFFER_SIZE = 1024;
     static constexpr unsigned NB_BUFFERS = 8;
 
     ChangesetInputStream(History& hist, version_type begin_version, version_type end_version)
-        : m_history(hist), m_begin_version(begin_version), m_end_version(end_version), m_buffer(new char[BUFFER_SIZE])
+        : m_history(hist), m_begin_version(begin_version), m_end_version(end_version)
     {
         get_changeset();
     }
@@ -201,11 +200,11 @@ public:
     bool next_block(const char*& begin, const char*& end) override
     {
         while (m_valid) {
-            size_t actual = m_changesets_begin->read(m_buffer.get(), BUFFER_SIZE);
+            BinaryData actual = m_changesets_begin->get_next();
 
-            if (actual > 0) {
-                begin = m_buffer.get();
-                end = m_buffer.get() + actual;
+            if (actual.size() > 0) {
+                begin = actual.data();
+                end = actual.data() + actual.size();
                 return true;
             }
 
@@ -225,7 +224,6 @@ private:
     BinaryIterator* m_changesets_begin = nullptr;
     BinaryIterator* m_changesets_end = nullptr;
     bool m_valid;
-    std::unique_ptr<char[]> m_buffer;
 
     void get_changeset()
     {

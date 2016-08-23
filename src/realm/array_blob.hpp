@@ -30,7 +30,7 @@ public:
     ~ArrayBlob() noexcept override {}
 
     const char* get(size_t index) const noexcept;
-    size_t read(size_t pos, char* buffer, size_t max_size) const noexcept;
+    BinaryData get_at(size_t& pos) const noexcept;
     bool is_null(size_t index) const noexcept;
     ref_type add(const char* data, size_t data_size, bool add_zero_term = false);
     void insert(size_t pos, const char* data, size_t data_size, bool add_zero_term = false);

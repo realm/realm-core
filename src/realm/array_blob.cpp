@@ -30,48 +30,41 @@ namespace {
 constexpr size_t max_blob_node_size = (max_array_payload - Array::header_size) & 0xFFFFFFF0;
 }
 
-size_t ArrayBlob::read(size_t pos, char* buffer, size_t max_size) const noexcept
+BinaryData ArrayBlob::get_at(size_t& pos) const noexcept
 {
+    size_t offset = pos;
     if (get_context_flag()) {
-        size_t size_copied = 0;
         size_t ndx = 0;
         size_t current_size = Array::get_size_from_header(m_alloc.translate(Array::get_as_ref(ndx)));
 
         // Find the blob to start from
-        while (pos >= current_size) {
+        while (offset >= current_size) {
             ndx++;
             if (ndx >= size()) {
-                return 0;
+                pos = 0;
+                return {};
             }
-            pos -= current_size;
+            offset -= current_size;
             current_size = Array::get_size_from_header(m_alloc.translate(Array::get_as_ref(ndx)));
         }
 
-        while (max_size) {
-            ArrayBlob blob(m_alloc);
-            blob.init_from_ref(Array::get_as_ref(ndx));
+        ArrayBlob blob(m_alloc);
+        blob.init_from_ref(Array::get_as_ref(ndx));
+        ndx++;
+        size_t sz = current_size - offset;
+        pos = (ndx >= size()) ? 0 : pos + sz;
 
-            size_t actual = blob.read(pos, buffer, max_size);
-            // Read from start of blob the next time around
-            pos = 0;
-            size_copied += actual;
-            max_size -= actual;
-            buffer += actual;
-
-            if (max_size) {
-                ndx++;
-                if (ndx >= size()) {
-                    break;
-                }
-            }
-        }
-        return size_copied;
+        return {blob.get(offset), sz};
     }
     else {
         // All data is in this array
-        size_t size_to_copy = (pos > m_size) ? 0 : std::min(max_size, m_size - pos);
-        std::copy(m_data + pos, m_data + pos + size_to_copy, buffer);
-        return size_to_copy;
+        pos = 0;
+        if (offset < size()){
+            return {get(offset), size() - offset};
+        }
+        else {
+            return {};
+        }
     }
 }
 

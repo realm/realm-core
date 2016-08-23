@@ -554,12 +554,14 @@ TEST(BinaryColumn_NonLeafRoot)
     }
 }
 
-TEST(BinaryColumn_Read)
+TEST(BinaryColumn_get_at)
 {
+    BinaryData read;
+    size_t get_pos;
+
     std::string hello = "Hello, world";
     std::string very_lazy_fox =
         "The lazy fox jumped over the quick brown dog. The quick fox jumped over the lazy brown dog. ";
-    char buffer[1000];
 
     ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
     BinaryColumn c(Allocator::get_default(), ref, true);
@@ -567,48 +569,50 @@ TEST(BinaryColumn_Read)
     c.add(BinaryData());
     c.add(BinaryData(hello));
 
+    // First one should be NULL
     CHECK(c.get(0).is_null());
-    size_t read = c.read(0, 0, buffer, 10);
-    CHECK_EQUAL(read, 0);
+    get_pos = 0;
+    read = c.get_at(0, get_pos);
+    CHECK(read.is_null());
 
-    read = c.read(1, 0, buffer, 10);
-    CHECK_EQUAL(read, 10);
-    CHECK_EQUAL(std::string(buffer, read), hello.substr(0, 10));
+    get_pos = 0;
+    read = c.get_at(1, get_pos);
+    CHECK_EQUAL(read.size(), hello.size());
+    CHECK_EQUAL(std::string(read.data(), read.size()), hello);
 
     BinaryIterator it0;
-    read = it0.read(buffer, 5);
-    CHECK_EQUAL(read, 0);
+    read = it0.get_next();
+    CHECK(read.is_null());
 
     BinaryIterator it1(&c, 1);
-    read = it1.read(buffer, 5);
-    CHECK_EQUAL(std::string(buffer, read), hello.substr(0, 5));
-    read = it1.read(buffer, 100);
-    CHECK_EQUAL(std::string(buffer, read), hello.substr(5));
-    read = it0.read(buffer, 5);
-    CHECK_EQUAL(read, 0);
+    read = it1.get_next();
+    CHECK_EQUAL(std::string(read.data(), read.size()), hello);
+    read = it1.get_next();
+    CHECK(read.is_null());
 
     BinaryIterator it2(c.get(1));
-    read = it2.read(buffer, 5);
-    CHECK_EQUAL(std::string(buffer, read), hello.substr(0, 5));
-    read = it2.read(buffer, 100);
-    CHECK_EQUAL(std::string(buffer, read), hello.substr(5));
-    read = it0.read(buffer, 5);
-    CHECK_EQUAL(read, 0);
+    read = it2.get_next();
+    CHECK_EQUAL(std::string(read.data(), read.size()), hello);
+    read = it2.get_next();
+    CHECK(read.is_null());
 
+    // Check BigBlob
     c.add(BinaryData(very_lazy_fox));
 
-    read = c.read(2, 0, buffer, 10);
-    CHECK_EQUAL(read, 10);
-    CHECK_EQUAL(std::string(buffer, read), very_lazy_fox.substr(0, 10));
+    get_pos = 0;
+    read = c.get_at(2, get_pos);
+    CHECK_EQUAL(read.size(), very_lazy_fox.size());
+    CHECK_EQUAL(std::string(read.data(), read.size()), very_lazy_fox);
 
     // Split root
     for (unsigned i = 0; i < REALM_MAX_BPNODE_SIZE; i++) {
         c.add(BinaryData());
     }
 
-    read = c.read(1, 0, buffer, 10);
-    CHECK_EQUAL(read, 10);
-    CHECK_EQUAL(std::string(buffer, read), hello.substr(0, 10));
+    get_pos = 0;
+    read = c.get_at(1, get_pos);
+    CHECK_EQUAL(read.size(), hello.size());
+    CHECK_EQUAL(std::string(read.data(), read.size()), hello);
 
     c.destroy();
 }

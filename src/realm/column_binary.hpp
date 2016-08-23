@@ -42,11 +42,11 @@ public:
 
     BinaryData get(size_t ndx) const noexcept;
 
-    /// Copy data from a blob into a user supplied buffer. Start
-    /// reading at position 'pos' and transfer at most 'max_size' bytes.
-    /// The value returned indicates the actual number of values read. This
-    /// could be less than 'max_size' if the blob contains fewer bytes.
-    size_t read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept;
+    /// Return data from position 'pos' and onwards. If the blob is distributed
+    /// across multiple arrays (if bigger than ~ 16M), you will only get data
+    /// from one array. 'pos' will be updated to be an index to next available
+    /// data. It will be 0 if no more data.
+    BinaryData get_at(size_t ndx, size_t& pos) const noexcept;
 
     bool is_null(size_t ndx) const noexcept override;
     StringData get_index_data(size_t, StringIndex::StringConversionBuffer& ) const noexcept final;
@@ -147,25 +147,24 @@ public:
 
     BinaryIterator(BinaryColumn* col, size_t ndx) : m_binary_col(col), m_ndx(ndx) {}
 
-    size_t read(char* buffer, size_t max_size) noexcept
+    BinaryData get_next() noexcept
     {
-        size_t actual = 0;
-        if (m_binary_col) {
-            actual = m_binary_col->read(m_ndx, m_pos, buffer, max_size);
-        }
-        else if (!m_binary.is_null()) {
-            if (m_pos < m_binary.size()) {
-                size_t bytes_left = m_binary.size() - m_pos;
-                actual = std::min(max_size, bytes_left);
-                const char* begin = m_binary.data() + m_pos;
-                std::copy(begin, begin + actual, buffer);
+        if (!end_of_data) {
+            if (m_binary_col) {
+                BinaryData ret = m_binary_col->get_at(m_ndx, m_pos);
+                end_of_data = (m_pos == 0);
+                return ret;
+            }
+            else if (!m_binary.is_null()) {
+                end_of_data = true;
+                return m_binary;
             }
         }
-        m_pos += actual;
-        return actual;
+        return {};
     }
 
 private:
+    bool end_of_data = false;
     BinaryColumn* m_binary_col = nullptr;
     size_t m_ndx = 0;
     size_t m_pos = 0;

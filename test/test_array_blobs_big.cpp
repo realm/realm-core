@@ -283,28 +283,36 @@ TEST(ArrayBigBlobs_Basic)
     c.destroy();
 }
 
-TEST(ArrayBigBlobs_Read)
+TEST(ArrayBigBlobs_get_at)
 {
     bool ok;
+    size_t get_pos;
+    size_t idx;
+    const char* data;
+    BinaryData read;
+
     std::string lazy_fox = "The lazy fox jumped over the quick brown dog";
     ArrayBigBlobs c(Allocator::get_default(), false);
     c.create();
 
     c.add(BinaryData(lazy_fox));
-    char buffer[1000];
-    // Read only part of the data
-    size_t read = c.read(0, 0, buffer, 10);
-    CHECK_EQUAL(read, 10);
-    CHECK_EQUAL(std::string(buffer, read), lazy_fox.substr(0, 10));
+
+    // read from beginning
+    get_pos = 0;
+    read = c.get_at(0, get_pos);
+    CHECK_EQUAL(get_pos, 0);
+    CHECK_EQUAL(std::string(read.data(), read.size()), lazy_fox);
 
     // Read from an offset
-    read = c.read(0, 4, buffer, 100);
-    CHECK_EQUAL(read, 40);
-    CHECK_EQUAL(std::string(buffer, read), lazy_fox.substr(4));
+    get_pos = 4;
+    read = c.get_at(0, get_pos);
+    CHECK_EQUAL(get_pos, 0);
+    CHECK_EQUAL(std::string(read.data(), read.size()), lazy_fox.substr(4));
 
     // Read from an offset larger than size of data
-    read = c.read(0, 50, buffer, 100);
-    CHECK_EQUAL(read, 0);
+    get_pos = 50;
+    read = c.get_at(0, get_pos);
+    CHECK(read.is_null());
 
     // Construct a huge blob
     std::vector<char> big_blob(0x2000000);
@@ -312,6 +320,7 @@ TEST(ArrayBigBlobs_Read)
         big_blob[i] = char(i & 0xFF);
     }
 
+    // This will be store in 3 blobs
     c.add(BinaryData(big_blob.data(), big_blob.size()));
 #ifdef REALM_DEBUG
     c.verify();
@@ -325,46 +334,59 @@ TEST(ArrayBigBlobs_Read)
     binary = ArrayBigBlobs::get(header, 1, Allocator::get_default());
     CHECK(binary.is_null());
 
-    // Reset data
-    big_blob.assign(big_blob.size(), '\0');
-    // Read data back
-    read = c.read(1, 0, big_blob.data(), big_blob.size());
-    CHECK_EQUAL(read, 0x2000000);
+    get_pos = 0;
+    idx = 0;
     ok = true;
-    for (unsigned i = 0; i < read; i++) {
-        if (big_blob[i] != char(i & 0xFF)) {
+    do {
+       read = c.get_at(1, get_pos);
+       data = read.data();
+       for (unsigned j = 0; j < read.size(); j++) {
+           if (data[j] != big_blob[idx++]) {
+               ok = false;
+           }
+       }
+    } while (get_pos);
+    CHECK_EQUAL(idx, 0x2000000);
+    CHECK(ok);
+
+
+    // Read from an offset (get data from 2nd blob)
+    get_pos = 0x1800000;
+    idx = 0x1800000;
+    read = c.get_at(1, get_pos);
+    data = read.data();
+    CHECK_EQUAL(get_pos, 0x1ffffe0);
+    CHECK_EQUAL(read.size(), 0x1ffffe0 - 0x1800000);
+    ok = true;
+    for (unsigned j = 0; j < read.size(); j++) {
+        if (data[j] != big_blob[idx++]) {
             ok = false;
         }
     }
     CHECK(ok);
 
-    // Read from an offset
-    read = c.read(1, 0x1800000, buffer, 0x200);
-    CHECK_EQUAL(read, 0x200);
+    // Request last
+    read = c.get_at(1, get_pos);
+    data = read.data();
+    CHECK_EQUAL(read.size(), 0x2000000 - 0x1ffffe0);
     ok = true;
-    for (unsigned i = 0; i < read; i++) {
-        if (big_blob[i] != char(i & 0xFF)) {
-            ok = false;
-        }
-    }
-    CHECK(ok);
-
-    // Request more data than available
-    read = c.read(1, 0x1FFFF00, buffer, 0x200);
-    CHECK_EQUAL(read, 0x100);
-    ok = true;
-    for (unsigned i = 0; i < read; i++) {
-        if (big_blob[i] != char(i & 0xFF)) {
+    for (unsigned j = 0; j < read.size(); j++) {
+        if (data[j] != big_blob[idx++]) {
             ok = false;
         }
     }
     CHECK(ok);
 
     // Read outside data
-    read = c.read(1, 0x2000000, buffer, 0x200);
-    CHECK_EQUAL(read, 0);
+    get_pos = 0x2000000;
+    read = c.get_at(1, get_pos);
+    CHECK(read.is_null());
 
+    // Read a NULL entry
     c.set(1, BinaryData());
+    get_pos = 0;
+    read = c.get_at(1, get_pos);
+    CHECK(read.is_null());
 
     c.destroy();
 }

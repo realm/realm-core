@@ -24,16 +24,16 @@
 
 using namespace realm;
 
-size_t ArrayBigBlobs::read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept
+BinaryData ArrayBigBlobs::get_at(size_t ndx, size_t& pos) const noexcept
 {
     ref_type ref = get_as_ref(ndx);
     if (ref == 0)
-        return 0; // realm::null();
+        return {}; // realm::null();
 
     ArrayBlob blob(m_alloc);
     blob.init_from_ref(ref);
 
-    return blob.read(pos, buffer, max_size);
+    return blob.get_at(pos);
 }
 
 

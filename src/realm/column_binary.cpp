@@ -110,7 +110,7 @@ struct SetLeafElem: Array::UpdateHandler {
 
 } // anonymous namespace
 
-size_t BinaryColumn::read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept
+BinaryData BinaryColumn::get_at(size_t ndx, size_t& pos) const noexcept
 {
     REALM_ASSERT_3(ndx, <, size());
     Array leaf(m_array->get_alloc());
@@ -130,11 +130,12 @@ size_t BinaryColumn::read(size_t ndx, size_t pos, char* buffer, size_t max_size)
     bool is_big = arr->get_context_flag();
     if (!is_big) {
         // Small blobs
-        return static_cast<ArrayBinary*>(arr)->read(ndx, pos, buffer, max_size);
+        pos = 0;
+        return static_cast<ArrayBinary*>(arr)->get(ndx);
     }
     else {
         // Big blobs
-        return static_cast<ArrayBigBlobs*>(arr)->read(ndx, pos, buffer, max_size);
+        return static_cast<ArrayBigBlobs*>(arr)->get_at(ndx, pos);
     }
 }
 

@@ -31,7 +31,7 @@ public:
     explicit ArrayBigBlobs(Allocator&, bool nullable) noexcept;
 
     BinaryData get(size_t ndx) const noexcept;
-    size_t read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept;
+    BinaryData get_at(size_t ndx, size_t& pos) const noexcept;
     void set(size_t ndx, BinaryData value, bool add_zero_term = false);
     void add(BinaryData value, bool add_zero_term = false);
     void insert(size_t ndx, BinaryData value, bool add_zero_term = false);
