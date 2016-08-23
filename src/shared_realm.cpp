@@ -149,7 +149,7 @@ void Realm::open_with_config(const Config& config,
             // throw a C++ exception if server_synchronization_mode is
             // inconsistent with the accessed Realm file. This exception
             // probably has to be transmuted to an NSError.
-            bool server_synchronization_mode = bool(config.sync_config);
+            bool server_synchronization_mode = bool(config.sync_login_function);
             if (server_synchronization_mode) {
                 history = realm::sync::make_sync_history(config.path);
             }

@@ -19,8 +19,6 @@
 #ifndef REALM_SYNC_MANAGER_HPP
 #define REALM_SYNC_MANAGER_HPP
 
-#include "shared_realm.hpp"
-
 #include <realm/sync/client.hpp>
 #include <realm/util/logger.hpp>
 
@@ -34,8 +32,6 @@ struct SyncClient;
 struct SyncSession;
 }
 
-using SyncLoginFunction = std::function<void(const Realm::Config&)>;
-
 class SyncLoggerFactory {
 public:
     virtual std::unique_ptr<util::Logger> make_logger(util::Logger::Level) = 0;
@@ -48,9 +44,7 @@ public:
     void set_log_level(util::Logger::Level) noexcept;
     void set_logger_factory(SyncLoggerFactory&) noexcept;
     void set_error_handler(std::function<sync::Client::ErrorHandler>);
-    void set_login_function(SyncLoginFunction);
 
-    SyncLoginFunction& get_sync_login_function();
     std::unique_ptr<_impl::SyncSession> create_session(std::string realm_path) const;
 
 private:
@@ -62,8 +56,6 @@ private:
     std::unique_ptr<_impl::SyncClient> create_sync_client() const;
 
     mutable std::mutex m_mutex;
-
-    SyncLoginFunction m_login_function;
 
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level m_log_level = util::Logger::Level::info;
