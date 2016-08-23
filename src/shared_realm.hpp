@@ -37,7 +37,6 @@ class Realm;
 class Replication;
 class SharedGroup;
 class StringData;
-struct SyncConfig;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
@@ -119,6 +118,8 @@ public:
     // migration function is only required if you wish to use the ObjectStore
     // functions which take a Schema from within the migration function.
     using MigrationFunction = std::function<void (SharedRealm old_realm, SharedRealm realm, Schema&)>;
+    using LoginFunction = std::function<void(const std::string&)>;
+    using SyncErrorHandler = std::function<sync::Client::ErrorHandler>;
 
     struct Config {
         std::string path;
@@ -156,8 +157,13 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
-        /// A data structure storing data used to configure the Realm for sync support.
-        std::shared_ptr<SyncConfig> sync_config;
+        // A function that is used to ask the binding to commence the login process. The binding is responsible for
+        // calling the `bind()` API on the shared Realm once the login process is complete. This may happen
+        // asynchronously. The presence of a value is the source of truth indicating that the Realm
+        // should be synced.
+        LoginFunction sync_login_function;
+
+        SyncErrorHandler sync_error_handler;
     };
 
     // Get a cached Realm or create a new one if no cached copies exists
