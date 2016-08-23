@@ -31,6 +31,7 @@ public:
     explicit ArrayBigBlobs(Allocator&, bool nullable) noexcept;
 
     BinaryData get(size_t ndx) const noexcept;
+    BinaryData get_at(size_t ndx, size_t& pos) const noexcept;
     void set(size_t ndx, BinaryData value, bool add_zero_term = false);
     void add(BinaryData value, bool add_zero_term = false);
     void insert(size_t ndx, BinaryData value, bool add_zero_term = false);
@@ -102,12 +103,15 @@ inline BinaryData ArrayBigBlobs::get(size_t ndx) const noexcept
 {
     ref_type ref = get_as_ref(ndx);
     if (ref == 0)
-        return BinaryData(); // realm::null();
+        return {}; // realm::null();
 
     const char* blob_header = get_alloc().translate(ref);
-    const char* value = ArrayBlob::get(blob_header, 0);
-    size_t blob_size = get_size_from_header(blob_header);
-    return BinaryData(value, blob_size);
+    if (!get_context_flag_from_header(blob_header)) {
+        const char* value = ArrayBlob::get(blob_header, 0);
+        size_t blob_size = get_size_from_header(blob_header);
+        return BinaryData(value, blob_size);
+    }
+    return {};
 }
 
 inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
@@ -115,12 +119,15 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
 {
     ref_type blob_ref = to_ref(Array::get(header, ndx));
     if (blob_ref == 0)
-        return BinaryData();
+        return {};
 
     const char* blob_header = alloc.translate(blob_ref);
-    const char* blob_data = Array::get_data_from_header(blob_header);
-    size_t blob_size = Array::get_size_from_header(blob_header);
-    return BinaryData(blob_data, blob_size);
+    if (!get_context_flag_from_header(blob_header)) {
+        const char* blob_data = Array::get_data_from_header(blob_header);
+        size_t blob_size = Array::get_size_from_header(blob_header);
+        return BinaryData(blob_data, blob_size);
+    }
+    return {};
 }
 
 inline void ArrayBigBlobs::erase(size_t ndx)

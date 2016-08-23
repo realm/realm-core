@@ -2090,7 +2090,7 @@ inline BinaryData TransactLogParser::read_binary(util::StringBuffer& buf)
 {
     size_t size = read_int<size_t>(); // Throws
 
-    if (size > Table::max_binary_size)
+    if (size > ArrayBlob::max_binary_size)
         parser_error();
 
     return read_buffer(buf, size);
@@ -2158,11 +2158,7 @@ inline void TransactLogParser::read_mixed(Mixed* mixed)
 
 inline bool TransactLogParser::next_input_buffer()
 {
-    size_t sz = m_input->next_block(m_input_begin, m_input_end);
-    if (sz == 0)
-        return false;
-    else
-        return true;
+    return m_input->next_block(m_input_begin, m_input_end);
 }
 
 
@@ -2610,15 +2606,15 @@ public:
         m_current = m_instr_order.size();
     }
 
-    size_t next_block(const char*& begin, const char*& end) override
+    bool next_block(const char*& begin, const char*& end) override
     {
         if (m_current != 0) {
             m_current--;
             begin = m_buffer + m_instr_order[m_current].begin;
             end   = m_buffer + m_instr_order[m_current].end;
-            return end-begin;
+            return (end > begin);
         }
-        return 0;
+        return false;
     }
 
 private:

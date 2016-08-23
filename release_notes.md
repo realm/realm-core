@@ -16,6 +16,14 @@
 
 ### Internals
 
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 2.0.0-rc0 Release notes
+
+### Internals
+
 * Changed instruction log format of Set instructions to be more amenable to the
 addition of future variants.
 * Changed instruction log format of LinkList instructions to include information

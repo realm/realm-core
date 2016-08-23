@@ -1357,7 +1357,12 @@ EOF
         realm_ver_major="$(grep ^"#define REALM_VER_MAJOR" $version_file | awk '{print $3}')" || exit 1
         realm_ver_minor="$(grep ^"#define REALM_VER_MINOR" $version_file | awk '{print $3}')" || exit 1
         realm_ver_patch="$(grep ^"#define REALM_VER_PATCH" $version_file | awk '{print $3}')" || exit 1
-        echo "$realm_ver_major.$realm_ver_minor.$realm_ver_patch"
+        realm_ver_extra="$(grep ^"#define REALM_VER_EXTRA" $version_file | awk '{print $3}' | tr -d '\"')" || exit 1
+        if [ -z "$realm_ver_extra" ]; then
+            echo "$realm_ver_major.$realm_ver_minor.$realm_ver_patch"
+        else
+            echo "$realm_ver_major.$realm_ver_minor.$realm_ver_patch-$realm_ver_extra"
+        fi
         exit 0
         ;;
 
@@ -1366,12 +1371,14 @@ EOF
         version_file="src/realm/version.hpp"
         realm_ver_major="$(echo "$realm_version" | cut -f1 -d.)" || exit 1
         realm_ver_minor="$(echo "$realm_version" | cut -f2 -d.)" || exit 1
-        realm_ver_patch="$(echo "$realm_version" | cut -f3 -d.)" || exit 1
+        realm_ver_patch="$(echo "$realm_version" | cut -f3 -d. | cut -f1 -d-)" || exit 1
+        realm_ver_extra="$(echo "$realm_version" | cut -f3 -d. | cut -f2 -s -d-)" || exit 1
 
         # update version.hpp
         printf ",s/#define REALM_VER_MAJOR .*/#define REALM_VER_MAJOR $realm_ver_major/\nw\nq" | ed -s "$version_file" || exit 1
         printf ",s/#define REALM_VER_MINOR .*/#define REALM_VER_MINOR $realm_ver_minor/\nw\nq" | ed -s "$version_file" || exit 1
         printf ",s/#define REALM_VER_PATCH .*/#define REALM_VER_PATCH $realm_ver_patch/\nw\nq" | ed -s "$version_file" || exit 1
+        printf ",s/#define REALM_VER_EXTRA .*/#define REALM_VER_EXTRA \"$realm_ver_extra\"/\nw\nq" | ed -s "$version_file" || exit 1
 
         # update dependencies.list
         sed -i.bck "s/^VERSION.*/VERSION=$realm_version/" dependencies.list && rm -f dependencies.list.bck
