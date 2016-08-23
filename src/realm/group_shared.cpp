@@ -728,7 +728,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file,
     REALM_ASSERT(!is_attached());
 
 #ifndef REALM_ASYNC_DAEMON
-    if (durability == durability_Async)
+    if (options.durability == SharedGroupOptions::durability_Async)
         throw std::runtime_error("Async mode not yet supported on Windows, iOS and watchOS");
 #endif
 
@@ -1182,7 +1182,10 @@ bool SharedGroup::compact()
     }
     close();
 
-    SharedGroupOptions new_options{dura, m_key, false};
+    SharedGroupOptions new_options;
+    new_options.durability = dura;
+    new_options.encryption_key = m_key;
+    new_options.allow_file_format_upgrade = false;
     do_open(m_db_path, true, false, new_options);
     return true;
 }

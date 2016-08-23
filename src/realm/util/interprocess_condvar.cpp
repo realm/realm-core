@@ -96,6 +96,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     m_shared_part = &shared_part;
     static_cast<void>(base_path);
     static_cast<void>(condvar_name);
+    static_cast<void>(tmp_path);
 #ifdef REALM_CONDVAR_EMULATION
 #if !REALM_TVOS
     m_resource_path = base_path + "." + condvar_name + ".cv";

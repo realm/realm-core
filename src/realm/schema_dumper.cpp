@@ -169,6 +169,7 @@ using realm::Group;
 using realm::LangBindHelper;
 using realm::ReadTransaction;
 using realm::SharedGroup;
+using realm::SharedGroupOptions;
 
 class SchemaDumper {
 public:
@@ -245,9 +246,10 @@ void SchemaDumper::open()
         encryption_key = (*m_config.key).c_str();
         LOG("Using encryption key `" << *m_config.key << '\'');
     }
-
-    m_sg.open(m_config.path, dont_create,
-            {realm::SharedGroupOptions::durability_Full, encryption_key, upgrade_file_format});
+    SharedGroupOptions options;
+    options.encryption_key = encryption_key;
+    options.allow_file_format_upgrade = upgrade_file_format;
+    m_sg.open(m_config.path, dont_create, options);
 }
 
 } // unnamed namespace
