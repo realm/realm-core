@@ -1444,8 +1444,8 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
     lvr->add(1);
     lvr->add(0);
 
-    CHECK_EQUAL(1, data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find());
-    CHECK_EQUAL(0, data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find());
+    CHECK_EQUAL(0, data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find());
+    CHECK_EQUAL(1, data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find());
     CHECK_EQUAL(not_found, data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find());
 }
 

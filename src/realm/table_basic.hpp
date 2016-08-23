@@ -406,11 +406,9 @@ public:
         return m_impl.count(start, end, limit);
     }
 
-    size_t remove(size_t start = 0,
-                       size_t end   = size_t(-1),
-                       size_t limit = size_t(-1))
+    size_t remove()
     {
-        return m_impl.remove(start, end, limit);
+        return m_impl.remove();
     }
 
     std::string validate() { return m_impl.validate(); }

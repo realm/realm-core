@@ -3285,73 +3285,6 @@ TEST(Query_Delete)
     CHECK_EQUAL(0, ttt.size());
 }
 
-TEST(Query_DeleteRange)
-{
-    TupleTableType ttt;
-
-    ttt.add(0, "X");
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "X");
-    ttt.add(5, "X");
-
-    TupleTableType::Query q = ttt.where().second.equal("X");
-    size_t r = q.remove(1, 4);
-
-    CHECK_EQUAL(3, r);
-    CHECK_EQUAL(3, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(4, ttt[1].first);
-    CHECK_EQUAL(5, ttt[2].first);
-}
-
-TEST(Query_DeleteRange_where)
-{
-    TupleTableType ttt;
-
-    ttt.add(0, "X");
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "X");
-    ttt.add(5, "X");
-
-    TupleTableType::View tv = ttt.where().second.equal("X").find_all();
-    TupleTableType::Query q = ttt.where(&tv).second.equal("X");
-
-    size_t r = q.remove(1, 4);
-
-    CHECK_EQUAL(3, r);
-    CHECK_EQUAL(3, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(4, ttt[1].first);
-    CHECK_EQUAL(5, ttt[2].first);
-}
-
-TEST(Query_DeleteLimit)
-{
-    TupleTableType ttt;
-
-    ttt.add(0, "X");
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "X");
-    ttt.add(5, "X");
-
-    TupleTableType::Query q = ttt.where().second.equal("X");
-    size_t r = q.remove(1, 4, 2);
-
-    CHECK_EQUAL(2, r);
-    CHECK_EQUAL(4, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(3, ttt[1].first);
-    CHECK_EQUAL(4, ttt[2].first);
-    CHECK_EQUAL(5, ttt[3].first);
-}
-
-
 
 TEST(Query_Simple)
 {
@@ -4055,7 +3988,7 @@ TEST(Query_Sort_And_Requery_Typed1)
     TupleTableType::View tv = q.find_all();
 
     size_t match = ttt.where(&tv).first.equal(7).find();
-    CHECK_EQUAL(match, 6);
+    CHECK_EQUAL(match, 8);
 
     tv.column().first.sort();
 
@@ -4081,13 +4014,13 @@ TEST(Query_Sort_And_Requery_Typed1)
     CHECK_EQUAL(match, 0);
 
     match = ttt.where(&tv).second.not_equal("X").find(1);
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, 3);
 
     match = ttt.where(&tv).second.not_equal("X").find(2);
-    CHECK_EQUAL(match, 5);
+    CHECK_EQUAL(match, 3);
 
     match = ttt.where(&tv).second.not_equal("X").find(6);
-    CHECK_EQUAL(match, 6);
+    CHECK_EQUAL(match, 7);
 }
 
 
