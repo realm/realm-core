@@ -465,7 +465,6 @@ public:
     /// modifications will in general both be retained during synchronization.
 
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
-    static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value, bool is_default = false);
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);

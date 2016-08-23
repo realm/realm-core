@@ -22,14 +22,6 @@
 
 using namespace realm;
 
-namespace {
-// If size of BinaryData is below 'max_blob_node_size', the data is stored directly
-// in a single ArrayBlob. If more space is needed, the root blob will just contain
-// references to child blobs holding the actual data. Context flag will indicate
-// if blob is split.
-constexpr size_t max_blob_node_size = (max_array_payload - Array::header_size) & 0xFFFFFFF0;
-}
-
 BinaryData ArrayBlob::get_at(size_t& pos) const noexcept
 {
     size_t offset = pos;
@@ -52,6 +44,8 @@ BinaryData ArrayBlob::get_at(size_t& pos) const noexcept
         blob.init_from_ref(Array::get_as_ref(ndx));
         ndx++;
         size_t sz = current_size - offset;
+
+        // Check if we are at last blob
         pos = (ndx >= size()) ? 0 : pos + sz;
 
         return {blob.get(offset), sz};
@@ -84,7 +78,7 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
         lastNode.init_from_ref(get_as_ref(size() - 1));
         lastNode.set_parent(this, size() - 1);
 
-        size_t space_left = max_blob_node_size - lastNode.size();
+        size_t space_left = max_binary_size - lastNode.size();
         size_t size_to_copy = std::min(space_left, data_size);
         lastNode.add(data, size_to_copy);
         data_size -= space_left;
@@ -92,7 +86,7 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
 
         while (data_size) {
             // Create new nodes as required
-            size_to_copy = std::min(max_blob_node_size, data_size);
+            size_to_copy = std::min(size_t(max_binary_size), data_size);
             ArrayBlob new_blob(m_alloc);
             new_blob.create(); // Throws
 
@@ -110,7 +104,11 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
         size_t add_size = add_zero_term ? data_size + 1 : data_size;
         size_t new_size = m_size - remove_size + add_size;
 
-        if (new_size > max_blob_node_size) {
+        // If size of BinaryData is below 'max_binary_size', the data is stored directly
+        // in a single ArrayBlob. If more space is needed, the root blob will just contain
+        // references to child blobs holding the actual data. Context flag will indicate
+        // if blob is split.
+        if (new_size > max_binary_size) {
             Array new_root(m_alloc);
             // Create new array with context flag set
             new_root.create(type_HasRefs, true); // Throws

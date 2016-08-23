@@ -3162,7 +3162,7 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_def
         throw LogicError(LogicError::column_index_out_of_range);
     if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
-    if (REALM_UNLIKELY(value.size() > max_binary_size))
+    if (REALM_UNLIKELY(value.size() > ArrayBlob::max_binary_size))
         throw LogicError(LogicError::binary_too_big);
     bump_version();
 
@@ -3258,7 +3258,7 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value, bool is_default)
             col.set_string(ndx, value.get_string()); // Throws
             break;
         case type_Binary:
-            if (REALM_UNLIKELY(value.get_binary().size() > max_binary_size))
+            if (REALM_UNLIKELY(value.get_binary().size() > ArrayBlob::max_binary_size))
                 throw LogicError(LogicError::binary_too_big);
             col.set_binary(ndx, value.get_binary()); // Throws
             break;

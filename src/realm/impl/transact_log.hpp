@@ -2081,7 +2081,7 @@ inline BinaryData TransactLogParser::read_binary(util::StringBuffer& buf)
 {
     size_t size = read_int<size_t>(); // Throws
 
-    if (size > Table::max_binary_size)
+    if (size > ArrayBlob::max_binary_size)
         parser_error();
 
     return read_buffer(buf, size);
