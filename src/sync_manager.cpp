@@ -18,7 +18,7 @@
 
 #include "sync_manager.hpp"
 
-#include "sync_session.hpp"
+#include "impl/sync_session.hpp"
 
 #include <thread>
 
