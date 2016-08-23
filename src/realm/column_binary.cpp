@@ -110,6 +110,35 @@ struct SetLeafElem: Array::UpdateHandler {
 
 } // anonymous namespace
 
+BinaryData BinaryColumn::get_at(size_t ndx, size_t& pos) const noexcept
+{
+    REALM_ASSERT_3(ndx, <, size());
+    Array leaf(m_array->get_alloc());
+    Array* arr;
+
+    if (root_is_leaf()) {
+        arr = m_array.get();
+    }
+    else {
+        // Non-leaf root
+        std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
+        leaf.init_from_mem(p.first);
+        ndx = p.second;
+        arr = &leaf;
+    }
+
+    bool is_big = arr->get_context_flag();
+    if (!is_big) {
+        // Small blobs
+        pos = 0;
+        return static_cast<ArrayBinary*>(arr)->get(ndx);
+    }
+    else {
+        // Big blobs
+        return static_cast<ArrayBigBlobs*>(arr)->get_at(ndx, pos);
+    }
+}
+
 void BinaryColumn::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_3(ndx, <, size());

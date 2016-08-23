@@ -100,7 +100,7 @@ public:
 
     void update_early_from_top_ref(version_type, size_t, ref_type) override;
     void update_from_parent(version_type) override;
-    void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
+    void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override;
     void set_oldest_bound_version(version_type) override;
     BinaryData get_uncommitted_changes() noexcept override;
 #ifdef REALM_DEBUG
@@ -260,6 +260,7 @@ protected:
 
     static void set_log_entry_internal(HistoryEntry*, const EntryHeader*, const char* log);
     static void set_log_entry_internal(BinaryData*, const EntryHeader*, const char* log);
+    static void set_log_entry_internal(BinaryIterator*, const EntryHeader*, const char* log);
 
     template<typename T>
     void get_commit_entries_internal(version_type from_version, version_type to_version,
@@ -560,10 +561,14 @@ void WriteLogCollector::set_log_entry_internal(HistoryEntry* entry,
 }
 
 
-void WriteLogCollector::set_log_entry_internal(BinaryData* entry,
-                                               const EntryHeader* hdr, const char* log)
+void WriteLogCollector::set_log_entry_internal(BinaryData* entry, const EntryHeader* hdr, const char* log)
 {
     *entry = BinaryData(log, size_t(hdr->size));
+}
+
+void WriteLogCollector::set_log_entry_internal(BinaryIterator* entry, const EntryHeader* hdr, const char* log)
+{
+    *entry = BinaryIterator(BinaryData(log, size_t(hdr->size)));
 }
 
 
@@ -732,7 +737,7 @@ void WriteLogCollector::update_from_parent(version_type)
 
 
 void WriteLogCollector::get_changesets(version_type from_version, version_type to_version,
-                                       BinaryData* logs_buffer) const noexcept
+                                       BinaryIterator* logs_buffer) const noexcept
 {
     get_commit_entries_internal(from_version, to_version, logs_buffer);
 }
