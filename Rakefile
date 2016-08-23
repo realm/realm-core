@@ -403,3 +403,11 @@ APPLE_BINDINGS.map do |name, info|
         puts "TODO: Unzip in #{info[:path]}"
     end
 end
+
+
+# Android
+
+desc 'Build for Android'
+task 'build-android' do
+    puts "It's all good man!"
+end
