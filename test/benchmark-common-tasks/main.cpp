@@ -537,7 +537,7 @@ void run_benchmark(TestContext& test_context, BenchmarkResults& results)
         // Open a SharedGroup:
         SHARED_GROUP_TEST_PATH(realm_path);
         std::unique_ptr<SharedGroup> group;
-        group.reset(new SharedGroup(realm_path, false, {level, key}));
+        group.reset(new SharedGroup(realm_path, false, SharedGroupOptions(level, key)));
 
         benchmark.before_all(*group);
 

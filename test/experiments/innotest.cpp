@@ -50,7 +50,7 @@ int main(int argc, char* argv [])
             ProfilerStart(name);
     }
     {
-        SharedGroup db("parallel_benchmark.realm", true, {SharedGroupOptions::durability_Async});
+        SharedGroup db("parallel_benchmark.realm", true, SharedGroupOptions(SharedGroupOptions::durability_Async));
 
         for (size_t round = 0; round < 20; ++round) {
 

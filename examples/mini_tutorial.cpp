@@ -30,7 +30,7 @@ REALM_TABLE_2(MyTable,
 int main()
 {
     // create an in-memory shared data structure
-    SharedGroup sg("persons.realm", false, {SharedGroupOptions::durability_MemOnly});
+    SharedGroup sg("persons.realm", false, SharedGroupOptions(SharedGroupOptions::durability_MemOnly));
 
     // a write transaction
     {

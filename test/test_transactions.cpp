@@ -567,7 +567,7 @@ TEST(Transactions_RollbackMoveTableColumns)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, {SharedGroupOptions::durability_Full, crypt_key()});
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
@@ -598,7 +598,7 @@ TEST(Transactions_RollbackMoveTableReferences)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, {SharedGroupOptions::durability_Full, crypt_key()});
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
@@ -627,8 +627,8 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_client_history(path, 0));
     std::unique_ptr<Replication> hist_2(make_client_history(path, 0));
-    SharedGroup sg_w(*hist_w, {SharedGroupOptions::durability_Full});
-    SharedGroup sg_2(*hist_2, {SharedGroupOptions::durability_Full});
+    SharedGroup sg_w(*hist_w);
+    SharedGroup sg_2(*hist_2);
     Group& g = const_cast<Group&>(sg_w.begin_read());
     Group& g2 = const_cast<Group&>(sg_2.begin_read());
     LangBindHelper::promote_to_write(sg_w);
@@ -676,7 +676,7 @@ TEST(LangBindHelper_RollbackLinkInsert)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_client_history(path, 0));
 
-    SharedGroup sg_w(*hist_w, {SharedGroupOptions::durability_Full});
+    SharedGroup sg_w(*hist_w);
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 

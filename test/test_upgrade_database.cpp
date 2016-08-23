@@ -133,7 +133,7 @@ TEST(Upgrade_Database_2_3)
         bool allow_upgrade = false;
 
         CHECK_THROW(
-            SharedGroup(temp_copy, no_create, {durability, encryption_key, allow_upgrade}),
+            SharedGroup(temp_copy, no_create, SharedGroupOptions(durability, encryption_key, allow_upgrade)),
             FileFormatUpgradeRequired);
     }
 
@@ -840,7 +840,7 @@ TEST(Upgrade_DatabaseWithCallback)
     upgrade_callback = callback;
 
     SharedGroup sg(temp_copy, no_create,
-                   {durability, encryption_key, allow_file_format_upgrade, upgrade_callback});
+                   SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
 
     CHECK(did_upgrade);
     CHECK_EQUAL(old_version, 3);
@@ -884,7 +884,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
     bool exception_thrown = false;
     try {
         SharedGroup sg1(temp_copy, no_create,
-                        {durability, encryption_key, allow_file_format_upgrade, upgrade_callback});
+                        SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     }
     catch(...) {
         exception_thrown = true;
@@ -895,7 +895,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
     // Callback should be triggered here because the file still needs to be upgraded
     upgrade_callback = successful_callback;
     SharedGroup sg2(temp_copy, no_create,
-                    {durability, encryption_key, allow_file_format_upgrade, upgrade_callback});
+                    SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     CHECK(did_upgrade);
     CHECK_EQUAL(old_version, 3);
     CHECK(new_version >= 5);
@@ -903,7 +903,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
     // Callback should not be triggered here because the file is already upgraded
     did_upgrade = false;
     SharedGroup sg3(temp_copy, no_create,
-                    {durability, encryption_key, allow_file_format_upgrade, upgrade_callback});
+                    SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     CHECK(!did_upgrade);
 }
 

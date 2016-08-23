@@ -142,13 +142,13 @@ public:
     /// `upgrade_callback` throws, then the file will be closed properly and the
     /// upgrade will be aborted.
     explicit SharedGroup(const std::string& file, bool no_create = false,
-                         SharedGroupOptions options = {});
+                         SharedGroupOptions options = SharedGroupOptions());
 
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and
     /// the upgrade will be aborted.
-    explicit SharedGroup(Replication& repl, SharedGroupOptions options = {});
+    explicit SharedGroup(Replication& repl, SharedGroupOptions options = SharedGroupOptions());
 
     struct unattached_tag {};
 
@@ -189,11 +189,12 @@ public:
     ///
     /// \throw FileFormatUpgradeRequired only if \a SharedGroupOptions::allow_upgrade
     /// is `false` and an upgrade is required.
-    void open(const std::string& file, bool no_create = false, SharedGroupOptions options = {});
+    void open(const std::string& file, bool no_create = false,
+              SharedGroupOptions options = SharedGroupOptions());
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in existence for as long as the SharedGroup.
-    void open(Replication&, SharedGroupOptions options = {});
+    void open(Replication&, SharedGroupOptions options = SharedGroupOptions());
 
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
