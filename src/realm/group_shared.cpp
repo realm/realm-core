@@ -697,7 +697,7 @@ void spawn_daemon(const std::string& file)
 
 } // anonymous namespace
 
-const std::string SharedGroupOptions::sys_tmp_dir = getenv("TMPDIR");
+const std::string SharedGroupOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //

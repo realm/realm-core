@@ -1750,7 +1750,7 @@ TEST_IF(Shared_Async, allow_async)
     // Do some changes in a async db
     {
         bool no_create = false;
-        SharedGroup db(path, no_create, SharedGroup::durability_Async);
+        SharedGroup db(path, no_create, {SharedGroupOptions::durability_Async});
 
         for (size_t i = 0; i < 100; ++i) {
 //            std::cout << "t "<<n<<"\n";
@@ -1786,7 +1786,7 @@ void multiprocess_thread(TestContext& test_context, std::string path, size_t row
 {
     // Open shared db
     bool no_create = false;
-    SharedGroup sg(path, no_create, SharedGroup::durability_Async);
+    SharedGroup sg(path, no_create, {SharedGroupOptions::durability_Async});
 
     for (size_t i = 0; i != multiprocess_increments; ++i) {
         // Increment cell
@@ -1864,7 +1864,7 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
 #    else
     {
         bool no_create = false;
-        SharedGroup sg(path, no_create, SharedGroup::durability_Async);
+        SharedGroup sg(path, no_create, {SharedGroupOptions::durability_Async});
         WriteTransaction wt(sg);
         TestTableShared::Ref t1 = wt.get_or_add_table<TestTableShared>("test");
         for (size_t i = 0; i < rows; ++i) {
@@ -1914,7 +1914,7 @@ void multiprocess_threaded(TestContext& test_context, std::string path, size_t n
     // Verify that the changes were made
     {
         bool no_create = false;
-        SharedGroup sg(path, no_create, SharedGroup::durability_Async);
+        SharedGroup sg(path, no_create, {SharedGroupOptions::durability_Async});
         ReadTransaction rt(sg);
         rt.get_group().verify();
         TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
@@ -2018,7 +2018,7 @@ TEST(Shared_WaitForChange)
     SharedGroup* sgs[num_threads];
 
     auto waiter = [&](std::string path, int i) {
-        SharedGroup* sg = new SharedGroup(path, true, SharedGroup::durability_Full);
+        SharedGroup* sg = new SharedGroup(path, true, {SharedGroupOptions::durability_Full});
         {
             LockGuard l(mutex);
             shared_state[i] = 1;
@@ -2063,7 +2063,7 @@ TEST(Shared_WaitForChange)
     SHARED_GROUP_TEST_PATH(path);
     for (int j=0; j < num_threads; j++)
         shared_state[j] = 0;
-    SharedGroup sg(path, false, SharedGroup::durability_Full);
+    SharedGroup sg(path, false, {SharedGroupOptions::durability_Full});
     Thread threads[num_threads];
     for (int j=0; j < num_threads; j++)
         threads[j].start([waiter, &path, j] { waiter(path, j); });

@@ -462,25 +462,25 @@ struct BenchmarkGetLinkList : Benchmark {
     }
 };
 
-const char* to_lead_cstr(SharedGroup::DurabilityLevel level)
+const char* to_lead_cstr(SharedGroupOptions::Durability level)
 {
     switch (level) {
-        case SharedGroup::durability_Full:    return "Full   ";
-        case SharedGroup::durability_MemOnly: return "MemOnly";
+        case SharedGroupOptions::durability_Full:    return "Full   ";
+        case SharedGroupOptions::durability_MemOnly: return "MemOnly";
 #ifndef _WIN32
-        case SharedGroup::durability_Async:   return "Async  ";
+        case SharedGroupOptions::durability_Async:   return "Async  ";
 #endif
     }
     return nullptr;
 }
 
-const char* to_ident_cstr(SharedGroup::DurabilityLevel level)
+const char* to_ident_cstr(SharedGroupOptions::Durability level)
 {
     switch (level) {
-        case SharedGroup::durability_Full:    return "Full";
-        case SharedGroup::durability_MemOnly: return "MemOnly";
+        case SharedGroupOptions::durability_Full:    return "Full";
+        case SharedGroupOptions::durability_MemOnly: return "MemOnly";
 #ifndef _WIN32
-        case SharedGroup::durability_Async:   return "Async";
+        case SharedGroupOptions::durability_Async:   return "Async";
 #endif
     }
     return nullptr;
@@ -504,24 +504,24 @@ void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
 template<typename B>
 void run_benchmark(TestContext& test_context, BenchmarkResults& results)
 {
-    typedef std::pair<SharedGroup::DurabilityLevel, const char*> config_pair;
+    typedef std::pair<SharedGroupOptions::Durability, const char*> config_pair;
     std::vector<config_pair> configs;
 
-    configs.push_back(config_pair(SharedGroup::durability_MemOnly, nullptr));
+    configs.push_back(config_pair(SharedGroupOptions::durability_MemOnly, nullptr));
 #if REALM_ENABLE_ENCRYPTION
-    configs.push_back(config_pair(SharedGroup::durability_MemOnly, crypt_key(true)));
+    configs.push_back(config_pair(SharedGroupOptions::durability_MemOnly, crypt_key(true)));
 #endif
 
-    configs.push_back(config_pair(SharedGroup::durability_Full, nullptr));
+    configs.push_back(config_pair(SharedGroupOptions::durability_Full, nullptr));
 
 #if REALM_ENABLE_ENCRYPTION
-    configs.push_back(config_pair(SharedGroup::durability_Full, crypt_key(true)));
+    configs.push_back(config_pair(SharedGroupOptions::durability_Full, crypt_key(true)));
 #endif
 
     Timer timer(Timer::type_UserTime);
 
     for (auto it = configs.begin(); it != configs.end(); ++it) {
-        SharedGroup::DurabilityLevel level = it->first;
+        SharedGroupOptions::Durability level = it->first;
         const char* key = it->second;
         B benchmark;
 
@@ -537,7 +537,7 @@ void run_benchmark(TestContext& test_context, BenchmarkResults& results)
         // Open a SharedGroup:
         SHARED_GROUP_TEST_PATH(realm_path);
         std::unique_ptr<SharedGroup> group;
-        group.reset(new SharedGroup(realm_path, false, level, key));
+        group.reset(new SharedGroup(realm_path, false, {level, key}));
 
         benchmark.before_all(*group);
 

@@ -168,8 +168,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "std::unique_ptr<Replication> hist_r(make_client_history(path, key));\n";
             *log << "std::unique_ptr<Replication> hist_w(make_client_history(path, key));\n";
 
-            *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);\n";
-            *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);\n";
+            *log << "SharedGroup sg_r(*hist_r, {SharedGroupOptions::durability_Full, key});\n";
+            *log << "SharedGroup sg_w(*hist_w, {SharedGroupOptions::durability_Full, key});\n";
 
             *log << "Group& g = const_cast<Group&>(sg_w.begin_write());\n";
             *log << "Group& g_r = const_cast<Group&>(sg_r.begin_read());\n";
