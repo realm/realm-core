@@ -466,9 +466,9 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
                     ObjectStore::set_primary_key_for_object(group, op.object->name, prop);
                 }
                 else
-                    ObjectStore::set_primary_key_for_object(group, op.object->name, "");
+                    ObjectStore::set_primary_key_for_object(group, op.object->name, StringData());
             #else
-                ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? op.property->name : StringData()); 
+                ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? op.property->name : ""); 
             #endif
         }
         void operator()(AddIndex op) { add_index(table(op.object), op.property->table_column); }
