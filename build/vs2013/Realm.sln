@@ -22,6 +22,8 @@ Global
 		Debug|x64 = Debug|x64
 		Release|Win32 = Release|Win32
 		Release|x64 = Release|x64
+		Schema dumper|Win32 = Schema dumper|Win32
+		Schema dumper|x64 = Schema dumper|x64
 		Static lib, debug|Win32 = Static lib, debug|Win32
 		Static lib, debug|x64 = Static lib, debug|x64
 		Static lib, release|Win32 = Static lib, release|Win32
@@ -44,6 +46,10 @@ Global
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Release|Win32.Build.0 = Release|Win32
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Release|x64.ActiveCfg = Release|x64
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Release|x64.Build.0 = Release|x64
+		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Schema dumper|Win32.ActiveCfg = Schema dumper|Win32
+		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Schema dumper|Win32.Build.0 = Schema dumper|Win32
+		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Schema dumper|x64.ActiveCfg = Schema dumper|x64
+		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Schema dumper|x64.Build.0 = Schema dumper|x64
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Static lib, debug|Win32.ActiveCfg = Static library, debug|Win32
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Static lib, debug|Win32.Build.0 = Static library, debug|Win32
 		{C18EDDC1-166A-49C4-B483-11458F48CF8E}.Static lib, debug|x64.ActiveCfg = Static library, debug|x64
