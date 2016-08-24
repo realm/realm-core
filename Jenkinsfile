@@ -421,12 +421,14 @@ def get_version() {
   }
 }
 
-@NonCPS
 def getDeviceNames(String commandOutput) {
-    return commandOutput
-        .split('\n')
-        .findAll { it.contains('\t') }
-        .collect { it.split('\t')[0].trim() }
+  def deviceNames = []
+  for (line in commandOutput.split('\n')) {
+    if (line.contains('\t')) {
+      deviceNames << line.split('\t')[0].trim()
+    }
+  }
+  return deviceNames
 }
 
 def doBuildPackage(distribution, fileType) {
