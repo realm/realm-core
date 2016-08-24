@@ -466,7 +466,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
                     ObjectStore::set_primary_key_for_object(group, op.object->name, prop);
                 }
                 else
-                    ObjectStore::set_primary_key_for_object(group, op.object->name, StringData());
+                    ObjectStore::set_primary_key_for_object(group, op.object->name, "");
             #else
                 ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? op.property->name : StringData()); 
             #endif
