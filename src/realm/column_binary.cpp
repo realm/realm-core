@@ -113,29 +113,39 @@ struct SetLeafElem: Array::UpdateHandler {
 BinaryData BinaryColumn::get_at(size_t ndx, size_t& pos) const noexcept
 {
     REALM_ASSERT_3(ndx, <, size());
-    Array leaf(m_array->get_alloc());
-    Array* arr;
 
     if (root_is_leaf()) {
-        arr = m_array.get();
+        Array* arr = m_array.get();
+        bool is_big = arr->get_context_flag();
+        if (!is_big) {
+            // Small blobs
+            pos = 0;
+            REALM_ASSERT(dynamic_cast<ArrayBinary*>(arr) != nullptr);
+            return static_cast<ArrayBinary*>(arr)->get(ndx);
+        }
+        else {
+            // Big blobs
+            return static_cast<ArrayBigBlobs*>(arr)->get_at(ndx, pos);
+        }
     }
     else {
         // Non-leaf root
         std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
-        leaf.init_from_mem(p.first);
-        ndx = p.second;
-        arr = &leaf;
-    }
-
-    bool is_big = arr->get_context_flag();
-    if (!is_big) {
-        // Small blobs
-        pos = 0;
-        return static_cast<ArrayBinary*>(arr)->get(ndx);
-    }
-    else {
-        // Big blobs
-        return static_cast<ArrayBigBlobs*>(arr)->get_at(ndx, pos);
+        const char* leaf_header = p.first.get_addr();
+        bool is_big = Array::get_context_flag_from_header(leaf_header);
+        if (!is_big) {
+            // Small blobs
+            pos = 0;
+            ArrayBinary leaf(m_array->get_alloc());
+            leaf.init_from_mem(p.first);
+            return leaf.get(p.second);
+        }
+        else {
+            // Big blobs
+            Array leaf(m_array->get_alloc());
+            leaf.init_from_mem(p.first);
+            return static_cast<ArrayBigBlobs*>(&leaf)->get_at(p.second, pos);
+        }
     }
 }
 
@@ -195,7 +205,7 @@ void BinaryColumn::do_insert(size_t row_ndx, BinaryData value, bool add_zero_ter
             bool is_big = upgrade_root_leaf(value.size()); // Throws
             if (!is_big) {
                 // Small blobs root leaf
-                ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
+                ArrayBinary* leaf = dynamic_cast<ArrayBinary*>(m_array.get());
                 new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, add_zero_term, state); // Throws
             }
             else {
