@@ -34,7 +34,9 @@ parallel (
   buildNodeLinux: doBuildNodeInDocker(),
   buildNodeOsx: doBuildNodeInOsx(),
   buildDotnetOsx: doBuildDotNetOsx(),
-  buildAndroid: doBuildAndroid()
+  buildAndroid: doBuildAndroid(),
+  addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
+  threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
 )
 
 stage 'build-packages'
