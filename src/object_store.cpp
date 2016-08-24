@@ -457,7 +457,20 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         void operator()(RemoveProperty op) { table(op.object).remove_column(op.property->table_column); }
         void operator()(MakePropertyNullable op) { make_property_optional(group, table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
-        void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name, op.property->name); }
+        void operator()(ChangePrimaryKey op) { 
+            #ifdef _MSC_VER
+            // workaround ternary expression compilation bug
+            // C2280    'realm::StringData::StringData<std::char_traits<char>,std::allocator<char>>(std::basic_string<char,std::char_traits<char>,std::allocator<char>> &&)': attempting to reference a deleted function    wrappers    c : \users\denta\dev\realm\realm - dotnet\wrappers\src\object - store\src\object_store.cpp    511
+                if (op.property != nullptr) {
+                    const StringData prop{ op.property->name };
+                    ObjectStore::set_primary_key_for_object(group, op.object->name, prop);
+                }
+                else
+                    ObjectStore::set_primary_key_for_object(group, op.object->name, StringData());
+            #else
+                ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? op.property->name : StringData()); 
+            #endif
+        }
         void operator()(AddIndex op) { add_index(table(op.object), op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
 
