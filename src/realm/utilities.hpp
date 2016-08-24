@@ -170,7 +170,7 @@ ReturnType type_punning(OriginalType variable) noexcept
 }
 
 enum FindRes {
-    FindRes_not_found,
+    FindRes_not_found, // Do not change this from 0
     FindRes_single,
     FindRes_column
 };

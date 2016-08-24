@@ -2798,10 +2798,22 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 template<IndexMethod method, class T>
 size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
 {
+    // Return`realm::not_found`, or an index to the (any) match
     bool first(method == index_FindFirst);
+    // Return 0, or the number of items that match the specified `value`
     bool get_count(method == index_Count);
+    // Place all row indexes containing `value` into `result`
+    // Returns one of FindRes_not_found[==0] if no matches found
+    // Returns FindRes_single, if one match found: the result row literal is both
+    // placed in `result_ref` and added to `column`
+    // Returns FindRes_column, if more than one match found: the matching row literals
+    // are copied into `column`
     bool all(method == index_FindAll);
-    bool allnocopy(method == index_FindAll_nocopy);
+    // Same as `index_FindAll` but does not copy matching rows into `column`
+    // returns FindRes_not_found if there are no matches
+    // returns FindRes_single and the row index (literal) in `result_ref`
+    // or returns FindRes_column and the reference to a column of duplicates in `result_ref`
+    bool allnocopy(method == index_FindAll_nocopy); // Return FindRes_not_found
 
     const char* data = m_data;
     const char* header;
@@ -2844,10 +2856,10 @@ top:
 
         key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
-        if (stored_key != key)
+        if (stored_key != key) // keys don't match so return not found (0 implies FindRes_not_found if `all==true`)
             return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
 
-        // Literal row index
+        // Literal row index (tagged)
         if (ref & 1) {
             size_t row_ref = size_t(uint64_t(ref) >> 1);
 
@@ -2867,7 +2879,8 @@ top:
         const char* sub_header = m_alloc.translate(to_ref(ref));
         const bool sub_isindex = get_context_flag_from_header(sub_header);
 
-        // List of matching row indexes
+        // List of values with common prefix up to this point, in sorted order.
+        // The list contains a row literal (tagged) or a ref to another list storing duplicates.
         if (!sub_isindex) {
             const bool sub_isleaf = !get_is_inner_bptree_node_from_header(sub_header);
             size_t sub_count = -1;
