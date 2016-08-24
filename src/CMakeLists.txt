@@ -71,7 +71,7 @@ set(INCLUDE_DIRS ${REALM_CORE_INCLUDE_DIR} ${PEGTL_INCLUDE_DIR} ${CMAKE_CURRENT_
 
 # Add the sync files separately to reduce merge conflicts.
 list(APPEND HEADERS sync_manager.cpp impl/sync_session.cpp)
-list(APPEND SOURCES sync_manager.cpp impl/sync_session.hpp)
+list(APPEND SOURCES sync_manager.cpp impl/sync_client.hpp impl/sync_session.hpp)
 find_package(ZLIB REQUIRED)
 list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
 

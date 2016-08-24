@@ -18,10 +18,14 @@
 
 #include "sync_session.hpp"
 
+#include "sync_client.hpp"
+
 using namespace realm;
 using namespace realm::_impl;
 
-SyncSession::SyncSession(sync::Session session) : m_session(std::move(session))
+SyncSession::SyncSession(std::shared_ptr<SyncClient> client, std::string realm_path)
+    : m_client(std::move(client))
+    , m_session(m_client->client, std::move(realm_path))
 {
 }
 
