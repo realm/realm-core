@@ -562,7 +562,7 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
 
 Realm::HandoverPackage::HandoverPackage(HandoverPackage&&) = default;
 Realm::HandoverPackage& Realm::HandoverPackage::operator=(HandoverPackage&&) = default;
-Realm::HandoverPackage::VersionID::VersionID() : VersionID(SharedGroup::VersionID()) { };
+Realm::HandoverPackage::VersionID::VersionID() : VersionID(SharedGroup::VersionID()) { }
 
 // Precondition: `m_version` is not greater than `new_version`
 // Postcondition: `m_version` is equal to `new_version`
