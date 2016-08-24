@@ -93,7 +93,7 @@ public:
     /// the memory references stay valid for the remainder of the transaction
     /// (up until initiation of the commit operation).
     virtual void get_changesets(version_type begin_version, version_type end_version,
-                                BinaryData* buffer) const noexcept = 0;
+                                BinaryIterator* buffer) const noexcept = 0;
 
     /// \brief Specify the version of the oldest bound snapshot.
     ///
@@ -168,7 +168,7 @@ public:
 
     void update_early_from_top_ref(version_type, size_t, ref_type) override;
     void update_from_parent(version_type) override;
-    void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
+    void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override;
     void set_oldest_bound_version(version_type) override;
 
 #ifdef REALM_DEBUG

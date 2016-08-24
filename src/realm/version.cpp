@@ -18,10 +18,10 @@
 
 #include <realm/util/features.h>
 #include <realm/version.hpp>
+#include <realm/string_data.hpp>
 #include <sstream>
 
 using namespace realm;
-
 
 std::string Version::get_version()
 {
@@ -30,7 +30,12 @@ std::string Version::get_version()
     return ss.str();
 }
 
-bool Version::is_at_least(int major, int minor, int patch)
+StringData Version::get_extra()
+{
+    return REALM_VER_EXTRA;
+}
+
+bool Version::is_at_least(int major, int minor, int patch, StringData extra)
 {
     if (get_major() < major)
         return false;
@@ -42,7 +47,17 @@ bool Version::is_at_least(int major, int minor, int patch)
     if (get_minor() > minor)
         return true;
 
-    return (get_patch() >= patch);
+    if(get_patch() > patch)
+        return true;
+    if(get_patch() < patch)
+        return false;
+
+    return (get_extra() >= extra);
+}
+
+bool Version::is_at_least(int major, int minor, int patch)
+{
+    return is_at_least(major, minor, patch, "");
 }
 
 bool Version::has_feature(Feature feature)

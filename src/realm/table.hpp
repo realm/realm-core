@@ -449,6 +449,13 @@ public:
     /// Users intending to implement primary keys must therefore manually check
     /// for duplicates if they want to raise an error instead.
     ///
+    /// NOTE:  It is an error to call either function after adding elements to a
+    /// linklist in the object. In general, calling set_int_unique() or
+    /// set_string_unique() should be the first thing that happens after
+    /// creating a row. These limitations are imposed by limitations in the
+    /// Realm Object Server and may be relaxed in the future. A violation of
+    /// these rules results in a LogicError being thrown.
+    ///
     /// insert_substring() inserts the specified string into the currently
     /// stored string at the specified position. The position must be less than
     /// or equal to the size of the currently stored string.
@@ -467,22 +474,22 @@ public:
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
-    void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
+    void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value, bool is_default = false);
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
-    void set_bool(size_t column_ndx, size_t row_ndx, bool value);
-    void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value);
-    void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value);
+    void set_bool(size_t column_ndx, size_t row_ndx, bool value, bool is_default = false);
+    void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value, bool is_default = false);
+    void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value, bool is_default = false);
     template<class E>
     void set_enum(size_t column_ndx, size_t row_ndx, E value);
-    void set_float(size_t column_ndx, size_t row_ndx, float value);
-    void set_double(size_t column_ndx, size_t row_ndx, double value);
-    void set_string(size_t column_ndx, size_t row_ndx, StringData value);
+    void set_float(size_t column_ndx, size_t row_ndx, float value, bool is_default = false);
+    void set_double(size_t column_ndx, size_t row_ndx, double value, bool is_default = false);
+    void set_string(size_t column_ndx, size_t row_ndx, StringData value, bool is_default = false);
     void set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
-    void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
-    void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
-    void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx);
+    void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default = false);
+    void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value, bool is_default = false);
+    void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default = false);
     void nullify_link(size_t column_ndx, size_t row_ndx);
-    void set_null(size_t column_ndx, size_t row_ndx);
+    void set_null(size_t column_ndx, size_t row_ndx, bool is_default = false);
 
     void insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
     void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t substring_size = realm::npos);
@@ -813,6 +820,8 @@ protected:
     bool compare_rows(const Table&) const;
 
     void set_into_mixed(Table* parent, size_t col_ndx, size_t row_ndx) const;
+
+    void check_lists_are_empty(size_t row_ndx) const;
 
 private:
     class SliceWriter;

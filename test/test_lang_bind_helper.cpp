@@ -208,8 +208,8 @@ public:
         // No-op
     }
 
-    void get_changesets(version_type begin_version, version_type end_version,
-                        BinaryData* buffer) const noexcept override
+    void get_changesets(version_type begin_version, version_type end_version, BinaryIterator* buffer) const
+        noexcept override
     {
         size_t n = size_t(end_version - begin_version);
         for (size_t i = 0; i < n; ++i) {
@@ -247,7 +247,6 @@ private:
 };
 
 } // anonymous namespace
-
 
 TEST(LangBindHelper_AdvanceReadTransact_Basics)
 {
@@ -7576,27 +7575,25 @@ public:
     bool swap_rows(size_t, size_t) { return false; }
     bool change_link_targets(size_t, size_t) { return false; }
     bool clear_table() noexcept { return false; }
-    bool link_list_set(size_t, size_t) { return false; }
-    bool link_list_insert(size_t, size_t) { return false; }
-    bool link_list_erase(size_t) { return false; }
-    bool link_list_nullify(size_t) { return false; }
+    bool link_list_set(size_t, size_t, size_t) { return false; }
+    bool link_list_insert(size_t, size_t, size_t) { return false; }
+    bool link_list_erase(size_t, size_t) { return false; }
+    bool link_list_nullify(size_t, size_t) { return false; }
     bool link_list_clear(size_t) { return false; }
     bool link_list_move(size_t, size_t) { return false; }
     bool link_list_swap(size_t, size_t) { return false; }
-    bool set_int(size_t, size_t, int_fast64_t) { return false; }
-    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return false; }
-    bool set_bool(size_t, size_t, bool) { return false; }
-    bool set_float(size_t, size_t, float) { return false; }
-    bool set_double(size_t, size_t, double) { return false; }
-    bool set_string(size_t, size_t, StringData) { return false; }
-    bool set_string_unique(size_t, size_t, size_t, StringData) { return false; }
-    bool set_binary(size_t, size_t, BinaryData) { return false; }
-    bool set_olddatetime(size_t, size_t, OldDateTime) { return false; }
-    bool set_timestamp(size_t, size_t, Timestamp) { return false; }
-    bool set_table(size_t, size_t) { return false; }
-    bool set_mixed(size_t, size_t, const Mixed&) { return false; }
-    bool set_link(size_t, size_t, size_t, size_t) { return false; }
-    bool set_null(size_t, size_t) { return false; }
+    bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) { return false; }
+    bool set_bool(size_t, size_t, bool, _impl::Instruction) { return false; }
+    bool set_float(size_t, size_t, float, _impl::Instruction) { return false; }
+    bool set_double(size_t, size_t, double, _impl::Instruction) { return false; }
+    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t) { return false; }
+    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction) { return false; }
+    bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction) { return false; }
+    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction) { return false; }
+    bool set_table(size_t, size_t, _impl::Instruction) { return false; }
+    bool set_mixed(size_t, size_t, const Mixed&, _impl::Instruction) { return false; }
+    bool set_link(size_t, size_t, size_t, size_t, _impl::Instruction) { return false; }
+    bool set_null(size_t, size_t, _impl::Instruction, size_t) { return false; }
     bool nullify_link(size_t, size_t, size_t) { return false; }
     bool insert_substring(size_t, size_t, size_t, StringData) { return false; }
     bool erase_substring(size_t, size_t, size_t, size_t) { return false; }
@@ -7730,7 +7727,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
                 return true;
             }
 
-            bool link_list_nullify(size_t ndx)
+            bool link_list_nullify(size_t ndx, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
@@ -7819,7 +7816,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool set_int(size_t, size_t, int_fast64_t) const
+            bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) const
             {
                 throw ObserverError();
             }
@@ -8709,7 +8706,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 return true;
             }
 
-            bool link_list_insert(size_t ndx, size_t value)
+            bool link_list_insert(size_t ndx, size_t value, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
@@ -8722,7 +8719,8 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 return true;
             }
 
-            bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t)
+            bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t,
+                          _impl::Instruction)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(0, col_ndx);
@@ -8761,7 +8759,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 
             size_t list_ndx = 0;
 
-            bool link_list_insert(size_t ndx, size_t)
+            bool link_list_insert(size_t ndx, size_t, size_t)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(1, get_current_linkview().first);
@@ -11547,7 +11545,6 @@ TEST(LangBindHelper_CommitlogSplitWorld)
         CHECK_EQUAL(r.get_int(0), 0);
     }
 }
-
 TEST(LangBindHelper_InRealmHistory_Basics)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -11722,6 +11719,46 @@ TEST(LangBindHelper_InRealmHistory_Basics)
     CHECK_EQUAL(0, bar->size());
     CHECK_EQUAL(foo, group.get_table("foo"));
     CHECK_EQUAL(bar, group.get_table("bar"));
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_BigCommit)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist = make_in_realm_history(path);
+    std::unique_ptr<Replication> hist_w = make_in_realm_history(path);
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.add_table("foo");
+        foo_w->add_column(type_Binary, "bin");
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+    auto foo_table = group.get_table("foo");
+
+    CHECK_EQUAL(foo_table->size(), 0);
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.get_table("foo");
+        foo_w->add_empty_row(20);
+        std::vector<char> big_binary(1024 * 1024); // 1 M
+        for (unsigned i = 0; i < 20; i++) {
+            foo_w->set_binary(0, i, BinaryData(big_binary.data(), big_binary.size()));
+        }
+        // this will result in a change set of around 20 M
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+    CHECK_EQUAL(foo_table->size(), 20);
 }
 
 

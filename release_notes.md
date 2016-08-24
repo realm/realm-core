@@ -24,6 +24,17 @@
 
 ----------------------------------------------
 
+# 2.0.0-rc0 Release notes
+
+### Internals
+
+* Changed instruction log format of Set instructions to be more amenable to the
+addition of future variants.
+* Changed instruction log format of LinkList instructions to include information
+about the size of the list in question prior to carrying out the instruction.
+
+----------------------------------------------
+
 # 1.5.1 Release notes
 
 ### Bugfixes
