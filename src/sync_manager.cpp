@@ -18,50 +18,13 @@
 
 #include "sync_manager.hpp"
 
+#include "impl/sync_client.hpp"
 #include "impl/sync_session.hpp"
 
 #include <thread>
 
 using namespace realm;
 using namespace realm::_impl;
-
-namespace realm {
-namespace _impl {
-
-struct SyncClient {
-    sync::Client client;
-
-    SyncClient(std::unique_ptr<util::Logger> logger, std::function<sync::Client::ErrorHandler> handler)
-    : client(make_client(*logger)) // Throws
-    , m_logger(std::move(logger))
-    , m_thread([this, handler=std::move(handler)] {
-        client.set_error_handler(std::move(handler));
-        client.run();
-    }) // Throws
-    {
-    }
-
-    ~SyncClient()
-    {
-        client.stop();
-        m_thread.join();
-    }
-
-private:
-    static sync::Client make_client(util::Logger& logger)
-    {
-        sync::Client::Config config;
-        config.logger = &logger;
-        return sync::Client(std::move(config)); // Throws
-    }
-
-    const std::unique_ptr<util::Logger> m_logger;
-    std::thread m_thread;
-};
-
-} // namespace _impl
-} // namespace realm
-
 
 SyncManager& SyncManager::shared()
 {
@@ -89,19 +52,19 @@ void SyncManager::set_error_handler(std::function<sync::Client::ErrorHandler> ha
 
 std::unique_ptr<SyncSession> SyncManager::create_session(std::string realm_path) const
 {
-    auto& client = get_sync_client(); // Throws
-    return std::make_unique<SyncSession>(sync::Session(client, std::move(realm_path))); // Throws
+    auto client = get_sync_client(); // Throws
+    return std::make_unique<SyncSession>(std::move(client), std::move(realm_path)); // Throws
 }
 
-sync::Client& SyncManager::get_sync_client() const
+std::shared_ptr<SyncClient> SyncManager::get_sync_client() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     if (!m_sync_client)
         m_sync_client = create_sync_client(); // Throws
-    return m_sync_client->client;
+    return m_sync_client;
 }
 
-std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
+std::shared_ptr<SyncClient> SyncManager::create_sync_client() const
 {
     REALM_ASSERT(!m_mutex.try_lock());
 
@@ -114,5 +77,5 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
         stderr_logger->set_level_threshold(m_log_level);
         logger = std::move(stderr_logger);
     }
-    return std::make_unique<SyncClient>(std::move(logger), std::move(m_error_handler));
+    return std::make_shared<SyncClient>(std::move(logger), std::move(m_error_handler));
 }

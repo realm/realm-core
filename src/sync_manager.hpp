@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_SYNC_MANAGER_HPP
-#define REALM_SYNC_MANAGER_HPP
+#ifndef REALM_OS_SYNC_MANAGER_HPP
+#define REALM_OS_SYNC_MANAGER_HPP
 
 #include <realm/sync/client.hpp>
 #include <realm/util/logger.hpp>
@@ -52,8 +52,8 @@ private:
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
 
-    sync::Client& get_sync_client() const;
-    std::unique_ptr<_impl::SyncClient> create_sync_client() const;
+    std::shared_ptr<_impl::SyncClient> get_sync_client() const;
+    std::shared_ptr<_impl::SyncClient> create_sync_client() const;
 
     mutable std::mutex m_mutex;
 
@@ -62,9 +62,9 @@ private:
     SyncLoggerFactory* m_logger_factory = nullptr;
     std::function<sync::Client::ErrorHandler> m_error_handler;
 
-    mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
+    mutable std::shared_ptr<_impl::SyncClient> m_sync_client;
 };
 
 } // namespace realm
 
-#endif // REALM_SYNC_MANAGER_HPP
+#endif // REALM_OS_SYNC_MANAGER_HPP

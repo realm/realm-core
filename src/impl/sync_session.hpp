@@ -16,8 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_SYNC_SESSION_HPP
-#define REALM_SYNC_SESSION_HPP
+#ifndef REALM_OS_SYNC_SESSION_HPP
+#define REALM_OS_SYNC_SESSION_HPP
 
 #include <realm/util/optional.hpp>
 
@@ -27,8 +27,10 @@ namespace realm {
 
 namespace _impl {
 
+struct SyncClient;
+
 struct SyncSession {
-    SyncSession(sync::Session);
+    SyncSession(std::shared_ptr<SyncClient>, std::string realm_path);
 
     void set_sync_transact_callback(std::function<sync::Session::SyncTransactCallback>);
     void set_error_handler(std::function<sync::Session::ErrorHandler>);
@@ -37,6 +39,7 @@ struct SyncSession {
     void refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url);
 
 private:
+    std::shared_ptr<SyncClient> m_client;
     sync::Session m_session;
     bool m_awaits_user_token = true;
     util::Optional<int_fast64_t> m_deferred_commit_notification;
@@ -48,4 +51,4 @@ private:
 }
 }
 
-#endif // REALM_SYNC_SESSION_HPP
+#endif // REALM_OS_SYNC_SESSION_HPP
