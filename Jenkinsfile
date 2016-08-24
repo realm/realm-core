@@ -419,6 +419,14 @@ def get_version() {
   }
 }
 
+@NonCPS
+def getDeviceNames(String commandOutput) {
+    return commandOutput
+        .split('\n')
+        .findAll { it.contains('\t') }
+        .collect { it.split('\t')[0].trim() }
+}
+
 def doBuildPackage(distribution, fileType) {
   return {
     node('docker') {
