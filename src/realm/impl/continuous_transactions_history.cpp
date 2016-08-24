@@ -36,9 +36,6 @@ void InRealmHistory::initialize(Group& group)
 
 InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
 {
-    if (changeset.size() > Table::max_binary_size)
-        throw std::runtime_error("Changeset too large");
-
     if (!m_changesets) {
         using gf = _impl::GroupFriend;
         Allocator& alloc = gf::get_alloc(*m_group);
@@ -58,10 +55,10 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
     // null. It should probably be changed such that BinaryData(0,0) is always
     // interpreted as the empty string. For the purpose of setting null values,
     // BinaryColumn::set() should accept values of type Optional<BinaryData>().
-    BinaryData changeset_2("", 0);
-    if (!changeset.is_null())
-        changeset_2 = changeset;
-    m_changesets->add(changeset_2); // Throws
+    if (changeset.is_null())
+        m_changesets->add(BinaryData("", 0)); // Throws
+    else
+        m_changesets->add(changeset); // Throws
     ++m_size;
     version_type new_version = m_base_version + m_size;
     return new_version;
@@ -88,7 +85,7 @@ void InRealmHistory::update_from_parent(version_type version)
 
 
 void InRealmHistory::get_changesets(version_type begin_version, version_type end_version,
-                                    BinaryData* buffer) const noexcept
+                                    ChangeSetBuffer* buffer) const noexcept
 {
     REALM_ASSERT(begin_version <= end_version);
     REALM_ASSERT(begin_version >= m_base_version);
@@ -99,7 +96,7 @@ void InRealmHistory::get_changesets(version_type begin_version, version_type end
     size_t n = size_t(n_version_type);
     size_t offset = size_t(offset_version_type);
     for (size_t i = 0; i < n; ++i)
-        buffer[i] = m_changesets->get(offset + i);
+        buffer[i] = ChangeSetBuffer(m_changesets, offset + i);
 }
 
 

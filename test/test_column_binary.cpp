@@ -554,4 +554,43 @@ TEST(BinaryColumn_NonLeafRoot)
     }
 }
 
+TEST(BinaryColumn_Read)
+{
+    std::string hello = "Hello, world";
+    std::string very_lazy_fox =
+        "The lazy fox jumped over the quick brown dog. The quick fox jumped over the lazy brown dog. ";
+    char buffer[1000];
+
+    ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
+    BinaryColumn c(Allocator::get_default(), ref, true);
+
+    c.add(BinaryData());
+    c.add(BinaryData(hello));
+
+    CHECK(c.get(0).is_null());
+    size_t read = c.read(0, 0, buffer, 10);
+    CHECK_EQUAL(read, 0);
+
+    read = c.read(1, 0, buffer, 10);
+    CHECK_EQUAL(read, 10);
+    CHECK_EQUAL(std::string(buffer, read), hello.substr(0, 10));
+
+    c.add(BinaryData(very_lazy_fox));
+
+    read = c.read(2, 0, buffer, 10);
+    CHECK_EQUAL(read, 10);
+    CHECK_EQUAL(std::string(buffer, read), very_lazy_fox.substr(0, 10));
+
+    // Split root
+    for (unsigned i = 0; i < REALM_MAX_BPNODE_SIZE; i++) {
+        c.add(BinaryData());
+    }
+
+    read = c.read(1, 0, buffer, 10);
+    CHECK_EQUAL(read, 10);
+    CHECK_EQUAL(std::string(buffer, read), hello.substr(0, 10));
+
+    c.destroy();
+}
+
 #endif // TEST_COLUMN_BINARY

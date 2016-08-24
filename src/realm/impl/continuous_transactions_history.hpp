@@ -30,6 +30,39 @@ class Group;
 
 namespace _impl {
 
+class ChangeSetBuffer {
+public:
+    ChangeSetBuffer() {}
+
+    // TODO: When WriteLogCollector is removed, there is no need for this
+    ChangeSetBuffer(BinaryData binary) : m_binary(binary) {}
+
+    ChangeSetBuffer(std::shared_ptr<BinaryColumn> changesets, size_t ndx) : m_changesets(changesets), m_ndx(ndx) {}
+
+    size_t read(char* buffer, size_t max_size) noexcept
+    {
+        size_t actual = 0;
+        if (m_changesets) {
+            actual = m_changesets->read(m_ndx, m_pos, buffer, max_size);
+            m_pos += actual;
+        }
+        else if (!m_binary.is_null()) {
+            if (m_pos < m_binary.size()) {
+                size_t bytes_left = m_binary.size() - m_pos;
+                actual = std::min(max_size, bytes_left);
+                std::copy(m_binary.data(), m_binary.data() + actual, buffer);
+            }
+        }
+        return actual;
+    }
+
+private:
+    std::shared_ptr<BinaryColumn> m_changesets;
+    size_t m_ndx = 0;
+    size_t m_pos = 0;
+    BinaryData m_binary;
+};
+
 /// Read-only access to history of changesets as needed to enable continuous
 /// transactions.
 class History {
@@ -93,7 +126,7 @@ public:
     /// the memory references stay valid for the remainder of the transaction
     /// (up until initiation of the commit operation).
     virtual void get_changesets(version_type begin_version, version_type end_version,
-                                BinaryData* buffer) const noexcept = 0;
+                                ChangeSetBuffer* buffer) const noexcept = 0;
 
     /// \brief Specify the version of the oldest bound snapshot.
     ///
@@ -168,7 +201,7 @@ public:
 
     void update_early_from_top_ref(version_type, size_t, ref_type) override;
     void update_from_parent(version_type) override;
-    void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
+    void get_changesets(version_type, version_type, ChangeSetBuffer*) const noexcept override;
     void set_oldest_bound_version(version_type) override;
 
 #ifdef REALM_DEBUG
@@ -201,7 +234,7 @@ private:
     /// unfortunate consequence of the fact that a column accessor contains a
     /// dynamically allocated root node accessor, and the type of the required
     /// root node accessor depends on the size of the B+-tree.
-    std::unique_ptr<BinaryColumn> m_changesets;
+    std::shared_ptr<BinaryColumn> m_changesets;
 
     void update_from_ref(ref_type, version_type);
 };

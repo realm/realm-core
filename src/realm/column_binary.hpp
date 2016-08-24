@@ -41,6 +41,7 @@ public:
     bool is_nullable() const noexcept override;
 
     BinaryData get(size_t ndx) const noexcept;
+    size_t read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept;
     bool is_null(size_t ndx) const noexcept override;
     StringData get_index_data(size_t, StringIndex::StringConversionBuffer& ) const noexcept final;
 

@@ -208,8 +208,8 @@ public:
         // No-op
     }
 
-    void get_changesets(version_type begin_version, version_type end_version,
-                        BinaryData* buffer) const noexcept override
+    void get_changesets(version_type begin_version, version_type end_version, _impl::ChangeSetBuffer* buffer) const
+        noexcept override
     {
         size_t n = size_t(end_version - begin_version);
         for (size_t i = 0; i < n; ++i) {
@@ -247,7 +247,6 @@ private:
 };
 
 } // anonymous namespace
-
 
 TEST(LangBindHelper_AdvanceReadTransact_Basics)
 {
@@ -11547,7 +11546,6 @@ TEST(LangBindHelper_CommitlogSplitWorld)
         CHECK_EQUAL(r.get_int(0), 0);
     }
 }
-
 TEST(LangBindHelper_InRealmHistory_Basics)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -11722,6 +11720,46 @@ TEST(LangBindHelper_InRealmHistory_Basics)
     CHECK_EQUAL(0, bar->size());
     CHECK_EQUAL(foo, group.get_table("foo"));
     CHECK_EQUAL(bar, group.get_table("bar"));
+}
+
+
+TEST(LangBindHelper_AdvanceReadTransact_BigCommit)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist = make_in_realm_history(path);
+    std::unique_ptr<Replication> hist_w = make_in_realm_history(path);
+    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.add_table("foo");
+        foo_w->add_column(type_Binary, "bin");
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+    auto foo_table = group.get_table("foo");
+
+    CHECK_EQUAL(foo_table->size(), 0);
+    {
+        WriteTransaction wt(sg_w);
+        TableRef foo_w = wt.get_table("foo");
+        foo_w->add_empty_row(20);
+        std::vector<char> big_binary(1024 * 1024); // 1 M
+        for (unsigned i = 0; i < 20; i++) {
+            foo_w->set_binary(0, i, BinaryData(big_binary.data(), big_binary.size()));
+        }
+        // this will result in a change set of around 20 M
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+    CHECK_EQUAL(foo_table->size(), 20);
 }
 
 

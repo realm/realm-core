@@ -282,3 +282,72 @@ TEST(ArrayBigBlobs_Basic)
 
     c.destroy();
 }
+
+TEST(ArrayBigBlobs_Read)
+{
+    bool ok;
+    std::string lazy_fox = "The lazy fox jumped over the quick brown dog";
+    ArrayBigBlobs c(Allocator::get_default(), false);
+    c.create();
+
+    c.add(BinaryData(lazy_fox));
+    char buffer[1000];
+    size_t read = c.read(0, 0, buffer, 10);
+    CHECK_EQUAL(read, 10);
+    CHECK_EQUAL(std::string(buffer, read), lazy_fox.substr(0, 10));
+
+    read = c.read(0, 4, buffer, 100);
+    CHECK_EQUAL(read, 40);
+    CHECK_EQUAL(std::string(buffer, read), lazy_fox.substr(4));
+
+    read = c.read(0, 50, buffer, 100);
+    CHECK_EQUAL(read, 0);
+
+    std::vector<char> big_blob(0x2000000);
+    for (unsigned i = 0; i < big_blob.size(); i++) {
+        big_blob[i] = char(i & 0xFF);
+    }
+
+    c.add(BinaryData(big_blob.data(), big_blob.size()));
+#ifdef REALM_DEBUG
+    c.verify();
+#endif
+
+    big_blob.assign(big_blob.size(), '\0');
+    read = c.read(1, 0, big_blob.data(), big_blob.size());
+    CHECK_EQUAL(read, 0x2000000);
+    ok = true;
+    for (unsigned i = 0; i < read; i++) {
+        if (big_blob[i] != char(i & 0xFF)) {
+            ok = false;
+        }
+    }
+    CHECK(ok);
+
+    read = c.read(1, 0x1800000, buffer, 0x200);
+    CHECK_EQUAL(read, 0x200);
+    ok = true;
+    for (unsigned i = 0; i < read; i++) {
+        if (big_blob[i] != char(i & 0xFF)) {
+            ok = false;
+        }
+    }
+    CHECK(ok);
+
+    read = c.read(1, 0x1FFFF00, buffer, 0x200);
+    CHECK_EQUAL(read, 0x100);
+    ok = true;
+    for (unsigned i = 0; i < read; i++) {
+        if (big_blob[i] != char(i & 0xFF)) {
+            ok = false;
+        }
+    }
+    CHECK(ok);
+
+    read = c.read(1, 0x2000000, buffer, 0x200);
+    CHECK_EQUAL(read, 0);
+
+    c.set(1, BinaryData());
+
+    c.destroy();
+}
