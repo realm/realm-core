@@ -640,6 +640,7 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
     if (!m_group) {
         // A read transaction doesn't yet exist, so create at the handover version
         m_group = &const_cast<Group&>(m_shared_group->begin_read(handover.m_version_id));
+        add_schema_change_handler();
     }
     else {
         auto current_version = m_shared_group->get_version_of_current_transaction();
