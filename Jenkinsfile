@@ -250,6 +250,7 @@ def doBuildAndroid() {
 
     return {
         node('fastlinux') {
+          ws('/tmp/core-android') {
             checkout scm
             sh 'git clean -ffdx -e .????????'
 
@@ -272,6 +273,7 @@ def doBuildAndroid() {
                 }
             }
             collectCompilerWarnings('gcc')
+          }
         }
 
         node('android-hub') {
