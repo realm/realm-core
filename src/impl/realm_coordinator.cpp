@@ -26,6 +26,7 @@
 #include "object_store.hpp"
 #include "schema.hpp"
 
+#include "sync_config.hpp"
 #include "sync_manager.hpp"
 #include "sync_session.hpp"
 
@@ -86,9 +87,6 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
         if (m_config.schema_version != config.schema_version && config.schema_version != ObjectStore::NotVersioned) {
             throw MismatchedConfigException("Realm at path '%1' already opened with different schema version.", config.path);
         }
-        if (m_config.sync_login_function && config.in_memory) {
-            throw MismatchedConfigException("Realm at path '%1' cannot be opened for Sync with a misconfigured user.", config.path);
-        }
         // Realm::update_schema() handles complaining about schema mismatches
     }
 
@@ -104,19 +102,17 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
         }
     }
 
-    if (config.sync_login_function && !m_sync_session) {
+    if (config.sync_config && !m_sync_session) {
         m_sync_session = SyncManager::shared().create_session(config.path);
         m_sync_session->set_sync_transact_callback([this] (sync::Session::version_type) {
             if (m_notifier)
                 m_notifier->notify_others();
         });
-        if (config.sync_error_handler) {
-            m_sync_session->set_error_handler(config.sync_error_handler);
+        if (config.sync_config->error_handler) {
+            m_sync_session->set_error_handler(config.sync_config->error_handler);
         }
-
-        // FIXME: figure out how to handle anonymous users (probably just defer bind until `refresh_access_token` is explicitly called)
-        // Hand control over to the RLMUser object to update the token and bind the Realm.
-        config.sync_login_function(config.path);
+        // Request the binding to bind the Realm at the earliest opportunity (immediately, or upon login).
+        SyncManager::shared().get_sync_login_function()(config);
     }
 
     auto realm = Realm::make_shared_realm(std::move(config));
