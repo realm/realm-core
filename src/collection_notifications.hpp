@@ -57,13 +57,37 @@ struct CollectionChangeSet {
         bool operator==(Move m) const { return from == m.from && to == m.to; }
     };
 
+    // Indices which were removed from the _old_ collection
     IndexSet deletions;
+
+    // Indices in the _new_ collection which are new insertions
     IndexSet insertions;
+
+    // Indices of objects in the _old_ collection which were modified
     IndexSet modifications;
+
+    // Indices in the _new_ collection which were modified. This will always
+    // have the same number of indices as `modifications` and conceptually
+    // represents the same entries, just in different versions of the collection.
+    // It exists for the sake of code which finds it easier to process
+    // modifications after processing deletions and insertions rather than before.
     IndexSet modifications_new;
+
+    // Rows in the collection which moved.
+    //
+    // Every `from` index will also be present in `deletions` and every `to`
+    // index will be present in `insertions`.
+    //
+    // This is currently not reliably calculated for all types of collections. A
+    // reported move will always actually be a move, but there may also be
+    // unreported moves which show up only as a delete/insert pair.
     std::vector<Move> moves;
 
-    bool empty() const { return deletions.empty() && insertions.empty() && modifications.empty() && modifications_new.empty() && moves.empty(); }
+    bool empty() const
+    {
+        return deletions.empty() && insertions.empty() && modifications.empty()
+            && modifications_new.empty() && moves.empty();
+    }
 };
 
 // A type-erasing wrapper for the callback for collection notifications. Can be
