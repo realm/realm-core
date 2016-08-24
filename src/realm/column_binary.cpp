@@ -125,6 +125,7 @@ BinaryData BinaryColumn::get_at(size_t ndx, size_t& pos) const noexcept
         }
         else {
             // Big blobs
+            REALM_ASSERT(dynamic_cast<ArrayBigBlobs*>(arr) != nullptr);
             return static_cast<ArrayBigBlobs*>(arr)->get_at(ndx, pos);
         }
     }
@@ -142,9 +143,9 @@ BinaryData BinaryColumn::get_at(size_t ndx, size_t& pos) const noexcept
         }
         else {
             // Big blobs
-            Array leaf(m_array->get_alloc());
+            ArrayBigBlobs leaf(m_array->get_alloc(), m_nullable);
             leaf.init_from_mem(p.first);
-            return static_cast<ArrayBigBlobs*>(&leaf)->get_at(p.second, pos);
+            return leaf.get_at(p.second, pos);
         }
     }
 }
