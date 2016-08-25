@@ -70,7 +70,8 @@ const uint16_t relaxed_sync_threshold = 50;
 // 7       Introducing `commit_in_critical_phase` and `sync_client_present`, and
 //         changing `daemon_started` and `daemon_ready` from 1-bit to 8-bit
 //         fields.
-const uint_fast16_t g_shared_info_version = 7;
+// 8       Placing the commitlog history inside the Realm file.
+const uint_fast16_t g_shared_info_version = 8;
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -1725,7 +1726,6 @@ Replication::version_type SharedGroup::do_commit()
 
     version_type current_version = r_info->get_current_version_unchecked();
     version_type new_version = current_version + 1;
-    r_info->commit_in_critical_phase = 1;
     if (Replication* repl = m_group.get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the
@@ -1737,8 +1737,6 @@ Replication::version_type SharedGroup::do_commit()
         }
         catch (...) {
             repl->abort_transact();
-            r_info = m_reader_map.get_addr();
-            r_info->commit_in_critical_phase = 0;
             throw;
         }
         repl->finalize_commit();
@@ -1746,8 +1744,6 @@ Replication::version_type SharedGroup::do_commit()
     else {
         low_level_commit(new_version); // Throws
     }
-    r_info = m_reader_map.get_addr();
-    r_info->commit_in_critical_phase = 0;
     return new_version;
 }
 
@@ -1885,7 +1881,11 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
             break;
     }
     size_t new_file_size = out.get_file_size();
-    // Update reader info
+    // Update reader info. If this fails in any way, the ringbuffer may be corrupted.
+    // This can lead to other readers seing invalid data which is likely to cause them
+    // to crash. Other writers *must* be prevented from writing any further updates
+    // to the database. The flag "commit_in_critical_phase" is used to prevent such updates.
+    info->commit_in_critical_phase = 1;
     {
         SharedInfo* r_info = m_reader_map.get_addr();
         if (r_info->readers.is_full()) {
@@ -1906,6 +1906,9 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r.version     = new_version;
         r_info->readers.use_next();
     }
+    // At this point, the ringbuffer has been succesfully updated, and the next writer
+    // can safely proceed once the writemutex has been lifted.
+    info->commit_in_critical_phase = 0;
     {
         std::lock_guard<InterprocessMutex> lock(m_controlmutex);
         info->number_of_versions = new_version - oldest_version + 1;
