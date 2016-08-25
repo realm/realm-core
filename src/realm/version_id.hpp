@@ -19,13 +19,12 @@
 #ifndef REALM_VERSION_ID_HPP
 #define REALM_VERSION_ID_HPP
 
-#include <realm/impl/continuous_transactions_history.hpp>
+#include <limits>
 
 namespace realm {
 
-using version_type = _impl::History::version_type;
-
 struct VersionID {
+    using version_type = uint_fast64_t;
     version_type version = std::numeric_limits<version_type>::max();
     uint_fast32_t index   = 0;
 
