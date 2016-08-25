@@ -1636,7 +1636,7 @@ void SharedGroup::rollback() noexcept
 
 SharedGroup::VersionID SharedGroup::pin_version()
 {
-    REALM_ASSERT(m_transact_stage == transact_Reading);
+    REALM_ASSERT(m_transact_stage != transact_Ready);
 
     // Get current version
     VersionID version_id(m_read_lock.m_version, m_read_lock.m_reader_idx);
