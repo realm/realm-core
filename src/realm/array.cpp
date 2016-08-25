@@ -2823,7 +2823,6 @@ size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& re
     key_type key;
     size_t stringoffset = 0;
 
-top:
     // Create 4 byte index key
     key = StringIndex::create_key(value, stringoffset);
 
@@ -2958,7 +2957,8 @@ top:
         else
             stringoffset += value.size() - stringoffset + 1;
 
-        goto top;
+        // Update 4 byte index key
+        key = StringIndex::create_key(value, stringoffset);
     }
 }
 
