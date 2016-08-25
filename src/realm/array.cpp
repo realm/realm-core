@@ -2383,6 +2383,8 @@ void Array::to_dot(std::ostream& out, StringData title) const
         out << "IsNode<BR/>";
     if (m_has_refs)
         out << "HasRefs<BR/>";
+    if (m_context_flag)
+        out << "ContextFlag<BR/>";
     out << "</FONT></TD>" << std::endl;
 
     // Values
