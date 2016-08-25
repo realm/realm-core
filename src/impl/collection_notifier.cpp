@@ -262,65 +262,59 @@ void CollectionNotifier::prepare_handover()
     do_prepare_handover(*m_sg);
 }
 
-bool CollectionNotifier::deliver(Realm& realm, SharedGroup& sg, std::exception_ptr err)
+void CollectionNotifier::before_advance()
+{
+    while (auto fn = next_callback(!m_changes_to_deliver.empty(), true))
+        fn.before(m_changes_to_deliver);
+}
+
+void CollectionNotifier::after_advance()
+{
+    while (auto fn = next_callback(!m_changes_to_deliver.empty(), false))
+        fn.after(m_changes_to_deliver);
+    m_changes_to_deliver = {};
+}
+
+void CollectionNotifier::deliver_error(std::exception_ptr error)
+{
+    while (auto fn = next_callback(true, false)) {
+        fn.error(error);
+    }
+
+    // Remove all the callbacks as we never need to call anything ever again
+    // after delivering an error
+    std::lock_guard<std::mutex> callback_lock(m_callback_mutex);
+    m_callbacks.clear();
+    m_error = true;
+}
+
+SharedGroup::VersionID CollectionNotifier::package_for_delivery(Realm& realm)
 {
     {
         std::lock_guard<std::mutex> lock(m_realm_mutex);
         if (m_realm.get() != &realm) {
-            return false;
+            return SharedGroup::VersionID{};
         }
     }
 
-    if (err) {
-        m_error = err;
-        return have_callbacks();
+    if (!prepare_to_deliver()) {
+        return SharedGroup::VersionID{};
     }
-
-    auto realm_sg_version = sg.get_version_of_current_transaction();
-    if (version() != realm_sg_version) {
-        // Realm version can be newer if a commit was made on our thread or the
-        // user manually called refresh(), or older if a commit was made on a
-        // different thread and we ran *really* fast in between the check for
-        // if the shared group has changed and when we pick up async results
-        return false;
-    }
-
-    bool should_call_callbacks = do_deliver(sg);
-    m_changes_to_deliver = std::move(m_accumulated_changes);
-
-    // fixup modifications to be source rows rather than dest rows
-    // FIXME: the actual change calculations should be updated to just calculate
-    // the correct thing instead
-    m_changes_to_deliver.modifications.erase_at(m_changes_to_deliver.insertions);
-    m_changes_to_deliver.modifications.shift_for_insert_at(m_changes_to_deliver.deletions);
-
-    return should_call_callbacks && have_callbacks();
+    m_changes_to_deliver = std::move(m_accumulated_changes).finalize();
+    return version();
 }
 
-void CollectionNotifier::call_callbacks()
-{
-    while (auto fn = next_callback()) {
-        fn(m_changes_to_deliver, m_error);
-    }
-
-    if (m_error) {
-        // Remove all the callbacks as we never need to call anything ever again
-        // after delivering an error
-        std::lock_guard<std::mutex> callback_lock(m_callback_mutex);
-        m_callbacks.clear();
-    }
-}
-
-CollectionChangeCallback CollectionNotifier::next_callback()
+CollectionChangeCallback CollectionNotifier::next_callback(bool has_changes, bool pre)
 {
     std::lock_guard<std::mutex> callback_lock(m_callback_mutex);
 
     for (++m_callback_index; m_callback_index < m_callbacks.size(); ++m_callback_index) {
         auto& callback = m_callbacks[m_callback_index];
-        if (!m_error && callback.initial_delivered && m_changes_to_deliver.empty()) {
+        if (callback.initial_delivered && !has_changes) {
             continue;
         }
-        callback.initial_delivered = true;
+        if (!pre)
+            callback.initial_delivered = true;
         return callback.fn;
     }
 

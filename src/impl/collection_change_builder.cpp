@@ -30,7 +30,7 @@ CollectionChangeBuilder::CollectionChangeBuilder(IndexSet deletions,
                                                  IndexSet insertions,
                                                  IndexSet modifications,
                                                  std::vector<Move> moves)
-: CollectionChangeSet({std::move(deletions), std::move(insertions), std::move(modifications), std::move(moves)})
+: CollectionChangeSet({std::move(deletions), std::move(insertions), std::move(modifications), {}, std::move(moves)})
 {
     for (auto&& move : this->moves) {
         this->deletions.add(move.from);
@@ -659,4 +659,25 @@ CollectionChangeBuilder CollectionChangeBuilder::calculate(std::vector<size_t> c
 #endif
 
     return ret;
+}
+
+CollectionChangeSet CollectionChangeBuilder::finalize() &&
+{
+    // Calculate which indices in the old collection were modified
+    auto modifications_in_old = modifications;
+    modifications_in_old.erase_at(insertions);
+    modifications_in_old.shift_for_insert_at(deletions);
+
+    // During changeset calculation we allow marking a row as both inserted and
+    // modified in case changeset merging results in it no longer being an insert,
+    // but we don't want inserts in the final modification set
+    modifications.remove(insertions);
+
+    return {
+        std::move(deletions),
+        std::move(insertions),
+        std::move(modifications_in_old),
+        std::move(modifications),
+        std::move(moves)
+    };
 }
