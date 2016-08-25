@@ -6,17 +6,28 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* The commit logs have been moved into the Realm file. This means we no longer
+  need the .log_a, .log_b and .log files, significantly reducing the number of
+  both files and open file handles. This is a breaking change, since versions
+  without .log files cannot interoperate with earlier versions which still
+  uses separate .log files. (issues #2065, #1354).
 
 ### Enhancements
 
-* Lorem ipsum.
+* Elimination of the .log files also eliminates all locking related to
+  accessing  the .log files, making read-transactions lock-free.
+* The critical phase of commits have been reduced significantly in length.
+  If a process is killed while in the critical phase, any other process
+  working jointly on the same Realm file is barred from updating the Realm
+  file until the next session. Reducing the length of the critical phase
+  reduces the risk of any user experiencing this limitation.
+  (issues #2065, #1354)
 
 -----------
 
 ### Internals
 
-* Lorem ipsum.
+* Added support for very large commit history entries. (issues #2038, #2050)
 
 ----------------------------------------------
 
