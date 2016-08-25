@@ -6,6 +6,9 @@
 
 ### Breaking changes
 
+* API Breaking change: The WriteLogCollector is no longer available. 
+  To create a history object for SharedGroup, make_in_realm_history() 
+  must now be used instead of make_client_history().
 * The commit logs have been moved into the Realm file. This means we no longer
   need the .log_a, .log_b and .log files, significantly reducing the number of
   both files and open file handles. This is a breaking change, since versions
