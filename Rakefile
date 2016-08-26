@@ -161,9 +161,11 @@ task :jenkins_workspace do
     @build_dir = @jenkins_workspace or raise 'No WORKSPACE set.'
 end
 
-task :jenkins_flags => :jenkins_workspace do
+task :bpnode_size_4 do
     ENV['REALM_MAX_BPNODE_SIZE'] = '4'
 end
+
+task :jenkins_flags => [:jenkins_workspace, :bpnode_size_4]
 
 desc 'Run by Jenkins as part of the core pipeline whenever master changes'
 task 'jenkins-pipeline-unit-tests' => :jenkins_flags do
@@ -173,7 +175,7 @@ task 'jenkins-pipeline-unit-tests' => :jenkins_flags do
 end
 
 desc 'Run by Jenkins as part of the core pipeline whenever master changes'
-task 'jenkins-pipeline-coverage' => [:jenkins_flags, :gcovr]
+task 'jenkins-pipeline-coverage' => [:bpnode_size_4, :gcovr]
 
 desc 'Run by Jenkins as part of the core pipeline whenever master changes'
 task 'jenkins-pipeline-address-sanitizer' => [:jenkins_flags, 'asan-debug']
