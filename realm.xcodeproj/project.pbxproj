@@ -84,8 +84,6 @@
 		36AB350D17E78DA900EC5744 /* string_data.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36AB350C17E78DA900EC5744 /* string_data.hpp */; };
 		36AD7F9917FB94F800F046FC /* librealm.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* librealm.a */; };
 		36AD7FA217FB959A00F046FC /* realmd.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36AD7FA117FB959A00F046FC /* realmd.cpp */; };
-		36E608681459976700CCC3E8 /* test-realm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3647E02214209CE600D56FD7 /* test-realm.cpp */; };
-		36E608691459977000CCC3E8 /* librealm.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3647E0E714209E6B00D56FD7 /* librealm.a */; };
 		36E67FCA15A2EDDB00D131FB /* index_string.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36E67FC815A2EDDB00D131FB /* index_string.cpp */; };
 		36E67FCB15A2EDDB00D131FB /* index_string.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36E67FC915A2EDDB00D131FB /* index_string.hpp */; };
 		36EE6CC117F0F97400BA9635 /* alloc_slab.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 36EE6CBE17F0F97300BA9635 /* alloc_slab.hpp */; };
@@ -174,7 +172,6 @@
 		3F838D1C1D35A1ED004625B7 /* test_column_timestamp.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 65033A7C1C7DD5180019E9F2 /* test_column_timestamp.cpp */; };
 		3F838D1D1D35A1ED004625B7 /* test_descriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52678851189AB590009CDE7D /* test_descriptor.cpp */; };
 		3F838D1E1D35A1ED004625B7 /* test_destroy_guard.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52807FB418E73A1900A22716 /* test_destroy_guard.cpp */; };
-		4B07BA971D64860100A6D7E0 /* test_destructor_thread_safety.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4B07BA961D64860100A6D7E0 /* test_destructor_thread_safety.cpp */; };
 		3F838D1F1D35A1ED004625B7 /* test_encrypted_file_mapping.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FA0DBCA1A0BF28C003548DC /* test_encrypted_file_mapping.cpp */; };
 		3F838D201D35A1ED004625B7 /* test_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52A32B3D17D4E84700DD22CC /* test_file.cpp */; };
 		3F838D211D35A1ED004625B7 /* test_file_locks.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52807FB618E73A4700A22716 /* test_file_locks.cpp */; };
@@ -304,6 +301,7 @@
 		48B1D23A1C749D850066A961 /* crypt_key.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48B1D2391C749D850066A961 /* crypt_key.cpp */; };
 		48B1D23B1C749DF00066A961 /* crypt_key.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48B1D2391C749D850066A961 /* crypt_key.cpp */; };
 		4BE251771D6B0282009121FB /* group_shared_options.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4BE251761D6B0282009121FB /* group_shared_options.hpp */; };
+		4B07BA971D64860100A6D7E0 /* test_destructor_thread_safety.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4B07BA961D64860100A6D7E0 /* test_destructor_thread_safety.cpp */; };
 		520588CA16C1DA9D009DA6D8 /* data_type.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 520588C916C1DA9D009DA6D8 /* data_type.hpp */; };
 		52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */; };
 		5219EB6918FB026100FF9232 /* verified_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5219EB6718FB026100FF9232 /* verified_integer.cpp */; };
@@ -338,7 +336,6 @@
 		52D6E06D175BDBDD00B423E5 /* timer.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 52D6E062175BDBDD00B423E5 /* timer.hpp */; };
 		52D6E06F175BDC5D00B423E5 /* mem.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52D6E059175BDBDD00B423E5 /* mem.cpp */; };
 		52D6E070175BDC6500B423E5 /* timer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52D6E060175BDBDD00B423E5 /* timer.cpp */; };
-		52D6E071175BDD6300B423E5 /* test-util.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 52D6E04E175BD9BC00B423E5 /* test-util.a */; };
 		52D7C47D1852A01700633748 /* assert.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 52D7C4671852A01700633748 /* assert.hpp */; };
 		52D7C47F1852A01700633748 /* bind_ptr.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 52D7C4691852A01700633748 /* bind_ptr.hpp */; };
 		52D7C4801852A01700633748 /* buffer.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 52D7C46A1852A01700633748 /* buffer.hpp */; };
@@ -654,21 +651,7 @@
 			remoteGlobalIDString = 36AD7F7117FB94F800F046FC;
 			remoteInfo = "realmd-noinst";
 		};
-		36E6086A14599C3300CCC3E8 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 3611F2FC14209B7000017263 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 3647E0E614209E6B00D56FD7;
-			remoteInfo = librealm;
-		};
 		526F3F09182465E3005217F1 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 3611F2FC14209B7000017263 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 52D6E04D175BD9BC00B423E5;
-			remoteInfo = "test-utils";
-		};
-		52D6E053175BD9DA00B423E5 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 3611F2FC14209B7000017263 /* Project object */;
 			proxyType = 1;
@@ -688,15 +671,6 @@
 			runOnlyForDeploymentPostprocessing = 1;
 		};
 		36AD7F9A17FB94F800F046FC /* CopyFiles */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = /usr/share/man/man1/;
-			dstSubfolderSpec = 0;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 1;
-		};
-		36E6085C1459972100CCC3E8 /* CopyFiles */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = /usr/share/man/man1/;
@@ -822,7 +796,6 @@
 		36AB350C17E78DA900EC5744 /* string_data.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = string_data.hpp; path = realm/string_data.hpp; sourceTree = "<group>"; };
 		36AD7F9E17FB94F800F046FC /* realmd-dbg-noinst */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "realmd-dbg-noinst"; sourceTree = BUILT_PRODUCTS_DIR; };
 		36AD7FA117FB959A00F046FC /* realmd.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = realmd.cpp; path = realm/realmd.cpp; sourceTree = "<group>"; };
-		36E6085E1459972100CCC3E8 /* test-realm */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "test-realm"; sourceTree = BUILT_PRODUCTS_DIR; };
 		36E608901459F11200CCC3E8 /* test_array_blob.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_array_blob.cpp; sourceTree = "<group>"; };
 		36E60896145A99D800CCC3E8 /* test_array_string_long.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_array_string_long.cpp; sourceTree = "<group>"; };
 		36E60898145AB43600CCC3E8 /* test_column_string.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_column_string.cpp; sourceTree = "<group>"; };
@@ -1097,15 +1070,6 @@
 			files = (
 				3FCA03C71A44F5B3009067D0 /* CoreFoundation.framework in Frameworks */,
 				36AD7F9917FB94F800F046FC /* librealm.a in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		36E6085B1459972100CCC3E8 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				36E608691459977000CCC3E8 /* librealm.a in Frameworks */,
-				52D6E071175BDD6300B423E5 /* test-util.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1440,7 +1404,6 @@
 				F4D0FC161B00E0D70040956A /* benchmark-common-tasks */,
 				3647E1031420E4D800D56FD7 /* realm_unit_tests */,
 				36AD7F9E17FB94F800F046FC /* realmd-dbg-noinst */,
-				36E6085E1459972100CCC3E8 /* test-realm */,
 				F4D0FC271B00F4010040956A /* benchmark-common-tasks-ios.app */,
 				4142C9951623478700B3B902 /* liblibrealm ios.a */,
 				C008FF991B67F02F0042669E /* liblibrealm watchos.a */,
@@ -1988,25 +1951,6 @@
 			productReference = 36AD7F9E17FB94F800F046FC /* realmd-dbg-noinst */;
 			productType = "com.apple.product-type.tool";
 		};
-		36E6085D1459972100CCC3E8 /* test-realm */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 36E608651459972200CCC3E8 /* Build configuration list for PBXNativeTarget "test-realm" */;
-			buildPhases = (
-				36E6085A1459972100CCC3E8 /* Sources */,
-				36E6085B1459972100CCC3E8 /* Frameworks */,
-				36E6085C1459972100CCC3E8 /* CopyFiles */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				52D6E054175BD9DA00B423E5 /* PBXTargetDependency */,
-				36E6086B14599C3300CCC3E8 /* PBXTargetDependency */,
-			);
-			name = "test-realm";
-			productName = "test-realm";
-			productReference = 36E6085E1459972100CCC3E8 /* test-realm */;
-			productType = "com.apple.product-type.tool";
-		};
 		4142C9391623478700B3B902 /* librealm ios */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 4142C9921623478700B3B902 /* Build configuration list for PBXNativeTarget "librealm ios" */;
@@ -2165,7 +2109,6 @@
 			targets = (
 				3647E0E614209E6B00D56FD7 /* librealm */,
 				3647E1021420E4D800D56FD7 /* realm_unit_tests */,
-				36E6085D1459972100CCC3E8 /* test-realm */,
 				4142C9391623478700B3B902 /* librealm ios */,
 				C008FF2F1B67F02F0042669E /* librealm watchos */,
 				52D6E04D175BD9BC00B423E5 /* test-utils */,
@@ -2385,14 +2328,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				36AD7FA217FB959A00F046FC /* realmd.cpp in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		36E6085A1459972100CCC3E8 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				36E608681459976700CCC3E8 /* test-realm.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2676,20 +2611,10 @@
 			target = 36AD7F7117FB94F800F046FC /* realmd-noinst */;
 			targetProxy = 36AD7F9F17FB955A00F046FC /* PBXContainerItemProxy */;
 		};
-		36E6086B14599C3300CCC3E8 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 3647E0E614209E6B00D56FD7 /* librealm */;
-			targetProxy = 36E6086A14599C3300CCC3E8 /* PBXContainerItemProxy */;
-		};
 		526F3F0A182465E3005217F1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 52D6E04D175BD9BC00B423E5 /* test-utils */;
 			targetProxy = 526F3F09182465E3005217F1 /* PBXContainerItemProxy */;
-		};
-		52D6E054175BD9DA00B423E5 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 52D6E04D175BD9BC00B423E5 /* test-utils */;
-			targetProxy = 52D6E053175BD9DA00B423E5 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -2902,40 +2827,6 @@
 				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
 				PRODUCT_NAME = "realmd-noinst";
 				VERSION_INFO_FILE = "$(TARGET_NAME)";
-			};
-			name = Release;
-		};
-		36E608661459972200CCC3E8 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
-				HEADER_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/src\"",
-					"\"$(SRCROOT)/test/UnitTest++/src\"",
-				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/test/UnitTest++\"",
-				);
-				PRODUCT_NAME = "$(TARGET_NAME)";
-			};
-			name = Debug;
-		};
-		36E608671459972200CCC3E8 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				GCC_SYMBOLS_PRIVATE_EXTERN = NO;
-				HEADER_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/src\"",
-					"\"$(SRCROOT)/test/UnitTest++/src\"",
-				);
-				LIBRARY_SEARCH_PATHS = (
-					"$(inherited)",
-					"\"$(SRCROOT)/test/UnitTest++\"",
-				);
-				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
 		};
@@ -3267,15 +3158,6 @@
 			buildConfigurations = (
 				36AD7F9C17FB94F800F046FC /* Debug */,
 				36AD7F9D17FB94F800F046FC /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		36E608651459972200CCC3E8 /* Build configuration list for PBXNativeTarget "test-realm" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				36E608661459972200CCC3E8 /* Debug */,
-				36E608671459972200CCC3E8 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
