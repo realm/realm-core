@@ -27,7 +27,7 @@ using version_type = _impl::History::version_type;
 
 struct VersionID {
     version_type version = std::numeric_limits<version_type>::max();
-    uint_fast32_t index   = 0;
+    uint_fast32_t index = 0;
 
     VersionID() {}
     VersionID(version_type initial_version, uint_fast32_t initial_index)

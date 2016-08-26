@@ -27,7 +27,7 @@
 #include <functional>
 
 #ifdef _MSC_VER
-#  include <intrin.h>
+    #include <intrin.h>
 #endif
 
 #include <realm/util/features.h>
@@ -36,25 +36,25 @@
 
 // GCC defines __i386__ and __x86_64__
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
-#  define REALM_X86_OR_X64
-#  define REALM_X86_OR_X64_TRUE true
+    #define REALM_X86_OR_X64
+    #define REALM_X86_OR_X64_TRUE true
 #else
-#  define REALM_X86_OR_X64_TRUE false
+    #define REALM_X86_OR_X64_TRUE false
 #endif
 
 // GCC defines __arm__
 #ifdef __arm__
-#  define REALM_ARCH_ARM
+    #define REALM_ARCH_ARM
 #endif
 
 #if defined _LP64 || defined __LP64__ || defined __64BIT__ || defined _ADDR64 || defined _WIN64 || defined __arch64__ || (defined(__WORDSIZE) && __WORDSIZE == 64) || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
-#  define REALM_PTR_64
+    #define REALM_PTR_64
 #endif
 
 
 #if defined(REALM_PTR_64) && defined(REALM_X86_OR_X64)
-#  define REALM_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
-#  define REALM_COMPILER_AVX
+    #define REALM_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
+    #define REALM_COMPILER_AVX
 #endif
 
 namespace realm {
@@ -67,7 +67,7 @@ extern signed char avx_support;
 template<int version>
 REALM_FORCEINLINE bool sseavx()
 {
-/*
+    /*
     Return whether or not SSE 3.0 (if version = 30) or 4.2 (for version = 42) is supported. Return value
     is based on the CPUID instruction.
 
@@ -85,7 +85,7 @@ REALM_FORCEINLINE bool sseavx()
 
     We runtime-initialize sse_support in a constructor of a static variable which is not guaranteed to be called
     prior to cpu_sse(). So we compile-time initialize sse_support to -2 as fallback.
-*/
+    */
     static_assert(version == 1 || version == 2 || version == 30 || version == 42,
                   "Only version == 1 (AVX), 2 (AVX2), 30 (SSE 3) and 42 (SSE 4.2) are supported for detection");
 #ifdef REALM_COMPILER_SSE
@@ -119,7 +119,8 @@ int fast_popcount64(int64_t x);
 uint64_t fastrand(uint64_t max = 0xffffffffffffffffULL, bool is_seed = false);
 
 // log2 - returns -1 if x==0, otherwise log2(x)
-inline int log2(size_t x) {
+inline int log2(size_t x)
+{
     if (x == 0)
         return -1;
 #if defined(__GNUC__)

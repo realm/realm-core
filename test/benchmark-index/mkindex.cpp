@@ -23,23 +23,24 @@
 using namespace realm;
 
 REALM_TABLE_7(IndexTable,
-                s1, String,
-                n1, Int,
-                n2, Int,
-                n3, Int,
-                n4, Int,
-                n5, Int,
-                s2, String)
+              s1, String,
+              n1, Int,
+              n2, Int,
+              n3, Int,
+              n4, Int,
+              n5, Int,
+              s2, String)
 
 
 
-int main(int argc, char *argv[]) {
-    Group *g = new Group();
+int main(int argc, char* argv[])
+{
+    Group* g = new Group();
 
     BasicTableRef<IndexTable> t = g->add_table<IndexTable>("test");
     srandom(1);
     printf("Adding rows\n");
-    for(size_t i=0; i<10000000; ++i) {
+    for (size_t i = 0; i < 10000000; ++i) {
         long n1 = random() % 1000;
         long n2 = random() % 1000;
         long n3 = random() % 1000;

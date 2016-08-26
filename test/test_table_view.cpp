@@ -174,16 +174,16 @@ TEST(TableView_TimestampGetSet)
     t.set_timestamp(0, 2, Timestamp(200, 210));
 
     TableView tv = t.where().find_all();
-    CHECK_EQUAL(tv.get_timestamp(0, 0), Timestamp(000,010));
-    CHECK_EQUAL(tv.get_timestamp(0, 1), Timestamp(100,110));
-    CHECK_EQUAL(tv.get_timestamp(0, 2), Timestamp(200,210));
+    CHECK_EQUAL(tv.get_timestamp(0, 0), Timestamp(000, 010));
+    CHECK_EQUAL(tv.get_timestamp(0, 1), Timestamp(100, 110));
+    CHECK_EQUAL(tv.get_timestamp(0, 2), Timestamp(200, 210));
 
     tv.set_timestamp(0, 0, Timestamp(1000, 1010));
     tv.set_timestamp(0, 1, Timestamp(1100, 1110));
     tv.set_timestamp(0, 2, Timestamp(1200, 1210));
-    CHECK_EQUAL(tv.get_timestamp(0, 0), Timestamp(1000,1010));
-    CHECK_EQUAL(tv.get_timestamp(0, 1), Timestamp(1100,1110));
-    CHECK_EQUAL(tv.get_timestamp(0, 2), Timestamp(1200,1210));
+    CHECK_EQUAL(tv.get_timestamp(0, 0), Timestamp(1000, 1010));
+    CHECK_EQUAL(tv.get_timestamp(0, 1), Timestamp(1100, 1110));
+    CHECK_EQUAL(tv.get_timestamp(0, 2), Timestamp(1200, 1210));
 }
 
 TEST(TableView_GetSetInteger)
@@ -229,11 +229,11 @@ TEST(TableView_FloatsGetSet)
     CHECK_EQUAL(true, table.is_empty());
 
     // Test add(?,?) with parameters
-    for (size_t i=0; i<5; ++i)
+    for (size_t i = 0; i < 5; ++i)
         table.add(f_val[i], d_val[i], i);
     table.add();
     CHECK_EQUAL(6, table.size());
-    for (size_t i=0; i<6; ++i) {
+    for (size_t i = 0; i < 6; ++i) {
         CHECK_EQUAL(f_val[i], table.column().col_float[i]);
         CHECK_EQUAL(d_val[i], table.column().col_double[i]);
     }
@@ -266,7 +266,7 @@ TEST(TableView_FloatsFindAndAggregations)
     // v_some =        ^^^^              ^^^^
     double sum_f = 0.0;
     double sum_d = 0.0;
-    for (size_t i=0; i<6; ++i) {
+    for (size_t i = 0; i < 6; ++i) {
         table.add(f_val[i], d_val[i], 1);
         sum_d += d_val[i];
         sum_f += f_val[i];
@@ -296,13 +296,13 @@ TEST(TableView_FloatsFindAndAggregations)
 
     // Test sum
     CHECK_APPROXIMATELY_EQUAL(sum_d,
-                              v_all.column().col_double.sum(),  10*epsilon);
+                              v_all.column().col_double.sum(),  10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(sum_f,
-                              v_all.column().col_float.sum(),   10*epsilon);
+                              v_all.column().col_float.sum(),   10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2,
-                              v_some.column().col_double.sum(), 10*epsilon);
+                              v_some.column().col_double.sum(), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f),
-                              v_some.column().col_float.sum(),  10*epsilon);
+                              v_some.column().col_float.sum(),  10 * epsilon);
 
     size_t ndx = not_found;
 
@@ -346,13 +346,13 @@ TEST(TableView_FloatsFindAndAggregations)
 
     // Test avg
     CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0,
-                              v_all.column().col_double.average(),  10*epsilon);
+                              v_all.column().col_double.average(),  10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0,
-                              v_some.column().col_double.average(), 10*epsilon);
+                              v_some.column().col_double.average(), 10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0,
-                              v_all.column().col_float.average(),   10*epsilon);
+                              v_all.column().col_float.average(),   10 * epsilon);
     CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2,
-                              v_some.column().col_float.average(), 10*epsilon);
+                              v_some.column().col_float.average(), 10 * epsilon);
 
     CHECK_EQUAL(1, v_some.column().col_float.count(1.2f));
     CHECK_EQUAL(2, v_some.column().col_double.count(-1.2));
@@ -539,11 +539,11 @@ TEST(TableView_Follows_Changes)
     Table table;
     table.add_column(type_Int, "first");
     table.add_empty_row();
-    table.set_int(0,0,1);
-    Query q = table.where().equal(0,1);
+    table.set_int(0, 0, 1);
+    Query q = table.where().equal(0, 1);
     TableView v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_int(0,0));
+    CHECK_EQUAL(1, v.get_int(0, 0));
 
     // low level sanity check that we can copy a query and run the copy:
     Query q2 = q;
@@ -553,22 +553,22 @@ TEST(TableView_Follows_Changes)
     CHECK_EQUAL(1, v.size());
     table.add_empty_row();
     CHECK_EQUAL(1, v.size());
-    table.set_int(0,1,1);
+    table.set_int(0, 1, 1);
     v.sync_if_needed();
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(1, v.get_int(0,0));
-    CHECK_EQUAL(1, v.get_int(0,1));
-    table.set_int(0,0,7);
+    CHECK_EQUAL(1, v.get_int(0, 0));
+    CHECK_EQUAL(1, v.get_int(0, 1));
+    table.set_int(0, 0, 7);
     v.sync_if_needed();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_int(0,0));
-    table.set_int(0,1,7);
+    CHECK_EQUAL(1, v.get_int(0, 0));
+    table.set_int(0, 1, 7);
     v.sync_if_needed();
     CHECK_EQUAL(0, v.size());
-    table.set_int(0,1,1);
+    table.set_int(0, 1, 1);
     v.sync_if_needed();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_int(0,0));
+    CHECK_EQUAL(1, v.get_int(0, 0));
 }
 
 
@@ -611,17 +611,18 @@ TEST(TableView_Distinct_Follows_Changes)
 }
 
 
-TEST(TableView_SyncAfterCopy) {
+TEST(TableView_SyncAfterCopy)
+{
     Table table;
     table.add_column(type_Int, "first");
     table.add_empty_row();
-    table.set_int(0,0,1);
+    table.set_int(0, 0, 1);
 
     // do initial query
-    Query q = table.where().equal(0,1);
+    Query q = table.where().equal(0, 1);
     TableView v = q.find_all();
     CHECK_EQUAL(1, v.size());
-    CHECK_EQUAL(1, v.get_int(0,0));
+    CHECK_EQUAL(1, v.get_int(0, 0));
 
     // move the tableview
     TableView v2 = v;
@@ -922,13 +923,13 @@ TEST(TableView_Clear)
 TEST(TableView_Imperative_Clear)
 {
     Table t;
-    t.add_column(type_Int,"i1");
+    t.add_column(type_Int, "i1");
     t.add_empty_row(3);
-    t.set_int(0,0,7);
-    t.set_int(0,1,13);
-    t.set_int(0,2,29);
+    t.set_int(0, 0, 7);
+    t.set_int(0, 1, 13);
+    t.set_int(0, 2, 29);
 
-    TableView v = t.where().less(0,20).find_all();
+    TableView v = t.where().less(0, 20).find_all();
     CHECK_EQUAL(2, v.size());
     // remove the underlying entry in the table, introducing a detached ref
     t.move_last_over(v.get_source_ndx(0));
@@ -948,17 +949,21 @@ TEST(TableView_Imperative_Clear)
 TEST(TableView_Stacked)
 {
     Table t;
-    t.add_column(type_Int,"i1");
-    t.add_column(type_Int,"i2");
-    t.add_column(type_String,"S1");
+    t.add_column(type_Int, "i1");
+    t.add_column(type_Int, "i2");
+    t.add_column(type_String, "S1");
     t.add_empty_row(2);
-    t.set_int(0,0,1);    t.set_int(1,0,2); t.set_string(2,0,"A");    //   1 2   "A"
-    t.set_int(0,1,2);    t.set_int(1,1,2); t.set_string(2,1,"B");    //   2 2   "B"
+    t.set_int(0, 0, 1);         // 1
+    t.set_int(1, 0, 2);         // 2
+    t.set_string(2, 0, "A");    // "A"
+    t.set_int(0, 1, 2);         // 2
+    t.set_int(1, 1, 2);         // 2
+    t.set_string(2, 1, "B");    // "B"
 
-    TableView tv = t.find_all_int(0,2);
-    TableView tv2 = tv.find_all_int(1,2);
-    CHECK_EQUAL(1,tv2.size()); //evaluates tv2.size to 1 which is expected
-    CHECK_EQUAL("B",tv2.get_string(2,0)); //evalates get_string(2,0) to "A" which is not expected
+    TableView tv = t.find_all_int(0, 2);
+    TableView tv2 = tv.find_all_int(1, 2);
+    CHECK_EQUAL(1, tv2.size()); //evaluates tv2.size to 1 which is expected
+    CHECK_EQUAL("B", tv2.get_string(2, 0)); //evalates get_string(2,0) to "A" which is not expected
 }
 
 
@@ -1356,18 +1361,18 @@ TEST(TableView_ToString)
     std::stringstream ss;
     TestTableInt2::View tv = tbl.where().find_all();
     tv.to_string(ss);
-    CHECK_EQUAL(s+s0+s1+s2+s3, ss.str());
+    CHECK_EQUAL(s + s0 + s1 + s2 + s3, ss.str());
 
     // Find partial view: row 1+3
     std::stringstream ss2;
     tv = tbl.where().first.equal(4).find_all();
     tv.to_string(ss2);
-    CHECK_EQUAL(s+s1+s3, ss2.str());
+    CHECK_EQUAL(s + s1 + s3, ss2.str());
 
     // test row_to_string. get row 0 of previous view - i.e. row 1 in tbl
     std::stringstream ss3;
-    tv.row_to_string(0,ss3);
-    CHECK_EQUAL(s+s1, ss3.str());
+    tv.row_to_string(0, ss3);
+    CHECK_EQUAL(s + s1, ss3.str());
 }
 
 
@@ -1410,7 +1415,7 @@ TEST(TableView_DynPivot)
         StringData sex = i % 2 ? "Male" : "Female";
         table->insert_empty_row(i);
         table->set_string(0, i, sex);
-        table->set_int(1, i, 20 + (i%20));
+        table->set_int(1, i, 20 + (i % 20));
         table->set_bool(2, i, true);
     }
 
@@ -1418,7 +1423,7 @@ TEST(TableView_DynPivot)
 
     Table result_count;
     tv.aggregate(0, 1, Table::aggr_count, result_count);
-    int64_t half = count/2;
+    int64_t half = count / 2;
     CHECK_EQUAL(2, result_count.get_column_count());
     CHECK_EQUAL(2, result_count.size());
     CHECK_EQUAL(half, result_count.get_int(1, 0));
@@ -1590,24 +1595,25 @@ TEST(TableView_UnderlyingRowRemoval)
     struct Fixture {
         Table table;
         TableView view;
-        Fixture() {
+        Fixture()
+        {
             table.add_column(type_Int, "a");
             table.add_column(type_Int, "b");
             table.add_empty_row(5);
 
-            table.set_int(0,0,0);
-            table.set_int(0,1,1);
-            table.set_int(0,2,2);
-            table.set_int(0,3,3);
-            table.set_int(0,4,4);
+            table.set_int(0, 0, 0);
+            table.set_int(0, 1, 1);
+            table.set_int(0, 2, 2);
+            table.set_int(0, 3, 3);
+            table.set_int(0, 4, 4);
 
-            table.set_int(1,0,0);
-            table.set_int(1,1,1);
-            table.set_int(1,2,0);
-            table.set_int(1,3,1);
-            table.set_int(1,4,1);
+            table.set_int(1, 0, 0);
+            table.set_int(1, 1, 1);
+            table.set_int(1, 2, 0);
+            table.set_int(1, 3, 1);
+            table.set_int(1, 4, 1);
 
-            view = table.find_all_int(1,0);
+            view = table.find_all_int(1, 0);
         }
     };
 
@@ -1628,10 +1634,10 @@ TEST(TableView_UnderlyingRowRemoval)
         Fixture f;
         f.view.remove(0);
         CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(1, f.table.get_int(0,0));
-        CHECK_EQUAL(2, f.table.get_int(0,1));
-        CHECK_EQUAL(3, f.table.get_int(0,2));
-        CHECK_EQUAL(4, f.table.get_int(0,3));
+        CHECK_EQUAL(1, f.table.get_int(0, 0));
+        CHECK_EQUAL(2, f.table.get_int(0, 1));
+        CHECK_EQUAL(3, f.table.get_int(0, 2));
+        CHECK_EQUAL(4, f.table.get_int(0, 3));
         CHECK_EQUAL(1, f.view.size());
         CHECK_EQUAL(1, f.view.get_source_ndx(0));
     }
@@ -1639,10 +1645,10 @@ TEST(TableView_UnderlyingRowRemoval)
         Fixture f;
         f.view.remove(1);
         CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(0, f.table.get_int(0,0));
-        CHECK_EQUAL(1, f.table.get_int(0,1));
-        CHECK_EQUAL(3, f.table.get_int(0,2));
-        CHECK_EQUAL(4, f.table.get_int(0,3));
+        CHECK_EQUAL(0, f.table.get_int(0, 0));
+        CHECK_EQUAL(1, f.table.get_int(0, 1));
+        CHECK_EQUAL(3, f.table.get_int(0, 2));
+        CHECK_EQUAL(4, f.table.get_int(0, 3));
         CHECK_EQUAL(1, f.view.size());
         CHECK_EQUAL(0, f.view.get_source_ndx(0));
     }
@@ -1652,10 +1658,10 @@ TEST(TableView_UnderlyingRowRemoval)
         Fixture f;
         f.view.remove(0, RemoveMode::unordered);
         CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(4, f.table.get_int(0,0));
-        CHECK_EQUAL(1, f.table.get_int(0,1));
-        CHECK_EQUAL(2, f.table.get_int(0,2));
-        CHECK_EQUAL(3, f.table.get_int(0,3));
+        CHECK_EQUAL(4, f.table.get_int(0, 0));
+        CHECK_EQUAL(1, f.table.get_int(0, 1));
+        CHECK_EQUAL(2, f.table.get_int(0, 2));
+        CHECK_EQUAL(3, f.table.get_int(0, 3));
         CHECK_EQUAL(1, f.view.size());
         CHECK_EQUAL(2, f.view.get_source_ndx(0));
     }
@@ -1663,10 +1669,10 @@ TEST(TableView_UnderlyingRowRemoval)
         Fixture f;
         f.view.remove(1, RemoveMode::unordered);
         CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(0, f.table.get_int(0,0));
-        CHECK_EQUAL(1, f.table.get_int(0,1));
-        CHECK_EQUAL(4, f.table.get_int(0,2));
-        CHECK_EQUAL(3, f.table.get_int(0,3));
+        CHECK_EQUAL(0, f.table.get_int(0, 0));
+        CHECK_EQUAL(1, f.table.get_int(0, 1));
+        CHECK_EQUAL(4, f.table.get_int(0, 2));
+        CHECK_EQUAL(3, f.table.get_int(0, 3));
         CHECK_EQUAL(1, f.view.size());
         CHECK_EQUAL(0, f.view.get_source_ndx(0));
     }
@@ -1676,10 +1682,10 @@ TEST(TableView_UnderlyingRowRemoval)
         Fixture f;
         f.view.remove_last();
         CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(0, f.table.get_int(0,0));
-        CHECK_EQUAL(1, f.table.get_int(0,1));
-        CHECK_EQUAL(3, f.table.get_int(0,2));
-        CHECK_EQUAL(4, f.table.get_int(0,3));
+        CHECK_EQUAL(0, f.table.get_int(0, 0));
+        CHECK_EQUAL(1, f.table.get_int(0, 1));
+        CHECK_EQUAL(3, f.table.get_int(0, 2));
+        CHECK_EQUAL(4, f.table.get_int(0, 3));
         CHECK_EQUAL(1, f.view.size());
         CHECK_EQUAL(0, f.view.get_source_ndx(0));
     }
@@ -1689,10 +1695,10 @@ TEST(TableView_UnderlyingRowRemoval)
         Fixture f;
         f.view.remove_last(RemoveMode::unordered);
         CHECK_EQUAL(4, f.table.size());
-        CHECK_EQUAL(0, f.table.get_int(0,0));
-        CHECK_EQUAL(1, f.table.get_int(0,1));
-        CHECK_EQUAL(4, f.table.get_int(0,2));
-        CHECK_EQUAL(3, f.table.get_int(0,3));
+        CHECK_EQUAL(0, f.table.get_int(0, 0));
+        CHECK_EQUAL(1, f.table.get_int(0, 1));
+        CHECK_EQUAL(4, f.table.get_int(0, 2));
+        CHECK_EQUAL(3, f.table.get_int(0, 3));
         CHECK_EQUAL(1, f.view.size());
         CHECK_EQUAL(0, f.view.get_source_ndx(0));
     }
@@ -1702,9 +1708,9 @@ TEST(TableView_UnderlyingRowRemoval)
         Fixture f;
         f.view.clear();
         CHECK_EQUAL(3, f.table.size());
-        CHECK_EQUAL(1, f.table.get_int(0,0));
-        CHECK_EQUAL(3, f.table.get_int(0,1));
-        CHECK_EQUAL(4, f.table.get_int(0,2));
+        CHECK_EQUAL(1, f.table.get_int(0, 0));
+        CHECK_EQUAL(3, f.table.get_int(0, 1));
+        CHECK_EQUAL(4, f.table.get_int(0, 2));
         CHECK_EQUAL(0, f.view.size());
     }
 
@@ -1713,9 +1719,9 @@ TEST(TableView_UnderlyingRowRemoval)
         Fixture f;
         f.view.clear(RemoveMode::unordered);
         CHECK_EQUAL(3, f.table.size());
-        CHECK_EQUAL(3, f.table.get_int(0,0));
-        CHECK_EQUAL(1, f.table.get_int(0,1));
-        CHECK_EQUAL(4, f.table.get_int(0,2));
+        CHECK_EQUAL(3, f.table.get_int(0, 0));
+        CHECK_EQUAL(1, f.table.get_int(0, 1));
+        CHECK_EQUAL(4, f.table.get_int(0, 2));
         CHECK_EQUAL(0, f.view.size());
     }
 }
@@ -1733,7 +1739,8 @@ TEST(TableView_Backlinks)
 
     source->add_empty_row(3);
 
-    { // Links
+    {
+        // Links
         TableView tv = source->get_backlink_view(2, links.get(), 0);
 
         CHECK_EQUAL(tv.size(), 0);
@@ -1745,7 +1752,8 @@ TEST(TableView_Backlinks)
         CHECK_EQUAL(tv.size(), 1);
         CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
     }
-    { // LinkViews
+    {
+        // LinkViews
         TableView tv = source->get_backlink_view(2, links.get(), 1);
 
         CHECK_EQUAL(tv.size(), 0);
@@ -1776,7 +1784,8 @@ TEST(TableView_BacklinksAfterMoveAssign)
 
     source->add_empty_row(3);
 
-    { // Links
+    {
+        // Links
         TableView tv_source = source->get_backlink_view(2, links.get(), 0);
         TableView tv;
         tv = std::move(tv_source);
@@ -1790,7 +1799,8 @@ TEST(TableView_BacklinksAfterMoveAssign)
         CHECK_EQUAL(tv.size(), 1);
         CHECK_EQUAL(tv[0].get_index(), links->get(0).get_index());
     }
-    { // LinkViews
+    {
+        // LinkViews
         TableView tv_source = source->get_backlink_view(2, links.get(), 1);
         TableView tv;
         tv = std::move(tv_source);
@@ -1852,7 +1862,7 @@ TEST(TableView_BacklinksWhenTargetRowMovedOrDeleted)
     CHECK(!tv_linklist.depends_on_deleted_object());
 
     source->move_last_over(0);
-    
+
     CHECK(tv_link.depends_on_deleted_object());
     CHECK(tv_linklist.depends_on_deleted_object());
 
@@ -2810,7 +2820,7 @@ NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
     table.add("ǂ");
     table.add("ǃ");
     table.add("µ");
-    
+
     // Core-only is default comparer
     TestTableString::View v1 = table.where().find_all();
     TestTableString::View v2 = table.where().find_all();

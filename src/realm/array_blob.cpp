@@ -58,7 +58,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t data_
     }
 
     // Insert the data
-    modify_begin = std::copy(data, data+data_size, modify_begin);
+    modify_begin = std::copy(data, data + data_size, modify_begin);
     if (add_zero_term)
         *modify_begin = 0;
 

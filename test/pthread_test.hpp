@@ -31,10 +31,10 @@ Use by #including this file in the file(s) that call pthreads functions. If you 
 #define REALM_PTHREAD_TEST_HPP
 
 #ifdef _WIN32
-#define NOMINMAX
-#include <Windows.h>
+    #define NOMINMAX
+    #include <Windows.h>
 #else
-#include <unistd.h>
+    #include <unistd.h>
 #endif
 
 inline unsigned int ptf_fastrand()
@@ -42,8 +42,8 @@ inline unsigned int ptf_fastrand()
     // Must be fast because important edge case is 0 delay. Not thread safe, but that just adds randomnes.
     static unsigned int u = 1;
     static unsigned int v = 1;
-    v = 36969*(v & 65535) + (v >> 16);
-    u = 18000*(u & 65535) + (u >> 16);
+    v = 36969 * (v & 65535) + (v >> 16);
+    u = 18000 * (u & 65535) + (u >> 16);
     return (v << 16) + u;
 }
 
@@ -74,9 +74,9 @@ inline void ptf_randsleep(void)
     else if (r < 999) {
         // Wake up in time slice according to normal OS scheduling
 #ifdef _WIN32
-    Sleep(0);
+        Sleep(0);
 #else
-    usleep(0);
+        usleep(0);
 #endif
     }
     else {
@@ -89,7 +89,7 @@ inline void ptf_randsleep(void)
     }
 }
 
-inline int ptf_pthread_mutex_trylock(pthread_mutex_t * mutex)
+inline int ptf_pthread_mutex_trylock(pthread_mutex_t* mutex)
 {
     ptf_randsleep();
     int i = pthread_mutex_trylock(mutex);
@@ -97,7 +97,7 @@ inline int ptf_pthread_mutex_trylock(pthread_mutex_t * mutex)
     return i;
 }
 
-inline int ptf_pthread_barrier_wait(pthread_barrier_t *barrier)
+inline int ptf_pthread_barrier_wait(pthread_barrier_t* barrier)
 {
     ptf_randsleep();
     int i = pthread_barrier_wait(barrier);
@@ -105,7 +105,7 @@ inline int ptf_pthread_barrier_wait(pthread_barrier_t *barrier)
     return i;
 }
 
-inline int ptf_pthread_mutex_lock(pthread_mutex_t * mutex)
+inline int ptf_pthread_mutex_lock(pthread_mutex_t* mutex)
 {
     ptf_randsleep();
     int i = pthread_mutex_lock(mutex);
@@ -113,7 +113,7 @@ inline int ptf_pthread_mutex_lock(pthread_mutex_t * mutex)
     return i;
 }
 
-inline int ptf_pthread_mutex_unlock(pthread_mutex_t * mutex)
+inline int ptf_pthread_mutex_unlock(pthread_mutex_t* mutex)
 {
     ptf_randsleep();
     int i = pthread_mutex_unlock(mutex);

@@ -188,7 +188,7 @@ TEST(Optional_PolymorphicReferences)
     Optional<Foo&> foo_ref { bar_ref };
     CHECK(foo_ref);
     CHECK_EQUAL(&foo_ref.value(), &bar);
- }
+}
 
 namespace {
 
@@ -262,7 +262,8 @@ TEST(Optional_ValueDoesntGenerateWarning)
     CHECK(*ii);
 }
 
-TEST(Optional_ConstExpr) {
+TEST(Optional_ConstExpr)
+{
     // Should compile:
     constexpr Optional<int> a;
     constexpr Optional<int> b { none };
@@ -280,7 +281,8 @@ TEST(Optional_ConstExpr) {
 
 // FIXME: Visual Studio 2015's constexpr support isn't sufficient to allow Optional<T&> to compile.
 #ifndef _WIN32
-TEST(Optional_ReferenceConstExpr) {
+TEST(Optional_ReferenceConstExpr)
+{
     // Should compile:
     constexpr Optional<const int&> a;
     constexpr Optional<const int&> b { none };
