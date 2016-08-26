@@ -230,7 +230,7 @@ def buildDiffCoverage() {
           def coverageResults = readFile('diff-coverage')
 
           withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
-              sh "curl -H \"Authorization: token ${githubToken}\" " +
+              sh "curl -H \"Authorization: token ${env.githubToken}\" " +
                  "-d '{ \"body\": \"${coverageResults}\n\nPlease check your coverage here: ${env.BUILD_URL}Diff_Coverage\"}' " +
                  "\"https://api.github.com/repos/realm/realm-core/issues/${env.CHANGE_ID}/comments\""
           }
