@@ -6495,6 +6495,25 @@ TEST(Table_RemoveSubstring)
     }
 }
 
+
+TEST(Table_SwapRowsThenMoveLastOverWithBacklinks)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+    t1->add_column(type_Int, "i");
+    t2->add_column_link(type_Link, "l", *t1);
+
+    t1->add_empty_row(2);
+    t2->add_empty_row(2);
+
+    t2->set_link(0, 0, 0);
+    t2->set_link(0, 1, 1);
+    t2->swap_rows(0, 1);
+    t2->move_last_over(0);
+}
+
+
 TEST(Table_RowAccessor_Null)
 {
     Table table;
