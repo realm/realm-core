@@ -1887,7 +1887,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
             break;
         case Durability::MemOnly:
         case Durability::Async:
-            // In durability_MemOnly mode, we just use the file as backing for
+            // In Durability::MemOnly mode, we just use the file as backing for
             // the shared memory. So we never actually flush the data to disk
             // (the OS may do so opportinisticly, or when swapping). So in this
             // mode the file on disk may very likely be in an invalid state.
