@@ -178,11 +178,24 @@ public:
         return false;
     }
 
-    bool set_null(size_t col_ndx, size_t row_ndx, _impl::Instruction, size_t)
+    bool set_null(size_t col_ndx, size_t row_ndx, _impl::Instruction variant, size_t prior_num_rows)
     {
+        static_cast<void>(prior_num_rows);
+        static_cast<void>(variant);
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
+            if (REALM_UNLIKELY(REALM_COVER_NEVER(variant == _impl::instr_SetUnique))) {
+                if (REALM_UNLIKELY(prior_num_rows != m_table->size())) {
+                    return false;
+                }
+            }
             log("table->set_null(%1, %2);", col_ndx, row_ndx); // Throws
-            // FIXME: Support "set_null_unique"
+            // Set and SetDefault are identical in this context.
+            // For SetUnique, it is acceptable to call the regular version of
+            // set_null(), because we presume that the side-effects of
+            // set_null_unique() are already documented as other instructions
+            // preceding this. Calling the set_null_unique() here would be a
+            // waste of time, because all possible side-effects have already
+            // been carried out.
             m_table->set_null(col_ndx, row_ndx); // Throws
             return true;
         }

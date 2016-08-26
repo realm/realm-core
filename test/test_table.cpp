@@ -1458,15 +1458,19 @@ TEST(Table_SetIntUnique)
     Table table;
     table.add_column(type_Int, "ints");
     table.add_column(type_Int, "ints_null", true);
+    table.add_column(type_Int, "ints_null", true);
     table.add_empty_row(10);
 
     CHECK_LOGIC_ERROR(table.set_int_unique(0, 0, 123), LogicError::no_search_index);
     CHECK_LOGIC_ERROR(table.set_int_unique(1, 0, 123), LogicError::no_search_index);
+    CHECK_LOGIC_ERROR(table.set_null_unique(2, 0), LogicError::no_search_index);
     table.add_search_index(0);
     table.add_search_index(1);
+    table.add_search_index(2);
 
     table.set_int_unique(0, 0, 123);
     table.set_int_unique(1, 0, 123);
+    table.set_null_unique(2, 0);
 
     // Check that conflicting SetIntUniques result in rows being deleted.
     table.set_int_unique(0, 1, 123);
@@ -1475,6 +1479,8 @@ TEST(Table_SetIntUnique)
     CHECK_EQUAL(table.size(), 9);
     table.set_int_unique(1, 2, 123);
     CHECK_EQUAL(table.size(), 8);
+    table.set_null_unique(2, 1);
+    CHECK_EQUAL(table.size(), 7);
 }
 
 

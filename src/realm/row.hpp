@@ -109,6 +109,7 @@ public:
     void set_mixed(size_t col_ndx, Mixed value);
     void set_mixed_subtable(size_t col_ndx, const Table* value);
     void set_null(size_t col_ndx);
+    void set_null_unique(size_t col_ndx);
 
     void insert_substring(size_t col_ndx, size_t pos, StringData);
     void remove_substring(size_t col_ndx, size_t pos, size_t size);
@@ -578,6 +579,12 @@ template<class T, class R>
 inline void RowFuncs<T,R>::set_null(size_t col_ndx)
 {
     table()->set_null(col_ndx, row_ndx()); // Throws
+}
+
+template<class T, class R>
+inline void RowFuncs<T,R>::set_null_unique(size_t col_ndx)
+{
+    table()->set_null_unique(col_ndx, row_ndx()); // Throws
 }
 
 template<class T, class R>
