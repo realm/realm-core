@@ -198,44 +198,46 @@ def doBuildInDocker(String command) {
 }
 
 def buildDiffCoverage() {
-    return {
-        node('docker') {
-          checkout scm
-          sh 'git clean -ffdx -e .????????'
+  return {
+      node('docker') {
+        checkout scm
+        sh 'git clean -ffdx -e .????????'
 
-          def buildEnv = docker.build 'realm-core:snapshot'
-          def environment = environment()
-          withEnv(environment()) {
-            buildEnv.inside {
-                sh 'sh build.sh config'
-                sh 'sh build.sh jenkins-pipeline-coverage'
+        def buildEnv = docker.build 'realm-core:snapshot'
+        def environment = environment()
+        withEnv(environment()) {
+          buildEnv.inside {
+              sh 'sh build.sh config'
+              sh 'sh build.sh jenkins-pipeline-coverage'
 
-                sh 'mkdir -p coverage'
-                sh "diff-cover gcovr.xml " +
-                  "--compare-branch=origin/${env.CHANGE_TARGET} " +
-                  "--html-report coverage/diff-coverage-report.html " +
-                  "| grep -F Coverage: " +
-                  "| head -n 1 " +
-                  "> diff-coverage"
+              sh 'mkdir -p coverage'
+              sh "diff-cover gcovr.xml " +
+                "--compare-branch=origin/${env.CHANGE_TARGET} " +
+                "--html-report coverage/diff-coverage-report.html " +
+                "| grep -F Coverage: " +
+                "| head -n 1 " +
+                "> diff-coverage"
 
-                publishHTML(target: [
-                    allowMissing: false,
-                    alwaysLinkToLastBuild: false,
-                    keepAll: true,
-                    reportDir: 'coverage',
-                    reportFiles: 'diff-coverage-report.html',
-                    reportName: 'Diff Coverage'
-                ])
+              publishHTML(target: [
+                  allowMissing: false,
+                  alwaysLinkToLastBuild: false,
+                  keepAll: true,
+                  reportDir: 'coverage',
+                  reportFiles: 'diff-coverage-report.html',
+                  reportName: 'Diff Coverage'
+              ])
 
-            def coverageResults = readFile('diff-coverage')
+          def coverageResults = readFile('diff-coverage')
 
-            withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'github-token']]) {
-                sh "curl -H \"Authorization: token ${github-token}\" " +
-                   "-d '{ \"body\": \"${coverageResults}\n\nPlease check your coverage here: ${env.BUILD_URL}Diff_Coverage\"}' " +
-                   "\"https://api.github.com/repos/realm/realm-core/issues/${env.CHANGE_ID}/comments\""
-            }
+          withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'github-token']]) {
+              sh "curl -H \"Authorization: token ${github-token}\" " +
+                 "-d '{ \"body\": \"${coverageResults}\n\nPlease check your coverage here: ${env.BUILD_URL}Diff_Coverage\"}' " +
+                 "\"https://api.github.com/repos/realm/realm-core/issues/${env.CHANGE_ID}/comments\""
+          }
         }
+      }
     }
+  }
 }
 
 def doBuildNodeInDocker() {
