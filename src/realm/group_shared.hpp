@@ -142,13 +142,13 @@ public:
     /// `upgrade_callback` throws, then the file will be closed properly and the
     /// upgrade will be aborted.
     explicit SharedGroup(const std::string& file, bool no_create = false,
-                         SharedGroupOptions options = SharedGroupOptions());
+                         const SharedGroupOptions options = SharedGroupOptions());
 
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and
     /// the upgrade will be aborted.
-    explicit SharedGroup(Replication& repl, SharedGroupOptions options = SharedGroupOptions());
+    explicit SharedGroup(Replication& repl, const SharedGroupOptions options = SharedGroupOptions());
 
     struct unattached_tag {};
 
@@ -190,11 +190,11 @@ public:
     /// \throw FileFormatUpgradeRequired only if \a SharedGroupOptions::allow_upgrade
     /// is `false` and an upgrade is required.
     void open(const std::string& file, bool no_create = false,
-              SharedGroupOptions options = SharedGroupOptions());
+              const SharedGroupOptions options = SharedGroupOptions());
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in existence for as long as the SharedGroup.
-    void open(Replication&, SharedGroupOptions options = SharedGroupOptions());
+    void open(Replication&, const SharedGroupOptions options = SharedGroupOptions());
 
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
@@ -522,7 +522,7 @@ private:
     std::function<void(int,int)> m_upgrade_callback;
 
     void do_open(const std::string& file, bool no_create, bool is_backend,
-                 SharedGroupOptions options);
+                 const SharedGroupOptions options);
 
     // Ring buffer management
     bool        ringbuf_is_empty() const noexcept;
@@ -740,7 +740,7 @@ private:
 struct SharedGroup::BadVersion: std::exception {};
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
-                                SharedGroupOptions options):
+                                const SharedGroupOptions options):
     m_group(Group::shared_tag()),
     m_upgrade_callback(std::move(options.upgrade_callback))
 {
@@ -752,7 +752,7 @@ inline SharedGroup::SharedGroup(unattached_tag) noexcept:
 {
 }
 
-inline SharedGroup::SharedGroup(Replication& repl, SharedGroupOptions options):
+inline SharedGroup::SharedGroup(Replication& repl, const SharedGroupOptions options):
     m_group(Group::shared_tag()),
     m_upgrade_callback(std::move(options.upgrade_callback))
 {
@@ -760,7 +760,7 @@ inline SharedGroup::SharedGroup(Replication& repl, SharedGroupOptions options):
 }
 
 inline void SharedGroup::open(const std::string& path, bool no_create_file,
-                              SharedGroupOptions options)
+                              const SharedGroupOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -769,7 +769,7 @@ inline void SharedGroup::open(const std::string& path, bool no_create_file,
     do_open(path, no_create_file, is_backend, options); // Throws
 }
 
-inline void SharedGroup::open(Replication& repl, SharedGroupOptions options)
+inline void SharedGroup::open(Replication& repl, const SharedGroupOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.

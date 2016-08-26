@@ -718,7 +718,7 @@ const std::string SharedGroupOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("T
 // undefined state.
 
 void SharedGroup::do_open(const std::string& path, bool no_create_file,
-                          bool is_backend, SharedGroupOptions options)
+                          bool is_backend, const SharedGroupOptions options)
 {
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
