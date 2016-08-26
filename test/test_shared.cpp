@@ -347,7 +347,7 @@ TEST(Shared_InitialMem)
     {
         // Create a new shared db
         bool no_create = false;
-        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::durability_MemOnly));
+        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
 
         // Verify that new group is empty
         {
@@ -375,7 +375,7 @@ TEST(Shared_InitialMem_StaleFile)
     // Create a MemOnly realm at the path so that a lock file gets initialized
     {
         bool no_create = false;
-        SharedGroup(path, no_create, SharedGroupOptions(SharedGroupOptions::durability_MemOnly));
+        SharedGroup(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
     }
     CHECK(!File::exists(path));
     CHECK(File::exists(path.get_lock_path()));
@@ -393,7 +393,7 @@ TEST(Shared_InitialMem_StaleFile)
     // it's cleaned up afterwards
     {
         bool no_create = false;
-        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::durability_MemOnly));
+        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
         CHECK(File::exists(path));
     }
     CHECK(!File::exists(path));
@@ -449,11 +449,11 @@ TEST(Shared_Initial2_Mem)
     {
         // Create a new shared db
         bool no_create = false;
-        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::durability_MemOnly));
+        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
 
         {
             // Open the same db again (in empty state)
-            SharedGroup sg2(path, no_create, SharedGroupOptions(SharedGroupOptions::durability_MemOnly));
+            SharedGroup sg2(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
 
             // Verify that new group is empty
             {
@@ -843,7 +843,7 @@ TEST(Shared_ManyReaders)
         SHARED_GROUP_TEST_PATH(path);
 
         bool no_create = false;
-        SharedGroup root_sg(path, no_create, SharedGroupOptions(SharedGroupOptions::durability_MemOnly));
+        SharedGroup root_sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
 
         // Add two tables
         {
@@ -861,7 +861,7 @@ TEST(Shared_ManyReaders)
 
         // Create 8*N shared group accessors
         for (int i = 0; i < 8*N; ++i)
-            shared_groups[i].reset(new SharedGroup(path, no_create, SharedGroupOptions(SharedGroupOptions::durability_MemOnly)));
+            shared_groups[i].reset(new SharedGroup(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly)));
 
         // Initiate 2*N read transactions with progressive changes
         for (int i = 0; i < 2*N; ++i) {
@@ -1043,7 +1043,7 @@ TEST(Shared_ManyReaders)
 
         // Check final state via new shared group
         {
-            SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::durability_MemOnly));
+            SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
             ReadTransaction rt(sg);
 #if !defined(_WIN32) || TEST_DURATION > 0
             rt.get_group().verify();
@@ -1750,7 +1750,7 @@ TEST_IF(Shared_Async, allow_async)
     // Do some changes in a async db
     {
         bool no_create = false;
-        SharedGroup db(path, no_create, SharedGroupOptions(SharedGroupOptions::durability_Async));
+        SharedGroup db(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
 
         for (size_t i = 0; i < 100; ++i) {
 //            std::cout << "t "<<n<<"\n";
@@ -1786,7 +1786,7 @@ void multiprocess_thread(TestContext& test_context, std::string path, size_t row
 {
     // Open shared db
     bool no_create = false;
-    SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::durability_Async));
+    SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
 
     for (size_t i = 0; i != multiprocess_increments; ++i) {
         // Increment cell
@@ -1864,7 +1864,7 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
 #    else
     {
         bool no_create = false;
-        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::durability_Async));
+        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
         WriteTransaction wt(sg);
         TestTableShared::Ref t1 = wt.get_or_add_table<TestTableShared>("test");
         for (size_t i = 0; i < rows; ++i) {
@@ -1914,7 +1914,7 @@ void multiprocess_threaded(TestContext& test_context, std::string path, size_t n
     // Verify that the changes were made
     {
         bool no_create = false;
-        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::durability_Async));
+        SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
         ReadTransaction rt(sg);
         rt.get_group().verify();
         TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
@@ -2764,10 +2764,10 @@ TEST(Shared_SessionDurabilityConsistency)
     SHARED_GROUP_TEST_PATH(path);
     {
         bool no_create = false;
-        SharedGroupOptions::Durability durability_1 = SharedGroupOptions::durability_Full;
+        SharedGroupOptions::Durability durability_1 = SharedGroupOptions::Durability::Full;
         SharedGroup sg(path, no_create, SharedGroupOptions(durability_1));
 
-        SharedGroupOptions::Durability durability_2 = SharedGroupOptions::durability_MemOnly;
+        SharedGroupOptions::Durability durability_2 = SharedGroupOptions::Durability::MemOnly;
         CHECK_LOGIC_ERROR(SharedGroup(path, no_create, SharedGroupOptions(durability_2)),
                           LogicError::mixed_durability);
     }

@@ -1088,7 +1088,7 @@ public:
         bool no_create = true;
         bool is_backend = true;
         SharedGroupOptions options;
-        options.durability = SharedGroupOptions::durability_Async;
+        options.durability = SharedGroupOptions::Durability::Async;
         options.encryption_key = nullptr;
         options.allow_file_format_upgrade = false;
         sg.do_open(file, no_create, is_backend, options); // Throws

@@ -27,13 +27,15 @@ namespace realm {
 class SharedGroupOptions {
 public:
 
-    enum Durability {
-        durability_Full,
-        durability_MemOnly,
-        durability_Async    ///< Not yet supported on windows.
+    /// The persistence level of the SharedGroup.
+    /// uint16_t is the type of SharedGroup::SharedInfo::durability
+    enum class Durability : uint16_t {
+        Full,
+        MemOnly,
+        Async    ///< Not yet supported on windows.
     };
 
-    explicit SharedGroupOptions(Durability level = durability_Full,
+    explicit SharedGroupOptions(Durability level = Durability::Full,
                        const char* key = nullptr,
                        bool allow_upgrade = true,
                        std::function<void(int,int)> file_upgrade_callback = std::function<void(int,int)>(),
@@ -45,7 +47,7 @@ public:
         temp_dir(temp_directory) {}
 
     explicit SharedGroupOptions(const char* key):
-        durability(durability_Full),
+        durability(Durability::Full),
         encryption_key(key),
         allow_file_format_upgrade(true),
         upgrade_callback(std::function<void(int,int)>()),

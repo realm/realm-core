@@ -1,0 +1,169 @@
+digraph G {
+subgraph cluster_string_index140730169446400 {
+ label = "String index";
+subgraph cluster_string_index_inner_node140730169446400 {
+ label = "Inner node";
+n7ffe4bc25000[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc25000<BR/>IsNode<BR/>HasRefs<BR/>ContextFlag<BR/></FONT></TD>
+<TD PORT="0"></TD>
+<TD PORT="1"></TD>
+<TD PORT="2"></TD>
+<TD PORT="3"></TD>
+</TR></TABLE>>];
+subgraph cluster_140730169446528 {
+ label = "keys";
+ color = white;
+n7ffe4bc25080[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc25080<BR/></FONT></TD>
+<TD>dupl</TD>
+<TD>five</TD>
+<TD>twoX</TD>
+</TR></TABLE>>];
+}
+n7ffe4bc25000:0 -> n7ffe4bc25080
+
+}
+subgraph cluster_string_index_leaf140730169445152 {
+ label = "Leaf";
+n7ffe4bc24b20[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc24b20<BR/>HasRefs<BR/>ContextFlag<BR/></FONT></TD>
+<TD PORT="0"></TD>
+<TD PORT="1"></TD>
+<TD PORT="2"></TD>
+</TR></TABLE>>];
+n7ffe4bc25000:1 -> n7ffe4bc24b20
+subgraph cluster_140730169445280 {
+ label = "keys";
+ color = white;
+n7ffe4bc24ba0[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc24ba0<BR/></FONT></TD>
+<TD>1234</TD>
+<TD>dupl</TD>
+</TR></TABLE>>];
+}
+n7ffe4bc24b20:0 -> n7ffe4bc24ba0
+
+}
+subgraph cluster_string_index_leaf140730169446912 {
+ label = "Leaf";
+n7ffe4bc25200[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc25200<BR/>HasRefs<BR/>ContextFlag<BR/></FONT></TD>
+<TD PORT="0"></TD>
+<TD PORT="1"></TD>
+</TR></TABLE>>];
+n7ffe4bc24b20:1 -> n7ffe4bc25200
+subgraph cluster_140730169447040 {
+ label = "keys";
+ color = white;
+n7ffe4bc25280[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc25280<BR/></FONT></TD>
+<TD>5678</TD>
+</TR></TABLE>>];
+}
+n7ffe4bc25200:0 -> n7ffe4bc25280
+
+}
+subgraph cluster_string_index_leaf140730169447280 {
+ label = "Leaf";
+n7ffe4bc25370[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc25370<BR/>HasRefs<BR/>ContextFlag<BR/></FONT></TD>
+<TD PORT="0"></TD>
+<TD BGCOLOR="grey90">15</TD>
+<TD BGCOLOR="grey90">16</TD>
+</TR></TABLE>>];
+n7ffe4bc25200:1 -> n7ffe4bc25370
+subgraph cluster_140730169447408 {
+ label = "keys";
+ color = white;
+n7ffe4bc253f0[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc253f0<BR/></FONT></TD>
+<TD>9000</TD>
+<TD>9001</TD>
+</TR></TABLE>>];
+}
+n7ffe4bc25370:0 -> n7ffe4bc253f0
+
+}
+subgraph cluster_integer_column140730169445888 {
+ label = "Integer column\n'ref_list'";
+subgraph cluster_inner_pbtree_node140730169445888 {
+ label = "";
+n7ffe4bc24e00[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc24e00<BR/>IsNode<BR/>HasRefs<BR/></FONT></TD>
+<TD BGCOLOR="grey90">4</TD>
+<TD PORT="1"></TD>
+<TD PORT="2"></TD>
+<TD PORT="3"></TD>
+<TD BGCOLOR="grey90">10</TD>
+</TR></TABLE>>];
+n7ffe4bc24b20:2 -> n7ffe4bc24e00
+}
+n7ffe4bc24c20[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc24c20<BR/></FONT></TD>
+<TD>0</TD>
+<TD>1</TD>
+<TD>2</TD>
+<TD>3</TD>
+</TR></TABLE>>];
+n7ffe4bc24e00:1 -> n7ffe4bc24c20
+n7ffe4bc24d10[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc24d10<BR/></FONT></TD>
+<TD>4</TD>
+<TD>5</TD>
+<TD>6</TD>
+<TD>7</TD>
+</TR></TABLE>>];
+n7ffe4bc24e00:2 -> n7ffe4bc24d10
+n7ffe4bc24e80[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc24e80<BR/></FONT></TD>
+<TD>8</TD>
+<TD>9</TD>
+</TR></TABLE>>];
+n7ffe4bc24e00:3 -> n7ffe4bc24e80
+}
+subgraph cluster_string_index_leaf140730169446656 {
+ label = "Leaf";
+n7ffe4bc25100[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc25100<BR/>HasRefs<BR/>ContextFlag<BR/></FONT></TD>
+<TD PORT="0"></TD>
+<TD BGCOLOR="grey90">14</TD>
+</TR></TABLE>>];
+n7ffe4bc25000:2 -> n7ffe4bc25100
+subgraph cluster_140730169446784 {
+ label = "keys";
+ color = white;
+n7ffe4bc25180[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc25180<BR/></FONT></TD>
+<TD>five</TD>
+</TR></TABLE>>];
+}
+n7ffe4bc25100:0 -> n7ffe4bc25180
+
+}
+subgraph cluster_string_index_leaf140730169446144 {
+ label = "Leaf";
+n7ffe4bc24f00[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc24f00<BR/>HasRefs<BR/>ContextFlag<BR/></FONT></TD>
+<TD PORT="0"></TD>
+<TD BGCOLOR="grey90">13</TD>
+<TD BGCOLOR="grey90">10</TD>
+<TD BGCOLOR="grey90">12</TD>
+<TD BGCOLOR="grey90">11</TD>
+</TR></TABLE>>];
+n7ffe4bc25000:3 -> n7ffe4bc24f00
+subgraph cluster_140730169446272 {
+ label = "keys";
+ color = white;
+n7ffe4bc24f80[shape=none,label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR>
+<TD BGCOLOR="lightgrey"><FONT POINT-SIZE="7"> 0x7ffe4bc24f80<BR/></FONT></TD>
+<TD>four</TD>
+<TD>oneX</TD>
+<TD>thre</TD>
+<TD>twoX</TD>
+</TR></TABLE>>];
+}
+n7ffe4bc24f00:0 -> n7ffe4bc24f80
+
+}
+}
+}
