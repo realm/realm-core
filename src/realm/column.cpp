@@ -116,16 +116,11 @@ void ColumnBaseWithIndex::destroy() noexcept
     }
 }
 
-
-#ifdef REALM_DEBUG
-
 void ColumnBase::verify(const Table&, size_t column_ndx) const
 {
     verify();
     REALM_ASSERT_EX(column_ndx == m_column_ndx, column_ndx, m_column_ndx);
 }
-
-#endif // REALM_DEBUG
 
 void ColumnBaseSimple::replace_root_array(std::unique_ptr<Array> leaf)
 {

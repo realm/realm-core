@@ -121,13 +121,13 @@ void InRealmHistory::set_oldest_bound_version(version_type version)
 }
 
 
-#ifdef REALM_DEBUG
 void InRealmHistory::verify() const
 {
+#ifdef REALM_DEBUG
     if (m_changesets)
         m_changesets->verify();
-}
 #endif
+}
 
 
 void InRealmHistory::update_from_ref(ref_type ref, version_type version)

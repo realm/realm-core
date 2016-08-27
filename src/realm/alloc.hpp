@@ -123,9 +123,9 @@ public:
 
     virtual ~Allocator() noexcept;
 
-#ifdef REALM_DEBUG
     virtual void verify() const = 0;
 
+#ifdef REALM_DEBUG
     /// Terminate the program precisely when the specified 'ref' is
     /// freed (or reallocated). You can use this to detect whether the
     /// ref is freed (or reallocated), and even to get a stacktrace at
@@ -211,9 +211,7 @@ protected:
     /// See get_file_format_version().
     int m_file_format_version = 0;
 
-#ifdef REALM_DEBUG
     ref_type m_watch;
-#endif
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -420,9 +418,7 @@ inline bool Allocator::is_read_only(ref_type ref) const noexcept
 inline Allocator::Allocator() noexcept:
     m_replication(nullptr)
 {
-#ifdef REALM_DEBUG
     m_watch = 0;
-#endif
     m_table_versioning_counter = 0;
 }
 

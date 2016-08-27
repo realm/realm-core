@@ -140,9 +140,7 @@ public:
     /// until initiation of the commit operation).
     virtual BinaryData get_uncommitted_changes() noexcept = 0;
 
-#ifdef REALM_DEBUG
     virtual void verify() const = 0;
-#endif
 
     virtual ~History() noexcept {}
 };
@@ -171,9 +169,7 @@ public:
     void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
     void set_oldest_bound_version(version_type) override;
 
-#ifdef REALM_DEBUG
     void verify() const override;
-#endif
 
 private:
     Group* m_group = 0;
