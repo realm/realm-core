@@ -74,7 +74,7 @@ TEST(EncryptedFile_CryptorBasic)
     const char data[4096] = "test data";
     char buffer[4096];
 
-    int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     cryptor.write(fd, 0, data, sizeof(data));
     cryptor.read(fd, 0, buffer, sizeof(buffer));
     CHECK(memcmp(buffer, data, strlen(data)) == 0);
@@ -89,7 +89,7 @@ TEST(EncryptedFile_CryptorRepeatedWrites)
 
     const char data[4096] = "test data";
     char raw_buffer_1[8192] = {0}, raw_buffer_2[8192] = {0};
-    int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 
     cryptor.write(fd, 0, data, sizeof(data));
     lseek(fd, 0, SEEK_SET);
@@ -113,7 +113,7 @@ TEST(EncryptedFile_SeparateCryptors)
     const char data[4096] = "test data";
     char buffer[4096];
 
-    int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     {
         AESCryptor cryptor(test_key);
         cryptor.set_file_size(16);
@@ -135,7 +135,7 @@ TEST(EncryptedFile_InterruptedWrite)
 
     const char data[4096] = "test data";
 
-    int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     {
         AESCryptor cryptor(test_key);
         cryptor.set_file_size(16);
@@ -166,7 +166,7 @@ TEST(EncryptedFile_LargePages)
 {
     TEST_PATH(path);
 
-    char data[4096*4];
+    char data[4096 * 4];
     for (size_t i = 0; i < sizeof(data); ++i)
         data[i] = static_cast<char>(i);
 
@@ -174,7 +174,7 @@ TEST(EncryptedFile_LargePages)
     cryptor.set_file_size(sizeof(data));
     char buffer[sizeof(data)];
 
-    int fd = open(path.c_str(), O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    int fd = open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     cryptor.write(fd, 0, data, sizeof(data));
     cryptor.read(fd, 0, buffer, sizeof(buffer));
     CHECK(memcmp(buffer, data, sizeof(data)) == 0);

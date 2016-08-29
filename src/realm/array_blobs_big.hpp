@@ -41,9 +41,9 @@ public:
     void destroy();
 
     size_t count(BinaryData value, bool is_string = false, size_t begin = 0,
-                      size_t end = npos) const noexcept;
+                 size_t end = npos) const noexcept;
     size_t find_first(BinaryData value, bool is_string = false, size_t begin = 0,
-                           size_t end = npos) const noexcept;
+                      size_t end = npos) const noexcept;
     void find_all(IntegerColumn& result, BinaryData value, bool is_string = false,
                   size_t add_offset = 0,
                   size_t begin = 0, size_t end = npos);
@@ -95,7 +95,7 @@ private:
 // Implementation:
 
 inline ArrayBigBlobs::ArrayBigBlobs(Allocator& allocator, bool nullable) noexcept:
-                                    Array(allocator), m_nullable(nullable)
+    Array(allocator), m_nullable(nullable)
 {
 }
 
@@ -160,7 +160,7 @@ inline StringData ArrayBigBlobs::get_string(size_t ndx) const noexcept
     if (bin.is_null())
         return realm::null();
     else
-        return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
+        return StringData(bin.data(), bin.size() - 1); // Do not include terminating zero
 }
 
 inline void ArrayBigBlobs::set_string(size_t ndx, StringData value)
@@ -196,7 +196,7 @@ inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
     if (bin.is_null())
         return realm::null();
     else
-        return StringData(bin.data(), bin.size()-1); // Do not include terminating zero
+        return StringData(bin.data(), bin.size() - 1); // Do not include terminating zero
 }
 
 inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(size_t ndx, StringData value,

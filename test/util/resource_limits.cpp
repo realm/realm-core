@@ -23,11 +23,11 @@
 #include "resource_limits.hpp"
 
 #ifndef _WIN32
-#  define REALM_HAVE_POSIX_RLIMIT 1
+    #define REALM_HAVE_POSIX_RLIMIT 1
 #endif
 
 #if REALM_HAVE_POSIX_RLIMIT
-#  include <sys/resource.h>
+    #include <sys/resource.h>
 #endif
 
 using namespace realm;

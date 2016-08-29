@@ -70,7 +70,7 @@ public:
     friend bool operator>=(super_int, super_int) noexcept;
 
     template<class C, class T>
-    friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, super_int);
+    friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, super_int);
 
     bool add_with_overflow_detect(super_int) noexcept;
     bool subtract_with_overflow_detect(super_int) noexcept;
@@ -228,7 +228,7 @@ inline bool operator>=(super_int a, super_int b) noexcept
 }
 
 template<class C, class T>
-std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, super_int i)
+std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, super_int i)
 {
     typedef super_int::val_uint val_uint;
     if (i.m_sign_bit) {

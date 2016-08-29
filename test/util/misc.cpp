@@ -22,7 +22,8 @@
 namespace realm {
 namespace test_util {
 
-void replace_all(std::string& str, const std::string& from, const std::string& to) {
+void replace_all(std::string& str, const std::string& from, const std::string& to)
+{
     if (from.empty())
         return;
     size_t start_pos = 0;

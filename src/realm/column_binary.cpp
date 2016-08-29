@@ -546,7 +546,7 @@ ref_type BinaryColumn::write(size_t slice_offset, size_t slice_size,
     else {
         SliceHandler handler(get_alloc());
         ref = ColumnBaseSimple::write(m_array.get(), slice_offset, slice_size,
-                                table_size, handler, out); // Throws
+                                      table_size, handler, out); // Throws
     }
     return ref;
 }
@@ -575,7 +575,7 @@ void BinaryColumn::update_from_ref(ref_type ref)
     bool old_root_is_small = !m_array->get_context_flag();
 
     bool root_type_changed = old_root_is_leaf != new_root_is_leaf ||
-        (old_root_is_leaf && old_root_is_small != new_root_is_small);
+                             (old_root_is_leaf && old_root_is_small != new_root_is_small);
     if (!root_type_changed) {
         // Keep, but refresh old root accessor
         if (old_root_is_leaf) {
@@ -724,7 +724,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
         leaf_type = "Big blobs leaf";
     }
     int indent = level * 2;
-    out << std::setw(indent) << "" << leaf_type << " (size: "<<leaf_size<<")\n";
+    out << std::setw(indent) << "" << leaf_type << " (size: " << leaf_size << ")\n";
 }
 
 } // anonymous namespace

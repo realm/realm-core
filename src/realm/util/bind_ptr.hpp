@@ -150,7 +150,7 @@ private:
 
 
 template<class C, class T, class U>
-inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const bind_ptr<U>& p)
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const bind_ptr<U>& p)
 {
     out << static_cast<const void*>(p.get());
     return out;
@@ -223,7 +223,8 @@ protected:
     // FIXME: Operators ++ and -- as used below use
     // std::memory_order_seq_cst. This can be optimized.
     void bind_ptr() const noexcept { ++m_ref_count; }
-    void unbind_ptr() const noexcept { 
+    void unbind_ptr() const noexcept
+    {
         if (--m_ref_count == 0) {
             delete this;
         }

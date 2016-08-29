@@ -1187,8 +1187,8 @@ TEST(Links_RemoveLastTargetColumn)
     origin->add_column_link(type_Link,     "o_1", *target);
     origin->add_column_link(type_LinkList, "o_2", *target);
     origin->add_empty_row();
-    origin->set_link(0,0,0);
-    LinkViewRef link_list = origin->get_linklist(1,0);
+    origin->set_link(0, 0, 0);
+    LinkViewRef link_list = origin->get_linklist(1, 0);
     link_list->add(0);
     Row target_row_1 = target->get(0);
     Row target_row_2 = link_list->get(0);
@@ -1197,9 +1197,9 @@ TEST(Links_RemoveLastTargetColumn)
     target->remove_column(0);
     CHECK_EQUAL(0, target->get_column_count());
     CHECK(target->is_empty());
-    CHECK(origin->is_null_link(0,0));
+    CHECK(origin->is_null_link(0, 0));
     CHECK(link_list->is_attached());
-    CHECK_EQUAL(link_list, origin->get_linklist(1,0));
+    CHECK_EQUAL(link_list, origin->get_linklist(1, 0));
     CHECK_EQUAL(origin, &link_list->get_origin_table());
     CHECK_EQUAL(target, &link_list->get_target_table());
     CHECK_EQUAL(0, link_list->size());
@@ -1224,10 +1224,10 @@ TEST(Links_ClearColumnWithTwoLevelBptree)
     target->add_empty_row();
 
     origin->add_column_link(type_LinkList, "", *target);
-    origin->add_empty_row(REALM_MAX_BPNODE_SIZE+1);
+    origin->add_empty_row(REALM_MAX_BPNODE_SIZE + 1);
     origin->clear();
     origin->add_empty_row();
-    origin->get_linklist(0,0)->add(0);
+    origin->get_linklist(0, 0)->add(0);
     group.verify();
 }
 
@@ -1240,8 +1240,8 @@ TEST(Links_ClearLinkListWithTwoLevelBptree)
     origin->add_column_link(type_LinkList, "", *target);
     target->add_empty_row();
     origin->add_empty_row();
-    LinkViewRef link_list = origin->get_linklist(0,0);
-    for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE+1; ++i)
+    LinkViewRef link_list = origin->get_linklist(0, 0);
+    for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE + 1; ++i)
         link_list->add(0);
     link_list->clear();
     group.verify();
@@ -1260,8 +1260,8 @@ TEST(Links_FormerMemLeakCase)
         target->add_empty_row();
         origin->add_column_link(type_Link, "", *target);
         origin->add_empty_row(2);
-        origin->set_link(0,0,0);
-        origin->set_link(0,1,0);
+        origin->set_link(0, 0, 0);
+        origin->set_link(0, 1, 0);
         wt.commit();
     }
     {
@@ -1341,9 +1341,9 @@ TEST(Links_CascadeRemove_ColumnLink)
             target_row_0 = target->get(0);
             target_row_1 = target->get(1);
             target_row_2 = target->get(2);
-            origin_row_0.set_link(0,0); // origin[0].o_1 -> target[0]
-            origin_row_1.set_link(0,1); // origin[1].o_1 -> target[1]
-            origin_row_2.set_link(0,2); // origin[2].o_1 -> target[2]
+            origin_row_0.set_link(0, 0); // origin[0].o_1 -> target[0]
+            origin_row_1.set_link(0, 1); // origin[1].o_1 -> target[1]
+            origin_row_2.set_link(0, 2); // origin[2].o_1 -> target[2]
         }
     };
 
@@ -1376,7 +1376,7 @@ TEST(Links_CascadeRemove_ColumnLink)
     // Break link by reassign
     {
         Fixture f;
-        f.origin_row_0.set_link(0,2); // origin[0].o_1 -> target[2]
+        f.origin_row_0.set_link(0, 2); // origin[0].o_1 -> target[2]
         // Cascade: target->move_last_over(0)
         CHECK(!f.target_row_0 && f.target_row_1 && f.target_row_2);
         CHECK_EQUAL(0, f.origin_row_0.get_link(0));
@@ -1385,7 +1385,7 @@ TEST(Links_CascadeRemove_ColumnLink)
     }
     {
         Fixture f;
-        f.origin_row_1.set_link(0,0); // origin[1].o_1 -> target[0]
+        f.origin_row_1.set_link(0, 0); // origin[1].o_1 -> target[0]
         // Cascade: target->move_last_over(1)
         CHECK(f.target_row_0 && !f.target_row_1 && f.target_row_2);
         CHECK_EQUAL(0, f.origin_row_0.get_link(0));
@@ -1394,7 +1394,7 @@ TEST(Links_CascadeRemove_ColumnLink)
     }
     {
         Fixture f;
-        f.origin_row_2.set_link(0,1); // origin[2].o_1 -> target[1]
+        f.origin_row_2.set_link(0, 1); // origin[2].o_1 -> target[1]
         // Cascade: target->move_last_over(2)
         CHECK(f.target_row_0 && f.target_row_1 && !f.target_row_2);
         CHECK_EQUAL(0, f.origin_row_0.get_link(0));
@@ -1405,7 +1405,7 @@ TEST(Links_CascadeRemove_ColumnLink)
     // Avoid breaking link by reassigning self
     {
         Fixture f;
-        f.origin_row_0.set_link(0,0); // No effective change!
+        f.origin_row_0.set_link(0, 0); // No effective change!
         CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
         CHECK_EQUAL(0, f.origin_row_0.get_link(0));
         CHECK_EQUAL(1, f.origin_row_1.get_link(0));
@@ -1413,7 +1413,7 @@ TEST(Links_CascadeRemove_ColumnLink)
     }
     {
         Fixture f;
-        f.origin_row_1.set_link(0,1); // No effective change!
+        f.origin_row_1.set_link(0, 1); // No effective change!
         CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
         CHECK_EQUAL(0, f.origin_row_0.get_link(0));
         CHECK_EQUAL(1, f.origin_row_1.get_link(0));
@@ -1421,7 +1421,7 @@ TEST(Links_CascadeRemove_ColumnLink)
     }
     {
         Fixture f;
-        f.origin_row_2.set_link(0,2); // No effective change!
+        f.origin_row_2.set_link(0, 2); // No effective change!
         CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
         CHECK_EQUAL(0, f.origin_row_0.get_link(0));
         CHECK_EQUAL(1, f.origin_row_1.get_link(0));
@@ -1587,7 +1587,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
     // Break links by reassign
     {
         Fixture f;
-        f.link_list_0->set(0,0); // Cascade: Nothing
+        f.link_list_0->set(0, 0); // Cascade: Nothing
         CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
         CHECK_EQUAL(0, f.link_list_0->get(0).get_index());
         CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
@@ -1599,7 +1599,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
     }
     {
         Fixture f;
-        f.link_list_1->set(0,1); // Cascade: target->move_last_over(0)
+        f.link_list_1->set(0, 1); // Cascade: target->move_last_over(0)
         CHECK(!f.target_row_0 && f.target_row_1 && f.target_row_2);
         CHECK_EQUAL(1, f.link_list_0->get(0).get_index());
         CHECK_EQUAL(1, f.link_list_1->get(0).get_index());
@@ -1613,7 +1613,7 @@ TEST(Links_CascadeRemove_ColumnLinkList)
     // Avoid breaking links by reassigning self
     {
         Fixture f;
-        f.link_list_1->set(0,0);
+        f.link_list_1->set(0, 0);
         CHECK(f.target_row_0 && f.target_row_1 && f.target_row_2);
         CHECK_EQUAL(1, f.link_list_0->get(0).get_index());
         CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
@@ -1734,7 +1734,7 @@ TEST(Links_OrderedRowRemoval)
         table->add_column_link(type_LinkList, "link_list", *table);
         table->add_empty_row();
         table->add_empty_row();
-        table->get_linklist(0,0)->add(0);
+        table->get_linklist(0, 0)->add(0);
         table->remove(0);
         group.verify();
     }
@@ -1744,7 +1744,7 @@ TEST(Links_OrderedRowRemoval)
         table->add_column_link(type_LinkList, "link_list", *table);
         table->add_empty_row();
         table->add_empty_row();
-        table->get_linklist(0,0)->add(1);
+        table->get_linklist(0, 0)->add(1);
         table->remove(0);
         group.verify();
     }
@@ -1754,8 +1754,8 @@ TEST(Links_OrderedRowRemoval)
         table->add_column_link(type_LinkList, "link_list", *table);
         table->add_empty_row();
         table->add_empty_row();
-        table->get_linklist(0,0)->add(0);
-        table->get_linklist(0,1)->add(0);
+        table->get_linklist(0, 0)->add(0);
+        table->get_linklist(0, 1)->add(0);
         table->remove(0);
         group.verify();
     }
@@ -1765,8 +1765,8 @@ TEST(Links_OrderedRowRemoval)
         table->add_column_link(type_LinkList, "link_list", *table);
         table->add_empty_row();
         table->add_empty_row();
-        table->get_linklist(0,0)->add(1);
-        table->get_linklist(0,1)->add(1);
+        table->get_linklist(0, 0)->add(1);
+        table->get_linklist(0, 1)->add(1);
         table->remove(0);
         group.verify();
     }
@@ -1776,8 +1776,8 @@ TEST(Links_OrderedRowRemoval)
         table->add_column_link(type_LinkList, "link_list", *table);
         table->add_empty_row();
         table->add_empty_row();
-        table->get_linklist(0,0)->add(0);
-        table->get_linklist(0,1)->add(1);
+        table->get_linklist(0, 0)->add(0);
+        table->get_linklist(0, 1)->add(1);
         table->remove(0);
         group.verify();
     }
@@ -1787,8 +1787,8 @@ TEST(Links_OrderedRowRemoval)
         table->add_column_link(type_LinkList, "link_list", *table);
         table->add_empty_row();
         table->add_empty_row();
-        table->get_linklist(0,0)->add(1);
-        table->get_linklist(0,1)->add(0);
+        table->get_linklist(0, 0)->add(1);
+        table->get_linklist(0, 1)->add(0);
         table->remove(0);
         group.verify();
     }
@@ -1843,10 +1843,10 @@ TEST(Links_LinkList_Swap)
             target->add_column(type_Int, "");
             origin->add_empty_row(2);
             target->add_empty_row(2);
-            link_list_1 = origin->get_linklist(0,0);
+            link_list_1 = origin->get_linklist(0, 0);
             link_list_1->add(0);
             link_list_1->add(1);
-            link_list_2 = origin->get_linklist(0,1); // Leave it empty
+            link_list_2 = origin->get_linklist(0, 1); // Leave it empty
         }
     };
 
@@ -1863,11 +1863,11 @@ TEST(Links_LinkList_Swap)
     // No-op
     {
         Fixture f;
-        f.link_list_1->swap(0,0);
+        f.link_list_1->swap(0, 0);
         CHECK_EQUAL(2, f.link_list_1->size());
         CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
         CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
-        f.link_list_1->swap(1,1);
+        f.link_list_1->swap(1, 1);
         CHECK_EQUAL(2, f.link_list_1->size());
         CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
         CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
@@ -1877,11 +1877,11 @@ TEST(Links_LinkList_Swap)
     // Both orders of arguments mean the same this
     {
         Fixture f;
-        f.link_list_1->swap(0,1);
+        f.link_list_1->swap(0, 1);
         CHECK_EQUAL(2, f.link_list_1->size());
         CHECK_EQUAL(1, f.link_list_1->get(0).get_index());
         CHECK_EQUAL(0, f.link_list_1->get(1).get_index());
-        f.link_list_1->swap(1,0);
+        f.link_list_1->swap(1, 0);
         CHECK_EQUAL(2, f.link_list_1->size());
         CHECK_EQUAL(0, f.link_list_1->get(0).get_index());
         CHECK_EQUAL(1, f.link_list_1->get(1).get_index());
@@ -1892,16 +1892,16 @@ TEST(Links_LinkList_Swap)
     {
         Fixture f;
         f.origin->remove(0);
-        CHECK_LOGIC_ERROR(f.link_list_1->swap(0,1), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(f.link_list_1->swap(0, 1), LogicError::detached_accessor);
         f.group.verify();
     }
 
     // Index out of range
     {
         Fixture f;
-        CHECK_LOGIC_ERROR(f.link_list_1->swap(1,2), LogicError::link_index_out_of_range);
-        CHECK_LOGIC_ERROR(f.link_list_1->swap(2,1), LogicError::link_index_out_of_range);
-        CHECK_LOGIC_ERROR(f.link_list_2->swap(0,0), LogicError::link_index_out_of_range);
+        CHECK_LOGIC_ERROR(f.link_list_1->swap(1, 2), LogicError::link_index_out_of_range);
+        CHECK_LOGIC_ERROR(f.link_list_1->swap(2, 1), LogicError::link_index_out_of_range);
+        CHECK_LOGIC_ERROR(f.link_list_2->swap(0, 0), LogicError::link_index_out_of_range);
         f.group.verify();
     }
 }
@@ -1953,13 +1953,13 @@ TEST(Links_DetachedAccessor)
     TableRef table = group.add_table("table");
     table->add_column_link(type_LinkList, "l", *table);
     table->add_empty_row();
-    LinkViewRef link_list = table->get_linklist(0,0);
+    LinkViewRef link_list = table->get_linklist(0, 0);
     link_list->add(0);
     link_list->add(0);
     group.remove_table("table");
 
-    CHECK_LOGIC_ERROR(link_list->move(0,1), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(link_list->swap(0,1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(link_list->move(0, 1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(link_list->swap(0, 1), LogicError::detached_accessor);
 }
 
 #endif // TEST_LINKS

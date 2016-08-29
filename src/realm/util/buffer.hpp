@@ -74,7 +74,7 @@ public:
 
     T* release() noexcept;
 
-    friend void swap(Buffer&a, Buffer&b) noexcept
+    friend void swap(Buffer& a, Buffer& b) noexcept
     {
         using std::swap;
         swap(a.m_data, b.m_data);
@@ -161,7 +161,7 @@ inline void Buffer<T>::set_size(size_t new_size)
 
 template<class T>
 inline void Buffer<T>::resize(size_t new_size, size_t copy_begin,
-                                                size_t copy_end, size_t copy_to)
+                              size_t copy_end, size_t copy_to)
 {
     std::unique_ptr<T[]> new_data(new T[new_size]); // Throws
     std::copy(m_data.get() + copy_begin, m_data.get() + copy_end, new_data.get() + copy_to);
@@ -171,7 +171,7 @@ inline void Buffer<T>::resize(size_t new_size, size_t copy_begin,
 
 template<class T>
 inline void Buffer<T>::reserve(size_t used_size,
-                                                 size_t min_capacity)
+                               size_t min_capacity)
 {
     size_t current_capacity = m_size;
     if (REALM_LIKELY(current_capacity >= min_capacity))
@@ -186,7 +186,7 @@ inline void Buffer<T>::reserve(size_t used_size,
 
 template<class T>
 inline void Buffer<T>::reserve_extra(size_t used_size,
-                                                       size_t min_extra_capacity)
+                                     size_t min_extra_capacity)
 {
     size_t min_capacity = used_size;
     if (REALM_UNLIKELY(int_add_with_overflow_detect(min_capacity, min_extra_capacity)))
@@ -229,7 +229,7 @@ template<class T>
 inline void AppendBuffer<T>::append(const T* append_data, size_t append_data_size)
 {
     m_buffer.reserve_extra(m_size, append_data_size); // Throws
-    std::copy(append_data, append_data+append_data_size, m_buffer.data()+m_size);
+    std::copy(append_data, append_data + append_data_size, m_buffer.data() + m_size);
     m_size += append_data_size;
 }
 

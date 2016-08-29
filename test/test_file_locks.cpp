@@ -163,12 +163,12 @@ TEST(File_NoSpuriousTryLockFailures)
     for (int i = 0; i != num_slaves; ++i)
         CHECK(!slaves[i].join());
 
-/*
+    /*
     typedef std::map<int, int>::const_iterator iter;
     iter end = results.end();
     for (iter i = results.begin(); i != end; ++i)
         std::cout << i->first << " -> " << i->second << "\n";
-*/
+    */
 
     // Check that there are no cases where no one got the lock
     CHECK_EQUAL(0, results[0]);

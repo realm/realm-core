@@ -83,20 +83,20 @@ TestList one_test_success_list, one_test_failure_list;
 
 TEST_EX(OneTestSuccess, one_test_success_list, true, true)
 {
-    CHECK_EQUAL(0,0);
-    CHECK_NOT_EQUAL(0,1);
+    CHECK_EQUAL(0, 0);
+    CHECK_NOT_EQUAL(0, 1);
     CHECK(true); // <--- Success
-    CHECK_LESS(0,1);
-    CHECK_GREATER(1,0);
+    CHECK_LESS(0, 1);
+    CHECK_GREATER(1, 0);
 }
 
 TEST_EX(OneTestFailure, one_test_failure_list, true, true)
 {
-    CHECK_EQUAL(0,0);
-    CHECK_NOT_EQUAL(0,1);
+    CHECK_EQUAL(0, 0);
+    CHECK_NOT_EQUAL(0, 1);
     CHECK(false); // <--- Failure
-    CHECK_LESS(0,1);
-    CHECK_GREATER(1,0);
+    CHECK_LESS(0, 1);
+    CHECK_GREATER(1, 0);
 }
 
 
@@ -104,52 +104,52 @@ TestList few_tests_success_list, few_tests_failure_list;
 
 TEST_EX(FewTestsSuccess_1, few_tests_success_list, true, true)
 {
-    CHECK_EQUAL(0,0);
-    CHECK_NOT_EQUAL(0,1);
-    CHECK_LESS(0,1);
-    CHECK_GREATER(1,0);
+    CHECK_EQUAL(0, 0);
+    CHECK_NOT_EQUAL(0, 1);
+    CHECK_LESS(0, 1);
+    CHECK_GREATER(1, 0);
 }
 
 TEST_EX(FewTestsSuccess_2, few_tests_success_list, true, true)
 {
-    CHECK_EQUAL(0,0);
-    CHECK_NOT_EQUAL(0,1);
+    CHECK_EQUAL(0, 0);
+    CHECK_NOT_EQUAL(0, 1);
     CHECK(true); // <--- Success
-    CHECK_LESS(0,1);
-    CHECK_GREATER(1,0);
+    CHECK_LESS(0, 1);
+    CHECK_GREATER(1, 0);
 }
 
 TEST_EX(FewTestsSuccess_3, few_tests_success_list, true, true)
 {
-    CHECK_EQUAL(0,0);
-    CHECK_NOT_EQUAL(0,1);
-    CHECK_LESS(0,1);
-    CHECK_GREATER(1,0);
+    CHECK_EQUAL(0, 0);
+    CHECK_NOT_EQUAL(0, 1);
+    CHECK_LESS(0, 1);
+    CHECK_GREATER(1, 0);
 }
 
 TEST_EX(FewTestsFailure_1, few_tests_failure_list, true, true)
 {
-    CHECK_EQUAL(0,0);
-    CHECK_NOT_EQUAL(0,1);
-    CHECK_LESS(0,1);
-    CHECK_GREATER(1,0);
+    CHECK_EQUAL(0, 0);
+    CHECK_NOT_EQUAL(0, 1);
+    CHECK_LESS(0, 1);
+    CHECK_GREATER(1, 0);
 }
 
 TEST_EX(FewTestsFailure_2, few_tests_failure_list, true, true)
 {
-    CHECK_EQUAL(0,0);
-    CHECK_NOT_EQUAL(0,1);
+    CHECK_EQUAL(0, 0);
+    CHECK_NOT_EQUAL(0, 1);
     CHECK(false); // <--- Failure
-    CHECK_LESS(0,1);
-    CHECK_GREATER(1,0);
+    CHECK_LESS(0, 1);
+    CHECK_GREATER(1, 0);
 }
 
 TEST_EX(FewTestsFailure_3, few_tests_failure_list, true, true)
 {
-    CHECK_EQUAL(0,0);
-    CHECK_NOT_EQUAL(0,1);
-    CHECK_LESS(0,1);
-    CHECK_GREATER(1,0);
+    CHECK_EQUAL(0, 0);
+    CHECK_NOT_EQUAL(0, 1);
+    CHECK_LESS(0, 1);
+    CHECK_GREATER(1, 0);
 }
 
 
@@ -157,18 +157,18 @@ TestList mixed_list;
 
 TEST_EX(Mixed_1_X, mixed_list, true, true)
 {
-    CHECK_EQUAL(0,0);
-    CHECK_NOT_EQUAL(0,1);
-    CHECK_LESS(0,1);
-    CHECK_GREATER(1,0);
+    CHECK_EQUAL(0, 0);
+    CHECK_NOT_EQUAL(0, 1);
+    CHECK_LESS(0, 1);
+    CHECK_GREATER(1, 0);
 }
 
 TEST_EX(Mixed_2_Y, mixed_list, true, true)
 {
-    CHECK_EQUAL(0,0);
-    CHECK_EQUAL(0,1);         // <--- Failure
-    CHECK_LESS(0,1);
-    CHECK_GREATER(1,0);
+    CHECK_EQUAL(0, 0);
+    CHECK_EQUAL(0, 1);        // <--- Failure
+    CHECK_LESS(0, 1);
+    CHECK_GREATER(1, 0);
 }
 
 TEST_EX(Mixed_3_X, mixed_list, true, true)
@@ -177,17 +177,17 @@ TEST_EX(Mixed_3_X, mixed_list, true, true)
 
 TEST_EX(Mixed_4_Y, mixed_list, true, true)
 {
-    CHECK_NOT_EQUAL(0,0);     // <--- Failure
-    CHECK_EQUAL(0,1);         // <--- Failure
-    CHECK_GREATER_EQUAL(0,1); // <--- Failure
+    CHECK_NOT_EQUAL(0, 0);    // <--- Failure
+    CHECK_EQUAL(0, 1);        // <--- Failure
+    CHECK_GREATER_EQUAL(0, 1); // <--- Failure
 }
 
 TEST_EX(Mixed_5_X, mixed_list, true, true)
 {
-    CHECK_NOT_EQUAL(0,0);     // <--- Failure
-    CHECK_NOT_EQUAL(0,1);
-    CHECK_GREATER_EQUAL(0,1); // <--- Failure
-    CHECK_GREATER(1,0);
+    CHECK_NOT_EQUAL(0, 0);    // <--- Failure
+    CHECK_NOT_EQUAL(0, 1);
+    CHECK_GREATER_EQUAL(0, 1); // <--- Failure
+    CHECK_GREATER(1, 0);
 }
 
 TEST_EX(Mixed_6_Y, mixed_list, true, true)
@@ -196,10 +196,10 @@ TEST_EX(Mixed_6_Y, mixed_list, true, true)
 
 TEST_EX(Mixed_7_Y, mixed_list, true, true)
 {
-    CHECK_EQUAL(0,0);
-    CHECK_NOT_EQUAL(0,1);
-    CHECK_LESS(0,1);
-    CHECK_GREATER(1,0);
+    CHECK_EQUAL(0, 0);
+    CHECK_NOT_EQUAL(0, 1);
+    CHECK_LESS(0, 1);
+    CHECK_GREATER(1, 0);
 }
 
 
@@ -241,34 +241,34 @@ TEST_EX(Failure_Bool, failure_list, true, true) // Test #1, accum checks = 0 + 1
 
 TEST_EX(Success_Int, success_list, true, true) // Test #2, accum checks = 13 + 12 = 25
 {
-    CHECK_EQUAL(1,1);
-    CHECK_EQUAL(2,2);
-    CHECK_NOT_EQUAL(1,2);
-    CHECK_NOT_EQUAL(2,1);
-    CHECK_LESS(1,2);
-    CHECK_GREATER(2,1);
-    CHECK_LESS_EQUAL(1,1);
-    CHECK_LESS_EQUAL(1,2);
-    CHECK_LESS_EQUAL(2,2);
-    CHECK_GREATER_EQUAL(1,1);
-    CHECK_GREATER_EQUAL(2,1);
-    CHECK_GREATER_EQUAL(2,2);
+    CHECK_EQUAL(1, 1);
+    CHECK_EQUAL(2, 2);
+    CHECK_NOT_EQUAL(1, 2);
+    CHECK_NOT_EQUAL(2, 1);
+    CHECK_LESS(1, 2);
+    CHECK_GREATER(2, 1);
+    CHECK_LESS_EQUAL(1, 1);
+    CHECK_LESS_EQUAL(1, 2);
+    CHECK_LESS_EQUAL(2, 2);
+    CHECK_GREATER_EQUAL(1, 1);
+    CHECK_GREATER_EQUAL(2, 1);
+    CHECK_GREATER_EQUAL(2, 2);
 }
 
 TEST_EX(Failure_Int, failure_list, true, true) // Test #2, accum checks = 13 + 12 = 25
 {
-    CHECK_EQUAL(1,2);
-    CHECK_EQUAL(2,1);
-    CHECK_NOT_EQUAL(1,1);
-    CHECK_NOT_EQUAL(2,2);
-    CHECK_LESS(1,1);
-    CHECK_LESS(2,1);
-    CHECK_LESS(2,2);
-    CHECK_GREATER(1,1);
-    CHECK_GREATER(1,2);
-    CHECK_GREATER(2,2);
-    CHECK_LESS_EQUAL(2,1);
-    CHECK_GREATER_EQUAL(1,2);
+    CHECK_EQUAL(1, 2);
+    CHECK_EQUAL(2, 1);
+    CHECK_NOT_EQUAL(1, 1);
+    CHECK_NOT_EQUAL(2, 2);
+    CHECK_LESS(1, 1);
+    CHECK_LESS(2, 1);
+    CHECK_LESS(2, 2);
+    CHECK_GREATER(1, 1);
+    CHECK_GREATER(1, 2);
+    CHECK_GREATER(2, 2);
+    CHECK_LESS_EQUAL(2, 1);
+    CHECK_GREATER_EQUAL(1, 2);
 }
 
 TEST_EX(Success_Float, success_list, true, true) // Test #3, accum checks = 25 + 32 = 57
@@ -392,8 +392,8 @@ TEST_EX(Success_String, success_list, true, true) // Test #4, accum checks = 57 
 
     // Check that we are not comparing pointers
     const char* t = "foo";
-    std::unique_ptr<char[]> t_1(new char[strlen(t)+1]);
-    std::unique_ptr<char[]> t_2(new char[strlen(t)+1]);
+    std::unique_ptr<char[]> t_1(new char[strlen(t) + 1]);
+    std::unique_ptr<char[]> t_2(new char[strlen(t) + 1]);
     std::copy(t, t + strlen(t) + 1, t_1.get());
     std::copy(t, t + strlen(t) + 1, t_2.get());
     CHECK_EQUAL(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_1.get()));
@@ -421,8 +421,8 @@ TEST_EX(Failure_String, failure_list, true, true) // Test #4, accum checks = 77 
 
     // Check that we are not comparing pointers
     const char* t = "foo";
-    std::unique_ptr<char[]> t_1(new char[strlen(t)+1]);
-    std::unique_ptr<char[]> t_2(new char[strlen(t)+1]);
+    std::unique_ptr<char[]> t_1(new char[strlen(t) + 1]);
+    std::unique_ptr<char[]> t_2(new char[strlen(t) + 1]);
     std::copy(t, t + strlen(t) + 1, t_1.get());
     std::copy(t, t + strlen(t) + 1, t_2.get());
     CHECK_NOT_EQUAL(const_cast<const char*>(t_1.get()), const_cast<const char*>(t_1.get()));

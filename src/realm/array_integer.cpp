@@ -34,7 +34,7 @@ void ArrayInteger::create(Array::Type type, bool context_flag)
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
 // Useful for counting-sort functions
 template<size_t w>
-bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t *min, int64_t *max) const
+bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t* min, int64_t* max) const
 {
     int64_t min2;
     int64_t max2;
@@ -139,13 +139,14 @@ void ArrayIntNull::init_from_parent() noexcept
 }
 
 namespace {
-    int64_t next_null_candidate(int64_t previous_candidate) {
-        uint64_t x = static_cast<uint64_t>(previous_candidate);
-        // Increment by a prime number. This guarantees that we will
-        // eventually hit every possible integer in the 2^64 range.
-        x += 0xfffffffbULL;
-        return util::from_twos_compl<int64_t>(x);
-    }
+int64_t next_null_candidate(int64_t previous_candidate)
+{
+    uint64_t x = static_cast<uint64_t>(previous_candidate);
+    // Increment by a prime number. This guarantees that we will
+    // eventually hit every possible integer in the 2^64 range.
+    x += 0xfffffffbULL;
+    return util::from_twos_compl<int64_t>(x);
+}
 }
 
 int_fast64_t ArrayIntNull::choose_random_null(int64_t incoming) const

@@ -67,7 +67,8 @@ inline OwnedData& OwnedData::operator=(const OwnedData& other)
         if (other.m_data) {
             m_data = std::unique_ptr<char[]>(new char[other.m_size]);
             memcpy(m_data.get(), other.m_data.get(), other.m_size);
-        } else {
+        }
+        else {
             m_data = nullptr;
         }
         m_size = other.m_size;

@@ -25,7 +25,8 @@
 using namespace realm;
 using namespace realm::util;
 
-static void help(const char* program) {
+static void help(const char* program)
+{
     std::cerr << "Usage: " << program << " <OUTPUT>\n";
     exit(1);
 }
