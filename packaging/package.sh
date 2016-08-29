@@ -30,7 +30,7 @@ fi
 
 mkdir -p ${src_path}/packaging/out
 cat <<-EOD > ${src_path}/packaging/out/packaging.list
-GIT_TAG=$GIT_TAG
+GIT_TAG=$git_tag
 VERSION=$VERSION
 ITERATION=$ITERATION
 EOD
