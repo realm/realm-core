@@ -36,8 +36,8 @@ parallelExecutors = [
   buildNodeOsx: doBuildNodeInOsx(),
   buildDotnetOsx: doBuildDotNetOsx(),
   buildAndroid: doBuildAndroid(),
-  addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
-  threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
+  addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
+  //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
 ]
 
 if (env.CHANGE_TARGET) {
