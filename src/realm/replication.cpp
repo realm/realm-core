@@ -48,8 +48,8 @@ public:
         m_logger = logger;
     }
 
-    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value,
-                 _impl::Instruction variant, size_t prior_num_rows)
+    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value, _impl::Instruction variant,
+                 size_t prior_num_rows)
     {
         static_cast<void>(prior_num_rows);
         static_cast<void>(variant);
@@ -103,8 +103,8 @@ public:
         return false;
     }
 
-    bool set_string(size_t col_ndx, size_t row_ndx, StringData value,
-                    _impl::Instruction variant, size_t prior_num_rows)
+    bool set_string(size_t col_ndx, size_t row_ndx, StringData value, _impl::Instruction variant,
+                    size_t prior_num_rows)
     {
         static_cast<void>(prior_num_rows);
         static_cast<void>(variant);
@@ -189,8 +189,7 @@ public:
         return false;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, size_t,
-                  _impl::Instruction)
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, size_t, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             if (target_row_ndx == realm::npos) {
@@ -676,10 +675,7 @@ public:
         return set_link(col_ndx, row_ndx, realm::npos, target_group_level_ndx, _impl::instr_Set);
     }
 
-    bool link_list_nullify(size_t link_ndx, size_t prior_size)
-    {
-        return link_list_erase(link_ndx, prior_size);
-    }
+    bool link_list_nullify(size_t link_ndx, size_t prior_size) { return link_list_erase(link_ndx, prior_size); }
 
 private:
     Group& m_group;

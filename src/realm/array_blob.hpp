@@ -36,8 +36,7 @@ public:
     bool is_null(size_t index) const noexcept;
     ref_type add(const char* data, size_t data_size, bool add_zero_term = false);
     void insert(size_t pos, const char* data, size_t data_size, bool add_zero_term = false);
-    ref_type replace(size_t begin, size_t end, const char* data, size_t data_size,
-                 bool add_zero_term = false);
+    ref_type replace(size_t begin, size_t end, const char* data, size_t data_size, bool add_zero_term = false);
     void erase(size_t begin, size_t end);
 
     /// Get the specified element without the cost of constructing an

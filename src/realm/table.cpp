@@ -2911,8 +2911,7 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_defa
     }
 
     if (Replication* repl = get_repl())
-        repl->set_int(this, col_ndx, ndx, value,
-                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        repl->set_int(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 Timestamp Table::get_timestamp(size_t col_ndx, size_t ndx) const noexcept
@@ -2936,8 +2935,7 @@ void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value, bool is_d
 
     if (Replication* repl = get_repl()) {
         if (value.is_null())
-            repl->set_null(this, col_ndx, ndx,
-                      is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+            repl->set_null(this, col_ndx, ndx, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
         else
             repl->set_timestamp(this, col_ndx, ndx, value,
                                 is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
@@ -2968,8 +2966,7 @@ void Table::set_bool(size_t col_ndx, size_t ndx, bool value, bool is_default)
     }
 
     if (Replication* repl = get_repl())
-        repl->set_bool(this, col_ndx, ndx, value,
-                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        repl->set_bool(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 
@@ -3017,8 +3014,7 @@ void Table::set_float(size_t col_ndx, size_t ndx, float value, bool is_default)
     col.set(ndx, value);
 
     if (Replication* repl = get_repl())
-        repl->set_float(this, col_ndx, ndx, value,
-                        is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        repl->set_float(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 
@@ -3314,8 +3310,7 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value, bool is_default)
     }
 
     if (Replication* repl = get_repl())
-        repl->set_mixed(this, col_ndx, ndx, value,
-                        is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        repl->set_mixed(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 
@@ -3456,8 +3451,7 @@ void Table::set_null(size_t col_ndx, size_t row_ndx, bool is_default)
     col.set_null(row_ndx);
 
     if (Replication* repl = get_repl())
-        repl->set_null(this, col_ndx, row_ndx,
-                       is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+        repl->set_null(this, col_ndx, row_ndx, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
 

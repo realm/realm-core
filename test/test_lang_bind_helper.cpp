@@ -7822,10 +7822,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) const
-            {
-                throw ObserverError();
-            }
+            bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) const { throw ObserverError(); }
         } parser(test_context);
 
         LangBindHelper::advance_read(sg, parser);
@@ -8726,8 +8723,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
                 return true;
             }
 
-            bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t,
-                          _impl::Instruction)
+            bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t, _impl::Instruction)
             {
                 CHECK_EQUAL(2, get_current_table());
                 CHECK_EQUAL(0, col_ndx);
