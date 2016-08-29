@@ -417,7 +417,7 @@ public:
                 using tf = _impl::TableFriend;
                 Table* link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
                 LinkTargetInfo link(link_target_table, backlink_col_ndx);
-                tf::insert_column(*m_desc, col_ndx, type, name, link); // Throws
+                tf::insert_column_unless_exists(*m_desc, col_ndx, type, name, link); // Throws
                 return true;
             }
         }
