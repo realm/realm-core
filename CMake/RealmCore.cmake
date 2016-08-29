@@ -17,6 +17,7 @@
 ###########################################################################
 
 include(ExternalProject)
+include(ProcessorCount)
 
 if(${CMAKE_GENERATOR} STREQUAL "Unix Makefiles")
     set(MAKE_EQUAL_MAKE "MAKE=$(MAKE)")
@@ -26,6 +27,11 @@ set(MAKE_FLAGS "REALM_HAVE_CONFIG=1")
 
 if(SANITIZER_FLAGS)
   set(MAKE_FLAGS ${MAKE_FLAGS} "EXTRA_CFLAGS=${SANITIZER_FLAGS}" "EXTRA_LDFLAGS=${SANITIZER_FLAGS}")
+endif()
+
+ProcessorCount(NUM_JOBS)
+if(NOT NUM_JOBS EQUAL 0)
+    set(MAKE_FLAGS ${MAKE_FLAGS} "-j${NUM_JOBS}")
 endif()
 
 if (${CMAKE_VERSION} VERSION_GREATER "3.4.0")
