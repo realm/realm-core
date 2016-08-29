@@ -6500,6 +6500,8 @@ TEST(Table_RemoveSubstring)
 
 TEST(Table_SwapRowsThenMoveLastOverWithBacklinks)
 {
+    // Attempts to trigger bug where LinkColumn::swap_rows() would only swap its backlinks but forgot
+    // to swap its own values
     Group g;
     TableRef t1 = g.add_table("t1");
     TableRef t2 = g.add_table("t2");
@@ -6511,8 +6513,11 @@ TEST(Table_SwapRowsThenMoveLastOverWithBacklinks)
 
     t2->set_link(0, 0, 0);
     t2->set_link(0, 1, 1);
+
     t2->swap_rows(0, 1);
+    t2->verify();
     t2->move_last_over(0);
+    t2->verify();
 }
 
 

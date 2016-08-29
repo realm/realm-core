@@ -139,6 +139,10 @@ void LinkColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         size_t target_row_ndx = to_size_t(value_2 - 1);
         m_backlink_column->swap_backlinks(target_row_ndx, row_ndx_1, row_ndx_2);
     }
+
+    set(row_ndx_1, value_2);
+    set(row_ndx_2, value_1);
+
 }
 
 
