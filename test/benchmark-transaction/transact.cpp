@@ -18,7 +18,7 @@
 
 #include <iostream>
 #include <unistd.h>
-#include <stdlib.h>
+#include <cstdlib>
 #include <stdio.h>
 #include <fcntl.h>
 #include <assert.h>

@@ -25,7 +25,7 @@
 #include <cstring>
 #include <cstddef>
 #include <cstdio>
-#include <stdlib.h>
+#include <cstdlib>
 
 #ifdef _WIN32
     #define NOMINMAX

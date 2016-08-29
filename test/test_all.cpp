@@ -23,7 +23,7 @@
 
 #include <time.h>
 #include <cstring>
-#include <stdlib.h>
+#include <cstdlib>
 #include <algorithm>
 #include <stdexcept>
 #include <tuple>

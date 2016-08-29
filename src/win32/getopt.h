@@ -63,7 +63,7 @@
 /* All the headers include this file. */
 #include <crtdefs.h>
 #include <errno.h>
-#include <stdlib.h>
+#include <cstdlib>
 #include <cstring>
 #include <cstdarg>
 #include <cstdio>
