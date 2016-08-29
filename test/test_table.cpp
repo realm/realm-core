@@ -6497,6 +6497,17 @@ TEST(Table_RemoveSubstring)
     }
 }
 
+
+TEST(Table_NullableLinkColumn)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    t1->add_column_link(type_Link, "l", *t1);
+
+    CHECK(t1->is_nullable(0));
+}
+
+
 TEST(Table_RowAccessor_Null)
 {
     Table table;
