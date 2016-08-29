@@ -88,7 +88,7 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     if (value.is_null() && legacy_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
-    int_fast64_t start = ndx ? m_offsets.get(ndx-1) : 0;
+    int_fast64_t start = ndx ? m_offsets.get(ndx - 1) : 0;
     int_fast64_t current_end = m_offsets.get(ndx);
     size_t stored_size = value.size();
     if (add_zero_term)
@@ -109,14 +109,14 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
     if (value.is_null() && legacy_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
-    size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t pos = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
 
     size_t stored_size = value.size();
     if (add_zero_term)
         ++stored_size;
     m_offsets.insert(ndx, pos + stored_size);
-    m_offsets.adjust(ndx+1, m_offsets.size(), stored_size);
+    m_offsets.adjust(ndx + 1, m_offsets.size(), stored_size);
 
     if (!legacy_array_type())
         m_nulls.insert(ndx, value.is_null());
@@ -126,7 +126,7 @@ void ArrayBinary::erase(size_t ndx)
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
-    size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t start = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     size_t end = to_size_t(m_offsets.get(ndx));
 
     m_blob.erase(start, end);
@@ -160,7 +160,7 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) no
     const char* blob_header = alloc.translate(to_ref(p.second));
     size_t begin, end;
     if (ndx) {
-        p = get_two(offsets_header, ndx-1);
+        p = get_two(offsets_header, ndx - 1);
         begin = to_size_t(p.first);
         end   = to_size_t(p.second);
     }

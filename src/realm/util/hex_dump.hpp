@@ -37,13 +37,13 @@ std::string hex_dump(const T* data, size_t size, const char* separator = " ", in
     using U = typename std::make_unsigned<T>::type;
 
     if (min_digits < 0)
-        min_digits = (std::numeric_limits<U>::digits+3) / 4;
+        min_digits = (std::numeric_limits<U>::digits + 3) / 4;
 
     std::ostringstream out;
-    for (const T* i = data; i != data+size; ++i) {
+    for (const T* i = data; i != data + size; ++i) {
         if (i != data)
             out << separator;
-        out << std::setw(min_digits)<<std::setfill('0')<<std::hex<<std::uppercase <<
+        out << std::setw(min_digits) << std::setfill('0') << std::hex << std::uppercase <<
             util::promote(U(*i));
     }
     return out.str();

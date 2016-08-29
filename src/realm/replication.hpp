@@ -35,7 +35,7 @@
 
 namespace realm {
 namespace util {
-    class Logger;
+class Logger;
 }
 
 // FIXME: Be careful about the possibility of one modification function being called by another where both do transaction logging.
@@ -47,8 +47,8 @@ namespace util {
 /// Replication is enabled by passing an instance of an implementation of this
 /// class to the SharedGroup constructor.
 class Replication:
-        public _impl::TransactLogConvenientEncoder,
-        protected _impl::TransactLogStream {
+    public _impl::TransactLogConvenientEncoder,
+    protected _impl::TransactLogStream {
 public:
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.

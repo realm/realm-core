@@ -30,11 +30,11 @@ using namespace realm;
 using namespace realm::util;
 
 namespace {
-    struct Foo {
-        void func() {}
-        void modify() { c = 123; }
-        char c;
-    };
+struct Foo {
+    void func() {}
+    void modify() { c = 123; }
+    char c;
+};
 }
 
 TEST(Utils_SharedPtr)

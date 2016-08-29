@@ -18,7 +18,7 @@
 
 // #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
-#  include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
+    #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
 #include <time.h>
@@ -52,12 +52,12 @@
 // like an unknown number of file descriptors can be left behind, presumably due
 // the way asynchronous DNS lookup is implemented.
 #if !defined _WIN32 && !REALM_PLATFORM_APPLE
-#  define ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
+    #define ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
 #endif
 
 #ifdef ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
-#  include <unistd.h>
-#  include <fcntl.h>
+    #include <unistd.h>
+    #include <fcntl.h>
 #endif
 
 using namespace realm;
@@ -126,10 +126,10 @@ void fix_max_open_files()
             long new_soft_limit = hard_limit < 0 ? 4096 : hard_limit;
             if (new_soft_limit > soft_limit) {
                 set_soft_rlimit(resource_NumOpenFiles, new_soft_limit);
-/*
+                /*
                 std::cout << "\n"
                     "MaxOpenFiles: "<<soft_limit<<" --> "<<new_soft_limit<<"\n";
-*/
+                */
             }
         }
     }
@@ -235,8 +235,8 @@ void display_build_config()
 #if REALM_ENABLE_ENCRYPTION
     bool always_encrypt = is_always_encrypt_enabled();
     const char* encryption = always_encrypt ?
-        "Enabled at compile-time (always encrypt = yes)" :
-        "Enabled at compile-time (always encrypt = no)";
+                             "Enabled at compile-time (always encrypt = yes)" :
+                             "Enabled at compile-time (always encrypt = no)";
 #else
     const char* encryption = "Disabled at compile-time";
 #endif
@@ -254,29 +254,29 @@ void display_build_config()
 #endif
 
     const char* cpu_sse = realm::sseavx<42>() ? "4.2" :
-        (realm::sseavx<30>() ? "3.0" : "None");
+                          (realm::sseavx<30>() ? "3.0" : "None");
 
     const char* cpu_avx = realm::sseavx<1>() ? "Yes" : "No";
 
     std::cout <<
-        "\n"
-        "Realm version: "<<Version::get_version()<<" with Debug "<<with_debug<<"\n"
-        "Encryption: "<<encryption<<"\n"
-        "\n"
-        "REALM_MAX_BPNODE_SIZE = "<<REALM_MAX_BPNODE_SIZE<<"\n"
-        "REALM_MEMDEBUG = " << memdebug << "\n"
-        "\n"
-        // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
-        // We decide to print size_t here
-        "sizeof (size_t) * 8 = " << (sizeof(size_t) * 8) << "\n"
-        "\n"
-        "Compiler supported SSE (auto detect):       " << compiler_sse << "\n"
-        "This CPU supports SSE (auto detect):        " << cpu_sse << "\n"
-        "Compiler supported AVX (auto detect):       " << compiler_avx << "\n"
-        "This CPU supports AVX (AVX1) (auto detect): " << cpu_avx << "\n"
-        "\n"
-        "Unit test random seed:                      " << unit_test_random_seed << "\n"
-        "\n";
+              "\n"
+              "Realm version: " << Version::get_version() << " with Debug " << with_debug << "\n"
+              "Encryption: " << encryption << "\n"
+              "\n"
+              "REALM_MAX_BPNODE_SIZE = " << REALM_MAX_BPNODE_SIZE << "\n"
+              "REALM_MEMDEBUG = " << memdebug << "\n"
+              "\n"
+              // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
+              // We decide to print size_t here
+              "sizeof (size_t) * 8 = " << (sizeof(size_t) * 8) << "\n"
+              "\n"
+              "Compiler supported SSE (auto detect):       " << compiler_sse << "\n"
+              "This CPU supports SSE (auto detect):        " << cpu_sse << "\n"
+              "Compiler supported AVX (auto detect):       " << compiler_avx << "\n"
+              "This CPU supports AVX (AVX1) (auto detect): " << cpu_avx << "\n"
+              "\n"
+              "Unit test random seed:                      " << unit_test_random_seed << "\n"
+              "\n";
 }
 
 
@@ -321,7 +321,7 @@ public:
             out.imbue(std::locale::classic());
             out << details.test_name;
             if (context.num_recurrences > 1)
-                out << '#' << (r.recurrence_index+1);
+                out << '#' << (r.recurrence_index + 1);
             std::string name = out.str();
             std::string time = Timer::format(r.elapsed_seconds);
             rows.emplace_back(name, time);
@@ -336,10 +336,10 @@ public:
         std::cout.fill('-');
         std::cout << "\nTop " << n << " time usage:\n" << std::setw(int(full_width)) << "" << "\n";
         std::cout.fill(' ');
-        for (const auto& row: rows) {
+        for (const auto& row : rows) {
             std::cout <<
-                std::left  << std::setw(int(name_col_width)) << std::get<0>(row) <<
-                std::right << std::setw(int(time_col_width)) << std::get<1>(row) << "\n";
+                      std::left  << std::setw(int(name_col_width)) << std::get<0>(row) <<
+                      std::right << std::setw(int(time_col_width)) << std::get<1>(row) << "\n";
         }
     }
 
@@ -388,7 +388,7 @@ bool run_tests(util::Logger* logger)
             if (bad)
                 throw std::runtime_error("Bad number of threads");
             if (config.num_threads > 1)
-                std::cout << "Number of test threads: "<<config.num_threads<<"\n\n";
+                std::cout << "Number of test threads: "<< config.num_threads << "\n\n";
         }
     }
 
@@ -401,7 +401,7 @@ bool run_tests(util::Logger* logger)
             in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
             in >> config.num_repetitions;
             bool bad = !in || in.get() != std::char_traits<char>::eof() ||
-                config.num_repetitions < 0;
+                       config.num_repetitions < 0;
             if (bad)
                 throw std::runtime_error("Bad number of repetitions");
         }
@@ -540,7 +540,7 @@ int test_all(int argc, char* argv[], util::Logger* logger)
         REALM_ASSERT(num_open_files_2 >= 0);
         if (num_open_files_2 > num_open_files) {
             long n = num_open_files_2 - num_open_files;
-            std::cerr << "ERROR: "<<n<<" file descriptors were leaked\n";
+            std::cerr << "ERROR: " << n << " file descriptors were leaked\n";
             success = false;
         }
     }

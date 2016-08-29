@@ -64,7 +64,7 @@ public:
 private:
     template<size_t w>
     bool minmax(size_t from, size_t to, uint64_t maxdiff,
-                                   int64_t* min, int64_t* max) const;
+                int64_t* min, int64_t* max) const;
 };
 
 class ArrayIntNull: public Array {
@@ -116,7 +116,7 @@ public:
     int64_t sum(size_t start = 0, size_t end = npos) const;
     size_t count(int64_t value) const noexcept;
     bool maximum(int64_t& result, size_t start = 0, size_t end = npos,
-        size_t* return_ndx = nullptr) const;
+                 size_t* return_ndx = nullptr) const;
     bool minimum(int64_t& result, size_t start = 0, size_t end = npos,
                  size_t* return_ndx = nullptr) const;
 
@@ -154,7 +154,7 @@ public:
     // setting up state initialization etc
     template<class cond>
     size_t find_first(value_type value, size_t start = 0,
-                           size_t end = npos) const;
+                      size_t end = npos) const;
 
     void find_all(IntegerColumn* result, value_type value, size_t col_offset = 0,
                   size_t begin = 0, size_t end = npos) const;
@@ -177,7 +177,7 @@ protected:
 private:
     template<bool find_max>
     bool minmax_helper(int64_t& result, size_t start = 0, size_t end = npos,
-                         size_t* return_ndx = nullptr) const;
+                       size_t* return_ndx = nullptr) const;
 
     int_fast64_t choose_random_null(int64_t incoming) const;
     void replace_nulls_with(int64_t new_null);

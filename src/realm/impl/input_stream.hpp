@@ -58,7 +58,7 @@ public:
     }
     size_t read(char* buffer, size_t size) override
     {
-        size_t n = std::min(size, size_t(m_end-m_ptr));
+        size_t n = std::min(size, size_t(m_end - m_ptr));
         const char* begin = m_ptr;
         m_ptr += n;
         const char* end = m_ptr;

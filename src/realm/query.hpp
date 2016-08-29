@@ -29,9 +29,9 @@
 #define REALM_MULTITHREAD_QUERY 0
 
 #if REALM_MULTITHREAD_QUERY
-// FIXME: Use our C++ thread abstraction API since it provides a much
-// higher level of encapsulation and safety.
-#include <pthread.h>
+    // FIXME: Use our C++ thread abstraction API since it provides a much
+    // higher level of encapsulation and safety.
+    #include <pthread.h>
 #endif
 
 #include <realm/views.hpp>
@@ -146,7 +146,7 @@ public:
     Query& less_float(size_t column_ndx1, size_t column_ndx2);
     Query& less_equal_float(size_t column_ndx1, size_t column_ndx2);
 
-     // Conditions: double
+    // Conditions: double
     Query& equal(size_t column_ndx, double value);
     Query& not_equal(size_t column_ndx, double value);
     Query& greater(size_t column_ndx, double value);
@@ -184,17 +184,17 @@ public:
     Query& between_olddatetime(size_t column_ndx, OldDateTime from, OldDateTime to) { return between(column_ndx, int64_t(from.get_olddatetime()), int64_t(to.get_olddatetime())); }
 
     // Conditions: strings
-    Query& equal(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive=true);
-    Query& contains(size_t column_ndx, StringData value, bool case_sensitive=true);
+    Query& equal(size_t column_ndx, StringData value, bool case_sensitive = true);
+    Query& not_equal(size_t column_ndx, StringData value, bool case_sensitive = true);
+    Query& begins_with(size_t column_ndx, StringData value, bool case_sensitive = true);
+    Query& ends_with(size_t column_ndx, StringData value, bool case_sensitive = true);
+    Query& contains(size_t column_ndx, StringData value, bool case_sensitive = true);
 
     // These are shortcuts for equal(StringData(c_str)) and
     // not_equal(StringData(c_str)), and are needed to avoid unwanted
     // implicit conversion of char* to bool.
-    Query& equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
-    Query& not_equal(size_t column_ndx, const char* c_str, bool case_sensitive=true);
+    Query& equal(size_t column_ndx, const char* c_str, bool case_sensitive = true);
+    Query& not_equal(size_t column_ndx, const char* c_str, bool case_sensitive = true);
 
     // Conditions: binary data
     Query& equal(size_t column_ndx, BinaryData value);
@@ -221,12 +221,12 @@ public:
 
 
     // Searching
-    size_t         find(size_t begin_at_table_row=size_t(0));
-    TableView      find_all(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1));
-    ConstTableView find_all(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+    size_t         find(size_t begin_at_table_row = size_t(0));
+    TableView      find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1));
+    ConstTableView find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
 
     // Aggregates
-    size_t count(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+    size_t count(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
 
     int64_t sum_int(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
                     size_t limit = size_t(-1)) const;
@@ -265,24 +265,24 @@ public:
                           size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
     OldDateTime maximum_olddatetime(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
-                              size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
+                                    size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
     OldDateTime minimum_olddatetime(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
-                              size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
+                                    size_t limit = size_t(-1), size_t* return_ndx = nullptr) const;
 
     Timestamp maximum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start = 0, size_t end = size_t(-1),
                                 size_t limit = size_t(-1));
 
-    Timestamp minimum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start = 0, size_t end = size_t(-1), 
+    Timestamp minimum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start = 0, size_t end = size_t(-1),
                                 size_t limit = size_t(-1));
 
     // Deletion
-    size_t  remove(size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1));
+    size_t  remove(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1));
 
 #if REALM_MULTITHREAD_QUERY
     // Multi-threading
-    TableView      find_all_multi(size_t start = 0, size_t end=size_t(-1));
-    ConstTableView find_all_multi(size_t start = 0, size_t end=size_t(-1)) const;
+    TableView      find_all_multi(size_t start = 0, size_t end = size_t(-1));
+    ConstTableView find_all_multi(size_t start = 0, size_t end = size_t(-1)) const;
     int            set_threads(unsigned int threadcount);
 #endif
 
@@ -302,8 +302,8 @@ private:
     Query(Table& table, TableViewBase* tv = nullptr);
     void create();
 
-    void   init() const;
-    size_t find_internal(size_t start = 0, size_t end=size_t(-1)) const;
+    void init() const;
+    size_t find_internal(size_t start = 0, size_t end = size_t(-1)) const;
     size_t peek_tableview(size_t tv_index) const;
     void handle_pending_not();
     void set_table(TableRef tr);
@@ -313,15 +313,13 @@ private:
 public:
     using HandoverPatch = QueryHandoverPatch;
 
-    std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                              ConstSourcePayload mode) const
+    std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch, ConstSourcePayload mode) const
     {
         patch.reset(new HandoverPatch);
         return std::make_unique<Query>(*this, *patch, mode);
     }
 
-    std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                              MutableSourcePayload mode)
+    std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch, MutableSourcePayload mode)
     {
         patch.reset(new HandoverPatch);
         return std::make_unique<Query>(*this, *patch, mode);
@@ -364,7 +362,7 @@ private:
 
     template<typename T, bool Nullable>
     double average(size_t column_ndx, size_t* resultcount = nullptr, size_t start = 0,
-                   size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+                   size_t end = size_t(-1), size_t limit = size_t(-1)) const;
 
     template<Action action, typename T, typename R, class ColClass>
     R aggregate(R (ColClass::*method)(size_t, size_t, size_t, size_t*) const,
@@ -375,7 +373,7 @@ private:
                             ParentNode* pn, QueryStateBase* st,
                             size_t start, size_t end, SequentialGetterBase* source_column) const;
 
-    void find_all(TableViewBase& tv, size_t start = 0, size_t end=size_t(-1), size_t limit = size_t(-1)) const;
+    void find_all(TableViewBase& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
     void delete_nodes() noexcept;
 
     bool has_conditions() const { return m_groups.size() > 0 && m_groups[0].m_root_node; }

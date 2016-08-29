@@ -408,7 +408,7 @@ inline void MixedColumn::clear()
 }
 
 inline size_t MixedColumn::get_size_from_ref(ref_type root_ref,
-                                                  Allocator& alloc) noexcept
+                                             Allocator& alloc) noexcept
 {
     const char* root_header = alloc.translate(root_ref);
     ref_type types_ref = to_ref(Array::get(root_header, 0));

@@ -99,10 +99,7 @@ public:
     // Public member variables do not have a 'm_' prefix.
     int baz;
 
-    MyClass(...):
-        Base(...),
-        m_bar(7),
-        ...
+    MyClass(...) : Base(...), m_bar(7)
     {
         // ...
     }
@@ -165,7 +162,7 @@ bool is_last = false;
 
 // Use of 'auto' keyword:
 //
-// 'auto' should *not* be used for trivial cases where the type declaration 
+// 'auto' should *not* be used for trivial cases where the type declaration
 // is short, non-templated, and non-derived (type_t, int64_t, std::string,
 // etc.
 

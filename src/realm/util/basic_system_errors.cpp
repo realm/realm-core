@@ -43,7 +43,7 @@ const char* system_category::name() const noexcept
 std::string system_category::message(int value) const
 {
     const size_t max_msg_size = 256;
-    char buffer[max_msg_size+1];
+    char buffer[max_msg_size + 1];
 
 #ifdef _WIN32 // Windows version
 

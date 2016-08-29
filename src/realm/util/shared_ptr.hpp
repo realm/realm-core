@@ -25,8 +25,7 @@ namespace realm {
 namespace util {
 
 template<class T>
-class SharedPtr
-{
+class SharedPtr {
 public:
     SharedPtr(T* p)
     {
@@ -48,7 +47,8 @@ public:
         incref();
     }
 
-    SharedPtr<T>& operator=(const SharedPtr<T>& o) {
+    SharedPtr<T>& operator=(const SharedPtr<T>& o)
+    {
         if (m_ptr == o.m_ptr)
             return *this;
         decref();
