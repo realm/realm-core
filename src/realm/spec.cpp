@@ -152,7 +152,7 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
     m_attr.insert(column_ndx, attr); // Throws
 
     bool is_subspec_type = type == col_type_Table || type == col_type_Link ||
-        type == col_type_LinkList || type == col_type_BackLink;
+                           type == col_type_LinkList || type == col_type_BackLink;
     if (is_subspec_type) {
         Allocator& alloc = m_top.get_alloc();
         // `m_subspecs` array is only present when the spec contains a subtable column
@@ -291,10 +291,10 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
 size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx == get_column_count() ||
-                   get_column_type(column_ndx) == col_type_Table    ||
-                   get_column_type(column_ndx) == col_type_Link     ||
-                   get_column_type(column_ndx) == col_type_LinkList ||
-                   get_column_type(column_ndx) == col_type_BackLink );
+                 get_column_type(column_ndx) == col_type_Table    ||
+                 get_column_type(column_ndx) == col_type_Link     ||
+                 get_column_type(column_ndx) == col_type_LinkList ||
+                 get_column_type(column_ndx) == col_type_BackLink );
 
     return get_subspec_ndx_after(column_ndx, column_ndx);
 }
@@ -387,8 +387,8 @@ size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx < get_column_count());
     REALM_ASSERT(get_column_type(column_ndx) == col_type_Link ||
-                   get_column_type(column_ndx) == col_type_LinkList ||
-                   get_column_type(column_ndx) == col_type_BackLink);
+                 get_column_type(column_ndx) == col_type_LinkList ||
+                 get_column_type(column_ndx) == col_type_BackLink);
 
     // Group-level index of opposite table is stored as tagged int in the
     // subspecs array
@@ -407,8 +407,8 @@ void Spec::set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx)
 {
     REALM_ASSERT(column_ndx < get_column_count());
     REALM_ASSERT(get_column_type(column_ndx) == col_type_Link ||
-                   get_column_type(column_ndx) == col_type_LinkList ||
-                   get_column_type(column_ndx) == col_type_BackLink);
+                 get_column_type(column_ndx) == col_type_LinkList ||
+                 get_column_type(column_ndx) == col_type_BackLink);
 
     // position of target table is stored as tagged int
     size_t tagged_ndx = (table_ndx << 1) + 1;
@@ -427,7 +427,7 @@ void Spec::set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col
     size_t tagged_ndx = (origin_col_ndx << 1) + 1;
 
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
-    m_subspecs.set(subspec_ndx+1, tagged_ndx); // Throws
+    m_subspecs.set(subspec_ndx + 1, tagged_ndx); // Throws
 }
 
 
@@ -438,7 +438,7 @@ size_t Spec::get_origin_column_ndx(size_t backlink_col_ndx) const noexcept
 
     // Origin column is stored as second tagged int in the subspecs array
     size_t subspec_ndx = get_subspec_ndx(backlink_col_ndx);
-    int64_t tagged_value = m_subspecs.get(subspec_ndx+1);
+    int64_t tagged_value = m_subspecs.get(subspec_ndx + 1);
     REALM_ASSERT(tagged_value != 0); // can't retrieve it if never set
 
     size_t origin_col_ndx = size_t(uint64_t(tagged_value) >> 1);
@@ -456,9 +456,7 @@ size_t Spec::find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx
     int64_t tagged_column_ndx = (origin_col_ndx << 1) + 1;
 
     for (size_t i = backlinks_start; i < count; i += 2) {
-        if (m_subspecs.get(i)   == tagged_table_ndx &&
-            m_subspecs.get(i+1) == tagged_column_ndx)
-        {
+        if (m_subspecs.get(i) == tagged_table_ndx && m_subspecs.get(i + 1) == tagged_column_ndx) {
             size_t pos = (i - backlinks_start) / 2;
             return backlinks_column_start + pos;
         }
@@ -518,19 +516,16 @@ bool Spec::operator==(const Spec& spec) const noexcept
     const size_t column_count = get_column_count();
     for (size_t col_ndx = 0; col_ndx < column_count; ++col_ndx) {
         ColumnType col_type = ColumnType(m_types.get(col_ndx));
-        switch (col_type)
-        {
+        switch (col_type) {
             case col_type_String:
-            case col_type_StringEnum:
-            {
+            case col_type_StringEnum: {
                 // These types are considered equal as col_type_StringEnum is used for an internal optimization only
                 const int64_t rhs_type = spec.m_types.get(col_ndx);
                 if (rhs_type != col_type_String && rhs_type != col_type_StringEnum)
                     return false;
                 break;
             }
-            case col_type_Table:
-            {
+            case col_type_Table: {
                 // Sub tables must be compared recursively
                 const size_t subspec_index = get_subspec_ndx(col_ndx);
                 const Spec lhs = Spec(const_cast<Spec&>(*this).get_subspec_by_ndx(subspec_index));
@@ -540,8 +535,7 @@ bool Spec::operator==(const Spec& spec) const noexcept
                 break;
             }
             case col_type_Link:
-            case col_type_LinkList:
-            {
+            case col_type_LinkList: {
                 // In addition to name and attributes, the link target table must also be compared
                 const size_t lhs_table_ndx = get_opposite_link_table_ndx(col_ndx);
                 const size_t rhs_table_ndx = spec.get_opposite_link_table_ndx(col_ndx);
@@ -605,7 +599,7 @@ void Spec::to_dot(std::ostream& out, StringData title) const
     for (size_t i = 0; i < num_cols; ++i) {
         ColumnType type = ColumnType(m_types.get(i));
         if (type == col_type_Table || type == col_type_Link
-            || type == col_type_LinkList || type == col_type_BackLink) {
+                || type == col_type_LinkList || type == col_type_BackLink) {
             have_subspecs = true;
             break;
         }

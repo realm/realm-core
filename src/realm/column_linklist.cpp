@@ -68,13 +68,13 @@ void LinkListColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
 
     // Remove backlinks to the removed origin rows
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
-        if (ref_type ref = get_as_ref(row_ndx+i)) {
+        if (ref_type ref = get_as_ref(row_ndx + i)) {
             if (!broken_reciprocal_backlinks) {
                 IntegerColumn link_list(get_alloc(), ref);
                 size_t n = link_list.size();
                 for (size_t j = 0; j < n; ++j) {
                     size_t target_row_ndx = to_size_t(link_list.get(j));
-                    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx+i);
+                    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx + i);
                 }
             }
             Array::destroy_deep(ref, get_alloc());
@@ -299,7 +299,7 @@ void LinkListColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
 
 
 void LinkListColumn::cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf,
-                                                               CascadeState& state)
+        CascadeState& state)
 {
     size_t target_table_ndx = m_target_table->get_index_in_group();
 
@@ -519,7 +519,7 @@ void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noex
         }
     }
 
-     m_list_accessors.erase(erased_begin, erased_end);
+    m_list_accessors.erase(erased_begin, erased_end);
 
     validate_list_accessors();
 }
@@ -663,8 +663,8 @@ void LinkListColumn::validate_list_accessors() const noexcept
     auto end = m_list_accessors.end();
     REALM_ASSERT_DEBUG(std::is_sorted(begin, end));
     REALM_ASSERT_DEBUG(end == std::adjacent_find(begin, end, [](const list_entry& a, const list_entry& b) {
-        return a.m_row_ndx == b.m_row_ndx;
-    }));
+                           return a.m_row_ndx == b.m_row_ndx;
+                       }));
 #endif
 }
 
@@ -681,9 +681,8 @@ void LinkListColumn::prune_list_accessor_tombstones() noexcept
     // to prune_list_accessor_tombstones() there is *no* guarantee that all tombstones
     // have been removed. It is merely a best effort at reducing the size of the
     // vector.
-    auto remove_from = std::remove_if(m_list_accessors.begin(), m_list_accessors.end(), [](const list_entry& e) {
-            return e.m_list.expired();
-    });
+    auto remove_from = std::remove_if(m_list_accessors.begin(), m_list_accessors.end(),
+                                      [](const list_entry& e) { return e.m_list.expired(); });
     m_list_accessors.erase(remove_from, m_list_accessors.end());
 }
 
@@ -739,7 +738,7 @@ void LinkListColumn::verify(const Table& table, size_t col_ndx) const
         typedef std::vector<BacklinkColumn::VerifyPair>::const_iterator iter;
         BacklinkColumn::VerifyPair search_value;
         search_value.origin_row_ndx = i;
-        std::pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
+        std::pair<iter, iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
         for (iter j = range.first; j != range.second; ++j)
             links_2.insert(j->target_row_ndx);
         REALM_ASSERT(links_1 == links_2);

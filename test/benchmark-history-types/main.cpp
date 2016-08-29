@@ -85,9 +85,9 @@ public:
             WriteTransaction wt(*writer_shared_group);
             TableRef table = wt.get_table("table");
             for (size_t j = 0; j < num_modifications; ++j) {
-                size_t col_ndx = (j+i) % num_cols;
+                size_t col_ndx = (j + i) % num_cols;
                 size_t row_ndx =
-                    (size_t((double(num_rows-1) / num_modifications-1) * j) + i) % num_rows;
+                    (size_t((double(num_rows - 1) / num_modifications - 1) * j) + i) % num_rows;
                 table->set_int(col_ndx, row_ndx, 262144L + long(j) + long(i));
             }
             wt.commit();
@@ -179,7 +179,7 @@ int main()
 
     Timer timer(Timer::type_UserTime);
     {
-/*
+        /*
         for (int i = 0; i != 1; ++i) {
             PeakFileSizeTask task;
             timer.reset();
@@ -187,7 +187,7 @@ int main()
             results.submit("dummy", timer);
         }
         results.finish("dummy", "Dummy");
-*/
+        */
         // No readers (no grow)
         for (int i = 0; i != 25; ++i) {
             Task task(0, false);

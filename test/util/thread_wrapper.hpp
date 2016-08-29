@@ -46,7 +46,7 @@ public:
     {
         std::string except_msg;
         if (join(except_msg)) {
-            std::cerr << "Exception thrown in thread: "<<except_msg<<"\n";
+            std::cerr << "Exception thrown in thread: " << except_msg << "\n";
             return true;
         }
         return false;

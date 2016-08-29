@@ -22,7 +22,7 @@
 using namespace realm;
 
 REALM_TABLE_1(TestTable,
-                value, Int)
+              value, Int)
 
 int main()
 {

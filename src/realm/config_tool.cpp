@@ -48,7 +48,7 @@ void clear_emit_flags()
 
 bool dirty = false;
 
-void emit_flags(const char*str)
+void emit_flags(const char* str)
 {
     if (dirty)
         std::cout << ' ';
@@ -166,9 +166,9 @@ int main(int argc, char* argv[])
         }
 
         if (empty || error || help) {
-	    const char* prog = argv[0];
+            const char* prog = argv[0];
             std::string msg =
-                "Synopsis: "+std::string(prog)+"\n\n"
+                "Synopsis: " + std::string(prog) + "\n\n"
                 "Options:\n"
                 "  --version     Show the version of Realm that this command was installed\n"
                 "                as part of\n"

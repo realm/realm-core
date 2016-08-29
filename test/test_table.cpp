@@ -99,16 +99,14 @@ REALM_TABLE_7(MainTableType,
 TEST(Table_ManyColumnsCrash2)
 {
     // Trying to reproduce Java crash.
-    for (int a = 0; a < 10; a++)
-    {
+    for (int a = 0; a < 10; a++) {
         Group group;
 
         MainTableType::Ref mainTable = group.add_table<MainTableType>("PatientTable");
         TableRef dynPatientTable = group.add_table("PatientTable");
         dynPatientTable->add_empty_row();
 
-        for (int counter = 0; counter < 20000; counter++)
-        {
+        for (int counter = 0; counter < 20000; counter++) {
 #if 0
             // Add row to subtable through typed interface
             SubtableType::Ref subtable = mainTable[0].events->get_table_ref();
@@ -124,8 +122,8 @@ TEST(Table_ManyColumnsCrash2)
             REALM_ASSERT(subtable2->is_attached());
 
 #endif
-            if((counter % 1000) == 0){
-           //     std::cerr << counter << "\n";
+            if ((counter % 1000) == 0) {
+                //     std::cerr << counter << "\n";
             }
         }
     }
@@ -296,8 +294,8 @@ TEST(Table_1)
     // Test adding multiple rows
     ndx = table.add_empty_row(7);
     for (size_t i = ndx; i < 7; ++i) {
-        table.set_int(0, i, 2*i);
-        table.set_int(1, i, 20*i);
+        table.set_int(0, i, 2 * i);
+        table.set_int(1, i, 20 * i);
     }
 
     for (size_t i = ndx; i < 7; ++i) {
@@ -413,13 +411,13 @@ TEST(Table_Floats)
     // Test adding multiple rows
     ndx = table.add_empty_row(7);
     for (size_t i = ndx; i < 7; ++i) {
-        table.set_float(0, i, float(1.12) + 100*i);
-        table.set_double(1, i, double(102.13)*200*i);
+        table.set_float(0, i, float(1.12) + 100 * i);
+        table.set_double(1, i, double(102.13) * 200 * i);
     }
 
     for (size_t i = ndx; i < 7; ++i) {
-        const float v1  = float(1.12) + 100*i;
-        const double v2 = double(102.13)*200*i;
+        const float v1  = float(1.12) + 100 * i;
+        const double v2 = double(102.13) * 200 * i;
         CHECK_EQUAL(v1, table.get_float(0, i));
         CHECK_EQUAL(v2, table.get_double(1, i));
     }
@@ -605,7 +603,7 @@ TEST(Table_GetName)
         DescriptorRef subdesc;
         table.add_column(type_Table, "sub", &subdesc);
         table.add_empty_row();
-        TableRef subtab = table.get_subtable(0,0);
+        TableRef subtab = table.get_subtable(0, 0);
         CHECK_EQUAL("", table.get_name());
         CHECK_EQUAL("", subtab->get_name());
     }
@@ -616,7 +614,7 @@ TEST(Table_GetName)
         DescriptorRef subdesc;
         table->add_column(type_Table, "sub", &subdesc);
         table->add_empty_row();
-        TableRef subtab = table->get_subtable(0,0);
+        TableRef subtab = table->get_subtable(0, 0);
         CHECK_EQUAL("table", table->get_name());
         CHECK_EQUAL("", subtab->get_name());
     }
@@ -651,14 +649,14 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
     table.add_empty_row(rows);
 
     for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i%2 == 0) ? 1 : -1;
-        table.set_int(0, i, int64_t(i*sign));
+        int64_t sign = (i % 2 == 0) ? 1 : -1;
+        table.set_int(0, i, int64_t(i * sign));
 
         if (i % 4 == 0) {
             table.set_null(12, i);
         }
         else {
-            table.set_int(12, i, int64_t(i*sign));
+            table.set_int(12, i, int64_t(i * sign));
         }
     }
     for (size_t i = 0; i < rows; ++i)
@@ -666,12 +664,12 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
     for (size_t i = 0; i < rows; ++i)
         table.set_olddatetime(2, i, 12345);
     for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i%2 == 0) ? 1 : -1;
-        table.set_float(3, i, 123.456f*sign);
+        int64_t sign = (i % 2 == 0) ? 1 : -1;
+        table.set_float(3, i, 123.456f * sign);
     }
     for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i%2 == 0) ? 1 : -1;
-        table.set_double(4, i, 9876.54321*sign);
+        int64_t sign = (i % 2 == 0) ? 1 : -1;
+        table.set_double(4, i, 9876.54321 * sign);
     }
     std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
@@ -716,26 +714,26 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
     for (size_t i = 0; i < rows; ++i)
         table.set_binary(9, i, BinaryData("binary", 7));
     for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i%2 == 0) ? 1 : -1;
+        int64_t sign = (i % 2 == 0) ? 1 : -1;
         size_t n = sub_rows;
         if (!fixed_subtab_sizes)
             n += i;
         for (size_t j = 0; j != n; ++j) {
             TableRef subtable = table.get_subtable(10, i);
-            int64_t val = -123+i*j*1234*sign;
+            int64_t val = -123 + i * j * 1234 * sign;
             subtable->insert_empty_row(j);
             subtable->set_int(0, j, val);
             subtable->set_string(1, j, "sub");
         }
     }
     for (size_t i = 0; i < rows; ++i) {
-        int64_t sign = (i%2 == 0) ? 1 : -1;
+        int64_t sign = (i % 2 == 0) ? 1 : -1;
         switch (i % 8) {
             case 0:
                 table.set_mixed(11, i, false);
                 break;
             case 1:
-                table.set_mixed(11, i, int64_t(i*i*sign));
+                table.set_mixed(11, i, int64_t(i * i * sign));
                 break;
             case 2:
                 table.set_mixed(11, i, "string");
@@ -756,16 +754,16 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows,
                 subtable->add_column(type_String, "second");
                 for (size_t j = 0; j != 2; ++j) {
                     subtable->insert_empty_row(j);
-                    subtable->set_int(0, j, i*i*j*sign);
+                    subtable->set_int(0, j, i * i * j * sign);
                     subtable->set_string(1, j, "mixed sub");
                 }
                 break;
             }
             case 6:
-                table.set_mixed(11, i, float(123.1*i*sign));
+                table.set_mixed(11, i, float(123.1 * i * sign));
                 break;
             case 7:
-                table.set_mixed(11, i, double(987.65*i*sign));
+                table.set_mixed(11, i, double(987.65 * i * sign));
                 break;
         }
     }
@@ -920,7 +918,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
 
     parent.add_empty_row(); // Create a degenerate subtable
 
-    ConstTableRef degen_child = parent.get_subtable(0,0); // NOTE: Constness is essential here!!!
+    ConstTableRef degen_child = parent.get_subtable(0, 0); // NOTE: Constness is essential here!!!
 
     CHECK_EQUAL(0, degen_child->size());
     CHECK_EQUAL(10, degen_child->get_column_count());
@@ -1049,7 +1047,7 @@ TEST(Table_Range)
     TableView tv = table.get_range_view(10, 20);
     CHECK_EQUAL(10, tv.size());
     for (size_t i = 0; i < tv.size(); ++i)
-        CHECK_EQUAL(int64_t(i+10), tv.get_int(0, i));
+        CHECK_EQUAL(int64_t(i + 10), tv.get_int(0, i));
 }
 
 TEST(Table_RangeConst)
@@ -1065,8 +1063,8 @@ TEST(Table_RangeConst)
     ConstTableRef ctable = group.get_table("test");
     ConstTableView tv = ctable->get_range_view(10, 20);
     CHECK_EQUAL(10, tv.size());
-    for (size_t i = 0; i<tv.size(); ++i)
-        CHECK_EQUAL(int64_t(i+10), tv.get_int(0, i));
+    for (size_t i = 0; i < tv.size(); ++i)
+        CHECK_EQUAL(int64_t(i + 10), tv.get_int(0, i));
 }
 
 
@@ -1810,29 +1808,29 @@ TEST(Table_AutoEnumeration)
 
     for (size_t i = 0; i < 5; ++i) {
         const size_t n = i * 5;
-        CHECK_EQUAL(1, table[0+n].first);
-        CHECK_EQUAL(2, table[1+n].first);
-        CHECK_EQUAL(5, table[2+n].first);
-        CHECK_EQUAL(8, table[3+n].first);
-        CHECK_EQUAL(9, table[4+n].first);
+        CHECK_EQUAL(1, table[0 + n].first);
+        CHECK_EQUAL(2, table[1 + n].first);
+        CHECK_EQUAL(5, table[2 + n].first);
+        CHECK_EQUAL(8, table[3 + n].first);
+        CHECK_EQUAL(9, table[4 + n].first);
 
-        CHECK_EQUAL("abd",     table[0+n].second);
-        CHECK_EQUAL("eftg",    table[1+n].second);
-        CHECK_EQUAL("hijkl",   table[2+n].second);
-        CHECK_EQUAL("mnopqr",  table[3+n].second);
-        CHECK_EQUAL("stuvxyz", table[4+n].second);
+        CHECK_EQUAL("abd",     table[0 + n].second);
+        CHECK_EQUAL("eftg",    table[1 + n].second);
+        CHECK_EQUAL("hijkl",   table[2 + n].second);
+        CHECK_EQUAL("mnopqr",  table[3 + n].second);
+        CHECK_EQUAL("stuvxyz", table[4 + n].second);
 
-        CHECK_EQUAL(true, table[0+n].third);
-        CHECK_EQUAL(true, table[1+n].third);
-        CHECK_EQUAL(true, table[2+n].third);
-        CHECK_EQUAL(true, table[3+n].third);
-        CHECK_EQUAL(true, table[4+n].third);
+        CHECK_EQUAL(true, table[0 + n].third);
+        CHECK_EQUAL(true, table[1 + n].third);
+        CHECK_EQUAL(true, table[2 + n].third);
+        CHECK_EQUAL(true, table[3 + n].third);
+        CHECK_EQUAL(true, table[4 + n].third);
 
-        CHECK_EQUAL(Mon, table[0+n].fourth);
-        CHECK_EQUAL(Tue, table[1+n].fourth);
-        CHECK_EQUAL(Wed, table[2+n].fourth);
-        CHECK_EQUAL(Thu, table[3+n].fourth);
-        CHECK_EQUAL(Fri, table[4+n].fourth);
+        CHECK_EQUAL(Mon, table[0 + n].fourth);
+        CHECK_EQUAL(Tue, table[1 + n].fourth);
+        CHECK_EQUAL(Wed, table[2 + n].fourth);
+        CHECK_EQUAL(Thu, table[3 + n].fourth);
+        CHECK_EQUAL(Fri, table[4 + n].fourth);
     }
 
     // Verify counts
@@ -1946,7 +1944,7 @@ TEST(Table_OptimizeSubtable)
         // Non-enumerable
         TestSubtabEnum2::Ref r = t[0].subtab;
         std::string s;
-        for (int i=0; i<100; ++i) {
+        for (int i = 0; i < 100; ++i) {
             r->add(s.c_str());
             s += 'x';
         }
@@ -1955,7 +1953,7 @@ TEST(Table_OptimizeSubtable)
     {
         // Enumerable
         TestSubtabEnum2::Ref r = t[1].subtab;
-        for (int i=0; i<100; ++i) {
+        for (int i = 0; i < 100; ++i) {
             r->add("foo");
         }
         r->optimize();
@@ -1983,10 +1981,10 @@ TEST(Table_OptimizeSubtable)
 TEST(Table_OptimizeCompare)
 {
     TestSubtabEnum2 t1, t2;
-    for (int i=0; i<100; ++i) {
+    for (int i = 0; i < 100; ++i) {
         t1.add("foo");
     }
-    for (int i=0; i<100; ++i) {
+    for (int i = 0; i < 100; ++i) {
         t2.add("foo");
     }
     t1.optimize();
@@ -2733,7 +2731,7 @@ TEST(Table_Mixed)
     CHECK_EQUAL(type_Bool,    table.get_mixed(1, 0).get_type());
     CHECK_EQUAL(type_Int,     table.get_mixed(1, 1).get_type());
     CHECK_EQUAL(type_String,  table.get_mixed(1, 2).get_type());
-    CHECK_EQUAL(type_OldDateTime,table.get_mixed(1, 3).get_type());
+    CHECK_EQUAL(type_OldDateTime, table.get_mixed(1, 3).get_type());
     CHECK_EQUAL(true,   table.get_mixed(1, 0).get_bool());
     CHECK_EQUAL(12,     table.get_mixed(1, 1).get_int());
     CHECK_EQUAL("test", table.get_mixed(1, 2).get_string());
@@ -2873,39 +2871,39 @@ TEST(Table_SubtableSizeAndClear)
     Table subtable;
     table.set_mixed_subtable(1, 1, &subtable);
 
-    CHECK_EQUAL(0, table.get_subtable_size(0,0)); // Subtable column
-    CHECK_EQUAL(0, table.get_subtable_size(1,0)); // Mixed column, bool value
-    CHECK_EQUAL(0, table.get_subtable_size(1,1)); // Mixed column, table value
+    CHECK_EQUAL(0, table.get_subtable_size(0, 0)); // Subtable column
+    CHECK_EQUAL(0, table.get_subtable_size(1, 0)); // Mixed column, bool value
+    CHECK_EQUAL(0, table.get_subtable_size(1, 1)); // Mixed column, table value
 
-    CHECK(table.get_subtable(0,0));  // Subtable column
-    CHECK(!table.get_subtable(1,0)); // Mixed column, bool value, must return nullptr
-    CHECK(table.get_subtable(1,1));  // Mixed column, table value
+    CHECK(table.get_subtable(0, 0)); // Subtable column
+    CHECK(!table.get_subtable(1, 0)); // Mixed column, bool value, must return nullptr
+    CHECK(table.get_subtable(1, 1)); // Mixed column, table value
 
     table.set_mixed(1, 0, Mixed::subtable_tag());
     table.set_mixed(1, 1, false);
-    CHECK(table.get_subtable(1,0));
-    CHECK(!table.get_subtable(1,1));
+    CHECK(table.get_subtable(1, 0));
+    CHECK(!table.get_subtable(1, 1));
 
-    TableRef subtab1 = table.get_subtable(0,0);
-    TableRef subtab2 = table.get_subtable(1,0);
+    TableRef subtab1 = table.get_subtable(0, 0);
+    TableRef subtab2 = table.get_subtable(1, 0);
     subtab2->add_column(type_Int, "int");
 
-    CHECK_EQUAL(0, table.get_subtable_size(1,0));
-    CHECK(table.get_subtable(1,0));
+    CHECK_EQUAL(0, table.get_subtable_size(1, 0));
+    CHECK(table.get_subtable(1, 0));
 
     subtab1->insert_empty_row(0);
     subtab2->insert_empty_row(0);
 
-    CHECK_EQUAL(1, table.get_subtable_size(0,0));
-    CHECK_EQUAL(1, table.get_subtable_size(1,0));
+    CHECK_EQUAL(1, table.get_subtable_size(0, 0));
+    CHECK_EQUAL(1, table.get_subtable_size(1, 0));
 
-    table.clear_subtable(0,0);
-    table.clear_subtable(1,0);
+    table.clear_subtable(0, 0);
+    table.clear_subtable(1, 0);
 
-    CHECK_EQUAL(0, table.get_subtable_size(0,0));
-    CHECK_EQUAL(0, table.get_subtable_size(1,0));
+    CHECK_EQUAL(0, table.get_subtable_size(0, 0));
+    CHECK_EQUAL(0, table.get_subtable_size(1, 0));
 
-    CHECK(table.get_subtable(1,0));
+    CHECK(table.get_subtable(1, 0));
 }
 
 
@@ -3143,20 +3141,20 @@ TEST(Table_HighLevelSubtables)
     CHECK_EQUAL(ct[0].subtab[0].subtab[0].val,                              6);
     CHECK_EQUAL(ct.column().subtab[0]->column().subtab[0]->column().val[0], 6);
 
-/*
-  Idea for compile time failure tests:
+    /*
+      Idea for compile time failure tests:
 
-    const MyTable2 t;
-#if    TEST_INDEX == 0
-    t[0].val = 7;
-#elsif TEST_INDEX == 1
-    t.column().val[0] = 7;
-#elsif TEST_INDEX == 2
-    t[0].subtab[0].val = 7;
-#elsif TEST_INDEX == 3
-    t[0].subtab->column().val[0] = 7;
-#endif
-*/
+        const MyTable2 t;
+    #if    TEST_INDEX == 0
+        t[0].val = 7;
+    #elsif TEST_INDEX == 1
+        t.column().val[0] = 7;
+    #elsif TEST_INDEX == 2
+        t[0].subtab[0].val = 7;
+    #elsif TEST_INDEX == 3
+        t[0].subtab->column().val[0] = 7;
+    #endif
+    */
 }
 
 
@@ -3201,11 +3199,11 @@ TEST(Table_DateAndBinary)
 
         const size_t size = 10;
         char data[size];
-        for (size_t i=0; i<size; ++i) data[i] = static_cast<char>(i);
+        for (size_t i = 0; i < size; ++i) data[i] = static_cast<char>(i);
         t.add(8, BinaryData(data, size));
         CHECK_EQUAL(t[0].date, 8);
         CHECK_EQUAL(t[0].bin.size(), size);
-        CHECK(std::equal(t[0].bin.data(), t[0].bin.data()+size, data));
+        CHECK(std::equal(t[0].bin.data(), t[0].bin.data() + size, data));
     }
 
     // Test that 64-bit dates are preserved
@@ -3283,14 +3281,14 @@ TEST(Table_SetSubTableByExample1)
     // create a freestanding table to be used as a source by set_subtable
 
     Table  sub = Table();
-    sub.add_column(type_Int,"sub_first");
-    sub.add_column(type_String,"sub_second");
+    sub.add_column(type_Int, "sub_first");
+    sub.add_column(type_String, "sub_second");
     sub.add_empty_row();
-    sub.set_int(0,0,42);
-    sub.set_string(1,0,"forty two");
+    sub.set_int(0, 0, 42);
+    sub.set_string(1, 0, "forty two");
     sub.add_empty_row();
-    sub.set_int(0,1,3);
-    sub.set_string(1,1,"PI");
+    sub.set_int(0, 1, 3);
+    sub.set_string(1, 1, "PI");
 
     // Get the sub-table back for inspection
     {
@@ -3298,14 +3296,14 @@ TEST(Table_SetSubTableByExample1)
         CHECK(subtable->is_empty());
 
         //add a subtable into the row, resembling the sub we just created
-        table->set_subtable(2,0,&sub);
+        table->set_subtable(2, 0, &sub);
 
         TableRef subtable2 = table->get_subtable(2, 0);
 
         CHECK_EQUAL(42,     subtable2->get_int(0, 0));
         CHECK_EQUAL("forty two", subtable2->get_string(1, 0));
         CHECK_EQUAL(3,     subtable2->get_int(0, 1));
-        CHECK_EQUAL("PI", subtable2->get_string(1,1));
+        CHECK_EQUAL("PI", subtable2->get_string(1, 1));
     }
 }
 
@@ -3338,18 +3336,18 @@ TEST(Table_SetSubTableByExample2)
     table->set_string(1, 1, "Hi!, Hello?");
 
     Table  sub = Table();
-    sub.add_column(type_Int,"sub_first");
-    sub.add_column(type_String,"sub_second");
+    sub.add_column(type_Int, "sub_first");
+    sub.add_column(type_String, "sub_second");
     sub.add_empty_row();
-    sub.set_int(0,0,42);
-    sub.set_string(1,0,"forty two");
+    sub.set_int(0, 0, 42);
+    sub.set_string(1, 0, "forty two");
     sub.add_empty_row();
-    sub.set_int(0,1,3);
-    sub.set_string(1,1,"PI");
+    sub.set_int(0, 1, 3);
+    sub.set_string(1, 1, "PI");
 
     //create a tableview with the table as source
 
-    TableView view = table->find_all_int(0,8);//select the second of the two rows
+    TableView view = table->find_all_int(0, 8); //select the second of the two rows
 
     // Verify the sub table is empty
     {
@@ -3357,7 +3355,7 @@ TEST(Table_SetSubTableByExample2)
         CHECK(subtable->is_empty());
 
         //add a subtable into the second table row (first view row), resembling the sub we just created
-        view.set_subtable(2,0,&sub);
+        view.set_subtable(2, 0, &sub);
 
         TableRef subtable2 = view.get_subtable(2, 0);//fetch back the subtable from the view
 
@@ -3365,14 +3363,14 @@ TEST(Table_SetSubTableByExample2)
         CHECK_EQUAL(42,     subtable2->get_int(0, 0));
         CHECK_EQUAL("forty two", subtable2->get_string(1, 0));
         CHECK_EQUAL(3,     subtable2->get_int(0, 1));
-        CHECK_EQUAL("PI", subtable2->get_string(1,1));
+        CHECK_EQUAL("PI", subtable2->get_string(1, 1));
 
         TableRef subtable3 = table->get_subtable(2, 1);//fetch back the subtable from the table.
 
         CHECK_EQUAL(42,     subtable3->get_int(0, 0));
         CHECK_EQUAL("forty two", subtable3->get_string(1, 0));
         CHECK_EQUAL(3,     subtable3->get_int(0, 1));
-        CHECK_EQUAL("PI", subtable3->get_string(1,1));
+        CHECK_EQUAL("PI", subtable3->get_string(1, 1));
     }
 }
 
@@ -3407,13 +3405,13 @@ REALM_TABLE_3(TableAgg,
               c_float, Float,
               c_double, Double)
 
-                // TODO: Bool? OldDateTime
+// TODO: Bool? OldDateTime
 } // anonymous namespace
 
 #if TEST_DURATION > 0
-#define TBL_SIZE REALM_MAX_BPNODE_SIZE*10
+    #define TBL_SIZE REALM_MAX_BPNODE_SIZE*10
 #else
-#define TBL_SIZE 10
+    #define TBL_SIZE 10
 #endif
 
 TEST(Table_Aggregates)
@@ -3448,13 +3446,13 @@ TEST(Table_Aggregates)
     CHECK_EQUAL(11.0f, table.column().c_float.maximum());
     CHECK_EQUAL(12.0, table.column().c_double.maximum());
     // sum
-    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.column().c_int.sum()), 10*epsilon);
-    CHECK_APPROXIMATELY_EQUAL(f_sum, table.column().c_float.sum(),  10*epsilon);
-    CHECK_APPROXIMATELY_EQUAL(d_sum, table.column().c_double.sum(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.column().c_int.sum()), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum, table.column().c_float.sum(),  10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum, table.column().c_double.sum(), 10 * epsilon);
     // average
-    CHECK_APPROXIMATELY_EQUAL(i_sum/size, table.column().c_int.average(),    10*epsilon);
-    CHECK_APPROXIMATELY_EQUAL(f_sum/size, table.column().c_float.average(),  10*epsilon);
-    CHECK_APPROXIMATELY_EQUAL(d_sum/size, table.column().c_double.average(), 10*epsilon);
+    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.column().c_int.average(),    10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.column().c_float.average(),  10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.column().c_double.average(), 10 * epsilon);
 }
 
 namespace {
@@ -3683,22 +3681,22 @@ TEST(Table_EmptyMinmax)
 
 TEST(Table_LanguageBindings)
 {
-   Table* table = LangBindHelper::new_table();
-   CHECK(table->is_attached());
+    Table* table = LangBindHelper::new_table();
+    CHECK(table->is_attached());
 
-   table->add_column(type_Int, "i");
-   table->insert_empty_row(0);
-   table->set_int(0, 0, 10);
-   table->insert_empty_row(1);
-   table->set_int(0, 1, 12);
+    table->add_column(type_Int, "i");
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 10);
+    table->insert_empty_row(1);
+    table->set_int(0, 1, 12);
 
-   Table* table2 = LangBindHelper::copy_table(*table);
-   CHECK(table2->is_attached());
+    Table* table2 = LangBindHelper::copy_table(*table);
+    CHECK(table2->is_attached());
 
-   CHECK(*table == *table2);
+    CHECK(*table == *table2);
 
-   LangBindHelper::unbind_table_ptr(table);
-   LangBindHelper::unbind_table_ptr(table2);
+    LangBindHelper::unbind_table_ptr(table);
+    LangBindHelper::unbind_table_ptr(table2);
 }
 
 TEST(Table_MultipleColumn)
@@ -3747,8 +3745,8 @@ TEST(Table_Pivot)
 
     for (size_t i = 0; i < count; ++i) {
         size_t sex = i % 2;
-        int64_t age =  3 + (i%117);
-        table.add((sex==0) ? "Male" : "Female", age, true);
+        int64_t age = 3 + (i % 117);
+        table.add((sex == 0) ? "Male" : "Female", age, true);
 
         age_sum[sex] += age;
         age_cnt[sex] += 1;
@@ -4013,7 +4011,7 @@ TEST(Table_WriteSlice)
     int table_sizes[] = { 0, 1, 2, 3, 5, 9, 27, 81, 82, 243, 729, 2187 };
 #endif
 
-    int num_sizes = sizeof table_sizes / sizeof *table_sizes;
+    int num_sizes = sizeof table_sizes / sizeof * table_sizes;
     for (int table_size_i = 0; table_size_i != num_sizes; ++table_size_i) {
         int table_size = table_sizes[table_size_i];
         Group group;
@@ -4055,22 +4053,22 @@ TEST(Table_Parent)
     TableRef subtab;
     size_t column_ndx = 0;
 
-    subtab = table->get_subtable(0,0);
+    subtab = table->get_subtable(0, 0);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(0, column_ndx);
     CHECK_EQUAL(0, subtab->get_parent_row_index());
 
-    subtab = table->get_subtable(0,1);
+    subtab = table->get_subtable(0, 1);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(0, column_ndx);
     CHECK_EQUAL(1, subtab->get_parent_row_index());
 
-    subtab = table->get_subtable(1,0);
+    subtab = table->get_subtable(1, 0);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(1, column_ndx);
     CHECK_EQUAL(0, subtab->get_parent_row_index());
 
-    subtab = table->get_subtable(1,1);
+    subtab = table->get_subtable(1, 1);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(1, column_ndx);
     CHECK_EQUAL(1, subtab->get_parent_row_index());
@@ -4079,22 +4077,22 @@ TEST(Table_Parent)
     // column is insert.
     table->insert_column(0, type_Int, "");
 
-    subtab = table->get_subtable(1,0);
+    subtab = table->get_subtable(1, 0);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(1, column_ndx);
     CHECK_EQUAL(0, subtab->get_parent_row_index());
 
-    subtab = table->get_subtable(1,1);
+    subtab = table->get_subtable(1, 1);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(1, column_ndx);
     CHECK_EQUAL(1, subtab->get_parent_row_index());
 
-    subtab = table->get_subtable(2,0);
+    subtab = table->get_subtable(2, 0);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(2, column_ndx);
     CHECK_EQUAL(0, subtab->get_parent_row_index());
 
-    subtab = table->get_subtable(2,1);
+    subtab = table->get_subtable(2, 1);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(2, column_ndx);
     CHECK_EQUAL(1, subtab->get_parent_row_index());
@@ -4103,22 +4101,22 @@ TEST(Table_Parent)
     // column is removed.
     table->remove_column(0);
 
-    subtab = table->get_subtable(0,0);
+    subtab = table->get_subtable(0, 0);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(0, column_ndx);
     CHECK_EQUAL(0, subtab->get_parent_row_index());
 
-    subtab = table->get_subtable(0,1);
+    subtab = table->get_subtable(0, 1);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(0, column_ndx);
     CHECK_EQUAL(1, subtab->get_parent_row_index());
 
-    subtab = table->get_subtable(1,0);
+    subtab = table->get_subtable(1, 0);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(1, column_ndx);
     CHECK_EQUAL(0, subtab->get_parent_row_index());
 
-    subtab = table->get_subtable(1,1);
+    subtab = table->get_subtable(1, 1);
     CHECK_EQUAL(table, subtab->get_parent_table(&column_ndx));
     CHECK_EQUAL(1, column_ndx);
     CHECK_EQUAL(1, subtab->get_parent_row_index());
@@ -4136,7 +4134,7 @@ TEST(Table_RegularSubtablesRetain)
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
     CHECK_EQUAL(1, parent->size());
-    TableRef subtab_0_0 = parent->get_subtable(0,0);
+    TableRef subtab_0_0 = parent->get_subtable(0, 0);
     CHECK_EQUAL(1, subtab_0_0->get_column_count());
     CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
     CHECK_EQUAL(0, subtab_0_0->size());
@@ -4154,15 +4152,15 @@ TEST(Table_RegularSubtablesRetain)
     CHECK_EQUAL(1, subtab_0_0->get_column_count());
     CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
     CHECK_EQUAL(1, subtab_0_0->size());
-    TableRef subtab_0_1 = parent->get_subtable(0,1);
+    TableRef subtab_0_1 = parent->get_subtable(0, 1);
     CHECK_EQUAL(1, subtab_0_1->get_column_count());
     CHECK_EQUAL(type_Int, subtab_0_1->get_column_type(0));
     CHECK_EQUAL(0, subtab_0_1->size());
-    TableRef subtab_1_0 = parent->get_subtable(1,0);
+    TableRef subtab_1_0 = parent->get_subtable(1, 0);
     CHECK_EQUAL(1, subtab_1_0->get_column_count());
     CHECK_EQUAL(type_Int, subtab_1_0->get_column_type(0));
     CHECK_EQUAL(0, subtab_1_0->size());
-    TableRef subtab_1_1 = parent->get_subtable(1,1);
+    TableRef subtab_1_1 = parent->get_subtable(1, 1);
     CHECK_EQUAL(1, subtab_1_1->get_column_count());
     CHECK_EQUAL(type_Int, subtab_1_1->get_column_type(0));
     CHECK_EQUAL(0, subtab_1_1->size());
@@ -4209,10 +4207,10 @@ TEST(Table_RegularSubtablesRetain)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10000,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10010.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11100,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11110.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(10000,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10010.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11100,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11110.0,  subtab_1_1->get_double (1, 0));
 
     // Insert a row and a column before all the subtables
     parent->insert_column(0, type_Table, "dummy_1");
@@ -4234,14 +4232,14 @@ TEST(Table_RegularSubtablesRetain)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10001,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10011.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11101,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11111.0,  subtab_1_1->get_double (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,2));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2,1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2,2));
+    CHECK_EQUAL(10001,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10011.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11101,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11111.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 2));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2, 1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2, 2));
 
     // Insert a row and a column between the subtables
     parent->insert_column(2, type_Int, "dummy_2");
@@ -4264,14 +4262,14 @@ TEST(Table_RegularSubtablesRetain)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10002,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10012.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11102,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11112.0,  subtab_1_1->get_double (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,3));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3,1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3,3));
+    CHECK_EQUAL(10002,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10012.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11102,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11112.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 3));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3, 1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3, 3));
 
     // Insert a column after the subtables
     parent->insert_column(4, type_Table, "dummy_3");
@@ -4294,14 +4292,14 @@ TEST(Table_RegularSubtablesRetain)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10003,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10013.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11103,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11113.0,  subtab_1_1->get_double (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,3));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3,1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3,3));
+    CHECK_EQUAL(10003,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10013.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11103,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11113.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 3));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3, 1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3, 3));
 
     // Remove the row and the column between the subtables
     parent->remove_column(2);
@@ -4320,14 +4318,14 @@ TEST(Table_RegularSubtablesRetain)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10004,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10014.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11104,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11114.0,  subtab_1_1->get_double (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,2));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2,1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2,2));
+    CHECK_EQUAL(10004,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10014.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11104,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11114.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 2));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2, 1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2, 2));
 
     // Remove the row and the column before the subtables
     parent->remove_column(0);
@@ -4341,14 +4339,14 @@ TEST(Table_RegularSubtablesRetain)
     CHECK_EQUAL(type_Table, parent->get_column_type(1));
     CHECK_EQUAL(type_Table, parent->get_column_type(2));
     CHECK_EQUAL(3, parent->size());
-    CHECK_EQUAL(10005,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10015.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11105,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11115.0,  subtab_1_1->get_double (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0,1));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1,0));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1,1));
+    CHECK_EQUAL(10005,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10015.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11105,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11115.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0, 1));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1, 1));
 
     // Remove the row and the column after the subtables
     parent->remove_column(2);
@@ -4361,14 +4359,14 @@ TEST(Table_RegularSubtablesRetain)
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
     CHECK_EQUAL(type_Table, parent->get_column_type(1));
     CHECK_EQUAL(2, parent->size());
-    CHECK_EQUAL(10006,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10016.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11106,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11116.0,  subtab_1_1->get_double (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0,1));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1,0));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1,1));
+    CHECK_EQUAL(10006,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10016.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11106,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11116.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0, 1));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1, 1));
 
     // Check that subtable accessors are detached when the subtables are removed
     parent->remove(1);
@@ -4380,10 +4378,10 @@ TEST(Table_RegularSubtablesRetain)
     CHECK(!subtab_0_1->is_attached());
     CHECK( subtab_1_0->is_attached());
     CHECK(!subtab_1_1->is_attached());
-    CHECK_EQUAL(10007,    subtab_0_0->get_int   (0,0));
-    CHECK_EQUAL(10017.0f, subtab_0_0->get_float (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1,0));
+    CHECK_EQUAL(10007,    subtab_0_0->get_int   (0, 0));
+    CHECK_EQUAL(10017.0f, subtab_0_0->get_float (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
     parent->remove_column(1);
     subtab_0_0->set_int   (0, 0, 10008);
     subtab_0_0->set_float (1, 0, 10018.0f);
@@ -4393,18 +4391,18 @@ TEST(Table_RegularSubtablesRetain)
     CHECK(!subtab_0_1->is_attached());
     CHECK(!subtab_1_0->is_attached());
     CHECK(!subtab_1_1->is_attached());
-    CHECK_EQUAL(10008,    subtab_0_0->get_int   (0,0));
-    CHECK_EQUAL(10018.0f, subtab_0_0->get_float (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
+    CHECK_EQUAL(10008,    subtab_0_0->get_int   (0, 0));
+    CHECK_EQUAL(10018.0f, subtab_0_0->get_float (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
 
     // Clear subtable
-    parent->clear_subtable(0,0);
+    parent->clear_subtable(0, 0);
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
     CHECK(subtab_0_0->is_attached());
     CHECK_EQUAL(2, subtab_0_0->get_column_count());
     CHECK_EQUAL(0, subtab_0_0->size());
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
 
     // Clear parent table
     parent->clear();
@@ -4419,10 +4417,10 @@ TEST(Table_RegularSubtablesRetain)
     parent->add_column(type_Table, "c", &subdesc);
     subdesc->add_column(type_String, "x");
     parent->add_empty_row(2);
-    subtab_0_0 = parent->get_subtable(0,0);
-    subtab_0_1 = parent->get_subtable(0,1);
-    subtab_1_0 = parent->get_subtable(1,0);
-    subtab_1_1 = parent->get_subtable(1,1);
+    subtab_0_0 = parent->get_subtable(0, 0);
+    subtab_0_1 = parent->get_subtable(0, 1);
+    subtab_1_0 = parent->get_subtable(1, 0);
+    subtab_1_1 = parent->get_subtable(1, 1);
     subtab_1_1->add_empty_row();
     subtab_1_1->set_string(0, 0, "pneumonoultramicroscopicsilicovolcanoconiosis");
     CHECK_EQUAL(2, parent->get_column_count());
@@ -4435,27 +4433,27 @@ TEST(Table_RegularSubtablesRetain)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0,0));
+    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0, 0));
     parent->remove(0);
     parent->remove_column(0);
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
-    subtab_1_1 = parent->get_subtable(0,0);
+    subtab_1_1 = parent->get_subtable(0, 0);
     CHECK(!subtab_0_0->is_attached());
     CHECK(!subtab_0_1->is_attached());
     CHECK(!subtab_1_0->is_attached());
     CHECK( subtab_1_1->is_attached());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0,0));
+    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0, 0));
 
     // Insert 2x2 new subtables, then remove them all together
     parent->add_column(type_Table, "d", &subdesc);
     subdesc->add_column(type_String, "x");
     parent->add_empty_row(2);
-    subtab_0_0 = parent->get_subtable(0,0);
-    subtab_0_1 = parent->get_subtable(0,1);
-    subtab_1_0 = parent->get_subtable(1,0);
-    subtab_1_1 = parent->get_subtable(1,1);
+    subtab_0_0 = parent->get_subtable(0, 0);
+    subtab_0_1 = parent->get_subtable(0, 1);
+    subtab_1_0 = parent->get_subtable(1, 0);
+    subtab_1_1 = parent->get_subtable(1, 1);
     subtab_1_1->add_empty_row();
     subtab_1_1->set_string(0, 0, "supercalifragilisticexpialidocious");
     parent->clear();
@@ -4469,7 +4467,7 @@ TEST(Table_RegularSubtablesRetain)
     // Insert 1x1 new subtable, then remove it by removing the last row
     parent->add_empty_row(1);
     parent->remove_column(0);
-    subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_0 = parent->get_subtable(0, 0);
     subtab_0_0->add_empty_row(1);
     subtab_0_0->set_string(0, 0, "brahmaputra");
     CHECK_EQUAL(1, parent->get_column_count());
@@ -4481,7 +4479,7 @@ TEST(Table_RegularSubtablesRetain)
     CHECK_EQUAL(type_String, subtab_0_0->get_column_type(0));
     CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
     CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL("brahmaputra", subtab_0_0->get_string(0,0));
+    CHECK_EQUAL("brahmaputra", subtab_0_0->get_string(0, 0));
     parent->remove(0);
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -4489,7 +4487,7 @@ TEST(Table_RegularSubtablesRetain)
 
     // Insert 1x1 new subtable, then remove it by removing the last column
     parent->add_empty_row(1);
-    subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_0 = parent->get_subtable(0, 0);
     subtab_0_0->add_empty_row(1);
     subtab_0_0->set_string(0, 0, "baikonur");
     CHECK_EQUAL(1, parent->get_column_count());
@@ -4501,7 +4499,7 @@ TEST(Table_RegularSubtablesRetain)
     CHECK_EQUAL(type_String, subtab_0_0->get_column_type(0));
     CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
     CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL("baikonur", subtab_0_0->get_string(0,0));
+    CHECK_EQUAL("baikonur", subtab_0_0->get_string(0, 0));
     parent->remove_column(0);
     CHECK_EQUAL(0, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -4516,7 +4514,7 @@ TEST(Table_MixedSubtablesRetain)
     parent->add_column(type_Mixed, "a");
     parent->add_empty_row();
     parent->set_mixed(0, 0, Mixed::subtable_tag());
-    TableRef subtab_0_0 = parent->get_subtable(0,0);
+    TableRef subtab_0_0 = parent->get_subtable(0, 0);
     subtab_0_0->add_column(type_Int, "x");
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
@@ -4529,14 +4527,14 @@ TEST(Table_MixedSubtablesRetain)
     subtab_0_0->add_empty_row();
     parent->add_column(type_Mixed, "b");
     parent->set_mixed(1, 0, Mixed::subtable_tag());
-    TableRef subtab_1_0 = parent->get_subtable(1,0);
+    TableRef subtab_1_0 = parent->get_subtable(1, 0);
     subtab_1_0->add_column(type_Int, "x");
     parent->add_empty_row();
     parent->set_mixed(0, 1, Mixed::subtable_tag());
-    TableRef subtab_0_1 = parent->get_subtable(0,1);
+    TableRef subtab_0_1 = parent->get_subtable(0, 1);
     subtab_0_1->add_column(type_Int, "x");
     parent->set_mixed(1, 1, Mixed::subtable_tag());
-    TableRef subtab_1_1 = parent->get_subtable(1,1);
+    TableRef subtab_1_1 = parent->get_subtable(1, 1);
     subtab_1_1->add_column(type_Int, "x");
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
@@ -4598,10 +4596,10 @@ TEST(Table_MixedSubtablesRetain)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10000,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10010.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11100,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11110.0,  subtab_1_1->get_double (1,0));
+    CHECK_EQUAL(10000,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10010.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11100,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11110.0,  subtab_1_1->get_double (1, 0));
 
     // Insert a row and a column before all the subtables
     parent->insert_column(0, type_Table, "dummy_1");
@@ -4623,21 +4621,21 @@ TEST(Table_MixedSubtablesRetain)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10001,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10011.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11101,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11111.0,  subtab_1_1->get_double (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,2));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2,1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2,2));
+    CHECK_EQUAL(10001,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10011.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11101,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11111.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 2));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2, 1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2, 2));
 
     // Insert a row and a column between the subtables
     parent->insert_column(2, type_Int, "dummy_2");
     parent->insert_empty_row(2);
     parent->set_mixed(3, 2, "Lopadotemachoselachogaleokranioleipsanodrimhypotrimmatosilphio"
-                        "paraomelitokatakechy­menokichlepikossyphophattoperisteralektryonopte"
-                        "kephalliokigklopeleiolagoiosiraiobaphetraganopterygon");
+                      "paraomelitokatakechy­menokichlepikossyphophattoperisteralektryonopte"
+                      "kephalliokigklopeleiolagoiosiraiobaphetraganopterygon");
     subtab_0_0->set_int    (0, 0, 10002);
     subtab_0_0->set_float  (1, 0, 10012.0f);
     subtab_1_1->set_int    (0, 0, 11102);
@@ -4656,14 +4654,14 @@ TEST(Table_MixedSubtablesRetain)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10002,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10012.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11102,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11112.0,  subtab_1_1->get_double (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,3));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3,1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3,3));
+    CHECK_EQUAL(10002,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10012.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11102,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11112.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 3));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3, 1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3, 3));
 
     // Insert a column after the subtables
     parent->insert_column(4, type_Table, "dummy_3");
@@ -4686,14 +4684,14 @@ TEST(Table_MixedSubtablesRetain)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10003,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10013.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11103,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11113.0,  subtab_1_1->get_double (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,3));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3,1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3,3));
+    CHECK_EQUAL(10003,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10013.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11103,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11113.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 3));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(3, 1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(3, 3));
 
     // Remove the row and the column between the subtables
     parent->remove_column(2);
@@ -4712,14 +4710,14 @@ TEST(Table_MixedSubtablesRetain)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10004,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10014.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11104,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11114.0,  subtab_1_1->get_double (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1,1));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1,2));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2,1));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2,2));
+    CHECK_EQUAL(10004,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10014.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11104,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11114.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 2));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(2, 1));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(2, 2));
 
     // Remove the row and the column before the subtables
     parent->remove_column(0);
@@ -4733,14 +4731,14 @@ TEST(Table_MixedSubtablesRetain)
     CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
     CHECK_EQUAL(type_Table, parent->get_column_type(2));
     CHECK_EQUAL(3, parent->size());
-    CHECK_EQUAL(10005,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10015.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11105,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11115.0,  subtab_1_1->get_double (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0,1));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1,0));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1,1));
+    CHECK_EQUAL(10005,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10015.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11105,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11115.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0, 1));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1, 1));
 
     // Remove the row and the column after the subtables
     parent->remove_column(2);
@@ -4753,14 +4751,14 @@ TEST(Table_MixedSubtablesRetain)
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
     CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
     CHECK_EQUAL(2, parent->size());
-    CHECK_EQUAL(10006,    subtab_0_0->get_int    (0,0));
-    CHECK_EQUAL(10016.0f, subtab_0_0->get_float  (1,0));
-    CHECK_EQUAL(11106,    subtab_1_1->get_int    (0,0));
-    CHECK_EQUAL(11116.0,  subtab_1_1->get_double (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
-    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0,1));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1,0));
-    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1,1));
+    CHECK_EQUAL(10006,    subtab_0_0->get_int    (0, 0));
+    CHECK_EQUAL(10016.0f, subtab_0_0->get_float  (1, 0));
+    CHECK_EQUAL(11106,    subtab_1_1->get_int    (0, 0));
+    CHECK_EQUAL(11116.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
+    CHECK_EQUAL(subtab_0_1, parent->get_subtable(0, 1));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
+    CHECK_EQUAL(subtab_1_1, parent->get_subtable(1, 1));
 
     // Check that subtable accessors are detached when the subtables are removed
     parent->remove(1);
@@ -4772,10 +4770,10 @@ TEST(Table_MixedSubtablesRetain)
     CHECK(!subtab_0_1->is_attached());
     CHECK( subtab_1_0->is_attached());
     CHECK(!subtab_1_1->is_attached());
-    CHECK_EQUAL(10007,    subtab_0_0->get_int   (0,0));
-    CHECK_EQUAL(10017.0f, subtab_0_0->get_float (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
-    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1,0));
+    CHECK_EQUAL(10007,    subtab_0_0->get_int   (0, 0));
+    CHECK_EQUAL(10017.0f, subtab_0_0->get_float (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
+    CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
     parent->remove_column(1);
     subtab_0_0->set_int   (0, 0, 10008);
     subtab_0_0->set_float (1, 0, 10018.0f);
@@ -4785,12 +4783,12 @@ TEST(Table_MixedSubtablesRetain)
     CHECK(!subtab_0_1->is_attached());
     CHECK(!subtab_1_0->is_attached());
     CHECK(!subtab_1_1->is_attached());
-    CHECK_EQUAL(10008,    subtab_0_0->get_int   (0,0));
-    CHECK_EQUAL(10018.0f, subtab_0_0->get_float (1,0));
-    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0,0));
+    CHECK_EQUAL(10008,    subtab_0_0->get_int   (0, 0));
+    CHECK_EQUAL(10018.0f, subtab_0_0->get_float (1, 0));
+    CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
 
     // Remove subtable
-    parent->clear_subtable(0,0);
+    parent->clear_subtable(0, 0);
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
     CHECK(!subtab_0_0->is_attached());
@@ -4808,10 +4806,10 @@ TEST(Table_MixedSubtablesRetain)
     parent->set_mixed(0, 1, Mixed::subtable_tag());
     parent->set_mixed(1, 0, Mixed::subtable_tag());
     parent->set_mixed(1, 1, Mixed::subtable_tag());
-    subtab_0_0 = parent->get_subtable(0,0);
-    subtab_0_1 = parent->get_subtable(0,1);
-    subtab_1_0 = parent->get_subtable(1,0);
-    subtab_1_1 = parent->get_subtable(1,1);
+    subtab_0_0 = parent->get_subtable(0, 0);
+    subtab_0_1 = parent->get_subtable(0, 1);
+    subtab_1_0 = parent->get_subtable(1, 0);
+    subtab_1_1 = parent->get_subtable(1, 1);
     CHECK(subtab_0_0);
     CHECK(subtab_0_1);
     CHECK(subtab_1_0);
@@ -4829,18 +4827,18 @@ TEST(Table_MixedSubtablesRetain)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0,0));
+    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0, 0));
     parent->remove(0);
     parent->remove_column(0);
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
-    subtab_1_1 = parent->get_subtable(0,0);
+    subtab_1_1 = parent->get_subtable(0, 0);
     CHECK(!subtab_0_0->is_attached());
     CHECK(!subtab_0_1->is_attached());
     CHECK(!subtab_1_0->is_attached());
     CHECK( subtab_1_1->is_attached());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0,0));
+    CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0, 0));
 
     // Insert 2x2 new subtables, then remove them all together
     parent->add_column(type_Mixed, "d");
@@ -4849,10 +4847,10 @@ TEST(Table_MixedSubtablesRetain)
     parent->set_mixed(0, 1, Mixed::subtable_tag());
     parent->set_mixed(1, 0, Mixed::subtable_tag());
     parent->set_mixed(1, 1, Mixed::subtable_tag());
-    subtab_0_0 = parent->get_subtable(0,0);
-    subtab_0_1 = parent->get_subtable(0,1);
-    subtab_1_0 = parent->get_subtable(1,0);
-    subtab_1_1 = parent->get_subtable(1,1);
+    subtab_0_0 = parent->get_subtable(0, 0);
+    subtab_0_1 = parent->get_subtable(0, 1);
+    subtab_1_0 = parent->get_subtable(1, 0);
+    subtab_1_1 = parent->get_subtable(1, 1);
     subtab_1_1->add_column(type_String, "x");
     subtab_1_1->add_empty_row();
     subtab_1_1->set_string(0, 0, "supercalifragilisticexpialidocious");
@@ -4868,7 +4866,7 @@ TEST(Table_MixedSubtablesRetain)
     parent->add_empty_row(1);
     parent->remove_column(0);
     parent->set_mixed(0, 0, Mixed::subtable_tag());
-    subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_0 = parent->get_subtable(0, 0);
     subtab_0_0->add_column(type_String, "x");
     subtab_0_0->add_empty_row(1);
     subtab_0_0->set_string(0, 0, "brahmaputra");
@@ -4881,7 +4879,7 @@ TEST(Table_MixedSubtablesRetain)
     CHECK_EQUAL(type_String, subtab_0_0->get_column_type(0));
     CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
     CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL("brahmaputra", subtab_0_0->get_string(0,0));
+    CHECK_EQUAL("brahmaputra", subtab_0_0->get_string(0, 0));
     parent->remove(0);
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -4890,7 +4888,7 @@ TEST(Table_MixedSubtablesRetain)
     // Insert 1x1 new subtable, then remove it by removing the last column
     parent->add_empty_row(1);
     parent->set_mixed(0, 0, Mixed::subtable_tag());
-    subtab_0_0 = parent->get_subtable(0,0);
+    subtab_0_0 = parent->get_subtable(0, 0);
     subtab_0_0->add_column(type_String, "x");
     subtab_0_0->add_empty_row(1);
     subtab_0_0->set_string(0, 0, "baikonur");
@@ -4903,7 +4901,7 @@ TEST(Table_MixedSubtablesRetain)
     CHECK_EQUAL(type_String, subtab_0_0->get_column_type(0));
     CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
     CHECK_EQUAL(1, subtab_0_0->size());
-    CHECK_EQUAL("baikonur", subtab_0_0->get_string(0,0));
+    CHECK_EQUAL("baikonur", subtab_0_0->get_string(0, 0));
     parent->remove_column(0);
     CHECK_EQUAL(0, parent->get_column_count());
     CHECK_EQUAL(0, parent->size());
@@ -4987,7 +4985,7 @@ TEST(Table_RowAccessor)
         TableRef subtab_0 = table[0].get_subtable(7);
         CHECK(*subtab_0 == empty_subtab);
         TableRef subtab_1 = table[1].get_subtable(7);
-        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
         CHECK(*subtab_1 == one_subtab);
     }
 
@@ -5028,7 +5026,7 @@ TEST(Table_RowAccessor)
         ConstTableRef subtab_0 = const_table[0].get_subtable(7);
         CHECK(*subtab_0 == empty_subtab);
         ConstTableRef subtab_1 = const_table[1].get_subtable(7);
-        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
         CHECK(*subtab_1 == one_subtab);
     }
 
@@ -5070,7 +5068,7 @@ TEST(Table_RowAccessor)
         TableRef subtab_0 = row_0.get_subtable(7);
         CHECK(*subtab_0 == empty_subtab);
         TableRef subtab_1 = row_1.get_subtable(7);
-        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
         CHECK(*subtab_1 == one_subtab);
     }
 
@@ -5104,7 +5102,7 @@ TEST(Table_RowAccessor)
         ConstTableRef subtab_0 = row_0.get_subtable(7);
         CHECK(*subtab_0 == empty_subtab);
         ConstTableRef subtab_1 = row_1.get_subtable(7);
-        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
         CHECK(*subtab_1 == one_subtab);
     }
 
@@ -5138,7 +5136,7 @@ TEST(Table_RowAccessor)
         ConstTableRef subtab_0 = row_0.get_subtable(7);
         CHECK(*subtab_0 == empty_subtab);
         ConstTableRef subtab_1 = row_1.get_subtable(7);
-        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
         CHECK(*subtab_1 == one_subtab);
     }
 
@@ -5172,7 +5170,7 @@ TEST(Table_RowAccessor)
         ConstTableRef subtab_0 = row_0.get_subtable(7);
         CHECK(*subtab_0 == empty_subtab);
         ConstTableRef subtab_1 = row_1.get_subtable(7);
-        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
         CHECK(*subtab_1 == one_subtab);
     }
 
@@ -5203,40 +5201,40 @@ TEST(Table_RowAccessor)
 
         Mixed mix_subtab((Mixed::subtable_tag()));
 
-        CHECK_EQUAL(5651,            table.get_int      (0,0));
-        CHECK_EQUAL(true,            table.get_bool     (1,0));
-        CHECK_EQUAL(8397.0f,         table.get_float    (2,0));
-        CHECK_EQUAL(1937.0,          table.get_double   (3,0));
-        CHECK_EQUAL("foo",           table.get_string   (4,0));
-        CHECK_EQUAL(bin,             table.get_binary   (5,0));
-        CHECK_EQUAL(OldDateTime(9992),  table.get_olddatetime (6,0));
-        CHECK_EQUAL(3637.0f,         table.get_mixed    (8,0));
+        CHECK_EQUAL(5651,            table.get_int      (0, 0));
+        CHECK_EQUAL(true,            table.get_bool     (1, 0));
+        CHECK_EQUAL(8397.0f,         table.get_float    (2, 0));
+        CHECK_EQUAL(1937.0,          table.get_double   (3, 0));
+        CHECK_EQUAL("foo",           table.get_string   (4, 0));
+        CHECK_EQUAL(bin,             table.get_binary   (5, 0));
+        CHECK_EQUAL(OldDateTime(9992),  table.get_olddatetime (6, 0));
+        CHECK_EQUAL(3637.0f,         table.get_mixed    (8, 0));
 
-        CHECK_EQUAL(int_fast64_t(),  table.get_int      (0,1));
-        CHECK_EQUAL(bool(),          table.get_bool     (1,1));
-        CHECK_EQUAL(float(),         table.get_float    (2,1));
-        CHECK_EQUAL(double(),        table.get_double   (3,1));
-        CHECK_EQUAL(StringData(""),  table.get_string   (4,1));
-        CHECK_EQUAL(BinaryData(),  table.get_binary   (5,1));
-        CHECK_EQUAL(OldDateTime(),      table.get_olddatetime (6,1));
-        CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,1));
+        CHECK_EQUAL(int_fast64_t(),  table.get_int      (0, 1));
+        CHECK_EQUAL(bool(),          table.get_bool     (1, 1));
+        CHECK_EQUAL(float(),         table.get_float    (2, 1));
+        CHECK_EQUAL(double(),        table.get_double   (3, 1));
+        CHECK_EQUAL(StringData(""),  table.get_string   (4, 1));
+        CHECK_EQUAL(BinaryData(),  table.get_binary   (5, 1));
+        CHECK_EQUAL(OldDateTime(),      table.get_olddatetime (6, 1));
+        CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8, 1));
 
-        TableRef subtab_0 = table.get_subtable(7,0);
-        CHECK_EQUAL(19, subtab_0->get_int(0,0));
+        TableRef subtab_0 = table.get_subtable(7, 0);
+        CHECK_EQUAL(19, subtab_0->get_int(0, 0));
         CHECK(*subtab_0 == one_subtab);
-        TableRef subtab_1 = table.get_subtable(7,1);
+        TableRef subtab_1 = table.get_subtable(7, 1);
         CHECK(*subtab_1 == empty_subtab);
 
         row_0.set_mixed_subtable(8, 0);
         row_1.set_mixed_subtable(8, &two_subtab);
-        subtab_0 = table.get_subtable(8,0);
-        subtab_1 = table.get_subtable(8,1);
+        subtab_0 = table.get_subtable(8, 0);
+        subtab_1 = table.get_subtable(8, 1);
         CHECK(subtab_0);
         CHECK(subtab_1);
         CHECK(subtab_0->is_attached());
         CHECK(subtab_1->is_attached());
         CHECK(*subtab_0 == Table());
-        CHECK_EQUAL(29, subtab_1->get_int(0,0));
+        CHECK_EQUAL(29, subtab_1->get_int(0, 0));
         CHECK(*subtab_1 == two_subtab);
     }
 
@@ -5264,39 +5262,39 @@ TEST(Table_RowAccessor)
 
         Mixed mix_subtab((Mixed::subtable_tag()));
 
-        CHECK_EQUAL(int_fast64_t(),  table.get_int      (0,0));
-        CHECK_EQUAL(bool(),          table.get_bool     (1,0));
-        CHECK_EQUAL(float(),         table.get_float    (2,0));
-        CHECK_EQUAL(double(),        table.get_double   (3,0));
-        CHECK_EQUAL(StringData(""),  table.get_string   (4,0));
-        CHECK_EQUAL(BinaryData(),  table.get_binary   (5,0));
-        CHECK_EQUAL(OldDateTime(),      table.get_olddatetime (6,0));
-        CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8,0));
+        CHECK_EQUAL(int_fast64_t(),  table.get_int      (0, 0));
+        CHECK_EQUAL(bool(),          table.get_bool     (1, 0));
+        CHECK_EQUAL(float(),         table.get_float    (2, 0));
+        CHECK_EQUAL(double(),        table.get_double   (3, 0));
+        CHECK_EQUAL(StringData(""),  table.get_string   (4, 0));
+        CHECK_EQUAL(BinaryData(),  table.get_binary   (5, 0));
+        CHECK_EQUAL(OldDateTime(),      table.get_olddatetime (6, 0));
+        CHECK_EQUAL(int_fast64_t(),  table.get_mixed    (8, 0));
 
-        CHECK_EQUAL(5651,            table.get_int      (0,1));
-        CHECK_EQUAL(true,            table.get_bool     (1,1));
-        CHECK_EQUAL(8397.0f,         table.get_float    (2,1));
-        CHECK_EQUAL(1937.0,          table.get_double   (3,1));
-        CHECK_EQUAL("foo",           table.get_string   (4,1));
-        CHECK_EQUAL(bin,             table.get_binary   (5,1));
-        CHECK_EQUAL(OldDateTime(9992),  table.get_olddatetime (6,1));
-        CHECK_EQUAL(3637.0f,         table.get_mixed    (8,1));
+        CHECK_EQUAL(5651,            table.get_int      (0, 1));
+        CHECK_EQUAL(true,            table.get_bool     (1, 1));
+        CHECK_EQUAL(8397.0f,         table.get_float    (2, 1));
+        CHECK_EQUAL(1937.0,          table.get_double   (3, 1));
+        CHECK_EQUAL("foo",           table.get_string   (4, 1));
+        CHECK_EQUAL(bin,             table.get_binary   (5, 1));
+        CHECK_EQUAL(OldDateTime(9992),  table.get_olddatetime (6, 1));
+        CHECK_EQUAL(3637.0f,         table.get_mixed    (8, 1));
 
-        TableRef subtab_0 = table.get_subtable(7,0);
+        TableRef subtab_0 = table.get_subtable(7, 0);
         CHECK(*subtab_0 == empty_subtab);
-        TableRef subtab_1 = table.get_subtable(7,1);
-        CHECK_EQUAL(19, subtab_1->get_int(0,0));
+        TableRef subtab_1 = table.get_subtable(7, 1);
+        CHECK_EQUAL(19, subtab_1->get_int(0, 0));
         CHECK(*subtab_1 == one_subtab);
 
         table[0].set_mixed_subtable(8, &two_subtab);
         table[1].set_mixed_subtable(8, 0);
-        subtab_0 = table.get_subtable(8,0);
-        subtab_1 = table.get_subtable(8,1);
+        subtab_0 = table.get_subtable(8, 0);
+        subtab_1 = table.get_subtable(8, 1);
         CHECK(subtab_0);
         CHECK(subtab_1);
         CHECK(subtab_0->is_attached());
         CHECK(subtab_1->is_attached());
-        CHECK_EQUAL(29, subtab_0->get_int(0,0));
+        CHECK_EQUAL(29, subtab_0->get_int(0, 0));
         CHECK(*subtab_0 == two_subtab);
         CHECK(*subtab_1 == Table());
     }
@@ -5814,12 +5812,12 @@ TEST(Table_SubtableRowAccessorsRetain)
     subdesc->add_column(type_Int, "regular");
     parent->add_empty_row();
     parent->set_mixed(0, 0, Mixed::subtable_tag());
-    TableRef mixed = parent->get_subtable(0,0);
+    TableRef mixed = parent->get_subtable(0, 0);
     CHECK(mixed && mixed->is_attached());
     mixed->add_column(type_Int, "mixed");
     mixed->add_empty_row();
     mixed->set_int(0, 0, 19);
-    TableRef regular = parent->get_subtable(1,0);
+    TableRef regular = parent->get_subtable(1, 0);
     CHECK(regular && regular->is_attached());
     regular->add_empty_row();
     regular->set_int(0, 0, 29);
@@ -5839,7 +5837,7 @@ TEST(Table_SubtableRowAccessorsRetain)
     CHECK(row_r.is_attached());
     // Restore mixed
     parent->set_mixed(0, 0, Mixed::subtable_tag());
-    mixed = parent->get_subtable(0,0);
+    mixed = parent->get_subtable(0, 0);
     CHECK(mixed);
     CHECK(mixed->is_attached());
     mixed->add_column(type_Int, "mixed_2");
@@ -5894,12 +5892,12 @@ TEST(Table_MoveLastOverRetain)
         ConstRow row_0 = (*parent)[0];
         ConstRow row_1 = (*parent)[1];
         ConstRow row_4 = (*parent)[4];
-        TableRef regular_0 = parent->get_subtable(0,0);
-        TableRef regular_1 = parent->get_subtable(0,1);
-        TableRef regular_4 = parent->get_subtable(0,4);
-        TableRef   mixed_0 = parent->get_subtable(1,0);
-        TableRef   mixed_1 = parent->get_subtable(1,1);
-        TableRef   mixed_4 = parent->get_subtable(1,4);
+        TableRef regular_0 = parent->get_subtable(0, 0);
+        TableRef regular_1 = parent->get_subtable(0, 1);
+        TableRef regular_4 = parent->get_subtable(0, 4);
+        TableRef   mixed_0 = parent->get_subtable(1, 0);
+        TableRef   mixed_1 = parent->get_subtable(1, 1);
+        TableRef   mixed_4 = parent->get_subtable(1, 4);
         CHECK(row_0.is_attached());
         CHECK(row_1.is_attached());
         CHECK(row_4.is_attached());
@@ -5909,15 +5907,15 @@ TEST(Table_MoveLastOverRetain)
         CHECK(regular_0->is_attached());
         CHECK(regular_1->is_attached());
         CHECK(regular_4->is_attached());
-        CHECK_EQUAL(10, regular_0->get_int(0,0));
-        CHECK_EQUAL(11, regular_1->get_int(0,0));
-        CHECK_EQUAL(14, regular_4->get_int(0,0));
+        CHECK_EQUAL(10, regular_0->get_int(0, 0));
+        CHECK_EQUAL(11, regular_1->get_int(0, 0));
+        CHECK_EQUAL(14, regular_4->get_int(0, 0));
         CHECK(mixed_0 && mixed_0->is_attached());
         CHECK(mixed_1 && mixed_1->is_attached());
         CHECK(mixed_4 && mixed_4->is_attached());
-        CHECK_EQUAL(20, mixed_0->get_int(0,0));
-        CHECK_EQUAL(21, mixed_1->get_int(0,0));
-        CHECK_EQUAL(24, mixed_4->get_int(0,0));
+        CHECK_EQUAL(20, mixed_0->get_int(0, 0));
+        CHECK_EQUAL(21, mixed_1->get_int(0, 0));
+        CHECK_EQUAL(24, mixed_4->get_int(0, 0));
 
         // Perform two 'move last over' operations which brings the number of
         // rows down from 5 to 3
@@ -5931,17 +5929,17 @@ TEST(Table_MoveLastOverRetain)
         CHECK(!regular_0->is_attached());
         CHECK(regular_1->is_attached());
         CHECK(regular_4->is_attached());
-        CHECK_EQUAL(11, regular_1->get_int(0,0));
-        CHECK_EQUAL(14, regular_4->get_int(0,0));
-        CHECK_EQUAL(regular_1, parent->get_subtable(0,1));
-        CHECK_EQUAL(regular_4, parent->get_subtable(0,2));
+        CHECK_EQUAL(11, regular_1->get_int(0, 0));
+        CHECK_EQUAL(14, regular_4->get_int(0, 0));
+        CHECK_EQUAL(regular_1, parent->get_subtable(0, 1));
+        CHECK_EQUAL(regular_4, parent->get_subtable(0, 2));
         CHECK(!mixed_0->is_attached());
         CHECK(mixed_1->is_attached());
         CHECK(mixed_4->is_attached());
-        CHECK_EQUAL(21, mixed_1->get_int(0,0));
-        CHECK_EQUAL(24, mixed_4->get_int(0,0));
-        CHECK_EQUAL(mixed_1, parent->get_subtable(1,1));
-        CHECK_EQUAL(mixed_4, parent->get_subtable(1,2));
+        CHECK_EQUAL(21, mixed_1->get_int(0, 0));
+        CHECK_EQUAL(24, mixed_4->get_int(0, 0));
+        CHECK_EQUAL(mixed_1, parent->get_subtable(1, 1));
+        CHECK_EQUAL(mixed_4, parent->get_subtable(1, 2));
 
         // Perform two more 'move last over' operations which brings the number
         // of rows down from 3 to 1
@@ -5954,13 +5952,13 @@ TEST(Table_MoveLastOverRetain)
         CHECK(!regular_0->is_attached());
         CHECK(!regular_1->is_attached());
         CHECK(regular_4->is_attached());
-        CHECK_EQUAL(14, regular_4->get_int(0,0));
-        CHECK_EQUAL(regular_4, parent->get_subtable(0,0));
+        CHECK_EQUAL(14, regular_4->get_int(0, 0));
+        CHECK_EQUAL(regular_4, parent->get_subtable(0, 0));
         CHECK(!mixed_0->is_attached());
         CHECK(!mixed_1->is_attached());
         CHECK(mixed_4->is_attached());
-        CHECK_EQUAL(24, mixed_4->get_int(0,0));
-        CHECK_EQUAL(mixed_4, parent->get_subtable(1,0));
+        CHECK_EQUAL(24, mixed_4->get_int(0, 0));
+        CHECK_EQUAL(mixed_4, parent->get_subtable(1, 0));
     }
 
     // Use second table to check with accessors on row indexes 0, 2, and 3, but
@@ -5970,12 +5968,12 @@ TEST(Table_MoveLastOverRetain)
         ConstRow row_0 = (*parent)[0];
         ConstRow row_2 = (*parent)[2];
         ConstRow row_3 = (*parent)[3];
-        TableRef regular_0 = parent->get_subtable(0,0);
-        TableRef regular_2 = parent->get_subtable(0,2);
-        TableRef regular_3 = parent->get_subtable(0,3);
-        TableRef   mixed_0 = parent->get_subtable(1,0);
-        TableRef   mixed_2 = parent->get_subtable(1,2);
-        TableRef   mixed_3 = parent->get_subtable(1,3);
+        TableRef regular_0 = parent->get_subtable(0, 0);
+        TableRef regular_2 = parent->get_subtable(0, 2);
+        TableRef regular_3 = parent->get_subtable(0, 3);
+        TableRef   mixed_0 = parent->get_subtable(1, 0);
+        TableRef   mixed_2 = parent->get_subtable(1, 2);
+        TableRef   mixed_3 = parent->get_subtable(1, 3);
         CHECK(row_0.is_attached());
         CHECK(row_2.is_attached());
         CHECK(row_3.is_attached());
@@ -5985,15 +5983,15 @@ TEST(Table_MoveLastOverRetain)
         CHECK(regular_0->is_attached());
         CHECK(regular_2->is_attached());
         CHECK(regular_3->is_attached());
-        CHECK_EQUAL(10, regular_0->get_int(0,0));
-        CHECK_EQUAL(12, regular_2->get_int(0,0));
-        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK_EQUAL(10, regular_0->get_int(0, 0));
+        CHECK_EQUAL(12, regular_2->get_int(0, 0));
+        CHECK_EQUAL(13, regular_3->get_int(0, 0));
         CHECK(mixed_0 && mixed_0->is_attached());
         CHECK(mixed_2 && mixed_2->is_attached());
         CHECK(mixed_3 && mixed_3->is_attached());
-        CHECK_EQUAL(20, mixed_0->get_int(0,0));
-        CHECK_EQUAL(22, mixed_2->get_int(0,0));
-        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+        CHECK_EQUAL(20, mixed_0->get_int(0, 0));
+        CHECK_EQUAL(22, mixed_2->get_int(0, 0));
+        CHECK_EQUAL(23, mixed_3->get_int(0, 0));
 
         // Perform two 'move last over' operations which brings the number of
         // rows down from 5 to 3
@@ -6006,13 +6004,13 @@ TEST(Table_MoveLastOverRetain)
         CHECK(!regular_0->is_attached());
         CHECK(!regular_2->is_attached());
         CHECK(regular_3->is_attached());
-        CHECK_EQUAL(13, regular_3->get_int(0,0));
-        CHECK_EQUAL(regular_3, parent->get_subtable(0,0));
+        CHECK_EQUAL(13, regular_3->get_int(0, 0));
+        CHECK_EQUAL(regular_3, parent->get_subtable(0, 0));
         CHECK(!mixed_0->is_attached());
         CHECK(!mixed_2->is_attached());
         CHECK(mixed_3->is_attached());
-        CHECK_EQUAL(23, mixed_3->get_int(0,0));
-        CHECK_EQUAL(mixed_3, parent->get_subtable(1,0));
+        CHECK_EQUAL(23, mixed_3->get_int(0, 0));
+        CHECK_EQUAL(mixed_3, parent->get_subtable(1, 0));
 
         // Perform one more 'move last over' operation which brings the number
         // of rows down from 3 to 2
@@ -6024,13 +6022,13 @@ TEST(Table_MoveLastOverRetain)
         CHECK(!regular_0->is_attached());
         CHECK(!regular_2->is_attached());
         CHECK(regular_3->is_attached());
-        CHECK_EQUAL(13, regular_3->get_int(0,0));
-        CHECK_EQUAL(regular_3, parent->get_subtable(0,0));
+        CHECK_EQUAL(13, regular_3->get_int(0, 0));
+        CHECK_EQUAL(regular_3, parent->get_subtable(0, 0));
         CHECK(!mixed_0->is_attached());
         CHECK(!mixed_2->is_attached());
         CHECK(mixed_3->is_attached());
-        CHECK_EQUAL(23, mixed_3->get_int(0,0));
-        CHECK_EQUAL(mixed_3, parent->get_subtable(1,0));
+        CHECK_EQUAL(23, mixed_3->get_int(0, 0));
+        CHECK_EQUAL(mixed_3, parent->get_subtable(1, 0));
 
         // Perform one final 'move last over' operation which brings the number
         // of rows down from 2 to 1
@@ -6052,22 +6050,22 @@ TEST(Table_MoveLastOverRetain)
         TableRef parent = parent_3;
         ConstRow row_1 = (*parent)[1];
         ConstRow row_3 = (*parent)[3];
-        TableRef regular_1 = parent->get_subtable(0,1);
-        TableRef regular_3 = parent->get_subtable(0,3);
-        TableRef   mixed_1 = parent->get_subtable(1,1);
-        TableRef   mixed_3 = parent->get_subtable(1,3);
+        TableRef regular_1 = parent->get_subtable(0, 1);
+        TableRef regular_3 = parent->get_subtable(0, 3);
+        TableRef   mixed_1 = parent->get_subtable(1, 1);
+        TableRef   mixed_3 = parent->get_subtable(1, 3);
         CHECK(row_1.is_attached());
         CHECK(row_3.is_attached());
         CHECK_EQUAL(1, row_1.get_index());
         CHECK_EQUAL(3, row_3.get_index());
         CHECK(regular_1->is_attached());
         CHECK(regular_3->is_attached());
-        CHECK_EQUAL(11, regular_1->get_int(0,0));
-        CHECK_EQUAL(13, regular_3->get_int(0,0));
+        CHECK_EQUAL(11, regular_1->get_int(0, 0));
+        CHECK_EQUAL(13, regular_3->get_int(0, 0));
         CHECK(mixed_1 && mixed_1->is_attached());
         CHECK(mixed_3 && mixed_3->is_attached());
-        CHECK_EQUAL(21, mixed_1->get_int(0,0));
-        CHECK_EQUAL(23, mixed_3->get_int(0,0));
+        CHECK_EQUAL(21, mixed_1->get_int(0, 0));
+        CHECK_EQUAL(23, mixed_3->get_int(0, 0));
 
         // Perform two 'move last over' operations which brings the number of
         // rows down from 5 to 3
@@ -6079,16 +6077,16 @@ TEST(Table_MoveLastOverRetain)
         CHECK_EQUAL(0, row_3.get_index());
         CHECK(regular_1->is_attached());
         CHECK(regular_3->is_attached());
-        CHECK_EQUAL(11, regular_1->get_int(0,0));
-        CHECK_EQUAL(13, regular_3->get_int(0,0));
-        CHECK_EQUAL(regular_1, parent->get_subtable(0,1));
-        CHECK_EQUAL(regular_3, parent->get_subtable(0,0));
+        CHECK_EQUAL(11, regular_1->get_int(0, 0));
+        CHECK_EQUAL(13, regular_3->get_int(0, 0));
+        CHECK_EQUAL(regular_1, parent->get_subtable(0, 1));
+        CHECK_EQUAL(regular_3, parent->get_subtable(0, 0));
         CHECK(mixed_1->is_attached());
         CHECK(mixed_3->is_attached());
-        CHECK_EQUAL(21, mixed_1->get_int(0,0));
-        CHECK_EQUAL(23, mixed_3->get_int(0,0));
-        CHECK_EQUAL(mixed_1, parent->get_subtable(1,1));
-        CHECK_EQUAL(mixed_3, parent->get_subtable(1,0));
+        CHECK_EQUAL(21, mixed_1->get_int(0, 0));
+        CHECK_EQUAL(23, mixed_3->get_int(0, 0));
+        CHECK_EQUAL(mixed_1, parent->get_subtable(1, 1));
+        CHECK_EQUAL(mixed_3, parent->get_subtable(1, 0));
 
         // Perform one more 'move last over' operation which brings the number
         // of rows down from 3 to 2
@@ -6098,12 +6096,12 @@ TEST(Table_MoveLastOverRetain)
         CHECK_EQUAL(0, row_3.get_index());
         CHECK(!regular_1->is_attached());
         CHECK(regular_3->is_attached());
-        CHECK_EQUAL(13, regular_3->get_int(0,0));
-        CHECK_EQUAL(regular_3, parent->get_subtable(0,0));
+        CHECK_EQUAL(13, regular_3->get_int(0, 0));
+        CHECK_EQUAL(regular_3, parent->get_subtable(0, 0));
         CHECK(!mixed_1->is_attached());
         CHECK(mixed_3->is_attached());
-        CHECK_EQUAL(23, mixed_3->get_int(0,0));
-        CHECK_EQUAL(mixed_3, parent->get_subtable(1,0));
+        CHECK_EQUAL(23, mixed_3->get_int(0, 0));
+        CHECK_EQUAL(mixed_3, parent->get_subtable(1, 0));
 
         // Perform one final 'move last over' operation which brings the number
         // of rows down from 2 to 1
@@ -6162,7 +6160,7 @@ TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
     table.add_column(type_Int, "");
-    table.add_empty_row(REALM_MAX_BPNODE_SIZE*REALM_MAX_BPNODE_SIZE+1);
+    table.add_empty_row(REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE + 1);
     table.add_column(type_Int, "");
     table.verify();
 }
@@ -6172,7 +6170,7 @@ TEST(Table_ClearWithTwoLevelBptree)
 {
     Table table;
     table.add_column(type_Mixed, "");
-    table.add_empty_row(REALM_MAX_BPNODE_SIZE+1);
+    table.add_empty_row(REALM_MAX_BPNODE_SIZE + 1);
     table.clear();
     table.verify();
 }
@@ -6269,12 +6267,12 @@ TEST(Table_Nulls)
         t.set_string(0, 0, "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx");
 
         CHECK_EQUAL(1, t.count_string(0,
-            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
+                                      "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
         CHECK_EQUAL(1, t.count_string(0, ""));
         CHECK_EQUAL(1, t.count_string(0, realm::null()));
 
         CHECK_EQUAL(0, t.find_first_string(0,
-            "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
+                                           "xxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxxYYYYYYYYYYxxxxxxxxxx"));
         CHECK_EQUAL(1, t.find_first_string(0, ""));
         CHECK_EQUAL(2, t.find_first_string(0, realm::null()));
 
@@ -6394,22 +6392,22 @@ TEST(Table_InsertSubstring)
     {
         Fixture f;
         f.table.insert_substring(0, 0, 0, "x");
-        CHECK_EQUAL("x0123456789", f.table.get_string(0,0));
+        CHECK_EQUAL("x0123456789", f.table.get_string(0, 0));
     }
     {
         Fixture f;
         f.table.insert_substring(0, 0, 5, "x");
-        CHECK_EQUAL("01234x56789", f.table.get_string(0,0));
+        CHECK_EQUAL("01234x56789", f.table.get_string(0, 0));
     }
     {
         Fixture f;
         f.table.insert_substring(0, 0, 10, "x");
-        CHECK_EQUAL("0123456789x", f.table.get_string(0,0));
+        CHECK_EQUAL("0123456789x", f.table.get_string(0, 0));
     }
     {
         Fixture f;
         f.table.insert_substring(0, 0, 5, "");
-        CHECK_EQUAL("0123456789", f.table.get_string(0,0));
+        CHECK_EQUAL("0123456789", f.table.get_string(0, 0));
     }
     {
         Fixture f;
@@ -6443,42 +6441,42 @@ TEST(Table_RemoveSubstring)
     {
         Fixture f;
         f.table.remove_substring(0, 0, 0, 1);
-        CHECK_EQUAL("123456789", f.table.get_string(0,0));
+        CHECK_EQUAL("123456789", f.table.get_string(0, 0));
     }
     {
         Fixture f;
         f.table.remove_substring(0, 0, 9, 1);
-        CHECK_EQUAL("012345678", f.table.get_string(0,0));
+        CHECK_EQUAL("012345678", f.table.get_string(0, 0));
     }
     {
         Fixture f;
         f.table.remove_substring(0, 0, 0);
-        CHECK_EQUAL("", f.table.get_string(0,0));
+        CHECK_EQUAL("", f.table.get_string(0, 0));
     }
     {
         Fixture f;
         f.table.remove_substring(0, 0, 5);
-        CHECK_EQUAL("01234", f.table.get_string(0,0));
+        CHECK_EQUAL("01234", f.table.get_string(0, 0));
     }
     {
         Fixture f;
         f.table.remove_substring(0, 0, 10);
-        CHECK_EQUAL("0123456789", f.table.get_string(0,0));
+        CHECK_EQUAL("0123456789", f.table.get_string(0, 0));
     }
     {
         Fixture f;
         f.table.remove_substring(0, 0, 5, 1000);
-        CHECK_EQUAL("01234", f.table.get_string(0,0));
+        CHECK_EQUAL("01234", f.table.get_string(0, 0));
     }
     {
         Fixture f;
         f.table.remove_substring(0, 0, 10, 0);
-        CHECK_EQUAL("0123456789", f.table.get_string(0,0));
+        CHECK_EQUAL("0123456789", f.table.get_string(0, 0));
     }
     {
         Fixture f;
         f.table.remove_substring(0, 0, 10, 1);
-        CHECK_EQUAL("0123456789", f.table.get_string(0,0));
+        CHECK_EQUAL("0123456789", f.table.get_string(0, 0));
     }
     {
         Fixture f;
@@ -6717,9 +6715,9 @@ TEST(Table_FuzzTestRevealed_SetUniqueAssert)
 {
     Group g;
     g.add_table("string_index_test_table");
-    g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "aa",true));
-    g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "bb",true));
-    g.get_table(0)->insert_column(0, DataType(0), "cc",true);
+    g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "aa", true));
+    g.get_table(0)->add_search_index(g.get_table(0)->add_column(DataType(0), "bb", true));
+    g.get_table(0)->insert_column(0, DataType(0), "cc", true);
     g.get_table(0)->add_search_index(0);
     g.get_table(0)->insert_column_link(3, type_Link, "dd", *g.get_table(0));
     g.get_table(0)->add_empty_row(225);
@@ -6829,8 +6827,8 @@ TEST(Table_DetachedAccessor)
     CHECK_LOGIC_ERROR(table->clear(), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->add_search_index(0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->remove_search_index(0), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->change_link_targets(0,1), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->swap_rows(0,1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->change_link_targets(0, 1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->swap_rows(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_string(1, 0, ""), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_string_unique(1, 0, ""), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->insert_substring(1, 0, 0, "x"), LogicError::detached_accessor);

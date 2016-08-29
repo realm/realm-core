@@ -306,7 +306,7 @@ TEST(StringData_Substrings)
     CHECK_EQUAL("", empty.prefix(0));
     CHECK_EQUAL("", empty.suffix(0));
     CHECK_EQUAL("", empty.substr(0));
-    CHECK_EQUAL("", empty.substr(0,0));
+    CHECK_EQUAL("", empty.substr(0, 0));
 
     StringData sd("Minkowski");
     CHECK(sd.begins_with(empty));
@@ -326,7 +326,7 @@ TEST(StringData_Substrings)
     CHECK_EQUAL("Min",    sd.prefix(3));
     CHECK_EQUAL("ski",    sd.suffix(3));
     CHECK_EQUAL("kowski", sd.substr(3));
-    CHECK_EQUAL("kow",    sd.substr(3,3));
+    CHECK_EQUAL("kow",    sd.substr(3, 3));
 }
 
 

@@ -28,7 +28,7 @@
 
 // Enable this only on platforms where it might be needed
 #if REALM_PLATFORM_APPLE || REALM_ANDROID
-#define REALM_ROBUST_MUTEX_EMULATION
+    #define REALM_ROBUST_MUTEX_EMULATION
 #endif
 
 namespace realm {
@@ -199,7 +199,8 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
         m_lock_info = std::make_shared<LockInfo>();
         m_lock_info->m_file = std::move(lock_file);
         s_info_map[m_fileuid] = m_lock_info;
-    } else {
+    }
+    else {
         // File exists and the lock info has been created in the map.
         m_lock_info = result->second.lock();
         lock_file.close();
@@ -230,7 +231,7 @@ inline void InterprocessMutex::lock()
     mutex_lock.release();
 #else
     REALM_ASSERT(m_shared_part);
-    m_shared_part->lock([](){});
+    m_shared_part->lock([]() {});
 #endif
 }
 

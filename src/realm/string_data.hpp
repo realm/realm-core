@@ -149,7 +149,7 @@ public:
     //@}
 
     template<class C, class T>
-    friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const StringData&);
+    friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const StringData&);
 
     explicit operator bool() const noexcept;
 
@@ -285,12 +285,12 @@ inline bool StringData::contains(StringData d) const noexcept
         return false;
 
     return d.m_size == 0 ||
-        std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
+           std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
 inline StringData StringData::prefix(size_t n) const noexcept
 {
-    return substr(0,n);
+    return substr(0, n);
 }
 
 inline StringData StringData::suffix(size_t n) const noexcept
@@ -309,7 +309,7 @@ inline StringData StringData::substr(size_t i) const noexcept
 }
 
 template<class C, class T>
-inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const StringData& d)
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const StringData& d)
 {
     for (const char* i = d.m_data; i != d.m_data + d.m_size; ++i)
         out << *i;

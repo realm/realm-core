@@ -61,7 +61,7 @@ private:
 
 template<class H>
 ScopeExit<typename std::remove_reference<H>::type> make_scope_exit(H&& handler)
-    noexcept(noexcept(ScopeExit<typename std::remove_reference<H>::type>(std::forward<H>(handler))))
+noexcept(noexcept(ScopeExit<typename std::remove_reference<H>::type>(std::forward<H>(handler))))
 {
     return ScopeExit<typename std::remove_reference<H>::type>(std::forward<H>(handler));
 }
