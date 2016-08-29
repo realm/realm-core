@@ -31,6 +31,9 @@
 ### Internals
 
 * Added support for very large commit history entries. (issues #2038, #2050)
+  This also implies an API change (but to the internal API) to the
+  History::get_changesets() method, which must be taken into account by
+  any derived classes.
 
 ----------------------------------------------
 
