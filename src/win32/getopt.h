@@ -65,7 +65,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <cstring>
-#include <stdarg.h>
+#include <cstdarg>
 #include <stdio.h>
 #include <windows.h>
 
