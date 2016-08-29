@@ -120,12 +120,12 @@ BinaryData BinaryColumn::get_at(size_t ndx, size_t& pos) const noexcept
         if (!is_big) {
             // Small blobs
             pos = 0;
-            REALM_ASSERT(dynamic_cast<ArrayBinary*>(arr) != nullptr);
+            REALM_ASSERT_DEBUG(dynamic_cast<ArrayBinary*>(arr) != nullptr);
             return static_cast<ArrayBinary*>(arr)->get(ndx);
         }
         else {
             // Big blobs
-            REALM_ASSERT(dynamic_cast<ArrayBigBlobs*>(arr) != nullptr);
+            REALM_ASSERT_DEBUG(dynamic_cast<ArrayBigBlobs*>(arr) != nullptr);
             return static_cast<ArrayBigBlobs*>(arr)->get_at(ndx, pos);
         }
     }
@@ -206,7 +206,7 @@ void BinaryColumn::do_insert(size_t row_ndx, BinaryData value, bool add_zero_ter
             bool is_big = upgrade_root_leaf(value.size()); // Throws
             if (!is_big) {
                 // Small blobs root leaf
-                ArrayBinary* leaf = dynamic_cast<ArrayBinary*>(m_array.get());
+                ArrayBinary* leaf = static_cast<ArrayBinary*>(m_array.get());
                 new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, add_zero_term, state); // Throws
             }
             else {
