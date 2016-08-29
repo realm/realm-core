@@ -2902,6 +2902,9 @@ NONCONCURRENT_TEST(Shared_OutOfMemory)
 #endif // !win32
 */
 
+
+/*
+
 // Run some (repeatable) random checks through the fuzz tester.
 // For a comprehensive fuzz test, afl should be run. To do this see test/fuzzy/README.md
 // If this check fails for some reason, you can find the problem by changing
@@ -2962,6 +2965,8 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
         }
     }
 }
+
+*/
 
 // Scaled down stress test. (Use string length ~15MB for max stress)
 NONCONCURRENT_TEST(Shared_BigAllocations)

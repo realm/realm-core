@@ -19,8 +19,16 @@
 #ifndef REALM_UTIL_ASSERT_HPP
 #define REALM_UTIL_ASSERT_HPP
 
+#include <vector>
+
 #include <realm/util/features.h>
 #include <realm/util/terminate.hpp>
+
+namespace realm {
+
+extern std::vector<std::string> database;
+
+}
 
 #if REALM_ENABLE_ASSERTIONS || defined(REALM_DEBUG)
 #  define REALM_ASSERTIONS_ENABLED 1
@@ -50,6 +58,17 @@
     (REALM_LIKELY(condition) ? static_cast<void>(0) : \
     realm::util::terminate_with_info("Assertion failed: " # condition, __LINE__, __FILE__, \
                                      REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
+
+
+#define REALM_ASSERT_RELEASE_EX2(condition, ...) \
+    get_alloc().get_file().update_checksum(); \
+    (REALM_LIKELY(condition) ? static_cast<void>(0) : \
+    realm::util::terminate_with_info("Assertion failed: " # condition, __LINE__, __FILE__, \
+                                     REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
+
+
+
+
 
 #ifdef REALM_DEBUG
 #  define REALM_ASSERT_DEBUG_EX REALM_ASSERT_RELEASE_EX

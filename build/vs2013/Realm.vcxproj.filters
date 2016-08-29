@@ -125,6 +125,7 @@
     <ClCompile Include="..\..\src\realm\column_timestamp.cpp" />
     <ClCompile Include="..\..\test\test_column_timestamp.cpp" />
     <ClCompile Include="..\..\src\realm\util\interprocess_condvar.cpp" />
+    <ClCompile Include="..\..\src\realm\util\assert.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\realm.hpp" />

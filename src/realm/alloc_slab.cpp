@@ -103,7 +103,7 @@ const SlabAlloc::Header SlabAlloc::empty_file_header = {
     { 0, 0 }, // top-refs
     { 'T', '-', 'D', 'B' },
     { 0, 0 }, // undecided file format
-    0, // reserved
+    123, // reserved
     0  // flags (lsb is select bit)
 };
 
@@ -116,7 +116,7 @@ void SlabAlloc::init_streaming_header(Header* streaming_header, int file_format_
         { 0xFFFFFFFFFFFFFFFFULL, 0 }, // top-refs
         { 'T', '-', 'D', 'B' },
         { storage_type(file_format_version), 0 },
-        0, // reserved
+        123, // reserved
         0  // flags (lsb is select bit)
     };
 }

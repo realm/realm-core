@@ -25,6 +25,7 @@
 #include <stdexcept>
 #include <string>
 #include <streambuf>
+#include <iostream>
 
 #ifndef _WIN32
 #  include <dirent.h> // POSIX.1-2001
@@ -453,6 +454,81 @@ public:
     /// string is interpreted as a relative path.
     static std::string resolve(const std::string& path, const std::string& base_dir);
 
+    char checksum()
+    {
+        if (!is_attached())
+            return 0;
+
+        constexpr size_t block = 128;
+        char buf[block];
+        char sum = 0;
+
+        size_t siz = get_size();
+
+        seek(0);
+        read(buf, block);
+
+        for (size_t t = 0; t < 22; t++)
+            sum += (buf[t] * t);
+
+        for (size_t t = 23; t < block; t++)
+            sum += (buf[t] * t);
+
+        seek(siz - block);
+        read(buf, block);
+
+        for (size_t t = 0; t < block; t++)
+            sum += (buf[t] * (t + siz - block));
+
+        return sum;
+    }
+
+    void update_checksum()
+    {
+        if (!is_attached())
+            return;
+
+        char tmp;
+
+        tmp = checksum();
+
+        seek(22);
+        write(&tmp, 1);
+    }
+
+    void invalidate_checksum()
+    {
+        if (!is_attached())
+            return;
+
+        char tmp;
+
+        tmp = 123;
+
+        seek(22);
+        write(&tmp, 1);
+    }
+
+    bool verify_checksum()
+    {
+        if (!is_attached())
+            return true;
+
+        char tmp;
+        char tmp2;
+
+        tmp = checksum();
+
+        seek(22);
+        read(&tmp2, 1);
+
+        if (tmp2 != 123 && tmp != tmp2) {
+            std::cerr << "\nERRRRRR " << (int)tmp << " " << (int)tmp2 << " " << get_size() << "\n";
+            return false;
+        }
+        
+        return true;
+    }
 
     struct UniqueID {
 #ifdef _WIN32 // Windows version
