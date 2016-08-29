@@ -35,7 +35,7 @@
     #include "aes_cryptor.hpp"
 
     #include <memory>
-    #include <signal.h>
+    #include <csignal>
     #include <sys/stat.h>
     #include <unistd.h>
     #include <cstring>
