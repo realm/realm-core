@@ -1785,7 +1785,8 @@ void Table::remove_search_index(size_t col_ndx)
 bool Table::is_nullable(size_t col_ndx) const
 {
     REALM_ASSERT_DEBUG(col_ndx < m_spec.get_column_count());
-    return (m_spec.get_column_attr(col_ndx) & col_attr_Nullable);
+    return (m_spec.get_column_attr(col_ndx) & col_attr_Nullable) ||
+        m_spec.get_column_type(col_ndx) == col_type_Link;
 }
 
 const ColumnBase& Table::get_column_base(size_t ndx) const noexcept
