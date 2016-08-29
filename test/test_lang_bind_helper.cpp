@@ -9620,8 +9620,16 @@ TEST(LangBindHelper_HandoverWithPinning)
         }
 
         // Advance the SharedGroup past the handover version
+        // also check that pinning during a write transaction actually
+        // refers to pinning of the most recent commit.
         {
+            auto token_a = sg_w.pin_version();
             LangBindHelper::promote_to_write(sg_w);
+            auto token_b = sg_w.pin_version();
+            bool token_eq = token_a == token_b;
+            CHECK(token_eq);
+            sg_w.unpin_version(token_a);
+            sg_w.unpin_version(token_b);
 
             TableRef table = group_w.get_table("table2");
             table->add_empty_row();
