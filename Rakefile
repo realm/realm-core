@@ -105,7 +105,7 @@ end
 desc 'Run coverage test and process output with Gcovr'
 task 'gcovr' => 'check-cover' do
     Dir.chdir(@build_dir) do
-        sh "gcovr --filter='*src/realm.*' -x > gcovr.xml"
+        sh "gcovr --filter='.*src/realm.*' -x > gcovr.xml"
     end
 end
 
