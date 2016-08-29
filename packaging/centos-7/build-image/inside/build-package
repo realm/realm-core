@@ -1,8 +1,11 @@
-#!/bin/bash -ex
+#!/bin/bash
+
+set -e
+
 # we should always set proper ownership before exiting, otherwise
 # the created packages will have root:root ownership and we'll be unable
 # to delete them from our host.
-trap 'chown -R --reference /build-inside/build-package /out/' EXIT
+trap 'code=$?; chown -R --reference /inside/build-package /out/; exit $code' EXIT
 
 clean_binaries() {
   # Remove unneeded information from binaries
@@ -21,6 +24,8 @@ clean_binaries() {
     cd - >/dev/null
   done
 }
+
+VERSION=$(echo ${VERSION} | tr - _)
 
 # the source directory is mounted read-only to prevent issues where the build
 # could alter the source; we should copy it somewhere inside the container
@@ -64,7 +69,7 @@ fpm \
     --rpm-dist el7 \
     --license "Realm License" \
     --version ${VERSION} \
-    --iteration ${BUILD_NUMBER} \
+    --iteration ${ITERATION} \
     --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
@@ -83,13 +88,13 @@ fpm \
     --rpm-dist el7 \
     --license "Realm License" \
     --version ${VERSION} \
-    --iteration ${BUILD_NUMBER} \
+    --iteration ${ITERATION} \
     --description "Development headers and tools for the realm-core C++ library" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "realm = ${VERSION}-${BUILD_NUMBER}.el7" \
+    -d "realm = ${VERSION}-${ITERATION}.el7" \
     -d "openssl-devel" \
     -C /devel \
     usr/lib64 usr/include usr/bin
@@ -101,7 +106,7 @@ fpm \
     --rpm-dist el7 \
     --license "Realm License" \
     --version ${VERSION} \
-    --iteration ${BUILD_NUMBER} \
+    --iteration ${ITERATION} \
     --description "Realm-core C++ library for node" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
@@ -117,13 +122,13 @@ fpm \
     --rpm-dist el7 \
     --license "Realm License" \
     --version ${VERSION} \
-    --iteration ${BUILD_NUMBER} \
+    --iteration ${ITERATION} \
     --description "Development realm-core C++ library for node" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "realm-devel = ${VERSION}-${BUILD_NUMBER}.el7" \
+    -d "realm-devel = ${VERSION}-${ITERATION}.el7" \
     -C /node-devel \
     usr/lib64
 
@@ -134,12 +139,12 @@ fpm \
     --rpm-dist el7 \
     --license "Realm License" \
     --version ${VERSION} \
-    --iteration ${BUILD_NUMBER} \
+    --iteration ${ITERATION} \
     --description "Utilities to work with Realm files" \
     --url "https://realm.io" \
     --category "Applications/Databases" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "realm = ${VERSION}-${BUILD_NUMBER}.el7" \
+    -d "realm = ${VERSION}-${ITERATION}.el7" \
     -C /utils \
     usr/bin

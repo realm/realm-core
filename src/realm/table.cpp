@@ -654,6 +654,9 @@ void Table::do_insert_column(Descriptor& desc, size_t col_ndx, DataType type,
     Table& root_table = df::get_root_table(desc);
     REALM_ASSERT(!root_table.has_shared_type());
 
+    if (type == type_Link)
+        nullable = true;
+
     if (desc.is_root()) {
         root_table.bump_version();
         root_table.insert_root_column(col_ndx, type, name, link, nullable); // Throws
