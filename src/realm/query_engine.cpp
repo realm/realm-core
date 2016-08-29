@@ -122,7 +122,7 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
 
 size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                    SequentialGetterBase* source_column)
-    {
+{
     // aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
     // integer version, because find_first_local() is relatively slower here (because it's non-integers).
     //
@@ -189,7 +189,7 @@ size_t NotNode::find_first_local(size_t start, size_t end)
 
 bool NotNode::evaluate_at(size_t rowndx)
 {
-    return m_condition->find_first(rowndx, rowndx+1) == not_found;
+    return m_condition->find_first(rowndx, rowndx + 1) == not_found;
 }
 
 void NotNode::update_known(size_t start, size_t end, size_t first)

@@ -36,6 +36,11 @@
   This also implies an API change (but to the internal API) to the
   History::get_changesets() method, which must be taken into account by
   any derived classes.
+* Support for setting and getting thread names (`util::Thread::set_name()` and
+  `util::Thread::get_name()`) when the platform supports
+  it. `util::Thread::set_name()` is now used by the test harness as a help while
+  debugging. Also, the terminate handler (in `util/terminate.cpp`) writes out
+  the name of the terminating thread if the name is available.
 
 ----------------------------------------------
 

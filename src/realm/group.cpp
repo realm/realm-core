@@ -22,8 +22,8 @@
 #include <fstream>
 
 #ifdef REALM_DEBUG
-#  include <iostream>
-#  include <iomanip>
+    #include <iostream>
+    #include <iomanip>
 #endif
 
 #include <realm/util/file_mapper.hpp>
@@ -603,7 +603,7 @@ void Group::remove_table(size_t table_ndx)
     // information for Group::TransactAdvancer to handle them.
     size_t n = table->get_column_count();
     for (size_t i = n; i > 0; --i)
-        table->remove_column(i-1);
+        table->remove_column(i - 1);
 
     int64_t ref_64 = m_tables.get(table_ndx);
     REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));
@@ -1042,8 +1042,8 @@ void Group::to_string(std::ostream& out) const
 
 
     // Print header
-    out << std::setw(int(index_width+1)) << std::left << " ";
-    out << std::setw(int(name_width+1))  << std::left << "tables";
+    out << std::setw(int(index_width + 1)) << std::left << " ";
+    out << std::setw(int(name_width + 1))  << std::left << "tables";
     out << std::setw(int(rows_width))    << std::left << "rows"    << std::endl;
 
     // Print tables
@@ -1103,7 +1103,7 @@ public:
     {
         typedef _impl::TableFriend tf;
         tf::adj_insert_column(table, m_col_ndx); // Throws
-        tf::mark_link_target_tables(table, m_col_ndx+1);
+        tf::mark_link_target_tables(table, m_col_ndx + 1);
     }
 
     void update_parent(Table&) override
@@ -1257,7 +1257,7 @@ public:
                 begin = m_group.m_table_accessors.begin() + to_table_ndx;
                 end = m_group.m_table_accessors.begin() + from_table_ndx + 1;
                 Table* table = end[-1];
-                std::copy_backward(begin, end-1, end);
+                std::copy_backward(begin, end - 1, end);
                 begin[0] = table;
             }
             for (iter i = begin; i != end; ++i) {
@@ -1286,7 +1286,7 @@ public:
         if (group_level_ndx < m_group.m_table_accessors.size()) {
             if (Table* table = m_group.m_table_accessors[group_level_ndx]) {
                 const size_t* path_begin = path;
-                const size_t* path_end = path_begin + 2*levels;
+                const size_t* path_end = path_begin + 2 * levels;
                 for (;;) {
                     typedef _impl::TableFriend tf;
                     tf::mark(*table);
@@ -2014,7 +2014,7 @@ void Group::verify() const
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     {
         REALM_ASSERT(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 ||
-                     (get_file_format_version() >=4 && m_top.size() == 9));
+                     (get_file_format_version() >= 4 && m_top.size() == 9));
         Allocator& alloc = m_top.get_alloc();
         ArrayInteger pos(alloc), len(alloc), ver(alloc);
         size_t pos_ndx = 3, len_ndx = 4, ver_ndx = 5;

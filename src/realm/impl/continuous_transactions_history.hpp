@@ -23,6 +23,7 @@
 #include <memory>
 
 #include <realm/column_binary.hpp>
+#include <realm/version_id.hpp>
 
 namespace realm {
 
@@ -34,7 +35,7 @@ namespace _impl {
 /// transactions.
 class History {
 public:
-    using version_type = uint_fast64_t;
+    using version_type = VersionID::version_type;
 
     /// May be called during a read transaction to gain early access to the
     /// history as it appears in a new snapshot that succeeds the one bound in

@@ -322,7 +322,7 @@ char encode_hex_digit(int value)
     typedef std::char_traits<char> traits;
     if (0 <= value) {
         if (value < 10) return traits::to_char_type(traits::to_int_type('0') + value);
-        if (value < 16) return traits::to_char_type(traits::to_int_type('A') + (value-10));
+        if (value < 16) return traits::to_char_type(traits::to_int_type('A') + (value - 10));
     }
     throw std::runtime_error("Bad hex digit value");
 }
