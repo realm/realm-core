@@ -19,7 +19,7 @@
 #ifndef REALM_COLUMN_HPP
 #define REALM_COLUMN_HPP
 
-#include <stdint.h> // unint8_t etc
+#include <cstdint> // unint8_t etc
 #include <cstdlib> // size_t
 #include <vector>
 #include <memory>

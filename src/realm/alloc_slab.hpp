@@ -19,7 +19,7 @@
 #ifndef REALM_ALLOC_SLAB_HPP
 #define REALM_ALLOC_SLAB_HPP
 
-#include <stdint.h> // unint8_t etc
+#include <cstdint> // unint8_t etc
 #include <vector>
 #include <string>
 #include <atomic>
