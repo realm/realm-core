@@ -21,7 +21,7 @@
 #include <algorithm>
 #include <vector>
 
-#include <errno.h>
+#include <cerrno>
 #include <cstring>
 #include <cstddef>
 #include <cstdio>
