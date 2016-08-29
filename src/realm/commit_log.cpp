@@ -75,13 +75,8 @@ namespace _impl {
 // buffers. The pointers may end up going to both mappings/files.
 //
 // Access to the commit-logs metadata is protected by an inter-process mutex.
-//
-// FIXME: we should not use size_t for memory mapped members, but one where the
-// size is guaranteed
 
-class WriteLogCollector:
-        public Replication,
-        private _impl::History {
+class WriteLogCollector : public Replication, private _impl::History {
 public:
     using version_type = _impl::History::version_type;
     WriteLogCollector(const std::string& database_name, const char* encryption_key);
@@ -337,8 +332,8 @@ inline void WriteLogCollector::map_header_if_needed() const
 // convenience methods for getting to buffers and logs.
 
 void WriteLogCollector::get_maps_in_order(const CommitLogPreamble* preamble,
-                           const util::File::Map<CommitLogHeader>*& first,
-                           const util::File::Map<CommitLogHeader>*& second) const
+                                          const util::File::Map<CommitLogHeader>*& first,
+                                          const util::File::Map<CommitLogHeader>*& second) const
 {
     if (preamble->active_file_is_log_a) {
         first  = &m_log_b.map;
@@ -442,7 +437,7 @@ void WriteLogCollector::cleanup_stale_versions(CommitLogPreamble* preamble)
         File::SizeType size = active_log->file.get_size();
         size /= page_size * minimal_pages;
         if (size > 4) {
-            size -= size/4;
+            size -= size / 4;
             size *= page_size * minimal_pages;
             // indicate change of log size, forcing readers to remap to new size
             m_header.get_addr()->mmap_counter++;
@@ -496,7 +491,7 @@ WriteLogCollector::internal_submit_log(HistoryEntry entry)
     // update metadata to reflect the added commit log
     preamble->write_offset += aligned_to(sizeof (uint64_t), entry.changeset.size() + sizeof(EntryHeader));
     version_type orig_version = preamble->end_commit_range;
-    preamble->end_commit_range = orig_version+1;
+    preamble->end_commit_range = orig_version + 1;
     sync_header();
     return orig_version + 1;
 }
@@ -637,7 +632,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
             // std::cerr << "  --at: " << m_read_offset << ", " << size << "\n";
             realm::util::encryption_read_barrier(hdr, size_t(size + sizeof(EntryHeader)),
                                                  first_map->get_encrypted_mapping());
-            set_log_entry_internal(logs_buffer, hdr, buffer+tmp_offset);
+            set_log_entry_internal(logs_buffer, hdr, buffer + tmp_offset);
             ++logs_buffer;
         }
         // break early to avoid updating tracking information, if we've reached
@@ -645,7 +640,7 @@ void WriteLogCollector::get_commit_entries_internal(version_type from_version,
         // cannot safely resume once we've read past the final entry. The reason
         // is that an intervening call to set_oldest_version could shift the
         // write point to the beginning of the other file.
-        if (m_read_version+1 >= preamble->end_commit_range)
+        if (m_read_version + 1 >= preamble->end_commit_range)
             break;
         m_read_offset = tmp_offset + size;
         m_read_version++;
@@ -770,10 +765,10 @@ void WriteLogCollector::verify() const
 
 
 std::unique_ptr<Replication> make_client_history(const std::string& database_name,
-                                                   const char* encryption_key)
+                                                 const char* encryption_key)
 {
     return std::unique_ptr<Replication>(new _impl::WriteLogCollector(database_name,
-                                                                     encryption_key));
+                                        encryption_key));
 }
 
 } // namespace realm

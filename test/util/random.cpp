@@ -19,10 +19,10 @@
 #include <ctime>
 
 #ifdef _WIN32
-#  define NOMINMAX
-#  include <windows.h>
+    #define NOMINMAX
+    #include <windows.h>
 #else
-#  include <unistd.h>
+    #include <unistd.h>
 #endif
 
 #include "random.hpp"
@@ -54,8 +54,6 @@ namespace _impl {
 
 GlobalRandom& GlobalRandom::get() noexcept
 {
-    // FIXME: Initialization of local statics are not guaranteed to be
-    // thread safe.
     static GlobalRandom r;
     return r;
 }

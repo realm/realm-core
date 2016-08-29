@@ -40,7 +40,7 @@ inline MemRef BasicArray<T>::create_array(size_t init_size, Allocator& allocator
     size_t byte_size_0 = calc_aligned_byte_size(init_size); // Throws
     // Adding zero to Array::initial_capacity to avoid taking the
     // address of that member
-    size_t byte_size = std::max(byte_size_0, Array::initial_capacity+0); // Throws
+    size_t byte_size = std::max(byte_size_0, Array::initial_capacity + 0); // Throws
 
     MemRef mem = allocator.alloc(byte_size); // Throws
 
@@ -132,6 +132,7 @@ template<class T>
 inline bool BasicArray<T>::is_null(size_t ndx) const noexcept
 {
     // FIXME: This assumes BasicArray will only ever be instantiated for float-like T.
+    static_assert(realm::is_any<T, float, double>::value, "T can only be float or double");
     auto x = get(ndx);
     return null::is_null_float(x);
 }
@@ -141,10 +142,8 @@ template<class T>
 inline T BasicArray<T>::get(const char* header, size_t ndx) noexcept
 {
     const char* data = get_data_from_header(header);
-    // FIXME: This casting assumes that T can be aliged on an 8-bype
-    // boundary (since data is aligned on an 8-byte boundary.) This
-    // restricts portability. The same problem recurs several times in
-    // the remainder of this file.
+    // This casting assumes that T can be aliged on an 8-bype
+    // boundary (since data is aligned on an 8-byte boundary.)
     return *(reinterpret_cast<const T*>(data) + ndx);
 }
 
@@ -178,12 +177,12 @@ void BasicArray<T>::insert(size_t ndx, T value)
     copy_on_write(); // Throws
 
     // Make room for the new value
-    alloc(m_size+1, m_width); // Throws
+    alloc(m_size + 1, m_width); // Throws
 
     // Move values below insertion
     if (ndx != m_size) {
-        char* src_begin = m_data + ndx*m_width;
-        char* src_end   = m_data + m_size*m_width;
+        char* src_begin = m_data + ndx * m_width;
+        char* src_end   = m_data + m_size * m_width;
         char* dst_end   = src_end + m_width;
         std::copy_backward(src_begin, src_end, dst_end);
     }
@@ -192,7 +191,7 @@ void BasicArray<T>::insert(size_t ndx, T value)
     T* data = reinterpret_cast<T*>(m_data) + ndx;
     *data = value;
 
-     ++m_size;
+    ++m_size;
 }
 
 template<class T>
@@ -204,10 +203,10 @@ void BasicArray<T>::erase(size_t ndx)
     copy_on_write(); // Throws
 
     // move data under deletion up
-    if (ndx < m_size-1) {
-        char* dst_begin = m_data + ndx*m_width;
+    if (ndx < m_size - 1) {
+        char* dst_begin = m_data + ndx * m_width;
         const char* src_begin = dst_begin + m_width;
-        const char* src_end   = m_data + m_size*m_width;
+        const char* src_end   = m_data + m_size * m_width;
         std::copy(src_begin, src_end, dst_begin);
     }
 
@@ -244,7 +243,7 @@ bool BasicArray<T>::compare(const BasicArray<T>& a) const
         return false;
     const T* data_1 = reinterpret_cast<const T*>(m_data);
     const T* data_2 = reinterpret_cast<const T*>(a.m_data);
-    return std::equal(data_1, data_1+n, data_2);
+    return std::equal(data_1, data_1 + n, data_2);
 }
 
 
@@ -257,14 +256,12 @@ size_t BasicArray<T>::calc_byte_len(size_t for_size, size_t) const
     // is done by returning the aligned version, and most callers of
     // calc_byte_len() will actually benefit if calc_byte_len() was
     // changed to always return the aligned byte size.
-    return header_size + for_size * sizeof (T); // FIXME: Prone to overflow
+    return header_size + for_size * sizeof(T);
 }
 
 template<class T>
 size_t BasicArray<T>::calc_item_count(size_t bytes, size_t) const noexcept
 {
-    // FIXME: ??? what about width = 0? return -1?
-
     size_t bytes_without_header = bytes - header_size;
     return bytes_without_header / sizeof (T);
 }
@@ -414,13 +411,14 @@ inline size_t BasicArray<T>::calc_aligned_byte_size(size_t size)
         throw std::runtime_error("Byte size overflow");
     size_t byte_size = header_size + size * sizeof (T);
     REALM_ASSERT_3(byte_size, >, 0);
-    size_t aligned_byte_size = ((byte_size-1) | 7) + 1; // 8-byte alignment
+    size_t aligned_byte_size = ((byte_size - 1) | 7) + 1; // 8-byte alignment
     return aligned_byte_size;
 }
 
 
 #ifdef REALM_DEBUG
 
+// LCOV_EXCL_START
 template<class T>
 void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
 {
@@ -451,6 +449,7 @@ void BasicArray<T>::to_dot(std::ostream& out, StringData title) const
 
     to_dot_parent_edge(out);
 }
+// LCOV_EXCL_STOP
 
 #endif // REALM_DEBUG
 

@@ -63,7 +63,7 @@ namespace _impl { class DescriptorFriend; }
 /// shared subtable descriptors are involved.
 ///
 /// \sa Table::get_descriptor()
-class Descriptor {
+class Descriptor : public std::enable_shared_from_this<Descriptor> {
 public:
     /// Get the number of columns in the associated tables.
     size_t get_column_count() const noexcept;
@@ -164,7 +164,7 @@ public:
                        DescriptorRef* subdesc = nullptr, bool nullable = false);
 
     size_t add_column_link(DataType type, StringData name, Table& target,
-                                LinkType = link_Weak);
+                           LinkType = link_Weak);
     void insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target,
                             LinkType = link_Weak);
     //@}
@@ -410,13 +410,16 @@ public:
 
     ~Descriptor() noexcept;
 
-
+private:
+    // for initialization through make_shared
+    struct PrivateTag {
+    };
+public:
+    Descriptor(const PrivateTag&) : Descriptor() {}
 private:
     TableRef m_root_table; // Table associated with root descriptor. Detached iff null.
     DescriptorRef m_parent; // Null iff detached or root descriptor.
     Spec* m_spec; // Valid if attached. Owned iff valid and `m_parent`.
-
-    mutable unsigned long m_ref_count;
 
     // Whenever a subtable descriptor accessor is created, it is
     // stored in this map. This ensures that when get_subdescriptor()
@@ -428,16 +431,13 @@ private:
     // objects.
     struct subdesc_entry {
         size_t m_column_ndx;
-        Descriptor* m_subdesc;
-        subdesc_entry(size_t column_ndx, Descriptor*);
+        std::weak_ptr<Descriptor> m_subdesc;
+        subdesc_entry(size_t column_ndx, DescriptorRef);
     };
     typedef std::vector<subdesc_entry> subdesc_map;
     mutable subdesc_map m_subdesc_map;
 
     Descriptor() noexcept;
-
-    void bind_ptr() const noexcept;
-    void unbind_ptr() const noexcept;
 
     // Called by the root table if this becomes the root
     // descriptor. Otherwise it is called by the descriptor that
@@ -461,7 +461,7 @@ private:
     // When the specified spec is the spec of the root table, the
     // parent must be specified as null. When the specified spec is
     // not the root spec, a proper parent must be specified.
-    void attach(Table*, Descriptor* parent, Spec*) noexcept;
+    void attach(Table*, DescriptorRef parent, Spec*) noexcept;
 
     // Detach accessor from underlying descriptor. Caller must ensure
     // that a reference count exists upon return, for example by
@@ -483,10 +483,6 @@ private:
     // this descriptor as ancestor.
     void detach_subdesc_accessors() noexcept;
 
-    // Remove the entry from m_subdesc_map that refers to the
-    // specified subtable descriptor. It must be there.
-    void remove_subdesc_entry(Descriptor* subdesc) const noexcept;
-
     // Record the path in terms of subtable column indexes from the
     // root descriptor to this descriptor. If this descriptor is a
     // root descriptor, the path is empty. Returns zero if the path is
@@ -498,7 +494,7 @@ private:
     // Returns a pointer to the accessor of the specified
     // subdescriptor if that accessor exists, otherwise this function
     // return null.
-    Descriptor* get_subdesc_accessor(size_t column_ndx) noexcept;
+    DescriptorRef get_subdesc_accessor(size_t column_ndx) noexcept;
 
     void move_column(size_t from_ndx, size_t to_ndx);
 
@@ -706,27 +702,16 @@ inline bool Descriptor::is_root() const noexcept
     return !m_parent;
 }
 
-inline Descriptor::Descriptor() noexcept: m_ref_count(0)
+inline Descriptor::Descriptor() noexcept
 {
 }
 
-inline void Descriptor::bind_ptr() const noexcept
-{
-    ++m_ref_count;
-}
-
-inline void Descriptor::unbind_ptr() const noexcept
-{
-    if (--m_ref_count == 0)
-        delete this;
-}
-
-inline void Descriptor::attach(Table* table, Descriptor* parent, Spec* spec) noexcept
+inline void Descriptor::attach(Table* table, DescriptorRef parent, Spec* spec) noexcept
 {
     REALM_ASSERT(!is_attached());
     REALM_ASSERT(!table->has_shared_type());
     m_root_table.reset(table);
-    m_parent.reset(parent);
+    m_parent = parent;
     m_spec = spec;
 }
 
@@ -735,9 +720,7 @@ inline bool Descriptor::is_attached() const noexcept
     return bool(m_root_table);
 }
 
-inline Descriptor::subdesc_entry::subdesc_entry(size_t n, Descriptor* d):
-    m_column_ndx(n),
-    m_subdesc(d)
+inline Descriptor::subdesc_entry::subdesc_entry(size_t n, DescriptorRef d) : m_column_ndx(n), m_subdesc(d)
 {
 }
 
@@ -757,12 +740,12 @@ inline bool Descriptor::operator!=(const Descriptor& d) const noexcept
 // not all of the non-public parts of the Descriptor class.
 class _impl::DescriptorFriend {
 public:
-    static Descriptor* create()
+    static DescriptorRef create()
     {
-        return new Descriptor; // Throws
+        return std::make_shared<Descriptor>(Descriptor::PrivateTag()); // Throws
     }
 
-    static void attach(Descriptor& desc, Table* table, Descriptor* parent, Spec* spec) noexcept
+    static void attach(Descriptor& desc, Table* table, DescriptorRef parent, Spec* spec) noexcept
     {
         desc.attach(table, parent, spec);
     }
@@ -793,12 +776,12 @@ public:
     }
 
     static size_t* record_subdesc_path(const Descriptor& desc, size_t* begin,
-                                            size_t* end) noexcept
+                                       size_t* end) noexcept
     {
         return desc.record_subdesc_path(begin, end);
     }
 
-    static Descriptor* get_subdesc_accessor(Descriptor& desc, size_t column_ndx) noexcept
+    static DescriptorRef get_subdesc_accessor(Descriptor& desc, size_t column_ndx) noexcept
     {
         return desc.get_subdesc_accessor(column_ndx);
     }

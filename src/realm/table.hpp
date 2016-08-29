@@ -614,7 +614,7 @@ public:
     TableView      get_range_view(size_t begin, size_t end);
     ConstTableView get_range_view(size_t begin, size_t end) const;
 
-    TableView      get_backlink_view(size_t row_ndx, Table *src_table,
+    TableView      get_backlink_view(size_t row_ndx, Table* src_table,
                                      size_t src_col_ndx);
 
 
@@ -726,8 +726,8 @@ public:
     /// \param offset Index of first row to include (if `slice_size >
     /// 0`). Must be less than, or equal to size().
     ///
-    /// \param slice_size Number of rows to include. May be zero. If 
-    /// `slice_size > size() - offset`, then the effective size of 
+    /// \param slice_size Number of rows to include. May be zero. If
+    /// `slice_size > size() - offset`, then the effective size of
     /// the written slice will be `size() - offset`.
     ///
     /// \throw std::out_of_range If `offset > size()`.
@@ -793,7 +793,7 @@ public:
 
     class Parent;
     using HandoverPatch = TableHandoverPatch;
-    static void generate_patch(const TableRef& ref, std::unique_ptr<HandoverPatch>& patch);
+    static void generate_patch(const Table* ref, std::unique_ptr<HandoverPatch>& patch);
     static TableRef create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group);
 
 protected:
@@ -874,7 +874,7 @@ private:
     // point in time. Subdescriptors are kept unique by means of a
     // registry in the parent descriptor. Table::m_descriptor is
     // always null for tables with shared descriptor.
-    mutable Descriptor* m_descriptor;
+    mutable std::weak_ptr<Descriptor> m_descriptor;
 
     // Table view instances
     // Access needs to be protected by m_accessor_mutex
@@ -908,7 +908,7 @@ private:
     size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
 
     void upgrade_file_format();
-    
+
     // Upgrades OldDateTime columns to Timestamp columns
     void upgrade_olddatetime();
 
@@ -1121,7 +1121,7 @@ private:
 
     static size_t get_size_from_ref(ref_type top_ref, Allocator&) noexcept;
     static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
-                                         Allocator&) noexcept;
+                                    Allocator&) noexcept;
 
     const Table* get_parent_table_ptr(size_t* column_ndx_out = nullptr) const noexcept;
     Table* get_parent_table_ptr(size_t* column_ndx_out = nullptr) noexcept;
@@ -1474,7 +1474,7 @@ inline void Table::move_last_over(size_t row_ndx)
 inline void Table::remove_last()
 {
     if (!is_empty())
-        remove(size()-1);
+        remove(size() - 1);
 }
 
 // A good place to start if you want to understand the memory ordering
@@ -1638,7 +1638,6 @@ inline Table::Table(Allocator& alloc):
     m_spec(alloc)
 {
     m_ref_count = 1; // Explicitely managed lifetime
-    m_descriptor = nullptr;
 
     ref_type ref = create_empty_table(alloc); // Throws
     Parent* parent = nullptr;
@@ -1652,7 +1651,6 @@ inline Table::Table(const Table& t, Allocator& alloc):
     m_spec(alloc)
 {
     m_ref_count = 1; // Explicitely managed lifetime
-    m_descriptor = nullptr;
 
     ref_type ref = t.clone(alloc); // Throws
     Parent* parent = nullptr;
@@ -1666,7 +1664,6 @@ inline Table::Table(ref_count_tag, Allocator& alloc):
     m_spec(alloc)
 {
     m_ref_count = 0; // Lifetime managed by reference counting
-    m_descriptor = nullptr;
 }
 
 inline Allocator& Table::get_alloc() const
@@ -1803,12 +1800,12 @@ inline Table::ConstRowExpr Table::front() const noexcept
 
 inline Table::RowExpr Table::back() noexcept
 {
-    return get(m_size-1);
+    return get(m_size - 1);
 }
 
 inline Table::ConstRowExpr Table::back() const noexcept
 {
-    return get(m_size-1);
+    return get(m_size - 1);
 }
 
 inline Table::RowExpr Table::operator[](size_t row_ndx) noexcept
@@ -2094,7 +2091,7 @@ public:
     }
 
     static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
-                                         Allocator& alloc) noexcept
+                                    Allocator& alloc) noexcept
     {
         return Table::get_size_from_ref(spec_ref, columns_ref, alloc);
     }
@@ -2149,7 +2146,7 @@ public:
     }
 
     static size_t get_num_strong_backlinks(const Table& table,
-                                                size_t row_ndx) noexcept
+                                           size_t row_ndx) noexcept
     {
         return table.get_num_strong_backlinks(row_ndx);
     }
@@ -2166,7 +2163,7 @@ public:
     }
 
     static size_t* record_subtable_path(const Table& table, size_t* begin,
-                                             size_t* end) noexcept
+                                        size_t* end) noexcept
     {
         return table.record_subtable_path(begin, end);
     }
@@ -2213,12 +2210,6 @@ public:
                                  bool is_move_last_over)
     {
         table.batch_erase_rows(row_indexes, is_move_last_over); // Throws
-    }
-
-    static void clear_root_table_desc(const Table& root_table) noexcept
-    {
-        REALM_ASSERT(!root_table.has_shared_type());
-        root_table.m_descriptor = nullptr;
     }
 
     static Table* get_subtable_accessor(Table& table, size_t col_ndx,
@@ -2321,9 +2312,9 @@ public:
         table.mark_opposite_link_tables();
     }
 
-    static Descriptor* get_root_table_desc_accessor(Table& root_table) noexcept
+    static DescriptorRef get_root_table_desc_accessor(Table& root_table) noexcept
     {
-        return root_table.m_descriptor;
+        return root_table.m_descriptor.lock();
     }
 
     typedef Table::AccessorUpdater AccessorUpdater;

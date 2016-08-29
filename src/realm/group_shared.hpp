@@ -28,13 +28,14 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #ifndef _WIN32
-#include <realm/util/interprocess_condvar.hpp>
+    #include <realm/util/interprocess_condvar.hpp>
 #endif
 #include <realm/util/interprocess_mutex.hpp>
 #include <realm/group.hpp>
 #include <realm/handover_defs.hpp>
 #include <realm/impl/transact_log.hpp>
 #include <realm/replication.hpp>
+#include <realm/version_id.hpp>
 
 namespace realm {
 
@@ -147,7 +148,7 @@ public:
                          DurabilityLevel durability = durability_Full,
                          const char* encryption_key = nullptr,
                          bool allow_file_format_upgrade = true,
-                         std::function<void(int,int)> upgrade_callback = std::function<void(int,int)>());
+                         std::function<void(int, int)> upgrade_callback = std::function<void(int, int)>());
 
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
@@ -157,7 +158,7 @@ public:
                          DurabilityLevel durability = durability_Full,
                          const char* encryption_key = nullptr,
                          bool allow_file_format_upgrade = true,
-                         std::function<void(int,int)> upgrade_callback = std::function<void(int,int)>());
+                         std::function<void(int, int)> upgrade_callback = std::function<void(int, int)>());
 
     struct unattached_tag {};
 
@@ -279,25 +280,7 @@ public:
     // Transactions:
 
     using version_type = _impl::History::version_type;
-
-    struct VersionID {
-        version_type version = std::numeric_limits<version_type>::max();
-        uint_fast32_t index   = 0;
-
-        VersionID() {}
-        VersionID(version_type initial_version, uint_fast32_t initial_index)
-        {
-            version = initial_version;
-            index = initial_index;
-        }
-
-        bool operator==(const VersionID& other) { return version == other.version; }
-        bool operator!=(const VersionID& other) { return version != other.version; }
-        bool operator<(const VersionID& other) { return version < other.version; }
-        bool operator<=(const VersionID& other) { return version <= other.version; }
-        bool operator>(const VersionID& other) { return version > other.version; }
-        bool operator>=(const VersionID& other) { return version >= other.version; }
-    };
+    using VersionID = realm::VersionID;
 
     /// Thrown by begin_read() if the specified version does not correspond to a
     /// bound (or tethered) snapshot.
@@ -513,6 +496,12 @@ public:
     /// may want to momentarily pin the current version until the other thread
     /// has retrieved it.
     ///
+    /// Pinning can be done in both read- and write-transactions, but with different
+    /// semantics. When pinning during a read-transaction, the version pinned is the
+    /// one accessible during the read-transaction. When pinning during a write-transaction,
+    /// the version pinned will be the last version that was succesfully committed to the
+    /// realm file at the point in time, when the write-transaction was started.
+    ///
     /// The release is not thread-safe, so it has to be done on the SharedGroup
     /// associated with the thread calling unpin_version(), and the SharedGroup
     /// must be attached to the realm file at the point of unpinning.
@@ -561,7 +550,7 @@ private:
 #endif
     util::InterprocessCondVar m_new_commit_available;
 #endif
-    std::function<void(int,int)> m_upgrade_callback;
+    std::function<void(int, int)> m_upgrade_callback;
 
     void do_open(const std::string& file, bool no_create, DurabilityLevel, bool is_backend,
                  const char* encryption_key, bool allow_file_format_upgrade);
@@ -784,7 +773,7 @@ struct SharedGroup::BadVersion: std::exception {};
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
                                 DurabilityLevel durability, const char* encryption_key,
-                                bool allow_file_format_upgrade, std::function<void(int,int)> upgrade_callback):
+                                bool allow_file_format_upgrade, std::function<void(int, int)> upgrade_callback):
     m_group(Group::shared_tag()),
     m_upgrade_callback(std::move(upgrade_callback))
 {
@@ -798,7 +787,7 @@ inline SharedGroup::SharedGroup(unattached_tag) noexcept:
 
 inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability,
                                 const char* encryption_key, bool allow_file_format_upgrade,
-                                std::function<void(int,int)> upgrade_callback):
+                                std::function<void(int, int)> upgrade_callback):
     m_group(Group::shared_tag()),
     m_upgrade_callback(std::move(upgrade_callback))
 {

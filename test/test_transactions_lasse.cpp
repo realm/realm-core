@@ -23,12 +23,12 @@
 #include <iostream>
 
 #ifdef _WIN32
-#  define NOMINMAX
-#  include <windows.h> // Sleep(), sched_yield()
-#  include <pthread.h> // pthread_win32_process_attach_np()
+    #define NOMINMAX
+    #include <windows.h> // Sleep(), sched_yield()
+    #include <pthread.h> // pthread_win32_process_attach_np()
 #else
-#  include <sched.h>  // sched_yield()
-#  include <unistd.h> // usleep()
+    #include <sched.h>  // sched_yield()
+    #include <unistd.h> // usleep()
 #endif
 
 #include <realm.hpp>
@@ -279,8 +279,8 @@ struct FastRand {
     FastRand(): u(1), v(1) {}
     unsigned int operator()()
     {
-        v = 36969*(v & 65535) + (v >> 16);
-        u = 18000*(u & 65535) + (u >> 16);
+        v = 36969 * (v & 65535) + (v >> 16);
+        u = 18000 * (u & 65535) + (u >> 16);
         return (v << 16) + u;
     }
 private:
@@ -298,7 +298,7 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
     const int ITER =     20;
     const int WRITERS =   4;
     const int READERS =   4;
-    const size_t ROWS = 1*1000*1000 + 1000; // + 1000 to add extra depth level if REALM_MAX_BPNODE_SIZE = 1000
+    const size_t ROWS = 1 * 1000 * 1000 + 1000; // + 1000 to add extra depth level if REALM_MAX_BPNODE_SIZE = 1000
     std::atomic<bool> terminate{false};
 
     auto write_thread = [&] {
@@ -333,12 +333,12 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
     auto read_thread = [&] {
         Random random(random_int<unsigned long>()); // Seed from slow global generator
         SharedGroup sg(path);
-        while (!terminate) { // FIXME: Oops - this 'read' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
+        while (!terminate) {
             ReadTransaction rt(sg);
-            if(rt.get_table("table")->size() > 0) {
-                int64_t r1 = rt.get_table("table")->get_int(0,0);
+            if (rt.get_table("table")->size() > 0) {
+                int64_t r1 = rt.get_table("table")->get_int(0, 0);
                 rand_sleep(random);
-                int64_t r2 = rt.get_table("table")->get_int(0,0);
+                int64_t r2 = rt.get_table("table")->get_int(0, 0);
                 CHECK_EQUAL(r1, r2);
             }
         }
@@ -421,7 +421,7 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
     auto read_thread = [&] {
         Random random(random_int<unsigned long>()); // Seed from slow global generator
         SharedGroup sg(path);
-        while (!terminate) { // FIXME: Oops - this 'read' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
+        while (!terminate) {
             ReadTransaction rt(sg);
             int64_t r1 = rt.get_table("table")->get_int(0, 0);
             rand_sleep(random);
@@ -460,7 +460,7 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
         CHECK(!writer_has_thrown);
     }
 
-    terminate = true; // FIXME: Oops - this 'write' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
+    terminate = true;
     for (int i = 0; i < READERS; ++i) {
         bool reader_has_thrown = read_threads[i].join();
         CHECK(!reader_has_thrown);

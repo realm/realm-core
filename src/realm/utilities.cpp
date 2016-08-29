@@ -23,11 +23,11 @@
 #include <fstream>
 
 #ifdef _WIN32
-#define NOMINMAX
-#  include "windows.h"
-#  include "psapi.h"
-#else 
-#include <unistd.h>
+    #define NOMINMAX
+    #include "windows.h"
+    #include "psapi.h"
+#else
+    #include <unistd.h>
 #endif
 
 #include <realm/utilities.hpp>
@@ -35,9 +35,9 @@
 #include <realm/util/thread.hpp>
 
 #ifdef REALM_COMPILER_SSE
-#  ifdef _MSC_VER
-#    include <intrin.h>
-#  endif
+    #ifdef _MSC_VER
+        #include <intrin.h>
+    #endif
 #endif
 
 
@@ -86,12 +86,12 @@ void cpuid_init()
 #  else
     int a = 1;
     __asm ( "mov %1, %%eax; "            // a into eax
-          "cpuid;"
-          "mov %%ecx, %0;"             // ecx into b
-          :"=r"(cret)                     // output
-          :"r"(a)                      // input
-          :"%eax","%ebx","%ecx","%edx" // clobbered register
-         );
+            "cpuid;"
+            "mov %%ecx, %0;"             // ecx into b
+            : "=r"(cret)                    // output
+            : "r"(a)                     // input
+            : "%eax", "%ebx", "%ecx", "%edx" // clobbered register
+          );
 #  endif
 
 // Byte is atomic. Race can/will occur but that's fine
@@ -136,20 +136,14 @@ void cpuid_init()
 // allow inlining.
 void* round_up(void* p, size_t align)
 {
-    // FIXME: The C++ standard does not guarantee that a pointer can
-    // be stored in size_t. Use uintptr_t instead. The problem with
-    // uintptr_t, is that is is not part of C++03.
     size_t r = size_t(p) % align == 0 ? 0 : align - size_t(p) % align;
-    return static_cast<char *>(p) + r;
+    return static_cast<char*>(p) + r;
 }
 
 void* round_down(void* p, size_t align)
 {
-    // FIXME: The C++ standard does not guarantee that a pointer can
-    // be stored in size_t. Use uintptr_t instead. The problem with
-    // uintptr_t, is that is is not part of C++03.
     size_t r = size_t(p);
-    return reinterpret_cast<void *>(r & ~(align - 1));
+    return reinterpret_cast<void*>(r & ~(align - 1));
 }
 
 size_t round_up(size_t p, size_t align)
@@ -228,7 +222,7 @@ namespace realm {
 // Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
 int fast_popcount32(int32_t x)
 {
-    return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
+    return a_popcount_bits[255 & x] + a_popcount_bits[255 & x >> 8] + a_popcount_bits[255 & x >> 16] + a_popcount_bits[255 & x >> 24];
 }
 int fast_popcount64(int64_t x)
 {

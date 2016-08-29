@@ -70,16 +70,19 @@ private:
 // Implementation:
 
 
-inline void Timer::reset() {
+inline void Timer::reset()
+{
     m_start = get_timer_ticks();
     m_paused_at = 0;
 }
 
-inline void Timer::pause() {
+inline void Timer::pause()
+{
     m_paused_at = get_timer_ticks();
 }
 
-inline void Timer::unpause() {
+inline void Timer::unpause()
+{
     if (m_paused_at) {
         m_start += get_timer_ticks() - m_paused_at;
         m_paused_at = 0;

@@ -26,7 +26,7 @@
 #include <realm/array.hpp>
 #include <realm/column_fwd.hpp>
 
- /*
+/*
 The StringIndex class is used for both type_String and all integral types, such as type_Bool, type_OldDateTime and
 type_Int. When used for integral types, the 64-bit integer is simply casted to a string of 8 bytes through a
 pretty simple "wrapper layer" in all public methods.
@@ -34,17 +34,17 @@ pretty simple "wrapper layer" in all public methods.
 The StringIndex data structure is like an "inversed" B+ tree where the leafs contain row indexes and the non-leafs
 contain 4-byte chunks of payload. Imagine a table with following strings:
 
-        hello, kitty, kitten, foobar, kitty, foobar
+       hello, kitty, kitten, foobar, kitty, foobar
 
 The topmost level of the index tree contains prefixes of the payload strings of length <= 4. The next level contains
 prefixes of the remaining parts of the strings. Unnecessary levels of the tree are optimized away; the prefix "foob"
 is shared only by rows that are identical ("foobar"), so "ar" is not needed to be stored in the tree.
 
-        hell   kitt      foob
-         |      /\        |
-         0     en  y    {3, 5}
-               |    \
-            {1, 4}   2
+       hell   kitt      foob
+        |      /\        |
+        0     en  y    {3, 5}
+              |    \
+           {1, 4}   2
 
 Each non-leafs consists of two integer arrays of the same length, one containing payload and the other containing
 references to the sublevel nodes.
@@ -177,7 +177,7 @@ private:
         size_t ref1;
         size_t ref2;
         enum ChangeType { none, insert_before, insert_after, split } type;
-        NodeChange(ChangeType t, size_t r1=0, size_t r2=0) : ref1(r1), ref2(r2), type(t) {}
+        NodeChange(ChangeType t, size_t r1 = 0, size_t r2 = 0) : ref1(r1), ref2(r2), type(t) {}
         NodeChange() : ref1(0), ref2(0), type(none) {}
     };
 
@@ -185,7 +185,7 @@ private:
     void TreeInsert(size_t row_ndx, key_type, size_t offset, StringData value);
     NodeChange do_insert(size_t ndx, key_type, size_t offset, StringData value);
     /// Returns true if there is room or it can join existing entries
-    bool leaf_insert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend=false);
+    bool leaf_insert(size_t row_ndx, key_type, size_t offset, StringData value, bool noextend = false);
     void node_insert_split(size_t ndx, size_t new_ref);
     void node_insert(size_t ndx, size_t ref);
     void do_delete(size_t ndx, StringData, size_t offset);
@@ -323,15 +323,15 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) noexcept
     // Create 4 byte index key
     // (encoded like this to allow literal comparisons
     // independently of endianness)
-  four:
+four:
     key |= (key_type(static_cast<unsigned char>(str[3])) <<  0);
-  three:
+three:
     key |= (key_type(static_cast<unsigned char>(str[2])) <<  8);
-  two:
+two:
     key |= (key_type(static_cast<unsigned char>(str[1])) << 16);
-  one:
+one:
     key |= (key_type(static_cast<unsigned char>(str[0])) << 24);
-  none:
+none:
     return key;
 }
 
@@ -347,7 +347,7 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
 
     // for very short strings
     size_t tail = str.size() - offset;
-    if (tail <= sizeof(key_type)-1) {
+    if (tail <= sizeof(key_type) - 1) {
         char buf[sizeof(key_type)];
         memset(buf, 0, sizeof(key_type));
         buf[tail] = 'X';

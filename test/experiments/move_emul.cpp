@@ -21,48 +21,48 @@
 
 namespace realm {
 
-    struct Data {
-        Data() { std::cout << "Data()\n"; }
-        ~Data() { std::cout << "~Data()\n"; }
-        Data* clone() const { return new Data(); }
-    };
+struct Data {
+    Data() { std::cout << "Data()\n"; }
+    ~Data() { std::cout << "~Data()\n"; }
+    Data* clone() const { return new Data(); }
+};
 
 
-    struct CopyAndMove {
-        CopyAndMove(): m_data(new Data()) {}
-        ~CopyAndMove() { delete m_data; }
+struct CopyAndMove {
+    CopyAndMove(): m_data(new Data()) {}
+    ~CopyAndMove() { delete m_data; }
 
-        CopyAndMove(const CopyAndMove& a): m_data(a.m_data->clone()) { std::cout << "Copy CopyAndMove (constructor)\n"; }
-        CopyAndMove& operator=(CopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; std::cout << "Move CopyAndMove (assign)\n"; return *this; }
+    CopyAndMove(const CopyAndMove& a): m_data(a.m_data->clone()) { std::cout << "Copy CopyAndMove (constructor)\n"; }
+    CopyAndMove& operator=(CopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; std::cout << "Move CopyAndMove (assign)\n"; return *this; }
 
-        friend CopyAndMove move(CopyAndMove& a) { Data* d = a.m_data; a.m_data = 0; std::cout << "Move CopyAndMove (move)\n"; return CopyAndMove(d); }
+    friend CopyAndMove move(CopyAndMove& a) { Data* d = a.m_data; a.m_data = 0; std::cout << "Move CopyAndMove (move)\n"; return CopyAndMove(d); }
 
-    private:
-        friend class ConstCopyAndMove;
+private:
+    friend class ConstCopyAndMove;
 
-        Data* m_data;
+    Data* m_data;
 
-        CopyAndMove(Data* d): m_data(d) {}
-    };
+    CopyAndMove(Data* d): m_data(d) {}
+};
 
 
-    struct ConstCopyAndMove {
-        ConstCopyAndMove(): m_data(new Data()) {}
-        ~ConstCopyAndMove() { delete m_data; }
+struct ConstCopyAndMove {
+    ConstCopyAndMove(): m_data(new Data()) {}
+    ~ConstCopyAndMove() { delete m_data; }
 
-        ConstCopyAndMove(const ConstCopyAndMove& a): m_data(a.m_data->clone()) { std::cout << "Copy ConstCopyAndMove (constructor)\n"; }
-        ConstCopyAndMove& operator=(ConstCopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; std::cout << "Move ConstCopyAndMove (assign)\n"; return *this; }
+    ConstCopyAndMove(const ConstCopyAndMove& a): m_data(a.m_data->clone()) { std::cout << "Copy ConstCopyAndMove (constructor)\n"; }
+    ConstCopyAndMove& operator=(ConstCopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; std::cout << "Move ConstCopyAndMove (assign)\n"; return *this; }
 
-        ConstCopyAndMove(CopyAndMove a): m_data(a.m_data) { a.m_data = 0; std::cout << "Move CopyAndMove to ConstCopyAndMove (constructor)\n"; }
-        ConstCopyAndMove& operator=(CopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; std::cout << "Move CopyAndMove to ConstCopyAndMove (assign)\n"; return *this; }
+    ConstCopyAndMove(CopyAndMove a): m_data(a.m_data) { a.m_data = 0; std::cout << "Move CopyAndMove to ConstCopyAndMove (constructor)\n"; }
+    ConstCopyAndMove& operator=(CopyAndMove a) { delete m_data; m_data = a.m_data; a.m_data = 0; std::cout << "Move CopyAndMove to ConstCopyAndMove (assign)\n"; return *this; }
 
-        friend ConstCopyAndMove move(ConstCopyAndMove& a) { const Data* d = a.m_data; a.m_data = 0; std::cout << "Move ConstCopyAndMove (move)\n"; return ConstCopyAndMove(d); }
+    friend ConstCopyAndMove move(ConstCopyAndMove& a) { const Data* d = a.m_data; a.m_data = 0; std::cout << "Move ConstCopyAndMove (move)\n"; return ConstCopyAndMove(d); }
 
-    private:
-        const Data* m_data;
+private:
+    const Data* m_data;
 
-        ConstCopyAndMove(const Data* d): m_data(d) {}
-    };
+    ConstCopyAndMove(const Data* d): m_data(d) {}
+};
 
 } // namespace realm
 

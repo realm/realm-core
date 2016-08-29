@@ -254,8 +254,8 @@ inline Mixed::Mixed(float v) noexcept
 
 inline Mixed::Mixed(double v) noexcept
 {
-   m_type = type_Double;
-   m_double = v;
+    m_type = type_Double;
+    m_double = v;
 }
 
 inline Mixed::Mixed(StringData v) noexcept
@@ -381,28 +381,48 @@ inline void Mixed::set_olddatetime(OldDateTime v) noexcept
     m_date = v.get_olddatetime();
 }
 
+// LCOV_EXCL_START
 inline void Mixed::set_timestamp(Timestamp v) noexcept
 {
     REALM_ASSERT(false && "not yet implemented");
     m_type = type_Timestamp;
     m_timestamp = v;
 }
+// LCOV_EXCL_STOP
 
-
+// LCOV_EXCL_START
 template<class Ch, class Tr>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Mixed& m)
 {
     out << "Mixed(";
     switch (m.m_type) {
-        case type_Int:         out << m.m_int;                        break;
-        case type_Bool:        out << m.m_bool;                       break;
-        case type_Float:       out << m.m_float;                      break;
-        case type_Double:      out << m.m_double;                     break;
-        case type_String:      out << StringData(m.m_data, m.m_size); break;
-        case type_Binary:      out << BinaryData(m.m_data, m.m_size); break;
-        case type_OldDateTime: out << OldDateTime(m.m_date);          break;
-        case type_Timestamp:   out << Timestamp(m.m_timestamp);       break;
-        case type_Table:       out << "subtable";                     break;
+        case type_Int:
+            out << m.m_int;
+            break;
+        case type_Bool:
+            out << m.m_bool;
+            break;
+        case type_Float:
+            out << m.m_float;
+            break;
+        case type_Double:
+            out << m.m_double;
+            break;
+        case type_String:
+            out << StringData(m.m_data, m.m_size);
+            break;
+        case type_Binary:
+            out << BinaryData(m.m_data, m.m_size);
+            break;
+        case type_OldDateTime:
+            out << OldDateTime(m.m_date);
+            break;
+        case type_Timestamp:
+            out << Timestamp(m.m_timestamp);
+            break;
+        case type_Table:
+            out << "subtable";
+            break;
         case type_Mixed:
         case type_Link:
         case type_LinkList:
@@ -411,6 +431,7 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
     out << ")";
     return out;
 }
+// LCOV_EXCL_STOP
 
 
 // Compare mixed with integer

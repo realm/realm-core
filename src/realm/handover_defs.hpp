@@ -61,8 +61,8 @@ struct SortDescriptorHandoverPatch {
 
 struct TableViewHandoverPatch {
     std::unique_ptr<TableHandoverPatch> m_table;
-    std::unique_ptr<TableHandoverPatch> linked_table;
     std::unique_ptr<RowBaseHandoverPatch> linked_row;
+    size_t linked_col;
     bool was_in_sync;
     QueryHandoverPatch query_patch;
     std::unique_ptr<LinkViewHandoverPatch> linkview_patch;

@@ -65,6 +65,8 @@ TEST(MixedColumn_Int)
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, 0, 0);
 
+    CHECK(!c.is_nullable());
+
     int64_t max_val = std::numeric_limits<int64_t>::max();
     int64_t min_val = std::numeric_limits<int64_t>::min();
     int64_t all_bit = 0xFFFFFFFFFFFFFFFFULL; // FIXME: Undefined cast from unsigned to signed
@@ -74,6 +76,8 @@ TEST(MixedColumn_Int)
     c.insert_int(2, max_val);
     c.insert_int(3, all_bit);
     CHECK_EQUAL(4, c.size());
+    CHECK(!c.is_null(0));
+    CHECK_LOGIC_ERROR(c.set_null(0), LogicError::column_not_nullable);
 
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Int, c.get_type(i));
@@ -110,10 +114,11 @@ TEST(MixedColumn_Float)
     float f = float(v);
     float fval1[] = { 0.0f, 100.123f, -111.222f, f };
     float fval2[] = { -0.0f, -100.123f, std::numeric_limits<float>::max(),
-                      std::numeric_limits<float>::min() };
+                      std::numeric_limits<float>::min()
+                    };
 
     // Test insert
-    for (size_t i=0; i<4; ++i)
+    for (size_t i = 0; i < 4; ++i)
         c.insert_float(i, fval1[i]);
     CHECK_EQUAL(4, c.size());
 
@@ -123,7 +128,7 @@ TEST(MixedColumn_Float)
     }
 
     // Set to new values - ensure sign is changed
-    for (size_t i=0; i<4; ++i)
+    for (size_t i = 0; i < 4; ++i)
         c.set_float(i, fval2[i]);
 
     for (size_t i = 0; i < c.size(); ++i) {
@@ -147,7 +152,7 @@ TEST(MixedColumn_Double)
     double fval2[] = {-1.0, -100.123, std::numeric_limits<double>::max(), std::numeric_limits<double>::min()};
 
     // Test insert
-    for (size_t i=0; i<4; ++i)
+    for (size_t i = 0; i < 4; ++i)
         c.insert_double(i, fval1[i]);
     CHECK_EQUAL(4, c.size());
 
@@ -158,7 +163,7 @@ TEST(MixedColumn_Double)
     }
 
     // Set to new values - ensure sign is changed
-    for (size_t i=0; i<4; ++i)
+    for (size_t i = 0; i < 4; ++i)
         c.set_double(i, fval2[i]);
 
     CHECK_EQUAL(4, c.size());
@@ -437,20 +442,23 @@ TEST(MixedColumn_SubtableSize)
     // No table instantiated yet (zero ref)
     CHECK_EQUAL( 0, c.get_subtable_size(0));
 
-    {    // Empty table (no columns)
+    {
+        // Empty table (no columns)
         TableRef t1 = c.get_subtable_ptr(1)->get_table_ref();
         CHECK(t1->is_empty());
         CHECK_EQUAL( 0, c.get_subtable_size(1));
     }
 
-    {   // Empty table (1 column, no rows)
+    {
+        // Empty table (1 column, no rows)
         TableRef t2 = c.get_subtable_ptr(2)->get_table_ref();
         CHECK(t2->is_empty());
         t2->add_column(type_Int, "col1");
         CHECK_EQUAL( 0, c.get_subtable_size(2));
     }
 
-    {   // Table with rows
+    {
+        // Table with rows
         TableRef t3 = c.get_subtable_ptr(3)->get_table_ref();
         CHECK(t3->is_empty());
         t3->add_column(type_Int, "col1");
@@ -458,7 +466,8 @@ TEST(MixedColumn_SubtableSize)
         CHECK_EQUAL(10, c.get_subtable_size(3));
     }
 
-    {   // Table with mixed column first
+    {
+        // Table with mixed column first
         TableRef t4 = c.get_subtable_ptr(4)->get_table_ref();
         CHECK(t4->is_empty());
         t4->add_column(type_Mixed, "col1");

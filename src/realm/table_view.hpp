@@ -216,7 +216,7 @@ public:
     // arguments in clang and vs2010 (fixed in 2012)
     template<int function, typename T, typename R, class ColType>
     R aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const,
-        size_t column_ndx, T count_target, size_t* return_ndx = nullptr) const;
+                size_t column_ndx, T count_target, size_t* return_ndx = nullptr) const;
 
     int64_t sum_int(size_t column_ndx) const;
     int64_t maximum_int(size_t column_ndx, size_t* return_ndx = nullptr) const;
@@ -331,11 +331,8 @@ protected:
     // Null if, and only if, the view is detached.
     mutable TableRef m_table;
 
-    // Contains a reference to the table that is the target of the link.
-    // Null unless this TableView was created using Table::get_backlink_view.
-    mutable TableRef m_linked_table;
-    // The index of the link column that this view contain backlinks for.
-    size_t m_linked_column;
+    // The link column that this view contain backlinks for.
+    const BacklinkColumn* m_linked_column = nullptr;
     // The target row that rows in this view link to.
     ConstRow m_linked_row;
 
@@ -370,7 +367,7 @@ protected:
     /// Construct empty view, ready for addition of row indices.
     TableViewBase(Table* parent);
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
-    TableViewBase(Table *parent, Table *linked_table, size_t column, BasicRowExpr<const Table> row);
+    TableViewBase(Table* parent, size_t column, BasicRowExpr<const Table> row);
 
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
@@ -399,10 +396,10 @@ protected:
     // a) forward their calls to the static type entry points.
     // b) new/delete patch data structures.
     virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                              ConstSourcePayload mode) const=0;
+                                                              ConstSourcePayload mode) const = 0;
 
     virtual std::unique_ptr<TableViewBase> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
-                                                              MutableSourcePayload mode)=0;
+                                                              MutableSourcePayload mode) = 0;
 
     void apply_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
     {
@@ -465,7 +462,6 @@ public:
     using TableViewBase::TableViewBase;
 
     TableView() = default;
-    ~TableView() noexcept = default;
 
     // Rows
     typedef BasicRowExpr<Table> RowExpr;
@@ -491,7 +487,7 @@ public:
     void set_string(size_t column_ndx, size_t row_ndx, StringData value);
     void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
-    void set_subtable(size_t column_ndx,size_t row_ndx, const Table* table);
+    void set_subtable(size_t column_ndx, size_t row_ndx, const Table* table);
     void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx);
 
     // Subtables
@@ -755,11 +751,10 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     m_row_indexes.get_root_array()->init_from_ref(ref_guard.release());
 }
 
-inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t column, BasicRowExpr<const Table> row):
+inline TableViewBase::TableViewBase(Table* parent, size_t column, BasicRowExpr<const Table> row):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(parent->get_table_ref()), // Throws
-    m_linked_table(linked_table->get_table_ref()), // Throws
-    m_linked_column(column),
+    m_linked_column(&parent->get_column_link_base(column).get_backlink_column()),
     m_linked_row(row),
     m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
 {
@@ -776,7 +771,6 @@ inline TableViewBase::TableViewBase(Table *parent, Table *linked_table, size_t c
 inline TableViewBase::TableViewBase(const TableViewBase& tv):
     RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
     m_table(tv.m_table),
-    m_linked_table(tv.m_linked_table),
     m_linked_column(tv.m_linked_column),
     m_linked_row(tv.m_linked_row),
     m_linkview_source(tv.m_linkview_source),
@@ -805,7 +799,6 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv):
 inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept:
     RowIndexes(std::move(tv.m_row_indexes)),
     m_table(std::move(tv.m_table)),
-    m_linked_table(std::move(tv.m_linked_table)),
     m_linked_column(tv.m_linked_column),
     m_linked_row(tv.m_linked_row),
     m_linkview_source(std::move(tv.m_linkview_source)),
@@ -849,7 +842,6 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_linked_table = std::move(tv.m_linked_table);
     m_linked_column = tv.m_linked_column;
     m_linked_row = tv.m_linked_row;
     m_linkview_source = std::move(tv.m_linkview_source);
@@ -886,7 +878,6 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     m_start = tv.m_start;
     m_end = tv.m_end;
     m_limit = tv.m_limit;
-    m_linked_table = tv.m_linked_table;
     m_linked_column = tv.m_linked_column;
     m_linked_row = tv.m_linked_row;
     m_linkview_source = tv.m_linkview_source;
@@ -1164,7 +1155,7 @@ inline ConstTableView::ConstTableView(TableView&& tv):
 inline void TableView::remove_last(RemoveMode underlying_mode)
 {
     if (!is_empty())
-        remove(size()-1, underlying_mode);
+        remove(size() - 1, underlying_mode);
 }
 
 inline Table& TableView::get_parent() noexcept
@@ -1197,12 +1188,14 @@ inline ConstTableView::ConstTableView(const Table& parent):
 {
 }
 
-inline ConstTableView& ConstTableView::operator=(const TableView& tv) {
+inline ConstTableView& ConstTableView::operator=(const TableView& tv)
+{
     TableViewBase::operator=(tv);
     return *this;
 }
 
-inline ConstTableView& ConstTableView::operator=(TableView&& tv) {
+inline ConstTableView& ConstTableView::operator=(TableView&& tv)
+{
     TableViewBase::operator=(std::move(tv));
     return *this;
 }

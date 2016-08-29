@@ -157,7 +157,7 @@ inline void StringBuffer::append_c_str(const char* c_string)
 inline void StringBuffer::reserve(size_t min_capacity)
 {
     size_t capacity = m_buffer.size();
-    if (capacity == 0 || capacity-1 < min_capacity)
+    if (capacity == 0 || capacity - 1 < min_capacity)
         reallocate(min_capacity);
 }
 
