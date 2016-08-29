@@ -6,7 +6,8 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Added log level argument to util::Logger::do_log().  Existing implementations
+can ignore the argument, or use it to add log level info to the log output.
 
 ### Enhancements
 
