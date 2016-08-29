@@ -6,6 +6,9 @@
 
 ### Breaking changes
 
+* API Breaking change: Added log level argument to util::Logger::do_log().
+  Existing implementations can ignore the argument, or use it to add log level
+  info to the log output.
 * API Breaking change: The WriteLogCollector is no longer available.
   To create a history object for SharedGroup, make_in_realm_history()
   must now be used instead of make_client_history().
