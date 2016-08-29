@@ -24,7 +24,7 @@
 #include <cassert>
 #include <pthread.h>
 #include <cstring>
-#include <time.h>
+#include <ctime>
 #include <sqlite3.h>
 #include <mysql/mysql.h>
 #include <realm.hpp>
