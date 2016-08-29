@@ -66,7 +66,7 @@
 #include <stdlib.h>
 #include <cstring>
 #include <cstdarg>
-#include <stdio.h>
+#include <cstdio>
 #include <windows.h>
 
 #ifdef __cplusplus

@@ -24,7 +24,7 @@
 #include <errno.h>
 #include <cstring>
 #include <cstddef>
-#include <stdio.h>
+#include <cstdio>
 #include <stdlib.h>
 
 #ifdef _WIN32
