@@ -32,7 +32,6 @@
 #include <realm.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/file.hpp>
-#include <realm/commit_log.hpp>
 #include <realm/version.hpp>
 #include <realm/history.hpp>
 
@@ -236,7 +235,7 @@ TEST(Upgrade_Database_2_3)
     {
         CHECK_OR_RETURN(File::copy(path, temp_copy));
 
-        std::unique_ptr<Replication> hist = make_client_history(temp_copy);
+        std::unique_ptr<Replication> hist = make_in_realm_history(temp_copy);
         SharedGroup sg(*hist);
         ReadTransaction rt(sg);
         ConstTableRef t = rt.get_table("table");

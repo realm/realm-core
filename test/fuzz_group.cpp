@@ -18,8 +18,8 @@
 
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
-#include <realm/commit_log.hpp>
 #include <realm/lang_bind_helper.hpp>
+#include <realm/history.hpp>
 #include "test.hpp"
 
 #include <ctime>
@@ -171,8 +171,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "SHARED_GROUP_TEST_PATH(path);\n";
 
             *log << "const char* key = " << printable_key << ";\n";
-            *log << "std::unique_ptr<Replication> hist_r(make_client_history(path, key));\n";
-            *log << "std::unique_ptr<Replication> hist_w(make_client_history(path, key));\n";
+            *log << "std::unique_ptr<Replication> hist_r(make_in_realm_history(path));\n";
+            *log << "std::unique_ptr<Replication> hist_w(make_in_realm_history(path));\n";
 
             *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);\n";
             *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);\n";
@@ -184,8 +184,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "\n";
         }
 
-        std::unique_ptr<Replication> hist_r(make_client_history(path, key));
-        std::unique_ptr<Replication> hist_w(make_client_history(path, key));
+        std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+        std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
 
         SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);
