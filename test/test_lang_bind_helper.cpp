@@ -2673,7 +2673,6 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->add_empty_row(2);
         parent_w->set_int(0, 0, 27);
         parent_w->set_int(0, 1, 227);
-        parent_w->set_int_unique(0, 1, 227);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2843,6 +2842,41 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
     CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+
+    // Check that adding a new row with the same primary key attaches row_1 to that row
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->set_int_unique(0, 0, 27);
+        parent_w->add_empty_row(2);
+        parent_w->set_int_unique(0, 2, 27);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(3, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(2, row_1.get_index());
+    CHECK_EQUAL(27, row_1.get_int(0));
+    CHECK_EQUAL(1, row_2.get_index());
+    CHECK_EQUAL(227, row_2.get_int(0));
+    // Move row_1 back to index 0
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->move_last_over(0);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(2, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(27, row_1.get_int(0));
+    CHECK_EQUAL(1, row_2.get_index());
     CHECK_EQUAL(227, row_2.get_int(0));
 
     // Check that descriptor modifications do not affect the row accessors (as

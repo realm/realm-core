@@ -1506,6 +1506,60 @@ TEST_TYPES(Table_SetStringUnique, std::true_type, std::false_type)
 }
 
 
+TEST(Table_SetUniqueAccessorUpdating)
+{
+    Group g;
+    TableRef origin = g.add_table("origin");
+    TableRef target = g.add_table("target");
+
+    target->add_column(type_Int, "col");
+    origin->add_column(type_Int, "pk");
+    origin->add_column_link(type_LinkList, "list", *target);
+    origin->add_search_index(0);
+
+    origin->add_empty_row(2);
+    origin->set_int_unique(0, 0, 1);
+    origin->set_int_unique(0, 1, 2);
+
+    Row row_0 = (*origin)[0];
+    Row row_1 = (*origin)[1];
+    LinkViewRef lv_0 = origin->get_linklist(1, 0);
+    LinkViewRef lv_1 = origin->get_linklist(1, 1);
+
+    // check new row number > old row number
+
+    origin->add_empty_row(2);
+    // subsumes old row 0, leaving new row at 2
+    origin->set_int_unique(0, 2, 1);
+
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 2);
+    CHECK_EQUAL(row_1.get_index(), 1);
+
+    CHECK(lv_0->is_attached());
+    CHECK(lv_1->is_attached());
+    CHECK(lv_0 == origin->get_linklist(1, 2));
+    CHECK(lv_1 == origin->get_linklist(1, 1));
+
+    // check new row number < old row number
+
+    origin->insert_empty_row(0, 2);
+    // subsumes old row 1, leaving new row at 0
+    origin->set_int_unique(0, 0, 2);
+
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 3); // moved due to insert
+    CHECK_EQUAL(row_1.get_index(), 0); // move due to subsume
+
+    CHECK(lv_0->is_attached());
+    CHECK(lv_1->is_attached());
+    CHECK(lv_0 == origin->get_linklist(1, 3));
+    CHECK(lv_1 == origin->get_linklist(1, 0));
+}
+
+
 TEST(Table_Distinct)
 {
     TestTableEnum table;

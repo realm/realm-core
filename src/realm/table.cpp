@@ -2848,6 +2848,7 @@ size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
         // RESOLUTION: Let the new row subsume the identity of the old row,
         // and delete the old row.
         change_link_targets(found_ndx, ndx);
+        adj_acc_subsume_row(found_ndx, ndx);
 
         if (ndx == size() - 1) {
             // Row will be moved by move_last_over, adjust index.
@@ -5402,6 +5403,23 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
+void Table::adj_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    adj_row_acc_subsume_row(old_row_ndx, new_row_ndx);
+
+    // Adjust LinkViews for new rows
+    for (auto& col : m_cols) {
+        if (col) {
+            col->adj_acc_subsume_row(old_row_ndx, new_row_ndx);
+        }
+    }
+}
+
+
 void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
@@ -5517,6 +5535,22 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
         else if (row->m_row_ndx == row_ndx_2) {
             row->m_row_ndx = row_ndx_1;
         }
+        row = row->m_next;
+    }
+}
+
+
+void Table::adj_row_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    LockGuard lock(m_accessor_mutex);
+    RowBase* row = m_row_accessors;
+    while (row) {
+        if (row->m_row_ndx == old_row_ndx)
+            row->m_row_ndx = new_row_ndx;
         row = row->m_next;
     }
 }
