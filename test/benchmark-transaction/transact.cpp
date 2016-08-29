@@ -21,7 +21,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <fcntl.h>
-#include <assert.h>
+#include <cassert>
 #include <pthread.h>
 #include <cstring>
 #include <time.h>
