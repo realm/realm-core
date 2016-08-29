@@ -38,14 +38,14 @@
     #include <signal.h>
     #include <sys/stat.h>
     #include <unistd.h>
-    #include <string.h>
+    #include <cstring>
     #include <atomic>
 
     #include <realm/util/errno.hpp>
     #include <realm/util/shared_ptr.hpp>
     #include <realm/util/terminate.hpp>
     #include <realm/util/thread.hpp>
-    #include <string.h> // for memset
+    #include <cstring> // for memset
 
     #if REALM_PLATFORM_APPLE
         #include <mach/mach.h>

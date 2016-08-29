@@ -23,7 +23,7 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <pthread.h>
-#include <string.h>
+#include <cstring>
 #include <time.h>
 #include <sqlite3.h>
 #include <mysql/mysql.h>

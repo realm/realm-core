@@ -22,7 +22,7 @@
 #include <vector>
 
 #include <errno.h>
-#include <string.h>
+#include <cstring>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>

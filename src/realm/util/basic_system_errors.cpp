@@ -17,7 +17,7 @@
  **************************************************************************/
 
 #include <stdlib.h>
-#include <string.h>
+#include <cstring>
 #include <string>
 
 #include <realm/util/features.h>
