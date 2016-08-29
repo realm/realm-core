@@ -82,12 +82,13 @@ protected:
 
     virtual void do_log(std::string message) = 0;
 
-private:
     struct State;
+    virtual void log_impl(State&);
+
+private:
     template<class> struct Subst;
 
     template<class... Params> REALM_NOINLINE void do_log(Level, const char* message, Params...);
-    void log_impl(State&);
     template<class Param, class... Params> void log_impl(State&, const Param&, Params...);
 };
 
@@ -205,12 +206,14 @@ private:
 // Implementation
 
 struct Logger::State {
+    Logger::Level m_level;
     std::string m_message;
     std::string m_search;
     int m_param_num = 1;
     std::ostringstream m_formatter;
     std::locale m_locale = std::locale::classic();
-    State(const char* s):
+    State(Logger::Level level, const char* s):
+        m_level(level),
         m_message(s),
         m_search(m_message)
     {
@@ -297,9 +300,9 @@ inline void Logger::do_log(Logger& logger, std::string message)
     logger.do_log(std::move(message));
 }
 
-template<class... Params> void Logger::do_log(Level, const char* message, Params... params)
+template<class... Params> void Logger::do_log(Level level, const char* message, Params... params)
 {
-    State state(message);
+    State state(level, message);
     log_impl(state, params...);
 }
 
