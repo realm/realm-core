@@ -18,8 +18,8 @@
 
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
-#include <realm/commit_log.hpp>
 #include <realm/lang_bind_helper.hpp>
+#include <realm/history.hpp>
 #include "test.hpp"
 
 #include <ctime>
@@ -34,14 +34,14 @@ using namespace realm::util;
 #define REALM_VERIFY true
 
 #if REALM_VERIFY
-    #define REALM_DO_IF_VERIFY(log, op) \
+#define REALM_DO_IF_VERIFY(log, op) \
         do { \
             if (log) *log << #op << ";\n"; \
             op; \
         } \
         while(false)
 #else
-    #define REALM_DO_IF_VERIFY(log, owner) \
+#define REALM_DO_IF_VERIFY(log, owner) \
         do {} while(false)
 #endif
 
@@ -62,7 +62,8 @@ enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, IN
             COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, CLOSE_AND_REOPEN, GET_ALL_COLUMN_NAMES,
             CREATE_TABLE_VIEW, COMPACT,
 
-            COUNT};
+            COUNT
+         };
 
 DataType get_type(unsigned char c)
 {
@@ -97,7 +98,8 @@ unsigned char get_next(State& s)
     return byte;
 }
 
-int64_t get_int64(State& s) {
+int64_t get_int64(State& s)
+{
     int64_t v = 0;
     for (size_t t = 0; t < 8; t++) {
         unsigned char c = get_next(s);
@@ -106,7 +108,8 @@ int64_t get_int64(State& s) {
     return v;
 }
 
-int32_t get_int32(State& s) {
+int32_t get_int32(State& s)
+{
     int32_t v = 0;
     for (size_t t = 0; t < 4; t++) {
         unsigned char c = get_next(s);
@@ -115,17 +118,20 @@ int32_t get_int32(State& s) {
     return v;
 }
 
-std::string create_column_name(State& s) {
+std::string create_column_name(State& s)
+{
     const size_t length = get_next(s) % (Descriptor::max_column_name_length + 1);
     return create_string(length);
 }
 
-std::string create_table_name(State& s) {
+std::string create_table_name(State& s)
+{
     const size_t length = get_next(s) % (Group::max_table_name_length + 1);
     return create_string(length);
 }
 
-std::string get_current_time_stamp() {
+std::string get_current_time_stamp()
+{
     std::time_t t = std::time(nullptr);
     const int str_size = 100;
     char str_buffer [str_size] = { 0 };
@@ -165,8 +171,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "SHARED_GROUP_TEST_PATH(path);\n";
 
             *log << "const char* key = " << printable_key << ";\n";
-            *log << "std::unique_ptr<Replication> hist_r(make_client_history(path, key));\n";
-            *log << "std::unique_ptr<Replication> hist_w(make_client_history(path, key));\n";
+            *log << "std::unique_ptr<Replication> hist_r(make_in_realm_history(path));\n";
+            *log << "std::unique_ptr<Replication> hist_w(make_in_realm_history(path));\n";
 
             *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);\n";
             *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);\n";
@@ -178,8 +184,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "\n";
         }
 
-        std::unique_ptr<Replication> hist_r(make_client_history(path, key));
-        std::unique_ptr<Replication> hist_w(make_client_history(path, key));
+        std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+        std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
 
         SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);
         SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);
@@ -453,7 +459,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                     size_t target_link_ndx = get_next(s) % target->size();
                                     if (log) {
                                         *log << "g.get_table(" << table_ndx << ")->get_linklist(" << col_ndx << ", "
-                                            << row_ndx << ")->set(" << linklist_row << ", " << target_link_ndx << ");\n";
+                                             << row_ndx << ")->set(" << linklist_row << ", " << target_link_ndx << ");\n";
                                     }
                                     links->set(linklist_row, target_link_ndx);
                                 }
@@ -461,7 +467,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                     size_t target_link_ndx = get_next(s) % target->size();
                                     if (log) {
                                         *log << "g.get_table(" << table_ndx << ")->get_linklist(" << col_ndx << ", "
-                                            << row_ndx << ")->add(" << target_link_ndx << ");\n";
+                                             << row_ndx << ")->add(" << target_link_ndx << ");\n";
                                     }
                                     links->add(target_link_ndx);
                                 }
@@ -650,7 +656,7 @@ int run_fuzzy(int argc, const char* argv[])
         if (arg == "--log") {
             log = util::some<std::ostream&>(std::cout);
         }
-        else if (arg == "--name"){
+        else if (arg == "--name") {
             name = argv[++i];
         }
         else {

@@ -25,14 +25,13 @@
 
 #include <sys/stat.h>
 #ifndef _WIN32
-#  include <unistd.h>
-#  include <sys/types.h>
+    #include <unistd.h>
+    #include <sys/types.h>
 #endif
 
 #include <realm.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/file.hpp>
-#include <realm/commit_log.hpp>
 #include <realm/version.hpp>
 #include <realm/history.hpp>
 
@@ -76,7 +75,7 @@ using namespace realm::util;
 TEST(Upgrade_Database_2_3)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
     // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
     // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
@@ -234,27 +233,27 @@ TEST(Upgrade_Database_2_3)
 
     // Automatic upgrade from SharedGroup with replication
     {
-      CHECK_OR_RETURN(File::copy(path, temp_copy));
+        CHECK_OR_RETURN(File::copy(path, temp_copy));
 
-      std::unique_ptr<Replication> hist = make_client_history(temp_copy);
-      SharedGroup sg(*hist);
-      ReadTransaction rt(sg);
-      ConstTableRef t = rt.get_table("table");
+        std::unique_ptr<Replication> hist = make_in_realm_history(temp_copy);
+        SharedGroup sg(*hist);
+        ReadTransaction rt(sg);
+        ConstTableRef t = rt.get_table("table");
 
-      CHECK(t->has_search_index(0));
-      CHECK(t->has_search_index(1));
+        CHECK(t->has_search_index(0));
+        CHECK(t->has_search_index(1));
 
-      for (int i = 0; i < 1000; i++) {
-          // These tests utilize the Integer and String index. That will crash if the database is still
-          // in version 2 format, because the on-disk format of index has changed in version 3.
-          std::string str = util::to_string(i);
-          StringData sd(str);
-          size_t f = t->find_first_string(0, sd);
-          CHECK_EQUAL(f, i);
+        for (int i = 0; i < 1000; i++) {
+            // These tests utilize the Integer and String index. That will crash if the database is still
+            // in version 2 format, because the on-disk format of index has changed in version 3.
+            std::string str = util::to_string(i);
+            StringData sd(str);
+            size_t f = t->find_first_string(0, sd);
+            CHECK_EQUAL(f, i);
 
-          f = t->find_first_int(1, i);
-          CHECK_EQUAL(f, i);
-      }
+            f = t->find_first_int(1, i);
+            CHECK_EQUAL(f, i);
+        }
     }
 
 #else // test write mode
@@ -287,7 +286,7 @@ TEST(Upgrade_Database_2_3)
 TEST(Upgrade_Database_2_Backwards_Compatible)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-        util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
 
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
@@ -429,7 +428,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
 TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-        util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
 
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
@@ -570,7 +569,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 TEST(Upgrade_Database_Binary)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-        util::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";
 
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
@@ -656,7 +655,7 @@ TEST(Upgrade_Database_Binary)
 TEST(Upgrade_Database_Strings_With_NUL)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-        util::to_string(REALM_MAX_BPNODE_SIZE) + "_4.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_4.realm";
 
     // entries in this array must have length == index
     const char* const nul_strings[] = {
@@ -731,7 +730,7 @@ TEST(Upgrade_Database_Strings_With_NUL)
 TEST(Upgrade_Database_2_3_Writes_New_File_Format)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
     CHECK_OR_RETURN(File::exists(path));
     SHARED_GROUP_TEST_PATH(temp_copy);
     CHECK_OR_RETURN(File::copy(path, temp_copy));
@@ -750,7 +749,7 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format_new)
     // the same database file will both think the database needs upgrade in the first check.
 
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
     CHECK_OR_RETURN(File::exists(path));
     SHARED_GROUP_TEST_PATH(temp_copy);
     CHECK_OR_RETURN(File::copy(path, temp_copy));
@@ -776,7 +775,7 @@ TEST(Upgrade_InRealmHistory)
     // version 4 is necessary.
 
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-        util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
 
     CHECK_OR_RETURN(File::exists(path));
     // Make a copy of the database so that we keep the original file intact and unmodified
@@ -812,7 +811,7 @@ TEST(Upgrade_InRealmHistory)
 TEST(Upgrade_DatabaseWithCallback)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-    util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
 
     CHECK_OR_RETURN(File::exists(path));
     SHARED_GROUP_TEST_PATH(temp_copy);
@@ -826,12 +825,11 @@ TEST(Upgrade_DatabaseWithCallback)
     SharedGroup::DurabilityLevel durability = SharedGroup::DurabilityLevel::durability_Full;
     const char* encryption_key = nullptr;
     bool allow_file_format_upgrade = true;
-    std::function<void(int,int)> upgrade_callback;
+    std::function<void(int, int)> upgrade_callback;
 
     bool did_upgrade = false;
     int old_version, new_version;
-    auto callback = [&](int from, int to)
-    {
+    auto callback = [&](int from, int to) {
         did_upgrade = true;
         old_version = from;
         new_version = to;
@@ -854,7 +852,7 @@ TEST(Upgrade_DatabaseWithCallback)
 TEST(Upgrade_DatabaseWithCallbackWithException)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-    util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
 
     CHECK_OR_RETURN(File::exists(path));
     SHARED_GROUP_TEST_PATH(temp_copy);
@@ -868,16 +866,14 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
     SharedGroup::DurabilityLevel durability = SharedGroup::DurabilityLevel::durability_Full;
     const char* encryption_key = nullptr;
     bool allow_file_format_upgrade = true;
-    std::function<void(int,int)> upgrade_callback;
+    std::function<void(int, int)> upgrade_callback;
 
     bool did_upgrade = false;
     int old_version, new_version;
-    auto exception_callback = [&](int, int)
-    {
+    auto exception_callback = [&](int, int) {
         throw std::exception();
     };
-    auto successful_callback = [&](int from, int to)
-    {
+    auto successful_callback = [&](int from, int to) {
         did_upgrade = true;
         old_version = from;
         new_version = to;
@@ -894,7 +890,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
                         allow_file_format_upgrade,
                         upgrade_callback);
     }
-    catch(...) {
+    catch (...) {
         exception_thrown = true;
     }
     CHECK(exception_thrown);
@@ -903,11 +899,11 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
     // Callback should be triggered here because the file still needs to be upgraded
     upgrade_callback = successful_callback;
     SharedGroup sg2(temp_copy,
-                   no_create,
-                   durability,
-                   encryption_key,
-                   allow_file_format_upgrade,
-                   upgrade_callback);
+                    no_create,
+                    durability,
+                    encryption_key,
+                    allow_file_format_upgrade,
+                    upgrade_callback);
     CHECK(did_upgrade);
     CHECK_EQUAL(old_version, 3);
     CHECK(new_version >= 5);
@@ -928,7 +924,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
 TEST(Upgrade_Database_4_5_DateTime1)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-        util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
 
 #if TEST_READ_UPGRADE_MODE
 
@@ -946,12 +942,12 @@ TEST(Upgrade_Database_4_5_DateTime1)
 
         WriteTransaction rt(sg);
         TableRef t = rt.get_table("table");
-        
+
         CHECK(t->has_search_index(0));
         CHECK(t->has_search_index(1));
         CHECK(!t->has_search_index(2));
         CHECK(!t->has_search_index(3));
-        
+
         CHECK(!t->is_null(0, 0));
         CHECK(!t->is_null(1, 0));
         CHECK(!t->is_null(2, 0));
@@ -996,7 +992,7 @@ TEST(Upgrade_Database_4_5_DateTime1)
     // No index
     t->add_column(type_OldDateTime, "dt1", true);  // nullable
     t->add_column(type_OldDateTime, "dt2", false); // nonnullable
-                                                // No index
+    // No index
     t->add_column(type_OldDateTime, "dt3", true);  // nullable
     t->add_column(type_OldDateTime, "dt4", false); // nonnullable
 

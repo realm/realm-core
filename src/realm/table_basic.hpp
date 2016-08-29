@@ -176,12 +176,12 @@ public:
     ///
     RowAccessor back(int rel_idx = -1) noexcept
     {
-        return RowAccessor(std::make_pair(this, size()+rel_idx));
+        return RowAccessor(std::make_pair(this, size() + rel_idx));
     }
 
     ConstRowAccessor back(int rel_idx = -1) const noexcept
     {
-        return ConstRowAccessor(std::make_pair(this, size()+rel_idx));
+        return ConstRowAccessor(std::make_pair(this, size() + rel_idx));
     }
 
     RowAccessor add() { return RowAccessor(std::make_pair(this, add_empty_row())); }
@@ -314,7 +314,7 @@ private:
         StringData dyn_col_names[num_cols];
         Spec::dyn_col_names(dyn_col_names);
         return !HasType<typename Spec::Columns,
-                        _impl::CmpColType>::exec(&spec, dyn_col_names);
+               _impl::CmpColType>::exec(&spec, dyn_col_names);
     }
 
     // This one allows a BasicTable to know that BasicTables with
@@ -359,15 +359,17 @@ private:
 
 
 #ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable: 4355)
+    #pragma warning(push)
+    #pragma warning(disable: 4355)
 #endif
 
+// Code formatting is tricked by this
+#define BASIC_TABLE_PARENT Spec::template ColNames<QueryCol, Query*>
+
 template<class Spec>
-class BasicTable<Spec>::Query:
-        public Spec::template ColNames<QueryCol, Query*> {
+class BasicTable<Spec>::Query: public BASIC_TABLE_PARENT {
 public:
-    Query(const Query& q): Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
+    Query(const Query& q) : Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
     virtual ~Query() noexcept {}
 
     Query& group() { m_impl.group(); return *this; }
@@ -400,15 +402,15 @@ public:
     }
 
     size_t count(size_t start = 0,
-                      size_t end   = size_t(-1),
-                      size_t limit = size_t(-1)) const
+                 size_t end   = size_t(-1),
+                 size_t limit = size_t(-1)) const
     {
         return m_impl.count(start, end, limit);
     }
 
     size_t remove(size_t start = 0,
-                       size_t end   = size_t(-1),
-                       size_t limit = size_t(-1))
+                  size_t end   = size_t(-1),
+                  size_t limit = size_t(-1))
     {
         return m_impl.remove(start, end, limit);
     }
@@ -416,19 +418,19 @@ public:
     std::string validate() { return m_impl.validate(); }
 
 protected:
-    Query(const BasicTable<Spec>& table, TableViewBase* tv):
-        Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv) {}
-
-    using HandoverPatch = QueryHandoverPatch;
-    Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode) :
-        Spec::template ColNames<QueryCol, Query*>(this),
-        m_impl(source.m_impl, patch, mode)
+    Query(const BasicTable<Spec>& table, TableViewBase* tv)
+        : Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv)
     {
     }
 
-    Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode) :
-        Spec::template ColNames<QueryCol, Query*>(this),
-        m_impl(source.m_impl, patch, mode)
+    using HandoverPatch = QueryHandoverPatch;
+    Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
+        : Spec::template ColNames<QueryCol, Query*>(this), m_impl(source.m_impl, patch, mode)
+    {
+    }
+
+    Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
+        : Spec::template ColNames<QueryCol, Query*>(this), m_impl(source.m_impl, patch, mode)
     {
     }
 
@@ -473,7 +475,7 @@ private:
 };
 
 #ifdef _MSC_VER
-#pragma warning(pop)
+    #pragma warning(pop)
 #endif
 
 
@@ -487,8 +489,7 @@ template<class T>
 struct GetColumnTypeId;
 
 template<>
-struct GetColumnTypeId<int64_t>
-{
+struct GetColumnTypeId<int64_t> {
     static const DataType id = type_Int;
 };
 template<class E>
@@ -496,44 +497,36 @@ struct GetColumnTypeId<SpecBase::Enum<E>> {
     static const DataType id = type_Int;
 };
 template<>
-struct GetColumnTypeId<bool>
-{
+struct GetColumnTypeId<bool> {
     static const DataType id = type_Bool;
 };
 template<>
-struct GetColumnTypeId<float>
-{
+struct GetColumnTypeId<float> {
     static const DataType id = type_Float;
 };
 template<>
-struct GetColumnTypeId<double>
-{
+struct GetColumnTypeId<double> {
     static const DataType id = type_Double;
 };
 template<>
-struct GetColumnTypeId<StringData>
-{
+struct GetColumnTypeId<StringData> {
     static const DataType id = type_String;
 };
 template<>
-struct GetColumnTypeId<BinaryData>
-{
+struct GetColumnTypeId<BinaryData> {
     static const DataType id = type_Binary;
 };
 template<>
-struct GetColumnTypeId<OldDateTime>
-{
+struct GetColumnTypeId<OldDateTime> {
     static const DataType id = type_OldDateTime;
 };
 template<>
-struct GetColumnTypeId<Mixed>
-{
+struct GetColumnTypeId<Mixed> {
     static const DataType id = type_Mixed;
 };
 template<>
-struct GetColumnTypeId<Timestamp>
-{
-        static const DataType id = type_Timestamp;
+struct GetColumnTypeId<Timestamp> {
+    static const DataType id = type_Timestamp;
 };
 
 template<class Type, int col_idx>
@@ -569,7 +562,7 @@ struct CmpColType {
     static bool exec(const Spec* spec, const StringData* col_names)
     {
         return GetColumnTypeId<Type>::id != spec->get_public_column_type(col_idx) ||
-            col_names[col_idx] != spec->get_column_name(col_idx);
+               col_names[col_idx] != spec->get_column_name(col_idx);
     }
 };
 
@@ -579,7 +572,7 @@ struct CmpColType<SpecBase::Subtable<Subtab>, col_idx> {
     static bool exec(const Spec* spec, const StringData* col_names)
     {
         if (spec->get_column_type(col_idx) != col_type_Table ||
-            col_names[col_idx] != spec->get_column_name(col_idx)) return true;
+                col_names[col_idx] != spec->get_column_name(col_idx)) return true;
         const Spec subspec = const_cast<Spec*>(spec)->get_subtable_spec(col_idx);
         return !Subtab::matches_dynamic_type(subspec);
     }

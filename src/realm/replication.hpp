@@ -35,7 +35,7 @@
 
 namespace realm {
 namespace util {
-    class Logger;
+class Logger;
 }
 
 // FIXME: Be careful about the possibility of one modification function being called by another where both do transaction logging.
@@ -47,8 +47,8 @@ namespace util {
 /// Replication is enabled by passing an instance of an implementation of this
 /// class to the SharedGroup constructor.
 class Replication:
-        public _impl::TransactLogConvenientEncoder,
-        protected _impl::TransactLogStream {
+    public _impl::TransactLogConvenientEncoder,
+    protected _impl::TransactLogStream {
 public:
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
@@ -89,16 +89,6 @@ public:
     ///
     /// The default implementation does nothing.
     virtual void terminate_session() noexcept = 0;
-
-    /// Called by the associated SharedGroup to close any open files
-    /// or release similar system resources.
-    ///
-    /// This is a special purpose function that solves a problem that is
-    /// specific to the implementation available through <commit_log.hpp>. At
-    /// least for now, it is not to be considered a genuine part of the
-    /// Replication interface. The default implementation does nothing and other
-    /// implementations should not override this function.
-    virtual void commit_log_close() noexcept {}
 
     //@{
 

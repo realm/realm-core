@@ -113,29 +113,40 @@ struct SetLeafElem: Array::UpdateHandler {
 BinaryData BinaryColumn::get_at(size_t ndx, size_t& pos) const noexcept
 {
     REALM_ASSERT_3(ndx, <, size());
-    Array leaf(m_array->get_alloc());
-    Array* arr;
 
     if (root_is_leaf()) {
-        arr = m_array.get();
+        Array* arr = m_array.get();
+        bool is_big = arr->get_context_flag();
+        if (!is_big) {
+            // Small blobs
+            pos = 0;
+            REALM_ASSERT_DEBUG(dynamic_cast<ArrayBinary*>(arr) != nullptr);
+            return static_cast<ArrayBinary*>(arr)->get(ndx);
+        }
+        else {
+            // Big blobs
+            REALM_ASSERT_DEBUG(dynamic_cast<ArrayBigBlobs*>(arr) != nullptr);
+            return static_cast<ArrayBigBlobs*>(arr)->get_at(ndx, pos);
+        }
     }
     else {
         // Non-leaf root
         std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
-        leaf.init_from_mem(p.first);
-        ndx = p.second;
-        arr = &leaf;
-    }
-
-    bool is_big = arr->get_context_flag();
-    if (!is_big) {
-        // Small blobs
-        pos = 0;
-        return static_cast<ArrayBinary*>(arr)->get(ndx);
-    }
-    else {
-        // Big blobs
-        return static_cast<ArrayBigBlobs*>(arr)->get_at(ndx, pos);
+        const char* leaf_header = p.first.get_addr();
+        bool is_big = Array::get_context_flag_from_header(leaf_header);
+        if (!is_big) {
+            // Small blobs
+            pos = 0;
+            ArrayBinary leaf(m_array->get_alloc());
+            leaf.init_from_mem(p.first);
+            return leaf.get(p.second);
+        }
+        else {
+            // Big blobs
+            ArrayBigBlobs leaf(m_array->get_alloc(), m_nullable);
+            leaf.init_from_mem(p.first);
+            return leaf.get_at(p.second, pos);
+        }
     }
 }
 
@@ -546,7 +557,7 @@ ref_type BinaryColumn::write(size_t slice_offset, size_t slice_size,
     else {
         SliceHandler handler(get_alloc());
         ref = ColumnBaseSimple::write(m_array.get(), slice_offset, slice_size,
-                                table_size, handler, out); // Throws
+                                      table_size, handler, out); // Throws
     }
     return ref;
 }
@@ -575,7 +586,7 @@ void BinaryColumn::update_from_ref(ref_type ref)
     bool old_root_is_small = !m_array->get_context_flag();
 
     bool root_type_changed = old_root_is_leaf != new_root_is_leaf ||
-        (old_root_is_leaf && old_root_is_small != new_root_is_small);
+                             (old_root_is_leaf && old_root_is_small != new_root_is_small);
     if (!root_type_changed) {
         // Keep, but refresh old root accessor
         if (old_root_is_leaf) {
@@ -724,7 +735,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
         leaf_type = "Big blobs leaf";
     }
     int indent = level * 2;
-    out << std::setw(indent) << "" << leaf_type << " (size: "<<leaf_size<<")\n";
+    out << std::setw(indent) << "" << leaf_type << " (size: " << leaf_size << ")\n";
 }
 
 } // anonymous namespace

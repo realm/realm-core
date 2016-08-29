@@ -120,10 +120,10 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size,
         // included in the first page which was handled above.
         size = header_to_size(static_cast<const char*>(addr));
     }
-    size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr)+size-1) >> m_page_shift;
+    size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr) + size - 1) >> m_page_shift;
     size_t last_idx = last_accessed_page - m_first_page;
 
-    for (size_t idx = first_idx+1; idx <= last_idx; ++idx) {
+    for (size_t idx = first_idx + 1; idx <= last_idx; ++idx) {
         if (!m_up_to_date_pages[idx]) {
             if (!lock.holds_lock())
                 lock.lock();

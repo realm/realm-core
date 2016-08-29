@@ -329,7 +329,7 @@ TEST(ArrayBigBlobs_get_at)
     char* header = c.get_mem().get_addr();
 
     // Using the normal get results in a NULL object
-    binary= c.get(1);
+    binary = c.get(1);
     CHECK(binary.is_null());
     binary = ArrayBigBlobs::get(header, 1, Allocator::get_default());
     CHECK(binary.is_null());
@@ -338,13 +338,13 @@ TEST(ArrayBigBlobs_get_at)
     idx = 0;
     ok = true;
     do {
-       read = c.get_at(1, get_pos);
-       data = read.data();
-       for (unsigned j = 0; j < read.size(); j++) {
-           if (data[j] != big_blob[idx++]) {
-               ok = false;
-           }
-       }
+        read = c.get_at(1, get_pos);
+        data = read.data();
+        for (unsigned j = 0; j < read.size(); j++) {
+            if (data[j] != big_blob[idx++]) {
+                ok = false;
+            }
+        }
     } while (get_pos);
     CHECK_EQUAL(idx, 0x2000000);
     CHECK(ok);

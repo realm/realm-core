@@ -437,7 +437,7 @@ inline bool Spec::has_subspec() const noexcept
     return (m_top.size() >= 4) && (m_top.get_as_ref(3) != 0);
 }
 
-inline bool Spec::operator!=(const Spec &s) const noexcept
+inline bool Spec::operator!=(const Spec& s) const noexcept
 {
     return !(*this == s);
 }
@@ -463,7 +463,7 @@ inline ConstSubspecRef::ConstSubspecRef(const Array* parent,
 }
 
 inline ConstSubspecRef::ConstSubspecRef(SubspecRef r) noexcept:
-        m_parent(r.m_parent),
+    m_parent(r.m_parent),
     m_ndx_in_parent(r.m_ndx_in_parent)
 {
 }

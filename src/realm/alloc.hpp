@@ -58,7 +58,7 @@ private:
     char* m_addr;
     ref_type m_ref;
 #if REALM_ENABLE_MEMDEBUG
-    // Allocator that created m_ref. Used to verify that the ref is valid whenever you call 
+    // Allocator that created m_ref. Used to verify that the ref is valid whenever you call
     // get_ref()/get_addr and that it e.g. has not been free'ed
     const Allocator* m_alloc = nullptr;
 #endif
@@ -81,7 +81,7 @@ private:
 /// \sa SlabAlloc
 class Allocator {
 public:
-	static constexpr int CURRENT_FILE_FORMAT_VERSION = 5;
+    static constexpr int CURRENT_FILE_FORMAT_VERSION = 5;
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -249,8 +249,8 @@ protected:
     // be more obvious to place it in Group, but that would add a runtime overhead,
     // and access is time critical.
     //
-    // This means that multiple threads that allocate Realm objects through the 
-    // default allocator will share this variable, which is a logical design flaw 
+    // This means that multiple threads that allocate Realm objects through the
+    // default allocator will share this variable, which is a logical design flaw
     // that can make sync_if_needed() re-run queries even though it is not required.
     // It must be atomic because it's shared.
     std::atomic<uint_fast64_t> m_table_versioning_counter;
@@ -308,8 +308,8 @@ inline ref_type to_ref(int_fast64_t v) noexcept
 
 inline int64_t to_int64(size_t value) noexcept
 {
-//    FIXME: Enable once we get clang warning flags correct
-//    REALM_ASSERT_DEBUG(value <= std::numeric_limits<int64_t>::max());
+    //    FIXME: Enable once we get clang warning flags correct
+    //    REALM_ASSERT_DEBUG(value <= std::numeric_limits<int64_t>::max());
     return static_cast<int64_t>(value);
 }
 

@@ -56,7 +56,7 @@ void ArrayStringLong::set(size_t ndx, StringData value)
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
-    size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     size_t end   = to_size_t(m_offsets.get(ndx));
     bool add_zero_term = true;
     m_blob.replace(begin, end, value.data(), value.size(), add_zero_term);
@@ -72,12 +72,12 @@ void ArrayStringLong::insert(size_t ndx, StringData value)
 {
     REALM_ASSERT_3(ndx, <=, m_offsets.size());
 
-    size_t pos = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t pos = 0 < ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     bool add_zero_term = true;
 
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
     m_offsets.insert(ndx, pos + value.size() + 1);
-    m_offsets.adjust(ndx+1, m_offsets.size(), value.size() + 1);
+    m_offsets.adjust(ndx + 1, m_offsets.size(), value.size() + 1);
     if (m_nullable)
         m_nulls.insert(ndx, !value.is_null());
 }
@@ -86,7 +86,7 @@ void ArrayStringLong::erase(size_t ndx)
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
-    size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     size_t end   = to_size_t(m_offsets.get(ndx));
 
     m_blob.erase(begin, end);
@@ -151,7 +151,7 @@ size_t ArrayStringLong::find_first(StringData value, size_t begin,
 }
 
 void ArrayStringLong::find_all(IntegerColumn& result, StringData value, size_t add_offset,
-                              size_t begin, size_t end) const
+                               size_t begin, size_t end) const
 {
     size_t begin_2 = begin;
     for (;;) {
@@ -245,7 +245,7 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullabl
         int_fast64_t value = 0;
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
         dg_2.reset(mem.get_ref());
-        int64_t v(from_ref(mem.get_ref())); 
+        int64_t v(from_ref(mem.get_ref()));
         top.add(v); // Throws
         dg_2.release();
     }
@@ -257,8 +257,7 @@ MemRef ArrayStringLong::create_array(size_t size, Allocator& alloc, bool nullabl
         top.add(v); // Throws
         dg_2.release();
     }
-    if (nullable)
-    {
+    if (nullable) {
         bool context_flag = false;
         int64_t value = 0; // initialize all rows to realm::null()
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws

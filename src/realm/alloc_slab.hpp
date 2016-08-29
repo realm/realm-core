@@ -136,7 +136,7 @@ public:
     /// \throw SlabAlloc::Retry
     ref_type attach_file(const std::string& path, Config& cfg);
 
-    /// Get the attached file. Only valid when called on an allocator with 
+    /// Get the attached file. Only valid when called on an allocator with
     /// an attached file.
     util::File& get_file();
 
@@ -307,7 +307,7 @@ public:
 protected:
     MemRef do_alloc(const size_t size) override;
     MemRef do_realloc(ref_type, const char*, size_t old_size,
-                    size_t new_size) override;
+                      size_t new_size) override;
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     void do_free(ref_type, const char*) noexcept override;
     char* do_translate(ref_type) const noexcept override;
@@ -468,7 +468,7 @@ private:
     /// which is inside the range from 'start_pos' to 'start_pos'+'free_chunk_size'
     /// If found return the position, if not return 0.
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size,
-                                      size_t request_size) const noexcept;
+                                 size_t request_size) const noexcept;
 
     friend class Group;
     friend class GroupWriter;
@@ -545,7 +545,7 @@ inline bool SlabAlloc::ref_less_than_slab_ref_end(ref_type ref, const Slab& slab
 
 inline size_t SlabAlloc::get_upper_section_boundary(size_t start_pos) const noexcept
 {
-    return get_section_base(1+get_section_index(start_pos));
+    return get_section_base(1 + get_section_index(start_pos));
 }
 
 inline size_t SlabAlloc::get_lower_section_boundary(size_t start_pos) const noexcept
