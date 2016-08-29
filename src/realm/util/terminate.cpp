@@ -30,7 +30,7 @@
     #include <CoreFoundation/CoreFoundation.h>
 #endif
 
-#ifdef __ANDROID__
+#ifdef ANDROID
     #include <android/log.h>
 #endif
 
@@ -70,7 +70,7 @@ void nslog(const char* message) noexcept
 
 void(*termination_notification_callback)(const char*) noexcept = nslog;
 
-#elif REALM_ANDROID
+#elif defined ANDROID
 
 void android_log(const char* message) noexcept
 {

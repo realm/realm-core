@@ -28,6 +28,7 @@ target_link_libraries(
   realm-tests
   realm test-util
   ${EXTRA_TEST_LIBS}
+  ${PLATFORM_LIBRARIES}
 )
 
 target_include_directories(

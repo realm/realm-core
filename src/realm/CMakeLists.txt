@@ -198,8 +198,7 @@ set_target_properties(realm-objects PROPERTIES
     XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelMinSize "3"
 )
 
-add_library(realm SHARED $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
-add_library(realm-static STATIC $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
+add_library(realm ${REALM_LIBTYPE} $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
 
 set_target_properties(
     realm PROPERTIES
@@ -207,17 +206,17 @@ set_target_properties(
     SOVERSION ${REALM_SOVERSION}
 )
 
-set_target_properties(
-    realm-static PROPERTIES
-    VERSION ${PROJECT_VERSION}
-    OUTPUT_NAME realm
-    # The static library may get included in a dynamic library
-    # (the bindings), so build as position independent code.
-    POSITION_INDEPENDENT_CODE true
+if(REALM_LIBTYPE STREQUAL "STATIC")
+    set_target_properties(
+        realm PROPERTIES
+        # The static library may get included in a dynamic library
+        # (the bindings), so build as position independent code.
+        POSITION_INDEPENDENT_CODE true
 
-    XCODE_ATTRIBUTE_INSTALL_PATH "/"
-    XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
-)
+        XCODE_ATTRIBUTE_INSTALL_PATH "/"
+        XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
+    )
+endif()
 
 target_link_libraries(
     realm
@@ -234,8 +233,6 @@ if(APPLE)
 endif(APPLE)
 
 install(TARGETS realm
-        DESTINATION ${CMAKE_INSTALL_LIBDIR})
-install(TARGETS realm-static
         DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm)

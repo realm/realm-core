@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.0.2)
 
+if(REALM_PLATFORM STREQUAL "Android")
+    # This must be before project()
+    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/CMake/android.toolchain.cmake")
+    set(ANDROID_ABI "arm64-v8a" CACHE STRING "")
+endif()
+
 # Custom CMake modules
 project(Realm)
 include(GNUInstallDirs)
@@ -15,6 +21,14 @@ set(REALM_VERSION_MINOR 5)
 set(REALM_VERSION_PATCH 1)
 set(REALM_SOVERSION "9.0.0")
 
+if(REALM_PLATFORM STREQUAL "Android")
+    set(REALM_LIBTYPE "STATIC")
+    find_library(ANDROID_LIBRARY android)
+    find_library(ANDROID_LOG_LIBRARY log)
+    list(APPEND PLATFORM_LIBRARIES ${ANDROID_LIBRARY})
+    list(APPEND PLATFORM_LIBRARIES ${ANDROID_LOG_LIBRARY})
+endif()
+
 project(
     realm
     VERSION ${REALM_VERSION_MAJOR}.${REALM_VERSION_MINOR}.${REALM_VERSION_PATCH}
@@ -27,6 +41,10 @@ include(GetGitRevisionDescription)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
+
+if(NOT DEFINED REALM_LIBTYPE)
+  set(REALM_LIBTYPE "SHARED")
+endif()
 
 # Project-wide build flags
 if(CMAKE_VERSION VERSION_LESS "3.1")
