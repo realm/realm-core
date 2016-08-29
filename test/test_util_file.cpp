@@ -86,7 +86,6 @@ TEST(Utils_File_dir)
         dir_exists = false;
     }
     CHECK_NOT(dir_exists);
-
 }
 
 TEST(Utils_File_resolve)

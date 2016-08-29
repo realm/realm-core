@@ -57,17 +57,13 @@ struct ColumnTypeTraits<util::Optional<int64_t>> {
 };
 
 template<>
-struct ColumnTypeTraits<bool> :
-    ColumnTypeTraits<int64_t>
-{
+struct ColumnTypeTraits<bool> : ColumnTypeTraits<int64_t> {
     static const DataType id = type_Bool;
     static const ColumnType column_id = col_type_Bool;
 };
 
 template<>
-struct ColumnTypeTraits<util::Optional<bool>> :
-    ColumnTypeTraits<util::Optional<int64_t>>
-{
+struct ColumnTypeTraits<util::Optional<bool>> : ColumnTypeTraits<util::Optional<int64_t>> {
     static const DataType id = type_Bool;
     static const ColumnType column_id = col_type_Bool;
 };
@@ -96,16 +92,13 @@ struct ColumnTypeTraits<double> {
 
 template<>
 struct ColumnTypeTraits<OldDateTime> :
-    ColumnTypeTraits<int64_t>
-{
+    ColumnTypeTraits<int64_t> {
     static const DataType id = type_OldDateTime;
     static const ColumnType column_id = col_type_OldDateTime;
 };
 
 template<>
-struct ColumnTypeTraits<util::Optional<OldDateTime>> :
-    ColumnTypeTraits<util::Optional<int64_t>>
-{
+struct ColumnTypeTraits<util::Optional<OldDateTime>> : ColumnTypeTraits<util::Optional<int64_t>> {
     static const DataType id = type_OldDateTime;
     static const ColumnType column_id = col_type_OldDateTime;
 };
@@ -132,13 +125,11 @@ struct ColumnTypeTraits<BinaryData> {
 template<DataType, bool Nullable>
 struct GetColumnType;
 template<>
-struct GetColumnType<type_Int, false>
-{
+struct GetColumnType<type_Int, false> {
     using type = IntegerColumn;
 };
 template<>
-struct GetColumnType<type_Int, true>
-{
+struct GetColumnType<type_Int, true> {
     using type = IntNullColumn;
 };
 template<bool N>
@@ -159,14 +150,12 @@ struct ColumnTypeTraitsSum {
 };
 
 template<>
-struct ColumnTypeTraitsSum<float, act_Sum>
-{
+struct ColumnTypeTraitsSum<float, act_Sum> {
     typedef double sum_type;
 };
 
 template<Action A>
-struct ColumnTypeTraitsSum<util::Optional<int64_t>, A>
-{
+struct ColumnTypeTraitsSum<util::Optional<int64_t>, A> {
     using sum_type = int64_t;
 };
 

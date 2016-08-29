@@ -55,38 +55,38 @@ namespace {
 
 TEST(MemoryStream_Input)
 {
-	const char buf[] = "123 4567";
-	realm::util::MemoryInputStream in;
-	in.set_buffer(buf, buf + sizeof(buf) - 1);
-	in.unsetf(std::ios_base::skipws);
+    const char buf[] = "123 4567";
+    realm::util::MemoryInputStream in;
+    in.set_buffer(buf, buf + sizeof(buf) - 1);
+    in.unsetf(std::ios_base::skipws);
 
-	CHECK_EQUAL(in.eof(), false);
-	CHECK_EQUAL(in.tellg(), 0);
+    CHECK_EQUAL(in.eof(), false);
+    CHECK_EQUAL(in.tellg(), 0);
 
-	int number;
-	char sp;
+    int number;
+    char sp;
 
- 	in >> number;
-	CHECK_EQUAL(number, 123);
-	CHECK_EQUAL(in.eof(), false);
-	CHECK_EQUAL(in.tellg(), 3);
+    in >> number;
+    CHECK_EQUAL(number, 123);
+    CHECK_EQUAL(in.eof(), false);
+    CHECK_EQUAL(in.tellg(), 3);
 
-	in >> sp;
-	CHECK_EQUAL(sp, ' ');
-	CHECK_EQUAL(in.eof(), false);
-	CHECK_EQUAL(in.tellg(), 4);
+    in >> sp;
+    CHECK_EQUAL(sp, ' ');
+    CHECK_EQUAL(in.eof(), false);
+    CHECK_EQUAL(in.tellg(), 4);
 
-	in.seekg(1);
-	in >> number;
-	CHECK_EQUAL(number, 23);
-	CHECK_EQUAL(in.eof(), false);
-	CHECK_EQUAL(in.tellg(), 3);
+    in.seekg(1);
+    in >> number;
+    CHECK_EQUAL(number, 23);
+    CHECK_EQUAL(in.eof(), false);
+    CHECK_EQUAL(in.tellg(), 3);
 
-	in.seekg(5);
-	in >> number;
-	CHECK_EQUAL(number, 567);
-	CHECK_EQUAL(in.eof(), true);
-	CHECK_EQUAL(in.tellg(), -1);
+    in.seekg(5);
+    in >> number;
+    CHECK_EQUAL(number, 567);
+    CHECK_EQUAL(in.eof(), true);
+    CHECK_EQUAL(in.tellg(), -1);
 }
 
 } // unnamed namespace

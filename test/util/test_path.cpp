@@ -64,7 +64,7 @@ std::string get_test_path(const TestContext& context, const std::string& suffix)
     int recurrence_index = context.recurrence_index;
     std::ostringstream out;
     out.imbue(locale_classic);
-    out << path_prefix << sanitize_for_file_name(test_name) << '.' << (recurrence_index+1) <<
+    out << path_prefix << sanitize_for_file_name(test_name) << '.' << (recurrence_index + 1) <<
         suffix;
     return out.str();
 }
@@ -173,9 +173,9 @@ SharedGroupTestPathGuard::~SharedGroupTestPathGuard() noexcept
 void SharedGroupTestPathGuard::cleanup() const noexcept
 {
     try {
-        do_clean_dir(m_path+ ".management", ".management");
-        if (File::is_dir(m_path+".management"))
-            remove_dir(m_path+ ".management");
+        do_clean_dir(m_path + ".management", ".management");
+        if (File::is_dir(m_path + ".management"))
+            remove_dir(m_path + ".management");
         File::try_remove(get_lock_path());
     }
     catch (...) {

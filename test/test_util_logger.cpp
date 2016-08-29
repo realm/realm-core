@@ -59,7 +59,8 @@ namespace {
 
 TEST(Util_Logger_LevelToFromString)
 {
-    auto check = [&test_context=test_context](util::Logger::Level level, const char* name) {
+    auto check = [& test_context = test_context](util::Logger::Level level, const char* name)
+    {
         std::ostringstream out;
         out.imbue(std::locale::classic());
         out << level;
@@ -93,9 +94,9 @@ TEST(Util_Logger_Stream)
         util::StreamLogger logger(out_1);
         for (int i = 0; i < 10; ++i) {
             std::ostringstream formatter;
-            formatter << "Foo "<<i;
+            formatter << "Foo " << i;
             logger.info(formatter.str().c_str());
-            out_2 << "Foo "<<i<<"\n";
+            out_2 << "Foo " << i << "\n";
         }
     }
     CHECK(out_1.str() == out_2.str());
@@ -138,7 +139,7 @@ TEST(Util_Logger_File_1)
         util::FileLogger logger(path);
         for (int i = 0; i < 10; ++i) {
             logger.info("Foo %1", i);
-            out << "Foo "<<i<<"\n";
+            out << "Foo " << i << "\n";
         }
     }
     std::string str = out.str();
@@ -162,7 +163,7 @@ TEST(Util_Logger_File_2)
         util::FileLogger logger(util::File(path, util::File::mode_Write));
         for (int i = 0; i < 10; ++i) {
             logger.info("Foo %1", i);
-            out << "Foo "<<i<<"\n";
+            out << "Foo " << i << "\n";
         }
     }
     std::string str = out.str();
@@ -222,7 +223,7 @@ TEST(Util_Logger_ThreadSafe)
         for (long j = 0; j < num_iterations; ++j) {
             std::ostringstream out;
             out.imbue(std::locale::classic());
-            out << i<<":"<<j;
+            out << i << ":" << j;
             messages_2.push_back(out.str());
         }
     }

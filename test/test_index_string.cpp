@@ -743,7 +743,7 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
 
     FindRes res = ndx.find_all(null{}, results);
     CHECK_EQUAL(FindRes_single, res);
-    CHECK_EQUAL(results, col.size()-1);
+    CHECK_EQUAL(results, col.size() - 1);
 
     // Clean up
     col.destroy();
@@ -900,7 +900,8 @@ namespace {
 
 // Generate string where the bit pattern in bits is converted to NUL bytes. E.g. (length=2):
 // bits=0 -> "\0\0", bits=1 -> "\x\0", bits=2 -> "\0\x", bits=3 -> "\x\x", where x is a random byte
-StringData create_string_with_nuls(const size_t bits, const size_t length, char* tmp, Random& random) {
+StringData create_string_with_nuls(const size_t bits, const size_t length, char* tmp, Random& random)
+{
     for (size_t i = 0; i < length; ++i) {
         tmp[i] = (bits & (1 << i)) == 0 ? '\0' : static_cast<char>(random.draw_int<int>(CHAR_MIN, CHAR_MAX));
     }
@@ -1223,7 +1224,8 @@ TEST(StringIndex_Duplicate_Values)
 
 namespace {
 
-void verify_single_move_last_over(TestContext& test_context, StringColumn& col, size_t index) {
+void verify_single_move_last_over(TestContext& test_context, StringColumn& col, size_t index)
+{
     std::string value = col.get(col.size() - 1);
     size_t orig_size = col.size();
     col.move_last_over(index);

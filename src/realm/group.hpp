@@ -387,7 +387,7 @@ public:
     ///
     /// \param pad If true, the file is padded to ensure the footer is aligned
     /// to the end of a page
-    void write(std::ostream& out, bool pad=false) const;
+    void write(std::ostream& out, bool pad = false) const;
 
     /// Write this database to a new file. It is an error to specify a
     /// file that already exists. This is to protect against
@@ -404,7 +404,7 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& file, const char* encryption_key=0) const;
+    void write(const std::string& file, const char* encryption_key = 0) const;
 
     /// Write this database to a memory buffer.
     ///
@@ -519,7 +519,7 @@ public:
     // Conversion
     template<class S>
     void to_json(S& out, size_t link_depth = 0,
-        std::map<std::string, std::string>* renames = nullptr) const;
+                 std::map<std::string, std::string>* renames = nullptr) const;
     void to_string(std::ostream& out) const;
 
     /// Compare two groups for equality. Two groups are equal if, and

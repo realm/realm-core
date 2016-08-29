@@ -29,8 +29,8 @@ using namespace realm::util;
 namespace {
 
 REALM_TABLE_2(Alpha,
-                foo, Int,
-                bar, Int)
+              foo, Int,
+              bar, Int)
 
 } // anonymous namespace
 
@@ -59,33 +59,33 @@ int main()
         time_t begin = time(0);
 
         int n_inner = 100;
-        for (int i=0; i<n_outer; ++i) {
+        for (int i = 0; i < n_outer; ++i) {
             std::cerr << ".";
-            for (int j=0; j<n_inner; ++j) {
+            for (int j = 0; j < n_inner; ++j) {
                 {
                     WriteTransaction wt(sg);
                     Alpha::Ref t = wt.get_or_add_table<Alpha>("alpha");
-                    for (int j=0; j<1000; ++j) t->add(65536,65536);
+                    for (int j = 0; j < 1000; ++j) t->add(65536, 65536);
                     wt.commit();
                 }
                 // Interference
-                for (int k=0; k<2; ++k) {
+                for (int k = 0; k < 2; ++k) {
                     {
                         WriteTransaction wt(sg_interfere1);
                         Alpha::Ref t = wt.get_or_add_table<Alpha>("alpha");
-                        for (int j=0; j<100; ++j) t->add(65536,65536);
+                        for (int j = 0; j < 100; ++j) t->add(65536, 65536);
                         wt.commit();
                     }
                     {
                         WriteTransaction wt(sg_interfere2);
                         Alpha::Ref t = wt.get_or_add_table<Alpha>("alpha");
-                        for (int j=0; j<400; ++j) t->add(65536,65536);
+                        for (int j = 0; j < 400; ++j) t->add(65536, 65536);
                         wt.commit();
                     }
                     {
                         WriteTransaction wt(sg_interfere3);
                         Alpha::Ref t = wt.get_or_add_table<Alpha>("alpha");
-                        for (int j=0; j<1600; ++j) t->add(65536,65536);
+                        for (int j = 0; j < 1600; ++j) t->add(65536, 65536);
                         wt.commit();
                     }
                 }
@@ -94,16 +94,16 @@ int main()
         std::cerr << "\n";
 
         time_t end = time(0);
-        std::cerr << "Small write transactions per second = " << (( n_outer*n_inner*7 / double(end - begin) )) << std::endl;
+        std::cerr << "Small write transactions per second = " << (( n_outer * n_inner * 7 / double(end - begin) )) << std::endl;
     }
 
     {
         time_t begin = time(0);
 
         int n_inner = 10;
-        for (int i=0; i<n_outer; ++i) {
+        for (int i = 0; i < n_outer; ++i) {
             std::cerr << "x";
-            for (int j=0; j<n_inner; ++j) {
+            for (int j = 0; j < n_inner; ++j) {
                 {
                     WriteTransaction wt(sg);
                     Alpha::Ref t = wt.get_table<Alpha>("alpha");
@@ -116,6 +116,6 @@ int main()
         std::cerr << "\n";
 
         time_t end = time(0);
-        std::cerr << "Large write transactions per second = " << (( n_outer*n_inner / double(end - begin) )) << std::endl;
+        std::cerr << "Large write transactions per second = " << (( n_outer * n_inner / double(end - begin) )) << std::endl;
     }
 }

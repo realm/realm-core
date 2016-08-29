@@ -306,12 +306,12 @@ inline Table* LangBindHelper::get_or_add_table(Group& group, StringData name, bo
 
 inline void LangBindHelper::unbind_table_ptr(const Table* t) noexcept
 {
-   t->unbind_ptr();
+    t->unbind_ptr();
 }
 
 inline void LangBindHelper::bind_table_ptr(const Table* t) noexcept
 {
-   t->bind_ptr();
+    t->bind_ptr();
 }
 
 inline void LangBindHelper::set_mixed_subtable(Table& parent, size_t col_ndx,

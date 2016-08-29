@@ -257,7 +257,7 @@ typedef BasicTableRef<const Table> ConstTableRef;
 
 
 template<class C, class T, class U>
-inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const BasicTableRef<U>& p)
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const BasicTableRef<U>& p)
 {
     out << static_cast<const void*>(&*p);
     return out;

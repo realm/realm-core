@@ -22,8 +22,8 @@
 #include <memory>
 
 #if REALM_HAVE_AT_LEAST_GCC(3,2)
-#  define REALM_HAVE_CXXABI_DEMANGLE
-#  include <cxxabi.h>
+    #define REALM_HAVE_CXXABI_DEMANGLE
+    #include <cxxabi.h>
 #endif
 
 #include "demangle.hpp"

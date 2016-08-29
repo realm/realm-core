@@ -152,7 +152,7 @@ protected:
     ref_type clone_table_columns(const Table*);
 
     size_t* record_subtable_path(size_t* begin,
-                                      size_t* end) noexcept override;
+                                 size_t* end) noexcept override;
 
     void update_table_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                                 _impl::TableFriend::AccessorUpdater&);
@@ -265,7 +265,7 @@ inline void SubtableColumnBase::erase_rows(size_t row_ndx, size_t num_rows_to_er
                                            bool broken_reciprocal_backlinks)
 {
     IntegerColumn::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
-                       broken_reciprocal_backlinks); // Throws
+                              broken_reciprocal_backlinks); // Throws
 
     const bool fix_ndx_in_parent = true;
     bool last_entry_removed =
@@ -530,7 +530,7 @@ inline SubtableColumnBase::~SubtableColumnBase() noexcept
 
 inline bool SubtableColumnBase::compare_subtable_rows(const Table& a, const Table& b)
 {
-    return _impl::TableFriend::compare_rows(a,b);
+    return _impl::TableFriend::compare_rows(a, b);
 }
 
 inline ref_type SubtableColumnBase::clone_table_columns(const Table* t)
