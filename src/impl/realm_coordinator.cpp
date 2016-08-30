@@ -26,7 +26,6 @@
 #include "object_store.hpp"
 #include "schema.hpp"
 
-#include <realm/commit_log.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/string_data.hpp>

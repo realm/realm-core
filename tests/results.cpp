@@ -27,7 +27,6 @@
 #include "results.hpp"
 #include "schema.hpp"
 
-#include <realm/commit_log.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 #include <realm/query_engine.hpp>
