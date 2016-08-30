@@ -56,6 +56,8 @@ public:
 
     void parse_complete();
 
+    CollectionChangeSet finalize() &&;
+
 private:
     std::unordered_map<size_t, size_t> m_move_mapping;
 

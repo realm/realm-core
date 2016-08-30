@@ -131,6 +131,7 @@ private:
     void open_helper_shared_group();
     void advance_helper_shared_group_to_latest();
     void clean_up_dead_notifiers();
+    std::vector<std::shared_ptr<_impl::CollectionNotifier>> notifiers_to_deliver(Realm&);
 };
 
 } // namespace _impl

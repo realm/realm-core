@@ -27,7 +27,12 @@
 #include "schema.hpp"
 #include "thread_confined.hpp"
 
+#if REALM_VER_MAJOR >= 2
+#include <realm/history.hpp>
+#else
 #include <realm/commit_log.hpp>
+#endif
+
 #include <realm/util/optional.hpp>
 
 #include <thread>
@@ -84,7 +89,11 @@ TEST_CASE("handover") {
     }
 
     SECTION("cleanup properly unpins version") {
-        auto history = realm::make_client_history(config.path, config.encryption_key.data());
+#if REALM_VER_MAJOR >= 2
+        auto history = realm::make_in_realm_history(config.path);
+#else
+        auto history = realm::make_client_history(config.path, config.encryption_key.data());   
+#endif
         SharedGroup shared_group(*history, SharedGroup::durability_MemOnly);
 
         auto get_current_version = [&]() -> SharedGroup::VersionID {

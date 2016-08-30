@@ -27,7 +27,12 @@
 #include "object_schema.hpp"
 #include "schema.hpp"
 
+#if REALM_VER_MAJOR >= 2
+#include <realm/history.hpp>
+#else
 #include <realm/commit_log.hpp>
+#endif
+
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 
@@ -36,7 +41,11 @@ using namespace realm;
 class CaptureHelper {
 public:
     CaptureHelper(std::string const& path, SharedRealm const& r, LinkViewRef lv, size_t table_ndx)
+#if REALM_VER_MAJOR >= 2
+    : m_history(make_in_realm_history(path))
+#else
     : m_history(make_client_history(path))
+#endif
     , m_sg(*m_history, SharedGroup::durability_MemOnly)
     , m_realm(r)
     , m_group(m_sg.begin_read())
@@ -140,7 +149,12 @@ TEST_CASE("Transaction log parsing: schema change validation") {
         });
         r->read_group();
 
+#if REALM_VER_MAJOR >= 2
+        auto history = make_in_realm_history(config.path);
+#else
         auto history = make_client_history(config.path);
+#endif
+
         SharedGroup sg(*history, SharedGroup::durability_MemOnly);
 
         SECTION("adding a table is allowed") {
@@ -225,7 +239,12 @@ TEST_CASE("Transaction log parsing: schema change validation") {
         });
         r->read_group();
 
+#if REALM_VER_MAJOR >= 2
+        auto history = make_in_realm_history(config.path);
+#else
         auto history = make_client_history(config.path);
+#endif
+
         SharedGroup sg(*history, SharedGroup::durability_MemOnly);
 
         SECTION("adding a table is allowed") {
@@ -329,7 +348,11 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         r->commit_transaction();
 
         auto track_changes = [&](std::vector<bool> tables_needed, auto&& f) {
+#if REALM_VER_MAJOR >= 2
+            auto history = make_in_realm_history(config.path);
+#else
             auto history = make_client_history(config.path);
+#endif
             SharedGroup sg(*history, SharedGroup::durability_MemOnly);
             sg.begin_read();
 
@@ -1020,7 +1043,11 @@ TEST_CASE("DeepChangeChecker") {
     r->commit_transaction();
 
     auto track_changes = [&](auto&& f) {
+#if REALM_VER_MAJOR >= 2
+        auto history = make_in_realm_history(config.path);
+#else
         auto history = make_client_history(config.path);
+#endif
         SharedGroup sg(*history, SharedGroup::durability_MemOnly);
         Group const& g = sg.begin_read();
 

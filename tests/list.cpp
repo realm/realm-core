@@ -30,7 +30,6 @@
 
 #include "impl/realm_coordinator.hpp"
 
-#include <realm/commit_log.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 
@@ -313,6 +312,24 @@ TEST_CASE("list") {
             REQUIRE_INDICES(change.insertions, 2);
             REQUIRE_INDICES(change.modifications, 5);
             REQUIRE_MOVES(change, {1, 2});
+        }
+
+        SECTION("moving the list's containing row does not break notifications") {
+            auto token = require_change();
+            write([&] {
+                origin->insert_empty_row(0, 2);
+                lv->add(1);
+            });
+            REQUIRE_INDICES(change.insertions, 10);
+
+            write([&] {
+                // delete the row after it, then the row before it so that it
+                // is moved by the deletion
+                origin->move_last_over(3);
+                origin->move_last_over(0);
+                lv->add(2);
+            });
+            REQUIRE_INDICES(change.insertions, 11);
         }
     }
 

@@ -27,7 +27,6 @@
 #include "results.hpp"
 #include "schema.hpp"
 
-#include <realm/commit_log.hpp>
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 #include <realm/query_engine.hpp>
@@ -206,6 +205,7 @@ TEST_CASE("results: notifications") {
             });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE_INDICES(change.modifications_new, 0);
         }
 
         SECTION("modifying a matching row to no longer match marks that row as deleted") {
@@ -223,6 +223,7 @@ TEST_CASE("results: notifications") {
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 4);
             REQUIRE(change.modifications.empty());
+            REQUIRE(change.modifications_new.empty());
         }
 
         SECTION("deleting a matching row marks that row as deleted") {
@@ -276,6 +277,7 @@ TEST_CASE("results: notifications") {
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.insertions, 4);
             REQUIRE(change.modifications.empty());
+            REQUIRE(change.modifications_new.empty());
         }
 
         SECTION("modification indices are pre-insert/delete") {
@@ -288,6 +290,7 @@ TEST_CASE("results: notifications") {
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.deletions, 1);
             REQUIRE_INDICES(change.modifications, 2);
+            REQUIRE_INDICES(change.modifications_new, 1);
         }
 
         SECTION("notifications are not delivered when collapsing transactions results in no net change") {
@@ -316,6 +319,84 @@ TEST_CASE("results: notifications") {
             write([&] {
                 table->set_int(0, table->add_empty_row(), 5);
             });
+        }
+    }
+
+    SECTION("before/after change callback") {
+        struct Callback {
+            size_t before_calls = 0;
+            size_t after_calls = 0;
+            CollectionChangeSet before_change;
+            CollectionChangeSet after_change;
+            std::function<void(void)> on_before = []{};
+            std::function<void(void)> on_after = []{};
+
+            void before(CollectionChangeSet c) {
+                before_change = c;
+                ++before_calls;
+                on_before();
+            }
+            void after(CollectionChangeSet c) {
+                after_change = c;
+                ++after_calls;
+                on_after();
+            }
+            void error(std::exception_ptr) {
+                FAIL("error() should not be called");
+            }
+        } callback;
+        auto token = results.add_notification_callback(&callback);
+        advance_and_notify(*r);
+
+        SECTION("only after() is called for initial results") {
+            REQUIRE(callback.before_calls == 0);
+            REQUIRE(callback.after_calls == 1);
+            REQUIRE(callback.after_change.empty());
+        }
+
+        auto write = [&](auto&& func) {
+            auto r2 = Realm::get_shared_realm(config);
+            r2->begin_transaction();
+            func(*r2->read_group().get_table("class_object"));
+            r2->commit_transaction();
+            advance_and_notify(*r);
+        };
+
+        SECTION("both are called after a write") {
+            write([&](auto&& t) {
+                t.set_int(0, t.add_empty_row(), 5);
+            });
+            REQUIRE(callback.before_calls == 1);
+            REQUIRE(callback.after_calls == 2);
+            REQUIRE_INDICES(callback.before_change.insertions, 4);
+            REQUIRE_INDICES(callback.after_change.insertions, 4);
+        }
+
+        SECTION("deleted objects are usable in before()") {
+            callback.on_before = [&] {
+                REQUIRE(results.size() == 4);
+                REQUIRE_INDICES(callback.before_change.deletions, 0);
+                REQUIRE(results.get(0).is_attached());
+                REQUIRE(results.get(0).get_int(0) == 2);
+            };
+            write([&](auto&& t) {
+                t.move_last_over(results.get(0).get_index());
+            });
+            REQUIRE(callback.before_calls == 1);
+            REQUIRE(callback.after_calls == 2);
+        }
+
+        SECTION("inserted objects are usable in after()") {
+            callback.on_after = [&] {
+                REQUIRE(results.size() == 5);
+                REQUIRE_INDICES(callback.after_change.insertions, 4);
+                REQUIRE(results.last()->get_int(0) == 5);
+            };
+            write([&](auto&& t) {
+                t.set_int(0, t.add_empty_row(), 5);
+            });
+            REQUIRE(callback.before_calls == 1);
+            REQUIRE(callback.after_calls == 2);
         }
     }
 
@@ -361,6 +442,7 @@ TEST_CASE("results: notifications") {
             });
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.modifications, 3);
+            REQUIRE_INDICES(change.modifications_new, 3);
         }
 
         SECTION("modifying a matching row to no longer match marks that row as deleted") {

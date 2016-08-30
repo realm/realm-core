@@ -67,7 +67,11 @@ else()
     list(APPEND SOURCES impl/generic/external_commit_helper.cpp)
 endif()
 
-set(INCLUDE_DIRS ${REALM_CORE_INCLUDE_DIR} ${PEGTL_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+set(INCLUDE_DIRS
+    ${REALM_CORE_INCLUDE_DIR}
+    ${PEGTL_INCLUDE_DIR}
+    ${UV_INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Add the sync files separately to reduce merge conflicts.
 list(APPEND HEADERS sync_manager.cpp impl/sync_session.cpp)

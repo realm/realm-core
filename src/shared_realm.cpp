@@ -30,7 +30,12 @@
 
 #include "util/format.hpp"
 
+#if REALM_VER_MAJOR >= 2
+#include <realm/history.hpp>
+#else
 #include <realm/commit_log.hpp>
+#endif
+
 #include <realm/sync/history.hpp>
 #include <realm/util/scope_exit.hpp>
 
@@ -154,7 +159,11 @@ void Realm::open_with_config(const Config& config,
                 history = realm::sync::make_sync_history(config.path);
             }
             else {
+#if REALM_VER_MAJOR >= 2
+                history = realm::make_in_realm_history(config.path);
+#else
                 history = realm::make_client_history(config.path, config.encryption_key.data());
+#endif
             }
             SharedGroup::DurabilityLevel durability = config.in_memory ? SharedGroup::durability_MemOnly :
                                                                            SharedGroup::durability_Full;
@@ -584,7 +593,7 @@ bool Realm::refresh_sync_access_token(std::string access_token, StringData path,
 
 Realm::HandoverPackage::HandoverPackage(HandoverPackage&&) = default;
 Realm::HandoverPackage& Realm::HandoverPackage::operator=(HandoverPackage&&) = default;
-Realm::HandoverPackage::VersionID::VersionID() : VersionID(SharedGroup::VersionID()) { };
+Realm::HandoverPackage::VersionID::VersionID() : VersionID(SharedGroup::VersionID()) { }
 
 // Precondition: `m_version` is not greater than `new_version`
 // Postcondition: `m_version` is equal to `new_version`
@@ -662,6 +671,7 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
     if (!m_group) {
         // A read transaction doesn't yet exist, so create at the handover version
         m_group = &const_cast<Group&>(m_shared_group->begin_read(handover.m_version_id));
+        add_schema_change_handler();
     }
     else {
         auto current_version = m_shared_group->get_version_of_current_transaction();
