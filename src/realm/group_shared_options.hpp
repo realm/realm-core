@@ -24,8 +24,7 @@
 
 namespace realm {
 
-class SharedGroupOptions {
-public:
+struct SharedGroupOptions {
 
     /// The persistence level of the SharedGroup.
     /// uint16_t is the type of SharedGroup::SharedInfo::durability
