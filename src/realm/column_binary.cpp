@@ -620,8 +620,11 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 } // anonymous namespace
 
+#endif
+
 void BinaryColumn::verify() const
 {
+#ifdef REALM_DEBUG
     if (root_is_leaf()) {
         bool is_big = m_array->get_context_flag();
         if (!is_big) {
@@ -637,11 +640,13 @@ void BinaryColumn::verify() const
     }
     // Non-leaf root
     m_array->verify_bptree(&verify_leaf);
+#endif
 }
 
 
 void BinaryColumn::to_dot(std::ostream& out, StringData title) const
 {
+#ifdef REALM_DEBUG
     ref_type ref = m_array->get_ref();
     out << "subgraph cluster_binary_column" << ref << " {" << std::endl;
     out << " label = \"Binary column";
@@ -650,11 +655,16 @@ void BinaryColumn::to_dot(std::ostream& out, StringData title) const
     out << "\";" << std::endl;
     tree_to_dot(out);
     out << "}" << std::endl;
+#else
+    static_cast<void>(title);
+    static_cast<void>(out);
+#endif
 }
 
 void BinaryColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
                                std::ostream& out) const
 {
+#ifdef REALM_DEBUG
     bool is_strings = false; // FIXME: Not necessarily the case, but leaf_to_dot() is just a debug method
     bool is_big = Array::get_context_flag_from_header(leaf_mem.get_addr());
     if (!is_big) {
@@ -670,8 +680,15 @@ void BinaryColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_
     leaf.init_from_mem(leaf_mem);
     leaf.set_parent(parent, ndx_in_parent);
     leaf.to_dot(out, is_strings);
+#else
+    static_cast<void>(leaf_mem);
+    static_cast<void>(parent);
+    static_cast<void>(ndx_in_parent);
+    static_cast<void>(out);
+#endif
 }
 
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -700,9 +717,16 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 
 } // anonymous namespace
 
+#endif
+
 void BinaryColumn::do_dump_node_structure(std::ostream& out, int level) const
 {
+#ifdef REALM_DEBUG
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
+#else
+    static_cast<void>(level);
+    static_cast<void>(out);
+#endif
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+// LCOV_EXCL_STOP ignore debug functions

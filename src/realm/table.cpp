@@ -5805,11 +5805,11 @@ TableRef Table::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& pa
     return TableRef();
 }
 
-
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+// LCOV_EXCL_START ignore debug functions
 
 void Table::verify() const
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT(is_attached());
     if (!m_columns.is_attached())
         return; // Accessor for degenerate subtable
@@ -5843,8 +5843,10 @@ void Table::verify() const
             REALM_ASSERT_3(col.size(), ==, m_size);
         }
     }
+#endif
 }
 
+#ifdef REALM_DEBUG
 
 void Table::to_dot(std::ostream& out, StringData title) const
 {

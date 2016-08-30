@@ -233,12 +233,10 @@ public:
         return BinaryData(); // FIXME: Not yet implemented
     }
 
-#ifdef REALM_DEBUG
     void verify() const override
     {
         // No-op
     }
-#endif
 
 private:
     Buffer<char> m_incoming_changeset;
