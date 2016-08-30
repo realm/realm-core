@@ -29,7 +29,7 @@
     #include <sys/mman.h>
     #include <sys/types.h>
     #include <sys/wait.h>
-    #include <signal.h>
+    #include <csignal>
     #include <sched.h>
     #define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else

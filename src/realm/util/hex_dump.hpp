@@ -19,7 +19,7 @@
 #ifndef REALM_UTIL_HEX_DUMP_HPP
 #define REALM_UTIL_HEX_DUMP_HPP
 
-#include <stddef.h>
+#include <cstddef>
 #include <type_traits>
 #include <limits>
 #include <string>
