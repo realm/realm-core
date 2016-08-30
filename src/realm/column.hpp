@@ -1440,6 +1440,8 @@ void Column<T>::verify() const
 #endif
 }
 
+// LCOV_EXCL_START
+
 template<class T>
 void Column<T>::to_dot(std::ostream& out, StringData title) const
 {
@@ -1509,8 +1511,7 @@ void Column<T>::dump_node_structure(const Array& root, std::ostream& out, int le
     root.dump_bptree_structure(out, level, &_impl::leaf_dumper);
 }
 
-#endif // REALM_DEBUG
-
+#endif // LCOV_EXCL_STOP ignore debug functions
 
 } // namespace realm
 
