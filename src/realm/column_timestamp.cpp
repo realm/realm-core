@@ -330,7 +330,7 @@ void TimestampColumn::to_dot(std::ostream&, StringData /*title*/) const
     // FIXME: Dummy implementation
 }
 
-void TimestampColumn::do_dump_node_structure(std::ostream&, int /*level*/) const
+void TimestampColumn::do_dump_node_structure(std::ostream&, std::string /*indent*/) const
 {
     // FIXME: Dummy implementation
 }

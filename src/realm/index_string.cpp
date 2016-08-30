@@ -843,9 +843,8 @@ void StringIndex::verify_entries(const StringColumn& column) const
 }
 
 
-void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int level)
+void StringIndex::dump_node_structure(const Array& node, std::ostream& out, std::string indent)
 {
-    int indent = level * 2;
     Allocator& alloc = node.get_alloc();
     Array subnode(alloc);
 
@@ -854,15 +853,14 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
 
     bool node_is_leaf = !node.is_inner_bptree_node();
     if (node_is_leaf) {
-        out << std::setw(indent) << "" << "Leaf (B+ tree) (ref: " << node.get_ref() << ")\n";
+        out << indent << "Leaf (B+ tree) (ref: " << node.get_ref() << ")\n";
     }
     else {
-        out << std::setw(indent) << "" << "Inner node (B+ tree) (ref: " << node.get_ref() << ")\n";
+        out << indent << "Inner node (B+ tree) (ref: " << node.get_ref() << ")\n";
     }
 
     subnode.init_from_ref(to_ref(node.front()));
-    out << std::setw(indent) << "" << "  Keys (keys_ref: "
-        "" << subnode.get_ref() << ", ";
+    out << indent << "  Keys (keys_ref: " << subnode.get_ref() << ", ";
     if (subnode.is_empty()) {
         out << "no keys";
     }
@@ -881,18 +879,18 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
             int_fast64_t value = node.get(i);
             bool is_single_row_index = (value & 1) != 0;
             if (is_single_row_index) {
-                out << std::setw(indent) << "" << "  Single row index (value: " << (value / 2) << ")\n";
+                out << indent << "  Single row index (value: " << (value / 2) << ")\n";
                 continue;
             }
             subnode.init_from_ref(to_ref(value));
             bool is_subindex = subnode.get_context_flag();
             if (is_subindex) {
-                out << std::setw(indent) << "" << "  Subindex\n";
-                dump_node_structure(subnode, out, level + 2);
+                out << indent << "  Subindex\n";
+                dump_node_structure(subnode, out, indent + "    ");
                 continue;
             }
-            out << std::setw(indent) << "" << "  List of row indexes\n";
-            IntegerColumn::dump_node_structure(subnode, out, level + 2);
+            out << indent << "  List of row indexes\n";
+            IntegerColumn::dump_node_structure(subnode, out, indent + "    ");
         }
         return;
     }
@@ -903,14 +901,14 @@ void StringIndex::dump_node_structure(const Array& node, std::ostream& out, int 
     size_t child_ref_end = 1 + num_children;
     for (size_t i = child_ref_begin; i != child_ref_end; ++i) {
         subnode.init_from_ref(node.get_as_ref(i));
-        dump_node_structure(subnode, out, level + 1);
+        dump_node_structure(subnode, out, indent + "  ");
     }
 }
 
 
-void StringIndex::do_dump_node_structure(std::ostream& out, int level) const
+void StringIndex::do_dump_node_structure(std::ostream& out, std::string indent) const
 {
-    dump_node_structure(*m_array, out, level);
+    dump_node_structure(*m_array, out, indent);
 }
 
 

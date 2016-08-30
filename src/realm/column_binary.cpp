@@ -675,7 +675,7 @@ void BinaryColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_
 
 namespace {
 
-void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, std::string indent)
 {
     size_t leaf_size;
     const char* leaf_type;
@@ -694,15 +694,14 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
         leaf_size = leaf.size();
         leaf_type = "Big blobs leaf";
     }
-    int indent = level * 2;
-    out << std::setw(indent) << "" << leaf_type << " (size: " << leaf_size << ")\n";
+    out << indent << leaf_type << " (size: " << leaf_size << ")\n";
 }
 
 } // anonymous namespace
 
-void BinaryColumn::do_dump_node_structure(std::ostream& out, int level) const
+void BinaryColumn::do_dump_node_structure(std::ostream& out, std::string indent) const
 {
-    m_array->dump_bptree_structure(out, level, &leaf_dumper);
+    m_array->dump_bptree_structure(out, indent, &leaf_dumper);
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions

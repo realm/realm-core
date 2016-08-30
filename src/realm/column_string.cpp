@@ -1633,7 +1633,7 @@ void StringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_
 
 namespace {
 
-void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, std::string indent)
 {
     // todo, support null (will now just show up in dump as empty strings)
     size_t leaf_size;
@@ -1663,18 +1663,16 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
             leaf_type = "Big strings leaf";
         }
     }
-    int indent = level * 2;
-    out << std::setw(indent) << "" << leaf_type << " (size: " << leaf_size << ")\n";
+    out << indent << leaf_type << " (size: " << leaf_size << ")\n";
 }
 
 } // anonymous namespace
 
-void StringColumn::do_dump_node_structure(std::ostream& out, int level) const
+void StringColumn::do_dump_node_structure(std::ostream& out, std::string indent) const
 {
-    m_array->dump_bptree_structure(out, level, &leaf_dumper);
-    int indent = level * 2;
-    out << std::setw(indent) << "" << "Search index\n";
-    m_search_index->do_dump_node_structure(out, level + 1);
+    m_array->dump_bptree_structure(out, indent, &leaf_dumper);
+    out << indent << "Search index\n";
+    m_search_index->do_dump_node_structure(out, indent + "  ");
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions

@@ -335,11 +335,11 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     {
         const size_t update = 5000000;
         if ((memstat_slab_size + new_size) / update > memstat_slab_size / update) {
-            std::cerr << "Size of all allocated slabs:    " << (memstat_slab_size + new_size) / 1024 << " KB\n" <<
-                      "Sum of size for do_alloc(size): " << memstat_requested / 1024 << " KB\n" <<
-                      "Average physical memory usage:  " << memstat_rss / memstat_rss_ctr / 1024 << " KB\n" <<
-                      "Page size:                      " << page_size() / 1024 << " KB\n" <<
-                      "Number of all allocated slabs:  " << memstat_slabs << "\n\n";
+            std::cerr << "Size of all allocated slabs:    " << (memstat_slab_size + new_size) / 1024 << " KB\n"
+                      << "Sum of size for do_alloc(size): " << memstat_requested / 1024 << " KB\n"
+                      << "Average physical memory usage:  " << memstat_rss / memstat_rss_ctr / 1024 << " KB\n"
+                      << "Page size:                      " << page_size() / 1024 << " KB\n"
+                      << "Number of all allocated slabs:  " << memstat_slabs << "\n\n";
         }
         memstat_slab_size += new_size;
         memstat_slabs += 1;
@@ -483,8 +483,8 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
 
 #ifdef REALM_DEBUG
     if (REALM_COVER_NEVER(m_debug_out)) {
-        std::cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size << " "
-                  "new_ref: " << new_mem.get_ref() << " new_size: " << new_size << "\n";
+        std::cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size
+                  << " new_ref: " << new_mem.get_ref() << " new_size: " << new_size << "\n";
     }
 #endif // REALM_DEBUG
 

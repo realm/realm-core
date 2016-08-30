@@ -6065,15 +6065,14 @@ void Table::dump_node_structure() const
     dump_node_structure(std::cerr, 0);
 }
 
-void Table::dump_node_structure(std::ostream& out, int level) const
+void Table::dump_node_structure(std::ostream& out, std::string indent) const
 {
-    int indent = level * 2;
-    out << std::setw(indent) << "" << "Table (top_ref: " << m_top.get_ref() << ")\n";
+    out << indent << "Table (top_ref: " << m_top.get_ref() << ")\n";
     size_t n = get_column_count();
     for (size_t i = 0; i != n; ++i) {
-        out << std::setw(indent) << "" << "  Column " << (i + 1) << "\n";
+        out << indent << "  Column " << (i + 1) << "\n";
         const ColumnBase& col = get_column_base(i);
-        col.do_dump_node_structure(out, level + 2);
+        col.do_dump_node_structure(out, indent + "  ");
     }
 }
 

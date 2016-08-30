@@ -1017,8 +1017,8 @@ public:
     };
     void report_memory_usage(MemUsageHandler&) const;
     void stats(MemStats& stats_dest) const;
-    typedef void (*LeafDumper)(MemRef, Allocator&, std::ostream&, int level);
-    void dump_bptree_structure(std::ostream&, int level, LeafDumper) const;
+    typedef void (*LeafDumper)(MemRef, Allocator&, std::ostream&, std::string indent);
+    void dump_bptree_structure(std::ostream&, std::string indent, LeafDumper) const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
     class ToDotHandler {
     public:

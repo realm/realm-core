@@ -124,7 +124,7 @@ public:
 #ifdef REALM_DEBUG
     void verify() const;
     void verify_entries(const StringColumn& column) const;
-    void do_dump_node_structure(std::ostream&, int) const;
+    void do_dump_node_structure(std::ostream&, std::string) const;
     void to_dot() const;
     void to_dot(std::ostream&, StringData title = StringData()) const;
 #endif
@@ -196,7 +196,7 @@ private:
     void node_add_key(ref_type ref);
 
 #ifdef REALM_DEBUG
-    static void dump_node_structure(const Array& node, std::ostream&, int level);
+    static void dump_node_structure(const Array& node, std::ostream&, std::string indent);
     void to_dot_2(std::ostream&, StringData title = StringData()) const;
     static void array_to_dot(std::ostream&, const Array&);
     static void keys_to_dot(std::ostream&, const Array&, StringData title = StringData());

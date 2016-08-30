@@ -272,7 +272,7 @@ public:
     virtual void verify(const Table&, size_t col_ndx) const;
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
     void dump_node_structure() const; // To std::cerr (for GDB)
-    virtual void do_dump_node_structure(std::ostream&, int level) const = 0;
+    virtual void do_dump_node_structure(std::ostream&, std::string indent) const = 0;
     void bptree_to_dot(const Array* root, std::ostream& out) const;
 #endif
 
@@ -557,7 +557,7 @@ public:
     void to_dot(std::ostream&, StringData title) const override;
     void tree_to_dot(std::ostream&) const;
     MemStats stats() const;
-    void do_dump_node_structure(std::ostream&, int) const override;
+    void do_dump_node_structure(std::ostream&, std::string) const override;
 #endif
 
     //@{
@@ -589,7 +589,7 @@ protected:
 #ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
                      std::ostream&) const override;
-    static void dump_node_structure(const Array& root, std::ostream&, int level);
+    static void dump_node_structure(const Array& root, std::ostream&, std::string indent);
 #endif
 
 private:
@@ -1478,19 +1478,19 @@ MemStats Column<T>::stats() const
 }
 
 namespace _impl {
-void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level);
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, std::string indent);
 }
 
 template <class T>
-void Column<T>::do_dump_node_structure(std::ostream& out, int level) const
+void Column<T>::do_dump_node_structure(std::ostream& out, std::string indent) const
 {
-    dump_node_structure(*get_root_array(), out, level);
+    dump_node_structure(*get_root_array(), out, indent);
 }
 
 template <class T>
-void Column<T>::dump_node_structure(const Array& root, std::ostream& out, int level)
+void Column<T>::dump_node_structure(const Array& root, std::ostream& out, std::string indent)
 {
-    root.dump_bptree_structure(out, level, &_impl::leaf_dumper);
+    root.dump_bptree_structure(out, indent, &_impl::leaf_dumper);
 }
 
 #endif // REALM_DEBUG

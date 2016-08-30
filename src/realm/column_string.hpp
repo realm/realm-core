@@ -140,7 +140,7 @@ public:
     void verify() const override;
     void verify(const Table&, size_t) const override;
     void to_dot(std::ostream&, StringData title) const override;
-    void do_dump_node_structure(std::ostream&, int) const override;
+    void do_dump_node_structure(std::ostream&, std::string) const override;
 #endif
 
 private:
