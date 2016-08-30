@@ -53,7 +53,7 @@ struct BadOptionalAccess : std::logic_error {
 
 namespace _impl {
 
-template<class T, bool=std::is_trivially_destructible<T>::value>
+template<class T, bool = std::is_trivially_destructible<T>::value>
 struct OptionalStorage;
 
 template<class T, class U>
@@ -91,7 +91,7 @@ public:
     Optional<T>& operator=(const Optional<T>& other);
 
     template<class U, class = typename std::enable_if<_impl::TypeIsAssignableToOptional<T, U>::value>::type>
-    Optional<T>& operator=(U&& value);
+    Optional<T>& operator=(U && value);
 
     explicit constexpr operator bool() const;
     constexpr const T& value() const; // Throws
@@ -197,7 +197,7 @@ struct Some {
     template<class... Args>
     static Optional<T> some(Args&&... args)
     {
-        return Optional<T>{std::forward<Args>(args)...};
+        return Optional<T> {std::forward<Args>(args)...};
     }
 };
 
@@ -462,7 +462,7 @@ bool operator<(const Optional<T>& lhs, const Optional<T>& rhs)
 {
     if (!rhs) { return false; }
     if (!lhs) { return true; }
-    return std::less<T>{}(*lhs, *rhs);
+    return std::less<T> {}(*lhs, *rhs);
 }
 
 template<class T>
@@ -470,7 +470,7 @@ bool operator>(const util::Optional<T>& lhs, const util::Optional<T>& rhs)
 {
     if (!lhs) { return false; }
     if (!rhs) { return true; }
-    return std::greater<T>{}(*lhs, *rhs);
+    return std::greater<T> {}(*lhs, *rhs);
 }
 
 template<class T>
@@ -519,7 +519,7 @@ bool operator==(const Optional<T>& lhs, const U& rhs)
 template<class T>
 bool operator<(const Optional<T>& lhs, const T& rhs)
 {
-    return lhs ? std::less<T>{}(*lhs, rhs) : true;
+    return lhs ? std::less<T> {}(*lhs, rhs) : true;
 }
 
 template<class T, class U>
@@ -531,7 +531,7 @@ bool operator==(const T& lhs, const Optional<U>& rhs)
 template<class T>
 bool operator<(const T& lhs, const Optional<T>& rhs)
 {
-    return rhs ? std::less<T>{}(lhs, *rhs) : false;
+    return rhs ? std::less<T> {}(lhs, *rhs) : false;
 }
 
 template<class T, class F>

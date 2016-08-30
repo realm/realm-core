@@ -62,7 +62,7 @@ TEST_TYPES(TimestampColumn_Basic, std::true_type, std::false_type)
     constexpr bool nullable_toggle = TEST_TYPE::value;
     ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
     TimestampColumn c(Allocator::get_default(), ref);
-    c.add(Timestamp(123,123));
+    c.add(Timestamp(123, 123));
     Timestamp ts = c.get(0);
     CHECK(ts == Timestamp(123, 123));
     c.destroy();
@@ -366,7 +366,7 @@ TEST_TYPES(TimestampColumn_DeleteAfterSetWithIndex, std::true_type, std::false_t
     CHECK(index);
 
     c.add(Timestamp{1, 1});
-    c.set(0,Timestamp{2, 2});
+    c.set(0, Timestamp{2, 2});
     c.erase_rows(0, 1, 1, false);
     CHECK_EQUAL(c.size(), 0);
 
@@ -444,7 +444,7 @@ namespace { // anonymous namespace
 template<class T, class C>
 bool compare(T&& a, T&& b, C&& condition)
 {
-  return condition(a, b, a.is_null(), b.is_null());
+    return condition(a, b, a.is_null(), b.is_null());
 }
 
 } // anonymous namespace
@@ -504,43 +504,43 @@ TEST(TimestampColumn_Operators)
 
     // All four elements are non-nulls
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Greater()) ==
-        compare(StringData(""), StringData(""), realm::Greater()));
+          compare(StringData(""), StringData(""), realm::Greater()));
 
     // Repeat with other operators than Greater
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::Less()) ==
-        compare(StringData(0, 0), StringData(0, 0), realm::Less()));
+          compare(StringData(0, 0), StringData(0, 0), realm::Less()));
     CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::Less()) ==
-        compare(StringData(""), StringData(0, 0), realm::Less()));
+          compare(StringData(""), StringData(0, 0), realm::Less()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Less()) ==
-        compare(StringData(""), StringData(""), realm::Less()));
+          compare(StringData(""), StringData(""), realm::Less()));
 
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::Equal()) ==
-        compare(StringData(0, 0), StringData(0, 0), realm::Equal()));
+          compare(StringData(0, 0), StringData(0, 0), realm::Equal()));
     CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::Equal()) ==
-        compare(StringData(""), StringData(0, 0), realm::Equal()));
+          compare(StringData(""), StringData(0, 0), realm::Equal()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Equal()) ==
-        compare(StringData(""), StringData(""), realm::Equal()));
+          compare(StringData(""), StringData(""), realm::Equal()));
 
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::NotEqual()) ==
-        compare(StringData(0, 0), StringData(0, 0), realm::NotEqual()));
+          compare(StringData(0, 0), StringData(0, 0), realm::NotEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::NotEqual()) ==
-        compare(StringData(""), StringData(0, 0), realm::NotEqual()));
+          compare(StringData(""), StringData(0, 0), realm::NotEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::NotEqual()) ==
-        compare(StringData(""), StringData(""), realm::NotEqual()));
+          compare(StringData(""), StringData(""), realm::NotEqual()));
 
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::GreaterEqual()) ==
-        compare(StringData(0, 0), StringData(0, 0), realm::GreaterEqual()));
+          compare(StringData(0, 0), StringData(0, 0), realm::GreaterEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::GreaterEqual()) ==
-        compare(StringData(""), StringData(0, 0), realm::GreaterEqual()));
+          compare(StringData(""), StringData(0, 0), realm::GreaterEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::GreaterEqual()) ==
-        compare(StringData(""), StringData(""), realm::GreaterEqual()));
+          compare(StringData(""), StringData(""), realm::GreaterEqual()));
 
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::LessEqual()) ==
-        compare(StringData(0, 0), StringData(0, 0), realm::LessEqual()));
+          compare(StringData(0, 0), StringData(0, 0), realm::LessEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::LessEqual()) ==
-        compare(StringData(""), StringData(0, 0), realm::LessEqual()));
+          compare(StringData(""), StringData(0, 0), realm::LessEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::LessEqual()) ==
-        compare(StringData(""), StringData(""), realm::LessEqual()));
+          compare(StringData(""), StringData(""), realm::LessEqual()));
 }
 
 
@@ -570,7 +570,7 @@ TEST(TimestampColumn_FindFirst)
     t.add_column(type_Timestamp, "date", non_nullable);
 
     t.add_empty_row(10);
-    
+
     t.set_timestamp(0, 0, Timestamp(null{})); // null
     t.set_timestamp(0, 1, Timestamp(0, 0));
     t.set_timestamp(0, 2, Timestamp(1, 0));
@@ -683,21 +683,23 @@ TEST(Table_DistinctTimestamp)
 
 
 namespace {
-    // Since C++11, modulo with negative operands is well-defined
+// Since C++11, modulo with negative operands is well-defined
 
-    // "Reference implementations" for conversions to and from milliseconds
-    Timestamp milliseconds_to_timestamp(int64_t milliseconds) {
-        int64_t seconds = milliseconds / 1000;
-        int32_t nanoseconds = (milliseconds % 1000) * 1000000;
-        return Timestamp(seconds, nanoseconds);
-    }
+// "Reference implementations" for conversions to and from milliseconds
+Timestamp milliseconds_to_timestamp(int64_t milliseconds)
+{
+    int64_t seconds = milliseconds / 1000;
+    int32_t nanoseconds = (milliseconds % 1000) * 1000000;
+    return Timestamp(seconds, nanoseconds);
+}
 
-    int64_t timestamp_to_milliseconds(const Timestamp& ts) {
-        const int64_t seconds = ts.get_seconds();
-        const int32_t nanoseconds = ts.get_nanoseconds();
-        const int64_t milliseconds = seconds * 1000 + nanoseconds / 1000000; // This may overflow
-        return milliseconds;
-    }
+int64_t timestamp_to_milliseconds(const Timestamp& ts)
+{
+    const int64_t seconds = ts.get_seconds();
+    const int32_t nanoseconds = ts.get_nanoseconds();
+    const int64_t milliseconds = seconds * 1000 + nanoseconds / 1000000; // This may overflow
+    return milliseconds;
+}
 
 } // unnamed namespace
 

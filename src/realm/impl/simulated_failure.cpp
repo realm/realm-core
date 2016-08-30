@@ -28,13 +28,13 @@
 #include <realm/impl/simulated_failure.hpp>
 
 #if REALM_PLATFORM_APPLE || REALM_ANDROID
-#  define USE_PTHREADS_IMPL 1
+    #define USE_PTHREADS_IMPL 1
 #else
-#  define USE_PTHREADS_IMPL 0
+    #define USE_PTHREADS_IMPL 0
 #endif
 
 #if USE_PTHREADS_IMPL
-#  include <pthread.h>
+    #include <pthread.h>
 #endif
 
 using namespace realm;
@@ -72,7 +72,7 @@ struct RandomPrimeMode: PrimeMode {
     int n;
     RandomPrimeMode(int trigger_threshold, int m, uint_fast64_t seed):
         random(seed),
-        dist(0, m-1),
+        dist(0, m - 1),
         n(trigger_threshold)
     {
         REALM_ASSERT(n >= 0 && m > 0);

@@ -152,7 +152,7 @@ inline void Random::seed(unsigned long new_seed) noexcept
 template<class T>
 inline T Random::draw_float(T a, T b) noexcept
 {
-    return std::uniform_real_distribution<T>(a,b)(m_engine);
+    return std::uniform_real_distribution<T>(a, b)(m_engine);
 }
 
 template<class T>
@@ -188,7 +188,7 @@ inline T Random::draw_int_max(T max) noexcept
 template<class T>
 inline T Random::draw_int_mod(T module_size) noexcept
 {
-    return draw_int_max(T(module_size-1));
+    return draw_int_max(T(module_size - 1));
 }
 
 template<class T>
@@ -196,8 +196,8 @@ inline T Random::draw_int_bits(int bits) noexcept
 {
     if (bits <= 0)
         return T();
-    T bit = T(1) << (bits-1);
-    T max = bit + (bit-1);
+    T bit = T(1) << (bits - 1);
+    T max = bit + (bit - 1);
     return draw_int_max(max);
 }
 
@@ -208,7 +208,7 @@ inline bool Random::chance(int n, int m) noexcept
 
 inline bool Random::draw_bool() noexcept
 {
-    return draw_int(0,1) == 1;
+    return draw_int(0, 1) == 1;
 }
 
 template<class RandomIt>
@@ -216,7 +216,7 @@ inline void Random::shuffle(RandomIt begin, RandomIt end)
 {
     typedef typename std::iterator_traits<RandomIt>::difference_type diff_type;
     diff_type n = end - begin;
-    for (diff_type i = n-1; i > 0; --i) {
+    for (diff_type i = n - 1; i > 0; --i) {
         using std::swap;
         swap(begin[i], begin[draw_int_max(i)]);
     }

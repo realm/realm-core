@@ -743,8 +743,7 @@ TEST(Query_NextGenSyntaxMonkey0)
     // table size to test out-of-bounds bugs.
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (int iter = 1; iter < 10 + TEST_DURATION * 1000; iter++)
-    {
+    for (int iter = 1; iter < 10 + TEST_DURATION * 1000; iter++) {
         const size_t rows = 1 + random.draw_int_mod(2 * REALM_MAX_BPNODE_SIZE);
         Table table;
 
@@ -803,7 +802,7 @@ TEST(Query_NextGenSyntaxMonkey)
         // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
         const size_t rows =
             1 + random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
-            (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
+                                            (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -1768,7 +1767,7 @@ TEST(Query_LimitUntyped2)
     CHECK_EQUAL(2, ndx);
 
     // Timestamp
-/*
+    /*
     ts = q.maximum_timestamp(3, nullptr, 0, -1, 1);
     CHECK_EQUAL(Timestamp(10000, 10000), ts);
     q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
@@ -1783,7 +1782,7 @@ TEST(Query_LimitUntyped2)
     CHECK_EQUAL(Timestamp(40000, 40000), ts);
     q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
     CHECK_EQUAL(2, ndx);
-*/
+    */
     // float
     sumf = q.maximum_float(1, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumf);
@@ -2989,7 +2988,7 @@ TEST(Query_DoubleCoordinates)
     // This unit test can be used as benchmark. Just enable this for loop
     //    for (size_t t = 0; t < 1000; t++) {
     Query q = table->column<double>(0) >= 100. && table->column<double>(0) <= 110. &&
-        table->column<double>(1) >= 100. && table->column<double>(1) <= 110.;
+              table->column<double>(1) >= 100. && table->column<double>(1) <= 110.;
 
     size_t c = q.count();
     REALM_ASSERT(c == expected);
@@ -3456,7 +3455,7 @@ TEST(Query_SubtableBug)
     sub->add_column(type_Bool, "sub 2");
     CHECK_EQUAL(2, table->get_column_count());
 
-    for (int i = 0; i<5; i++) {
+    for (int i = 0; i < 5; i++) {
         table->insert_empty_row(i);
         table->set_int(0, i, 100);
     }
@@ -8188,14 +8187,14 @@ TEST(Query_DeepLink)
     size_t col_bool = table->add_column(type_Bool, "bool");
     size_t col_linklist = table->add_column_link(type_LinkList, "list", *table);
 
-    for(size_t j = 0; j < N; ++j) {
+    for (size_t j = 0; j < N; ++j) {
         table->add_empty_row();
         table->set_int(col_int, j, j);
         table->set_bool(col_bool, j, (j % 2) == 0);
 
         LinkViewRef links = table->get_linklist(col_linklist, j);
         TableView view = table->where().find_all();
-        for(size_t i = 0; i < view.size(); ++i) {
+        for (size_t i = 0; i < view.size(); ++i) {
             links->add(i);
         }
     }
@@ -8291,8 +8290,7 @@ TEST(Query_BrokenFindGT)
 TEST(Query_FuzzyFind)
 {
     // TEST_DURATION is normally 0.
-    for (size_t iter = 0; iter < 50 + TEST_DURATION * 2000; iter++)
-    {
+    for (size_t iter = 0; iter < 50 + TEST_DURATION * 2000; iter++) {
         Group group;
         TableRef table = group.add_table("test");
         size_t col = table->add_column(type_Int, "int");
@@ -9079,18 +9077,20 @@ TEST(Query_SyncViewIfNeeded)
     size_t col_links = source->add_column_link(type_LinkList, "link", *target);
     size_t col_id = target->add_column(type_Int, "id");
 
-    auto reset_table_contents = [&]{
+    auto reset_table_contents = [&] {
         source->clear();
         target->clear();
 
-        for (size_t i = 0; i < 15; ++i) {
+        for (size_t i = 0; i < 15; ++i)
+        {
             target->add_empty_row();
             target->set_int(col_id, i, i);
         }
 
         source->add_empty_row();
         LinkViewRef ll = source->get_linklist(col_links, 0);
-        for (size_t i = 6; i < 15; ++i) {
+        for (size_t i = 6; i < 15; ++i)
+        {
             ll->add(i);
         }
     };

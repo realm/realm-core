@@ -85,7 +85,7 @@ bool wildcard_pattern::match(const char* begin, const char* end) const noexcept
     }
 
     // Check unanchored infix cards
-    for (size_t i = 1; i != num_cards-1; ++i) {
+    for (size_t i = 1; i != num_cards - 1; ++i) {
         const card& card_i = m_cards[i];
         str_iter card_begin = m_text.begin() + card_i.m_offset;
         str_iter card_end   = card_begin + card_i.m_size;

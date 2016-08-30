@@ -24,8 +24,8 @@
 
 
 struct MySubtableSpec: realm::SpecBase {
-    typedef typename realm::TypeAppend< void, int >::type Columns1;
-    typedef typename realm::TypeAppend< Columns1, int >::type Columns;
+    typedef typename realm::TypeAppend<void, int>::type Columns1;
+    typedef typename realm::TypeAppend<Columns1, int>::type Columns;
 
     template<template<int> class Col, class Init>
     struct ColNames {
@@ -47,9 +47,9 @@ typedef realm::BasicTable<MySubtableSpec> MySubtable;
 
 
 struct MyTableSpec: realm::SpecBase {
-    typedef typename realm::TypeAppend< void, int >::type Columns1;
-    typedef typename realm::TypeAppend< Columns1, int >::type Columns2;
-    typedef typename realm::TypeAppend< Columns2, realm::SpecBase::Subtable<MySubtable>>::type Columns;
+    typedef typename realm::TypeAppend<void, int>::type Columns1;
+    typedef typename realm::TypeAppend<Columns1, int>::type Columns2;
+    typedef typename realm::TypeAppend<Columns2, realm::SpecBase::Subtable<MySubtable>>::type Columns;
 
     template<template<int> class Col, class Init>
     struct ColNames {

@@ -158,7 +158,7 @@ public:
     static size_t verify_leaf(MemRef mem, Allocator& alloc);
 #endif
     static void leaf_to_dot(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                         std::ostream& out, Allocator& alloc);
+                            std::ostream& out, Allocator& alloc);
 private:
     LeafType& root_as_leaf();
     const LeafType& root_as_leaf() const;
@@ -371,7 +371,7 @@ template<class T>
 T BpTree<T>::back() const noexcept
 {
     // FIXME: slow
-    return get(size()-1);
+    return get(size() - 1);
 }
 
 namespace _impl {
@@ -508,8 +508,7 @@ void BpTree<T>::insert(size_t row_ndx, T value, size_t num_rows)
 }
 
 template<class T>
-struct BpTree<T>::UpdateHandler : Array::UpdateHandler
-{
+struct BpTree<T>::UpdateHandler : Array::UpdateHandler {
     LeafType m_leaf;
     const T m_value;
     UpdateHandler(BpTreeBase& tree, T value) noexcept:
@@ -524,8 +523,7 @@ struct BpTree<T>::UpdateHandler : Array::UpdateHandler
 };
 
 template<class T>
-struct BpTree<T>::SetNullHandler : Array::UpdateHandler
-{
+struct BpTree<T>::SetNullHandler : Array::UpdateHandler {
     LeafType m_leaf;
     SetNullHandler(BpTreeBase& tree) noexcept: m_leaf(tree.get_alloc()) {}
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
@@ -614,7 +612,7 @@ template<class T>
 void BpTree<T>::erase(size_t ndx, bool is_last)
 {
     REALM_ASSERT_DEBUG_EX(ndx < size(), ndx, size());
-    REALM_ASSERT_DEBUG(is_last == (ndx == size()-1));
+    REALM_ASSERT_DEBUG(is_last == (ndx == size() - 1));
     if (root_is_leaf()) {
         root_as_leaf().erase(ndx);
     }
@@ -738,7 +736,7 @@ private:
 
 template<class T>
 ref_type BpTree<T>::write(size_t slice_offset, size_t slice_size,
-                            size_t table_size, _impl::OutputStream& out) const
+                          size_t table_size, _impl::OutputStream& out) const
 {
     ref_type ref;
     if (root_is_leaf()) {
@@ -754,7 +752,7 @@ ref_type BpTree<T>::write(size_t slice_offset, size_t slice_size,
     else {
         SliceHandler handler(get_alloc());
         ref = write_subtree(root(), slice_offset, slice_size,
-                                table_size, handler, out); // Throws
+                            table_size, handler, out); // Throws
     }
     return ref;
 }
@@ -768,7 +766,7 @@ MemRef BpTree<T>::create_leaf(Array::Type leaf_type, size_t size, T value, Alloc
 
 template<class T>
 void BpTree<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf,
-                                  LeafInfo& inout_leaf_info) const noexcept
+                         LeafInfo& inout_leaf_info) const noexcept
 {
     if (root_is_leaf()) {
         ndx_in_leaf = ndx;
@@ -864,7 +862,7 @@ void BpTree<T>::verify() const
 
 template<class T>
 void BpTree<T>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
-                                    std::ostream& out, Allocator& alloc)
+                            std::ostream& out, Allocator& alloc)
 {
     LeafType leaf(alloc);
     leaf.init_from_mem(leaf_mem);

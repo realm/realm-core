@@ -26,10 +26,10 @@
 namespace realm {
 namespace util {
 
-void *mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char *encryption_key);
-void munmap(void *addr, size_t size) noexcept;
+void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key);
+void munmap(void* addr, size_t size) noexcept;
 void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size);
-void msync(void *addr, size_t size);
+void msync(void* addr, size_t size);
 
 // A function which may be given to encryption_read_barrier. If present, the read barrier is a
 // a barrier for a full array. If absent, the read barrier is a barrier only for the address
@@ -43,7 +43,7 @@ class EncryptedFileMapping;
 
 // This variant allows the caller to obtain direct access to the encrypted file mapping
 // for optimization purposes.
-void *mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char *encryption_key,
+void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key,
            EncryptedFileMapping*& mapping);
 
 void do_encryption_read_barrier(const void* addr, size_t size,
@@ -102,14 +102,14 @@ template<typename T>
 void encryption_read_barrier(File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
     T* addr = map.get_addr();
-    encryption_read_barrier(addr+index, sizeof(T)*num_elements, map.get_encrypted_mapping());
+    encryption_read_barrier(addr + index, sizeof(T) * num_elements, map.get_encrypted_mapping());
 }
 
 template<typename T>
 void encryption_write_barrier(File::Map<T>& map, size_t index, size_t num_elements = 1)
 {
     T* addr = map.get_addr();
-    encryption_write_barrier(addr+index, sizeof(T)*num_elements, map.get_encrypted_mapping());
+    encryption_write_barrier(addr + index, sizeof(T) * num_elements, map.get_encrypted_mapping());
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;
