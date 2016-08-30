@@ -3362,8 +3362,6 @@ ConstLinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx) const
 LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
 {
     REALM_ASSERT_3(row_ndx, <, m_size);
-    // FIXME: this looks wrong! It should instead be the modifying operations of
-    // LinkView that bump the change count of the containing table.
     LinkListColumn& col = get_column_link_list(col_ndx);
     return col.get(row_ndx);
 }
