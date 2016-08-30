@@ -62,6 +62,17 @@ public:
 
     /// Specifies criticality when passed to log(). Functions as a criticality
     /// threshold when returned from LevelThreshold::get().
+    ///
+    ///     error   Be silent unless when there is an error.
+    ///     warn    Be silent unless when there is an error or a warning.
+    ///     info    Reveal information about what is going on, but in a
+    ///             minimalistic fashion to avoid general overhead from logging
+    ///             and to keep volume down.
+    ///     detail  Same as 'info', but prioritize completeness over minimalism.
+    ///     debug   Reveal information that can aid debugging, no longer paying
+    ///             attention to efficiency.
+    ///     trace   A version of 'debug' that allows for very high volume
+    ///             output.
     enum class Level { all, trace, debug, detail, info, warn, error, fatal, off };
 
     template<class... Params> void log(Level, const char* message, Params...);
