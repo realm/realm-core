@@ -85,7 +85,7 @@ TEST(TimestampColumn_Basic_Nulls)
     CHECK_THROW_ANY(t.set_null(0, 0));
     t.set_null(1, 0);
 
-    CHECK_THROW_ANY(t.set_timestamp(0, 0, Timestamp(null{})));
+    CHECK_THROW_ANY(t.set_timestamp(0, 0, Timestamp{}));
 }
 
 TEST(TimestampColumn_Relocate)
@@ -454,17 +454,17 @@ TEST(TimestampColumn_Operators)
     // Note that the Timestamp::operator==, operator>, operator<, operator>=, etc, do not work
     // if one of the Timestamps are null! Please use realm::Greater, realm::Equal, etc instead.
 
-    // Test A. Note that Timestamp(null{}) is null and Timestamp(0, 0) is non-null
+    // Test A. Note that Timestamp{} is null and Timestamp(0, 0) is non-null
     // -----------------------------------------------------------------------------------------
-    CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::Equal()));
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::Equal()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Equal()));
     CHECK(compare(Timestamp(1, 2), Timestamp(1, 2), realm::Equal()));
     CHECK(compare(Timestamp(-1, -2), Timestamp(-1, -2), realm::Equal()));
 
     // Test B
     // -----------------------------------------------------------------------------------------
-    CHECK(!compare(Timestamp(null{}), Timestamp(0, 0), realm::Equal()));
-    CHECK(!compare(Timestamp(0, 0), Timestamp(null{}), realm::Equal()));
+    CHECK(!compare(Timestamp{}, Timestamp(0, 0), realm::Equal()));
+    CHECK(!compare(Timestamp(0, 0), Timestamp{}, realm::Equal()));
     CHECK(!compare(Timestamp(0, 0), Timestamp(0, 1), realm::Equal()));
     CHECK(!compare(Timestamp(0, 1), Timestamp(0, 0), realm::Equal()));
     CHECK(!compare(Timestamp(1, 0), Timestamp(0, 0), realm::Equal()));
@@ -472,8 +472,8 @@ TEST(TimestampColumn_Operators)
 
     // Test C: !compare(..., Equal) == compare(..., NotEqual)
     // -----------------------------------------------------------------------------------------
-    CHECK(compare(Timestamp(null{}), Timestamp(0, 0), realm::NotEqual()));
-    CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::NotEqual()));
+    CHECK(compare(Timestamp{}, Timestamp(0, 0), realm::NotEqual()));
+    CHECK(compare(Timestamp(0, 0), Timestamp{}, realm::NotEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 1), realm::NotEqual()));
     CHECK(compare(Timestamp(0, 1), Timestamp(0, 0), realm::NotEqual()));
     CHECK(compare(Timestamp(1, 0), Timestamp(0, 0), realm::NotEqual()));
@@ -482,63 +482,63 @@ TEST(TimestampColumn_Operators)
     // Test D: compare(..., Equal) == true implies that compare(..., GreaterEqual) == true
     // (but not vice versa). So we copy/pate tests from test B again:
     // -----------------------------------------------------------------------------------------
-    CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::GreaterEqual()));
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::GreaterEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::GreaterEqual()));
     CHECK(compare(Timestamp(1, 2), Timestamp(1, 2), realm::GreaterEqual()));
     CHECK(compare(Timestamp(-1, -2), Timestamp(-1, -2), realm::GreaterEqual()));
 
-    CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::LessEqual()));
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::LessEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::LessEqual()));
     CHECK(compare(Timestamp(1, 2), Timestamp(1, 2), realm::LessEqual()));
     CHECK(compare(Timestamp(-1, -2), Timestamp(-1, -2), realm::LessEqual()));
 
     // Test E: Sorting order of nulls vs. non-nulls should be the same for Timestamp as for other types
     // -----------------------------------------------------------------------------------------
-    // All four data elements are null here (StringData(0, 0) means null)
-    CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::Greater()) ==
-          compare(StringData(0, 0), StringData(0, 0), realm::Greater()));
+    // All four data elements are null here (StringData{} means null)
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::Greater()) ==
+          compare(StringData{}, StringData{}, realm::Greater()));
 
     // Compare null with non-nulls (Timestamp(0, 0) is non-null and StringData("") is non-null
-    CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::Greater()) ==
-          compare(StringData(""), StringData(0, 0), realm::Greater()));
+    CHECK(compare(Timestamp(0, 0), Timestamp{}, realm::Greater()) ==
+          compare(StringData(""), StringData{}, realm::Greater()));
 
     // All four elements are non-nulls
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Greater()) ==
           compare(StringData(""), StringData(""), realm::Greater()));
 
     // Repeat with other operators than Greater
-    CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::Less()) ==
-          compare(StringData(0, 0), StringData(0, 0), realm::Less()));
-    CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::Less()) ==
-          compare(StringData(""), StringData(0, 0), realm::Less()));
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::Less()) ==
+          compare(StringData{}, StringData{}, realm::Less()));
+    CHECK(compare(Timestamp(0, 0), Timestamp{}, realm::Less()) ==
+          compare(StringData(""), StringData{}, realm::Less()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Less()) ==
           compare(StringData(""), StringData(""), realm::Less()));
 
-    CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::Equal()) ==
-          compare(StringData(0, 0), StringData(0, 0), realm::Equal()));
-    CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::Equal()) ==
-          compare(StringData(""), StringData(0, 0), realm::Equal()));
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::Equal()) ==
+          compare(StringData{}, StringData{}, realm::Equal()));
+    CHECK(compare(Timestamp(0, 0), Timestamp{}, realm::Equal()) ==
+          compare(StringData(""), StringData{}, realm::Equal()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Equal()) ==
           compare(StringData(""), StringData(""), realm::Equal()));
 
-    CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::NotEqual()) ==
-          compare(StringData(0, 0), StringData(0, 0), realm::NotEqual()));
-    CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::NotEqual()) ==
-          compare(StringData(""), StringData(0, 0), realm::NotEqual()));
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::NotEqual()) ==
+          compare(StringData{}, StringData{}, realm::NotEqual()));
+    CHECK(compare(Timestamp(0, 0), Timestamp{}, realm::NotEqual()) ==
+          compare(StringData(""), StringData{}, realm::NotEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::NotEqual()) ==
           compare(StringData(""), StringData(""), realm::NotEqual()));
 
-    CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::GreaterEqual()) ==
-          compare(StringData(0, 0), StringData(0, 0), realm::GreaterEqual()));
-    CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::GreaterEqual()) ==
-          compare(StringData(""), StringData(0, 0), realm::GreaterEqual()));
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::GreaterEqual()) ==
+          compare(StringData{}, StringData{}, realm::GreaterEqual()));
+    CHECK(compare(Timestamp(0, 0), Timestamp{}, realm::GreaterEqual()) ==
+          compare(StringData(""), StringData{}, realm::GreaterEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::GreaterEqual()) ==
           compare(StringData(""), StringData(""), realm::GreaterEqual()));
 
-    CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::LessEqual()) ==
-          compare(StringData(0, 0), StringData(0, 0), realm::LessEqual()));
-    CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::LessEqual()) ==
-          compare(StringData(""), StringData(0, 0), realm::LessEqual()));
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::LessEqual()) ==
+          compare(StringData{}, StringData{}, realm::LessEqual()));
+    CHECK(compare(Timestamp(0, 0), Timestamp{}, realm::LessEqual()) ==
+          compare(StringData(""), StringData{}, realm::LessEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::LessEqual()) ==
           compare(StringData(""), StringData(""), realm::LessEqual()));
 }
@@ -571,7 +571,7 @@ TEST(TimestampColumn_FindFirst)
 
     t.add_empty_row(10);
 
-    t.set_timestamp(0, 0, Timestamp(null{})); // null
+    t.set_timestamp(0, 0, Timestamp{}); // null
     t.set_timestamp(0, 1, Timestamp(0, 0));
     t.set_timestamp(0, 2, Timestamp(1, 0));
     t.set_timestamp(0, 3, Timestamp(0, 1));
@@ -585,7 +585,7 @@ TEST(TimestampColumn_FindFirst)
     t.set_timestamp(1, 4, Timestamp(1, 1));
     t.set_timestamp(1, 5, Timestamp(-1, 0));
 
-    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(null{})), 0);
+    CHECK_EQUAL(t.find_first_timestamp(0, Timestamp{}), 0);
     CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(0, 0)), 1);
     CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(1, 0)), 2);
     CHECK_EQUAL(t.find_first_timestamp(0, Timestamp(0, 1)), 3);

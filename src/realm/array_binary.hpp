@@ -141,7 +141,7 @@ inline ArrayBinary::ArrayBinary(Allocator& allocator) noexcept:
 inline void ArrayBinary::create()
 {
     size_t init_size = 0;
-    BinaryData defaults = BinaryData(0, 0); // This init value is ignored because size = 0
+    BinaryData defaults = BinaryData{}; // This init value is ignored because size = 0
     MemRef mem = create_array(init_size, get_alloc(), defaults); // Throws
     init_from_mem(mem);
 }
