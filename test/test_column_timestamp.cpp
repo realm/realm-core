@@ -494,13 +494,13 @@ TEST(TimestampColumn_Operators)
 
     // Test E: Sorting order of nulls vs. non-nulls should be the same for Timestamp as for other types
     // -----------------------------------------------------------------------------------------
-    // All four data elements are null here (StringData(nullptr, 0) means null)
+    // All four data elements are null here (StringData{} means null)
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::Greater()) ==
-          compare(StringData(nullptr, 0), StringData(nullptr, 0), realm::Greater()));
+          compare(StringData{}, StringData{}, realm::Greater()));
 
     // Compare null with non-nulls (Timestamp(0, 0) is non-null and StringData("") is non-null
     CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::Greater()) ==
-          compare(StringData(""), StringData(nullptr, 0), realm::Greater()));
+          compare(StringData(""), StringData{}, realm::Greater()));
 
     // All four elements are non-nulls
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Greater()) ==
@@ -508,37 +508,37 @@ TEST(TimestampColumn_Operators)
 
     // Repeat with other operators than Greater
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::Less()) ==
-          compare(StringData(nullptr, 0), StringData(nullptr, 0), realm::Less()));
+          compare(StringData{}, StringData{}, realm::Less()));
     CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::Less()) ==
-          compare(StringData(""), StringData(nullptr, 0), realm::Less()));
+          compare(StringData(""), StringData{}, realm::Less()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Less()) ==
           compare(StringData(""), StringData(""), realm::Less()));
 
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::Equal()) ==
-          compare(StringData(nullptr, 0), StringData(nullptr, 0), realm::Equal()));
+          compare(StringData{}, StringData{}, realm::Equal()));
     CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::Equal()) ==
-          compare(StringData(""), StringData(nullptr, 0), realm::Equal()));
+          compare(StringData(""), StringData{}, realm::Equal()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Equal()) ==
           compare(StringData(""), StringData(""), realm::Equal()));
 
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::NotEqual()) ==
-          compare(StringData(nullptr, 0), StringData(nullptr, 0), realm::NotEqual()));
+          compare(StringData{}, StringData{}, realm::NotEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::NotEqual()) ==
-          compare(StringData(""), StringData(nullptr, 0), realm::NotEqual()));
+          compare(StringData(""), StringData{}, realm::NotEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::NotEqual()) ==
           compare(StringData(""), StringData(""), realm::NotEqual()));
 
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::GreaterEqual()) ==
-          compare(StringData(nullptr, 0), StringData(nullptr, 0), realm::GreaterEqual()));
+          compare(StringData{}, StringData{}, realm::GreaterEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::GreaterEqual()) ==
-          compare(StringData(""), StringData(nullptr, 0), realm::GreaterEqual()));
+          compare(StringData(""), StringData{}, realm::GreaterEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::GreaterEqual()) ==
           compare(StringData(""), StringData(""), realm::GreaterEqual()));
 
     CHECK(compare(Timestamp(null{}), Timestamp(null{}), realm::LessEqual()) ==
-          compare(StringData(nullptr, 0), StringData(nullptr, 0), realm::LessEqual()));
+          compare(StringData{}, StringData{}, realm::LessEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(null{}), realm::LessEqual()) ==
-          compare(StringData(""), StringData(nullptr, 0), realm::LessEqual()));
+          compare(StringData(""), StringData{}, realm::LessEqual()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::LessEqual()) ==
           compare(StringData(""), StringData(""), realm::LessEqual()));
 }
