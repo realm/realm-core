@@ -277,7 +277,7 @@ public:
                                 size_t limit = size_t(-1));
 
     // Deletion
-    size_t  remove(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1));
+    size_t remove();
 
 #if REALM_MULTITHREAD_QUERY
     // Multi-threading
@@ -304,7 +304,7 @@ private:
 
     void init() const;
     size_t find_internal(size_t start = 0, size_t end = size_t(-1)) const;
-    size_t peek_tableview(size_t tv_index) const;
+    size_t peek_tablerow(size_t row) const;
     void handle_pending_not();
     void set_table(TableRef tr);
 
