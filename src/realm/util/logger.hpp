@@ -93,6 +93,8 @@ protected:
 
     virtual void do_log(Level, std::string message) = 0;
 
+    static const char* get_level_prefix(Level) noexcept;
+
 private:
     struct State;
     template<class> struct Subst;
@@ -429,9 +431,9 @@ inline Logger::Level RootLogger::get() const noexcept
     return m_level_threshold;
 }
 
-inline void StderrLogger::do_log(Level, std::string message)
+inline void StderrLogger::do_log(Level level, std::string message)
 {
-    std::cerr << message << '\n'; // Throws
+    std::cerr << get_level_prefix(level) << message << '\n'; // Throws
     std::cerr.flush(); // Throws
 }
 
@@ -440,9 +442,9 @@ inline StreamLogger::StreamLogger(std::ostream& out) noexcept:
 {
 }
 
-inline void StreamLogger::do_log(Level, std::string message)
+inline void StreamLogger::do_log(Level level, std::string message)
 {
-    m_out << message << '\n'; // Throws
+    m_out << get_level_prefix(level) << message << '\n'; // Throws
     m_out.flush(); // Throws
 }
 
