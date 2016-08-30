@@ -7049,37 +7049,38 @@ TEST(Table_getVersionCounterAfterRowAccessor)
     int_fast64_t ver = t.get_version_counter();
     int_fast64_t newVer;
 
-#define _CHECK_VER_BUMP() \
-    newVer = t.get_version_counter();\
-    CHECK_GREATER(newVer, ver); \
-    ver = newVer;
+    auto check_ver_bump = [&]() {
+        newVer = t.get_version_counter();
+        CHECK_GREATER(newVer, ver);
+        ver = newVer;
+    };
 
     t.set_bool(col_bool, 0, true);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_int(col_int, 0, 42);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_string(col_string, 0, "foo");
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_float(col_float, 0, 0.42f);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_double(col_double, 0, 0.42);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_olddatetime(col_date, 0, 1234);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_binary(col_binary, 0, BinaryData("binary", 7));
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_timestamp(col_timestamp, 0, Timestamp(777, 888));
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_null(0, 0);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 }
 
 #endif // TEST_TABLE
