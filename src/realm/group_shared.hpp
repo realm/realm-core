@@ -102,8 +102,8 @@ struct IncompatibleLockFile: std::runtime_error {
 ///    not committed.
 ///
 ///  - If SharedGroup::advance_read() or SharedGroup::promote_to_write() throws
-///    an unexpected exception, the shared group accessor is left in state "error
-///    during read".
+///    an unexpected exception, the shared group accessor is left in state
+///    "error during read".
 ///
 ///  - If SharedGroup::commit_and_continue_as_read() or
 ///    SharedGroup::rollback_and_continue_as_read() throws an unexpected
@@ -191,8 +191,8 @@ public:
     ///
     /// \param durability See DurabilityLevel.
     ///
-    /// \param encryption_key The key to encrypt the Realm, or `nullptr` (default)
-    /// if the file is not encrypted.
+    /// \param encryption_key The key to encrypt the Realm, or `nullptr`
+    ///  (default) if the file is not encrypted.
     ///
     /// \param allow_file_format_upgrade
     /// \parblock
@@ -266,8 +266,8 @@ public:
     /// NOTE:
     /// "changed" means that one or more commits has been made to the database
     /// since the SharedGroup (on which wait_for_change() is called) last
-    /// started, committed, promoted or advanced a transaction. If the SharedGroup
-    /// has not yet begun a transaction, "changed" is undefined.
+    /// started, committed, promoted or advanced a transaction. If the
+    /// SharedGroup has not yet begun a transaction, "changed" is undefined.
     ///
     /// No distinction is made between changes done by another process
     /// and changes done by another thread in the same process as the caller.
@@ -276,10 +276,11 @@ public:
     bool has_changed();
 
     /// The calling thread goes to sleep until the database is changed, or
-    /// until wait_for_change_release() is called. After a call to wait_for_change_release()
-    /// further calls to wait_for_change() will return immediately. To restore
-    /// the ability to wait for a change, a call to enable_wait_for_change()
-    /// is required. Return true if the database has changed, false if it might have.
+    /// until wait_for_change_release() is called. After a call to
+    /// wait_for_change_release() further calls to wait_for_change() will return
+    /// immediately. To restore the ability to wait for a change, a call to
+    /// enable_wait_for_change() is required. Return true if the database has
+    /// changed, false if it might have.
     bool wait_for_change();
 
     /// release any thread waiting in wait_for_change() on *this* SharedGroup.
@@ -398,16 +399,18 @@ public:
     /// Compact the database file.
     /// - The method will throw if called inside a transaction.
     /// - The method will throw if called in unattached state.
-    /// - The method will return false if other SharedGroups are accessing the database
-    ///   in which case compaction is not done. This is not necessarily an error.
+    /// - The method will return false if other SharedGroups are accessing the
+    ///    database in which case compaction is not done. This is not
+    ///    necessarily an error.
     /// It will return true following successful compaction.
     /// While compaction is in progress, attempts by other
     /// threads or processes to open the database will wait.
-    /// Be warned that resource requirements for compaction is proportional to the amount
-    /// of live data in the database.
-    /// Compaction works by writing the database contents to a temporary database file and
-    /// then replacing the database with the temporary one. The name of the temporary
-    /// file is formed by appending ".tmp_compaction_space" to the name of the database
+    /// Be warned that resource requirements for compaction is proportional to
+    /// the amount of live data in the database.
+    /// Compaction works by writing the database contents to a temporary
+    /// database file and then replacing the database with the temporary one.
+    /// The name of the temporary file is formed by appending
+    /// ".tmp_compaction_space" to the name of the database
     ///
     /// FIXME: This function is not yet implemented in an exception-safe manner,
     /// therefore, if it throws, the application should not attempt to
@@ -418,56 +421,60 @@ public:
     void test_ringbuf();
 #endif
 
-    /// To handover a table view, query, linkview or row accessor of type T, you must
-    /// wrap it into a Handover<T> for the transfer. Wrapping and unwrapping of a handover
-    /// object is done by the methods 'export_for_handover()' and 'import_from_handover()'
-    /// declared below. 'export_for_handover()' returns a Handover object, and
-    /// 'import_for_handover()' consumes that object, producing a new accessor which
-    /// is ready for use in the context of the importing SharedGroup.
+    /// To handover a table view, query, linkview or row accessor of type T, you
+    /// must wrap it into a Handover<T> for the transfer. Wrapping and
+    /// unwrapping of a handover object is done by the methods
+    /// 'export_for_handover()' and 'import_from_handover()' declared below.
+    /// 'export_for_handover()' returns a Handover object, and
+    /// 'import_for_handover()' consumes that object, producing a new accessor
+    /// which is ready for use in the context of the importing SharedGroup.
     ///
     /// The Handover always creates a new accessor object at the importing side.
     /// For TableViews, there are 3 forms of handover.
     ///
     /// - with payload move: the payload is handed over and ends up as a payload
-    ///   held by the accessor at the importing side. The accessor on the exporting
-    ///   side will rerun its query and generate a new payload, if TableView::sync_if_needed() is
-    ///   called. If the original payload was in sync at the exporting side, it will
-    ///   also be in sync at the importing side. This is indicated to handover_export()
-    ///   by the argument MutableSourcePayload::Move
+    ///   held by the accessor at the importing side. The accessor on the
+    ///   exporting side will rerun its query and generate a new payload, if
+    ///   TableView::sync_if_needed() is called. If the original payload was in
+    ///   sync at the exporting side, it will also be in sync at the importing
+    ///   side. This is indicated to handover_export() by the argument
+    ///   MutableSourcePayload::Move
     ///
-    /// - with payload copy: a copy of the payload is handed over, so both the accessors
-    ///   on the exporting side *and* the accessors created at the importing side has
-    ///   their own payload. This is indicated to handover_export() by the argument
-    ///   ConstSourcePayload::Copy
+    /// - with payload copy: a copy of the payload is handed over, so both the
+    ///   accessors on the exporting side *and* the accessors created at the
+    ///   importing side has their own payload. This is indicated to
+    ///   handover_export() by the argument ConstSourcePayload::Copy
     ///
     /// - without payload: the payload stays with the accessor on the exporting
-    ///   side. On the importing side, the new accessor is created without payload.
-    ///   a call to TableView::sync_if_needed() will trigger generation of a new payload.
-    ///   This form of handover is indicated to handover_export() by the argument
-    ///   ConstSourcePayload::Stay.
+    ///   side. On the importing side, the new accessor is created without
+    ///   payload. A call to TableView::sync_if_needed() will trigger generation
+    ///   of a new payload. This form of handover is indicated to
+    ///   handover_export() by the argument ConstSourcePayload::Stay.
     ///
-    /// For all other (non-TableView) accessors, handover is done with payload copy,
-    /// since the payload is trivial.
+    /// For all other (non-TableView) accessors, handover is done with payload
+    /// copy, since the payload is trivial.
     ///
-    /// Handover *without* payload is useful when you want to ship a tableview with its query for
-    /// execution in a background thread. Handover with *payload move* is useful when you want to
-    /// transfer the result back.
+    /// Handover *without* payload is useful when you want to ship a tableview
+    /// with its query for execution in a background thread. Handover with
+    /// *payload move* is useful when you want to transfer the result back.
     ///
-    /// Handover *without* payload or with payload copy is guaranteed *not* to change
-    /// the accessors on the exporting side.
+    /// Handover *without* payload or with payload copy is guaranteed *not* to
+    /// change the accessors on the exporting side.
     ///
     /// Handover is *not* thread safe and should be carried out
     /// by the thread that "owns" the involved accessors.
     ///
     /// Handover is transitive:
-    /// If the object being handed over depends on other views (table- or link- ), those
-    /// objects will be handed over as well. The mode of handover (payload copy, payload
-    /// move, without payload) is applied recursively. Note: If you are handing over
-    /// a tableview dependent upon another tableview and using MutableSourcePayload::Move,
+    /// If the object being handed over depends on other views
+    /// (table- or link- ), those objects will be handed over as well. The mode
+    /// of handover (payload copy, payload move, without payload) is applied
+    /// recursively. Note: If you are handing over a tableview dependent upon
+    /// another tableview and using MutableSourcePayload::Move,
     /// you are on thin ice!
     ///
-    /// On the importing side, the top-level accessor being created during import takes ownership
-    /// of all other accessors (if any) being created as part of the import.
+    /// On the importing side, the top-level accessor being created during
+    /// import takes ownership of all other accessors (if any) being created as
+    /// part of the import.
 
     /// Type used to support handover of accessors between shared groups.
     template<typename T>
@@ -488,13 +495,14 @@ public:
     template<typename T>
     std::unique_ptr<Handover<T>> export_for_handover(T& accessor, MutableSourcePayload mode);
 
-    /// Import an accessor wrapped in a handover object. The import will fail if the
-    /// importing SharedGroup is viewing a version of the database that is different
-    /// from the exporting SharedGroup. The call to import_from_handover is not thread-safe.
+    /// Import an accessor wrapped in a handover object. The import will fail
+    /// if the importing SharedGroup is viewing a version of the database that
+    /// is different from the exporting SharedGroup. The call to
+    /// import_from_handover is not thread-safe.
     template<typename T>
     std::unique_ptr<T> import_from_handover(std::unique_ptr<Handover<T>> handover);
 
-    // we need to special case handling of LinkViews, because they are ref counted.
+    // We need two cases for handling of LinkViews, because they are ref counted.
     std::unique_ptr<Handover<LinkView>> export_linkview_for_handover(const LinkViewRef& accessor);
     LinkViewRef import_linkview_from_handover(std::unique_ptr<Handover<LinkView>> handover);
 
@@ -577,8 +585,8 @@ private:
     /// the latest available snapshot. Fails if the snapshot is no longer
     /// available.
     ///
-    /// As a side effect update memory mapping to ensure that the ringbuffer entries
-    /// referenced in the readlock info is accessible.
+    /// As a side effect update memory mapping to ensure that the ringbuffer
+    /// entries referenced in the readlock info is accessible.
     ///
     /// FIXME: It needs to be made more clear exactly under which conditions
     /// this function fails. Also, why is it useful to promise anything about
@@ -881,10 +889,10 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const
         throw LogicError(LogicError::wrong_transact_state);
     std::unique_ptr<Handover<T>> result(new Handover<T>());
     // Implementation note:
-    // often, the return value from clone will be T*, BUT it may be ptr to some base of T
-    // instead, so we must cast it to T*. This is always safe, because no matter the type,
-    // clone() will clone the actual accessor instance, and hence return an instance of the
-    // same type.
+    // often, the return value from clone will be T*, BUT it may be ptr to some
+    // base of T instead, so we must cast it to T*. This is always safe, because
+    // no matter the type, clone() will clone the actual accessor instance, and
+    // hence return an instance of the same type.
     result->clone.reset(dynamic_cast<T*>(accessor.clone_for_handover(result->patch, mode).release()));
     result->version = get_version_of_current_transaction();
     return move(result);
@@ -1031,7 +1039,8 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
     REALM_ASSERT(new_read_lock.m_version >= m_read_lock.m_version);
     if (new_read_lock.m_version == m_read_lock.m_version) {
         release_read_lock(new_read_lock);
-        return false; // _impl::History::update_early_from_top_ref() was not called
+        // _impl::History::update_early_from_top_ref() was not called
+        return false;
     }
 
     ReadLockUnlockGuard g(*this, new_read_lock);

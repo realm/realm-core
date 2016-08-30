@@ -96,25 +96,28 @@ public:
     /// starting at the specified row index. The new elements will have the
     /// default value for the column type.
     ///
-    /// \param row_ndx The row to start insertion at. If the row_ndx is less than prior_num_rows then
-    /// previous rows from row_ndx onwards will be moved ahead by num_rows_to_insert.
+    /// \param row_ndx The row to start insertion at. If the row_ndx is less
+    /// than prior_num_rows then previous rows from row_ndx onwards will be
+    /// moved ahead by num_rows_to_insert.
     ///
-    /// \param num_rows_to_insert The number of rows to insert. There is no restriction on this value.
+    /// \param num_rows_to_insert The number of rows to insert. There is no
+    /// restriction on this value.
     ///
     /// \param prior_num_rows The number of elements in this column prior to the
     /// modification.
     ///
-    /// \param nullable Specifies whether or not this column is nullable. This function may assert if
-    /// nullable does not agree with \a is_nullable()
+    /// \param nullable Specifies whether or not this column is nullable. This
+    /// function may assert if nullable does not agree with \a is_nullable()
     virtual void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool nullable) = 0;
 
     /// Removes the specified number of consecutive elements from
     /// this column, starting at the specified row index.
     ///
-    /// \param row_ndx The row to start removal at (inclusive). This must be less than prior_num_rows.
+    /// \param row_ndx The row to start removal at (inclusive). This must be
+    /// less than prior_num_rows.
     ///
-    /// \param num_rows_to_erase The number of rows to erase. The row_ndx + num_rows_to_erase must
-    /// be less than prior_num_rows.
+    /// \param num_rows_to_erase The number of rows to erase.
+    /// The row_ndx + num_rows_to_erase must be less than prior_num_rows.
     ///
     /// \param prior_num_rows The number of elements in this column prior to the
     /// modification.
@@ -129,7 +132,7 @@ public:
     /// moving the element at the last row index over it. This reduces the
     /// number of elements by one.
     ///
-    /// \param row_ndx The row to effectivly erase. This must be less than prior_num_rows.
+    /// \param row_ndx The row to erase. Must be less than prior_num_rows.
     ///
     /// \param prior_num_rows The number of elements in this column prior to the
     /// modification.
@@ -162,9 +165,9 @@ public:
 
     virtual ~ColumnBase() noexcept {}
 
-    // Getter function for index. For integer index, the caller must supply a buffer that we can store the
-    // extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with
-    // String index).
+    // Getter function for index. For integer index, the caller must supply a
+    // buffer that we can store the extracted value in (it may be bitpacked, so
+    // we cannot return a pointer in to the Array as we do with String index).
     virtual StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept = 0;
 
     // Search index
