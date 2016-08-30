@@ -3590,7 +3590,7 @@ OldDateTime Table::minimum_olddatetime(size_t col_ndx, size_t* return_ndx) const
 Timestamp Table::minimum_timestamp(size_t col_ndx, size_t* return_ndx) const
 {
     if (!m_columns.is_attached())
-        return Timestamp(null{});
+        return Timestamp{};
 
     const TimestampColumn& col = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
     return col.minimum(return_ndx);
@@ -3665,7 +3665,7 @@ OldDateTime Table::maximum_olddatetime(size_t col_ndx, size_t* return_ndx) const
 Timestamp Table::maximum_timestamp(size_t col_ndx, size_t* return_ndx) const
 {
     if (!m_columns.is_attached())
-        return Timestamp(null{});
+        return Timestamp{};
 
     const TimestampColumn& col = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
     return col.maximum(return_ndx);

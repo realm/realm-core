@@ -160,7 +160,7 @@ TEST(TableView_TimestampMaxMinCount)
     cnt = tv.count_timestamp(0, Timestamp(100, 100));
     CHECK_EQUAL(cnt, 1);
 
-    cnt = tv.count_timestamp(0, Timestamp(null{}));
+    cnt = tv.count_timestamp(0, Timestamp{});
     CHECK_EQUAL(cnt, 1);
 }
 
