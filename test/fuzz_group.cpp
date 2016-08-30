@@ -502,7 +502,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     t->remove(row_ndx);
                 }
-                REALM_DO_IF_VERIFY(log, g.verify());
             }
             else if (instr == MOVE_LAST_OVER && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
@@ -514,7 +513,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     t->move_last_over(row_ndx);
                 }
-                REALM_DO_IF_VERIFY(log, g.verify());
             }
             else if (instr == SWAP_ROWS && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
@@ -527,7 +525,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     t->swap_rows(row_ndx1, row_ndx2);
                 }
-                REALM_DO_IF_VERIFY(log, g.verify());
             }
             else if (instr == COMMIT) {
                 if (log) {
