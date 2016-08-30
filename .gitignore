@@ -11,8 +11,7 @@ CMakeScripts/
 realm-object-store.xcodeproj/
 
 # Build products
-src/librealm-object-store.dylib
-src/librealm-object-store-static.a
+src/librealm-object-store.a
 tests/tests
 *.build/
 Debug/
