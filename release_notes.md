@@ -1,3 +1,9 @@
+# 2.0.0-rc2 Release notes
+
+### Enhancements
+
+* Add back log level prefixes for `StderrLogger` and `StreamLogger`
+
 # 2.0.0-rc1 Release notes
 
 ### Breaking changes
