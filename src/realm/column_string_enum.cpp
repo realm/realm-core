@@ -393,20 +393,24 @@ void StringEnumColumn::to_dot(std::ostream& out, StringData title) const
 
 namespace {
 
-void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, std::string indent)
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 {
     Array leaf(alloc);
     leaf.init_from_mem(mem);
-    out << indent << "String enumeration leaf (size: " << leaf.size() << ")\n";
+    int indent = level * 2;
+    out << std::setw(indent) << ""
+        << "String enumeration leaf (size: " << leaf.size() << ")\n";
 }
 
 } // anonymous namespace
 
-void StringEnumColumn::do_dump_node_structure(std::ostream& out, std::string indent) const
+void StringEnumColumn::do_dump_node_structure(std::ostream& out, int level) const
 {
-    get_root_array()->dump_bptree_structure(out, indent, &leaf_dumper);
-    out << indent << "Search index\n";
-    m_search_index->do_dump_node_structure(out, indent + "  ");
+    get_root_array()->dump_bptree_structure(out, level, &leaf_dumper);
+    int indent = level * 2;
+    out << std::setw(indent) << ""
+        << "Search index\n";
+    m_search_index->do_dump_node_structure(out, level + 1);
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions

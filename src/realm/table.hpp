@@ -782,7 +782,7 @@ public:
     void print() const;
     MemStats stats() const;
     void dump_node_structure() const; // To std::cerr (for GDB)
-    void dump_node_structure(std::ostream&, std::string indent) const;
+    void dump_node_structure(std::ostream&, int level) const;
 #else
     void verify() const {}
 #endif

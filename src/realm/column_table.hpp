@@ -217,7 +217,7 @@ public:
 
 #ifdef REALM_DEBUG
     void verify(const Table&, size_t) const override;
-    void do_dump_node_structure(std::ostream&, std::string) const override;
+    void do_dump_node_structure(std::ostream&, int) const override;
     void to_dot(std::ostream&, StringData title) const override;
 #endif
 

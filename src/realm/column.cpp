@@ -388,11 +388,13 @@ void ColumnBase::dump_node_structure() const
 namespace realm {
 namespace _impl {
 
-void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, std::string indent)
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 {
     Array leaf(alloc);
     leaf.init_from_mem(mem);
-    out << indent << "Integer leaf (ref: " << leaf.get_ref() << ", size: " << leaf.size() << ")\n";
+    int indent = level * 2;
+    out << std::setw(indent) << ""
+        << "Integer leaf (ref: " << leaf.get_ref() << ", size: " << leaf.size() << ")\n";
     std::ostringstream out_2;
     for (size_t i = 0; i != leaf.size(); ++i) {
         if (i != 0) {
@@ -404,7 +406,8 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, std::string in
         }
         out_2 << leaf.get(i);
     }
-    out << indent << "  Elems: " << out_2.str() << "\n";
+    out << std::setw(indent) << ""
+        << "  Elems: " << out_2.str() << "\n";
 }
 
 } // namespace _impl

@@ -58,10 +58,11 @@ int main(int argc, const char* const argv[])
     if (positional_args.size() < 2) {
     bad_command_line:
         std::cerr << "ERROR: Bad command line.\n"
-                  << std::endl
+                  << "\n"
                   << "Synopsis: " << argv[0] << "  NUM-REPS  TEXT...\n"
-                  << std::endl
-                  << "Options:" << std::endl
+                  << "\n"
+                  << "Options:"
+                  << "\n"
                   << "  --database-file STRING   (default: \"" << database_file << "\")\n";
         return 1;
     }

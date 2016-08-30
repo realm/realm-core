@@ -6018,14 +6018,17 @@ void Table::dump_node_structure() const
     dump_node_structure(std::cerr, 0);
 }
 
-void Table::dump_node_structure(std::ostream& out, std::string indent) const
+void Table::dump_node_structure(std::ostream& out, int level) const
 {
-    out << indent << "Table (top_ref: " << m_top.get_ref() << ")\n";
+    int indent = level * 2;
+    out << std::setw(indent) << ""
+        << "Table (top_ref: " << m_top.get_ref() << ")\n";
     size_t n = get_column_count();
     for (size_t i = 0; i != n; ++i) {
-        out << indent << "  Column " << (i + 1) << "\n";
+        out << std::setw(indent) << ""
+            << "  Column " << (i + 1) << "\n";
         const ColumnBase& col = get_column_base(i);
-        col.do_dump_node_structure(out, indent + "  ");
+        col.do_dump_node_structure(out, level + 2);
     }
 }
 

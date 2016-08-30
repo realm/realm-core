@@ -582,9 +582,9 @@ void MixedColumn::to_dot(std::ostream& out, StringData title) const
     out << "}" << std::endl;
 }
 
-void MixedColumn::do_dump_node_structure(std::ostream& out, std::string indent) const
+void MixedColumn::do_dump_node_structure(std::ostream& out, int level) const
 {
-    m_types->do_dump_node_structure(out, indent); // FIXME: How to do this?
+    m_types->do_dump_node_structure(out, level); // FIXME: How to do this?
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions

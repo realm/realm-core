@@ -439,18 +439,20 @@ void SubtableColumn::to_dot(std::ostream& out, StringData title) const
 
 namespace {
 
-void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, std::string indent)
+void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 {
     Array leaf(alloc);
     leaf.init_from_mem(mem);
-    out << indent << "Subtable leaf (size: " << leaf.size() << ")\n";
+    int indent = level * 2;
+    out << std::setw(indent) << ""
+        << "Subtable leaf (size: " << leaf.size() << ")\n";
 }
 
 } // anonymous namespace
 
-void SubtableColumn::do_dump_node_structure(std::ostream& out, std::string indent) const
+void SubtableColumn::do_dump_node_structure(std::ostream& out, int level) const
 {
-    get_root_array()->dump_bptree_structure(out, indent, &leaf_dumper);
+    get_root_array()->dump_bptree_structure(out, level, &leaf_dumper);
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions

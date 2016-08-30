@@ -2270,28 +2270,33 @@ void Array::verify_bptree(LeafVerifier leaf_verifier) const
 }
 
 
-void Array::dump_bptree_structure(std::ostream& out, std::string indent, LeafDumper leaf_dumper) const
+void Array::dump_bptree_structure(std::ostream& out, int level, LeafDumper leaf_dumper) const
 {
     bool root_is_leaf = !is_inner_bptree_node();
     if (root_is_leaf) {
-        (*leaf_dumper)(get_mem(), m_alloc, out, indent);
+        (*leaf_dumper)(get_mem(), m_alloc, out, level);
         return;
     }
 
-    out << indent << "Inner node (B+ tree) (ref: " << get_ref() << ")\n";
+    int indent = level * 2;
+    out << std::setw(indent) << ""
+        << "Inner node (B+ tree) (ref: " << get_ref() << ")\n";
 
     size_t num_elems_in_subtree = size_t(back() / 2);
-    out << indent << "  Number of elements in subtree: " << num_elems_in_subtree << "\n";
+    out << std::setw(indent) << ""
+        << "  Number of elements in subtree: " << num_elems_in_subtree << "\n";
 
     bool compact_form = front() % 2 != 0;
     if (compact_form) {
         size_t elems_per_child = size_t(front() / 2);
-        out << indent << "  Compact form (elements per child: " << elems_per_child << ")\n";
+        out << std::setw(indent) << ""
+            << "  Compact form (elements per child: " << elems_per_child << ")\n";
     }
     else { // General form
         Array offsets(m_alloc);
         offsets.init_from_ref(to_ref(front()));
-        out << indent << "  General form (offsets_ref: " << offsets.get_ref() << ", ";
+        out << std::setw(indent) << ""
+            << "  General form (offsets_ref: " << offsets.get_ref() << ", ";
         if (offsets.is_empty()) {
             out << "no offsets";
         }
@@ -2312,7 +2317,7 @@ void Array::dump_bptree_structure(std::ostream& out, std::string indent, LeafDum
     for (size_t i = child_ref_begin; i != child_ref_end; ++i) {
         Array child(m_alloc);
         child.init_from_ref(get_as_ref(i));
-        child.dump_bptree_structure(out, indent + "  ", leaf_dumper);
+        child.dump_bptree_structure(out, level + 1, leaf_dumper);
     }
 }
 
@@ -2408,8 +2413,8 @@ void Array::to_dot_parent_edge(std::ostream& out) const
         std::pair<ref_type, size_t> p = parent->get_to_dot_parent(ndx_in_parent);
         ref_type real_parent_ref = p.first;
         size_t ndx_in_real_parent = p.second;
-        out << "n" << std::hex << real_parent_ref << std::dec << ":" << ndx_in_real_parent;
-        out << " -> n" << std::hex << get_ref() << std::dec << std::endl;
+        out << "n" << std::hex << real_parent_ref << std::dec << ":" << ndx_in_real_parent << " -> n" << std::hex
+            << get_ref() << std::dec << std::endl;
     }
 }
 
