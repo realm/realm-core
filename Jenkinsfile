@@ -6,7 +6,16 @@ def dependencies
 
 stage 'gather-info'
 node {
-  getSourceArchive()
+  checkout([
+    $class: 'GitSCM',
+    branches: scm.branches,
+    gitTool: 'native git',
+    extensions: scm.extensions + [[$class: 'CleanCheckout']],
+    userRemoteConfigs: scm.userRemoteConfigs
+  ])
+  sh 'git archive -o core.zip HEAD'
+  stash includes: 'core.zip', name: 'core-source'
+
   dependencies = readProperties file: 'dependencies.list'
   echo "VERSION: ${dependencies.VERSION}"
 
@@ -72,8 +81,10 @@ if (['ajl/jenkinsfile'].contains(env.BRANCH_NAME)) {
 def doBuildCocoa() {
   return {
     node('osx') {
-      checkout scm
-      sh 'git clean -ffdx -e .????????'
+      sh 'rm -rf *'
+      unstash 'core-source'
+      unzip dir: '', glob: '', zipFile: 'core.zip'
+
       try {
         withEnv([
           'PATH=$PATH:/usr/local/bin',
@@ -125,8 +136,10 @@ def doBuildCocoa() {
 def doBuildDotNetOsx() {
   return {
     node('osx') {
-      checkout scm
-      sh 'git clean -ffdx -e .????????'
+      sh 'rm -rf *'
+      unstash 'core-source'
+      unzip dir: '', glob: '', zipFile: 'core.zip'
+
       try {
         withEnv([
           'PATH=$PATH:/usr/local/bin',
@@ -177,8 +190,9 @@ def doBuildDotNetOsx() {
 def doBuildInDocker(String command) {
   return {
     node('docker') {
-      checkout scm
-      sh 'git clean -ffdx -e .????????'
+      sh 'rm -rf *'
+      unstash 'core-source'
+      unzip dir: '', glob: '', zipFile: 'core.zip'
 
       def buildEnv = docker.build 'realm-core:snapshot'
       def environment = environment()
@@ -200,8 +214,9 @@ def doBuildInDocker(String command) {
 def buildDiffCoverage() {
   return {
     node('docker') {
-      checkout scm
-      sh 'git clean -ffdx -e .????????'
+      sh 'rm -rf *'
+      unstash 'core-source'
+      unzip dir: '', glob: '', zipFile: 'core.zip'
 
       def buildEnv = docker.build 'realm-core:snapshot'
       def environment = environment()
@@ -243,8 +258,9 @@ def buildDiffCoverage() {
 def doBuildNodeInDocker() {
   return {
     node('docker') {
-      checkout scm
-      sh 'git clean -ffdx -e .????????'
+      sh 'rm -rf *'
+      unstash 'core-source'
+      unzip dir: '', glob: '', zipFile: 'core.zip'
 
       def buildEnv = docker.build 'realm-core:snapshot'
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
@@ -270,8 +286,9 @@ def doBuildNodeInDocker() {
 def doBuildNodeInOsx() {
   return {
     node('osx') {
-      checkout scm
-      sh 'git clean -ffdx -e .????????'
+      sh 'rm -rf *'
+      unstash 'core-source'
+      unzip dir: '', glob: '', zipFile: 'core.zip'
 
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
       withEnv(environment) {
@@ -303,8 +320,9 @@ def doBuildAndroid() {
     return {
         node('fastlinux') {
           ws('/tmp/core-android') {
-            checkout scm
-            sh 'git clean -ffdx -e .????????'
+            sh 'rm -rf *'
+            unstash 'core-source'
+            unzip dir: '', glob: '', zipFile: 'core.zip'
 
             withEnv(environment) {
               sh "sh build.sh config '${pwd()}/install'"
@@ -441,12 +459,6 @@ def environment() {
     "UNITTEST_THREADS=1",
     "UNITTEST_XML=1"
     ]
-}
-
-def getSourceArchive() {
-  checkout scm
-  sh 'git clean -ffdx -e .????????'
-  sh 'git submodule update --init'
 }
 
 def readGitTag() {
