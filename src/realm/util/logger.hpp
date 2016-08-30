@@ -19,7 +19,7 @@
 #ifndef REALM_UTIL_LOGGER_HPP
 #define REALM_UTIL_LOGGER_HPP
 
-#include <string.h>
+#include <cstring>
 #include <utility>
 #include <string>
 #include <locale>

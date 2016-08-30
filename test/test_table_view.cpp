@@ -23,7 +23,7 @@
 #include <string>
 #include <sstream>
 #include <ostream>
-#include <wchar.h>
+#include <cwchar>
 
 #include <realm/table_macros.hpp>
 

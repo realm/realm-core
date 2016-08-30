@@ -44,7 +44,7 @@ Searching: The main finding function is:
 #include <vector>
 #include <ostream>
 
-#include <stdint.h> // unint8_t etc
+#include <cstdint> // unint8_t etc
 
 #include <realm/util/meta.hpp>
 #include <realm/util/assert.hpp>
