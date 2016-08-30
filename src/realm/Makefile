@@ -125,6 +125,7 @@ DEV_PROGRAMS     = realm-config
 
 librealm_a_SOURCES = \
 util/encrypted_file_mapping.cpp \
+util/logger.hpp \
 util/misc_errors.cpp \
 util/basic_system_errors.cpp \
 util/file.cpp \
