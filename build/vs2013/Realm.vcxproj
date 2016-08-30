@@ -618,7 +618,6 @@
     <ClCompile Include="..\..\src\realm\query_engine.cpp" />
     <ClCompile Include="..\..\src\realm\replication.cpp" />
     <ClCompile Include="..\..\src\realm\unicode.cpp" />
-    <ClCompile Include="..\..\src\realm\util\assert.cpp" />
     <ClCompile Include="..\..\src\realm\util\basic_system_errors.cpp" />
     <ClCompile Include="..\..\src\realm\util\encrypted_file_mapping.cpp" />
     <ClCompile Include="..\..\src\realm\util\file.cpp" />

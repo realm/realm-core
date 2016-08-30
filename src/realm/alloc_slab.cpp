@@ -771,6 +771,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             m_file_on_streaming_form = false;
             writable_map.sync();
         }
+        get_file().update_checksum();
     }
 
     // We can only safely mmap the file, if its size matches a section. If not,

@@ -26,7 +26,10 @@
 
 namespace realm {
 
-extern std::vector<std::string> database;
+    inline void verify_checksum()
+    {
+    
+    }
 
 }
 
@@ -55,13 +58,14 @@ extern std::vector<std::string> database;
 #define REALM_STRINGIFY(X) #X
 
 #define REALM_ASSERT_RELEASE_EX(condition, ...) \
+    verify_checksum(); \
     (REALM_LIKELY(condition) ? static_cast<void>(0) : \
     realm::util::terminate_with_info("Assertion failed: " # condition, __LINE__, __FILE__, \
                                      REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
 
 
 #define REALM_ASSERT_RELEASE_EX2(condition, ...) \
-    get_alloc().get_file().update_checksum(); \
+    get_alloc().get_file().verify_checksum(); \
     (REALM_LIKELY(condition) ? static_cast<void>(0) : \
     realm::util::terminate_with_info("Assertion failed: " # condition, __LINE__, __FILE__, \
                                      REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))

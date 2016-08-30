@@ -1182,6 +1182,7 @@ bool SharedGroup::compact()
     }
     close();
     do_open(m_db_path, true, dura, false, m_key, false);
+    m_file.update_checksum();
     return true;
 }
 
@@ -1613,7 +1614,6 @@ SharedGroup::version_type SharedGroup::commit()
     m_group.m_alloc.get_file().invalidate_checksum();
     version_type new_version = do_commit(); // Throws
     m_group.m_alloc.get_file().update_checksum();
-
 
     do_end_write();
     do_end_read();

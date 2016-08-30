@@ -258,6 +258,10 @@ protected:
 /// database copying, one would have to also specify the target allocator.
 class Array: public ArrayParent {
 public:
+    inline void verify_checksum() const
+    {
+        get_alloc().get_file().verify_checksum();
+    }
 
 //    void state_init(int action, QueryState *state);
 //    bool match(int action, size_t index, int64_t value, QueryState *state);

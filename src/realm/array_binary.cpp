@@ -43,7 +43,7 @@ void ArrayBinary::init_from_mem(MemRef mem) noexcept
 
 void ArrayBinary::add(BinaryData value, bool add_zero_term)
 {
-    REALM_ASSERT_RELEASE_EX2(value.size() == 0 || value.data() != 0);
+    REALM_ASSERT_RELEASE_EX2(value.size() == 0 || value.data() != 0, value.size());
 
     if (value.is_null() && legacy_array_type())
         throw LogicError(LogicError::column_not_nullable);

@@ -257,7 +257,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
 #endif
 
 
-TEST(Shared_CompactingOnTheFly)
+ONLY(Shared_CompactingOnTheFly)
 {
     SHARED_GROUP_TEST_PATH(path);
     Thread writer_thread;
