@@ -1,22 +1,8 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
+# 2.0.0-rc2 Release notes
 
 ### Enhancements
 
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
+* Add back log level prefixes for `StderrLogger` and `StreamLogger`
 
 ----------------------------------------------
 
