@@ -86,9 +86,8 @@ protected:
 // Implementation
 
 inline LinkColumnBase::LinkColumnBase(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
-    : IntegerColumn(alloc, ref, column_ndx)
-    , // Throws
-    m_table(table)
+    : IntegerColumn(alloc, ref, column_ndx) // Throws
+    , m_table(table)
 {
 }
 

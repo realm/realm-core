@@ -141,9 +141,8 @@ public:
 
 template <class T>
 inline Buffer<T>::Buffer(size_t initial_size)
-    : m_data(new T[initial_size])
-    , // Throws
-    m_size(initial_size)
+    : m_data(new T[initial_size]) // Throws
+    , m_size(initial_size)
 {
 }
 

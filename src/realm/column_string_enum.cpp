@@ -33,11 +33,9 @@ using namespace realm::util;
 
 StringEnumColumn::StringEnumColumn(Allocator& alloc, ref_type ref, ref_type keys_ref, bool nullable,
                                    size_t column_ndx)
-    : IntegerColumn(alloc, ref, column_ndx)
-    , // Throws
-    m_keys(alloc, keys_ref, nullable, column_ndx)
-    , // Throws
-    m_nullable(nullable)
+    : IntegerColumn(alloc, ref, column_ndx) // Throws
+    , m_keys(alloc, keys_ref, nullable, column_ndx) // Throws
+    , m_nullable(nullable)
 {
 }
 
