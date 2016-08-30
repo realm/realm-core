@@ -11,8 +11,7 @@ src_path="$(pushd "$script_path/.." >/dev/null; pwd)"
 default="generic centos-6 centos-7"
 distros=${@:-$default}
 
-#git_tag=$(git describe --exact-match --tags HEAD 2>/dev/null || true)
-git_tag="v1.5.0"
+git_tag=$(git describe --exact-match --tags HEAD 2>/dev/null || true)
 
 . ${src_path}/dependencies.list
 
