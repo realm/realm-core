@@ -12297,23 +12297,49 @@ TEST(LangBindHelper_SwapSimple)
     SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
-    std::vector<TableView> table_views;
 
     try { g.add_table("t0"); } catch (const TableNameInUse&) { }
     g.get_table(0)->add_column(type_Int, "t_int");
     g.get_table(0)->add_column_link(type_Link, "t_link", *g.get_table(0));
-    g.get_table(0)->add_empty_row(10);
+    const size_t num_rows = 10;
+    g.get_table(0)->add_empty_row(num_rows);
+    for (size_t i = 0; i < num_rows; ++i) {
+        g.get_table(0)->set_int(0, i, i);
+    }
     LangBindHelper::advance_read(sg_r);
     g_r.verify();
     LangBindHelper::commit_and_continue_as_read(sg_w);
     g.verify();
     LangBindHelper::promote_to_write(sg_w);
     g.verify();
+    for (size_t i = 0; i < num_rows; ++i) {
+        CHECK_EQUAL(g.get_table(0)->get_int(0, i), i);
+    }
     g.get_table(0)->swap_rows(7, 4);
+    CHECK_EQUAL(g.get_table(0)->get_int(0, 4), 7);
+    CHECK_EQUAL(g.get_table(0)->get_int(0, 7), 4);
     try { g.remove_table(0); } catch (const CrossTableLinkTarget&) { }
 
     LangBindHelper::rollback_and_continue_as_read(sg_w);
 
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    CHECK_EQUAL(g.get_table(0)->get_int(0, 4), 4);
+    CHECK_EQUAL(g.get_table(0)->get_int(0, 7), 7);
+    CHECK_EQUAL(g_r.get_table(0)->get_int(0, 4), 4);
+    CHECK_EQUAL(g_r.get_table(0)->get_int(0, 7), 7);
+
+    LangBindHelper::promote_to_write(sg_w);
+    g.get_table(0)->swap_rows(7, 4);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    CHECK_EQUAL(g.get_table(0)->get_int(0, 4), 7);
+    CHECK_EQUAL(g.get_table(0)->get_int(0, 7), 4);
+    CHECK_EQUAL(g_r.get_table(0)->get_int(0, 4), 7);
+    CHECK_EQUAL(g_r.get_table(0)->get_int(0, 7), 4);
 }
 
 
