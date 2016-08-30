@@ -12286,5 +12286,36 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     sg_w.commit();
 }
 
+// Found by AFL
+TEST(LangBindHelper_SwapSimple)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = nullptr;
+    std::unique_ptr<Replication> hist_r(make_client_history(path, key));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, key));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+    std::vector<TableView> table_views;
+
+    try { g.add_table("t0"); } catch (const TableNameInUse&) { }
+    g.get_table(0)->add_column(type_Int, "t_int");
+    g.get_table(0)->add_column_link(type_Link, "t_link", *g.get_table(0));
+    g.get_table(0)->add_empty_row(10);
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    g.get_table(0)->swap_rows(7, 4);
+    try { g.remove_table(0); } catch (const CrossTableLinkTarget&) { }
+
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+
+}
+
+
 
 #endif
