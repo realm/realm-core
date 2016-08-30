@@ -73,19 +73,8 @@ set(INCLUDE_DIRS
     ${UV_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR})
 
-# An object library to group together the compilation of the source files.
-add_library(realm-object-store-objects OBJECT ${SOURCES} ${HEADERS})
-add_dependencies(realm-object-store-objects realm)
-target_compile_definitions(realm-object-store-objects PRIVATE ${PLATFORM_DEFINES})
-set_target_properties(realm-object-store-objects PROPERTIES POSITION_INDEPENDENT_CODE 1)
-target_include_directories(realm-object-store-objects PUBLIC ${INCLUDE_DIRS})
-
-# A static library, aggregating the prebuilt object files.
-add_library(realm-object-store-static STATIC $<TARGET_OBJECTS:realm-object-store-objects>)
-target_include_directories(realm-object-store-static PUBLIC ${INCLUDE_DIRS})
-target_link_libraries(realm-object-store-static PUBLIC realm ${PLATFORM_LIBRARIES})
-
-# A dynamic library, linking together the prebuilt object files.
-add_library(realm-object-store SHARED $<TARGET_OBJECTS:realm-object-store-objects> placeholder.cpp)
+add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
+set_target_properties(realm-object-store PROPERTIES POSITION_INDEPENDENT_CODE 1)
+target_compile_definitions(realm-object-store PRIVATE ${PLATFORM_DEFINES})
 target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
-target_link_libraries(realm-object-store PRIVATE realm ${PLATFORM_LIBRARIES})
+target_link_libraries(realm-object-store PUBLIC realm ${PLATFORM_LIBRARIES})
