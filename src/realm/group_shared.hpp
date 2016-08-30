@@ -496,6 +496,12 @@ public:
     /// may want to momentarily pin the current version until the other thread
     /// has retrieved it.
     ///
+    /// Pinning can be done in both read- and write-transactions, but with different
+    /// semantics. When pinning during a read-transaction, the version pinned is the
+    /// one accessible during the read-transaction. When pinning during a write-transaction,
+    /// the version pinned will be the last version that was succesfully committed to the
+    /// realm file at the point in time, when the write-transaction was started.
+    ///
     /// The release is not thread-safe, so it has to be done on the SharedGroup
     /// associated with the thread calling unpin_version(), and the SharedGroup
     /// must be attached to the realm file at the point of unpinning.
