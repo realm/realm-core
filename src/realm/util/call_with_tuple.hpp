@@ -25,11 +25,16 @@
 namespace realm {
 namespace _impl {
 
-template <size_t...> struct Indexes {};
+template <size_t...>
+struct Indexes {
+};
 template <size_t N, size_t... I>
 struct GenIndexes : GenIndexes<N - 1, N - 1, I...> {
 };
-template <size_t... I> struct GenIndexes<0, I...> { typedef Indexes<I...> type; };
+template <size_t... I>
+struct GenIndexes<0, I...> {
+    typedef Indexes<I...> type;
+};
 
 template <class F, class... A, size_t... I>
 auto call_with_tuple(F func, std::tuple<A...> args, Indexes<I...>) -> decltype(func(std::get<I>(args)...))
@@ -47,8 +52,7 @@ auto call_with_tuple(F func, std::tuple<A...> args)
     -> decltype(_impl::call_with_tuple(std::move(func), std::move(args),
                                        typename _impl::GenIndexes<sizeof...(A)>::type()))
 {
-    return _impl::call_with_tuple(std::move(func), std::move(args),
-                                  typename _impl::GenIndexes<sizeof... (A)>::type());
+    return _impl::call_with_tuple(std::move(func), std::move(args), typename _impl::GenIndexes<sizeof...(A)>::type());
 }
 
 } // namespace util

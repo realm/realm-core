@@ -35,7 +35,7 @@ using namespace realm::util;
 
 namespace {
 
-const size_t small_string_max_size  = 15; // ArrayString
+const size_t small_string_max_size = 15;  // ArrayString
 const size_t medium_string_max_size = 63; // ArrayStringLong
 
 void copy_leaf(const ArrayString& from, ArrayStringLong& to)
@@ -68,9 +68,8 @@ void copy_leaf(const ArrayStringLong& from, ArrayBigBlobs& to)
 } // anonymous namespace
 
 
-StringColumn::StringColumn(Allocator& alloc, ref_type ref, bool nullable, size_t column_ndx):
-    ColumnBaseSimple(column_ndx),
-    m_nullable(nullable)
+StringColumn::StringColumn(Allocator& alloc, ref_type ref, bool nullable, size_t column_ndx)
+    : ColumnBaseSimple(column_ndx), m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref, alloc);
@@ -244,12 +243,12 @@ std::unique_ptr<StringIndex> StringColumn::release_search_index() noexcept
 }
 
 
-void StringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
-                                        size_t ndx_in_parent, bool allow_duplicate_valaues)
+void StringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
+                                        bool allow_duplicate_valaues)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this,
-                                         !allow_duplicate_valaues, m_array->get_alloc())); // Throws
+    m_search_index.reset(
+        new StringIndex(ref, parent, ndx_in_parent, this, !allow_duplicate_valaues, m_array->get_alloc())); // Throws
 }
 
 
@@ -302,17 +301,19 @@ void StringColumn::update_from_parent(size_t old_baseline) noexcept
 
 namespace {
 
-class SetLeafElem: public Array::UpdateHandler {
+class SetLeafElem : public Array::UpdateHandler {
 public:
     Allocator& m_alloc;
     const StringData m_value;
     bool m_nullable;
 
-    SetLeafElem(Allocator& alloc, StringData value, bool nullable) noexcept:
-        m_alloc(alloc), m_value(value), m_nullable(nullable) {}
+    SetLeafElem(Allocator& alloc, StringData value, bool nullable) noexcept : m_alloc(alloc),
+                                                                              m_value(value),
+                                                                              m_nullable(nullable)
+    {
+    }
 
-    void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                size_t elem_ndx_in_leaf) override
+    void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t elem_ndx_in_leaf) override
     {
         bool long_strings = Array::get_hasrefs_from_header(mem.get_addr());
         if (long_strings) {
@@ -333,10 +334,10 @@ public:
             }
             // Upgrade leaf from medium to big strings
             ArrayBigBlobs new_leaf(m_alloc, m_nullable);
-            new_leaf.create(); // Throws
+            new_leaf.create();                          // Throws
             new_leaf.set_parent(parent, ndx_in_parent); // Throws
-            new_leaf.update_parent(); // Throws
-            copy_leaf(leaf, new_leaf); // Throws
+            new_leaf.update_parent();                   // Throws
+            copy_leaf(leaf, new_leaf);                  // Throws
             leaf.destroy();
             new_leaf.set_string(elem_ndx_in_leaf, m_value); // Throws
             return;
@@ -353,7 +354,7 @@ public:
             ArrayStringLong new_leaf(m_alloc, m_nullable);
             new_leaf.create(); // Throws
             new_leaf.set_parent(parent, ndx_in_parent);
-            new_leaf.update_parent(); // Throws
+            new_leaf.update_parent();  // Throws
             copy_leaf(leaf, new_leaf); // Throws
             leaf.destroy();
             new_leaf.set(elem_ndx_in_leaf, m_value); // Throws
@@ -363,7 +364,7 @@ public:
         ArrayBigBlobs new_leaf(m_alloc, m_nullable);
         new_leaf.create(); // Throws
         new_leaf.set_parent(parent, ndx_in_parent);
-        new_leaf.update_parent(); // Throws
+        new_leaf.update_parent();  // Throws
         copy_leaf(leaf, new_leaf); // Throws
         leaf.destroy();
         new_leaf.set_string(elem_ndx_in_leaf, m_value); // Throws
@@ -416,13 +417,11 @@ void StringColumn::set(size_t ndx, StringData value)
 }
 
 
-class StringColumn::EraseLeafElem: public Array::EraseHandler {
+class StringColumn::EraseLeafElem : public Array::EraseHandler {
 public:
     StringColumn& m_column;
-    EraseLeafElem(StringColumn& column, bool nullable) noexcept:
-        m_column(column), m_nullable(nullable) {}
-    bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent,
-                         size_t leaf_ndx_in_parent,
+    EraseLeafElem(StringColumn& column, bool nullable) noexcept : m_column(column), m_nullable(nullable) {}
+    bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent, size_t leaf_ndx_in_parent,
                          size_t elem_ndx_in_leaf) override
     {
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
@@ -471,10 +470,7 @@ public:
         leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) noexcept override
-    {
-        Array::destroy_deep(leaf_mem, m_column.get_alloc());
-    }
+    void destroy_leaf(MemRef leaf_mem) noexcept override { Array::destroy_deep(leaf_mem, m_column.get_alloc()); }
     void replace_root_by_leaf(MemRef leaf_mem) override
     {
         std::unique_ptr<Array> leaf;
@@ -506,7 +502,7 @@ public:
     {
         std::unique_ptr<ArrayString> leaf;
         leaf.reset(new ArrayString(m_column.get_alloc(), m_nullable)); // Throws
-        leaf->create(); // Throws
+        leaf->create();                                                // Throws
         m_column.replace_root_array(std::move(leaf)); // Throws, but accessor ownership is passed to callee
     }
 
@@ -598,7 +594,7 @@ void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
             // Small strings root leaf
             ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
             leaf->set(row_ndx, copy_of_value); // Throws
-            leaf->erase(last_row_ndx); // Throws
+            leaf->erase(last_row_ndx);         // Throws
             return;
         }
         bool is_big = m_array->get_context_flag();
@@ -606,13 +602,13 @@ void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
             // Medium strings root leaf
             ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
             leaf->set(row_ndx, copy_of_value); // Throws
-            leaf->erase(last_row_ndx); // Throws
+            leaf->erase(last_row_ndx);         // Throws
             return;
         }
         // Big strings root leaf
         ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
         leaf->set_string(row_ndx, copy_of_value); // Throws
-        leaf->erase(last_row_ndx); // Throws
+        leaf->erase(last_row_ndx);                // Throws
         return;
     }
 
@@ -643,7 +639,7 @@ void StringColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         set(row_ndx_2, realm::null());
     }
     else {
-        StringData copy {buffer_1.data(), buffer_1.size()};
+        StringData copy{buffer_1.data(), buffer_1.size()};
         set(row_ndx_2, copy);
     }
 
@@ -651,7 +647,7 @@ void StringColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         set(row_ndx_1, realm::null());
     }
     else {
-        StringData copy {buffer_2.data(), buffer_2.size()};
+        StringData copy{buffer_2.data(), buffer_2.size()};
         set(row_ndx_1, copy);
     }
 }
@@ -685,7 +681,7 @@ void StringColumn::do_clear()
         Allocator& alloc = m_array->get_alloc();
         std::unique_ptr<ArrayString> array;
         array.reset(new ArrayString(alloc, m_nullable)); // Throws
-        array->create(); // Throws
+        array->create();                                 // Throws
         array->set_parent(m_array->get_parent(), m_array->get_ndx_in_parent());
         array->update_parent(); // Throws
 
@@ -920,8 +916,7 @@ void StringColumn::find_all(IntegerColumn& result, StringData value, size_t begi
                 end_in_leaf = std::min(leaf.size(), end - leaf_offset);
                 BinaryData bin(value.data(), value.size());
                 bool is_string = true;
-                leaf.find_all(result, bin, is_string, leaf_offset, ndx_in_leaf,
-                              end_in_leaf); // Throws
+                leaf.find_all(result, bin, is_string, leaf_offset, ndx_in_leaf, end_in_leaf); // Throws
             }
         }
         ndx_in_tree = leaf_offset + end_in_leaf;
@@ -934,16 +929,10 @@ namespace {
 struct BinToStrAdaptor {
     typedef StringData value_type;
     const ArrayBigBlobs& m_big_blobs;
-    BinToStrAdaptor(const ArrayBigBlobs& big_blobs) noexcept: m_big_blobs(big_blobs) {}
+    BinToStrAdaptor(const ArrayBigBlobs& big_blobs) noexcept : m_big_blobs(big_blobs) {}
     ~BinToStrAdaptor() noexcept {}
-    size_t size() const noexcept
-    {
-        return m_big_blobs.size();
-    }
-    StringData get(size_t ndx) const noexcept
-    {
-        return m_big_blobs.get_string(ndx);
-    }
+    size_t size() const noexcept { return m_big_blobs.size(); }
+    StringData get(size_t ndx) const noexcept { return m_big_blobs.get_string(ndx); }
 };
 
 } // anonymous namespace
@@ -1010,7 +999,7 @@ bool StringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_ref, bool
 {
     Allocator& alloc = m_array->get_alloc();
     ref_type keys_ref_2 = StringColumn::create(alloc); // Throws
-    StringColumn keys(alloc, keys_ref_2, m_nullable); // Throws // FIXME
+    StringColumn keys(alloc, keys_ref_2, m_nullable);  // Throws // FIXME
 
     // Generate list of unique values (keys)
     size_t n = size();
@@ -1033,7 +1022,7 @@ bool StringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_ref, bool
 
     // Generate enumerated list of entries
     ref_type values_ref_2 = IntegerColumn::create(alloc); // Throws
-    IntegerColumn values(alloc, values_ref_2); // Throws
+    IntegerColumn values(alloc, values_ref_2);            // Throws
     for (size_t i = 0; i != n; ++i) {
         StringData v = get(i);
         size_t pos = keys.lower_bound_string(v);
@@ -1041,7 +1030,7 @@ bool StringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_ref, bool
         values.add(pos); // Throws
     }
 
-    keys_ref   = keys.get_ref();
+    keys_ref = keys.get_ref();
     values_ref = values.get_ref();
     return true;
 }
@@ -1110,8 +1099,7 @@ void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_ro
                 case leaf_type_Big: {
                     // Big strings root leaf
                     ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
-                    new_sibling_ref =
-                        leaf->bptree_leaf_insert_string(row_ndx_2, value, state); // Throws
+                    new_sibling_ref = leaf->bptree_leaf_insert_string(row_ndx_2, value, state); // Throws
                     goto insert_done;
                 }
             }
@@ -1128,7 +1116,7 @@ void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_ro
             new_sibling_ref = m_array->bptree_insert(row_ndx_2, state); // Throws
         }
 
-insert_done:
+    insert_done:
         if (REALM_UNLIKELY(new_sibling_ref)) {
             bool is_append = row_ndx_2 == realm::npos;
             introduce_new_root(new_sibling_ref, state, is_append); // Throws
@@ -1137,9 +1125,8 @@ insert_done:
 }
 
 
-ref_type StringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t ndx_in_parent,
-                                   Allocator& alloc, size_t insert_ndx,
-                                   Array::TreeInsert<StringColumn>& state)
+ref_type StringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t ndx_in_parent, Allocator& alloc,
+                                   size_t insert_ndx, Array::TreeInsert<StringColumn>& state)
 {
     bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
     if (long_strings) {
@@ -1159,7 +1146,7 @@ ref_type StringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t 
         ArrayBigBlobs new_leaf(alloc, state.m_nullable);
         new_leaf.create(); // Throws
         new_leaf.set_parent(&parent, ndx_in_parent);
-        new_leaf.update_parent(); // Throws
+        new_leaf.update_parent();  // Throws
         copy_leaf(leaf, new_leaf); // Throws
         leaf.destroy();
         return new_leaf.bptree_leaf_insert_string(insert_ndx, state.m_value, state); // Throws
@@ -1174,7 +1161,7 @@ ref_type StringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t 
         ArrayStringLong new_leaf(alloc, state.m_nullable);
         new_leaf.create(); // Throws
         new_leaf.set_parent(&parent, ndx_in_parent);
-        new_leaf.update_parent(); // Throws
+        new_leaf.update_parent();  // Throws
         copy_leaf(leaf, new_leaf); // Throws
         leaf.destroy();
         return new_leaf.bptree_leaf_insert(insert_ndx, state.m_value, state); // Throws
@@ -1183,7 +1170,7 @@ ref_type StringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t 
     ArrayBigBlobs new_leaf(alloc, state.m_nullable);
     new_leaf.create(); // Throws
     new_leaf.set_parent(&parent, ndx_in_parent);
-    new_leaf.update_parent(); // Throws
+    new_leaf.update_parent();  // Throws
     copy_leaf(leaf, new_leaf); // Throws
     leaf.destroy();
     return new_leaf.bptree_leaf_insert_string(insert_ndx, state.m_value, state); // Throws
@@ -1208,9 +1195,9 @@ StringColumn::LeafType StringColumn::upgrade_root_leaf(size_t value_size)
         size_t ndx_in_parent = leaf->get_ndx_in_parent();
         Allocator& alloc = leaf->get_alloc();
         new_leaf.reset(new ArrayBigBlobs(alloc, m_nullable)); // Throws
-        new_leaf->create(); // Throws
+        new_leaf->create();                                   // Throws
         new_leaf->set_parent(parent, ndx_in_parent);
-        new_leaf->update_parent(); // Throws
+        new_leaf->update_parent();   // Throws
         copy_leaf(*leaf, *new_leaf); // Throws
         leaf->destroy();
         m_array = std::move(new_leaf);
@@ -1226,9 +1213,9 @@ StringColumn::LeafType StringColumn::upgrade_root_leaf(size_t value_size)
         // Upgrade root leaf from small to medium strings
         std::unique_ptr<ArrayStringLong> new_leaf;
         new_leaf.reset(new ArrayStringLong(alloc, m_nullable)); // Throws
-        new_leaf->create(); // Throws
+        new_leaf->create();                                     // Throws
         new_leaf->set_parent(parent, ndx_in_parent);
-        new_leaf->update_parent(); // Throws
+        new_leaf->update_parent();   // Throws
         copy_leaf(*leaf, *new_leaf); // Throws
         leaf->destroy();
         m_array = std::move(new_leaf);
@@ -1237,9 +1224,9 @@ StringColumn::LeafType StringColumn::upgrade_root_leaf(size_t value_size)
     // Upgrade root leaf from small to big strings
     std::unique_ptr<ArrayBigBlobs> new_leaf;
     new_leaf.reset(new ArrayBigBlobs(alloc, m_nullable)); // Throws
-    new_leaf->create(); // Throws
+    new_leaf->create();                                   // Throws
     new_leaf->set_parent(parent, ndx_in_parent);
-    new_leaf->update_parent(); // Throws
+    new_leaf->update_parent();   // Throws
     copy_leaf(*leaf, *new_leaf); // Throws
     leaf->destroy();
     m_array = std::move(new_leaf);
@@ -1257,8 +1244,7 @@ std::unique_ptr<const ArrayParent> StringColumn::get_leaf(size_t ndx, size_t& ou
     return std::unique_ptr<const ArrayParent>(ap);
 }
 
-StringColumn::LeafType StringColumn::get_block(size_t ndx, ArrayParent** ap, size_t& off,
-                                               bool use_retval) const
+StringColumn::LeafType StringColumn::get_block(size_t ndx, ArrayParent** ap, size_t& off, bool use_retval) const
 {
     static_cast<void>(use_retval);
     REALM_ASSERT_3(use_retval, ==, false); // retval optimization not supported. See Array on how to implement
@@ -1307,17 +1293,15 @@ StringColumn::LeafType StringColumn::get_block(size_t ndx, ArrayParent** ap, siz
 }
 
 
-class StringColumn::CreateHandler: public ColumnBase::CreateHandler {
+class StringColumn::CreateHandler : public ColumnBase::CreateHandler {
 public:
-    CreateHandler(Allocator& alloc):
-        m_alloc(alloc)
-    {
-    }
+    CreateHandler(Allocator& alloc) : m_alloc(alloc) {}
     ref_type create_leaf(size_t size) override
     {
         MemRef mem = ArrayString::create_array(size, m_alloc); // Throws
         return mem.get_ref();
     }
+
 private:
     Allocator& m_alloc;
 };
@@ -1329,15 +1313,10 @@ ref_type StringColumn::create(Allocator& alloc, size_t size)
 }
 
 
-class StringColumn::SliceHandler: public ColumnBase::SliceHandler {
+class StringColumn::SliceHandler : public ColumnBase::SliceHandler {
 public:
-    SliceHandler(Allocator& alloc, bool nullable):
-        m_alloc(alloc),
-        m_nullable(nullable)
-    {
-    }
-    MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size,
-                      Allocator& target_alloc) override
+    SliceHandler(Allocator& alloc, bool nullable) : m_alloc(alloc), m_nullable(nullable) {}
+    MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size, Allocator& target_alloc) override
     {
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
         if (!long_strings) {
@@ -1358,13 +1337,14 @@ public:
         leaf.init_from_mem(leaf_mem);
         return leaf.slice(offset, size, target_alloc); // Throws
     }
+
 private:
     Allocator& m_alloc;
     bool m_nullable;
 };
 
-ref_type StringColumn::write(size_t slice_offset, size_t slice_size,
-                             size_t table_size, _impl::OutputStream& out) const
+ref_type StringColumn::write(size_t slice_offset, size_t slice_size, size_t table_size,
+                             _impl::OutputStream& out) const
 {
     ref_type ref;
     if (root_is_leaf()) {
@@ -1392,14 +1372,13 @@ ref_type StringColumn::write(size_t slice_offset, size_t slice_size,
         Array slice(alloc);
         _impl::DeepArrayDestroyGuard dg(&slice);
         slice.init_from_mem(mem);
-        bool deep = true; // Deep
-        bool only_if_modified = false; // Always
+        bool deep = true;                               // Deep
+        bool only_if_modified = false;                  // Always
         ref = slice.write(out, deep, only_if_modified); // Throws
     }
     else {
         SliceHandler handler(get_alloc(), m_nullable);
-        ref = ColumnBaseSimple::write(m_array.get(), slice_offset, slice_size,
-                                      table_size, handler, out); // Throws
+        ref = ColumnBaseSimple::write(m_array.get(), slice_offset, slice_size, table_size, handler, out); // Throws
     }
     return ref;
 }
@@ -1416,8 +1395,7 @@ void StringColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
         size_t search_ndx_in_parent = m_search_index->get_ndx_in_parent();
         // Index in parent should have been set before now, if it is incorrect we will
         // fix it now, but we have probably already written to an incorrect index at this point.
-        REALM_ASSERT_DEBUG_EX(search_ndx_in_parent == ndx_in_parent + 1,
-                              search_ndx_in_parent, ndx_in_parent + 1);
+        REALM_ASSERT_DEBUG_EX(search_ndx_in_parent == ndx_in_parent + 1, search_ndx_in_parent, ndx_in_parent + 1);
         m_search_index->refresh_accessor_tree(col_ndx, spec); // Throws
     }
 }
@@ -1433,11 +1411,11 @@ void StringColumn::refresh_root_accessor()
 
     ref_type root_ref = m_array->get_ref_from_parent();
     MemRef root_mem(root_ref, m_array->get_alloc());
-    bool new_root_is_leaf   = !Array::get_is_inner_bptree_node_from_header(root_mem.get_addr());
-    bool new_root_is_small  = !Array::get_hasrefs_from_header(root_mem.get_addr());
+    bool new_root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_mem.get_addr());
+    bool new_root_is_small = !Array::get_hasrefs_from_header(root_mem.get_addr());
     bool new_root_is_medium = !Array::get_context_flag_from_header(root_mem.get_addr());
-    bool old_root_is_leaf   = !m_array->is_inner_bptree_node();
-    bool old_root_is_small  = !m_array->has_refs();
+    bool old_root_is_leaf = !m_array->is_inner_bptree_node();
+    bool old_root_is_small = !m_array->has_refs();
     bool old_root_is_medium = !m_array->get_context_flag();
 
     bool root_type_changed = old_root_is_leaf != new_root_is_leaf ||
@@ -1505,7 +1483,7 @@ void StringColumn::refresh_root_accessor()
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 namespace {
 
@@ -1583,8 +1561,7 @@ void StringColumn::verify(const Table& table, size_t col_ndx) const
     bool column_has_search_index = (attr & col_attr_Indexed) != 0;
     REALM_ASSERT_3(column_has_search_index, ==, bool(m_search_index));
     if (column_has_search_index) {
-        REALM_ASSERT(m_search_index->get_ndx_in_parent() ==
-                     get_root_array()->get_ndx_in_parent() + 1);
+        REALM_ASSERT(m_search_index->get_ndx_in_parent() == get_root_array()->get_ndx_in_parent() + 1);
     }
 }
 
@@ -1601,8 +1578,7 @@ void StringColumn::to_dot(std::ostream& out, StringData title) const
     out << "}" << std::endl;
 }
 
-void StringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
-                               std::ostream& out) const
+void StringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent, std::ostream& out) const
 {
     bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
     if (!long_strings) {

@@ -41,17 +41,14 @@ public:
         init(m_column);
     }
 
-    SequentialGetter(const ColType* column)
-    {
-        init(column);
-    }
+    SequentialGetter(const ColType* column) { init(column); }
 
     ~SequentialGetter() noexcept override {}
 
     void init(const ColType* column)
     {
         m_array_ptr.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
-        m_array_ptr.reset(new(&m_leaf_accessor_storage) ArrayType(column->get_alloc()));
+        m_array_ptr.reset(new (&m_leaf_accessor_storage) ArrayType(column->get_alloc()));
         m_column = column;
         m_leaf_end = 0;
     }
@@ -60,7 +57,7 @@ public:
     {
         // Return whether or not leaf array has changed (could be useful to know for caller)
         if (index >= m_leaf_end || index < m_leaf_start) {
-            typename ColType::LeafInfo leaf { &m_leaf_ptr, m_array_ptr.get() };
+            typename ColType::LeafInfo leaf{&m_leaf_ptr, m_array_ptr.get()};
             size_t ndx_in_leaf;
             m_column->get_leaf(index, ndx_in_leaf, leaf);
             m_leaf_start = index - ndx_in_leaf;
@@ -76,7 +73,7 @@ public:
     {
 #ifdef _MSC_VER
 #pragma warning(push)
-#pragma warning(disable:4800)   // Disable the Microsoft warning about bool performance issue.
+#pragma warning(disable : 4800) // Disable the Microsoft warning about bool performance issue.
 #endif
 
         cache_next(index);
@@ -101,6 +98,7 @@ public:
     const ColType* m_column = nullptr;
 
     const ArrayType* m_leaf_ptr = nullptr;
+
 private:
     // Leaf cache for when the root of the column is not a leaf.
     // This dog and pony show is because Array has a reference to Allocator internally,

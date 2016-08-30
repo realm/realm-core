@@ -103,35 +103,36 @@ class Mixed {
 public:
     Mixed() noexcept;
 
-    Mixed(bool)       noexcept;
-    Mixed(int64_t)    noexcept;
-    Mixed(float)      noexcept;
-    Mixed(double)     noexcept;
+    Mixed(bool) noexcept;
+    Mixed(int64_t) noexcept;
+    Mixed(float) noexcept;
+    Mixed(double) noexcept;
     Mixed(StringData) noexcept;
     Mixed(BinaryData) noexcept;
-    Mixed(OldDateTime)   noexcept;
-    Mixed(Timestamp)    noexcept;
+    Mixed(OldDateTime) noexcept;
+    Mixed(Timestamp) noexcept;
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
-    Mixed(      char* c_str) noexcept { set_string(c_str); }
+    Mixed(char* c_str) noexcept { set_string(c_str); }
     Mixed(const char* c_str) noexcept { set_string(c_str); }
 
-    struct subtable_tag {};
-    Mixed(subtable_tag) noexcept: m_type(type_Table) {}
+    struct subtable_tag {
+    };
+    Mixed(subtable_tag) noexcept : m_type(type_Table) {}
 
     ~Mixed() noexcept {}
 
     DataType get_type() const noexcept { return m_type; }
 
-    int64_t     get_int()      const noexcept;
-    bool        get_bool()     const noexcept;
-    float       get_float()    const noexcept;
-    double      get_double()   const noexcept;
-    StringData  get_string()   const noexcept;
-    BinaryData  get_binary()   const noexcept;
-    OldDateTime    get_olddatetime() const noexcept;
-    Timestamp     get_timestamp()  const noexcept;
+    int64_t get_int() const noexcept;
+    bool get_bool() const noexcept;
+    float get_float() const noexcept;
+    double get_double() const noexcept;
+    StringData get_string() const noexcept;
+    BinaryData get_binary() const noexcept;
+    OldDateTime get_olddatetime() const noexcept;
+    Timestamp get_timestamp() const noexcept;
 
     void set_int(int64_t) noexcept;
     void set_bool(bool) noexcept;
@@ -149,13 +150,13 @@ public:
 private:
     DataType m_type;
     union {
-        int64_t      m_int;
-        bool         m_bool;
-        float        m_float;
-        double       m_double;
-        const char*  m_data;
+        int64_t m_int;
+        bool m_bool;
+        float m_float;
+        double m_double;
+        const char* m_data;
         int_fast64_t m_date;
-        Timestamp      m_timestamp;
+        Timestamp m_timestamp;
     };
     size_t m_size = 0;
 };
@@ -224,20 +225,18 @@ bool operator==(OldDateTime, Wrap<Mixed>) noexcept;
 bool operator!=(OldDateTime, Wrap<Mixed>) noexcept;
 
 
-
-
 // Implementation:
 
 inline Mixed::Mixed() noexcept
 {
     m_type = type_Int;
-    m_int  = 0;
+    m_int = 0;
 }
 
 inline Mixed::Mixed(int64_t v) noexcept
 {
     m_type = type_Int;
-    m_int  = v;
+    m_int = v;
 }
 
 inline Mixed::Mixed(bool v) noexcept

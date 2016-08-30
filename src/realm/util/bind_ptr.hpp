@@ -33,7 +33,8 @@ namespace util {
 
 class bind_ptr_base {
 public:
-    struct adopt_tag {};
+    struct adopt_tag {
+    };
 };
 
 
@@ -46,36 +47,66 @@ public:
 ///
 /// This smart pointer implementation assumes that the target object
 /// destructor never throws.
-template <class T> class bind_ptr: public bind_ptr_base {
+template <class T>
+class bind_ptr : public bind_ptr_base {
 public:
-    constexpr bind_ptr() noexcept: m_ptr(nullptr) {}
+    constexpr bind_ptr() noexcept : m_ptr(nullptr) {}
     ~bind_ptr() noexcept { unbind(); }
 
     explicit bind_ptr(T* p) noexcept { bind(p); }
-    template <class U> explicit bind_ptr(U* p) noexcept { bind(p); }
+    template <class U>
+    explicit bind_ptr(U* p) noexcept
+    {
+        bind(p);
+    }
 
     bind_ptr(T* p, adopt_tag) noexcept { m_ptr = p; }
-    template <class U> bind_ptr(U* p, adopt_tag) noexcept { m_ptr = p; }
+    template <class U>
+    bind_ptr(U* p, adopt_tag) noexcept
+    {
+        m_ptr = p;
+    }
 
     // Copy construct
     bind_ptr(const bind_ptr& p) noexcept { bind(p.m_ptr); }
     template <class U>
-    bind_ptr(const bind_ptr<U>& p) noexcept { bind(p.m_ptr); }
+    bind_ptr(const bind_ptr<U>& p) noexcept
+    {
+        bind(p.m_ptr);
+    }
 
     // Copy assign
-    bind_ptr& operator=(const bind_ptr& p) noexcept { bind_ptr(p).swap(*this); return *this; }
+    bind_ptr& operator=(const bind_ptr& p) noexcept
+    {
+        bind_ptr(p).swap(*this);
+        return *this;
+    }
     template <class U>
-    bind_ptr& operator=(const bind_ptr<U>& p) noexcept { bind_ptr(p).swap(*this); return *this; }
+    bind_ptr& operator=(const bind_ptr<U>& p) noexcept
+    {
+        bind_ptr(p).swap(*this);
+        return *this;
+    }
 
     // Move construct
-    bind_ptr(bind_ptr&& p) noexcept: m_ptr(p.release()) {}
+    bind_ptr(bind_ptr&& p) noexcept : m_ptr(p.release()) {}
     template <class U>
-    bind_ptr(bind_ptr<U>&& p) noexcept: m_ptr(p.release()) {}
+    bind_ptr(bind_ptr<U>&& p) noexcept : m_ptr(p.release())
+    {
+    }
 
     // Move assign
-    bind_ptr& operator=(bind_ptr&& p) noexcept { bind_ptr(std::move(p)).swap(*this); return *this; }
+    bind_ptr& operator=(bind_ptr&& p) noexcept
+    {
+        bind_ptr(std::move(p)).swap(*this);
+        return *this;
+    }
     template <class U>
-    bind_ptr& operator=(bind_ptr<U>&& p) noexcept { bind_ptr(std::move(p)).swap(*this); return *this; }
+    bind_ptr& operator=(bind_ptr<U>&& p) noexcept
+    {
+        bind_ptr(std::move(p)).swap(*this);
+        return *this;
+    }
 
     //@{
     // Comparison
@@ -126,26 +157,46 @@ public:
     void reset() noexcept { bind_ptr().swap(*this); }
     void reset(T* p) noexcept { bind_ptr(p).swap(*this); }
     template <class U>
-    void reset(U* p) noexcept { bind_ptr(p).swap(*this); }
+    void reset(U* p) noexcept
+    {
+        bind_ptr(p).swap(*this);
+    }
 
-    T* release() noexcept { T* const p = m_ptr; m_ptr = nullptr; return p; }
+    T* release() noexcept
+    {
+        T* const p = m_ptr;
+        m_ptr = nullptr;
+        return p;
+    }
 
     void swap(bind_ptr& p) noexcept { std::swap(m_ptr, p.m_ptr); }
     friend void swap(bind_ptr& a, bind_ptr& b) noexcept { a.swap(b); }
 
 protected:
-    struct casting_move_tag {};
+    struct casting_move_tag {
+    };
     template <class U>
-    bind_ptr(bind_ptr<U>* p, casting_move_tag) noexcept:
-        m_ptr(static_cast<T*>(p->release())) {}
+    bind_ptr(bind_ptr<U>* p, casting_move_tag) noexcept : m_ptr(static_cast<T*>(p->release()))
+    {
+    }
 
 private:
     T* m_ptr;
 
-    void bind(T* p) noexcept { if (p) p->bind_ptr(); m_ptr = p; }
-    void unbind() noexcept { if (m_ptr) m_ptr->unbind_ptr(); }
+    void bind(T* p) noexcept
+    {
+        if (p)
+            p->bind_ptr();
+        m_ptr = p;
+    }
+    void unbind() noexcept
+    {
+        if (m_ptr)
+            m_ptr->unbind_ptr();
+    }
 
-    template <class> friend class bind_ptr;
+    template <class>
+    friend class bind_ptr;
 };
 
 
@@ -174,7 +225,6 @@ bool operator>=(T*, const bind_ptr<U>&) noexcept;
 //@}
 
 
-
 /// Polymorphic convenience base class for reference counting objects.
 ///
 /// Together with bind_ptr, this class delivers simple instrusive
@@ -183,7 +233,7 @@ bool operator>=(T*, const bind_ptr<U>&) noexcept;
 /// \sa bind_ptr
 class RefCountBase {
 public:
-    RefCountBase() noexcept: m_ref_count(0) {}
+    RefCountBase() noexcept : m_ref_count(0) {}
     virtual ~RefCountBase() noexcept { REALM_ASSERT(m_ref_count == 0); }
 
     RefCountBase(const RefCountBase&) = delete;
@@ -194,12 +244,17 @@ public:
 
 protected:
     void bind_ptr() const noexcept { ++m_ref_count; }
-    void unbind_ptr() const noexcept { if (--m_ref_count == 0) delete this; }
+    void unbind_ptr() const noexcept
+    {
+        if (--m_ref_count == 0)
+            delete this;
+    }
 
 private:
     mutable unsigned long m_ref_count;
 
-    template <class> friend class bind_ptr;
+    template <class>
+    friend class bind_ptr;
 };
 
 
@@ -210,7 +265,7 @@ private:
 /// \sa bind_ptr
 class AtomicRefCountBase {
 public:
-    AtomicRefCountBase() noexcept: m_ref_count(0) {}
+    AtomicRefCountBase() noexcept : m_ref_count(0) {}
     virtual ~AtomicRefCountBase() noexcept { REALM_ASSERT(m_ref_count == 0); }
 
     AtomicRefCountBase(const AtomicRefCountBase&) = delete;
@@ -233,11 +288,9 @@ protected:
 private:
     mutable std::atomic<unsigned long> m_ref_count;
 
-    template <class> friend class bind_ptr;
+    template <class>
+    friend class bind_ptr;
 };
-
-
-
 
 
 // Implementation:

@@ -68,8 +68,8 @@ public:
         const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
         REALM_ASSERT_EX(both_non_negative || both_non_positive, both_non_negative, both_non_positive);
     }
-    Timestamp(realm::null) : m_is_null(true) { }
-    Timestamp() : Timestamp(null{}) { }
+    Timestamp(realm::null) : m_is_null(true) {}
+    Timestamp() : Timestamp(null{}) {}
 
     bool is_null() const { return m_is_null; }
 
@@ -85,17 +85,47 @@ public:
         return m_nanoseconds;
     }
 
-    // Note that these operators do not work if one of the Timestamps are null! Please use realm::Greater, realm::Equal
-    // etc instead. This is in order to collect all treatment of null behaviour in a single place for all
+    // Note that these operators do not work if one of the Timestamps are null! Please use realm::Greater,
+    // realm::Equal etc instead. This is in order to collect all treatment of null behaviour in a single place for all
     // types (query_conditions.hpp) to ensure that all types sort and compare null vs. non-null in the same manner,
-    // especially for int/float where we cannot override operators. This design is open for discussion, though, because
-    // it has usability drawbacks
-    bool operator==(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds; }
-    bool operator!=(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds; }
-    bool operator>(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds > rhs.m_nanoseconds); }
-    bool operator<(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return (m_seconds < rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds < rhs.m_nanoseconds); }
-    bool operator<=(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return *this < rhs || *this == rhs; }
-    bool operator>=(const Timestamp& rhs) const { REALM_ASSERT(!is_null()); REALM_ASSERT(!rhs.is_null()); return *this > rhs || *this == rhs; }
+    // especially for int/float where we cannot override operators. This design is open for discussion, though,
+    // because it has usability drawbacks
+    bool operator==(const Timestamp& rhs) const
+    {
+        REALM_ASSERT(!is_null());
+        REALM_ASSERT(!rhs.is_null());
+        return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds;
+    }
+    bool operator!=(const Timestamp& rhs) const
+    {
+        REALM_ASSERT(!is_null());
+        REALM_ASSERT(!rhs.is_null());
+        return m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds;
+    }
+    bool operator>(const Timestamp& rhs) const
+    {
+        REALM_ASSERT(!is_null());
+        REALM_ASSERT(!rhs.is_null());
+        return (m_seconds > rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds > rhs.m_nanoseconds);
+    }
+    bool operator<(const Timestamp& rhs) const
+    {
+        REALM_ASSERT(!is_null());
+        REALM_ASSERT(!rhs.is_null());
+        return (m_seconds < rhs.m_seconds) || (m_seconds == rhs.m_seconds && m_nanoseconds < rhs.m_nanoseconds);
+    }
+    bool operator<=(const Timestamp& rhs) const
+    {
+        REALM_ASSERT(!is_null());
+        REALM_ASSERT(!rhs.is_null());
+        return *this < rhs || *this == rhs;
+    }
+    bool operator>=(const Timestamp& rhs) const
+    {
+        REALM_ASSERT(!is_null());
+        REALM_ASSERT(!rhs.is_null());
+        return *this > rhs || *this == rhs;
+    }
     Timestamp& operator=(const Timestamp& rhs) = default;
 
     template <class Ch, class Tr>

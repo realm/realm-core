@@ -235,7 +235,6 @@ struct BenchmarkEmptyCommit : Benchmark {
         WriteTransaction tr(group);
         tr.commit();
     }
-
 };
 
 struct BenchmarkSortInt : BenchmarkWithInts {
@@ -533,10 +532,10 @@ void run_benchmark(TestContext& test_context, BenchmarkResults& results)
         // Generate the benchmark result texts:
         std::stringstream lead_text_ss;
         std::stringstream ident_ss;
-        lead_text_ss << benchmark.name() << " (" << to_lead_cstr(level)
-                     << ", " << (key == nullptr ? "EncryptionOff" : "EncryptionOn") << ")";
-        ident_ss     << benchmark.name() << "_" << to_ident_cstr(level)
-                     << (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
+        lead_text_ss << benchmark.name() << " (" << to_lead_cstr(level) << ", "
+                     << (key == nullptr ? "EncryptionOff" : "EncryptionOn") << ")";
+        ident_ss << benchmark.name() << "_" << to_ident_cstr(level)
+                 << (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
         std::string ident = ident_ss.str();
 
         // Open a SharedGroup:
@@ -590,8 +589,7 @@ TEST(benchmark_common_tasks_main)
     std::string results_file_stem = test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
 
-#define BENCH(B) \
-    run_benchmark<B>(test_context, results)
+#define BENCH(B) run_benchmark<B>(test_context, results)
 
     BENCH(BenchmarkUnorderedTableViewClear);
     BENCH(BenchmarkEmptyCommit);

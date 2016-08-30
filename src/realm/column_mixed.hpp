@@ -43,7 +43,7 @@ class BinaryColumn;
 /// column (BinaryColumn) and stores additional data for values of type string
 /// or binary data. The last subcolumn is optional. The root of a mixed column
 /// is an array node of type Array that stores the root refs of the subcolumns.
-class MixedColumn: public ColumnBaseSimple {
+class MixedColumn : public ColumnBaseSimple {
 public:
     /// Create a mixed column wrapper and attach it to a preexisting
     /// underlying structure of arrays.
@@ -132,8 +132,7 @@ public:
     static size_t get_size_from_ref(ref_type root_ref, Allocator&) noexcept;
 
     // Overriding method in ColumnBase
-    ref_type write(size_t, size_t, size_t,
-                   _impl::OutputStream&) const override;
+    ref_type write(size_t, size_t, size_t, _impl::OutputStream&) const override;
 
     void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
@@ -160,19 +159,19 @@ private:
     enum MixedColType {
         // NOTE: below numbers must be kept in sync with ColumnType
         // Column types used in Mixed
-        mixcol_Int         =  0,
-        mixcol_Bool        =  1,
-        mixcol_String      =  2,
+        mixcol_Int = 0,
+        mixcol_Bool = 1,
+        mixcol_String = 2,
         //                    3, used for STRING_ENUM in ColumnType
-        mixcol_Binary      =  4,
-        mixcol_Table       =  5,
-        mixcol_Mixed       =  6,
-        mixcol_OldDateTime =  7,
-        mixcol_Timestamp   =  8,
-        mixcol_Float       =  9,
-        mixcol_Double      = 10, // Positive Double
-        mixcol_DoubleNeg   = 11, // Negative Double
-        mixcol_IntNeg      = 12  // Negative Integers
+        mixcol_Binary = 4,
+        mixcol_Table = 5,
+        mixcol_Mixed = 6,
+        mixcol_OldDateTime = 7,
+        mixcol_Timestamp = 8,
+        mixcol_Float = 9,
+        mixcol_Double = 10,    // Positive Double
+        mixcol_DoubleNeg = 11, // Negative Double
+        mixcol_IntNeg = 12     // Negative Integers
     };
 
     class RefsColumn;
@@ -216,8 +215,7 @@ private:
 
     void insert_value(size_t row_ndx, int_fast64_t types_value, int_fast64_t data_value);
     void insert_int(size_t ndx, int_fast64_t value, MixedColType type);
-    void insert_pos_neg(size_t ndx, int_fast64_t value, MixedColType pos_type,
-                        MixedColType neg_type);
+    void insert_pos_neg(size_t ndx, int_fast64_t value, MixedColType pos_type, MixedColType neg_type);
 
     void do_discard_child_accessors() noexcept override;
 
@@ -237,10 +235,10 @@ inline StringData MixedColumn::get_index_data(size_t, StringIndex::StringConvers
 // LCOV_EXCL_STOP
 
 
-class MixedColumn::RefsColumn: public SubtableColumnBase {
+class MixedColumn::RefsColumn : public SubtableColumnBase {
 public:
-    RefsColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx):
-        SubtableColumnBase(alloc, ref, table, column_ndx)
+    RefsColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
+        : SubtableColumnBase(alloc, ref, table, column_ndx)
     {
     }
 

@@ -39,11 +39,11 @@ namespace realm {
 class BinaryData {
 public:
     BinaryData() noexcept : m_data(nullptr), m_size(0) {}
-    BinaryData(const char* external_data, size_t data_size) noexcept:
-        m_data(external_data), m_size(data_size) {}
+    BinaryData(const char* external_data, size_t data_size) noexcept : m_data(external_data), m_size(data_size) {}
     template <size_t N>
-    explicit BinaryData(const char (&external_data)[N]):
-        m_data(external_data), m_size(N) {}
+    explicit BinaryData(const char (&external_data)[N]) : m_data(external_data), m_size(N)
+    {
+    }
     template <class T, class A>
     explicit BinaryData(const std::basic_string<char, T, A>&);
 
@@ -110,23 +110,16 @@ public:
     using OwnedData::OwnedData;
 
     OwnedBinaryData() = default;
-    OwnedBinaryData(const BinaryData& binary_data):
-        OwnedData(binary_data.data(), binary_data.size()) { }
+    OwnedBinaryData(const BinaryData& binary_data) : OwnedData(binary_data.data(), binary_data.size()) {}
 
-    BinaryData get() const
-    {
-        return { data(), size() };
-    }
+    BinaryData get() const { return {data(), size()}; }
 };
-
 
 
 // Implementation:
 
 template <class T, class A>
-inline BinaryData::BinaryData(const std::basic_string<char, T, A>& s):
-    m_data(s.data()),
-    m_size(s.size())
+inline BinaryData::BinaryData(const std::basic_string<char, T, A>& s) : m_data(s.data()), m_size(s.size())
 {
 }
 
@@ -156,8 +149,7 @@ inline bool operator<(const BinaryData& a, const BinaryData& b) noexcept
     if (a.is_null() || b.is_null())
         return !a.is_null() < !b.is_null();
 
-    return std::lexicographical_compare(a.m_data, a.m_data + a.m_size,
-                                        b.m_data, b.m_data + b.m_size);
+    return std::lexicographical_compare(a.m_data, a.m_data + a.m_size, b.m_data, b.m_data + b.m_size);
 }
 
 inline bool operator>(const BinaryData& a, const BinaryData& b) noexcept
@@ -196,8 +188,7 @@ inline bool BinaryData::contains(BinaryData d) const noexcept
     if (is_null() && !d.is_null())
         return false;
 
-    return d.m_size == 0 ||
-           std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
+    return d.m_size == 0 || std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
 template <class C, class T>

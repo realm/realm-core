@@ -62,10 +62,6 @@ InterprocessCondVar::InterprocessCondVar()
 }
 
 
-
-
-
-
 void InterprocessCondVar::close() noexcept
 {
     if (uses_emulation) { // true if emulating a process shared condvar
@@ -87,9 +83,7 @@ InterprocessCondVar::~InterprocessCondVar() noexcept
 }
 
 
-
-void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path,
-                                          std::string condvar_name)
+void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, std::string condvar_name)
 {
     close();
     uses_emulation = true;
@@ -337,5 +331,3 @@ void InterprocessCondVar::notify_all() noexcept
     m_shared_part->notify_all();
 #endif
 }
-
-

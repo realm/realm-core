@@ -85,16 +85,16 @@ void cpuid_init()
     cret = CPUInfo[2];
 #else
     int a = 1;
-    __asm ( "mov %1, %%eax; "            // a into eax
-            "cpuid;"
-            "mov %%ecx, %0;"             // ecx into b
-            : "=r"(cret)                    // output
-            : "r"(a)                     // input
-            : "%eax", "%ebx", "%ecx", "%edx" // clobbered register
+    __asm("mov %1, %%eax; " // a into eax
+          "cpuid;"
+          "mov %%ecx, %0;"                 // ecx into b
+          : "=r"(cret)                     // output
+          : "r"(a)                         // input
+          : "%eax", "%ebx", "%ecx", "%edx" // clobbered register
           );
 #endif
 
-// Byte is atomic. Race can/will occur but that's fine
+    // Byte is atomic. Race can/will occur but that's fine
     if (cret & 0x100000) { // test for 4.2
         sse_support = 1;
     }
@@ -126,7 +126,7 @@ void cpuid_init()
         avx_support = -1; // No AVX supported
     }
 
-    // 1 is reserved for AVX2
+// 1 is reserved for AVX2
 
 #endif
 }
@@ -212,17 +212,25 @@ int fast_popcount64(int64_t x)
 namespace {
 
 const char a_popcount_bits[256] = {
-    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
+    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 1, 2, 2, 3, 2,
+    3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3,
+    3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5,
+    6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4,
+    3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4,
+    5, 5, 6, 5, 6, 6, 7, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6,
+    6, 7, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
 };
 
 } // anonymous namespace
 
 namespace realm {
 
-// Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
+// Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this
+// automatically. Todo, investigate.
 int fast_popcount32(int32_t x)
 {
-    return a_popcount_bits[255 & x] + a_popcount_bits[255 & x >> 8] + a_popcount_bits[255 & x >> 16] + a_popcount_bits[255 & x >> 24];
+    return a_popcount_bits[255 & x] + a_popcount_bits[255 & x >> 8] + a_popcount_bits[255 & x >> 16] +
+           a_popcount_bits[255 & x >> 24];
 }
 int fast_popcount64(int64_t x)
 {
@@ -286,9 +294,9 @@ void process_mem_usage(double& vm_usage, double& resident_set)
     {
         std::string ignore;
         std::ifstream ifs("/proc/self/stat", std::ios_base::in);
-        ifs >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore
-            >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore
-            >> ignore >> ignore >> vsize >> rss;
+        ifs >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >>
+            ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >>
+            ignore >> ignore >> vsize >> rss;
     }
 
     long page_size_kb = sysconf(_SC_PAGE_SIZE); // in case x86-64 is configured to use 2MB pages

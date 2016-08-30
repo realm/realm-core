@@ -24,7 +24,9 @@ namespace util {
 
 
 template <class T, class A, class B>
-struct EitherTypeIs { static const bool value = false; };
+struct EitherTypeIs {
+    static const bool value = false;
+};
 template <class T, class A>
 struct EitherTypeIs<T, T, A> {
     static const bool value = true;

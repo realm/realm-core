@@ -79,7 +79,8 @@ struct TimeBase {
     {
         mach_timebase_info_data_t info;
         kern_return_t err = mach_timebase_info(&info);
-        if (err) throw std::runtime_error("Failed to get absolute time base");
+        if (err)
+            throw std::runtime_error("Failed to get absolute time base");
         m_seconds_per_tick = (1E-9 * info.numer) / info.denom;
     }
 };
@@ -104,9 +105,9 @@ double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const
 namespace {
 
 #ifdef CLOCK_MONOTONIC_RAW
-    const clockid_t real_time_clock_id = CLOCK_MONOTONIC_RAW; // (since Linux 2.6.28; Linux-specific)
+const clockid_t real_time_clock_id = CLOCK_MONOTONIC_RAW; // (since Linux 2.6.28; Linux-specific)
 #else
-    const clockid_t real_time_clock_id = CLOCK_MONOTONIC;
+const clockid_t real_time_clock_id = CLOCK_MONOTONIC;
 #endif
 
 const clockid_t user_time_clock_id = CLOCK_PROCESS_CPUTIME_ID;
@@ -141,11 +142,10 @@ uint_fast64_t Timer::get_timer_ticks() const
     timespec time;
     clock_gettime(clock_id, &time);
     if (time.tv_nsec < init_time->tv_nsec) {
-        time.tv_sec  -= 1;
+        time.tv_sec -= 1;
         time.tv_nsec += 1000000000;
     }
-    return uint_fast64_t(time.tv_sec - init_time->tv_sec) *
-           1000000000 + (time.tv_nsec - init_time->tv_nsec);
+    return uint_fast64_t(time.tv_sec - init_time->tv_sec) * 1000000000 + (time.tv_nsec - init_time->tv_nsec);
 }
 
 double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const
@@ -178,7 +178,7 @@ void Timer::format(double seconds_float, std::ostream& out)
     int64_t rounded_minutes = round_to_int64(seconds_float / 60);
     if (rounded_minutes > 60) {
         // 1h0m -> inf
-        int64_t hours   = rounded_minutes / 60;
+        int64_t hours = rounded_minutes / 60;
         int64_t minutes = rounded_minutes % 60;
         out << hours << "h" << minutes << "m";
     }

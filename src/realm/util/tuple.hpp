@@ -33,10 +33,11 @@ struct Tuple {
     typedef Tuple<typename L::tail> tail_type;
     head_type m_head;
     tail_type m_tail;
-    Tuple(const head_type& h, const tail_type& t): m_head(h), m_tail(t) {}
+    Tuple(const head_type& h, const tail_type& t) : m_head(h), m_tail(t) {}
 };
 template <>
-struct Tuple<void> {};
+struct Tuple<void> {
+};
 
 
 template <class H, class T>
@@ -46,7 +47,10 @@ inline Tuple<TypeCons<H, T>> cons(const H& h, const Tuple<T>& t)
 }
 
 
-inline Tuple<void> tuple() { return Tuple<void>(); }
+inline Tuple<void> tuple()
+{
+    return Tuple<void>();
+}
 
 template <class A>
 inline Tuple<TypeCons<A, void>> tuple(const A& a)
@@ -61,36 +65,35 @@ inline Tuple<TypeCons<A, TypeCons<B, void>>> tuple(const A& a, const B& b)
 }
 
 template <class A, class B, class C>
-inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, void>>>>
-tuple(const A& a, const B& b, const C& c)
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, void>>>> tuple(const A& a, const B& b, const C& c)
 {
     return cons(a, tuple(b, c));
 }
 
 template <class A, class B, class C, class D>
-inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, void>>>>> tuple(
-            const A& a, const B& b, const C& c, const D& d)
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, void>>>>> tuple(const A& a, const B& b, const C& c,
+                                                                             const D& d)
 {
     return cons(a, tuple(b, c, d));
 }
 
 template <class A, class B, class C, class D, class E>
-inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, void>>>>>> tuple(
-    const A& a, const B& b, const C& c, const D& d, const E& e)
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, void>>>>>>
+tuple(const A& a, const B& b, const C& c, const D& d, const E& e)
 {
     return cons(a, tuple(b, c, d, e));
 }
 
 template <class A, class B, class C, class D, class E, class F>
-inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, void>>>>>>> tuple(
-    const A& a, const B& b, const C& c, const D& d, const E& e, const F& f)
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, void>>>>>>>
+tuple(const A& a, const B& b, const C& c, const D& d, const E& e, const F& f)
 {
     return cons(a, tuple(b, c, d, e, f));
 }
 
 template <class A, class B, class C, class D, class E, class F, class G>
-inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, TypeCons<G, void>>>>>>>> tuple(
-            const A& a, const B& b, const C& c, const D& d, const E& e, const F& f, const G& g)
+inline Tuple<TypeCons<A, TypeCons<B, TypeCons<C, TypeCons<D, TypeCons<E, TypeCons<F, TypeCons<G, void>>>>>>>>
+tuple(const A& a, const B& b, const C& c, const D& d, const E& e, const F& f, const G& g)
 {
     return cons(a, tuple(b, c, d, e, f, g));
 }
@@ -107,7 +110,7 @@ inline Tuple<TypeCons<V, void>> append(const Tuple<void>&, const V& v)
     return tuple(v);
 }
 template <class L, class V>
-inline Tuple<typename TypeAppend<L, V>::type> operator, (const Tuple<L>& t, const V& v)
+inline Tuple<typename TypeAppend<L, V>::type> operator,(const Tuple<L>& t, const V& v)
 {
     return append(t, v);
 }
@@ -128,13 +131,14 @@ struct TupleAt<L, 0> {
 };
 
 template <class Ch, class Tr, class T>
-inline void write(std::basic_ostream<Ch, Tr>& out,
-                  const util::Tuple<util::TypeCons<T, void>>& t)
+inline void write(std::basic_ostream<Ch, Tr>& out, const util::Tuple<util::TypeCons<T, void>>& t)
 {
     out << t.m_head;
 }
 template <class Ch, class Tr>
-inline void write(std::basic_ostream<Ch, Tr>&, const util::Tuple<void>&) {}
+inline void write(std::basic_ostream<Ch, Tr>&, const util::Tuple<void>&)
+{
+}
 template <class Ch, class Tr, class L>
 inline void write(std::basic_ostream<Ch, Tr>& out, const util::Tuple<L>& t)
 {
@@ -158,7 +162,9 @@ inline void for_each(const Tuple<L>& tuple)
     for_each<Op>(tuple.m_tail);
 }
 template <template <class T> class Op>
-inline void for_each(const Tuple<void>&) {}
+inline void for_each(const Tuple<void>&)
+{
+}
 
 template <template <class T> class Op, class L, class A>
 inline void for_each(const Tuple<L>& tuple, const A& a)
@@ -167,7 +173,9 @@ inline void for_each(const Tuple<L>& tuple, const A& a)
     for_each<Op>(tuple.m_tail, a);
 }
 template <template <class T> class Op, class A>
-inline void for_each(const Tuple<void>&, const A&) {}
+inline void for_each(const Tuple<void>&, const A&)
+{
+}
 
 template <class Ch, class Tr, class L>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Tuple<L>& t)

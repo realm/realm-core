@@ -31,10 +31,7 @@ class InRealmHistoryImpl : public TrivialReplication, private _impl::InRealmHist
 public:
     using version_type = TrivialReplication::version_type;
 
-    InRealmHistoryImpl(std::string realm_path):
-        TrivialReplication(realm_path)
-    {
-    }
+    InRealmHistoryImpl(std::string realm_path) : TrivialReplication(realm_path) {}
 
     void initialize(SharedGroup& sg) override
     {
@@ -53,8 +50,7 @@ public:
         // No-op
     }
 
-    version_type prepare_changeset(const char* data, size_t size,
-                                   version_type orig_version) override
+    version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
         if (!is_history_updated())
             update_from_parent(orig_version); // Throws
@@ -69,20 +65,11 @@ public:
         // automatically finalized as part of the commit operation.
     }
 
-    HistoryType get_history_type() const noexcept override
-    {
-        return hist_InRealm;
-    }
+    HistoryType get_history_type() const noexcept override { return hist_InRealm; }
 
-    _impl::History* get_history() override
-    {
-        return this;
-    }
+    _impl::History* get_history() override { return this; }
 
-    BinaryData get_uncommitted_changes() noexcept override
-    {
-        return TrivialReplication::get_uncommitted_changes();
-    }
+    BinaryData get_uncommitted_changes() noexcept override { return TrivialReplication::get_uncommitted_changes(); }
 };
 
 } // unnamed namespace

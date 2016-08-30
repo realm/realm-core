@@ -28,7 +28,7 @@ using namespace realm::util;
 
 namespace {
 
-class system_category: public std::error_category {
+class system_category : public std::error_category {
     const char* name() const noexcept override;
     std::string message(int) const override;
 };
@@ -65,7 +65,7 @@ std::string system_category::message(int value) const
         }
     }
 
-#elif ! REALM_ANDROID && _GNU_SOURCE // GNU specific version
+#elif !REALM_ANDROID && _GNU_SOURCE // GNU specific version
 
     {
         char* msg = nullptr;

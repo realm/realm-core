@@ -46,7 +46,6 @@ struct AssignIntoCol;
 } // namespace _impl
 
 
-
 /// This class is non-polymorphic, that is, it has no virtual
 /// functions. Further more, it has no destructor, and it adds no new
 /// data-members. These properties are important, because it ensures
@@ -58,7 +57,7 @@ struct AssignIntoCol;
 /// Table via a pointer or reference to a BasicTable is not in
 /// violation of the strict aliasing rule.
 template <class Spec>
-class BasicTable: private Table, public Spec::ConvenienceMethods {
+class BasicTable : private Table, public Spec::ConvenienceMethods {
 public:
     typedef Spec spec_type;
     typedef typename Spec::Columns Columns;
@@ -88,12 +87,9 @@ public:
     using Table::is_group_level;
     using Table::get_index_in_group;
 
-    BasicTable(Allocator& alloc = Allocator::get_default()): Table(alloc)
-    {
-        set_dynamic_type(*this);
-    }
+    BasicTable(Allocator& alloc = Allocator::get_default()) : Table(alloc) { set_dynamic_type(*this); }
 
-    BasicTable(const BasicTable& t, Allocator& alloc = Allocator::get_default()): Table(t, alloc) {}
+    BasicTable(const BasicTable& t, Allocator& alloc = Allocator::get_default()) : Table(t, alloc) {}
 
     ~BasicTable() noexcept {}
 
@@ -101,10 +97,7 @@ public:
 
     Ref copy(Allocator& = Allocator::get_default()) const;
 
-    static int get_column_count() noexcept
-    {
-        return util::TypeCount<typename Spec::Columns>::value;
-    }
+    static int get_column_count() noexcept { return util::TypeCount<typename Spec::Columns>::value; }
 
     Ref get_table_ref() { return Ref(this); }
 
@@ -148,25 +141,16 @@ public:
     typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
     typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
 
-    RowAccessor operator[](size_t row_idx) noexcept
-    {
-        return RowAccessor(std::make_pair(this, row_idx));
-    }
+    RowAccessor operator[](size_t row_idx) noexcept { return RowAccessor(std::make_pair(this, row_idx)); }
 
     ConstRowAccessor operator[](size_t row_idx) const noexcept
     {
         return ConstRowAccessor(std::make_pair(this, row_idx));
     }
 
-    RowAccessor front() noexcept
-    {
-        return RowAccessor(std::make_pair(this, 0));
-    }
+    RowAccessor front() noexcept { return RowAccessor(std::make_pair(this, 0)); }
 
-    ConstRowAccessor front() const noexcept
-    {
-        return ConstRowAccessor(std::make_pair(this, 0));
-    }
+    ConstRowAccessor front() const noexcept { return ConstRowAccessor(std::make_pair(this, 0)); }
 
     /// Access the last row, or one of its predecessors.
     ///
@@ -174,10 +158,7 @@ public:
     /// to the end. Thus, <tt>table.back(rel_idx)</tt> is the same as
     /// <tt>table[table.size() + rel_idx]</tt>.
     ///
-    RowAccessor back(int rel_idx = -1) noexcept
-    {
-        return RowAccessor(std::make_pair(this, size() + rel_idx));
-    }
+    RowAccessor back(int rel_idx = -1) noexcept { return RowAccessor(std::make_pair(this, size() + rel_idx)); }
 
     ConstRowAccessor back(int rel_idx = -1) const noexcept
     {
@@ -206,8 +187,7 @@ public:
     void set(size_t i, const util::Tuple<L>& tuple)
     {
         using namespace realm::util;
-        static_assert(TypeCount<L>::value == TypeCount<Columns>::value,
-                      "Wrong number of tuple elements");
+        static_assert(TypeCount<L>::value == TypeCount<Columns>::value, "Wrong number of tuple elements");
         ForEachType<Columns, _impl::AssignIntoCol>::exec(static_cast<Table*>(this), i, tuple);
     }
 
@@ -224,8 +204,11 @@ public:
 
 
     class Query;
-    Query       where(typename BasicTable<Spec>::View* tv = nullptr) { return Query(*this, tv ? tv->get_impl() : nullptr); }
-    Query where(typename BasicTable<Spec>::View* tv = nullptr) const { return Query(*this, tv ? tv->get_impl() : nullptr); }
+    Query where(typename BasicTable<Spec>::View* tv = nullptr) { return Query(*this, tv ? tv->get_impl() : nullptr); }
+    Query where(typename BasicTable<Spec>::View* tv = nullptr) const
+    {
+        return Query(*this, tv ? tv->get_impl() : nullptr);
+    }
 
     /// Compare two tables for equality. Two tables are equal if, and
     /// only if, they contain the same rows in the same order, that
@@ -313,8 +296,7 @@ private:
         const int num_cols = util::TypeCount<typename Spec::Columns>::value;
         StringData dyn_col_names[num_cols];
         Spec::dyn_col_names(dyn_col_names);
-        return !HasType<typename Spec::Columns,
-               _impl::CmpColType>::exec(&spec, dyn_col_names);
+        return !HasType<typename Spec::Columns, _impl::CmpColType>::exec(&spec, dyn_col_names);
     }
 
     // This one allows a BasicTable to know that BasicTables with
@@ -367,50 +349,60 @@ private:
 #define BASIC_TABLE_PARENT Spec::template ColNames<QueryCol, Query*>
 
 template <class Spec>
-class BasicTable<Spec>::Query: public BASIC_TABLE_PARENT {
+class BasicTable<Spec>::Query : public BASIC_TABLE_PARENT {
 public:
     Query(const Query& q) : Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
     virtual ~Query() noexcept {}
 
-    Query& group() { m_impl.group(); return *this; }
-
-    Query& end_group() { m_impl.end_group(); return *this; }
-
-    Query& end_subtable() { m_impl.end_subtable(); return *this; }
-
-    Query& Or() { m_impl.Or(); return *this; }
-
-    Query& Not() { m_impl.Not(); return *this; }
-
-    size_t find(size_t begin_at_table_row = 0)
+    Query& group()
     {
-        return m_impl.find(begin_at_table_row);
+        m_impl.group();
+        return *this;
     }
 
-    typename BasicTable<Spec>::View find_all(size_t start = 0,
-                                             size_t end   = size_t(-1),
-                                             size_t limit = size_t(-1))
+    Query& end_group()
+    {
+        m_impl.end_group();
+        return *this;
+    }
+
+    Query& end_subtable()
+    {
+        m_impl.end_subtable();
+        return *this;
+    }
+
+    Query& Or()
+    {
+        m_impl.Or();
+        return *this;
+    }
+
+    Query& Not()
+    {
+        m_impl.Not();
+        return *this;
+    }
+
+    size_t find(size_t begin_at_table_row = 0) { return m_impl.find(begin_at_table_row); }
+
+    typename BasicTable<Spec>::View find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1))
     {
         return m_impl.find_all(start, end, limit);
     }
 
-    typename BasicTable<Spec>::ConstView find_all(size_t start = 0,
-                                                  size_t end   = size_t(-1),
+    typename BasicTable<Spec>::ConstView find_all(size_t start = 0, size_t end = size_t(-1),
                                                   size_t limit = size_t(-1)) const
     {
         return m_impl.find_all(start, end, limit);
     }
 
-    size_t count(size_t start = 0,
-                 size_t end   = size_t(-1),
-                 size_t limit = size_t(-1)) const
+    size_t count(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const
     {
         return m_impl.count(start, end, limit);
     }
 
-    size_t remove(size_t start = 0,
-                  size_t end   = size_t(-1),
-                  size_t limit = size_t(-1))
+    size_t remove(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1))
     {
         return m_impl.remove(start, end, limit);
     }
@@ -434,24 +426,21 @@ protected:
     {
     }
 
-    void apply_patch(HandoverPatch& patch, Group& dest_group)
-    {
-        m_impl.apply_patch(patch, dest_group);
-    }
+    void apply_patch(HandoverPatch& patch, Group& dest_group) { m_impl.apply_patch(patch, dest_group); }
 
-    virtual std::unique_ptr<Query>
-    clone_for_handover(std::unique_ptr<HandoverPatch>& patch, ConstSourcePayload mode) const
+    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
+                                                      ConstSourcePayload mode) const
     {
         patch.reset(new HandoverPatch);
-        std::unique_ptr<Query> retval( new Query(*this, *patch, mode));
+        std::unique_ptr<Query> retval(new Query(*this, *patch, mode));
         return retval;
     }
 
-    virtual std::unique_ptr<Query>
-    clone_for_handover(std::unique_ptr<HandoverPatch>& patch, MutableSourcePayload mode)
+    virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
+                                                      MutableSourcePayload mode)
     {
         patch.reset(new HandoverPatch);
-        std::unique_ptr<Query> retval( new Query(*this, *patch, mode));
+        std::unique_ptr<Query> retval(new Query(*this, *patch, mode));
         return retval;
     }
 
@@ -477,8 +466,6 @@ private:
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
-
-
 
 
 // Implementation:
@@ -556,7 +543,6 @@ struct AddCol<SpecBase::Subtable<Subtab>, col_idx> {
 };
 
 
-
 template <class Type, int col_idx>
 struct CmpColType {
     static bool exec(const Spec* spec, const StringData* col_names)
@@ -571,8 +557,8 @@ template <class Subtab, int col_idx>
 struct CmpColType<SpecBase::Subtable<Subtab>, col_idx> {
     static bool exec(const Spec* spec, const StringData* col_names)
     {
-        if (spec->get_column_type(col_idx) != col_type_Table ||
-                col_names[col_idx] != spec->get_column_name(col_idx)) return true;
+        if (spec->get_column_type(col_idx) != col_type_Table || col_names[col_idx] != spec->get_column_name(col_idx))
+            return true;
         const Spec subspec = const_cast<Spec*>(spec)->get_subtable_spec(col_idx);
         return !Subtab::matches_dynamic_type(subspec);
     }

@@ -40,7 +40,7 @@ namespace {
 std::unique_ptr<Replication> make_history(std::string path)
 {
     return make_client_history(path);
-//    return make_in_realm_history(path);
+    //    return make_in_realm_history(path);
 }
 
 
@@ -86,8 +86,7 @@ public:
             TableRef table = wt.get_table("table");
             for (size_t j = 0; j < num_modifications; ++j) {
                 size_t col_ndx = (j + i) % num_cols;
-                size_t row_ndx =
-                    (size_t((double(num_rows - 1) / num_modifications - 1) * j) + i) % num_rows;
+                size_t row_ndx = (size_t((double(num_rows - 1) / num_modifications - 1) * j) + i) % num_rows;
                 table->set_int(col_ndx, row_ndx, 262144L + long(j) + long(i));
             }
             wt.commit();
@@ -111,9 +110,7 @@ private:
 
 class Task {
 public:
-    Task(int num_readers, bool grow):
-        m_num_readers(num_readers),
-        m_grow(grow)
+    Task(int num_readers, bool grow) : m_num_readers(num_readers), m_grow(grow)
     {
         std::string path = "/tmp/benchmark-history-types.realm";
         util::File::try_remove(path);

@@ -53,7 +53,7 @@ Old database files do not have any m_nulls array. To be backwardscompatible, man
 in set(), etc). This way no file format upgrade is needed to support nulls for BinaryData.
 */
 
-class ArrayBinary: public Array {
+class ArrayBinary : public Array {
 public:
     explicit ArrayBinary(Allocator&) noexcept;
     ~ArrayBinary() noexcept override {}
@@ -96,8 +96,7 @@ public:
     /// slower.
     static BinaryData get(const char* header, size_t ndx, Allocator&) noexcept;
 
-    ref_type bptree_leaf_insert(size_t ndx, BinaryData, bool add_zero_term,
-                                TreeInsertBase& state);
+    ref_type bptree_leaf_insert(size_t ndx, BinaryData, bool add_zero_term, TreeInsertBase& state);
 
     static size_t get_size_from_header(const char*, Allocator&) noexcept;
 
@@ -124,14 +123,12 @@ private:
 };
 
 
-
-
-
 // Implementation:
 
-inline ArrayBinary::ArrayBinary(Allocator& allocator) noexcept:
-    Array(allocator), m_offsets(allocator), m_blob(allocator),
-    m_nulls(allocator)
+inline ArrayBinary::ArrayBinary(Allocator& allocator) noexcept : Array(allocator),
+                                                                 m_offsets(allocator),
+                                                                 m_blob(allocator),
+                                                                 m_nulls(allocator)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
@@ -141,7 +138,7 @@ inline ArrayBinary::ArrayBinary(Allocator& allocator) noexcept:
 inline void ArrayBinary::create()
 {
     size_t init_size = 0;
-    BinaryData defaults = BinaryData(0, 0); // This init value is ignored because size = 0
+    BinaryData defaults = BinaryData(0, 0);                      // This init value is ignored because size = 0
     MemRef mem = create_array(init_size, get_alloc(), defaults); // Throws
     init_from_mem(mem);
 }
@@ -170,11 +167,11 @@ inline bool ArrayBinary::is_empty() const noexcept
 inline bool ArrayBinary::legacy_array_type() const noexcept
 {
     if (Array::size() == 3)
-        return false;               // New database file
+        return false; // New database file
     else if (Array::size() == 2)
-        return true;                // Old database file
+        return true; // Old database file
     else
-        REALM_ASSERT(false);        // Should never happen
+        REALM_ASSERT(false); // Should never happen
     return false;
 }
 
@@ -230,8 +227,7 @@ inline void ArrayBinary::destroy()
     Array::destroy();
 }
 
-inline size_t ArrayBinary::get_size_from_header(const char* header,
-                                                Allocator& alloc) noexcept
+inline size_t ArrayBinary::get_size_from_header(const char* header, Allocator& alloc) noexcept
 {
     ref_type offsets_ref = to_ref(Array::get(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);

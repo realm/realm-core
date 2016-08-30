@@ -39,20 +39,20 @@ namespace realm {
 /// want to specify colum names or convenience methods, since suitable
 /// fallbacks are defined here.
 struct SpecBase {
-    typedef int64_t             Int;
-    typedef bool                Bool;
-    typedef realm::OldDateTime   OldDateTime;
-    typedef float               Float;
-    typedef double              Double;
+    typedef int64_t Int;
+    typedef bool Bool;
+    typedef realm::OldDateTime OldDateTime;
+    typedef float Float;
+    typedef double Double;
     typedef realm::StringData String;
     typedef realm::BinaryData Binary;
-    typedef realm::Mixed      Mixed;
+    typedef realm::Mixed Mixed;
 
     template <class E>
     class Enum {
     public:
         typedef E enum_type;
-        Enum(E v): m_value(v) {}
+        Enum(E v) : m_value(v) {}
         operator E() const { return m_value; }
     private:
         E m_value;
@@ -62,8 +62,8 @@ struct SpecBase {
     class Subtable {
     public:
         typedef T table_type;
-        Subtable(T* t): m_table(t) {}
-        operator T* () const { return m_table; }
+        Subtable(T* t) : m_table(t) {}
+        operator T*() const { return m_table; }
     private:
         T* m_table;
     };
@@ -133,7 +133,8 @@ struct SpecBase {
     /// deriving from Table, this cannot become a problem, nor would
     /// it lead to a violation of the strict aliasing rule of C++03 or
     /// C++11.
-    struct ConvenienceMethods {};
+    struct ConvenienceMethods {
+    };
 };
 
 
@@ -151,11 +152,17 @@ namespace _impl {
 /// If T matches 'BasicTableView<T2>' or 'const BasicTableView<T2>',
 /// then return T2, else simply return T.
 template <class Tab>
-struct GetTableFromView { typedef Tab type; };
+struct GetTableFromView {
+    typedef Tab type;
+};
 template <class Tab>
-struct GetTableFromView<BasicTableView<Tab>> { typedef Tab type; };
+struct GetTableFromView<BasicTableView<Tab>> {
+    typedef Tab type;
+};
 template <class Tab>
-struct GetTableFromView<const BasicTableView<Tab>> { typedef Tab type; };
+struct GetTableFromView<const BasicTableView<Tab>> {
+    typedef Tab type;
+};
 
 
 /// Determine whether an accessor has const-only access to a table, so
@@ -166,14 +173,17 @@ struct GetTableFromView<const BasicTableView<Tab>> { typedef Tab type; };
 /// accessor is still allowed to reorder the rows of the view, as long
 /// as it does not modify the contents of the table.
 template <class Taboid>
-struct TableIsConst { static const bool value = false; };
+struct TableIsConst {
+    static const bool value = false;
+};
 template <class Taboid>
-struct TableIsConst<const Taboid> { static const bool value = true; };
+struct TableIsConst<const Taboid> {
+    static const bool value = true;
+};
 template <class Tab>
 struct TableIsConst<BasicTableView<const Tab>> {
     static const bool value = true;
 };
-
 
 
 /// This class gives access to a field of a row of a table, or a table
@@ -201,28 +211,26 @@ protected:
     typedef std::pair<Taboid*, size_t> Init;
     Taboid* const m_table;
     const size_t m_row_idx;
-    FieldAccessorBase(Init i) noexcept: m_table(i.first), m_row_idx(i.second) {}
+    FieldAccessorBase(Init i) noexcept : m_table(i.first), m_row_idx(i.second) {}
 };
 
 
 /// Field accessor specialization for integers.
 template <class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, int64_t, const_tab>: public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, int64_t, const_tab> : public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    int64_t get() const noexcept
-    {
-        return Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx);
-    }
+    int64_t get() const noexcept { return Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx); }
 
-    void set(int64_t value) const
-    {
-        Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
-    }
+    void set(int64_t value) const { Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value); }
     operator int64_t() const noexcept { return get(); }
-    const FieldAccessor& operator=(int64_t value) const { set(value); return *this; }
+    const FieldAccessor& operator=(int64_t value) const
+    {
+        set(value);
+        return *this;
+    }
 
     const FieldAccessor& operator+=(int64_t value) const
     {
@@ -243,7 +251,7 @@ public:
     const FieldAccessor& operator++() const { return *this += 1; }
     const FieldAccessor& operator--() const { return *this -= 1; }
 
-    int64_t operator++(int) const
+    int64_t operator++(int)const
     {
         // FIXME: Should be optimized (can be both optimized and
         // generalized by using a form of expression templates).
@@ -252,7 +260,7 @@ public:
         return value;
     }
 
-    int64_t operator--(int) const
+    int64_t operator--(int)const
     {
         // FIXME: Should be optimized (can be both optimized and
         // generalized by using a form of expression templates).
@@ -262,29 +270,27 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 };
 
 
 /// Field accessor specialization for floats.
 template <class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, float, const_tab>: public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, float, const_tab> : public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    float get() const noexcept
-    {
-        return Base::m_table->get_impl()->get_float(col_idx, Base::m_row_idx);
-    }
+    float get() const noexcept { return Base::m_table->get_impl()->get_float(col_idx, Base::m_row_idx); }
 
-    void set(float value) const
-    {
-        Base::m_table->get_impl()->set_float(col_idx, Base::m_row_idx, value);
-    }
+    void set(float value) const { Base::m_table->get_impl()->set_float(col_idx, Base::m_row_idx, value); }
 
     operator float() const noexcept { return get(); }
-    const FieldAccessor& operator=(float value) const { set(value); return *this; }
+    const FieldAccessor& operator=(float value) const
+    {
+        set(value);
+        return *this;
+    }
 
     const FieldAccessor& operator+=(float value) const
     {
@@ -303,29 +309,27 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 };
 
 
 /// Field accessor specialization for doubles.
 template <class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, double, const_tab>: public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, double, const_tab> : public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    double get() const noexcept
-    {
-        return Base::m_table->get_impl()->get_double(col_idx, Base::m_row_idx);
-    }
+    double get() const noexcept { return Base::m_table->get_impl()->get_double(col_idx, Base::m_row_idx); }
 
-    void set(double value) const
-    {
-        Base::m_table->get_impl()->set_double(col_idx, Base::m_row_idx, value);
-    }
+    void set(double value) const { Base::m_table->get_impl()->set_double(col_idx, Base::m_row_idx, value); }
 
     operator double() const noexcept { return get(); }
-    const FieldAccessor& operator=(double value) const { set(value); return *this; }
+    const FieldAccessor& operator=(double value) const
+    {
+        set(value);
+        return *this;
+    }
 
     const FieldAccessor& operator+=(double value) const
     {
@@ -344,128 +348,117 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 };
 
 
 /// Field accessor specialization for booleans.
 template <class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, bool, const_tab>: public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, bool, const_tab> : public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    bool get() const noexcept
-    {
-        return Base::m_table->get_impl()->get_bool(col_idx, Base::m_row_idx);
-    }
+    bool get() const noexcept { return Base::m_table->get_impl()->get_bool(col_idx, Base::m_row_idx); }
 
-    void set(bool value) const
-    {
-        Base::m_table->get_impl()->set_bool(col_idx, Base::m_row_idx, value);
-    }
+    void set(bool value) const { Base::m_table->get_impl()->set_bool(col_idx, Base::m_row_idx, value); }
 
     operator bool() const noexcept { return get(); }
-    const FieldAccessor& operator=(bool value) const { set(value); return *this; }
+    const FieldAccessor& operator=(bool value) const
+    {
+        set(value);
+        return *this;
+    }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 };
 
 
 /// Field accessor specialization for enumerations.
 template <class Taboid, int col_idx, class E, bool const_tab>
-class FieldAccessor<Taboid, col_idx, SpecBase::Enum<E>, const_tab>:
-    public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, SpecBase::Enum<E>, const_tab> : public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    E get() const noexcept
-    {
-        return static_cast<E>(Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx));
-    }
+    E get() const noexcept { return static_cast<E>(Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx)); }
 
-    void set(E value) const
-    {
-        Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
-    }
+    void set(E value) const { Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value); }
 
     operator E() const noexcept { return get(); }
-    const FieldAccessor& operator=(E value) const { set(value); return *this; }
+    const FieldAccessor& operator=(E value) const
+    {
+        set(value);
+        return *this;
+    }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 };
 
 
 /// Field accessor specialization for dates.
 template <class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, OldDateTime, const_tab>: public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, OldDateTime, const_tab> : public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    OldDateTime get() const noexcept
-    {
-        return Base::m_table->get_impl()->get_olddatetime(col_idx, Base::m_row_idx);
-    }
+    OldDateTime get() const noexcept { return Base::m_table->get_impl()->get_olddatetime(col_idx, Base::m_row_idx); }
 
-    void set(OldDateTime value) const
-    {
-        Base::m_table->get_impl()->set_olddatetime(col_idx, Base::m_row_idx, value);
-    }
+    void set(OldDateTime value) const { Base::m_table->get_impl()->set_olddatetime(col_idx, Base::m_row_idx, value); }
 
     operator OldDateTime() const noexcept { return get(); }
-    const FieldAccessor& operator=(OldDateTime value) const { set(value); return *this; }
+    const FieldAccessor& operator=(OldDateTime value) const
+    {
+        set(value);
+        return *this;
+    }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 };
 
 /// Field accessor specialization for timestamps.
 template <class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, Timestamp, const_tab>: public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, Timestamp, const_tab> : public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    Timestamp get() const noexcept
-    {
-        return Base::m_table->get_impl()->get_timestamp(col_idx, Base::m_row_idx);
-    }
+    Timestamp get() const noexcept { return Base::m_table->get_impl()->get_timestamp(col_idx, Base::m_row_idx); }
 
-    void set(Timestamp value) const
-    {
-        Base::m_table->get_impl()->set_timestamp(col_idx, Base::m_row_idx, value);
-    }
+    void set(Timestamp value) const { Base::m_table->get_impl()->set_timestamp(col_idx, Base::m_row_idx, value); }
 
     operator Timestamp() const noexcept { return get(); }
-    const FieldAccessor& operator=(Timestamp value) const { set(value); return *this; }
+    const FieldAccessor& operator=(Timestamp value) const
+    {
+        set(value);
+        return *this;
+    }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 };
 
 /// Field accessor specialization for strings.
 template <class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, StringData, const_tab>: public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, StringData, const_tab> : public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    StringData get() const noexcept
-    {
-        return Base::m_table->get_impl()->get_string(col_idx, Base::m_row_idx);
-    }
+    StringData get() const noexcept { return Base::m_table->get_impl()->get_string(col_idx, Base::m_row_idx); }
 
-    void set(StringData value) const
-    {
-        Base::m_table->get_impl()->set_string(col_idx, Base::m_row_idx, value);
-    }
+    void set(StringData value) const { Base::m_table->get_impl()->set_string(col_idx, Base::m_row_idx, value); }
 
     operator StringData() const noexcept { return get(); }
-    const FieldAccessor& operator=(StringData value) const { set(value); return *this; }
+    const FieldAccessor& operator=(StringData value) const
+    {
+        set(value);
+        return *this;
+    }
 
     const char* data() const noexcept { return get().data(); }
     size_t size() const noexcept { return get().size(); }
@@ -473,21 +466,18 @@ public:
     const char* c_str() const noexcept { return data(); }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 };
 
 
 /// Field accessor specialization for binary data.
 template <class Taboid, int col_idx, bool const_tab>
-class FieldAccessor<Taboid, col_idx, BinaryData, const_tab>: public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, BinaryData, const_tab> : public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    BinaryData get() const noexcept
-    {
-        return Base::m_table->get_impl()->get_binary(col_idx, Base::m_row_idx);
-    }
+    BinaryData get() const noexcept { return Base::m_table->get_impl()->get_binary(col_idx, Base::m_row_idx); }
 
     void set(const BinaryData& value) const
     {
@@ -495,30 +485,34 @@ public:
     }
 
     operator BinaryData() const noexcept { return get(); }
-    const FieldAccessor& operator=(const BinaryData& value) const { set(value); return *this; }
+    const FieldAccessor& operator=(const BinaryData& value) const
+    {
+        set(value);
+        return *this;
+    }
 
     const char* data() const noexcept { return get().data(); }
     size_t size() const noexcept { return get().size(); }
 
-
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 };
 
 
 /// Field accessor specialization for subtables of non-const parent.
 template <class Taboid, int col_idx, class Subtab>
-class FieldAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>, false>:
-    public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>, false> : public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
     // FIXME: Dangerous slicing posibility as long as Cursor is same as RowAccessor.
-    // FIXME: Accessors must not be publicly copyable. This requires that Spec::ColNames is made a friend of BasicTable.
+    // FIXME: Accessors must not be publicly copyable. This requires that Spec::ColNames is made a friend of
+    // BasicTable.
     // FIXME: Need BasicTableView::Cursor and BasicTableView::ConstCursor if Cursors should exist at all.
-    struct SubtabRowAccessor: Subtab::RowAccessor {
+    struct SubtabRowAccessor : Subtab::RowAccessor {
     public:
-        SubtabRowAccessor(Subtab* subtable, size_t row_idx):
-            Subtab::RowAccessor(std::make_pair(subtable, row_idx)),
-            m_owner(subtable->get_table_ref()) {}
+        SubtabRowAccessor(Subtab* subtable, size_t row_idx)
+            : Subtab::RowAccessor(std::make_pair(subtable, row_idx)), m_owner(subtable->get_table_ref())
+        {
+        }
 
     private:
         typename Subtab::Ref const m_owner;
@@ -527,75 +521,68 @@ private:
 public:
     operator typename Subtab::Ref() const
     {
-        Subtab* subtab =
-            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        Subtab* subtab = Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
         return subtab->get_table_ref();
     }
 
     operator typename Subtab::ConstRef() const
     {
-        const Subtab* subtab =
-            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        const Subtab* subtab = Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
         return subtab->get_table_ref();
     }
 
     typename Subtab::Ref operator->() const
     {
-        Subtab* subtab =
-            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        Subtab* subtab = Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
         return subtab->get_table_ref();
     }
 
     SubtabRowAccessor operator[](size_t row_idx) const
     {
-        Subtab* subtab =
-            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        Subtab* subtab = Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
         return SubtabRowAccessor(subtab, row_idx);
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 };
 
 
 /// Field accessor specialization for subtables of const parent.
 template <class Taboid, int col_idx, class Subtab>
-class FieldAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>, true>:
-    public FieldAccessorBase<Taboid> {
+class FieldAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>, true> : public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
     // FIXME: Dangerous slicing posibility as long as Cursor is same as RowAccessor.
-    struct SubtabRowAccessor: Subtab::ConstRowAccessor {
+    struct SubtabRowAccessor : Subtab::ConstRowAccessor {
     public:
-        SubtabRowAccessor(const Subtab* subtable, size_t row_idx):
-            Subtab::ConstRowAccessor(std::make_pair(subtable, row_idx)),
-            m_owner(subtable->get_table_ref()) {}
+        SubtabRowAccessor(const Subtab* subtable, size_t row_idx)
+            : Subtab::ConstRowAccessor(std::make_pair(subtable, row_idx)), m_owner(subtable->get_table_ref())
+        {
+        }
 
     private:
         typename Subtab::ConstRef const m_owner;
     };
 
 public:
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 
     operator typename Subtab::ConstRef() const
     {
-        const Subtab* subtab =
-            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        const Subtab* subtab = Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
         return subtab->get_table_ref();
     }
 
     typename Subtab::ConstRef operator->() const
     {
-        const Subtab* subtab =
-            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        const Subtab* subtab = Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
         return subtab->get_table_ref();
     }
 
     SubtabRowAccessor operator[](size_t row_idx) const
     {
-        const Subtab* subtab =
-            Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
+        const Subtab* subtab = Base::m_table->template get_subtable_ptr<Subtab>(col_idx, Base::m_row_idx);
         return SubtabRowAccessor(subtab, row_idx);
     }
 };
@@ -603,20 +590,14 @@ public:
 
 /// Base for field accessor specializations for mixed type.
 template <class Taboid, int col_idx, class FieldAccessor>
-class MixedFieldAccessorBase: public FieldAccessorBase<Taboid> {
+class MixedFieldAccessorBase : public FieldAccessorBase<Taboid> {
 private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    Mixed get() const noexcept
-    {
-        return Base::m_table->get_impl()->get_mixed(col_idx, Base::m_row_idx);
-    }
+    Mixed get() const noexcept { return Base::m_table->get_impl()->get_mixed(col_idx, Base::m_row_idx); }
 
-    void set(const Mixed& value) const
-    {
-        Base::m_table->get_impl()->set_mixed(col_idx, Base::m_row_idx, value);
-    }
+    void set(const Mixed& value) const { Base::m_table->get_impl()->set_mixed(col_idx, Base::m_row_idx, value); }
 
     operator Mixed() const noexcept { return get(); }
 
@@ -626,10 +607,7 @@ public:
         return static_cast<FieldAccessor&>(*this);
     }
 
-    DataType get_type() const noexcept
-    {
-        return Base::m_table->get_impl()->get_mixed_type(col_idx, Base::m_row_idx);
-    }
+    DataType get_type() const noexcept { return Base::m_table->get_impl()->get_mixed_type(col_idx, Base::m_row_idx); }
 
     int64_t get_int() const noexcept { return get().get_int(); }
 
@@ -656,7 +634,8 @@ public:
     template <class T>
     bool is_subtable() const
     {
-        // FIXME: Conversion from TableRef to ConstTableRef is relatively expensive, or is it? Check whether it involves access to the reference count!
+        // FIXME: Conversion from TableRef to ConstTableRef is relatively expensive, or is it? Check whether it
+        // involves access to the reference count!
         ConstTableRef t = static_cast<const FieldAccessor*>(this)->get_subtable();
         return t && T::matches_dynamic_type(TableFriend::get_spec(*t));
     }
@@ -692,24 +671,21 @@ public:
     }
 
 protected:
-    MixedFieldAccessorBase(typename Base::Init i) noexcept: Base(i) {}
+    MixedFieldAccessorBase(typename Base::Init i) noexcept : Base(i) {}
 };
 
 
 /// Field accessor specialization for mixed type of non-const parent.
 template <class Taboid, int col_idx>
-class FieldAccessor<Taboid, col_idx, Mixed, false>:
-    public MixedFieldAccessorBase<Taboid, col_idx, FieldAccessor<Taboid, col_idx, Mixed, false>> {
+class FieldAccessor<Taboid, col_idx, Mixed, false>
+    : public MixedFieldAccessorBase<Taboid, col_idx, FieldAccessor<Taboid, col_idx, Mixed, false>> {
 private:
     typedef FieldAccessor<Taboid, col_idx, Mixed, false> This;
     typedef MixedFieldAccessorBase<Taboid, col_idx, This> Base;
 
 public:
     /// Returns null if the current value is not a subtable.
-    TableRef get_subtable() const
-    {
-        return Base::m_table->get_impl()->get_subtable(col_idx, Base::m_row_idx);
-    }
+    TableRef get_subtable() const { return Base::m_table->get_impl()->get_subtable(col_idx, Base::m_row_idx); }
 
     /// Overwrites the current value with an empty subtable and
     /// returns a reference to it.
@@ -787,23 +763,20 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 };
 
 
 /// Field accessor specialization for mixed type of const parent.
 template <class Taboid, int col_idx>
-class FieldAccessor<Taboid, col_idx, Mixed, true>:
-    public MixedFieldAccessorBase<Taboid, col_idx, FieldAccessor<Taboid, col_idx, Mixed, true>> {
+class FieldAccessor<Taboid, col_idx, Mixed, true>
+    : public MixedFieldAccessorBase<Taboid, col_idx, FieldAccessor<Taboid, col_idx, Mixed, true>> {
 private:
     typedef FieldAccessor<Taboid, col_idx, Mixed, true> This;
     typedef MixedFieldAccessorBase<Taboid, col_idx, This> Base;
 
 public:
-    ConstTableRef get_subtable() const
-    {
-        return Base::m_table->get_impl()->get_subtable(col_idx, Base::m_row_idx);
-    }
+    ConstTableRef get_subtable() const { return Base::m_table->get_impl()->get_subtable(col_idx, Base::m_row_idx); }
 
     /// FIXME: Consider deleting this function, since it is both
     /// unsafe and superfluous.
@@ -815,10 +788,8 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept: Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
 };
-
-
 
 
 /// This class gives access to a column of a table.
@@ -837,10 +808,7 @@ protected:
     typedef FieldAccessor<Taboid, col_idx, Type, TableIsConst<Taboid>::value> Field;
 
 public:
-    Field operator[](size_t row_idx) const
-    {
-        return Field(std::make_pair(m_table, row_idx));
-    }
+    Field operator[](size_t row_idx) const { return Field(std::make_pair(m_table, row_idx)); }
 
     bool has_search_index() const { return m_table->get_impl()->has_search_index(col_idx); }
     void add_search_index() const { m_table->get_impl()->add_search_index(col_idx); }
@@ -856,7 +824,7 @@ public:
 protected:
     Taboid* const m_table;
 
-    explicit ColumnAccessorBase(Taboid* t) noexcept: m_table(t) {}
+    explicit ColumnAccessorBase(Taboid* t) noexcept : m_table(t) {}
 };
 
 namespace {
@@ -864,7 +832,7 @@ namespace {
 // Used as base class of ColumnAccessor when Columns is not appropriate
 // (e.g., accessor of a TableView, which is not yet supported).
 struct NotARealColumns {
-    NotARealColumns(size_t, void*) { }
+    NotARealColumns(size_t, void*) {}
 };
 
 // Select whether to use Columns<T> or NotARealColumns for the given Taboid.
@@ -877,21 +845,16 @@ struct ColumnsForTaboid {
 
 /// Column accessor specialization for integers.
 template <class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, int64_t>:
-    public ColumnAccessorBase<Taboid, col_idx, int64_t>, public ColumnsForTaboid<Taboid, int64_t>::type {
+class ColumnAccessor<Taboid, col_idx, int64_t> : public ColumnAccessorBase<Taboid, col_idx, int64_t>,
+                                                 public ColumnsForTaboid<Taboid, int64_t>::type {
 private:
     using Base = ColumnAccessorBase<Taboid, col_idx, int64_t>;
     using ColumnsBase = typename ColumnsForTaboid<Taboid, int64_t>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t), ColumnsBase(col_idx, t->get_impl())
-    {
-    }
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl()) {}
 
-    size_t find_first(int64_t value) const
-    {
-        return Base::m_table->get_impl()->find_first_int(col_idx, value);
-    }
+    size_t find_first(int64_t value) const { return Base::m_table->get_impl()->find_first_int(col_idx, value); }
 
     BasicTableView<typename Base::RealTable> find_all(int64_t value) const
     {
@@ -903,15 +866,9 @@ public:
         return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
-    size_t count(int64_t target) const
-    {
-        return Base::m_table->get_impl()->count_int(col_idx, target);
-    }
+    size_t count(int64_t target) const { return Base::m_table->get_impl()->count_int(col_idx, target); }
 
-    int64_t sum() const
-    {
-        return Base::m_table->get_impl()->sum_int(col_idx);
-    }
+    int64_t sum() const { return Base::m_table->get_impl()->sum_int(col_idx); }
 
     int64_t maximum(size_t* return_ndx = nullptr) const
     {
@@ -923,40 +880,26 @@ public:
         return Base::m_table->get_impl()->minimum_int(col_idx, return_ndx);
     }
 
-    double average() const
-    {
-        return Base::m_table->get_impl()->average_int(col_idx);
-    }
+    double average() const { return Base::m_table->get_impl()->average_int(col_idx); }
 
-    size_t lower_bound(int64_t value) const noexcept
-    {
-        return Base::m_table->lower_bound_int(col_idx, value);
-    }
+    size_t lower_bound(int64_t value) const noexcept { return Base::m_table->lower_bound_int(col_idx, value); }
 
-    size_t upper_bound(int64_t value) const noexcept
-    {
-        return Base::m_table->upper_bound_int(col_idx, value);
-    }
+    size_t upper_bound(int64_t value) const noexcept { return Base::m_table->upper_bound_int(col_idx, value); }
 };
 
 
 /// Column accessor specialization for float
 template <class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, float>:
-    public ColumnAccessorBase<Taboid, col_idx, float>, public ColumnsForTaboid<Taboid, float>::type {
+class ColumnAccessor<Taboid, col_idx, float> : public ColumnAccessorBase<Taboid, col_idx, float>,
+                                               public ColumnsForTaboid<Taboid, float>::type {
 private:
     using Base = ColumnAccessorBase<Taboid, col_idx, float>;
     using ColumnsBase = typename ColumnsForTaboid<Taboid, float>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t), ColumnsBase(col_idx, t->get_impl())
-    {
-    }
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl()) {}
 
-    size_t find_first(float value) const
-    {
-        return Base::m_table->get_impl()->find_first_float(col_idx, value);
-    }
+    size_t find_first(float value) const { return Base::m_table->get_impl()->find_first_float(col_idx, value); }
 
     BasicTableView<typename Base::RealTable> find_all(float value) const
     {
@@ -968,15 +911,9 @@ public:
         return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
-    size_t count(float target) const
-    {
-        return Base::m_table->get_impl()->count_float(col_idx, target);
-    }
+    size_t count(float target) const { return Base::m_table->get_impl()->count_float(col_idx, target); }
 
-    double sum() const
-    {
-        return Base::m_table->get_impl()->sum_float(col_idx);
-    }
+    double sum() const { return Base::m_table->get_impl()->sum_float(col_idx); }
 
     float maximum(size_t* return_ndx = nullptr) const
     {
@@ -988,10 +925,7 @@ public:
         return Base::m_table->get_impl()->minimum_float(col_idx, return_ndx);
     }
 
-    double average() const
-    {
-        return Base::m_table->get_impl()->average_float(col_idx);
-    }
+    double average() const { return Base::m_table->get_impl()->average_float(col_idx); }
 
     const ColumnAccessor& operator+=(float value) const
     {
@@ -999,35 +933,24 @@ public:
         return *this;
     }
 
-    size_t lower_bound(float value) const noexcept
-    {
-        return Base::m_table->lower_bound_float(col_idx, value);
-    }
+    size_t lower_bound(float value) const noexcept { return Base::m_table->lower_bound_float(col_idx, value); }
 
-    size_t upper_bound(float value) const noexcept
-    {
-        return Base::m_table->upper_bound_float(col_idx, value);
-    }
+    size_t upper_bound(float value) const noexcept { return Base::m_table->upper_bound_float(col_idx, value); }
 };
 
 
 /// Column accessor specialization for double
 template <class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, double>:
-    public ColumnAccessorBase<Taboid, col_idx, double>, public ColumnsForTaboid<Taboid, double>::type {
+class ColumnAccessor<Taboid, col_idx, double> : public ColumnAccessorBase<Taboid, col_idx, double>,
+                                                public ColumnsForTaboid<Taboid, double>::type {
 private:
     using Base = ColumnAccessorBase<Taboid, col_idx, double>;
     using ColumnsBase = typename ColumnsForTaboid<Taboid, double>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t), ColumnsBase(col_idx, t->get_impl())
-    {
-    }
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl()) {}
 
-    size_t find_first(double value) const
-    {
-        return Base::m_table->get_impl()->find_first_double(col_idx, value);
-    }
+    size_t find_first(double value) const { return Base::m_table->get_impl()->find_first_double(col_idx, value); }
 
     BasicTableView<typename Base::RealTable> find_all(double value) const
     {
@@ -1039,15 +962,9 @@ public:
         return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
-    size_t count(double target) const
-    {
-        return Base::m_table->get_impl()->count_double(col_idx, target);
-    }
+    size_t count(double target) const { return Base::m_table->get_impl()->count_double(col_idx, target); }
 
-    double sum() const
-    {
-        return Base::m_table->get_impl()->sum_double(col_idx);
-    }
+    double sum() const { return Base::m_table->get_impl()->sum_double(col_idx); }
 
     double maximum(size_t* return_ndx = nullptr) const
     {
@@ -1059,10 +976,7 @@ public:
         return Base::m_table->get_impl()->minimum_double(col_idx, return_ndx);
     }
 
-    double average() const
-    {
-        return Base::m_table->get_impl()->average_double(col_idx);
-    }
+    double average() const { return Base::m_table->get_impl()->average_double(col_idx); }
 
     const ColumnAccessor& operator+=(double value) const
     {
@@ -1070,46 +984,31 @@ public:
         return *this;
     }
 
-    size_t lower_bound(float value) const noexcept
-    {
-        return Base::m_table->lower_bound_double(col_idx, value);
-    }
+    size_t lower_bound(float value) const noexcept { return Base::m_table->lower_bound_double(col_idx, value); }
 
-    size_t upper_bound(float value) const noexcept
-    {
-        return Base::m_table->upper_bound_double(col_idx, value);
-    }
+    size_t upper_bound(float value) const noexcept { return Base::m_table->upper_bound_double(col_idx, value); }
 };
 
 
 /// Column accessor specialization for booleans.
 template <class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, bool>: public ColumnAccessorBase<Taboid, col_idx, bool> {
+class ColumnAccessor<Taboid, col_idx, bool> : public ColumnAccessorBase<Taboid, col_idx, bool> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, bool> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t) {}
 
-    size_t find_first(bool value) const
-    {
-        return Base::m_table->get_impl()->find_first_bool(col_idx, value);
-    }
+    size_t find_first(bool value) const { return Base::m_table->get_impl()->find_first_bool(col_idx, value); }
 
     BasicTableView<typename Base::RealTable> find_all(bool value) const
     {
         return Base::m_table->get_impl()->find_all_bool(col_idx, value);
     }
 
-    size_t lower_bound(bool value) const noexcept
-    {
-        return Base::m_table->lower_bound_bool(col_idx, value);
-    }
+    size_t lower_bound(bool value) const noexcept { return Base::m_table->lower_bound_bool(col_idx, value); }
 
-    size_t upper_bound(bool value) const noexcept
-    {
-        return Base::m_table->upper_bound_bool(col_idx, value);
-    }
+    size_t upper_bound(bool value) const noexcept { return Base::m_table->upper_bound_bool(col_idx, value); }
 
     BasicTableView<typename Base::RealTable> get_distinct_view() const
     {
@@ -1120,17 +1019,15 @@ public:
 
 /// Column accessor specialization for enumerations.
 template <class Taboid, int col_idx, class E>
-class ColumnAccessor<Taboid, col_idx, SpecBase::Enum<E>>: public ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> {
+class ColumnAccessor<Taboid, col_idx, SpecBase::Enum<E>>
+    : public ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t) {}
 
-    size_t find_first(E value) const
-    {
-        return Base::m_table->get_impl()->find_first_int(col_idx, int64_t(value));
-    }
+    size_t find_first(E value) const { return Base::m_table->get_impl()->find_first_int(col_idx, int64_t(value)); }
 
     BasicTableView<typename Base::RealTable> find_all(E value) const
     {
@@ -1146,12 +1043,12 @@ public:
 
 /// Column accessor specialization for dates.
 template <class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, OldDateTime>: public ColumnAccessorBase<Taboid, col_idx, OldDateTime> {
+class ColumnAccessor<Taboid, col_idx, OldDateTime> : public ColumnAccessorBase<Taboid, col_idx, OldDateTime> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, OldDateTime> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t) {}
 
     OldDateTime maximum(size_t* return_ndx = nullptr) const
     {
@@ -1182,25 +1079,18 @@ public:
 
 /// Column accessor specialization for strings.
 template <class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, StringData>:
-    public ColumnAccessorBase<Taboid, col_idx, StringData>, public ColumnsForTaboid<Taboid, StringData>::type {
+class ColumnAccessor<Taboid, col_idx, StringData> : public ColumnAccessorBase<Taboid, col_idx, StringData>,
+                                                    public ColumnsForTaboid<Taboid, StringData>::type {
 private:
     using Base = ColumnAccessorBase<Taboid, col_idx, StringData>;
     using ColumnsBase = typename ColumnsForTaboid<Taboid, StringData>::type;
+
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t), ColumnsBase(col_idx, t->get_impl())
-    {
-    }
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl()) {}
 
-    size_t count(StringData value) const
-    {
-        return Base::m_table->get_impl()->count_string(col_idx, value);
-    }
+    size_t count(StringData value) const { return Base::m_table->get_impl()->count_string(col_idx, value); }
 
-    size_t find_first(StringData value) const
-    {
-        return Base::m_table->get_impl()->find_first_string(col_idx, value);
-    }
+    size_t find_first(StringData value) const { return Base::m_table->get_impl()->find_first_string(col_idx, value); }
 
     BasicTableView<typename Base::RealTable> find_all(StringData value) const
     {
@@ -1212,27 +1102,20 @@ public:
         return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
-    size_t lower_bound(StringData value) const noexcept
-    {
-        return Base::m_table->lower_bound_string(col_idx, value);
-    }
+    size_t lower_bound(StringData value) const noexcept { return Base::m_table->lower_bound_string(col_idx, value); }
 
-    size_t upper_bound(StringData value) const noexcept
-    {
-        return Base::m_table->upper_bound_string(col_idx, value);
-    }
+    size_t upper_bound(StringData value) const noexcept { return Base::m_table->upper_bound_string(col_idx, value); }
 };
 
 
 /// Column accessor specialization for binary data.
 template <class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, BinaryData>:
-    public ColumnAccessorBase<Taboid, col_idx, BinaryData> {
+class ColumnAccessor<Taboid, col_idx, BinaryData> : public ColumnAccessorBase<Taboid, col_idx, BinaryData> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, BinaryData> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t) {}
 
     size_t find_first(const BinaryData& value) const
     {
@@ -1248,26 +1131,25 @@ public:
 
 /// Column accessor specialization for subtables.
 template <class Taboid, int col_idx, class Subtab>
-class ColumnAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>>:
-            public ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab>> {
+class ColumnAccessor<Taboid, col_idx, SpecBase::Subtable<Subtab>>
+    : public ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab>> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab>> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t) {}
 };
 
 
 /// Column accessor specialization for mixed type.
 template <class Taboid, int col_idx>
-class ColumnAccessor<Taboid, col_idx, Mixed>: public ColumnAccessorBase<Taboid, col_idx, Mixed> {
+class ColumnAccessor<Taboid, col_idx, Mixed> : public ColumnAccessorBase<Taboid, col_idx, Mixed> {
 private:
     typedef ColumnAccessorBase<Taboid, col_idx, Mixed> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept: Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t) {}
 };
-
 
 
 /// ***********************************************************************************************
@@ -1287,7 +1169,7 @@ class QueryColumnBase {
 protected:
     typedef typename Taboid::Query Query;
     Query* const m_query;
-    explicit QueryColumnBase(Query* q) noexcept: m_query(q) {}
+    explicit QueryColumnBase(Query* q) noexcept : m_query(q) {}
 
     Query& equal(const Type& value) const
     {
@@ -1305,13 +1187,13 @@ protected:
 
 /// QueryColumn specialization for integers.
 template <class Taboid, int col_idx>
-class QueryColumn<Taboid, col_idx, int64_t>: public QueryColumnBase<Taboid, col_idx, int64_t> {
+class QueryColumn<Taboid, col_idx, int64_t> : public QueryColumnBase<Taboid, col_idx, int64_t> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, int64_t> Base;
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q) {}
 
     // Todo, these do not turn up in Visual Studio 2013 intellisense
     using Base::equal;
@@ -1347,44 +1229,41 @@ public:
         return *Base::m_query;
     }
 
-    int64_t sum(size_t* resultcount = nullptr, size_t start = 0,
-                size_t end = size_t(-1), size_t limit = size_t(-1)) const
+    int64_t sum(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                size_t limit = size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_int(col_idx, resultcount, start, end, limit);
     }
 
-    int64_t maximum(size_t* resultcount = nullptr, size_t start = 0,
-                    size_t end = size_t(-1), size_t limit = size_t(-1),
-                    size_t* return_ndx = nullptr) const
+    int64_t maximum(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                    size_t limit = size_t(-1), size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_int(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    int64_t minimum(size_t* resultcount = nullptr, size_t start = 0,
-                    size_t end = size_t(-1), size_t limit = size_t(-1),
-                    size_t* return_ndx = nullptr) const
+    int64_t minimum(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                    size_t limit = size_t(-1), size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_int(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double average(size_t* resultcount = nullptr, size_t start = 0,
-                   size_t end = size_t(-1), size_t limit = size_t(-1)) const
+    double average(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                   size_t limit = size_t(-1)) const
     {
         return Base::m_query->m_impl.average_int(col_idx, resultcount, start, end, limit);
     }
 };
 
 
-
 /// QueryColumn specialization for floats.
 template <class Taboid, int col_idx>
-class QueryColumn<Taboid, col_idx, float>: public QueryColumnBase<Taboid, col_idx, float> {
+class QueryColumn<Taboid, col_idx, float> : public QueryColumnBase<Taboid, col_idx, float> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, float> Base;
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q) {}
     using Base::equal;
     using Base::not_equal;
 
@@ -1418,44 +1297,41 @@ public:
         return *Base::m_query;
     }
 
-    double sum(size_t* resultcount = nullptr, size_t start = 0,
-               size_t end = size_t(-1), size_t limit = size_t(-1)) const
+    double sum(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+               size_t limit = size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_float(col_idx, resultcount, start, end, limit);
     }
 
-    float maximum(size_t* resultcount = nullptr, size_t start = 0,
-                  size_t end = size_t(-1), size_t limit = size_t(-1),
+    float maximum(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1),
                   size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_float(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    float minimum(size_t* resultcount = nullptr, size_t start = 0,
-                  size_t end = size_t(-1), size_t limit = size_t(-1),
+    float minimum(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1),
                   size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_float(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double average(size_t* resultcount = nullptr, size_t start = 0,
-                   size_t end = size_t(-1), size_t limit = size_t(-1)) const
+    double average(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                   size_t limit = size_t(-1)) const
     {
         return Base::m_query->m_impl.average_float(col_idx, resultcount, start, end, limit);
     }
 };
 
 
-
 /// QueryColumn specialization for doubles.
 template <class Taboid, int col_idx>
-class QueryColumn<Taboid, col_idx, double>: public QueryColumnBase<Taboid, col_idx, double> {
+class QueryColumn<Taboid, col_idx, double> : public QueryColumnBase<Taboid, col_idx, double> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, double> Base;
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q) {}
     using Base::equal;
     using Base::not_equal;
 
@@ -1489,44 +1365,41 @@ public:
         return *Base::m_query;
     }
 
-    double sum(size_t* resultcount = nullptr, size_t start = 0,
-               size_t end = size_t(-1), size_t limit = size_t(-1)) const
+    double sum(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+               size_t limit = size_t(-1)) const
     {
         return Base::m_query->m_impl.sum_double(col_idx, resultcount, start, end, limit);
     }
 
-    double maximum(size_t* resultcount = nullptr, size_t start = 0,
-                   size_t end = size_t(-1), size_t limit = size_t(-1),
-                   size_t* return_ndx = nullptr) const
+    double maximum(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                   size_t limit = size_t(-1), size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_double(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double minimum(size_t* resultcount = nullptr, size_t start = 0,
-                   size_t end = size_t(-1), size_t limit = size_t(-1),
-                   size_t* return_ndx = nullptr) const
+    double minimum(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                   size_t limit = size_t(-1), size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_double(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    double average(size_t* resultcount = nullptr, size_t start = 0,
-                   size_t end = size_t(-1), size_t limit = size_t(-1)) const
+    double average(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                   size_t limit = size_t(-1)) const
     {
         return Base::m_query->m_impl.average_double(col_idx, resultcount, start, end, limit);
     }
 };
 
 
-
 /// QueryColumn specialization for booleans.
 template <class Taboid, int col_idx>
-class QueryColumn<Taboid, col_idx, bool>: public QueryColumnBase<Taboid, col_idx, bool> {
+class QueryColumn<Taboid, col_idx, bool> : public QueryColumnBase<Taboid, col_idx, bool> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, bool> Base;
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q) {}
     using Base::equal;
     using Base::not_equal;
 };
@@ -1534,13 +1407,13 @@ public:
 
 /// QueryColumn specialization for enumerations.
 template <class Taboid, int col_idx, class E>
-class QueryColumn<Taboid, col_idx, SpecBase::Enum<E>>: public QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E>> {
+class QueryColumn<Taboid, col_idx, SpecBase::Enum<E>> : public QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E>> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, SpecBase::Enum<E>> Base;
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q) {}
     using Base::equal;
     using Base::not_equal;
 };
@@ -1548,13 +1421,13 @@ public:
 
 /// QueryColumn specialization for dates.
 template <class Taboid, int col_idx>
-class QueryColumn<Taboid, col_idx, OldDateTime>: public QueryColumnBase<Taboid, col_idx, OldDateTime> {
+class QueryColumn<Taboid, col_idx, OldDateTime> : public QueryColumnBase<Taboid, col_idx, OldDateTime> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, OldDateTime> Base;
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q) {}
 
     Query& equal(OldDateTime value) const
     {
@@ -1598,16 +1471,14 @@ public:
         return *Base::m_query;
     }
 
-    OldDateTime maximum(size_t* resultcount = nullptr, size_t start = 0,
-                        size_t end = size_t(-1), size_t limit = size_t(-1),
-                        size_t* return_ndx = nullptr) const
+    OldDateTime maximum(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                        size_t limit = size_t(-1), size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.maximum_olddatetime(col_idx, resultcount, start, end, limit, return_ndx);
     }
 
-    OldDateTime minimum(size_t* resultcount = nullptr, size_t start = 0,
-                        size_t end = size_t(-1), size_t limit = size_t(-1),
-                        size_t* return_ndx = nullptr) const
+    OldDateTime minimum(size_t* resultcount = nullptr, size_t start = 0, size_t end = size_t(-1),
+                        size_t limit = size_t(-1), size_t* return_ndx = nullptr) const
     {
         return Base::m_query->m_impl.minimum_olddatetime(col_idx, resultcount, start, end, limit, return_ndx);
     }
@@ -1616,14 +1487,13 @@ public:
 
 /// QueryColumn specialization for strings.
 template <class Taboid, int col_idx>
-class QueryColumn<Taboid, col_idx, StringData>:
-    public QueryColumnBase<Taboid, col_idx, StringData> {
+class QueryColumn<Taboid, col_idx, StringData> : public QueryColumnBase<Taboid, col_idx, StringData> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, StringData> Base;
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q) {}
 
     Query& equal(StringData value, bool case_sensitive = true) const
     {
@@ -1659,14 +1529,13 @@ public:
 
 /// QueryColumn specialization for binary data.
 template <class Taboid, int col_idx>
-class QueryColumn<Taboid, col_idx, BinaryData>:
-    public QueryColumnBase<Taboid, col_idx, BinaryData> {
+class QueryColumn<Taboid, col_idx, BinaryData> : public QueryColumnBase<Taboid, col_idx, BinaryData> {
 private:
     typedef QueryColumnBase<Taboid, col_idx, BinaryData> Base;
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept: Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q) {}
 
     Query& equal(BinaryData value) const
     {
@@ -1708,7 +1577,7 @@ private:
     Query* const m_query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept: m_query(q) {}
+    explicit QueryColumn(Query* q) noexcept : m_query(q) {}
 
     Query& subtable()
     {

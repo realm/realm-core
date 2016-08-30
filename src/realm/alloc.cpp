@@ -53,7 +53,7 @@ namespace {
 /// be used by multiple threads. Although it has m_replication, this
 /// is not a problem, as there is no way to modify it, so it will
 /// remain zero.
-class DefaultAllocator: public realm::Allocator {
+class DefaultAllocator : public realm::Allocator {
 public:
     DefaultAllocator()
     {
@@ -74,8 +74,7 @@ public:
         return MemRef(addr, reinterpret_cast<size_t>(addr), *this);
     }
 
-    MemRef do_realloc(ref_type, const char* addr, size_t old_size,
-                      size_t new_size) override
+    MemRef do_realloc(ref_type, const char* addr, size_t old_size, size_t new_size) override
     {
         char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!new_addr))) {
@@ -90,15 +89,9 @@ public:
         return MemRef(new_addr, reinterpret_cast<size_t>(new_addr), *this);
     }
 
-    void do_free(ref_type, const char* addr) noexcept override
-    {
-        ::free(const_cast<char*>(addr));
-    }
+    void do_free(ref_type, const char* addr) noexcept override { ::free(const_cast<char*>(addr)); }
 
-    char* do_translate(ref_type ref) const noexcept override
-    {
-        return reinterpret_cast<char*>(ref);
-    }
+    char* do_translate(ref_type ref) const noexcept override { return reinterpret_cast<char*>(ref); }
 
 #ifdef REALM_DEBUG
     void verify() const override {}
@@ -111,7 +104,6 @@ public:
 DefaultAllocator default_alloc;
 
 } // anonymous namespace
-
 
 
 Allocator& Allocator::get_default() noexcept

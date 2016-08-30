@@ -101,7 +101,8 @@ public:
     Mutex();
     ~Mutex() noexcept;
 
-    struct process_shared_tag {};
+    struct process_shared_tag {
+    };
 
     /// Initialize this mutex for use across multiple processes. When
     /// constructed this way, the instance may be placed in memory
@@ -121,7 +122,8 @@ public:
 protected:
     pthread_mutex_t m_impl = PTHREAD_MUTEX_INITIALIZER;
 
-    struct no_init_tag {};
+    struct no_init_tag {
+    };
     Mutex(no_init_tag) {}
 
     void init_as_regular();
@@ -149,7 +151,8 @@ private:
 
 
 /// See UniqueLock.
-struct defer_lock_tag {};
+struct defer_lock_tag {
+};
 
 /// A general-purpose mutex ownership wrapper supporting deferred
 /// locking as well as repeated unlocking and relocking.
@@ -162,6 +165,7 @@ public:
     void lock() noexcept;
     void unlock() noexcept;
     bool holds_lock() noexcept;
+
 private:
     Mutex* m_mutex;
     bool m_is_locked;
@@ -177,7 +181,7 @@ private:
 /// mutexes, this mutex class behaves as a regular process-shared
 /// mutex, which means that if a thread dies while holding a lock, any
 /// future attempt at locking will block indefinitely.
-class RobustMutex: private Mutex {
+class RobustMutex : private Mutex {
 public:
     RobustMutex();
     ~RobustMutex() noexcept;
@@ -246,12 +250,9 @@ public:
     friend class CondVar;
 };
 
-class RobustMutex::NotRecoverable: public std::exception {
+class RobustMutex::NotRecoverable : public std::exception {
 public:
-    const char* what() const noexcept override
-    {
-        return "Failed to recover consistent state of shared memory";
-    }
+    const char* what() const noexcept override { return "Failed to recover consistent state of shared memory"; }
 };
 
 
@@ -269,15 +270,14 @@ private:
 };
 
 
-
-
 /// Condition variable for use in synchronization monitors.
 class CondVar {
 public:
     CondVar();
     ~CondVar() noexcept;
 
-    struct process_shared_tag {};
+    struct process_shared_tag {
+    };
 
     /// Initialize this condition variable for use across multiple
     /// processes. When constructed this way, the instance may be
@@ -312,22 +312,16 @@ private:
 };
 
 
-
-
-
-
-
-
 // Implementation:
 
-inline Thread::Thread(): m_joinable(false)
+inline Thread::Thread() : m_joinable(false)
 {
 }
 
 template <class F>
-inline Thread::Thread(F func): m_joinable(true)
+inline Thread::Thread(F func) : m_joinable(true)
 {
-    std::unique_ptr<F> func2(new F(func)); // Throws
+    std::unique_ptr<F> func2(new F(func));       // Throws
     start(&Thread::entry_point<F>, func2.get()); // Throws
     func2.release();
 }
@@ -337,7 +331,7 @@ inline void Thread::start(F func)
 {
     if (m_joinable)
         std::terminate();
-    std::unique_ptr<F> func2(new F(func)); // Throws
+    std::unique_ptr<F> func2(new F(func));       // Throws
     start(&Thread::entry_point<F>, func2.get()); // Throws
     func2.release();
     m_joinable = true;
@@ -416,8 +410,7 @@ inline void Mutex::unlock() noexcept
 }
 
 
-inline LockGuard::LockGuard(Mutex& m) noexcept:
-    m_mutex(m)
+inline LockGuard::LockGuard(Mutex& m) noexcept : m_mutex(m)
 {
     m_mutex.lock();
 }
@@ -428,15 +421,13 @@ inline LockGuard::~LockGuard() noexcept
 }
 
 
-inline UniqueLock::UniqueLock(Mutex& m) noexcept:
-    m_mutex(&m)
+inline UniqueLock::UniqueLock(Mutex& m) noexcept : m_mutex(&m)
 {
     m_mutex->lock();
     m_is_locked = true;
 }
 
-inline UniqueLock::UniqueLock(Mutex& m, defer_lock_tag) noexcept:
-    m_mutex(&m)
+inline UniqueLock::UniqueLock(Mutex& m, defer_lock_tag) noexcept : m_mutex(&m)
 {
     m_is_locked = false;
 }
@@ -465,8 +456,7 @@ inline void UniqueLock::unlock() noexcept
 }
 
 template <typename TFunc>
-inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func) :
-    m_mutex(m)
+inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func) : m_mutex(m)
 {
     m_mutex.lock(func);
 }
@@ -477,9 +467,7 @@ inline RobustLockGuard::~RobustLockGuard() noexcept
 }
 
 
-
-inline RobustMutex::RobustMutex():
-    Mutex(no_init_tag())
+inline RobustMutex::RobustMutex() : Mutex(no_init_tag())
 {
     bool robust_if_available = true;
     init_as_process_shared(robust_if_available);
@@ -517,9 +505,6 @@ inline void RobustMutex::unlock() noexcept
 {
     Mutex::unlock();
 }
-
-
-
 
 
 inline CondVar::CondVar()
@@ -591,7 +576,6 @@ inline void CondVar::notify_all() noexcept
     int r = pthread_cond_broadcast(&m_impl);
     REALM_ASSERT(r == 0);
 }
-
 
 
 } // namespace util

@@ -37,6 +37,7 @@ template <class From, class To>
 struct CopyConst {
 private:
     typedef typename std::remove_const<To>::type type_1;
+
 public:
     typedef typename std::conditional<std::is_const<From>::value, const type_1, type_1>::type type;
 };
@@ -106,10 +107,10 @@ struct ChooseWidestInt {
 private:
     typedef std::numeric_limits<A> lim_a;
     typedef std::numeric_limits<B> lim_b;
-    static_assert(lim_a::is_specialized&& lim_b::is_specialized,
+    static_assert(lim_a::is_specialized && lim_b::is_specialized,
                   "std::numeric_limits<> must be specialized for both types");
-    static_assert(lim_a::is_integer&& lim_b::is_integer,
-                  "Both types must be integers");
+    static_assert(lim_a::is_integer && lim_b::is_integer, "Both types must be integers");
+
 public:
     typedef typename std::conditional<(lim_a::digits >= lim_b::digits), A, B>::type type;
 };
@@ -118,11 +119,11 @@ public:
 template <int bits>
 struct LeastUnsigned {
 private:
-    typedef void                                          types_0;
-    typedef TypeAppend<types_0, unsigned char>::type      types_1;
-    typedef TypeAppend<types_1, unsigned short>::type     types_2;
-    typedef TypeAppend<types_2, unsigned int>::type       types_3;
-    typedef TypeAppend<types_3, unsigned long>::type      types_4;
+    typedef void types_0;
+    typedef TypeAppend<types_0, unsigned char>::type types_1;
+    typedef TypeAppend<types_1, unsigned short>::type types_2;
+    typedef TypeAppend<types_2, unsigned int>::type types_3;
+    typedef TypeAppend<types_3, unsigned long>::type types_4;
     typedef TypeAppend<types_4, unsigned long long>::type types_5;
     typedef types_5 types;
     // The `dummy<>` template is there to work around a bug in
@@ -138,6 +139,7 @@ private:
             static const bool value = std::numeric_limits<T>::digits >= bits;
         };
     };
+
 public:
     typedef typename FindType<types, dummy<bits>::template pred>::type type;
     static_assert(!(std::is_same<type, void>::value), "No unsigned type is that wide");
@@ -148,6 +150,7 @@ template <int bits>
 struct FastestUnsigned {
 private:
     typedef typename util::LeastUnsigned<bits>::type least_unsigned;
+
 public:
     typedef typename util::ChooseWidestInt<unsigned, least_unsigned>::type type;
 };

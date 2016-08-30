@@ -43,8 +43,7 @@ std::string hex_dump(const T* data, size_t size, const char* separator = " ", in
     for (const T* i = data; i != data + size; ++i) {
         if (i != data)
             out << separator;
-        out << std::setw(min_digits) << std::setfill('0') << std::hex << std::uppercase <<
-            util::promote(U(*i));
+        out << std::setw(min_digits) << std::setfill('0') << std::hex << std::uppercase << util::promote(U(*i));
     }
     return out.str();
 }

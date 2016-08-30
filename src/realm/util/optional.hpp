@@ -22,7 +22,7 @@
 
 #include <realm/util/features.h>
 
-#include <stdexcept> // std::logic_error
+#include <stdexcept>  // std::logic_error
 #include <functional> // std::less
 
 namespace realm {
@@ -38,9 +38,13 @@ template <class T>
 struct Some;
 
 // Note: Should conform with the future std::nullopt_t and std::in_place_t.
-struct None { constexpr explicit None(int) {} };
-static constexpr None none { 0 };
-struct InPlace { constexpr InPlace() {} };
+struct None {
+    constexpr explicit None(int) {}
+};
+static constexpr None none{0};
+struct InPlace {
+    constexpr InPlace() {}
+};
 static constexpr InPlace in_place;
 
 // Note: Should conform with the future std::bad_optional_access.
@@ -59,9 +63,8 @@ struct OptionalStorage;
 template <class T, class U>
 struct TypeIsAssignableToOptional {
     // Constraints from [optional.object.assign.18]
-    static const bool value = (std::is_same<typename std::remove_reference<U>::type, T>::value
-                               && std::is_constructible<T, U>::value
-                               && std::is_assignable<T&, U>::value);
+    static const bool value = (std::is_same<typename std::remove_reference<U>::type, T>::value &&
+                               std::is_constructible<T, U>::value && std::is_assignable<T&, U>::value);
 };
 
 } // namespace _impl
@@ -91,15 +94,15 @@ public:
     Optional<T>& operator=(const Optional<T>& other);
 
     template <class U, class = typename std::enable_if<_impl::TypeIsAssignableToOptional<T, U>::value>::type>
-    Optional<T>& operator=(U && value);
+    Optional<T>& operator=(U&& value);
 
     explicit constexpr operator bool() const;
-    constexpr const T& value() const; // Throws
-    T& value(); // Throws, FIXME: Can be constexpr with C++14
-    constexpr const T& operator*() const; // Throws
-    T& operator*(); // Throws, FIXME: Can be constexpr with C++14
+    constexpr const T& value() const;      // Throws
+    T& value();                            // Throws, FIXME: Can be constexpr with C++14
+    constexpr const T& operator*() const;  // Throws
+    T& operator*();                        // Throws, FIXME: Can be constexpr with C++14
     constexpr const T* operator->() const; // Throws
-    T* operator->(); // Throws, FIXME: Can be constexpr with C++14
+    T* operator->();                       // Throws, FIXME: Can be constexpr with C++14
 
     template <class U>
     constexpr T value_or(U&& value) const&;
@@ -152,22 +155,38 @@ public:
     constexpr Optional(None) {} // FIXME: Was a delegating constructor, but not fully supported in VS2015
     Optional(const Optional<T&>& other) = default;
     template <class U>
-    Optional(const Optional<U&>& other) : m_ptr(other.m_ptr) {}
+    Optional(const Optional<U&>& other) : m_ptr(other.m_ptr)
+    {
+    }
     template <class U>
-    Optional(std::reference_wrapper<U> ref) : m_ptr(&ref.get()) {}
+    Optional(std::reference_wrapper<U> ref) : m_ptr(&ref.get())
+    {
+    }
 
     constexpr Optional(T& init_value) : m_ptr(&init_value) {}
     Optional(T&& value) = delete; // Catches accidental references to rvalue temporaries.
 
-    Optional<T&>& operator=(None) { m_ptr = nullptr; return *this; }
-    Optional<T&>& operator=(const Optional<T&>& other) { m_ptr = other.m_ptr; return *this; }
+    Optional<T&>& operator=(None)
+    {
+        m_ptr = nullptr;
+        return *this;
+    }
+    Optional<T&>& operator=(const Optional<T&>& other)
+    {
+        m_ptr = other.m_ptr;
+        return *this;
+    }
 
     template <class U>
-    Optional<T&>& operator=(std::reference_wrapper<U> ref) { m_ptr = &ref.get(); return *this; }
+    Optional<T&>& operator=(std::reference_wrapper<U> ref)
+    {
+        m_ptr = &ref.get();
+        return *this;
+    }
 
     explicit constexpr operator bool() const { return m_ptr; }
     constexpr const target_type& value() const; // Throws
-    target_type& value(); // Throws
+    target_type& value();                       // Throws
     constexpr const target_type& operator*() const { return value(); }
     target_type& operator*() { return value(); }
     constexpr const target_type* operator->() const { return &value(); }
@@ -182,10 +201,12 @@ private:
 };
 
 
-template <class T> struct RemoveOptional {
+template <class T>
+struct RemoveOptional {
     using type = T;
 };
-template <class T> struct RemoveOptional<Optional<T>> {
+template <class T>
+struct RemoveOptional<Optional<T>> {
     using type = typename RemoveOptional<T>::type; // Remove recursively
 };
 
@@ -197,7 +218,7 @@ struct Some {
     template <class... Args>
     static Optional<T> some(Args&&... args)
     {
-        return Optional<T> {std::forward<Args>(args)...};
+        return Optional<T>{std::forward<Args>(args)...};
     }
 };
 
@@ -220,46 +241,46 @@ Optional<T> some(Args&&... args)
 
 
 template <class T>
-constexpr Optional<T>::Optional(): Storage(none)
+constexpr Optional<T>::Optional() : Storage(none)
 {
 }
 
 template <class T>
-constexpr Optional<T>::Optional(None): Storage(none)
+constexpr Optional<T>::Optional(None) : Storage(none)
 {
 }
 
 template <class T>
-Optional<T>::Optional(Optional<T>&& other): Storage(none)
+Optional<T>::Optional(Optional<T>&& other) : Storage(none)
 {
     if (other.m_engaged) {
-        new(&m_value) T(std::move(other.m_value));
+        new (&m_value) T(std::move(other.m_value));
         m_engaged = true;
     }
 }
 
 template <class T>
-Optional<T>::Optional(const Optional<T>& other): Storage(none)
+Optional<T>::Optional(const Optional<T>& other) : Storage(none)
 {
     if (other.m_engaged) {
-        new(&m_value) T(other.m_value);
+        new (&m_value) T(other.m_value);
         m_engaged = true;
     }
 }
 
 template <class T>
-constexpr Optional<T>::Optional(T&& r_value): Storage(std::move(r_value))
+constexpr Optional<T>::Optional(T&& r_value) : Storage(std::move(r_value))
 {
 }
 
 template <class T>
-constexpr Optional<T>::Optional(const T& l_value): Storage(l_value)
+constexpr Optional<T>::Optional(const T& l_value) : Storage(l_value)
 {
 }
 
 template <class T>
 template <class... Args>
-constexpr Optional<T>::Optional(InPlace, Args&&... args): Storage(std::forward<Args>(args)...)
+constexpr Optional<T>::Optional(InPlace, Args&&... args) : Storage(std::forward<Args>(args)...)
 {
 }
 
@@ -292,7 +313,7 @@ Optional<T>& Optional<T>::operator=(Optional<T>&& other)
     }
     else {
         if (other.m_engaged) {
-            new(&m_value) T(std::move(other.m_value));
+            new (&m_value) T(std::move(other.m_value));
             m_engaged = true;
         }
     }
@@ -312,7 +333,7 @@ Optional<T>& Optional<T>::operator=(const Optional<T>& other)
     }
     else {
         if (other.m_engaged) {
-            new(&m_value) T(other.m_value);
+            new (&m_value) T(other.m_value);
             m_engaged = true;
         }
     }
@@ -327,7 +348,7 @@ Optional<T>& Optional<T>::operator=(U&& r_value)
         m_value = std::forward<U>(r_value);
     }
     else {
-        new(&m_value) T(std::forward<U>(r_value));
+        new (&m_value) T(std::forward<U>(r_value));
         m_engaged = true;
     }
     return *this;
@@ -406,7 +427,7 @@ constexpr T Optional<T>::value_or(U&& otherwise) const&
 
 template <class T>
 template <class U>
-T Optional<T>::value_or(U&& otherwise) &&
+T Optional<T>::value_or(U&& otherwise)&&
 {
     if (is_engaged()) {
         return T(std::move(m_value));
@@ -430,14 +451,13 @@ template <class... Args>
 void Optional<T>::emplace(Args&&... args)
 {
     clear();
-    new(&m_value) T(std::forward<Args>(args)...);
+    new (&m_value) T(std::forward<Args>(args)...);
     m_engaged = true;
 }
 
 
 template <class T>
-constexpr Optional<typename std::decay<T>::type>
-make_optional(T&& value)
+constexpr Optional<typename std::decay<T>::type> make_optional(T&& value)
 {
     using Type = typename std::decay<T>::type;
     return some<Type>(std::forward<T>(value));
@@ -446,8 +466,12 @@ make_optional(T&& value)
 template <class T>
 bool operator==(const Optional<T>& lhs, const Optional<T>& rhs)
 {
-    if (!lhs && !rhs) { return true; }
-    if (lhs && rhs) { return *lhs == *rhs; }
+    if (!lhs && !rhs) {
+        return true;
+    }
+    if (lhs && rhs) {
+        return *lhs == *rhs;
+    }
     return false;
 }
 
@@ -460,17 +484,25 @@ bool operator!=(const Optional<T>& lhs, const Optional<T>& rhs)
 template <class T>
 bool operator<(const Optional<T>& lhs, const Optional<T>& rhs)
 {
-    if (!rhs) { return false; }
-    if (!lhs) { return true; }
-    return std::less<T> {}(*lhs, *rhs);
+    if (!rhs) {
+        return false;
+    }
+    if (!lhs) {
+        return true;
+    }
+    return std::less<T>{}(*lhs, *rhs);
 }
 
 template <class T>
 bool operator>(const util::Optional<T>& lhs, const util::Optional<T>& rhs)
 {
-    if (!lhs) { return false; }
-    if (!rhs) { return true; }
-    return std::greater<T> {}(*lhs, *rhs);
+    if (!lhs) {
+        return false;
+    }
+    if (!rhs) {
+        return true;
+    }
+    return std::greater<T>{}(*lhs, *rhs);
 }
 
 template <class T>
@@ -519,7 +551,7 @@ bool operator==(const Optional<T>& lhs, const U& rhs)
 template <class T>
 bool operator<(const Optional<T>& lhs, const T& rhs)
 {
-    return lhs ? std::less<T> {}(*lhs, rhs) : true;
+    return lhs ? std::less<T>{}(*lhs, rhs) : true;
 }
 
 template <class T, class U>
@@ -531,7 +563,7 @@ bool operator==(const T& lhs, const Optional<U>& rhs)
 template <class T>
 bool operator<(const T& lhs, const Optional<T>& rhs)
 {
-    return rhs ? std::less<T> {}(lhs, *rhs) : false;
+    return rhs ? std::less<T>{}(lhs, *rhs) : false;
 }
 
 template <class T, class F>
@@ -589,11 +621,13 @@ struct OptionalStorage<T, true> {
     };
     bool m_engaged = false;
 
-    constexpr OptionalStorage(realm::util::None) : m_null_state() { }
-    constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true) { }
+    constexpr OptionalStorage(realm::util::None) : m_null_state() {}
+    constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true) {}
 
     template <class... Args>
-    constexpr OptionalStorage(Args&&... args): m_value(args...), m_engaged(true) { }
+    constexpr OptionalStorage(Args&&... args) : m_value(args...), m_engaged(true)
+    {
+    }
 };
 
 // T is not trivially destructible.
@@ -605,11 +639,13 @@ struct OptionalStorage<T, false> {
     };
     bool m_engaged = false;
 
-    constexpr OptionalStorage(realm::util::None) : m_null_state() { }
-    constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true) { }
+    constexpr OptionalStorage(realm::util::None) : m_null_state() {}
+    constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true) {}
 
     template <class... Args>
-    constexpr OptionalStorage(Args&&... args): m_value(args...), m_engaged(true) { }
+    constexpr OptionalStorage(Args&&... args) : m_value(args...), m_engaged(true)
+    {
+    }
 
     ~OptionalStorage()
     {

@@ -484,8 +484,6 @@ TEST(Array_AddNeg1_1)
 }
 
 
-
-
 // Oops, see Array_LowerUpperBound
 TEST(Array_UpperLowerBound)
 {
@@ -498,8 +496,8 @@ TEST(Array_UpperLowerBound)
 
     // we use 4 as constant in order to make border case sequences of
     // v, v, v and v, v+1, v+2, etc, probable
-    for (int i = 0; i < (1000 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION *
-                                 TEST_DURATION * TEST_DURATION)) ; i++) {
+    for (int i = 0; i < (1000 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION));
+         i++) {
         int elements = random.draw_int_mod(64);
         int val = random.draw_int_mod(4); // random start value
 
@@ -541,6 +539,7 @@ TEST(Array_LowerUpperBound)
     a.add(70);
     a.add(80);
 
+    // clang-format off
     CHECK_EQUAL(0, a.lower_bound_int(0));  CHECK_EQUAL(0, a.upper_bound_int(0));
     CHECK_EQUAL(0, a.lower_bound_int(1));  CHECK_EQUAL(0, a.upper_bound_int(1));
     CHECK_EQUAL(0, a.lower_bound_int(9));  CHECK_EQUAL(0, a.upper_bound_int(9));
@@ -574,11 +573,10 @@ TEST(Array_LowerUpperBound)
     CHECK_EQUAL(7, a.lower_bound_int(80)); CHECK_EQUAL(8, a.upper_bound_int(80));
     CHECK_EQUAL(8, a.lower_bound_int(81)); CHECK_EQUAL(8, a.upper_bound_int(81));
     CHECK_EQUAL(8, a.lower_bound_int(82)); CHECK_EQUAL(8, a.upper_bound_int(82));
+    // clang-format on
 
     a.destroy();
 }
-
-
 
 
 /** find_all() int tests spread out over bitwidth
@@ -868,17 +866,19 @@ TEST(Array_FindAllInt7)
     r.destroy();
 }
 
-// Tests the case where a value does *not* exist in one entire 64-bit chunk (triggers the 'if (has_zero_byte()) break;' condition)
+// Tests the case where a value does *not* exist in one entire 64-bit chunk (triggers the 'if (has_zero_byte())
+// break;' condition)
 TEST(Array_FindHasZeroByte)
 {
-    // we want at least 1 entire 64-bit chunk-test, and we also want a remainder-test, so we chose n to be a prime > 64
+    // we want at least 1 entire 64-bit chunk-test, and we also want a remainder-test, so we chose n to be a prime >
+    // 64
     size_t n = 73;
-    has_zero_byte(test_context, 1, n); // width = 1
-    has_zero_byte(test_context, 3, n); // width = 2
-    has_zero_byte(test_context, 13, n); // width = 4
-    has_zero_byte(test_context, 100, n); // 8
-    has_zero_byte(test_context, 10000, n); // 16
-    has_zero_byte(test_context, 100000, n); // 32
+    has_zero_byte(test_context, 1, n);            // width = 1
+    has_zero_byte(test_context, 3, n);            // width = 2
+    has_zero_byte(test_context, 13, n);           // width = 4
+    has_zero_byte(test_context, 100, n);          // 8
+    has_zero_byte(test_context, 10000, n);        // 16
+    has_zero_byte(test_context, 100000, n);       // 32
     has_zero_byte(test_context, 8000000000LL, n); // 64
 }
 
@@ -901,7 +901,6 @@ TEST(Array_find_sse)
     }
     a.destroy();
 }
-
 
 
 TEST(Array_Greater)
@@ -1023,12 +1022,9 @@ TEST(Array_Greater)
             CHECK_EQUAL(i, t);
             a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
-
     }
     a.destroy();
 }
-
-
 
 
 TEST(Array_Less)
@@ -1147,7 +1143,6 @@ TEST(Array_Less)
             CHECK_EQUAL(i, t);
             a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
-
     }
     a.destroy();
 }
@@ -1283,14 +1278,9 @@ TEST(Array_NotEqual)
             CHECK_EQUAL(i, t);
             a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
-
     }
     a.destroy();
 }
-
-
-
-
 
 
 TEST(Array_Copy)
@@ -1364,7 +1354,8 @@ TEST(Array_Count)
 
     // 1 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 1);
+        if (i % 2)
+            a.set(i, 1);
     }
     const size_t c3 = a.count(0);
     const size_t c4 = a.count(1);
@@ -1375,7 +1366,8 @@ TEST(Array_Count)
 
     // 2 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 2);
+        if (i % 2)
+            a.set(i, 2);
     }
     const size_t c5 = a.count(0);
     const size_t c6 = a.count(2);
@@ -1386,7 +1378,8 @@ TEST(Array_Count)
 
     // 4 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 7);
+        if (i % 2)
+            a.set(i, 7);
     }
     const size_t c7 = a.count(0);
     const size_t c8 = a.count(7);
@@ -1397,7 +1390,8 @@ TEST(Array_Count)
 
     // 8 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 100);
+        if (i % 2)
+            a.set(i, 100);
     }
     const size_t c9 = a.count(0);
     const size_t c10 = a.count(100);
@@ -1409,7 +1403,8 @@ TEST(Array_Count)
 
     // 16 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 500);
+        if (i % 2)
+            a.set(i, 500);
     }
     const size_t c11 = a.count(0);
     const size_t c12 = a.count(500);
@@ -1421,7 +1416,8 @@ TEST(Array_Count)
 
     // 32 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 0x1FFFF);
+        if (i % 2)
+            a.set(i, 0x1FFFF);
     }
     const size_t c13 = a.count(0);
     const size_t c14 = a.count(0x1FFFF);

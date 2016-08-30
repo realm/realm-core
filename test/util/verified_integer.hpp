@@ -59,12 +59,10 @@ private:
 };
 
 
-
 // Implementation
 
-inline VerifiedInteger::VerifiedInteger(Random& random):
-    u(IntegerColumn::unattached_root_tag(), Allocator::get_default()),
-    m_random(random)
+inline VerifiedInteger::VerifiedInteger(Random& random)
+    : u(IntegerColumn::unattached_root_tag(), Allocator::get_default()), m_random(random)
 {
     u.get_root_array()->create(Array::type_Normal); // Throws
 }

@@ -38,12 +38,10 @@
 // extern "C" and noinline so that a readable message shows up in the stack trace
 // of the crash
 // prototype here to silence warning
-extern "C" REALM_NORETURN REALM_NOINLINE
-void please_report_this_error_to_help_at_realm_dot_io();
+extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_error_to_help_at_realm_dot_io();
 
 // LCOV_EXCL_START
-extern "C" REALM_NORETURN REALM_NOINLINE
-void please_report_this_error_to_help_at_realm_dot_io()
+extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_error_to_help_at_realm_dot_io()
 {
     std::abort();
 }
@@ -61,14 +59,15 @@ void nslog(const char* message) noexcept
     // Log the message to Crashlytics if it's loaded into the process
     void* addr = dlsym(RTLD_DEFAULT, "CLSLog");
     if (addr) {
-        CFStringRef str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
+        CFStringRef str =
+            CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
         auto fn = reinterpret_cast<void (*)(CFStringRef, ...)>(reinterpret_cast<size_t>(addr));
         fn(CFSTR("%@"), str);
         CFRelease(str);
     }
 }
 
-void(*termination_notification_callback)(const char*) noexcept = nslog;
+void (*termination_notification_callback)(const char*) noexcept = nslog;
 
 #elif REALM_ANDROID
 
@@ -77,11 +76,11 @@ void android_log(const char* message) noexcept
     __android_log_print(ANDROID_LOG_ERROR, "REALM", message);
 }
 
-void(*termination_notification_callback)(const char*) noexcept = android_log;
+void (*termination_notification_callback)(const char*) noexcept = android_log;
 
 #else
 
-void(*termination_notification_callback)(const char*) noexcept = nullptr;
+void (*termination_notification_callback)(const char*) noexcept = nullptr;
 
 #endif
 
@@ -90,7 +89,7 @@ void(*termination_notification_callback)(const char*) noexcept = nullptr;
 namespace realm {
 namespace util {
 
-void set_termination_notification_callback(void(*callback)(const char* ) noexcept) noexcept
+void set_termination_notification_callback(void (*callback)(const char*) noexcept) noexcept
 {
     termination_notification_callback = callback;
 }

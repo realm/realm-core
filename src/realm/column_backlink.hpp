@@ -34,7 +34,7 @@ namespace realm {
 /// The individual values in the column are either refs to Columns containing
 /// the row indexes in the origin table that links to it, or in the case where
 /// there is a single link, a tagged ref encoding the origin row position.
-class BacklinkColumn: public IntegerColumn, public ArrayParent {
+class BacklinkColumn : public IntegerColumn, public ArrayParent {
 public:
     BacklinkColumn(Allocator&, ref_type, size_t col_ndx = npos);
     ~BacklinkColumn() noexcept override {}
@@ -48,10 +48,8 @@ public:
     void add_backlink(size_t row_ndx, size_t origin_row_ndx);
     void remove_one_backlink(size_t row_ndx, size_t origin_row_ndx);
     void remove_all_backlinks(size_t num_rows);
-    void update_backlink(size_t row_ndx, size_t old_origin_row_ndx,
-                         size_t new_origin_row_ndx);
-    void swap_backlinks(size_t row_ndx, size_t origin_row_ndx_1,
-                        size_t origin_row_ndx_2);
+    void update_backlink(size_t row_ndx, size_t old_origin_row_ndx, size_t new_origin_row_ndx);
+    void swap_backlinks(size_t row_ndx, size_t origin_row_ndx_1, size_t origin_row_ndx_2);
 
     void add_row();
 
@@ -101,7 +99,7 @@ protected:
 #endif
 
 private:
-    TableRef        m_origin_table;
+    TableRef m_origin_table;
     LinkColumnBase* m_origin_column = nullptr;
 
     template <typename Func>
@@ -109,12 +107,10 @@ private:
 };
 
 
-
-
 // Implementation
 
-inline BacklinkColumn::BacklinkColumn(Allocator& alloc, ref_type ref, size_t col_ndx):
-    IntegerColumn(alloc, ref, col_ndx) // Throws
+inline BacklinkColumn::BacklinkColumn(Allocator& alloc, ref_type ref, size_t col_ndx)
+    : IntegerColumn(alloc, ref, col_ndx) // Throws
 {
 }
 
@@ -159,8 +155,7 @@ inline void BacklinkColumn::add_row()
     IntegerColumn::add(0);
 }
 
-inline void BacklinkColumn::adj_acc_insert_rows(size_t row_ndx,
-                                                size_t num_rows) noexcept
+inline void BacklinkColumn::adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
 {
     IntegerColumn::adj_acc_insert_rows(row_ndx, num_rows);
 
@@ -176,8 +171,7 @@ inline void BacklinkColumn::adj_acc_erase_row(size_t row_ndx) noexcept
     tf::mark(*m_origin_table);
 }
 
-inline void BacklinkColumn::adj_acc_move_over(size_t from_row_ndx,
-                                              size_t to_row_ndx) noexcept
+inline void BacklinkColumn::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     IntegerColumn::adj_acc_move_over(from_row_ndx, to_row_ndx);
 

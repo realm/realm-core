@@ -46,9 +46,8 @@ public:
     // `column_indices` must be non-empty, and each vector within it must also
     // be non-empty. `ascending` must either be empty or have one entry for each
     // column index chain.
-    SortDescriptor(Table const& table,
-                   std::vector<std::vector<size_t>> column_indices,
-                   std::vector<bool> ascending={});
+    SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices,
+                   std::vector<bool> ascending = {});
 
     // returns whether this descriptor is valid and can be used to sort
     explicit operator bool() const noexcept { return !m_columns.empty(); }
@@ -60,6 +59,7 @@ public:
 
     class Sorter;
     Sorter sorter(IntegerColumn const& row_indexes) const;
+
 private:
     std::vector<std::vector<const ColumnBase*>> m_columns;
     std::vector<bool> m_ascending;
@@ -69,19 +69,21 @@ private:
 // supports sorting and distinct.
 class RowIndexes {
 public:
-    RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc) :
-        m_row_indexes(urt, alloc)
+    RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc)
+        : m_row_indexes(urt, alloc)
 #ifdef REALM_COOKIE_CHECK
         , cookie(cookie_expected)
 #endif
-    {}
+    {
+    }
 
-    RowIndexes(IntegerColumn&& col) :
-        m_row_indexes(std::move(col))
+    RowIndexes(IntegerColumn&& col)
+        : m_row_indexes(std::move(col))
 #ifdef REALM_COOKIE_CHECK
         , cookie(cookie_expected)
 #endif
-    {}
+    {
+    }
 
     RowIndexes(const RowIndexes& source, ConstSourcePayload mode);
     RowIndexes(RowIndexes& source, MutableSourcePayload mode);

@@ -31,9 +31,12 @@
 using namespace realm;
 using namespace realm::util;
 
-StringEnumColumn::StringEnumColumn(Allocator& alloc, ref_type ref, ref_type keys_ref, bool nullable, size_t column_ndx):
-    IntegerColumn(alloc, ref, column_ndx), // Throws
-    m_keys(alloc, keys_ref, nullable, column_ndx), // Throws
+StringEnumColumn::StringEnumColumn(Allocator& alloc, ref_type ref, ref_type keys_ref, bool nullable,
+                                   size_t column_ndx)
+    : IntegerColumn(alloc, ref, column_ndx)
+    , // Throws
+    m_keys(alloc, keys_ref, nullable, column_ndx)
+    , // Throws
     m_nullable(nullable)
 {
 }
@@ -52,7 +55,7 @@ void StringEnumColumn::destroy() noexcept
 
 MemRef StringEnumColumn::clone_deep(Allocator& alloc) const
 {
-    ref_type ref = StringColumn::create(alloc); // Throws
+    ref_type ref = StringColumn::create(alloc);      // Throws
     StringColumn new_col(alloc, ref, is_nullable()); // Throws
     // FIXME: Should be optimized with something like
     // new_col.add(seq_tree_accessor.begin(),
@@ -209,7 +212,7 @@ void StringEnumColumn::find_all(IntegerColumn& res, size_t key_ndx, size_t begin
 
 FindRes StringEnumColumn::find_all_indexref(StringData value, size_t& dst) const
 {
-//    REALM_ASSERT(value.m_data); fixme
+    //    REALM_ASSERT(value.m_data); fixme
     REALM_ASSERT(m_search_index);
 
     return m_search_index->find_all(value, dst);
@@ -342,7 +345,7 @@ void StringEnumColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void StringEnumColumn::verify() const
 {
@@ -369,8 +372,7 @@ void StringEnumColumn::verify(const Table& table, size_t col_ndx) const
     bool column_has_search_index = (attr & col_attr_Indexed) != 0;
     REALM_ASSERT_3(column_has_search_index, ==, bool(m_search_index));
     if (column_has_search_index) {
-        REALM_ASSERT_3(m_search_index->get_ndx_in_parent(), ==,
-                       get_root_array()->get_ndx_in_parent() + 1);
+        REALM_ASSERT_3(m_search_index->get_ndx_in_parent(), ==, get_root_array()->get_ndx_in_parent() + 1);
     }
 }
 

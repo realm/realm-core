@@ -31,16 +31,9 @@ namespace util {
 template <class Ref>
 class CFPtr {
 public:
-    explicit CFPtr(Ref ref = nullptr) noexcept:
-        m_ref(ref)
-    {
-    }
+    explicit CFPtr(Ref ref = nullptr) noexcept : m_ref(ref) {}
 
-    CFPtr(CFPtr&& rg) noexcept:
-        m_ref(rg.m_ref)
-    {
-        rg.m_ref = nullptr;
-    }
+    CFPtr(CFPtr&& rg) noexcept : m_ref(rg.m_ref) { rg.m_ref = nullptr; }
 
     ~CFPtr() noexcept
     {
@@ -58,15 +51,9 @@ public:
         return *this;
     }
 
-    explicit operator bool() const noexcept
-    {
-        return bool(m_ref);
-    }
+    explicit operator bool() const noexcept { return bool(m_ref); }
 
-    Ref get() const noexcept
-    {
-        return m_ref;
-    }
+    Ref get() const noexcept { return m_ref; }
 
     Ref release() noexcept
     {
@@ -99,8 +86,6 @@ CFPtr<Ref> retainCF(Ref ptr)
     CFRetain(ptr);
     return CFPtr<Ref>(ptr);
 }
-
-
 }
 }
 

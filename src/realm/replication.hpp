@@ -38,17 +38,19 @@ namespace util {
 class Logger;
 }
 
-// FIXME: Be careful about the possibility of one modification function being called by another where both do transaction logging.
+// FIXME: Be careful about the possibility of one modification function being called by another where both do
+// transaction logging.
 
-// FIXME: The current table/subtable selection scheme assumes that a TableRef of a subtable is not accessed after any modification of one of its ancestor tables.
+// FIXME: The current table/subtable selection scheme assumes that a TableRef of a subtable is not accessed after any
+// modification of one of its ancestor tables.
 
-// FIXME: Checking on same Table* requires that ~Table checks and nullifies on match. Another option would be to store m_selected_table as a TableRef. Yet another option would be to assign unique identifiers to each Table instance via Allocator. Yet another option would be to explicitely invalidate subtables recursively when parent is modified.
+// FIXME: Checking on same Table* requires that ~Table checks and nullifies on match. Another option would be to store
+// m_selected_table as a TableRef. Yet another option would be to assign unique identifiers to each Table instance via
+// Allocator. Yet another option would be to explicitely invalidate subtables recursively when parent is modified.
 
 /// Replication is enabled by passing an instance of an implementation of this
 /// class to the SharedGroup constructor.
-class Replication:
-    public _impl::TransactLogConvenientEncoder,
-    protected _impl::TransactLogStream {
+class Replication : public _impl::TransactLogConvenientEncoder, protected _impl::TransactLogStream {
 public:
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
@@ -400,16 +402,13 @@ protected:
 };
 
 
-class Replication::Interrupted: public std::exception {
+class Replication::Interrupted : public std::exception {
 public:
-    const char* what() const noexcept override
-    {
-        return "Interrupted";
-    }
+    const char* what() const noexcept override { return "Interrupted"; }
 };
 
 
-class TrivialReplication: public Replication {
+class TrivialReplication : public Replication {
 public:
     ~TrivialReplication() noexcept {}
 
@@ -418,12 +417,10 @@ protected:
 
     TrivialReplication(const std::string& database_file);
 
-    virtual version_type prepare_changeset(const char* data, size_t size,
-                                           version_type orig_version) = 0;
+    virtual version_type prepare_changeset(const char* data, size_t size, version_type orig_version) = 0;
     virtual void finalize_changeset() noexcept = 0;
 
-    static void apply_changeset(const char* data, size_t size, SharedGroup& target,
-                                util::Logger* logger = nullptr);
+    static void apply_changeset(const char* data, size_t size, SharedGroup& target, util::Logger* logger = nullptr);
 
     bool is_history_updated() const noexcept;
 
@@ -438,8 +435,7 @@ protected:
     void do_interrupt() noexcept override;
     void do_clear_interrupt() noexcept override;
     void transact_log_reserve(size_t n, char** new_begin, char** new_end) override;
-    void transact_log_append(const char* data, size_t size, char** new_begin,
-                             char** new_end) override;
+    void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
 
 private:
     const std::string m_database_file;
@@ -451,12 +447,9 @@ private:
 };
 
 
-
-
 // Implementation:
 
-inline Replication::Replication():
-    _impl::TransactLogConvenientEncoder(static_cast<_impl::TransactLogStream&>(*this))
+inline Replication::Replication() : _impl::TransactLogConvenientEncoder(static_cast<_impl::TransactLogStream&>(*this))
 {
 }
 
@@ -491,8 +484,7 @@ inline void Replication::clear_interrupt() noexcept
     do_clear_interrupt();
 }
 
-inline TrivialReplication::TrivialReplication(const std::string& database_file):
-    m_database_file(database_file)
+inline TrivialReplication::TrivialReplication(const std::string& database_file) : m_database_file(database_file)
 {
 }
 

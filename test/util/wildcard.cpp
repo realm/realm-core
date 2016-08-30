@@ -23,13 +23,11 @@
 #include "wildcard.hpp"
 
 
-
 namespace realm {
 namespace test_util {
 
 
-wildcard_pattern::wildcard_pattern(const std::string& text):
-    m_text(text)
+wildcard_pattern::wildcard_pattern(const std::string& text) : m_text(text)
 {
     size_t pos = m_text.find('*');
     if (pos == std::string::npos) {
@@ -52,7 +50,7 @@ wildcard_pattern::wildcard_pattern(const std::string& text):
 bool wildcard_pattern::match(const char* begin, const char* end) const noexcept
 {
     const char* begin_2 = begin;
-    const char* end_2   = end;
+    const char* end_2 = end;
 
     size_t num_cards = m_cards.size();
     REALM_ASSERT(num_cards >= 1);
@@ -88,7 +86,7 @@ bool wildcard_pattern::match(const char* begin, const char* end) const noexcept
     for (size_t i = 1; i != num_cards - 1; ++i) {
         const card& card_i = m_cards[i];
         str_iter card_begin = m_text.begin() + card_i.m_offset;
-        str_iter card_end   = card_begin + card_i.m_size;
+        str_iter card_end = card_begin + card_i.m_size;
         begin_2 = search(begin_2, end_2, card_begin, card_end);
         if (begin_2 == end_2)
             return false;

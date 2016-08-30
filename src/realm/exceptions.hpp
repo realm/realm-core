@@ -27,7 +27,7 @@ namespace realm {
 
 /// Thrown by various functions to indicate that a specified table does not
 /// exist.
-class NoSuchTable: public std::exception {
+class NoSuchTable : public std::exception {
 public:
     const char* what() const noexcept override;
 };
@@ -35,7 +35,7 @@ public:
 
 /// Thrown by various functions to indicate that a specified table name is
 /// already in use.
-class TableNameInUse: public std::exception {
+class TableNameInUse : public std::exception {
 public:
     const char* what() const noexcept override;
 };
@@ -43,7 +43,7 @@ public:
 
 // Thrown by functions that require a table to **not** be the target of link
 // columns, unless those link columns are part of the table itself.
-class CrossTableLinkTarget: public std::exception {
+class CrossTableLinkTarget : public std::exception {
 public:
     const char* what() const noexcept override;
 };
@@ -51,7 +51,7 @@ public:
 
 /// Thrown by various functions to indicate that the dynamic type of a table
 /// does not match a particular other table type (dynamic or static).
-class DescriptorMismatch: public std::exception {
+class DescriptorMismatch : public std::exception {
 public:
     const char* what() const noexcept override;
 };
@@ -63,13 +63,13 @@ public:
 /// be performed. This exception indicates that until an upgrade of the file
 /// format is performed, the database will be unavailable for read or write
 /// operations.
-class FileFormatUpgradeRequired: public std::exception {
+class FileFormatUpgradeRequired : public std::exception {
 public:
     const char* what() const noexcept override;
 };
 
 /// Thrown when memory can no longer be mapped to. When mmap/remap fails.
-class AddressSpaceExhausted: public std::runtime_error {
+class AddressSpaceExhausted : public std::runtime_error {
 public:
     AddressSpaceExhausted(const std::string& msg);
     /// runtime_error::what() returns the msg provided in the constructor.
@@ -108,7 +108,7 @@ public:
 ///
 /// FIXME: This exception class should probably be moved to the `_impl`
 /// namespace, in order to avoid some confusion.
-class LogicError: public std::exception {
+class LogicError : public std::exception {
 public:
     enum ErrorKind {
         string_too_big,
@@ -197,11 +197,10 @@ public:
 
     const char* what() const noexcept override;
     ErrorKind kind() const noexcept;
+
 private:
     ErrorKind m_kind;
 };
-
-
 
 
 // Implementation:
@@ -235,13 +234,11 @@ inline const char* FileFormatUpgradeRequired::what() const noexcept
 
 // LCOV_EXCL_STOP
 
-inline AddressSpaceExhausted::AddressSpaceExhausted(const std::string& msg):
-    std::runtime_error(msg)
+inline AddressSpaceExhausted::AddressSpaceExhausted(const std::string& msg) : std::runtime_error(msg)
 {
 }
 
-inline LogicError::LogicError(LogicError::ErrorKind k):
-    m_kind(k)
+inline LogicError::LogicError(LogicError::ErrorKind k) : m_kind(k)
 {
 }
 

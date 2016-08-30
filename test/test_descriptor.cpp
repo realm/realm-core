@@ -54,7 +54,6 @@ using namespace realm;
 // check-testcase` (or one of its friends) from the command line.
 
 
-
 /*
 
 FIXME: Test: Multiple subdescs, insert subdescriptor, check that all
@@ -124,9 +123,9 @@ TEST(Descriptor_Basics)
     desc->insert_column(0, type_Bool, "alpha");
     CHECK_EQUAL(2, desc->get_column_count());
     CHECK_EQUAL(type_Bool, desc->get_column_type(0));
-    CHECK_EQUAL(type_Int,  desc->get_column_type(1));
+    CHECK_EQUAL(type_Int, desc->get_column_type(1));
     CHECK_EQUAL("alpha", desc->get_column_name(0));
-    CHECK_EQUAL("beta",  desc->get_column_name(1));
+    CHECK_EQUAL("beta", desc->get_column_name(1));
     CHECK_EQUAL(not_found, desc->get_column_index("foo"));
     CHECK_EQUAL(0, desc->get_column_index("alpha"));
     CHECK_EQUAL(1, desc->get_column_index("beta"));
@@ -135,18 +134,18 @@ TEST(Descriptor_Basics)
     desc->rename_column(0, "alpha_2");
     CHECK_EQUAL(2, desc->get_column_count());
     CHECK_EQUAL(type_Bool, desc->get_column_type(0));
-    CHECK_EQUAL(type_Int,  desc->get_column_type(1));
+    CHECK_EQUAL(type_Int, desc->get_column_type(1));
     CHECK_EQUAL("alpha_2", desc->get_column_name(0));
-    CHECK_EQUAL("beta",  desc->get_column_name(1));
+    CHECK_EQUAL("beta", desc->get_column_name(1));
     CHECK_EQUAL(not_found, desc->get_column_index("alpha"));
     CHECK_EQUAL(0, desc->get_column_index("alpha_2"));
     CHECK_EQUAL(1, desc->get_column_index("beta"));
     desc->rename_column(1, "beta_2");
     CHECK_EQUAL(2, desc->get_column_count());
     CHECK_EQUAL(type_Bool, desc->get_column_type(0));
-    CHECK_EQUAL(type_Int,  desc->get_column_type(1));
+    CHECK_EQUAL(type_Int, desc->get_column_type(1));
     CHECK_EQUAL("alpha_2", desc->get_column_name(0));
-    CHECK_EQUAL("beta_2",  desc->get_column_name(1));
+    CHECK_EQUAL("beta_2", desc->get_column_name(1));
     CHECK_EQUAL(not_found, desc->get_column_index("beta"));
     CHECK_EQUAL(0, desc->get_column_index("alpha_2"));
     CHECK_EQUAL(1, desc->get_column_index("beta_2"));
@@ -203,41 +202,41 @@ TEST(Descriptor_EmptyAndDuplicateNames)
 {
     TableRef table = Table::create();
     DescriptorRef desc = table->get_descriptor();
-    desc->add_column(type_Bool,    "alpha"); // 0
-    desc->add_column(type_Int,     "beta");  // 1
-    desc->add_column(type_Double,  "");      // 2
-    desc->add_column(type_String,  "alpha"); // 3
-    desc->add_column(type_Int,     "beta");  // 4
-    desc->add_column(type_Float,   "");      // 5
-    desc->add_column(type_Bool,    "gamma"); // 6
-    desc->add_column(type_Double,  "gamma"); // 7
-    desc->add_column(type_String,  "");      // 8
+    desc->add_column(type_Bool, "alpha");   // 0
+    desc->add_column(type_Int, "beta");     // 1
+    desc->add_column(type_Double, "");      // 2
+    desc->add_column(type_String, "alpha"); // 3
+    desc->add_column(type_Int, "beta");     // 4
+    desc->add_column(type_Float, "");       // 5
+    desc->add_column(type_Bool, "gamma");   // 6
+    desc->add_column(type_Double, "gamma"); // 7
+    desc->add_column(type_String, "");      // 8
     CHECK(table->is_attached());
     CHECK(desc->is_attached());
     CHECK_EQUAL(9, desc->get_column_count());
-    CHECK_EQUAL(type_Bool,   desc->get_column_type(0));
-    CHECK_EQUAL(type_Int,    desc->get_column_type(1));
+    CHECK_EQUAL(type_Bool, desc->get_column_type(0));
+    CHECK_EQUAL(type_Int, desc->get_column_type(1));
     CHECK_EQUAL(type_Double, desc->get_column_type(2));
     CHECK_EQUAL(type_String, desc->get_column_type(3));
-    CHECK_EQUAL(type_Int,    desc->get_column_type(4));
-    CHECK_EQUAL(type_Float,  desc->get_column_type(5));
-    CHECK_EQUAL(type_Bool,   desc->get_column_type(6));
+    CHECK_EQUAL(type_Int, desc->get_column_type(4));
+    CHECK_EQUAL(type_Float, desc->get_column_type(5));
+    CHECK_EQUAL(type_Bool, desc->get_column_type(6));
     CHECK_EQUAL(type_Double, desc->get_column_type(7));
     CHECK_EQUAL(type_String, desc->get_column_type(8));
     CHECK_EQUAL("alpha", desc->get_column_name(0));
-    CHECK_EQUAL("beta",  desc->get_column_name(1));
-    CHECK_EQUAL("",      desc->get_column_name(2));
+    CHECK_EQUAL("beta", desc->get_column_name(1));
+    CHECK_EQUAL("", desc->get_column_name(2));
     CHECK_EQUAL("alpha", desc->get_column_name(3));
-    CHECK_EQUAL("beta",  desc->get_column_name(4));
-    CHECK_EQUAL("",      desc->get_column_name(5));
+    CHECK_EQUAL("beta", desc->get_column_name(4));
+    CHECK_EQUAL("", desc->get_column_name(5));
     CHECK_EQUAL("gamma", desc->get_column_name(6));
     CHECK_EQUAL("gamma", desc->get_column_name(7));
-    CHECK_EQUAL("",      desc->get_column_name(8));
+    CHECK_EQUAL("", desc->get_column_name(8));
     CHECK_EQUAL(not_found, desc->get_column_index("foo"));
-    CHECK_EQUAL(0,         desc->get_column_index("alpha"));
-    CHECK_EQUAL(1,         desc->get_column_index("beta"));
-    CHECK_EQUAL(6,         desc->get_column_index("gamma"));
-    CHECK_EQUAL(2,         desc->get_column_index(""));
+    CHECK_EQUAL(0, desc->get_column_index("alpha"));
+    CHECK_EQUAL(1, desc->get_column_index("beta"));
+    CHECK_EQUAL(6, desc->get_column_index("gamma"));
+    CHECK_EQUAL(2, desc->get_column_index(""));
 }
 
 
@@ -245,10 +244,10 @@ TEST(Descriptor_SubtableColumn)
 {
     TableRef table = Table::create();
     DescriptorRef desc = table->get_descriptor(), subdesc;
-    desc->add_column(type_Int,   "alpha");
+    desc->add_column(type_Int, "alpha");
     desc->add_column(type_Table, "beta", &subdesc);
     CHECK_EQUAL(2, desc->get_column_count());
-    CHECK_EQUAL(type_Int,   desc->get_column_type(0));
+    CHECK_EQUAL(type_Int, desc->get_column_type(0));
     CHECK_EQUAL(type_Table, desc->get_column_type(1));
     CHECK(subdesc);
     CHECK(desc->is_attached());
@@ -306,17 +305,17 @@ TEST(Descriptor_SubtableColumn)
     }
 
     // Test that columns can be added and removed from subdescriptor
-    subdesc->add_column(type_Int,    "foo");
+    subdesc->add_column(type_Int, "foo");
     subdesc->add_column(type_String, "bar");
     subdesc->remove_column(1);
     CHECK(table->is_attached());
     CHECK(desc->is_attached());
     CHECK(subdesc->is_attached());
     CHECK_EQUAL(2, desc->get_column_count());
-    CHECK_EQUAL(type_Int,   desc->get_column_type(0));
+    CHECK_EQUAL(type_Int, desc->get_column_type(0));
     CHECK_EQUAL(type_Table, desc->get_column_type(1));
     CHECK_EQUAL("alpha", desc->get_column_name(0));
-    CHECK_EQUAL("beta",  desc->get_column_name(1));
+    CHECK_EQUAL("beta", desc->get_column_name(1));
     CHECK_EQUAL(not_found, desc->get_column_index("foo"));
     CHECK_EQUAL(0, desc->get_column_index("alpha"));
     CHECK_EQUAL(1, desc->get_column_index("beta"));
@@ -333,10 +332,10 @@ TEST(Descriptor_SubtableColumn)
     CHECK(desc->is_attached());
     CHECK(subdesc->is_attached());
     CHECK_EQUAL(2, desc->get_column_count());
-    CHECK_EQUAL(type_Int,   desc->get_column_type(0));
+    CHECK_EQUAL(type_Int, desc->get_column_type(0));
     CHECK_EQUAL(type_Table, desc->get_column_type(1));
     CHECK_EQUAL("alpha_2", desc->get_column_name(0));
-    CHECK_EQUAL("beta_2",  desc->get_column_name(1));
+    CHECK_EQUAL("beta_2", desc->get_column_name(1));
     CHECK_EQUAL(not_found, desc->get_column_index("alpha"));
     CHECK_EQUAL(not_found, desc->get_column_index("beta"));
     CHECK_EQUAL(0, desc->get_column_index("alpha_2"));
@@ -350,7 +349,7 @@ TEST(Descriptor_SubtableColumn)
     CHECK(subdesc->is_attached());
     CHECK_EQUAL(1, desc->get_column_count());
     CHECK_EQUAL(type_Table, desc->get_column_type(0));
-    CHECK_EQUAL("beta_2",  desc->get_column_name(0));
+    CHECK_EQUAL("beta_2", desc->get_column_name(0));
     CHECK_EQUAL(not_found, desc->get_column_index("alpha_2"));
     CHECK_EQUAL(0, desc->get_column_index("beta_2"));
     {
@@ -358,18 +357,18 @@ TEST(Descriptor_SubtableColumn)
         CHECK_EQUAL(subdesc, subdesc_2);
     }
     subdesc->add_column(type_String, "bar");
-    subdesc->add_column(type_Float,  "baz");
+    subdesc->add_column(type_Float, "baz");
     subdesc->remove_column(2);
     CHECK(table->is_attached());
     CHECK(desc->is_attached());
     CHECK(subdesc->is_attached());
     CHECK_EQUAL(1, desc->get_column_count());
     CHECK_EQUAL(type_Table, desc->get_column_type(0));
-    CHECK_EQUAL("beta_2",  desc->get_column_name(0));
+    CHECK_EQUAL("beta_2", desc->get_column_name(0));
     CHECK_EQUAL(not_found, desc->get_column_index("foo"));
     CHECK_EQUAL(0, desc->get_column_index("beta_2"));
     CHECK_EQUAL(2, subdesc->get_column_count());
-    CHECK_EQUAL(type_Int,    subdesc->get_column_type(0));
+    CHECK_EQUAL(type_Int, subdesc->get_column_type(0));
     CHECK_EQUAL(type_String, subdesc->get_column_type(1));
     CHECK_EQUAL("foo", subdesc->get_column_name(0));
     CHECK_EQUAL("bar", subdesc->get_column_name(1));
@@ -460,7 +459,7 @@ TEST(Descriptor_DeeplyNested)
     TableRef table = Table::create();
     DescriptorRef desc = table->get_descriptor(), subdesc;
     for (int i = 0; i != 128; ++i) {
-        desc->add_column(type_Int,   "foo");
+        desc->add_column(type_Int, "foo");
         desc->add_column(type_Table, "bar", &subdesc);
         CHECK(subdesc);
         CHECK(!subdesc->is_root());
@@ -493,17 +492,17 @@ TEST(Descriptor_DeeplyNested)
         CHECK(bool(desc->get_parent()) == (i != 0));
         CHECK_EQUAL(table, desc->get_root_table());
         CHECK_EQUAL(6, desc->get_column_count());
-        CHECK_EQUAL(type_Int,   desc->get_column_type(0));
-        CHECK_EQUAL(type_Int,   desc->get_column_type(1));
-        CHECK_EQUAL(type_Int,   desc->get_column_type(2));
+        CHECK_EQUAL(type_Int, desc->get_column_type(0));
+        CHECK_EQUAL(type_Int, desc->get_column_type(1));
+        CHECK_EQUAL(type_Int, desc->get_column_type(2));
         CHECK_EQUAL(type_Table, desc->get_column_type(3));
-        CHECK_EQUAL(type_Int,   desc->get_column_type(4));
+        CHECK_EQUAL(type_Int, desc->get_column_type(4));
         CHECK_EQUAL(type_Table, desc->get_column_type(5));
-        CHECK_EQUAL("a",   desc->get_column_name(0));
+        CHECK_EQUAL("a", desc->get_column_name(0));
         CHECK_EQUAL("foo", desc->get_column_name(1));
-        CHECK_EQUAL("b",   desc->get_column_name(2));
+        CHECK_EQUAL("b", desc->get_column_name(2));
         CHECK_EQUAL("bar", desc->get_column_name(3));
-        CHECK_EQUAL("c",   desc->get_column_name(4));
+        CHECK_EQUAL("c", desc->get_column_name(4));
         CHECK_EQUAL("baz", desc->get_column_name(5));
         subdesc = desc->get_subdescriptor(5); // baz
         CHECK(subdesc);
@@ -512,11 +511,10 @@ TEST(Descriptor_DeeplyNested)
         CHECK_EQUAL(i, subdesc->get_column_count());
         for (int i_2 = 0; i_2 != i; ++i_2) {
             CHECK_EQUAL(type_Bool, subdesc->get_column_type(i_2));
-            CHECK_EQUAL("dummy",   subdesc->get_column_name(i_2));
+            CHECK_EQUAL("dummy", subdesc->get_column_name(i_2));
         }
         CHECK_EQUAL(not_found, subdesc->get_column_index("foo"));
-        CHECK_EQUAL(i == 0 ? not_found : 0,
-                    subdesc->get_column_index("dummy"));
+        CHECK_EQUAL(i == 0 ? not_found : 0, subdesc->get_column_index("dummy"));
         subdesc = desc->get_subdescriptor(3); // bar
         CHECK_EQUAL(desc, subdesc->get_parent());
         desc = subdesc;
@@ -536,10 +534,8 @@ TEST(Descriptor_IllegalOps)
         if (CHECK(!desc->is_attached())) {
             CHECK_LOGIC_ERROR(desc->add_column(type_Int, ""), LogicError::detached_accessor);
             CHECK_LOGIC_ERROR(desc->insert_column(0, type_Int, ""), LogicError::detached_accessor);
-            CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "", *table),
-                              LogicError::detached_accessor);
-            CHECK_LOGIC_ERROR(desc->insert_column_link(0, type_Link, "", *table),
-                              LogicError::detached_accessor);
+            CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "", *table), LogicError::detached_accessor);
+            CHECK_LOGIC_ERROR(desc->insert_column_link(0, type_Link, "", *table), LogicError::detached_accessor);
             CHECK_LOGIC_ERROR(desc->remove_column(0), LogicError::detached_accessor);
             CHECK_LOGIC_ERROR(desc->rename_column(0, "foo"), LogicError::detached_accessor);
             CHECK_LOGIC_ERROR(desc->set_link_type(0, link_Strong), LogicError::detached_accessor);
@@ -553,10 +549,8 @@ TEST(Descriptor_IllegalOps)
         TableRef target = group.add_table("target");
         group.remove_table("target");
         DescriptorRef desc = origin->get_descriptor();
-        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "", *target),
-                          LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(desc->insert_column_link(0, type_Link, "", *target),
-                          LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "", *target), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(desc->insert_column_link(0, type_Link, "", *target), LogicError::detached_accessor);
     }
 
     // Column index out of range
@@ -565,14 +559,11 @@ TEST(Descriptor_IllegalOps)
         TableRef table = group.add_table("table");
         table->add_column_link(type_Link, "link", *table);
         DescriptorRef desc = table->get_descriptor();
-        CHECK_LOGIC_ERROR(desc->insert_column(2, type_Int, ""),
-                          LogicError::column_index_out_of_range);
-        CHECK_LOGIC_ERROR(desc->insert_column_link(2, type_Link, "", *table),
-                          LogicError::column_index_out_of_range);
+        CHECK_LOGIC_ERROR(desc->insert_column(2, type_Int, ""), LogicError::column_index_out_of_range);
+        CHECK_LOGIC_ERROR(desc->insert_column_link(2, type_Link, "", *table), LogicError::column_index_out_of_range);
         CHECK_LOGIC_ERROR(desc->remove_column(1), LogicError::column_index_out_of_range);
         CHECK_LOGIC_ERROR(desc->rename_column(1, "foo"), LogicError::column_index_out_of_range);
-        CHECK_LOGIC_ERROR(desc->set_link_type(1, link_Strong),
-                          LogicError::column_index_out_of_range);
+        CHECK_LOGIC_ERROR(desc->set_link_type(1, link_Strong), LogicError::column_index_out_of_range);
     }
 
     // Illegal data type
@@ -593,8 +584,7 @@ TEST(Descriptor_IllegalOps)
         TableRef table = group.add_table("table");
         DescriptorRef subdesc;
         table->add_column(type_Table, "subtable", &subdesc);
-        CHECK_LOGIC_ERROR(subdesc->add_column_link(type_Link, "link", *table),
-                          LogicError::wrong_kind_of_descriptor);
+        CHECK_LOGIC_ERROR(subdesc->add_column_link(type_Link, "link", *table), LogicError::wrong_kind_of_descriptor);
     }
 
     // Wrong kind of table
@@ -604,8 +594,7 @@ TEST(Descriptor_IllegalOps)
         Group group;
         TableRef target = group.add_table("target");
         DescriptorRef desc = origin.get_descriptor();
-        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "link", *target),
-                          LogicError::wrong_kind_of_table);
+        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "link", *target), LogicError::wrong_kind_of_table);
     }
     {
         // Free-standing link target
@@ -613,8 +602,7 @@ TEST(Descriptor_IllegalOps)
         TableRef origin = group.add_table("origin");
         Table target;
         DescriptorRef desc = origin->get_descriptor();
-        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "link", target),
-                          LogicError::wrong_kind_of_table);
+        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "link", target), LogicError::wrong_kind_of_table);
     }
     {
         // Link target is a subtable
@@ -626,8 +614,7 @@ TEST(Descriptor_IllegalOps)
         subdesc->add_column(type_Int, "int");
         table->add_empty_row();
         TableRef subtable = table->get_subtable(0, 0);
-        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "link", *subtable),
-                          LogicError::wrong_kind_of_table);
+        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "link", *subtable), LogicError::wrong_kind_of_table);
     }
 
     // Different groups
@@ -636,8 +623,7 @@ TEST(Descriptor_IllegalOps)
         TableRef table_1 = group_1.add_table("table_1");
         TableRef table_2 = group_2.add_table("table_2");
         DescriptorRef desc = table_1->get_descriptor();
-        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "", *table_2),
-                          LogicError::group_mismatch);
+        CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "", *table_2), LogicError::group_mismatch);
     }
 }
 
@@ -688,7 +674,6 @@ TEST(Descriptor_SubTableEquality)
     sub->add_column(type_String, "str");
 
     CHECK(*t1.get_descriptor() != *t2.get_descriptor());
-
 }
 
 
@@ -723,7 +708,6 @@ TEST(Descriptor_TwoStringColumnTypesEquality)
     t3.optimize();
 
     CHECK(*t1.get_descriptor() == *t3.get_descriptor()); // (col_type_StringEnum == col_type_StringEunm)
-
 }
 
 

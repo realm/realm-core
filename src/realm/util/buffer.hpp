@@ -38,7 +38,7 @@ namespace util {
 template <class T>
 class Buffer {
 public:
-    Buffer() noexcept: m_size(0) {}
+    Buffer() noexcept : m_size(0) {}
     explicit Buffer(size_t initial_size);
     Buffer(Buffer<T>&&) noexcept = default;
     ~Buffer() noexcept {}
@@ -65,8 +65,7 @@ public:
     /// \param copy_to Specifies where the retained range should be
     /// copied to. `\a copy_to + \a copy_end - \a copy_begin` must be
     /// less than, or equal to \a new_size.
-    void resize(size_t new_size, size_t copy_begin, size_t copy_end,
-                size_t copy_to);
+    void resize(size_t new_size, size_t copy_begin, size_t copy_end, size_t copy_to);
 
     void reserve(size_t used_size, size_t min_capacity);
 
@@ -133,21 +132,17 @@ private:
 };
 
 
-
-
 // Implementation:
 
-class BufferSizeOverflow: public std::exception {
+class BufferSizeOverflow : public std::exception {
 public:
-    const char* what() const noexcept override
-    {
-        return "Buffer size overflow";
-    }
+    const char* what() const noexcept override { return "Buffer size overflow"; }
 };
 
 template <class T>
-inline Buffer<T>::Buffer(size_t initial_size):
-    m_data(new T[initial_size]), // Throws
+inline Buffer<T>::Buffer(size_t initial_size)
+    : m_data(new T[initial_size])
+    , // Throws
     m_size(initial_size)
 {
 }
@@ -160,8 +155,7 @@ inline void Buffer<T>::set_size(size_t new_size)
 }
 
 template <class T>
-inline void Buffer<T>::resize(size_t new_size, size_t copy_begin,
-                              size_t copy_end, size_t copy_to)
+inline void Buffer<T>::resize(size_t new_size, size_t copy_begin, size_t copy_end, size_t copy_to)
 {
     std::unique_ptr<T[]> new_data(new T[new_size]); // Throws
     std::copy(m_data.get() + copy_begin, m_data.get() + copy_end, new_data.get() + copy_to);
@@ -170,8 +164,7 @@ inline void Buffer<T>::resize(size_t new_size, size_t copy_begin,
 }
 
 template <class T>
-inline void Buffer<T>::reserve(size_t used_size,
-                               size_t min_capacity)
+inline void Buffer<T>::reserve(size_t used_size, size_t min_capacity)
 {
     size_t current_capacity = m_size;
     if (REALM_LIKELY(current_capacity >= min_capacity))
@@ -185,8 +178,7 @@ inline void Buffer<T>::reserve(size_t used_size,
 }
 
 template <class T>
-inline void Buffer<T>::reserve_extra(size_t used_size,
-                                     size_t min_extra_capacity)
+inline void Buffer<T>::reserve_extra(size_t used_size, size_t min_extra_capacity)
 {
     size_t min_capacity = used_size;
     if (REALM_UNLIKELY(int_add_with_overflow_detect(min_capacity, min_extra_capacity)))
@@ -203,7 +195,7 @@ inline T* Buffer<T>::release() noexcept
 
 
 template <class T>
-inline AppendBuffer<T>::AppendBuffer() noexcept: m_size(0)
+inline AppendBuffer<T>::AppendBuffer() noexcept : m_size(0)
 {
 }
 

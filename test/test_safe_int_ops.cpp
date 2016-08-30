@@ -69,7 +69,6 @@ using unit_test::TestContext;
 // check-testcase` (or one of its friends) from the command line.
 
 
-
 // FIXME: Test T -> realm::test_util::super_int -> T using min/max
 // values for each fundamental standard type, and also using 0 and -1
 // for signed types.
@@ -99,10 +98,10 @@ namespace {
 template <class T_1, class T_2>
 void test_two_args(TestContext& test_context, const std::set<super_int>& values)
 {
-//    if (!(std::is_same<T_1, bool>::value && std::is_same<T_2, char>::value))
-//        return;
+    //    if (!(std::is_same<T_1, bool>::value && std::is_same<T_2, char>::value))
+    //        return;
 
-//    std::cerr << get_type_name<T_1>() << ", " << get_type_name<T_2>() << "\n";
+    //    std::cerr << get_type_name<T_1>() << ", " << get_type_name<T_2>() << "\n";
     std::vector<T_1> values_1;
     std::vector<T_2> values_2;
     {
@@ -124,7 +123,7 @@ void test_two_args(TestContext& test_context, const std::set<super_int>& values)
     iter_2 end_2 = values_2.end();
     for (iter_1 i_1 = values_1.begin(); i_1 != end_1; ++i_1) {
         for (iter_2 i_2 = values_2.begin(); i_2 != end_2; ++i_2) {
-//            std::cout << "--> " << promote(*i_1) << " vs " << promote(*i_2) << "\n";
+            //            std::cout << "--> " << promote(*i_1) << " vs " << promote(*i_2) << "\n";
             // Comparisons
             {
                 T_1 v_1 = *i_1;
@@ -154,8 +153,7 @@ void test_two_args(TestContext& test_context, const std::set<super_int>& values)
                 T_1 v_1 = *i_1;
                 T_2 v_2 = *i_2;
                 super_int s_1(v_1), s_2(v_2);
-                bool add_overflow_1 = s_1.add_with_overflow_detect(s_2) ||
-                                      s_1.cast_has_overflow<T_1>();
+                bool add_overflow_1 = s_1.add_with_overflow_detect(s_2) || s_1.cast_has_overflow<T_1>();
                 bool add_overflow_2 = int_add_with_overflow_detect(v_1, v_2);
                 CHECK_EQUAL(add_overflow_1, add_overflow_2);
                 if (!add_overflow_1 && !add_overflow_2)
@@ -166,8 +164,7 @@ void test_two_args(TestContext& test_context, const std::set<super_int>& values)
                 T_1 v_1 = *i_1;
                 T_2 v_2 = *i_2;
                 super_int s_1(v_1), s_2(v_2);
-                bool sub_overflow_1 = s_1.subtract_with_overflow_detect(s_2) ||
-                                      s_1.cast_has_overflow<T_1>();
+                bool sub_overflow_1 = s_1.subtract_with_overflow_detect(s_2) || s_1.cast_has_overflow<T_1>();
                 bool sub_overflow_2 = int_subtract_with_overflow_detect(v_1, v_2);
                 CHECK_EQUAL(sub_overflow_1, sub_overflow_2);
                 if (!sub_overflow_1 && !sub_overflow_2)
@@ -194,19 +191,19 @@ void test_two_args(TestContext& test_context, const std::set<super_int>& values)
 }
 
 
-typedef void                                           types_00;
-typedef TypeAppend<types_00, bool>::type               types_01;
-typedef TypeAppend<types_01, char>::type               types_02;
-typedef TypeAppend<types_02, signed char>::type        types_03;
-typedef TypeAppend<types_03, unsigned char>::type      types_04;
-typedef TypeAppend<types_04, wchar_t>::type            types_05;
-typedef TypeAppend<types_05, short>::type              types_06;
-typedef TypeAppend<types_06, unsigned short>::type     types_07;
-typedef TypeAppend<types_07, int>::type                types_08;
-typedef TypeAppend<types_08, unsigned>::type           types_09;
-typedef TypeAppend<types_09, long>::type               types_10;
-typedef TypeAppend<types_10, unsigned long>::type      types_11;
-typedef TypeAppend<types_11, long long>::type          types_12;
+typedef void types_00;
+typedef TypeAppend<types_00, bool>::type types_01;
+typedef TypeAppend<types_01, char>::type types_02;
+typedef TypeAppend<types_02, signed char>::type types_03;
+typedef TypeAppend<types_03, unsigned char>::type types_04;
+typedef TypeAppend<types_04, wchar_t>::type types_05;
+typedef TypeAppend<types_05, short>::type types_06;
+typedef TypeAppend<types_06, unsigned short>::type types_07;
+typedef TypeAppend<types_07, int>::type types_08;
+typedef TypeAppend<types_08, unsigned>::type types_09;
+typedef TypeAppend<types_09, long>::type types_10;
+typedef TypeAppend<types_10, unsigned long>::type types_11;
+typedef TypeAppend<types_11, long long>::type types_12;
 typedef TypeAppend<types_12, unsigned long long>::type types_13;
 typedef types_13 types;
 
@@ -237,7 +234,6 @@ struct test_two_args_1 {
 };
 
 } // anonymous namespace
-
 
 
 TEST_IF(SafeIntOps_General, TEST_DURATION >= 1)

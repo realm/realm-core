@@ -55,7 +55,7 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     top->init_from_ref(ref);
     REALM_ASSERT(top->size() == 2 || top->size() == 3 || top->size() == 4);
     ref_type types_ref = top->get_as_ref(0);
-    ref_type data_ref  = top->get_as_ref(1);
+    ref_type data_ref = top->get_as_ref(1);
     types.reset(new IntegerColumn(alloc, types_ref)); // Throws
     types->set_parent(top.get(), 0);
     data.reset(new RefsColumn(alloc, data_ref, table, column_ndx)); // Throws
@@ -91,7 +91,7 @@ void MixedColumn::ensure_binary_data_column()
         return;
 
     ref_type ref = BinaryColumn::create(m_array->get_alloc(), 0, true); // Throws
-    m_binary_data.reset(new BinaryColumn(m_array->get_alloc(), ref)); // Throws
+    m_binary_data.reset(new BinaryColumn(m_array->get_alloc(), ref));   // Throws
     REALM_ASSERT_3(m_array->size(), ==, 2);
     m_array->add(ref); // Throws
     m_binary_data->set_parent(m_array.get(), 2);
@@ -108,7 +108,7 @@ void MixedColumn::ensure_timestamp_column()
 
     constexpr bool nullable = true;
     ref_type ref = TimestampColumn::create(m_array->get_alloc(), 0, nullable); // Throws
-    m_timestamp_data.reset(new TimestampColumn(m_array->get_alloc(), ref)); // Throws
+    m_timestamp_data.reset(new TimestampColumn(m_array->get_alloc(), ref));    // Throws
     REALM_ASSERT_3(m_array->size(), ==, 3);
     m_array->add(ref); // Throws
     m_timestamp_data->set_parent(m_array.get(), 3);
@@ -193,12 +193,11 @@ void MixedColumn::do_erase(size_t row_ndx, size_t num_rows_to_erase, size_t prio
         size_t row_ndx_2 = row_ndx + i - 1;
         // Remove refs or binary data
         clear_value(row_ndx_2, mixcol_Int); // Throws
-        m_types->erase(row_ndx, is_last); // Throws
+        m_types->erase(row_ndx, is_last);   // Throws
     }
 
-    bool broken_reciprocal_backlinks = false; // Ignored
-    m_data->erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
-                       broken_reciprocal_backlinks); // Throws
+    bool broken_reciprocal_backlinks = false;                                                    // Ignored
+    m_data->erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
 
@@ -213,7 +212,7 @@ void MixedColumn::do_move_last_over(size_t row_ndx, size_t prior_num_rows)
     size_t last_row_ndx = prior_num_rows - 1;
     m_types->move_last_over(row_ndx, last_row_ndx); // Throws
 
-    bool broken_reciprocal_backlinks = false; // Ignored
+    bool broken_reciprocal_backlinks = false;                                         // Ignored
     m_data->move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
@@ -230,7 +229,7 @@ void MixedColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 void MixedColumn::do_clear(size_t num_rows)
 {
     discard_child_accessors();
-    bool broken_reciprocal_backlinks = false; // Value is immaterial for these column types
+    bool broken_reciprocal_backlinks = false;              // Value is immaterial for these column types
     m_types->clear(num_rows, broken_reciprocal_backlinks); // Throws
     m_data->clear(num_rows, broken_reciprocal_backlinks);  // Throws
     if (m_binary_data) {
@@ -249,7 +248,7 @@ DataType MixedColumn::get_type(size_t ndx) const noexcept
         case mixcol_DoubleNeg:
             return type_Double;
         default:
-            return DataType(coltype);   // all others must be in sync with ColumnType
+            return DataType(coltype); // all others must be in sync with ColumnType
     }
 }
 
@@ -360,28 +359,36 @@ bool MixedColumn::compare_mixed(const MixedColumn& c) const
             return false;
         switch (type) {
             case type_Int:
-                if (get_int(i) != c.get_int(i)) return false;
+                if (get_int(i) != c.get_int(i))
+                    return false;
                 break;
             case type_Bool:
-                if (get_bool(i) != c.get_bool(i)) return false;
+                if (get_bool(i) != c.get_bool(i))
+                    return false;
                 break;
             case type_OldDateTime:
-                if (get_olddatetime(i) != c.get_olddatetime(i)) return false;
+                if (get_olddatetime(i) != c.get_olddatetime(i))
+                    return false;
                 break;
             case type_Timestamp:
-                if (get_timestamp(i) != c.get_timestamp(i)) return false;
+                if (get_timestamp(i) != c.get_timestamp(i))
+                    return false;
                 break;
             case type_Float:
-                if (get_float(i) != c.get_float(i)) return false;
+                if (get_float(i) != c.get_float(i))
+                    return false;
                 break;
             case type_Double:
-                if (get_double(i) != c.get_double(i)) return false;
+                if (get_double(i) != c.get_double(i))
+                    return false;
                 break;
             case type_String:
-                if (get_string(i) != c.get_string(i)) return false;
+                if (get_string(i) != c.get_string(i))
+                    return false;
                 break;
             case type_Binary:
-                if (get_binary(i) != c.get_binary(i)) return false;
+                if (get_binary(i) != c.get_binary(i))
+                    return false;
                 break;
             case type_Table: {
                 ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();
@@ -426,7 +433,7 @@ ref_type MixedColumn::create(Allocator& alloc, size_t size)
         top.add(v); // Throws
     }
     {
-        int_fast64_t v = 1; // 1 + 2*value where value is 0
+        int_fast64_t v = 1;                                                        // 1 + 2*value where value is 0
         ref_type ref = IntegerColumn::create(alloc, Array::type_HasRefs, size, v); // Throws
         v = from_ref(ref);
         top.add(v); // Throws
@@ -436,8 +443,7 @@ ref_type MixedColumn::create(Allocator& alloc, size_t size)
 }
 
 
-ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
-                            size_t table_size, _impl::OutputStream& out) const
+ref_type MixedColumn::write(size_t slice_offset, size_t slice_size, size_t table_size, _impl::OutputStream& out) const
 {
     // FIXME:There is no reasonably efficient way to implement this. The
     // problem is that we have no guarantees about how the order of entries in
@@ -466,15 +472,14 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
     // from the B+-tree inner node (a.k.a. `total_elems_in_subtree`).
 
     ref_type types_ref = m_types->write(slice_offset, slice_size, table_size, out); // Throws
-    ref_type data_ref = m_data->write(slice_offset, slice_size, table_size, out); // Throws
+    ref_type data_ref = m_data->write(slice_offset, slice_size, table_size, out);   // Throws
 
     // FIXME: This is far from good enough. See comments above.
     ref_type binary_data_ref = 0;
     if (m_binary_data) {
-        bool deep = true; // Deep
-        bool only_if_modified = false; // Always
-        binary_data_ref =
-            m_binary_data->get_root_array()->write(out, deep, only_if_modified); // Throws
+        bool deep = true;                                                                      // Deep
+        bool only_if_modified = false;                                                         // Always
+        binary_data_ref = m_binary_data->get_root_array()->write(out, deep, only_if_modified); // Throws
     }
 
     // build new top array
@@ -495,13 +500,13 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
     }
 
     // Write new top array
-    bool deep = false; // Shallow
-    bool only_if_modified = false; // Always
+    bool deep = false;                             // Shallow
+    bool only_if_modified = false;                 // Always
     return top.write(out, deep, only_if_modified); // Throws
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void MixedColumn::verify() const
 {
@@ -540,7 +545,7 @@ void MixedColumn::do_verify(const Table* table, size_t col_ndx) const
 
     // types and refs should be in sync
     size_t types_len = m_types->size();
-    size_t refs_len  = m_data->size();
+    size_t refs_len = m_data->size();
     REALM_ASSERT_3(types_len, ==, refs_len);
 }
 

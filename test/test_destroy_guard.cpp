@@ -61,31 +61,19 @@ namespace {
 
 class Foo {
 public:
-    Foo(bool* destroyed_flag):
-        m_destroyed_flag(destroyed_flag)
-    {
-    }
+    Foo(bool* destroyed_flag) : m_destroyed_flag(destroyed_flag) {}
 
-    void destroy()
-    {
-        *m_destroyed_flag = true;
-    }
+    void destroy() { *m_destroyed_flag = true; }
 
 private:
     bool* const m_destroyed_flag;
 };
 
-class FooAlloc: public Allocator {
+class FooAlloc : public Allocator {
 public:
-    FooAlloc():
-        m_offset(8)
-    {
-        m_baseline = 8;
-    }
+    FooAlloc() : m_offset(8) { m_baseline = 8; }
 
-    ~FooAlloc() noexcept
-    {
-    }
+    ~FooAlloc() noexcept {}
 
     MemRef do_alloc(size_t size) override
     {
@@ -125,10 +113,7 @@ public:
         return addr;
     }
 
-    bool empty()
-    {
-        return m_map.empty();
-    }
+    bool empty() { return m_map.empty(); }
 
     void clear()
     {
@@ -142,9 +127,7 @@ public:
     }
 
 #ifdef REALM_DEBUG
-    void verify() const override
-    {
-    }
+    void verify() const override {}
 #endif
 
 private:
@@ -263,8 +246,7 @@ TEST(DestroyGuard_ArrayDeep)
             root.create(Array::type_HasRefs);
             {
                 bool context_flag = false;
-                MemRef child_mem =
-                    Array::create_empty_array(Array::type_Normal, context_flag, alloc);
+                MemRef child_mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
                 int_fast64_t v(child_mem.get_ref());
                 root.add(v);
             }
@@ -322,8 +304,7 @@ TEST(DestroyGuard_ArrayRefDeep)
                 Array root(alloc);
                 root.create(Array::type_HasRefs);
                 bool context_flag = false;
-                MemRef child_mem =
-                    Array::create_empty_array(Array::type_Normal, context_flag, alloc);
+                MemRef child_mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
                 int_fast64_t v(child_mem.get_ref());
                 root.add(v);
                 root_ref = root.get_ref();

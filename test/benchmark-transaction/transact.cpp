@@ -36,8 +36,8 @@ using namespace realm;
 
 // which databases are possible
 #define DB_REALM 0
-#define DB_SQLITE  1
-#define DB_MYSQL   2
+#define DB_SQLITE 1
+#define DB_MYSQL 2
 #define DB_SQLITE_WAL 3
 
 // database parameters - primarily for MySQL
@@ -47,15 +47,13 @@ using namespace realm;
 #define DB_NAME "benchmark"
 
 
-REALM_TABLE_2(TestTable,
-              x, Int,
-              y, Int)
+REALM_TABLE_2(TestTable, x, Int, y, Int)
 
 
 struct thread_info {
     pthread_t thread_id;
-    int       thread_num;
-    char*     datfile;
+    int thread_num;
+    char* datfile;
 };
 
 
@@ -120,7 +118,7 @@ void copy(const char* src, const char* dst)
 // copy table in mysql
 void copy_db(const char* src, const char* dst)
 {
-    MYSQL*    db;
+    MYSQL* db;
     char sql[128];
 
     db = mysql_init(NULL);
@@ -315,7 +313,7 @@ static void* sqlite_writer(void* arg)
     sqlite3_stmt* s;
     char* tail;
 
-    struct thread_info* tinfo = (struct thread_info*) arg;
+    struct thread_info* tinfo = (struct thread_info*)arg;
     srandom(tinfo->thread_num);
 
     sqlite3_open(tinfo->datfile, &db);
@@ -435,11 +433,11 @@ static void* realm_writer(void* arg)
 
 void sqlite_create(const char* f, long n, bool wal)
 {
-    int      i;
-    long     randx, randy;
-    char     sql[128];
+    int i;
+    long randx, randy;
+    char sql[128];
     sqlite3* db;
-    char*    errmsg;
+    char* errmsg;
 
     util::File::try_remove(f);
     srandom(1);
@@ -468,10 +466,10 @@ void sqlite_create(const char* f, long n, bool wal)
 
 void mysql_create(const char* f, long n)
 {
-    int      i;
-    long     randx, randy;
-    char     sql[128];
-    MYSQL*    db;
+    int i;
+    long randx, randy;
+    char sql[128];
+    MYSQL* db;
 
     db = mysql_init(NULL);
     mysql_real_connect(db, DB_HOST, DB_USER, DB_PASS, DB_NAME, 0, NULL, 0);
@@ -521,15 +519,16 @@ void benchmark(bool single, int database, const char* datfile, long n_readers, l
     struct thread_info* tinfo;
     void* res;
 
-    wall_time         = 0.0;
-    dt_readers        = 0.0;
+    wall_time = 0.0;
+    dt_readers = 0.0;
     iteration_readers = 0;
-    dt_writers        = 0.0;
+    dt_writers = 0.0;
     iteration_writers = 0;
-    runnable          = true;
+    runnable = true;
 
     if (!single) {
-        if (verbose) std::cout << "Copying file" << std::endl;
+        if (verbose)
+            std::cout << "Copying file" << std::endl;
         if (database == DB_MYSQL) {
             copy_db(datfile, ("tmp" + std::string(datfile)).c_str());
         }
@@ -555,7 +554,8 @@ void benchmark(bool single, int database, const char* datfile, long n_readers, l
         }
     }
 
-    if (verbose) std::cout << "Starting threads" << std::endl;
+    if (verbose)
+        std::cout << "Starting threads" << std::endl;
     struct timespec ts_1;
     clock_gettime(CLOCK_REALTIME, &ts_1);
     for (int i = 0; i < n_readers; ++i) {
@@ -565,8 +565,7 @@ void benchmark(bool single, int database, const char* datfile, long n_readers, l
                 break;
             case DB_SQLITE:
             case DB_SQLITE_WAL:
-                pthread_create(&
-                               tinfo[i].thread_id, &attr, &sqlite_reader, &tinfo[i]);
+                pthread_create(&tinfo[i].thread_id, &attr, &sqlite_reader, &tinfo[i]);
                 break;
             case DB_MYSQL:
                 pthread_create(&tinfo[i].thread_id, &attr, &mysql_reader, &tinfo[i]);
@@ -589,10 +588,12 @@ void benchmark(bool single, int database, const char* datfile, long n_readers, l
         }
     }
 
-    if (verbose) std::cout << "Waiting for " << duration << " seconds" << std::endl;
+    if (verbose)
+        std::cout << "Waiting for " << duration << " seconds" << std::endl;
     sleep(duration);
 
-    if (verbose) std::cout << "Cancelling threads" << std::endl;
+    if (verbose)
+        std::cout << "Cancelling threads" << std::endl;
     pthread_mutex_lock(&mtx_runnable);
     runnable = false;
     pthread_mutex_unlock(&mtx_runnable);
@@ -624,7 +625,7 @@ int main(int argc, char* argv[])
     long n_readers = -1, n_writers = -1, n_records = -1;
     unsigned int duration = 0;
     int database = -1;
-    bool single  = true;
+    bool single = true;
     extern char* optarg;
     char* datfile = NULL;
 
@@ -690,7 +691,8 @@ int main(int argc, char* argv[])
         sqlite3_config(SQLITE_CONFIG_SERIALIZED);
     }
 
-    if (verbose) std::cout << "Creating test data for " << database << std::endl;
+    if (verbose)
+        std::cout << "Creating test data for " << database << std::endl;
     switch (database) {
         case DB_REALM:
             realm_create(datfile, n_records);
@@ -711,24 +713,23 @@ int main(int argc, char* argv[])
 
     if (single) {
         benchmark(true, database, datfile, n_readers, n_writers, duration);
-        std::cout << wall_time << " " << iteration_readers << " " << dt_readers
-                  << " " << iteration_writers << " " << dt_writers << std::endl;
+        std::cout << wall_time << " " << iteration_readers << " " << dt_readers << " " << iteration_writers << " "
+                  << dt_writers << std::endl;
     }
     else {
-        std::cout << "# Columns: "                   << std::endl;
-        std::cout << "# 1. number of readers"        << std::endl;
-        std::cout << "# 2. number of writers"        << std::endl;
-        std::cout << "# 3. wall time"                << std::endl;
-        std::cout << "# 4. read transactions"        << std::endl;
-        std::cout << "# 5. read time"                << std::endl;
-        std::cout << "# 6. writer transactions"      << std::endl;
-        std::cout << "# 7. writer time"              << std::endl;
+        std::cout << "# Columns: " << std::endl;
+        std::cout << "# 1. number of readers" << std::endl;
+        std::cout << "# 2. number of writers" << std::endl;
+        std::cout << "# 3. wall time" << std::endl;
+        std::cout << "# 4. read transactions" << std::endl;
+        std::cout << "# 5. read time" << std::endl;
+        std::cout << "# 6. writer transactions" << std::endl;
+        std::cout << "# 7. writer time" << std::endl;
         for (int i = 0; i <= n_readers; ++i) {
             for (int j = 0; j <= n_writers; ++j) {
                 benchmark(false, database, "test_db", i, j, duration);
                 std::cout << i << " " << j << " ";
-                std::cout << wall_time << " " << iteration_readers
-                          << " " << dt_readers << " " << iteration_writers
+                std::cout << wall_time << " " << iteration_readers << " " << dt_readers << " " << iteration_writers
                           << " " << dt_writers << std::endl;
             }
         }

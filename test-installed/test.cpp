@@ -21,8 +21,7 @@
 
 using namespace realm;
 
-REALM_TABLE_1(TestTable,
-              value, Int)
+REALM_TABLE_1(TestTable, value, Int)
 
 int main()
 {

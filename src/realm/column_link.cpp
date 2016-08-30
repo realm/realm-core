@@ -61,8 +61,7 @@ void LinkColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t p
         uint_fast64_t value = LinkColumnBase::get_uint(old_origin_row_ndx);
         if (value != 0) { // Zero means null
             size_t target_row_ndx = to_size_t(value - 1);
-            m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx,
-                                               new_origin_row_ndx); // Throws
+            m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx, new_origin_row_ndx); // Throws
         }
     }
 
@@ -91,18 +90,15 @@ void LinkColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t pri
         uint_fast64_t value = LinkColumnBase::get_uint(old_origin_row_ndx);
         if (value != 0) { // Zero means null
             size_t target_row_ndx = to_size_t(value - 1);
-            m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx,
-                                               new_origin_row_ndx); // Throws
+            m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx, new_origin_row_ndx); // Throws
         }
     }
 
-    LinkColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
-                               broken_reciprocal_backlinks); // Throws
+    LinkColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
 
-void LinkColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-                                    bool broken_reciprocal_backlinks)
+void LinkColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
@@ -121,8 +117,7 @@ void LinkColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
         }
     }
 
-    LinkColumnBase::move_last_row_over(row_ndx, prior_num_rows,
-                                       broken_reciprocal_backlinks); // Throws
+    LinkColumnBase::move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
 
@@ -142,7 +137,6 @@ void LinkColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 
     set(row_ndx_1, value_2);
     set(row_ndx_2, value_1);
-
 }
 
 

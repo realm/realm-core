@@ -75,8 +75,6 @@ namespace util {
 std::error_code make_basic_system_error_code(int) noexcept;
 
 
-
-
 // implementation
 
 inline std::error_code make_basic_system_error_code(int err) noexcept

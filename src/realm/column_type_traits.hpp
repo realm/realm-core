@@ -29,7 +29,8 @@ class OldDateTime;
 class ArrayBinary;
 class ArrayInteger;
 class ArrayIntNull;
-template <class> class BasicArray;
+template <class>
+class BasicArray;
 
 template <class T>
 struct ColumnTypeTraits;
@@ -91,8 +92,7 @@ struct ColumnTypeTraits<double> {
 };
 
 template <>
-struct ColumnTypeTraits<OldDateTime> :
-    ColumnTypeTraits<int64_t> {
+struct ColumnTypeTraits<OldDateTime> : ColumnTypeTraits<int64_t> {
     static const DataType id = type_OldDateTime;
     static const ColumnType column_id = col_type_OldDateTime;
 };
@@ -158,7 +158,6 @@ template <Action A>
 struct ColumnTypeTraitsSum<util::Optional<int64_t>, A> {
     using sum_type = int64_t;
 };
-
 }
 
 #endif // REALM_COLUMN_TYPE_TRAITS_HPP

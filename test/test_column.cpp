@@ -124,11 +124,11 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     // TEST(Column_Add5)
 
     c.add(16);
-    CHECK_EQUAL(0LL,  c.get(0));
-    CHECK_EQUAL(1LL,  c.get(1));
-    CHECK_EQUAL(2LL,  c.get(2));
-    CHECK_EQUAL(3LL,  c.get(3));
-    CHECK_EQUAL(4LL,  c.get(4));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
+    CHECK_EQUAL(3LL, c.get(3));
+    CHECK_EQUAL(4LL, c.get(4));
     CHECK_EQUAL(16LL, c.get(5));
     CHECK_EQUAL(6U, c.size());
 
@@ -136,12 +136,12 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     // TEST(Column_Add6)
 
     c.add(256);
-    CHECK_EQUAL(0LL,   c.get(0));
-    CHECK_EQUAL(1LL,   c.get(1));
-    CHECK_EQUAL(2LL,   c.get(2));
-    CHECK_EQUAL(3LL,   c.get(3));
-    CHECK_EQUAL(4LL,   c.get(4));
-    CHECK_EQUAL(16LL,  c.get(5));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
+    CHECK_EQUAL(3LL, c.get(3));
+    CHECK_EQUAL(4LL, c.get(4));
+    CHECK_EQUAL(16LL, c.get(5));
     CHECK_EQUAL(256LL, c.get(6));
     CHECK_EQUAL(7U, c.size());
 
@@ -149,13 +149,13 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     // TEST(Column_Add7)
 
     c.add(65536);
-    CHECK_EQUAL(0LL,     c.get(0));
-    CHECK_EQUAL(1LL,     c.get(1));
-    CHECK_EQUAL(2LL,     c.get(2));
-    CHECK_EQUAL(3LL,     c.get(3));
-    CHECK_EQUAL(4LL,     c.get(4));
-    CHECK_EQUAL(16LL,    c.get(5));
-    CHECK_EQUAL(256LL,   c.get(6));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
+    CHECK_EQUAL(3LL, c.get(3));
+    CHECK_EQUAL(4LL, c.get(4));
+    CHECK_EQUAL(16LL, c.get(5));
+    CHECK_EQUAL(256LL, c.get(6));
     CHECK_EQUAL(65536LL, c.get(7));
     CHECK_EQUAL(8U, c.size());
 
@@ -163,14 +163,14 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     // TEST(Column_Add8)
 
     c.add(4294967296LL);
-    CHECK_EQUAL(0LL,            c.get(0));
-    CHECK_EQUAL(1LL,            c.get(1));
-    CHECK_EQUAL(2LL,            c.get(2));
-    CHECK_EQUAL(3LL,            c.get(3));
-    CHECK_EQUAL(4LL,            c.get(4));
-    CHECK_EQUAL(16LL,           c.get(5));
-    CHECK_EQUAL(256LL,          c.get(6));
-    CHECK_EQUAL(65536LL,        c.get(7));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
+    CHECK_EQUAL(3LL, c.get(3));
+    CHECK_EQUAL(4LL, c.get(4));
+    CHECK_EQUAL(16LL, c.get(5));
+    CHECK_EQUAL(256LL, c.get(6));
+    CHECK_EQUAL(65536LL, c.get(7));
     CHECK_EQUAL(4294967296LL, c.get(8));
     CHECK_EQUAL(9U, c.size());
 
@@ -190,7 +190,7 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.add(-256);
 
     CHECK_EQUAL(2U, c.size());
-    CHECK_EQUAL(-1LL,   c.get(0));
+    CHECK_EQUAL(-1LL, c.get(0));
     CHECK_EQUAL(-256LL, c.get(1));
 
 
@@ -199,8 +199,8 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.add(-65536);
 
     CHECK_EQUAL(3U, c.size());
-    CHECK_EQUAL(-1LL,     c.get(0));
-    CHECK_EQUAL(-256LL,   c.get(1));
+    CHECK_EQUAL(-1LL, c.get(0));
+    CHECK_EQUAL(-256LL, c.get(1));
     CHECK_EQUAL(-65536LL, c.get(2));
 
 
@@ -209,10 +209,10 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.add(-4294967296LL);
 
     CHECK_EQUAL(4U, c.size());
-    CHECK_EQUAL(-1LL,            c.get(0));
-    CHECK_EQUAL(-256LL,          c.get(1));
-    CHECK_EQUAL(-65536LL,        c.get(2));
-    CHECK_EQUAL(-4294967296LL,   c.get(3));
+    CHECK_EQUAL(-1LL, c.get(0));
+    CHECK_EQUAL(-256LL, c.get(1));
+    CHECK_EQUAL(-65536LL, c.get(2));
+    CHECK_EQUAL(-4294967296LL, c.get(3));
 
 
     // TEST(Column_Set)
@@ -242,11 +242,11 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.insert(2, 16);
 
     CHECK_EQUAL(5U, c.size());
-    CHECK_EQUAL(0LL,  c.get(0));
-    CHECK_EQUAL(1LL,  c.get(1));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
     CHECK_EQUAL(16LL, c.get(2));
-    CHECK_EQUAL(2LL,  c.get(3));
-    CHECK_EQUAL(3LL,  c.get(4));
+    CHECK_EQUAL(2LL, c.get(3));
+    CHECK_EQUAL(3LL, c.get(4));
 
 
     // TEST(Column_Insert2)
@@ -256,11 +256,11 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
 
     CHECK_EQUAL(6U, c.size());
     CHECK_EQUAL(256LL, c.get(0));
-    CHECK_EQUAL(0LL,   c.get(1));
-    CHECK_EQUAL(1LL,   c.get(2));
-    CHECK_EQUAL(16LL,  c.get(3));
-    CHECK_EQUAL(2LL,   c.get(4));
-    CHECK_EQUAL(3LL,   c.get(5));
+    CHECK_EQUAL(0LL, c.get(1));
+    CHECK_EQUAL(1LL, c.get(2));
+    CHECK_EQUAL(16LL, c.get(3));
+    CHECK_EQUAL(2LL, c.get(4));
+    CHECK_EQUAL(3LL, c.get(5));
 
 
     // TEST(Column_Insert3)
@@ -268,13 +268,13 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     // Insert at bottom
     c.insert(6, 65536);
 
-    CHECK_EQUAL(7U,    c.size());
-    CHECK_EQUAL(256LL,   c.get(0));
-    CHECK_EQUAL(0LL,     c.get(1));
-    CHECK_EQUAL(1LL,     c.get(2));
-    CHECK_EQUAL(16LL,    c.get(3));
-    CHECK_EQUAL(2LL,     c.get(4));
-    CHECK_EQUAL(3LL,     c.get(5));
+    CHECK_EQUAL(7U, c.size());
+    CHECK_EQUAL(256LL, c.get(0));
+    CHECK_EQUAL(0LL, c.get(1));
+    CHECK_EQUAL(1LL, c.get(2));
+    CHECK_EQUAL(16LL, c.get(3));
+    CHECK_EQUAL(2LL, c.get(4));
+    CHECK_EQUAL(3LL, c.get(5));
     CHECK_EQUAL(65536LL, c.get(6));
 
 
@@ -284,11 +284,11 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.erase(3);
 
     CHECK_EQUAL(6U, c.size());
-    CHECK_EQUAL(256LL,   c.get(0));
-    CHECK_EQUAL(0LL,     c.get(1));
-    CHECK_EQUAL(1LL,     c.get(2));
-    CHECK_EQUAL(2LL,     c.get(3));
-    CHECK_EQUAL(3LL,     c.get(4));
+    CHECK_EQUAL(256LL, c.get(0));
+    CHECK_EQUAL(0LL, c.get(1));
+    CHECK_EQUAL(1LL, c.get(2));
+    CHECK_EQUAL(2LL, c.get(3));
+    CHECK_EQUAL(3LL, c.get(4));
     CHECK_EQUAL(65536LL, c.get(5));
 
 
@@ -298,10 +298,10 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     c.erase(0);
 
     CHECK_EQUAL(5U, c.size());
-    CHECK_EQUAL(0LL,     c.get(0));
-    CHECK_EQUAL(1LL,     c.get(1));
-    CHECK_EQUAL(2LL,     c.get(2));
-    CHECK_EQUAL(3LL,     c.get(3));
+    CHECK_EQUAL(0LL, c.get(0));
+    CHECK_EQUAL(1LL, c.get(1));
+    CHECK_EQUAL(2LL, c.get(2));
+    CHECK_EQUAL(3LL, c.get(3));
     CHECK_EQUAL(65536LL, c.get(4));
 
 
@@ -746,11 +746,11 @@ TEST_TYPES(Column_Average, IntegerColumn, IntNullColumn)
     CHECK_EQUAL(10, c.average());
 
     c.add(30);
-    CHECK_EQUAL(0, c.average(0, 0));    // None
-    CHECK_EQUAL(10, c.average(0, 1));   // first
-    CHECK_EQUAL(0, c.average(1, 1));    // None
-    CHECK_EQUAL(30, c.average(1, 2));   // second
-    CHECK_EQUAL(20, c.average(0, 2));   // both
+    CHECK_EQUAL(0, c.average(0, 0));  // None
+    CHECK_EQUAL(10, c.average(0, 1)); // first
+    CHECK_EQUAL(0, c.average(1, 1));  // None
+    CHECK_EQUAL(30, c.average(1, 2)); // second
+    CHECK_EQUAL(20, c.average(0, 2)); // both
 
     c.destroy();
 }
@@ -819,7 +819,7 @@ TEST_TYPES(Column_Max, IntegerColumn, IntNullColumn)
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
     int64_t t = c.maximum();
-//    CHECK_EQUAL(0, t); // max on empty range returns zero // edit: is undefined!
+    //    CHECK_EQUAL(0, t); // max on empty range returns zero // edit: is undefined!
 
     c.add(1);
     t = c.maximum();
@@ -852,7 +852,7 @@ TEST_TYPES(Column_Min, IntegerColumn, IntNullColumn)
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE c(Allocator::get_default(), ref);
     int64_t t = c.minimum();
-//    CHECK_EQUAL(0, t); // min on empty range returns zero // update: is undefined
+    //    CHECK_EQUAL(0, t); // min on empty range returns zero // update: is undefined
 
     c.add(1);
     t = c.minimum();
@@ -1097,7 +1097,8 @@ TEST(ColumnIntNull_Null)
         // ArrayString capacity starts at 128 bytes, so we need lots of elements
         // to test if relocation works
         for (size_t i = 0; i < 100; i++) {
-            unsigned char rnd = static_cast<unsigned char>(random.draw_int<unsigned int>());  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
+            unsigned char rnd = static_cast<unsigned char>(
+                random.draw_int<unsigned int>()); //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
 
             // Add more often than removing, so that we grow
             if (rnd < 80 && a.size() > 0) {
@@ -1150,7 +1151,6 @@ TEST(ColumnIntNull_Null)
         }
         a.destroy();
     }
-
 }
 
 

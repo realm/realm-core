@@ -58,9 +58,7 @@ namespace {
 TEST(Util_ScopeExit_Basics)
 {
     bool called = false;
-    auto handler = [&]() noexcept {
-        called = true;
-    };
+    auto handler = [&]() noexcept { called = true; };
     {
         auto seg = util::make_scope_exit(handler);
         CHECK_NOT(called);

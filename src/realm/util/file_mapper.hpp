@@ -46,14 +46,12 @@ class EncryptedFileMapping;
 void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key,
            EncryptedFileMapping*& mapping);
 
-void do_encryption_read_barrier(const void* addr, size_t size,
-                                HeaderToSize header_to_size,
+void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
                                 EncryptedFileMapping* mapping);
 
 void do_encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping);
 
-void inline encryption_read_barrier(const void* addr, size_t size,
-                                    EncryptedFileMapping* mapping,
+void inline encryption_read_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping,
                                     HeaderToSize header_to_size = nullptr)
 {
     if (mapping)
@@ -69,32 +67,31 @@ void inline encryption_write_barrier(const void* addr, size_t size, EncryptedFil
 
 extern util::Mutex mapping_mutex;
 
-inline void do_encryption_read_barrier(const void* addr, size_t size,
-                                       HeaderToSize header_to_size,
+inline void do_encryption_read_barrier(const void* addr, size_t size, HeaderToSize header_to_size,
                                        EncryptedFileMapping* mapping)
 {
     UniqueLock lock(mapping_mutex, defer_lock_tag());
     mapping->read_barrier(addr, size, lock, header_to_size);
 }
 
-inline void do_encryption_write_barrier(const void* addr, size_t size,
-                                        EncryptedFileMapping* mapping)
+inline void do_encryption_write_barrier(const void* addr, size_t size, EncryptedFileMapping* mapping)
 {
     LockGuard lock(mapping_mutex);
     mapping->write_barrier(addr, size);
 }
 
 
-
 #else
-void inline encryption_read_barrier(const void*, size_t,
-                                    EncryptedFileMapping*,
-                                    HeaderToSize header_to_size = nullptr)
+void inline encryption_read_barrier(const void*, size_t, EncryptedFileMapping*, HeaderToSize header_to_size = nullptr)
 {
     static_cast<void>(header_to_size);
 }
-void inline encryption_write_barrier(const void*, size_t) {}
-void inline encryption_write_barrier(const void*, size_t, EncryptedFileMapping*) {}
+void inline encryption_write_barrier(const void*, size_t)
+{
+}
+void inline encryption_write_barrier(const void*, size_t, EncryptedFileMapping*)
+{
+}
 #endif
 
 // helpers for encrypted Maps
@@ -116,7 +113,6 @@ File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept;
 File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept;
 
 size_t round_up_to_page_size(size_t size) noexcept;
-
 }
 }
 #endif

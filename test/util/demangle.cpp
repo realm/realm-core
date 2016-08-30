@@ -21,7 +21,7 @@
 #include <realm/util/features.h>
 #include <memory>
 
-#if REALM_HAVE_AT_LEAST_GCC(3,2)
+#if REALM_HAVE_AT_LEAST_GCC(3, 2)
 #define REALM_HAVE_CXXABI_DEMANGLE
 #include <cxxabi.h>
 #endif
@@ -33,10 +33,7 @@ using namespace realm;
 namespace {
 
 struct Free {
-    void operator()(char* p) const
-    {
-        free(p);
-    }
+    void operator()(char* p) const { free(p); }
 };
 
 } // anonymous namespace

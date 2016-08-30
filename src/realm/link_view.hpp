@@ -99,7 +99,8 @@ public:
     /// returned.
     size_t find(size_t target_row_ndx, size_t start = 0) const noexcept;
 
-    const ColumnBase& get_column_base(size_t index) const override; // FIXME: `ColumnBase` is not part of the public API, so this function must be made private.
+    const ColumnBase& get_column_base(size_t index)
+        const override; // FIXME: `ColumnBase` is not part of the public API, so this function must be made private.
     const Table& get_origin_table() const noexcept;
     Table& get_origin_table() noexcept;
 
@@ -113,7 +114,8 @@ public:
     bool is_in_sync() const override { return true; }
 
 private:
-    struct ctor_cookie {};
+    struct ctor_cookie {
+    };
 
     TableRef m_origin_table;
     LinkListColumn& m_origin_column;
@@ -164,11 +166,11 @@ public:
 
 // Implementation
 
-inline LinkView::LinkView(const ctor_cookie&, Table* origin_table, LinkListColumn& column, size_t row_ndx):
-    RowIndexes(IntegerColumn::unattached_root_tag(), column.get_alloc()), // Throws
-    m_origin_table(origin_table->get_table_ref()),
-    m_origin_column(column),
-    m_ref_count(0)
+inline LinkView::LinkView(const ctor_cookie&, Table* origin_table, LinkListColumn& column, size_t row_ndx)
+    : RowIndexes(IntegerColumn::unattached_root_tag(), column.get_alloc()) // Throws
+    , m_origin_table(origin_table->get_table_ref())
+    , m_origin_column(column)
+    , m_ref_count(0)
 {
     Array& root = *m_row_indexes.get_root_array();
     root.set_parent(&column, row_ndx);
@@ -176,8 +178,7 @@ inline LinkView::LinkView(const ctor_cookie&, Table* origin_table, LinkListColum
         root.init_from_ref(ref);
 }
 
-inline std::shared_ptr<LinkView>
-LinkView::create(Table* origin_table, LinkListColumn& column, size_t row_ndx)
+inline std::shared_ptr<LinkView> LinkView::create(Table* origin_table, LinkListColumn& column, size_t row_ndx)
 {
     return std::make_shared<LinkView>(ctor_cookie(), origin_table, column, row_ndx);
 }
@@ -232,11 +233,9 @@ inline bool LinkView::operator==(const LinkView& link_list) const noexcept
     if (target_table_1.get_index_in_group() != target_table_2.get_index_in_group())
         return false;
     if (!m_row_indexes.is_attached() || m_row_indexes.is_empty()) {
-        return !link_list.m_row_indexes.is_attached() ||
-               link_list.m_row_indexes.is_empty();
+        return !link_list.m_row_indexes.is_attached() || link_list.m_row_indexes.is_empty();
     }
-    return link_list.m_row_indexes.is_attached() &&
-           m_row_indexes.compare(link_list.m_row_indexes);
+    return link_list.m_row_indexes.is_attached() && m_row_indexes.compare(link_list.m_row_indexes);
 }
 
 inline bool LinkView::operator!=(const LinkView& link_list) const noexcept
@@ -360,10 +359,7 @@ public:
         list.do_set(link_ndx, target_row_ndx);
     }
 
-    static void do_remove(LinkView& list, size_t link_ndx)
-    {
-        list.do_remove(link_ndx);
-    }
+    static void do_remove(LinkView& list, size_t link_ndx) { list.do_remove(link_ndx); }
 
     static void do_clear(LinkView& list)
     {

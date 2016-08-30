@@ -28,15 +28,13 @@
 #define REALM_VER_PATCH 1
 #define REALM_PRODUCT_NAME "realm-core"
 
-#define REALM_VER_STRING REALM_QUOTE(REALM_VER_MAJOR) "." REALM_QUOTE(REALM_VER_MINOR) "." REALM_QUOTE(REALM_VER_PATCH)
+#define REALM_VER_STRING                                                                                             \
+    REALM_QUOTE(REALM_VER_MAJOR) "." REALM_QUOTE(REALM_VER_MINOR) "." REALM_QUOTE(REALM_VER_PATCH)
 #define REALM_VER_CHUNK "[" REALM_PRODUCT_NAME "-" REALM_VER_STRING "]"
 
 namespace realm {
 
-enum Feature {
-    feature_Debug,
-    feature_Replication
-};
+enum Feature { feature_Debug, feature_Replication };
 
 class Version {
 public:

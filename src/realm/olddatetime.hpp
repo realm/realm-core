@@ -27,7 +27,7 @@ namespace realm {
 
 class OldDateTime {
 public:
-    OldDateTime() noexcept: m_time(0) {}
+    OldDateTime() noexcept : m_time(0) {}
 
     /// Construct from the number of seconds since Jan 1 00:00:00 UTC
     /// 1970.
@@ -39,10 +39,10 @@ public:
 
     friend bool operator==(const OldDateTime&, const OldDateTime&) noexcept;
     friend bool operator!=(const OldDateTime&, const OldDateTime&) noexcept;
-    friend bool operator< (const OldDateTime&, const OldDateTime&) noexcept;
-    friend bool operator<= (const OldDateTime&, const OldDateTime&) noexcept;
-    friend bool operator> (const OldDateTime&, const OldDateTime&) noexcept;
-    friend bool operator>= (const OldDateTime&, const OldDateTime&) noexcept;
+    friend bool operator<(const OldDateTime&, const OldDateTime&) noexcept;
+    friend bool operator<=(const OldDateTime&, const OldDateTime&) noexcept;
+    friend bool operator>(const OldDateTime&, const OldDateTime&) noexcept;
+    friend bool operator>=(const OldDateTime&, const OldDateTime&) noexcept;
 
     /// Construct from broken down local time.
     ///
@@ -117,8 +117,10 @@ inline OldDateTime::operator int_fast64_t() noexcept
     return m_time;
 }
 
-inline OldDateTime::OldDateTime(int year, int month, int day, int hours, int minutes, int seconds):
-    m_time(assemble(year, month, day, hours, minutes, seconds)) {}
+inline OldDateTime::OldDateTime(int year, int month, int day, int hours, int minutes, int seconds)
+    : m_time(assemble(year, month, day, hours, minutes, seconds))
+{
+}
 
 template <class Ch, class Tr>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const OldDateTime& d)
@@ -130,12 +132,12 @@ inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, c
 inline std::time_t OldDateTime::assemble(int year, int month, int day, int hours, int minutes, int seconds)
 {
     std::tm local_time;
-    local_time.tm_year  = year  - 1900;
-    local_time.tm_mon   = month - 1;
-    local_time.tm_mday  = day;
-    local_time.tm_hour  = hours;
-    local_time.tm_min   = minutes;
-    local_time.tm_sec   = seconds;
+    local_time.tm_year = year - 1900;
+    local_time.tm_mon = month - 1;
+    local_time.tm_mday = day;
+    local_time.tm_hour = hours;
+    local_time.tm_min = minutes;
+    local_time.tm_sec = seconds;
     local_time.tm_isdst = -1;
     return std::mktime(&local_time);
 }
@@ -144,4 +146,3 @@ inline std::time_t OldDateTime::assemble(int year, int month, int day, int hours
 } // namespace realm
 
 #endif // REALM_DATETIME_HPP
-

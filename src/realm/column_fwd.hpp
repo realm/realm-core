@@ -40,7 +40,8 @@ template <class T>
 class BasicColumn;
 
 namespace util {
-template <class> class Optional;
+template <class>
+class Optional;
 }
 
 // Shortcuts, aka typedefs.

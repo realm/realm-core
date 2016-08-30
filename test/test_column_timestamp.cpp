@@ -317,8 +317,8 @@ TEST_TYPES(TimestampColumn_SwapRows, std::true_type, std::false_type)
     StringIndex* index = c.create_search_index();
     CHECK(index);
 
-    Timestamp one {1, 1};
-    Timestamp three {3, 3};
+    Timestamp one{1, 1};
+    Timestamp three{3, 3};
     c.add(one);
     c.add(Timestamp{2, 2});
     c.add(three);
@@ -333,7 +333,6 @@ TEST_TYPES(TimestampColumn_SwapRows, std::true_type, std::false_type)
     index->destroy();
     c.destroy_search_index();
     c.destroy();
-
 }
 
 TEST_TYPES(TimestampColumn_DeleteWithIndex, std::true_type, std::false_type)
@@ -352,7 +351,6 @@ TEST_TYPES(TimestampColumn_DeleteWithIndex, std::true_type, std::false_type)
     index->destroy();
     c.destroy_search_index();
     c.destroy();
-
 }
 
 
@@ -661,7 +659,6 @@ TEST(TimestampColumn_AggregateBug)
     ts = t.where().minimum_timestamp(0, &index);
     CHECK_EQUAL(2, index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
-
 }
 
 TEST(Table_DistinctTimestamp)

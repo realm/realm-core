@@ -149,8 +149,8 @@ TEST(TypeList_Basic)
     auto person_info = (util::tuple(), std::string("Paul"), 20, true);
     auto person_info1 = (util::tuple(), std::string("John Doe"), 30, true);
 
-    using Dummy1   = util::TypeAppend<void, std::string>::type;
-    using Dummy2   = util::TypeAppend<Dummy1, int>::type;
+    using Dummy1 = util::TypeAppend<void, std::string>::type;
+    using Dummy2 = util::TypeAppend<Dummy1, int>::type;
     using TypeList = util::TypeAppend<Dummy2, bool>::type;
 
     {

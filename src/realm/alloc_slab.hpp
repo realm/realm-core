@@ -55,7 +55,7 @@ struct InvalidDatabase;
 ///
 /// For efficiency, this allocator manages its mutable memory as a set
 /// of slabs.
-class SlabAlloc: public Allocator {
+class SlabAlloc : public Allocator {
 public:
     ~SlabAlloc() noexcept override;
     SlabAlloc();
@@ -70,7 +70,8 @@ public:
         const char* encryption_key = nullptr;
     };
 
-    struct Retry {};
+    struct Retry {
+    };
 
     /// \brief Attach this allocator to the specified file.
     ///
@@ -306,8 +307,7 @@ public:
 
 protected:
     MemRef do_alloc(const size_t size) override;
-    MemRef do_realloc(ref_type, const char*, size_t old_size,
-                      size_t new_size) override;
+    MemRef do_realloc(ref_type, const char*, size_t old_size, size_t new_size) override;
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     void do_free(ref_type, const char*) noexcept override;
     char* do_translate(ref_type) const noexcept override;
@@ -338,15 +338,13 @@ private:
     };
 
     // Values of each used bit in m_flags
-    enum {
-        flags_SelectBit = 1
-    };
+    enum { flags_SelectBit = 1 };
 
     // 24 bytes
     struct Header {
         uint64_t m_top_ref[2]; // 2 * 8 bytes
         // Info-block 8-bytes
-        uint8_t m_mnemonic[4]; // "T-DB"
+        uint8_t m_mnemonic[4];    // "T-DB"
         uint8_t m_file_format[2]; // See `library_file_format`
         uint8_t m_reserved;
         // bit 0 of m_flags is used to select between the two top refs.
@@ -359,8 +357,8 @@ private:
         uint64_t m_magic_cookie;
     };
 
-    static_assert(sizeof (Header) == 24, "Bad header size");
-    static_assert(sizeof (StreamingFooter) == 16, "Bad footer size");
+    static_assert(sizeof(Header) == 24, "Bad header size");
+    static_assert(sizeof(StreamingFooter) == 16, "Bad footer size");
 
     static const Header empty_file_header;
     static void init_streaming_header(Header*, int file_format_version);
@@ -386,11 +384,7 @@ private:
     size_t m_num_section_bases = 0;
     AttachMode m_attach_mode = attach_None;
     bool m_file_on_streaming_form = false;
-    enum FeeeSpaceState {
-        free_space_Clean,
-        free_space_Dirty,
-        free_space_Invalid
-    };
+    enum FeeeSpaceState { free_space_Clean, free_space_Dirty, free_space_Invalid };
 
     /// When set to free_space_Invalid, the free lists are no longer
     /// up-to-date. This happens if do_free() or
@@ -467,33 +461,32 @@ private:
     /// Find a possible allocation of 'request_size' that will fit into a section
     /// which is inside the range from 'start_pos' to 'start_pos'+'free_chunk_size'
     /// If found return the position, if not return 0.
-    size_t find_section_in_range(size_t start_pos, size_t free_chunk_size,
-                                 size_t request_size) const noexcept;
+    size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
     friend class Group;
     friend class GroupWriter;
 };
 
-inline void SlabAlloc::invalidate_cache() noexcept { ++version; }
+inline void SlabAlloc::invalidate_cache() noexcept
+{
+    ++version;
+}
 
 class SlabAlloc::DetachGuard {
 public:
-    DetachGuard(SlabAlloc& alloc) noexcept: m_alloc(&alloc) {}
+    DetachGuard(SlabAlloc& alloc) noexcept : m_alloc(&alloc) {}
     ~DetachGuard() noexcept;
     SlabAlloc* release() noexcept;
+
 private:
     SlabAlloc* m_alloc;
 };
 
 
-
 // Implementation:
 
-struct InvalidDatabase: util::File::AccessError {
-    InvalidDatabase(const std::string& msg, const std::string& path):
-        util::File::AccessError(msg, path)
-    {
-    }
+struct InvalidDatabase : util::File::AccessError {
+    InvalidDatabase(const std::string& msg, const std::string& path) : util::File::AccessError(msg, path) {}
 };
 
 inline void SlabAlloc::own_buffer() noexcept

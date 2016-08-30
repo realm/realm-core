@@ -225,10 +225,6 @@ template <class To, class From>
 To from_twos_compl(From twos_compl) noexcept;
 
 
-
-
-
-
 // Implementation:
 
 template <class T>
@@ -245,17 +241,11 @@ namespace _impl {
 
 template <class T, bool is_signed>
 struct IsNegative {
-    static bool test(T value) noexcept
-    {
-        return value < 0;
-    }
+    static bool test(T value) noexcept { return value < 0; }
 };
 template <class T>
 struct IsNegative<T, false> {
-    static bool test(T) noexcept
-    {
-        return false;
-    }
+    static bool test(T) noexcept { return false; }
 };
 
 template <class To>
@@ -276,7 +266,8 @@ struct CastToUnsigned<bool> {
 };
 
 template <class L, class R, bool l_signed, bool r_signed>
-struct SafeIntBinopsImpl {};
+struct SafeIntBinopsImpl {
+};
 
 // (unsigned, unsigned) (all size combinations)
 //
@@ -297,14 +288,8 @@ struct SafeIntBinopsImpl<L, R, false, false> {
     static const int needed_bits_r = lim_r::digits;
     static const int needed_bits = needed_bits_l >= needed_bits_r ? needed_bits_l : needed_bits_r;
     typedef typename util::FastestUnsigned<needed_bits>::type common_unsigned;
-    static bool equal(L l, R r) noexcept
-    {
-        return common_unsigned(l) == common_unsigned(r);
-    }
-    static bool less(L l, R r) noexcept
-    {
-        return common_unsigned(l) < common_unsigned(r);
-    }
+    static bool equal(L l, R r) noexcept { return common_unsigned(l) == common_unsigned(r); }
+    static bool less(L l, R r) noexcept { return common_unsigned(l) < common_unsigned(r); }
     static bool add(L& lval, R rval) noexcept
     {
         L lval_2 = util::cast_to_unsigned<L>(lval + rval);
@@ -337,13 +322,11 @@ struct SafeIntBinopsImpl<L, R, false, true> {
     typedef std::numeric_limits<common_unsigned> lim_cu;
     static bool equal(L l, R r) noexcept
     {
-        return (lim_l::digits > lim_r::digits) ?
-               r >= 0 && l == util::cast_to_unsigned<L>(r) : R(l) == r;
+        return (lim_l::digits > lim_r::digits) ? r >= 0 && l == util::cast_to_unsigned<L>(r) : R(l) == r;
     }
     static bool less(L l, R r) noexcept
     {
-        return (lim_l::digits > lim_r::digits) ?
-               r >= 0 && l < util::cast_to_unsigned<L>(r) : R(l) < r;
+        return (lim_l::digits > lim_r::digits) ? r >= 0 && l < util::cast_to_unsigned<L>(r) : R(l) < r;
     }
     static bool add(L& lval, R rval) noexcept
     {
@@ -388,13 +371,11 @@ struct SafeIntBinopsImpl<L, R, true, false> {
     typedef typename util::FastestUnsigned<needed_bits>::type common_unsigned;
     static bool equal(L l, R r) noexcept
     {
-        return (lim_l::digits < lim_r::digits) ?
-               l >= 0 && util::cast_to_unsigned<R>(l) == r : l == L(r);
+        return (lim_l::digits < lim_r::digits) ? l >= 0 && util::cast_to_unsigned<R>(l) == r : l == L(r);
     }
     static bool less(L l, R r) noexcept
     {
-        return (lim_l::digits < lim_r::digits) ?
-               l < 0 || util::cast_to_unsigned<R>(l) < r : l < L(r);
+        return (lim_l::digits < lim_r::digits) ? l < 0 || util::cast_to_unsigned<R>(l) < r : l < L(r);
     }
     static bool add(L& lval, R rval) noexcept
     {
@@ -420,14 +401,8 @@ struct SafeIntBinopsImpl<L, R, true, false> {
 template <class L, class R>
 struct SafeIntBinopsImpl<L, R, true, true> {
     typedef std::numeric_limits<L> lim_l;
-    static bool equal(L l, R r) noexcept
-    {
-        return l == r;
-    }
-    static bool less(L l, R r) noexcept
-    {
-        return l < r;
-    }
+    static bool equal(L l, R r) noexcept { return l == r; }
+    static bool less(L l, R r) noexcept { return l < r; }
     static bool add(L& lval, R rval) noexcept
     {
         // Note that both subtractions below occur in a signed type
@@ -472,14 +447,12 @@ struct SafeIntBinopsImpl<L, R, true, true> {
 };
 
 template <class L, class R>
-struct SafeIntBinops: SafeIntBinopsImpl<L, R, std::numeric_limits<L>::is_signed,
-    std::numeric_limits<R>::is_signed> {
+struct SafeIntBinops : SafeIntBinopsImpl<L, R, std::numeric_limits<L>::is_signed, std::numeric_limits<R>::is_signed> {
     typedef std::numeric_limits<L> lim_l;
     typedef std::numeric_limits<R> lim_r;
-    static_assert(lim_l::is_specialized&& lim_r::is_specialized,
+    static_assert(lim_l::is_specialized && lim_r::is_specialized,
                   "std::numeric_limits<> must be specialized for both types");
-    static_assert(lim_l::is_integer&& lim_r::is_integer,
-                  "Both types must be integers");
+    static_assert(lim_l::is_integer && lim_r::is_integer, "Both types must be integers");
 };
 
 } // namespace _impl
@@ -556,8 +529,7 @@ inline bool int_multiply_with_overflow_detect(L& lval, R rval) noexcept
     typedef std::numeric_limits<R> lim_r;
     static_assert(lim_l::is_specialized && lim_r::is_specialized,
                   "std::numeric_limits<> must be specialized for both types");
-    static_assert(lim_l::is_integer && lim_r::is_integer,
-                  "Both types must be integers");
+    static_assert(lim_l::is_integer && lim_r::is_integer, "Both types must be integers");
     REALM_ASSERT(int_greater_than_or_equal(lval, 0));
     REALM_ASSERT(int_greater_than(rval, 0));
     if (int_less_than(lim_r::max() / rval, lval))
@@ -570,10 +542,8 @@ template <class T>
 inline bool int_shift_left_with_overflow_detect(T& lval, int i) noexcept
 {
     typedef std::numeric_limits<T> lim;
-    static_assert(lim::is_specialized,
-                  "std::numeric_limits<> must be specialized for T");
-    static_assert(lim::is_integer,
-                  "T must be an integer type");
+    static_assert(lim::is_specialized, "std::numeric_limits<> must be specialized for T");
+    static_assert(lim::is_integer, "T must be an integer type");
     REALM_ASSERT(int_greater_than_or_equal(lval, 0));
     if ((lim::max() >> i) < lval)
         return true;
@@ -602,11 +572,10 @@ template <class To, class From>
 inline To from_twos_compl(From twos_compl) noexcept
 {
     typedef std::numeric_limits<From> lim_f;
-    typedef std::numeric_limits<To>   lim_t;
+    typedef std::numeric_limits<To> lim_t;
     static_assert(lim_f::is_specialized && lim_t::is_specialized,
                   "std::numeric_limits<> must be specialized for both types");
-    static_assert(lim_f::is_integer && lim_t::is_integer,
-                  "Both types must be integers");
+    static_assert(lim_f::is_integer && lim_t::is_integer, "Both types must be integers");
     static_assert(!lim_f::is_signed, "`From` must be unsigned");
     To native;
     int sign_bit_pos = lim_f::digits - 1;

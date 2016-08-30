@@ -218,8 +218,7 @@ void SubtableColumnBase::SubtableMap::update_from_parent(size_t old_baseline) co
 }
 
 
-void SubtableColumnBase::SubtableMap::update_accessors(const size_t* col_path_begin,
-                                                       const size_t* col_path_end,
+void SubtableColumnBase::SubtableMap::update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                                                        _impl::TableFriend::AccessorUpdater& updater)
 {
     for (const auto& entry : m_entries) {
@@ -260,7 +259,7 @@ void SubtableColumnBase::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_p
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 std::pair<ref_type, size_t> SubtableColumnBase::get_to_dot_parent(size_t ndx_in_parent) const
 {
@@ -350,21 +349,18 @@ void SubtableColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     for (size_t i = 0; i < num_rows_to_erase; ++i)
         destroy_subtable(row_ndx + i);
 
-    SubtableColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
-                                   broken_reciprocal_backlinks); // Throws
+    SubtableColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
 
-void SubtableColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-                                        bool broken_reciprocal_backlinks)
+void SubtableColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx < prior_num_rows);
 
     destroy_subtable(row_ndx);
 
-    SubtableColumnBase::move_last_row_over(row_ndx, prior_num_rows,
-                                           broken_reciprocal_backlinks); // Throws
+    SubtableColumnBase::move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
 
@@ -381,7 +377,7 @@ bool SubtableColumn::compare_table(const SubtableColumn& c) const
     if (c.size() != n)
         return false;
     for (size_t i = 0; i != n; ++i) {
-        ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref(); // Throws
+        ConstTableRef t1 = get_subtable_ptr(i)->get_table_ref();   // Throws
         ConstTableRef t2 = c.get_subtable_ptr(i)->get_table_ref(); // throws
         if (!compare_subtable_rows(*t1, *t2))
             return false;
@@ -396,7 +392,7 @@ void SubtableColumn::do_discard_child_accessors() noexcept
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void SubtableColumn::verify(const Table& table, size_t col_ndx) const
 {

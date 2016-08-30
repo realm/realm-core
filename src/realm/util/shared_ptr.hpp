@@ -27,25 +27,13 @@ namespace util {
 template <class T>
 class SharedPtr {
 public:
-    SharedPtr(T* p)
-    {
-        init(p);
-    }
+    SharedPtr(T* p) { init(p); }
 
-    SharedPtr()
-    {
-        init(0);
-    }
+    SharedPtr() { init(0); }
 
-    ~SharedPtr()
-    {
-        decref();
-    }
+    ~SharedPtr() { decref(); }
 
-    SharedPtr(const SharedPtr<T>& o) : m_ptr(o.m_ptr), m_count(o.m_count)
-    {
-        incref();
-    }
+    SharedPtr(const SharedPtr<T>& o) : m_ptr(o.m_ptr), m_count(o.m_count) { incref(); }
 
     SharedPtr<T>& operator=(const SharedPtr<T>& o)
     {
@@ -58,40 +46,19 @@ public:
         return *this;
     }
 
-    T* operator->() const
-    {
-        return m_ptr;
-    }
+    T* operator->() const { return m_ptr; }
 
-    T& operator*() const
-    {
-        return *m_ptr;
-    }
+    T& operator*() const { return *m_ptr; }
 
-    T* get() const
-    {
-        return m_ptr;
-    }
+    T* get() const { return m_ptr; }
 
-    bool operator==(const SharedPtr<T>& o) const
-    {
-        return m_ptr == o.m_ptr;
-    }
+    bool operator==(const SharedPtr<T>& o) const { return m_ptr == o.m_ptr; }
 
-    bool operator!=(const SharedPtr<T>& o) const
-    {
-        return m_ptr != o.m_ptr;
-    }
+    bool operator!=(const SharedPtr<T>& o) const { return m_ptr != o.m_ptr; }
 
-    bool operator<(const SharedPtr<T>& o) const
-    {
-        return m_ptr < o.m_ptr;
-    }
+    bool operator<(const SharedPtr<T>& o) const { return m_ptr < o.m_ptr; }
 
-    size_t ref_count() const
-    {
-        return *m_count;
-    }
+    size_t ref_count() const { return *m_count; }
 
 private:
     void init(T* p)
@@ -114,15 +81,11 @@ private:
         }
     }
 
-    void incref()
-    {
-        ++(*m_count);
-    }
+    void incref() { ++(*m_count); }
 
     T* m_ptr;
     size_t* m_count;
 };
-
 }
 }
 

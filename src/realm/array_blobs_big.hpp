@@ -24,7 +24,7 @@
 namespace realm {
 
 
-class ArrayBigBlobs: public Array {
+class ArrayBigBlobs : public Array {
 public:
     typedef BinaryData value_type;
 
@@ -39,12 +39,9 @@ public:
     void clear();
     void destroy();
 
-    size_t count(BinaryData value, bool is_string = false, size_t begin = 0,
-                 size_t end = npos) const noexcept;
-    size_t find_first(BinaryData value, bool is_string = false, size_t begin = 0,
-                      size_t end = npos) const noexcept;
-    void find_all(IntegerColumn& result, BinaryData value, bool is_string = false,
-                  size_t add_offset = 0,
+    size_t count(BinaryData value, bool is_string = false, size_t begin = 0, size_t end = npos) const noexcept;
+    size_t find_first(BinaryData value, bool is_string = false, size_t begin = 0, size_t end = npos) const noexcept;
+    void find_all(IntegerColumn& result, BinaryData value, bool is_string = false, size_t add_offset = 0,
                   size_t begin = 0, size_t end = npos);
 
     /// Get the specified element without the cost of constructing an
@@ -53,8 +50,7 @@ public:
     /// slower.
     static BinaryData get(const char* header, size_t ndx, Allocator&) noexcept;
 
-    ref_type bptree_leaf_insert(size_t ndx, BinaryData, bool add_zero_term,
-                                TreeInsertBase& state);
+    ref_type bptree_leaf_insert(size_t ndx, BinaryData, bool add_zero_term, TreeInsertBase& state);
 
     //@{
     /// Those that return a string, discard the terminating zero from
@@ -90,11 +86,10 @@ private:
 };
 
 
-
 // Implementation:
 
-inline ArrayBigBlobs::ArrayBigBlobs(Allocator& allocator, bool nullable) noexcept:
-    Array(allocator), m_nullable(nullable)
+inline ArrayBigBlobs::ArrayBigBlobs(Allocator& allocator, bool nullable) noexcept : Array(allocator),
+                                                                                    m_nullable(nullable)
 {
 }
 
@@ -110,8 +105,7 @@ inline BinaryData ArrayBigBlobs::get(size_t ndx) const noexcept
     return BinaryData(value, blob_size);
 }
 
-inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
-                                     Allocator& alloc) noexcept
+inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx, Allocator& alloc) noexcept
 {
     ref_type blob_ref = to_ref(Array::get(header, ndx));
     if (blob_ref == 0)
@@ -126,7 +120,7 @@ inline BinaryData ArrayBigBlobs::get(const char* header, size_t ndx,
 inline void ArrayBigBlobs::erase(size_t ndx)
 {
     ref_type blob_ref = Array::get_as_ref(ndx);
-    if (blob_ref != 0) { // nothing to destroy if null
+    if (blob_ref != 0) {                       // nothing to destroy if null
         Array::destroy(blob_ref, get_alloc()); // Shallow
     }
     Array::erase(ndx);
@@ -180,8 +174,7 @@ inline void ArrayBigBlobs::insert_string(size_t ndx, StringData value)
     insert(ndx, bin, add_zero_term);
 }
 
-inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
-                                            Allocator& alloc, bool nullable) noexcept
+inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx, Allocator& alloc, bool nullable) noexcept
 {
     static_cast<void>(nullable);
     BinaryData bin = get(header, ndx, alloc);
@@ -192,8 +185,7 @@ inline StringData ArrayBigBlobs::get_string(const char* header, size_t ndx,
         return StringData(bin.data(), bin.size() - 1); // Do not include terminating zero
 }
 
-inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(size_t ndx, StringData value,
-                                                         TreeInsertBase& state)
+inline ref_type ArrayBigBlobs::bptree_leaf_insert_string(size_t ndx, StringData value, TreeInsertBase& state)
 {
     REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     BinaryData bin(value.data(), value.size());
@@ -207,8 +199,7 @@ inline void ArrayBigBlobs::create()
     Array::create(type_HasRefs, context_flag); // Throws
 }
 
-inline MemRef ArrayBigBlobs::slice(size_t offset, size_t slice_size,
-                                   Allocator& target_alloc) const
+inline MemRef ArrayBigBlobs::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
     return slice_and_clone_children(offset, slice_size, target_alloc);
 }

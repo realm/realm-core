@@ -91,7 +91,8 @@ public:
     size_t get_link_count(size_t col_ndx) const noexcept;
     Mixed get_mixed(size_t col_ndx) const noexcept;
     DataType get_mixed_type(size_t col_ndx) const noexcept;
-    template <typename U> U get(size_t col_ndx) const noexcept;
+    template <typename U>
+    U get(size_t col_ndx) const noexcept;
 
     void set_int(size_t col_ndx, int_fast64_t value);
     void set_int_unique(size_t col_ndx, int_fast64_t value);
@@ -119,10 +120,8 @@ public:
     void move_last_over();
     //@}
 
-    size_t get_backlink_count(const Table& src_table,
-                              size_t src_col_ndx) const noexcept;
-    size_t get_backlink(const Table& src_table, size_t src_col_ndx,
-                        size_t backlink_ndx) const noexcept;
+    size_t get_backlink_count(const Table& src_table, size_t src_col_ndx) const noexcept;
+    size_t get_backlink(const Table& src_table, size_t src_col_ndx, size_t backlink_ndx) const noexcept;
 
     size_t get_column_count() const noexcept;
     DataType get_column_type(size_t col_ndx) const noexcept;
@@ -183,8 +182,7 @@ private:
 ///
 /// \sa BasicRow
 template <class T>
-class BasicRowExpr:
-    public RowFuncs<T, BasicRowExpr<T>> {
+class BasicRowExpr : public RowFuncs<T, BasicRowExpr<T>> {
 public:
     BasicRowExpr() noexcept;
 
@@ -192,7 +190,7 @@ public:
     BasicRowExpr(const BasicRowExpr<U>&) noexcept;
 
 private:
-    T* m_table; // nullptr if detached.
+    T* m_table;       // nullptr if detached.
     size_t m_row_ndx; // Undefined if detached.
 
     BasicRowExpr(T*, size_t init_row_ndx) noexcept;
@@ -230,21 +228,22 @@ protected:
     void attach(Table*, size_t row_ndx) noexcept;
     void reattach(Table*, size_t row_ndx) noexcept;
     void impl_detach() noexcept;
-    RowBase() { }
+    RowBase() {}
 
     using HandoverPatch = RowBaseHandoverPatch;
 
     RowBase(const RowBase& source, HandoverPatch& patch);
+
 public:
     static void generate_patch(const RowBase& source, HandoverPatch& patch);
     void apply_patch(HandoverPatch& patch, Group& group);
+
 private:
     RowBase* m_prev = nullptr; // nullptr if first, undefined if detached.
     RowBase* m_next = nullptr; // nullptr if last, undefined if detached.
 
     // Table needs to be able to modify m_table and m_row_ndx.
     friend class Table;
-
 };
 
 
@@ -278,9 +277,7 @@ private:
 ///
 /// \sa RowFuncs
 template <class T>
-class BasicRow:
-    private RowBase,
-    public RowFuncs<T, BasicRow<T>> {
+class BasicRow : private RowBase, public RowFuncs<T, BasicRow<T>> {
 public:
     BasicRow() noexcept;
 
@@ -335,23 +332,15 @@ public:
         patch.reset();
     }
 
-    void apply_patch(HandoverPatch& patch, Group& group)
-    {
-        RowBase::apply_patch(patch, group);
-    }
+    void apply_patch(HandoverPatch& patch, Group& group) { RowBase::apply_patch(patch, group); }
 
 private:
-    BasicRow(const BasicRow<T>& source, HandoverPatch& patch)
-        : RowBase(source, patch)
-    {
-    }
+    BasicRow(const BasicRow<T>& source, HandoverPatch& patch) : RowBase(source, patch) {}
     friend class SharedGroup;
 };
 
 typedef BasicRow<Table> Row;
 typedef BasicRow<const Table> ConstRow;
-
-
 
 
 // Implementation
@@ -610,8 +599,8 @@ inline size_t RowFuncs<T, R>::get_backlink_count(const Table& src_table, size_t 
 }
 
 template <class T, class R>
-inline size_t RowFuncs<T, R>::get_backlink(const Table& src_table, size_t src_col_ndx,
-                                           size_t backlink_ndx) const noexcept
+inline size_t RowFuncs<T, R>::get_backlink(const Table& src_table, size_t src_col_ndx, size_t backlink_ndx) const
+    noexcept
 {
     return table()->get_backlink(row_ndx(), src_table, src_col_ndx, backlink_ndx);
 }
@@ -696,24 +685,20 @@ inline size_t RowFuncs<T, R>::row_ndx() const noexcept
 
 
 template <class T>
-inline BasicRowExpr<T>::BasicRowExpr() noexcept:
-    m_table(0),
-    m_row_ndx(0)
+inline BasicRowExpr<T>::BasicRowExpr() noexcept : m_table(0), m_row_ndx(0)
 {
 }
 
 template <class T>
 template <class U>
-inline BasicRowExpr<T>::BasicRowExpr(const BasicRowExpr<U>& expr) noexcept:
-    m_table(expr.m_table),
-    m_row_ndx(expr.m_row_ndx)
+inline BasicRowExpr<T>::BasicRowExpr(const BasicRowExpr<U>& expr) noexcept : m_table(expr.m_table),
+                                                                             m_row_ndx(expr.m_row_ndx)
 {
 }
 
 template <class T>
-inline BasicRowExpr<T>::BasicRowExpr(T* init_table, size_t init_row_ndx) noexcept:
-    m_table(init_table),
-    m_row_ndx(init_row_ndx)
+inline BasicRowExpr<T>::BasicRowExpr(T* init_table, size_t init_row_ndx) noexcept : m_table(init_table),
+                                                                                    m_row_ndx(init_row_ndx)
 {
 }
 
@@ -742,8 +727,7 @@ inline BasicRow<T>::BasicRow() noexcept
 }
 
 template <class T>
-inline BasicRow<T>::BasicRow(const BasicRow<T>& row) noexcept:
-    RowBase(row)
+inline BasicRow<T>::BasicRow(const BasicRow<T>& row) noexcept : RowBase(row)
 {
     attach(const_cast<Table*>(row.m_table.get()), row.m_row_ndx);
 }

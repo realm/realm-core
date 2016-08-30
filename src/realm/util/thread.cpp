@@ -69,10 +69,7 @@ void free_threadpool();
 
 class Initialization {
 public:
-    ~Initialization()
-    {
-        free_threadpool();
-    }
+    ~Initialization() { free_threadpool(); }
 };
 
 Initialization initialization;
@@ -271,7 +268,6 @@ void RobustMutex::mark_as_consistent() noexcept
     REALM_ASSERT(r == 0);
 #endif
 }
-
 
 
 CondVar::CondVar(process_shared_tag)

@@ -52,8 +52,7 @@ void RowBase::impl_detach() noexcept
     }
 }
 
-RowBase::RowBase(const RowBase& source, HandoverPatch& patch)
-    : m_table(TableRef())
+RowBase::RowBase(const RowBase& source, HandoverPatch& patch) : m_table(TableRef())
 {
     generate_patch(source, patch);
 }
@@ -62,7 +61,6 @@ void RowBase::generate_patch(const RowBase& source, HandoverPatch& patch)
 {
     Table::generate_patch(source.m_table.get(), patch.m_table);
     patch.row_ndx = source.m_row_ndx;
-
 }
 
 void RowBase::apply_patch(HandoverPatch& patch, Group& group)
@@ -72,5 +70,3 @@ void RowBase::apply_patch(HandoverPatch& patch, Group& group)
         m_table->register_row_accessor(this);
     m_row_ndx = patch.row_ndx;
 }
-
-

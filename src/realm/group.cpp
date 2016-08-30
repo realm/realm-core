@@ -46,10 +46,7 @@ namespace {
 
 class Initialization {
 public:
-    Initialization()
-    {
-        realm::cpuid_init();
-    }
+    Initialization() { realm::cpuid_init(); }
 };
 
 Initialization initialization;
@@ -57,12 +54,12 @@ Initialization initialization;
 } // anonymous namespace
 
 
-Group::Group():
-    m_alloc(), // Throws
-    m_top(m_alloc),
-    m_tables(m_alloc),
-    m_table_names(m_alloc),
-    m_is_shared(false)
+Group::Group()
+    : m_alloc() // Throws
+    , m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(false)
 {
     init_array_parents();
     m_alloc.attach_empty(); // Throws
@@ -96,8 +93,7 @@ int Group::get_committed_file_format_version() const noexcept
 int Group::get_target_file_format_version_for_session(int current_file_format_version,
                                                       int requested_history_type) noexcept
 {
-    Replication::HistoryType requested_history_type_2 =
-        Replication::HistoryType(requested_history_type);
+    Replication::HistoryType requested_history_type_2 = Replication::HistoryType(requested_history_type);
 
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
@@ -134,9 +130,9 @@ void Group::upgrade_file_format(int target_file_format_version)
     // SlabAlloc::validate_buffer() must ensure this. Be sure to revisit the
     // following upgrade logic when SlabAlloc::validate_buffer() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version == 2 ||
-                    current_file_format_version == 3 ||
-                    current_file_format_version == 4, current_file_format_version);
+    REALM_ASSERT_EX(current_file_format_version == 2 || current_file_format_version == 3 ||
+                        current_file_format_version == 4,
+                    current_file_format_version);
 
     // Upgrade from 2 to 3
     if (current_file_format_version <= 2 && target_file_format_version >= 3) {
@@ -198,7 +194,7 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
 
     bool create_group_when_missing = true;
     attach(top_ref, create_group_when_missing); // Throws
-    dg.release(); // Do not detach after all
+    dg.release();                               // Do not detach after all
 }
 
 
@@ -233,7 +229,7 @@ void Group::open(BinaryData buffer, bool take_ownership)
 
     bool create_group_when_missing = true;
     attach(top_ref, create_group_when_missing); // Throws
-    dg.release(); // Do not detach after all
+    dg.release();                               // Do not detach after all
 
     if (take_ownership)
         m_alloc.own_buffer();
@@ -383,7 +379,7 @@ void Group::create_empty_group()
         m_top.add(m_tables.get_ref()); // Throws
         dg.release();
     }
-    size_t initial_logical_file_size = sizeof (SlabAlloc::Header);
+    size_t initial_logical_file_size = sizeof(SlabAlloc::Header);
     m_top.add(RefOrTagged::make_tagged(initial_logical_file_size)); // Throws
     dg_top.release();
 }
@@ -427,8 +423,7 @@ Table* Group::do_get_table(StringData name, DescMatcher desc_matcher)
 }
 
 
-Table* Group::do_insert_table(size_t table_ndx, StringData name, DescSetter desc_setter,
-                              bool require_unique_name)
+Table* Group::do_insert_table(size_t table_ndx, StringData name, DescSetter desc_setter, bool require_unique_name)
 {
     if (require_unique_name && has_table(name))
         throw TableNameInUse();
@@ -440,7 +435,7 @@ Table* Group::do_insert_table(size_t table_ndx, StringData name, DescSetter desc
 {
     if (table_ndx > m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);
-    create_and_insert_table(table_ndx, name); // Throws
+    create_and_insert_table(table_ndx, name);        // Throws
     Table* table = do_get_table(table_ndx, nullptr); // Throws
     if (desc_setter)
         (*desc_setter)(*table); // Throws
@@ -466,8 +461,7 @@ Table* Group::do_get_or_insert_table(size_t table_ndx, StringData name, DescMatc
 }
 
 
-Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher,
-                                  DescSetter desc_setter, bool* was_added)
+Table* Group::do_get_or_add_table(StringData name, DescMatcher desc_matcher, DescSetter desc_setter, bool* was_added)
 {
     REALM_ASSERT(m_table_names.is_attached());
     Table* table;
@@ -494,7 +488,7 @@ void Group::create_and_insert_table(size_t table_ndx, StringData name)
     ref_type ref = tf::create_empty_table(m_alloc); // Throws
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
     size_t prior_num_tables = m_tables.size();
-    m_tables.insert(table_ndx, ref); // Throws
+    m_tables.insert(table_ndx, ref);       // Throws
     m_table_names.insert(table_ndx, name); // Throws
 
     // Need slot for table accessor
@@ -610,7 +604,7 @@ void Group::remove_table(size_t table_ndx)
     ref_type ref = ref_type(ref_64);
 
     // Remove table and move all successive tables
-    m_tables.erase(table_ndx); // Throws
+    m_tables.erase(table_ndx);      // Throws
     m_table_names.erase(table_ndx); // Throws
     m_table_accessors.erase(m_table_accessors.begin() + table_ndx);
 
@@ -709,15 +703,15 @@ void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
         iter first, new_first, last;
         if (from_table_ndx < to_table_ndx) {
             // Rotate left.
-            first     = m_table_accessors.begin() + from_table_ndx;
+            first = m_table_accessors.begin() + from_table_ndx;
             new_first = first + 1;
-            last      = m_table_accessors.begin() + to_table_ndx + 1;
+            last = m_table_accessors.begin() + to_table_ndx + 1;
         }
         else { // from_table_ndx > to_table_ndx
             // Rotate right.
-            first     = m_table_accessors.begin() + to_table_ndx;
+            first = m_table_accessors.begin() + to_table_ndx;
             new_first = m_table_accessors.begin() + from_table_ndx;
-            last      = new_first + 1;
+            last = new_first + 1;
         }
         std::rotate(first, new_first, last);
     }
@@ -735,24 +729,22 @@ void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
 }
 
 
-class Group::DefaultTableWriter: public Group::TableWriter {
+class Group::DefaultTableWriter : public Group::TableWriter {
 public:
-    DefaultTableWriter(const Group& group):
-        m_group(group)
-    {
-    }
+    DefaultTableWriter(const Group& group) : m_group(group) {}
     ref_type write_names(_impl::OutputStream& out) override
     {
-        bool deep = true; // Deep
-        bool only_if_modified = false; // Always
+        bool deep = true;                                                // Deep
+        bool only_if_modified = false;                                   // Always
         return m_group.m_table_names.write(out, deep, only_if_modified); // Throws
     }
     ref_type write_tables(_impl::OutputStream& out) override
     {
-        bool deep = true; // Deep
-        bool only_if_modified = false; // Always
+        bool deep = true;                                           // Deep
+        bool only_if_modified = false;                              // Always
         return m_group.m_tables.write(out, deep, only_if_modified); // Throws
     }
+
 private:
     const Group& m_group;
 };
@@ -820,8 +812,8 @@ BinaryData Group::write_to_mem() const
 }
 
 
-void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_writer,
-                  bool no_top_array, bool pad_for_encryption, uint_fast64_t version_number)
+void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_writer, bool no_top_array,
+                  bool pad_for_encryption, uint_fast64_t version_number)
 {
     _impl::OutputStream out_2(out);
 
@@ -847,7 +839,7 @@ void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_
         // indicating that versioning info is to be saved. This is used from
         // SharedGroup to compact the database by writing only the live data
         // into a separate file.
-        ref_type names_ref  = table_writer.write_names(out_2); // Throws
+        ref_type names_ref = table_writer.write_names(out_2);   // Throws
         ref_type tables_ref = table_writer.write_tables(out_2); // Throws
         SlabAlloc new_alloc;
         new_alloc.attach_empty(); // Throws
@@ -860,7 +852,7 @@ void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_
         int_fast64_t value_2 = from_ref(tables_ref);
         top.add(value_1); // Throws
         top.add(value_2); // Throws
-        top.add(0); // Throws
+        top.add(0);       // Throws
 
         int top_size = 3;
         if (version_number) {
@@ -873,14 +865,14 @@ void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_
             _impl::DeepArrayDestroyGuard dg_2(&size_list);
             version_list.create(Array::type_Normal); // Throws
             _impl::DeepArrayDestroyGuard dg_3(&version_list);
-            bool deep = true; // Deep
+            bool deep = true;              // Deep
             bool only_if_modified = false; // Always
             ref_type free_list_ref = free_list.write(out_2, deep, only_if_modified);
             ref_type size_list_ref = size_list.write(out_2, deep, only_if_modified);
             ref_type version_list_ref = version_list.write(out_2, deep, only_if_modified);
-            top.add(RefOrTagged::make_ref(free_list_ref)); // Throws
-            top.add(RefOrTagged::make_ref(size_list_ref)); // Throws
-            top.add(RefOrTagged::make_ref(version_list_ref)); // Throws
+            top.add(RefOrTagged::make_ref(free_list_ref));     // Throws
+            top.add(RefOrTagged::make_ref(size_list_ref));     // Throws
+            top.add(RefOrTagged::make_ref(version_list_ref));  // Throws
             top.add(RefOrTagged::make_tagged(version_number)); // Throws
             top_size = 7;
         }
@@ -900,8 +892,8 @@ void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_
         top.set(2, RefOrTagged::make_tagged(final_file_size)); // Throws
 
         // Write the top array
-        bool deep = false; // Shallow
-        bool only_if_modified = false; // Always
+        bool deep = false;                        // Shallow
+        bool only_if_modified = false;            // Always
         top.write(out_2, deep, only_if_modified); // Throws
         REALM_ASSERT_3(size_t(out_2.get_ref_of_next_array()), ==, final_file_size);
 
@@ -1007,12 +999,12 @@ bool Group::operator==(const Group& g) const
     if (n != g.size())
         return false;
     for (size_t i = 0; i < n; ++i) {
-        const StringData& table_name_1 = get_table_name(i); // Throws
+        const StringData& table_name_1 = get_table_name(i);   // Throws
         const StringData& table_name_2 = g.get_table_name(i); // Throws
         if (table_name_1 != table_name_2)
             return false;
 
-        ConstTableRef table_1 = get_table(i); // Throws
+        ConstTableRef table_1 = get_table(i);   // Throws
         ConstTableRef table_2 = g.get_table(i); // Throws
         if (*table_1 != *table_2)
             return false;
@@ -1043,8 +1035,8 @@ void Group::to_string(std::ostream& out) const
 
     // Print header
     out << std::setw(int(index_width + 1)) << std::left << " ";
-    out << std::setw(int(name_width + 1))  << std::left << "tables";
-    out << std::setw(int(rows_width))    << std::left << "rows"    << std::endl;
+    out << std::setw(int(name_width + 1)) << std::left << "tables";
+    out << std::setw(int(rows_width)) << std::left << "rows" << std::endl;
 
     // Print tables
     for (size_t i = 0; i < count; ++i) {
@@ -1052,9 +1044,9 @@ void Group::to_string(std::ostream& out) const
         ConstTableRef table = get_table(name);
         size_t row_count = table->size();
 
-        out << std::setw(int(index_width)) << std::right << i                 << " ";
-        out << std::setw(int(name_width))  << std::left  << std::string(name) << " ";
-        out << std::setw(int(rows_width))  << std::left  << row_count         << std::endl;
+        out << std::setw(int(index_width)) << std::right << i << " ";
+        out << std::setw(int(name_width)) << std::left << std::string(name) << " ";
+        out << std::setw(int(rows_width)) << std::left << row_count << std::endl;
     }
 }
 
@@ -1073,7 +1065,7 @@ void Group::mark_all_table_accessors() noexcept
 
 namespace {
 
-class MarkDirtyUpdater: public _impl::TableFriend::AccessorUpdater {
+class MarkDirtyUpdater : public _impl::TableFriend::AccessorUpdater {
 public:
     void update(Table& table) override
     {
@@ -1092,12 +1084,9 @@ public:
 };
 
 
-class InsertColumnUpdater: public _impl::TableFriend::AccessorUpdater {
+class InsertColumnUpdater : public _impl::TableFriend::AccessorUpdater {
 public:
-    InsertColumnUpdater(size_t col_ndx):
-        m_col_ndx(col_ndx)
-    {
-    }
+    InsertColumnUpdater(size_t col_ndx) : m_col_ndx(col_ndx) {}
 
     void update(Table& table) override
     {
@@ -1106,21 +1095,16 @@ public:
         tf::mark_link_target_tables(table, m_col_ndx + 1);
     }
 
-    void update_parent(Table&) override
-    {
-    }
+    void update_parent(Table&) override {}
 
 private:
     size_t m_col_ndx;
 };
 
 
-class EraseColumnUpdater: public _impl::TableFriend::AccessorUpdater {
+class EraseColumnUpdater : public _impl::TableFriend::AccessorUpdater {
 public:
-    EraseColumnUpdater(size_t col_ndx):
-        m_col_ndx(col_ndx)
-    {
-    }
+    EraseColumnUpdater(size_t col_ndx) : m_col_ndx(col_ndx) {}
 
     void update(Table& table) override
     {
@@ -1129,21 +1113,16 @@ public:
         tf::mark_link_target_tables(table, m_col_ndx);
     }
 
-    void update_parent(Table&) override
-    {
-    }
+    void update_parent(Table&) override {}
 
 private:
     size_t m_col_ndx;
 };
 
 
-class MoveColumnUpdater: public _impl::TableFriend::AccessorUpdater {
+class MoveColumnUpdater : public _impl::TableFriend::AccessorUpdater {
 public:
-    MoveColumnUpdater(size_t col_ndx_1, size_t col_ndx_2):
-        m_col_ndx_1(col_ndx_1), m_col_ndx_2(col_ndx_2)
-    {
-    }
+    MoveColumnUpdater(size_t col_ndx_1, size_t col_ndx_2) : m_col_ndx_1(col_ndx_1), m_col_ndx_2(col_ndx_2) {}
 
     void update(Table& table) override
     {
@@ -1151,9 +1130,7 @@ public:
         tf::adj_move_column(table, m_col_ndx_1, m_col_ndx_2);
     }
 
-    void update_parent(Table&) override
-    {
-    }
+    void update_parent(Table&) override {}
 
 private:
     size_t m_col_ndx_1;
@@ -1174,11 +1151,7 @@ private:
 // transaction log enough to skip these checks.
 class Group::TransactAdvancer {
 public:
-    TransactAdvancer(Group& group, bool& schema_changed):
-        m_group(group),
-        m_schema_changed(schema_changed)
-    {
-    }
+    TransactAdvancer(Group& group, bool& schema_changed) : m_group(group), m_schema_changed(schema_changed) {}
 
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) noexcept
     {
@@ -1281,8 +1254,7 @@ public:
         // the number of tables prior to this instruction (see
         // Group::do_get_table()). An empty list means that no table accessors
         // have been created yet (all entries are null).
-        REALM_ASSERT(m_group.m_table_accessors.empty() ||
-                     group_level_ndx < m_group.m_table_accessors.size());
+        REALM_ASSERT(m_group.m_table_accessors.empty() || group_level_ndx < m_group.m_table_accessors.size());
         if (group_level_ndx < m_group.m_table_accessors.size()) {
             if (Table* table = m_group.m_table_accessors[group_level_ndx]) {
                 const size_t* path_begin = path;
@@ -1306,8 +1278,7 @@ public:
         return true;
     }
 
-    bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
-                           bool unordered) noexcept
+    bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool unordered) noexcept
     {
         typedef _impl::TableFriend tf;
         if (m_table) {
@@ -1326,8 +1297,7 @@ public:
         return true;
     }
 
-    bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
-                    bool unordered) noexcept
+    bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool unordered) noexcept
     {
         if (unordered) {
             // Unordered removal of multiple rows is not yet supported (and not
@@ -1794,8 +1764,7 @@ void Group::update_table_indices(F&& map_function)
 }
 
 
-void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
-                             _impl::NoCopyInputStream& in)
+void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::NoCopyInputStream& in)
 {
     REALM_ASSERT(is_attached());
 
@@ -1862,62 +1831,62 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size,
     }
 
     m_alloc.invalidate_cache();
-    m_top.detach(); // Soft detach
-    bool create_group_when_missing = false; // See Group::attach_shared().
+    m_top.detach();                                 // Soft detach
+    bool create_group_when_missing = false;         // See Group::attach_shared().
     attach(new_top_ref, create_group_when_missing); // Throws
-    refresh_dirty_accessors(); // Throws
+    refresh_dirty_accessors();                      // Throws
 
     if (schema_changed)
         send_schema_change_notification();
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 namespace {
 
-class MemUsageVerifier: public Array::MemUsageHandler {
+class MemUsageVerifier : public Array::MemUsageHandler {
 public:
-    MemUsageVerifier(ref_type ref_begin, ref_type immutable_ref_end, ref_type mutable_ref_end, ref_type baseline):
-        m_ref_begin(ref_begin),
-        m_immutable_ref_end(immutable_ref_end),
-        m_mutable_ref_end(mutable_ref_end),
-        m_baseline(baseline)
+    MemUsageVerifier(ref_type ref_begin, ref_type immutable_ref_end, ref_type mutable_ref_end, ref_type baseline)
+        : m_ref_begin(ref_begin)
+        , m_immutable_ref_end(immutable_ref_end)
+        , m_mutable_ref_end(mutable_ref_end)
+        , m_baseline(baseline)
     {
     }
     void add_immutable(ref_type ref, size_t size)
     {
-        REALM_ASSERT_3(ref % 8, ==, 0); // 8-byte alignment
+        REALM_ASSERT_3(ref % 8, ==, 0);  // 8-byte alignment
         REALM_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
         REALM_ASSERT_3(size, >, 0);
         REALM_ASSERT_3(ref, >=, m_ref_begin);
         REALM_ASSERT_3(size, <=, m_immutable_ref_end - ref);
         Chunk chunk;
-        chunk.ref  = ref;
+        chunk.ref = ref;
         chunk.size = size;
         m_chunks.push_back(chunk);
     }
     void add_mutable(ref_type ref, size_t size)
     {
-        REALM_ASSERT_3(ref % 8, ==, 0); // 8-byte alignment
+        REALM_ASSERT_3(ref % 8, ==, 0);  // 8-byte alignment
         REALM_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
         REALM_ASSERT_3(size, >, 0);
         REALM_ASSERT_3(ref, >=, m_immutable_ref_end);
         REALM_ASSERT_3(size, <=, m_mutable_ref_end - ref);
         Chunk chunk;
-        chunk.ref  = ref;
+        chunk.ref = ref;
         chunk.size = size;
         m_chunks.push_back(chunk);
     }
     void add(ref_type ref, size_t size)
     {
-        REALM_ASSERT_3(ref % 8, ==, 0); // 8-byte alignment
+        REALM_ASSERT_3(ref % 8, ==, 0);  // 8-byte alignment
         REALM_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
         REALM_ASSERT_3(size, >, 0);
         REALM_ASSERT_3(ref, >=, m_ref_begin);
         REALM_ASSERT(size <= (ref < m_baseline ? m_immutable_ref_end : m_mutable_ref_end) - ref);
         Chunk chunk;
-        chunk.ref  = ref;
+        chunk.ref = ref;
         chunk.size = size;
         m_chunks.push_back(chunk);
     }
@@ -1925,10 +1894,7 @@ public:
     {
         m_chunks.insert(m_chunks.end(), verifier.m_chunks.begin(), verifier.m_chunks.end());
     }
-    void handle(ref_type ref, size_t allocated, size_t) override
-    {
-        add(ref, allocated);
-    }
+    void handle(ref_type ref, size_t allocated, size_t) override { add(ref, allocated); }
     void canonicalize()
     {
         // Sort the chunks in order of increasing ref, then merge adjacent
@@ -1951,24 +1917,19 @@ public:
             m_chunks.erase(i_1 + 1, end);
         }
     }
-    void clear()
-    {
-        m_chunks.clear();
-    }
+    void clear() { m_chunks.clear(); }
     void check_total_coverage()
     {
         REALM_ASSERT_3(m_chunks.size(), ==, 1);
         REALM_ASSERT_3(m_chunks.front().ref, ==, m_ref_begin);
         REALM_ASSERT_3(m_chunks.front().size, ==, m_mutable_ref_end - m_ref_begin);
     }
+
 private:
     struct Chunk {
         ref_type ref;
         size_t size;
-        bool operator<(const Chunk& c) const
-        {
-            return ref < c.ref;
-        }
+        bool operator<(const Chunk& c) const { return ref < c.ref; }
     };
     std::vector<Chunk> m_chunks;
     ref_type m_ref_begin, m_immutable_ref_end, m_mutable_ref_end, m_baseline;
@@ -2009,7 +1970,7 @@ void Group::verify() const
     }
 
     size_t logical_file_size = to_size_t(m_top.get_as_ref_or_tagged(2).get_as_int());
-    size_t ref_begin = sizeof (SlabAlloc::Header);
+    size_t ref_begin = sizeof(SlabAlloc::Header);
     ref_type immutable_ref_end = logical_file_size;
     ref_type mutable_ref_end = m_alloc.get_total_size();
     ref_type baseline = m_alloc.get_baseline();
@@ -2051,7 +2012,7 @@ void Group::verify() const
             if (ver.is_attached())
                 REALM_ASSERT_3(n, ==, ver.size());
             for (size_t i = 0; i != n; ++i) {
-                ref_type ref  = to_ref(pos.get(i));
+                ref_type ref = to_ref(pos.get(i));
                 size_t size_of_i = to_size_t(len.get(i));
                 mem_usage_2.add_immutable(ref, size_of_i);
             }
@@ -2145,7 +2106,7 @@ void Group::print_free() const
     size_t n = pos.size();
     for (size_t i = 0; i != n; ++i) {
         size_t offset = to_size_t(pos[i]);
-        size_t size_of_i   = to_size_t(len[i]);
+        size_t size_of_i = to_size_t(len[i]);
         std::cout << i << ": " << offset << " " << size_of_i;
 
         if (has_versions) {

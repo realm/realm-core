@@ -80,16 +80,9 @@ namespace {
 
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
-REALM_TABLE_4(TestTableGroup,
-              first,  String,
-              second, Int,
-              third,  Bool,
-              fourth, Enum<Days>)
+REALM_TABLE_4(TestTableGroup, first, String, second, Int, third, Bool, fourth, Enum<Days>)
 
-REALM_TABLE_3(TestTableGroup2,
-              first,  Mixed,
-              second, Subtable<TestTableGroup>,
-              third,  Subtable<TestTableGroup>)
+REALM_TABLE_3(TestTableGroup2, first, Mixed, second, Subtable<TestTableGroup>, third, Subtable<TestTableGroup>)
 
 } // Anonymous namespace
 
@@ -109,62 +102,40 @@ TEST(Group_UnattachedErrorHandling)
     CHECK_EQUAL(false, group.is_empty());
     CHECK_EQUAL(0, group.size());
     CHECK_EQUAL(0, group.find_table("foo"));
-    CHECK_LOGIC_ERROR(group.get_table(0),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table("foo"),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.add_table("foo", false),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.insert_table(0, "foo", false),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>(0),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>("foo"),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.add_table<TestTableGroup>("foo", false),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.insert_table<TestTableGroup>(0, "foo", false),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.remove_table("foo"),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.remove_table(0),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.rename_table("foo", "bar", false),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.rename_table(0, "bar", false),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.move_table(0, 1),
-                      LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.commit(),
-                      LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table(0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table("foo", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.insert_table(0, "foo", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>(0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>("foo"), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table<TestTableGroup>("foo", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.insert_table<TestTableGroup>(0, "foo", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.remove_table("foo"), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.remove_table(0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.rename_table("foo", "bar", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.rename_table(0, "bar", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.move_table(0, 1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.commit(), LogicError::detached_accessor);
 
     {
         const Group& const_group = group;
-        CHECK_LOGIC_ERROR(const_group.get_table(0),
-                          LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(const_group.get_table("foo"),
-                          LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(const_group.get_table<TestTableGroup>(0),
-                          LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table(0), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table("foo"), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table<TestTableGroup>(0), LogicError::detached_accessor);
     }
 
     {
         bool f = false;
-        CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f),
-                          LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(group.get_or_insert_table(0, "foo", &f),
-                          LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(group.get_or_add_table<TestTableGroup>("foo", &f),
-                          LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(group.get_or_insert_table<TestTableGroup>(0, "foo", &f),
-                          LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_insert_table(0, "foo", &f), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_add_table<TestTableGroup>("foo", &f), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_insert_table<TestTableGroup>(0, "foo", &f), LogicError::detached_accessor);
     }
     {
         std::ostringstream out;
         size_t link_depth = 0;
         std::map<std::string, std::string> renames;
-        CHECK_LOGIC_ERROR(group.to_json(out, link_depth, &renames),
-                          LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.to_json(out, link_depth, &renames), LogicError::detached_accessor);
     }
 }
 
@@ -190,7 +161,6 @@ TEST(Group_OpenFile)
         group.open(path, crypt_key(), Group::mode_ReadOnly);
         CHECK(group.is_attached());
     }
-
 }
 
 // Ensure that Group throws when you attempt to attach it twice in a row
@@ -277,7 +247,7 @@ TEST(Group_Permissions)
         Group group1;
         TableRef t1 = group1.add_table("table1");
         t1->add_column(type_String, "s");
-        t1->add_column(type_Int,    "i");
+        t1->add_column(type_Int, "i");
         for (size_t i = 0; i < 4; ++i) {
             t1->insert_empty_row(i);
             t1->set_string(0, i, "a");
@@ -467,8 +437,7 @@ TEST(Group_TableNameTooLong)
     Group group;
     size_t buf_len = 64;
     std::unique_ptr<char[]> buf(new char[buf_len]);
-    CHECK_LOGIC_ERROR(group.add_table(StringData(buf.get(), buf_len)),
-                      LogicError::table_name_too_long);
+    CHECK_LOGIC_ERROR(group.add_table(StringData(buf.get(), buf_len)), LogicError::table_name_too_long);
     group.add_table(StringData(buf.get(), buf_len - 1));
 }
 
@@ -476,9 +445,9 @@ TEST(Group_TableNameTooLong)
 TEST(Group_TableIndex)
 {
     Group group;
-    TableRef moja  = group.add_table("moja");
+    TableRef moja = group.add_table("moja");
     TableRef mbili = group.add_table("mbili");
-    TableRef tatu  = group.add_table("tatu");
+    TableRef tatu = group.add_table("tatu");
     CHECK_EQUAL(3, group.size());
     std::vector<size_t> indexes;
     indexes.push_back(moja->get_index_in_group());
@@ -488,12 +457,12 @@ TEST(Group_TableIndex)
     CHECK_EQUAL(0, indexes[0]);
     CHECK_EQUAL(1, indexes[1]);
     CHECK_EQUAL(2, indexes[2]);
-    CHECK_EQUAL(moja,  group.get_table(moja->get_index_in_group()));
+    CHECK_EQUAL(moja, group.get_table(moja->get_index_in_group()));
     CHECK_EQUAL(mbili, group.get_table(mbili->get_index_in_group()));
-    CHECK_EQUAL(tatu,  group.get_table(tatu->get_index_in_group()));
-    CHECK_EQUAL("moja",  group.get_table_name(moja->get_index_in_group()));
+    CHECK_EQUAL(tatu, group.get_table(tatu->get_index_in_group()));
+    CHECK_EQUAL("moja", group.get_table_name(moja->get_index_in_group()));
     CHECK_EQUAL("mbili", group.get_table_name(mbili->get_index_in_group()));
-    CHECK_EQUAL("tatu",  group.get_table_name(tatu->get_index_in_group()));
+    CHECK_EQUAL("tatu", group.get_table_name(tatu->get_index_in_group()));
     CHECK_LOGIC_ERROR(group.get_table(4), LogicError::table_index_out_of_range);
     CHECK_LOGIC_ERROR(group.get_table_name(4), LogicError::table_index_out_of_range);
 }
@@ -568,11 +537,11 @@ TEST(Group_StaticallyTypedTables)
     Group group;
     const Group& cgroup = group;
 
-    TestTableGroup::Ref  table_1 = group.add_table<TestTableGroup>("table_1");
+    TestTableGroup::Ref table_1 = group.add_table<TestTableGroup>("table_1");
     TestTableGroup2::Ref table_2 = group.add_table<TestTableGroup2>("table_2");
 
     CHECK_THROW(group.add_table("table_2"), TableNameInUse);
-    CHECK_THROW(group.add_table<TestTableGroup>("table_2"),  TableNameInUse);
+    CHECK_THROW(group.add_table<TestTableGroup>("table_2"), TableNameInUse);
     CHECK_THROW(group.add_table<TestTableGroup2>("table_2"), TableNameInUse);
 
     CHECK_NOT(group.get_table("foo"));
@@ -586,24 +555,24 @@ TEST(Group_StaticallyTypedTables)
     CHECK_EQUAL(table_1, cgroup.get_table<TestTableGroup>(table_1->get_index_in_group()));
     CHECK_EQUAL(table_2, group.get_table<TestTableGroup2>(table_2->get_index_in_group()));
     CHECK_EQUAL(table_2, cgroup.get_table<TestTableGroup2>(table_2->get_index_in_group()));
-    CHECK_THROW(group.get_table<TestTableGroup2>(table_1->get_index_in_group()),  DescriptorMismatch);
+    CHECK_THROW(group.get_table<TestTableGroup2>(table_1->get_index_in_group()), DescriptorMismatch);
     CHECK_THROW(cgroup.get_table<TestTableGroup2>(table_1->get_index_in_group()), DescriptorMismatch);
-    CHECK_THROW(group.get_table<TestTableGroup>(table_2->get_index_in_group()),   DescriptorMismatch);
-    CHECK_THROW(cgroup.get_table<TestTableGroup>(table_2->get_index_in_group()),  DescriptorMismatch);
+    CHECK_THROW(group.get_table<TestTableGroup>(table_2->get_index_in_group()), DescriptorMismatch);
+    CHECK_THROW(cgroup.get_table<TestTableGroup>(table_2->get_index_in_group()), DescriptorMismatch);
 
     CHECK_EQUAL(table_1, group.get_table<TestTableGroup>("table_1"));
     CHECK_EQUAL(table_1, cgroup.get_table<TestTableGroup>("table_1"));
     CHECK_EQUAL(table_2, group.get_table<TestTableGroup2>("table_2"));
     CHECK_EQUAL(table_2, cgroup.get_table<TestTableGroup2>("table_2"));
-    CHECK_THROW(group.get_table<TestTableGroup2>("table_1"),  DescriptorMismatch);
+    CHECK_THROW(group.get_table<TestTableGroup2>("table_1"), DescriptorMismatch);
     CHECK_THROW(cgroup.get_table<TestTableGroup2>("table_1"), DescriptorMismatch);
-    CHECK_THROW(group.get_table<TestTableGroup>("table_2"),   DescriptorMismatch);
-    CHECK_THROW(cgroup.get_table<TestTableGroup>("table_2"),  DescriptorMismatch);
+    CHECK_THROW(group.get_table<TestTableGroup>("table_2"), DescriptorMismatch);
+    CHECK_THROW(cgroup.get_table<TestTableGroup>("table_2"), DescriptorMismatch);
 
     CHECK_EQUAL(table_1, group.get_or_add_table<TestTableGroup>("table_1"));
     CHECK_EQUAL(table_2, group.get_or_add_table<TestTableGroup2>("table_2"));
     CHECK_THROW(group.get_or_add_table<TestTableGroup2>("table_1"), DescriptorMismatch);
-    CHECK_THROW(group.get_or_add_table<TestTableGroup>("table_2"),  DescriptorMismatch);
+    CHECK_THROW(group.get_or_add_table<TestTableGroup>("table_2"), DescriptorMismatch);
 
     CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>(3), LogicError::table_index_out_of_range);
 }
@@ -613,7 +582,7 @@ TEST(Group_BasicRemoveTable)
 {
     Group group;
     TableRef alpha = group.add_table("alpha");
-    TableRef beta  = group.add_table("beta");
+    TableRef beta = group.add_table("beta");
     TableRef gamma = group.add_table("gamma");
     TableRef delta = group.add_table("delta");
     CHECK_EQUAL(4, group.size());
@@ -624,7 +593,7 @@ TEST(Group_BasicRemoveTable)
     CHECK_NOT(gamma->is_attached());
     CHECK(delta->is_attached());
     CHECK_EQUAL("alpha", group.get_table_name(alpha->get_index_in_group()));
-    CHECK_EQUAL("beta",  group.get_table_name(beta->get_index_in_group()));
+    CHECK_EQUAL("beta", group.get_table_name(beta->get_index_in_group()));
     CHECK_EQUAL("delta", group.get_table_name(delta->get_index_in_group()));
     group.remove_table(alpha->get_index_in_group()); // By index
     CHECK_EQUAL(2, group.size());
@@ -632,7 +601,7 @@ TEST(Group_BasicRemoveTable)
     CHECK(beta->is_attached());
     CHECK_NOT(gamma->is_attached());
     CHECK(delta->is_attached());
-    CHECK_EQUAL("beta",  group.get_table_name(beta->get_index_in_group()));
+    CHECK_EQUAL("beta", group.get_table_name(beta->get_index_in_group()));
     CHECK_EQUAL("delta", group.get_table_name(delta->get_index_in_group()));
     group.remove_table("delta"); // By name
     CHECK_EQUAL(1, group.size());
@@ -640,7 +609,7 @@ TEST(Group_BasicRemoveTable)
     CHECK(beta->is_attached());
     CHECK_NOT(gamma->is_attached());
     CHECK_NOT(delta->is_attached());
-    CHECK_EQUAL("beta",  group.get_table_name(beta->get_index_in_group()));
+    CHECK_EQUAL("beta", group.get_table_name(beta->get_index_in_group()));
     CHECK_LOGIC_ERROR(group.remove_table(1), LogicError::table_index_out_of_range);
     CHECK_THROW(group.remove_table("epsilon"), NoSuchTable);
     group.verify();
@@ -651,10 +620,10 @@ TEST(Group_RemoveTableWithColumns)
 {
     Group group;
 
-    TableRef alpha   = group.add_table("alpha");
-    TableRef beta    = group.add_table("beta");
-    TableRef gamma   = group.add_table("gamma");
-    TableRef delta   = group.add_table("delta");
+    TableRef alpha = group.add_table("alpha");
+    TableRef beta = group.add_table("beta");
+    TableRef gamma = group.add_table("gamma");
+    TableRef delta = group.add_table("delta");
     TableRef epsilon = group.add_table("epsilon");
     CHECK_EQUAL(5, group.size());
 
@@ -710,25 +679,25 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     group.add_table("beta");
     group.add_table("gamma");
     group.add_table("delta");
-    TableRef first  = group.get_table(0);
+    TableRef first = group.get_table(0);
     TableRef second = group.get_table(1);
-    TableRef third  = group.get_table(2);
+    TableRef third = group.get_table(2);
     TableRef fourth = group.get_table(3);
 
-    first->add_column_link(type_Link,  "one",   *third);
-    third->add_column_link(type_Link,  "two",   *fourth);
-    third->add_column_link(type_Link,  "three", *third);
-    fourth->add_column_link(type_Link, "four",  *first);
-    fourth->add_column_link(type_Link, "five",  *third);
+    first->add_column_link(type_Link, "one", *third);
+    third->add_column_link(type_Link, "two", *fourth);
+    third->add_column_link(type_Link, "three", *third);
+    fourth->add_column_link(type_Link, "four", *first);
+    fourth->add_column_link(type_Link, "five", *third);
     first->add_empty_row(2);
     third->add_empty_row(2);
     fourth->add_empty_row(2);
-    first->set_link(0, 0, 0); // first[0].one   = third[0]
-    first->set_link(0, 1, 1); // first[1].one   = third[1]
-    third->set_link(0, 0, 1); // third[0].two   = fourth[1]
-    third->set_link(0, 1, 0); // third[1].two   = fourth[0]
-    third->set_link(1, 0, 1); // third[0].three = third[1]
-    third->set_link(1, 1, 1); // third[1].three = third[1]
+    first->set_link(0, 0, 0);  // first[0].one   = third[0]
+    first->set_link(0, 1, 1);  // first[1].one   = third[1]
+    third->set_link(0, 0, 1);  // third[0].two   = fourth[1]
+    third->set_link(0, 1, 0);  // third[1].two   = fourth[0]
+    third->set_link(1, 0, 1);  // third[0].three = third[1]
+    third->set_link(1, 1, 1);  // third[1].three = third[1]
     fourth->set_link(0, 0, 0); // fourth[0].four = first[0]
     fourth->set_link(0, 1, 0); // fourth[1].four = first[0]
     fourth->set_link(1, 0, 0); // fourth[0].five = third[0]
@@ -749,19 +718,19 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     CHECK_EQUAL("one", first->get_column_name(0));
     CHECK_EQUAL(third, first->get_link_target(0));
     CHECK_EQUAL(2, third->get_column_count());
-    CHECK_EQUAL("two",   third->get_column_name(0));
+    CHECK_EQUAL("two", third->get_column_name(0));
     CHECK_EQUAL("three", third->get_column_name(1));
     CHECK_EQUAL(fourth, third->get_link_target(0));
-    CHECK_EQUAL(third,  third->get_link_target(1));
+    CHECK_EQUAL(third, third->get_link_target(1));
     CHECK_EQUAL(2, fourth->get_column_count());
     CHECK_EQUAL("four", fourth->get_column_name(0));
     CHECK_EQUAL("five", fourth->get_column_name(1));
     CHECK_EQUAL(first, fourth->get_link_target(0));
     CHECK_EQUAL(third, fourth->get_link_target(1));
 
-    third->set_link(0, 0, 0); // third[0].two   = fourth[0]
+    third->set_link(0, 0, 0);  // third[0].two   = fourth[0]
     fourth->set_link(0, 1, 1); // fourth[1].four = first[1]
-    first->set_link(0, 0, 1); // first[0].one   = third[1]
+    first->set_link(0, 0, 1);  // first[0].one   = third[1]
 
     group.verify();
 
@@ -775,10 +744,10 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     CHECK_EQUAL(0, third->get_link(0, 1));
     CHECK_EQUAL(1, third->get_link(1, 0));
     CHECK_EQUAL(1, third->get_link(1, 1));
-    CHECK_EQUAL(0, third->get_backlink_count(0, *first,  0));
-    CHECK_EQUAL(2, third->get_backlink_count(1, *first,  0));
-    CHECK_EQUAL(0, third->get_backlink_count(0, *third,  1));
-    CHECK_EQUAL(2, third->get_backlink_count(1, *third,  1));
+    CHECK_EQUAL(0, third->get_backlink_count(0, *first, 0));
+    CHECK_EQUAL(2, third->get_backlink_count(1, *first, 0));
+    CHECK_EQUAL(0, third->get_backlink_count(0, *third, 1));
+    CHECK_EQUAL(2, third->get_backlink_count(1, *third, 1));
     CHECK_EQUAL(1, third->get_backlink_count(0, *fourth, 1));
     CHECK_EQUAL(1, third->get_backlink_count(1, *fourth, 1));
     CHECK_EQUAL(2, fourth->size());
@@ -816,14 +785,14 @@ TEST(Group_RenameTable)
 {
     Group group;
     TableRef alpha = group.add_table("alpha");
-    TableRef beta  = group.add_table("beta");
+    TableRef beta = group.add_table("beta");
     TableRef gamma = group.add_table("gamma");
     group.rename_table(beta->get_index_in_group(), "delta");
     CHECK_EQUAL("delta", beta->get_name());
     group.rename_table("delta", "epsilon");
-    CHECK_EQUAL("alpha",   alpha->get_name());
+    CHECK_EQUAL("alpha", alpha->get_name());
     CHECK_EQUAL("epsilon", beta->get_name());
-    CHECK_EQUAL("gamma",   gamma->get_name());
+    CHECK_EQUAL("gamma", gamma->get_name());
     CHECK_LOGIC_ERROR(group.rename_table(3, "zeta"), LogicError::table_index_out_of_range);
     CHECK_THROW(group.rename_table("eta", "theta"), NoSuchTable);
     CHECK_THROW(group.rename_table("epsilon", "alpha"), TableNameInUse);
@@ -840,7 +809,7 @@ TEST(Group_BasicMoveTable)
 {
     Group group;
     TableRef alpha = group.add_table("alpha");
-    TableRef beta  = group.add_table("beta");
+    TableRef beta = group.add_table("beta");
     TableRef gamma = group.add_table("gamma");
     TableRef delta = group.add_table("delta");
     CHECK_EQUAL(4, group.size());
@@ -946,7 +915,7 @@ namespace {
 
 void setup_table(TestTableGroup::Ref t)
 {
-    t->add("a",  1, true, Wed);
+    t->add("a", 1, true, Wed);
     t->add("b", 15, true, Wed);
     t->add("ccc", 10, true, Wed);
     t->add("dddd", 20, true, Wed);
@@ -1051,12 +1020,12 @@ TEST(Group_Serialize0)
         CHECK_EQUAL(0, t->size());
 
         // Modify table
-        t->add("Test",  1, true, Wed);
+        t->add("Test", 1, true, Wed);
 
         CHECK_EQUAL("Test", t[0].first);
-        CHECK_EQUAL(1,      t[0].second);
-        CHECK_EQUAL(true,   t[0].third);
-        CHECK_EQUAL(Wed,    t[0].fourth);
+        CHECK_EQUAL(1, t[0].second);
+        CHECK_EQUAL(true, t[0].third);
+        CHECK_EQUAL(Wed, t[0].fourth);
     }
     {
         // Load the group and let it clean up without loading
@@ -1073,16 +1042,16 @@ TEST(Group_Serialize1)
         // Create group with one table
         Group to_disk;
         TestTableGroup::Ref table = to_disk.add_table<TestTableGroup>("test");
-        table->add("",  1, true, Wed);
+        table->add("", 1, true, Wed);
         table->add("", 15, true, Wed);
         table->add("", 10, true, Wed);
         table->add("", 20, true, Wed);
         table->add("", 11, true, Wed);
         table->add("", 45, true, Wed);
         table->add("", 10, true, Wed);
-        table->add("",  0, true, Wed);
+        table->add("", 0, true, Wed);
         table->add("", 30, true, Wed);
-        table->add("",  9, true, Wed);
+        table->add("", 9, true, Wed);
 
 #ifdef REALM_DEBUG
         to_disk.verify();
@@ -1131,12 +1100,12 @@ TEST(Group_Serialize2)
     // Create group with two tables
     Group to_disk;
     TestTableGroup::Ref table1 = to_disk.add_table<TestTableGroup>("test1");
-    table1->add("",  1, true, Wed);
+    table1->add("", 1, true, Wed);
     table1->add("", 15, true, Wed);
     table1->add("", 10, true, Wed);
 
     TestTableGroup::Ref table2 = to_disk.add_table<TestTableGroup>("test2");
-    table2->add("hey",  0, true, Tue);
+    table2->add("hey", 0, true, Tue);
     table2->add("hello", 3232, false, Sun);
 
 #ifdef REALM_DEBUG
@@ -1169,7 +1138,7 @@ TEST(Group_Serialize3)
     // Create group with one table (including long strings
     Group to_disk;
     TestTableGroup::Ref table = to_disk.add_table<TestTableGroup>("test");
-    table->add("1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1",  1, true, Wed);
+    table->add("1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1", 1, true, Wed);
     table->add("2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
 
 #ifdef REALM_DEBUG
@@ -1197,16 +1166,16 @@ TEST(Group_Serialize_Mem)
     // Create group with one table
     Group to_mem;
     TestTableGroup::Ref table = to_mem.add_table<TestTableGroup>("test");
-    table->add("",  1, true, Wed);
+    table->add("", 1, true, Wed);
     table->add("", 15, true, Wed);
     table->add("", 10, true, Wed);
     table->add("", 20, true, Wed);
     table->add("", 11, true, Wed);
     table->add("", 45, true, Wed);
     table->add("", 10, true, Wed);
-    table->add("",  0, true, Wed);
+    table->add("", 0, true, Wed);
     table->add("", 30, true, Wed);
-    table->add("",  9, true, Wed);
+    table->add("", 9, true, Wed);
 
 #ifdef REALM_DEBUG
     to_mem.verify();
@@ -1235,8 +1204,8 @@ TEST(Group_Close)
 {
     Group to_mem;
     TestTableGroup::Ref table = to_mem.add_table<TestTableGroup>("test");
-    table->add("",  1, true, Wed);
-    table->add("",  2, true, Wed);
+    table->add("", 1, true, Wed);
+    table->add("", 2, true, Wed);
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -1252,10 +1221,10 @@ TEST(Group_Serialize_Optimized)
     TestTableGroup::Ref table = to_mem.add_table<TestTableGroup>("test");
 
     for (size_t i = 0; i < 5; ++i) {
-        table->add("abd",     1, true, Mon);
-        table->add("eftg",    2, true, Tue);
-        table->add("hijkl",   5, true, Wed);
-        table->add("mnopqr",  8, true, Thu);
+        table->add("abd", 1, true, Mon);
+        table->add("eftg", 2, true, Tue);
+        table->add("hijkl", 5, true, Wed);
+        table->add("mnopqr", 8, true, Thu);
         table->add("stuvxyz", 9, true, Fri);
     }
 
@@ -1296,12 +1265,12 @@ TEST(Group_Serialize_All)
     Group to_mem;
     TableRef table = to_mem.add_table("test");
 
-    table->add_column(type_Int,      "int");
-    table->add_column(type_Bool,     "bool");
+    table->add_column(type_Int, "int");
+    table->add_column(type_Bool, "bool");
     table->add_column(type_OldDateTime, "date");
-    table->add_column(type_String,   "string");
-    table->add_column(type_Binary,   "binary");
-    table->add_column(type_Mixed,    "mixed");
+    table->add_column(type_String, "string");
+    table->add_column(type_Binary, "binary");
+    table->add_column(type_Mixed, "mixed");
 
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
@@ -1339,13 +1308,13 @@ TEST(Group_Persist)
 
     // Insert some data
     TableRef table = db.add_table("test");
-    table->add_column(type_Int,      "int");
-    table->add_column(type_Bool,     "bool");
+    table->add_column(type_Int, "int");
+    table->add_column(type_Bool, "bool");
     table->add_column(type_OldDateTime, "date");
-    table->add_column(type_String,   "string");
-    table->add_column(type_Binary,   "binary");
-    table->add_column(type_Mixed,    "mixed");
-    table->add_column(type_Timestamp,  "timestamp");
+    table->add_column(type_String, "string");
+    table->add_column(type_Binary, "binary");
+    table->add_column(type_Mixed, "mixed");
+    table->add_column(type_Timestamp, "timestamp");
     table->insert_empty_row(0);
     table->set_int(0, 0, 12);
     table->set_bool(1, 0, true);
@@ -1408,7 +1377,7 @@ TEST(Group_Subtable)
     Group g;
     TableRef table = g.add_table("test");
     DescriptorRef sub;
-    table->add_column(type_Int,   "foo");
+    table->add_column(type_Int, "foo");
     table->add_column(type_Table, "sub", &sub);
     table->add_column(type_Mixed, "baz");
     sub->add_column(type_Int, "bar");
@@ -1438,7 +1407,7 @@ TEST(Group_Subtable)
         {
             TableRef st = table->get_subtable(1, i);
             CHECK_EQUAL(i % 2 == 0 ? 1 : 0, st->size());
-            if (i%2 == 0)
+            if (i % 2 == 0)
                 CHECK_EQUAL(200 + i, st->get_int(0, 0));
             if (i % 3 == 0) {
                 st->add_empty_row();
@@ -1455,7 +1424,7 @@ TEST(Group_Subtable)
             if (i % 3 != 1)
                 table->set_mixed(2, i, Mixed::subtable_tag());
             TableRef st = table->get_subtable(2, i);
-            if (i%3 != 1)
+            if (i % 3 != 1)
                 st->add_column(type_Int, "banach");
             st->add_empty_row();
             st->set_int(0, st->size() - 1, 800 + i);
@@ -1650,12 +1619,12 @@ TEST(Group_MultiLevelSubtables)
         TableRef table = g.add_table("test");
         {
             DescriptorRef sub_1, sub_2;
-            table->add_column(type_Int,   "int");
+            table->add_column(type_Int, "int");
             table->add_column(type_Table, "tab", &sub_1);
             table->add_column(type_Mixed, "mix");
-            sub_1->add_column(type_Int,   "int");
+            sub_1->add_column(type_Int, "int");
             sub_1->add_column(type_Table, "tab", &sub_2);
-            sub_2->add_column(type_Int,   "int");
+            sub_2->add_column(type_Int, "int");
         }
         table->add_empty_row();
         {
@@ -1667,7 +1636,7 @@ TEST(Group_MultiLevelSubtables)
         {
             table->set_mixed(2, 0, Mixed::subtable_tag());
             TableRef a = table->get_subtable(2, 0);
-            a->add_column(type_Int,   "int");
+            a->add_column(type_Int, "int");
             a->add_column(type_Mixed, "mix");
             a->add_empty_row();
             a->set_mixed(1, 0, Mixed::subtable_tag());
@@ -1772,7 +1741,7 @@ TEST(Group_CommitSubtable)
     TableRef table = group.add_table("test");
     DescriptorRef sub_1;
     table->add_column(type_Table, "subtable", &sub_1);
-    sub_1->add_column(type_Int,   "int");
+    sub_1->add_column(type_Int, "int");
     sub_1.reset();
     table->add_empty_row();
 
@@ -1844,9 +1813,9 @@ TEST(Group_CommitDegenerateSubtable)
 TEST(Group_InvalidateTables)
 {
     TestTableGroup2::Ref table;
-    TableRef             subtable1;
-    TestTableGroup::Ref  subtable2;
-    TestTableGroup::Ref  subtable3;
+    TableRef subtable1;
+    TestTableGroup::Ref subtable2;
+    TestTableGroup::Ref subtable3;
     {
         Group group;
         table = group.add_table<TestTableGroup2>("foo");
@@ -1868,8 +1837,8 @@ TEST(Group_InvalidateTables)
         CHECK(subtable2->is_attached());
         CHECK(subtable3);
         CHECK(subtable3->is_attached());
-        subtable3->add("alpha", 79542, true,  Wed);
-        subtable3->add("beta",     97, false, Mon);
+        subtable3->add("alpha", 79542, true, Wed);
+        subtable3->add("beta", 97, false, Mon);
         CHECK(table->is_attached());
         CHECK(subtable1->is_attached());
         CHECK(subtable2->is_attached());
@@ -1888,12 +1857,14 @@ TEST(Group_ToJSON)
     TestTableGroup::Ref table = g.add_table<TestTableGroup>("test");
 
     table->add("jeff", 1, true, Wed);
-    table->add("jim",  1, true, Wed);
+    table->add("jim", 1, true, Wed);
     std::ostringstream out;
     g.to_json(out);
     std::string str = out.str();
     CHECK(str.length() > 0);
-    CHECK_EQUAL("{\"test\":[{\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"first\":\"jim\",\"second\":1,\"third\":true,\"fourth\":2}]}", str);
+    CHECK_EQUAL("{\"test\":[{\"first\":\"jeff\",\"second\":1,\"third\":true,\"fourth\":2},{\"first\":\"jim\","
+                "\"second\":1,\"third\":true,\"fourth\":2}]}",
+                str);
 }
 
 
@@ -1903,7 +1874,7 @@ TEST(Group_ToString)
     TestTableGroup::Ref table = g.add_table<TestTableGroup>("test");
 
     table->add("jeff", 1, true, Wed);
-    table->add("jim",  1, true, Wed);
+    table->add("jim", 1, true, Wed);
     std::ostringstream out;
     g.to_string(out);
     std::string str = out.str();
@@ -1917,14 +1888,14 @@ TEST(Group_IndexString)
     Group to_mem;
     TestTableGroup::Ref table = to_mem.add_table<TestTableGroup>("test");
 
-    table->add("jeff",     1, true, Wed);
-    table->add("jim",      1, true, Wed);
+    table->add("jeff", 1, true, Wed);
+    table->add("jim", 1, true, Wed);
     table->add("jennifer", 1, true, Wed);
-    table->add("john",     1, true, Wed);
-    table->add("jimmy",    1, true, Wed);
-    table->add("jimbo",    1, true, Wed);
-    table->add("johnny",   1, true, Wed);
-    table->add("jennifer", 1, true, Wed); //duplicate
+    table->add("john", 1, true, Wed);
+    table->add("jimmy", 1, true, Wed);
+    table->add("jimbo", 1, true, Wed);
+    table->add("johnny", 1, true, Wed);
+    table->add("jennifer", 1, true, Wed); // duplicate
 
     table->column().first.add_search_index();
     CHECK(table->column().first.has_search_index());
@@ -2060,9 +2031,7 @@ TEST(Group_CascadeNotify_Simple)
     t->add_empty_row(100);
 
     bool called = false;
-    g.set_cascade_notification_handler([&](const Group::CascadeNotification&) {
-        called = true;
-    });
+    g.set_cascade_notification_handler([&](const Group::CascadeNotification&) { called = true; });
     t->remove(5);
     CHECK(called);
 
@@ -2461,16 +2430,16 @@ TEST(Group_ToDot)
     // Create table with all column types
     TableRef table = mygroup.add_table("test");
     DescriptorRef subdesc;
-    s.add_column(type_Int,      "int");
-    s.add_column(type_Bool,     "bool");
+    s.add_column(type_Int, "int");
+    s.add_column(type_Bool, "bool");
     s.add_column(type_OldDateTime, "date");
-    s.add_column(type_String,   "string");
-    s.add_column(type_String,   "string_long");
-    s.add_column(type_String,   "string_enum"); // becomes StringEnumColumn
-    s.add_column(type_Binary,   "binary");
-    s.add_column(type_Mixed,    "mixed");
-    s.add_column(type_Table,    "tables", &subdesc);
-    subdesc->add_column(type_Int,    "sub_first");
+    s.add_column(type_String, "string");
+    s.add_column(type_String, "string_long");
+    s.add_column(type_String, "string_enum"); // becomes StringEnumColumn
+    s.add_column(type_Binary, "binary");
+    s.add_column(type_Mixed, "mixed");
+    s.add_column(type_Table, "tables", &subdesc);
+    subdesc->add_column(type_Int, "sub_first");
     subdesc->add_column(type_String, "sub_second");
 
     // Add some rows
@@ -2522,7 +2491,7 @@ TEST(Group_ToDot)
             Table subtable = table->GetMixedTable(7, i);
 
             Spec s = subtable->get_spec();
-            s.add_column(type_Int,    "first");
+            s.add_column(type_Int, "first");
             s.add_column(type_String, "second");
             subtable->UpdateFromSpec(s.get_ref());
 

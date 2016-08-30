@@ -105,8 +105,9 @@ struct TypeCount<void> {
 template <class List, template <class> class Pred>
 struct FindType {
 private:
-    typedef typename List::head                                type_1;
+    typedef typename List::head type_1;
     typedef typename FindType<typename List::tail, Pred>::type type_2;
+
 public:
     typedef typename std::conditional<Pred<type_1>::value, type_1, type_2>::type type;
 };
@@ -160,11 +161,17 @@ template <template <class T, int i> class Op, int i>
 struct ForEachType<void, Op, i> {
     static void exec() {}
     template <class A>
-    static void exec(const A&) {}
+    static void exec(const A&)
+    {
+    }
     template <class A, class B>
-    static void exec(const A&, const B&) {}
+    static void exec(const A&, const B&)
+    {
+    }
     template <class A, class B, class C>
-    static void exec(const A&, const B&, const C&) {}
+    static void exec(const A&, const B&, const C&)
+    {
+    }
 };
 
 
@@ -211,11 +218,20 @@ template <template <class T, int i> class Pred, int i>
 struct HasType<void, Pred, i> {
     static bool exec() { return false; }
     template <class A>
-    static bool exec(const A&) { return false; }
+    static bool exec(const A&)
+    {
+        return false;
+    }
     template <class A, class B>
-    static bool exec(const A&, const B&) { return false; }
+    static bool exec(const A&, const B&)
+    {
+        return false;
+    }
     template <class A, class B, class C>
-    static bool exec(const A&, const B&, const C&) { return false; }
+    static bool exec(const A&, const B&, const C&)
+    {
+        return false;
+    }
 };
 
 

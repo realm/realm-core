@@ -46,8 +46,7 @@ public:
     void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool nullable) override;
     void erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                     bool broken_reciprocal_backlinks) override;
-    void move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-                            bool broken_reciprocal_backlinks) override;
+    void move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool broken_reciprocal_backlinks) override;
     void clear(size_t num_rows, bool broken_reciprocal_backlinks) override;
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2) override;
     void destroy() noexcept override;
@@ -73,7 +72,7 @@ public:
     void do_dump_node_structure(std::ostream&, std::string indent) const override;
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const override;
 #endif
-    void add(const Timestamp& ts = Timestamp {});
+    void add(const Timestamp& ts = Timestamp{});
     Timestamp get(size_t row_ndx) const noexcept;
     void set(size_t row_ndx, const Timestamp& ts);
     bool compare(const TimestampColumn& c) const noexcept;
@@ -87,8 +86,8 @@ public:
     template <class Condition>
     size_t find(Timestamp value, size_t begin, size_t end) const noexcept
     {
-        // FIXME: Here we can do all sorts of clever optimizations. Use bithack-search on seconds, then for each match check
-        // nanoseconds, etc. Lots of possibilities. Below code is naive and slow but works.
+        // FIXME: Here we can do all sorts of clever optimizations. Use bithack-search on seconds, then for each match
+        // check nanoseconds, etc. Lots of possibilities. Below code is naive and slow but works.
 
         Condition cond;
         for (size_t t = begin; t < end; t++) {

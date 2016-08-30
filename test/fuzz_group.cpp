@@ -34,18 +34,20 @@ using namespace realm::util;
 #define REALM_VERIFY true
 
 #if REALM_VERIFY
-#define REALM_DO_IF_VERIFY(log, op) \
-        do { \
-            if (log) *log << #op << ";\n"; \
-            op; \
-        } \
-        while(false)
+#define REALM_DO_IF_VERIFY(log, op)                                                                                  \
+    do {                                                                                                             \
+        if (log)                                                                                                     \
+            *log << #op << ";\n";                                                                                    \
+        op;                                                                                                          \
+    } while (false)
 #else
-#define REALM_DO_IF_VERIFY(log, owner) \
-        do {} while(false)
+#define REALM_DO_IF_VERIFY(log, owner)                                                                               \
+    do {                                                                                                             \
+    } while (false)
 #endif
 
-struct EndOfFile {};
+struct EndOfFile {
+};
 
 std::string create_string(size_t length)
 {
@@ -56,28 +58,40 @@ std::string create_string(size_t length)
     return std::string{buf, length};
 }
 
-enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
-            ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
-            CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
-            COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, CLOSE_AND_REOPEN, GET_ALL_COLUMN_NAMES,
-            CREATE_TABLE_VIEW, COMPACT,
+enum INS {
+    ADD_TABLE,
+    INSERT_TABLE,
+    REMOVE_TABLE,
+    INSERT_ROW,
+    ADD_EMPTY_ROW,
+    INSERT_COLUMN,
+    ADD_COLUMN,
+    REMOVE_COLUMN,
+    SET,
+    REMOVE_ROW,
+    ADD_COLUMN_LINK,
+    ADD_COLUMN_LINK_LIST,
+    CLEAR_TABLE,
+    MOVE_TABLE,
+    INSERT_COLUMN_LINK,
+    ADD_SEARCH_INDEX,
+    REMOVE_SEARCH_INDEX,
+    COMMIT,
+    ROLLBACK,
+    ADVANCE,
+    MOVE_LAST_OVER,
+    CLOSE_AND_REOPEN,
+    GET_ALL_COLUMN_NAMES,
+    CREATE_TABLE_VIEW,
+    COMPACT,
 
-            COUNT
-         };
+    COUNT
+};
 
 DataType get_type(unsigned char c)
 {
-    DataType types[] = {
-        type_Int,
-        type_Bool,
-        type_Float,
-        type_Double,
-        type_String,
-        type_Binary,
-        type_Table,
-        type_Mixed,
-        type_Timestamp
-    };
+    DataType types[] = {type_Int,    type_Bool,  type_Float, type_Double,   type_String,
+                        type_Binary, type_Table, type_Mixed, type_Timestamp};
 
     unsigned char mod = c % (sizeof(types) / sizeof(DataType));
     return types[mod];
@@ -134,7 +148,7 @@ std::string get_current_time_stamp()
 {
     std::time_t t = std::time(nullptr);
     const int str_size = 100;
-    char str_buffer [str_size] = { 0 };
+    char str_buffer[str_size] = {0};
     std::strftime(str_buffer, str_size, "%c", std::localtime(&t));
     return str_buffer;
 }
@@ -158,7 +172,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         const char* key = use_encryption ? crypt_key(true) : nullptr;
 
         if (log) {
-            *log << "// Test case generated in "  REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
+            *log << "// Test case generated in " REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
             *log << "// ----------------------------------------------------------------------\n";
             std::string printable_key;
             if (key == nullptr) {
@@ -211,7 +225,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t table_ndx = get_next(s) % (g.size() + 1);
                 std::string name = create_table_name(s);
                 if (log) {
-                    *log << "try { g.insert_table(" << table_ndx << ", \"" << name << "\"); } catch (const TableNameInUse&) { }\n";
+                    *log << "try { g.insert_table(" << table_ndx << ", \"" << name
+                         << "\"); } catch (const TableNameInUse&) { }\n";
                 }
                 try {
                     g.insert_table(table_ndx, name);
@@ -255,9 +270,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t row_ndx = get_next(s) % (g.get_table(table_ndx)->size() + 1);
                 size_t num_rows = get_next(s);
                 typedef _impl::TableFriend tf;
-                if (g.get_table(table_ndx)->get_column_count() > 0 || tf::is_cross_table_link_target(*g.get_table(table_ndx))) {
+                if (g.get_table(table_ndx)->get_column_count() > 0 ||
+                    tf::is_cross_table_link_target(*g.get_table(table_ndx))) {
                     if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->insert_empty_row(" << row_ndx << ", " << num_rows % add_empty_row_max << ");\n";
+                        *log << "g.get_table(" << table_ndx << ")->insert_empty_row(" << row_ndx << ", "
+                             << num_rows % add_empty_row_max << ");\n";
                     }
                     g.get_table(table_ndx)->insert_empty_row(row_ndx, num_rows % add_empty_row_max);
                 }
@@ -270,9 +287,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t num_rows = get_next(s);
                 if (g.get_table(table_ndx)->size() + num_rows < max_rows) {
                     typedef _impl::TableFriend tf;
-                    if (g.get_table(table_ndx)->get_column_count() > 0 || tf::is_cross_table_link_target(*g.get_table(table_ndx))) {
+                    if (g.get_table(table_ndx)->get_column_count() > 0 ||
+                        tf::is_cross_table_link_target(*g.get_table(table_ndx))) {
                         if (log) {
-                            *log << "g.get_table(" << table_ndx << ")->add_empty_row(" << num_rows % add_empty_row_max << ");\n";
+                            *log << "g.get_table(" << table_ndx << ")->add_empty_row(" << num_rows % add_empty_row_max
+                                 << ");\n";
                         }
                         g.get_table(table_ndx)->add_empty_row(num_rows % add_empty_row_max);
                     }
@@ -285,7 +304,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 // Mixed and Subtable cannot be nullable. For other types, chose nullability randomly
                 bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name << "\", " << (nullable ? "true" : "false") << ");\n";
+                    *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name
+                         << "\", " << (nullable ? "true" : "false") << ");\n";
                 }
                 g.get_table(table_ndx)->add_column(type, name, nullable);
             }
@@ -296,7 +316,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 std::string name = create_column_name(s);
                 bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType(" << int(type) << "), \"" << name << "\", " << (nullable ? "true" : "false") << ");\n";
+                    *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType("
+                         << int(type) << "), \"" << name << "\", " << (nullable ? "true" : "false") << ");\n";
                 }
                 g.get_table(table_ndx)->insert_column(col_ndx, type, name, nullable);
             }
@@ -331,7 +352,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 TableRef t = g.get_table(table_ndx);
                 if (t->get_column_count() > 0) {
                     size_t col_ndx = get_next(s) % t->get_column_count();
-                    // We don't need to check if the column is of a type that is indexable or if it has index on or off
+                    // We don't need to check if the column is of a type that is indexable or if it has index on or
+                    // off
                     // because Realm will just do a no-op at worst (no exception or assert).
                     if (log) {
                         *log << "g.get_table(" << table_ndx << ")->remove_search_index(" << col_ndx << ");\n";
@@ -346,7 +368,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 TableRef t2 = g.get_table(table_ndx_2);
                 std::string name = create_column_name(s);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_Link, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
+                    *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_Link, \"" << name
+                         << "\", *g.get_table(" << table_ndx_2 << "));\n";
                 }
                 t1->add_column_link(type_Link, name, *t2);
             }
@@ -358,7 +381,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 TableRef t2 = g.get_table(table_ndx_2);
                 std::string name = create_column_name(s);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx_1 << ")->insert_column_link(" << col_ndx << ", type_Link, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
+                    *log << "g.get_table(" << table_ndx_1 << ")->insert_column_link(" << col_ndx << ", type_Link, \""
+                         << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
                 }
                 t1->insert_column_link(col_ndx, type_Link, name, *t2);
             }
@@ -369,7 +393,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 TableRef t2 = g.get_table(table_ndx_2);
                 std::string name = create_column_name(s);
                 if (log) {
-                    *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_LinkList, \"" << name << "\", *g.get_table(" << table_ndx_2 << "));\n";
+                    *log << "g.get_table(" << table_ndx_1 << ")->add_column_link(type_LinkList, \"" << name
+                         << "\", *g.get_table(" << table_ndx_2 << "));\n";
                 }
                 t1->add_column_link(type_LinkList, name, *t2);
             }
@@ -385,13 +410,15 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     if (get_next(s) % 2 == 0 && t->is_nullable(col_ndx)) {
                         if (type == type_Link) {
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->nullify_link(" << col_ndx << ", " << row_ndx << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->nullify_link(" << col_ndx << ", "
+                                     << row_ndx << ");\n";
                             }
                             t->nullify_link(col_ndx, row_ndx);
                         }
                         else {
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_null(" << col_ndx << ", " << row_ndx << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_null(" << col_ndx << ", " << row_ndx
+                                     << ");\n";
                             }
                             t->set_null(col_ndx, row_ndx);
                         }
@@ -400,42 +427,48 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         if (type == type_String) {
                             std::string str = create_string(get_next(s));
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_string(" << col_ndx << ", " << row_ndx << ", \"" << str << "\");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_string(" << col_ndx << ", " << row_ndx
+                                     << ", \"" << str << "\");\n";
                             }
                             t->set_string(col_ndx, row_ndx, str);
                         }
                         else if (type == type_Binary) {
                             std::string str = create_string(get_next(s));
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_binary(" << col_ndx << ", " << row_ndx << ", BinaryData{\"" << str << "\", " << str.size() << "});\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_binary(" << col_ndx << ", " << row_ndx
+                                     << ", BinaryData{\"" << str << "\", " << str.size() << "});\n";
                             }
                             t->set_binary(col_ndx, row_ndx, BinaryData(str));
                         }
                         else if (type == type_Int) {
                             int64_t value = get_int64(s);
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_int(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_int(" << col_ndx << ", " << row_ndx
+                                     << ", " << value << ");\n";
                             }
                             t->set_int(col_ndx, row_ndx, get_next(s));
                         }
                         else if (type == type_Bool) {
                             bool value = get_next(s) % 2 == 0;
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_bool(" << col_ndx << ", " << row_ndx << ", " << (value ? "true" : "false") << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_bool(" << col_ndx << ", " << row_ndx
+                                     << ", " << (value ? "true" : "false") << ");\n";
                             }
                             t->set_bool(col_ndx, row_ndx, value);
                         }
                         else if (type == type_Float) {
                             float value = get_next(s);
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_float(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_float(" << col_ndx << ", " << row_ndx
+                                     << ", " << value << ");\n";
                             }
                             t->set_float(col_ndx, row_ndx, value);
                         }
                         else if (type == type_Double) {
                             double value = get_next(s);
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_double(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_double(" << col_ndx << ", " << row_ndx
+                                     << ", " << value << ");\n";
                             }
                             t->set_double(col_ndx, row_ndx, value);
                         }
@@ -444,7 +477,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             if (target->size() > 0) {
                                 size_t target_row = get_next(s) % target->size();
                                 if (log) {
-                                    *log << "g.get_table(" << table_ndx << ")->set_link(" << col_ndx << ", " << row_ndx << ", " << target_row << ");\n";
+                                    *log << "g.get_table(" << table_ndx << ")->set_link(" << col_ndx << ", "
+                                         << row_ndx << ", " << target_row << ");\n";
                                 }
                                 t->set_link(col_ndx, row_ndx, target_row);
                             }
@@ -459,7 +493,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                     size_t target_link_ndx = get_next(s) % target->size();
                                     if (log) {
                                         *log << "g.get_table(" << table_ndx << ")->get_linklist(" << col_ndx << ", "
-                                             << row_ndx << ")->set(" << linklist_row << ", " << target_link_ndx << ");\n";
+                                             << row_ndx << ")->set(" << linklist_row << ", " << target_link_ndx
+                                             << ");\n";
                                     }
                                     links->set(linklist_row, target_link_ndx);
                                 }
@@ -483,9 +518,10 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             if (!correct_timestamp) {
                                 nanoseconds = -nanoseconds;
                             }
-                            Timestamp value{ seconds, nanoseconds };
+                            Timestamp value{seconds, nanoseconds};
                             if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_timestamp(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
+                                *log << "g.get_table(" << table_ndx << ")->set_timestamp(" << col_ndx << ", "
+                                     << row_ndx << ", " << value << ");\n";
                             }
                             t->set_timestamp(col_ndx, row_ndx, value);
                         }
@@ -635,12 +671,12 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
 void usage(const char* argv[])
 {
-    fprintf(stderr,
-            "Usage: %s FILE [--log] [--name NAME]\n"
-            "Where FILE is a instruction file that will be replayed.\n"
-            "Pass --log to have code printed to stdout producing the same instructions.\n"
-            "Pass --name NAME with distinct values when running on multiple threads,\n"
-            "                 to make sure the test don't use the same Realm file\n", argv[0]);
+    fprintf(stderr, "Usage: %s FILE [--log] [--name NAME]\n"
+                    "Where FILE is a instruction file that will be replayed.\n"
+                    "Pass --log to have code printed to stdout producing the same instructions.\n"
+                    "Pass --name NAME with distinct values when running on multiple threads,\n"
+                    "                 to make sure the test don't use the same Realm file\n",
+            argv[0]);
     exit(1);
 }
 
@@ -682,4 +718,3 @@ int run_fuzzy(int argc, const char* argv[])
 
     return 0;
 }
-

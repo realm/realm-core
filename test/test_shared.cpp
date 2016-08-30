@@ -108,18 +108,9 @@ bool allow_async = true;
 #endif
 
 
-REALM_TABLE_4(TestTableShared,
-              first,  Int,
-              second, Int,
-              third,  Bool,
-              fourth, String)
+REALM_TABLE_4(TestTableShared, first, Int, second, Int, third, Bool, fourth, String)
 
-REALM_TABLE_5(TestTableSharedTimestamp,
-              first,  Int,
-              second, Int,
-              third,  Bool,
-              fourth, String,
-              fifth, Timestamp)
+REALM_TABLE_5(TestTableSharedTimestamp, first, Int, second, Int, third, Bool, fourth, String, fifth, Timestamp)
 
 void writer(std::string path, int id)
 {
@@ -160,7 +151,8 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
             // pseudo randomized wait (to prevent unwanted synchronization effects of yield):
             int n = random() % 10000;
             volatile int thing = 0;
-            while (n--) thing += random();
+            while (n--)
+                thing += random();
             ReadTransaction rt(sg);
             rt.get_group().verify();
             TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
@@ -197,7 +189,7 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
 
 } // anonymous namespace
 
-#if !defined(_WIN32)&& !REALM_ENABLE_ENCRYPTION && !REALM_ANDROID
+#if !defined(_WIN32) && !REALM_ENABLE_ENCRYPTION && !REALM_ANDROID
 
 TEST_IF(Shared_PipelinedWritesWithKills, false)
 {
@@ -294,7 +286,6 @@ TEST(Shared_CompactingOnTheFly)
             t1[41].third = true;
             wt.commit();
         }
-
     }
     writer_thread.join();
     {
@@ -335,7 +326,6 @@ TEST(Shared_Initial)
             ReadTransaction rt(sg);
             CHECK(rt.get_group().is_empty());
         }
-
     }
 }
 
@@ -353,7 +343,6 @@ TEST(Shared_InitialMem)
             ReadTransaction rt(sg);
             CHECK(rt.get_group().is_empty());
         }
-
     }
 
     // In MemOnly mode, the database file must be automatically
@@ -699,7 +688,7 @@ TEST(Shared_AddColumnToSubspec)
         TableRef table = wt.add_table("table");
         DescriptorRef sub_1;
         table->add_column(type_Table, "subtable", &sub_1);
-        sub_1->add_column(type_Int,   "int");
+        sub_1->add_column(type_Int, "int");
         table->add_empty_row();
         TableRef subtable = table->get_subtable(0, 0);
         subtable->add_empty_row();
@@ -738,8 +727,8 @@ TEST(Shared_AddColumnToSubspec)
         CHECK_EQUAL(type_Int, subtable->get_column_type(1));
         CHECK_EQUAL(2, subtable->size());
         CHECK_EQUAL(789, subtable->get_int(0, 0));
-        CHECK_EQUAL(0,   subtable->get_int(0, 1));
-        CHECK_EQUAL(0,   subtable->get_int(1, 0));
+        CHECK_EQUAL(0, subtable->get_int(0, 1));
+        CHECK_EQUAL(0, subtable->get_int(1, 0));
         CHECK_EQUAL(654, subtable->get_int(1, 1));
     }
 }
@@ -756,9 +745,9 @@ TEST(Shared_RemoveColumnBeforeSubtableColumn)
         WriteTransaction wt(sg);
         DescriptorRef sub_1;
         TableRef table = wt.add_table("table");
-        table->add_column(type_Int,   "int");
+        table->add_column(type_Int, "int");
         table->add_column(type_Table, "subtable", &sub_1);
-        sub_1->add_column(type_Int,   "int");
+        sub_1->add_column(type_Int, "int");
         table->add_empty_row();
         TableRef subtable = table->get_subtable(1, 0);
         subtable->add_empty_row();
@@ -825,11 +814,11 @@ TEST(Shared_ManyReaders)
 
 #if TEST_DURATION < 1
     // Mac OS X 10.8 cannot handle more than 15 due to its default ulimit settings.
-    int rounds[] = { 3, 5, 7, 9, 11, 13 };
+    int rounds[] = {3, 5, 7, 9, 11, 13};
 #else
-    int rounds[] = { 3, 5, 11, 15, 17, 23, 27, 31, 47, 59 };
+    int rounds[] = {3, 5, 11, 15, 17, 23, 27, 31, 47, 59};
 #endif
-    const int num_rounds = sizeof rounds / sizeof * rounds;
+    const int num_rounds = sizeof rounds / sizeof *rounds;
 
     const int max_N = 64;
     CHECK(max_N >= rounds[num_rounds - 1]);
@@ -871,7 +860,7 @@ TEST(Shared_ManyReaders)
                 CHECK_EQUAL(1u, test_1->size());
                 CHECK_EQUAL(i, test_1->get_int(0, 0));
                 ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
-                int n_1 = i *  1;
+                int n_1 = i * 1;
                 int n_2 = i * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
                 for (int j = 0; j < n_1; ++j)
@@ -907,7 +896,7 @@ TEST(Shared_ManyReaders)
             CHECK_EQUAL(1, test_1->size());
             CHECK_EQUAL(i, test_1->get_int(0, 0));
             ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
-            int n_1 = i *  1;
+            int n_1 = i * 1;
             int n_2 = i * 18;
             CHECK_EQUAL(n_1 + n_2, test_2->size());
             for (int j = 0; j < n_1; ++j)
@@ -921,7 +910,7 @@ TEST(Shared_ManyReaders)
         for (int i = N - 1; i >= 0; --i) {
             {
                 WriteTransaction wt(root_sg);
-#if !defined(_WIN32) || TEST_DURATION > 0  // These .verify() calls are horribly slow on Windows
+#if !defined(_WIN32) || TEST_DURATION > 0 // These .verify() calls are horribly slow on Windows
                 wt.get_group().verify();
 #endif
                 TableRef test_1 = wt.get_table("test_1");
@@ -933,7 +922,7 @@ TEST(Shared_ManyReaders)
                 CHECK_EQUAL(1, test_1->size());
                 CHECK_EQUAL(i, test_1->get_int(0, 0));
                 ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
-                int n_1 = i *  1;
+                int n_1 = i * 1;
                 int n_2 = i * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
                 for (int j = 0; j < n_1; ++j)
@@ -956,7 +945,7 @@ TEST(Shared_ManyReaders)
                 int i_2 = 2 * N + i;
                 CHECK_EQUAL(i_2, test_1->get_int(0, 0));
                 ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
-                int n_1 = i *  1;
+                int n_1 = i * 1;
                 int n_2 = i * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
                 for (int j = 0; j < n_1; ++j)
@@ -1007,7 +996,7 @@ TEST(Shared_ManyReaders)
                 int i_2 = i < 2 * N ? i : 2 * N + i;
                 CHECK_EQUAL(i_2, test_1->get_int(0, 0));
                 ConstTableRef test_2 = read_transactions[i]->get_table("test_2");
-                int n_1 = i *  1;
+                int n_1 = i * 1;
                 int n_2 = i * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
                 for (int j = 0; j < n_1; ++j)
@@ -1029,7 +1018,7 @@ TEST(Shared_ManyReaders)
                 CHECK_EQUAL(1, test_1->size());
                 CHECK_EQUAL(3 * 8 * N, test_1->get_int(0, 0));
                 ConstTableRef test_2 = rt.get_table("test_2");
-                int n_1 = 8 * N *  1;
+                int n_1 = 8 * N * 1;
                 int n_2 = 8 * N * 18;
                 CHECK_EQUAL(n_1 + n_2, test_2->size());
                 for (int j = 0; j < n_1; ++j)
@@ -1051,7 +1040,7 @@ TEST(Shared_ManyReaders)
             CHECK_EQUAL(1, test_1->size());
             CHECK_EQUAL(3 * 8 * N, test_1->get_int(0, 0));
             ConstTableRef test_2 = rt.get_table("test_2");
-            int n_1 = 8 * N *  1;
+            int n_1 = 8 * N * 1;
             int n_2 = 8 * N * 18;
             CHECK_EQUAL(n_1 + n_2, test_2->size());
             for (int j = 0; j < n_1; ++j)
@@ -1107,7 +1096,7 @@ TEST(Many_ConcurrentReaders)
 
 namespace {
 
-REALM_TABLE_1(MyTable_SpecialOrder, first,  Int)
+REALM_TABLE_1(MyTable_SpecialOrder, first, Int)
 
 } // anonymous namespace
 
@@ -1116,7 +1105,8 @@ TEST(Shared_WritesSpecialOrder)
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path, false, SharedGroup::durability_Full, crypt_key());
 
-    const int num_rows = 5; // FIXME: Should be strictly greater than REALM_MAX_BPNODE_SIZE, but that takes too long time.
+    const int num_rows =
+        5; // FIXME: Should be strictly greater than REALM_MAX_BPNODE_SIZE, but that takes too long time.
     const int num_reps = 25;
 
     {
@@ -1152,7 +1142,7 @@ TEST(Shared_WritesSpecialOrder)
     }
 }
 
-namespace  {
+namespace {
 
 void writer_threads_thread(TestContext& test_context, std::string path, size_t row_ndx)
 {
@@ -1234,7 +1224,7 @@ TEST(Shared_WriterThreads)
 }
 
 
-#if !REALM_ENABLE_ENCRYPTION &&  defined(ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE)
+#if !REALM_ENABLE_ENCRYPTION && defined(ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE)
 // this unittest has issues that has not been fully understood, but could be
 // related to interaction between posix robust mutexes and the fork() system call.
 // it has so far only been seen failing on Linux, so we enable it on ios.
@@ -1321,17 +1311,17 @@ TEST(Shared_FormerErrorCase1)
         WriteTransaction wt(sg);
         wt.get_group().verify();
         TableRef table = wt.add_table("my_table");
-        table->add_column(type_Int,      "alpha");
-        table->add_column(type_Bool,     "beta");
-        table->add_column(type_Int,      "gamma");
+        table->add_column(type_Int, "alpha");
+        table->add_column(type_Bool, "beta");
+        table->add_column(type_Int, "gamma");
         table->add_column(type_OldDateTime, "delta");
-        table->add_column(type_String,   "epsilon");
-        table->add_column(type_Binary,   "zeta");
-        table->add_column(type_Table,    "eta", &sub_1);
-        table->add_column(type_Mixed,    "theta");
-        sub_1->add_column(type_Int,        "foo");
-        sub_1->add_column(type_Table,      "bar", &sub_2);
-        sub_2->add_column(type_Int,          "value");
+        table->add_column(type_String, "epsilon");
+        table->add_column(type_Binary, "zeta");
+        table->add_column(type_Table, "eta", &sub_1);
+        table->add_column(type_Mixed, "theta");
+        sub_1->add_column(type_Int, "foo");
+        sub_1->add_column(type_Table, "bar", &sub_2);
+        sub_2->add_column(type_Int, "value");
         table->insert_empty_row(0, 1);
         wt.commit();
     }
@@ -1450,14 +1440,11 @@ TEST(Shared_FormerErrorCase1)
 }
 
 
-
 namespace {
 
-REALM_TABLE_1(FormerErrorCase2_Subtable,
-              value,  Int)
+REALM_TABLE_1(FormerErrorCase2_Subtable, value, Int)
 
-REALM_TABLE_1(FormerErrorCase2_Table,
-              bar, Subtable<FormerErrorCase2_Subtable>)
+REALM_TABLE_1(FormerErrorCase2_Table, bar, Subtable<FormerErrorCase2_Subtable>)
 
 } // namespace
 
@@ -1483,8 +1470,7 @@ TEST(Shared_FormerErrorCase2)
 
 namespace {
 
-REALM_TABLE_1(OverAllocTable,
-              text, String)
+REALM_TABLE_1(OverAllocTable, text, String)
 
 } // namespace
 
@@ -1646,7 +1632,7 @@ TEST(Shared_StringIndexBug2)
         wt.get_group().verify();
         TableRef table = wt.add_table("a");
         table->add_column(type_String, "b");
-        table->add_search_index(0);  // Not adding index makes it work
+        table->add_search_index(0); // Not adding index makes it work
         table->add_empty_row();
         wt.commit();
     }
@@ -1677,7 +1663,7 @@ TEST(Shared_StringIndexBug3)
         Group& group = db.begin_write();
         TableRef table = group.add_table("users");
         table->add_column(type_String, "username");
-        table->add_search_index(0);  // Disabling index makes it work
+        table->add_search_index(0); // Disabling index makes it work
         db.commit();
     }
 
@@ -1695,7 +1681,7 @@ TEST(Shared_StringIndexBug3)
             TableRef table = group.get_table("users");
             if (table->size() > 0) {
                 size_t del = random.draw_int_mod(table->size());
-                //cerr << "-" << del << ": " << table->get_string(0, del) << std::endl;
+                // cerr << "-" << del << ": " << table->get_string(0, del) << std::endl;
                 table->remove(del);
                 table->verify();
             }
@@ -1709,7 +1695,7 @@ TEST(Shared_StringIndexBug3)
             char txt[100];
             rand_str(random, txt, 8);
             txt[8] = 0;
-            //cerr << "+" << txt << std::endl;
+            // cerr << "+" << txt << std::endl;
             table->set_string(0, table->size() - 1, txt);
             table->verify();
             db.commit();
@@ -1753,7 +1739,7 @@ TEST_IF(Shared_Async, allow_async)
         SharedGroup db(path, no_create, SharedGroup::durability_Async);
 
         for (size_t i = 0; i < 100; ++i) {
-//            std::cout << "t "<<n<<"\n";
+            //            std::cout << "t "<<n<<"\n";
             WriteTransaction wt(db);
             wt.get_group().verify();
             TestTableShared::Ref t1 = wt.get_or_add_table<TestTableShared>("test");
@@ -1778,7 +1764,7 @@ TEST_IF(Shared_Async, allow_async)
 }
 
 
-namespace  {
+namespace {
 
 #define multiprocess_increments 100
 
@@ -1822,7 +1808,7 @@ void multiprocess_thread(TestContext& test_context, std::string path, size_t row
 void multiprocess_make_table(std::string path, std::string lock_path, std::string alone_path, size_t rows)
 {
     static_cast<void>(lock_path);
-    // Create first table in group
+// Create first table in group
 #if 1
     static_cast<void>(alone_path);
 #if 0
@@ -1926,8 +1912,8 @@ void multiprocess_threaded(TestContext& test_context, std::string path, size_t n
     }
 }
 
-void multiprocess_validate_and_clear(TestContext& test_context, std::string path, std::string lock_path,
-                                     size_t rows, int result)
+void multiprocess_validate_and_clear(TestContext& test_context, std::string path, std::string lock_path, size_t rows,
+                                     int result)
 {
     // Wait for async_commit process to shutdown
     // FIXME: this is not apropriate
@@ -1980,25 +1966,21 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
     multiprocess_make_table(path, path.get_lock_path(), alone_path, 4);
 
     multiprocess_threaded(test_context, path, 2, 0);
-    multiprocess_validate_and_clear(test_context, path, path.get_lock_path(),
-                                    2, multiprocess_increments);
+    multiprocess_validate_and_clear(test_context, path, path.get_lock_path(), 2, multiprocess_increments);
 
     for (int k = 1; k < 3; ++k) {
         multiprocess(test_context, path, 2, 2);
-        multiprocess_validate_and_clear(test_context, path, path.get_lock_path(),
-                                        4, multiprocess_increments);
+        multiprocess_validate_and_clear(test_context, path, path.get_lock_path(), 4, multiprocess_increments);
     }
 #else
     multiprocess_make_table(path, path.get_lock_path(), alone_path, 100);
 
     multiprocess_threaded(test_context, path, 10, 0);
-    multiprocess_validate_and_clear(test_context, path, path.get_lock_path(),
-                                    10, multiprocess_increments);
+    multiprocess_validate_and_clear(test_context, path, path.get_lock_path(), 10, multiprocess_increments);
 
     for (int k = 1; k < 10; ++k) {
         multiprocess(test_context, path, 10, 10);
-        multiprocess_validate_and_clear(test_context, path, path.get_lock_path(),
-                                        100, multiprocess_increments);
+        multiprocess_validate_and_clear(test_context, path, path.get_lock_path(), 100, multiprocess_increments);
     }
 #endif
 }
@@ -2380,7 +2362,7 @@ TEST(Shared_ReserveDiskSpace)
         if (crypt_key()) {
             // For encrypted files, reserve() may actually grow the file
             // with a page sized header.
-            CHECK(orig_file_size <= new_file_size_2 && (orig_file_size + page_size()) >= new_file_size_2 );
+            CHECK(orig_file_size <= new_file_size_2 && (orig_file_size + page_size()) >= new_file_size_2);
         }
         else {
             CHECK_EQUAL(orig_file_size, new_file_size_2);
@@ -2591,13 +2573,13 @@ TEST(Shared_MovingSearchIndex)
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
         CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
         CHECK_EQUAL(realm::not_found, table->find_first_string(2, "bad"));
-        CHECK_EQUAL(0,  table->find_first_string(1, "foo_X"));
+        CHECK_EQUAL(0, table->find_first_string(1, "foo_X"));
         CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
         CHECK_EQUAL(62, table->find_first_string(1, "foo62"));
         CHECK_EQUAL(63, table->find_first_string(1, "foo63"));
-        CHECK_EQUAL(0,  table->find_first_string(2, "bar_X"));
-        CHECK_EQUAL(1,  table->find_first_string(2, "bar"));
+        CHECK_EQUAL(0, table->find_first_string(2, "bar_X"));
+        CHECK_EQUAL(1, table->find_first_string(2, "bar"));
         CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
         wt.commit();
     }
@@ -2610,13 +2592,13 @@ TEST(Shared_MovingSearchIndex)
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(2));
         CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
         CHECK_EQUAL(realm::not_found, table->find_first_string(2, "bad"));
-        CHECK_EQUAL(0,  table->find_first_string(1, "foo_X"));
+        CHECK_EQUAL(0, table->find_first_string(1, "foo_X"));
         CHECK_EQUAL(31, table->find_first_string(1, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(1, "foo61"));
         CHECK_EQUAL(62, table->find_first_string(1, "foo62"));
         CHECK_EQUAL(63, table->find_first_string(1, "foo63"));
-        CHECK_EQUAL(0,  table->find_first_string(2, "bar_X"));
-        CHECK_EQUAL(1,  table->find_first_string(2, "bar"));
+        CHECK_EQUAL(0, table->find_first_string(2, "bar_X"));
+        CHECK_EQUAL(1, table->find_first_string(2, "bar"));
         CHECK_EQUAL(63, table->find_first_string(2, "bar63"));
         table->remove_column(0);
         wt.get_group().verify();
@@ -2625,13 +2607,13 @@ TEST(Shared_MovingSearchIndex)
         CHECK_EQUAL(3, table->get_descriptor()->get_num_unique_values(1));
         CHECK_EQUAL(realm::not_found, table->find_first_string(0, "bad"));
         CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
-        CHECK_EQUAL(0,  table->find_first_string(0, "foo_X"));
+        CHECK_EQUAL(0, table->find_first_string(0, "foo_X"));
         CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(0, "foo61"));
         CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
         CHECK_EQUAL(63, table->find_first_string(0, "foo63"));
-        CHECK_EQUAL(0,  table->find_first_string(1, "bar_X"));
-        CHECK_EQUAL(1,  table->find_first_string(1, "bar"));
+        CHECK_EQUAL(0, table->find_first_string(1, "bar_X"));
+        CHECK_EQUAL(1, table->find_first_string(1, "bar"));
         CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
         table->set_string(0, 1, "foo_Y");
         table->set_string(1, 1, "bar_Y");
@@ -2641,15 +2623,15 @@ TEST(Shared_MovingSearchIndex)
         CHECK_EQUAL(4, table->get_descriptor()->get_num_unique_values(1));
         CHECK_EQUAL(realm::not_found, table->find_first_string(0, "bad"));
         CHECK_EQUAL(realm::not_found, table->find_first_string(1, "bad"));
-        CHECK_EQUAL(0,  table->find_first_string(0, "foo_X"));
-        CHECK_EQUAL(1,  table->find_first_string(0, "foo_Y"));
+        CHECK_EQUAL(0, table->find_first_string(0, "foo_X"));
+        CHECK_EQUAL(1, table->find_first_string(0, "foo_Y"));
         CHECK_EQUAL(31, table->find_first_string(0, "foo31"));
         CHECK_EQUAL(61, table->find_first_string(0, "foo61"));
         CHECK_EQUAL(62, table->find_first_string(0, "foo62"));
         CHECK_EQUAL(63, table->find_first_string(0, "foo63"));
-        CHECK_EQUAL(0,  table->find_first_string(1, "bar_X"));
-        CHECK_EQUAL(1,  table->find_first_string(1, "bar_Y"));
-        CHECK_EQUAL(2,  table->find_first_string(1, "bar"));
+        CHECK_EQUAL(0, table->find_first_string(1, "bar_X"));
+        CHECK_EQUAL(1, table->find_first_string(1, "bar_Y"));
+        CHECK_EQUAL(2, table->find_first_string(1, "bar"));
         CHECK_EQUAL(63, table->find_first_string(1, "bar63"));
         wt.commit();
     }
@@ -2768,8 +2750,7 @@ TEST(Shared_SessionDurabilityConsistency)
         SharedGroup sg(path, no_create, durability_1);
 
         SharedGroup::DurabilityLevel durability_2 = SharedGroup::durability_MemOnly;
-        CHECK_LOGIC_ERROR(SharedGroup(path, no_create, durability_2),
-                          LogicError::mixed_durability);
+        CHECK_LOGIC_ERROR(SharedGroup(path, no_create, durability_2), LogicError::mixed_durability);
     }
 }
 
@@ -2912,11 +2893,11 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
     // Either provide a crash file generated by AFL to reproduce a crash, or leave it blank in order to run
     // a very simple fuzz test that just uses a random generator for generating Realm actions.
     std::string filename = "";
-    //std::string filename = "/findings/hangs/id:000041,src:000000,op:havoc,rep:64";
-    //std::string filename = "d:/crash3";
+    // std::string filename = "/findings/hangs/id:000041,src:000000,op:havoc,rep:64";
+    // std::string filename = "d:/crash3";
 
     if (filename != "") {
-        const char* tmp[] = { "", filename.c_str(), "--log" };
+        const char* tmp[] = {"", filename.c_str(), "--log"};
         run_fuzzy(sizeof(tmp) / sizeof(tmp[0]), tmp);
     }
     else {
@@ -2930,7 +2911,7 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
         for (size_t counter = 0; counter < iterations; counter++) {
             // You can use your own seed if you have observed a crashing unit test that
             // printed out some specific seed (the "Unit test random seed:" part that appears).
-            //fastrand(534653645, true);
+            // fastrand(534653645, true);
             fastrand(unit_test_random_seed + counter, true);
 
             std::string instr;
@@ -2956,7 +2937,7 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
             SHARED_GROUP_TEST_PATH(path);
             // If using std::cerr, you can copy/paste the console output into a unit test
             // to get a reproduction test case
-            //parse_and_apply_instructions(instr, path, std::cerr);
+            // parse_and_apply_instructions(instr, path, std::cerr);
             parse_and_apply_instructions(instr, path, util::none);
         }
     }
@@ -2985,7 +2966,7 @@ NONCONCURRENT_TEST(Shared_BigAllocations)
         wt.commit();
     }
     for (int k = 0; k < 10; ++k) {
-        //sg.compact(); // <--- enable this if you want to stress with compact()
+        // sg.compact(); // <--- enable this if you want to stress with compact()
         for (int j = 0; j < 20; ++j) {
             WriteTransaction wt(sg);
             TableRef table = wt.get_table("table");
@@ -3055,7 +3036,7 @@ NONCONCURRENT_TEST(Shared_TopSizeNotEqualNine)
     sg2.begin_read(); // <- does not fail
     SharedGroup sg3(path, false, SharedGroup::durability_Full, crypt_key());
     sg3.begin_read(); // <- does not fail
-    sg.begin_read(); // <- does fail
+    sg.begin_read();  // <- does fail
 }
 
 // Found by AFL after adding the compact instruction

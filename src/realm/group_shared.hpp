@@ -46,11 +46,8 @@ class WriteLogCollector;
 
 /// Thrown by SharedGroup::open() if the lock file is already open in another
 /// process which can't share mutexes with this process
-struct IncompatibleLockFile: std::runtime_error {
-    IncompatibleLockFile(const std::string& msg):
-        std::runtime_error("Incompatible lock file. " + msg)
-    {
-    }
+struct IncompatibleLockFile : std::runtime_error {
+    IncompatibleLockFile(const std::string& msg) : std::runtime_error("Incompatible lock file. " + msg) {}
 };
 
 /// A SharedGroup facilitates transactions.
@@ -137,7 +134,7 @@ public:
     enum DurabilityLevel {
         durability_Full,
         durability_MemOnly,
-        durability_Async    ///< Not yet supported on windows.
+        durability_Async ///< Not yet supported on windows.
     };
 
     /// \brief Same as calling the corresponding version of open() on a instance
@@ -145,8 +142,7 @@ public:
     /// `upgrade_callback` throws, then the file will be closed properly and the
     /// upgrade will be aborted.
     explicit SharedGroup(const std::string& file, bool no_create = false,
-                         DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = nullptr,
+                         DurabilityLevel durability = durability_Full, const char* encryption_key = nullptr,
                          bool allow_file_format_upgrade = true,
                          std::function<void(int, int)> upgrade_callback = std::function<void(int, int)>());
 
@@ -154,13 +150,12 @@ public:
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and
     /// the upgrade will be aborted.
-    explicit SharedGroup(Replication& repl,
-                         DurabilityLevel durability = durability_Full,
-                         const char* encryption_key = nullptr,
-                         bool allow_file_format_upgrade = true,
+    explicit SharedGroup(Replication& repl, DurabilityLevel durability = durability_Full,
+                         const char* encryption_key = nullptr, bool allow_file_format_upgrade = true,
                          std::function<void(int, int)> upgrade_callback = std::function<void(int, int)>());
 
-    struct unattached_tag {};
+    struct unattached_tag {
+    };
 
     /// Create a SharedGroup instance in its unattached state. It may
     /// then be attached to a database file later by calling
@@ -212,14 +207,13 @@ public:
     ///
     /// \throw FileFormatUpgradeRequired only if \a allow_upgrade is `false`
     ///        and an upgrade is required.
-    void open(const std::string& file, bool no_create = false,
-              DurabilityLevel = durability_Full,
+    void open(const std::string& file, bool no_create = false, DurabilityLevel = durability_Full,
               const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
 
     /// Open this group in replication mode. The specified Replication instance
     /// must remain in existence for as long as the SharedGroup.
-    void open(Replication&, DurabilityLevel = durability_Full,
-              const char* encryption_key = nullptr, bool allow_file_format_upgrade = true);
+    void open(Replication&, DurabilityLevel = durability_Full, const char* encryption_key = nullptr,
+              bool allow_file_format_upgrade = true);
 
     /// Close any open database, returning to the unattached state.
     void close() noexcept;
@@ -367,11 +361,7 @@ public:
 
     //@}
 
-    enum TransactStage {
-        transact_Ready,
-        transact_Reading,
-        transact_Writing
-    };
+    enum TransactStage { transact_Ready, transact_Reading, transact_Writing };
 
     /// Get the current transaction type
     TransactStage get_transact_stage() const noexcept;
@@ -516,10 +506,10 @@ private:
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
-        uint_fast64_t   m_version    = std::numeric_limits<version_type>::max();
-        uint_fast32_t   m_reader_idx = 0;
-        ref_type        m_top_ref    = 0;
-        size_t          m_file_size  = 0;
+        uint_fast64_t m_version = std::numeric_limits<version_type>::max();
+        uint_fast32_t m_reader_idx = 0;
+        ref_type m_top_ref = 0;
+        size_t m_file_size = 0;
     };
     class ReadLockUnlockGuard;
 
@@ -556,17 +546,17 @@ private:
                  const char* encryption_key, bool allow_file_format_upgrade);
 
     // Ring buffer management
-    bool        ringbuf_is_empty() const noexcept;
+    bool ringbuf_is_empty() const noexcept;
     size_t ringbuf_size() const noexcept;
     size_t ringbuf_capacity() const noexcept;
-    bool        ringbuf_is_first(size_t ndx) const noexcept;
-    void        ringbuf_remove_first() noexcept;
+    bool ringbuf_is_first(size_t ndx) const noexcept;
+    void ringbuf_remove_first() noexcept;
     size_t ringbuf_find(uint64_t version) const noexcept;
-    ReadCount&  ringbuf_get(size_t ndx) noexcept;
-    ReadCount&  ringbuf_get_first() noexcept;
-    ReadCount&  ringbuf_get_last() noexcept;
-    void        ringbuf_put(const ReadCount& v);
-    void        ringbuf_expand();
+    ReadCount& ringbuf_get(size_t ndx) noexcept;
+    ReadCount& ringbuf_get_first() noexcept;
+    ReadCount& ringbuf_get_last() noexcept;
+    void ringbuf_put(const ReadCount& v);
+    void ringbuf_expand();
 
     /// Grab a read lock on the snapshot associated with the specified
     /// version. If `version_id == VersionID()`, a read lock will be grabbed on
@@ -614,15 +604,19 @@ private:
 
     //@{
     /// See LangBindHelper.
-    template <class O> void advance_read(O* observer, VersionID);
-    template <class O> void promote_to_write(O* observer);
+    template <class O>
+    void advance_read(O* observer, VersionID);
+    template <class O>
+    void promote_to_write(O* observer);
     version_type commit_and_continue_as_read();
-    template <class O> void rollback_and_continue_as_read(O* observer);
+    template <class O>
+    void rollback_and_continue_as_read(O* observer);
     //@}
 
     /// Returns true if, and only if _impl::History::update_early_from_top_ref()
     /// was called during the execution of this function.
-    template <class O> bool do_advance_read(O* observer, VersionID, _impl::History&);
+    template <class O>
+    bool do_advance_read(O* observer, VersionID, _impl::History&);
 
     /// If there is an associated \ref Replication object, then this function
     /// returns `repl->get_history()` where `repl` is that Replication object,
@@ -635,24 +629,16 @@ private:
 };
 
 
-
 class ReadTransaction {
 public:
-    ReadTransaction(SharedGroup& sg):
-        m_shared_group(sg)
+    ReadTransaction(SharedGroup& sg) : m_shared_group(sg)
     {
         m_shared_group.begin_read(); // Throws
     }
 
-    ~ReadTransaction() noexcept
-    {
-        m_shared_group.end_read();
-    }
+    ~ReadTransaction() noexcept { m_shared_group.end_read(); }
 
-    bool has_table(StringData name) const noexcept
-    {
-        return get_group().has_table(name);
-    }
+    bool has_table(StringData name) const noexcept { return get_group().has_table(name); }
 
     ConstTableRef get_table(size_t table_ndx) const
     {
@@ -682,8 +668,7 @@ private:
 
 class WriteTransaction {
 public:
-    WriteTransaction(SharedGroup& sg):
-        m_shared_group(&sg)
+    WriteTransaction(SharedGroup& sg) : m_shared_group(&sg)
     {
         m_shared_group->begin_write(); // Throws
     }
@@ -694,10 +679,7 @@ public:
             m_shared_group->rollback();
     }
 
-    bool has_table(StringData name) const noexcept
-    {
-        return get_group().has_table(name);
-    }
+    bool has_table(StringData name) const noexcept { return get_group().has_table(name); }
 
     TableRef get_table(size_t table_ndx) const
     {
@@ -763,51 +745,42 @@ private:
 };
 
 
-
-
-
-
 // Implementation:
 
-struct SharedGroup::BadVersion: std::exception {};
+struct SharedGroup::BadVersion : std::exception {
+};
 
-inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
-                                DurabilityLevel durability, const char* encryption_key,
-                                bool allow_file_format_upgrade, std::function<void(int, int)> upgrade_callback):
-    m_group(Group::shared_tag()),
-    m_upgrade_callback(std::move(upgrade_callback))
+inline SharedGroup::SharedGroup(const std::string& file, bool no_create, DurabilityLevel durability,
+                                const char* encryption_key, bool allow_file_format_upgrade,
+                                std::function<void(int, int)> upgrade_callback)
+    : m_group(Group::shared_tag()), m_upgrade_callback(std::move(upgrade_callback))
 {
     open(file, no_create, durability, encryption_key, allow_file_format_upgrade); // Throws
 }
 
-inline SharedGroup::SharedGroup(unattached_tag) noexcept:
-    m_group(Group::shared_tag())
+inline SharedGroup::SharedGroup(unattached_tag) noexcept : m_group(Group::shared_tag())
 {
 }
 
-inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability,
-                                const char* encryption_key, bool allow_file_format_upgrade,
-                                std::function<void(int, int)> upgrade_callback):
-    m_group(Group::shared_tag()),
-    m_upgrade_callback(std::move(upgrade_callback))
+inline SharedGroup::SharedGroup(Replication& repl, DurabilityLevel durability, const char* encryption_key,
+                                bool allow_file_format_upgrade, std::function<void(int, int)> upgrade_callback)
+    : m_group(Group::shared_tag()), m_upgrade_callback(std::move(upgrade_callback))
 {
     open(repl, durability, encryption_key, allow_file_format_upgrade); // Throws
 }
 
-inline void SharedGroup::open(const std::string& path, bool no_create_file,
-                              DurabilityLevel durability, const char* encryption_key,
-                              bool allow_file_format_upgrade)
+inline void SharedGroup::open(const std::string& path, bool no_create_file, DurabilityLevel durability,
+                              const char* encryption_key, bool allow_file_format_upgrade)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
 
     bool is_backend = false;
-    do_open(path, no_create_file, durability, is_backend, encryption_key,
-            allow_file_format_upgrade); // Throws
+    do_open(path, no_create_file, durability, is_backend, encryption_key, allow_file_format_upgrade); // Throws
 }
 
-inline void SharedGroup::open(Replication& repl, DurabilityLevel durability,
-                              const char* encryption_key, bool allow_file_format_upgrade)
+inline void SharedGroup::open(Replication& repl, DurabilityLevel durability, const char* encryption_key,
+                              bool allow_file_format_upgrade)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -820,10 +793,9 @@ inline void SharedGroup::open(Replication& repl, DurabilityLevel durability,
     gf::set_replication(m_group, &repl);
 
     std::string file = repl.get_database_path();
-    bool no_create   = false;
-    bool is_backend  = false;
-    do_open(file, no_create, durability, is_backend, encryption_key,
-            allow_file_format_upgrade); // Throws
+    bool no_create = false;
+    bool is_backend = false;
+    do_open(file, no_create, durability, is_backend, encryption_key, allow_file_format_upgrade); // Throws
 }
 
 inline bool SharedGroup::is_attached() const noexcept
@@ -843,9 +815,8 @@ inline SharedGroup::version_type SharedGroup::get_version_of_bound_snapshot() co
 
 class SharedGroup::ReadLockUnlockGuard {
 public:
-    ReadLockUnlockGuard(SharedGroup& shared_group, ReadLockInfo& read_lock) noexcept:
-        m_shared_group(shared_group),
-        m_read_lock(&read_lock)
+    ReadLockUnlockGuard(SharedGroup& shared_group, ReadLockInfo& read_lock) noexcept : m_shared_group(shared_group),
+                                                                                       m_read_lock(&read_lock)
     {
     }
     ~ReadLockUnlockGuard() noexcept
@@ -853,10 +824,7 @@ public:
         if (m_read_lock)
             m_shared_group.release_read_lock(*m_read_lock);
     }
-    void release() noexcept
-    {
-        m_read_lock = 0;
-    }
+    void release() noexcept { m_read_lock = 0; }
 private:
     SharedGroup& m_shared_group;
     ReadLockInfo* m_read_lock;
@@ -953,7 +921,7 @@ inline void SharedGroup::promote_to_write(O* observer)
 
     do_begin_write(); // Throws
     try {
-        VersionID version = VersionID(); // Latest
+        VersionID version = VersionID();                                  // Latest
         bool history_updated = do_advance_read(observer, version, *hist); // Throws
 
         Replication* repl = m_group.get_replication();
@@ -1002,7 +970,7 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
     if (observer && uncommitted_changes.size()) {
         _impl::ReversedNoCopyInputStream reversed_in(reverser);
         parser.parse(reversed_in, *observer); // Throws
-        observer->parse_complete(); // Throws
+        observer->parse_complete();           // Throws
     }
 
     ref_type top_ref = m_read_lock.m_top_ref;
@@ -1046,7 +1014,7 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
         version_type new_version = new_read_lock.m_version;
         _impl::ChangesetInputStream in(hist, old_version, new_version);
         parser.parse(in, *observer); // Throws
-        observer->parse_complete(); // Throws
+        observer->parse_complete();  // Throws
     }
 
     // The old read lock must be retained for as long as the change history is
@@ -1094,10 +1062,7 @@ inline int SharedGroup::get_file_format_version() const noexcept
 // not all of the non-public parts of the SharedGroup class.
 class _impl::SharedGroupFriend {
 public:
-    static Group& get_group(SharedGroup& sg) noexcept
-    {
-        return sg.m_group;
-    }
+    static Group& get_group(SharedGroup& sg) noexcept { return sg.m_group; }
 
     template <class O>
     static void advance_read(SharedGroup& sg, O* obs, SharedGroup::VersionID ver)
@@ -1129,14 +1094,10 @@ public:
         bool is_backend = true;
         const char* encryption_key = nullptr;
         bool allow_file_format_upgrade = false;
-        sg.do_open(file, no_create, durability, is_backend, encryption_key,
-                   allow_file_format_upgrade); // Throws
+        sg.do_open(file, no_create, durability, is_backend, encryption_key, allow_file_format_upgrade); // Throws
     }
 
-    static int get_file_format_version(const SharedGroup& sg) noexcept
-    {
-        return sg.get_file_format_version();
-    }
+    static int get_file_format_version(const SharedGroup& sg) noexcept { return sg.get_file_format_version(); }
 
     static SharedGroup::version_type get_version_of_latest_snapshot(SharedGroup& sg)
     {

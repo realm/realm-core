@@ -26,7 +26,7 @@ namespace realm {
 /// A BasicArray can currently only be used for simple unstructured
 /// types like float, double.
 template <class T>
-class BasicArray: public Array {
+class BasicArray : public Array {
 public:
     explicit BasicArray(Allocator&) noexcept;
     ~BasicArray() noexcept override {}
@@ -41,9 +41,8 @@ public:
     void truncate(size_t size);
     void clear();
 
-    size_t find_first(T value, size_t begin = 0 , size_t end = npos) const;
-    void find_all(IntegerColumn* result, T value, size_t add_offset = 0,
-                  size_t begin = 0, size_t end = npos) const;
+    size_t find_first(T value, size_t begin = 0, size_t end = npos) const;
+    void find_all(IntegerColumn* result, T value, size_t add_offset = 0, size_t begin = 0, size_t end = npos) const;
 
     size_t count(T value, size_t begin = 0, size_t end = npos) const;
     bool maximum(T& result, size_t begin = 0, size_t end = npos) const;
@@ -68,8 +67,7 @@ public:
     /// initialized to `T()`.
     static MemRef create_array(size_t size, Allocator&);
 
-    static MemRef create_array(Array::Type leaf_type, bool context_flag, size_t size, T value,
-                               Allocator&);
+    static MemRef create_array(Array::Type leaf_type, bool context_flag, size_t size, T value, Allocator&);
 
     /// Create a new empty array and attach this accessor to it. This
     /// does not modify the parent reference information of this

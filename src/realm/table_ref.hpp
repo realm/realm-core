@@ -124,16 +124,17 @@ class BasicTable;
 /// \sa Table
 /// \sa TableRef
 template <class T>
-class BasicTableRef: util::bind_ptr<T> {
+class BasicTableRef : util::bind_ptr<T> {
 public:
     constexpr BasicTableRef() noexcept {}
     ~BasicTableRef() noexcept {}
 
     // Copy construct
-    BasicTableRef(const BasicTableRef& r) noexcept: util::bind_ptr<T>(r) {}
+    BasicTableRef(const BasicTableRef& r) noexcept : util::bind_ptr<T>(r) {}
     template <class U>
-    BasicTableRef(const BasicTableRef<U>& r) noexcept:
-        util::bind_ptr<T>(r) {}
+    BasicTableRef(const BasicTableRef<U>& r) noexcept : util::bind_ptr<T>(r)
+    {
+    }
 
     // Copy assign
     BasicTableRef& operator=(const BasicTableRef&) noexcept;
@@ -141,10 +142,11 @@ public:
     BasicTableRef& operator=(const BasicTableRef<U>&) noexcept;
 
     // Move construct
-    BasicTableRef(BasicTableRef&& r) noexcept: util::bind_ptr<T>(std::move(r)) {}
+    BasicTableRef(BasicTableRef&& r) noexcept : util::bind_ptr<T>(std::move(r)) {}
     template <class U>
-    BasicTableRef(BasicTableRef<U>&& r) noexcept:
-        util::bind_ptr<T>(std::move(r)) {}
+    BasicTableRef(BasicTableRef<U>&& r) noexcept : util::bind_ptr<T>(std::move(r))
+    {
+    }
 
     // Move assign
     BasicTableRef& operator=(BasicTableRef&&) noexcept;
@@ -188,9 +190,9 @@ public:
 
     template <class U>
     bool operator>=(U*) const noexcept;
-    //@}
+//@}
 
-    // Dereference
+// Dereference
 #ifdef __clang__
     // Clang has a bug that causes it to effectively ignore the 'using' declaration.
     T& operator*() const noexcept { return util::bind_ptr<T>::operator*(); }
@@ -216,7 +218,9 @@ public:
 
 private:
     template <class>
-    struct GetRowAccType { typedef void type; };
+    struct GetRowAccType {
+        typedef void type;
+    };
 
     template <class Spec>
     struct GetRowAccType<BasicTable<Spec>> {
@@ -243,12 +247,13 @@ private:
     template <class>
     friend class BasicTableRef;
 
-    explicit BasicTableRef(T* t) noexcept: util::bind_ptr<T>(t) {}
+    explicit BasicTableRef(T* t) noexcept : util::bind_ptr<T>(t) {}
 
     typedef typename util::bind_ptr<T>::casting_move_tag casting_move_tag;
     template <class U>
-    BasicTableRef(BasicTableRef<U>* r, casting_move_tag) noexcept:
-        util::bind_ptr<T>(r, casting_move_tag()) {}
+    BasicTableRef(BasicTableRef<U>* r, casting_move_tag) noexcept : util::bind_ptr<T>(r, casting_move_tag())
+    {
+    }
 };
 
 
@@ -291,9 +296,6 @@ bool operator<=(T*, const BasicTableRef<U>&) noexcept;
 template <class T, class U>
 bool operator>=(T*, const BasicTableRef<U>&) noexcept;
 //@}
-
-
-
 
 
 // Implementation:

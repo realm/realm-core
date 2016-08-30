@@ -62,7 +62,7 @@ using test_util::unit_test::TestContext;
 namespace {
 
 template <class T, size_t N>
-inline size_t size_of_array(T(&)[N])
+inline size_t size_of_array(T (&)[N])
 {
     return N;
 }
@@ -70,22 +70,10 @@ inline size_t size_of_array(T(&)[N])
 // Article about comparing floats:
 // http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
 
-float float_values[] = {
-    0.0f,
-    1.0f,
-    2.12345f,
-    12345.12f,
-    -12345.12f
-};
+float float_values[] = {0.0f, 1.0f, 2.12345f, 12345.12f, -12345.12f};
 const size_t num_float_values = size_of_array(float_values);
 
-double double_values[] = {
-    0.0,
-    1.0,
-    2.12345,
-    12345.12,
-    -12345.12
-};
+double double_values[] = {0.0, 1.0, 2.12345, 12345.12, -12345.12};
 const size_t num_double_values = size_of_array(double_values);
 
 } // anonymous namespace
@@ -263,8 +251,8 @@ void BasicColumn_Aggregates(TestContext& test_context, T values[], size_t num_va
     ref_type ref = C::create(Allocator::get_default());
     C c(Allocator::get_default(), ref);
 
-//    double sum = c.sum();
-//    CHECK_EQUAL(0, sum);
+    //    double sum = c.sum();
+    //    CHECK_EQUAL(0, sum);
 
     // todo: add tests for minimum, maximum,
     // todo !!!

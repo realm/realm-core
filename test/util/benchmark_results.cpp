@@ -107,8 +107,7 @@ std::string pad_right(std::string str, int width, char padding = ' ')
 
 } // anonymous namespace
 
-BenchmarkResults::Result::Result():
-    min(DBL_MAX), max(DBL_MIN), total(0), rep(0)
+BenchmarkResults::Result::Result() : min(DBL_MAX), max(DBL_MIN), total(0), rep(0)
 {
 }
 
@@ -117,8 +116,7 @@ double BenchmarkResults::Result::avg() const
     return total / rep;
 }
 
-void BenchmarkResults::submit_single(const char* ident, const char* lead_text,
-                                     double seconds, ChangeType change_type)
+void BenchmarkResults::submit_single(const char* ident, const char* lead_text, double seconds, ChangeType change_type)
 {
     submit(ident, seconds);
     finish(ident, lead_text, change_type);
@@ -233,9 +231,11 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
         else {
             out << "  ";
         }
-        out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << " " << pad_right(format_change(br.min, r.min, change_type), 15) << "     ";
+        out << "min " << std::setw(time_width) << format_elapsed_time(r.min) << " "
+            << pad_right(format_change(br.min, r.min, change_type), 15) << "     ";
 
-        out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << " " << pad_right(format_change(br.max, r.max, change_type), 15) << "   ";
+        out << "max " << std::setw(time_width) << format_elapsed_time(r.max) << " "
+            << pad_right(format_change(br.max, r.max, change_type), 15) << "   ";
 
         if ((r.median - br.median) > r.stddev * 2) {
             out << "* ";
@@ -244,7 +244,8 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
             out << "  ";
         }
 
-        out << "med " << std::setw(time_width) << format_elapsed_time(r.median)   << " " << pad_right(format_change(br.median, r.median, change_type), 15) << "   ";
+        out << "med " << std::setw(time_width) << format_elapsed_time(r.median) << " "
+            << pad_right(format_change(br.median, r.median, change_type), 15) << "   ";
 
         if ((avg - baseline_avg) > r.stddev * 2) {
             out << "* ";
@@ -252,13 +253,15 @@ void BenchmarkResults::finish(const std::string& ident, const std::string& lead_
         else {
             out << "  ";
         }
-        out << "avg " << std::setw(time_width) << format_elapsed_time(avg) << " " << pad_right(format_change(baseline_avg, avg, change_type), 15) << "     ";
+        out << "avg " << std::setw(time_width) << format_elapsed_time(avg) << " "
+            << pad_right(format_change(baseline_avg, avg, change_type), 15) << "     ";
 
-        out << "stddev" << std::setw(time_width) << format_elapsed_time(r.stddev) << " " << pad_right(format_change(br.stddev, r.stddev, change_type), 15);
+        out << "stddev" << std::setw(time_width) << format_elapsed_time(r.stddev) << " "
+            << pad_right(format_change(br.stddev, r.stddev, change_type), 15);
     }
     else {
-        out << "min " << std::setw(time_width) << format_elapsed_time(r.min)   << "     ";
-        out << "max " << std::setw(time_width) << format_elapsed_time(r.max)   << "     ";
+        out << "min " << std::setw(time_width) << format_elapsed_time(r.min) << "     ";
+        out << "max " << std::setw(time_width) << format_elapsed_time(r.max) << "     ";
         out << "median " << std::setw(time_width) << format_elapsed_time(r.median) << "     ";
         out << "avg " << std::setw(time_width) << format_elapsed_time(r.avg()) << "     ";
         out << "stddev " << std::setw(time_width) << format_elapsed_time(r.stddev);
@@ -326,16 +329,13 @@ void BenchmarkResults::save_results()
     time_t now = time(0);
     localtime(&now);
     struct tm local;
-    localtime_r(&now,  &local);
+    localtime_r(&now, &local);
     std::ostringstream name_out;
     name_out << m_results_file_stem << ".";
     // Format: YYYYMMDD_hhmmss;
     name_out.fill('0');
-    name_out << (1900 + local.tm_year) << ""
-             << std::setw(2) << (1 + local.tm_mon) << ""
-             << std::setw(2) << local.tm_mday << "_"
-             << std::setw(2) << local.tm_hour << ""
-             << std::setw(2) << local.tm_min << ""
+    name_out << (1900 + local.tm_year) << "" << std::setw(2) << (1 + local.tm_mon) << "" << std::setw(2)
+             << local.tm_mday << "_" << std::setw(2) << local.tm_hour << "" << std::setw(2) << local.tm_min << ""
              << std::setw(2) << local.tm_sec;
     std::string name = name_out.str();
     std::string csv_name = name + ".csv";
@@ -351,10 +351,12 @@ void BenchmarkResults::save_results()
             Result r = it->second.finish();
 
             out << it->first << ' ';
-            out << r.min << " " << r.max << " " << r.median << " " << r.stddev << " " << r.total << " " << r.rep << '\n';
+            out << r.min << " " << r.max << " " << r.median << " " << r.stddev << " " << r.total << " " << r.rep
+                << '\n';
 
             csv_out << '"' << it->first << "\",";
-            csv_out << r.min << ',' << r.max << ',' << r.median << ',' << r.avg() << ',' << r.stddev << ',' << r.rep << ',' << r.total << '\n';
+            csv_out << r.min << ',' << r.max << ',' << r.median << ',' << r.avg() << ',' << r.stddev << ',' << r.rep
+                    << ',' << r.total << '\n';
         }
     }
 
@@ -371,4 +373,3 @@ void BenchmarkResults::save_results()
     r = link(csv_name.c_str(), latest_csv_file.c_str());
     static_cast<void>(r); // FIXME: Display if error
 }
-

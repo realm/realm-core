@@ -25,7 +25,7 @@
 
 using namespace realm;
 
-int main(int argc, char* argv [])
+int main(int argc, char* argv[])
 {
     int spawns = 0;
     if (argc != 4) {
@@ -74,7 +74,7 @@ int main(int argc, char* argv [])
                     size_t ndx = rand() % 1000000;
                     volatile int v;
                     v = t->get_int(0, ndx);
-                    (void) v;
+                    (void)v;
                 }
             }
         }

@@ -22,8 +22,7 @@
 namespace realm {
 
 
-TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx)
-: ColumnBaseSimple(col_ndx)
+TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx) : ColumnBaseSimple(col_ndx)
 {
     std::unique_ptr<Array> top;
     std::unique_ptr<BpTree<util::Optional<int64_t>>> seconds;
@@ -50,16 +49,16 @@ TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx)
 
 
 template <class BT>
-class TimestampColumn::CreateHandler: public ColumnBase::CreateHandler {
+class TimestampColumn::CreateHandler : public ColumnBase::CreateHandler {
 public:
-    CreateHandler(typename BT::value_type value, Allocator& alloc):
-        m_value(value), m_alloc(alloc) {}
+    CreateHandler(typename BT::value_type value, Allocator& alloc) : m_value(value), m_alloc(alloc) {}
 
     ref_type create_leaf(size_t size) override
     {
         MemRef mem = BT::create_leaf(Array::type_Normal, size, m_value, m_alloc); // Throws
         return mem.get_ref();
     }
+
 private:
     const typename BT::value_type m_value;
     Allocator& m_alloc;
@@ -116,19 +115,18 @@ void TimestampColumn::set_null(size_t row_ndx)
 
     // FIXME: Consider not setting 0 on m_nanoseconds
     // The current setting of 0 forces an arguably unnecessary copy-on-write etc of that leaf node
-    m_seconds->set_null(row_ndx); // Throws
+    m_seconds->set_null(row_ndx);   // Throws
     m_nanoseconds->set(row_ndx, 0); // Throws
 }
 
-void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t /*prior_num_rows*/,
-                                  bool nullable)
+void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t /*prior_num_rows*/, bool nullable)
 {
     bool is_append = row_ndx == size();
     size_t row_ndx_or_npos = is_append ? realm::npos : row_ndx;
 
     util::Optional<int64_t> default_value = nullable ? util::none : util::make_optional<int64_t>(0);
     m_seconds->insert(row_ndx_or_npos, default_value, num_rows_to_insert); // Throws
-    m_nanoseconds->insert(row_ndx_or_npos, 0, num_rows_to_insert); // Throws
+    m_nanoseconds->insert(row_ndx_or_npos, 0, num_rows_to_insert);         // Throws
 
     if (has_search_index()) {
         if (nullable) {
@@ -145,7 +143,7 @@ void TimestampColumn::erase(size_t row_ndx, bool is_last)
     if (has_search_index()) {
         m_search_index->erase<StringData>(row_ndx, is_last); // Throws
     }
-    m_seconds->erase(row_ndx, is_last); // Throws
+    m_seconds->erase(row_ndx, is_last);     // Throws
     m_nanoseconds->erase(row_ndx, is_last); // Throws
 }
 
@@ -161,13 +159,12 @@ void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_
         if (has_search_index()) {
             m_search_index->erase<StringData>(row_ndx + num_rows_to_erase - i - 1, is_last); // Throws
         }
-        m_seconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last); // Throws
+        m_seconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last);     // Throws
         m_nanoseconds->erase(row_ndx + num_rows_to_erase - i - 1, is_last); // Throws
     }
 }
 
-void TimestampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-                                         bool /*broken_reciprocal_backlinks*/)
+void TimestampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool /*broken_reciprocal_backlinks*/)
 {
     size_t last_row_ndx = prior_num_rows - 1;
 
@@ -183,7 +180,7 @@ void TimestampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
         }
     }
 
-    m_seconds->move_last_over(row_ndx, last_row_ndx); // Throws
+    m_seconds->move_last_over(row_ndx, last_row_ndx);     // Throws
     m_nanoseconds->move_last_over(row_ndx, last_row_ndx); // Throws
 }
 
@@ -191,7 +188,7 @@ void TimestampColumn::clear(size_t num_rows, bool /*broken_reciprocal_backlinks*
 {
     REALM_ASSERT_EX(num_rows == m_seconds->size(), num_rows, m_seconds->size());
     static_cast<void>(num_rows);
-    m_seconds->clear(); // Throws
+    m_seconds->clear();     // Throws
     m_nanoseconds->clear(); // Throws
     if (has_search_index()) {
         m_search_index->clear(); // Throws
@@ -206,18 +203,18 @@ void TimestampColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         size_t column_size = this->size();
         bool row_ndx_1_is_last = row_ndx_1 == column_size - 1;
         bool row_ndx_2_is_last = row_ndx_2 == column_size - 1;
-        m_search_index->erase<StringData>(row_ndx_1, row_ndx_1_is_last); // Throws
+        m_search_index->erase<StringData>(row_ndx_1, row_ndx_1_is_last);  // Throws
         m_search_index->insert(row_ndx_1, value_2, 1, row_ndx_1_is_last); // Throws
-        m_search_index->erase<StringData>(row_ndx_2, row_ndx_2_is_last); // Throws
+        m_search_index->erase<StringData>(row_ndx_2, row_ndx_2_is_last);  // Throws
         m_search_index->insert(row_ndx_2, value_1, 1, row_ndx_2_is_last); // Throws
     }
 
     auto tmp1 = m_seconds->get(row_ndx_1);
     m_seconds->set(row_ndx_1, m_seconds->get(row_ndx_2)); // Throws
-    m_seconds->set(row_ndx_2, tmp1); // Throws
+    m_seconds->set(row_ndx_2, tmp1);                      // Throws
     auto tmp2 = m_nanoseconds->get(row_ndx_1);
     m_nanoseconds->set(row_ndx_1, m_nanoseconds->get(row_ndx_2)); // Throws
-    m_nanoseconds->set(row_ndx_2, tmp2); // Throws
+    m_nanoseconds->set(row_ndx_2, tmp2);                          // Throws
 }
 
 void TimestampColumn::destroy() noexcept
@@ -252,7 +249,7 @@ StringIndex* TimestampColumn::create_search_index()
 {
     REALM_ASSERT(!has_search_index());
     m_search_index.reset(new StringIndex(this, get_alloc())); // Throws
-    populate_search_index(); // Throws
+    populate_search_index();                                  // Throws
     return m_search_index.get();
 }
 
@@ -261,12 +258,12 @@ void TimestampColumn::destroy_search_index() noexcept
     m_search_index.reset();
 }
 
-void TimestampColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
-                                           size_t ndx_in_parent, bool allow_duplicate_values)
+void TimestampColumn::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
+                                           bool allow_duplicate_values)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this,
-                                         !allow_duplicate_values, get_alloc())); // Throws
+    m_search_index.reset(
+        new StringIndex(ref, parent, ndx_in_parent, this, !allow_duplicate_values, get_alloc())); // Throws
 }
 
 
@@ -310,7 +307,7 @@ void TimestampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec
     }
 }
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void TimestampColumn::verify() const
 {
@@ -347,11 +344,11 @@ void TimestampColumn::add(const Timestamp& ts)
     bool ts_is_null = ts.is_null();
     util::Optional<int64_t> seconds = ts_is_null ? util::none : util::make_optional(ts.get_seconds());
     int32_t nanoseconds = ts_is_null ? 0 : ts.get_nanoseconds();
-    m_seconds->insert(npos, seconds); // Throws
+    m_seconds->insert(npos, seconds);         // Throws
     m_nanoseconds->insert(npos, nanoseconds); // Throws
 
     if (has_search_index()) {
-        size_t ndx = size() - 1; // Slow
+        size_t ndx = size() - 1;                  // Slow
         m_search_index->insert(ndx, ts, 1, true); // Throws
     }
 }
@@ -375,7 +372,7 @@ void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)
         m_search_index->set(row_ndx, ts); // Throws
     }
 
-    m_seconds->set(row_ndx, seconds); // Throws
+    m_seconds->set(row_ndx, seconds);         // Throws
     m_nanoseconds->set(row_ndx, nanoseconds); // Throws
 }
 
@@ -408,6 +405,4 @@ Timestamp TimestampColumn::minimum(size_t* result_index) const
 {
     return minmax<Less>(result_index);
 }
-
-
 }

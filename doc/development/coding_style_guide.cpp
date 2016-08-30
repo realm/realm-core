@@ -81,7 +81,6 @@ void my_func_2()
 }
 
 
-
 // A name space name uses lowercase and its parts are separated by
 // underscores.
 
@@ -93,9 +92,8 @@ namespace my_namespace {
 // A Class name uses CamelCase with uppercase initial.
 
 template <class T>
-class MyClass: public Base {
+class MyClass : public Base {
 public:
-
     // Public member variables do not have a 'm_' prefix.
     int baz;
 
@@ -116,17 +114,12 @@ private:
 } // namespace my_namespace
 
 
-
 // Names of values of an enumeration are composed of two parts
 // separated by an underscore. The first part is a common lowercase
 // prefix. The second part identifies the value and uses CamelCase
 // with uppercase initial.
 
-enum mode {
-    mode_Foo,
-    mode_FooBar
-};
-
+enum mode { mode_Foo, mode_FooBar };
 
 
 // Order of class members (roughly):
@@ -151,7 +144,6 @@ private:
 };
 
 
-
 // Use literals when possible
 
 char* str = nullptr; // don't use 0, NULL
@@ -159,14 +151,11 @@ bool enable_feature = true;
 bool is_last = false;
 
 
-
 // Use of 'auto' keyword:
 //
 // 'auto' should *not* be used for trivial cases where the type declaration
 // is short, non-templated, and non-derived (type_t, int64_t, std::string,
 // etc.
-
-
 
 
 // About FIXMEs:

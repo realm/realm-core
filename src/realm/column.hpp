@@ -20,7 +20,7 @@
 #define REALM_COLUMN_HPP
 
 #include <stdint.h> // unint8_t etc
-#include <cstdlib> // size_t
+#include <cstdlib>  // size_t
 #include <vector>
 #include <memory>
 
@@ -68,8 +68,7 @@ struct ImplicitNull<double> {
 // FIXME: Add specialization for ImplicitNull for float, double, StringData, BinaryData.
 
 template <class T, class R, Action action, class Condition, class ColType>
-R aggregate(const ColType& column, T target, size_t start, size_t end,
-            size_t limit, size_t* return_ndx);
+R aggregate(const ColType& column, T target, size_t start, size_t end, size_t limit, size_t* return_ndx);
 
 /// Base class for all column types.
 class ColumnBase {
@@ -115,8 +114,7 @@ public:
     virtual void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool nullable) = 0;
     virtual void erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                             bool broken_reciprocal_backlinks) = 0;
-    virtual void move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-                                    bool broken_reciprocal_backlinks) = 0;
+    virtual void move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool broken_reciprocal_backlinks) = 0;
 
     //@}
 
@@ -154,8 +152,7 @@ public:
     virtual void destroy_search_index() noexcept;
     virtual const StringIndex* get_search_index() const noexcept;
     virtual StringIndex* get_search_index() noexcept;
-    virtual void set_search_index_ref(ref_type, ArrayParent*, size_t ndx_in_parent,
-                                      bool allow_duplicate_values);
+    virtual void set_search_index_ref(ref_type, ArrayParent*, size_t ndx_in_parent, bool allow_duplicate_values);
     virtual void set_search_index_allow_duplicate_values(bool) noexcept;
 
     virtual Allocator& get_alloc() const noexcept = 0;
@@ -177,8 +174,7 @@ public:
     static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref, Allocator&);
 
     /// Write a slice of this column to the specified output stream.
-    virtual ref_type write(size_t slice_offset, size_t slice_size,
-                           size_t table_size, _impl::OutputStream&) const = 0;
+    virtual ref_type write(size_t slice_offset, size_t slice_size, size_t table_size, _impl::OutputStream&) const = 0;
 
     /// Get this column's logical index within the containing table, or npos
     /// for free-standing or non-top-level columns.
@@ -228,16 +224,11 @@ public:
     virtual void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     virtual void adj_acc_erase_row(size_t row_ndx) noexcept;
     /// See Table::adj_acc_move_over()
-    virtual void adj_acc_move_over(size_t from_row_ndx,
-                                   size_t to_row_ndx) noexcept;
+    virtual void adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
     virtual void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
     virtual void adj_acc_clear_root_table() noexcept;
 
-    enum {
-        mark_Recursive   = 0x01,
-        mark_LinkTargets = 0x02,
-        mark_LinkOrigins = 0x04
-    };
+    enum { mark_Recursive = 0x01, mark_LinkTargets = 0x02, mark_LinkOrigins = 0x04 };
 
     virtual void mark(int type) noexcept;
 
@@ -308,8 +299,7 @@ protected:
 
 #ifdef REALM_DEBUG
     class LeafToDot;
-    virtual void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
-                             std::ostream&) const = 0;
+    virtual void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const = 0;
 #endif
 
     template <class Column>
@@ -318,8 +308,7 @@ protected:
 private:
     size_t m_column_ndx = npos;
 
-    static ref_type build(size_t* rest_size_ptr, size_t fixed_height,
-                          Allocator&, CreateHandler&);
+    static ref_type build(size_t* rest_size_ptr, size_t fixed_height, Allocator&, CreateHandler&);
 };
 
 
@@ -336,12 +325,19 @@ public:
     //@}
 
     Allocator& get_alloc() const noexcept final { return m_array->get_alloc(); }
-    void destroy() noexcept override { if (m_array) m_array->destroy_deep(); }
+    void destroy() noexcept override
+    {
+        if (m_array)
+            m_array->destroy_deep();
+    }
     ref_type get_ref() const noexcept final { return m_array->get_ref(); }
     MemRef get_mem() const noexcept final { return m_array->get_mem(); }
     void detach() noexcept final { m_array->detach(); }
     bool is_attached() const noexcept final { return m_array->is_attached(); }
-    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept final { m_array->set_parent(parent, ndx_in_parent); }
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept final
+    {
+        m_array->set_parent(parent, ndx_in_parent);
+    }
     size_t get_ndx_in_parent() const noexcept final { return m_array->get_ndx_in_parent(); }
     void set_ndx_in_parent(size_t ndx_in_parent) noexcept override { m_array->set_ndx_in_parent(ndx_in_parent); }
     void update_from_parent(size_t old_baseline) noexcept override { m_array->update_from_parent(old_baseline); }
@@ -357,11 +353,10 @@ protected:
 
     /// Introduce a new root node which increments the height of the
     /// tree by one.
-    void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
-                            bool is_append);
+    void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state, bool is_append);
 
-    static ref_type write(const Array* root, size_t slice_offset, size_t slice_size,
-                          size_t table_size, SliceHandler&, _impl::OutputStream&);
+    static ref_type write(const Array* root, size_t slice_offset, size_t slice_size, size_t table_size, SliceHandler&,
+                          _impl::OutputStream&);
 
 #if defined(REALM_DEBUG)
     void tree_to_dot(std::ostream&) const;
@@ -382,9 +377,10 @@ public:
     StringIndex* get_search_index() noexcept final { return m_search_index.get(); }
     const StringIndex* get_search_index() const noexcept final { return m_search_index.get(); }
     void destroy_search_index() noexcept override;
-    void set_search_index_ref(ref_type ref, ArrayParent* parent,
-                              size_t ndx_in_parent, bool allow_duplicate_valaues) final;
+    void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
+                              bool allow_duplicate_valaues) final;
     StringIndex* create_search_index() override = 0;
+
 protected:
     using ColumnBase::ColumnBase;
     ColumnBaseWithIndex(ColumnBaseWithIndex&&) = default;
@@ -403,7 +399,8 @@ public:
 
     static constexpr bool nullable = ImplicitNull<T>::value;
 
-    struct unattached_root_tag {};
+    struct unattached_root_tag {
+    };
 
     explicit Column() noexcept : ColumnBaseWithIndex(npos), m_tree(Allocator::get_default()) {}
     explicit Column(std::unique_ptr<Array> root) noexcept;
@@ -449,8 +446,7 @@ public:
     /// accessors. For this reason, the identified leaf should always
     /// be accessed through the returned const-qualified reference,
     /// and never directly through the specfied fallback accessor.
-    void get_leaf(size_t ndx, size_t& ndx_in_leaf,
-                  LeafInfo& inout_leaf) const noexcept;
+    void get_leaf(size_t ndx, size_t& ndx_in_leaf, LeafInfo& inout_leaf) const noexcept;
 
     // Getting and setting values
     T get(size_t ndx) const noexcept;
@@ -485,21 +481,19 @@ public:
 
     size_t count(T target) const;
 
-    typename ColumnTypeTraits<T>::sum_type
-    sum(size_t start = 0, size_t end = npos, size_t limit = npos, size_t* return_ndx = nullptr) const;
+    typename ColumnTypeTraits<T>::sum_type sum(size_t start = 0, size_t end = npos, size_t limit = npos,
+                                               size_t* return_ndx = nullptr) const;
 
-    typename ColumnTypeTraits<T>::minmax_type
-    maximum(size_t start = 0, size_t end = npos, size_t limit = npos, size_t* return_ndx = nullptr) const;
+    typename ColumnTypeTraits<T>::minmax_type maximum(size_t start = 0, size_t end = npos, size_t limit = npos,
+                                                      size_t* return_ndx = nullptr) const;
 
-    typename ColumnTypeTraits<T>::minmax_type
-    minimum(size_t start = 0, size_t end = npos, size_t limit = npos, size_t* return_ndx = nullptr) const;
+    typename ColumnTypeTraits<T>::minmax_type minimum(size_t start = 0, size_t end = npos, size_t limit = npos,
+                                                      size_t* return_ndx = nullptr) const;
 
-    double average(size_t start = 0, size_t end = npos, size_t limit = npos,
-                   size_t* return_ndx = nullptr) const;
+    double average(size_t start = 0, size_t end = npos, size_t limit = npos, size_t* return_ndx = nullptr) const;
 
     size_t find_first(T value, size_t begin = 0, size_t end = npos) const;
-    void find_all(Column<int64_t>& out_indices, T value,
-                  size_t begin = 0, size_t end = npos) const;
+    void find_all(Column<int64_t>& out_indices, T value, size_t begin = 0, size_t end = npos) const;
 
     void populate_search_index();
     StringIndex* create_search_index() override;
@@ -525,12 +519,10 @@ public:
     bool compare(const Column&) const noexcept;
     int compare_values(size_t row1, size_t row2) const noexcept override;
 
-    static ref_type create(Allocator&, Array::Type leaf_type = Array::type_Normal,
-                           size_t size = 0, T value = T{});
+    static ref_type create(Allocator&, Array::Type leaf_type = Array::type_Normal, size_t size = 0, T value = T{});
 
     // Overriding method in ColumnBase
-    ref_type write(size_t, size_t, size_t,
-                   _impl::OutputStream&) const override;
+    ref_type write(size_t, size_t, size_t, _impl::OutputStream&) const override;
 
     void insert_rows(size_t, size_t, size_t, bool) override;
     void erase_rows(size_t, size_t, size_t, bool) override;
@@ -587,8 +579,7 @@ protected:
     void clear_without_updating_index();
 
 #ifdef REALM_DEBUG
-    void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
-                     std::ostream&) const override;
+    void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const override;
     static void dump_node_structure(const Array& root, std::ostream&, std::string indent);
 #endif
 
@@ -789,8 +780,8 @@ size_t Column<T>::count(T target) const
 }
 
 template <class T>
-typename ColumnTypeTraits<T>::sum_type
-Column<T>::sum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
+typename ColumnTypeTraits<T>::sum_type Column<T>::sum(size_t start, size_t end, size_t limit,
+                                                      size_t* return_ndx) const
 {
     using sum_type = typename ColumnTypeTraits<T>::sum_type;
     if (nullable)
@@ -814,24 +805,24 @@ double Column<T>::average(size_t start, size_t end, size_t limit, size_t* return
 }
 
 template <class T>
-typename ColumnTypeTraits<T>::minmax_type
-Column<T>::minimum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
+typename ColumnTypeTraits<T>::minmax_type Column<T>::minimum(size_t start, size_t end, size_t limit,
+                                                             size_t* return_ndx) const
 {
     using R = typename ColumnTypeTraits<T>::minmax_type;
     return aggregate<T, R, act_Min, NotNull>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T>
-typename ColumnTypeTraits<T>::minmax_type
-Column<T>::maximum(size_t start, size_t end, size_t limit, size_t* return_ndx) const
+typename ColumnTypeTraits<T>::minmax_type Column<T>::maximum(size_t start, size_t end, size_t limit,
+                                                             size_t* return_ndx) const
 {
     using R = typename ColumnTypeTraits<T>::minmax_type;
     return aggregate<T, R, act_Max, NotNull>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T>
-void Column<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf,
-                         typename BpTree<T>::LeafInfo& inout_leaf_info) const noexcept
+void Column<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf, typename BpTree<T>::LeafInfo& inout_leaf_info) const
+    noexcept
 {
     m_tree.get_leaf(ndx, ndx_in_leaf, inout_leaf_info);
 }
@@ -955,7 +946,7 @@ inline ref_type ColumnBase::create(Allocator& alloc, size_t column_size, CreateH
 
 template <class T>
 Column<T>::Column(Allocator& alloc, ref_type ref, size_t column_ndx)
-: ColumnBaseWithIndex(column_ndx), m_tree(BpTreeBase::unattached_tag{})
+    : ColumnBaseWithIndex(column_ndx), m_tree(BpTreeBase::unattached_tag{})
 {
     // fixme, must m_search_index be copied here?
     m_tree.init_from_ref(alloc, ref);
@@ -1241,8 +1232,10 @@ void Column<T>::clear()
     clear_without_updating_index();
 }
 
-template <class T, class Enable = void> struct NullOrDefaultValue;
-template <class T> struct NullOrDefaultValue<T, typename std::enable_if<std::is_floating_point<T>::value>::type> {
+template <class T, class Enable = void>
+struct NullOrDefaultValue;
+template <class T>
+struct NullOrDefaultValue<T, typename std::enable_if<std::is_floating_point<T>::value>::type> {
     static T null_or_default_value(bool is_null)
     {
         if (is_null) {
@@ -1253,7 +1246,8 @@ template <class T> struct NullOrDefaultValue<T, typename std::enable_if<std::is_
         }
     }
 };
-template <class T> struct NullOrDefaultValue<util::Optional<T>, void> {
+template <class T>
+struct NullOrDefaultValue<util::Optional<T>, void> {
     static util::Optional<T> null_or_default_value(bool is_null)
     {
         if (is_null) {
@@ -1383,15 +1377,18 @@ int Column<T>::compare_values(size_t row1, size_t row2) const noexcept
 }
 
 template <class T>
-class Column<T>::CreateHandler: public ColumnBase::CreateHandler {
+class Column<T>::CreateHandler : public ColumnBase::CreateHandler {
 public:
-    CreateHandler(Array::Type leaf_type, T value, Allocator& alloc):
-        m_value(value), m_alloc(alloc), m_leaf_type(leaf_type) {}
+    CreateHandler(Array::Type leaf_type, T value, Allocator& alloc)
+        : m_value(value), m_alloc(alloc), m_leaf_type(leaf_type)
+    {
+    }
     ref_type create_leaf(size_t size) override
     {
         MemRef mem = BpTree<T>::create_leaf(m_leaf_type, size, m_value, m_alloc); // Throws
         return mem.get_ref();
     }
+
 private:
     const T m_value;
     Allocator& m_alloc;
@@ -1406,8 +1403,7 @@ ref_type Column<T>::create(Allocator& alloc, Array::Type leaf_type, size_t size,
 }
 
 template <class T>
-ref_type Column<T>::write(size_t slice_offset, size_t slice_size,
-                          size_t table_size, _impl::OutputStream& out) const
+ref_type Column<T>::write(size_t slice_offset, size_t slice_size, size_t table_size, _impl::OutputStream& out) const
 {
     return m_tree.write(slice_offset, slice_size, table_size, out);
 }
@@ -1463,8 +1459,7 @@ void Column<T>::tree_to_dot(std::ostream& out) const
 }
 
 template <class T>
-void Column<T>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
-                            std::ostream& out) const
+void Column<T>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent, std::ostream& out) const
 {
     BpTree<T>::leaf_to_dot(leaf_mem, parent, ndx_in_parent, out, get_alloc());
 }

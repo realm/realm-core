@@ -74,7 +74,7 @@ public:
 
     bool add_with_overflow_detect(super_int) noexcept;
     bool subtract_with_overflow_detect(super_int) noexcept;
-//    bool multiply_with_overflow_detect(super_int) noexcept;
+    //    bool multiply_with_overflow_detect(super_int) noexcept;
 
 private:
     // Value bits (not including the sign bit) of the two's complement
@@ -87,14 +87,11 @@ private:
 };
 
 
-
-
-
 // Implementation
 
 inline super_int::super_int() noexcept
 {
-    m_value    = 0;
+    m_value = 0;
     m_sign_bit = false;
 }
 
@@ -108,7 +105,7 @@ inline super_int::super_int(T value) noexcept
     // 2). This means that the following conversion to two's
     // complement representation can throw away at most the sign bit,
     // which is fine, because we handle the sign bit separately.
-    m_value    = value;
+    m_value = value;
     m_sign_bit = lim_t::is_signed && util::is_negative(value);
 }
 
@@ -184,7 +181,7 @@ inline super_int operator*(super_int a, super_int b) noexcept
     val_uint a_2 = (val_uint(a.m_sign_bit) << msb_pos) | (a.m_value >> 1);
     val_uint b_1 = b.m_value & 1;
     val_uint b_2 = (val_uint(b.m_sign_bit) << msb_pos) | (b.m_value >> 1);
-    val_uint v = ((a_2 * b_2) << 1)  +  a_2 * b_1  +  a_1 * b_2;
+    val_uint v = ((a_2 * b_2) << 1) + a_2 * b_1 + a_1 * b_2;
     super_int c;
     c.m_value = (v << 1) | (a_1 * b_1);
     c.m_sign_bit = v >> msb_pos != 0;
@@ -244,7 +241,7 @@ std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, super_int i)
         int last_digit_2 = int(i.m_value % 10);
         val_uint other_digits_2 = i.m_value / 10;
         // Subtract m_value from max+1
-        last_digit_1   -= last_digit_2;
+        last_digit_1 -= last_digit_2;
         other_digits_1 -= other_digits_2;
         if (last_digit_1 < 0) {
             last_digit_1 += 10;

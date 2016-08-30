@@ -30,18 +30,9 @@ using namespace realm::util;
 
 namespace {
 
-enum Mode {
-    mode_UseShared,
-    mode_UseGroup,
-    mode_UseTable
-};
+enum Mode { mode_UseShared, mode_UseGroup, mode_UseTable };
 
-REALM_TABLE_5(TestTable,
-              x,  Int,
-              s1, String,
-              b,  Bool,
-              s2, String,
-              s3, String)
+REALM_TABLE_5(TestTable, x, Int, s1, String, b, Bool, s2, String, s3, String)
 
 
 void usage()
@@ -70,10 +61,10 @@ int main(int argc, char* argv[])
     int c;
     extern char* optarg;
 
-    bool use_shared    = false;
+    bool use_shared = false;
     SharedGroup::DurabilityLevel dlevel = SharedGroup::durability_Full;
-    bool do_insert     = false;
-    bool use_group     = false;
+    bool do_insert = false;
+    bool use_group = false;
     bool random_insert = false;
 
     // FIXME: 'getopt' is POSIX/Linux specific. We should replace with
@@ -158,7 +149,7 @@ int main(int argc, char* argv[])
         std::cout << "#  random insert     : " << random_insert << std::endl;
     }
 
-    if (random_insert) {  // initialize RNG
+    if (random_insert) { // initialize RNG
         srandom(0);
     }
 
@@ -267,4 +258,3 @@ int main(int argc, char* argv[])
     }
     return 0;
 }
-

@@ -39,7 +39,7 @@ New: If m_witdh = 0, then all elements are realm::null(). So to add an empty str
 New: StringData is null() if-and-only-if StringData::data() == 0.
 */
 
-class ArrayString: public Array {
+class ArrayString : public Array {
 public:
     static const size_t max_width = 64;
 
@@ -58,12 +58,10 @@ public:
     void insert(size_t ndx, StringData value);
     void erase(size_t ndx);
 
-    size_t count(StringData value, size_t begin = 0,
-                 size_t end = npos) const noexcept;
-    size_t find_first(StringData value, size_t begin = 0,
-                      size_t end = npos) const noexcept;
-    void find_all(IntegerColumn& result, StringData value, size_t add_offset = 0,
-                  size_t begin = 0, size_t end = npos);
+    size_t count(StringData value, size_t begin = 0, size_t end = npos) const noexcept;
+    size_t find_first(StringData value, size_t begin = 0, size_t end = npos) const noexcept;
+    void find_all(IntegerColumn& result, StringData value, size_t add_offset = 0, size_t begin = 0,
+                  size_t end = npos);
 
     /// Compare two string arrays for equality.
     bool compare_string(const ArrayString&) const noexcept;
@@ -100,19 +98,16 @@ public:
 
 private:
     size_t calc_byte_len(size_t num_items, size_t width) const override;
-    size_t calc_item_count(size_t bytes,
-                           size_t width) const noexcept override;
+    size_t calc_item_count(size_t bytes, size_t width) const noexcept override;
 
     bool m_nullable;
 };
 
 
-
 // Implementation:
 
 // Creates new array (but invalid, call init_from_ref() to init)
-inline ArrayString::ArrayString(Allocator& allocator, bool nullable) noexcept:
-    Array(allocator), m_nullable(nullable)
+inline ArrayString::ArrayString(Allocator& allocator, bool nullable) noexcept : Array(allocator), m_nullable(nullable)
 {
 }
 
@@ -142,7 +137,8 @@ inline StringData ArrayString::get(size_t ndx) const noexcept
     if (array_size == static_cast<size_t>(-1))
         return m_nullable ? realm::null() : StringData("");
 
-    REALM_ASSERT_EX(data[array_size] == 0, data[array_size], array_size); // Realm guarantees 0 terminated return strings
+    REALM_ASSERT_EX(data[array_size] == 0, data[array_size],
+                    array_size); // Realm guarantees 0 terminated return strings
     return StringData(data, array_size);
 }
 

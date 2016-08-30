@@ -105,7 +105,6 @@ struct Shared {
             m_value = int(f);
         }
     }
-
 };
 
 struct SharedWithEmulated {
@@ -136,7 +135,6 @@ struct SharedWithEmulated {
             m_value = int(f);
         }
     }
-
 };
 
 struct Robust {
@@ -157,10 +155,7 @@ struct Robust {
         // Do not unlock
     }
 
-    void recover()
-    {
-        m_recover_called = true;
-    }
+    void recover() { m_recover_called = true; }
 
     void recover_throw()
     {
@@ -172,9 +167,7 @@ struct Robust {
 
 class QueueMonitor {
 public:
-    QueueMonitor(): m_closed(false)
-    {
-    }
+    QueueMonitor() : m_closed(false) {}
 
     bool get(int& value)
     {
@@ -242,10 +235,7 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
 
 class bowl_of_stones_semaphore {
 public:
-    bowl_of_stones_semaphore(int initial_number_of_stones = 0):
-        m_num_stones(initial_number_of_stones)
-    {
-    }
+    bowl_of_stones_semaphore(int initial_number_of_stones = 0) : m_num_stones(initial_number_of_stones) {}
     void get_stone(int num_to_get)
     {
         LockGuard lock(m_mutex);
@@ -259,6 +249,7 @@ public:
         ++m_num_stones;
         m_cond_var.notify_all();
     }
+
 private:
     Mutex m_mutex;
     int m_num_stones;
@@ -266,9 +257,7 @@ private:
 };
 
 
-
 } // anonymous namespace
-
 
 
 TEST(Thread_Join)
@@ -411,18 +400,15 @@ TEST_IF(Thread_RobustMutex, TEST_THREAD_ROBUSTNESS)
     }
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover_throw, &robust)),
-                RobustMutex::NotRecoverable);
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover_throw, &robust)), RobustMutex::NotRecoverable);
     CHECK(robust.m_recover_called);
 
     // Check that successive attempts at locking will throw
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)),
-                RobustMutex::NotRecoverable);
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)), RobustMutex::NotRecoverable);
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)),
-                RobustMutex::NotRecoverable);
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)), RobustMutex::NotRecoverable);
     CHECK(!robust.m_recover_called);
 }
 
@@ -568,17 +554,16 @@ void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessC
 }
 
 
-void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter,
-                       InterprocessMutex* mutex, InterprocessCondVar* cv)
+void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, InterprocessMutex* mutex,
+                       InterprocessCondVar* cv)
 {
     std::lock_guard<InterprocessMutex> l(*mutex);
-    ++ *wait_counter;
+    ++*wait_counter;
     feedback->add_stone();
     cv->wait(*mutex, nullptr);
-    -- *wait_counter;
+    --*wait_counter;
     feedback->add_stone();
 }
-
 
 
 void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
@@ -586,7 +571,6 @@ void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
     std::lock_guard<InterprocessMutex> l(*mutex);
     cv->wait(*mutex, nullptr);
 }
-
 }
 
 // Verify, that a wait on a condition variable actually waits

@@ -24,8 +24,7 @@ using namespace realm;
 using namespace realm::test_util;
 
 
-VerifiedString::VerifiedString():
-    u(Allocator::get_default(), StringColumn::create(Allocator::get_default()))
+VerifiedString::VerifiedString() : u(Allocator::get_default(), StringColumn::create(Allocator::get_default()))
 {
 }
 
@@ -160,7 +159,7 @@ bool VerifiedString::verify()
 // makes it run amortized the same time complexity as original, even though the row count grows
 bool VerifiedString::conditional_verify()
 {
-    if ((uint64_t(rand()) * uint64_t(rand()))  % (v.size() / 10 + 1) == 0) {
+    if ((uint64_t(rand()) * uint64_t(rand())) % (v.size() / 10 + 1) == 0) {
         return verify();
     }
     else {

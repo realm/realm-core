@@ -26,11 +26,12 @@
 #include <realm/util/tuple.hpp>
 
 
-// Check that Inlining is still perfect when referring to context variables whose value are not known to be constant (e.g. a function argument)
+// Check that Inlining is still perfect when referring to context variables whose value are not known to be constant
+// (e.g. a function argument)
 //   Optimization is not perfect - consider evaluating logical operators before COUNT/EXISTS operation.
 
-// table.count(t.foo || t.bar) is also not perfectly optimized - again consider evaluating logical operators before COUNT/EXISTS operation.
-
+// table.count(t.foo || t.bar) is also not perfectly optimized - again consider evaluating logical operators before
+// COUNT/EXISTS operation.
 
 
 /* Maybe:
@@ -39,13 +40,12 @@ Then reconsider AND changes for improved optimization
 */
 
 
-
-
 // ToDo: Optimization issues
 // ToDo: Column/B-tree iterator
 // GOOD: Refer to any regular variable in context
 // GOOD: Use any arithemtic, comparison, or conditional operator
-// GOOD: No restrictions on mixing of types (except that it is not allowed to use enums in arithmetic operations that involve column references)
+// GOOD: No restrictions on mixing of types (except that it is not allowed to use enums in arithmetic operations that
+// involve column references)
 // CAVEAT: Ternary operator cannot be used if any operand involves a column reference.
 // CAVEAT: Regular function calls cannot be used if any argument involves a column reference.
 // CAVEAT: Type casting/conversion cannot be used if the argument involves a column reference.
@@ -62,21 +62,22 @@ Then reconsider AND changes for improved optimization
 namespace realm {
 
 
-
 template <class Spec>
 class BasicTable;
 
 
 namespace query {
-struct EmptyType {};
+struct EmptyType {
+};
 
 template <class T>
-struct IsSubtable { static const bool value = false; };
+struct IsSubtable {
+    static const bool value = false;
+};
 template <class T>
 struct IsSubtable<SpecBase::Subtable<T>> {
     static const bool value = true;
 };
-
 
 
 template <class Tab, int col_idx, class Type>
@@ -87,23 +88,22 @@ struct ColRef {
 template <class Op, class A>
 struct UnOp {
     A arg;
-    explicit UnOp(const A& a): arg(a) {}
+    explicit UnOp(const A& a) : arg(a) {}
 };
 
 template <class Op, class A, class B>
 struct BinOp {
     A left;
     B right;
-    BinOp(const A& a, const B& b): left(a), right(b) {}
+    BinOp(const A& a, const B& b) : left(a), right(b) {}
 };
 
 template <class Op, class Col, class Query>
 struct Subquery {
     Col col;
     Query query;
-    Subquery(const Col& c, const Query& q): col(c), query(q) {}
+    Subquery(const Col& c, const Query& q) : col(c), query(q) {}
 };
-
 
 
 /// A query expression wrapper whose purpose is to give all
@@ -111,7 +111,7 @@ struct Subquery {
 template <class T>
 struct Expr {
     T value;
-    explicit Expr(const T& v): value(v) {}
+    explicit Expr(const T& v) : value(v) {}
 };
 
 /// We need to specialize Expr for ColRef because it has to have a
@@ -123,23 +123,32 @@ struct Expr<ColRef<Tab, col_idx, Type>> {
 };
 
 
-
 /// Encoding of logical negation.
 struct Not {
     static const char* sym() { return "!"; }
     template <class>
-    struct Result { typedef bool type; };
+    struct Result {
+        typedef bool type;
+    };
     template <class A>
-    static bool eval(const A& a) { return !a; }
+    static bool eval(const A& a)
+    {
+        return !a;
+    }
 };
 
 /// Encoding of bitwise complementation.
 struct Compl {
     static const char* sym() { return "~"; }
     template <class A>
-    struct Result { typedef typename Promote<A>::type type; };
+    struct Result {
+        typedef typename Promote<A>::type type;
+    };
     template <class A>
-    static typename Result<A>::type eval(const A& a) { return ~a; }
+    static typename Result<A>::type eval(const A& a)
+    {
+        return ~a;
+    }
 };
 
 /// Encoding of unary prefix 'plus' operator, which applies
@@ -148,189 +157,294 @@ struct Compl {
 struct Pos {
     static const char* sym() { return "+"; }
     template <class A>
-    struct Result { typedef typename Promote<A>::type type; };
+    struct Result {
+        typedef typename Promote<A>::type type;
+    };
     template <class A>
-    static typename Result<A>::type eval(const A& a) { return +a; }
+    static typename Result<A>::type eval(const A& a)
+    {
+        return +a;
+    }
 };
 
 /// Encoding of arithmetic negation.
 struct Neg {
     static const char* sym() { return "-"; }
     template <class A>
-    struct Result { typedef typename Promote<A>::type type; };
+    struct Result {
+        typedef typename Promote<A>::type type;
+    };
     template <class A>
-    static typename Result<A>::type eval(const A& a) { return -a; }
+    static typename Result<A>::type eval(const A& a)
+    {
+        return -a;
+    }
 };
 
 /// Encoding of pointer dereferencing operation.
 struct Deref {
     static const char* sym() { return "*"; }
     template <class A>
-    struct Result { typedef typename RemovePointer<A>::type type; };
+    struct Result {
+        typedef typename RemovePointer<A>::type type;
+    };
     template <class A>
-    static typename Result<A>::type eval(const A& a) { return *a; }
+    static typename Result<A>::type eval(const A& a)
+    {
+        return *a;
+    }
 };
 
 /// Encoding of multiplication.
 struct Mul {
     static const char* sym() { return "*"; }
     template <class A, class B>
-    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
+    struct Result {
+        typedef typename ArithBinOpType<A, B>::type type;
+    };
     template <class A, class B>
-    static typename Result<A, B>::type eval(const A& a, const B& b) { return a * b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b)
+    {
+        return a * b;
+    }
 };
 
 /// Encoding of division.
 struct Div {
     static const char* sym() { return "/"; }
     template <class A, class B>
-    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
+    struct Result {
+        typedef typename ArithBinOpType<A, B>::type type;
+    };
     template <class A, class B>
-    static typename Result<A, B>::type eval(const A& a, const B& b) { return a / b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b)
+    {
+        return a / b;
+    }
 };
 
 /// Encoding of modulus operation (remainder of integer division).
 struct Mod {
     static const char* sym() { return "%"; }
     template <class A, class B>
-    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
+    struct Result {
+        typedef typename ArithBinOpType<A, B>::type type;
+    };
     template <class A, class B>
-    static typename Result<A, B>::type eval(const A& a, const B& b) { return a % b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b)
+    {
+        return a % b;
+    }
 };
 
 /// Encoding of addition.
 struct Add {
     static const char* sym() { return "+"; }
     template <class A, class B>
-    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
+    struct Result {
+        typedef typename ArithBinOpType<A, B>::type type;
+    };
     template <class A, class B>
-    static typename Result<A, B>::type eval(const A& a, const B& b) { return a + b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b)
+    {
+        return a + b;
+    }
 };
 
 /// Encoding of subtraction.
 struct Sub {
     static const char* sym() { return "-"; }
     template <class A, class B>
-    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
+    struct Result {
+        typedef typename ArithBinOpType<A, B>::type type;
+    };
     template <class A, class B>
-    static typename Result<A, B>::type eval(const A& a, const B& b) { return a - b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b)
+    {
+        return a - b;
+    }
 };
 
 /// Encoding of 'shift left' operation.
 struct Shl {
     static const char* sym() { return "<<"; }
     template <class A, class>
-    struct Result { typedef typename Promote<A>::type type; };
+    struct Result {
+        typedef typename Promote<A>::type type;
+    };
     template <class A, class B>
-    static typename Result<A, B>::type eval(const A& a, const B& b) { return a << b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b)
+    {
+        return a << b;
+    }
 };
 
 /// Encoding of 'shift right' operation.
 struct Shr {
     static const char* sym() { return ">>"; }
     template <class A, class>
-    struct Result { typedef typename Promote<A>::type type; };
+    struct Result {
+        typedef typename Promote<A>::type type;
+    };
     template <class A, class B>
-    static typename Result<A, B>::type eval(const A& a, const B& b) { return a >> b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b)
+    {
+        return a >> b;
+    }
 };
 
 /// Encoding of equality comparison operation.
 struct Eq {
     static const char* sym() { return "=="; }
     template <class, class>
-    struct Result { typedef bool type; };
+    struct Result {
+        typedef bool type;
+    };
     template <class A, class B>
-    static bool eval(const A& a, const B& b) { return a == b; }
+    static bool eval(const A& a, const B& b)
+    {
+        return a == b;
+    }
 };
 
 /// Encoding of 'not equal' comparison operation.
 struct Ne {
     static const char* sym() { return "!="; }
     template <class, class>
-    struct Result { typedef bool type; };
+    struct Result {
+        typedef bool type;
+    };
     template <class A, class B>
-    static bool eval(const A& a, const B& b) { return a != b; }
+    static bool eval(const A& a, const B& b)
+    {
+        return a != b;
+    }
 };
 
 /// Encoding of 'less than' comparison operation.
 struct Lt {
     static const char* sym() { return "<"; }
     template <class, class>
-    struct Result { typedef bool type; };
+    struct Result {
+        typedef bool type;
+    };
     template <class A, class B>
-    static bool eval(const A& a, const B& b) { return a < b; }
+    static bool eval(const A& a, const B& b)
+    {
+        return a < b;
+    }
 };
 
 /// Encoding of 'greater than' comparison operation.
 struct Gt {
     static const char* sym() { return ">"; }
     template <class, class>
-    struct Result { typedef bool type; };
+    struct Result {
+        typedef bool type;
+    };
     template <class A, class B>
-    static bool eval(const A& a, const B& b) { return a > b; }
+    static bool eval(const A& a, const B& b)
+    {
+        return a > b;
+    }
 };
 
 /// Encoding of 'less than or equal' comparison operation.
 struct Le {
     static const char* sym() { return "<="; }
     template <class, class>
-    struct Result { typedef bool type; };
+    struct Result {
+        typedef bool type;
+    };
     template <class A, class B>
-    static bool eval(const A& a, const B& b) { return a <= b; }
+    static bool eval(const A& a, const B& b)
+    {
+        return a <= b;
+    }
 };
 
 /// Encoding of 'greater than or equal' comparison operation.
 struct Ge {
     static const char* sym() { return ">="; }
     template <class, class>
-    struct Result { typedef bool type; };
+    struct Result {
+        typedef bool type;
+    };
     template <class A, class B>
-    static bool eval(const A& a, const B& b) { return a >= b; }
+    static bool eval(const A& a, const B& b)
+    {
+        return a >= b;
+    }
 };
 
 /// Encoding of bitwise 'and' operation.
 struct And {
     static const char* sym() { return "&"; }
     template <class A, class B>
-    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
+    struct Result {
+        typedef typename ArithBinOpType<A, B>::type type;
+    };
     template <class A, class B>
-    static typename Result<A, B>::type eval(const A& a, const B& b) { return a & b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b)
+    {
+        return a & b;
+    }
 };
 
 /// Encoding of bitwise 'exclusiv or' operation.
 struct Xor {
     static const char* sym() { return "^"; }
     template <class A, class B>
-    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
+    struct Result {
+        typedef typename ArithBinOpType<A, B>::type type;
+    };
     template <class A, class B>
-    static typename Result<A, B>::type eval(const A& a, const B& b) { return a ^ b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b)
+    {
+        return a ^ b;
+    }
 };
 
 /// Encoding of bitwise 'or' operation.
 struct Or {
     static const char* sym() { return "|"; }
     template <class A, class B>
-    struct Result { typedef typename ArithBinOpType<A, B>::type type; };
+    struct Result {
+        typedef typename ArithBinOpType<A, B>::type type;
+    };
     template <class A, class B>
-    static typename Result<A, B>::type eval(const A& a, const B& b) { return a | b; }
+    static typename Result<A, B>::type eval(const A& a, const B& b)
+    {
+        return a | b;
+    }
 };
 
 /// Encoding of logical conjunction.
 struct Conj {
     static const char* sym() { return "&&"; }
     template <class, class>
-    struct Result { typedef bool type; };
+    struct Result {
+        typedef bool type;
+    };
     template <class A, class B>
-    static bool eval(const A& a, const B& b) { return a && b; }
+    static bool eval(const A& a, const B& b)
+    {
+        return a && b;
+    }
 };
 
 /// Encoding of logical disjunction.
 struct Disj {
     static const char* sym() { return "||"; }
     template <class, class>
-    struct Result { typedef bool type; };
+    struct Result {
+        typedef bool type;
+    };
     template <class A, class B>
-    static bool eval(const A& a, const B& b) { return a || b; }
+    static bool eval(const A& a, const B& b)
+    {
+        return a || b;
+    }
 };
 
 
@@ -338,16 +452,21 @@ struct Exists {
     static const char* name() { return "exists"; }
     typedef bool ResultType;
     template <class Tab, class Query>
-    static bool eval(const Tab* t, const Query& q) { return t && t->exists(q); }
+    static bool eval(const Tab* t, const Query& q)
+    {
+        return t && t->exists(q);
+    }
 };
 
 struct Count {
     static const char* name() { return "count"; }
     typedef size_t ResultType;
     template <class Tab, class Query>
-    static size_t eval(const Tab* t, const Query& q) { return t ? t->count(q) : 0; }
+    static size_t eval(const Tab* t, const Query& q)
+    {
+        return t ? t->count(q) : 0;
+    }
 };
-
 
 
 template <class Q>
@@ -371,11 +490,9 @@ inline BinOp<Op, A, B> binop(const A& a, const B& b)
 template <class Op, class Col, class Query>
 inline Subquery<Op, Col, Query> subquery(const Col& c, const Query& q)
 {
-    static_assert(IsSubtable<typename Col::column_type>::value,
-                  "A subtable column is required at this point");
+    static_assert(IsSubtable<typename Col::column_type>::value, "A subtable column is required at this point");
     return Subquery<Op, Col, Query>(c, q);
 }
-
 
 
 template <class Q>
@@ -752,19 +869,18 @@ inline Expr<BinOp<Disj, A, B>> operator||(const A& a, const Expr<B>& b)
 
 
 template <class Tab, int col_idx, class Type, class Query>
-inline Expr<Subquery<Exists, ColRef<Tab, col_idx, Type>, Query>>
-        exists(const Expr<ColRef<Tab, col_idx, Type>>& col, const Query& query)
+inline Expr<Subquery<Exists, ColRef<Tab, col_idx, Type>, Query>> exists(const Expr<ColRef<Tab, col_idx, Type>>& col,
+                                                                        const Query& query)
 {
     return expr(subquery<Exists>(col.value, query));
 }
 
 template <class Tab, int col_idx, class Type, class Query>
-inline Expr<Subquery<Count, ColRef<Tab, col_idx, Type>, Query>>
-        count(const Expr<ColRef<Tab, col_idx, Type>>& col, const Query& query)
+inline Expr<Subquery<Count, ColRef<Tab, col_idx, Type>, Query>> count(const Expr<ColRef<Tab, col_idx, Type>>& col,
+                                                                      const Query& query)
 {
     return expr(subquery<Count>(col.value, query));
 }
-
 
 
 /**
@@ -793,7 +909,6 @@ struct HasCol<Subquery<Op, Col, Query>> {
 };
 
 
-
 template <bool, class, class>
 struct GetColBinOp;
 
@@ -802,7 +917,8 @@ struct GetColBinOp;
  * specified query expression.
  */
 template <class>
-struct GetCol {};
+struct GetCol {
+};
 template <class Tab, int i, class T>
 struct GetCol<ColRef<Tab, i, T>> {
     typedef T type;
@@ -825,7 +941,6 @@ struct GetCol<Subquery<Op, Col, Query>> {
 };
 
 
-
 template <bool a_has_col, class A, class B>
 struct GetColBinOp {
     typedef typename GetCol<A>::type type;
@@ -836,7 +951,6 @@ struct GetColBinOp<false, A, B> {
     typedef typename GetCol<B>::type type;
     static const int col_idx = GetCol<B>::col_idx;
 };
-
 
 
 template <class Op, class A>
@@ -850,7 +964,9 @@ struct BinOpResult;
  * query expression.
  */
 template <class T>
-struct ExprResult { typedef T type; };
+struct ExprResult {
+    typedef T type;
+};
 template <class Tab, int col_idx, class Type>
 struct ExprResult<ColRef<Tab, col_idx, Type>> {
     typedef Type type;
@@ -869,7 +985,6 @@ struct ExprResult<Subquery<Op, Col, Query>> {
 };
 
 
-
 template <class Op, class A>
 struct UnOpResult {
     typedef typename Op::template Result<typename ExprResult<A>::type>::type type;
@@ -877,10 +992,8 @@ struct UnOpResult {
 
 template <class Op, class A, class B>
 struct BinOpResult {
-    typedef typename Op::template Result<typename ExprResult<A>::type,
-                                         typename ExprResult<B>::type>::type type;
+    typedef typename Op::template Result<typename ExprResult<A>::type, typename ExprResult<B>::type>::type type;
 };
-
 
 
 template <class Query>
@@ -918,6 +1031,7 @@ struct Canonicalize<UnOp<Not, BinOp<Disj, A, B>>> {
 private:
     typedef typename Canonicalize<UnOp<Not, A>>::Result A2;
     typedef typename Canonicalize<UnOp<Not, B>>::Result B2;
+
 public:
     typedef BinOp<Conj, A2, B2> Result;
     static Result exec(const UnOp<Not, BinOp<Disj, A, B>>& q)
@@ -931,6 +1045,7 @@ struct Canonicalize<UnOp<Not, BinOp<Conj, A, B>>> {
 private:
     typedef typename Canonicalize<UnOp<Not, A>>::Result A2;
     typedef typename Canonicalize<UnOp<Not, B>>::Result B2;
+
 public:
     typedef BinOp<Disj, A2, B2> Result;
     static Result exec(const UnOp<Not, BinOp<Conj, A, B>>& q)
@@ -940,7 +1055,6 @@ public:
 };
 
 
-
 /**
  * Handles the evaluation of a query expression based on a
  * specific principal column.
@@ -948,7 +1062,7 @@ public:
 template <class Tab, int col_idx, class Type>
 class ColEval {
 public:
-    ColEval(const void* c, const Tab* t): m_column(c), m_table(t) {}
+    ColEval(const void* c, const Tab* t) : m_column(c), m_table(t) {}
 
     template <class T>
     T operator()(const T& expr, size_t) const
@@ -1008,39 +1122,31 @@ private:
 };
 
 
-
 template <class Ch, class Tr, class Tab, int col_idx, class Type>
-inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out,
-                                              const ColRef<Tab, col_idx, Type>&)
+inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const ColRef<Tab, col_idx, Type>&)
 {
     out << "t" << '.' << Tab::get_column_name(col_idx);
     return out;
 }
 template <class Ch, class Tr, class Op, class Q>
-inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out,
-                                              const UnOp<Op, Q>& q)
+inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const UnOp<Op, Q>& q)
 {
     out << Op::sym() << '(' << q.arg << ')';
     return out;
 }
 template <class Ch, class Tr, class Op, class A, class B>
-inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out,
-                                              const BinOp<Op, A, B>& q)
+inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const BinOp<Op, A, B>& q)
 {
     out << '(' << q.left << ')' << Op::sym() << '(' << q.right << ')';
     return out;
 }
 template <class Ch, class Tr, class Op, class Col, class Query>
-inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out,
-                                              const Subquery<Op, Col, Query>& q)
+inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const Subquery<Op, Col, Query>& q)
 {
     out << Op::name() << '(' << q.col << ';' << q.query << ')';
     return out;
 }
 }
-
-
-
 
 
 template <class Spec>
@@ -1065,24 +1171,22 @@ public:
     Type get(size_t i) const
     {
         return static_cast<Type*>(m_cols[col_idx])[i];
-
     }
 
     size_t size() const { return m_size; }
 
-    static const char* get_column_name(int col_idx)
-    {
-        return Spec::col_names()[col_idx];
-    }
+    static const char* get_column_name(int col_idx) { return Spec::col_names()[col_idx]; }
 
-    BasicTable(): m_size(0)
+    BasicTable() : m_size(0)
     {
         m_size = 256;
-        m_cols = new void* [TypeCount<typename Spec::Columns>::value];
+        m_cols = new void*[TypeCount<typename Spec::Columns>::value];
         ForEachType<typename Spec::Columns, MakeCol>::exec(this);
     }
 
-    struct QueryRow: QueryRowBase { QueryRow(): QueryRowBase(query::EmptyType()) {} };
+    struct QueryRow : QueryRowBase {
+        QueryRow() : QueryRowBase(query::EmptyType()) {}
+    };
 
     template <class Query>
     bool exists(const Query& q) const
@@ -1120,38 +1224,40 @@ private:
     template <class T>
     size_t _count(const T& q) const
     {
-//        std::cout << q << std::endl;
+        //        std::cout << q << std::endl;
         size_t n = 0, i = 0;
         const size_t end = size();
 
         for (;;) {
             i = _find(q, i, end);
-            if (i == end) break;
+            if (i == end)
+                break;
             ++n;
             ++i;
-
         }
         return n;
     }
 
 
-
     template <class A, class B>
     size_t _find(const query::BinOp<query::Disj, A, B>& q, size_t begin, size_t end) const
     {
-        return Find_OR<query::HasCol<A>::value, query::HasCol<B>::value, A, B>::find(this, q.left, q.right, begin, end);
+        return Find_OR<query::HasCol<A>::value, query::HasCol<B>::value, A, B>::find(this, q.left, q.right, begin,
+                                                                                     end);
     }
 
     template <class A, class B>
     size_t _find(const query::BinOp<query::Conj, A, B>& q, size_t begin, size_t end) const
     {
         /*
-                return Find_AND<query::HasCol<A>::value, query::HasCol<B>::value, A, B>::find(this, q.left, q.right, begin, end);
+                return Find_AND<query::HasCol<A>::value, query::HasCol<B>::value, A, B>::find(this, q.left, q.right,
+        begin, end);
         --
         */
         for (;;) {
             const size_t i = _find_AND(q, begin, end);
-            if (i == begin || i == end) return i;
+            if (i == begin || i == end)
+                return i;
             begin = i;
         }
     }
@@ -1159,7 +1265,7 @@ private:
     template <class A, class B>
     size_t _find_AND(const query::BinOp<query::Conj, A, B>& q, size_t begin, size_t end) const
     {
-        begin = _find_AND(q.left,  begin, end);
+        begin = _find_AND(q.left, begin, end);
         begin = _find_AND(q.right, begin, end);
         return begin;
     }
@@ -1185,18 +1291,15 @@ private:
             const int col_idx = query::GetCol<T>::col_idx;
             query::ColEval<BasicTable, col_idx, Type> eval(t->m_cols[col_idx], t);
             for (size_t i = begin; i != end; ++i)
-                if (eval(q, i)) return i;
+                if (eval(q, i))
+                    return i;
             return end;
         }
     };
     template <class T>
     struct Find<false, T> {
-        static size_t find(const BasicTable*, const T& q, size_t begin, size_t end)
-        {
-            return q ? begin : end;
-        }
+        static size_t find(const BasicTable*, const T& q, size_t begin, size_t end) { return q ? begin : end; }
     };
-
 
 
     // FIXME: This implementation is not omptimal in that a range of
@@ -1219,7 +1322,8 @@ private:
     struct Find_OR<false, true, A, B> {
         static size_t find(const BasicTable* t, const A& a, const B& b, size_t begin, size_t end)
         {
-            if (a) return begin; // because (true || x) is aways true
+            if (a)
+                return begin; // because (true || x) is aways true
             return t->_find(b, begin, end);
         }
     };
@@ -1227,7 +1331,8 @@ private:
     struct Find_OR<true, false, A, B> {
         static size_t find(const BasicTable* t, const A& a, const B& b, size_t begin, size_t end)
         {
-            if (b) return begin; // because (x || true) is aways true
+            if (b)
+                return begin; // because (x || true) is aways true
             return t->_find(a, begin, end);
         }
     };

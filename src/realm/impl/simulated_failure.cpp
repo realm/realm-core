@@ -55,7 +55,7 @@ struct PrimeState {
     std::unique_ptr<PrimeMode> slots[num_failure_types];
 };
 
-struct OneShotPrimeMode: PrimeMode {
+struct OneShotPrimeMode : PrimeMode {
     bool triggered = false;
     bool check_trigger() noexcept override
     {
@@ -66,14 +66,12 @@ struct OneShotPrimeMode: PrimeMode {
     }
 };
 
-struct RandomPrimeMode: PrimeMode {
+struct RandomPrimeMode : PrimeMode {
     std::mt19937_64 random;
     std::uniform_int_distribution<int> dist;
     int n;
-    RandomPrimeMode(int trigger_threshold, int m, uint_fast64_t seed):
-        random(seed),
-        dist(0, m - 1),
-        n(trigger_threshold)
+    RandomPrimeMode(int trigger_threshold, int m, uint_fast64_t seed)
+        : random(seed), dist(0, m - 1), n(trigger_threshold)
     {
         REALM_ASSERT(n >= 0 && m > 0);
     }
@@ -173,7 +171,7 @@ bool SimulatedFailure::do_check_trigger(FailureType failure_type) noexcept
 
 namespace {
 
-class ErrorCategory: public std::error_category {
+class ErrorCategory : public std::error_category {
 public:
     const char* name() const noexcept override;
     std::string message(int) const override;

@@ -38,8 +38,7 @@ class EncryptedFileMapping;
 class EncryptedFileMapping {
 public:
     // Adds the newly-created object to file.mappings iff it's successfully constructed
-    EncryptedFileMapping(SharedFileInfo& file, size_t file_offset,
-                         void* addr, size_t size, File::AccessMode access);
+    EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size, File::AccessMode access);
     ~EncryptedFileMapping();
 
     // Write all dirty pages to disk and mark them read-only
@@ -51,9 +50,7 @@ public:
 
     // Make sure that memory in the specified range is synchronized with any
     // changes made globally visible through call to write_barrier
-    void read_barrier(const void* addr, size_t size,
-                      UniqueLock& lock,
-                      Header_to_size header_to_size);
+    void read_barrier(const void* addr, size_t size, UniqueLock& lock, Header_to_size header_to_size);
 
     // Ensures that any changes made to memory in the specified range
     // becomes visible to any later calls to read_barrier()
@@ -99,9 +96,7 @@ private:
 };
 
 
-
-inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size,
-                                               UniqueLock& lock,
+inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, UniqueLock& lock,
                                                Header_to_size header_to_size)
 {
     size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) >> m_page_shift;
@@ -131,10 +126,6 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size,
         }
     }
 }
-
-
-
-
 }
 }
 
@@ -145,10 +136,9 @@ namespace util {
 
 /// Thrown by EncryptedFileMapping if a file opened is non-empty and does not
 /// contain valid encrypted data
-struct DecryptionFailed: util::File::AccessError {
-    DecryptionFailed(): util::File::AccessError("Decryption failed", std::string()) {}
+struct DecryptionFailed : util::File::AccessError {
+    DecryptionFailed() : util::File::AccessError("Decryption failed", std::string()) {}
 };
-
 }
 }
 

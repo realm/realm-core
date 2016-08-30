@@ -41,13 +41,13 @@ public:
     }
 
     /// If \a unique_data is 'null', \a data_size must be zero.
-    OwnedData(std::unique_ptr<char[]> unique_data, size_t data_size) noexcept :
-        m_data(std::move(unique_data)), m_size(data_size)
+    OwnedData(std::unique_ptr<char[]> unique_data, size_t data_size) noexcept : m_data(std::move(unique_data)),
+                                                                                m_size(data_size)
     {
         REALM_ASSERT_DEBUG(m_data || m_size == 0);
     }
 
-    OwnedData(const OwnedData& other) : OwnedData(other.m_data.get(), other.m_size) { }
+    OwnedData(const OwnedData& other) : OwnedData(other.m_data.get(), other.m_size) {}
     OwnedData& operator=(const OwnedData& other);
 
     OwnedData(OwnedData&&) = default;

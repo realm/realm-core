@@ -25,7 +25,7 @@
 namespace realm {
 
 
-class ArrayStringLong: public Array {
+class ArrayStringLong : public Array {
 public:
     typedef StringData value_type;
 
@@ -64,12 +64,10 @@ public:
     bool is_null(size_t ndx) const;
     void set_null(size_t ndx);
 
-    size_t count(StringData value, size_t begin = 0,
-                 size_t end = npos) const noexcept;
-    size_t find_first(StringData value, size_t begin = 0,
-                      size_t end = npos) const noexcept;
-    void find_all(IntegerColumn& result, StringData value, size_t add_offset = 0,
-                  size_t begin = 0, size_t end = npos) const;
+    size_t count(StringData value, size_t begin = 0, size_t end = npos) const noexcept;
+    size_t find_first(StringData value, size_t begin = 0, size_t end = npos) const noexcept;
+    void find_all(IntegerColumn& result, StringData value, size_t add_offset = 0, size_t begin = 0,
+                  size_t end = npos) const;
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -95,6 +93,7 @@ public:
 #endif
 
     bool update_from_parent(size_t old_baseline) noexcept;
+
 private:
     ArrayInteger m_offsets;
     ArrayBlob m_blob;
@@ -103,12 +102,13 @@ private:
 };
 
 
-
-
 // Implementation:
-inline ArrayStringLong::ArrayStringLong(Allocator& allocator, bool nullable) noexcept:
-    Array(allocator), m_offsets(allocator), m_blob(allocator),
-    m_nulls(nullable ? allocator : Allocator::get_default()), m_nullable(nullable)
+inline ArrayStringLong::ArrayStringLong(Allocator& allocator, bool nullable) noexcept
+    : Array(allocator),
+      m_offsets(allocator),
+      m_blob(allocator),
+      m_nulls(nullable ? allocator : Allocator::get_default()),
+      m_nullable(nullable)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);
@@ -157,11 +157,11 @@ inline StringData ArrayStringLong::get(size_t ndx) const noexcept
     size_t begin, end;
     if (0 < ndx) {
         begin = to_size_t(m_offsets.get(ndx - 1));
-        end   = to_size_t(m_offsets.get(ndx));
+        end = to_size_t(m_offsets.get(ndx));
     }
     else {
         begin = 0;
-        end   = to_size_t(m_offsets.get(0));
+        end = to_size_t(m_offsets.get(0));
     }
     --end; // Discount the terminating zero
 
@@ -209,8 +209,7 @@ inline bool ArrayStringLong::update_from_parent(size_t old_baseline) noexcept
     return res;
 }
 
-inline size_t ArrayStringLong::get_size_from_header(const char* header,
-                                                    Allocator& alloc) noexcept
+inline size_t ArrayStringLong::get_size_from_header(const char* header, Allocator& alloc) noexcept
 {
     ref_type offsets_ref = to_ref(Array::get(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);
