@@ -27,7 +27,7 @@
 #include "../util/benchmark_results.hpp"
 #include "../util/test_path.hpp"
 #if REALM_ENABLE_ENCRYPTION
-#  include "../util/crypt_key.hpp"
+    #include "../util/crypt_key.hpp"
 #endif
 
 using namespace realm;
@@ -57,8 +57,7 @@ const size_t max_repetitions = 1000;
 const double min_duration_s = 0.1;
 const double min_warmup_time_s = 0.05;
 
-struct Benchmark
-{
+struct Benchmark {
     virtual const char* name() const = 0;
     virtual void before_all(SharedGroup&) {}
     virtual void after_all(SharedGroup&) {}
@@ -465,10 +464,13 @@ struct BenchmarkGetLinkList : Benchmark {
 const char* to_lead_cstr(SharedGroupOptions::Durability level)
 {
     switch (level) {
-        case SharedGroupOptions::Durability::Full:    return "Full   ";
-        case SharedGroupOptions::Durability::MemOnly: return "MemOnly";
+        case SharedGroupOptions::Durability::Full:
+            return "Full   ";
+        case SharedGroupOptions::Durability::MemOnly:
+            return "MemOnly";
 #ifndef _WIN32
-        case SharedGroupOptions::Durability::Async:   return "Async  ";
+        case SharedGroupOptions::Durability::Async:
+            return "Async  ";
 #endif
     }
     return nullptr;
@@ -477,10 +479,13 @@ const char* to_lead_cstr(SharedGroupOptions::Durability level)
 const char* to_ident_cstr(SharedGroupOptions::Durability level)
 {
     switch (level) {
-        case SharedGroupOptions::Durability::Full:    return "Full";
-        case SharedGroupOptions::Durability::MemOnly: return "MemOnly";
+        case SharedGroupOptions::Durability::Full:
+            return "Full";
+        case SharedGroupOptions::Durability::MemOnly:
+            return "MemOnly";
 #ifndef _WIN32
-        case SharedGroupOptions::Durability::Async:   return "Async";
+        case SharedGroupOptions::Durability::Async:
+            return "Async";
 #endif
     }
     return nullptr;
@@ -528,10 +533,10 @@ void run_benchmark(TestContext& test_context, BenchmarkResults& results)
         // Generate the benchmark result texts:
         std::stringstream lead_text_ss;
         std::stringstream ident_ss;
-        lead_text_ss << benchmark.name() << " (" << to_lead_cstr(level) <<
-            ", " << (key == nullptr ? "EncryptionOff" : "EncryptionOn") << ")";
-        ident_ss << benchmark.name() << "_" << to_ident_cstr(level) <<
-            (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
+        lead_text_ss << benchmark.name() << " (" << to_lead_cstr(level)
+                     << ", " << (key == nullptr ? "EncryptionOff" : "EncryptionOn") << ")";
+        ident_ss     << benchmark.name() << "_" << to_ident_cstr(level)
+                     << (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
         std::string ident = ident_ss.str();
 
         // Open a SharedGroup:

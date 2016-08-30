@@ -19,7 +19,7 @@
 #include <algorithm>
 
 #ifdef REALM_DEBUG
-#  include <iostream>
+    #include <iostream>
 #endif
 
 #include <realm/util/miscellaneous.hpp>
@@ -78,7 +78,7 @@ bool GroupWriter::MapWindow::matches(ref_type start_ref, size_t size)
 ref_type GroupWriter::MapWindow::aligned_to_mmap_block(ref_type start_ref)
 {
     // align to 1MB boundary
-    size_t page_mask = intended_alignment-1;
+    size_t page_mask = intended_alignment - 1;
     return start_ref & ~page_mask;
 }
 
@@ -90,7 +90,7 @@ size_t GroupWriter::MapWindow::get_window_size(util::File& f, ref_type start_ref
         window_size = intended_alignment;
     // but never map beyond end of file
     size_t file_size = f.get_size();
-    REALM_ASSERT_DEBUG_EX(start_ref+size <= file_size, start_ref+size, file_size);
+    REALM_ASSERT_DEBUG_EX(start_ref + size <= file_size, start_ref + size, file_size);
     if (window_size > file_size - base_ref)
         window_size = file_size - base_ref;
     return window_size;
@@ -209,7 +209,7 @@ GroupWriter::GroupWriter(Group& group):
         }
         else {
             int_fast64_t value = int_fast64_t(initial_version); // FIXME: Problematic unsigned -> signed conversion
-            top.set(6, 1 + 2*value); // Throws
+            top.set(6, 1 + 2 * value); // Throws
             size_t n = m_free_positions.size();
             bool context_flag = false;
             m_free_versions.Array::create(Array::type_Normal, context_flag, n, value); // Throws
@@ -228,7 +228,7 @@ GroupWriter::GroupWriter(Group& group):
 
 GroupWriter::~GroupWriter()
 {
-    for (auto& window: m_map_windows) {
+    for (auto& window : m_map_windows) {
         delete window;
     }
     m_map_windows.clear();
@@ -241,7 +241,7 @@ size_t GroupWriter::get_file_size() const noexcept
 
 void GroupWriter::sync_all_mappings()
 {
-    for (const auto& window: m_map_windows) {
+    for (const auto& window : m_map_windows) {
         window->sync();
     }
 }
@@ -254,12 +254,12 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 {
     MapWindow* found_window = nullptr;
     for (unsigned int i = 0; i < m_map_windows.size(); ++i) {
-        if (m_map_windows[i]->matches(start_ref, size)
-            || m_map_windows[i]->extends_to_match(m_alloc.get_file(), start_ref, size)) {
+        if (m_map_windows[i]->matches(start_ref, size) ||
+            m_map_windows[i]->extends_to_match(m_alloc.get_file(), start_ref, size)) {
             found_window = m_map_windows[i];
             // move matching window to top (to keep LRU order):
             for (int k = i; k; --k)
-                m_map_windows[k] = m_map_windows[k-1];
+                m_map_windows[k] = m_map_windows[k - 1];
             m_map_windows[0] = found_window;
             return found_window;
         }
@@ -356,7 +356,7 @@ ref_type GroupWriter::write_group()
     if (is_shared)
         ++max_top_size; // database version (a.k.a. transaction number)
     size_t max_free_space_needed = Array::get_max_byte_size(max_top_size) +
-        num_free_lists * Array::get_max_byte_size(max_free_list_size);
+                                   num_free_lists * Array::get_max_byte_size(max_free_list_size);
 
     // Reserve space for remaining arrays. We ask for one extra byte beyond the
     // maximum number that is required. This ensures that even if we end up
@@ -555,8 +555,8 @@ size_t GroupWriter::get_free_space(size_t size)
 
 
 inline size_t GroupWriter::split_freelist_chunk(size_t index, size_t start_pos,
-                                                     size_t alloc_pos, size_t chunk_size,
-                                                     bool is_shared)
+                                                size_t alloc_pos, size_t chunk_size,
+                                                bool is_shared)
 {
     m_free_positions.insert(index, start_pos);
     m_free_lengths.insert(index, alloc_pos - start_pos);
@@ -611,7 +611,7 @@ GroupWriter::search_free_space_in_part_of_freelist(size_t size, size_t begin,
     }
     // No match
     found = false;
-    return std::make_pair(end,0);
+    return std::make_pair(end, 0);
 }
 
 
@@ -630,9 +630,9 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
         if (found) return chunk;
     }
     else {
-        chunk = search_free_space_in_part_of_freelist(size, end/2, end, found);
+        chunk = search_free_space_in_part_of_freelist(size, end / 2, end, found);
         if (found) return chunk;
-        chunk = search_free_space_in_part_of_freelist(size, 0, end/2, found);
+        chunk = search_free_space_in_part_of_freelist(size, 0, end / 2, found);
         if (found) return chunk;
     }
 
@@ -642,7 +642,7 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
         // extending the file will add a new entry at the end of the freelist,
         // so search that particular entry
         end = m_free_lengths.size();
-        chunk = search_free_space_in_part_of_freelist(size, end-1, end, found);
+        chunk = search_free_space_in_part_of_freelist(size, end - 1, end, found);
     }
     while (!found);
     return chunk;
@@ -692,7 +692,7 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
         m_free_versions.add(0); // new space is always free for writing
 
     // Update the logical file size
-    m_group.m_top.set(2, 1 + 2*new_file_size); // Throws
+    m_group.m_top.set(2, 1 + 2 * new_file_size); // Throws
     REALM_ASSERT(chunk_size != 0);
     REALM_ASSERT((chunk_size % 8) == 0);
     return std::make_pair(chunk_ndx, chunk_size);
@@ -709,7 +709,7 @@ void GroupWriter::write(const char* data, size_t size)
     MapWindow* window = get_window(pos, size);
     char* dest_addr = window->translate(pos);
     window->encryption_read_barrier(dest_addr, size);
-    std::copy(data, data+size, dest_addr);
+    std::copy(data, data + size, dest_addr);
     window->encryption_write_barrier(dest_addr, size);
 }
 
@@ -799,17 +799,16 @@ void GroupWriter::dump()
 
     size_t count = m_free_lengths.size();
     std::cout << "count: " << count << ", m_size = " << m_alloc.get_file().get_size() << ", "
-        "version >= " << m_readlock_version << "\n";
+              << "version >= " << m_readlock_version << "\n";
     if (!is_shared) {
         for (size_t i = 0; i < count; ++i) {
-            std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i) <<
-                "\n";
+            std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i) << "\n";
         }
     }
     else {
         for (size_t i = 0; i < count; ++i) {
-            std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i) <<
-                " - " << m_free_versions.get(i) << "\n";
+            std::cout << i << ": " << m_free_positions.get(i) << ", " << m_free_lengths.get(i)
+                      << " - " << m_free_versions.get(i) << "\n";
         }
     }
 }

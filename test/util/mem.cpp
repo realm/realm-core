@@ -21,13 +21,13 @@
 #include <realm/util/features.h>
 
 #if defined _WIN32
-#  include <windows.h>
-#  include <psapi.h>
+    #include <windows.h>
+    #include <psapi.h>
 #elif REALM_PLATFORM_APPLE
-#  include <mach/mach.h>
+    #include <mach/mach.h>
 #elif defined REALM_HAVE_LIBPROCPS
-// Requires libprocps (formerly known as libproc)
-#  include <proc/readproc.h>
+    // Requires libprocps (formerly known as libproc)
+    #include <proc/readproc.h>
 #endif
 
 #include "mem.hpp"
@@ -82,8 +82,8 @@ DWORD calculate_ws_private(DWORD process_id)
                 if (i == dPages) break; //if last page
 
                 dCurrentPageAddress = dWorkingSetPages[i] & 0xFFFFF000;
-                dNextPageAddress = dWorkingSetPages[i+1] & 0xFFFFF000;
-                dNextPageFlags = dWorkingSetPages[i+1] & 0x00000FFF;
+                dNextPageAddress = dWorkingSetPages[i + 1] & 0xFFFFF000;
+                dNextPageFlags = dWorkingSetPages[i + 1] & 0x00000FFF;
 
                 //decide whether iterate further or exit
                 //(this is non-contiguous page or have different flags)

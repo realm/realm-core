@@ -26,7 +26,7 @@
 #include <mutex>
 
 #ifndef _WIN32
-#include <unistd.h>
+    #include <unistd.h>
 #endif
 
 #include <realm/group_shared_options.hpp>
@@ -34,7 +34,7 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #ifndef _WIN32
-#include <realm/util/interprocess_condvar.hpp>
+    #include <realm/util/interprocess_condvar.hpp>
 #endif
 #include <realm/util/interprocess_mutex.hpp>
 
@@ -89,7 +89,7 @@ struct Shared {
     // 10000 takes less than 0.1 sec
     void increment_10000_times()
     {
-        for (int i=0; i<10000; ++i) {
+        for (int i = 0; i < 10000; ++i) {
             LockGuard lock(m_mutex);
             ++m_value;
         }
@@ -97,7 +97,7 @@ struct Shared {
 
     void increment_10000_times2()
     {
-        for (int i=0; i<10000; ++i) {
+        for (int i = 0; i < 10000; ++i) {
             LockGuard lock(m_mutex);
             // Create a time window where thread interference can take place. Problem with ++m_value is that it
             // could assemble into 'inc [addr]' which has very tiny gap
@@ -120,7 +120,7 @@ struct SharedWithEmulated {
     // 10000 takes less than 0.1 sec
     void increment_10000_times()
     {
-        for (int i=0; i<10000; ++i) {
+        for (int i = 0; i < 10000; ++i) {
             std::lock_guard<InterprocessMutex> lock(m_mutex);
             ++m_value;
         }
@@ -128,7 +128,7 @@ struct SharedWithEmulated {
 
     void increment_10000_times2()
     {
-        for (int i=0; i<10000; ++i) {
+        for (int i = 0; i < 10000; ++i) {
             std::lock_guard<InterprocessMutex> lock(m_mutex);
             // Create a time window where thread interference can take place. Problem with ++m_value is that it
             // could assemble into 'inc [addr]' which has very tiny gap
@@ -224,7 +224,7 @@ private:
 
 void producer_thread(QueueMonitor* queue, int value)
 {
-    for (int i=0; i<1000; ++i) {
+    for (int i = 0; i < 1000; ++i) {
         queue->put(value);
     }
 }
@@ -569,7 +569,7 @@ void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessC
 }
 
 
-void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, 
+void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter,
                        InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
     std::lock_guard<InterprocessMutex> l(*mutex);
@@ -641,7 +641,7 @@ NONCONCURRENT_TEST(Thread_CondvarIsStateless)
     // send some signals:
     {
         std::lock_guard<InterprocessMutex> l(mutex);
-        for (int i=0; i<10; ++i)
+        for (int i = 0; i < 10; ++i)
             changed.notify_all();
     }
     // spawn a thread which will later do one more signal in order
@@ -651,7 +651,7 @@ NONCONCURRENT_TEST(Thread_CondvarIsStateless)
     // that this wait will actually wait for the thread to signal.
     {
         std::lock_guard<InterprocessMutex> l(mutex);
-        changed.wait(mutex,0);
+        changed.wait(mutex, 0);
         CHECK_EQUAL(signal_state, 2);
     }
     signal_thread.join();
@@ -677,7 +677,7 @@ NONCONCURRENT_TEST(Thread_CondvarTimeout)
     time.tv_nsec = 100000000; // 0.1 sec
     {
         std::lock_guard<InterprocessMutex> l(mutex);
-        for (int i=0; i<5; ++i)
+        for (int i = 0; i < 5; ++i)
             changed.wait(mutex, &time);
     }
     changed.release_shared_part();
@@ -700,12 +700,12 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
     changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     const int num_waiters = 10;
     Thread waiters[num_waiters];
-    for (int i=0; i<num_waiters; ++i) {
+    for (int i = 0; i < num_waiters; ++i) {
         waiters[i].start(std::bind(waiter, &mutex, &changed));
     }
     millisleep(1000); // allow time for all waiters to wait
     changed.notify_all();
-    for (int i=0; i<num_waiters; ++i) {
+    for (int i = 0; i < num_waiters; ++i) {
         waiters[i].join();
     }
     changed.release_shared_part();
@@ -733,19 +733,19 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
     changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     const int num_waiters = 10;
     Thread waiters[num_waiters];
-    for (int i=0; i<num_waiters; ++i) {
+    for (int i = 0; i < num_waiters; ++i) {
         waiters[i].start(std::bind(waiter_with_count, &feedback, &wait_counter, &mutex, &changed));
     }
     feedback.get_stone(num_waiters);
     CHECK_EQUAL(wait_counter, num_waiters);
     changed.notify();
     feedback.get_stone(1);
-    CHECK_EQUAL(wait_counter, num_waiters-1);
+    CHECK_EQUAL(wait_counter, num_waiters - 1);
     changed.notify();
     feedback.get_stone(1);
-    CHECK_EQUAL(wait_counter, num_waiters-2);
+    CHECK_EQUAL(wait_counter, num_waiters - 2);
     changed.notify_all();
-    for (int i=0; i<num_waiters; ++i) {
+    for (int i = 0; i < num_waiters; ++i) {
         waiters[i].join();
     }
     changed.release_shared_part();

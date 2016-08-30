@@ -28,7 +28,7 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #ifndef _WIN32
-#include <realm/util/interprocess_condvar.hpp>
+    #include <realm/util/interprocess_condvar.hpp>
 #endif
 #include <realm/util/interprocess_mutex.hpp>
 #include <realm/group.hpp>
@@ -148,7 +148,8 @@ public:
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and
     /// the upgrade will be aborted.
-    explicit SharedGroup(Replication& repl, const SharedGroupOptions options = SharedGroupOptions());
+    explicit SharedGroup(Replication& repl,
+                         const SharedGroupOptions options = SharedGroupOptions());
 
     struct unattached_tag {};
 
@@ -471,6 +472,12 @@ public:
     /// may want to momentarily pin the current version until the other thread
     /// has retrieved it.
     ///
+    /// Pinning can be done in both read- and write-transactions, but with different
+    /// semantics. When pinning during a read-transaction, the version pinned is the
+    /// one accessible during the read-transaction. When pinning during a write-transaction,
+    /// the version pinned will be the last version that was succesfully committed to the
+    /// realm file at the point in time, when the write-transaction was started.
+    ///
     /// The release is not thread-safe, so it has to be done on the SharedGroup
     /// associated with the thread calling unpin_version(), and the SharedGroup
     /// must be attached to the realm file at the point of unpinning.
@@ -519,7 +526,7 @@ private:
 #endif
     util::InterprocessCondVar m_new_commit_available;
 #endif
-    std::function<void(int,int)> m_upgrade_callback;
+    std::function<void(int, int)> m_upgrade_callback;
 
     void do_open(const std::string& file, bool no_create, bool is_backend,
                  const SharedGroupOptions options);

@@ -588,9 +588,7 @@ template<class Test> struct RegisterTest {
 
 template<class Compare> inline void TestList::sort(Compare compare)
 {
-    auto compare_2 = [&](const Test* a, const Test* b) {
-        return compare(a->details, b->details);
-    };
+    auto compare_2 = [&](const Test* a, const Test* b) { return compare(a->details, b->details); };
     std::stable_sort(m_tests.begin(), m_tests.end(), compare_2);
 }
 
@@ -620,7 +618,7 @@ inline PatternBasedFileOrder::PatternBasedFileOrder(const char** patterns_begin,
 
 template<size_t N>
 inline PatternBasedFileOrder::PatternBasedFileOrder(const char* (&patterns)[N]):
-    m_wrap(patterns, patterns+N)
+    m_wrap(patterns, patterns + N)
 {
 }
 
@@ -641,11 +639,11 @@ template<class A, class B>
 struct Compare<A, B, true> {
     static bool equal(const A& a, const B& b)
     {
-        return util::int_equal_to(a,b);
+        return util::int_equal_to(a, b);
     }
     static bool less(const A& a, const B& b)
     {
-        return util::int_less_than(a,b);
+        return util::int_less_than(a, b);
     }
 };
 
@@ -654,14 +652,14 @@ template<class A, class B>
 inline bool equal(const A& a, const B& b)
 {
     const bool both_are_integral = std::is_integral<A>::value && std::is_integral<B>::value;
-    return Compare<A, B, both_are_integral>::equal(a,b);
+    return Compare<A, B, both_are_integral>::equal(a, b);
 }
 
 template<class A, class B>
 inline bool less(const A& a, const B& b)
 {
     const bool both_are_integral = std::is_integral<A>::value && std::is_integral<B>::value;
-    return Compare<A, B, both_are_integral>::less(a,b);
+    return Compare<A, B, both_are_integral>::less(a, b);
 }
 
 
@@ -670,12 +668,12 @@ inline bool less(const A& a, const B& b)
 // FIXME: Also handle `wchar_t*`.
 inline bool equal(const char* a, const char* b)
 {
-    return std::strcmp(a,b) == 0;
+    return std::strcmp(a, b) == 0;
 }
 
 inline bool less(const char* a, const char* b)
 {
-    return std::strcmp(a,b) < 0;
+    return std::strcmp(a, b) < 0;
 }
 
 
@@ -780,7 +778,7 @@ inline bool TestContext::check_equal(const A& a, const B& b,
                                      const char* file, long line,
                                      const char* a_text, const char* b_text)
 {
-    bool cond = equal(a,b);
+    bool cond = equal(a, b);
     return check_compare(cond, a, b, file, line, "CHECK_EQUAL", a_text, b_text);
 }
 
@@ -789,7 +787,7 @@ inline bool TestContext::check_not_equal(const A& a, const B& b,
                                          const char* file, long line,
                                          const char* a_text, const char* b_text)
 {
-    bool cond = !equal(a,b);
+    bool cond = !equal(a, b);
     return check_compare(cond, a, b, file, line, "CHECK_NOT_EQUAL", a_text, b_text);
 }
 
@@ -798,7 +796,7 @@ inline bool TestContext::check_less(const A& a, const B& b,
                                     const char* file, long line,
                                     const char* a_text, const char* b_text)
 {
-    bool cond = less(a,b);
+    bool cond = less(a, b);
     return check_compare(cond, a, b, file, line, "CHECK_LESS", a_text, b_text);
 }
 
@@ -807,7 +805,7 @@ inline bool TestContext::check_less_equal(const A& a, const B& b,
                                           const char* file, long line,
                                           const char* a_text, const char* b_text)
 {
-    bool cond = !less(b,a); // Note: Reverse operand order
+    bool cond = !less(b, a); // Note: Reverse operand order
     return check_compare(cond, a, b, file, line, "CHECK_LESS_EQUAL", a_text, b_text);
 }
 
@@ -816,7 +814,7 @@ inline bool TestContext::check_greater(const A& a, const B& b,
                                        const char* file, long line,
                                        const char* a_text, const char* b_text)
 {
-    bool cond = less(b,a); // Note: Reverse operand order
+    bool cond = less(b, a); // Note: Reverse operand order
     return check_compare(cond, a, b, file, line, "CHECK_GREATER", a_text, b_text);
 }
 
@@ -825,7 +823,7 @@ inline bool TestContext::check_greater_equal(const A& a, const B& b,
                                              const char* file, long line,
                                              const char* a_text, const char* b_text)
 {
-    bool cond = !less(a,b);
+    bool cond = !less(a, b);
     return check_compare(cond, a, b, file, line, "CHECK_GREATER_EQUAL", a_text, b_text);
 }
 

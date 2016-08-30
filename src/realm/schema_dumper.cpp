@@ -46,17 +46,17 @@ int setenv(const char *name, const char *value, int overwrite)
 void show_help(const std::string& program_name)
 {
     std::cerr <<
-        "Usage: " << program_name << " [options] FILE\n"
-        "\n"
-        "Arguments:\n"
-        "\n"
-        "  FILE    The Realm file that should have its schema dumped.\n"
-        "\n"
-        "Options:\n"
-        "\n"
-        "  -k,--key     Encryption key to decrypt the Realm\n"
-        "  -u,--upgrade Perform file format upgrade if required\n"
-        "  -h,--help    Print this message\n";
+              "Usage: " << program_name << " [options] FILE\n"
+              "\n"
+              "Arguments:\n"
+              "\n"
+              "  FILE    The Realm file that should have its schema dumped.\n"
+              "\n"
+              "Options:\n"
+              "\n"
+              "  -k,--key     Encryption key to decrypt the Realm\n"
+              "  -u,--upgrade Perform file format upgrade if required\n"
+              "  -h,--help    Print this message\n";
 }
 
 namespace Logging {
@@ -68,13 +68,13 @@ struct LogData {
     T items;
 };
 
-template<typename Begin, typename Value>
+template <typename Begin, typename Value>
 constexpr LogData<std::pair<Begin&&, Value&&>> operator<<(LogData<Begin>&& begin, Value&& value) noexcept
 {
     return {{ std::forward<Begin>(begin.items), std::forward<Value>(value) }};
 }
 
-template<typename Begin, size_t n>
+template <typename Begin, size_t n>
 constexpr LogData<std::pair<Begin&&, const char*>> operator<<(LogData<Begin>&& begin, const char (&value)[n]) noexcept
 {
     return {{ std::forward<Begin>(begin.items), value }};
@@ -82,8 +82,9 @@ constexpr LogData<std::pair<Begin&&, const char*>> operator<<(LogData<Begin>&& b
 
 typedef std::ostream& (*PfnManipulator)(std::ostream&);
 
-template<typename Begin>
-constexpr LogData<std::pair<Begin&&, PfnManipulator>> operator<<(LogData<Begin>&& begin, PfnManipulator value) noexcept
+template <typename Begin>
+constexpr LogData<std::pair<Begin&&, PfnManipulator>> operator<<(LogData<Begin>&& begin,
+                                                                 PfnManipulator value) noexcept
 {
     return {{ std::forward<Begin>(begin.items), value }};
 }
@@ -238,7 +239,7 @@ void SchemaDumper::list_columns(std::ostream& stream, const ConstTableRef& table
         std::string column_type_name = LangBindHelper::get_data_type_name(column_type);
 
         stream << "    " << column_type_name << " " << column_name
-            << " (type id: " << column_type << ")";
+               << " (type id: " << column_type << ")";
 
         if (idx + 1 < column_count) {
             stream << ',';

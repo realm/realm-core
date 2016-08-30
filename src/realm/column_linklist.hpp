@@ -98,10 +98,10 @@ private:
 
     // The accessors stored in `m_list_accessors` are sorted by their row index.
     // When a LinkList accessor is destroyed because the last shared_ptr pointing
-    // to it dies, its entry is implicitly replaced by a tombstone (an entry with 
-    // an empty `m_list`). These tombstones are pruned at a later time by 
-    // `prune_list_accessor_tombstones`. This is done to amortize the O(n) cost 
-    // of `std::vector::erase` that would otherwise be incurred each time an 
+    // to it dies, its entry is implicitly replaced by a tombstone (an entry with
+    // an empty `m_list`). These tombstones are pruned at a later time by
+    // `prune_list_accessor_tombstones`. This is done to amortize the O(n) cost
+    // of `std::vector::erase` that would otherwise be incurred each time an
     // accessor is removed.
     mutable std::vector<list_entry> m_list_accessors;
     mutable std::atomic<bool> m_list_accessors_contains_tombstones;
@@ -165,8 +165,8 @@ private:
 
 inline LinkListColumn::LinkListColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx):
     LinkColumnBase(alloc, ref, table, column_ndx)
-{ 
-    m_list_accessors_contains_tombstones.store(false); 
+{
+    m_list_accessors_contains_tombstones.store(false);
 }
 
 inline LinkListColumn::~LinkListColumn() noexcept

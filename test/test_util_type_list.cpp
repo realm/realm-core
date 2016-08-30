@@ -77,7 +77,7 @@ template<class T, int i>
 struct DoSomething;
 
 template<int idx>
-struct DoSomething<std::string, idx>{
+struct DoSomething<std::string, idx> {
     static void exec() { magic += idx; }
     static void exec(Person* p) { p->set_name("John Doe"); }
     static void exec(Person* p, int child) { p->m_children[child].set_name("John Doe Jr."); }
@@ -89,7 +89,7 @@ struct DoSomething<std::string, idx>{
 };
 
 template<int idx>
-struct DoSomething<int, idx>{
+struct DoSomething<int, idx> {
     static void exec() { magic += 2 * idx; }
     static void exec(Person* p) { p->set_age(30); }
     static void exec(Person* p, int child) { p->m_children[child].set_age(10); }
@@ -101,7 +101,7 @@ struct DoSomething<int, idx>{
 };
 
 template<int idx>
-struct DoSomething<bool, idx>{
+struct DoSomething<bool, idx> {
     static void exec() { magic += 3 * idx; }
     static void exec(Person* p) { p->set_married(true); }
     static void exec(Person* p, int child) { p->m_children[child].set_married(false); }
@@ -116,7 +116,7 @@ template<class T, int i>
 struct NotEqual;
 
 template<int idx>
-struct NotEqual<std::string, idx>{
+struct NotEqual<std::string, idx> {
     template<class L>
     static bool exec(Person* p, util::Tuple<L> tuple)
     {
@@ -125,7 +125,7 @@ struct NotEqual<std::string, idx>{
 };
 
 template<int idx>
-struct NotEqual<int, idx>{
+struct NotEqual<int, idx> {
     template<class L>
     static bool exec(Person* p, util::Tuple<L> tuple)
     {
@@ -134,7 +134,7 @@ struct NotEqual<int, idx>{
 };
 
 template<int idx>
-struct NotEqual<bool, idx>{
+struct NotEqual<bool, idx> {
     template<class L>
     static bool exec(Person* p, util::Tuple<L> tuple)
     {
@@ -149,9 +149,9 @@ TEST(TypeList_Basic)
     auto person_info = (util::tuple(), std::string("Paul"), 20, true);
     auto person_info1 = (util::tuple(), std::string("John Doe"), 30, true);
 
-    using Dummy1   = util::TypeAppend< void, std::string >::type;
-    using Dummy2   = util::TypeAppend< Dummy1, int>::type;
-    using TypeList = util::TypeAppend< Dummy2, bool>::type;
+    using Dummy1   = util::TypeAppend<void, std::string>::type;
+    using Dummy2   = util::TypeAppend<Dummy1, int>::type;
+    using TypeList = util::TypeAppend<Dummy2, bool>::type;
 
     {
         util::LockGuard lk(magicMutex);
