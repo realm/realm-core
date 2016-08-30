@@ -133,7 +133,7 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) no
         REALM_ASSERT_3(n == 1, ||, n == 0);
         bool null = (n != 0);
         if (null)
-            return BinaryData(nullptr, 0);
+            return BinaryData{};
     }
 
     std::pair<int64_t, int64_t> p = get_two(header, 0);

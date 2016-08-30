@@ -54,8 +54,8 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
         m_changesets->get_root_array()->update_parent(); // Throws
         dg.release();
     }
-    // FIXME: BinaryColumn::set() currently interprets BinaryData(nullptr, 0) as
-    // null. It should probably be changed such that BinaryData(nullptr, 0) is always
+    // FIXME: BinaryColumn::set() currently interprets BinaryData{} as
+    // null. It should probably be changed such that BinaryData{} is always
     // interpreted as the empty string. For the purpose of setting null values,
     // BinaryColumn::set() should accept values of type Optional<BinaryData>().
     BinaryData changeset_2("", 0);

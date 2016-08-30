@@ -463,7 +463,7 @@ private:
 
 ref_type BinaryColumn::create(Allocator& alloc, size_t size, bool nullable)
 {
-    CreateHandler handler(alloc, nullable ? BinaryData(nullptr, 0) : BinaryData("", 0));
+    CreateHandler handler(alloc, nullable ? BinaryData{} : BinaryData("", 0));
     return ColumnBase::create(alloc, size, handler);
 }
 
