@@ -10,15 +10,14 @@ RUN apt-get update && apt-get install -y \
     libprocps4-dev \
     libssl-dev \
     pandoc \
-    python-cheetah \
-    python-setuptools \
+    python3-pip \
     pkg-config \
     ruby \
     ruby-dev \
     s3cmd \
     && rm -rf /var/lib/apt/lists/*
 
-RUN easy_install pip && pip install diff_cover
+RUN pip3 install diff_cover && pip3 install cheetah
 
 VOLUME /source
 VOLUME /out
