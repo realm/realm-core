@@ -307,9 +307,8 @@ public:
     const StringData m_value;
     bool m_nullable;
 
-    SetLeafElem(Allocator& alloc, StringData value, bool nullable) noexcept : m_alloc(alloc),
-                                                                              m_value(value),
-                                                                              m_nullable(nullable)
+    SetLeafElem(Allocator& alloc, StringData value, bool nullable) noexcept
+        : m_alloc(alloc), m_value(value), m_nullable(nullable)
     {
     }
 

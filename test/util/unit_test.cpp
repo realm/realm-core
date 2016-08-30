@@ -420,7 +420,7 @@ bool TestList::run(Config config)
     shared_context.concur_tests = std::move(concur_tests);
     shared_context.no_concur_tests = std::move(no_concur_tests);
     std::unique_ptr<std::unique_ptr<util::Logger>[]> loggers;
-    loggers.reset(new std::unique_ptr<util::Logger>[num_threads]);
+    loggers.reset(new std::unique_ptr<util::Logger>[ num_threads ]);
     if (num_threads != 1 || !config.per_thread_log_path.empty()) {
         std::unique_ptr<util::Logger> logger;
         std::ostringstream formatter;
@@ -458,7 +458,7 @@ bool TestList::run(Config config)
     }
     else {
         std::unique_ptr<std::unique_ptr<ThreadContextImpl>[]> thread_contexts;
-        thread_contexts.reset(new std::unique_ptr<ThreadContextImpl>[num_threads]);
+        thread_contexts.reset(new std::unique_ptr<ThreadContextImpl>[ num_threads ]);
         for (int i = 0; i < num_threads; ++i)
             thread_contexts[i].reset(new ThreadContextImpl(shared_context, i, loggers[i].get()));
 

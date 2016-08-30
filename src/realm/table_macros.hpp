@@ -395,14 +395,8 @@
             typename Col<5>::type name6;                                                                             \
             typename Col<6>::type name7;                                                                             \
             typename Col<7>::type name8;                                                                             \
-            ColNames(Init i) noexcept : name1(i),                                                                    \
-                                        name2(i),                                                                    \
-                                        name3(i),                                                                    \
-                                        name4(i),                                                                    \
-                                        name5(i),                                                                    \
-                                        name6(i),                                                                    \
-                                        name7(i),                                                                    \
-                                        name8(i)                                                                     \
+            ColNames(Init i) noexcept                                                                                \
+                : name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i)                     \
             {                                                                                                        \
             }                                                                                                        \
         };                                                                                                           \
@@ -472,15 +466,8 @@
             typename Col<6>::type name7;                                                                             \
             typename Col<7>::type name8;                                                                             \
             typename Col<8>::type name9;                                                                             \
-            ColNames(Init i) noexcept : name1(i),                                                                    \
-                                        name2(i),                                                                    \
-                                        name3(i),                                                                    \
-                                        name4(i),                                                                    \
-                                        name5(i),                                                                    \
-                                        name6(i),                                                                    \
-                                        name7(i),                                                                    \
-                                        name8(i),                                                                    \
-                                        name9(i)                                                                     \
+            ColNames(Init i) noexcept                                                                                \
+                : name1(i), name2(i), name3(i), name4(i), name5(i), name6(i), name7(i), name8(i), name9(i)           \
             {                                                                                                        \
             }                                                                                                        \
         };                                                                                                           \
@@ -554,16 +541,17 @@
             typename Col<7>::type name8;                                                                             \
             typename Col<8>::type name9;                                                                             \
             typename Col<9>::type name10;                                                                            \
-            ColNames(Init i) noexcept : name1(i),                                                                    \
-                                        name2(i),                                                                    \
-                                        name3(i),                                                                    \
-                                        name4(i),                                                                    \
-                                        name5(i),                                                                    \
-                                        name6(i),                                                                    \
-                                        name7(i),                                                                    \
-                                        name8(i),                                                                    \
-                                        name9(i),                                                                    \
-                                        name10(i)                                                                    \
+            ColNames(Init i) noexcept                                                                                \
+                : name1(i)                                                                                           \
+                , name2(i)                                                                                           \
+                , name3(i)                                                                                           \
+                , name4(i)                                                                                           \
+                , name5(i)                                                                                           \
+                , name6(i)                                                                                           \
+                , name7(i)                                                                                           \
+                , name8(i)                                                                                           \
+                , name9(i)                                                                                           \
+                , name10(i)                                                                                          \
             {                                                                                                        \
             }                                                                                                        \
         };                                                                                                           \
@@ -640,17 +628,18 @@
             typename Col<8>::type name9;                                                                             \
             typename Col<9>::type name10;                                                                            \
             typename Col<10>::type name11;                                                                           \
-            ColNames(Init i) noexcept : name1(i),                                                                    \
-                                        name2(i),                                                                    \
-                                        name3(i),                                                                    \
-                                        name4(i),                                                                    \
-                                        name5(i),                                                                    \
-                                        name6(i),                                                                    \
-                                        name7(i),                                                                    \
-                                        name8(i),                                                                    \
-                                        name9(i),                                                                    \
-                                        name10(i),                                                                   \
-                                        name11(i)                                                                    \
+            ColNames(Init i) noexcept                                                                                \
+                : name1(i)                                                                                           \
+                , name2(i)                                                                                           \
+                , name3(i)                                                                                           \
+                , name4(i)                                                                                           \
+                , name5(i)                                                                                           \
+                , name6(i)                                                                                           \
+                , name7(i)                                                                                           \
+                , name8(i)                                                                                           \
+                , name9(i)                                                                                           \
+                , name10(i)                                                                                          \
+                , name11(i)                                                                                          \
             {                                                                                                        \
             }                                                                                                        \
         };                                                                                                           \
@@ -730,18 +719,19 @@
             typename Col<9>::type name10;                                                                            \
             typename Col<10>::type name11;                                                                           \
             typename Col<11>::type name12;                                                                           \
-            ColNames(Init i) noexcept : name1(i),                                                                    \
-                                        name2(i),                                                                    \
-                                        name3(i),                                                                    \
-                                        name4(i),                                                                    \
-                                        name5(i),                                                                    \
-                                        name6(i),                                                                    \
-                                        name7(i),                                                                    \
-                                        name8(i),                                                                    \
-                                        name9(i),                                                                    \
-                                        name10(i),                                                                   \
-                                        name11(i),                                                                   \
-                                        name12(i)                                                                    \
+            ColNames(Init i) noexcept                                                                                \
+                : name1(i)                                                                                           \
+                , name2(i)                                                                                           \
+                , name3(i)                                                                                           \
+                , name4(i)                                                                                           \
+                , name5(i)                                                                                           \
+                , name6(i)                                                                                           \
+                , name7(i)                                                                                           \
+                , name8(i)                                                                                           \
+                , name9(i)                                                                                           \
+                , name10(i)                                                                                          \
+                , name11(i)                                                                                          \
+                , name12(i)                                                                                          \
             {                                                                                                        \
             }                                                                                                        \
         };                                                                                                           \
@@ -826,19 +816,20 @@
             typename Col<10>::type name11;                                                                           \
             typename Col<11>::type name12;                                                                           \
             typename Col<12>::type name13;                                                                           \
-            ColNames(Init i) noexcept : name1(i),                                                                    \
-                                        name2(i),                                                                    \
-                                        name3(i),                                                                    \
-                                        name4(i),                                                                    \
-                                        name5(i),                                                                    \
-                                        name6(i),                                                                    \
-                                        name7(i),                                                                    \
-                                        name8(i),                                                                    \
-                                        name9(i),                                                                    \
-                                        name10(i),                                                                   \
-                                        name11(i),                                                                   \
-                                        name12(i),                                                                   \
-                                        name13(i)                                                                    \
+            ColNames(Init i) noexcept                                                                                \
+                : name1(i)                                                                                           \
+                , name2(i)                                                                                           \
+                , name3(i)                                                                                           \
+                , name4(i)                                                                                           \
+                , name5(i)                                                                                           \
+                , name6(i)                                                                                           \
+                , name7(i)                                                                                           \
+                , name8(i)                                                                                           \
+                , name9(i)                                                                                           \
+                , name10(i)                                                                                          \
+                , name11(i)                                                                                          \
+                , name12(i)                                                                                          \
+                , name13(i)                                                                                          \
             {                                                                                                        \
             }                                                                                                        \
         };                                                                                                           \
@@ -927,20 +918,21 @@
             typename Col<11>::type name12;                                                                           \
             typename Col<12>::type name13;                                                                           \
             typename Col<13>::type name14;                                                                           \
-            ColNames(Init i) noexcept : name1(i),                                                                    \
-                                        name2(i),                                                                    \
-                                        name3(i),                                                                    \
-                                        name4(i),                                                                    \
-                                        name5(i),                                                                    \
-                                        name6(i),                                                                    \
-                                        name7(i),                                                                    \
-                                        name8(i),                                                                    \
-                                        name9(i),                                                                    \
-                                        name10(i),                                                                   \
-                                        name11(i),                                                                   \
-                                        name12(i),                                                                   \
-                                        name13(i),                                                                   \
-                                        name14(i)                                                                    \
+            ColNames(Init i) noexcept                                                                                \
+                : name1(i)                                                                                           \
+                , name2(i)                                                                                           \
+                , name3(i)                                                                                           \
+                , name4(i)                                                                                           \
+                , name5(i)                                                                                           \
+                , name6(i)                                                                                           \
+                , name7(i)                                                                                           \
+                , name8(i)                                                                                           \
+                , name9(i)                                                                                           \
+                , name10(i)                                                                                          \
+                , name11(i)                                                                                          \
+                , name12(i)                                                                                          \
+                , name13(i)                                                                                          \
+                , name14(i)                                                                                          \
             {                                                                                                        \
             }                                                                                                        \
         };                                                                                                           \
@@ -1033,21 +1025,22 @@
             typename Col<12>::type name13;                                                                           \
             typename Col<13>::type name14;                                                                           \
             typename Col<14>::type name15;                                                                           \
-            ColNames(Init i) noexcept : name1(i),                                                                    \
-                                        name2(i),                                                                    \
-                                        name3(i),                                                                    \
-                                        name4(i),                                                                    \
-                                        name5(i),                                                                    \
-                                        name6(i),                                                                    \
-                                        name7(i),                                                                    \
-                                        name8(i),                                                                    \
-                                        name9(i),                                                                    \
-                                        name10(i),                                                                   \
-                                        name11(i),                                                                   \
-                                        name12(i),                                                                   \
-                                        name13(i),                                                                   \
-                                        name14(i),                                                                   \
-                                        name15(i)                                                                    \
+            ColNames(Init i) noexcept                                                                                \
+                : name1(i)                                                                                           \
+                , name2(i)                                                                                           \
+                , name3(i)                                                                                           \
+                , name4(i)                                                                                           \
+                , name5(i)                                                                                           \
+                , name6(i)                                                                                           \
+                , name7(i)                                                                                           \
+                , name8(i)                                                                                           \
+                , name9(i)                                                                                           \
+                , name10(i)                                                                                          \
+                , name11(i)                                                                                          \
+                , name12(i)                                                                                          \
+                , name13(i)                                                                                          \
+                , name14(i)                                                                                          \
+                , name15(i)                                                                                          \
             {                                                                                                        \
             }                                                                                                        \
         };                                                                                                           \

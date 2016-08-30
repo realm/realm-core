@@ -815,8 +815,8 @@ inline SharedGroup::version_type SharedGroup::get_version_of_bound_snapshot() co
 
 class SharedGroup::ReadLockUnlockGuard {
 public:
-    ReadLockUnlockGuard(SharedGroup& shared_group, ReadLockInfo& read_lock) noexcept : m_shared_group(shared_group),
-                                                                                       m_read_lock(&read_lock)
+    ReadLockUnlockGuard(SharedGroup& shared_group, ReadLockInfo& read_lock) noexcept
+        : m_shared_group(shared_group), m_read_lock(&read_lock)
     {
     }
     ~ReadLockUnlockGuard() noexcept

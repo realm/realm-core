@@ -76,9 +76,8 @@ struct SetLeafElem : Array::UpdateHandler {
     Allocator& m_alloc;
     const BinaryData m_value;
     const bool m_add_zero_term;
-    SetLeafElem(Allocator& alloc, BinaryData value, bool add_zero_term) noexcept : m_alloc(alloc),
-                                                                                   m_value(value),
-                                                                                   m_add_zero_term(add_zero_term)
+    SetLeafElem(Allocator& alloc, BinaryData value, bool add_zero_term) noexcept
+        : m_alloc(alloc), m_value(value), m_add_zero_term(add_zero_term)
     {
     }
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t elem_ndx_in_leaf) override

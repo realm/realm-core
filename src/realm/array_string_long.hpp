@@ -104,11 +104,11 @@ private:
 
 // Implementation:
 inline ArrayStringLong::ArrayStringLong(Allocator& allocator, bool nullable) noexcept
-    : Array(allocator),
-      m_offsets(allocator),
-      m_blob(allocator),
-      m_nulls(nullable ? allocator : Allocator::get_default()),
-      m_nullable(nullable)
+    : Array(allocator)
+    , m_offsets(allocator)
+    , m_blob(allocator)
+    , m_nulls(nullable ? allocator : Allocator::get_default())
+    , m_nullable(nullable)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);

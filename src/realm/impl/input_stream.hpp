@@ -82,9 +82,8 @@ public:
 
 class NoCopyInputStreamAdaptor : public NoCopyInputStream {
 public:
-    NoCopyInputStreamAdaptor(InputStream& in, char* buffer, size_t buffer_size) noexcept : m_in(in),
-                                                                                           m_buffer(buffer),
-                                                                                           m_buffer_size(buffer_size)
+    NoCopyInputStreamAdaptor(InputStream& in, char* buffer, size_t buffer_size) noexcept
+        : m_in(in), m_buffer(buffer), m_buffer_size(buffer_size)
     {
     }
     size_t next_block(const char*& begin, const char*& end) override

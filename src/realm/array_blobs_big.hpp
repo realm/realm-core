@@ -88,8 +88,8 @@ private:
 
 // Implementation:
 
-inline ArrayBigBlobs::ArrayBigBlobs(Allocator& allocator, bool nullable) noexcept : Array(allocator),
-                                                                                    m_nullable(nullable)
+inline ArrayBigBlobs::ArrayBigBlobs(Allocator& allocator, bool nullable) noexcept
+    : Array(allocator), m_nullable(nullable)
 {
 }
 

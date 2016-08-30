@@ -4404,10 +4404,7 @@ void Table::optimize(bool enforce)
 class Table::SliceWriter : public Group::TableWriter {
 public:
     SliceWriter(const Table& table, StringData table_name, size_t offset, size_t size) noexcept
-        : m_table(table),
-          m_table_name(table_name),
-          m_offset(offset),
-          m_size(size)
+        : m_table(table), m_table_name(table_name), m_offset(offset), m_size(size)
     {
     }
 

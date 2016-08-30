@@ -165,8 +165,8 @@ inline StringData::StringData() noexcept : m_data(nullptr), m_size(0)
 {
 }
 
-inline StringData::StringData(const char* external_data, size_t data_size) noexcept : m_data(external_data),
-                                                                                      m_size(data_size)
+inline StringData::StringData(const char* external_data, size_t data_size) noexcept
+    : m_data(external_data), m_size(data_size)
 {
     REALM_ASSERT_DEBUG(external_data || data_size == 0);
 }

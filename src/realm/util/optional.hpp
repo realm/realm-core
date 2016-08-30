@@ -105,7 +105,7 @@ public:
     T* operator->();                       // Throws, FIXME: Can be constexpr with C++14
 
     template <class U>
-    constexpr T value_or(U&& value) const&;
+    constexpr T value_or(U&& value) const &;
 
     template <class U>
     T value_or(U&& value) &&;
@@ -420,14 +420,14 @@ T* Optional<T>::operator->()
 
 template <class T>
 template <class U>
-constexpr T Optional<T>::value_or(U&& otherwise) const&
+constexpr T Optional<T>::value_or(U&& otherwise) const &
 {
     return m_engaged ? T{m_value} : T{std::forward<U>(otherwise)};
 }
 
 template <class T>
 template <class U>
-T Optional<T>::value_or(U&& otherwise)&&
+T Optional<T>::value_or(U&& otherwise) &&
 {
     if (is_engaged()) {
         return T(std::move(m_value));

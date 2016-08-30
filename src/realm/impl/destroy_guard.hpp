@@ -181,8 +181,8 @@ inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(Allocator& alloc) noex
 {
 }
 
-inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(ref_type ref, Allocator& alloc) noexcept : m_ref(ref),
-                                                                                                     m_alloc(alloc)
+inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(ref_type ref, Allocator& alloc) noexcept
+    : m_ref(ref), m_alloc(alloc)
 {
 }
 

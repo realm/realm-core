@@ -440,8 +440,8 @@ inline void StreamLogger::do_log(std::string message)
 inline FileLogger::FileLogger(std::string path)
     : StreamLogger(m_out)
     , m_file(path, util::File::mode_Write) // Throws
-    , m_streambuf(&m_file) // Throws
-    , m_out(&m_streambuf) // Throws
+    , m_streambuf(&m_file)                 // Throws
+    , m_out(&m_streambuf)                  // Throws
 {
 }
 
@@ -449,7 +449,7 @@ inline FileLogger::FileLogger(util::File file)
     : StreamLogger(m_out)
     , m_file(std::move(file))
     , m_streambuf(&m_file) // Throws
-    , m_out(&m_streambuf) // Throws
+    , m_out(&m_streambuf)  // Throws
 {
 }
 
@@ -473,9 +473,7 @@ inline Logger::Level ThreadSafeLogger::get() const noexcept
 }
 
 inline PrefixLogger::PrefixLogger(std::string prefix, Logger& base_logger) noexcept
-    : Logger(base_logger.level_threshold),
-      m_prefix(std::move(prefix)),
-      m_base_logger(base_logger)
+    : Logger(base_logger.level_threshold), m_prefix(std::move(prefix)), m_base_logger(base_logger)
 {
 }
 

@@ -232,13 +232,14 @@ void TreeWriter::ParentLevel::add_child_ref(ref_type child_ref, size_t elems_in_
 struct BpTreeBase::WriteSliceHandler : public Array::VisitHandler {
 public:
     WriteSliceHandler(size_t offset, size_t size, Allocator& alloc, BpTreeBase::SliceHandler& slice_handler,
-                      _impl::OutputStream& out) noexcept : m_begin(offset),
-                                                           m_end(offset + size),
-                                                           m_leaf_cache(alloc),
-                                                           m_slice_handler(slice_handler),
-                                                           m_out(out),
-                                                           m_tree_writer(out),
-                                                           m_top_ref(0)
+                      _impl::OutputStream& out) noexcept
+        : m_begin(offset)
+        , m_end(offset + size)
+        , m_leaf_cache(alloc)
+        , m_slice_handler(slice_handler)
+        , m_out(out)
+        , m_tree_writer(out)
+        , m_top_ref(0)
     {
     }
     ~WriteSliceHandler() noexcept {}

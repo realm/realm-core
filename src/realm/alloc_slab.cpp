@@ -616,7 +616,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             size_t section_index = mapping_index + m_file_mappings->m_first_additional_mapping;
             m_baseline = get_section_base(section_index);
             m_num_local_mappings = m_file_mappings->m_num_global_mappings;
-            m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[m_num_local_mappings]);
+            m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[ m_num_local_mappings ]);
             for (size_t k = 0; k < m_num_local_mappings; ++k) {
                 m_local_mappings[k] = m_file_mappings->m_global_mappings[k];
             }
@@ -979,7 +979,7 @@ void SlabAlloc::remap(size_t file_size)
             m_file_mappings->m_capacity_global_mappings = num_additional_mappings + 128;
             std::unique_ptr<std::shared_ptr<const util::File::Map<char>>[]> new_mappings;
             new_mappings.reset(
-                new std::shared_ptr<const util::File::Map<char>>[m_file_mappings->m_capacity_global_mappings]);
+                new std::shared_ptr<const util::File::Map<char>>[ m_file_mappings->m_capacity_global_mappings ]);
             for (size_t j = 0; j < m_file_mappings->m_num_global_mappings; ++j)
                 new_mappings[j] = m_file_mappings->m_global_mappings[j];
             m_file_mappings->m_global_mappings = std::move(new_mappings);
@@ -1004,7 +1004,7 @@ void SlabAlloc::remap(size_t file_size)
         // update local cache of mappings, if global mappings have been extended beyond local
         if (num_additional_mappings > m_num_local_mappings) {
             m_num_local_mappings = num_additional_mappings;
-            m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[m_num_local_mappings]);
+            m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[ m_num_local_mappings ]);
             for (size_t k = 0; k < m_num_local_mappings; ++k) {
                 m_local_mappings[k] = m_file_mappings->m_global_mappings[k];
             }

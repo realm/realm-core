@@ -789,22 +789,23 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv)
 }
 
 inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
-    : RowIndexes(std::move(tv.m_row_indexes)),
-      m_table(std::move(tv.m_table)),
-      m_linked_column(tv.m_linked_column),
-      m_linked_row(tv.m_linked_row),
-      m_linkview_source(std::move(tv.m_linkview_source)),
-      m_distinct_column_source(tv.m_distinct_column_source),
-      m_distinct_predicate(std::move(tv.m_distinct_predicate)),
-      m_sorting_predicate(std::move(tv.m_sorting_predicate)),
-      m_query(std::move(tv.m_query)),
-      m_start(tv.m_start),
-      m_end(tv.m_end),
-      m_limit(tv.m_limit),
-      // if we are created from a table view which is outdated, take care to use the outdated
-      // version number so that we can later trigger a sync if needed.
-      m_last_seen_version(tv.m_last_seen_version),
-      m_num_detached_refs(tv.m_num_detached_refs)
+    : RowIndexes(std::move(tv.m_row_indexes))
+    , m_table(std::move(tv.m_table))
+    , m_linked_column(tv.m_linked_column)
+    , m_linked_row(tv.m_linked_row)
+    , m_linkview_source(std::move(tv.m_linkview_source))
+    , m_distinct_column_source(tv.m_distinct_column_source)
+    , m_distinct_predicate(std::move(tv.m_distinct_predicate))
+    , m_sorting_predicate(std::move(tv.m_sorting_predicate))
+    , m_query(std::move(tv.m_query))
+    , m_start(tv.m_start)
+    , m_end(tv.m_end)
+    , m_limit(tv.m_limit)
+    ,
+    // if we are created from a table view which is outdated, take care to use the outdated
+    // version number so that we can later trigger a sync if needed.
+    m_last_seen_version(tv.m_last_seen_version)
+    , m_num_detached_refs(tv.m_num_detached_refs)
 {
     if (m_table)
         m_table->move_registered_view(&tv, this);

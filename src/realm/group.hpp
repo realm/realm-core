@@ -743,11 +743,13 @@ inline Group::Group(BinaryData buffer, bool take_ownership)
     open(buffer, take_ownership); // Throws
 }
 
-inline Group::Group(unattached_tag) noexcept : m_alloc(), // Throws
-                                               m_top(m_alloc),
-                                               m_tables(m_alloc),
-                                               m_table_names(m_alloc),
-                                               m_is_shared(false)
+inline Group::Group(unattached_tag) noexcept
+    : m_alloc()
+    , // Throws
+    m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(false)
 {
     init_array_parents();
 }
@@ -757,11 +759,13 @@ inline Group* Group::get_parent_group() noexcept
     return this;
 }
 
-inline Group::Group(shared_tag) noexcept : m_alloc(), // Throws
-                                           m_top(m_alloc),
-                                           m_tables(m_alloc),
-                                           m_table_names(m_alloc),
-                                           m_is_shared(true)
+inline Group::Group(shared_tag) noexcept
+    : m_alloc()
+    , // Throws
+    m_top(m_alloc)
+    , m_tables(m_alloc)
+    , m_table_names(m_alloc)
+    , m_is_shared(true)
 {
     init_array_parents();
 }

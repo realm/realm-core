@@ -2893,8 +2893,8 @@ top:
                     }
                 }
                 else {
-                    return allnocopy ? size_t(FindRes_column) : first ? to_size_t(get_direct(sub_data, sub_width, 0))
-                                                                      : sub_count;
+                    return allnocopy ? size_t(FindRes_column)
+                                     : first ? to_size_t(get_direct(sub_data, sub_width, 0)) : sub_count;
                 }
             }
             else {

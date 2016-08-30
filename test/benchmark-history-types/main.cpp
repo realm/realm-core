@@ -115,8 +115,8 @@ public:
         std::string path = "/tmp/benchmark-history-types.realm";
         util::File::try_remove(path);
 
-        reader_histories.reset(new std::unique_ptr<Replication>[num_readers]);
-        reader_shared_groups.reset(new std::unique_ptr<SharedGroup>[num_readers]);
+        reader_histories.reset(new std::unique_ptr<Replication>[ num_readers ]);
+        reader_shared_groups.reset(new std::unique_ptr<SharedGroup>[ num_readers ]);
 
         for (int i = 0; i < num_readers; ++i) {
             reader_histories[i] = make_history(path);
