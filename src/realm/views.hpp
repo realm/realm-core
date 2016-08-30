@@ -77,7 +77,7 @@ public:
     virtual ~RowIndexes()
     {
 #ifdef REALM_COOKIE_CHECK
-        cookie = 0x7765697633333333; // 0x77656976 = 'view'; 0x33333333 = '3333' = destructed
+        m_debug_cookie = 0x7765697633333333; // 0x77656976 = 'view'; 0x33333333 = '3333' = destructed
 #endif
     }
 
@@ -94,7 +94,7 @@ public:
     void check_cookie() const
     {
 #ifdef REALM_COOKIE_CHECK
-        REALM_ASSERT_RELEASE(cookie == cookie_expected);
+        REALM_ASSERT_RELEASE(m_debug_cookie == cookie_expected);
 #endif
     }
 
@@ -104,7 +104,7 @@ protected:
     void do_sort(const SortDescriptor& sorting_predicate, const SortDescriptor& distinct_columns);
 
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
-    uint64_t cookie;
+    uint64_t m_debug_cookie;
 };
 
 } // namespace realm
