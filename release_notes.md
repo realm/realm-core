@@ -6,7 +6,13 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* BREAKING! Until now, a Query would return indexes into a restricting view if such was 
+  present (a view given in the `.where(&view) method`, or it would return indexes into the
+  Table if no restricting view was present. This would make query results useless if you did 
+  not know whether or not a restricting view was present. This fix make it *always* return 
+  indexes into the Table in all cases. Also, any `begin` and `end` arguments could point into 
+  eitherthe View or the Table. These now always point into the Table. Also see 
+  https://github.com/realm/realm-core/issues/1565
 
 ### Enhancements
 
@@ -178,13 +184,6 @@
 
 * Removed the 'stealing' variant of export for handover. It was not a great
   idea. It was not being used and required locking which we'd like to avoid.
-* Until now, a Query would return indexes into a restricting view if such was present (a view 
-  given in the `.where(&view) method`, or it would return indexes into the Table if no
-  restricting view was present. This would make query results useless if you did not know
-  whether or not a restricting view was present. This fix make it *always* return indexes 
-  into the Table in all cases. Also, any `begin` and `end` arguments could point into either
-  the View or the Table. These now always point into the Table. Also see 
-  https://github.com/realm/realm-core/issues/1565
 * S: A concept of log levels was added to `util::Logger`. `util::Logger::log()`
   now takes a log level argument, and new shorthand methods were added
   (`debug()`, `info()`, `warn()`, ...). All loggers now have a `level_threshold`
