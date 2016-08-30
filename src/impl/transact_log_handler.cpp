@@ -626,6 +626,10 @@ public:
         REALM_ASSERT(!unordered);
         if (auto change = get_change())
             change->insert(row_ndx, num_rows_to_insert, need_move_info());
+        for (auto& list : m_info.lists) {
+            if (list.row_ndx >= row_ndx)
+                list.row_ndx += num_rows_to_insert;
+        }
 
         return true;
     }
@@ -642,7 +646,7 @@ public:
                     m_info.lists.pop_back();
                     continue;
                 }
-                if (it->row_ndx == last_row - 1)
+                if (it->row_ndx == last_row)
                     it->row_ndx = row_ndx;
             }
             ++it;
