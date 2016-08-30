@@ -3686,10 +3686,10 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
 
         CHECK(lv1->is_attached());
         CHECK(lv2->is_attached());
-        CHECK_EQUAL(lv1->size(), 1);
-        CHECK_EQUAL(lv2->size(), 2);
+        CHECK_EQUAL(lv1->size(), 2);
+        CHECK_EQUAL(lv2->size(), 1);
 
-        origin->get_linklist(1, 2)->add(4);
+        origin->get_linklist(1, 3)->add(4);
 
         LangBindHelper::commit_and_continue_as_read(sg);
     }

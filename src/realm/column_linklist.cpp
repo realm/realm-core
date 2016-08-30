@@ -370,8 +370,10 @@ LinkViewRef LinkListColumn::get_ptr(size_t row_ndx) const
     if (it != m_list_accessors.end()) {
         if (it->m_row_ndx == row_ndx) {
             // If we have an existing LinkView, return it.
-            if (LinkViewRef list = it->m_list.lock())
+            if (LinkViewRef list = it->m_list.lock()) {
+                REALM_ASSERT_DEBUG(list->is_attached());
                 return list;
+            }
         }
         if (it->m_list.expired()) {
             // We found an expired entry at the appropriate position. Reuse it with a new LinkView.
