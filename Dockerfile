@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     gcovr \
+    git \
     g++-4.9 \
     libprocps4-dev \
     libssl-dev \
