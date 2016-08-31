@@ -208,7 +208,13 @@ def doBuildInDocker(String command) {
 def buildDiffCoverage() {
   return {
     node('docker') {
-      getArchive()
+      checkout([
+        $class: 'GitSCM',
+        branches: scm.branches,
+        gitTool: 'native git',
+        extensions: scm.extensions + [[$class: 'CleanCheckout']],
+        userRemoteConfigs: scm.userRemoteConfigs
+      ])
 
       def buildEnv = docker.build 'realm-core:snapshot'
       def environment = environment()
