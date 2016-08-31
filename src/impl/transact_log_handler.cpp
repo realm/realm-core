@@ -657,6 +657,15 @@ public:
         return true;
     }
 
+    bool change_link_targets(size_t from, size_t to)
+    {
+        for (auto& list : m_info.lists) {
+            if (list.table_ndx == current_table() && list.row_ndx == from)
+                list.row_ndx = to;
+        }
+        return true;
+    }
+
     bool clear_table()
     {
         auto tbl_ndx = current_table();
