@@ -111,6 +111,7 @@ void ResultsNotifier::calculate_changes()
         for (size_t i = 0; i < m_tv.size(); ++i)
             next_rows.push_back(m_tv[i].get_index());
 
+        util::Optional<IndexSet> move_candidates;
         if (changes) {
             auto const& moves = changes->moves;
             for (auto& idx : m_previous_rows) {
@@ -123,11 +124,13 @@ void ResultsNotifier::calculate_changes()
                 else
                     REALM_ASSERT_DEBUG(!changes->insertions.contains(idx));
             }
+            if (m_target_is_in_table_order && !m_sort)
+                move_candidates = changes->insertions;
         }
 
         m_changes = CollectionChangeBuilder::calculate(m_previous_rows, next_rows,
                                                        get_modification_checker(*m_info, *m_query->get_table()),
-                                                       m_target_is_in_table_order && !m_sort);
+                                                       move_candidates);
 
         m_previous_rows = std::move(next_rows);
     }

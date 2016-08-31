@@ -32,23 +32,35 @@ using namespace realm;
 namespace {
 template<typename Derived>
 struct MarkDirtyMixin  {
-    bool mark_dirty(size_t row, size_t col) { static_cast<Derived *>(this)->mark_dirty(row, col); return true; }
-
 #if REALM_VER_MAJOR >= 2
-    bool add_int(size_t col, size_t row, int_fast64_t) { return mark_dirty(row, col); }
-    bool set_int(size_t col, size_t row, int_fast64_t, _impl::Instruction, size_t) { return mark_dirty(row, col); }
-    bool set_bool(size_t col, size_t row, bool, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_float(size_t col, size_t row, float, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_double(size_t col, size_t row, double, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_string(size_t col, size_t row, StringData, _impl::Instruction, size_t) { return mark_dirty(row, col); }
-    bool set_binary(size_t col, size_t row, BinaryData, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_olddatetime(size_t col, size_t row, OldDateTime, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_timestamp(size_t col, size_t row, Timestamp, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_table(size_t col, size_t row, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_mixed(size_t col, size_t row, const Mixed&, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_link(size_t col, size_t row, size_t, size_t, _impl::Instruction) { return mark_dirty(row, col); }
-    bool set_null(size_t col, size_t row, _impl::Instruction, size_t) { return mark_dirty(row, col); }
+    bool mark_dirty(size_t row, size_t col, _impl::Instruction instr=_impl::instr_Set)
+    {
+        // Ignore SetDefault and SetUnique as those conceptually cannot be
+        // changes to existing rows
+        if (instr == _impl::instr_Set)
+            static_cast<Derived *>(this)->mark_dirty(row, col);
+        return true;
+    }
+
+    bool set_int(size_t c, size_t r, int_fast64_t, _impl::Instruction i, size_t) { return mark_dirty(r, c, i); }
+    bool set_bool(size_t c, size_t r, bool, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_float(size_t c, size_t r, float, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_double(size_t c, size_t r, double, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_string(size_t c, size_t r, StringData, _impl::Instruction i, size_t) { return mark_dirty(r, c, i); }
+    bool set_binary(size_t c, size_t r, BinaryData, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_olddatetime(size_t c, size_t r, OldDateTime, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_timestamp(size_t c, size_t r, Timestamp, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_table(size_t c, size_t r, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_mixed(size_t c, size_t r, const Mixed&, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_link(size_t c, size_t r, size_t, size_t, _impl::Instruction i) { return mark_dirty(r, c, i); }
+    bool set_null(size_t c, size_t r, _impl::Instruction i, size_t) { return mark_dirty(r, c, i); }
 #else
+    bool mark_dirty(size_t row, size_t col)
+    {
+        static_cast<Derived *>(this)->mark_dirty(row, col);
+        return true;
+    }
+
     bool set_int(size_t col, size_t row, int_fast64_t) { return mark_dirty(row, col); }
     bool set_bool(size_t col, size_t row, bool) { return mark_dirty(row, col); }
     bool set_float(size_t col, size_t row, float) { return mark_dirty(row, col); }
@@ -62,11 +74,14 @@ struct MarkDirtyMixin  {
     bool set_link(size_t col, size_t row, size_t, size_t) { return mark_dirty(row, col); }
     bool set_null(size_t col, size_t row) { return mark_dirty(row, col); }
 #endif
+
+    bool add_int(size_t col, size_t row, size_t) { return mark_dirty(row, col); }
     bool nullify_link(size_t col, size_t row, size_t) { return mark_dirty(row, col); }
-    bool set_int_unique(size_t col, size_t row, size_t, int_fast64_t) { return mark_dirty(row, col); }
-    bool set_string_unique(size_t col, size_t row, size_t, StringData) { return mark_dirty(row, col); }
     bool insert_substring(size_t col, size_t row, size_t, StringData) { return mark_dirty(row, col); }
     bool erase_substring(size_t col, size_t row, size_t, size_t) { return mark_dirty(row, col); }
+
+    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return true; }
+    bool set_string_unique(size_t, size_t, size_t, StringData) { return true; }
 };
 
 class TransactLogValidationMixin {
@@ -658,12 +673,28 @@ public:
         return true;
     }
 
+    bool swap_rows(size_t row_ndx_1, size_t row_ndx_2) {
+        for (auto& list : m_info.lists) {
+            if (list.table_ndx == current_table()) {
+                if (list.row_ndx == row_ndx_1)
+                    list.row_ndx = row_ndx_2;
+                else if (list.row_ndx == row_ndx_2)
+                    list.row_ndx = row_ndx_1;
+            }
+        }
+        if (auto change = get_change())
+            change->swap(row_ndx_1, row_ndx_2, need_move_info());
+        return true;
+    }
+
     bool change_link_targets(size_t from, size_t to)
     {
         for (auto& list : m_info.lists) {
             if (list.table_ndx == current_table() && list.row_ndx == from)
                 list.row_ndx = to;
         }
+        if (auto change = get_change())
+            change->subsume(from, to, need_move_info());
         return true;
     }
 

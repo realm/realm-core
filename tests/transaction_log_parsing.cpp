@@ -347,6 +347,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         auto r = Realm::get_shared_realm(config);
         r->update_schema({
             {"table", {
+                {"pk", PropertyType::Int, "", "", true, true},
                 {"value", PropertyType::Int}
             }},
         });
@@ -355,8 +356,10 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         r->begin_transaction();
         table.add_empty_row(10);
-        for (int i = 0; i < 10; ++i)
-            table.set_int(0, i, i);
+        for (int i = 9; i >= 0; --i) {
+            table.set_int_unique(0, i, i);
+            table.set_int(1, i, i);
+        }
         r->commit_transaction();
 
         auto track_changes = [&](std::vector<bool> tables_needed, auto&& f) {
@@ -460,6 +463,91 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(info.tables.size() == 3);
             REQUIRE_INDICES(info.tables[1].insertions, 10, 11, 12);
         }
+
+        SECTION("swap_rows() reports a pair of moves") {
+            auto info = track_changes({false, false, true}, [&] {
+                table.swap_rows(1, 5);
+            });
+            REQUIRE(info.tables.size() == 3);
+            REQUIRE_INDICES(info.tables[2].deletions, 1, 5);
+            REQUIRE_INDICES(info.tables[2].insertions, 1, 5);
+            REQUIRE_MOVES(info.tables[2], {1, 5}, {5, 1});
+        }
+
+        SECTION("swap_rows() preserves modifications from before the swap") {
+            auto info = track_changes({false, false, true}, [&] {
+                table.set_int(1, 8, 15);
+                table.swap_rows(8, 9);
+                table.move_last_over(8);
+            });
+            REQUIRE(info.tables.size() == 3);
+            auto& table = info.tables[2];
+            REQUIRE(table.insertions.empty());
+            REQUIRE(table.moves.empty());
+            REQUIRE_INDICES(table.deletions, 9);
+            REQUIRE_INDICES(table.modifications, 8);
+        }
+
+#if REALM_VER_MAJOR >= 2
+        SECTION("PK conflict from last row produces no net change") {
+            auto info = track_changes({false, false, true}, [&] {
+                table.add_empty_row();
+                table.set_int_unique(0, 10, 5);
+            });
+            REQUIRE(info.tables.size() == 3);
+            // new row is inserted at 10, then moved over 5 and assumes the
+            // identity of the one which was at 5, so nothing actually happened
+            REQUIRE(info.tables[2].empty());
+        }
+
+        SECTION("moving a row via a PK conflict marks it as moved") {
+            auto info = track_changes({false, false, true}, [&] {
+                table.add_empty_row(2);
+                table.set_int_unique(0, 10, 5);
+            });
+            REQUIRE(info.tables.size() == 3);
+            // 10 assumed identity of old 5, but 11 was moved over it, so 5
+            // is a new insert and 10 is a move.
+            REQUIRE_INDICES(info.tables[2].insertions, 5, 10);
+            REQUIRE_INDICES(info.tables[2].deletions, 5);
+            REQUIRE_MOVES(info.tables[2], {5, 10});
+        }
+
+        SECTION("modifying a row before a PK-conflict move marks it as modified") {
+            auto info = track_changes({false, false, true}, [&] {
+                table.set_int(1, 5, 15);
+                table.add_empty_row(2);
+                table.set_int_unique(0, 10, 5);
+            });
+            REQUIRE(info.tables.size() == 3);
+            REQUIRE_INDICES(info.tables[2].modifications, 10);
+        }
+
+        SECTION("modifying a row after a PK-conflict move marks it as modified") {
+            auto info = track_changes({false, false, true}, [&] {
+                table.add_empty_row(2);
+                table.set_int_unique(0, 10, 5);
+                table.set_int(1, 10, 15);
+            });
+            REQUIRE(info.tables.size() == 3);
+            REQUIRE_INDICES(info.tables[2].modifications, 10);
+        }
+
+        SECTION("non-conflicting set_int_unique() does not mark a row as modified") {
+            auto info = track_changes({false, false, true}, [&] {
+                table.set_int_unique(0, 0, 20);
+            });
+            REQUIRE(info.tables.empty());
+        }
+
+        SECTION("SetDefault does not mark a row as modified") {
+            auto info = track_changes({false, false, true}, [&] {
+                bool is_default = true;
+                table.set_int(0, 0, 1, is_default);
+            });
+            REQUIRE(info.tables.empty());
+        }
+#endif
     }
 
     SECTION("LinkView change information") {

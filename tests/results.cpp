@@ -199,6 +199,50 @@ TEST_CASE("results: notifications") {
             REQUIRE(notification_calls == 1);
         }
 
+        SECTION("swapping adjacent matching and non-matching rows does not send notifications") {
+            write([&] {
+                table->swap_rows(0, 1);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("swapping non-adjacent matching and non-matching rows send a single insert/delete pair") {
+            write([&] {
+                table->swap_rows(0, 2);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.deletions, 1);
+            REQUIRE_INDICES(change.insertions, 0);
+        }
+
+        SECTION("swapping matching rows sends insert/delete pairs") {
+            write([&] {
+                table->swap_rows(1, 4);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.deletions, 0, 3);
+            REQUIRE_INDICES(change.insertions, 0, 3);
+
+            write([&] {
+                table->swap_rows(1, 2);
+                table->swap_rows(2, 3);
+                table->swap_rows(3, 4);
+            });
+            REQUIRE(notification_calls == 3);
+            REQUIRE_INDICES(change.deletions, 1, 2, 3);
+            REQUIRE_INDICES(change.insertions, 0, 1, 2);
+        }
+
+        SECTION("swap does not inhibit move collapsing after removals") {
+            write([&] {
+                table->swap_rows(2, 3);
+                table->set_int(0, 3, 100);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.deletions, 1);
+            REQUIRE(change.insertions.empty());
+        }
+
         SECTION("modifying a matching row and leaving it matching marks that row as modified") {
             write([&] {
                 table->set_int(0, 1, 3);
@@ -235,6 +279,15 @@ TEST_CASE("results: notifications") {
         }
 
         SECTION("moving a matching row via deletion marks that row as moved") {
+            write([&] {
+                table->where().greater_equal(0, 10).find_all().clear(RemoveMode::unordered);
+                table->move_last_over(0);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_MOVES(change, {3, 0});
+        }
+
+        SECTION("moving a matching row via subsumption marks that row as modified") {
             write([&] {
                 table->where().greater_equal(0, 10).find_all().clear(RemoveMode::unordered);
                 table->move_last_over(0);
@@ -421,6 +474,13 @@ TEST_CASE("results: notifications") {
             advance_and_notify(*r);
         };
 
+        SECTION("swapping rows does not send notifications") {
+            write([&] {
+                table->swap_rows(2, 3);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+
         SECTION("modifications that leave a non-matching row non-matching do not send notifications") {
             write([&] {
                 table->set_int(0, 6, 13);
@@ -443,6 +503,24 @@ TEST_CASE("results: notifications") {
             REQUIRE(notification_calls == 2);
             REQUIRE_INDICES(change.modifications, 3);
             REQUIRE_INDICES(change.modifications_new, 3);
+        }
+
+        SECTION("swapping leaves modified rows marked as modified") {
+            write([&] {
+                table->set_int(0, 1, 3);
+                table->swap_rows(1, 2);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.modifications, 3);
+            REQUIRE_INDICES(change.modifications_new, 3);
+
+            write([&] {
+                table->swap_rows(3, 1);
+                table->set_int(0, 1, 7);
+            });
+            REQUIRE(notification_calls == 3);
+            REQUIRE_INDICES(change.modifications, 1);
+            REQUIRE_INDICES(change.modifications_new, 1);
         }
 
         SECTION("modifying a matching row to no longer match marks that row as deleted") {
