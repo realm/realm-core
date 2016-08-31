@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     ruby \
     ruby-dev \
     s3cmd \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install diff_cover
