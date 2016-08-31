@@ -82,6 +82,7 @@ def doBuildCocoa() {
   return {
     node('osx') {
       getArchive()
+      sh 'unzip -o -q core.zip'
 
       try {
         withEnv([
@@ -135,6 +136,7 @@ def doBuildDotNetOsx() {
   return {
     node('osx') {
       getArchive()
+      sh 'unzip -o -q core.zip'
 
       try {
         withEnv([
@@ -192,6 +194,7 @@ def doBuildInDocker(String command) {
       def environment = environment()
       withEnv(environment) {
         buildEnv.inside {
+          sh 'unzip -o -q core.zip'
           sh 'sh build.sh config'
           try {
               sh "sh build.sh ${command}"
@@ -214,6 +217,7 @@ def buildDiffCoverage() {
       def environment = environment()
       withEnv(environment) {
         buildEnv.inside {
+          sh 'unzip -o -q core.zip'
           sh 'sh build.sh config'
           sh 'sh build.sh jenkins-pipeline-coverage'
 
@@ -256,6 +260,7 @@ def doBuildNodeInDocker() {
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
       withEnv(environment) {
         buildEnv.inside {
+          sh 'unzip -o -q core.zip'
           sh 'sh build.sh config'
           try {
               sh 'sh build.sh build-node-package'
@@ -277,6 +282,7 @@ def doBuildNodeInOsx() {
   return {
     node('osx') {
       getArchive()
+      sh 'unzip -o -q core.zip'
 
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
       withEnv(environment) {
@@ -309,6 +315,7 @@ def doBuildAndroid() {
         node('fastlinux') {
           ws('/tmp/core-android') {
             getArchive()
+            sh 'unzip -o -q core.zip'
 
             withEnv(environment) {
               sh "sh build.sh config '${pwd()}/install'"
@@ -557,5 +564,4 @@ def setBuildName(newBuildName) {
 def getArchive() {
     sh 'rm -rf *'
     unstash 'core-source'
-    sh 'unzip -o -q core.zip'
 }
