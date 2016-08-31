@@ -20,7 +20,7 @@
 #define REALM_UNICODE_HPP
 
 #include <locale>
-#include <stdint.h>
+#include <cstdint>
 #include <string>
 
 #include <realm/util/safe_int_ops.hpp>

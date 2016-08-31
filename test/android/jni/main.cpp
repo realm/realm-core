@@ -17,7 +17,7 @@
  **************************************************************************/
 
 #include <jni.h>
-#include <errno.h>
+#include <cerrno>
 #include <iostream>
 #include <fstream>
 #include <string>

@@ -3720,7 +3720,7 @@ TEST(Table_FormerLeakCase)
     subdesc->add_column(type_Int,  "a");
     root.add_empty_row(1);
     root.set_subtable(0, 0, &sub);
-    root.set_subtable(0, 0, 0);
+    root.set_subtable(0, 0, nullptr);
 }
 
 
@@ -5196,7 +5196,7 @@ TEST(Table_RowAccessor)
         row_1.set_string   (4, StringData(""));
         row_1.set_binary   (5, BinaryData());
         row_1.set_olddatetime (6, OldDateTime());
-        row_1.set_subtable (7, 0);
+        row_1.set_subtable (7, nullptr);
         row_1.set_mixed    (8, Mixed());
 
         Mixed mix_subtab((Mixed::subtable_tag()));
@@ -5247,7 +5247,7 @@ TEST(Table_RowAccessor)
         table[0].set_string   (4, StringData(""));
         table[0].set_binary   (5, BinaryData());
         table[0].set_olddatetime (6, OldDateTime());
-        table[0].set_subtable (7, 0);
+        table[0].set_subtable (7, nullptr);
         table[0].set_mixed    (8, Mixed());
 
         table[1].set_int      (0, 5651);
@@ -5852,7 +5852,7 @@ TEST(Table_SubtableRowAccessorsRetain)
 
     // Check that all row accessors in a regular subtable are detached if the
     // subtable is overridden
-    parent->set_subtable(1, 0, 0); // Clear
+    parent->set_subtable(1, 0, nullptr); // Clear
     CHECK(mixed->is_attached());
     CHECK(regular->is_attached());
     CHECK(row_m.is_attached());

@@ -1976,8 +1976,11 @@ private:
 
 } // anonymous namespace
 
+#endif
+
 void Group::verify() const
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT(is_attached());
 
     m_alloc.verify();
@@ -2097,8 +2100,10 @@ void Group::verify() const
     // At this point we have accounted for all memory managed by the slab
     // allocator
     mem_usage_1.check_total_coverage();
+#endif
 }
 
+#ifdef REALM_DEBUG
 
 MemStats Group::stats()
 {
@@ -2193,10 +2198,11 @@ void Group::to_dot(const char* file_path) const
     to_dot(out);
 }
 
+#endif
 
 std::pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
 {
     return std::make_pair(m_tables.get_ref(), ndx_in_parent);
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+// LCOV_EXCL_STOP ignore debug functions

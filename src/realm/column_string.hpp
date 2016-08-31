@@ -136,12 +136,10 @@ public:
     void update_from_parent(size_t old_baseline) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
-#ifdef REALM_DEBUG
     void verify() const override;
     void verify(const Table&, size_t) const override;
     void to_dot(std::ostream&, StringData title) const override;
     void do_dump_node_structure(std::ostream&, int) const override;
-#endif
 
 private:
     std::unique_ptr<StringIndex> m_search_index;
@@ -189,10 +187,8 @@ private:
 
     void refresh_root_accessor();
 
-#ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
                      std::ostream&) const override;
-#endif
 
     friend class Array;
     friend class ColumnBase;

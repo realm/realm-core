@@ -101,9 +101,7 @@ public:
     void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
     void set_oldest_bound_version(version_type) override;
     BinaryData get_uncommitted_changes() noexcept override;
-#ifdef REALM_DEBUG
     void verify() const override;
-#endif
 
 protected:
     // file and memory mappings are always multiples of this size
@@ -754,12 +752,10 @@ BinaryData WriteLogCollector::get_uncommitted_changes() noexcept
 }
 
 
-#ifdef REALM_DEBUG
 void WriteLogCollector::verify() const
 {
     // No-op
 }
-#endif
 
 } // namespace _impl
 

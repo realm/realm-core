@@ -67,9 +67,7 @@ public:
     void cascade_break_backlinks_to(size_t, CascadeState&) override;
     void cascade_break_backlinks_to_all_rows(size_t, CascadeState&) override;
 
-#ifdef REALM_DEBUG
     void verify(const Table&, size_t) const override;
-#endif
 
 protected:
     friend class BacklinkColumn;

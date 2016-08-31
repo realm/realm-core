@@ -1504,8 +1504,9 @@ void StringColumn::refresh_root_accessor()
     m_array.reset(new_root);
 }
 
+// LCOV_EXCL_START ignore debug functions
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -1538,8 +1539,11 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 } // anonymous namespace
 
+#endif
+
 void StringColumn::verify() const
 {
+#ifdef REALM_DEBUG
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
@@ -1570,11 +1574,13 @@ void StringColumn::verify() const
         m_search_index->verify();
         m_search_index->verify_entries(*this);
     }
+#endif
 }
 
 
 void StringColumn::verify(const Table& table, size_t col_ndx) const
 {
+#ifdef REALM_DEBUG
     ColumnBase::verify(table, col_ndx);
 
     typedef _impl::TableFriend tf;
@@ -1586,11 +1592,16 @@ void StringColumn::verify(const Table& table, size_t col_ndx) const
         REALM_ASSERT(m_search_index->get_ndx_in_parent() ==
                      get_root_array()->get_ndx_in_parent() + 1);
     }
+#else
+    static_cast<void>(table);
+    static_cast<void>(col_ndx);
+#endif
 }
 
 
 void StringColumn::to_dot(std::ostream& out, StringData title) const
 {
+#ifdef REALM_DEBUG
     ref_type ref = m_array->get_ref();
     out << "subgraph cluster_string_column" << ref << " {" << std::endl;
     out << " label = \"String column";
@@ -1599,11 +1610,16 @@ void StringColumn::to_dot(std::ostream& out, StringData title) const
     out << "\";" << std::endl;
     tree_to_dot(out);
     out << "}" << std::endl;
+#else
+    static_cast<void>(out);
+    static_cast<void>(title);
+#endif
 }
 
 void StringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
                                std::ostream& out) const
 {
+#ifdef REALM_DEBUG
     bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
     if (!long_strings) {
         // Small strings
@@ -1628,8 +1644,15 @@ void StringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_
     leaf.set_parent(parent, ndx_in_parent);
     bool is_strings = true;
     leaf.to_dot(out, is_strings);
+#else
+    static_cast<void>(leaf_mem);
+    static_cast<void>(parent);
+    static_cast<void>(ndx_in_parent);
+    static_cast<void>(out);
+#endif
 }
 
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -1669,12 +1692,19 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
 
 } // anonymous namespace
 
+#endif
+
 void StringColumn::do_dump_node_structure(std::ostream& out, int level) const
 {
+#ifdef REALM_DEBUG
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
     int indent = level * 2;
     out << std::setw(indent) << "" << "Search index\n";
     m_search_index->do_dump_node_structure(out, level + 1);
+#else
+    static_cast<void>(out);
+    static_cast<void>(level);
+#endif
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+// LCOV_EXCL_STOP ignore debug functions

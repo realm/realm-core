@@ -19,7 +19,7 @@
 #ifndef REALM_GROUP_WRITER_HPP
 #define REALM_GROUP_WRITER_HPP
 
-#include <stdint.h> // unint8_t etc
+#include <cstdint> // unint8_t etc
 #include <utility>
 
 #include <realm/util/file.hpp>

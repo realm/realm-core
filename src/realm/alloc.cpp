@@ -100,9 +100,7 @@ public:
         return reinterpret_cast<char*>(ref);
     }
 
-#ifdef REALM_DEBUG
     void verify() const override {}
-#endif
 };
 
 // This variable is declared such that get_default() can return it. It could be a static local variable, but

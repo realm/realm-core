@@ -44,7 +44,7 @@ Searching: The main finding function is:
 #include <vector>
 #include <ostream>
 
-#include <stdint.h> // unint8_t etc
+#include <cstdint> // unint8_t etc
 
 #include <realm/util/meta.hpp>
 #include <realm/util/assert.hpp>
@@ -199,10 +199,8 @@ protected:
 
     virtual ref_type get_child_ref(size_t child_ndx) const noexcept = 0;
 
-#ifdef REALM_DEBUG
     // Used only by Array::to_dot().
     virtual std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const = 0;
-#endif
 
     friend class Array;
 };
@@ -1155,10 +1153,7 @@ protected:
 
     void destroy_children(size_t offset = 0) noexcept;
 
-#ifdef REALM_DEBUG
-    std::pair<ref_type, size_t>
-    get_to_dot_parent(size_t ndx_in_parent) const override;
-#endif
+    std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
 
 protected:
     // Getters and Setters for adaptive-packed arrays

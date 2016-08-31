@@ -65,7 +65,7 @@ import_csv(csv file handle, realm table)
     Calls table.add_empty_row(), table.set_float(), table.set_bool()
 */
 
-#include <stddef.h>
+#include <cstddef>
 
 // Disk read chunk size. This MUST be large enough to contain at least TWO rows of csv plaintext! It's a good idea
 // to set it as low as ever possible (like 32 K) even though it's counter-intuitive with respect to performance. It
