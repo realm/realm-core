@@ -6210,6 +6210,21 @@ TEST(Table_InsertColumnMaintainsBacklinkIndices)
 }
 
 
+TEST(Table_MultipleLinkColumnsToSelf)
+{
+    Group g;
+    TableRef t = g.add_table("A");
+    t->insert_column_link(0, type_Link, "e", *t);
+    t->insert_column_link(1, type_LinkList, "f", *t);
+    t->add_empty_row();
+    t->get_linklist(1, 0)->add(0);
+    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 1);
+    g.verify();
+    t->get_linklist(0, 0)->add(0);
+    g.verify();
+}
+
+
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
