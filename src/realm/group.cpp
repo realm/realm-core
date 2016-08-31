@@ -1368,9 +1368,10 @@ public:
 
     bool change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
     {
-        static_cast<void>(row_ndx);
-        static_cast<void>(new_row_ndx);
-        return true; // No-op
+        typedef _impl::TableFriend tf;
+        if (m_table)
+            tf::adj_acc_subsume_row(*m_table, row_ndx, new_row_ndx);
+        return true;
     }
 
     bool clear_table() noexcept

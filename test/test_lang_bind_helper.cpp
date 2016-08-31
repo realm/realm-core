@@ -2673,7 +2673,6 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         parent_w->add_empty_row(2);
         parent_w->set_int(0, 0, 27);
         parent_w->set_int(0, 1, 227);
-        parent_w->set_int_unique(0, 1, 227);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2843,6 +2842,41 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
     CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(227, row_2.get_int(0));
+
+    // Check that adding a new row with the same primary key attaches row_1 to that row
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->set_int_unique(0, 0, 27);
+        parent_w->add_empty_row(2);
+        parent_w->set_int_unique(0, 2, 27);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(3, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(2, row_1.get_index());
+    CHECK_EQUAL(27, row_1.get_int(0));
+    CHECK_EQUAL(1, row_2.get_index());
+    CHECK_EQUAL(227, row_2.get_int(0));
+    // Move row_1 back to index 0
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        parent_w->move_last_over(0);
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    CHECK_EQUAL(2, parent->size());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(0, row_1.get_index());
+    CHECK_EQUAL(27, row_1.get_int(0));
+    CHECK_EQUAL(1, row_2.get_index());
     CHECK_EQUAL(227, row_2.get_int(0));
 
     // Check that descriptor modifications do not affect the row accessors (as
@@ -3535,6 +3569,146 @@ TEST(LangBindHelper_AdvanceReadTransact_ChangeLinkTargets)
     CHECK(row_int_0_replaced_by_row_2.is_attached());
     CHECK(row_link_0_replaced_by_row_2.is_attached());
 }
+
+TEST(LangBindHelper_AdvanceReadTransact_LinkView)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_q(hist, SharedGroup::durability_Full, crypt_key());
+
+    // Start a continuous read transaction
+    ReadTransaction rt(sg);
+    Group& group = const_cast<Group&>(rt.get_group());
+
+    // Add some tables and rows.
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin = wt.add_table("origin");
+        TableRef target = wt.add_table("target");
+        target->add_column(type_Int, "value");
+        origin->add_column(type_Int, "pk");
+        origin->add_column_link(type_LinkList, "list", *target);
+        origin->add_search_index(0);
+
+        target->add_empty_row(10);
+
+        origin->add_empty_row(2);
+        origin->set_int_unique(0, 0, 1);
+        origin->set_int_unique(0, 1, 2);
+        origin->get_linklist(1, 0)->add(1);
+        origin->get_linklist(1, 1)->add(2);
+        // state:
+        // origin[0].ll[0] -> target[1]
+        // origin[1].ll[0] -> target[2]
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
+
+    // Grab references to the LinkViews
+    auto origin = group.get_table("origin");
+    auto lv1 = origin->get_linklist(1, 0); // lv1[0] -> target[1]
+    auto lv2 = origin->get_linklist(1, 1); // lv2[0] -> target[2]
+    CHECK_EQUAL(lv1->size(), 1);
+    CHECK_EQUAL(lv2->size(), 1);
+
+    // Add a new row with the same PK which will replace the old row 0
+    {
+        WriteTransaction wt(sg_w);
+        TableRef origin_ = wt.get_table("origin");
+        origin_->add_empty_row(2);
+        origin_->set_int_unique(0, 3, 100);
+        CHECK_EQUAL(origin_->size(), 4);
+
+        origin_->set_int(0, 3, 42); // for later tracking of this entry
+        CHECK_EQUAL(origin_->get_linklist(1, 0)->size(), 1);
+        origin_->set_int_unique(0, 2, 1);
+        // origin[2] is set to same pk as origin[0]. Origin[2] wins so
+        // origin[0] is lost. This then causes a move last over
+        // of origin[3] into origin[0].
+        CHECK_EQUAL(origin_->size(), 3);
+        CHECK_EQUAL(origin_->get_int(0, 0), 42);
+        CHECK_EQUAL(origin_->get_int(0, 1), 2);
+        CHECK_EQUAL(origin_->get_int(0, 2), 1);
+
+        // origin[1] should be unchanged
+        CHECK_EQUAL(origin_->get_linklist(1, 1)->size(), 1);
+        // the winner should get the link(s) from the loser
+        CHECK_EQUAL(origin_->get_linklist(1, 2)->size(), 1);
+
+        origin_->get_linklist(1, 2)->add(3);
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+    group.verify();
+    // lv1 is now origin[2], which has {1, 3}
+    // lv2 is now origin[1], which has {2}
+
+    CHECK_EQUAL(origin->size(), 3);
+    CHECK_EQUAL(origin->get_int(0, 0), 42);
+    CHECK_EQUAL(origin->get_int(0, 1), 2);
+    CHECK_EQUAL(origin->get_int(0, 2), 1);
+
+    // LinkViews should still be attached and working
+    CHECK(lv1->is_attached());
+    CHECK(lv2->is_attached());
+
+    CHECK_EQUAL(lv1->size(), 2);
+    CHECK_EQUAL(lv1->get(0).get_index(), 1);
+    CHECK_EQUAL(lv1->get(1).get_index(), 3);
+
+    CHECK_EQUAL(lv2->size(), 1);
+    CHECK_EQUAL(lv2->get(0).get_index(), 2);
+
+
+    // Same thing, but on the other LV and via a write on the same SG
+    {
+        LangBindHelper::promote_to_write(sg);
+        origin->add_empty_row(2);
+        origin->set_int_unique(0, 4, 101);
+        CHECK_EQUAL(origin->size(), 5);
+        CHECK_EQUAL(origin->get_linklist(1, 1)->size(), 1);
+        CHECK_EQUAL(origin->get_linklist(1, 2)->size(), 2);
+        origin->set_int_unique(0, 3, 2);
+        // origin[3] is set to same pk as origin[1]. Origin[3] wins so
+        // origin[1] is lost. This causes a move last over
+        // of origin[4] to origin[1]
+        CHECK_EQUAL(origin->size(), 4);
+
+        // since origin[3] won, it should get the links from the looser
+        CHECK_EQUAL(origin->get_linklist(1, 0)->size(), 0);
+        CHECK_EQUAL(origin->get_linklist(1, 1)->size(), 0);
+        CHECK_EQUAL(origin->get_linklist(1, 2)->size(), 2);
+        CHECK_EQUAL(origin->get_linklist(1, 3)->size(), 1);
+
+        CHECK(lv1->is_attached());
+        CHECK(lv2->is_attached());
+        CHECK_EQUAL(lv1->size(), 2);
+        CHECK_EQUAL(lv2->size(), 1);
+
+        origin->get_linklist(1, 3)->add(4);
+
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+    group.verify();
+    // lv1 is now origin[2], which has {1, 3}
+    // lv2 is now origin[3], which has {2, 4}
+
+    CHECK(lv1->is_attached());
+    CHECK(lv2->is_attached());
+    CHECK_EQUAL(lv1->size(), 2);
+    CHECK_EQUAL(lv1->get(0).get_index(), 1);
+    CHECK_EQUAL(lv1->get(1).get_index(), 3);
+
+    CHECK_EQUAL(lv2->size(), 2);
+    CHECK_EQUAL(lv2->get(0).get_index(), 2);
+    CHECK_EQUAL(lv2->get(1).get_index(), 4);
+}
+
+
 namespace {
 
 template<typename T>

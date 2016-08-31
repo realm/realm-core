@@ -2392,15 +2392,18 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
     for (size_t col_ndx = 0; col_ndx < backlink_col_start; ++col_ndx) {
         if (m_spec.get_column_type(col_ndx) == col_type_LinkList) {
             auto& col = get_column_link_list(col_ndx);
-            LinkViewRef from = col.get(row_ndx);
-            LinkViewRef to = col.get(new_row_ndx);
-            REALM_ASSERT_EX(to->size() == 0 || from->size() == 0, to->size(), from->size());
-            if (from->size() != 0) {
-                using llf = _impl::LinkListFriend;
-                for (size_t i = 0; i < from->size(); ++i) {
-                    llf::do_insert(*to, i, from->get(i).get_index());
-                }
-                llf::do_clear(*from);
+            bool old_is_empty = !col.has_links(row_ndx);
+            bool new_is_empty = !col.has_links(new_row_ndx);
+            REALM_ASSERT_EX(old_is_empty || new_is_empty, old_is_empty, new_is_empty);
+            if (!old_is_empty) {
+                // because `to` is empty, swapping them is equivalent to moving
+                // the rows from `from` to `to`.
+                col.swap_rows(row_ndx, new_row_ndx);
+            }
+            else {
+                // don't need to move any rows, but we still need to update the
+                // LinkViews to reflect the change
+                col.adj_acc_subsume_row(row_ndx, new_row_ndx);
             }
         }
     }
@@ -2848,6 +2851,7 @@ size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
         // RESOLUTION: Let the new row subsume the identity of the old row,
         // and delete the old row.
         change_link_targets(found_ndx, ndx);
+        adj_row_acc_subsume_row(found_ndx, ndx);
 
         if (ndx == size() - 1) {
             // Row will be moved by move_last_over, adjust index.
@@ -5402,6 +5406,23 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
+void Table::adj_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    adj_row_acc_subsume_row(old_row_ndx, new_row_ndx);
+
+    // Adjust LinkViews for new rows
+    for (auto& col : m_cols) {
+        if (col) {
+            col->adj_acc_subsume_row(old_row_ndx, new_row_ndx);
+        }
+    }
+}
+
+
 void Table::adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
@@ -5517,6 +5538,22 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
         else if (row->m_row_ndx == row_ndx_2) {
             row->m_row_ndx = row_ndx_1;
         }
+        row = row->m_next;
+    }
+}
+
+
+void Table::adj_row_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept
+{
+    // This function must assume no more than minimal consistency of the
+    // accessor hierarchy. This means in particular that it cannot access the
+    // underlying node structure. See AccessorConsistencyLevels.
+
+    LockGuard lock(m_accessor_mutex);
+    RowBase* row = m_row_accessors;
+    while (row) {
+        if (row->m_row_ndx == old_row_ndx)
+            row->m_row_ndx = new_row_ndx;
         row = row->m_next;
     }
 }

@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Accessors pointing to subsumed rows are updated to the new row rather than detached.
 
 -----------
 
