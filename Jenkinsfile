@@ -62,7 +62,7 @@ parallel(
   centos6: doBuildPackage('centos-6', 'rpm')
 )
 
-if (['ajl/jenkinsfile'].contains(env.BRANCH_NAME)) {
+if (['master', 'next-major'].contains(env.BRANCH_NAME)) {
   stage 'publish-packages'
   parallel(
     generic: doPublishGeneric(),
@@ -484,7 +484,7 @@ def getDeviceNames(String commandOutput) {
 def doBuildPackage(distribution, fileType) {
   return {
     node('docker') {
-      getSourceArchive()
+      getArchive()
 
       withCredentials([[$class: 'StringBinding', credentialsId: 'packagecloud-sync-devel-master-token', variable: 'PACKAGECLOUD_MASTER_TOKEN']]) {
         sh "sh packaging/package.sh ${distribution}"
@@ -501,7 +501,7 @@ def doBuildPackage(distribution, fileType) {
 def doPublish(distribution, fileType, distroName, distroVersion) {
   return {
     node {
-      getSourceArchive()
+      getArchive()
       packaging = load './packaging/publish.groovy'
 
       dir('packaging/out') {
@@ -517,7 +517,7 @@ def doPublish(distribution, fileType, distroName, distroVersion) {
 def doPublishGeneric() {
   return {
     node {
-      getSourceArchive()
+      getArchive()
       def version = get_version()
       def topdir = pwd()
       dir('packaging/out') {
