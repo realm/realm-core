@@ -32,6 +32,7 @@
 
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
+#include <realm/version.hpp>
 
 using namespace realm;
 
@@ -340,6 +341,7 @@ TEST_CASE("list") {
             REQUIRE(lst.size() == 12);
             REQUIRE(lst.get(11).get_index() == 2);
 
+#if REALM_VER_MAJOR >= 2
             // add a new row with the same primary key
             write([&] {
                 size_t row = origin->add_empty_row(2);
@@ -350,6 +352,7 @@ TEST_CASE("list") {
             REQUIRE_INDICES(change.insertions, 12);
             REQUIRE(lst.size() == 13);
             REQUIRE(lst.get(12).get_index() == 3);
+#endif
         }
     }
 
