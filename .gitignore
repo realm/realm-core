@@ -12,7 +12,6 @@ realm-object-store.xcodeproj/
 
 # Build products
 src/librealm-object-store.a
-librealm-object-store.dylib
 tests/tests
 *.build/
 Debug/
