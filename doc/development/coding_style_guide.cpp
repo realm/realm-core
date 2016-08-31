@@ -2,6 +2,36 @@
 // Realm C++ coding standard - by example
 //
 
+/*
+ * The layout of the code is enforced by the use of clang-format - currently in version 3.9. The layout is
+ * defined by the .clang-format configuration file in the project root. You can ensure that a code change
+ * complies with the formatting rules in the following ways:
+ *
+ * Before files are added to the staging area:
+ *
+ * $ git clang-format -f
+ *
+ * This will immediately modify the changes you have made to comply with the standard (if changes are needed).
+ *
+ * After you have added files to the staging area:
+ *
+ * $ git add -u
+ * $ git clang-format
+ *
+ * This will modify the work-area files to comply with the standard, and you can easily inspect the changes made
+ * by a 'git diff' command. If you are happy with the changes, add them by 'git add -u'.
+ *
+ * After you have made your commit:
+ *
+ * $ git commit
+ * $ git clang-format HEAD^
+ *
+ * This will modify the work-area files to comply with the standard, and you can easily inspect the changes made
+ * by a 'git diff' command. If you are happy with the changes, add them by 'git add -u' and amend the commit with
+ * 'git commit --amend'.
+ *
+ * 'git clang-format' can be used in other ways - use 'git clang-format -h' to get info.
+ */
 
 // Lines should never exceed 118 characters --------------------------------------------------------------------------
 
