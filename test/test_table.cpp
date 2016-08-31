@@ -7050,6 +7050,10 @@ TEST(Table_getVersionCounterAfterRowAccessor)
 }
 
 
+// This test a bug where get_size_from_type_and_ref() returned off-by-one on nullable integer columns.
+// It seems to be only invoked from Table::get_size_from_ref() which is fast static method that lets
+// you find the size of a Table without having to create an instance of it. This seems to be only done
+// on subtables, so the bug has not been triggered in public.
 TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
 {
     constexpr bool nullable = TEST_TYPE::value;
@@ -7071,9 +7075,8 @@ TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
         t->add_empty_row(num_rows);
         CHECK_EQUAL(t->size(), num_rows);
         using tf = _impl::TableFriend;
-        // We know there are 2 hidden backlink columns
-        size_t actual_num_cols = t->get_column_count() + 2;
         Spec& t_spec = tf::get_spec(*t);
+        size_t actual_num_cols = t_spec.get_column_count();
         for (size_t col_ndx = 0; col_ndx < actual_num_cols; ++col_ndx) {
             ColumnType col_type = t_spec.get_column_type(col_ndx);
             ColumnBase& base = tf::get_column(*t, col_ndx);
@@ -7095,7 +7098,7 @@ TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
     // Test on boundary for good measure
     check_column_sizes(REALM_MAX_BPNODE_SIZE);
 
-    // Test on more nodes
+    // Try with more levels in the tree
     check_column_sizes(10 * REALM_MAX_BPNODE_SIZE);
 }
 
