@@ -260,7 +260,7 @@ task 'xcode-project' => :xcode_project
 
 task :xcode_project => [:build_dir_apple, :check_xcpretty] do
     Dir.chdir(@build_dir) do
-        sh "cmake -GXcode -DREALM_ENABLE_ENCRYPTION=1 -DREALM_ENABLE_ASSERTIONS=1 #{REALM_PROJECT_ROOT}"
+        sh "cmake -GXcode -DREALM_ENABLE_ENCRYPTION=1 -DREALM_ENABLE_ASSERTIONS=1 -DREALM_LIBTYPE=STATIC #{REALM_PROJECT_ROOT}"
     end
 end
 
@@ -272,7 +272,7 @@ def build_apple(sdk, configuration, bitcode: nil, install_to: nil)
         sh <<-EOS.gsub(/\s+/, ' ')
             xcodebuild
             -sdk #{sdk}
-            -target realm-static
+            -target realm
             -configuration #{configuration}
             ONLY_ACTIVE_ARCH=NO
             #{bitcode_option}
