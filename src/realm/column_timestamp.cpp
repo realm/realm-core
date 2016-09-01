@@ -310,10 +310,11 @@ void TimestampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec
     }
 }
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+// LCOV_EXCL_START ignore debug functions
 
 void TimestampColumn::verify() const
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT_3(m_seconds->size(), ==, m_nanoseconds->size());
 
     for (size_t t = 0; t < size(); t++) {
@@ -322,8 +323,8 @@ void TimestampColumn::verify() const
 
     m_seconds->verify();
     m_nanoseconds->verify();
+#endif
 }
-
 
 void TimestampColumn::to_dot(std::ostream&, StringData /*title*/) const
 {
@@ -340,7 +341,7 @@ void TimestampColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_parent*/
     // FIXME: Dummy implementation
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+// LCOV_EXCL_STOP ignore debug functions
 
 void TimestampColumn::add(const Timestamp& ts)
 {
@@ -359,7 +360,7 @@ void TimestampColumn::add(const Timestamp& ts)
 Timestamp TimestampColumn::get(size_t row_ndx) const noexcept
 {
     util::Optional<int64_t> seconds = m_seconds->get(row_ndx);
-    return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds->get(row_ndx))) : Timestamp(null{});
+    return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds->get(row_ndx))) : Timestamp{};
 }
 
 void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)

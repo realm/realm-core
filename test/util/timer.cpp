@@ -31,7 +31,7 @@
     #include <mach/mach_time.h>
     #include <sys/time.h>
 #else
-    #include <time.h>
+    #include <ctime>
 #endif
 
 #include "timer.hpp"

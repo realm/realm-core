@@ -62,11 +62,11 @@
 
 /* All the headers include this file. */
 #include <crtdefs.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdarg.h>
-#include <stdio.h>
+#include <cerrno>
+#include <cstdlib>
+#include <cstring>
+#include <cstdarg>
+#include <cstdio>
 #include <windows.h>
 
 #ifdef __cplusplus
