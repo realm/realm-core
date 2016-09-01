@@ -119,8 +119,7 @@ struct GetSizeFromRef {
     const ref_type m_ref;
     Allocator& m_alloc;
     size_t m_size;
-    bool m_nullable;
-    GetSizeFromRef(ref_type r, Allocator& a, bool nullable): m_ref(r), m_alloc(a), m_size(0), m_nullable(nullable) {}
+    GetSizeFromRef(ref_type r, Allocator& a): m_ref(r), m_alloc(a), m_size(0) {}
 
     template<class Col>
     void call() noexcept
@@ -130,14 +129,14 @@ struct GetSizeFromRef {
 };
 
 template<class Op>
-void col_type_deleg(Op& op, ColumnType type)
+void col_type_deleg(Op& op, ColumnType type, bool nullable)
 {
     switch (type) {
         case col_type_Int:
         case col_type_Bool:
         case col_type_OldDateTime:
         case col_type_Link:
-            if(op.m_nullable)
+            if(nullable)
                 op.template call<IntNullColumn>();
             else
                 op.template call<IntegerColumn>();
@@ -186,8 +185,8 @@ size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
                                               Allocator& alloc,
                                               bool nullable) noexcept
 {
-    GetSizeFromRef op(ref, alloc, nullable);
-    col_type_deleg(op, type);
+    GetSizeFromRef op(ref, alloc);
+    col_type_deleg(op, type, nullable);
     return op.m_size;
 }
 
