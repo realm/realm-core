@@ -267,7 +267,7 @@ void Results::update_tableview(bool wants_notifications)
                 m_table_view.sort(m_sort);
             }
             m_mode = Mode::TableView;
-            break;
+            REALM_FALLTHROUGH;
         case Mode::TableView:
             if (wants_notifications && !m_notifier && !m_realm->is_in_transaction() && m_realm->can_deliver_notifications()) {
                 m_notifier = std::make_shared<_impl::ResultsNotifier>(*this);
