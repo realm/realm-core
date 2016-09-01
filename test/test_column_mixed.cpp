@@ -63,7 +63,7 @@ using namespace realm::util;
 TEST(MixedColumn_Int)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
-    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+    MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
     CHECK(!c.is_nullable());
 
@@ -108,7 +108,7 @@ TEST(MixedColumn_Int)
 TEST(MixedColumn_Float)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
-    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+    MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
     uint32_t v = 0xFFFFFFFF;
     float f = float(v);
@@ -142,7 +142,7 @@ TEST(MixedColumn_Float)
 TEST(MixedColumn_Double)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
-    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+    MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
     uint64_t v = 0xFFFFFFFFFFFFFFFFULL;
     double d = double(v);
@@ -177,7 +177,7 @@ TEST(MixedColumn_Double)
 TEST(MixedColumn_Bool)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
-    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+    MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
     c.insert_bool(0, true);
     c.insert_bool(1, false);
@@ -210,7 +210,7 @@ TEST(MixedColumn_Bool)
 TEST(MixedColumn_Date)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
-    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+    MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
     c.insert_olddatetime(0, 2);
     c.insert_olddatetime(1, 100);
@@ -243,9 +243,9 @@ TEST(MixedColumn_Date)
 TEST(MixedColumn_Timestamp)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
-    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+    MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
-    c.insert_timestamp(0, Timestamp(null{}));
+    c.insert_timestamp(0, Timestamp{});
     c.insert_timestamp(1, Timestamp(100, 200));
     c.insert_timestamp(2, Timestamp(0, 0)); // Should *not* equal null
     c.insert_timestamp(3, Timestamp(-1000, 0));
@@ -278,7 +278,7 @@ TEST(MixedColumn_Timestamp)
 TEST(MixedColumn_String)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
-    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+    MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
     c.insert_string(0, "aaa");
     c.insert_string(1, "bbbbb");
@@ -311,7 +311,7 @@ TEST(MixedColumn_String)
 TEST(MixedColumn_Binary)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
-    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+    MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
     c.insert_binary(0, BinaryData("aaa", 4));
     c.insert_binary(1, BinaryData("bbbbb", 6));
@@ -344,10 +344,10 @@ TEST(MixedColumn_Binary)
 TEST(MixedColumn_Table)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
-    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+    MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
-    c.insert_subtable(0, 0);
-    c.insert_subtable(1, 0);
+    c.insert_subtable(0, nullptr);
+    c.insert_subtable(1, nullptr);
     CHECK_EQUAL(2, c.size());
 
     for (size_t i = 0; i < c.size(); ++i)
@@ -365,7 +365,7 @@ TEST(MixedColumn_Table)
 TEST(MixedColumn_Mixed)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
-    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+    MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
     // Insert mixed types
     c.insert_int(0, 23);
@@ -373,7 +373,7 @@ TEST(MixedColumn_Mixed)
     c.insert_olddatetime(0, 23423);
     c.insert_string(0, "Hello");
     c.insert_binary(0, BinaryData("binary"));
-    c.insert_subtable(0, 0);
+    c.insert_subtable(0, nullptr);
     c.insert_float(0, 1.124f);
     c.insert_double(0, 1234.124);
     c.insert_timestamp(0, Timestamp(111, 222));
@@ -406,10 +406,10 @@ TEST(MixedColumn_Mixed)
     c.set_olddatetime(2, 23423);
     c.set_string(3, "Hello");
     c.set_binary(4, BinaryData("binary"));
-    c.set_subtable(5, 0);
+    c.set_subtable(5, nullptr);
     c.set_float(6, 1.124f);
     c.set_double(7, 1234.124);
-    c.set_timestamp(8, Timestamp(null{}));
+    c.set_timestamp(8, Timestamp{});
     CHECK_EQUAL(9, c.size());
 
     CHECK_EQUAL(type_Timestamp, c.get_type(8));
@@ -429,13 +429,13 @@ TEST(MixedColumn_Mixed)
 TEST(MixedColumn_SubtableSize)
 {
     ref_type ref = MixedColumn::create(Allocator::get_default());
-    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+    MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
-    c.insert_subtable(0, 0);
-    c.insert_subtable(1, 0);
-    c.insert_subtable(2, 0);
-    c.insert_subtable(3, 0);
-    c.insert_subtable(4, 0);
+    c.insert_subtable(0, nullptr);
+    c.insert_subtable(1, nullptr);
+    c.insert_subtable(2, nullptr);
+    c.insert_subtable(3, nullptr);
+    c.insert_subtable(4, nullptr);
 
     // No table instantiated yet (zero ref)
     CHECK_EQUAL(0, c.get_subtable_size(0));
@@ -491,10 +491,10 @@ TEST(MixedColumn_WriteLeak)
     _impl::OutputStream out(null_stream);
 
     ref_type ref = MixedColumn::create(Allocator::get_default());
-    MixedColumn c(Allocator::get_default(), ref, 0, 0);
+    MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
-    c.insert_subtable(0, 0);
-    c.insert_subtable(1, 0);
+    c.insert_subtable(0, nullptr);
+    c.insert_subtable(1, nullptr);
 
     c.write(0, 2, 2, out);
 
@@ -508,7 +508,7 @@ TEST(MixedColumn_SwapRows)
     // Normal case
     {
         ref_type ref = MixedColumn::create(Allocator::get_default());
-        MixedColumn c(Allocator::get_default(), ref, 0, 0);
+        MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
         c.insert_bool(0, false);
         c.insert_string(1, "a");
@@ -529,7 +529,7 @@ TEST(MixedColumn_SwapRows)
     // First two elements
     {
         ref_type ref = MixedColumn::create(Allocator::get_default());
-        MixedColumn c(Allocator::get_default(), ref, 0, 0);
+        MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
         c.insert_bool(0, false);
         c.insert_string(1, "a");
@@ -549,7 +549,7 @@ TEST(MixedColumn_SwapRows)
     // Last two elements
     {
         ref_type ref = MixedColumn::create(Allocator::get_default());
-        MixedColumn c(Allocator::get_default(), ref, 0, 0);
+        MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
         c.insert_bool(0, false);
         c.insert_string(1, "a");
@@ -569,7 +569,7 @@ TEST(MixedColumn_SwapRows)
     // Indices in wrong order
     {
         ref_type ref = MixedColumn::create(Allocator::get_default());
-        MixedColumn c(Allocator::get_default(), ref, 0, 0);
+        MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
         c.insert_bool(0, false);
         c.insert_string(1, "a");

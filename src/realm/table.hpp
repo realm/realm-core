@@ -775,16 +775,14 @@ public:
     /// function is mainly intended for debugging purposes.
     bool is_degenerate() const noexcept;
 
-// Debug
-#ifdef REALM_DEBUG
+    // Debug
     void verify() const;
+#ifdef REALM_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
     void print() const;
     MemStats stats() const;
     void dump_node_structure() const; // To std::cerr (for GDB)
     void dump_node_structure(std::ostream&, int level) const;
-#else
-    void verify() const {}
 #endif
 
     class Parent;

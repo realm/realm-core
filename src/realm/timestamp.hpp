@@ -19,7 +19,7 @@
 #ifndef REALM_TIMESTAMP_HPP
 #define REALM_TIMESTAMP_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <ostream>
 #include <realm/util/assert.hpp>
 

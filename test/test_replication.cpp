@@ -256,7 +256,7 @@ TEST(Replication_Timestamp)
         // Overwrite non-null with null to test that
         // TransactLogParser::parse_one(InstructionHandler& handler) correctly will see a set_null instruction
         // and not a set_new_date instruction
-        table->set_timestamp(0, 1, Timestamp(null{}));
+        table->set_timestamp(0, 1, Timestamp{});
 
         // Overwrite non-null with other non-null
         table->set_timestamp(0, 2, Timestamp(3, 4));

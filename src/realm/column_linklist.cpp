@@ -681,8 +681,8 @@ void LinkListColumn::prune_list_accessor_tombstones() noexcept
     m_list_accessors.erase(remove_from, m_list_accessors.end());
 }
 
-
-#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
+// LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -697,8 +697,11 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 } // anonymous namespace
 
+#endif
+
 void LinkListColumn::verify() const
 {
+#ifdef REALM_DEBUG
     if (root_is_leaf()) {
         get_root_array()->verify();
         REALM_ASSERT(get_root_array()->has_refs());
@@ -706,11 +709,13 @@ void LinkListColumn::verify() const
     }
 
     get_root_array()->verify_bptree(&verify_leaf);
+#endif
 }
 
 
 void LinkListColumn::verify(const Table& table, size_t col_ndx) const
 {
+#ifdef REALM_DEBUG
     LinkColumnBase::verify(table, col_ndx);
 
     std::vector<BacklinkColumn::VerifyPair> pairs;
@@ -742,6 +747,10 @@ void LinkListColumn::verify(const Table& table, size_t col_ndx) const
 
     // All backlinks must have been matched by a forward link
     REALM_ASSERT_3(backlinks_seen, ==, pairs.size());
+#else
+    static_cast<void>(table);
+    static_cast<void>(col_ndx);
+#endif
 }
 
 
@@ -751,4 +760,4 @@ std::pair<ref_type, size_t> LinkListColumn::get_to_dot_parent(size_t ndx_in_pare
     return std::make_pair(p.first.get_ref(), p.second);
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+// LCOV_EXCL_STOP ignore debug functions

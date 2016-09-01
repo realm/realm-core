@@ -1124,6 +1124,22 @@ void SlabAlloc::set_file_format_version(int file_format_version) noexcept
 }
 
 
+void SlabAlloc::verify() const
+{
+#ifdef REALM_DEBUG
+    // Make sure that all free blocks fit within a slab
+    for (const auto& chunk : m_free_space) {
+        slabs::const_iterator slab =
+            upper_bound(m_slabs.begin(), m_slabs.end(), chunk.ref, &ref_less_than_slab_ref_end);
+        REALM_ASSERT(slab != m_slabs.end());
+
+        ref_type slab_ref_end = slab->ref_end;
+        ref_type chunk_ref_end = chunk.ref + chunk.size;
+        REALM_ASSERT_3(chunk_ref_end, <=, slab_ref_end);
+    }
+#endif
+}
+
 #ifdef REALM_DEBUG
 
 bool SlabAlloc::is_all_free() const
@@ -1145,20 +1161,6 @@ bool SlabAlloc::is_all_free() const
     return true;
 }
 
-
-void SlabAlloc::verify() const
-{
-    // Make sure that all free blocks fit within a slab
-    for (const auto& chunk : m_free_space) {
-        slabs::const_iterator slab =
-            upper_bound(m_slabs.begin(), m_slabs.end(), chunk.ref, &ref_less_than_slab_ref_end);
-        REALM_ASSERT(slab != m_slabs.end());
-
-        ref_type slab_ref_end = slab->ref_end;
-        ref_type chunk_ref_end = chunk.ref + chunk.size;
-        REALM_ASSERT_3(chunk_ref_end, <=, slab_ref_end);
-    }
-}
 
 // LCOV_EXCL_START
 void SlabAlloc::print() const

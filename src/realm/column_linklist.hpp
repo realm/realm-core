@@ -81,10 +81,8 @@ public:
     void adj_acc_swap_rows(size_t, size_t) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
-#ifdef REALM_DEBUG
     void verify() const override;
     void verify(const Table&, size_t) const override;
-#endif
 
 protected:
     void do_discard_child_accessors() noexcept override;
@@ -145,9 +143,7 @@ private:
     void prune_list_accessor_tombstones() noexcept;
     void validate_list_accessors() const noexcept;
 
-#ifdef REALM_DEBUG
     std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
-#endif
 
     friend class BacklinkColumn;
     friend class LinkView;

@@ -17,7 +17,7 @@
  **************************************************************************/
 
 #include <cstdio>
-#include <stdint.h>
+#include <cstdint>
 
 union Float_t {
     Float_t(float num = 0.0f) : f(num) {}

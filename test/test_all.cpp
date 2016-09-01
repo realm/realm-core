@@ -21,9 +21,9 @@
 #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
-#include <time.h>
-#include <string.h>
-#include <stdlib.h>
+#include <ctime>
+#include <cstring>
+#include <cstdlib>
 #include <algorithm>
 #include <stdexcept>
 #include <tuple>

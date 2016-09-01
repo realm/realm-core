@@ -79,9 +79,9 @@ public:
 
     int compare_values(size_t, size_t) const noexcept override;
 
-#ifdef REALM_DEBUG
     void verify() const override;
     void verify(const Table&, size_t) const override;
+#ifdef REALM_DEBUG
     struct VerifyPair {
         size_t origin_row_ndx, target_row_ndx;
         bool operator<(const VerifyPair&) const noexcept;
@@ -94,9 +94,7 @@ protected:
     void update_child_ref(size_t child_ndx, ref_type new_ref) override;
     ref_type get_child_ref(size_t child_ndx) const noexcept override;
 
-#ifdef REALM_DEBUG
     std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
-#endif
 
 private:
     TableRef m_origin_table;

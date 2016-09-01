@@ -126,9 +126,9 @@ public:
         m_map.clear();
     }
 
-#ifdef REALM_DEBUG
-    void verify() const override {}
-#endif
+    void verify() const override
+    {
+    }
 
 private:
     ref_type m_offset;

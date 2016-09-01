@@ -18,13 +18,13 @@
 
 #include <iostream>
 #include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstdlib>
+#include <cstdio>
 #include <fcntl.h>
-#include <assert.h>
+#include <cassert>
 #include <pthread.h>
-#include <string.h>
-#include <time.h>
+#include <cstring>
+#include <ctime>
 #include <sqlite3.h>
 #include <mysql/mysql.h>
 #include <realm.hpp>

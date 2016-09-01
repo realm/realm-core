@@ -57,10 +57,9 @@ void LinkColumnBase::check_cascade_break_backlinks_to(size_t target_table_ndx, s
 }
 
 
-#ifdef REALM_DEBUG
-
 void LinkColumnBase::verify(const Table& table, size_t col_ndx) const
 {
+#ifdef REALM_DEBUG
     IntegerColumn::verify(table, col_ndx);
 
     // Check that the backlink column specifies the right origin
@@ -77,6 +76,9 @@ void LinkColumnBase::verify(const Table& table, size_t col_ndx) const
     const Spec& target_spec = tf::get_spec(*m_target_table);
     size_t backlink_col_ndx = target_spec.find_backlink_column(table.get_index_in_group(), col_ndx);
     REALM_ASSERT(m_backlink_column == &tf::get_column(*m_target_table, backlink_col_ndx));
+#else
+    static_cast<void>(table);
+    static_cast<void>(col_ndx);
+#endif // REALM_DEBUG
 }
 
-#endif // REALM_DEBUG

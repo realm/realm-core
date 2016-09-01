@@ -19,7 +19,7 @@
 #ifndef REALM_ALLOC_HPP
 #define REALM_ALLOC_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <cstddef>
 #include <atomic>
 
@@ -121,15 +121,15 @@ public:
 
     virtual ~Allocator() noexcept;
 
-#ifdef REALM_DEBUG
     virtual void verify() const = 0;
 
+#ifdef REALM_DEBUG
     /// Terminate the program precisely when the specified 'ref' is
     /// freed (or reallocated). You can use this to detect whether the
     /// ref is freed (or reallocated), and even to get a stacktrace at
     /// the point where it happens. Call watch(0) to stop watching
     /// that ref.
-    void watch(ref_type);
+    void watch(ref_type ref) { m_debug_watch = ref; }
 #endif
 
     Replication* get_replication() noexcept;
@@ -204,14 +204,12 @@ public:
 protected:
     size_t m_baseline = 0; // Separation line between immutable and mutable refs.
 
-    Replication* m_replication;
+    Replication* m_replication = nullptr;
 
     /// See get_file_format_version().
     int m_file_format_version = 0;
 
-#ifdef REALM_DEBUG
-    ref_type m_watch;
-#endif
+    ref_type m_debug_watch = 0;
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -374,7 +372,7 @@ inline MemRef Allocator::alloc(size_t size)
 inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_size, size_t new_size)
 {
 #ifdef REALM_DEBUG
-    if (ref == m_watch)
+    if (ref == m_debug_watch)
         REALM_TERMINATE("Allocator watch: Ref was reallocated");
 #endif
     return do_realloc(ref, addr, old_size, new_size);
@@ -383,7 +381,7 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_siz
 inline void Allocator::free_(ref_type ref, const char* addr) noexcept
 {
 #ifdef REALM_DEBUG
-    if (ref == m_watch)
+    if (ref == m_debug_watch)
         REALM_TERMINATE("Allocator watch: Ref was freed");
 #endif
     return do_free(ref, addr);
@@ -406,11 +404,8 @@ inline bool Allocator::is_read_only(ref_type ref) const noexcept
     return ref < m_baseline;
 }
 
-inline Allocator::Allocator() noexcept : m_replication(nullptr)
+inline Allocator::Allocator() noexcept
 {
-#ifdef REALM_DEBUG
-    m_watch = 0;
-#endif
     m_table_versioning_counter = 0;
 }
 
@@ -422,13 +417,6 @@ inline Replication* Allocator::get_replication() noexcept
 {
     return m_replication;
 }
-
-#ifdef REALM_DEBUG
-inline void Allocator::watch(ref_type ref)
-{
-    m_watch = ref;
-}
-#endif
 
 inline int Allocator::get_file_format_version() const noexcept
 {

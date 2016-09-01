@@ -3674,7 +3674,7 @@ TEST(Table_FormerLeakCase)
     subdesc->add_column(type_Int, "a");
     root.add_empty_row(1);
     root.set_subtable(0, 0, &sub);
-    root.set_subtable(0, 0, 0);
+    root.set_subtable(0, 0, nullptr);
 }
 
 
@@ -5128,25 +5128,25 @@ TEST(Table_RowAccessor)
         Row row_0 = table[0];
         Row row_1 = table[1];
 
-        row_0.set_int(0, 5651);
-        row_0.set_bool(1, true);
-        row_0.set_float(2, 8397.0f);
-        row_0.set_double(3, 1937.0);
-        row_0.set_string(4, "foo");
-        row_0.set_binary(5, bin);
-        row_0.set_olddatetime(6, OldDateTime(9992));
-        row_0.set_subtable(7, &one_subtab);
-        row_0.set_mixed(8, Mixed(3637.0f));
+        row_0.set_int      (0, 5651);
+        row_0.set_bool     (1, true);
+        row_0.set_float    (2, 8397.0f);
+        row_0.set_double   (3, 1937.0);
+        row_0.set_string   (4, "foo");
+        row_0.set_binary   (5, bin);
+        row_0.set_olddatetime (6, OldDateTime(9992));
+        row_0.set_subtable (7, &one_subtab);
+        row_0.set_mixed    (8, Mixed(3637.0f));
 
-        row_1.set_int(0, int_fast64_t());
-        row_1.set_bool(1, bool());
-        row_1.set_float(2, float());
-        row_1.set_double(3, double());
-        row_1.set_string(4, StringData(""));
-        row_1.set_binary(5, BinaryData());
-        row_1.set_olddatetime(6, OldDateTime());
-        row_1.set_subtable(7, 0);
-        row_1.set_mixed(8, Mixed());
+        row_1.set_int      (0, int_fast64_t());
+        row_1.set_bool     (1, bool());
+        row_1.set_float    (2, float());
+        row_1.set_double   (3, double());
+        row_1.set_string   (4, StringData(""));
+        row_1.set_binary   (5, BinaryData());
+        row_1.set_olddatetime (6, OldDateTime());
+        row_1.set_subtable (7, nullptr);
+        row_1.set_mixed    (8, Mixed());
 
         Mixed mix_subtab((Mixed::subtable_tag()));
 
@@ -5189,25 +5189,25 @@ TEST(Table_RowAccessor)
 
     // Check setters for `RowExpr`
     {
-        table[0].set_int(0, int_fast64_t());
-        table[0].set_bool(1, bool());
-        table[0].set_float(2, float());
-        table[0].set_double(3, double());
-        table[0].set_string(4, StringData(""));
-        table[0].set_binary(5, BinaryData());
-        table[0].set_olddatetime(6, OldDateTime());
-        table[0].set_subtable(7, 0);
-        table[0].set_mixed(8, Mixed());
+        table[0].set_int      (0, int_fast64_t());
+        table[0].set_bool     (1, bool());
+        table[0].set_float    (2, float());
+        table[0].set_double   (3, double());
+        table[0].set_string   (4, StringData(""));
+        table[0].set_binary   (5, BinaryData());
+        table[0].set_olddatetime (6, OldDateTime());
+        table[0].set_subtable (7, nullptr);
+        table[0].set_mixed    (8, Mixed());
 
-        table[1].set_int(0, 5651);
-        table[1].set_bool(1, true);
-        table[1].set_float(2, 8397.0f);
-        table[1].set_double(3, 1937.0);
-        table[1].set_string(4, "foo");
-        table[1].set_binary(5, bin);
-        table[1].set_olddatetime(6, OldDateTime(9992));
-        table[1].set_subtable(7, &one_subtab);
-        table[1].set_mixed(8, Mixed(3637.0f));
+        table[1].set_int      (0, 5651);
+        table[1].set_bool     (1, true);
+        table[1].set_float    (2, 8397.0f);
+        table[1].set_double   (3, 1937.0);
+        table[1].set_string   (4, "foo");
+        table[1].set_binary   (5, bin);
+        table[1].set_olddatetime (6, OldDateTime(9992));
+        table[1].set_subtable (7, &one_subtab);
+        table[1].set_mixed    (8, Mixed(3637.0f));
 
         Mixed mix_subtab((Mixed::subtable_tag()));
 
@@ -5801,7 +5801,7 @@ TEST(Table_SubtableRowAccessorsRetain)
 
     // Check that all row accessors in a regular subtable are detached if the
     // subtable is overridden
-    parent->set_subtable(1, 0, 0); // Clear
+    parent->set_subtable(1, 0, nullptr); // Clear
     CHECK(mixed->is_attached());
     CHECK(regular->is_attached());
     CHECK(row_m.is_attached());

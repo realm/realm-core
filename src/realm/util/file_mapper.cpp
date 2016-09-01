@@ -31,31 +31,31 @@
 
 #if REALM_ENABLE_ENCRYPTION
 
-#include "encrypted_file_mapping.hpp"
-#include "aes_cryptor.hpp"
+    #include "encrypted_file_mapping.hpp"
+    #include "aes_cryptor.hpp"
 
-#include <memory>
-#include <signal.h>
-#include <sys/stat.h>
-#include <unistd.h>
-#include <string.h>
-#include <atomic>
+    #include <memory>
+    #include <csignal>
+    #include <sys/stat.h>
+    #include <unistd.h>
+    #include <cstring>
+    #include <atomic>
 
-#include <realm/util/errno.hpp>
-#include <realm/util/shared_ptr.hpp>
-#include <realm/util/terminate.hpp>
-#include <realm/util/thread.hpp>
-#include <string.h> // for memset
+    #include <realm/util/errno.hpp>
+    #include <realm/util/shared_ptr.hpp>
+    #include <realm/util/terminate.hpp>
+    #include <realm/util/thread.hpp>
+    #include <cstring> // for memset
 
-#if REALM_PLATFORM_APPLE
-#include <mach/mach.h>
-#include <mach/exc.h>
-#endif
+    #if REALM_PLATFORM_APPLE
+        #include <mach/mach.h>
+        #include <mach/exc.h>
+    #endif
 
-#if REALM_ANDROID
-#include <linux/unistd.h>
-#include <sys/syscall.h>
-#endif
+    #if REALM_ANDROID
+        #include <linux/unistd.h>
+        #include <sys/syscall.h>
+    #endif
 
 #endif // enable encryption
 

@@ -20,7 +20,7 @@
 #define REALM_UTIL_FILE_HPP
 
 #include <cstddef>
-#include <stdint.h>
+#include <cstdint>
 #include <memory>
 #include <stdexcept>
 #include <string>

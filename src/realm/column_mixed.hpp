@@ -148,12 +148,10 @@ public:
     void mark(int) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
-#ifdef REALM_DEBUG
     void verify() const override;
     void verify(const Table&, size_t) const override;
     void to_dot(std::ostream&, StringData title) const override;
     void do_dump_node_structure(std::ostream&, int) const override;
-#endif
 
 private:
     enum MixedColType {
@@ -221,8 +219,8 @@ private:
 
 #ifdef REALM_DEBUG
     void do_verify(const Table*, size_t col_ndx) const;
-    void leaf_to_dot(MemRef, ArrayParent*, size_t, std::ostream&) const override;
 #endif
+    void leaf_to_dot(MemRef, ArrayParent*, size_t, std::ostream&) const override;
 };
 
 // LCOV_EXCL_START
@@ -237,12 +235,8 @@ inline StringData MixedColumn::get_index_data(size_t, StringIndex::StringConvers
 
 class MixedColumn::RefsColumn : public SubtableColumnBase {
 public:
-    RefsColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
-        : SubtableColumnBase(alloc, ref, table, column_ndx)
-    {
-    }
-
-    ~RefsColumn() noexcept override {}
+    RefsColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx);
+    ~RefsColumn() noexcept override;
 
     using SubtableColumnBase::get_subtable_ptr;
 

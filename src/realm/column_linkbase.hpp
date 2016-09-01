@@ -63,10 +63,8 @@ public:
     void refresh_accessor_tree(size_t, const Spec&) override;
     void bump_link_origin_table_version() noexcept override;
 
-#ifdef REALM_DEBUG
     void verify(const Table&, size_t) const override;
     using IntegerColumn::verify;
-#endif
 
 protected:
     // A pointer to the table that this column is part of.

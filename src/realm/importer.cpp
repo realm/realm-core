@@ -21,7 +21,7 @@
 #include <iostream>
 #include <limits>
 #include <sstream>
-#include <stdint.h>
+#include <cstdint>
 #include <vector>
 
 #include <realm/util/assert.hpp>

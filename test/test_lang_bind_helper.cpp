@@ -218,12 +218,10 @@ public:
         return BinaryData(); // FIXME: Not yet implemented
     }
 
-#ifdef REALM_DEBUG
     void verify() const override
     {
         // No-op
     }
-#endif
 
 private:
     Buffer<char> m_incoming_changeset;
@@ -917,9 +915,9 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         TableRef other_w = wt.get_table("other");
         other_w->clear();
         other_w->add_empty_row(1);
-        other_w->set_int(0, 0, 9);
-        other_w->set_float(1, 0, 17.0f);
-        other_w->set_subtable(2, 0, 0); // FIXME: Set something
+        other_w->set_int      (0, 0, 9);
+        other_w->set_float    (1, 0, 17.0f);
+        other_w->set_subtable (2, 0, nullptr); // FIXME: Set something
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2964,7 +2962,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
     {
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.get_table("parent");
-        parent_w->set_subtable(1, 0, 0); // Clear
+        parent_w->set_subtable(1, 0, nullptr); // Clear
         wt.commit();
     }
     LangBindHelper::advance_read(sg);

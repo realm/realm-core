@@ -19,7 +19,7 @@
 #ifndef REALM_MIXED_HPP
 #define REALM_MIXED_HPP
 
-#include <stdint.h> // int64_t - not part of C++03, not even required by C++11 (see C++11 section 18.4.1)
+#include <cstdint> // int64_t - not part of C++03, not even required by C++11 (see C++11 section 18.4.1)
 
 #include <cstddef> // size_t
 #include <cstring>

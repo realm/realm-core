@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <string.h>
+#include <cstring>
 #include <stdexcept>
 
 #include <realm/util/thread.hpp>

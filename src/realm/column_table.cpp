@@ -49,8 +49,12 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 } // anonymous namespace
 
+
+#endif
+
 void SubtableColumnBase::verify() const
 {
+#ifdef REALM_DEBUG
     if (root_is_leaf()) {
         IntegerColumn::verify();
         REALM_ASSERT(get_root_array()->has_refs());
@@ -58,16 +62,20 @@ void SubtableColumnBase::verify() const
     }
 
     get_root_array()->verify_bptree(&verify_leaf);
+#endif
 }
 
 void SubtableColumnBase::verify(const Table& table, size_t col_ndx) const
 {
+#ifdef REALM_DEBUG
     IntegerColumn::verify(table, col_ndx);
 
     REALM_ASSERT(m_table == &table);
-}
-
+#else
+    static_cast<void>(table);
+    static_cast<void>(col_ndx);
 #endif
+}
 
 
 Table* SubtableColumnBase::get_subtable_ptr(size_t subtable_ndx)
@@ -259,7 +267,7 @@ void SubtableColumnBase::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_p
 }
 
 
-#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
+// LCOV_EXCL_START ignore debug functions
 
 std::pair<ref_type, size_t> SubtableColumnBase::get_to_dot_parent(size_t ndx_in_parent) const
 {
@@ -267,7 +275,7 @@ std::pair<ref_type, size_t> SubtableColumnBase::get_to_dot_parent(size_t ndx_in_
     return std::make_pair(p.first.get_ref(), p.second);
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+// LCOV_EXCL_STOP ignore debug functions
 
 size_t SubtableColumn::get_subtable_size(size_t ndx) const noexcept
 {

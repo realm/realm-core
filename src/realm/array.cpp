@@ -2131,7 +2131,14 @@ ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& st
     return new_leaf.get_ref();
 }
 
-#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
+// LCOV_EXCL_START ignore debug functions
+
+std::pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const
+{
+    return std::make_pair(get_ref(), ndx_in_parent);
+}
+
+#ifdef REALM_DEBUG
 
 void Array::print() const
 {
@@ -2416,11 +2423,6 @@ void Array::to_dot_parent_edge(std::ostream& out) const
         out << "n" << std::hex << real_parent_ref << std::dec << ":" << ndx_in_real_parent << " -> n" << std::hex
             << get_ref() << std::dec << std::endl;
     }
-}
-
-std::pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const
-{
-    return std::make_pair(get_ref(), ndx_in_parent);
 }
 
 

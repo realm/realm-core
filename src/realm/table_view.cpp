@@ -269,7 +269,7 @@ template <class C>
 Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx) const
 {
     C compare = C();
-    Timestamp best = Timestamp(null{});
+    Timestamp best = Timestamp{};
     size_t ndx = npos;
     for (size_t t = 0; t < size(); t++) {
         Timestamp ts = get_timestamp(column_ndx, t);

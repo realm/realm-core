@@ -255,11 +255,28 @@ void RowIndexes::do_sort(const SortDescriptor& order, const SortDescriptor& dist
         m_row_indexes.add(-1);
 }
 
+RowIndexes::RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc)
+    : m_row_indexes(urt, alloc)
+#ifdef REALM_COOKIE_CHECK
+    , m_debug_cookie(cookie_expected)
+#endif
+{
+}
+
+RowIndexes::RowIndexes(IntegerColumn&& col)
+    : m_row_indexes(std::move(col))
+#ifdef REALM_COOKIE_CHECK
+    , m_debug_cookie(cookie_expected)
+#endif
+{
+}
+
+
 // FIXME: this only works (and is only used) for row indexes with memory
 // managed by the default allocator, e.q. for TableViews.
 RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
 #ifdef REALM_COOKIE_CHECK
-    : cookie(source.cookie)
+    : m_debug_cookie(source.m_debug_cookie)
 #endif
 {
     REALM_ASSERT(&source.m_row_indexes.get_alloc() == &Allocator::get_default());
@@ -272,7 +289,7 @@ RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
 
 RowIndexes::RowIndexes(RowIndexes& source, MutableSourcePayload)
 #ifdef REALM_COOKIE_CHECK
-    : cookie(source.cookie)
+    : m_debug_cookie(source.m_debug_cookie)
 #endif
 {
     REALM_ASSERT(&source.m_row_indexes.get_alloc() == &Allocator::get_default());

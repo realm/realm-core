@@ -18,7 +18,7 @@
 
 #include <cstdlib> // size_t
 #include <string>
-#include <stdint.h>
+#include <cstdint>
 #include <atomic>
 #include <fstream>
 
