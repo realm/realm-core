@@ -12284,5 +12284,65 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     sg_w.commit();
 }
 
+// Found by AFL
+TEST(LangBindHelper_SwapSimple)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_r(make_client_history(path, key));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, key));
+    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);
+    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    TableRef t = g.add_table("t0");
+    t->add_column(type_Int, "t_int");
+    t->add_column_link(type_Link, "t_link", *t);
+    const size_t num_rows = 10;
+    t->add_empty_row(num_rows);
+    for (size_t i = 0; i < num_rows; ++i) {
+        t->set_int(0, i, i);
+    }
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    for (size_t i = 0; i < num_rows; ++i) {
+        CHECK_EQUAL(t->get_int(0, i), i);
+    }
+    t->swap_rows(7, 4);
+    CHECK_EQUAL(t->get_int(0, 4), 7);
+    CHECK_EQUAL(t->get_int(0, 7), 4);
+    g.remove_table(0);
+
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    TableRef tw = g.get_table(0);
+    TableRef tr = g_r.get_table(0);
+
+    CHECK_EQUAL(tw->get_int(0, 4), 4);
+    CHECK_EQUAL(tw->get_int(0, 7), 7);
+    CHECK_EQUAL(tr->get_int(0, 4), 4);
+    CHECK_EQUAL(tr->get_int(0, 7), 7);
+
+    LangBindHelper::promote_to_write(sg_w);
+    tw->swap_rows(7, 4);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    CHECK_EQUAL(tw->get_int(0, 4), 7);
+    CHECK_EQUAL(tw->get_int(0, 7), 4);
+    CHECK_EQUAL(tr->get_int(0, 4), 7);
+    CHECK_EQUAL(tr->get_int(0, 7), 4);
+}
+
+
 
 #endif
