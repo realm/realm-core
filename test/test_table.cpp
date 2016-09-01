@@ -7089,13 +7089,13 @@ TEST(Table_getVersionCounterAfterRowAccessor)
 // on subtables, so the bug has not been triggered in public.
 TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
 {
-    constexpr bool nullable = TEST_TYPE::value;
+    constexpr bool nullable_toggle = TEST_TYPE::value;
     Group g;
     TableRef t = g.add_table("table");
-    t->add_column(type_Int, "int", nullable);
-    t->add_column(type_Bool, "bool", nullable);
-    t->add_column(type_String, "string", nullable);
-    t->add_column(type_Binary, "binary", nullable);
+    t->add_column(type_Int, "int", nullable_toggle);
+    t->add_column(type_Bool, "bool", nullable_toggle);
+    t->add_column(type_String, "string", nullable_toggle);
+    t->add_column(type_Binary, "binary", nullable_toggle);
     t->add_column(type_Double, "double");
     t->add_column(type_Float, "float");
     t->add_column(type_Mixed, "mixed");
