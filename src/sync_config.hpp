@@ -23,13 +23,21 @@
 
 namespace realm {
 
-using SyncErrorHandler = std::function<sync::Client::ErrorHandler>;
+enum class SyncSessionError {
+    Debug,                  // An informational error, nothing to do. Only for debug purposes.
+    SessionTokenExpired,    // The session's token has expired.
+    SessionFatal,           // The session is invalid and should be killed.
+    AccessDenied,           // Permissions error with the session.
+    UserFatal,              // The user associated with the session is invalid.
+};
+
+using SyncSessionErrorHandler = void(int error_code, std::string message, SyncSessionError error_type);
 
 struct SyncConfig {
 public:
     std::string user_tag;
     std::string realm_url;
-    SyncErrorHandler error_handler;
+    std::function<SyncSessionErrorHandler> error_handler;
 };
 
 } // realm

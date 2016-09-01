@@ -23,6 +23,8 @@
 
 #include <realm/sync/client.hpp>
 
+#include "sync_config.hpp"
+
 namespace realm {
 
 namespace _impl {
@@ -33,7 +35,7 @@ struct SyncSession {
     SyncSession(std::shared_ptr<SyncClient>, std::string realm_path);
 
     void set_sync_transact_callback(std::function<sync::Session::SyncTransactCallback>);
-    void set_error_handler(std::function<sync::Session::ErrorHandler>);
+    void set_error_handler(std::function<SyncSessionErrorHandler>);
     void nonsync_transact_notify(sync::Session::version_type);
 
     void refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url);

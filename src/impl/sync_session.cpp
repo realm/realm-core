@@ -20,6 +20,8 @@
 
 #include "sync_client.hpp"
 
+#include <realm/sync/protocol.hpp>
+
 using namespace realm;
 using namespace realm::_impl;
 
@@ -34,9 +36,59 @@ void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTr
     m_session.set_sync_transact_callback(std::move(callback));
 }
 
-void SyncSession::set_error_handler(std::function<sync::Session::ErrorHandler> handler)
+void SyncSession::set_error_handler(std::function<SyncSessionErrorHandler> handler)
 {
-    m_session.set_error_handler(std::move(handler));
+    auto wrapped_handler = [=](int error_code, std::string message) {
+        using Error = realm::sync::Error;
+
+        SyncSessionError error_type;
+        // Precondition: error_code is a valid realm::sync::Error raw value.
+        Error strong_code = static_cast<Error>(error_code);
+
+        switch (strong_code) {
+            // Client errors; all ignored (for now)
+            case Error::connection_closed:
+            case Error::other_error:
+            case Error::unknown_message:
+            case Error::bad_syntax:
+            case Error::limits_exceeded:
+            case Error::wrong_protocol_version:
+            case Error::bad_session_ident:
+            case Error::reuse_of_session_ident:
+            case Error::bound_in_other_session:
+            case Error::bad_message_order:
+                return;
+            // Session errors
+            case Error::session_closed:
+            case Error::other_session_error:
+                // The binding doesn't need to be aware of these because they are strictly informational, and do not
+                // represent actual errors.
+                return;
+            case Error::token_expired:
+                error_type = SyncSessionError::SessionTokenExpired;
+                break;
+            case Error::bad_authentication:
+                error_type = SyncSessionError::UserFatal;
+                break;
+            case Error::illegal_realm_path:
+            case Error::no_such_realm:
+            case Error::bad_server_file_ident:
+            case Error::diverging_histories:
+            case Error::bad_changeset:
+                error_type = SyncSessionError::SessionFatal;
+                break;
+            case Error::permission_denied:
+                error_type = SyncSessionError::AccessDenied;
+                break;
+            case Error::bad_client_file_ident:
+            case Error::bad_server_version:
+            case Error::bad_client_version:
+                error_type = SyncSessionError::Debug;
+                break;
+        }
+        handler(error_code, message, error_type);
+    };
+    m_session.set_error_handler(std::move(wrapped_handler));
 }
 
 void SyncSession::nonsync_transact_notify(sync::Session::version_type version)
