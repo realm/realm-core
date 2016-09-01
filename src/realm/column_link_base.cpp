@@ -81,4 +81,3 @@ void LinkColumnBase::verify(const Table& table, size_t col_ndx) const
     static_cast<void>(col_ndx);
 #endif // REALM_DEBUG
 }
-

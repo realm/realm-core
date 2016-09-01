@@ -194,7 +194,6 @@ void LinkColumn::do_nullify_link(size_t row_ndx, size_t)
 }
 
 
-
 void LinkColumn::verify(const Table& table, size_t col_ndx) const
 {
 #ifdef REALM_DEBUG
