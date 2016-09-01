@@ -1061,12 +1061,24 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
 
     size_t origin_table_ndx = get_index_in_group();
 
+    // If multiple link columns exist to the same table, updating the backlink
+    // columns one by one is risky, because we use Spec::find_backlink_column
+    // to figure out which backlink column should be updated. If we update them
+    // as we find them, the next iteration might find the column that we have
+    // just updated, thinking it should be updated once more.
+    //
+    // Therefore, we figure out which backlink columns need to be updated first,
+    // and then we actually update them in the second pass.
+    //
+    // Tuples are: (target spec, backlink column index, new column index).
+    std::vector<std::tuple<Spec&, size_t, size_t>> update_backlink_columns;
+
     // Update backlink columns pointing to the column that was moved.
     if (is_link_type(m_spec.get_column_type(moved_to))) {
         LinkColumnBase* link_col = static_cast<LinkColumnBase*>(m_cols[moved_to]);
         Spec& target_spec = link_col->get_target_table().m_spec;
         size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, moved_from);
-        target_spec.set_backlink_origin_column(backlink_col_ndx, moved_to);
+        update_backlink_columns.emplace_back(target_spec, backlink_col_ndx, moved_to);
     }
 
     // Update backlink columns pointing to any link columns between the source and
@@ -1080,7 +1092,7 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
             Spec& target_spec = link_col->get_target_table().m_spec;
             size_t old_col_ndx = col_ndx + 1;
             size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
-            target_spec.set_backlink_origin_column(backlink_col_ndx, col_ndx);
+            update_backlink_columns.emplace_back(target_spec, backlink_col_ndx, col_ndx);
         }
     }
     else if (moved_from > moved_to) {
@@ -1092,9 +1104,15 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
             Spec& target_spec = link_col->get_target_table().m_spec;
             size_t old_col_ndx = col_ndx - 1;
             size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
-            target_spec.set_backlink_origin_column(backlink_col_ndx, col_ndx);
+            update_backlink_columns.emplace_back(target_spec, backlink_col_ndx, col_ndx);
         }
     }
+
+    for (auto& t : update_backlink_columns) {
+        Spec& target_spec = std::get<0>(t);
+        target_spec.set_backlink_origin_column(std::get<1>(t), std::get<2>(t));
+    }
+
 }
 
 
