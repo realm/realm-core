@@ -385,11 +385,11 @@ task :apple_release_notes => [:tmpdir_core, :check_pandoc] do
 end
 
 APPLE_BINDINGS.map do |name, info|
-    static_library_targetes = info[:platforms].product(['-dbg', '']).map do |platform, suffix|
+    static_library_targets = info[:platforms].product(['-dbg', '']).map do |platform, suffix|
         "librealm-#{platform}#{suffix}.a"
     end.to_a
 
-    task "#{name}_static_libraries" => static_library_targetes
+    task "#{name}_static_libraries" => static_library_targets
 
     task "#{name}_zip" => [:guess_version_string, "#{name}_static_libraries", :apple_copy_headers, :apple_copy_license, :apple_release_notes] do
         zip_name = "core-#{@version_string}.zip"
