@@ -6187,6 +6187,49 @@ TEST(Table_MultipleLinkColumnsToOther)
 }
 
 
+TEST(Table_MultipleLinkColumnsMoveTables)
+{
+    Group g;
+    TableRef t = g.add_table("A");
+    TableRef t2 = g.add_table("B");
+    t->insert_column_link(0, type_Link, "e", *t);
+    t->insert_column_link(1, type_LinkList, "f", *t);
+    t->add_empty_row();
+    t->get_linklist(1, 0)->add(0);
+    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 1);
+    g.verify();
+    t->get_linklist(0, 0)->add(0);
+    g.verify();
+    g.move_table(0, 1);
+    g.verify();
+    g.move_table(1, 0);
+    g.verify();
+}
+
+
+TEST(Table_MultipleLinkColumnsMoveTablesCrossLinks)
+{
+    Group g;
+    TableRef t = g.add_table("A");
+    TableRef t2 = g.add_table("B");
+    t->insert_column_link(0, type_Link, "e", *t2);
+    t->insert_column_link(1, type_LinkList, "f", *t);
+    t->insert_column_link(2, type_Link, "g", *t2);
+    t->add_empty_row();
+    t->get_linklist(1, 0)->add(0);
+    g.move_table(0, 1);
+    g.verify();
+    _impl::TableFriend::move_column(*t->get_descriptor(), 1, 2);
+    g.verify();
+    t->get_linklist(2, 0)->add(0);
+    g.verify();
+    g.move_table(1, 0);
+    g.verify();
+    _impl::TableFriend::move_column(*t->get_descriptor(), 1, 0);
+    g.verify();
+}
+
+
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
