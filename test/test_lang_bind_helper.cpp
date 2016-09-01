@@ -12290,7 +12290,7 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
 TEST(LangBindHelper_SwapSimple)
 {
     SHARED_GROUP_TEST_PATH(path);
-    const char* key = nullptr;
+    const char* key = crypt_key();
     std::unique_ptr<Replication> hist_r(make_client_history(path, key));
     std::unique_ptr<Replication> hist_w(make_client_history(path, key));
     SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);
@@ -12298,13 +12298,13 @@ TEST(LangBindHelper_SwapSimple)
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
-    try { g.add_table("t0"); } catch (const TableNameInUse&) { }
-    g.get_table(0)->add_column(type_Int, "t_int");
-    g.get_table(0)->add_column_link(type_Link, "t_link", *g.get_table(0));
+    TableRef t = g.add_table("t0");
+    t->add_column(type_Int, "t_int");
+    t->add_column_link(type_Link, "t_link", *t);
     const size_t num_rows = 10;
-    g.get_table(0)->add_empty_row(num_rows);
+    t->add_empty_row(num_rows);
     for (size_t i = 0; i < num_rows; ++i) {
-        g.get_table(0)->set_int(0, i, i);
+        t->set_int(0, i, i);
     }
     LangBindHelper::advance_read(sg_r);
     g_r.verify();
@@ -12313,33 +12313,36 @@ TEST(LangBindHelper_SwapSimple)
     LangBindHelper::promote_to_write(sg_w);
     g.verify();
     for (size_t i = 0; i < num_rows; ++i) {
-        CHECK_EQUAL(g.get_table(0)->get_int(0, i), i);
+        CHECK_EQUAL(t->get_int(0, i), i);
     }
-    g.get_table(0)->swap_rows(7, 4);
-    CHECK_EQUAL(g.get_table(0)->get_int(0, 4), 7);
-    CHECK_EQUAL(g.get_table(0)->get_int(0, 7), 4);
-    try { g.remove_table(0); } catch (const CrossTableLinkTarget&) { }
+    t->swap_rows(7, 4);
+    CHECK_EQUAL(t->get_int(0, 4), 7);
+    CHECK_EQUAL(t->get_int(0, 7), 4);
+    g.remove_table(0);
 
     LangBindHelper::rollback_and_continue_as_read(sg_w);
 
     LangBindHelper::advance_read(sg_r);
     g_r.verify();
 
-    CHECK_EQUAL(g.get_table(0)->get_int(0, 4), 4);
-    CHECK_EQUAL(g.get_table(0)->get_int(0, 7), 7);
-    CHECK_EQUAL(g_r.get_table(0)->get_int(0, 4), 4);
-    CHECK_EQUAL(g_r.get_table(0)->get_int(0, 7), 7);
+    TableRef tw = g.get_table(0);
+    TableRef tr = g_r.get_table(0);
+
+    CHECK_EQUAL(tw->get_int(0, 4), 4);
+    CHECK_EQUAL(tw->get_int(0, 7), 7);
+    CHECK_EQUAL(tr->get_int(0, 4), 4);
+    CHECK_EQUAL(tr->get_int(0, 7), 7);
 
     LangBindHelper::promote_to_write(sg_w);
-    g.get_table(0)->swap_rows(7, 4);
+    tw->swap_rows(7, 4);
     LangBindHelper::commit_and_continue_as_read(sg_w);
     LangBindHelper::advance_read(sg_r);
     g_r.verify();
 
-    CHECK_EQUAL(g.get_table(0)->get_int(0, 4), 7);
-    CHECK_EQUAL(g.get_table(0)->get_int(0, 7), 4);
-    CHECK_EQUAL(g_r.get_table(0)->get_int(0, 4), 7);
-    CHECK_EQUAL(g_r.get_table(0)->get_int(0, 7), 4);
+    CHECK_EQUAL(tw->get_int(0, 4), 7);
+    CHECK_EQUAL(tw->get_int(0, 7), 4);
+    CHECK_EQUAL(tr->get_int(0, 4), 7);
+    CHECK_EQUAL(tr->get_int(0, 7), 4);
 }
 
 
