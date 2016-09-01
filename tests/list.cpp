@@ -61,6 +61,8 @@ TEST_CASE("list") {
 
     auto origin = r->read_group().get_table("class_origin");
     auto target = r->read_group().get_table("class_target");
+    auto other_origin = r->read_group().get_table("class_other_origin");
+    auto other_target = r->read_group().get_table("class_other_target");
 
     r->begin_transaction();
 
@@ -77,6 +79,11 @@ TEST_CASE("list") {
     LinkViewRef lv2 = origin->get_linklist(1, 1);
     for (int i = 0; i < 10; ++i)
         lv2->add(i);
+
+    other_target->add_empty_row();
+    other_origin->add_empty_row();
+    LinkViewRef other_lv = other_origin->get_linklist(0, 0);
+    other_lv->add(0);
 
     r->commit_transaction();
 
@@ -260,18 +267,48 @@ TEST_CASE("list") {
             }
         }
 
+        SECTION("modifying a different table does not send a change notification") {
+            auto token = require_no_change();
+            write([&] { other_lv->add(0); });
+        }
+
+        SECTION("changes are reported correctly for multiple tables") {
+            List lst2(r, other_lv);
+            CollectionChangeSet other_changes;
+            auto token1 = lst2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                other_changes = std::move(c);
+            });
+            auto token2 = require_change();
+
+            write([&] {
+                lv->add(1);
+
+                other_origin->insert_empty_row(0);
+                other_lv->add(0);
+
+                lv->add(2);
+            });
+            REQUIRE_INDICES(change.insertions, 10, 11);
+            REQUIRE_INDICES(other_changes.insertions, 1);
+
+            write([&] {
+                lv->add(3);
+                other_origin->move_last_over(1);
+                lv->add(4);
+            });
+            REQUIRE_INDICES(change.insertions, 12, 13);
+            REQUIRE_INDICES(other_changes.deletions, 0, 1);
+
+            write([&] {
+                lv->add(5);
+                other_origin->clear();
+                lv->add(6);
+            });
+            REQUIRE_INDICES(change.insertions, 14, 15);
+        }
+
         SECTION("tables-of-interest are tracked properly for multiple source versions") {
-            auto other_origin = r->read_group().get_table("class_other_origin");
-            auto other_target = r->read_group().get_table("class_other_target");
-
-            r->begin_transaction();
-            other_target->add_empty_row();
-            other_origin->add_empty_row();
-            LinkViewRef lv2 = other_origin->get_linklist(0, 0);
-            lv2->add(0);
-            r->commit_transaction();
-
-            List lst2(r, lv2);
+            List lst2(r, other_lv);
 
             // Add a callback for list1, advance the version, then add a
             // callback for list2, so that the notifiers added at each source

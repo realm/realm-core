@@ -316,7 +316,7 @@ public:
     {
         if (row_ndx != prior_size) {
             for (auto& observer : m_observers) {
-                if (observer.row_ndx >= row_ndx)
+                if (observer.table_ndx == current_table() && observer.row_ndx >= row_ndx)
                     observer.row_ndx += num_rows;
             }
         }
@@ -627,7 +627,7 @@ public:
         if (auto change = get_change())
             change->insert(row_ndx, num_rows_to_insert, need_move_info());
         for (auto& list : m_info.lists) {
-            if (list.row_ndx >= row_ndx)
+            if (list.table_ndx == current_table() && list.row_ndx >= row_ndx)
                 list.row_ndx += num_rows_to_insert;
         }
 
