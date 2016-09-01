@@ -4,6 +4,7 @@ FROM ubuntu:16.04
 # This should help avoiding duplicates and make the file easier to update.
 RUN apt-get update && apt-get install -y \
     build-essential \
+    cmake \
     curl \
     gcovr \
     git \
