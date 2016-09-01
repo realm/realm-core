@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix subspecs not updating properly after a move operation.
 
 ### Breaking changes
 
