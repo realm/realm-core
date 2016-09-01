@@ -906,9 +906,7 @@ public:
 
     TimestampNode(Timestamp v, size_t column) : m_value(v) { m_condition_column_idx = column; }
 
-    TimestampNode(null, size_t column) : TimestampNode(Timestamp{}, column)
-    {
-    }
+    TimestampNode(null, size_t column) : TimestampNode(Timestamp{}, column) {}
 
     void table_changed() override { m_condition_column = &get_column<TimestampColumn>(m_condition_column_idx); }
 

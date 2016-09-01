@@ -505,15 +505,13 @@ TEST(TimestampColumn_Operators)
           compare(StringData(""), StringData(""), realm::Greater()));
 
     // Repeat with other operators than Greater
-    CHECK(compare(Timestamp{}, Timestamp{}, realm::Less()) ==
-          compare(StringData{}, StringData{}, realm::Less()));
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::Less()) == compare(StringData{}, StringData{}, realm::Less()));
     CHECK(compare(Timestamp(0, 0), Timestamp{}, realm::Less()) ==
           compare(StringData(""), StringData{}, realm::Less()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Less()) ==
           compare(StringData(""), StringData(""), realm::Less()));
 
-    CHECK(compare(Timestamp{}, Timestamp{}, realm::Equal()) ==
-          compare(StringData{}, StringData{}, realm::Equal()));
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::Equal()) == compare(StringData{}, StringData{}, realm::Equal()));
     CHECK(compare(Timestamp(0, 0), Timestamp{}, realm::Equal()) ==
           compare(StringData(""), StringData{}, realm::Equal()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Equal()) ==

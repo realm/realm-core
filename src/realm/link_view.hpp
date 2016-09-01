@@ -165,10 +165,10 @@ public:
 
 // Implementation
 
-inline LinkView::LinkView(const ctor_cookie&, Table* origin_table, LinkListColumn& column, size_t row_ndx):
-    RowIndexes(IntegerColumn::unattached_root_tag(), column.get_alloc()), // Throws
-    m_origin_table(origin_table->get_table_ref()),
-    m_origin_column(column)
+inline LinkView::LinkView(const ctor_cookie&, Table* origin_table, LinkListColumn& column, size_t row_ndx)
+    : RowIndexes(IntegerColumn::unattached_root_tag(), column.get_alloc()) // Throws
+    , m_origin_table(origin_table->get_table_ref())
+    , m_origin_column(column)
 {
     Array& root = *m_row_indexes.get_root_array();
     root.set_parent(&column, row_ndx);

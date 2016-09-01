@@ -577,8 +577,7 @@ protected:
     /// if the leaf type is Array::type_HasRefs.
     void clear_without_updating_index();
 
-    void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
-                     std::ostream&) const override;
+    void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const override;
 #ifdef REALM_DEBUG
     static void dump_node_structure(const Array& root, std::ostream&, int level);
 #endif
@@ -1430,7 +1429,7 @@ void Column<T>::do_erase(size_t row_ndx, size_t num_rows_to_erase, bool is_last)
     }
 }
 
-template<class T>
+template <class T>
 void Column<T>::verify() const
 {
 #ifdef REALM_DEBUG
@@ -1458,7 +1457,7 @@ void Column<T>::to_dot(std::ostream& out, StringData title) const
 #endif
 }
 
-template<class T>
+template <class T>
 void Column<T>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent, std::ostream& out) const
 {
 #ifdef REALM_DEBUG
@@ -1471,7 +1470,7 @@ void Column<T>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_
 #endif
 }
 
-template<class T>
+template <class T>
 void Column<T>::do_dump_node_structure(std::ostream& out, int level) const
 {
 #ifdef REALM_DEBUG
@@ -1484,14 +1483,14 @@ void Column<T>::do_dump_node_structure(std::ostream& out, int level) const
 
 #ifdef REALM_DEBUG
 
-template<class T>
+template <class T>
 void Column<T>::tree_to_dot(std::ostream& out) const
 {
     ColumnBase::bptree_to_dot(get_root_array(), out);
 }
 
 
-template<class T>
+template <class T>
 MemStats Column<T>::stats() const
 {
     MemStats mem_stats;
@@ -1503,7 +1502,7 @@ namespace _impl {
 void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level);
 }
 
-template<class T>
+template <class T>
 void Column<T>::dump_node_structure(const Array& root, std::ostream& out, int level)
 {
     root.dump_bptree_structure(out, level, &_impl::leaf_dumper);

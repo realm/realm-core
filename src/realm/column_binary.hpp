@@ -118,8 +118,7 @@ private:
 
     bool m_nullable = false;
 
-    void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
-                     std::ostream&) const override;
+    void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const override;
 
     friend class Array;
     friend class ColumnBase;

@@ -320,10 +320,8 @@ void StringIndex::node_insert_split(size_t ndx, size_t new_ref)
     // Get sublists
     size_t refs_ndx = ndx + 1; // first entry in refs points to offsets
     ref_type orig_ref = m_array->get_as_ref(refs_ndx);
-    StringIndex orig_col(orig_ref, m_array.get(), refs_ndx, m_target_column,
-                         m_deny_duplicate_values, alloc);
-    StringIndex new_col(new_ref, nullptr, 0, m_target_column,
-                        m_deny_duplicate_values, alloc);
+    StringIndex orig_col(orig_ref, m_array.get(), refs_ndx, m_target_column, m_deny_duplicate_values, alloc);
+    StringIndex new_col(new_ref, nullptr, 0, m_target_column, m_deny_duplicate_values, alloc);
 
     // Update original key
     key_type last_key = orig_col.get_last_key();
@@ -349,8 +347,7 @@ void StringIndex::node_insert(size_t ndx, size_t ref)
     REALM_ASSERT(ndx <= offsets.size());
     REALM_ASSERT(offsets.size() < REALM_MAX_BPNODE_SIZE);
 
-    StringIndex col(ref, nullptr, 0, m_target_column,
-                    m_deny_duplicate_values, alloc);
+    StringIndex col(ref, nullptr, 0, m_target_column, m_deny_duplicate_values, alloc);
     key_type last_key = col.get_last_key();
 
     offsets.insert(ndx, last_key);
@@ -487,8 +484,7 @@ void StringIndex::distinct(IntegerColumn& result) const
     if (m_array->is_inner_bptree_node()) {
         for (size_t i = 1; i < array_size; ++i) {
             size_t ref = m_array->get_as_ref(i);
-            StringIndex ndx(ref, nullptr, 0, m_target_column,
-                            m_deny_duplicate_values, alloc);
+            StringIndex ndx(ref, nullptr, 0, m_target_column, m_deny_duplicate_values, alloc);
             ndx.distinct(result);
         }
     }

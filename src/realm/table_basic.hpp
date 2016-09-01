@@ -402,10 +402,7 @@ public:
         return m_impl.count(start, end, limit);
     }
 
-    size_t remove()
-    {
-        return m_impl.remove();
-    }
+    size_t remove() { return m_impl.remove(); }
 
     std::string validate() { return m_impl.validate(); }
 

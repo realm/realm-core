@@ -1191,7 +1191,8 @@ void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit)
         else {
             QueryState<int64_t> st;
             st.init(act_FindAll, &ret.m_row_indexes, limit);
-            aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, false, root_node(), &st, begin, end, nullptr);
+            aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, false, root_node(), &st, begin, end,
+                               nullptr);
         }
     }
 }
@@ -1252,7 +1253,7 @@ size_t Query::remove()
 
     TableView tv = find_all();
     size_t rows = tv.size();
-    tv.clear();    
+    tv.clear();
     return rows;
 }
 

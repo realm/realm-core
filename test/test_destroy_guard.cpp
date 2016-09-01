@@ -126,9 +126,7 @@ public:
         m_map.clear();
     }
 
-    void verify() const override
-    {
-    }
+    void verify() const override {}
 
 private:
     ref_type m_offset;

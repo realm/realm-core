@@ -72,7 +72,7 @@ public:
     void do_dump_node_structure(std::ostream&, int level) const override;
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const override;
 
-    void add(const Timestamp& ts = Timestamp {});
+    void add(const Timestamp& ts = Timestamp{});
     Timestamp get(size_t row_ndx) const noexcept;
     void set(size_t row_ndx, const Timestamp& ts);
     bool compare(const TimestampColumn& c) const noexcept;
