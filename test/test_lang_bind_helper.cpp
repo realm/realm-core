@@ -12288,11 +12288,10 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
 TEST(LangBindHelper_SwapSimple)
 {
     SHARED_GROUP_TEST_PATH(path);
-    const char* key = crypt_key();
-    std::unique_ptr<Replication> hist_r(make_client_history(path, key));
-    std::unique_ptr<Replication> hist_w(make_client_history(path, key));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
