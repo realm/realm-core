@@ -1072,6 +1072,7 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
     //
     // Tuples are: (target spec, backlink column index, new column index).
     std::vector<std::tuple<Spec&, size_t, size_t>> update_backlink_columns;
+    update_backlink_columns.reserve(m_spec.get_public_column_count());
 
     // Update backlink columns pointing to the column that was moved.
     if (is_link_type(m_spec.get_column_type(moved_to))) {
