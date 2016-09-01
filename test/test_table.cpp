@@ -7114,8 +7114,8 @@ TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
             ColumnType col_type = t_spec.get_column_type(col_ndx);
             ColumnBase& base = tf::get_column(*t, col_ndx);
             ref_type col_ref = base.get_ref();
-            bool nullable = (t_spec.get_column_attr(col_ndx) & col_attr_Nullable) == col_attr_Nullable;
-            size_t col_size = ColumnBase::get_size_from_type_and_ref(col_type, col_ref, base.get_alloc(), nullable);
+            bool nullable_from_spec = (t_spec.get_column_attr(col_ndx) & col_attr_Nullable) == col_attr_Nullable;
+            size_t col_size = ColumnBase::get_size_from_type_and_ref(col_type, col_ref, base.get_alloc(), nullable_from_spec);
             CHECK_EQUAL(col_size, num_rows);
         }
     };
