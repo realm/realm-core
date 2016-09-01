@@ -140,6 +140,7 @@ struct GetSizeFromRef {
     Allocator& m_alloc;
     size_t m_size;
     GetSizeFromRef(ref_type r, Allocator& a): m_ref(r), m_alloc(a), m_size(0) {}
+
     template<class Col>
     void call() noexcept
     {
@@ -148,17 +149,21 @@ struct GetSizeFromRef {
 };
 
 template<class Op>
-void col_type_deleg(Op& op, ColumnType type)
+void col_type_deleg(Op& op, ColumnType type, bool nullable)
 {
     switch (type) {
         case col_type_Int:
         case col_type_Bool:
         case col_type_OldDateTime:
         case col_type_Link:
-            op.template call<IntegerColumn>();
+            if(nullable)
+                op.template call<IntNullColumn>();
+            else
+                op.template call<IntegerColumn>();
             return;
         case col_type_Timestamp:
             op.template call<TimestampColumn>();
+            return;
         case col_type_String:
             op.template call<StringColumn>();
             return;
@@ -180,9 +185,13 @@ void col_type_deleg(Op& op, ColumnType type)
         case col_type_Double:
             op.template call<DoubleColumn>();
             return;
-        case col_type_Reserved4:
         case col_type_LinkList:
+            op.template call<LinkListColumn>();
+            return;
         case col_type_BackLink:
+            op.template call<BacklinkColumn>();
+            return;
+        case col_type_Reserved4:
             break;
     }
     REALM_ASSERT_DEBUG(false);
@@ -193,10 +202,11 @@ void col_type_deleg(Op& op, ColumnType type)
 
 
 size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
-                                              Allocator& alloc) noexcept
+                                              Allocator& alloc,
+                                              bool nullable) noexcept
 {
     GetSizeFromRef op(ref, alloc);
-    col_type_deleg(op, type);
+    col_type_deleg(op, type, nullable);
     return op.m_size;
 }
 

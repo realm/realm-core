@@ -85,6 +85,14 @@ ref_type TimestampColumn::create(Allocator& alloc, size_t size, bool nullable)
 }
 
 
+size_t TimestampColumn::get_size_from_ref(ref_type root_ref, Allocator& alloc) noexcept
+{
+    const char* root_header = alloc.translate(root_ref);
+    ref_type seconds_ref = to_ref(Array::get(root_header, 0));
+    return IntNullColumn::get_size_from_ref(seconds_ref, alloc);
+}
+
+
 /// Get the number of entries in this column. This operation is relatively
 /// slow.
 size_t TimestampColumn::size() const noexcept
