@@ -7243,8 +7243,6 @@ TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
             ColumnBase& base = tf::get_column(*t, col_ndx);
             ref_type col_ref = base.get_ref();
             bool nullable = (t_spec.get_column_attr(col_ndx) & col_attr_Nullable) == col_attr_Nullable;
-            if (col_type == col_type_Link)
-                nullable = false; // FIXME: this is a design problem that requires a file format breaking change to fix
             size_t col_size = ColumnBase::get_size_from_type_and_ref(col_type, col_ref, base.get_alloc(), nullable);
             CHECK_EQUAL(col_size, num_rows);
         }
