@@ -47,7 +47,18 @@ void SyncManager::set_logger_factory(SyncLoggerFactory& factory) noexcept
 void SyncManager::set_error_handler(std::function<sync::Client::ErrorHandler> handler)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_error_handler = std::move(handler);
+    auto wrapped_handler = [=](int error_code, std::string message) {
+        // FIXME: If the sync team decides to route all errors through the session-level error handler, the client-level
+        // error handler might go away altogether.
+        switch (error_code) {
+            case 100:       // Connection closed (no error)
+            case 101:       // Unspecified non-critical error
+                return;
+            default:
+                handler(error_code, message);
+        }
+    };
+    m_error_handler = std::move(wrapped_handler);
 }
 
 void SyncManager::set_login_function(SyncLoginFunction login_function)
