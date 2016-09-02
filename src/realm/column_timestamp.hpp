@@ -31,6 +31,7 @@ public:
     TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx = npos);
 
     static ref_type create(Allocator& alloc, size_t size, bool nullable);
+    static size_t get_size_from_ref(ref_type root_ref, Allocator& alloc) noexcept;
 
     /// Get the number of entries in this column. This operation is relatively
     /// slow.

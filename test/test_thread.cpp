@@ -29,6 +29,7 @@
 #include <unistd.h>
 #endif
 
+#include <realm/group_shared_options.hpp>
 #include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
@@ -584,8 +585,9 @@ NONCONCURRENT_TEST(Thread_CondvarWaits)
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     changed.init_shared_part(condvar_part);
     Thread signal_thread;
     signals = 0;
@@ -615,8 +617,9 @@ NONCONCURRENT_TEST(Thread_CondvarIsStateless)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     Thread signal_thread;
     signal_state = 1;
     // send some signals:
@@ -650,8 +653,9 @@ NONCONCURRENT_TEST(Thread_CondvarTimeout)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     struct timespec time;
     time.tv_sec = 0;
     time.tv_nsec = 100000000; // 0.1 sec
@@ -675,8 +679,9 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i = 0; i < num_waiters; ++i) {
@@ -707,8 +712,9 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
     InterprocessCondVar::init_shared_part(condvar_part);
     bowl_of_stones_semaphore feedback(0);
     SHARED_GROUP_TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i = 0; i < num_waiters; ++i) {

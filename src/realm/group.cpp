@@ -1329,10 +1329,9 @@ public:
 
     bool swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
     {
-        if (REALM_UNLIKELY(!m_table))
-            return false;
         using tf = _impl::TableFriend;
-        tf::adj_acc_swap_rows(*m_table, row_ndx_1, row_ndx_2);
+        if (m_table)
+            tf::adj_acc_swap_rows(*m_table, row_ndx_1, row_ndx_2);
         return true;
     }
 

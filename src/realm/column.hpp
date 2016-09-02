@@ -166,7 +166,7 @@ public:
     virtual void detach(void) = 0;
     virtual bool is_attached(void) const noexcept = 0;
 
-    static size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&) noexcept;
+    static size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&, bool) noexcept;
 
     // These assume that the right column compile-time type has been
     // figured out.
@@ -427,6 +427,10 @@ public:
 
     void move_assign(Column&);
 
+    static size_t get_size_from_ref(ref_type root_ref, Allocator& alloc) {
+        return ColumnBase::get_size_from_ref(root_ref, alloc);
+    }
+
     size_t size() const noexcept override;
     bool is_empty() const noexcept { return size() == 0; }
     bool is_nullable() const noexcept override;
@@ -597,6 +601,18 @@ private:
 };
 
 // Implementation:
+
+
+template<>
+inline size_t IntNullColumn::get_size_from_ref(ref_type root_ref, Allocator& alloc)
+{
+    // FIXME: Speed improvement possible by not creating instance, but tricky! This slow method is OK so far
+    // because it's only invoked by Table::get_size_from_ref() which is only used for subtables which we
+    // currently 2016) do not expose publicly.
+    IntNullColumn inc(alloc, root_ref);
+    return inc.size();
+}
+
 
 inline bool ColumnBase::supports_search_index() const noexcept
 {

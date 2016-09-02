@@ -2,10 +2,14 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed various crashes when using subtables. The crash will occur when the first column
+  of the subtable if of type `col_type_Timestamp` or if it is nullable and of type Bool, Int
+  or OldDateTime. Caused by bad static `get_size_from_ref()` methods of columns. (#2101)
 
 ### Breaking changes
 
+* Refactored the `SharedGroup` constructors and open methods to use a new
+  `SharedGroupOptions` parameter which stores all options together.
 * BREAKING! Until now, a Query would return indexes into a restricting view if such was 
   present (a view given in the `.where(&view) method`, or it would return indexes into the
   Table if no restricting view was present. This would make query results useless if you did 
@@ -16,7 +20,9 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* When creating a `SharedGroup`, optionally allow setting the temporary 
+  directory to when making named pipes fails. This is to fix a bug
+  involving mkfifo on recent android devices (#1959).
 
 -----------
 
