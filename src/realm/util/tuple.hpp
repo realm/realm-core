@@ -33,7 +33,9 @@ struct Tuple {
     typedef Tuple<typename L::tail> tail_type;
     head_type m_head;
     tail_type m_tail;
-    Tuple(const head_type& h, const tail_type& t) : m_head(h), m_tail(t)
+    Tuple(const head_type& h, const tail_type& t)
+        : m_head(h)
+        , m_tail(t)
     {
     }
 };

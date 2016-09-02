@@ -135,7 +135,8 @@ namespace {
 
 struct SetBooleanOnDestroy {
     bool& m_b;
-    explicit SetBooleanOnDestroy(bool& b) : m_b(b)
+    explicit SetBooleanOnDestroy(bool& b)
+        : m_b(b)
     {
     }
     ~SetBooleanOnDestroy()

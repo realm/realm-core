@@ -28,7 +28,10 @@ const size_t init_subtab_path_buf_size = 2 * init_subtab_path_buf_levels - 1;
 } // anonymous namespace
 
 TransactLogConvenientEncoder::TransactLogConvenientEncoder(TransactLogStream& stream)
-    : m_encoder(stream), m_selected_table(nullptr), m_selected_spec(nullptr), m_selected_link_list(nullptr)
+    : m_encoder(stream)
+    , m_selected_table(nullptr)
+    , m_selected_spec(nullptr)
+    , m_selected_link_list(nullptr)
 {
     m_subtab_path_buf.set_size(init_subtab_path_buf_size); // Throws
 }

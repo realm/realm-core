@@ -202,7 +202,8 @@ private:
     SharedGroup m_sg{SharedGroup::unattached_tag{}};
 };
 
-SchemaDumper::SchemaDumper(const Configuration& config) : m_config(config)
+SchemaDumper::SchemaDumper(const Configuration& config)
+    : m_config(config)
 {
     open();
 }

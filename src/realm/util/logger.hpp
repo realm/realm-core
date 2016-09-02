@@ -214,7 +214,9 @@ struct Logger::State {
     int m_param_num = 1;
     std::ostringstream m_formatter;
     std::locale m_locale = std::locale::classic();
-    State(const char* s) : m_message(s), m_search(m_message)
+    State(const char* s)
+        : m_message(s)
+        , m_search(m_message)
     {
         m_formatter.imbue(m_locale);
     }
@@ -297,7 +299,8 @@ inline Logger::~Logger() noexcept
 {
 }
 
-inline Logger::Logger(const LevelThreshold& lt) noexcept : level_threshold(lt)
+inline Logger::Logger(const LevelThreshold& lt) noexcept
+    : level_threshold(lt)
 {
 }
 
@@ -415,7 +418,9 @@ inline void RootLogger::set_level_threshold(Level new_level_threshold) noexcept
     m_level_threshold = new_level_threshold;
 }
 
-inline RootLogger::RootLogger() : Logger::LevelThreshold(), Logger(static_cast<Logger::LevelThreshold&>(*this))
+inline RootLogger::RootLogger()
+    : Logger::LevelThreshold()
+    , Logger(static_cast<Logger::LevelThreshold&>(*this))
 {
 }
 
@@ -430,7 +435,8 @@ inline void StderrLogger::do_log(std::string message)
     std::cerr.flush();            // Throws
 }
 
-inline StreamLogger::StreamLogger(std::ostream& out) noexcept : m_out(out)
+inline StreamLogger::StreamLogger(std::ostream& out) noexcept
+    : m_out(out)
 {
 }
 
@@ -476,7 +482,9 @@ inline Logger::Level ThreadSafeLogger::get() const noexcept
 }
 
 inline PrefixLogger::PrefixLogger(std::string prefix, Logger& base_logger) noexcept
-    : Logger(base_logger.level_threshold), m_prefix(std::move(prefix)), m_base_logger(base_logger)
+    : Logger(base_logger.level_threshold)
+    , m_prefix(std::move(prefix))
+    , m_base_logger(base_logger)
 {
 }
 

@@ -184,7 +184,8 @@ private:
 
 // Implementation:
 
-inline ArrayInteger::ArrayInteger(Allocator& allocator) noexcept : Array(allocator)
+inline ArrayInteger::ArrayInteger(Allocator& allocator) noexcept
+    : Array(allocator)
 {
     m_is_inner_bptree_node = false;
 }
@@ -270,7 +271,8 @@ inline size_t ArrayInteger::upper_bound(int64_t value) const noexcept
 }
 
 
-inline ArrayIntNull::ArrayIntNull(Allocator& allocator) noexcept : Array(allocator)
+inline ArrayIntNull::ArrayIntNull(Allocator& allocator) noexcept
+    : Array(allocator)
 {
 }
 

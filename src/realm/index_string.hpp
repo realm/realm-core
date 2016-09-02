@@ -180,10 +180,16 @@ private:
         size_t ref1;
         size_t ref2;
         enum ChangeType { none, insert_before, insert_after, split } type;
-        NodeChange(ChangeType t, size_t r1 = 0, size_t r2 = 0) : ref1(r1), ref2(r2), type(t)
+        NodeChange(ChangeType t, size_t r1 = 0, size_t r2 = 0)
+            : ref1(r1)
+            , ref2(r2)
+            , type(t)
         {
         }
-        NodeChange() : ref1(0), ref2(0), type(none)
+        NodeChange()
+            : ref1(0)
+            , ref2(0)
+            , type(none)
         {
         }
     };
@@ -296,7 +302,9 @@ inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc)
 
 inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, ColumnBase* target_column,
                                 bool deny_duplicate_values, Allocator& alloc)
-    : m_array(new Array(alloc)), m_target_column(target_column), m_deny_duplicate_values(deny_duplicate_values)
+    : m_array(new Array(alloc))
+    , m_target_column(target_column)
+    , m_deny_duplicate_values(deny_duplicate_values)
 {
     REALM_ASSERT_EX(Array::get_context_flag_from_header(alloc.translate(ref)), ref, size_t(alloc.translate(ref)));
     m_array->init_from_ref(ref);

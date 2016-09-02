@@ -130,7 +130,9 @@ bool is_null(const char* v)
 } // anonymous namespace
 
 
-Importer::Importer() : Quiet(false), Separator(',')
+Importer::Importer()
+    : Quiet(false)
+    , Separator(',')
 {
 }
 

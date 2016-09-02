@@ -109,7 +109,9 @@ private:
 // Implementation:
 
 // Creates new array (but invalid, call init_from_ref() to init)
-inline ArrayString::ArrayString(Allocator& allocator, bool nullable) noexcept : Array(allocator), m_nullable(nullable)
+inline ArrayString::ArrayString(Allocator& allocator, bool nullable) noexcept
+    : Array(allocator)
+    , m_nullable(nullable)
 {
 }
 

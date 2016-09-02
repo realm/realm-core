@@ -102,7 +102,9 @@ private:
 };
 
 
-inline TreeWriter::TreeWriter(_impl::OutputStream& out) noexcept : m_alloc(Allocator::get_default()), m_out(out)
+inline TreeWriter::TreeWriter(_impl::OutputStream& out) noexcept
+    : m_alloc(Allocator::get_default())
+    , m_out(out)
 {
 }
 
@@ -125,7 +127,11 @@ void TreeWriter::add_leaf_ref(ref_type leaf_ref, size_t elems_in_leaf, ref_type*
 
 
 inline TreeWriter::ParentLevel::ParentLevel(Allocator& alloc, _impl::OutputStream& out, size_t max_elems_per_child)
-    : m_max_elems_per_child(max_elems_per_child), m_elems_in_parent(0), m_main(alloc), m_offsets(alloc), m_out(out)
+    : m_max_elems_per_child(max_elems_per_child)
+    , m_elems_in_parent(0)
+    , m_main(alloc)
+    , m_offsets(alloc)
+    , m_out(out)
 {
     m_main.create(Array::type_InnerBptreeNode); // Throws
 }

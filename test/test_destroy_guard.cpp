@@ -61,7 +61,8 @@ namespace {
 
 class Foo {
 public:
-    Foo(bool* destroyed_flag) : m_destroyed_flag(destroyed_flag)
+    Foo(bool* destroyed_flag)
+        : m_destroyed_flag(destroyed_flag)
     {
     }
 
@@ -76,7 +77,8 @@ private:
 
 class FooAlloc : public Allocator {
 public:
-    FooAlloc() : m_offset(8)
+    FooAlloc()
+        : m_offset(8)
     {
         m_baseline = 8;
     }

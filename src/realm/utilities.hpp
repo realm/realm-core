@@ -213,7 +213,8 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
 
 template <class T>
 struct Wrap {
-    Wrap(const T& v) : m_value(v)
+    Wrap(const T& v)
+        : m_value(v)
     {
     }
     operator T() const

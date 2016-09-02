@@ -34,7 +34,8 @@ using namespace realm::util;
 
 class Replication::TransactLogApplier {
 public:
-    TransactLogApplier(Group& group) : m_group(group)
+    TransactLogApplier(Group& group)
+        : m_group(group)
     {
     }
 
@@ -771,7 +772,9 @@ namespace {
 
 class InputStreamImpl : public _impl::NoCopyInputStream {
 public:
-    InputStreamImpl(const char* data, size_t size) noexcept : m_begin(data), m_end(data + size)
+    InputStreamImpl(const char* data, size_t size) noexcept
+        : m_begin(data)
+        , m_end(data + size)
     {
     }
 

@@ -280,7 +280,8 @@ void display_build_config()
 // Records elapsed time for each test and shows a "Top 5" at the end.
 class CustomReporter : public SimpleReporter {
 public:
-    explicit CustomReporter(bool report_progress) : SimpleReporter(report_progress)
+    explicit CustomReporter(bool report_progress)
+        : SimpleReporter(report_progress)
     {
     }
 

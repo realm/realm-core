@@ -1910,7 +1910,8 @@ TEST(TableView_BacklinksWithColumnInsertion)
 namespace {
 struct DistinctDirect {
     Table& table;
-    DistinctDirect(TableRef, TableRef t) : table(*t)
+    DistinctDirect(TableRef, TableRef t)
+        : table(*t)
     {
     }
 
@@ -1940,7 +1941,8 @@ struct DistinctDirect {
 
 struct DistinctOverLink {
     Table& table;
-    DistinctOverLink(TableRef t, TableRef) : table(*t)
+    DistinctOverLink(TableRef t, TableRef)
+        : table(*t)
     {
     }
 

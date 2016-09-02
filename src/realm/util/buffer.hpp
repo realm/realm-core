@@ -38,7 +38,8 @@ namespace util {
 template <class T>
 class Buffer {
 public:
-    Buffer() noexcept : m_size(0)
+    Buffer() noexcept
+        : m_size(0)
     {
     }
     explicit Buffer(size_t initial_size);
@@ -221,7 +222,8 @@ inline T* Buffer<T>::release() noexcept
 
 
 template <class T>
-inline AppendBuffer<T>::AppendBuffer() noexcept : m_size(0)
+inline AppendBuffer<T>::AppendBuffer() noexcept
+    : m_size(0)
 {
 }
 

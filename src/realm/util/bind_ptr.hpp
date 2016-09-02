@@ -50,7 +50,8 @@ public:
 template <class T>
 class bind_ptr : public bind_ptr_base {
 public:
-    constexpr bind_ptr() noexcept : m_ptr(nullptr)
+    constexpr bind_ptr() noexcept
+        : m_ptr(nullptr)
     {
     }
     ~bind_ptr() noexcept
@@ -103,11 +104,13 @@ public:
     }
 
     // Move construct
-    bind_ptr(bind_ptr&& p) noexcept : m_ptr(p.release())
+    bind_ptr(bind_ptr&& p) noexcept
+        : m_ptr(p.release())
     {
     }
     template <class U>
-    bind_ptr(bind_ptr<U>&& p) noexcept : m_ptr(p.release())
+    bind_ptr(bind_ptr<U>&& p) noexcept
+        : m_ptr(p.release())
     {
     }
 
@@ -216,7 +219,8 @@ protected:
     struct casting_move_tag {
     };
     template <class U>
-    bind_ptr(bind_ptr<U>* p, casting_move_tag) noexcept : m_ptr(static_cast<T*>(p->release()))
+    bind_ptr(bind_ptr<U>* p, casting_move_tag) noexcept
+        : m_ptr(static_cast<T*>(p->release()))
     {
     }
 
@@ -273,7 +277,8 @@ bool operator>=(T*, const bind_ptr<U>&) noexcept;
 /// \sa bind_ptr
 class RefCountBase {
 public:
-    RefCountBase() noexcept : m_ref_count(0)
+    RefCountBase() noexcept
+        : m_ref_count(0)
     {
     }
     virtual ~RefCountBase() noexcept
@@ -313,7 +318,8 @@ private:
 /// \sa bind_ptr
 class AtomicRefCountBase {
 public:
-    AtomicRefCountBase() noexcept : m_ref_count(0)
+    AtomicRefCountBase() noexcept
+        : m_ref_count(0)
     {
     }
     virtual ~AtomicRefCountBase() noexcept

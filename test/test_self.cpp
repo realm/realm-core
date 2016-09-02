@@ -508,7 +508,8 @@ TEST_EX(Failure_Exception, failure_list, true, true) // Test #6, accum checks = 
 
 struct SummaryRecorder : Reporter {
     Summary& m_summary;
-    SummaryRecorder(Summary& init_summary) : m_summary(init_summary)
+    SummaryRecorder(Summary& init_summary)
+        : m_summary(init_summary)
     {
     }
     void summary(const SharedContext&, const Summary& results_summary) override

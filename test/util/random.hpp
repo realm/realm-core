@@ -133,11 +133,13 @@ private:
 
 // Implementation
 
-inline Random::Random() noexcept : m_engine(std::mt19937::default_seed)
+inline Random::Random() noexcept
+    : m_engine(std::mt19937::default_seed)
 {
 }
 
-inline Random::Random(unsigned long initial_seed) noexcept : m_engine(std::mt19937::result_type(initial_seed))
+inline Random::Random(unsigned long initial_seed) noexcept
+    : m_engine(std::mt19937::result_type(initial_seed))
 {
 }
 

@@ -311,7 +311,9 @@ inline int64_t to_int64(size_t value) noexcept
 }
 
 
-inline MemRef::MemRef() noexcept : m_addr(nullptr), m_ref(0)
+inline MemRef::MemRef() noexcept
+    : m_addr(nullptr)
+    , m_ref(0)
 {
 }
 
@@ -319,7 +321,9 @@ inline MemRef::~MemRef() noexcept
 {
 }
 
-inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept : m_addr(addr), m_ref(ref)
+inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept
+    : m_addr(addr)
+    , m_ref(ref)
 {
     static_cast<void>(alloc);
 #if REALM_ENABLE_MEMDEBUG
@@ -327,7 +331,9 @@ inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept : m_a
 #endif
 }
 
-inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept : m_addr(alloc.translate(ref)), m_ref(ref)
+inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept
+    : m_addr(alloc.translate(ref))
+    , m_ref(ref)
 {
     static_cast<void>(alloc);
 #if REALM_ENABLE_MEMDEBUG

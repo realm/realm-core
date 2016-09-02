@@ -319,12 +319,14 @@ private:
 
 // Implementation:
 
-inline Thread::Thread() : m_joinable(false)
+inline Thread::Thread()
+    : m_joinable(false)
 {
 }
 
 template <class F>
-inline Thread::Thread(F func) : m_joinable(true)
+inline Thread::Thread(F func)
+    : m_joinable(true)
 {
     std::unique_ptr<F> func2(new F(func));       // Throws
     start(&Thread::entry_point<F>, func2.get()); // Throws
@@ -415,7 +417,8 @@ inline void Mutex::unlock() noexcept
 }
 
 
-inline LockGuard::LockGuard(Mutex& m) noexcept : m_mutex(m)
+inline LockGuard::LockGuard(Mutex& m) noexcept
+    : m_mutex(m)
 {
     m_mutex.lock();
 }
@@ -426,13 +429,15 @@ inline LockGuard::~LockGuard() noexcept
 }
 
 
-inline UniqueLock::UniqueLock(Mutex& m) noexcept : m_mutex(&m)
+inline UniqueLock::UniqueLock(Mutex& m) noexcept
+    : m_mutex(&m)
 {
     m_mutex->lock();
     m_is_locked = true;
 }
 
-inline UniqueLock::UniqueLock(Mutex& m, defer_lock_tag) noexcept : m_mutex(&m)
+inline UniqueLock::UniqueLock(Mutex& m, defer_lock_tag) noexcept
+    : m_mutex(&m)
 {
     m_is_locked = false;
 }
@@ -461,7 +466,8 @@ inline void UniqueLock::unlock() noexcept
 }
 
 template <typename TFunc>
-inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func) : m_mutex(m)
+inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func)
+    : m_mutex(m)
 {
     m_mutex.lock(func);
 }
@@ -472,7 +478,8 @@ inline RobustLockGuard::~RobustLockGuard() noexcept
 }
 
 
-inline RobustMutex::RobustMutex() : Mutex(no_init_tag())
+inline RobustMutex::RobustMutex()
+    : Mutex(no_init_tag())
 {
     bool robust_if_available = true;
     init_as_process_shared(robust_if_available);

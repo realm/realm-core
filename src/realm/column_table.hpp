@@ -561,7 +561,8 @@ inline void SubtableColumnBase::do_insert(size_t row_ndx, int_fast64_t value, si
 
 
 inline SubtableColumn::SubtableColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
-    : SubtableColumnBase(alloc, ref, table, column_ndx), m_subspec_ndx(realm::npos)
+    : SubtableColumnBase(alloc, ref, table, column_ndx)
+    , m_subspec_ndx(realm::npos)
 {
 }
 

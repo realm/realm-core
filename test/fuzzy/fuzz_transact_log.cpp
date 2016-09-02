@@ -27,7 +27,8 @@ using namespace realm;
 using namespace realm::util;
 
 struct InputStreamAdapter : _impl::InputStream {
-    InputStreamAdapter(std::ifstream& s) : m_stream(s)
+    InputStreamAdapter(std::ifstream& s)
+        : m_stream(s)
     {
     }
 

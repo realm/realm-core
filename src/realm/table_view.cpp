@@ -29,7 +29,8 @@
 using namespace realm;
 
 TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSourcePayload mode)
-    : RowIndexes(src, mode), m_linked_column(src.m_linked_column)
+    : RowIndexes(src, mode)
+    , m_linked_column(src.m_linked_column)
 {
     patch.was_in_sync = src.is_in_sync();
     // m_query must be exported after patch.was_in_sync is updated
@@ -53,7 +54,9 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSo
 }
 
 TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch, ConstSourcePayload mode)
-    : RowIndexes(src, mode), m_linked_column(src.m_linked_column), m_query(src.m_query, patch.query_patch, mode)
+    : RowIndexes(src, mode)
+    , m_linked_column(src.m_linked_column)
+    , m_query(src.m_query, patch.query_patch, mode)
 {
     if (mode == ConstSourcePayload::Stay)
         patch.was_in_sync = false;

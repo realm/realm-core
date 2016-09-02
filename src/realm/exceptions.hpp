@@ -234,11 +234,13 @@ inline const char* FileFormatUpgradeRequired::what() const noexcept
 
 // LCOV_EXCL_STOP
 
-inline AddressSpaceExhausted::AddressSpaceExhausted(const std::string& msg) : std::runtime_error(msg)
+inline AddressSpaceExhausted::AddressSpaceExhausted(const std::string& msg)
+    : std::runtime_error(msg)
 {
 }
 
-inline LogicError::LogicError(LogicError::ErrorKind k) : m_kind(k)
+inline LogicError::LogicError(LogicError::ErrorKind k)
+    : m_kind(k)
 {
 }
 

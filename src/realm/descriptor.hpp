@@ -416,7 +416,8 @@ private:
     };
 
 public:
-    Descriptor(const PrivateTag&) : Descriptor()
+    Descriptor(const PrivateTag&)
+        : Descriptor()
     {
     }
 
@@ -720,7 +721,9 @@ inline bool Descriptor::is_attached() const noexcept
     return bool(m_root_table);
 }
 
-inline Descriptor::subdesc_entry::subdesc_entry(size_t n, DescriptorRef d) : m_column_ndx(n), m_subdesc(d)
+inline Descriptor::subdesc_entry::subdesc_entry(size_t n, DescriptorRef d)
+    : m_column_ndx(n)
+    , m_subdesc(d)
 {
 }
 

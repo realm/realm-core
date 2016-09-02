@@ -100,12 +100,14 @@ private:
 // DestroyGuard<T>
 
 template <class T>
-inline DestroyGuard<T>::DestroyGuard() noexcept : m_ptr(nullptr)
+inline DestroyGuard<T>::DestroyGuard() noexcept
+    : m_ptr(nullptr)
 {
 }
 
 template <class T>
-inline DestroyGuard<T>::DestroyGuard(T* ptr) noexcept : m_ptr(ptr)
+inline DestroyGuard<T>::DestroyGuard(T* ptr) noexcept
+    : m_ptr(ptr)
 {
 }
 
@@ -141,11 +143,13 @@ inline T* DestroyGuard<T>::release() noexcept
 
 // DeepArrayDestroyGuard
 
-inline DeepArrayDestroyGuard::DeepArrayDestroyGuard() noexcept : m_ptr(nullptr)
+inline DeepArrayDestroyGuard::DeepArrayDestroyGuard() noexcept
+    : m_ptr(nullptr)
 {
 }
 
-inline DeepArrayDestroyGuard::DeepArrayDestroyGuard(Array* ptr) noexcept : m_ptr(ptr)
+inline DeepArrayDestroyGuard::DeepArrayDestroyGuard(Array* ptr) noexcept
+    : m_ptr(ptr)
 {
 }
 
@@ -177,12 +181,15 @@ inline Array* DeepArrayDestroyGuard::release() noexcept
 
 // DeepArrayRefDestroyGuard
 
-inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(Allocator& alloc) noexcept : m_ref(0), m_alloc(alloc)
+inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(Allocator& alloc) noexcept
+    : m_ref(0)
+    , m_alloc(alloc)
 {
 }
 
 inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(ref_type ref, Allocator& alloc) noexcept
-    : m_ref(ref), m_alloc(alloc)
+    : m_ref(ref)
+    , m_alloc(alloc)
 {
 }
 

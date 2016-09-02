@@ -43,7 +43,8 @@ void copy_leaf(const ArrayBinary& from, ArrayBigBlobs& to)
 
 
 BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable, size_t column_ndx)
-    : ColumnBaseSimple(column_ndx), m_nullable(nullable)
+    : ColumnBaseSimple(column_ndx)
+    , m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref, alloc);
@@ -77,7 +78,9 @@ struct SetLeafElem : Array::UpdateHandler {
     const BinaryData m_value;
     const bool m_add_zero_term;
     SetLeafElem(Allocator& alloc, BinaryData value, bool add_zero_term) noexcept
-        : m_alloc(alloc), m_value(value), m_add_zero_term(add_zero_term)
+        : m_alloc(alloc)
+        , m_value(value)
+        , m_add_zero_term(add_zero_term)
     {
     }
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t elem_ndx_in_leaf) override
@@ -224,7 +227,8 @@ ref_type BinaryColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t 
 class BinaryColumn::EraseLeafElem : public Array::EraseHandler {
 public:
     BinaryColumn& m_column;
-    EraseLeafElem(BinaryColumn& column) noexcept : m_column(column)
+    EraseLeafElem(BinaryColumn& column) noexcept
+        : m_column(column)
     {
     }
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent, size_t leaf_ndx_in_parent,
@@ -449,7 +453,9 @@ bool BinaryColumn::upgrade_root_leaf(size_t value_size)
 
 class BinaryColumn::CreateHandler : public ColumnBase::CreateHandler {
 public:
-    CreateHandler(Allocator& alloc, BinaryData defaults) : m_alloc(alloc), m_defaults(defaults)
+    CreateHandler(Allocator& alloc, BinaryData defaults)
+        : m_alloc(alloc)
+        , m_defaults(defaults)
     {
     }
     ref_type create_leaf(size_t size) override
@@ -471,7 +477,8 @@ ref_type BinaryColumn::create(Allocator& alloc, size_t size, bool nullable)
 
 class BinaryColumn::SliceHandler : public ColumnBase::SliceHandler {
 public:
-    SliceHandler(Allocator& alloc) : m_alloc(alloc)
+    SliceHandler(Allocator& alloc)
+        : m_alloc(alloc)
     {
     }
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size, Allocator& target_alloc) override

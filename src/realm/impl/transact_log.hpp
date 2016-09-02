@@ -659,7 +659,8 @@ inline const char* TransactLogBufferStream::transact_log_data() const
     return m_buffer.data();
 }
 
-inline TransactLogEncoder::TransactLogEncoder(TransactLogStream& stream) : m_stream(stream)
+inline TransactLogEncoder::TransactLogEncoder(TransactLogStream& stream)
+    : m_stream(stream)
 {
 }
 
@@ -1509,7 +1510,9 @@ inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list
 inline bool TransactLogEncoder::link_list_set_all(const IntegerColumn& values)
 {
     struct iter {
-        iter(const IntegerColumn& iter_values, size_t ndx) : m_values(&iter_values), m_ndx(ndx)
+        iter(const IntegerColumn& iter_values, size_t ndx)
+            : m_values(&iter_values)
+            , m_ndx(ndx)
         {
         }
         const IntegerColumn* m_values;
@@ -1633,7 +1636,8 @@ inline void TransactLogConvenientEncoder::on_link_list_destroyed(const LinkView&
 }
 
 
-inline TransactLogParser::TransactLogParser() : m_input_buffer(1024) // Throws
+inline TransactLogParser::TransactLogParser()
+    : m_input_buffer(1024) // Throws
 {
 }
 
@@ -2717,7 +2721,8 @@ private:
 
 class ReversedNoCopyInputStream : public NoCopyInputStream {
 public:
-    ReversedNoCopyInputStream(TransactReverser& reverser) : m_instr_order(reverser.m_instructions)
+    ReversedNoCopyInputStream(TransactReverser& reverser)
+        : m_instr_order(reverser.m_instructions)
     {
         // push any pending select_table or select_descriptor into the buffer
         reverser.sync_table();

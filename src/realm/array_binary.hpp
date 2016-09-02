@@ -128,7 +128,10 @@ private:
 // Implementation:
 
 inline ArrayBinary::ArrayBinary(Allocator& allocator) noexcept
-    : Array(allocator), m_offsets(allocator), m_blob(allocator), m_nulls(allocator)
+    : Array(allocator)
+    , m_offsets(allocator)
+    , m_blob(allocator)
+    , m_nulls(allocator)
 {
     m_offsets.set_parent(this, 0);
     m_blob.set_parent(this, 1);

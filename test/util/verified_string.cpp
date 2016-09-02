@@ -24,7 +24,8 @@ using namespace realm;
 using namespace realm::test_util;
 
 
-VerifiedString::VerifiedString() : u(Allocator::get_default(), StringColumn::create(Allocator::get_default()))
+VerifiedString::VerifiedString()
+    : u(Allocator::get_default(), StringColumn::create(Allocator::get_default()))
 {
 }
 

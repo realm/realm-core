@@ -110,7 +110,9 @@ private:
 
 class Task {
 public:
-    Task(int num_readers, bool grow) : m_num_readers(num_readers), m_grow(grow)
+    Task(int num_readers, bool grow)
+        : m_num_readers(num_readers)
+        , m_grow(grow)
     {
         std::string path = "/tmp/benchmark-history-types.realm";
         util::File::try_remove(path);

@@ -27,7 +27,8 @@ namespace realm {
 namespace test_util {
 
 
-wildcard_pattern::wildcard_pattern(const std::string& text) : m_text(text)
+wildcard_pattern::wildcard_pattern(const std::string& text)
+    : m_text(text)
 {
     size_t pos = m_text.find('*');
     if (pos == std::string::npos) {

@@ -228,7 +228,8 @@ public:
             return m_child->validate();
     }
 
-    ParentNode(const ParentNode& from) : ParentNode(from, nullptr)
+    ParentNode(const ParentNode& from)
+        : ParentNode(from, nullptr)
     {
     }
 
@@ -317,7 +318,8 @@ private:
 // only if one or more subtable rows match the condition.
 class SubtableNode : public ParentNode {
 public:
-    SubtableNode(size_t column, std::unique_ptr<ParentNode> condition) : m_condition(std::move(condition))
+    SubtableNode(size_t column, std::unique_ptr<ParentNode> condition)
+        : m_condition(std::move(condition))
     {
         m_dT = 100.0;
         m_condition_column_idx = column;
@@ -593,7 +595,9 @@ protected:
         }
     }
 
-    IntegerNodeBase(TConditionValue value, size_t column_idx) : ColumnNodeBase(column_idx), m_value(std::move(value))
+    IntegerNodeBase(TConditionValue value, size_t column_idx)
+        : ColumnNodeBase(column_idx)
+        , m_value(std::move(value))
     {
     }
 
@@ -684,10 +688,12 @@ public:
     static const bool special_null_node = false;
     using TConditionValue = typename BaseType::TConditionValue;
 
-    IntegerNode(TConditionValue value, size_t column_ndx) : BaseType(value, column_ndx)
+    IntegerNode(TConditionValue value, size_t column_ndx)
+        : BaseType(value, column_ndx)
     {
     }
-    IntegerNode(const IntegerNode& from, QueryNodeHandoverPatches* patches) : BaseType(from, patches)
+    IntegerNode(const IntegerNode& from, QueryNodeHandoverPatches* patches)
+        : BaseType(from, patches)
     {
     }
 
@@ -817,12 +823,14 @@ public:
     using TConditionValue = typename ColType::value_type;
     static const bool special_null_node = false;
 
-    FloatDoubleNode(TConditionValue v, size_t column_ndx) : m_value(v)
+    FloatDoubleNode(TConditionValue v, size_t column_ndx)
+        : m_value(v)
     {
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
     }
-    FloatDoubleNode(null, size_t column_ndx) : m_value(null::get_null_float<TConditionValue>())
+    FloatDoubleNode(null, size_t column_ndx)
+        : m_value(null::get_null_float<TConditionValue>())
     {
         m_condition_column_idx = column_ndx;
         m_dT = 1.0;
@@ -867,7 +875,8 @@ public:
     }
 
     FloatDoubleNode(const FloatDoubleNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches), m_value(from.m_value)
+        : ParentNode(from, patches)
+        , m_value(from.m_value)
     {
         copy_getter(m_condition_column, m_condition_column_idx, from.m_condition_column, patches);
     }
@@ -884,13 +893,15 @@ public:
     using TConditionValue = BinaryData;
     static const bool special_null_node = false;
 
-    BinaryNode(BinaryData v, size_t column) : m_value(v)
+    BinaryNode(BinaryData v, size_t column)
+        : m_value(v)
     {
         m_dT = 100.0;
         m_condition_column_idx = column;
     }
 
-    BinaryNode(null, size_t column) : BinaryNode(BinaryData{}, column)
+    BinaryNode(null, size_t column)
+        : BinaryNode(BinaryData{}, column)
     {
     }
 
@@ -924,7 +935,9 @@ public:
     }
 
     BinaryNode(const BinaryNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches), m_value(from.m_value), m_condition_column(from.m_condition_column)
+        : ParentNode(from, patches)
+        , m_value(from.m_value)
+        , m_condition_column(from.m_condition_column)
     {
         if (m_condition_column && patches)
             m_condition_column_idx = m_condition_column->get_column_index();
@@ -942,12 +955,14 @@ public:
     using TConditionValue = Timestamp;
     static const bool special_null_node = false;
 
-    TimestampNode(Timestamp v, size_t column) : m_value(v)
+    TimestampNode(Timestamp v, size_t column)
+        : m_value(v)
     {
         m_condition_column_idx = column;
     }
 
-    TimestampNode(null, size_t column) : TimestampNode(Timestamp{}, column)
+    TimestampNode(null, size_t column)
+        : TimestampNode(Timestamp{}, column)
     {
     }
 
@@ -976,7 +991,9 @@ public:
     }
 
     TimestampNode(const TimestampNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches), m_value(from.m_value), m_condition_column(from.m_condition_column)
+        : ParentNode(from, patches)
+        , m_value(from.m_value)
+        , m_condition_column(from.m_condition_column)
     {
         if (m_condition_column && patches)
             m_condition_column_idx = m_condition_column->get_column_index();
@@ -1048,7 +1065,8 @@ protected:
 template <class TConditionFunction>
 class StringNode : public StringNodeBase {
 public:
-    StringNode(StringData v, size_t column) : StringNodeBase(v, column)
+    StringNode(StringData v, size_t column)
+        : StringNodeBase(v, column)
     {
         auto upper = case_map(v, true);
         auto lower = case_map(v, false);
@@ -1123,7 +1141,9 @@ public:
     }
 
     StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
-        : StringNodeBase(from, patches), m_ucase(from.m_ucase), m_lcase(from.m_lcase)
+        : StringNodeBase(from, patches)
+        , m_ucase(from.m_ucase)
+        , m_lcase(from.m_lcase)
     {
     }
 
@@ -1139,7 +1159,8 @@ protected:
 template <>
 class StringNode<Equal> : public StringNodeBase {
 public:
-    StringNode(StringData v, size_t column) : StringNodeBase(v, column)
+    StringNode(StringData v, size_t column)
+        : StringNodeBase(v, column)
     {
     }
     ~StringNode() noexcept override
@@ -1326,7 +1347,8 @@ public:
         return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this, patches));
     }
 
-    StringNode(const StringNode& from, QueryNodeHandoverPatches* patches) : StringNodeBase(from, patches)
+    StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
+        : StringNodeBase(from, patches)
     {
     }
 
@@ -1368,7 +1390,8 @@ public:
             m_conditions.emplace_back(std::move(condition));
     }
 
-    OrNode(const OrNode& other, QueryNodeHandoverPatches* patches) : ParentNode(other, patches)
+    OrNode(const OrNode& other, QueryNodeHandoverPatches* patches)
+        : ParentNode(other, patches)
     {
         for (const auto& condition : other.m_conditions) {
             m_conditions.emplace_back(condition->clone(patches));
@@ -1489,7 +1512,8 @@ private:
 
 class NotNode : public ParentNode {
 public:
-    NotNode(std::unique_ptr<ParentNode> condition) : m_condition(std::move(condition))
+    NotNode(std::unique_ptr<ParentNode> condition)
+        : m_condition(std::move(condition))
     {
         m_dT = 50.0;
     }
@@ -1690,7 +1714,8 @@ private:
 class ExpressionNode : public ParentNode {
 
 public:
-    ExpressionNode(std::unique_ptr<Expression> expression) : m_expression(std::move(expression))
+    ExpressionNode(std::unique_ptr<Expression> expression)
+        : m_expression(std::move(expression))
     {
         m_dD = 10.0;
         m_dT = 50.0;
@@ -1719,7 +1744,8 @@ public:
 
 private:
     ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches), m_expression(from.m_expression->clone(patches))
+        : ParentNode(from, patches)
+        , m_expression(from.m_expression->clone(patches))
     {
     }
 
@@ -1735,7 +1761,8 @@ struct LinksToNodeHandoverPatch : public QueryNodeHandoverPatch {
 class LinksToNode : public ParentNode {
 public:
     LinksToNode(size_t origin_column_index, const ConstRow& target_row)
-        : m_origin_column(origin_column_index), m_target_row(target_row)
+        : m_origin_column(origin_column_index)
+        , m_target_row(target_row)
     {
         m_dD = 10.0;
         m_dT = 50.0;
@@ -1798,7 +1825,8 @@ private:
     LinkColumnBase* m_column = nullptr;
     DataType m_column_type;
 
-    LinksToNode(const LinksToNode& source, QueryNodeHandoverPatches* patches) : ParentNode(source, patches)
+    LinksToNode(const LinksToNode& source, QueryNodeHandoverPatches* patches)
+        : ParentNode(source, patches)
     {
         auto patch = std::make_unique<LinksToNodeHandoverPatch>();
         patch->m_origin_column = source.m_column->get_column_index();

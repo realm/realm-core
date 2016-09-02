@@ -1135,11 +1135,13 @@ R TableViewBase::find_all_string(V* view, size_t column_ndx, StringData value)
 
 //-------------------------- TableView, ConstTableView implementation:
 
-inline ConstTableView::ConstTableView(const TableView& tv) : TableViewBase(tv)
+inline ConstTableView::ConstTableView(const TableView& tv)
+    : TableViewBase(tv)
 {
 }
 
-inline ConstTableView::ConstTableView(TableView&& tv) : TableViewBase(std::move(tv))
+inline ConstTableView::ConstTableView(TableView&& tv)
+    : TableViewBase(std::move(tv))
 {
 }
 
@@ -1164,7 +1166,8 @@ inline const Table& ConstTableView::get_parent() const noexcept
     return *m_table;
 }
 
-inline TableView::TableView(Table& parent) : TableViewBase(&parent)
+inline TableView::TableView(Table& parent)
+    : TableViewBase(&parent)
 {
 }
 
@@ -1173,7 +1176,8 @@ inline TableView::TableView(Table& parent, Query& query, size_t start, size_t en
 {
 }
 
-inline ConstTableView::ConstTableView(const Table& parent) : TableViewBase(const_cast<Table*>(&parent))
+inline ConstTableView::ConstTableView(const Table& parent)
+    : TableViewBase(const_cast<Table*>(&parent))
 {
 }
 

@@ -42,7 +42,9 @@ public:
         decref();
     }
 
-    SharedPtr(const SharedPtr<T>& o) : m_ptr(o.m_ptr), m_count(o.m_count)
+    SharedPtr(const SharedPtr<T>& o)
+        : m_ptr(o.m_ptr)
+        , m_count(o.m_count)
     {
         incref();
     }

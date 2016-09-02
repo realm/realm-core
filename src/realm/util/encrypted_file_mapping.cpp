@@ -40,7 +40,9 @@
 namespace realm {
 namespace util {
 
-SharedFileInfo::SharedFileInfo(const uint8_t* key, int file_descriptor) : fd(file_descriptor), cryptor(key)
+SharedFileInfo::SharedFileInfo(const uint8_t* key, int file_descriptor)
+    : fd(file_descriptor)
+    , cryptor(key)
 {
 }
 
@@ -125,7 +127,8 @@ size_t check_read(int fd, off_t pos, void* dst, size_t len)
 
 } // anonymous namespace
 
-AESCryptor::AESCryptor(const uint8_t* key) : m_rw_buffer(new char[block_size])
+AESCryptor::AESCryptor(const uint8_t* key)
+    : m_rw_buffer(new char[block_size])
 {
 #if REALM_PLATFORM_APPLE
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);

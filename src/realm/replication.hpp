@@ -458,7 +458,8 @@ private:
 
 // Implementation:
 
-inline Replication::Replication() : _impl::TransactLogConvenientEncoder(static_cast<_impl::TransactLogStream&>(*this))
+inline Replication::Replication()
+    : _impl::TransactLogConvenientEncoder(static_cast<_impl::TransactLogStream&>(*this))
 {
 }
 
@@ -493,7 +494,8 @@ inline void Replication::clear_interrupt() noexcept
     do_clear_interrupt();
 }
 
-inline TrivialReplication::TrivialReplication(const std::string& database_file) : m_database_file(database_file)
+inline TrivialReplication::TrivialReplication(const std::string& database_file)
+    : m_database_file(database_file)
 {
 }
 

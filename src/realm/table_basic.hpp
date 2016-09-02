@@ -87,12 +87,14 @@ public:
     using Table::is_group_level;
     using Table::get_index_in_group;
 
-    BasicTable(Allocator& alloc = Allocator::get_default()) : Table(alloc)
+    BasicTable(Allocator& alloc = Allocator::get_default())
+        : Table(alloc)
     {
         set_dynamic_type(*this);
     }
 
-    BasicTable(const BasicTable& t, Allocator& alloc = Allocator::get_default()) : Table(t, alloc)
+    BasicTable(const BasicTable& t, Allocator& alloc = Allocator::get_default())
+        : Table(t, alloc)
     {
     }
 
@@ -406,7 +408,9 @@ private:
 template <class Spec>
 class BasicTable<Spec>::Query : public BASIC_TABLE_PARENT {
 public:
-    Query(const Query& q) : Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl)
+    Query(const Query& q)
+        : Spec::template ColNames<QueryCol, Query*>(this)
+        , m_impl(q.m_impl)
     {
     }
     virtual ~Query() noexcept
@@ -476,18 +480,21 @@ public:
 
 protected:
     Query(const BasicTable<Spec>& table, TableViewBase* tv)
-        : Spec::template ColNames<QueryCol, Query*>(this), m_impl(table, tv)
+        : Spec::template ColNames<QueryCol, Query*>(this)
+        , m_impl(table, tv)
     {
     }
 
     using HandoverPatch = QueryHandoverPatch;
     Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
-        : Spec::template ColNames<QueryCol, Query*>(this), m_impl(source.m_impl, patch, mode)
+        : Spec::template ColNames<QueryCol, Query*>(this)
+        , m_impl(source.m_impl, patch, mode)
     {
     }
 
     Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
-        : Spec::template ColNames<QueryCol, Query*>(this), m_impl(source.m_impl, patch, mode)
+        : Spec::template ColNames<QueryCol, Query*>(this)
+        , m_impl(source.m_impl, patch, mode)
     {
     }
 

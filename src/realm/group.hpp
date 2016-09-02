@@ -457,7 +457,8 @@ public:
             /// Row index which will be removed.
             size_t row_ndx;
 
-            row() : is_ordered_removal(0)
+            row()
+                : is_ordered_removal(0)
             {
             }
 

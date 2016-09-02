@@ -275,7 +275,9 @@ namespace {
 
 // Must be fast because important edge case is 0 delay.
 struct FastRand {
-    FastRand() : u(1), v(1)
+    FastRand()
+        : u(1)
+        , v(1)
     {
     }
     unsigned int operator()()

@@ -1604,7 +1604,8 @@ inline bool Table::has_shared_type() const noexcept
 
 class Table::UnbindGuard {
 public:
-    UnbindGuard(Table* table) noexcept : m_table(table)
+    UnbindGuard(Table* table) noexcept
+        : m_table(table)
     {
     }
 
@@ -1641,7 +1642,10 @@ private:
 };
 
 
-inline Table::Table(Allocator& alloc) : m_top(alloc), m_columns(alloc), m_spec(alloc)
+inline Table::Table(Allocator& alloc)
+    : m_top(alloc)
+    , m_columns(alloc)
+    , m_spec(alloc)
 {
     m_ref_count = 1; // Explicitely managed lifetime
 
@@ -1651,7 +1655,10 @@ inline Table::Table(Allocator& alloc) : m_top(alloc), m_columns(alloc), m_spec(a
     init(ref, parent, ndx_in_parent);
 }
 
-inline Table::Table(const Table& t, Allocator& alloc) : m_top(alloc), m_columns(alloc), m_spec(alloc)
+inline Table::Table(const Table& t, Allocator& alloc)
+    : m_top(alloc)
+    , m_columns(alloc)
+    , m_spec(alloc)
 {
     m_ref_count = 1; // Explicitely managed lifetime
 
@@ -1661,7 +1668,10 @@ inline Table::Table(const Table& t, Allocator& alloc) : m_top(alloc), m_columns(
     init(ref, parent, ndx_in_parent);
 }
 
-inline Table::Table(ref_count_tag, Allocator& alloc) : m_top(alloc), m_columns(alloc), m_spec(alloc)
+inline Table::Table(ref_count_tag, Allocator& alloc)
+    : m_top(alloc)
+    , m_columns(alloc)
+    , m_spec(alloc)
 {
     m_ref_count = 0; // Lifetime managed by reference counting
 }
@@ -1979,7 +1989,8 @@ inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 // This is not a valid link if the target table == nullptr
 struct LinkTargetInfo {
     LinkTargetInfo(Table* target = nullptr, size_t backlink_ndx = realm::npos)
-        : m_target_table(target), m_backlink_col_ndx(backlink_ndx)
+        : m_target_table(target)
+        , m_backlink_col_ndx(backlink_ndx)
     {
     }
     bool is_valid() const

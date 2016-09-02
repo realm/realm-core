@@ -177,7 +177,8 @@ struct Robust {
 
 class QueueMonitor {
 public:
-    QueueMonitor() : m_closed(false)
+    QueueMonitor()
+        : m_closed(false)
     {
     }
 
@@ -247,7 +248,8 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
 
 class bowl_of_stones_semaphore {
 public:
-    bowl_of_stones_semaphore(int initial_number_of_stones = 0) : m_num_stones(initial_number_of_stones)
+    bowl_of_stones_semaphore(int initial_number_of_stones = 0)
+        : m_num_stones(initial_number_of_stones)
     {
     }
     void get_stone(int num_to_get)

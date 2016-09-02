@@ -125,7 +125,8 @@ public:
 
     struct subtable_tag {
     };
-    Mixed(subtable_tag) noexcept : m_type(type_Table)
+    Mixed(subtable_tag) noexcept
+        : m_type(type_Table)
     {
     }
 

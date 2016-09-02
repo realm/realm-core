@@ -282,13 +282,16 @@ struct Common<T1, T2, true, false, b> {
 struct RowIndex {
     enum DetachedTag { Detached };
 
-    explicit RowIndex() : m_row_index(npos)
+    explicit RowIndex()
+        : m_row_index(npos)
     {
     }
-    explicit RowIndex(size_t row_index) : m_row_index(row_index)
+    explicit RowIndex(size_t row_index)
+        : m_row_index(row_index)
     {
     }
-    RowIndex(DetachedTag) : m_row_index()
+    RowIndex(DetachedTag)
+        : m_row_index()
     {
     }
 
@@ -1273,7 +1276,8 @@ public:
 class ConstantStringValue : public Value<StringData> {
 public:
     ConstantStringValue(const StringData& string)
-        : Value(), m_string(string.is_null() ? util::none : util::make_optional(std::string(string)))
+        : Value()
+        , m_string(string.is_null() ? util::none : util::make_optional(std::string(string)))
     {
         init(false, ValueBase::default_size, m_string);
     }
@@ -1284,7 +1288,9 @@ public:
     }
 
 private:
-    ConstantStringValue(const ConstantStringValue& other) : Value(), m_string(other.m_string)
+    ConstantStringValue(const ConstantStringValue& other)
+        : Value()
+        , m_string(other.m_string)
     {
         init(other.m_from_link_list, other.m_values, m_string);
     }
@@ -1562,7 +1568,8 @@ struct FindNullLinks : public LinkMapFunction {
 };
 
 struct MakeLinkVector : public LinkMapFunction {
-    MakeLinkVector(std::vector<size_t>& result) : m_links(result)
+    MakeLinkVector(std::vector<size_t>& result)
+        : m_links(result)
     {
     }
 
@@ -1608,12 +1615,14 @@ iterator pattern. First solution can't exit, second solution requires internal s
 class LinkMap {
 public:
     LinkMap() = default;
-    LinkMap(const Table* table, std::vector<size_t> columns) : m_link_column_indexes(std::move(columns))
+    LinkMap(const Table* table, std::vector<size_t> columns)
+        : m_link_column_indexes(std::move(columns))
     {
         set_base_table(table);
     }
 
-    LinkMap(LinkMap const& other, QueryNodeHandoverPatches* patches) : LinkMap(other)
+    LinkMap(LinkMap const& other, QueryNodeHandoverPatches* patches)
+        : LinkMap(other)
     {
         if (!patches || m_link_column_indexes.empty())
             return;
@@ -1801,7 +1810,8 @@ template <class T>
 class SimpleQuerySupport : public Subexpr2<T> {
 public:
     SimpleQuerySupport(size_t column, const Table* table, std::vector<size_t> links = {})
-        : m_column_ndx(column), m_link_map(table, std::move(links))
+        : m_column_ndx(column)
+        , m_link_map(table, std::move(links))
     {
         m_column = &m_link_map.target_table()->get_column_base(m_column_ndx);
     }
@@ -2040,7 +2050,8 @@ inline Query operator!=(BinaryData left, const Columns<BinaryData>& right)
 template <bool has_links>
 class UnaryLinkCompare : public Expression {
 public:
-    UnaryLinkCompare(LinkMap lm) : m_link_map(std::move(lm))
+    UnaryLinkCompare(LinkMap lm)
+        : m_link_map(std::move(lm))
     {
     }
 
@@ -2080,7 +2091,8 @@ public:
 
 private:
     UnaryLinkCompare(const UnaryLinkCompare& other, QueryNodeHandoverPatches* patches = nullptr)
-        : Expression(other), m_link_map(other.m_link_map, patches)
+        : Expression(other)
+        , m_link_map(other.m_link_map, patches)
     {
     }
 
@@ -2089,11 +2101,13 @@ private:
 
 class LinkCount : public Subexpr2<Int> {
 public:
-    LinkCount(LinkMap link_map) : m_link_map(std::move(link_map))
+    LinkCount(LinkMap link_map)
+        : m_link_map(std::move(link_map))
     {
     }
     LinkCount(LinkCount const& other, QueryNodeHandoverPatches* patches)
-        : Subexpr2<Int>(other), m_link_map(other.m_link_map, patches)
+        : Subexpr2<Int>(other)
+        , m_link_map(other.m_link_map, patches)
     {
     }
 
@@ -2128,7 +2142,8 @@ struct ConstantRowValueHandoverPatch : public QueryNodeHandoverPatch {
 
 class ConstantRowValue : public Subexpr2<Link> {
 public:
-    ConstantRowValue(const ConstRow& row) : m_row(row)
+    ConstantRowValue(const ConstRow& row)
+        : m_row(row)
     {
     }
 
@@ -2249,12 +2264,14 @@ public:
     }
 
     Columns(const Columns& other, QueryNodeHandoverPatches* patches)
-        : Subexpr2<Link>(other), m_link_map(other.m_link_map, patches)
+        : Subexpr2<Link>(other)
+        , m_link_map(other.m_link_map, patches)
     {
     }
 
 private:
-    Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {}) : m_link_map(table, links)
+    Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {})
+        : m_link_map(table, links)
     {
         static_cast<void>(column_ndx);
     }
@@ -2352,7 +2369,9 @@ public:
     }
 
     Columns(const Columns& other, QueryNodeHandoverPatches* patches = nullptr)
-        : m_link_map(other.m_link_map, patches), m_column(other.m_column), m_nullable(other.m_nullable)
+        : m_link_map(other.m_link_map, patches)
+        , m_column(other.m_column)
+        , m_nullable(other.m_nullable)
     {
         if (!other.m_sg)
             return;
@@ -2547,7 +2566,9 @@ class Average;
 template <typename T>
 class SubColumns : public Subexpr {
 public:
-    SubColumns(Columns<T> column, LinkMap link_map) : m_column(std::move(column)), m_link_map(std::move(link_map))
+    SubColumns(Columns<T> column, LinkMap link_map)
+        : m_column(std::move(column))
+        , m_link_map(std::move(link_map))
     {
     }
 
@@ -2602,11 +2623,13 @@ template <typename T, typename Operation>
 class SubColumnAggregate : public Subexpr2<typename Operation::ResultType> {
 public:
     SubColumnAggregate(Columns<T> column, LinkMap link_map)
-        : m_column(std::move(column)), m_link_map(std::move(link_map))
+        : m_column(std::move(column))
+        , m_link_map(std::move(link_map))
     {
     }
     SubColumnAggregate(SubColumnAggregate const& other, QueryNodeHandoverPatches* patches)
-        : m_column(other.m_column, patches), m_link_map(other.m_link_map, patches)
+        : m_column(other.m_column, patches)
+        , m_link_map(other.m_link_map, patches)
     {
     }
 
@@ -2672,7 +2695,9 @@ struct SubQueryCountHandoverPatch : QueryNodeHandoverPatch {
 
 class SubQueryCount : public Subexpr2<Int> {
 public:
-    SubQueryCount(Query q, LinkMap link_map) : m_query(std::move(q)), m_link_map(std::move(link_map))
+    SubQueryCount(Query q, LinkMap link_map)
+        : m_query(std::move(q))
+        , m_link_map(std::move(link_map))
     {
     }
 
@@ -2735,7 +2760,9 @@ private:
 template <class>
 class SubQuery {
 public:
-    SubQuery(Columns<Link> link_column, Query query) : m_query(std::move(query)), m_link_map(link_column.link_map())
+    SubQuery(Columns<Link> link_column, Query query)
+        : m_query(std::move(query))
+        , m_link_map(link_column.link_map())
     {
         REALM_ASSERT(m_link_map.target_table() == m_query.get_table());
     }
@@ -2845,7 +2872,8 @@ public:
 template <class oper, class TLeft>
 class UnaryOperator : public Subexpr2<typename oper::type> {
 public:
-    UnaryOperator(std::unique_ptr<TLeft> left) : m_left(std::move(left))
+    UnaryOperator(std::unique_ptr<TLeft> left)
+        : m_left(std::move(left))
     {
     }
 
@@ -2909,12 +2937,14 @@ template <class oper, class TLeft, class TRight>
 class Operator : public Subexpr2<typename oper::type> {
 public:
     Operator(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right)
-        : m_left(std::move(left)), m_right(std::move(right))
+        : m_left(std::move(left))
+        , m_right(std::move(right))
     {
     }
 
     Operator(const Operator& other, QueryNodeHandoverPatches* patches)
-        : m_left(other.m_left->clone(patches)), m_right(other.m_right->clone(patches))
+        : m_left(other.m_left->clone(patches))
+        , m_right(other.m_right->clone(patches))
     {
     }
 
@@ -2986,7 +3016,8 @@ template <class TCond, class T, class TLeft, class TRight>
 class Compare : public Expression {
 public:
     Compare(std::unique_ptr<TLeft> left, std::unique_ptr<TRight> right)
-        : m_left(std::move(left)), m_right(std::move(right))
+        : m_left(std::move(left))
+        , m_right(std::move(right))
     {
     }
 
@@ -3047,7 +3078,8 @@ public:
 
 private:
     Compare(const Compare& other, QueryNodeHandoverPatches* patches)
-        : m_left(other.m_left->clone(patches)), m_right(other.m_right->clone(patches))
+        : m_left(other.m_left->clone(patches))
+        , m_right(other.m_right->clone(patches))
     {
     }
 

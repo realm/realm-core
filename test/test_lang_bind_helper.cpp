@@ -147,7 +147,8 @@ class ShortCircuitHistory : public TrivialReplication, public _impl::History {
 public:
     using version_type = _impl::History::version_type;
 
-    ShortCircuitHistory(const std::string& database_file) : TrivialReplication(database_file)
+    ShortCircuitHistory(const std::string& database_file)
+        : TrivialReplication(database_file)
     {
     }
 
@@ -3491,7 +3492,8 @@ namespace {
 template <typename T>
 class ConcurrentQueue {
 public:
-    ConcurrentQueue(size_t size) : sz(size)
+    ConcurrentQueue(size_t size)
+        : sz(size)
     {
         data.reset(new T[sz]);
     }
@@ -7449,7 +7451,8 @@ namespace {
 // the entire interface
 class NoOpTransactionLogParser {
 public:
-    NoOpTransactionLogParser(TestContext& context) : test_context(context)
+    NoOpTransactionLogParser(TestContext& context)
+        : test_context(context)
     {
     }
 

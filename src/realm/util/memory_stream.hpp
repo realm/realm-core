@@ -100,7 +100,10 @@ private:
 
 // Implementation
 
-inline MemoryInputStreambuf::MemoryInputStreambuf() : m_begin(nullptr), m_end(nullptr), m_curr(nullptr)
+inline MemoryInputStreambuf::MemoryInputStreambuf()
+    : m_begin(nullptr)
+    , m_end(nullptr)
+    , m_curr(nullptr)
 {
 }
 
@@ -135,7 +138,8 @@ inline size_t MemoryOutputStreambuf::size() const noexcept
 }
 
 
-inline MemoryInputStream::MemoryInputStream() : std::istream(&m_streambuf)
+inline MemoryInputStream::MemoryInputStream()
+    : std::istream(&m_streambuf)
 {
 }
 
@@ -164,7 +168,8 @@ inline void MemoryInputStream::set_c_string(const char* c_str) noexcept
 }
 
 
-inline MemoryOutputStream::MemoryOutputStream() : std::ostream(&m_streambuf)
+inline MemoryOutputStream::MemoryOutputStream()
+    : std::ostream(&m_streambuf)
 {
 }
 

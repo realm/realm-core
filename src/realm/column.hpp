@@ -276,7 +276,8 @@ public:
 protected:
     using SliceHandler = BpTreeBase::SliceHandler;
 
-    ColumnBase(size_t column_ndx = npos) : m_column_ndx(column_ndx)
+    ColumnBase(size_t column_ndx = npos)
+        : m_column_ndx(column_ndx)
     {
     }
     ColumnBase(ColumnBase&&) = default;
@@ -387,10 +388,12 @@ public:
     }
 
 protected:
-    ColumnBaseSimple(size_t column_ndx) : ColumnBase(column_ndx)
+    ColumnBaseSimple(size_t column_ndx)
+        : ColumnBase(column_ndx)
     {
     }
-    ColumnBaseSimple(Array* root) : m_array(root)
+    ColumnBaseSimple(Array* root)
+        : m_array(root)
     {
     }
     std::unique_ptr<Array> m_array;
@@ -466,7 +469,9 @@ public:
     struct unattached_root_tag {
     };
 
-    explicit Column() noexcept : ColumnBaseWithIndex(npos), m_tree(Allocator::get_default())
+    explicit Column() noexcept
+        : ColumnBaseWithIndex(npos)
+        , m_tree(Allocator::get_default())
     {
     }
     explicit Column(std::unique_ptr<Array> root) noexcept;
@@ -1044,19 +1049,23 @@ inline ref_type ColumnBase::create(Allocator& alloc, size_t column_size, CreateH
 
 template <class T>
 Column<T>::Column(Allocator& alloc, ref_type ref, size_t column_ndx)
-    : ColumnBaseWithIndex(column_ndx), m_tree(BpTreeBase::unattached_tag{})
+    : ColumnBaseWithIndex(column_ndx)
+    , m_tree(BpTreeBase::unattached_tag{})
 {
     // fixme, must m_search_index be copied here?
     m_tree.init_from_ref(alloc, ref);
 }
 
 template <class T>
-Column<T>::Column(unattached_root_tag, Allocator& alloc) : ColumnBaseWithIndex(npos), m_tree(alloc)
+Column<T>::Column(unattached_root_tag, Allocator& alloc)
+    : ColumnBaseWithIndex(npos)
+    , m_tree(alloc)
 {
 }
 
 template <class T>
-Column<T>::Column(std::unique_ptr<Array> root) noexcept : m_tree(std::move(root))
+Column<T>::Column(std::unique_ptr<Array> root) noexcept
+    : m_tree(std::move(root))
 {
 }
 
@@ -1478,7 +1487,9 @@ template <class T>
 class Column<T>::CreateHandler : public ColumnBase::CreateHandler {
 public:
     CreateHandler(Array::Type leaf_type, T value, Allocator& alloc)
-        : m_value(value), m_alloc(alloc), m_leaf_type(leaf_type)
+        : m_value(value)
+        , m_alloc(alloc)
+        , m_leaf_type(leaf_type)
     {
     }
     ref_type create_leaf(size_t size) override

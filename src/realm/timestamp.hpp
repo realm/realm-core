@@ -61,17 +61,22 @@ public:
     //       +1.1 seconds (1100 milliseconds after the epoch) is constructed by Timestamp(1, 100000000)
     //       -1.1 seconds (1100 milliseconds before the epoch) is constructed by Timestamp(-1, -100000000)
     //
-    Timestamp(int64_t seconds, int32_t nanoseconds) : m_seconds(seconds), m_nanoseconds(nanoseconds), m_is_null(false)
+    Timestamp(int64_t seconds, int32_t nanoseconds)
+        : m_seconds(seconds)
+        , m_nanoseconds(nanoseconds)
+        , m_is_null(false)
     {
         REALM_ASSERT_EX(-nanoseconds_per_second < nanoseconds && nanoseconds < nanoseconds_per_second, nanoseconds);
         const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
         const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
         REALM_ASSERT_EX(both_non_negative || both_non_positive, both_non_negative, both_non_positive);
     }
-    Timestamp(realm::null) : m_is_null(true)
+    Timestamp(realm::null)
+        : m_is_null(true)
     {
     }
-    Timestamp() : Timestamp(null{})
+    Timestamp()
+        : Timestamp(null{})
     {
     }
 

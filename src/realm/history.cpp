@@ -31,7 +31,8 @@ class InRealmHistoryImpl : public TrivialReplication, private _impl::InRealmHist
 public:
     using version_type = TrivialReplication::version_type;
 
-    InRealmHistoryImpl(std::string realm_path) : TrivialReplication(realm_path)
+    InRealmHistoryImpl(std::string realm_path)
+        : TrivialReplication(realm_path)
     {
     }
 

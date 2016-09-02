@@ -29,7 +29,8 @@
 namespace realm {
 
 template <class T>
-inline BasicArray<T>::BasicArray(Allocator& allocator) noexcept : Array(allocator)
+inline BasicArray<T>::BasicArray(Allocator& allocator) noexcept
+    : Array(allocator)
 {
 }
 

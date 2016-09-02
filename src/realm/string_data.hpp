@@ -161,18 +161,23 @@ private:
 
 // Implementation:
 
-inline StringData::StringData() noexcept : m_data(nullptr), m_size(0)
+inline StringData::StringData() noexcept
+    : m_data(nullptr)
+    , m_size(0)
 {
 }
 
 inline StringData::StringData(const char* external_data, size_t data_size) noexcept
-    : m_data(external_data), m_size(data_size)
+    : m_data(external_data)
+    , m_size(data_size)
 {
     REALM_ASSERT_DEBUG(external_data || data_size == 0);
 }
 
 template <class T, class A>
-inline StringData::StringData(const std::basic_string<char, T, A>& s) : m_data(s.data()), m_size(s.size())
+inline StringData::StringData(const std::basic_string<char, T, A>& s)
+    : m_data(s.data())
+    , m_size(s.size())
 {
 }
 
@@ -184,15 +189,20 @@ inline StringData::operator std::basic_string<char, T, A>() const
 
 template <class T, class A>
 inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s)
-    : m_data(s ? s->data() : nullptr), m_size(s ? s->size() : 0)
+    : m_data(s ? s->data() : nullptr)
+    , m_size(s ? s->size() : 0)
 {
 }
 
-inline StringData::StringData(const null&) noexcept : m_data(nullptr), m_size(0)
+inline StringData::StringData(const null&) noexcept
+    : m_data(nullptr)
+    , m_size(0)
 {
 }
 
-inline StringData::StringData(const char* c_str) noexcept : m_data(c_str), m_size(0)
+inline StringData::StringData(const char* c_str) noexcept
+    : m_data(c_str)
+    , m_size(0)
 {
     if (c_str)
         m_size = std::char_traits<char>::length(c_str);

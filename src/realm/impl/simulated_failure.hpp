@@ -179,11 +179,13 @@ inline constexpr bool SimulatedFailure::is_enabled()
 #endif
 }
 
-inline SimulatedFailure::SimulatedFailure(std::error_code ec) : std::system_error(ec)
+inline SimulatedFailure::SimulatedFailure(std::error_code ec)
+    : std::system_error(ec)
 {
 }
 
-inline SimulatedFailure::OneShotPrimeGuard::OneShotPrimeGuard(FailureType failure_type) : m_type(failure_type)
+inline SimulatedFailure::OneShotPrimeGuard::OneShotPrimeGuard(FailureType failure_type)
+    : m_type(failure_type)
 {
     prime_one_shot(m_type);
 }

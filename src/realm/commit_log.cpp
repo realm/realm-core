@@ -169,7 +169,9 @@ protected:
         // memory mapping counter, increased whenever a log is resized
         uint64_t mmap_counter;
 
-        CommitLogHeader(uint_fast64_t version) : preamble_a(version), preamble_b(version)
+        CommitLogHeader(uint_fast64_t version)
+            : preamble_a(version)
+            , preamble_b(version)
         {
             use_preamble_a = true;
             mmap_counter = 1;
@@ -190,7 +192,8 @@ protected:
         std::string name;
         mutable util::File::Map<CommitLogHeader> map;
         mutable uint64_t last_seen_mmap_counter = 0;
-        CommitLogMetadata(std::string log_name) : name(log_name)
+        CommitLogMetadata(std::string log_name)
+            : name(log_name)
         {
         }
     };
@@ -274,7 +277,8 @@ protected:
 
 
 WriteLogCollector::WriteLogCollector(const std::string& database_name, const char* encryption_key)
-    : m_log_a(database_name + ".management/log_a"), m_log_b(database_name + ".management/log_b")
+    : m_log_a(database_name + ".management/log_a")
+    , m_log_b(database_name + ".management/log_b")
 {
     m_database_name = database_name;
     m_header_name = database_name + ".management/log_access";

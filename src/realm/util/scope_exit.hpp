@@ -30,7 +30,8 @@ namespace util {
 template <class H>
 class ScopeExit {
 public:
-    explicit ScopeExit(const H& handler) noexcept(std::is_nothrow_copy_constructible<H>::value) : m_handler(handler)
+    explicit ScopeExit(const H& handler) noexcept(std::is_nothrow_copy_constructible<H>::value)
+        : m_handler(handler)
     {
     }
 

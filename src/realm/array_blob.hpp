@@ -71,7 +71,8 @@ private:
 // Implementation:
 
 // Creates new array (but invalid, call init_from_ref() to init)
-inline ArrayBlob::ArrayBlob(Allocator& allocator) noexcept : Array(allocator)
+inline ArrayBlob::ArrayBlob(Allocator& allocator) noexcept
+    : Array(allocator)
 {
 }
 

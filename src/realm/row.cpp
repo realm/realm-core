@@ -52,7 +52,8 @@ void RowBase::impl_detach() noexcept
     }
 }
 
-RowBase::RowBase(const RowBase& source, HandoverPatch& patch) : m_table(TableRef())
+RowBase::RowBase(const RowBase& source, HandoverPatch& patch)
+    : m_table(TableRef())
 {
     generate_patch(source, patch);
 }

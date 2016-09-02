@@ -548,7 +548,10 @@ void Table::init(ConstSubspecRef shared_spec, ArrayParent* parent_column, size_t
 
 
 struct Table::InsertSubtableColumns : SubtableUpdater {
-    InsertSubtableColumns(size_t i, DataType t, bool nullable) : m_column_ndx(i), m_type(t), m_nullable(nullable)
+    InsertSubtableColumns(size_t i, DataType t, bool nullable)
+        : m_column_ndx(i)
+        , m_type(t)
+        , m_nullable(nullable)
     {
     }
     void update(const SubtableColumn& subtables, Array& subcolumns) override
@@ -577,7 +580,8 @@ private:
 
 
 struct Table::EraseSubtableColumns : SubtableUpdater {
-    EraseSubtableColumns(size_t i) : m_column_ndx(i)
+    EraseSubtableColumns(size_t i)
+        : m_column_ndx(i)
     {
     }
     void update(const SubtableColumn&, Array& subcolumns) override
@@ -611,7 +615,9 @@ struct Table::RenameSubtableColumns : SubtableUpdater {
 };
 
 struct Table::MoveSubtableColumns : SubtableUpdater {
-    MoveSubtableColumns(size_t col_ndx_1, size_t col_ndx_2) : m_col_ndx_1(col_ndx_1), m_col_ndx_2(col_ndx_2)
+    MoveSubtableColumns(size_t col_ndx_1, size_t col_ndx_2)
+        : m_col_ndx_1(col_ndx_1)
+        , m_col_ndx_2(col_ndx_2)
     {
     }
 
@@ -3936,7 +3942,10 @@ const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain)
 namespace {
 
 struct AggrState {
-    AggrState(const Table& target_table) : table(target_table), cache(table.get_alloc()), added_row(false)
+    AggrState(const Table& target_table)
+        : table(target_table)
+        , cache(table.get_alloc())
+        , added_row(false)
     {
     }
 
@@ -4415,7 +4424,10 @@ void Table::optimize(bool enforce)
 class Table::SliceWriter : public Group::TableWriter {
 public:
     SliceWriter(const Table& table, StringData table_name, size_t offset, size_t size) noexcept
-        : m_table(table), m_table_name(table_name), m_offset(offset), m_size(size)
+        : m_table(table)
+        , m_table_name(table_name)
+        , m_offset(offset)
+        , m_size(size)
     {
     }
 

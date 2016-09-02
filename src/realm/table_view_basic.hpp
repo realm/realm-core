@@ -147,7 +147,8 @@ protected:
         : m_impl(tv.m_impl, patch, mode)
     {
     }
-    BasicTableViewBase(Impl i) : m_impl(std::move(i))
+    BasicTableViewBase(Impl i)
+        : m_impl(std::move(i))
     {
     }
 
@@ -272,10 +273,12 @@ public:
     }
 
 private:
-    BasicTableView(BasicTableView* tv) : Base(move(tv->m_impl))
+    BasicTableView(BasicTableView* tv)
+        : Base(move(tv->m_impl))
     {
     }
-    BasicTableView(TableView tv) : Base(std::move(tv))
+    BasicTableView(TableView tv)
+        : Base(std::move(tv))
     {
     }
 
@@ -332,7 +335,8 @@ public:
 
     /// Construct BasicTableView<const Tab> from BasicTableView<Tab>.
     ///
-    BasicTableView(BasicTableView<Tab> tv) : Base(std::move(tv.m_impl))
+    BasicTableView(BasicTableView<Tab> tv)
+        : Base(std::move(tv.m_impl))
     {
     }
 
@@ -350,10 +354,12 @@ public:
     }
 
 private:
-    BasicTableView(BasicTableView* tv) : Base(move(tv->m_impl))
+    BasicTableView(BasicTableView* tv)
+        : Base(move(tv->m_impl))
     {
     }
-    BasicTableView(ConstTableView tv) : Base(std::move(tv))
+    BasicTableView(ConstTableView tv)
+        : Base(std::move(tv))
     {
     }
 

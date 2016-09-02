@@ -31,11 +31,13 @@ namespace util {
 template <class Ref>
 class CFPtr {
 public:
-    explicit CFPtr(Ref ref = nullptr) noexcept : m_ref(ref)
+    explicit CFPtr(Ref ref = nullptr) noexcept
+        : m_ref(ref)
     {
     }
 
-    CFPtr(CFPtr&& rg) noexcept : m_ref(rg.m_ref)
+    CFPtr(CFPtr&& rg) noexcept
+        : m_ref(rg.m_ref)
     {
         rg.m_ref = nullptr;
     }

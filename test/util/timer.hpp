@@ -34,7 +34,8 @@ public:
         type_RealTime
     };
 
-    Timer(Type type = type_RealTime) : m_type(type)
+    Timer(Type type = type_RealTime)
+        : m_type(type)
     {
         reset();
     }

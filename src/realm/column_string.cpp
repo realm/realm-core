@@ -69,7 +69,8 @@ void copy_leaf(const ArrayStringLong& from, ArrayBigBlobs& to)
 
 
 StringColumn::StringColumn(Allocator& alloc, ref_type ref, bool nullable, size_t column_ndx)
-    : ColumnBaseSimple(column_ndx), m_nullable(nullable)
+    : ColumnBaseSimple(column_ndx)
+    , m_nullable(nullable)
 {
     char* header = alloc.translate(ref);
     MemRef mem(header, ref, alloc);
@@ -308,7 +309,9 @@ public:
     bool m_nullable;
 
     SetLeafElem(Allocator& alloc, StringData value, bool nullable) noexcept
-        : m_alloc(alloc), m_value(value), m_nullable(nullable)
+        : m_alloc(alloc)
+        , m_value(value)
+        , m_nullable(nullable)
     {
     }
 
@@ -419,7 +422,9 @@ void StringColumn::set(size_t ndx, StringData value)
 class StringColumn::EraseLeafElem : public Array::EraseHandler {
 public:
     StringColumn& m_column;
-    EraseLeafElem(StringColumn& column, bool nullable) noexcept : m_column(column), m_nullable(nullable)
+    EraseLeafElem(StringColumn& column, bool nullable) noexcept
+        : m_column(column)
+        , m_nullable(nullable)
     {
     }
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent, size_t leaf_ndx_in_parent,
@@ -933,7 +938,8 @@ namespace {
 struct BinToStrAdaptor {
     typedef StringData value_type;
     const ArrayBigBlobs& m_big_blobs;
-    BinToStrAdaptor(const ArrayBigBlobs& big_blobs) noexcept : m_big_blobs(big_blobs)
+    BinToStrAdaptor(const ArrayBigBlobs& big_blobs) noexcept
+        : m_big_blobs(big_blobs)
     {
     }
     ~BinToStrAdaptor() noexcept
@@ -1309,7 +1315,8 @@ StringColumn::LeafType StringColumn::get_block(size_t ndx, ArrayParent** ap, siz
 
 class StringColumn::CreateHandler : public ColumnBase::CreateHandler {
 public:
-    CreateHandler(Allocator& alloc) : m_alloc(alloc)
+    CreateHandler(Allocator& alloc)
+        : m_alloc(alloc)
     {
     }
     ref_type create_leaf(size_t size) override
@@ -1331,7 +1338,9 @@ ref_type StringColumn::create(Allocator& alloc, size_t size)
 
 class StringColumn::SliceHandler : public ColumnBase::SliceHandler {
 public:
-    SliceHandler(Allocator& alloc, bool nullable) : m_alloc(alloc), m_nullable(nullable)
+    SliceHandler(Allocator& alloc, bool nullable)
+        : m_alloc(alloc)
+        , m_nullable(nullable)
     {
     }
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size, Allocator& target_alloc) override

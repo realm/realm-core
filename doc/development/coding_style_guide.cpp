@@ -127,7 +127,9 @@ public:
     // Public member variables do not have a 'm_' prefix.
     int baz;
 
-    MyClass(...) : Base(...), m_bar(7)
+    MyClass(...)
+        : Base(...)
+        , m_bar(7)
     {
         // ...
     }

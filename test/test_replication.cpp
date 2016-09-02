@@ -69,7 +69,8 @@ namespace {
 
 class MyTrivialReplication : public TrivialReplication {
 public:
-    MyTrivialReplication(const std::string& path) : TrivialReplication(path)
+    MyTrivialReplication(const std::string& path)
+        : TrivialReplication(path)
     {
     }
 

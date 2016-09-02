@@ -2430,7 +2430,8 @@ namespace {
 
 class MemStatsHandler : public Array::MemUsageHandler {
 public:
-    MemStatsHandler(MemStats& stats) : m_stats(stats)
+    MemStatsHandler(MemStats& stats)
+        : m_stats(stats)
     {
     }
     void handle(ref_type, size_t allocated, size_t used) override
@@ -3332,7 +3333,8 @@ namespace {
 
 class VisitAdapter {
 public:
-    VisitAdapter(Array::VisitHandler& handler) noexcept : m_handler(handler)
+    VisitAdapter(Array::VisitHandler& handler) noexcept
+        : m_handler(handler)
     {
     }
     bool operator()(const Array::NodeInfo& leaf_info)
@@ -3361,7 +3363,8 @@ namespace {
 
 class UpdateAdapter {
 public:
-    UpdateAdapter(Array::UpdateHandler& handler) noexcept : m_handler(handler)
+    UpdateAdapter(Array::UpdateHandler& handler) noexcept
+        : m_handler(handler)
     {
     }
     void operator()(const Array::NodeInfo& leaf_info)

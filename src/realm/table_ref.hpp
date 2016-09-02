@@ -134,11 +134,13 @@ public:
     }
 
     // Copy construct
-    BasicTableRef(const BasicTableRef& r) noexcept : util::bind_ptr<T>(r)
+    BasicTableRef(const BasicTableRef& r) noexcept
+        : util::bind_ptr<T>(r)
     {
     }
     template <class U>
-    BasicTableRef(const BasicTableRef<U>& r) noexcept : util::bind_ptr<T>(r)
+    BasicTableRef(const BasicTableRef<U>& r) noexcept
+        : util::bind_ptr<T>(r)
     {
     }
 
@@ -148,11 +150,13 @@ public:
     BasicTableRef& operator=(const BasicTableRef<U>&) noexcept;
 
     // Move construct
-    BasicTableRef(BasicTableRef&& r) noexcept : util::bind_ptr<T>(std::move(r))
+    BasicTableRef(BasicTableRef&& r) noexcept
+        : util::bind_ptr<T>(std::move(r))
     {
     }
     template <class U>
-    BasicTableRef(BasicTableRef<U>&& r) noexcept : util::bind_ptr<T>(std::move(r))
+    BasicTableRef(BasicTableRef<U>&& r) noexcept
+        : util::bind_ptr<T>(std::move(r))
     {
     }
 
@@ -276,13 +280,15 @@ private:
     template <class>
     friend class BasicTableRef;
 
-    explicit BasicTableRef(T* t) noexcept : util::bind_ptr<T>(t)
+    explicit BasicTableRef(T* t) noexcept
+        : util::bind_ptr<T>(t)
     {
     }
 
     typedef typename util::bind_ptr<T>::casting_move_tag casting_move_tag;
     template <class U>
-    BasicTableRef(BasicTableRef<U>* r, casting_move_tag) noexcept : util::bind_ptr<T>(r, casting_move_tag())
+    BasicTableRef(BasicTableRef<U>* r, casting_move_tag) noexcept
+        : util::bind_ptr<T>(r, casting_move_tag())
     {
     }
 };

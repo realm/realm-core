@@ -48,7 +48,8 @@ class WriteLogCollector;
 /// Thrown by SharedGroup::open() if the lock file is already open in another
 /// process which can't share mutexes with this process
 struct IncompatibleLockFile : std::runtime_error {
-    IncompatibleLockFile(const std::string& msg) : std::runtime_error("Incompatible lock file. " + msg)
+    IncompatibleLockFile(const std::string& msg)
+        : std::runtime_error("Incompatible lock file. " + msg)
     {
     }
 };
@@ -610,7 +611,8 @@ private:
 
 class ReadTransaction {
 public:
-    ReadTransaction(SharedGroup& sg) : m_shared_group(sg)
+    ReadTransaction(SharedGroup& sg)
+        : m_shared_group(sg)
     {
         m_shared_group.begin_read(); // Throws
     }
@@ -653,7 +655,8 @@ private:
 
 class WriteTransaction {
 public:
-    WriteTransaction(SharedGroup& sg) : m_shared_group(&sg)
+    WriteTransaction(SharedGroup& sg)
+        : m_shared_group(&sg)
     {
         m_shared_group->begin_write(); // Throws
     }
@@ -739,17 +742,20 @@ struct SharedGroup::BadVersion : std::exception {
 };
 
 inline SharedGroup::SharedGroup(const std::string& file, bool no_create, const SharedGroupOptions options)
-    : m_group(Group::shared_tag()), m_upgrade_callback(std::move(options.upgrade_callback))
+    : m_group(Group::shared_tag())
+    , m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(file, no_create, options); // Throws
 }
 
-inline SharedGroup::SharedGroup(unattached_tag) noexcept : m_group(Group::shared_tag())
+inline SharedGroup::SharedGroup(unattached_tag) noexcept
+    : m_group(Group::shared_tag())
 {
 }
 
 inline SharedGroup::SharedGroup(Replication& repl, const SharedGroupOptions options)
-    : m_group(Group::shared_tag()), m_upgrade_callback(std::move(options.upgrade_callback))
+    : m_group(Group::shared_tag())
+    , m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(repl, options); // Throws
 }
@@ -799,7 +805,8 @@ inline SharedGroup::version_type SharedGroup::get_version_of_bound_snapshot() co
 class SharedGroup::ReadLockUnlockGuard {
 public:
     ReadLockUnlockGuard(SharedGroup& shared_group, ReadLockInfo& read_lock) noexcept
-        : m_shared_group(shared_group), m_read_lock(&read_lock)
+        : m_shared_group(shared_group)
+        , m_read_lock(&read_lock)
     {
     }
     ~ReadLockUnlockGuard() noexcept

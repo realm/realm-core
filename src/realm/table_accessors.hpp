@@ -52,7 +52,8 @@ struct SpecBase {
     class Enum {
     public:
         typedef E enum_type;
-        Enum(E v) : m_value(v)
+        Enum(E v)
+            : m_value(v)
         {
         }
         operator E() const
@@ -68,7 +69,8 @@ struct SpecBase {
     class Subtable {
     public:
         typedef T table_type;
-        Subtable(T* t) : m_table(t)
+        Subtable(T* t)
+            : m_table(t)
         {
         }
         operator T*() const
@@ -227,7 +229,9 @@ protected:
     typedef std::pair<Taboid*, size_t> Init;
     Taboid* const m_table;
     const size_t m_row_idx;
-    FieldAccessorBase(Init i) noexcept : m_table(i.first), m_row_idx(i.second)
+    FieldAccessorBase(Init i) noexcept
+        : m_table(i.first)
+        , m_row_idx(i.second)
     {
     }
 };
@@ -303,7 +307,8 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -353,7 +358,8 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -403,7 +409,8 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -437,7 +444,8 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -471,7 +479,8 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -505,7 +514,8 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -538,7 +548,8 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -585,7 +596,8 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -627,7 +639,8 @@ public:
         return get().size();
     }
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -645,7 +658,8 @@ private:
     struct SubtabRowAccessor : Subtab::RowAccessor {
     public:
         SubtabRowAccessor(Subtab* subtable, size_t row_idx)
-            : Subtab::RowAccessor(std::make_pair(subtable, row_idx)), m_owner(subtable->get_table_ref())
+            : Subtab::RowAccessor(std::make_pair(subtable, row_idx))
+            , m_owner(subtable->get_table_ref())
         {
         }
 
@@ -679,7 +693,8 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -694,7 +709,8 @@ private:
     struct SubtabRowAccessor : Subtab::ConstRowAccessor {
     public:
         SubtabRowAccessor(const Subtab* subtable, size_t row_idx)
-            : Subtab::ConstRowAccessor(std::make_pair(subtable, row_idx)), m_owner(subtable->get_table_ref())
+            : Subtab::ConstRowAccessor(std::make_pair(subtable, row_idx))
+            , m_owner(subtable->get_table_ref())
         {
         }
 
@@ -703,7 +719,8 @@ private:
     };
 
 public:
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 
@@ -846,7 +863,8 @@ public:
     }
 
 protected:
-    MixedFieldAccessorBase(typename Base::Init i) noexcept : Base(i)
+    MixedFieldAccessorBase(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -943,7 +961,8 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -973,7 +992,8 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    explicit FieldAccessor(typename Base::Init i) noexcept
+        : Base(i)
     {
     }
 };
@@ -1026,7 +1046,8 @@ public:
 protected:
     Taboid* const m_table;
 
-    explicit ColumnAccessorBase(Taboid* t) noexcept : m_table(t)
+    explicit ColumnAccessorBase(Taboid* t) noexcept
+        : m_table(t)
     {
     }
 };
@@ -1058,7 +1079,9 @@ private:
     using ColumnsBase = typename ColumnsForTaboid<Taboid, int64_t>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl())
+    explicit ColumnAccessor(Taboid* t) noexcept
+        : Base(t)
+        , ColumnsBase(col_idx, t->get_impl())
     {
     }
 
@@ -1123,7 +1146,9 @@ private:
     using ColumnsBase = typename ColumnsForTaboid<Taboid, float>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl())
+    explicit ColumnAccessor(Taboid* t) noexcept
+        : Base(t)
+        , ColumnsBase(col_idx, t->get_impl())
     {
     }
 
@@ -1194,7 +1219,9 @@ private:
     using ColumnsBase = typename ColumnsForTaboid<Taboid, double>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl())
+    explicit ColumnAccessor(Taboid* t) noexcept
+        : Base(t)
+        , ColumnsBase(col_idx, t->get_impl())
     {
     }
 
@@ -1263,7 +1290,8 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, bool> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t)
+    explicit ColumnAccessor(Taboid* t) noexcept
+        : Base(t)
     {
     }
 
@@ -1302,7 +1330,8 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t)
+    explicit ColumnAccessor(Taboid* t) noexcept
+        : Base(t)
     {
     }
 
@@ -1330,7 +1359,8 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, OldDateTime> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t)
+    explicit ColumnAccessor(Taboid* t) noexcept
+        : Base(t)
     {
     }
 
@@ -1370,7 +1400,9 @@ private:
     using ColumnsBase = typename ColumnsForTaboid<Taboid, StringData>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl())
+    explicit ColumnAccessor(Taboid* t) noexcept
+        : Base(t)
+        , ColumnsBase(col_idx, t->get_impl())
     {
     }
 
@@ -1413,7 +1445,8 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, BinaryData> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t)
+    explicit ColumnAccessor(Taboid* t) noexcept
+        : Base(t)
     {
     }
 
@@ -1437,7 +1470,8 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab>> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t)
+    explicit ColumnAccessor(Taboid* t) noexcept
+        : Base(t)
     {
     }
 };
@@ -1450,7 +1484,8 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, Mixed> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t)
+    explicit ColumnAccessor(Taboid* t) noexcept
+        : Base(t)
     {
     }
 };
@@ -1473,7 +1508,8 @@ class QueryColumnBase {
 protected:
     typedef typename Taboid::Query Query;
     Query* const m_query;
-    explicit QueryColumnBase(Query* q) noexcept : m_query(q)
+    explicit QueryColumnBase(Query* q) noexcept
+        : m_query(q)
     {
     }
 
@@ -1499,7 +1535,8 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q)
+    explicit QueryColumn(Query* q) noexcept
+        : Base(q)
     {
     }
 
@@ -1571,7 +1608,8 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q)
+    explicit QueryColumn(Query* q) noexcept
+        : Base(q)
     {
     }
     using Base::equal;
@@ -1641,7 +1679,8 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q)
+    explicit QueryColumn(Query* q) noexcept
+        : Base(q)
     {
     }
     using Base::equal;
@@ -1711,7 +1750,8 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q)
+    explicit QueryColumn(Query* q) noexcept
+        : Base(q)
     {
     }
     using Base::equal;
@@ -1727,7 +1767,8 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q)
+    explicit QueryColumn(Query* q) noexcept
+        : Base(q)
     {
     }
     using Base::equal;
@@ -1743,7 +1784,8 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q)
+    explicit QueryColumn(Query* q) noexcept
+        : Base(q)
     {
     }
 
@@ -1811,7 +1853,8 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q)
+    explicit QueryColumn(Query* q) noexcept
+        : Base(q)
     {
     }
 
@@ -1855,7 +1898,8 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q)
+    explicit QueryColumn(Query* q) noexcept
+        : Base(q)
     {
     }
 
@@ -1899,7 +1943,8 @@ private:
     Query* const m_query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : m_query(q)
+    explicit QueryColumn(Query* q) noexcept
+        : m_query(q)
     {
     }
 

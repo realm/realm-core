@@ -91,7 +91,8 @@ void set_test_resource_path(const std::string& path)
     resource_path = path;
 }
 
-TestPathGuard::TestPathGuard(const std::string& path) : m_path(path)
+TestPathGuard::TestPathGuard(const std::string& path)
+    : m_path(path)
 {
     File::try_remove(m_path);
 }
@@ -109,7 +110,8 @@ TestPathGuard::~TestPathGuard() noexcept
 }
 
 
-TestDirGuard::TestDirGuard(const std::string& path) : m_path(path)
+TestDirGuard::TestDirGuard(const std::string& path)
+    : m_path(path)
 {
     if (!try_make_dir(path)) {
         clean_dir(path);
@@ -157,7 +159,8 @@ void TestDirGuard::clean_dir(const std::string& path)
 }
 
 
-SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path) : TestPathGuard(path)
+SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path)
+    : TestPathGuard(path)
 {
     cleanup();
 }

@@ -263,7 +263,12 @@ inline Spec::Spec(SubspecRef r) noexcept
 
 // Uninitialized Spec (call init() to init)
 inline Spec::Spec(Allocator& alloc) noexcept
-    : m_top(alloc), m_types(alloc), m_names(alloc), m_attr(alloc), m_subspecs(alloc), m_enumkeys(alloc)
+    : m_top(alloc)
+    , m_types(alloc)
+    , m_names(alloc)
+    , m_attr(alloc)
+    , m_subspecs(alloc)
+    , m_enumkeys(alloc)
 {
 }
 
@@ -441,22 +446,26 @@ inline bool Spec::operator!=(const Spec& s) const noexcept
 
 
 inline SubspecRef::SubspecRef(Array* parent, size_t ndx_in_parent) noexcept
-    : m_parent(parent), m_ndx_in_parent(ndx_in_parent)
+    : m_parent(parent)
+    , m_ndx_in_parent(ndx_in_parent)
 {
 }
 
 inline SubspecRef::SubspecRef(const_cast_tag, ConstSubspecRef r) noexcept
-    : m_parent(const_cast<Array*>(r.m_parent)), m_ndx_in_parent(r.m_ndx_in_parent)
+    : m_parent(const_cast<Array*>(r.m_parent))
+    , m_ndx_in_parent(r.m_ndx_in_parent)
 {
 }
 
 inline ConstSubspecRef::ConstSubspecRef(const Array* parent, size_t ndx_in_parent) noexcept
-    : m_parent(parent), m_ndx_in_parent(ndx_in_parent)
+    : m_parent(parent)
+    , m_ndx_in_parent(ndx_in_parent)
 {
 }
 
 inline ConstSubspecRef::ConstSubspecRef(SubspecRef r) noexcept
-    : m_parent(r.m_parent), m_ndx_in_parent(r.m_ndx_in_parent)
+    : m_parent(r.m_parent)
+    , m_ndx_in_parent(r.m_ndx_in_parent)
 {
 }
 

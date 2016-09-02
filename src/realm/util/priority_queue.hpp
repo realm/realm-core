@@ -148,13 +148,15 @@ private:
 
 template <class T, class Container, class Compare>
 PriorityQueue<T, Container, Compare>::PriorityQueue(const Compare& comparator, const Container& cont)
-    : Compare(comparator), m_queue(cont)
+    : Compare(comparator)
+    , m_queue(cont)
 {
 }
 
 template <class T, class Container, class Compare>
 PriorityQueue<T, Container, Compare>::PriorityQueue(const Compare& comparator, Container&& cont)
-    : Compare(comparator), m_queue(std::move(cont))
+    : Compare(comparator)
+    , m_queue(std::move(cont))
 {
 }
 
@@ -162,7 +164,8 @@ template <class T, class Container, class Compare>
 template <class InputIt>
 PriorityQueue<T, Container, Compare>::PriorityQueue(InputIt first, InputIt last, const Compare& comparator,
                                                     const Container& cont)
-    : Compare(comparator), m_queue(cont)
+    : Compare(comparator)
+    , m_queue(cont)
 {
     for (auto it = first; it != last; ++it) {
         push(*it);
@@ -173,7 +176,8 @@ template <class T, class Container, class Compare>
 template <class InputIt>
 PriorityQueue<T, Container, Compare>::PriorityQueue(InputIt first, InputIt last, const Compare& comparator,
                                                     Container&& cont)
-    : Compare(comparator), m_queue(std::move(cont))
+    : Compare(comparator)
+    , m_queue(std::move(cont))
 {
     for (auto it = first; it != last; ++it) {
         push(*it);

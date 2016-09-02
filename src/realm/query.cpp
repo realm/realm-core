@@ -34,7 +34,10 @@ Query::Query()
     create();
 }
 
-Query::Query(Table& table, TableViewBase* tv) : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv)
+Query::Query(Table& table, TableViewBase* tv)
+    : m_table(table.get_table_ref())
+    , m_view(tv)
+    , m_source_table_view(tv)
 {
 #ifdef REALM_DEBUG
     if (m_view)
@@ -44,7 +47,9 @@ Query::Query(Table& table, TableViewBase* tv) : m_table(table.get_table_ref()), 
 }
 
 Query::Query(const Table& table, const LinkViewRef& lv)
-    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(lv.get()), m_source_link_view(lv)
+    : m_table((const_cast<Table&>(table)).get_table_ref())
+    , m_view(lv.get())
+    , m_source_link_view(lv)
 {
 #ifdef REALM_DEBUG
     if (m_view)
@@ -55,7 +60,9 @@ Query::Query(const Table& table, const LinkViewRef& lv)
 }
 
 Query::Query(const Table& table, TableViewBase* tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv)
+    : m_table((const_cast<Table&>(table)).get_table_ref())
+    , m_view(tv)
+    , m_source_table_view(tv)
 {
 #ifdef REALM_DEBUG
     if (m_view)
@@ -140,7 +147,8 @@ Query& Query::operator=(Query&&) = default;
 Query::~Query() noexcept = default;
 
 Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
-    : m_table(TableRef()), m_source_link_view(LinkViewRef())
+    : m_table(TableRef())
+    , m_source_link_view(LinkViewRef())
 {
     Table::generate_patch(source.m_table.get(), patch.m_table);
     if (source.m_source_table_view) {
@@ -159,7 +167,8 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
 }
 
 Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
-    : m_table(TableRef()), m_source_link_view(LinkViewRef())
+    : m_table(TableRef())
+    , m_source_link_view(LinkViewRef())
 {
     Table::generate_patch(source.m_table.get(), patch.m_table);
     if (source.m_source_table_view) {
@@ -177,7 +186,8 @@ Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
     }
 }
 
-Query::Query(std::unique_ptr<Expression> expr) : Query()
+Query::Query(std::unique_ptr<Expression> expr)
+    : Query()
 {
     if (auto table = const_cast<Table*>(expr->get_base_table()))
         set_table(table->get_table_ref());

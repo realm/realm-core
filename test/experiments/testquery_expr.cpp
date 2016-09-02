@@ -31,7 +31,9 @@ struct MySubtableSpec : realm::SpecBase {
     struct ColNames {
         typename Col<0>::type alpha;
         typename Col<1>::type beta;
-        ColNames(Init i) : alpha(i), beta(i)
+        ColNames(Init i)
+            : alpha(i)
+            , beta(i)
         {
         }
     };
@@ -56,7 +58,10 @@ struct MyTableSpec : realm::SpecBase {
         typename Col<0>::type foo;
         typename Col<1>::type bar;
         typename Col<2>::type baz;
-        ColNames(Init i) : foo(i), bar(i), baz(i)
+        ColNames(Init i)
+            : foo(i)
+            , bar(i)
+            , baz(i)
         {
         }
     };

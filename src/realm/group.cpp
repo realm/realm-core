@@ -734,7 +734,8 @@ void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
 
 class Group::DefaultTableWriter : public Group::TableWriter {
 public:
-    DefaultTableWriter(const Group& group) : m_group(group)
+    DefaultTableWriter(const Group& group)
+        : m_group(group)
     {
     }
     ref_type write_names(_impl::OutputStream& out) override
@@ -1091,7 +1092,8 @@ public:
 
 class InsertColumnUpdater : public _impl::TableFriend::AccessorUpdater {
 public:
-    InsertColumnUpdater(size_t col_ndx) : m_col_ndx(col_ndx)
+    InsertColumnUpdater(size_t col_ndx)
+        : m_col_ndx(col_ndx)
     {
     }
 
@@ -1113,7 +1115,8 @@ private:
 
 class EraseColumnUpdater : public _impl::TableFriend::AccessorUpdater {
 public:
-    EraseColumnUpdater(size_t col_ndx) : m_col_ndx(col_ndx)
+    EraseColumnUpdater(size_t col_ndx)
+        : m_col_ndx(col_ndx)
     {
     }
 
@@ -1135,7 +1138,9 @@ private:
 
 class MoveColumnUpdater : public _impl::TableFriend::AccessorUpdater {
 public:
-    MoveColumnUpdater(size_t col_ndx_1, size_t col_ndx_2) : m_col_ndx_1(col_ndx_1), m_col_ndx_2(col_ndx_2)
+    MoveColumnUpdater(size_t col_ndx_1, size_t col_ndx_2)
+        : m_col_ndx_1(col_ndx_1)
+        , m_col_ndx_2(col_ndx_2)
     {
     }
 
@@ -1168,7 +1173,9 @@ private:
 // transaction log enough to skip these checks.
 class Group::TransactAdvancer {
 public:
-    TransactAdvancer(Group& group, bool& schema_changed) : m_group(group), m_schema_changed(schema_changed)
+    TransactAdvancer(Group& group, bool& schema_changed)
+        : m_group(group)
+        , m_schema_changed(schema_changed)
     {
     }
 

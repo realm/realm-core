@@ -38,7 +38,8 @@ struct Data {
 
 
 struct CopyAndMove {
-    CopyAndMove() : m_data(new Data())
+    CopyAndMove()
+        : m_data(new Data())
     {
     }
     ~CopyAndMove()
@@ -46,7 +47,8 @@ struct CopyAndMove {
         delete m_data;
     }
 
-    CopyAndMove(const CopyAndMove& a) : m_data(a.m_data->clone())
+    CopyAndMove(const CopyAndMove& a)
+        : m_data(a.m_data->clone())
     {
         std::cout << "Copy CopyAndMove (constructor)\n";
     }
@@ -72,14 +74,16 @@ private:
 
     Data* m_data;
 
-    CopyAndMove(Data* d) : m_data(d)
+    CopyAndMove(Data* d)
+        : m_data(d)
     {
     }
 };
 
 
 struct ConstCopyAndMove {
-    ConstCopyAndMove() : m_data(new Data())
+    ConstCopyAndMove()
+        : m_data(new Data())
     {
     }
     ~ConstCopyAndMove()
@@ -87,7 +91,8 @@ struct ConstCopyAndMove {
         delete m_data;
     }
 
-    ConstCopyAndMove(const ConstCopyAndMove& a) : m_data(a.m_data->clone())
+    ConstCopyAndMove(const ConstCopyAndMove& a)
+        : m_data(a.m_data->clone())
     {
         std::cout << "Copy ConstCopyAndMove (constructor)\n";
     }
@@ -100,7 +105,8 @@ struct ConstCopyAndMove {
         return *this;
     }
 
-    ConstCopyAndMove(CopyAndMove a) : m_data(a.m_data)
+    ConstCopyAndMove(CopyAndMove a)
+        : m_data(a.m_data)
     {
         a.m_data = 0;
         std::cout << "Move CopyAndMove to ConstCopyAndMove (constructor)\n";
@@ -125,7 +131,8 @@ struct ConstCopyAndMove {
 private:
     const Data* m_data;
 
-    ConstCopyAndMove(const Data* d) : m_data(d)
+    ConstCopyAndMove(const Data* d)
+        : m_data(d)
     {
     }
 };

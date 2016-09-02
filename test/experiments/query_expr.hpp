@@ -88,7 +88,8 @@ struct ColRef {
 template <class Op, class A>
 struct UnOp {
     A arg;
-    explicit UnOp(const A& a) : arg(a)
+    explicit UnOp(const A& a)
+        : arg(a)
     {
     }
 };
@@ -97,7 +98,9 @@ template <class Op, class A, class B>
 struct BinOp {
     A left;
     B right;
-    BinOp(const A& a, const B& b) : left(a), right(b)
+    BinOp(const A& a, const B& b)
+        : left(a)
+        , right(b)
     {
     }
 };
@@ -106,7 +109,9 @@ template <class Op, class Col, class Query>
 struct Subquery {
     Col col;
     Query query;
-    Subquery(const Col& c, const Query& q) : col(c), query(q)
+    Subquery(const Col& c, const Query& q)
+        : col(c)
+        , query(q)
     {
     }
 };
@@ -117,7 +122,8 @@ struct Subquery {
 template <class T>
 struct Expr {
     T value;
-    explicit Expr(const T& v) : value(v)
+    explicit Expr(const T& v)
+        : value(v)
     {
     }
 };
@@ -1156,7 +1162,9 @@ public:
 template <class Tab, int col_idx, class Type>
 class ColEval {
 public:
-    ColEval(const void* c, const Tab* t) : m_column(c), m_table(t)
+    ColEval(const void* c, const Tab* t)
+        : m_column(c)
+        , m_table(t)
     {
     }
 
@@ -1279,7 +1287,8 @@ public:
         return Spec::col_names()[col_idx];
     }
 
-    BasicTable() : m_size(0)
+    BasicTable()
+        : m_size(0)
     {
         m_size = 256;
         m_cols = new void*[TypeCount<typename Spec::Columns>::value];
@@ -1287,7 +1296,8 @@ public:
     }
 
     struct QueryRow : QueryRowBase {
-        QueryRow() : QueryRowBase(query::EmptyType())
+        QueryRow()
+            : QueryRowBase(query::EmptyType())
         {
         }
     };

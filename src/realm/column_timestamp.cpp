@@ -22,7 +22,8 @@
 namespace realm {
 
 
-TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx) : ColumnBaseSimple(col_ndx)
+TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx)
+    : ColumnBaseSimple(col_ndx)
 {
     std::unique_ptr<Array> top;
     std::unique_ptr<BpTree<util::Optional<int64_t>>> seconds;
@@ -51,7 +52,9 @@ TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx)
 template <class BT>
 class TimestampColumn::CreateHandler : public ColumnBase::CreateHandler {
 public:
-    CreateHandler(typename BT::value_type value, Allocator& alloc) : m_value(value), m_alloc(alloc)
+    CreateHandler(typename BT::value_type value, Allocator& alloc)
+        : m_value(value)
+        , m_alloc(alloc)
     {
     }
 

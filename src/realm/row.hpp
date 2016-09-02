@@ -340,7 +340,8 @@ public:
     }
 
 private:
-    BasicRow(const BasicRow<T>& source, HandoverPatch& patch) : RowBase(source, patch)
+    BasicRow(const BasicRow<T>& source, HandoverPatch& patch)
+        : RowBase(source, patch)
     {
     }
     friend class SharedGroup;
@@ -692,20 +693,24 @@ inline size_t RowFuncs<T, R>::row_ndx() const noexcept
 
 
 template <class T>
-inline BasicRowExpr<T>::BasicRowExpr() noexcept : m_table(0), m_row_ndx(0)
+inline BasicRowExpr<T>::BasicRowExpr() noexcept
+    : m_table(0)
+    , m_row_ndx(0)
 {
 }
 
 template <class T>
 template <class U>
 inline BasicRowExpr<T>::BasicRowExpr(const BasicRowExpr<U>& expr) noexcept
-    : m_table(expr.m_table), m_row_ndx(expr.m_row_ndx)
+    : m_table(expr.m_table)
+    , m_row_ndx(expr.m_row_ndx)
 {
 }
 
 template <class T>
 inline BasicRowExpr<T>::BasicRowExpr(T* init_table, size_t init_row_ndx) noexcept
-    : m_table(init_table), m_row_ndx(init_row_ndx)
+    : m_table(init_table)
+    , m_row_ndx(init_row_ndx)
 {
 }
 
@@ -734,7 +739,8 @@ inline BasicRow<T>::BasicRow() noexcept
 }
 
 template <class T>
-inline BasicRow<T>::BasicRow(const BasicRow<T>& row) noexcept : RowBase(row)
+inline BasicRow<T>::BasicRow(const BasicRow<T>& row) noexcept
+    : RowBase(row)
 {
     attach(const_cast<Table*>(row.m_table.get()), row.m_row_ndx);
 }

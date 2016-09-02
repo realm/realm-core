@@ -40,7 +40,8 @@
         {                                                                                                            \
             return bool(enabled);                                                                                    \
         }                                                                                                            \
-        Realm_UnitTest__##name(realm::test_util::unit_test::TestContext& c) : TestBase(c)                            \
+        Realm_UnitTest__##name(realm::test_util::unit_test::TestContext& c)                                          \
+            : TestBase(c)                                                                                            \
         {                                                                                                            \
         }                                                                                                            \
         void test_run();                                                                                             \

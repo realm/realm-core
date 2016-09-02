@@ -67,7 +67,8 @@ struct TestStruct {
 
 class match1 {
 public:
-    match1(bool target) : m_target(target)
+    match1(bool target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -80,7 +81,8 @@ private:
 };
 class match2 {
 public:
-    match2(bool target) : m_target(target)
+    match2(bool target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -93,7 +95,8 @@ private:
 };
 class match3 {
 public:
-    match3(int target) : m_target(target)
+    match3(int target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -106,7 +109,8 @@ private:
 };
 class match4 {
 public:
-    match4(int target) : m_target(target)
+    match4(int target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -119,7 +123,8 @@ private:
 };
 class match5 {
 public:
-    match5(int target) : m_target(target)
+    match5(int target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -132,7 +137,8 @@ private:
 };
 class match6 {
 public:
-    match6(int target) : m_target(target)
+    match6(int target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -145,7 +151,8 @@ private:
 };
 class match7 {
 public:
-    match7(int target) : m_target(target)
+    match7(int target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -158,7 +165,8 @@ private:
 };
 class match8 {
 public:
-    match8(int64_t target) : m_target(target)
+    match8(int64_t target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -171,7 +179,8 @@ private:
 };
 class match9 {
 public:
-    match9(const std::string& target) : m_target(target)
+    match9(const std::string& target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -184,7 +193,8 @@ private:
 };
 class match10 {
 public:
-    match10(const std::string& target) : m_target(target)
+    match10(const std::string& target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -197,7 +207,8 @@ private:
 };
 class match11 {
 public:
-    match11(const std::string& target) : m_target(target)
+    match11(const std::string& target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -210,7 +221,8 @@ private:
 };
 class match9n {
 public:
-    match9n(const std::string& target) : m_target(target)
+    match9n(const std::string& target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -223,7 +235,8 @@ private:
 };
 class match10n {
 public:
-    match10n(const std::string& target) : m_target(target)
+    match10n(const std::string& target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const
@@ -236,7 +249,8 @@ private:
 };
 class match11n {
 public:
-    match11n(const std::string& target) : m_target(target)
+    match11n(const std::string& target)
+        : m_target(target)
     {
     }
     bool operator()(const TestStruct& v) const

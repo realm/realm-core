@@ -1539,11 +1539,13 @@ inline RefOrTagged RefOrTagged::make_tagged(uint_fast64_t i) noexcept
     return RefOrTagged(value);
 }
 
-inline RefOrTagged::RefOrTagged(int_fast64_t value) noexcept : m_value(value)
+inline RefOrTagged::RefOrTagged(int_fast64_t value) noexcept
+    : m_value(value)
 {
 }
 
-inline Array::Array(Allocator& allocator) noexcept : m_alloc(allocator)
+inline Array::Array(Allocator& allocator) noexcept
+    : m_alloc(allocator)
 {
 }
 

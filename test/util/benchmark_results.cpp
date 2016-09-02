@@ -107,7 +107,11 @@ std::string pad_right(std::string str, int width, char padding = ' ')
 
 } // anonymous namespace
 
-BenchmarkResults::Result::Result() : min(DBL_MAX), max(DBL_MIN), total(0), rep(0)
+BenchmarkResults::Result::Result()
+    : min(DBL_MAX)
+    , max(DBL_MIN)
+    , total(0)
+    , rep(0)
 {
 }
 

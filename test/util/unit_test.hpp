@@ -61,7 +61,8 @@
         {                                                                                                            \
             return bool(enabled);                                                                                    \
         }                                                                                                            \
-        Realm_UnitTest__##name(realm::test_util::unit_test::TestContext& c) : TestBase(c)                            \
+        Realm_UnitTest__##name(realm::test_util::unit_test::TestContext& c)                                          \
+            : TestBase(c)                                                                                            \
         {                                                                                                            \
         }                                                                                                            \
         void test_run();                                                                                             \
@@ -587,7 +588,8 @@ inline PatternBasedFileOrder::PatternBasedFileOrder(const char** patterns_begin,
 }
 
 template <size_t N>
-inline PatternBasedFileOrder::PatternBasedFileOrder(const char* (&patterns)[N]) : m_wrap(patterns, patterns + N)
+inline PatternBasedFileOrder::PatternBasedFileOrder(const char* (&patterns)[N])
+    : m_wrap(patterns, patterns + N)
 {
 }
 
@@ -823,16 +825,22 @@ inline bool TestContext::check_definitely_greater(long double a, long double b, 
 }
 
 inline ThreadContext::ThreadContext(SharedContext& sc, int ti, util::Logger& rl)
-    : shared_context(sc), thread_index(ti), report_logger(rl)
+    : shared_context(sc)
+    , thread_index(ti)
+    , report_logger(rl)
 {
 }
 
 inline SharedContext::SharedContext(const TestList& tl, int nr, int nt, util::Logger& rl)
-    : test_list(tl), num_recurrences(nr), num_threads(nt), report_logger(rl)
+    : test_list(tl)
+    , num_recurrences(nr)
+    , num_threads(nt)
+    , report_logger(rl)
 {
 }
 
-inline TestBase::TestBase(TestContext& context) : test_context(context)
+inline TestBase::TestBase(TestContext& context)
+    : test_context(context)
 {
 }
 

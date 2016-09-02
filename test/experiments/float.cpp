@@ -20,7 +20,8 @@
 #include <cstdint>
 
 union Float_t {
-    Float_t(float num = 0.0f) : f(num)
+    Float_t(float num = 0.0f)
+        : f(num)
     {
     }
     // Portable extraction of components.

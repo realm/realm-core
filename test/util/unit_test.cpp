@@ -66,7 +66,8 @@ std::string xml_escape(const std::string& value)
 
 class XmlReporter : public Reporter {
 public:
-    XmlReporter(std::ostream& out) : m_out(out)
+    XmlReporter(std::ostream& out)
+        : m_out(out)
     {
     }
 
@@ -802,7 +803,8 @@ PatternBasedFileOrder::wrap::~wrap()
 {
 }
 
-PatternBasedFileOrder::wrap::wrap(const wrap& w) : m_state(w.m_state)
+PatternBasedFileOrder::wrap::wrap(const wrap& w)
+    : m_state(w.m_state)
 {
 }
 

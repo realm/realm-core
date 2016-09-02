@@ -481,7 +481,8 @@ inline void SlabAlloc::invalidate_cache() noexcept
 
 class SlabAlloc::DetachGuard {
 public:
-    DetachGuard(SlabAlloc& alloc) noexcept : m_alloc(&alloc)
+    DetachGuard(SlabAlloc& alloc) noexcept
+        : m_alloc(&alloc)
     {
     }
     ~DetachGuard() noexcept;
@@ -495,7 +496,8 @@ private:
 // Implementation:
 
 struct InvalidDatabase : util::File::AccessError {
-    InvalidDatabase(const std::string& msg, const std::string& path) : util::File::AccessError(msg, path)
+    InvalidDatabase(const std::string& msg, const std::string& path)
+        : util::File::AccessError(msg, path)
     {
     }
 };

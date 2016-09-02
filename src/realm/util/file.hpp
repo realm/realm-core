@@ -537,7 +537,8 @@ private:
 
 class File::ExclusiveLock {
 public:
-    ExclusiveLock(File& f) : m_file(f)
+    ExclusiveLock(File& f)
+        : m_file(f)
     {
         f.lock_exclusive();
     }
@@ -552,7 +553,8 @@ private:
 
 class File::SharedLock {
 public:
-    SharedLock(File& f) : m_file(f)
+    SharedLock(File& f)
+        : m_file(f)
     {
         f.lock_shared();
     }
@@ -678,7 +680,8 @@ public:
 
 class File::CloseGuard {
 public:
-    CloseGuard(File& f) noexcept : m_file(&f)
+    CloseGuard(File& f) noexcept
+        : m_file(&f)
     {
     }
     ~CloseGuard() noexcept
@@ -698,7 +701,8 @@ private:
 
 class File::UnlockGuard {
 public:
-    UnlockGuard(File& f) noexcept : m_file(&f)
+    UnlockGuard(File& f) noexcept
+        : m_file(&f)
     {
     }
     ~UnlockGuard() noexcept
@@ -719,7 +723,8 @@ private:
 class File::UnmapGuard {
 public:
     template <class T>
-    UnmapGuard(Map<T>& m) noexcept : m_map(&m)
+    UnmapGuard(Map<T>& m) noexcept
+        : m_map(&m)
     {
     }
     ~UnmapGuard() noexcept
@@ -1065,7 +1070,9 @@ inline T* File::Map<T>::release() noexcept
 }
 
 
-inline File::Streambuf::Streambuf(File* f) : m_file(*f), m_buffer(new char[buffer_size])
+inline File::Streambuf::Streambuf(File* f)
+    : m_file(*f)
+    , m_buffer(new char[buffer_size])
 {
     char* b = m_buffer.get();
     setp(b, b + buffer_size);
@@ -1116,7 +1123,8 @@ inline void File::Streambuf::flush()
 }
 
 inline File::AccessError::AccessError(const std::string& msg, const std::string& path)
-    : std::runtime_error(msg), m_path(path)
+    : std::runtime_error(msg)
+    , m_path(path)
 {
 }
 
@@ -1130,11 +1138,13 @@ inline File::PermissionDenied::PermissionDenied(const std::string& msg, const st
 {
 }
 
-inline File::NotFound::NotFound(const std::string& msg, const std::string& path) : AccessError(msg, path)
+inline File::NotFound::NotFound(const std::string& msg, const std::string& path)
+    : AccessError(msg, path)
 {
 }
 
-inline File::Exists::Exists(const std::string& msg, const std::string& path) : AccessError(msg, path)
+inline File::Exists::Exists(const std::string& msg, const std::string& path)
+    : AccessError(msg, path)
 {
 }
 

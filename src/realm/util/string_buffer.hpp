@@ -107,7 +107,8 @@ private:
 
 // Implementation:
 
-inline StringBuffer::StringBuffer() noexcept : m_size(0)
+inline StringBuffer::StringBuffer() noexcept
+    : m_size(0)
 {
 }
 

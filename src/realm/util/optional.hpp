@@ -53,10 +53,12 @@ static constexpr InPlace in_place;
 
 // Note: Should conform with the future std::bad_optional_access.
 struct BadOptionalAccess : std::logic_error {
-    explicit BadOptionalAccess(const std::string& what_arg) : std::logic_error(what_arg)
+    explicit BadOptionalAccess(const std::string& what_arg)
+        : std::logic_error(what_arg)
     {
     }
-    explicit BadOptionalAccess(const char* what_arg) : std::logic_error(what_arg)
+    explicit BadOptionalAccess(const char* what_arg)
+        : std::logic_error(what_arg)
     {
     }
 };
@@ -173,15 +175,18 @@ public:
     } // FIXME: Was a delegating constructor, but not fully supported in VS2015
     Optional(const Optional<T&>& other) = default;
     template <class U>
-    Optional(const Optional<U&>& other) : m_ptr(other.m_ptr)
+    Optional(const Optional<U&>& other)
+        : m_ptr(other.m_ptr)
     {
     }
     template <class U>
-    Optional(std::reference_wrapper<U> ref) : m_ptr(&ref.get())
+    Optional(std::reference_wrapper<U> ref)
+        : m_ptr(&ref.get())
     {
     }
 
-    constexpr Optional(T& init_value) : m_ptr(&init_value)
+    constexpr Optional(T& init_value)
+        : m_ptr(&init_value)
     {
     }
     Optional(T&& value) = delete; // Catches accidental references to rvalue temporaries.
@@ -276,17 +281,20 @@ Optional<T> some(Args&&... args)
 
 
 template <class T>
-constexpr Optional<T>::Optional() : Storage(none)
+constexpr Optional<T>::Optional()
+    : Storage(none)
 {
 }
 
 template <class T>
-constexpr Optional<T>::Optional(None) : Storage(none)
+constexpr Optional<T>::Optional(None)
+    : Storage(none)
 {
 }
 
 template <class T>
-Optional<T>::Optional(Optional<T>&& other) : Storage(none)
+Optional<T>::Optional(Optional<T>&& other)
+    : Storage(none)
 {
     if (other.m_engaged) {
         new (&m_value) T(std::move(other.m_value));
@@ -295,7 +303,8 @@ Optional<T>::Optional(Optional<T>&& other) : Storage(none)
 }
 
 template <class T>
-Optional<T>::Optional(const Optional<T>& other) : Storage(none)
+Optional<T>::Optional(const Optional<T>& other)
+    : Storage(none)
 {
     if (other.m_engaged) {
         new (&m_value) T(other.m_value);
@@ -304,18 +313,21 @@ Optional<T>::Optional(const Optional<T>& other) : Storage(none)
 }
 
 template <class T>
-constexpr Optional<T>::Optional(T&& r_value) : Storage(std::move(r_value))
+constexpr Optional<T>::Optional(T&& r_value)
+    : Storage(std::move(r_value))
 {
 }
 
 template <class T>
-constexpr Optional<T>::Optional(const T& l_value) : Storage(l_value)
+constexpr Optional<T>::Optional(const T& l_value)
+    : Storage(l_value)
 {
 }
 
 template <class T>
 template <class... Args>
-constexpr Optional<T>::Optional(InPlace, Args&&... args) : Storage(std::forward<Args>(args)...)
+constexpr Optional<T>::Optional(InPlace, Args&&... args)
+    : Storage(std::forward<Args>(args)...)
 {
 }
 
@@ -656,15 +668,20 @@ struct OptionalStorage<T, true> {
     };
     bool m_engaged = false;
 
-    constexpr OptionalStorage(realm::util::None) : m_null_state()
+    constexpr OptionalStorage(realm::util::None)
+        : m_null_state()
     {
     }
-    constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true)
+    constexpr OptionalStorage(T&& value)
+        : m_value(std::move(value))
+        , m_engaged(true)
     {
     }
 
     template <class... Args>
-    constexpr OptionalStorage(Args&&... args) : m_value(args...), m_engaged(true)
+    constexpr OptionalStorage(Args&&... args)
+        : m_value(args...)
+        , m_engaged(true)
     {
     }
 };
@@ -678,15 +695,20 @@ struct OptionalStorage<T, false> {
     };
     bool m_engaged = false;
 
-    constexpr OptionalStorage(realm::util::None) : m_null_state()
+    constexpr OptionalStorage(realm::util::None)
+        : m_null_state()
     {
     }
-    constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true)
+    constexpr OptionalStorage(T&& value)
+        : m_value(std::move(value))
+        , m_engaged(true)
     {
     }
 
     template <class... Args>
-    constexpr OptionalStorage(Args&&... args) : m_value(args...), m_engaged(true)
+    constexpr OptionalStorage(Args&&... args)
+        : m_value(args...)
+        , m_engaged(true)
     {
     }
 

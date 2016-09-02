@@ -107,7 +107,8 @@ public:
     BpTree();
     explicit BpTree(BpTreeBase::unattached_tag);
     explicit BpTree(Allocator& alloc);
-    explicit BpTree(std::unique_ptr<Array> init_root) : BpTreeBase(std::move(init_root))
+    explicit BpTree(std::unique_ptr<Array> init_root)
+        : BpTreeBase(std::move(init_root))
     {
     }
     BpTree(BpTree&&) = default;
@@ -188,7 +189,8 @@ private:
 
 /// Implementation:
 
-inline BpTreeBase::BpTreeBase(std::unique_ptr<Array> init_root) : m_root(std::move(init_root))
+inline BpTreeBase::BpTreeBase(std::unique_ptr<Array> init_root)
+    : m_root(std::move(init_root))
 {
 }
 
@@ -254,17 +256,20 @@ inline Array& BpTreeBase::root() noexcept
 }
 
 template <class T>
-BpTree<T>::BpTree() : BpTree(Allocator::get_default())
+BpTree<T>::BpTree()
+    : BpTree(Allocator::get_default())
 {
 }
 
 template <class T>
-BpTree<T>::BpTree(Allocator& alloc) : BpTreeBase(std::unique_ptr<Array>(new LeafType(alloc)))
+BpTree<T>::BpTree(Allocator& alloc)
+    : BpTreeBase(std::unique_ptr<Array>(new LeafType(alloc)))
 {
 }
 
 template <class T>
-BpTree<T>::BpTree(BpTreeBase::unattached_tag) : BpTreeBase(nullptr)
+BpTree<T>::BpTree(BpTreeBase::unattached_tag)
+    : BpTreeBase(nullptr)
 {
 }
 
@@ -455,7 +460,8 @@ template <class T>
 struct BpTree<T>::LeafValueInserter {
     using value_type = T;
     T m_value;
-    LeafValueInserter(T value) : m_value(std::move(value))
+    LeafValueInserter(T value)
+        : m_value(std::move(value))
     {
     }
 
@@ -500,7 +506,9 @@ template <class T>
 struct BpTree<T>::UpdateHandler : Array::UpdateHandler {
     LeafType m_leaf;
     const T m_value;
-    UpdateHandler(BpTreeBase& tree, T value) noexcept : m_leaf(tree.get_alloc()), m_value(std::move(value))
+    UpdateHandler(BpTreeBase& tree, T value) noexcept
+        : m_leaf(tree.get_alloc())
+        , m_value(std::move(value))
     {
     }
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t elem_ndx_in_leaf) override
@@ -514,7 +522,8 @@ struct BpTree<T>::UpdateHandler : Array::UpdateHandler {
 template <class T>
 struct BpTree<T>::SetNullHandler : Array::UpdateHandler {
     LeafType m_leaf;
-    SetNullHandler(BpTreeBase& tree) noexcept : m_leaf(tree.get_alloc())
+    SetNullHandler(BpTreeBase& tree) noexcept
+        : m_leaf(tree.get_alloc())
     {
     }
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t elem_ndx_in_leaf) override
@@ -554,7 +563,10 @@ struct BpTree<T>::EraseHandler : Array::EraseHandler {
     BpTreeBase& m_tree;
     LeafType m_leaf;
     bool m_leaves_have_refs; // FIXME: Should be able to eliminate this.
-    EraseHandler(BpTreeBase& tree) noexcept : m_tree(tree), m_leaf(tree.get_alloc()), m_leaves_have_refs(false)
+    EraseHandler(BpTreeBase& tree) noexcept
+        : m_tree(tree)
+        , m_leaf(tree.get_alloc())
+        , m_leaves_have_refs(false)
     {
     }
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent, size_t leaf_ndx_in_parent,
@@ -647,7 +659,9 @@ template <class T>
 struct BpTree<T>::AdjustHandler : Array::UpdateHandler {
     LeafType m_leaf;
     const T m_diff;
-    AdjustHandler(BpTreeBase& tree, T diff) : m_leaf(tree.get_alloc()), m_diff(diff)
+    AdjustHandler(BpTreeBase& tree, T diff)
+        : m_leaf(tree.get_alloc())
+        , m_diff(diff)
     {
     }
 
@@ -683,7 +697,10 @@ struct BpTree<T>::AdjustGEHandler : Array::UpdateHandler {
     LeafType m_leaf;
     const T m_limit, m_diff;
 
-    AdjustGEHandler(BpTreeBase& tree, T limit, T diff) : m_leaf(tree.get_alloc()), m_limit(limit), m_diff(diff)
+    AdjustGEHandler(BpTreeBase& tree, T limit, T diff)
+        : m_leaf(tree.get_alloc())
+        , m_limit(limit)
+        , m_diff(diff)
     {
     }
 
@@ -710,7 +727,8 @@ void BpTree<T>::adjust_ge(T limit, T diff)
 template <class T>
 struct BpTree<T>::SliceHandler : public BpTreeBase::SliceHandler {
 public:
-    SliceHandler(Allocator& alloc) : m_leaf(alloc)
+    SliceHandler(Allocator& alloc)
+        : m_leaf(alloc)
     {
     }
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size, Allocator& target_alloc) override

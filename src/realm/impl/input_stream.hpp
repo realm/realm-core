@@ -52,7 +52,9 @@ public:
 
 class SimpleInputStream : public InputStream {
 public:
-    SimpleInputStream(const char* data, size_t size) noexcept : m_ptr(data), m_end(data + size)
+    SimpleInputStream(const char* data, size_t size) noexcept
+        : m_ptr(data)
+        , m_end(data + size)
     {
     }
     size_t read(char* buffer, size_t size) override
@@ -89,7 +91,9 @@ public:
 class NoCopyInputStreamAdaptor : public NoCopyInputStream {
 public:
     NoCopyInputStreamAdaptor(InputStream& in, char* buffer, size_t buffer_size) noexcept
-        : m_in(in), m_buffer(buffer), m_buffer_size(buffer_size)
+        : m_in(in)
+        , m_buffer(buffer)
+        , m_buffer_size(buffer_size)
     {
     }
     size_t next_block(const char*& begin, const char*& end) override
@@ -109,7 +113,9 @@ private:
 
 class SimpleNoCopyInputStream : public NoCopyInputStream {
 public:
-    SimpleNoCopyInputStream(const char* data, size_t size) : m_data(data), m_size(size)
+    SimpleNoCopyInputStream(const char* data, size_t size)
+        : m_data(data)
+        , m_size(size)
     {
     }
 
@@ -132,7 +138,8 @@ private:
 class MultiLogNoCopyInputStream : public NoCopyInputStream {
 public:
     MultiLogNoCopyInputStream(const BinaryData* logs_begin, const BinaryData* logs_end)
-        : m_logs_begin(logs_begin), m_logs_end(logs_end)
+        : m_logs_begin(logs_begin)
+        , m_logs_end(logs_end)
     {
         if (m_logs_begin != m_logs_end)
             m_curr_buf_remaining_size = m_logs_begin->size();
@@ -201,7 +208,9 @@ private:
 
 
 inline ChangesetInputStream::ChangesetInputStream(History& hist, version_type begin_version, version_type end_version)
-    : m_history(hist), m_begin_version(begin_version), m_end_version(end_version)
+    : m_history(hist)
+    , m_begin_version(begin_version)
+    , m_end_version(end_version)
 {
 }
 
