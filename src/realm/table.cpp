@@ -1326,7 +1326,7 @@ void Table::detach() noexcept
     // This prevents the destructor from deallocating the underlying
     // memory structure, and from attempting to notify the parent. It
     // also causes is_attached() to return false.
-    m_columns.set_parent(0, 0);
+    m_columns.set_parent(nullptr, 0);
 
     discard_child_accessors();
     destroy_column_accessors();
@@ -1999,7 +1999,10 @@ size_t Table::get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
     const char* columns_header = alloc.translate(columns_ref);
     REALM_ASSERT_3(Array::get_size_from_header(columns_header), !=, 0);
     ref_type first_col_ref = to_ref(Array::get(columns_header, 0));
-    size_t size = ColumnBase::get_size_from_type_and_ref(first_col_type, first_col_ref, alloc);
+    Spec spec(alloc);
+    spec.init(spec_ref);
+    bool nullable = (spec.get_column_attr(0) & col_attr_Nullable) == col_attr_Nullable;
+    size_t size = ColumnBase::get_size_from_type_and_ref(first_col_type, first_col_ref, alloc, nullable);
     return size;
 }
 
@@ -2649,7 +2652,7 @@ void Table::clear_subtable(size_t col_ndx, size_t row_ndx)
     }
     else if (type == col_type_Mixed) {
         MixedColumn& subtables = get_column_mixed(col_ndx);
-        subtables.set_subtable(row_ndx, 0);
+        subtables.set_subtable(row_ndx, nullptr);
 
         if (Replication* repl = get_repl())
             repl->set_mixed(this, col_ndx, row_ndx, Mixed::subtable_tag()); // Throws
@@ -3331,7 +3334,7 @@ void Table::set_mixed(size_t col_ndx, size_t ndx, Mixed value, bool is_default)
             col.set_binary(ndx, value.get_binary()); // Throws
             break;
         case type_Table:
-            col.set_subtable(ndx, 0); // Throws
+            col.set_subtable(ndx, nullptr); // Throws
             break;
         case type_Mixed:
         case type_Link:
@@ -3438,8 +3441,6 @@ ConstLinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx) const
 LinkViewRef Table::get_linklist(size_t col_ndx, size_t row_ndx)
 {
     REALM_ASSERT_3(row_ndx, <, m_size);
-    // FIXME: this looks wrong! It should instead be the modifying operations of
-    // LinkView that bump the change count of the containing table.
     LinkListColumn& col = get_column_link_list(col_ndx);
     return col.get(row_ndx);
 }
@@ -3666,7 +3667,7 @@ OldDateTime Table::minimum_olddatetime(size_t col_ndx, size_t* return_ndx) const
 Timestamp Table::minimum_timestamp(size_t col_ndx, size_t* return_ndx) const
 {
     if (!m_columns.is_attached())
-        return Timestamp(null{});
+        return Timestamp{};
 
     const TimestampColumn& col = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
     return col.minimum(return_ndx);
@@ -3741,7 +3742,7 @@ OldDateTime Table::maximum_olddatetime(size_t col_ndx, size_t* return_ndx) const
 Timestamp Table::maximum_timestamp(size_t col_ndx, size_t* return_ndx) const
 {
     if (!m_columns.is_attached())
-        return Timestamp(null{});
+        return Timestamp{};
 
     const TimestampColumn& col = get_column<TimestampColumn, col_type_Timestamp>(col_ndx);
     return col.maximum(return_ndx);
@@ -5935,11 +5936,11 @@ TableRef Table::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& pa
     return TableRef();
 }
 
-
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+// LCOV_EXCL_START ignore debug functions
 
 void Table::verify() const
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT(is_attached());
     if (!m_columns.is_attached())
         return; // Accessor for degenerate subtable
@@ -5973,8 +5974,10 @@ void Table::verify() const
             REALM_ASSERT_3(col.size(), ==, m_size);
         }
     }
+#endif
 }
 
+#ifdef REALM_DEBUG
 
 void Table::to_dot(std::ostream& out, StringData title) const
 {

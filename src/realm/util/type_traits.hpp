@@ -19,7 +19,7 @@
 #ifndef REALM_UTIL_TYPE_TRAITS_HPP
 #define REALM_UTIL_TYPE_TRAITS_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <climits>
 #include <cwchar>
 #include <limits>

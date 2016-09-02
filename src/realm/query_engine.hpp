@@ -910,7 +910,7 @@ public:
         m_condition_column_idx = column;
     }
 
-    TimestampNode(null, size_t column) : TimestampNode(Timestamp(null{}), column)
+    TimestampNode(null, size_t column) : TimestampNode(Timestamp{}, column)
     {
     }
 

@@ -141,11 +141,9 @@ public:
         m_map.clear();
     }
 
-#ifdef REALM_DEBUG
     void verify() const override
     {
     }
-#endif
 
 private:
     ref_type m_offset;

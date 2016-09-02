@@ -5,10 +5,21 @@
 * Fixed a bug with link columns incorrectly updating on a `move_last_over`
   operation when the link points to the same table.
 * Fix subspecs not updating properly after a move operation.
+* Fixed various crashes when using subtables. The crash will occur when the first column
+  of the subtable if of type `col_type_Timestamp` or if it is nullable and of type Bool, Int
+  or OldDateTime. Caused by bad static `get_size_from_ref()` methods of columns. (#2101)
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Refactored the `SharedGroup` constructors and open methods to use a new
+  `SharedGroupOptions` parameter which stores all options together.
+* BREAKING! Until now, a Query would return indexes into a restricting view if such was 
+  present (a view given in the `.where(&view) method`, or it would return indexes into the
+  Table if no restricting view was present. This would make query results useless if you did 
+  not know whether or not a restricting view was present. This fix make it *always* return 
+  indexes into the Table in all cases. Also, any `begin` and `end` arguments could point into 
+  eitherthe View or the Table. These now always point into the Table. Also see 
+  https://github.com/realm/realm-core/issues/1565
 
 ### Enhancements
 
@@ -18,7 +29,9 @@
 
 ### Internals
 
-* Lorem ipsum.
+* When creating a `SharedGroup`, optionally allow setting the temporary 
+  directory to when making named pipes fails. This is to fix a bug
+  involving mkfifo on recent android devices (#1959).
 
 ----------------------------------------------
 

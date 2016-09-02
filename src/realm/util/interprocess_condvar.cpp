@@ -89,13 +89,14 @@ InterprocessCondVar::~InterprocessCondVar() noexcept
 
 
 void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path,
-                                          std::string condvar_name)
+                                          std::string condvar_name, std::string tmp_path)
 {
     close();
     uses_emulation = true;
     m_shared_part = &shared_part;
     static_cast<void>(base_path);
     static_cast<void>(condvar_name);
+    static_cast<void>(tmp_path);
 #ifdef REALM_CONDVAR_EMULATION
 #if !REALM_TVOS
     m_resource_path = base_path + "." + condvar_name + ".cv";
@@ -104,13 +105,12 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     int ret = mkfifo(m_resource_path.c_str(), 0600);
     if (ret == -1) {
         int err = errno;
-        if (err == ENOTSUP) {
+        if (err == ENOTSUP || err == EACCES) {
             // Filesystem doesn't support named pipes, so try putting it in tmp instead
             // Hash collisions are okay here because they just result in doing
             // extra work, as opposed to correctness problems
             std::ostringstream ss;
-            // FIXME: getenv() is not classified as thread safe
-            ss << getenv("TMPDIR");
+            ss << tmp_path;
             ss << "realm_" << std::hash<std::string>()(m_resource_path) << ".cv";
             m_resource_path = ss.str();
             ret = mkfifo(m_resource_path.c_str(), 0600);

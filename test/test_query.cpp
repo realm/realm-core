@@ -3284,73 +3284,6 @@ TEST(Query_Delete)
     CHECK_EQUAL(0, ttt.size());
 }
 
-TEST(Query_DeleteRange)
-{
-    TupleTableType ttt;
-
-    ttt.add(0, "X");
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "X");
-    ttt.add(5, "X");
-
-    TupleTableType::Query q = ttt.where().second.equal("X");
-    size_t r = q.remove(1, 4);
-
-    CHECK_EQUAL(3, r);
-    CHECK_EQUAL(3, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(4, ttt[1].first);
-    CHECK_EQUAL(5, ttt[2].first);
-}
-
-TEST(Query_DeleteRange_where)
-{
-    TupleTableType ttt;
-
-    ttt.add(0, "X");
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "X");
-    ttt.add(5, "X");
-
-    TupleTableType::View tv = ttt.where().second.equal("X").find_all();
-    TupleTableType::Query q = ttt.where(&tv).second.equal("X");
-
-    size_t r = q.remove(1, 4);
-
-    CHECK_EQUAL(3, r);
-    CHECK_EQUAL(3, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(4, ttt[1].first);
-    CHECK_EQUAL(5, ttt[2].first);
-}
-
-TEST(Query_DeleteLimit)
-{
-    TupleTableType ttt;
-
-    ttt.add(0, "X");
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "X");
-    ttt.add(5, "X");
-
-    TupleTableType::Query q = ttt.where().second.equal("X");
-    size_t r = q.remove(1, 4, 2);
-
-    CHECK_EQUAL(2, r);
-    CHECK_EQUAL(4, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(3, ttt[1].first);
-    CHECK_EQUAL(4, ttt[2].first);
-    CHECK_EQUAL(5, ttt[3].first);
-}
-
-
 
 TEST(Query_Simple)
 {
@@ -4054,7 +3987,7 @@ TEST(Query_Sort_And_Requery_Typed1)
     TupleTableType::View tv = q.find_all();
 
     size_t match = ttt.where(&tv).first.equal(7).find();
-    CHECK_EQUAL(match, 6);
+    CHECK_EQUAL(match, 8);
 
     tv.column().first.sort();
 
@@ -4080,13 +4013,13 @@ TEST(Query_Sort_And_Requery_Typed1)
     CHECK_EQUAL(match, 0);
 
     match = ttt.where(&tv).second.not_equal("X").find(1);
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, 3);
 
     match = ttt.where(&tv).second.not_equal("X").find(2);
-    CHECK_EQUAL(match, 5);
+    CHECK_EQUAL(match, 3);
 
     match = ttt.where(&tv).second.not_equal("X").find(6);
-    CHECK_EQUAL(match, 6);
+    CHECK_EQUAL(match, 7);
 }
 
 
@@ -8981,7 +8914,7 @@ TEST(Query_Timestamp)
     table.set_timestamp(0, 0, Timestamp(111, 222));
     table.set_timestamp(0, 1, Timestamp(111, 333));
     table.set_timestamp(0, 2, Timestamp(333, 444));
-    table.set_timestamp(0, 3, Timestamp(null{}));
+    table.set_timestamp(0, 3, Timestamp{});
     table.set_timestamp(0, 4, Timestamp(0, 0));
     table.set_timestamp(0, 5, Timestamp(-1000, 0));
 
@@ -9014,7 +8947,7 @@ TEST(Query_Timestamp)
     match = (first < Timestamp(0, 0)).count();
     CHECK_EQUAL(match, 1);
 
-    match = (first != Timestamp(null{})).count();
+    match = (first != Timestamp{}).count();
     CHECK_EQUAL(match, 5);
 
     match = (first != null{}).count();
@@ -9030,7 +8963,7 @@ TEST(Query_Timestamp)
     match = (Timestamp(111, 222) == first).find();
     CHECK_EQUAL(match, 0);
 
-    match = (Timestamp(null{}) == first).find();
+    match = (Timestamp{} == first).find();
     CHECK_EQUAL(match, 3);
 
     match = (Timestamp(111, 222) > first).find();
@@ -9099,10 +9032,10 @@ TEST(Query_Timestamp_Null)
     Columns<Timestamp> first = table.column<Timestamp>(0);
     Columns<Timestamp> second = table.column<Timestamp>(1);
 
-    match = (first == Timestamp(null{})).find();
+    match = (first == Timestamp{}).find();
     CHECK_EQUAL(match, npos);
 
-    match = (second == Timestamp(null{})).find();
+    match = (second == Timestamp{}).find();
     CHECK_EQUAL(match, 0);
 }
 
@@ -9426,8 +9359,8 @@ TEST(Query_TableInitialization)
 
     auto repl = make_in_realm_history(path);
     auto repl2 = make_in_realm_history(path);
-    SharedGroup sg(*repl, SharedGroup::durability_MemOnly);
-    SharedGroup sg2(*repl2, SharedGroup::durability_MemOnly);
+    SharedGroup sg(*repl, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+    SharedGroup sg2(*repl2, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
     Group& g = const_cast<Group&>(sg.begin_read());
     LangBindHelper::promote_to_write(sg);
 
