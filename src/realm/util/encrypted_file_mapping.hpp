@@ -137,7 +137,9 @@ namespace util {
 /// Thrown by EncryptedFileMapping if a file opened is non-empty and does not
 /// contain valid encrypted data
 struct DecryptionFailed : util::File::AccessError {
-    DecryptionFailed() : util::File::AccessError("Decryption failed", std::string()) {}
+    DecryptionFailed() : util::File::AccessError("Decryption failed", std::string())
+    {
+    }
 };
 }
 }

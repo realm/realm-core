@@ -52,8 +52,14 @@ struct SpecBase {
     class Enum {
     public:
         typedef E enum_type;
-        Enum(E v) : m_value(v) {}
-        operator E() const { return m_value; }
+        Enum(E v) : m_value(v)
+        {
+        }
+        operator E() const
+        {
+            return m_value;
+        }
+
     private:
         E m_value;
     };
@@ -62,8 +68,14 @@ struct SpecBase {
     class Subtable {
     public:
         typedef T table_type;
-        Subtable(T* t) : m_table(t) {}
-        operator T*() const { return m_table; }
+        Subtable(T* t) : m_table(t)
+        {
+        }
+        operator T*() const
+        {
+            return m_table;
+        }
+
     private:
         T* m_table;
     };
@@ -93,12 +105,16 @@ struct SpecBase {
     /// you do not have to specify a name for every column.
     template <template <int> class Col, class Init>
     struct ColNames {
-        ColNames(Init) noexcept {}
+        ColNames(Init) noexcept
+        {
+        }
     };
 
     /// FIXME: Currently we do not support absence of dynamic column
     /// names.
-    static void dyn_col_names(StringData*) noexcept {}
+    static void dyn_col_names(StringData*) noexcept
+    {
+    }
 
     /// This is the fallback class that is used when no convenience
     /// methods are specified in the users Spec class.
@@ -211,7 +227,9 @@ protected:
     typedef std::pair<Taboid*, size_t> Init;
     Taboid* const m_table;
     const size_t m_row_idx;
-    FieldAccessorBase(Init i) noexcept : m_table(i.first), m_row_idx(i.second) {}
+    FieldAccessorBase(Init i) noexcept : m_table(i.first), m_row_idx(i.second)
+    {
+    }
 };
 
 
@@ -222,10 +240,19 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    int64_t get() const noexcept { return Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx); }
+    int64_t get() const noexcept
+    {
+        return Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx);
+    }
 
-    void set(int64_t value) const { Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value); }
-    operator int64_t() const noexcept { return get(); }
+    void set(int64_t value) const
+    {
+        Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
+    }
+    operator int64_t() const noexcept
+    {
+        return get();
+    }
     const FieldAccessor& operator=(int64_t value) const
     {
         set(value);
@@ -248,8 +275,14 @@ public:
         return *this;
     }
 
-    const FieldAccessor& operator++() const { return *this += 1; }
-    const FieldAccessor& operator--() const { return *this -= 1; }
+    const FieldAccessor& operator++() const
+    {
+        return *this += 1;
+    }
+    const FieldAccessor& operator--() const
+    {
+        return *this -= 1;
+    }
 
     int64_t operator++(int)const
     {
@@ -270,7 +303,9 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 
@@ -281,11 +316,20 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    float get() const noexcept { return Base::m_table->get_impl()->get_float(col_idx, Base::m_row_idx); }
+    float get() const noexcept
+    {
+        return Base::m_table->get_impl()->get_float(col_idx, Base::m_row_idx);
+    }
 
-    void set(float value) const { Base::m_table->get_impl()->set_float(col_idx, Base::m_row_idx, value); }
+    void set(float value) const
+    {
+        Base::m_table->get_impl()->set_float(col_idx, Base::m_row_idx, value);
+    }
 
-    operator float() const noexcept { return get(); }
+    operator float() const noexcept
+    {
+        return get();
+    }
     const FieldAccessor& operator=(float value) const
     {
         set(value);
@@ -309,7 +353,9 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 
@@ -320,11 +366,20 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    double get() const noexcept { return Base::m_table->get_impl()->get_double(col_idx, Base::m_row_idx); }
+    double get() const noexcept
+    {
+        return Base::m_table->get_impl()->get_double(col_idx, Base::m_row_idx);
+    }
 
-    void set(double value) const { Base::m_table->get_impl()->set_double(col_idx, Base::m_row_idx, value); }
+    void set(double value) const
+    {
+        Base::m_table->get_impl()->set_double(col_idx, Base::m_row_idx, value);
+    }
 
-    operator double() const noexcept { return get(); }
+    operator double() const noexcept
+    {
+        return get();
+    }
     const FieldAccessor& operator=(double value) const
     {
         set(value);
@@ -348,7 +403,9 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 
@@ -359,11 +416,20 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    bool get() const noexcept { return Base::m_table->get_impl()->get_bool(col_idx, Base::m_row_idx); }
+    bool get() const noexcept
+    {
+        return Base::m_table->get_impl()->get_bool(col_idx, Base::m_row_idx);
+    }
 
-    void set(bool value) const { Base::m_table->get_impl()->set_bool(col_idx, Base::m_row_idx, value); }
+    void set(bool value) const
+    {
+        Base::m_table->get_impl()->set_bool(col_idx, Base::m_row_idx, value);
+    }
 
-    operator bool() const noexcept { return get(); }
+    operator bool() const noexcept
+    {
+        return get();
+    }
     const FieldAccessor& operator=(bool value) const
     {
         set(value);
@@ -371,7 +437,9 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 
@@ -382,11 +450,20 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    E get() const noexcept { return static_cast<E>(Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx)); }
+    E get() const noexcept
+    {
+        return static_cast<E>(Base::m_table->get_impl()->get_int(col_idx, Base::m_row_idx));
+    }
 
-    void set(E value) const { Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value); }
+    void set(E value) const
+    {
+        Base::m_table->get_impl()->set_int(col_idx, Base::m_row_idx, value);
+    }
 
-    operator E() const noexcept { return get(); }
+    operator E() const noexcept
+    {
+        return get();
+    }
     const FieldAccessor& operator=(E value) const
     {
         set(value);
@@ -394,7 +471,9 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 
@@ -405,11 +484,20 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    OldDateTime get() const noexcept { return Base::m_table->get_impl()->get_olddatetime(col_idx, Base::m_row_idx); }
+    OldDateTime get() const noexcept
+    {
+        return Base::m_table->get_impl()->get_olddatetime(col_idx, Base::m_row_idx);
+    }
 
-    void set(OldDateTime value) const { Base::m_table->get_impl()->set_olddatetime(col_idx, Base::m_row_idx, value); }
+    void set(OldDateTime value) const
+    {
+        Base::m_table->get_impl()->set_olddatetime(col_idx, Base::m_row_idx, value);
+    }
 
-    operator OldDateTime() const noexcept { return get(); }
+    operator OldDateTime() const noexcept
+    {
+        return get();
+    }
     const FieldAccessor& operator=(OldDateTime value) const
     {
         set(value);
@@ -417,7 +505,9 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 /// Field accessor specialization for timestamps.
@@ -427,11 +517,20 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    Timestamp get() const noexcept { return Base::m_table->get_impl()->get_timestamp(col_idx, Base::m_row_idx); }
+    Timestamp get() const noexcept
+    {
+        return Base::m_table->get_impl()->get_timestamp(col_idx, Base::m_row_idx);
+    }
 
-    void set(Timestamp value) const { Base::m_table->get_impl()->set_timestamp(col_idx, Base::m_row_idx, value); }
+    void set(Timestamp value) const
+    {
+        Base::m_table->get_impl()->set_timestamp(col_idx, Base::m_row_idx, value);
+    }
 
-    operator Timestamp() const noexcept { return get(); }
+    operator Timestamp() const noexcept
+    {
+        return get();
+    }
     const FieldAccessor& operator=(Timestamp value) const
     {
         set(value);
@@ -439,7 +538,9 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 /// Field accessor specialization for strings.
@@ -449,24 +550,44 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    StringData get() const noexcept { return Base::m_table->get_impl()->get_string(col_idx, Base::m_row_idx); }
+    StringData get() const noexcept
+    {
+        return Base::m_table->get_impl()->get_string(col_idx, Base::m_row_idx);
+    }
 
-    void set(StringData value) const { Base::m_table->get_impl()->set_string(col_idx, Base::m_row_idx, value); }
+    void set(StringData value) const
+    {
+        Base::m_table->get_impl()->set_string(col_idx, Base::m_row_idx, value);
+    }
 
-    operator StringData() const noexcept { return get(); }
+    operator StringData() const noexcept
+    {
+        return get();
+    }
     const FieldAccessor& operator=(StringData value) const
     {
         set(value);
         return *this;
     }
 
-    const char* data() const noexcept { return get().data(); }
-    size_t size() const noexcept { return get().size(); }
+    const char* data() const noexcept
+    {
+        return get().data();
+    }
+    size_t size() const noexcept
+    {
+        return get().size();
+    }
 
-    const char* c_str() const noexcept { return data(); }
+    const char* c_str() const noexcept
+    {
+        return data();
+    }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 
@@ -477,24 +598,38 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    BinaryData get() const noexcept { return Base::m_table->get_impl()->get_binary(col_idx, Base::m_row_idx); }
+    BinaryData get() const noexcept
+    {
+        return Base::m_table->get_impl()->get_binary(col_idx, Base::m_row_idx);
+    }
 
     void set(const BinaryData& value) const
     {
         Base::m_table->get_impl()->set_binary(col_idx, Base::m_row_idx, value);
     }
 
-    operator BinaryData() const noexcept { return get(); }
+    operator BinaryData() const noexcept
+    {
+        return get();
+    }
     const FieldAccessor& operator=(const BinaryData& value) const
     {
         set(value);
         return *this;
     }
 
-    const char* data() const noexcept { return get().data(); }
-    size_t size() const noexcept { return get().size(); }
+    const char* data() const noexcept
+    {
+        return get().data();
+    }
+    size_t size() const noexcept
+    {
+        return get().size();
+    }
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 
@@ -544,7 +679,9 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 
@@ -566,7 +703,9 @@ private:
     };
 
 public:
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 
     operator typename Subtab::ConstRef() const
     {
@@ -595,11 +734,20 @@ private:
     typedef FieldAccessorBase<Taboid> Base;
 
 public:
-    Mixed get() const noexcept { return Base::m_table->get_impl()->get_mixed(col_idx, Base::m_row_idx); }
+    Mixed get() const noexcept
+    {
+        return Base::m_table->get_impl()->get_mixed(col_idx, Base::m_row_idx);
+    }
 
-    void set(const Mixed& value) const { Base::m_table->get_impl()->set_mixed(col_idx, Base::m_row_idx, value); }
+    void set(const Mixed& value) const
+    {
+        Base::m_table->get_impl()->set_mixed(col_idx, Base::m_row_idx, value);
+    }
 
-    operator Mixed() const noexcept { return get(); }
+    operator Mixed() const noexcept
+    {
+        return get();
+    }
 
     const FieldAccessor& operator=(const Mixed& value) const
     {
@@ -607,23 +755,50 @@ public:
         return static_cast<FieldAccessor&>(*this);
     }
 
-    DataType get_type() const noexcept { return Base::m_table->get_impl()->get_mixed_type(col_idx, Base::m_row_idx); }
+    DataType get_type() const noexcept
+    {
+        return Base::m_table->get_impl()->get_mixed_type(col_idx, Base::m_row_idx);
+    }
 
-    int64_t get_int() const noexcept { return get().get_int(); }
+    int64_t get_int() const noexcept
+    {
+        return get().get_int();
+    }
 
-    bool get_bool() const noexcept { return get().get_bool(); }
+    bool get_bool() const noexcept
+    {
+        return get().get_bool();
+    }
 
-    OldDateTime get_olddatetime() const noexcept { return get().get_olddatetime(); }
+    OldDateTime get_olddatetime() const noexcept
+    {
+        return get().get_olddatetime();
+    }
 
-    float get_float() const noexcept { return get().get_float(); }
+    float get_float() const noexcept
+    {
+        return get().get_float();
+    }
 
-    double get_double() const noexcept { return get().get_double(); }
+    double get_double() const noexcept
+    {
+        return get().get_double();
+    }
 
-    StringData get_string() const noexcept { return get().get_string(); }
+    StringData get_string() const noexcept
+    {
+        return get().get_string();
+    }
 
-    BinaryData get_binary() const noexcept { return get().get_binary(); }
+    BinaryData get_binary() const noexcept
+    {
+        return get().get_binary();
+    }
 
-    bool is_subtable() const noexcept { return get_type() == type_Table; }
+    bool is_subtable() const noexcept
+    {
+        return get_type() == type_Table;
+    }
 
     /// Checks whether this value is a subtable of the specified type.
     ///
@@ -671,7 +846,9 @@ public:
     }
 
 protected:
-    MixedFieldAccessorBase(typename Base::Init i) noexcept : Base(i) {}
+    MixedFieldAccessorBase(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 
@@ -685,7 +862,10 @@ private:
 
 public:
     /// Returns null if the current value is not a subtable.
-    TableRef get_subtable() const { return Base::m_table->get_impl()->get_subtable(col_idx, Base::m_row_idx); }
+    TableRef get_subtable() const
+    {
+        return Base::m_table->get_impl()->get_subtable(col_idx, Base::m_row_idx);
+    }
 
     /// Overwrites the current value with an empty subtable and
     /// returns a reference to it.
@@ -763,7 +943,9 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 
@@ -776,7 +958,10 @@ private:
     typedef MixedFieldAccessorBase<Taboid, col_idx, This> Base;
 
 public:
-    ConstTableRef get_subtable() const { return Base::m_table->get_impl()->get_subtable(col_idx, Base::m_row_idx); }
+    ConstTableRef get_subtable() const
+    {
+        return Base::m_table->get_impl()->get_subtable(col_idx, Base::m_row_idx);
+    }
 
     /// FIXME: Consider deleting this function, since it is both
     /// unsafe and superfluous.
@@ -788,7 +973,9 @@ public:
     }
 
 
-    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i) {}
+    explicit FieldAccessor(typename Base::Init i) noexcept : Base(i)
+    {
+    }
 };
 
 
@@ -808,23 +995,40 @@ protected:
     typedef FieldAccessor<Taboid, col_idx, Type, TableIsConst<Taboid>::value> Field;
 
 public:
-    Field operator[](size_t row_idx) const { return Field(std::make_pair(m_table, row_idx)); }
+    Field operator[](size_t row_idx) const
+    {
+        return Field(std::make_pair(m_table, row_idx));
+    }
 
-    bool has_search_index() const { return m_table->get_impl()->has_search_index(col_idx); }
-    void add_search_index() const { m_table->get_impl()->add_search_index(col_idx); }
-    void remove_search_index() const { m_table->get_impl()->remove_search_index(col_idx); }
+    bool has_search_index() const
+    {
+        return m_table->get_impl()->has_search_index(col_idx);
+    }
+    void add_search_index() const
+    {
+        m_table->get_impl()->add_search_index(col_idx);
+    }
+    void remove_search_index() const
+    {
+        m_table->get_impl()->remove_search_index(col_idx);
+    }
 
     BasicTableView<RealTable> get_sorted_view(bool ascending = true) const
     {
         return m_table->get_impl()->get_sorted_view(col_idx, ascending);
     }
 
-    void sort(bool ascending = true) const { m_table->get_impl()->sort(col_idx, ascending); }
+    void sort(bool ascending = true) const
+    {
+        m_table->get_impl()->sort(col_idx, ascending);
+    }
 
 protected:
     Taboid* const m_table;
 
-    explicit ColumnAccessorBase(Taboid* t) noexcept : m_table(t) {}
+    explicit ColumnAccessorBase(Taboid* t) noexcept : m_table(t)
+    {
+    }
 };
 
 namespace {
@@ -832,7 +1036,9 @@ namespace {
 // Used as base class of ColumnAccessor when Columns is not appropriate
 // (e.g., accessor of a TableView, which is not yet supported).
 struct NotARealColumns {
-    NotARealColumns(size_t, void*) {}
+    NotARealColumns(size_t, void*)
+    {
+    }
 };
 
 // Select whether to use Columns<T> or NotARealColumns for the given Taboid.
@@ -852,9 +1058,14 @@ private:
     using ColumnsBase = typename ColumnsForTaboid<Taboid, int64_t>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl()) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl())
+    {
+    }
 
-    size_t find_first(int64_t value) const { return Base::m_table->get_impl()->find_first_int(col_idx, value); }
+    size_t find_first(int64_t value) const
+    {
+        return Base::m_table->get_impl()->find_first_int(col_idx, value);
+    }
 
     BasicTableView<typename Base::RealTable> find_all(int64_t value) const
     {
@@ -866,9 +1077,15 @@ public:
         return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
-    size_t count(int64_t target) const { return Base::m_table->get_impl()->count_int(col_idx, target); }
+    size_t count(int64_t target) const
+    {
+        return Base::m_table->get_impl()->count_int(col_idx, target);
+    }
 
-    int64_t sum() const { return Base::m_table->get_impl()->sum_int(col_idx); }
+    int64_t sum() const
+    {
+        return Base::m_table->get_impl()->sum_int(col_idx);
+    }
 
     int64_t maximum(size_t* return_ndx = nullptr) const
     {
@@ -880,11 +1097,20 @@ public:
         return Base::m_table->get_impl()->minimum_int(col_idx, return_ndx);
     }
 
-    double average() const { return Base::m_table->get_impl()->average_int(col_idx); }
+    double average() const
+    {
+        return Base::m_table->get_impl()->average_int(col_idx);
+    }
 
-    size_t lower_bound(int64_t value) const noexcept { return Base::m_table->lower_bound_int(col_idx, value); }
+    size_t lower_bound(int64_t value) const noexcept
+    {
+        return Base::m_table->lower_bound_int(col_idx, value);
+    }
 
-    size_t upper_bound(int64_t value) const noexcept { return Base::m_table->upper_bound_int(col_idx, value); }
+    size_t upper_bound(int64_t value) const noexcept
+    {
+        return Base::m_table->upper_bound_int(col_idx, value);
+    }
 };
 
 
@@ -897,9 +1123,14 @@ private:
     using ColumnsBase = typename ColumnsForTaboid<Taboid, float>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl()) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl())
+    {
+    }
 
-    size_t find_first(float value) const { return Base::m_table->get_impl()->find_first_float(col_idx, value); }
+    size_t find_first(float value) const
+    {
+        return Base::m_table->get_impl()->find_first_float(col_idx, value);
+    }
 
     BasicTableView<typename Base::RealTable> find_all(float value) const
     {
@@ -911,9 +1142,15 @@ public:
         return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
-    size_t count(float target) const { return Base::m_table->get_impl()->count_float(col_idx, target); }
+    size_t count(float target) const
+    {
+        return Base::m_table->get_impl()->count_float(col_idx, target);
+    }
 
-    double sum() const { return Base::m_table->get_impl()->sum_float(col_idx); }
+    double sum() const
+    {
+        return Base::m_table->get_impl()->sum_float(col_idx);
+    }
 
     float maximum(size_t* return_ndx = nullptr) const
     {
@@ -925,7 +1162,10 @@ public:
         return Base::m_table->get_impl()->minimum_float(col_idx, return_ndx);
     }
 
-    double average() const { return Base::m_table->get_impl()->average_float(col_idx); }
+    double average() const
+    {
+        return Base::m_table->get_impl()->average_float(col_idx);
+    }
 
     const ColumnAccessor& operator+=(float value) const
     {
@@ -933,9 +1173,15 @@ public:
         return *this;
     }
 
-    size_t lower_bound(float value) const noexcept { return Base::m_table->lower_bound_float(col_idx, value); }
+    size_t lower_bound(float value) const noexcept
+    {
+        return Base::m_table->lower_bound_float(col_idx, value);
+    }
 
-    size_t upper_bound(float value) const noexcept { return Base::m_table->upper_bound_float(col_idx, value); }
+    size_t upper_bound(float value) const noexcept
+    {
+        return Base::m_table->upper_bound_float(col_idx, value);
+    }
 };
 
 
@@ -948,9 +1194,14 @@ private:
     using ColumnsBase = typename ColumnsForTaboid<Taboid, double>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl()) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl())
+    {
+    }
 
-    size_t find_first(double value) const { return Base::m_table->get_impl()->find_first_double(col_idx, value); }
+    size_t find_first(double value) const
+    {
+        return Base::m_table->get_impl()->find_first_double(col_idx, value);
+    }
 
     BasicTableView<typename Base::RealTable> find_all(double value) const
     {
@@ -962,9 +1213,15 @@ public:
         return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
-    size_t count(double target) const { return Base::m_table->get_impl()->count_double(col_idx, target); }
+    size_t count(double target) const
+    {
+        return Base::m_table->get_impl()->count_double(col_idx, target);
+    }
 
-    double sum() const { return Base::m_table->get_impl()->sum_double(col_idx); }
+    double sum() const
+    {
+        return Base::m_table->get_impl()->sum_double(col_idx);
+    }
 
     double maximum(size_t* return_ndx = nullptr) const
     {
@@ -976,7 +1233,10 @@ public:
         return Base::m_table->get_impl()->minimum_double(col_idx, return_ndx);
     }
 
-    double average() const { return Base::m_table->get_impl()->average_double(col_idx); }
+    double average() const
+    {
+        return Base::m_table->get_impl()->average_double(col_idx);
+    }
 
     const ColumnAccessor& operator+=(double value) const
     {
@@ -984,9 +1244,15 @@ public:
         return *this;
     }
 
-    size_t lower_bound(float value) const noexcept { return Base::m_table->lower_bound_double(col_idx, value); }
+    size_t lower_bound(float value) const noexcept
+    {
+        return Base::m_table->lower_bound_double(col_idx, value);
+    }
 
-    size_t upper_bound(float value) const noexcept { return Base::m_table->upper_bound_double(col_idx, value); }
+    size_t upper_bound(float value) const noexcept
+    {
+        return Base::m_table->upper_bound_double(col_idx, value);
+    }
 };
 
 
@@ -997,18 +1263,29 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, bool> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t)
+    {
+    }
 
-    size_t find_first(bool value) const { return Base::m_table->get_impl()->find_first_bool(col_idx, value); }
+    size_t find_first(bool value) const
+    {
+        return Base::m_table->get_impl()->find_first_bool(col_idx, value);
+    }
 
     BasicTableView<typename Base::RealTable> find_all(bool value) const
     {
         return Base::m_table->get_impl()->find_all_bool(col_idx, value);
     }
 
-    size_t lower_bound(bool value) const noexcept { return Base::m_table->lower_bound_bool(col_idx, value); }
+    size_t lower_bound(bool value) const noexcept
+    {
+        return Base::m_table->lower_bound_bool(col_idx, value);
+    }
 
-    size_t upper_bound(bool value) const noexcept { return Base::m_table->upper_bound_bool(col_idx, value); }
+    size_t upper_bound(bool value) const noexcept
+    {
+        return Base::m_table->upper_bound_bool(col_idx, value);
+    }
 
     BasicTableView<typename Base::RealTable> get_distinct_view() const
     {
@@ -1025,9 +1302,14 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Enum<E>> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t)
+    {
+    }
 
-    size_t find_first(E value) const { return Base::m_table->get_impl()->find_first_int(col_idx, int64_t(value)); }
+    size_t find_first(E value) const
+    {
+        return Base::m_table->get_impl()->find_first_int(col_idx, int64_t(value));
+    }
 
     BasicTableView<typename Base::RealTable> find_all(E value) const
     {
@@ -1048,7 +1330,9 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, OldDateTime> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t)
+    {
+    }
 
     OldDateTime maximum(size_t* return_ndx = nullptr) const
     {
@@ -1086,11 +1370,19 @@ private:
     using ColumnsBase = typename ColumnsForTaboid<Taboid, StringData>::type;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl()) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t), ColumnsBase(col_idx, t->get_impl())
+    {
+    }
 
-    size_t count(StringData value) const { return Base::m_table->get_impl()->count_string(col_idx, value); }
+    size_t count(StringData value) const
+    {
+        return Base::m_table->get_impl()->count_string(col_idx, value);
+    }
 
-    size_t find_first(StringData value) const { return Base::m_table->get_impl()->find_first_string(col_idx, value); }
+    size_t find_first(StringData value) const
+    {
+        return Base::m_table->get_impl()->find_first_string(col_idx, value);
+    }
 
     BasicTableView<typename Base::RealTable> find_all(StringData value) const
     {
@@ -1102,9 +1394,15 @@ public:
         return Base::m_table->get_impl()->get_distinct_view(col_idx);
     }
 
-    size_t lower_bound(StringData value) const noexcept { return Base::m_table->lower_bound_string(col_idx, value); }
+    size_t lower_bound(StringData value) const noexcept
+    {
+        return Base::m_table->lower_bound_string(col_idx, value);
+    }
 
-    size_t upper_bound(StringData value) const noexcept { return Base::m_table->upper_bound_string(col_idx, value); }
+    size_t upper_bound(StringData value) const noexcept
+    {
+        return Base::m_table->upper_bound_string(col_idx, value);
+    }
 };
 
 
@@ -1115,7 +1413,9 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, BinaryData> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t)
+    {
+    }
 
     size_t find_first(const BinaryData& value) const
     {
@@ -1137,7 +1437,9 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, SpecBase::Subtable<Subtab>> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t)
+    {
+    }
 };
 
 
@@ -1148,7 +1450,9 @@ private:
     typedef ColumnAccessorBase<Taboid, col_idx, Mixed> Base;
 
 public:
-    explicit ColumnAccessor(Taboid* t) noexcept : Base(t) {}
+    explicit ColumnAccessor(Taboid* t) noexcept : Base(t)
+    {
+    }
 };
 
 
@@ -1169,7 +1473,9 @@ class QueryColumnBase {
 protected:
     typedef typename Taboid::Query Query;
     Query* const m_query;
-    explicit QueryColumnBase(Query* q) noexcept : m_query(q) {}
+    explicit QueryColumnBase(Query* q) noexcept : m_query(q)
+    {
+    }
 
     Query& equal(const Type& value) const
     {
@@ -1193,7 +1499,9 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q)
+    {
+    }
 
     // Todo, these do not turn up in Visual Studio 2013 intellisense
     using Base::equal;
@@ -1263,7 +1571,9 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q)
+    {
+    }
     using Base::equal;
     using Base::not_equal;
 
@@ -1331,7 +1641,9 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q)
+    {
+    }
     using Base::equal;
     using Base::not_equal;
 
@@ -1399,7 +1711,9 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q)
+    {
+    }
     using Base::equal;
     using Base::not_equal;
 };
@@ -1413,7 +1727,9 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q)
+    {
+    }
     using Base::equal;
     using Base::not_equal;
 };
@@ -1427,7 +1743,9 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q)
+    {
+    }
 
     Query& equal(OldDateTime value) const
     {
@@ -1493,7 +1811,9 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q)
+    {
+    }
 
     Query& equal(StringData value, bool case_sensitive = true) const
     {
@@ -1535,7 +1855,9 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : Base(q) {}
+    explicit QueryColumn(Query* q) noexcept : Base(q)
+    {
+    }
 
     Query& equal(BinaryData value) const
     {
@@ -1577,7 +1899,9 @@ private:
     Query* const m_query;
 
 public:
-    explicit QueryColumn(Query* q) noexcept : m_query(q) {}
+    explicit QueryColumn(Query* q) noexcept : m_query(q)
+    {
+    }
 
     Query& subtable()
     {
@@ -1594,7 +1918,9 @@ private:
     typedef typename Taboid::Query Query;
 
 public:
-    explicit QueryColumn(Query*) noexcept {}
+    explicit QueryColumn(Query*) noexcept
+    {
+    }
 };
 
 

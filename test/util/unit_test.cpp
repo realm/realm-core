@@ -66,9 +66,13 @@ std::string xml_escape(const std::string& value)
 
 class XmlReporter : public Reporter {
 public:
-    XmlReporter(std::ostream& out) : m_out(out) {}
+    XmlReporter(std::ostream& out) : m_out(out)
+    {
+    }
 
-    ~XmlReporter() noexcept {}
+    ~XmlReporter() noexcept
+    {
+    }
 
     void begin(const TestContext& context) override
     {
@@ -209,7 +213,9 @@ public:
             m_include.push_back(wildcard_pattern("*"));
     }
 
-    ~WildcardFilter() noexcept {}
+    ~WildcardFilter() noexcept
+    {
+    }
 
     bool include(const TestDetails& details) override
     {
@@ -264,7 +270,10 @@ private:
     Logger& m_base_logger;
     const Level m_level_threshold;
 
-    Level get() const noexcept override final { return m_level_threshold; }
+    Level get() const noexcept override final
+    {
+        return m_level_threshold;
+    }
 };
 
 
@@ -754,7 +763,9 @@ public:
             m_patterns.push_back(wildcard_pattern(*i));
     }
 
-    ~state() noexcept {}
+    ~state() noexcept
+    {
+    }
 
     int get_major(const TestDetails& details)
     {

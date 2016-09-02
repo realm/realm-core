@@ -39,18 +39,26 @@ struct Some;
 
 // Note: Should conform with the future std::nullopt_t and std::in_place_t.
 struct None {
-    constexpr explicit None(int) {}
+    constexpr explicit None(int)
+    {
+    }
 };
 static constexpr None none{0};
 struct InPlace {
-    constexpr InPlace() {}
+    constexpr InPlace()
+    {
+    }
 };
 static constexpr InPlace in_place;
 
 // Note: Should conform with the future std::bad_optional_access.
 struct BadOptionalAccess : std::logic_error {
-    explicit BadOptionalAccess(const std::string& what_arg) : std::logic_error(what_arg) {}
-    explicit BadOptionalAccess(const char* what_arg) : std::logic_error(what_arg) {}
+    explicit BadOptionalAccess(const std::string& what_arg) : std::logic_error(what_arg)
+    {
+    }
+    explicit BadOptionalAccess(const char* what_arg) : std::logic_error(what_arg)
+    {
+    }
 };
 
 } // namespace util
@@ -120,8 +128,14 @@ private:
     using Storage::m_engaged;
     using Storage::m_value;
 
-    constexpr bool is_engaged() const { return m_engaged; }
-    void set_engaged(bool b) { m_engaged = b; }
+    constexpr bool is_engaged() const
+    {
+        return m_engaged;
+    }
+    void set_engaged(bool b)
+    {
+        m_engaged = b;
+    }
     void clear();
 };
 
@@ -151,8 +165,12 @@ public:
     using value_type = T&;
     using target_type = typename std::decay<T>::type;
 
-    constexpr Optional() {}
-    constexpr Optional(None) {} // FIXME: Was a delegating constructor, but not fully supported in VS2015
+    constexpr Optional()
+    {
+    }
+    constexpr Optional(None)
+    {
+    } // FIXME: Was a delegating constructor, but not fully supported in VS2015
     Optional(const Optional<T&>& other) = default;
     template <class U>
     Optional(const Optional<U&>& other) : m_ptr(other.m_ptr)
@@ -163,7 +181,9 @@ public:
     {
     }
 
-    constexpr Optional(T& init_value) : m_ptr(&init_value) {}
+    constexpr Optional(T& init_value) : m_ptr(&init_value)
+    {
+    }
     Optional(T&& value) = delete; // Catches accidental references to rvalue temporaries.
 
     Optional<T&>& operator=(None)
@@ -184,13 +204,28 @@ public:
         return *this;
     }
 
-    explicit constexpr operator bool() const { return m_ptr; }
+    explicit constexpr operator bool() const
+    {
+        return m_ptr;
+    }
     constexpr const target_type& value() const; // Throws
     target_type& value();                       // Throws
-    constexpr const target_type& operator*() const { return value(); }
-    target_type& operator*() { return value(); }
-    constexpr const target_type* operator->() const { return &value(); }
-    target_type* operator->() { return &value(); }
+    constexpr const target_type& operator*() const
+    {
+        return value();
+    }
+    target_type& operator*()
+    {
+        return value();
+    }
+    constexpr const target_type* operator->() const
+    {
+        return &value();
+    }
+    target_type* operator->()
+    {
+        return &value();
+    }
 
     void swap(Optional<T&> other); // FIXME: Add noexcept() clause
 private:
@@ -621,8 +656,12 @@ struct OptionalStorage<T, true> {
     };
     bool m_engaged = false;
 
-    constexpr OptionalStorage(realm::util::None) : m_null_state() {}
-    constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true) {}
+    constexpr OptionalStorage(realm::util::None) : m_null_state()
+    {
+    }
+    constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true)
+    {
+    }
 
     template <class... Args>
     constexpr OptionalStorage(Args&&... args) : m_value(args...), m_engaged(true)
@@ -639,8 +678,12 @@ struct OptionalStorage<T, false> {
     };
     bool m_engaged = false;
 
-    constexpr OptionalStorage(realm::util::None) : m_null_state() {}
-    constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true) {}
+    constexpr OptionalStorage(realm::util::None) : m_null_state()
+    {
+    }
+    constexpr OptionalStorage(T&& value) : m_value(std::move(value)), m_engaged(true)
+    {
+    }
 
     template <class... Args>
     constexpr OptionalStorage(Args&&... args) : m_value(args...), m_engaged(true)

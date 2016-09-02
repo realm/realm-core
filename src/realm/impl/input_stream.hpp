@@ -44,13 +44,17 @@ public:
     /// availble.
     virtual size_t read(char* buffer, size_t size) = 0;
 
-    virtual ~InputStream() noexcept {}
+    virtual ~InputStream() noexcept
+    {
+    }
 };
 
 
 class SimpleInputStream : public InputStream {
 public:
-    SimpleInputStream(const char* data, size_t size) noexcept : m_ptr(data), m_end(data + size) {}
+    SimpleInputStream(const char* data, size_t size) noexcept : m_ptr(data), m_end(data + size)
+    {
+    }
     size_t read(char* buffer, size_t size) override
     {
         size_t n = std::min(size, size_t(m_end - m_ptr));
@@ -76,7 +80,9 @@ public:
     /// contiguous memory chunk.
     virtual size_t next_block(const char*& begin, const char*& end) = 0;
 
-    virtual ~NoCopyInputStream() noexcept {}
+    virtual ~NoCopyInputStream() noexcept
+    {
+    }
 };
 
 
@@ -103,7 +109,9 @@ private:
 
 class SimpleNoCopyInputStream : public NoCopyInputStream {
 public:
-    SimpleNoCopyInputStream(const char* data, size_t size) : m_data(data), m_size(size) {}
+    SimpleNoCopyInputStream(const char* data, size_t size) : m_data(data), m_size(size)
+    {
+    }
 
     size_t next_block(const char*& begin, const char*& end) override
     {

@@ -299,7 +299,10 @@ public:
 
     void verify() const override;
 #ifdef REALM_DEBUG
-    void enable_debug(bool enable) { m_debug_out = enable; }
+    void enable_debug(bool enable)
+    {
+        m_debug_out = enable;
+    }
     bool is_all_free() const;
     void print() const;
 #endif
@@ -428,8 +431,14 @@ private:
     class SlabRefEndEq;
     static bool ref_less_than_slab_ref_end(ref_type, const Slab&) noexcept;
 
-    Replication* get_replication() const noexcept { return m_replication; }
-    void set_replication(Replication* r) noexcept { m_replication = r; }
+    Replication* get_replication() const noexcept
+    {
+        return m_replication;
+    }
+    void set_replication(Replication* r) noexcept
+    {
+        m_replication = r;
+    }
 
     /// Returns the first section boundary *above* the given position.
     size_t get_upper_section_boundary(size_t start_pos) const noexcept;
@@ -472,7 +481,9 @@ inline void SlabAlloc::invalidate_cache() noexcept
 
 class SlabAlloc::DetachGuard {
 public:
-    DetachGuard(SlabAlloc& alloc) noexcept : m_alloc(&alloc) {}
+    DetachGuard(SlabAlloc& alloc) noexcept : m_alloc(&alloc)
+    {
+    }
     ~DetachGuard() noexcept;
     SlabAlloc* release() noexcept;
 
@@ -484,7 +495,9 @@ private:
 // Implementation:
 
 struct InvalidDatabase : util::File::AccessError {
-    InvalidDatabase(const std::string& msg, const std::string& path) : util::File::AccessError(msg, path) {}
+    InvalidDatabase(const std::string& msg, const std::string& path) : util::File::AccessError(msg, path)
+    {
+    }
 };
 
 inline void SlabAlloc::own_buffer() noexcept

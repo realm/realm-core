@@ -51,7 +51,9 @@ TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx)
 template <class BT>
 class TimestampColumn::CreateHandler : public ColumnBase::CreateHandler {
 public:
-    CreateHandler(typename BT::value_type value, Allocator& alloc) : m_value(value), m_alloc(alloc) {}
+    CreateHandler(typename BT::value_type value, Allocator& alloc) : m_value(value), m_alloc(alloc)
+    {
+    }
 
     ref_type create_leaf(size_t size) override
     {

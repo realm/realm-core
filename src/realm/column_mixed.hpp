@@ -60,8 +60,14 @@ public:
     ~MixedColumn() noexcept override;
 
     DataType get_type(size_t ndx) const noexcept;
-    size_t size() const noexcept final { return m_types->size(); }
-    bool is_empty() const noexcept { return size() == 0; }
+    size_t size() const noexcept final
+    {
+        return m_types->size();
+    }
+    bool is_empty() const noexcept
+    {
+        return size() == 0;
+    }
 
     int64_t get_int(size_t ndx) const noexcept;
     bool get_bool(size_t ndx) const noexcept;

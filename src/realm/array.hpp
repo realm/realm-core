@@ -211,7 +211,9 @@ private:
 
 class ArrayParent {
 public:
-    virtual ~ArrayParent() noexcept {}
+    virtual ~ArrayParent() noexcept
+    {
+    }
 
 protected:
     virtual void update_child_ref(size_t child_ndx, ref_type new_ref) = 0;
@@ -281,7 +283,9 @@ public:
     /// Create an array accessor in the unattached state.
     explicit Array(Allocator&) noexcept;
 
-    ~Array() noexcept override {}
+    ~Array() noexcept override
+    {
+    }
 
     enum Type {
         type_Normal,
@@ -652,7 +656,10 @@ public:
     /// destroy_deep() for every contained 'ref' element.
     static void destroy_deep(MemRef, Allocator&) noexcept;
 
-    Allocator& get_alloc() const noexcept { return m_alloc; }
+    Allocator& get_alloc() const noexcept
+    {
+        return m_alloc;
+    }
 
     // Serialization
 
@@ -977,7 +984,10 @@ public:
 
     /// The meaning of 'width' depends on the context in which this
     /// array is used.
-    size_t get_width() const noexcept { return m_width; }
+    size_t get_width() const noexcept
+    {
+        return m_width;
+    }
 
     static char* get_data_from_header(char*) noexcept;
     static char* get_header_from_data(char*) noexcept;
@@ -1029,7 +1039,9 @@ public:
     class ToDotHandler {
     public:
         virtual void to_dot(MemRef leaf_mem, ArrayParent*, size_t ndx_in_parent, std::ostream&) = 0;
-        ~ToDotHandler() {}
+        ~ToDotHandler()
+        {
+        }
     };
     void bptree_to_dot(std::ostream&, ToDotHandler&) const;
     void to_dot_parent_edge(std::ostream&) const;
@@ -1243,14 +1255,18 @@ public:
 class Array::VisitHandler {
 public:
     virtual bool visit(const NodeInfo& leaf_info) = 0;
-    virtual ~VisitHandler() noexcept {}
+    virtual ~VisitHandler() noexcept
+    {
+    }
 };
 
 
 class Array::UpdateHandler {
 public:
     virtual void update(MemRef, ArrayParent*, size_t leaf_ndx_in_parent, size_t elem_ndx_in_leaf) = 0;
-    virtual ~UpdateHandler() noexcept {}
+    virtual ~UpdateHandler() noexcept
+    {
+    }
 };
 
 
@@ -1283,14 +1299,18 @@ public:
     /// it will be preceeded by a call to erase_leaf_elem().
     virtual void replace_root_by_empty_leaf() = 0;
 
-    virtual ~EraseHandler() noexcept {}
+    virtual ~EraseHandler() noexcept
+    {
+    }
 };
 
 
 // Implementation:
 
 class QueryStateBase {
-    virtual void dyncast() {}
+    virtual void dyncast()
+    {
+    }
 };
 
 template <>

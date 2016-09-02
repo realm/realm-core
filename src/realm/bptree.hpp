@@ -66,7 +66,9 @@ protected:
 
     struct SliceHandler {
         virtual MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size, Allocator& target_alloc) = 0;
-        ~SliceHandler() noexcept {}
+        ~SliceHandler() noexcept
+        {
+        }
     };
     static ref_type write_subtree(const Array& root, size_t slice_offset, size_t slice_size, size_t table_size,
                                   SliceHandler&, _impl::OutputStream&);
@@ -105,7 +107,9 @@ public:
     BpTree();
     explicit BpTree(BpTreeBase::unattached_tag);
     explicit BpTree(Allocator& alloc);
-    explicit BpTree(std::unique_ptr<Array> init_root) : BpTreeBase(std::move(init_root)) {}
+    explicit BpTree(std::unique_ptr<Array> init_root) : BpTreeBase(std::move(init_root))
+    {
+    }
     BpTree(BpTree&&) = default;
     BpTree& operator=(BpTree&&) = default;
     void init_from_ref(Allocator& alloc, ref_type ref);
@@ -113,7 +117,10 @@ public:
     void init_from_parent();
 
     size_t size() const noexcept;
-    bool is_empty() const noexcept { return size() == 0; }
+    bool is_empty() const noexcept
+    {
+        return size() == 0;
+    }
 
     T get(size_t ndx) const noexcept;
     bool is_null(size_t ndx) const noexcept;
@@ -366,13 +373,25 @@ namespace _impl {
 // is not supported).
 template <class Leaf>
 struct NullableOrNothing {
-    static bool is_null(const Leaf& leaf, size_t ndx) { return leaf.is_null(ndx); }
-    static void set_null(Leaf& leaf, size_t ndx) { leaf.set_null(ndx); }
+    static bool is_null(const Leaf& leaf, size_t ndx)
+    {
+        return leaf.is_null(ndx);
+    }
+    static void set_null(Leaf& leaf, size_t ndx)
+    {
+        leaf.set_null(ndx);
+    }
 };
 template <>
 struct NullableOrNothing<ArrayInteger> {
-    static bool is_null(const ArrayInteger&, size_t) { return false; }
-    static void set_null(ArrayInteger&, size_t) { REALM_ASSERT_RELEASE(false); }
+    static bool is_null(const ArrayInteger&, size_t)
+    {
+        return false;
+    }
+    static void set_null(ArrayInteger&, size_t)
+    {
+        REALM_ASSERT_RELEASE(false);
+    }
 };
 }
 
@@ -436,7 +455,9 @@ template <class T>
 struct BpTree<T>::LeafValueInserter {
     using value_type = T;
     T m_value;
-    LeafValueInserter(T value) : m_value(std::move(value)) {}
+    LeafValueInserter(T value) : m_value(std::move(value))
+    {
+    }
 
     // TreeTraits concept:
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t ndx_in_parent, Allocator& alloc,
@@ -479,7 +500,9 @@ template <class T>
 struct BpTree<T>::UpdateHandler : Array::UpdateHandler {
     LeafType m_leaf;
     const T m_value;
-    UpdateHandler(BpTreeBase& tree, T value) noexcept : m_leaf(tree.get_alloc()), m_value(std::move(value)) {}
+    UpdateHandler(BpTreeBase& tree, T value) noexcept : m_leaf(tree.get_alloc()), m_value(std::move(value))
+    {
+    }
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t elem_ndx_in_leaf) override
     {
         m_leaf.init_from_mem(mem);
@@ -491,7 +514,9 @@ struct BpTree<T>::UpdateHandler : Array::UpdateHandler {
 template <class T>
 struct BpTree<T>::SetNullHandler : Array::UpdateHandler {
     LeafType m_leaf;
-    SetNullHandler(BpTreeBase& tree) noexcept : m_leaf(tree.get_alloc()) {}
+    SetNullHandler(BpTreeBase& tree) noexcept : m_leaf(tree.get_alloc())
+    {
+    }
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t elem_ndx_in_leaf) override
     {
         m_leaf.init_from_mem(mem);
@@ -529,7 +554,9 @@ struct BpTree<T>::EraseHandler : Array::EraseHandler {
     BpTreeBase& m_tree;
     LeafType m_leaf;
     bool m_leaves_have_refs; // FIXME: Should be able to eliminate this.
-    EraseHandler(BpTreeBase& tree) noexcept : m_tree(tree), m_leaf(tree.get_alloc()), m_leaves_have_refs(false) {}
+    EraseHandler(BpTreeBase& tree) noexcept : m_tree(tree), m_leaf(tree.get_alloc()), m_leaves_have_refs(false)
+    {
+    }
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent, size_t leaf_ndx_in_parent,
                          size_t elem_ndx_in_leaf) override
     {
@@ -620,7 +647,9 @@ template <class T>
 struct BpTree<T>::AdjustHandler : Array::UpdateHandler {
     LeafType m_leaf;
     const T m_diff;
-    AdjustHandler(BpTreeBase& tree, T diff) : m_leaf(tree.get_alloc()), m_diff(diff) {}
+    AdjustHandler(BpTreeBase& tree, T diff) : m_leaf(tree.get_alloc()), m_diff(diff)
+    {
+    }
 
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t) final
     {
@@ -654,7 +683,9 @@ struct BpTree<T>::AdjustGEHandler : Array::UpdateHandler {
     LeafType m_leaf;
     const T m_limit, m_diff;
 
-    AdjustGEHandler(BpTreeBase& tree, T limit, T diff) : m_leaf(tree.get_alloc()), m_limit(limit), m_diff(diff) {}
+    AdjustGEHandler(BpTreeBase& tree, T limit, T diff) : m_leaf(tree.get_alloc()), m_limit(limit), m_diff(diff)
+    {
+    }
 
     void update(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, size_t) final
     {
@@ -679,7 +710,9 @@ void BpTree<T>::adjust_ge(T limit, T diff)
 template <class T>
 struct BpTree<T>::SliceHandler : public BpTreeBase::SliceHandler {
 public:
-    SliceHandler(Allocator& alloc) : m_leaf(alloc) {}
+    SliceHandler(Allocator& alloc) : m_leaf(alloc)
+    {
+    }
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size, Allocator& target_alloc) override
     {
         m_leaf.init_from_mem(leaf_mem);

@@ -50,17 +50,28 @@ public:
 template <class T>
 class bind_ptr : public bind_ptr_base {
 public:
-    constexpr bind_ptr() noexcept : m_ptr(nullptr) {}
-    ~bind_ptr() noexcept { unbind(); }
+    constexpr bind_ptr() noexcept : m_ptr(nullptr)
+    {
+    }
+    ~bind_ptr() noexcept
+    {
+        unbind();
+    }
 
-    explicit bind_ptr(T* p) noexcept { bind(p); }
+    explicit bind_ptr(T* p) noexcept
+    {
+        bind(p);
+    }
     template <class U>
     explicit bind_ptr(U* p) noexcept
     {
         bind(p);
     }
 
-    bind_ptr(T* p, adopt_tag) noexcept { m_ptr = p; }
+    bind_ptr(T* p, adopt_tag) noexcept
+    {
+        m_ptr = p;
+    }
     template <class U>
     bind_ptr(U* p, adopt_tag) noexcept
     {
@@ -68,7 +79,10 @@ public:
     }
 
     // Copy construct
-    bind_ptr(const bind_ptr& p) noexcept { bind(p.m_ptr); }
+    bind_ptr(const bind_ptr& p) noexcept
+    {
+        bind(p.m_ptr);
+    }
     template <class U>
     bind_ptr(const bind_ptr<U>& p) noexcept
     {
@@ -89,7 +103,9 @@ public:
     }
 
     // Move construct
-    bind_ptr(bind_ptr&& p) noexcept : m_ptr(p.release()) {}
+    bind_ptr(bind_ptr&& p) noexcept : m_ptr(p.release())
+    {
+    }
     template <class U>
     bind_ptr(bind_ptr<U>&& p) noexcept : m_ptr(p.release())
     {
@@ -148,14 +164,32 @@ public:
     //@}
 
     // Dereference
-    T& operator*() const noexcept { return *m_ptr; }
-    T* operator->() const noexcept { return m_ptr; }
+    T& operator*() const noexcept
+    {
+        return *m_ptr;
+    }
+    T* operator->() const noexcept
+    {
+        return m_ptr;
+    }
 
-    explicit operator bool() const noexcept { return m_ptr != 0; }
+    explicit operator bool() const noexcept
+    {
+        return m_ptr != 0;
+    }
 
-    T* get() const noexcept { return m_ptr; }
-    void reset() noexcept { bind_ptr().swap(*this); }
-    void reset(T* p) noexcept { bind_ptr(p).swap(*this); }
+    T* get() const noexcept
+    {
+        return m_ptr;
+    }
+    void reset() noexcept
+    {
+        bind_ptr().swap(*this);
+    }
+    void reset(T* p) noexcept
+    {
+        bind_ptr(p).swap(*this);
+    }
     template <class U>
     void reset(U* p) noexcept
     {
@@ -169,8 +203,14 @@ public:
         return p;
     }
 
-    void swap(bind_ptr& p) noexcept { std::swap(m_ptr, p.m_ptr); }
-    friend void swap(bind_ptr& a, bind_ptr& b) noexcept { a.swap(b); }
+    void swap(bind_ptr& p) noexcept
+    {
+        std::swap(m_ptr, p.m_ptr);
+    }
+    friend void swap(bind_ptr& a, bind_ptr& b) noexcept
+    {
+        a.swap(b);
+    }
 
 protected:
     struct casting_move_tag {
@@ -233,8 +273,13 @@ bool operator>=(T*, const bind_ptr<U>&) noexcept;
 /// \sa bind_ptr
 class RefCountBase {
 public:
-    RefCountBase() noexcept : m_ref_count(0) {}
-    virtual ~RefCountBase() noexcept { REALM_ASSERT(m_ref_count == 0); }
+    RefCountBase() noexcept : m_ref_count(0)
+    {
+    }
+    virtual ~RefCountBase() noexcept
+    {
+        REALM_ASSERT(m_ref_count == 0);
+    }
 
     RefCountBase(const RefCountBase&) = delete;
     RefCountBase(RefCountBase&&) = delete;
@@ -243,7 +288,10 @@ public:
     void operator=(RefCountBase&&) = delete;
 
 protected:
-    void bind_ptr() const noexcept { ++m_ref_count; }
+    void bind_ptr() const noexcept
+    {
+        ++m_ref_count;
+    }
     void unbind_ptr() const noexcept
     {
         if (--m_ref_count == 0)
@@ -265,8 +313,13 @@ private:
 /// \sa bind_ptr
 class AtomicRefCountBase {
 public:
-    AtomicRefCountBase() noexcept : m_ref_count(0) {}
-    virtual ~AtomicRefCountBase() noexcept { REALM_ASSERT(m_ref_count == 0); }
+    AtomicRefCountBase() noexcept : m_ref_count(0)
+    {
+    }
+    virtual ~AtomicRefCountBase() noexcept
+    {
+        REALM_ASSERT(m_ref_count == 0);
+    }
 
     AtomicRefCountBase(const AtomicRefCountBase&) = delete;
     AtomicRefCountBase(AtomicRefCountBase&&) = delete;
@@ -277,7 +330,10 @@ public:
 protected:
     // FIXME: Operators ++ and -- as used below use
     // std::memory_order_seq_cst. This can be optimized.
-    void bind_ptr() const noexcept { ++m_ref_count; }
+    void bind_ptr() const noexcept
+    {
+        ++m_ref_count;
+    }
     void unbind_ptr() const noexcept
     {
         if (--m_ref_count == 0) {

@@ -28,7 +28,9 @@ namespace realm {
 class OwnedData {
 public:
     /// Construct a null reference.
-    OwnedData() noexcept {}
+    OwnedData() noexcept
+    {
+    }
 
     /// If \a data_to_copy is 'null', \a data_size must be zero.
     OwnedData(const char* data_to_copy, size_t data_size) : m_size(data_size)
@@ -47,14 +49,22 @@ public:
         REALM_ASSERT_DEBUG(m_data || m_size == 0);
     }
 
-    OwnedData(const OwnedData& other) : OwnedData(other.m_data.get(), other.m_size) {}
+    OwnedData(const OwnedData& other) : OwnedData(other.m_data.get(), other.m_size)
+    {
+    }
     OwnedData& operator=(const OwnedData& other);
 
     OwnedData(OwnedData&&) = default;
     OwnedData& operator=(OwnedData&&) = default;
 
-    const char* data() const { return m_data.get(); }
-    size_t size() const { return m_size; }
+    const char* data() const
+    {
+        return m_data.get();
+    }
+    size_t size() const
+    {
+        return m_size;
+    }
 
 private:
     std::unique_ptr<char[]> m_data;

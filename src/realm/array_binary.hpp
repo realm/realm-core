@@ -56,7 +56,9 @@ in set(), etc). This way no file format upgrade is needed to support nulls for B
 class ArrayBinary : public Array {
 public:
     explicit ArrayBinary(Allocator&) noexcept;
-    ~ArrayBinary() noexcept override {}
+    ~ArrayBinary() noexcept override
+    {
+    }
 
     /// Create a new empty binary array and attach this accessor to
     /// it. This does not modify the parent reference information of

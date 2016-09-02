@@ -100,7 +100,9 @@ public:
     /// least for now, it is not to be considered a genuine part of the
     /// Replication interface. The default implementation does nothing and other
     /// implementations should not override this function.
-    virtual void commit_log_close() noexcept {}
+    virtual void commit_log_close() noexcept
+    {
+    }
 
     //@{
 
@@ -365,7 +367,9 @@ public:
     /// returns \ref hist_None.
     virtual _impl::History* get_history() = 0;
 
-    virtual ~Replication() noexcept {}
+    virtual ~Replication() noexcept
+    {
+    }
 
 protected:
     Replication();
@@ -404,13 +408,18 @@ protected:
 
 class Replication::Interrupted : public std::exception {
 public:
-    const char* what() const noexcept override { return "Interrupted"; }
+    const char* what() const noexcept override
+    {
+        return "Interrupted";
+    }
 };
 
 
 class TrivialReplication : public Replication {
 public:
-    ~TrivialReplication() noexcept {}
+    ~TrivialReplication() noexcept
+    {
+    }
 
 protected:
     typedef Replication::version_type version_type;

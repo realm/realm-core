@@ -9241,19 +9241,28 @@ struct InsertColumn {
     }
 };
 struct GetCount {
-    auto operator()(Query& q) { return q.count(); }
+    auto operator()(Query& q)
+    {
+        return q.count();
+    }
 };
 
 template <typename Func, typename... Rest>
 struct Compose {
     QueryInitHelper& state;
-    auto operator()(Query& q) { return Func()(q, Compose<Rest...>{state}); }
+    auto operator()(Query& q)
+    {
+        return Func()(q, Compose<Rest...>{state});
+    }
 };
 
 template <typename Func>
 struct Compose<Func> {
     QueryInitHelper& state;
-    auto operator()(Query& q) { return Func()(q); }
+    auto operator()(Query& q)
+    {
+        return Func()(q);
+    }
 };
 
 struct QueryInitHelper {

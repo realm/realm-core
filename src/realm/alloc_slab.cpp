@@ -50,7 +50,10 @@ std::map<ref_type, void*> malloc_debug_map;
 
 class InvalidFreeSpace : std::exception {
 public:
-    const char* what() const noexcept override { return "Free space tracking was lost due to out-of-memory"; }
+    const char* what() const noexcept override
+    {
+        return "Free space tracking was lost due to out-of-memory";
+    }
 };
 
 } // anonymous namespace
@@ -71,7 +74,10 @@ struct SlabAlloc::MappedFile {
     /// Indicates if attaching to the file was succesfull
     bool m_success = false;
 
-    ~MappedFile() { m_file.close(); }
+    ~MappedFile()
+    {
+        m_file.close();
+    }
 };
 
 
@@ -118,8 +124,14 @@ void SlabAlloc::init_streaming_header(Header* streaming_header, int file_format_
 
 class SlabAlloc::ChunkRefEq {
 public:
-    ChunkRefEq(ref_type ref) noexcept : m_ref(ref) {}
-    bool operator()(const Chunk& chunk) const noexcept { return chunk.ref == m_ref; }
+    ChunkRefEq(ref_type ref) noexcept : m_ref(ref)
+    {
+    }
+    bool operator()(const Chunk& chunk) const noexcept
+    {
+        return chunk.ref == m_ref;
+    }
+
 private:
     ref_type m_ref;
 };
@@ -127,8 +139,14 @@ private:
 
 class SlabAlloc::ChunkRefEndEq {
 public:
-    ChunkRefEndEq(ref_type ref) noexcept : m_ref(ref) {}
-    bool operator()(const Chunk& chunk) const noexcept { return chunk.ref + chunk.size == m_ref; }
+    ChunkRefEndEq(ref_type ref) noexcept : m_ref(ref)
+    {
+    }
+    bool operator()(const Chunk& chunk) const noexcept
+    {
+        return chunk.ref + chunk.size == m_ref;
+    }
+
 private:
     ref_type m_ref;
 };
@@ -136,8 +154,14 @@ private:
 
 class SlabAlloc::SlabRefEndEq {
 public:
-    SlabRefEndEq(ref_type ref) noexcept : m_ref(ref) {}
-    bool operator()(const Slab& slab) const noexcept { return slab.ref_end == m_ref; }
+    SlabRefEndEq(ref_type ref) noexcept : m_ref(ref)
+    {
+    }
+    bool operator()(const Slab& slab) const noexcept
+    {
+        return slab.ref_end == m_ref;
+    }
+
 private:
     ref_type m_ref;
 };

@@ -189,8 +189,13 @@ public:
     struct const_cast_tag {
     };
     SubspecRef(const_cast_tag, ConstSubspecRef r) noexcept;
-    ~SubspecRef() noexcept {}
-    Allocator& get_alloc() const noexcept { return m_parent->get_alloc(); }
+    ~SubspecRef() noexcept
+    {
+    }
+    Allocator& get_alloc() const noexcept
+    {
+        return m_parent->get_alloc();
+    }
 
 private:
     Array* const m_parent;
@@ -205,8 +210,13 @@ private:
 class ConstSubspecRef {
 public:
     ConstSubspecRef(SubspecRef r) noexcept;
-    ~ConstSubspecRef() noexcept {}
-    Allocator& get_alloc() const noexcept { return m_parent->get_alloc(); }
+    ~ConstSubspecRef() noexcept
+    {
+    }
+    Allocator& get_alloc() const noexcept
+    {
+        return m_parent->get_alloc();
+    }
 
 private:
     const Array* const m_parent;

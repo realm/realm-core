@@ -28,19 +28,39 @@ struct VersionID {
     version_type version = std::numeric_limits<version_type>::max();
     uint_fast32_t index = 0;
 
-    VersionID() {}
+    VersionID()
+    {
+    }
     VersionID(version_type initial_version, uint_fast32_t initial_index)
     {
         version = initial_version;
         index = initial_index;
     }
 
-    bool operator==(const VersionID& other) { return version == other.version; }
-    bool operator!=(const VersionID& other) { return version != other.version; }
-    bool operator<(const VersionID& other) { return version < other.version; }
-    bool operator<=(const VersionID& other) { return version <= other.version; }
-    bool operator>(const VersionID& other) { return version > other.version; }
-    bool operator>=(const VersionID& other) { return version >= other.version; }
+    bool operator==(const VersionID& other)
+    {
+        return version == other.version;
+    }
+    bool operator!=(const VersionID& other)
+    {
+        return version != other.version;
+    }
+    bool operator<(const VersionID& other)
+    {
+        return version < other.version;
+    }
+    bool operator<=(const VersionID& other)
+    {
+        return version <= other.version;
+    }
+    bool operator>(const VersionID& other)
+    {
+        return version > other.version;
+    }
+    bool operator>=(const VersionID& other)
+    {
+        return version >= other.version;
+    }
 };
 
 } // namespace realm

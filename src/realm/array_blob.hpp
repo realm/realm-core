@@ -27,7 +27,9 @@ namespace realm {
 class ArrayBlob : public Array {
 public:
     explicit ArrayBlob(Allocator&) noexcept;
-    ~ArrayBlob() noexcept override {}
+    ~ArrayBlob() noexcept override
+    {
+    }
 
     const char* get(size_t index) const noexcept;
     bool is_null(size_t index) const noexcept;

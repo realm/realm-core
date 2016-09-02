@@ -129,7 +129,10 @@ public:
     /// ref is freed (or reallocated), and even to get a stacktrace at
     /// the point where it happens. Call watch(0) to stop watching
     /// that ref.
-    void watch(ref_type ref) { m_debug_watch = ref; }
+    void watch(ref_type ref)
+    {
+        m_debug_watch = ref;
+    }
 #endif
 
     Replication* get_replication() noexcept;

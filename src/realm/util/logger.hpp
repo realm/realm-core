@@ -214,7 +214,10 @@ struct Logger::State {
     int m_param_num = 1;
     std::ostringstream m_formatter;
     std::locale m_locale = std::locale::classic();
-    State(const char* s) : m_message(s), m_search(m_message) { m_formatter.imbue(m_locale); }
+    State(const char* s) : m_message(s), m_search(m_message)
+    {
+        m_formatter.imbue(m_locale);
+    }
 };
 
 template <class T>

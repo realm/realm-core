@@ -38,22 +38,44 @@ namespace util {
 template <class T>
 class Buffer {
 public:
-    Buffer() noexcept : m_size(0) {}
+    Buffer() noexcept : m_size(0)
+    {
+    }
     explicit Buffer(size_t initial_size);
     Buffer(Buffer<T>&&) noexcept = default;
-    ~Buffer() noexcept {}
+    ~Buffer() noexcept
+    {
+    }
 
     Buffer<T>& operator=(Buffer<T>&&) noexcept = default;
 
-    T& operator[](size_t i) noexcept { return m_data[i]; }
-    const T& operator[](size_t i) const noexcept { return m_data[i]; }
+    T& operator[](size_t i) noexcept
+    {
+        return m_data[i];
+    }
+    const T& operator[](size_t i) const noexcept
+    {
+        return m_data[i];
+    }
 
-    T* data() noexcept { return m_data.get(); }
-    const T* data() const noexcept { return m_data.get(); }
-    size_t size() const noexcept { return m_size; }
+    T* data() noexcept
+    {
+        return m_data.get();
+    }
+    const T* data() const noexcept
+    {
+        return m_data.get();
+    }
+    size_t size() const noexcept
+    {
+        return m_size;
+    }
 
     /// False iff the data() returns null.
-    explicit operator bool() const noexcept { return bool(m_data); }
+    explicit operator bool() const noexcept
+    {
+        return bool(m_data);
+    }
 
     /// Discards the original contents.
     void set_size(size_t new_size);
@@ -93,7 +115,9 @@ template <class T>
 class AppendBuffer {
 public:
     AppendBuffer() noexcept;
-    ~AppendBuffer() noexcept {}
+    ~AppendBuffer() noexcept
+    {
+    }
 
     /// Returns the current size of the buffer.
     size_t size() const noexcept;
@@ -136,7 +160,10 @@ private:
 
 class BufferSizeOverflow : public std::exception {
 public:
-    const char* what() const noexcept override { return "Buffer size overflow"; }
+    const char* what() const noexcept override
+    {
+        return "Buffer size overflow";
+    }
 };
 
 template <class T>

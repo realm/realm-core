@@ -89,11 +89,19 @@ public:
         return MemRef(new_addr, reinterpret_cast<size_t>(new_addr), *this);
     }
 
-    void do_free(ref_type, const char* addr) noexcept override { ::free(const_cast<char*>(addr)); }
+    void do_free(ref_type, const char* addr) noexcept override
+    {
+        ::free(const_cast<char*>(addr));
+    }
 
-    char* do_translate(ref_type ref) const noexcept override { return reinterpret_cast<char*>(ref); }
+    char* do_translate(ref_type ref) const noexcept override
+    {
+        return reinterpret_cast<char*>(ref);
+    }
 
-    void verify() const override {}
+    void verify() const override
+    {
+    }
 };
 
 // This variable is declared such that get_default() can return it. It could be a static local variable, but

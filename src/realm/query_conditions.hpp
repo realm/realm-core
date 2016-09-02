@@ -55,8 +55,14 @@ struct Contains : public HackClass {
     {
         return v2.contains(v1);
     }
-    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const { return v2.contains(v1); }
-    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v2.contains(v1); }
+    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const
+    {
+        return v2.contains(v1);
+    }
+    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const
+    {
+        return v2.contains(v1);
+    }
 
     template <class A, class B>
     bool operator()(A, B) const
@@ -85,8 +91,14 @@ struct BeginsWith : public HackClass {
     {
         return v2.begins_with(v1);
     }
-    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const { return v2.begins_with(v1); }
-    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v2.begins_with(v1); }
+    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const
+    {
+        return v2.begins_with(v1);
+    }
+    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const
+    {
+        return v2.begins_with(v1);
+    }
 
     template <class A, class B, class C, class D>
     bool operator()(A, B, C, D) const
@@ -110,8 +122,14 @@ struct EndsWith : public HackClass {
     {
         return v2.ends_with(v1);
     }
-    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const { return v2.ends_with(v1); }
-    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v2.ends_with(v1); }
+    bool operator()(StringData v1, StringData v2, bool = false, bool = false) const
+    {
+        return v2.ends_with(v1);
+    }
+    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const
+    {
+        return v2.ends_with(v1);
+    }
 
     template <class A, class B>
     bool operator()(A, B) const
@@ -137,7 +155,10 @@ struct Equal {
     {
         return v1 == v2;
     }
-    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v1 == v2; }
+    bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const
+    {
+        return v1 == v2;
+    }
 
     template <class T>
     bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const
@@ -145,8 +166,14 @@ struct Equal {
         return (v1null && v2null) || (!v1null && !v2null && v1 == v2);
     }
     static const int condition = cond_Equal;
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return (v >= lbound && v <= ubound); }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (v == 0 && ubound == 0 && lbound == 0); }
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound)
+    {
+        return (v >= lbound && v <= ubound);
+    }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound)
+    {
+        return (v == 0 && ubound == 0 && lbound == 0);
+    }
 };
 
 struct NotEqual {
@@ -170,8 +197,14 @@ struct NotEqual {
     }
 
     static const int condition = cond_NotEqual;
-    bool can_match(int64_t v, int64_t lbound, int64_t ubound) { return !(v == 0 && ubound == 0 && lbound == 0); }
-    bool will_match(int64_t v, int64_t lbound, int64_t ubound) { return (v > ubound || v < lbound); }
+    bool can_match(int64_t v, int64_t lbound, int64_t ubound)
+    {
+        return !(v == 0 && ubound == 0 && lbound == 0);
+    }
+    bool will_match(int64_t v, int64_t lbound, int64_t ubound)
+    {
+        return (v > ubound || v < lbound);
+    }
 
     template <class A, class B, class C, class D>
     bool operator()(A, B, C, D) const
@@ -562,7 +595,10 @@ struct GreaterEqual : public HackClass {
 // operator of StringData (currently gives circular header dependency with utf8.hpp)
 template <class T>
 struct CompareLess {
-    static bool compare(T v1, T v2, bool = false, bool = false) { return v1 < v2; }
+    static bool compare(T v1, T v2, bool = false, bool = false)
+    {
+        return v1 < v2;
+    }
 };
 template <>
 struct CompareLess<StringData> {

@@ -228,7 +228,9 @@ protected:
     void attach(Table*, size_t row_ndx) noexcept;
     void reattach(Table*, size_t row_ndx) noexcept;
     void impl_detach() noexcept;
-    RowBase() {}
+    RowBase()
+    {
+    }
 
     using HandoverPatch = RowBaseHandoverPatch;
 
@@ -332,10 +334,15 @@ public:
         patch.reset();
     }
 
-    void apply_patch(HandoverPatch& patch, Group& group) { RowBase::apply_patch(patch, group); }
+    void apply_patch(HandoverPatch& patch, Group& group)
+    {
+        RowBase::apply_patch(patch, group);
+    }
 
 private:
-    BasicRow(const BasicRow<T>& source, HandoverPatch& patch) : RowBase(source, patch) {}
+    BasicRow(const BasicRow<T>& source, HandoverPatch& patch) : RowBase(source, patch)
+    {
+    }
     friend class SharedGroup;
 };
 

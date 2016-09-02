@@ -135,8 +135,13 @@ namespace {
 
 struct SetBooleanOnDestroy {
     bool& m_b;
-    explicit SetBooleanOnDestroy(bool& b) : m_b(b) {}
-    ~SetBooleanOnDestroy() { m_b = true; }
+    explicit SetBooleanOnDestroy(bool& b) : m_b(b)
+    {
+    }
+    ~SetBooleanOnDestroy()
+    {
+        m_b = true;
+    }
 };
 
 } // unnamed namespace
@@ -177,10 +182,14 @@ TEST(Optional_References)
 TEST(Optional_PolymorphicReferences)
 {
     struct Foo {
-        virtual ~Foo() {}
+        virtual ~Foo()
+        {
+        }
     };
     struct Bar : Foo {
-        virtual ~Bar() {}
+        virtual ~Bar()
+        {
+        }
     };
 
     Bar bar;
@@ -234,7 +243,10 @@ struct TestingReferenceBinding {
         REALM_ASSERT(&ii == &global_i);
     }
 
-    void operator=(int&&) { REALM_ASSERT(false); }
+    void operator=(int&&)
+    {
+        REALM_ASSERT(false);
+    }
 };
 
 } // unnamed namespace

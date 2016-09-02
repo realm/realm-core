@@ -31,7 +31,9 @@ namespace realm {
 // FIXME: Why is this exception class exposed?
 class LogFileError : public std::runtime_error {
 public:
-    LogFileError(const std::string& file_name) : std::runtime_error(file_name) {}
+    LogFileError(const std::string& file_name) : std::runtime_error(file_name)
+    {
+    }
 };
 
 /// Create a writelog collector and associate it with a filepath. You'll need

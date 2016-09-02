@@ -274,13 +274,25 @@ public:
         return sizeof(ReadCount) * (num_entries - init_readers_size);
     }
 
-    uint_fast32_t get_num_entries() const noexcept { return entries; }
+    uint_fast32_t get_num_entries() const noexcept
+    {
+        return entries;
+    }
 
-    uint_fast32_t last() const noexcept { return put_pos.load(std::memory_order_acquire); }
+    uint_fast32_t last() const noexcept
+    {
+        return put_pos.load(std::memory_order_acquire);
+    }
 
-    const ReadCount& get(uint_fast32_t idx) const noexcept { return data[idx]; }
+    const ReadCount& get(uint_fast32_t idx) const noexcept
+    {
+        return data[idx];
+    }
 
-    const ReadCount& get_last() const noexcept { return get(last()); }
+    const ReadCount& get_last() const noexcept
+    {
+        return get(last());
+    }
 
     // This method re-initialises the last used ringbuffer entry to hold a new entry.
     // Precondition: This should *only* be done if the caller has established that she
@@ -301,7 +313,10 @@ public:
         return r;
     }
 
-    const ReadCount& get_oldest() const noexcept { return get(old_pos.load(std::memory_order_relaxed)); }
+    const ReadCount& get_oldest() const noexcept
+    {
+        return get(old_pos.load(std::memory_order_relaxed));
+    }
 
     bool is_full() const noexcept
     {
@@ -483,7 +498,9 @@ struct alignas(8) SharedGroup::SharedInfo {
     Ringbuffer readers;
 
     SharedInfo(Durability, Replication::HistoryType);
-    ~SharedInfo() noexcept {}
+    ~SharedInfo() noexcept
+    {
+    }
 
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
     {
@@ -494,7 +511,10 @@ struct alignas(8) SharedGroup::SharedInfo {
         r.current_top = top_ref;
     }
 
-    uint_fast64_t get_current_version_unchecked() const { return readers.get_last().version; }
+    uint_fast64_t get_current_version_unchecked() const
+    {
+        return readers.get_last().version;
+    }
 };
 
 

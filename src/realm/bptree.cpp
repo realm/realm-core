@@ -242,7 +242,9 @@ public:
         , m_top_ref(0)
     {
     }
-    ~WriteSliceHandler() noexcept {}
+    ~WriteSliceHandler() noexcept
+    {
+    }
     bool visit(const Array::NodeInfo& leaf_info) override
     {
         ref_type ref;
@@ -281,7 +283,11 @@ public:
         m_tree_writer.add_leaf_ref(ref, size, is_last); // Throws
         return !is_last;
     }
-    ref_type get_top_ref() const noexcept { return m_top_ref; }
+    ref_type get_top_ref() const noexcept
+    {
+        return m_top_ref;
+    }
+
 private:
     size_t m_begin, m_end;
     Array m_leaf_cache;

@@ -111,7 +111,10 @@ public:
 
     // No-op because LinkViews are always kept in sync.
     uint_fast64_t sync_if_needed() const override;
-    bool is_in_sync() const override { return true; }
+    bool is_in_sync() const override
+    {
+        return true;
+    }
 
 private:
     struct ctor_cookie {
@@ -357,7 +360,10 @@ public:
         list.do_set(link_ndx, target_row_ndx);
     }
 
-    static void do_remove(LinkView& list, size_t link_ndx) { list.do_remove(link_ndx); }
+    static void do_remove(LinkView& list, size_t link_ndx)
+    {
+        list.do_remove(link_ndx);
+    }
 
     static void do_clear(LinkView& list)
     {

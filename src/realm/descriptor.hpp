@@ -416,7 +416,10 @@ private:
     };
 
 public:
-    Descriptor(const PrivateTag&) : Descriptor() {}
+    Descriptor(const PrivateTag&) : Descriptor()
+    {
+    }
+
 private:
     TableRef m_root_table;  // Table associated with root descriptor. Detached iff null.
     DescriptorRef m_parent; // Null iff detached or root descriptor.
@@ -747,15 +750,30 @@ public:
         desc.attach(table, parent, spec);
     }
 
-    static void detach(Descriptor& desc) noexcept { desc.detach(); }
+    static void detach(Descriptor& desc) noexcept
+    {
+        desc.detach();
+    }
 
-    static Table& get_root_table(Descriptor& desc) noexcept { return *desc.m_root_table; }
+    static Table& get_root_table(Descriptor& desc) noexcept
+    {
+        return *desc.m_root_table;
+    }
 
-    static const Table& get_root_table(const Descriptor& desc) noexcept { return *desc.m_root_table; }
+    static const Table& get_root_table(const Descriptor& desc) noexcept
+    {
+        return *desc.m_root_table;
+    }
 
-    static Spec& get_spec(Descriptor& desc) noexcept { return *desc.m_spec; }
+    static Spec& get_spec(Descriptor& desc) noexcept
+    {
+        return *desc.m_spec;
+    }
 
-    static const Spec& get_spec(const Descriptor& desc) noexcept { return *desc.m_spec; }
+    static const Spec& get_spec(const Descriptor& desc) noexcept
+    {
+        return *desc.m_spec;
+    }
 
     static size_t* record_subdesc_path(const Descriptor& desc, size_t* begin, size_t* end) noexcept
     {
@@ -772,9 +790,15 @@ public:
         return desc.move_column(from_ndx, to_ndx);
     }
 
-    static void adj_insert_column(Descriptor& desc, size_t col_ndx) noexcept { desc.adj_insert_column(col_ndx); }
+    static void adj_insert_column(Descriptor& desc, size_t col_ndx) noexcept
+    {
+        desc.adj_insert_column(col_ndx);
+    }
 
-    static void adj_erase_column(Descriptor& desc, size_t col_ndx) noexcept { desc.adj_erase_column(col_ndx); }
+    static void adj_erase_column(Descriptor& desc, size_t col_ndx) noexcept
+    {
+        desc.adj_erase_column(col_ndx);
+    }
 
     static void adj_move_column(Descriptor& desc, size_t col_ndx_1, size_t col_ndx_2) noexcept
     {

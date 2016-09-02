@@ -30,7 +30,9 @@ public:
     typedef StringData value_type;
 
     explicit ArrayStringLong(Allocator&, bool nullable) noexcept;
-    ~ArrayStringLong() noexcept override {}
+    ~ArrayStringLong() noexcept override
+    {
+    }
 
     /// Create a new empty long string array and attach this accessor to
     /// it. This does not modify the parent reference information of

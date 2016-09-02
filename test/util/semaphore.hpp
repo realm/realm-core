@@ -26,7 +26,9 @@ namespace test_util {
 
 class BowlOfStonesSemaphore {
 public:
-    BowlOfStonesSemaphore(int initial_number_of_stones = 0) : m_num_stones(initial_number_of_stones) {}
+    BowlOfStonesSemaphore(int initial_number_of_stones = 0) : m_num_stones(initial_number_of_stones)
+    {
+    }
     void get_stone()
     {
         util::LockGuard lock(m_mutex);

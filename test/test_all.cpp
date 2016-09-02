@@ -280,9 +280,13 @@ void display_build_config()
 // Records elapsed time for each test and shows a "Top 5" at the end.
 class CustomReporter : public SimpleReporter {
 public:
-    explicit CustomReporter(bool report_progress) : SimpleReporter(report_progress) {}
+    explicit CustomReporter(bool report_progress) : SimpleReporter(report_progress)
+    {
+    }
 
-    ~CustomReporter() noexcept {}
+    ~CustomReporter() noexcept
+    {
+    }
 
     void end(const TestContext& context, double elapsed_seconds) override
     {

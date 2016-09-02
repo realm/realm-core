@@ -47,7 +47,9 @@ public:
     // Constructor defaults to non-nullable because we use non-nullable ArrayString so many places internally in core
     // (data which isn't user payload) where null isn't needed.
     explicit ArrayString(Allocator&, bool nullable = false) noexcept;
-    ~ArrayString() noexcept override {}
+    ~ArrayString() noexcept override
+    {
+    }
 
     bool is_null(size_t ndx) const;
     void set_null(size_t ndx);

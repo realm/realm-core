@@ -124,7 +124,9 @@ protected:
 
     struct no_init_tag {
     };
-    Mutex(no_init_tag) {}
+    Mutex(no_init_tag)
+    {
+    }
 
     void init_as_regular();
     void init_as_process_shared(bool robust_if_available);
@@ -252,7 +254,10 @@ public:
 
 class RobustMutex::NotRecoverable : public std::exception {
 public:
-    const char* what() const noexcept override { return "Failed to recover consistent state of shared memory"; }
+    const char* what() const noexcept override
+    {
+        return "Failed to recover consistent state of shared memory";
+    }
 };
 
 

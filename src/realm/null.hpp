@@ -56,8 +56,13 @@ The `S` bit is at position 22 (float) or 51 (double).
 */
 
 struct null {
-    null() {}
-    operator int64_t() { throw(LogicError::type_mismatch); }
+    null()
+    {
+    }
+    operator int64_t()
+    {
+        throw(LogicError::type_mismatch);
+    }
     template <class T>
     operator util::Optional<T>()
     {

@@ -139,7 +139,9 @@ struct GetSizeFromRef {
     const ref_type m_ref;
     Allocator& m_alloc;
     size_t m_size;
-    GetSizeFromRef(ref_type r, Allocator& a) : m_ref(r), m_alloc(a), m_size(0) {}
+    GetSizeFromRef(ref_type r, Allocator& a) : m_ref(r), m_alloc(a), m_size(0)
+    {
+    }
 
     template <class Col>
     void call() noexcept
@@ -366,7 +368,9 @@ void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent
 class ColumnBase::LeafToDot : public Array::ToDotHandler {
 public:
     const ColumnBase& m_column;
-    LeafToDot(const ColumnBase& column) : m_column(column) {}
+    LeafToDot(const ColumnBase& column) : m_column(column)
+    {
+    }
     void to_dot(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, std::ostream& out) override
     {
         m_column.leaf_to_dot(mem, parent, ndx_in_parent, out);

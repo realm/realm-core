@@ -228,7 +228,9 @@ public:
             return m_child->validate();
     }
 
-    ParentNode(const ParentNode& from) : ParentNode(from, nullptr) {}
+    ParentNode(const ParentNode& from) : ParentNode(from, nullptr)
+    {
+    }
 
     ParentNode(const ParentNode& from, QueryNodeHandoverPatches* patches)
         : m_child(from.m_child ? from.m_child->clone(patches) : nullptr)
@@ -274,7 +276,10 @@ protected:
     ConstTableRef m_table;
     std::string error_code;
 
-    const ColumnBase& get_column_base(size_t ndx) { return m_table->get_column_base(ndx); }
+    const ColumnBase& get_column_base(size_t ndx)
+    {
+        return m_table->get_column_base(ndx);
+    }
 
     template <class ColType>
     const ColType& get_column(size_t ndx)
@@ -284,7 +289,10 @@ protected:
         return static_cast<const ColType&>(col);
     }
 
-    ColumnType get_real_column_type(size_t ndx) { return m_table->get_real_column_type(ndx); }
+    ColumnType get_real_column_type(size_t ndx)
+    {
+        return m_table->get_real_column_type(ndx);
+    }
 
     template <class ColType>
     void copy_getter(SequentialGetter<ColType>& dst, size_t& dst_idx, const SequentialGetter<ColType>& src,
@@ -414,14 +422,26 @@ struct CostHeuristic;
 
 template <>
 struct CostHeuristic<IntegerColumn> {
-    static constexpr double dD() { return 100.0; }
-    static constexpr double dT() { return 1.0 / 4.0; }
+    static constexpr double dD()
+    {
+        return 100.0;
+    }
+    static constexpr double dT()
+    {
+        return 1.0 / 4.0;
+    }
 };
 
 template <>
 struct CostHeuristic<IntNullColumn> {
-    static constexpr double dD() { return 100.0; }
-    static constexpr double dT() { return 1.0 / 4.0; }
+    static constexpr double dD()
+    {
+        return 100.0;
+    }
+    static constexpr double dT()
+    {
+        return 1.0 / 4.0;
+    }
 };
 
 // FIXME: Add AdaptiveStringColumn, BasicColumn, etc.
@@ -429,7 +449,10 @@ struct CostHeuristic<IntNullColumn> {
 
 class ColumnNodeBase : public ParentNode {
 protected:
-    ColumnNodeBase(size_t column_idx) { m_condition_column_idx = column_idx; }
+    ColumnNodeBase(size_t column_idx)
+    {
+        m_condition_column_idx = column_idx;
+    }
 
     ColumnNodeBase(const ColumnNodeBase& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
@@ -584,7 +607,10 @@ protected:
             m_condition_column_idx = m_condition_column->get_column_index();
     }
 
-    void table_changed() override { m_condition_column = &get_column<ColType>(m_condition_column_idx); }
+    void table_changed() override
+    {
+        m_condition_column = &get_column<ColType>(m_condition_column_idx);
+    }
 
     void init() override
     {
@@ -658,8 +684,12 @@ public:
     static const bool special_null_node = false;
     using TConditionValue = typename BaseType::TConditionValue;
 
-    IntegerNode(TConditionValue value, size_t column_ndx) : BaseType(value, column_ndx) {}
-    IntegerNode(const IntegerNode& from, QueryNodeHandoverPatches* patches) : BaseType(from, patches) {}
+    IntegerNode(TConditionValue value, size_t column_ndx) : BaseType(value, column_ndx)
+    {
+    }
+    IntegerNode(const IntegerNode& from, QueryNodeHandoverPatches* patches) : BaseType(from, patches)
+    {
+    }
 
     void aggregate_local_prepare(Action action, DataType col_id, bool nullable) override
     {
@@ -798,7 +828,10 @@ public:
         m_dT = 1.0;
     }
 
-    void table_changed() override { m_condition_column.init(&get_column<ColType>(m_condition_column_idx)); }
+    void table_changed() override
+    {
+        m_condition_column.init(&get_column<ColType>(m_condition_column_idx));
+    }
 
     void init() override
     {
@@ -857,9 +890,14 @@ public:
         m_condition_column_idx = column;
     }
 
-    BinaryNode(null, size_t column) : BinaryNode(BinaryData{}, column) {}
+    BinaryNode(null, size_t column) : BinaryNode(BinaryData{}, column)
+    {
+    }
 
-    void table_changed() override { m_condition_column = &get_column<BinaryColumn>(m_condition_column_idx); }
+    void table_changed() override
+    {
+        m_condition_column = &get_column<BinaryColumn>(m_condition_column_idx);
+    }
 
     void init() override
     {
@@ -904,11 +942,19 @@ public:
     using TConditionValue = Timestamp;
     static const bool special_null_node = false;
 
-    TimestampNode(Timestamp v, size_t column) : m_value(v) { m_condition_column_idx = column; }
+    TimestampNode(Timestamp v, size_t column) : m_value(v)
+    {
+        m_condition_column_idx = column;
+    }
 
-    TimestampNode(null, size_t column) : TimestampNode(Timestamp{}, column) {}
+    TimestampNode(null, size_t column) : TimestampNode(Timestamp{}, column)
+    {
+    }
 
-    void table_changed() override { m_condition_column = &get_column<TimestampColumn>(m_condition_column_idx); }
+    void table_changed() override
+    {
+        m_condition_column = &get_column<TimestampColumn>(m_condition_column_idx);
+    }
 
     void init() override
     {
@@ -968,7 +1014,10 @@ public:
         m_leaf_end = 0;
     }
 
-    void clear_leaf_state() { m_leaf.reset(nullptr); }
+    void clear_leaf_state()
+    {
+        m_leaf.reset(nullptr);
+    }
 
     StringNodeBase(const StringNodeBase& from, QueryNodeHandoverPatches* patches)
         : ParentNode(from, patches)
@@ -1090,8 +1139,13 @@ protected:
 template <>
 class StringNode<Equal> : public StringNodeBase {
 public:
-    StringNode(StringData v, size_t column) : StringNodeBase(v, column) {}
-    ~StringNode() noexcept override { deallocate(); }
+    StringNode(StringData v, size_t column) : StringNodeBase(v, column)
+    {
+    }
+    ~StringNode() noexcept override
+    {
+        deallocate();
+    }
 
     void deallocate() noexcept
     {
@@ -1272,10 +1326,15 @@ public:
         return std::unique_ptr<ParentNode>(new StringNode<Equal>(*this, patches));
     }
 
-    StringNode(const StringNode& from, QueryNodeHandoverPatches* patches) : StringNodeBase(from, patches) {}
+    StringNode(const StringNode& from, QueryNodeHandoverPatches* patches) : StringNodeBase(from, patches)
+    {
+    }
 
 private:
-    inline BinaryData str_to_bin(const StringData& s) noexcept { return BinaryData(s.data(), s.size()); }
+    inline BinaryData str_to_bin(const StringData& s) noexcept
+    {
+        return BinaryData(s.data(), s.size());
+    }
 
     size_t m_key_ndx = not_found;
     size_t m_last_indexed;
@@ -1430,9 +1489,15 @@ private:
 
 class NotNode : public ParentNode {
 public:
-    NotNode(std::unique_ptr<ParentNode> condition) : m_condition(std::move(condition)) { m_dT = 50.0; }
+    NotNode(std::unique_ptr<ParentNode> condition) : m_condition(std::move(condition))
+    {
+        m_dT = 50.0;
+    }
 
-    void table_changed() override { m_condition->set_table(*m_table); }
+    void table_changed() override
+    {
+        m_condition->set_table(*m_table);
+    }
 
     void init() override
     {
@@ -1524,7 +1589,10 @@ public:
         m_condition_column_idx2 = column2;
     }
 
-    ~TwoColumnsNode() noexcept override { delete[] m_value.data(); }
+    ~TwoColumnsNode() noexcept override
+    {
+        delete[] m_value.data();
+    }
 
     void table_changed() override
     {
@@ -1628,9 +1696,15 @@ public:
         m_dT = 50.0;
     }
 
-    void table_changed() override { m_expression->set_base_table(m_table.get()); }
+    void table_changed() override
+    {
+        m_expression->set_base_table(m_table.get());
+    }
 
-    size_t find_first_local(size_t start, size_t end) override { return m_expression->find_first(start, end); }
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        return m_expression->find_first(start, end);
+    }
 
     std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
     {

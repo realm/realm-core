@@ -37,7 +37,9 @@ namespace realm {
 class BacklinkColumn : public IntegerColumn, public ArrayParent {
 public:
     BacklinkColumn(Allocator&, ref_type, size_t col_ndx = npos);
-    ~BacklinkColumn() noexcept override {}
+    ~BacklinkColumn() noexcept override
+    {
+    }
 
     static ref_type create(Allocator&, size_t size = 0);
 

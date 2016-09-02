@@ -37,7 +37,10 @@ public:
     void set_null(size_t) override = 0;
     bool is_null(size_t) const noexcept override = 0;
 
-    bool supports_search_index() const noexcept final { return false; }
+    bool supports_search_index() const noexcept final
+    {
+        return false;
+    }
     StringIndex* create_search_index() override;
 
     bool get_weak_links() const noexcept;

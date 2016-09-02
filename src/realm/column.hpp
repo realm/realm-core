@@ -138,7 +138,9 @@ public:
     virtual void destroy() noexcept = 0;
     void move_assign(ColumnBase& col) noexcept;
 
-    virtual ~ColumnBase() noexcept {}
+    virtual ~ColumnBase() noexcept
+    {
+    }
 
     // Getter function for index. For integer index, the caller must supply a buffer that we can store the
     // extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with
@@ -178,7 +180,10 @@ public:
 
     /// Get this column's logical index within the containing table, or npos
     /// for free-standing or non-top-level columns.
-    size_t get_column_index() const noexcept { return m_column_ndx; }
+    size_t get_column_index() const noexcept
+    {
+        return m_column_ndx;
+    }
 
     virtual void set_parent(ArrayParent*, size_t ndx_in_parent) noexcept = 0;
     virtual size_t get_ndx_in_parent() const noexcept = 0;
@@ -271,12 +276,16 @@ public:
 protected:
     using SliceHandler = BpTreeBase::SliceHandler;
 
-    ColumnBase(size_t column_ndx = npos) : m_column_ndx(column_ndx) {}
+    ColumnBase(size_t column_ndx = npos) : m_column_ndx(column_ndx)
+    {
+    }
     ColumnBase(ColumnBase&&) = default;
 
     // Must not assume more than minimal consistency (see
     // AccessorConsistencyLevels).
-    virtual void do_discard_child_accessors() noexcept {}
+    virtual void do_discard_child_accessors() noexcept
+    {
+    }
 
     //@{
     /// \tparam L Any type with an appropriate `value_type`, %size(),
@@ -293,7 +302,9 @@ protected:
     class CreateHandler {
     public:
         virtual ref_type create_leaf(size_t size) = 0;
-        ~CreateHandler() noexcept {}
+        ~CreateHandler() noexcept
+        {
+        }
     };
 
     static ref_type create(Allocator&, size_t size, CreateHandler&);
@@ -319,36 +330,76 @@ public:
     /// that there is no guarantee that this node is an inner B+-tree
     /// node or a leaf. This is the case for a MixedColumn in
     /// particular.
-    Array* get_root_array() noexcept { return m_array.get(); }
-    const Array* get_root_array() const noexcept { return m_array.get(); }
+    Array* get_root_array() noexcept
+    {
+        return m_array.get();
+    }
+    const Array* get_root_array() const noexcept
+    {
+        return m_array.get();
+    }
     //@}
 
-    Allocator& get_alloc() const noexcept final { return m_array->get_alloc(); }
+    Allocator& get_alloc() const noexcept final
+    {
+        return m_array->get_alloc();
+    }
     void destroy() noexcept override
     {
         if (m_array)
             m_array->destroy_deep();
     }
-    ref_type get_ref() const noexcept final { return m_array->get_ref(); }
-    MemRef get_mem() const noexcept final { return m_array->get_mem(); }
-    void detach() noexcept final { m_array->detach(); }
-    bool is_attached() const noexcept final { return m_array->is_attached(); }
+    ref_type get_ref() const noexcept final
+    {
+        return m_array->get_ref();
+    }
+    MemRef get_mem() const noexcept final
+    {
+        return m_array->get_mem();
+    }
+    void detach() noexcept final
+    {
+        m_array->detach();
+    }
+    bool is_attached() const noexcept final
+    {
+        return m_array->is_attached();
+    }
     void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept final
     {
         m_array->set_parent(parent, ndx_in_parent);
     }
-    size_t get_ndx_in_parent() const noexcept final { return m_array->get_ndx_in_parent(); }
-    void set_ndx_in_parent(size_t ndx_in_parent) noexcept override { m_array->set_ndx_in_parent(ndx_in_parent); }
-    void update_from_parent(size_t old_baseline) noexcept override { m_array->update_from_parent(old_baseline); }
-    MemRef clone_deep(Allocator& alloc) const override { return m_array->clone_deep(alloc); }
+    size_t get_ndx_in_parent() const noexcept final
+    {
+        return m_array->get_ndx_in_parent();
+    }
+    void set_ndx_in_parent(size_t ndx_in_parent) noexcept override
+    {
+        m_array->set_ndx_in_parent(ndx_in_parent);
+    }
+    void update_from_parent(size_t old_baseline) noexcept override
+    {
+        m_array->update_from_parent(old_baseline);
+    }
+    MemRef clone_deep(Allocator& alloc) const override
+    {
+        return m_array->clone_deep(alloc);
+    }
 
 protected:
-    ColumnBaseSimple(size_t column_ndx) : ColumnBase(column_ndx) {}
-    ColumnBaseSimple(Array* root) : m_array(root) {}
+    ColumnBaseSimple(size_t column_ndx) : ColumnBase(column_ndx)
+    {
+    }
+    ColumnBaseSimple(Array* root) : m_array(root)
+    {
+    }
     std::unique_ptr<Array> m_array;
 
     void replace_root_array(std::unique_ptr<Array> new_root) final;
-    bool root_is_leaf() const noexcept { return !m_array->is_inner_bptree_node(); }
+    bool root_is_leaf() const noexcept
+    {
+        return !m_array->is_inner_bptree_node();
+    }
 
     /// Introduce a new root node which increments the height of the
     /// tree by one.
@@ -364,17 +415,31 @@ protected:
 
 class ColumnBaseWithIndex : public ColumnBase {
 public:
-    ~ColumnBaseWithIndex() noexcept override {}
+    ~ColumnBaseWithIndex() noexcept override
+    {
+    }
     void set_ndx_in_parent(size_t ndx) noexcept override;
     void update_from_parent(size_t old_baseline) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
     void move_assign(ColumnBaseWithIndex& col) noexcept;
     void destroy() noexcept override;
 
-    virtual bool supports_search_index() const noexcept override { return true; }
-    bool has_search_index() const noexcept final { return bool(m_search_index); }
-    StringIndex* get_search_index() noexcept final { return m_search_index.get(); }
-    const StringIndex* get_search_index() const noexcept final { return m_search_index.get(); }
+    virtual bool supports_search_index() const noexcept override
+    {
+        return true;
+    }
+    bool has_search_index() const noexcept final
+    {
+        return bool(m_search_index);
+    }
+    StringIndex* get_search_index() noexcept final
+    {
+        return m_search_index.get();
+    }
+    const StringIndex* get_search_index() const noexcept final
+    {
+        return m_search_index.get();
+    }
     void destroy_search_index() noexcept override;
     void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
                               bool allow_duplicate_valaues) final;
@@ -401,7 +466,9 @@ public:
     struct unattached_root_tag {
     };
 
-    explicit Column() noexcept : ColumnBaseWithIndex(npos), m_tree(Allocator::get_default()) {}
+    explicit Column() noexcept : ColumnBaseWithIndex(npos), m_tree(Allocator::get_default())
+    {
+    }
     explicit Column(std::unique_ptr<Array> root) noexcept;
     Column(Allocator&, ref_type, size_t column_ndx = npos);
     Column(unattached_root_tag, Allocator&);
@@ -433,7 +500,10 @@ public:
     }
 
     size_t size() const noexcept override;
-    bool is_empty() const noexcept { return size() == 0; }
+    bool is_empty() const noexcept
+    {
+        return size() == 0;
+    }
     bool is_nullable() const noexcept override;
 
     /// Provides access to the leaf that contains the element at the
@@ -561,13 +631,25 @@ public:
     /// that there is no guarantee that this node is an inner B+-tree
     /// node or a leaf. This is the case for a MixedColumn in
     /// particular.
-    Array* get_root_array() noexcept { return &m_tree.root(); }
-    const Array* get_root_array() const noexcept { return &m_tree.root(); }
+    Array* get_root_array() noexcept
+    {
+        return &m_tree.root();
+    }
+    const Array* get_root_array() const noexcept
+    {
+        return &m_tree.root();
+    }
     //@}
 
 protected:
-    bool root_is_leaf() const noexcept { return m_tree.root_is_leaf(); }
-    void replace_root_array(std::unique_ptr<Array> leaf) final { m_tree.replace_root(std::move(leaf)); }
+    bool root_is_leaf() const noexcept
+    {
+        return m_tree.root_is_leaf();
+    }
+    void replace_root_array(std::unique_ptr<Array> leaf) final
+    {
+        m_tree.replace_root(std::move(leaf));
+    }
 
     void set_without_updating_index(size_t row_ndx, T value);
     void erase_without_updating_index(size_t row_ndx, bool is_last);

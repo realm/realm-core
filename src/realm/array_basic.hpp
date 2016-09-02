@@ -29,7 +29,9 @@ template <class T>
 class BasicArray : public Array {
 public:
     explicit BasicArray(Allocator&) noexcept;
-    ~BasicArray() noexcept override {}
+    ~BasicArray() noexcept override
+    {
+    }
 
     T get(size_t ndx) const noexcept;
     bool is_null(size_t ndx) const noexcept;

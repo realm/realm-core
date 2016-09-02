@@ -61,9 +61,14 @@ namespace {
 
 class Foo {
 public:
-    Foo(bool* destroyed_flag) : m_destroyed_flag(destroyed_flag) {}
+    Foo(bool* destroyed_flag) : m_destroyed_flag(destroyed_flag)
+    {
+    }
 
-    void destroy() { *m_destroyed_flag = true; }
+    void destroy()
+    {
+        *m_destroyed_flag = true;
+    }
 
 private:
     bool* const m_destroyed_flag;
@@ -71,9 +76,14 @@ private:
 
 class FooAlloc : public Allocator {
 public:
-    FooAlloc() : m_offset(8) { m_baseline = 8; }
+    FooAlloc() : m_offset(8)
+    {
+        m_baseline = 8;
+    }
 
-    ~FooAlloc() noexcept {}
+    ~FooAlloc() noexcept
+    {
+    }
 
     MemRef do_alloc(size_t size) override
     {
@@ -113,7 +123,10 @@ public:
         return addr;
     }
 
-    bool empty() { return m_map.empty(); }
+    bool empty()
+    {
+        return m_map.empty();
+    }
 
     void clear()
     {
@@ -126,7 +139,9 @@ public:
         m_map.clear();
     }
 
-    void verify() const override {}
+    void verify() const override
+    {
+    }
 
 private:
     ref_type m_offset;

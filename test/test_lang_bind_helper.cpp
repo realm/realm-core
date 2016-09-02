@@ -147,7 +147,9 @@ class ShortCircuitHistory : public TrivialReplication, public _impl::History {
 public:
     using version_type = _impl::History::version_type;
 
-    ShortCircuitHistory(const std::string& database_file) : TrivialReplication(database_file) {}
+    ShortCircuitHistory(const std::string& database_file) : TrivialReplication(database_file)
+    {
+    }
 
     void initiate_session(version_type) override
     {
@@ -179,9 +181,15 @@ public:
         m_changesets[m_incoming_version] = std::move(m_incoming_changeset);
     }
 
-    HistoryType get_history_type() const noexcept override { return hist_OutOfRealm; }
+    HistoryType get_history_type() const noexcept override
+    {
+        return hist_OutOfRealm;
+    }
 
-    _impl::History* get_history() override { return this; }
+    _impl::History* get_history() override
+    {
+        return this;
+    }
 
     void update_early_from_top_ref(version_type, size_t, ref_type) override
     {
@@ -3483,9 +3491,18 @@ namespace {
 template <typename T>
 class ConcurrentQueue {
 public:
-    ConcurrentQueue(size_t size) : sz(size) { data.reset(new T[sz]); }
-    inline bool is_full() { return writer - reader == sz; }
-    inline bool is_empty() { return writer - reader == 0; }
+    ConcurrentQueue(size_t size) : sz(size)
+    {
+        data.reset(new T[sz]);
+    }
+    inline bool is_full()
+    {
+        return writer - reader == sz;
+    }
+    inline bool is_empty()
+    {
+        return writer - reader == 0;
+    }
     void put(T& e)
     {
         std::unique_lock<std::mutex> lock(mutex);
@@ -7432,9 +7449,14 @@ namespace {
 // the entire interface
 class NoOpTransactionLogParser {
 public:
-    NoOpTransactionLogParser(TestContext& context) : test_context(context) {}
+    NoOpTransactionLogParser(TestContext& context) : test_context(context)
+    {
+    }
 
-    size_t get_current_table() const { return m_current_table; }
+    size_t get_current_table() const
+    {
+        return m_current_table;
+    }
 
     std::pair<size_t, size_t> get_current_linkview() const
     {
@@ -7450,7 +7472,9 @@ private:
     size_t m_current_linkview_row = realm::npos;
 
 public:
-    void parse_complete() {}
+    void parse_complete()
+    {
+    }
 
     bool select_table(size_t group_level_ndx, int, const size_t*)
     {
@@ -7466,54 +7490,192 @@ public:
     }
 
     // subtables not supported
-    bool select_descriptor(int, const size_t*) { return false; }
+    bool select_descriptor(int, const size_t*)
+    {
+        return false;
+    }
 
     // Default no-op implmentations of all of the mutation instructions
-    bool insert_group_level_table(size_t, size_t, StringData) { return false; }
-    bool erase_group_level_table(size_t, size_t) { return false; }
-    bool rename_group_level_table(size_t, StringData) { return false; }
-    bool move_group_level_table(size_t, size_t) { return false; }
-    bool insert_column(size_t, DataType, StringData, bool) { return false; }
-    bool insert_link_column(size_t, DataType, StringData, size_t, size_t) { return false; }
-    bool erase_column(size_t) { return false; }
-    bool erase_link_column(size_t, size_t, size_t) { return false; }
-    bool rename_column(size_t, StringData) { return false; }
-    bool move_column(size_t, size_t) { return false; }
-    bool add_search_index(size_t) { return false; }
-    bool remove_search_index(size_t) { return false; }
-    bool add_primary_key(size_t) { return false; }
-    bool remove_primary_key() { return false; }
-    bool set_link_type(size_t, LinkType) { return false; }
-    bool insert_empty_rows(size_t, size_t, size_t, bool) { return false; }
-    bool erase_rows(size_t, size_t, size_t, bool) { return false; }
-    bool swap_rows(size_t, size_t) { return false; }
-    bool change_link_targets(size_t, size_t) { return false; }
-    bool clear_table() noexcept { return false; }
-    bool link_list_set(size_t, size_t) { return false; }
-    bool link_list_insert(size_t, size_t) { return false; }
-    bool link_list_erase(size_t) { return false; }
-    bool link_list_nullify(size_t) { return false; }
-    bool link_list_clear(size_t) { return false; }
-    bool link_list_move(size_t, size_t) { return false; }
-    bool link_list_swap(size_t, size_t) { return false; }
-    bool set_int(size_t, size_t, int_fast64_t) { return false; }
-    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return false; }
-    bool set_bool(size_t, size_t, bool) { return false; }
-    bool set_float(size_t, size_t, float) { return false; }
-    bool set_double(size_t, size_t, double) { return false; }
-    bool set_string(size_t, size_t, StringData) { return false; }
-    bool set_string_unique(size_t, size_t, size_t, StringData) { return false; }
-    bool set_binary(size_t, size_t, BinaryData) { return false; }
-    bool set_olddatetime(size_t, size_t, OldDateTime) { return false; }
-    bool set_timestamp(size_t, size_t, Timestamp) { return false; }
-    bool set_table(size_t, size_t) { return false; }
-    bool set_mixed(size_t, size_t, const Mixed&) { return false; }
-    bool set_link(size_t, size_t, size_t, size_t) { return false; }
-    bool set_null(size_t, size_t) { return false; }
-    bool nullify_link(size_t, size_t, size_t) { return false; }
-    bool insert_substring(size_t, size_t, size_t, StringData) { return false; }
-    bool erase_substring(size_t, size_t, size_t, size_t) { return false; }
-    bool optimize_table() { return false; }
+    bool insert_group_level_table(size_t, size_t, StringData)
+    {
+        return false;
+    }
+    bool erase_group_level_table(size_t, size_t)
+    {
+        return false;
+    }
+    bool rename_group_level_table(size_t, StringData)
+    {
+        return false;
+    }
+    bool move_group_level_table(size_t, size_t)
+    {
+        return false;
+    }
+    bool insert_column(size_t, DataType, StringData, bool)
+    {
+        return false;
+    }
+    bool insert_link_column(size_t, DataType, StringData, size_t, size_t)
+    {
+        return false;
+    }
+    bool erase_column(size_t)
+    {
+        return false;
+    }
+    bool erase_link_column(size_t, size_t, size_t)
+    {
+        return false;
+    }
+    bool rename_column(size_t, StringData)
+    {
+        return false;
+    }
+    bool move_column(size_t, size_t)
+    {
+        return false;
+    }
+    bool add_search_index(size_t)
+    {
+        return false;
+    }
+    bool remove_search_index(size_t)
+    {
+        return false;
+    }
+    bool add_primary_key(size_t)
+    {
+        return false;
+    }
+    bool remove_primary_key()
+    {
+        return false;
+    }
+    bool set_link_type(size_t, LinkType)
+    {
+        return false;
+    }
+    bool insert_empty_rows(size_t, size_t, size_t, bool)
+    {
+        return false;
+    }
+    bool erase_rows(size_t, size_t, size_t, bool)
+    {
+        return false;
+    }
+    bool swap_rows(size_t, size_t)
+    {
+        return false;
+    }
+    bool change_link_targets(size_t, size_t)
+    {
+        return false;
+    }
+    bool clear_table() noexcept
+    {
+        return false;
+    }
+    bool link_list_set(size_t, size_t)
+    {
+        return false;
+    }
+    bool link_list_insert(size_t, size_t)
+    {
+        return false;
+    }
+    bool link_list_erase(size_t)
+    {
+        return false;
+    }
+    bool link_list_nullify(size_t)
+    {
+        return false;
+    }
+    bool link_list_clear(size_t)
+    {
+        return false;
+    }
+    bool link_list_move(size_t, size_t)
+    {
+        return false;
+    }
+    bool link_list_swap(size_t, size_t)
+    {
+        return false;
+    }
+    bool set_int(size_t, size_t, int_fast64_t)
+    {
+        return false;
+    }
+    bool set_int_unique(size_t, size_t, size_t, int_fast64_t)
+    {
+        return false;
+    }
+    bool set_bool(size_t, size_t, bool)
+    {
+        return false;
+    }
+    bool set_float(size_t, size_t, float)
+    {
+        return false;
+    }
+    bool set_double(size_t, size_t, double)
+    {
+        return false;
+    }
+    bool set_string(size_t, size_t, StringData)
+    {
+        return false;
+    }
+    bool set_string_unique(size_t, size_t, size_t, StringData)
+    {
+        return false;
+    }
+    bool set_binary(size_t, size_t, BinaryData)
+    {
+        return false;
+    }
+    bool set_olddatetime(size_t, size_t, OldDateTime)
+    {
+        return false;
+    }
+    bool set_timestamp(size_t, size_t, Timestamp)
+    {
+        return false;
+    }
+    bool set_table(size_t, size_t)
+    {
+        return false;
+    }
+    bool set_mixed(size_t, size_t, const Mixed&)
+    {
+        return false;
+    }
+    bool set_link(size_t, size_t, size_t, size_t)
+    {
+        return false;
+    }
+    bool set_null(size_t, size_t)
+    {
+        return false;
+    }
+    bool nullify_link(size_t, size_t, size_t)
+    {
+        return false;
+    }
+    bool insert_substring(size_t, size_t, size_t, StringData)
+    {
+        return false;
+    }
+    bool erase_substring(size_t, size_t, size_t, size_t)
+    {
+        return false;
+    }
+    bool optimize_table()
+    {
+        return false;
+    }
 };
 
 struct AdvanceReadTransact {
@@ -7555,7 +7717,10 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         // With no changes, the handler should not be called at all
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
-            void parse_complete() { CHECK(false); }
+            void parse_complete()
+            {
+                CHECK(false);
+            }
         } parser(test_context);
         TEST_TYPE::call(sg, parser);
     }
@@ -7572,7 +7737,10 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
             bool called = false;
-            void parse_complete() { called = true; }
+            void parse_complete()
+            {
+                called = true;
+            }
         } parser(test_context);
         TEST_TYPE::call(sg, parser);
         CHECK(parser.called);
@@ -7731,7 +7899,10 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool set_int(size_t, size_t, int_fast64_t) const { throw ObserverError(); }
+            bool set_int(size_t, size_t, int_fast64_t) const
+            {
+                throw ObserverError();
+            }
         } parser(test_context);
 
         LangBindHelper::advance_read(sg, parser);
@@ -8539,7 +8710,10 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
         // With no changes, the handler should not be called at all
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
-            void parse_complete() { CHECK(false); }
+            void parse_complete()
+            {
+                CHECK(false);
+            }
         } parser(test_context);
         LangBindHelper::promote_to_write(sg);
         LangBindHelper::rollback_and_continue_as_read(sg, parser);
@@ -9818,7 +9992,9 @@ struct HandoverControl {
         m_has_feedback = false;
     }
     HandoverControl(const HandoverControl&) = delete;
-    HandoverControl() {}
+    HandoverControl()
+    {
+    }
 };
 
 void handover_writer(std::string path)

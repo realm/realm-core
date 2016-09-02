@@ -68,10 +68,17 @@ public:
         const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
         REALM_ASSERT_EX(both_non_negative || both_non_positive, both_non_negative, both_non_positive);
     }
-    Timestamp(realm::null) : m_is_null(true) {}
-    Timestamp() : Timestamp(null{}) {}
+    Timestamp(realm::null) : m_is_null(true)
+    {
+    }
+    Timestamp() : Timestamp(null{})
+    {
+    }
 
-    bool is_null() const { return m_is_null; }
+    bool is_null() const
+    {
+        return m_is_null;
+    }
 
     int64_t get_seconds() const noexcept
     {

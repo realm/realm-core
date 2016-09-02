@@ -309,10 +309,16 @@ public:
     int set_threads(unsigned int threadcount);
 #endif
 
-    const TableRef& get_table() { return m_table; }
+    const TableRef& get_table()
+    {
+        return m_table;
+    }
 
     // True if matching rows are guaranteed to be returned in table order.
-    bool produces_results_in_table_order() const { return !m_view; }
+    bool produces_results_in_table_order() const
+    {
+        return !m_view;
+    }
 
     // Calls sync_if_needed on the restricting view, if present.
     // Returns the current version of the table(s) this query depends on,
@@ -398,7 +404,10 @@ private:
     void find_all(TableViewBase& tv, size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1)) const;
     void delete_nodes() noexcept;
 
-    bool has_conditions() const { return m_groups.size() > 0 && m_groups[0].m_root_node; }
+    bool has_conditions() const
+    {
+        return m_groups.size() > 0 && m_groups[0].m_root_node;
+    }
     ParentNode* root_node() const
     {
         REALM_ASSERT(m_groups.size());

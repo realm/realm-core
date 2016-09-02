@@ -59,15 +59,26 @@ const double min_warmup_time_s = 0.05;
 
 struct Benchmark {
     virtual const char* name() const = 0;
-    virtual void before_all(SharedGroup&) {}
-    virtual void after_all(SharedGroup&) {}
-    virtual void before_each(SharedGroup&) {}
-    virtual void after_each(SharedGroup&) {}
+    virtual void before_all(SharedGroup&)
+    {
+    }
+    virtual void after_all(SharedGroup&)
+    {
+    }
+    virtual void before_each(SharedGroup&)
+    {
+    }
+    virtual void after_each(SharedGroup&)
+    {
+    }
     virtual void operator()(SharedGroup&) = 0;
 };
 
 struct BenchmarkUnorderedTableViewClear : Benchmark {
-    const char* name() const { return "UnorderedTableViewClear"; }
+    const char* name() const
+    {
+        return "UnorderedTableViewClear";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -91,7 +102,10 @@ struct BenchmarkUnorderedTableViewClear : Benchmark {
 };
 
 struct AddTable : Benchmark {
-    const char* name() const { return "AddTable"; }
+    const char* name() const
+    {
+        return "AddTable";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -194,7 +208,10 @@ struct BenchmarkWithInts : BenchmarkWithIntsTable {
 };
 
 struct BenchmarkQuery : BenchmarkWithStrings {
-    const char* name() const { return "Query"; }
+    const char* name() const
+    {
+        return "Query";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -205,7 +222,10 @@ struct BenchmarkQuery : BenchmarkWithStrings {
 };
 
 struct BenchmarkSize : BenchmarkWithStrings {
-    const char* name() const { return "Size"; }
+    const char* name() const
+    {
+        return "Size";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -217,7 +237,10 @@ struct BenchmarkSize : BenchmarkWithStrings {
 };
 
 struct BenchmarkSort : BenchmarkWithStrings {
-    const char* name() const { return "Sort"; }
+    const char* name() const
+    {
+        return "Sort";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -228,7 +251,10 @@ struct BenchmarkSort : BenchmarkWithStrings {
 };
 
 struct BenchmarkEmptyCommit : Benchmark {
-    const char* name() const { return "EmptyCommit"; }
+    const char* name() const
+    {
+        return "EmptyCommit";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -238,7 +264,10 @@ struct BenchmarkEmptyCommit : Benchmark {
 };
 
 struct BenchmarkSortInt : BenchmarkWithInts {
-    const char* name() const { return "SortInt"; }
+    const char* name() const
+    {
+        return "SortInt";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -249,7 +278,10 @@ struct BenchmarkSortInt : BenchmarkWithInts {
 };
 
 struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
-    const char* name() const { return "DistinctIntNoDupes"; }
+    const char* name() const
+    {
+        return "DistinctIntNoDupes";
+    }
 
     void before_all(SharedGroup& group)
     {
@@ -274,7 +306,10 @@ struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
 };
 
 struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
-    const char* name() const { return "DistinctIntManyDupes"; }
+    const char* name() const
+    {
+        return "DistinctIntManyDupes";
+    }
 
     void before_all(SharedGroup& group)
     {
@@ -299,7 +334,10 @@ struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
 };
 
 struct BenchmarkInsert : BenchmarkWithStringsTable {
-    const char* name() const { return "Insert"; }
+    const char* name() const
+    {
+        return "Insert";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -314,7 +352,10 @@ struct BenchmarkInsert : BenchmarkWithStringsTable {
 };
 
 struct BenchmarkGetString : BenchmarkWithStrings {
-    const char* name() const { return "GetString"; }
+    const char* name() const
+    {
+        return "GetString";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -330,7 +371,10 @@ struct BenchmarkGetString : BenchmarkWithStrings {
 };
 
 struct BenchmarkSetString : BenchmarkWithStrings {
-    const char* name() const { return "SetString"; }
+    const char* name() const
+    {
+        return "SetString";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -345,7 +389,10 @@ struct BenchmarkSetString : BenchmarkWithStrings {
 };
 
 struct BenchmarkCreateIndex : BenchmarkWithStrings {
-    const char* name() const { return "CreateIndex"; }
+    const char* name() const
+    {
+        return "CreateIndex";
+    }
     void operator()(SharedGroup& group)
     {
         WriteTransaction tr(group);
@@ -356,7 +403,10 @@ struct BenchmarkCreateIndex : BenchmarkWithStrings {
 };
 
 struct BenchmarkGetLongString : BenchmarkWithLongStrings {
-    const char* name() const { return "GetLongString"; }
+    const char* name() const
+    {
+        return "GetLongString";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -372,7 +422,10 @@ struct BenchmarkGetLongString : BenchmarkWithLongStrings {
 };
 
 struct BenchmarkSetLongString : BenchmarkWithLongStrings {
-    const char* name() const { return "SetLongString"; }
+    const char* name() const
+    {
+        return "SetLongString";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -387,7 +440,10 @@ struct BenchmarkSetLongString : BenchmarkWithLongStrings {
 };
 
 struct BenchmarkQueryNot : Benchmark {
-    const char* name() const { return "QueryNot"; }
+    const char* name() const
+    {
+        return "QueryNot";
+    }
 
     void before_all(SharedGroup& group)
     {
@@ -420,7 +476,10 @@ struct BenchmarkQueryNot : Benchmark {
 };
 
 struct BenchmarkGetLinkList : Benchmark {
-    const char* name() const { return "GetLinkList"; }
+    const char* name() const
+    {
+        return "GetLinkList";
+    }
     static const size_t rows = 10000;
 
     void before_all(SharedGroup& group)

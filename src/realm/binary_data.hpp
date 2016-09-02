@@ -38,8 +38,12 @@ namespace realm {
 /// \sa StringData
 class BinaryData {
 public:
-    BinaryData() noexcept : m_data(nullptr), m_size(0) {}
-    BinaryData(const char* external_data, size_t data_size) noexcept : m_data(external_data), m_size(data_size) {}
+    BinaryData() noexcept : m_data(nullptr), m_size(0)
+    {
+    }
+    BinaryData(const char* external_data, size_t data_size) noexcept : m_data(external_data), m_size(data_size)
+    {
+    }
     template <size_t N>
     explicit BinaryData(const char (&external_data)[N]) : m_data(external_data), m_size(N)
     {
@@ -50,10 +54,19 @@ public:
     template <class T, class A>
     explicit operator std::basic_string<char, T, A>() const;
 
-    char operator[](size_t i) const noexcept { return m_data[i]; }
+    char operator[](size_t i) const noexcept
+    {
+        return m_data[i];
+    }
 
-    const char* data() const noexcept { return m_data; }
-    size_t size() const noexcept { return m_size; }
+    const char* data() const noexcept
+    {
+        return m_data;
+    }
+    size_t size() const noexcept
+    {
+        return m_size;
+    }
 
     /// Is this a null reference?
     ///
@@ -110,9 +123,14 @@ public:
     using OwnedData::OwnedData;
 
     OwnedBinaryData() = default;
-    OwnedBinaryData(const BinaryData& binary_data) : OwnedData(binary_data.data(), binary_data.size()) {}
+    OwnedBinaryData(const BinaryData& binary_data) : OwnedData(binary_data.data(), binary_data.size())
+    {
+    }
 
-    BinaryData get() const { return {data(), size()}; }
+    BinaryData get() const
+    {
+        return {data(), size()};
+    }
 };
 
 

@@ -33,7 +33,10 @@ using namespace realm;
 namespace {
 
 struct Free {
-    void operator()(char* p) const { free(p); }
+    void operator()(char* p) const
+    {
+        free(p);
+    }
 };
 
 } // anonymous namespace

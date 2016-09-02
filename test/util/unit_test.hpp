@@ -57,8 +57,13 @@
 
 #define TEST_EX(name, list, enabled, allow_concur)                                                                   \
     struct Realm_UnitTest__##name : realm::test_util::unit_test::TestBase {                                          \
-        static bool test_enabled() { return bool(enabled); }                                                         \
-        Realm_UnitTest__##name(realm::test_util::unit_test::TestContext& c) : TestBase(c) {}                         \
+        static bool test_enabled()                                                                                   \
+        {                                                                                                            \
+            return bool(enabled);                                                                                    \
+        }                                                                                                            \
+        Realm_UnitTest__##name(realm::test_util::unit_test::TestContext& c) : TestBase(c)                            \
+        {                                                                                                            \
+        }                                                                                                            \
         void test_run();                                                                                             \
     };                                                                                                               \
     realm::test_util::unit_test::RegisterTest<Realm_UnitTest__##name> realm_unit_test_reg__##name(                   \
@@ -198,14 +203,18 @@ public:
     virtual void end(const TestContext&, double elapsed_seconds);
     virtual void thread_end(const ThreadContext&);
     virtual void summary(const SharedContext&, const Summary&);
-    virtual ~Reporter() noexcept {}
+    virtual ~Reporter() noexcept
+    {
+    }
 };
 
 
 class Filter {
 public:
     virtual bool include(const TestDetails&) = 0;
-    virtual ~Filter() noexcept {}
+    virtual ~Filter() noexcept
+    {
+    }
 };
 
 
@@ -237,7 +246,9 @@ public:
     void sort(Compare);
 
     struct Config {
-        Config() {}
+        Config()
+        {
+        }
 
         int num_threads = 1;
         int num_repetitions = 1;
@@ -583,14 +594,26 @@ inline PatternBasedFileOrder::PatternBasedFileOrder(const char* (&patterns)[N]) 
 
 template <class A, class B, bool both_are_integral>
 struct Compare {
-    static bool equal(const A& a, const B& b) { return a == b; }
-    static bool less(const A& a, const B& b) { return a < b; }
+    static bool equal(const A& a, const B& b)
+    {
+        return a == b;
+    }
+    static bool less(const A& a, const B& b)
+    {
+        return a < b;
+    }
 };
 
 template <class A, class B>
 struct Compare<A, B, true> {
-    static bool equal(const A& a, const B& b) { return util::int_equal_to(a, b); }
-    static bool less(const A& a, const B& b) { return util::int_less_than(a, b); }
+    static bool equal(const A& a, const B& b)
+    {
+        return util::int_equal_to(a, b);
+    }
+    static bool less(const A& a, const B& b)
+    {
+        return util::int_less_than(a, b);
+    }
 };
 
 
@@ -644,12 +667,17 @@ inline bool definitely_less(long double a, long double b, long double epsilon)
 
 template <class T, bool is_float>
 struct SetPrecision {
-    static void exec(std::ostream&) {}
+    static void exec(std::ostream&)
+    {
+    }
 };
 
 template <class T>
 struct SetPrecision<T, true> {
-    static void exec(std::ostream& out) { out.precision(std::numeric_limits<T>::digits10 + 1); }
+    static void exec(std::ostream& out)
+    {
+        out.precision(std::numeric_limits<T>::digits10 + 1);
+    }
 };
 
 template <class T>

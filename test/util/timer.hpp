@@ -34,7 +34,10 @@ public:
         type_RealTime
     };
 
-    Timer(Type type = type_RealTime) : m_type(type) { reset(); }
+    Timer(Type type = type_RealTime) : m_type(type)
+    {
+        reset();
+    }
 
     void reset();
 
@@ -43,10 +46,16 @@ public:
     void unpause();
 
     /// Returns elapsed time in seconds since last call to reset().
-    double get_elapsed_time() const { return calc_elapsed_seconds(get_timer_ticks() - m_start); }
+    double get_elapsed_time() const
+    {
+        return calc_elapsed_seconds(get_timer_ticks() - m_start);
+    }
 
     /// Same as get_elapsed_time().
-    operator double() const { return get_elapsed_time(); }
+    operator double() const
+    {
+        return get_elapsed_time();
+    }
 
     /// Format the elapsed time on the form 0h00m, 00m00s, 00.00s, or
     /// 000.0ms depending on magnitude.

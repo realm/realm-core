@@ -178,7 +178,10 @@ public:
     void write(const char* data, size_t size);
 
     /// Calls write(s.data(), s.size()).
-    void write(const std::string& s) { write(s.data(), s.size()); }
+    void write(const std::string& s)
+    {
+        write(s.data(), s.size());
+    }
 
     /// Calls read(data, N).
     template <size_t N>
@@ -518,9 +521,15 @@ private:
         void sync();
 #if REALM_ENABLE_ENCRYPTION
         util::EncryptedFileMapping* m_encrypted_mapping = nullptr;
-        inline util::EncryptedFileMapping* get_encrypted_mapping() const { return m_encrypted_mapping; }
+        inline util::EncryptedFileMapping* get_encrypted_mapping() const
+        {
+            return m_encrypted_mapping;
+        }
 #else
-        inline util::EncryptedFileMapping* get_encrypted_mapping() const { return nullptr; }
+        inline util::EncryptedFileMapping* get_encrypted_mapping() const
+        {
+            return nullptr;
+        }
 #endif
     };
 };
@@ -528,16 +537,30 @@ private:
 
 class File::ExclusiveLock {
 public:
-    ExclusiveLock(File& f) : m_file(f) { f.lock_exclusive(); }
-    ~ExclusiveLock() noexcept { m_file.unlock(); }
+    ExclusiveLock(File& f) : m_file(f)
+    {
+        f.lock_exclusive();
+    }
+    ~ExclusiveLock() noexcept
+    {
+        m_file.unlock();
+    }
+
 private:
     File& m_file;
 };
 
 class File::SharedLock {
 public:
-    SharedLock(File& f) : m_file(f) { f.lock_shared(); }
-    ~SharedLock() noexcept { m_file.unlock(); }
+    SharedLock(File& f) : m_file(f)
+    {
+        f.lock_shared();
+    }
+    ~SharedLock() noexcept
+    {
+        m_file.unlock();
+    }
+
 private:
     File& m_file;
 };
@@ -638,9 +661,15 @@ public:
 
 #if REALM_ENABLE_ENCRYPTION
     /// Get the encrypted file mapping corresponding to this mapping
-    inline EncryptedFileMapping* get_encrypted_mapping() const { return m_encrypted_mapping; }
+    inline EncryptedFileMapping* get_encrypted_mapping() const
+    {
+        return m_encrypted_mapping;
+    }
 #else
-    inline EncryptedFileMapping* get_encrypted_mapping() const { return nullptr; }
+    inline EncryptedFileMapping* get_encrypted_mapping() const
+    {
+        return nullptr;
+    }
 #endif
 
     friend class UnmapGuard;
@@ -649,13 +678,19 @@ public:
 
 class File::CloseGuard {
 public:
-    CloseGuard(File& f) noexcept : m_file(&f) {}
+    CloseGuard(File& f) noexcept : m_file(&f)
+    {
+    }
     ~CloseGuard() noexcept
     {
         if (m_file)
             m_file->close();
     }
-    void release() noexcept { m_file = nullptr; }
+    void release() noexcept
+    {
+        m_file = nullptr;
+    }
+
 private:
     File* m_file;
 };
@@ -663,13 +698,19 @@ private:
 
 class File::UnlockGuard {
 public:
-    UnlockGuard(File& f) noexcept : m_file(&f) {}
+    UnlockGuard(File& f) noexcept : m_file(&f)
+    {
+    }
     ~UnlockGuard() noexcept
     {
         if (m_file)
             m_file->unlock();
     }
-    void release() noexcept { m_file = nullptr; }
+    void release() noexcept
+    {
+        m_file = nullptr;
+    }
+
 private:
     File* m_file;
 };
@@ -686,7 +727,11 @@ public:
         if (m_map)
             m_map->unmap();
     }
-    void release() noexcept { m_map = nullptr; }
+    void release() noexcept
+    {
+        m_map = nullptr;
+    }
+
 private:
     MapBase* m_map;
 };

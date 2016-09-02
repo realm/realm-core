@@ -1910,7 +1910,9 @@ TEST(TableView_BacklinksWithColumnInsertion)
 namespace {
 struct DistinctDirect {
     Table& table;
-    DistinctDirect(TableRef, TableRef t) : table(*t) {}
+    DistinctDirect(TableRef, TableRef t) : table(*t)
+    {
+    }
 
     SortDescriptor operator()(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
     {
@@ -1920,16 +1922,27 @@ struct DistinctDirect {
         return SortDescriptor(table, column_indices, ascending);
     }
 
-    size_t get_source_ndx(const TableView& tv, size_t ndx) const { return tv.get_source_ndx(ndx); }
+    size_t get_source_ndx(const TableView& tv, size_t ndx) const
+    {
+        return tv.get_source_ndx(ndx);
+    }
 
-    StringData get_string(const TableView& tv, size_t col, size_t row) const { return tv.get_string(col, row); }
+    StringData get_string(const TableView& tv, size_t col, size_t row) const
+    {
+        return tv.get_string(col, row);
+    }
 
-    TableView find_all() const { return table.where().find_all(); }
+    TableView find_all() const
+    {
+        return table.where().find_all();
+    }
 };
 
 struct DistinctOverLink {
     Table& table;
-    DistinctOverLink(TableRef t, TableRef) : table(*t) {}
+    DistinctOverLink(TableRef t, TableRef) : table(*t)
+    {
+    }
 
     SortDescriptor operator()(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
     {
@@ -1939,14 +1952,20 @@ struct DistinctOverLink {
         return SortDescriptor(table, column_indices, ascending);
     }
 
-    size_t get_source_ndx(const TableView& tv, size_t ndx) const { return tv.get_link(0, ndx); }
+    size_t get_source_ndx(const TableView& tv, size_t ndx) const
+    {
+        return tv.get_link(0, ndx);
+    }
 
     StringData get_string(const TableView& tv, size_t col, size_t row) const
     {
         return tv.get_link_target(0)->get_string(col, tv.get_link(0, row));
     }
 
-    TableView find_all() const { return table.where().find_all(); }
+    TableView find_all() const
+    {
+        return table.where().find_all();
+    }
 };
 } // anonymous namespace
 

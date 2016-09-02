@@ -22,17 +22,34 @@
 namespace realm {
 
 struct Data {
-    Data() { std::cout << "Data()\n"; }
-    ~Data() { std::cout << "~Data()\n"; }
-    Data* clone() const { return new Data(); }
+    Data()
+    {
+        std::cout << "Data()\n";
+    }
+    ~Data()
+    {
+        std::cout << "~Data()\n";
+    }
+    Data* clone() const
+    {
+        return new Data();
+    }
 };
 
 
 struct CopyAndMove {
-    CopyAndMove() : m_data(new Data()) {}
-    ~CopyAndMove() { delete m_data; }
+    CopyAndMove() : m_data(new Data())
+    {
+    }
+    ~CopyAndMove()
+    {
+        delete m_data;
+    }
 
-    CopyAndMove(const CopyAndMove& a) : m_data(a.m_data->clone()) { std::cout << "Copy CopyAndMove (constructor)\n"; }
+    CopyAndMove(const CopyAndMove& a) : m_data(a.m_data->clone())
+    {
+        std::cout << "Copy CopyAndMove (constructor)\n";
+    }
     CopyAndMove& operator=(CopyAndMove a)
     {
         delete m_data;
@@ -55,13 +72,20 @@ private:
 
     Data* m_data;
 
-    CopyAndMove(Data* d) : m_data(d) {}
+    CopyAndMove(Data* d) : m_data(d)
+    {
+    }
 };
 
 
 struct ConstCopyAndMove {
-    ConstCopyAndMove() : m_data(new Data()) {}
-    ~ConstCopyAndMove() { delete m_data; }
+    ConstCopyAndMove() : m_data(new Data())
+    {
+    }
+    ~ConstCopyAndMove()
+    {
+        delete m_data;
+    }
 
     ConstCopyAndMove(const ConstCopyAndMove& a) : m_data(a.m_data->clone())
     {
@@ -101,7 +125,9 @@ struct ConstCopyAndMove {
 private:
     const Data* m_data;
 
-    ConstCopyAndMove(const Data* d) : m_data(d) {}
+    ConstCopyAndMove(const Data* d) : m_data(d)
+    {
+    }
 };
 
 } // namespace realm

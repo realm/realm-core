@@ -133,60 +133,200 @@ public:
     /// to find on the `InstructionHandler`.
 
     // No selection needed:
-    bool select_table(size_t, size_t, const size_t*) { return true; }
-    bool select_descriptor(size_t, const size_t*) { return true; }
-    bool select_link_list(size_t, size_t, size_t) { return true; }
-    bool insert_group_level_table(size_t, size_t, StringData) { return true; }
-    bool erase_group_level_table(size_t, size_t) { return true; }
-    bool rename_group_level_table(size_t, StringData) { return true; }
-    bool move_group_level_table(size_t, size_t) { return true; }
+    bool select_table(size_t, size_t, const size_t*)
+    {
+        return true;
+    }
+    bool select_descriptor(size_t, const size_t*)
+    {
+        return true;
+    }
+    bool select_link_list(size_t, size_t, size_t)
+    {
+        return true;
+    }
+    bool insert_group_level_table(size_t, size_t, StringData)
+    {
+        return true;
+    }
+    bool erase_group_level_table(size_t, size_t)
+    {
+        return true;
+    }
+    bool rename_group_level_table(size_t, StringData)
+    {
+        return true;
+    }
+    bool move_group_level_table(size_t, size_t)
+    {
+        return true;
+    }
 
     // Must have table selected:
-    bool insert_empty_rows(size_t, size_t, size_t, bool) { return true; }
-    bool erase_rows(size_t, size_t, size_t, bool) { return true; }
-    bool swap_rows(size_t, size_t) { return true; }
-    bool change_link_targets(size_t, size_t) { return true; }
-    bool clear_table() { return true; }
-    bool set_int(size_t, size_t, int_fast64_t) { return true; }
-    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return true; }
-    bool set_bool(size_t, size_t, bool) { return true; }
-    bool set_float(size_t, size_t, float) { return true; }
-    bool set_double(size_t, size_t, double) { return true; }
-    bool set_string(size_t, size_t, StringData) { return true; }
-    bool set_string_unique(size_t, size_t, size_t, StringData) { return true; }
-    bool set_binary(size_t, size_t, BinaryData) { return true; }
-    bool set_olddatetime(size_t, size_t, OldDateTime) { return true; }
-    bool set_timestamp(size_t, size_t, Timestamp) { return true; }
-    bool set_table(size_t, size_t) { return true; }
-    bool set_mixed(size_t, size_t, const Mixed&) { return true; }
-    bool set_link(size_t, size_t, size_t, size_t) { return true; }
-    bool set_null(size_t, size_t) { return true; }
-    bool nullify_link(size_t, size_t, size_t) { return true; }
-    bool insert_substring(size_t, size_t, size_t, StringData) { return true; }
-    bool erase_substring(size_t, size_t, size_t, size_t) { return true; }
-    bool optimize_table() { return true; }
+    bool insert_empty_rows(size_t, size_t, size_t, bool)
+    {
+        return true;
+    }
+    bool erase_rows(size_t, size_t, size_t, bool)
+    {
+        return true;
+    }
+    bool swap_rows(size_t, size_t)
+    {
+        return true;
+    }
+    bool change_link_targets(size_t, size_t)
+    {
+        return true;
+    }
+    bool clear_table()
+    {
+        return true;
+    }
+    bool set_int(size_t, size_t, int_fast64_t)
+    {
+        return true;
+    }
+    bool set_int_unique(size_t, size_t, size_t, int_fast64_t)
+    {
+        return true;
+    }
+    bool set_bool(size_t, size_t, bool)
+    {
+        return true;
+    }
+    bool set_float(size_t, size_t, float)
+    {
+        return true;
+    }
+    bool set_double(size_t, size_t, double)
+    {
+        return true;
+    }
+    bool set_string(size_t, size_t, StringData)
+    {
+        return true;
+    }
+    bool set_string_unique(size_t, size_t, size_t, StringData)
+    {
+        return true;
+    }
+    bool set_binary(size_t, size_t, BinaryData)
+    {
+        return true;
+    }
+    bool set_olddatetime(size_t, size_t, OldDateTime)
+    {
+        return true;
+    }
+    bool set_timestamp(size_t, size_t, Timestamp)
+    {
+        return true;
+    }
+    bool set_table(size_t, size_t)
+    {
+        return true;
+    }
+    bool set_mixed(size_t, size_t, const Mixed&)
+    {
+        return true;
+    }
+    bool set_link(size_t, size_t, size_t, size_t)
+    {
+        return true;
+    }
+    bool set_null(size_t, size_t)
+    {
+        return true;
+    }
+    bool nullify_link(size_t, size_t, size_t)
+    {
+        return true;
+    }
+    bool insert_substring(size_t, size_t, size_t, StringData)
+    {
+        return true;
+    }
+    bool erase_substring(size_t, size_t, size_t, size_t)
+    {
+        return true;
+    }
+    bool optimize_table()
+    {
+        return true;
+    }
 
     // Must have descriptor selected:
-    bool insert_link_column(size_t, DataType, StringData, size_t, size_t) { return true; }
-    bool insert_column(size_t, DataType, StringData, bool) { return true; }
-    bool erase_link_column(size_t, size_t, size_t) { return true; }
-    bool erase_column(size_t) { return true; }
-    bool rename_column(size_t, StringData) { return true; }
-    bool move_column(size_t, size_t) { return true; }
-    bool add_search_index(size_t) { return true; }
-    bool remove_search_index(size_t) { return true; }
-    bool set_link_type(size_t, LinkType) { return true; }
+    bool insert_link_column(size_t, DataType, StringData, size_t, size_t)
+    {
+        return true;
+    }
+    bool insert_column(size_t, DataType, StringData, bool)
+    {
+        return true;
+    }
+    bool erase_link_column(size_t, size_t, size_t)
+    {
+        return true;
+    }
+    bool erase_column(size_t)
+    {
+        return true;
+    }
+    bool rename_column(size_t, StringData)
+    {
+        return true;
+    }
+    bool move_column(size_t, size_t)
+    {
+        return true;
+    }
+    bool add_search_index(size_t)
+    {
+        return true;
+    }
+    bool remove_search_index(size_t)
+    {
+        return true;
+    }
+    bool set_link_type(size_t, LinkType)
+    {
+        return true;
+    }
 
     // Must have linklist selected:
-    bool link_list_set(size_t, size_t) { return true; }
-    bool link_list_insert(size_t, size_t) { return true; }
-    bool link_list_move(size_t, size_t) { return true; }
-    bool link_list_swap(size_t, size_t) { return true; }
-    bool link_list_erase(size_t) { return true; }
-    bool link_list_nullify(size_t) { return true; }
-    bool link_list_clear(size_t) { return true; }
+    bool link_list_set(size_t, size_t)
+    {
+        return true;
+    }
+    bool link_list_insert(size_t, size_t)
+    {
+        return true;
+    }
+    bool link_list_move(size_t, size_t)
+    {
+        return true;
+    }
+    bool link_list_swap(size_t, size_t)
+    {
+        return true;
+    }
+    bool link_list_erase(size_t)
+    {
+        return true;
+    }
+    bool link_list_nullify(size_t)
+    {
+        return true;
+    }
+    bool link_list_clear(size_t)
+    {
+        return true;
+    }
 
-    void parse_complete() {}
+    void parse_complete()
+    {
+    }
 };
 // LCOV_EXCL_STOP (NullInstructionObserver)
 
@@ -260,7 +400,10 @@ public:
 
     TransactLogEncoder(TransactLogStream& out_stream);
     void set_buffer(char* new_free_begin, char* new_free_end);
-    char* write_position() const { return m_transact_log_free_begin; }
+    char* write_position() const
+    {
+        return m_transact_log_free_begin;
+    }
 
 private:
     // Make sure this is in agreement with the actual integer encoding
@@ -379,8 +522,14 @@ protected:
     TransactLogConvenientEncoder(TransactLogStream& encoder);
 
     void reset_selection_caches() noexcept;
-    void set_buffer(char* new_free_begin, char* new_free_end) { m_encoder.set_buffer(new_free_begin, new_free_end); }
-    char* write_position() const { return m_encoder.write_position(); }
+    void set_buffer(char* new_free_begin, char* new_free_end)
+    {
+        m_encoder.set_buffer(new_free_begin, new_free_end);
+    }
+    char* write_position() const
+    {
+        return m_encoder.write_position();
+    }
 
 private:
     TransactLogEncoder m_encoder;
@@ -477,7 +626,10 @@ private:
 
 class TransactLogParser::BadTransactLog : public std::exception {
 public:
-    const char* what() const noexcept override { return "Bad transaction log"; }
+    const char* what() const noexcept override
+    {
+        return "Bad transaction log";
+    }
 };
 
 
@@ -654,15 +806,24 @@ struct TransactLogEncoder::EncodeNumber {
 };
 template <>
 struct TransactLogEncoder::EncodeNumber<bool> {
-    void operator()(bool value, char** ptr) { *ptr = encode_bool(*ptr, value); }
+    void operator()(bool value, char** ptr)
+    {
+        *ptr = encode_bool(*ptr, value);
+    }
 };
 template <>
 struct TransactLogEncoder::EncodeNumber<float> {
-    void operator()(float value, char** ptr) { *ptr = encode_float(*ptr, value); }
+    void operator()(float value, char** ptr)
+    {
+        *ptr = encode_float(*ptr, value);
+    }
 };
 template <>
 struct TransactLogEncoder::EncodeNumber<double> {
-    void operator()(double value, char** ptr) { *ptr = encode_double(*ptr, value); }
+    void operator()(double value, char** ptr)
+    {
+        *ptr = encode_double(*ptr, value);
+    }
 };
 
 template <class L>
@@ -1348,13 +1509,27 @@ inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list
 inline bool TransactLogEncoder::link_list_set_all(const IntegerColumn& values)
 {
     struct iter {
-        iter(const IntegerColumn& iter_values, size_t ndx) : m_values(&iter_values), m_ndx(ndx) {}
+        iter(const IntegerColumn& iter_values, size_t ndx) : m_values(&iter_values), m_ndx(ndx)
+        {
+        }
         const IntegerColumn* m_values;
         size_t m_ndx;
-        bool operator==(const iter& i) const { return m_ndx == i.m_ndx; }
-        bool operator!=(const iter& i) const { return m_ndx != i.m_ndx; }
-        size_t operator-(const iter& i) const { return m_ndx - i.m_ndx; }
-        int_fast64_t operator*() const { return m_values->get(m_ndx); }
+        bool operator==(const iter& i) const
+        {
+            return m_ndx == i.m_ndx;
+        }
+        bool operator!=(const iter& i) const
+        {
+            return m_ndx != i.m_ndx;
+        }
+        size_t operator-(const iter& i) const
+        {
+            return m_ndx - i.m_ndx;
+        }
+        int_fast64_t operator*() const
+        {
+            return m_values->get(m_ndx);
+        }
         iter& operator++()
         {
             ++m_ndx;
@@ -2501,9 +2676,15 @@ private:
         return m_encoder.write_position() - m_buffer.transact_log_data();
     }
 
-    void append_instruction() { m_instructions.push_back(get_inst()); }
+    void append_instruction()
+    {
+        m_instructions.push_back(get_inst());
+    }
 
-    void append_instruction(Instr instr) { m_instructions.push_back(instr); }
+    void append_instruction(Instr instr)
+    {
+        m_instructions.push_back(instr);
+    }
 
     void sync_select(Instr& pending_instr)
     {
@@ -2513,7 +2694,10 @@ private:
         }
     }
 
-    void sync_linkview() { sync_select(m_pending_lv_instr); }
+    void sync_linkview()
+    {
+        sync_select(m_pending_lv_instr);
+    }
 
     void sync_descriptor()
     {

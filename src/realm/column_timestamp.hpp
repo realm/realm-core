@@ -52,15 +52,27 @@ public:
     void swap_rows(size_t row_ndx_1, size_t row_ndx_2) override;
     void destroy() noexcept override;
 
-    bool has_search_index() const noexcept final { return bool(m_search_index); }
-    StringIndex* get_search_index() noexcept final { return m_search_index.get(); }
-    StringIndex* get_search_index() const noexcept final { return m_search_index.get(); }
+    bool has_search_index() const noexcept final
+    {
+        return bool(m_search_index);
+    }
+    StringIndex* get_search_index() noexcept final
+    {
+        return m_search_index.get();
+    }
+    StringIndex* get_search_index() const noexcept final
+    {
+        return m_search_index.get();
+    }
     void destroy_search_index() noexcept override;
     void set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
                               bool allow_duplicate_values) final;
     void populate_search_index();
     StringIndex* create_search_index() override;
-    bool supports_search_index() const noexcept final { return true; }
+    bool supports_search_index() const noexcept final
+    {
+        return true;
+    }
 
     StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept override;
     ref_type write(size_t slice_offset, size_t slice_size, size_t table_size, _impl::OutputStream&) const override;

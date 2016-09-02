@@ -473,7 +473,10 @@ struct FooException {
 };
 
 struct BarException : std::exception {
-    const char* what() const noexcept override { return "bar"; }
+    const char* what() const noexcept override
+    {
+        return "bar";
+    }
 };
 
 void throw_foo()
@@ -505,8 +508,13 @@ TEST_EX(Failure_Exception, failure_list, true, true) // Test #6, accum checks = 
 
 struct SummaryRecorder : Reporter {
     Summary& m_summary;
-    SummaryRecorder(Summary& init_summary) : m_summary(init_summary) {}
-    void summary(const SharedContext&, const Summary& results_summary) override { m_summary = results_summary; }
+    SummaryRecorder(Summary& init_summary) : m_summary(init_summary)
+    {
+    }
+    void summary(const SharedContext&, const Summary& results_summary) override
+    {
+        m_summary = results_summary;
+    }
 };
 
 void check_summary(TestContext& test_context, TestList& list, int num_included_tests, int num_failed_tests,

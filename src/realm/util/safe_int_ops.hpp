@@ -241,11 +241,17 @@ namespace _impl {
 
 template <class T, bool is_signed>
 struct IsNegative {
-    static bool test(T value) noexcept { return value < 0; }
+    static bool test(T value) noexcept
+    {
+        return value < 0;
+    }
 };
 template <class T>
 struct IsNegative<T, false> {
-    static bool test(T) noexcept { return false; }
+    static bool test(T) noexcept
+    {
+        return false;
+    }
 };
 
 template <class To>
@@ -288,8 +294,14 @@ struct SafeIntBinopsImpl<L, R, false, false> {
     static const int needed_bits_r = lim_r::digits;
     static const int needed_bits = needed_bits_l >= needed_bits_r ? needed_bits_l : needed_bits_r;
     typedef typename util::FastestUnsigned<needed_bits>::type common_unsigned;
-    static bool equal(L l, R r) noexcept { return common_unsigned(l) == common_unsigned(r); }
-    static bool less(L l, R r) noexcept { return common_unsigned(l) < common_unsigned(r); }
+    static bool equal(L l, R r) noexcept
+    {
+        return common_unsigned(l) == common_unsigned(r);
+    }
+    static bool less(L l, R r) noexcept
+    {
+        return common_unsigned(l) < common_unsigned(r);
+    }
     static bool add(L& lval, R rval) noexcept
     {
         L lval_2 = util::cast_to_unsigned<L>(lval + rval);
@@ -401,8 +413,14 @@ struct SafeIntBinopsImpl<L, R, true, false> {
 template <class L, class R>
 struct SafeIntBinopsImpl<L, R, true, true> {
     typedef std::numeric_limits<L> lim_l;
-    static bool equal(L l, R r) noexcept { return l == r; }
-    static bool less(L l, R r) noexcept { return l < r; }
+    static bool equal(L l, R r) noexcept
+    {
+        return l == r;
+    }
+    static bool less(L l, R r) noexcept
+    {
+        return l < r;
+    }
     static bool add(L& lval, R rval) noexcept
     {
         // Note that both subtractions below occur in a signed type

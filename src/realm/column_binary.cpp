@@ -224,7 +224,9 @@ ref_type BinaryColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t 
 class BinaryColumn::EraseLeafElem : public Array::EraseHandler {
 public:
     BinaryColumn& m_column;
-    EraseLeafElem(BinaryColumn& column) noexcept : m_column(column) {}
+    EraseLeafElem(BinaryColumn& column) noexcept : m_column(column)
+    {
+    }
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent, size_t leaf_ndx_in_parent,
                          size_t elem_ndx_in_leaf) override
     {
@@ -258,7 +260,10 @@ public:
         leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) noexcept override { Array::destroy_deep(leaf_mem, m_column.get_alloc()); }
+    void destroy_leaf(MemRef leaf_mem) noexcept override
+    {
+        Array::destroy_deep(leaf_mem, m_column.get_alloc());
+    }
     void replace_root_by_leaf(MemRef leaf_mem) override
     {
         Array* leaf;
@@ -444,7 +449,9 @@ bool BinaryColumn::upgrade_root_leaf(size_t value_size)
 
 class BinaryColumn::CreateHandler : public ColumnBase::CreateHandler {
 public:
-    CreateHandler(Allocator& alloc, BinaryData defaults) : m_alloc(alloc), m_defaults(defaults) {}
+    CreateHandler(Allocator& alloc, BinaryData defaults) : m_alloc(alloc), m_defaults(defaults)
+    {
+    }
     ref_type create_leaf(size_t size) override
     {
         MemRef mem = ArrayBinary::create_array(size, m_alloc, m_defaults); // Throws
@@ -464,7 +471,9 @@ ref_type BinaryColumn::create(Allocator& alloc, size_t size, bool nullable)
 
 class BinaryColumn::SliceHandler : public ColumnBase::SliceHandler {
 public:
-    SliceHandler(Allocator& alloc) : m_alloc(alloc) {}
+    SliceHandler(Allocator& alloc) : m_alloc(alloc)
+    {
+    }
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size, Allocator& target_alloc) override
     {
         bool is_big = Array::get_context_flag_from_header(leaf_mem.get_addr());

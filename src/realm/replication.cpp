@@ -34,11 +34,18 @@ using namespace realm::util;
 
 class Replication::TransactLogApplier {
 public:
-    TransactLogApplier(Group& group) : m_group(group) {}
+    TransactLogApplier(Group& group) : m_group(group)
+    {
+    }
 
-    ~TransactLogApplier() noexcept {}
+    ~TransactLogApplier() noexcept
+    {
+    }
 
-    void set_logger(util::Logger* logger) noexcept { m_logger = logger; }
+    void set_logger(util::Logger* logger) noexcept
+    {
+        m_logger = logger;
+    }
 
     bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
     {
@@ -666,7 +673,10 @@ public:
         return set_link(col_ndx, row_ndx, realm::npos, target_group_level_ndx);
     }
 
-    bool link_list_nullify(size_t link_ndx) { return link_list_erase(link_ndx); }
+    bool link_list_nullify(size_t link_ndx)
+    {
+        return link_list_erase(link_ndx);
+    }
 
 private:
     Group& m_group;
@@ -761,9 +771,13 @@ namespace {
 
 class InputStreamImpl : public _impl::NoCopyInputStream {
 public:
-    InputStreamImpl(const char* data, size_t size) noexcept : m_begin(data), m_end(data + size) {}
+    InputStreamImpl(const char* data, size_t size) noexcept : m_begin(data), m_end(data + size)
+    {
+    }
 
-    ~InputStreamImpl() noexcept {}
+    ~InputStreamImpl() noexcept
+    {
+    }
 
     size_t next_block(const char*& begin, const char*& end) override
     {

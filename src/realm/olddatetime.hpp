@@ -27,15 +27,22 @@ namespace realm {
 
 class OldDateTime {
 public:
-    OldDateTime() noexcept : m_time(0) {}
+    OldDateTime() noexcept : m_time(0)
+    {
+    }
 
     /// Construct from the number of seconds since Jan 1 00:00:00 UTC
     /// 1970.
     /// FIXME: See if we can make this private again. Required by query_expression.hpp
-    OldDateTime(int_fast64_t d) noexcept : m_time(d) {}
+    OldDateTime(int_fast64_t d) noexcept : m_time(d)
+    {
+    }
 
     /// Return the time as seconds since Jan 1 00:00:00 UTC 1970.
-    int_fast64_t get_olddatetime() const noexcept { return m_time; }
+    int_fast64_t get_olddatetime() const noexcept
+    {
+        return m_time;
+    }
 
     friend bool operator==(const OldDateTime&, const OldDateTime&) noexcept;
     friend bool operator!=(const OldDateTime&, const OldDateTime&) noexcept;

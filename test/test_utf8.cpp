@@ -286,16 +286,28 @@ struct IntCharTraits : private std::char_traits<Char> {
     typedef Int int_type;
     typedef typename std::char_traits<Char>::off_type off_type;
     typedef typename std::char_traits<Char>::pos_type pos_type;
-    static Int to_int_type(Char c) { return c.m_value; }
+    static Int to_int_type(Char c)
+    {
+        return c.m_value;
+    }
     static Char to_char_type(Int i)
     {
         Char c;
         c.m_value = typename Char::int_type(i);
         return c;
     }
-    static bool eq_int_type(Int i1, Int i2) { return i1 == i2; }
-    static Int eof() { return std::numeric_limits<Int>::max(); }
-    static Int not_eof(Int i) { return i != eof() ? i : Int(); }
+    static bool eq_int_type(Int i1, Int i2)
+    {
+        return i1 == i2;
+    }
+    static Int eof()
+    {
+        return std::numeric_limits<Int>::max();
+    }
+    static Int not_eof(Int i)
+    {
+        return i != eof() ? i : Int();
+    }
     using std::char_traits<Char>::assign;
     using std::char_traits<Char>::eq;
     using std::char_traits<Char>::lt;

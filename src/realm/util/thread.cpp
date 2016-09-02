@@ -69,7 +69,10 @@ void free_threadpool();
 
 class Initialization {
 public:
-    ~Initialization() { free_threadpool(); }
+    ~Initialization()
+    {
+        free_threadpool();
+    }
 };
 
 Initialization initialization;

@@ -88,21 +88,27 @@ struct ColRef {
 template <class Op, class A>
 struct UnOp {
     A arg;
-    explicit UnOp(const A& a) : arg(a) {}
+    explicit UnOp(const A& a) : arg(a)
+    {
+    }
 };
 
 template <class Op, class A, class B>
 struct BinOp {
     A left;
     B right;
-    BinOp(const A& a, const B& b) : left(a), right(b) {}
+    BinOp(const A& a, const B& b) : left(a), right(b)
+    {
+    }
 };
 
 template <class Op, class Col, class Query>
 struct Subquery {
     Col col;
     Query query;
-    Subquery(const Col& c, const Query& q) : col(c), query(q) {}
+    Subquery(const Col& c, const Query& q) : col(c), query(q)
+    {
+    }
 };
 
 
@@ -111,7 +117,9 @@ struct Subquery {
 template <class T>
 struct Expr {
     T value;
-    explicit Expr(const T& v) : value(v) {}
+    explicit Expr(const T& v) : value(v)
+    {
+    }
 };
 
 /// We need to specialize Expr for ColRef because it has to have a
@@ -119,13 +127,18 @@ struct Expr {
 template <class Tab, int col_idx, class Type>
 struct Expr<ColRef<Tab, col_idx, Type>> {
     ColRef<Tab, col_idx, Type> value;
-    explicit Expr(EmptyType) {}
+    explicit Expr(EmptyType)
+    {
+    }
 };
 
 
 /// Encoding of logical negation.
 struct Not {
-    static const char* sym() { return "!"; }
+    static const char* sym()
+    {
+        return "!";
+    }
     template <class>
     struct Result {
         typedef bool type;
@@ -139,7 +152,10 @@ struct Not {
 
 /// Encoding of bitwise complementation.
 struct Compl {
-    static const char* sym() { return "~"; }
+    static const char* sym()
+    {
+        return "~";
+    }
     template <class A>
     struct Result {
         typedef typename Promote<A>::type type;
@@ -155,7 +171,10 @@ struct Compl {
 /// integral promotion to its argument, but otherwise does
 /// nothing.
 struct Pos {
-    static const char* sym() { return "+"; }
+    static const char* sym()
+    {
+        return "+";
+    }
     template <class A>
     struct Result {
         typedef typename Promote<A>::type type;
@@ -169,7 +188,10 @@ struct Pos {
 
 /// Encoding of arithmetic negation.
 struct Neg {
-    static const char* sym() { return "-"; }
+    static const char* sym()
+    {
+        return "-";
+    }
     template <class A>
     struct Result {
         typedef typename Promote<A>::type type;
@@ -183,7 +205,10 @@ struct Neg {
 
 /// Encoding of pointer dereferencing operation.
 struct Deref {
-    static const char* sym() { return "*"; }
+    static const char* sym()
+    {
+        return "*";
+    }
     template <class A>
     struct Result {
         typedef typename RemovePointer<A>::type type;
@@ -197,7 +222,10 @@ struct Deref {
 
 /// Encoding of multiplication.
 struct Mul {
-    static const char* sym() { return "*"; }
+    static const char* sym()
+    {
+        return "*";
+    }
     template <class A, class B>
     struct Result {
         typedef typename ArithBinOpType<A, B>::type type;
@@ -211,7 +239,10 @@ struct Mul {
 
 /// Encoding of division.
 struct Div {
-    static const char* sym() { return "/"; }
+    static const char* sym()
+    {
+        return "/";
+    }
     template <class A, class B>
     struct Result {
         typedef typename ArithBinOpType<A, B>::type type;
@@ -225,7 +256,10 @@ struct Div {
 
 /// Encoding of modulus operation (remainder of integer division).
 struct Mod {
-    static const char* sym() { return "%"; }
+    static const char* sym()
+    {
+        return "%";
+    }
     template <class A, class B>
     struct Result {
         typedef typename ArithBinOpType<A, B>::type type;
@@ -239,7 +273,10 @@ struct Mod {
 
 /// Encoding of addition.
 struct Add {
-    static const char* sym() { return "+"; }
+    static const char* sym()
+    {
+        return "+";
+    }
     template <class A, class B>
     struct Result {
         typedef typename ArithBinOpType<A, B>::type type;
@@ -253,7 +290,10 @@ struct Add {
 
 /// Encoding of subtraction.
 struct Sub {
-    static const char* sym() { return "-"; }
+    static const char* sym()
+    {
+        return "-";
+    }
     template <class A, class B>
     struct Result {
         typedef typename ArithBinOpType<A, B>::type type;
@@ -267,7 +307,10 @@ struct Sub {
 
 /// Encoding of 'shift left' operation.
 struct Shl {
-    static const char* sym() { return "<<"; }
+    static const char* sym()
+    {
+        return "<<";
+    }
     template <class A, class>
     struct Result {
         typedef typename Promote<A>::type type;
@@ -281,7 +324,10 @@ struct Shl {
 
 /// Encoding of 'shift right' operation.
 struct Shr {
-    static const char* sym() { return ">>"; }
+    static const char* sym()
+    {
+        return ">>";
+    }
     template <class A, class>
     struct Result {
         typedef typename Promote<A>::type type;
@@ -295,7 +341,10 @@ struct Shr {
 
 /// Encoding of equality comparison operation.
 struct Eq {
-    static const char* sym() { return "=="; }
+    static const char* sym()
+    {
+        return "==";
+    }
     template <class, class>
     struct Result {
         typedef bool type;
@@ -309,7 +358,10 @@ struct Eq {
 
 /// Encoding of 'not equal' comparison operation.
 struct Ne {
-    static const char* sym() { return "!="; }
+    static const char* sym()
+    {
+        return "!=";
+    }
     template <class, class>
     struct Result {
         typedef bool type;
@@ -323,7 +375,10 @@ struct Ne {
 
 /// Encoding of 'less than' comparison operation.
 struct Lt {
-    static const char* sym() { return "<"; }
+    static const char* sym()
+    {
+        return "<";
+    }
     template <class, class>
     struct Result {
         typedef bool type;
@@ -337,7 +392,10 @@ struct Lt {
 
 /// Encoding of 'greater than' comparison operation.
 struct Gt {
-    static const char* sym() { return ">"; }
+    static const char* sym()
+    {
+        return ">";
+    }
     template <class, class>
     struct Result {
         typedef bool type;
@@ -351,7 +409,10 @@ struct Gt {
 
 /// Encoding of 'less than or equal' comparison operation.
 struct Le {
-    static const char* sym() { return "<="; }
+    static const char* sym()
+    {
+        return "<=";
+    }
     template <class, class>
     struct Result {
         typedef bool type;
@@ -365,7 +426,10 @@ struct Le {
 
 /// Encoding of 'greater than or equal' comparison operation.
 struct Ge {
-    static const char* sym() { return ">="; }
+    static const char* sym()
+    {
+        return ">=";
+    }
     template <class, class>
     struct Result {
         typedef bool type;
@@ -379,7 +443,10 @@ struct Ge {
 
 /// Encoding of bitwise 'and' operation.
 struct And {
-    static const char* sym() { return "&"; }
+    static const char* sym()
+    {
+        return "&";
+    }
     template <class A, class B>
     struct Result {
         typedef typename ArithBinOpType<A, B>::type type;
@@ -393,7 +460,10 @@ struct And {
 
 /// Encoding of bitwise 'exclusiv or' operation.
 struct Xor {
-    static const char* sym() { return "^"; }
+    static const char* sym()
+    {
+        return "^";
+    }
     template <class A, class B>
     struct Result {
         typedef typename ArithBinOpType<A, B>::type type;
@@ -407,7 +477,10 @@ struct Xor {
 
 /// Encoding of bitwise 'or' operation.
 struct Or {
-    static const char* sym() { return "|"; }
+    static const char* sym()
+    {
+        return "|";
+    }
     template <class A, class B>
     struct Result {
         typedef typename ArithBinOpType<A, B>::type type;
@@ -421,7 +494,10 @@ struct Or {
 
 /// Encoding of logical conjunction.
 struct Conj {
-    static const char* sym() { return "&&"; }
+    static const char* sym()
+    {
+        return "&&";
+    }
     template <class, class>
     struct Result {
         typedef bool type;
@@ -435,7 +511,10 @@ struct Conj {
 
 /// Encoding of logical disjunction.
 struct Disj {
-    static const char* sym() { return "||"; }
+    static const char* sym()
+    {
+        return "||";
+    }
     template <class, class>
     struct Result {
         typedef bool type;
@@ -449,7 +528,10 @@ struct Disj {
 
 
 struct Exists {
-    static const char* name() { return "exists"; }
+    static const char* name()
+    {
+        return "exists";
+    }
     typedef bool ResultType;
     template <class Tab, class Query>
     static bool eval(const Tab* t, const Query& q)
@@ -459,7 +541,10 @@ struct Exists {
 };
 
 struct Count {
-    static const char* name() { return "count"; }
+    static const char* name()
+    {
+        return "count";
+    }
     typedef size_t ResultType;
     template <class Tab, class Query>
     static size_t eval(const Tab* t, const Query& q)
@@ -1011,19 +1096,28 @@ inline typename Canonicalize<Query>::Result canon(const Query& q)
 template <class Query>
 struct Canonicalize {
     typedef Query Result;
-    static Result exec(const Query& q) { return q; }
+    static Result exec(const Query& q)
+    {
+        return q;
+    }
 };
 // Get rid of the Expr<Q> wrapper
 template <class Q>
 struct Canonicalize<Expr<Q>> {
     typedef typename Canonicalize<Q>::Result Result;
-    static Result exec(const Expr<Q>& q) { return canon(q.value); }
+    static Result exec(const Expr<Q>& q)
+    {
+        return canon(q.value);
+    }
 };
 // Reduce (!!q) to (q)
 template <class Q>
 struct Canonicalize<UnOp<Not, UnOp<Not, Q>>> {
     typedef typename Canonicalize<Q>::Result Result;
-    static Result exec(const UnOp<Not, UnOp<Not, Q>>& q) { return canon(q.arg.arg); }
+    static Result exec(const UnOp<Not, UnOp<Not, Q>>& q)
+    {
+        return canon(q.arg.arg);
+    }
 };
 // Rewrite (!(a || b)) to (!a && !b) (De Morgan's law)
 template <class A, class B>
@@ -1062,7 +1156,9 @@ public:
 template <class Tab, int col_idx, class Type>
 class ColEval {
 public:
-    ColEval(const void* c, const Tab* t) : m_column(c), m_table(t) {}
+    ColEval(const void* c, const Tab* t) : m_column(c), m_table(t)
+    {
+    }
 
     template <class T>
     T operator()(const T& expr, size_t) const
@@ -1173,9 +1269,15 @@ public:
         return static_cast<Type*>(m_cols[col_idx])[i];
     }
 
-    size_t size() const { return m_size; }
+    size_t size() const
+    {
+        return m_size;
+    }
 
-    static const char* get_column_name(int col_idx) { return Spec::col_names()[col_idx]; }
+    static const char* get_column_name(int col_idx)
+    {
+        return Spec::col_names()[col_idx];
+    }
 
     BasicTable() : m_size(0)
     {
@@ -1185,7 +1287,9 @@ public:
     }
 
     struct QueryRow : QueryRowBase {
-        QueryRow() : QueryRowBase(query::EmptyType()) {}
+        QueryRow() : QueryRowBase(query::EmptyType())
+        {
+        }
     };
 
     template <class Query>
@@ -1206,11 +1310,17 @@ private:
 
     template <class Type, int col_idx>
     struct MakeCol {
-        static void exec(BasicTable* t) { t->m_cols[col_idx] = new Type[t->m_size]; }
+        static void exec(BasicTable* t)
+        {
+            t->m_cols[col_idx] = new Type[t->m_size];
+        }
     };
     template <class T, int col_idx>
     struct MakeCol<SpecBase::Subtable<T>, col_idx> {
-        static void exec(BasicTable* t) { t->m_cols[col_idx] = new T*[t->m_size]; }
+        static void exec(BasicTable* t)
+        {
+            t->m_cols[col_idx] = new T*[t->m_size];
+        }
     };
 
     template <class T>
@@ -1298,7 +1408,10 @@ private:
     };
     template <class T>
     struct Find<false, T> {
-        static size_t find(const BasicTable*, const T& q, size_t begin, size_t end) { return q ? begin : end; }
+        static size_t find(const BasicTable*, const T& q, size_t begin, size_t end)
+        {
+            return q ? begin : end;
+        }
     };
 
 

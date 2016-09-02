@@ -23,7 +23,9 @@ namespace realm {
 
 class SequentialGetterBase {
 public:
-    virtual ~SequentialGetterBase() noexcept {}
+    virtual ~SequentialGetterBase() noexcept
+    {
+    }
 };
 
 template <class ColType>
@@ -32,7 +34,9 @@ public:
     using T = typename ColType::value_type;
     using ArrayType = typename ColType::LeafType;
 
-    SequentialGetter() {}
+    SequentialGetter()
+    {
+    }
 
     SequentialGetter(const Table& table, size_t column_ndx)
     {
@@ -41,9 +45,14 @@ public:
         init(m_column);
     }
 
-    SequentialGetter(const ColType* column) { init(column); }
+    SequentialGetter(const ColType* column)
+    {
+        init(column);
+    }
 
-    ~SequentialGetter() noexcept override {}
+    ~SequentialGetter() noexcept override
+    {
+    }
 
     void init(const ColType* column)
     {

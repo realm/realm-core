@@ -52,7 +52,10 @@ public:
     void destroy() noexcept override;
 
     size_t size() const noexcept final;
-    bool is_empty() const noexcept { return size() == 0; }
+    bool is_empty() const noexcept
+    {
+        return size() == 0;
+    }
 
     bool is_null(size_t ndx) const noexcept final;
     void set_null(size_t ndx) final;
@@ -95,7 +98,10 @@ public:
     StringIndex* get_search_index() noexcept override;
     const StringIndex* get_search_index() const noexcept override;
     std::unique_ptr<StringIndex> release_search_index() noexcept;
-    bool supports_search_index() const noexcept final { return true; }
+    bool supports_search_index() const noexcept final
+    {
+        return true;
+    }
     StringIndex* create_search_index() override;
 
     // Simply inserts all column values in the index in a loop

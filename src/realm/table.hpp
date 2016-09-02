@@ -688,13 +688,22 @@ public:
     // Queries
     // Using where(tv) is the new method to perform queries on TableView. The 'tv' can have any order; it does not
     // need to be sorted, and, resulting view retains its order.
-    Query where(TableViewBase* tv = nullptr) { return Query(*this, tv); }
+    Query where(TableViewBase* tv = nullptr)
+    {
+        return Query(*this, tv);
+    }
 
     // FIXME: We need a ConstQuery class or runtime check against modifications in read transaction.
-    Query where(TableViewBase* tv = nullptr) const { return Query(*this, tv); }
+    Query where(TableViewBase* tv = nullptr) const
+    {
+        return Query(*this, tv);
+    }
 
     // Perform queries on a LinkView. The returned Query holds a reference to lv.
-    Query where(const LinkViewRef& lv) { return Query(*this, lv); }
+    Query where(const LinkViewRef& lv)
+    {
+        return Query(*this, lv);
+    }
 
     Table& link(size_t link_column);
     Table& backlink(const Table& origin, size_t origin_col_ndx);
@@ -743,8 +752,14 @@ public:
     void row_to_string(size_t row_ndx, std::ostream& out) const;
 
     // Get a reference to this table
-    TableRef get_table_ref() { return TableRef(this); }
-    ConstTableRef get_table_ref() const { return ConstTableRef(this); }
+    TableRef get_table_ref()
+    {
+        return TableRef(this);
+    }
+    ConstTableRef get_table_ref() const
+    {
+        return ConstTableRef(this);
+    }
 
     /// \brief Compare two tables for equality.
     ///
@@ -980,7 +995,9 @@ private:
     struct SubtableUpdater {
         virtual void update(const SubtableColumn&, Array& subcolumns) = 0;
         virtual void update_accessor(Table&) = 0;
-        virtual ~SubtableUpdater() {}
+        virtual ~SubtableUpdater()
+        {
+        }
     };
     static void update_subtables(Descriptor&, SubtableUpdater*);
     void update_subtables(const size_t* col_path_begin, const size_t* col_path_end, SubtableUpdater*);
@@ -988,7 +1005,9 @@ private:
     struct AccessorUpdater {
         virtual void update(Table&) = 0;
         virtual void update_parent(Table&) = 0;
-        virtual ~AccessorUpdater() {}
+        virtual ~AccessorUpdater()
+        {
+        }
     };
     void update_accessors(const size_t* col_path_begin, const size_t* col_path_end, AccessorUpdater&);
 
@@ -1384,7 +1403,9 @@ private:
 
 class Table::Parent : public ArrayParent {
 public:
-    ~Parent() noexcept override {}
+    ~Parent() noexcept override
+    {
+    }
 
 protected:
     virtual StringData get_child_name(size_t child_ndx) const noexcept;
@@ -1583,7 +1604,9 @@ inline bool Table::has_shared_type() const noexcept
 
 class Table::UnbindGuard {
 public:
-    UnbindGuard(Table* table) noexcept : m_table(table) {}
+    UnbindGuard(Table* table) noexcept : m_table(table)
+    {
+    }
 
     ~UnbindGuard() noexcept
     {
@@ -1591,11 +1614,20 @@ public:
             m_table->unbind_ptr();
     }
 
-    Table& operator*() const noexcept { return *m_table; }
+    Table& operator*() const noexcept
+    {
+        return *m_table;
+    }
 
-    Table* operator->() const noexcept { return m_table; }
+    Table* operator->() const noexcept
+    {
+        return m_table;
+    }
 
-    Table* get() const noexcept { return m_table; }
+    Table* get() const noexcept
+    {
+        return m_table;
+    }
 
     Table* release() noexcept
     {
@@ -1950,7 +1982,10 @@ struct LinkTargetInfo {
         : m_target_table(target), m_backlink_col_ndx(backlink_ndx)
     {
     }
-    bool is_valid() const { return (m_target_table != nullptr); }
+    bool is_valid() const
+    {
+        return (m_target_table != nullptr);
+    }
     Table* m_target_table;
     size_t m_backlink_col_ndx; // a value of npos indicates the backlink should be appended
 };
@@ -2017,20 +2052,35 @@ public:
         table.update_from_parent(old_baseline);
     }
 
-    static void detach(Table& table) noexcept { table.detach(); }
+    static void detach(Table& table) noexcept
+    {
+        table.detach();
+    }
 
-    static void discard_row_accessors(Table& table) noexcept { table.discard_row_accessors(); }
+    static void discard_row_accessors(Table& table) noexcept
+    {
+        table.discard_row_accessors();
+    }
 
-    static void discard_child_accessors(Table& table) noexcept { table.discard_child_accessors(); }
+    static void discard_child_accessors(Table& table) noexcept
+    {
+        table.discard_child_accessors();
+    }
 
     static void discard_subtable_accessor(Table& table, size_t col_ndx, size_t row_ndx) noexcept
     {
         table.discard_subtable_accessor(col_ndx, row_ndx);
     }
 
-    static void bind_ptr(Table& table) noexcept { table.bind_ptr(); }
+    static void bind_ptr(Table& table) noexcept
+    {
+        table.bind_ptr();
+    }
 
-    static void unbind_ptr(Table& table) noexcept { table.unbind_ptr(); }
+    static void unbind_ptr(Table& table) noexcept
+    {
+        table.unbind_ptr();
+    }
 
     static bool compare_rows(const Table& a, const Table& b)
     {
@@ -2047,11 +2097,20 @@ public:
         return Table::get_size_from_ref(spec_ref, columns_ref, alloc);
     }
 
-    static Spec& get_spec(Table& table) noexcept { return table.m_spec; }
+    static Spec& get_spec(Table& table) noexcept
+    {
+        return table.m_spec;
+    }
 
-    static const Spec& get_spec(const Table& table) noexcept { return table.m_spec; }
+    static const Spec& get_spec(const Table& table) noexcept
+    {
+        return table.m_spec;
+    }
 
-    static ColumnBase& get_column(const Table& table, size_t col_ndx) { return *table.m_cols[col_ndx]; }
+    static ColumnBase& get_column(const Table& table, size_t col_ndx)
+    {
+        return *table.m_cols[col_ndx];
+    }
 
     static void do_remove(Table& table, size_t row_ndx)
     {
@@ -2168,7 +2227,10 @@ public:
         table.adj_acc_insert_rows(row_ndx, num_rows);
     }
 
-    static void adj_acc_erase_row(Table& table, size_t row_ndx) noexcept { table.adj_acc_erase_row(row_ndx); }
+    static void adj_acc_erase_row(Table& table, size_t row_ndx) noexcept
+    {
+        table.adj_acc_erase_row(row_ndx);
+    }
 
     static void adj_acc_swap_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
     {
@@ -2180,9 +2242,15 @@ public:
         table.adj_acc_move_over(from_row_ndx, to_row_ndx);
     }
 
-    static void adj_acc_clear_root_table(Table& table) noexcept { table.adj_acc_clear_root_table(); }
+    static void adj_acc_clear_root_table(Table& table) noexcept
+    {
+        table.adj_acc_clear_root_table();
+    }
 
-    static void adj_acc_clear_nonroot_table(Table& table) noexcept { table.adj_acc_clear_nonroot_table(); }
+    static void adj_acc_clear_nonroot_table(Table& table) noexcept
+    {
+        table.adj_acc_clear_nonroot_table();
+    }
 
     static void adj_insert_column(Table& table, size_t col_ndx)
     {
@@ -2195,27 +2263,45 @@ public:
         table.adj_insert_column(num_cols); // Throws
     }
 
-    static void adj_erase_column(Table& table, size_t col_ndx) noexcept { table.adj_erase_column(col_ndx); }
+    static void adj_erase_column(Table& table, size_t col_ndx) noexcept
+    {
+        table.adj_erase_column(col_ndx);
+    }
 
     static void adj_move_column(Table& table, size_t col_ndx_1, size_t col_ndx_2) noexcept
     {
         table.adj_move_column(col_ndx_1, col_ndx_2);
     }
 
-    static bool is_marked(const Table& table) noexcept { return table.is_marked(); }
+    static bool is_marked(const Table& table) noexcept
+    {
+        return table.is_marked();
+    }
 
-    static void mark(Table& table) noexcept { table.mark(); }
+    static void mark(Table& table) noexcept
+    {
+        table.mark();
+    }
 
-    static void unmark(Table& table) noexcept { table.unmark(); }
+    static void unmark(Table& table) noexcept
+    {
+        table.unmark();
+    }
 
-    static void recursive_mark(Table& table) noexcept { table.recursive_mark(); }
+    static void recursive_mark(Table& table) noexcept
+    {
+        table.recursive_mark();
+    }
 
     static void mark_link_target_tables(Table& table, size_t col_ndx_begin) noexcept
     {
         table.mark_link_target_tables(col_ndx_begin);
     }
 
-    static void mark_opposite_link_tables(Table& table) noexcept { table.mark_opposite_link_tables(); }
+    static void mark_opposite_link_tables(Table& table) noexcept
+    {
+        table.mark_opposite_link_tables();
+    }
 
     static DescriptorRef get_root_table_desc_accessor(Table& root_table) noexcept
     {
@@ -2244,22 +2330,40 @@ public:
         table.m_spec.set_ndx_in_parent(spec_ndx_in_parent);
     }
 
-    static bool is_link_type(ColumnType type) noexcept { return Table::is_link_type(type); }
+    static bool is_link_type(ColumnType type) noexcept
+    {
+        return Table::is_link_type(type);
+    }
 
-    static void bump_version(Table& table, bool bump_global = true) noexcept { table.bump_version(bump_global); }
+    static void bump_version(Table& table, bool bump_global = true) noexcept
+    {
+        table.bump_version(bump_global);
+    }
 
-    static bool is_cross_table_link_target(const Table& table) { return table.is_cross_table_link_target(); }
+    static bool is_cross_table_link_target(const Table& table)
+    {
+        return table.is_cross_table_link_target();
+    }
 
-    static Group* get_parent_group(const Table& table) noexcept { return table.get_parent_group(); }
+    static Group* get_parent_group(const Table& table) noexcept
+    {
+        return table.get_parent_group();
+    }
 
-    static Replication* get_repl(Table& table) noexcept { return table.get_repl(); }
+    static Replication* get_repl(Table& table) noexcept
+    {
+        return table.get_repl();
+    }
 
     static void register_view(Table& table, const TableViewBase* view)
     {
         table.register_view(view); // Throws
     }
 
-    static void unregister_view(Table& table, const TableViewBase* view) noexcept { table.unregister_view(view); }
+    static void unregister_view(Table& table, const TableViewBase* view) noexcept
+    {
+        table.unregister_view(view);
+    }
 };
 
 

@@ -87,21 +87,37 @@ public:
     using Table::is_group_level;
     using Table::get_index_in_group;
 
-    BasicTable(Allocator& alloc = Allocator::get_default()) : Table(alloc) { set_dynamic_type(*this); }
+    BasicTable(Allocator& alloc = Allocator::get_default()) : Table(alloc)
+    {
+        set_dynamic_type(*this);
+    }
 
-    BasicTable(const BasicTable& t, Allocator& alloc = Allocator::get_default()) : Table(t, alloc) {}
+    BasicTable(const BasicTable& t, Allocator& alloc = Allocator::get_default()) : Table(t, alloc)
+    {
+    }
 
-    ~BasicTable() noexcept {}
+    ~BasicTable() noexcept
+    {
+    }
 
     static Ref create(Allocator& = Allocator::get_default());
 
     Ref copy(Allocator& = Allocator::get_default()) const;
 
-    static int get_column_count() noexcept { return util::TypeCount<typename Spec::Columns>::value; }
+    static int get_column_count() noexcept
+    {
+        return util::TypeCount<typename Spec::Columns>::value;
+    }
 
-    Ref get_table_ref() { return Ref(this); }
+    Ref get_table_ref()
+    {
+        return Ref(this);
+    }
 
-    ConstRef get_table_ref() const { return ConstRef(this); }
+    ConstRef get_table_ref() const
+    {
+        return ConstRef(this);
+    }
 
 private:
     template <int col_idx>
@@ -119,8 +135,14 @@ private:
     typedef typename Spec::template ColNames<ConstCol, const BasicTable*> ConstColsAccessor;
 
 public:
-    ColsAccessor column() noexcept { return ColsAccessor(this); }
-    ConstColsAccessor column() const noexcept { return ConstColsAccessor(this); }
+    ColsAccessor column() noexcept
+    {
+        return ColsAccessor(this);
+    }
+    ConstColsAccessor column() const noexcept
+    {
+        return ConstColsAccessor(this);
+    }
 
 private:
     template <int col_idx>
@@ -141,16 +163,25 @@ public:
     typedef typename Spec::template ColNames<Field, FieldInit> RowAccessor;
     typedef typename Spec::template ColNames<ConstField, ConstFieldInit> ConstRowAccessor;
 
-    RowAccessor operator[](size_t row_idx) noexcept { return RowAccessor(std::make_pair(this, row_idx)); }
+    RowAccessor operator[](size_t row_idx) noexcept
+    {
+        return RowAccessor(std::make_pair(this, row_idx));
+    }
 
     ConstRowAccessor operator[](size_t row_idx) const noexcept
     {
         return ConstRowAccessor(std::make_pair(this, row_idx));
     }
 
-    RowAccessor front() noexcept { return RowAccessor(std::make_pair(this, 0)); }
+    RowAccessor front() noexcept
+    {
+        return RowAccessor(std::make_pair(this, 0));
+    }
 
-    ConstRowAccessor front() const noexcept { return ConstRowAccessor(std::make_pair(this, 0)); }
+    ConstRowAccessor front() const noexcept
+    {
+        return ConstRowAccessor(std::make_pair(this, 0));
+    }
 
     /// Access the last row, or one of its predecessors.
     ///
@@ -158,14 +189,20 @@ public:
     /// to the end. Thus, <tt>table.back(rel_idx)</tt> is the same as
     /// <tt>table[table.size() + rel_idx]</tt>.
     ///
-    RowAccessor back(int rel_idx = -1) noexcept { return RowAccessor(std::make_pair(this, size() + rel_idx)); }
+    RowAccessor back(int rel_idx = -1) noexcept
+    {
+        return RowAccessor(std::make_pair(this, size() + rel_idx));
+    }
 
     ConstRowAccessor back(int rel_idx = -1) const noexcept
     {
         return ConstRowAccessor(std::make_pair(this, size() + rel_idx));
     }
 
-    RowAccessor add() { return RowAccessor(std::make_pair(this, add_empty_row())); }
+    RowAccessor add()
+    {
+        return RowAccessor(std::make_pair(this, add_empty_row()));
+    }
 
     template <class L>
     void add(const util::Tuple<L>& tuple)
@@ -174,7 +211,10 @@ public:
         insert(i, tuple);
     }
 
-    void insert(size_t i) { insert_empty_row(i); }
+    void insert(size_t i)
+    {
+        insert_empty_row(i);
+    }
 
     template <class L>
     void insert(size_t i, const util::Tuple<L>& tuple)
@@ -204,7 +244,10 @@ public:
 
 
     class Query;
-    Query where(typename BasicTable<Spec>::View* tv = nullptr) { return Query(*this, tv ? tv->get_impl() : nullptr); }
+    Query where(typename BasicTable<Spec>::View* tv = nullptr)
+    {
+        return Query(*this, tv ? tv->get_impl() : nullptr);
+    }
     Query where(typename BasicTable<Spec>::View* tv = nullptr) const
     {
         return Query(*this, tv ? tv->get_impl() : nullptr);
@@ -215,10 +258,16 @@ public:
     /// is, for each value V at column index C and row index R in one
     /// of the tables, there is a value at column index C and row
     /// index R in the other table that is equal to V.
-    bool operator==(const BasicTable& t) const { return compare_rows(t); }
+    bool operator==(const BasicTable& t) const
+    {
+        return compare_rows(t);
+    }
 
     /// Compare two tables for inequality. See operator==().
-    bool operator!=(const BasicTable& t) const { return !compare_rows(t); }
+    bool operator!=(const BasicTable& t) const
+    {
+        return !compare_rows(t);
+    }
 
     /// Checks whether the dynamic type of the specified table matches
     /// the statically specified table type. The two types (or specs)
@@ -265,8 +314,14 @@ private:
     };
 
     // These are intende to be used only by accessor classes
-    Table* get_impl() noexcept { return this; }
-    const Table* get_impl() const noexcept { return this; }
+    Table* get_impl() noexcept
+    {
+        return this;
+    }
+    const Table* get_impl() const noexcept
+    {
+        return this;
+    }
 
     template <class Subtab>
     Subtab* get_subtable_ptr(size_t col_idx, size_t row_idx)
@@ -351,8 +406,12 @@ private:
 template <class Spec>
 class BasicTable<Spec>::Query : public BASIC_TABLE_PARENT {
 public:
-    Query(const Query& q) : Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl) {}
-    virtual ~Query() noexcept {}
+    Query(const Query& q) : Spec::template ColNames<QueryCol, Query*>(this), m_impl(q.m_impl)
+    {
+    }
+    virtual ~Query() noexcept
+    {
+    }
 
     Query& group()
     {
@@ -384,7 +443,10 @@ public:
         return *this;
     }
 
-    size_t find(size_t begin_at_table_row = 0) { return m_impl.find(begin_at_table_row); }
+    size_t find(size_t begin_at_table_row = 0)
+    {
+        return m_impl.find(begin_at_table_row);
+    }
 
     typename BasicTable<Spec>::View find_all(size_t start = 0, size_t end = size_t(-1), size_t limit = size_t(-1))
     {
@@ -402,9 +464,15 @@ public:
         return m_impl.count(start, end, limit);
     }
 
-    size_t remove() { return m_impl.remove(); }
+    size_t remove()
+    {
+        return m_impl.remove();
+    }
 
-    std::string validate() { return m_impl.validate(); }
+    std::string validate()
+    {
+        return m_impl.validate();
+    }
 
 protected:
     Query(const BasicTable<Spec>& table, TableViewBase* tv)
@@ -423,7 +491,10 @@ protected:
     {
     }
 
-    void apply_patch(HandoverPatch& patch, Group& dest_group) { m_impl.apply_patch(patch, dest_group); }
+    void apply_patch(HandoverPatch& patch, Group& dest_group)
+    {
+        m_impl.apply_patch(patch, dest_group);
+    }
 
     virtual std::unique_ptr<Query> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
                                                       ConstSourcePayload mode) const

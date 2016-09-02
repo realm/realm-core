@@ -91,7 +91,10 @@ private:
     struct list_entry {
         size_t m_row_ndx;
         std::weak_ptr<LinkView> m_list;
-        bool operator<(const list_entry& other) const { return m_row_ndx < other.m_row_ndx; }
+        bool operator<(const list_entry& other) const
+        {
+            return m_row_ndx < other.m_row_ndx;
+        }
     };
 
     // The accessors stored in `m_list_accessors` are sorted by their row index.

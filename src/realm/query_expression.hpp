@@ -212,32 +212,47 @@ int no_timestamp(const Timestamp&)
 
 template <class T>
 struct Plus {
-    T operator()(T v1, T v2) const { return v1 + v2; }
+    T operator()(T v1, T v2) const
+    {
+        return v1 + v2;
+    }
     typedef T type;
 };
 
 template <class T>
 struct Minus {
-    T operator()(T v1, T v2) const { return v1 - v2; }
+    T operator()(T v1, T v2) const
+    {
+        return v1 - v2;
+    }
     typedef T type;
 };
 
 template <class T>
 struct Div {
-    T operator()(T v1, T v2) const { return v1 / v2; }
+    T operator()(T v1, T v2) const
+    {
+        return v1 / v2;
+    }
     typedef T type;
 };
 
 template <class T>
 struct Mul {
-    T operator()(T v1, T v2) const { return v1 * v2; }
+    T operator()(T v1, T v2) const
+    {
+        return v1 * v2;
+    }
     typedef T type;
 };
 
 // Unary operator
 template <class T>
 struct Pow {
-    T operator()(T v) const { return v * v; }
+    T operator()(T v) const
+    {
+        return v * v;
+    }
     typedef T type;
 };
 
@@ -267,12 +282,24 @@ struct Common<T1, T2, true, false, b> {
 struct RowIndex {
     enum DetachedTag { Detached };
 
-    explicit RowIndex() : m_row_index(npos) {}
-    explicit RowIndex(size_t row_index) : m_row_index(row_index) {}
-    RowIndex(DetachedTag) : m_row_index() {}
+    explicit RowIndex() : m_row_index(npos)
+    {
+    }
+    explicit RowIndex(size_t row_index) : m_row_index(row_index)
+    {
+    }
+    RowIndex(DetachedTag) : m_row_index()
+    {
+    }
 
-    bool is_attached() const { return bool(m_row_index); }
-    bool is_null() const { return is_attached() && *m_row_index == npos; }
+    bool is_attached() const
+    {
+        return bool(m_row_index);
+    }
+    bool is_null() const
+    {
+        return is_attached() && *m_row_index == npos;
+    }
 
     bool operator==(const RowIndex& other) const
     {
@@ -281,7 +308,10 @@ struct RowIndex {
             return false;
         return m_row_index == other.m_row_index;
     }
-    bool operator!=(const RowIndex& other) const { return !(*this == other); }
+    bool operator!=(const RowIndex& other) const
+    {
+        return !(*this == other);
+    }
 
 private:
     util::Optional<size_t> m_row_index;
@@ -312,15 +342,21 @@ struct ValueBase {
 
 class Expression {
 public:
-    Expression() {}
-    virtual ~Expression() {}
+    Expression()
+    {
+    }
+    virtual ~Expression()
+    {
+    }
 
     virtual size_t find_first(size_t start, size_t end) const = 0;
     virtual void set_base_table(const Table* table) = 0;
     virtual const Table* get_base_table() const = 0;
 
     virtual std::unique_ptr<Expression> clone(QueryNodeHandoverPatches*) const = 0;
-    virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&) {}
+    virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&)
+    {
+    }
 };
 
 template <typename T, typename... Args>
@@ -331,10 +367,14 @@ std::unique_ptr<Expression> make_expression(Args&&... args)
 
 class Subexpr {
 public:
-    virtual ~Subexpr() {}
+    virtual ~Subexpr()
+    {
+    }
 
     virtual std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* = nullptr) const = 0;
-    virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&) {}
+    virtual void apply_handover_patch(QueryNodeHandoverPatches&, Group&)
+    {
+    }
 
     // When the user constructs a query, it always "belongs" to one single base/parent table (regardless of
     // any links or not and regardless of any queries assembled with || or &&). When you do a Query::find(),
@@ -343,12 +383,17 @@ public:
     //
     // During thread-handover of a Query, set_base_table() is also called to make objects point at the new table
     // instead of the old one from the old thread.
-    virtual void set_base_table(const Table*) {}
+    virtual void set_base_table(const Table*)
+    {
+    }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and
     // binds it to a Query at a later time
-    virtual const Table* get_base_table() const { return nullptr; }
+    virtual const Table* get_base_table() const
+    {
+        return nullptr;
+    }
 
     virtual void evaluate(size_t index, ValueBase& destination) = 0;
 };
@@ -458,28 +503,73 @@ template <class L, class R>
 class Overloads {
     typedef typename Common<L, R>::type CommonType;
 
-    std::unique_ptr<Subexpr> clone_subexpr() const { return static_cast<const Subexpr2<L>&>(*this).clone(); }
+    std::unique_ptr<Subexpr> clone_subexpr() const
+    {
+        return static_cast<const Subexpr2<L>&>(*this).clone();
+    }
 
 public:
     // Arithmetic, right side constant
-    Operator<Plus<CommonType>> operator+(R right) const { return {clone_subexpr(), make_subexpr<Value<R>>(right)}; }
-    Operator<Minus<CommonType>> operator-(R right) const { return {clone_subexpr(), make_subexpr<Value<R>>(right)}; }
-    Operator<Mul<CommonType>> operator*(R right) const { return {clone_subexpr(), make_subexpr<Value<R>>(right)}; }
-    Operator<Div<CommonType>> operator/(R right) const { return {clone_subexpr(), make_subexpr<Value<R>>(right)}; }
+    Operator<Plus<CommonType>> operator+(R right) const
+    {
+        return {clone_subexpr(), make_subexpr<Value<R>>(right)};
+    }
+    Operator<Minus<CommonType>> operator-(R right) const
+    {
+        return {clone_subexpr(), make_subexpr<Value<R>>(right)};
+    }
+    Operator<Mul<CommonType>> operator*(R right) const
+    {
+        return {clone_subexpr(), make_subexpr<Value<R>>(right)};
+    }
+    Operator<Div<CommonType>> operator/(R right) const
+    {
+        return {clone_subexpr(), make_subexpr<Value<R>>(right)};
+    }
 
     // Arithmetic, right side subexpression
-    Operator<Plus<CommonType>> operator+(const Subexpr2<R>& right) const { return {clone_subexpr(), right.clone()}; }
-    Operator<Minus<CommonType>> operator-(const Subexpr2<R>& right) const { return {clone_subexpr(), right.clone()}; }
-    Operator<Mul<CommonType>> operator*(const Subexpr2<R>& right) const { return {clone_subexpr(), right.clone()}; }
-    Operator<Div<CommonType>> operator/(const Subexpr2<R>& right) const { return {clone_subexpr(), right.clone()}; }
+    Operator<Plus<CommonType>> operator+(const Subexpr2<R>& right) const
+    {
+        return {clone_subexpr(), right.clone()};
+    }
+    Operator<Minus<CommonType>> operator-(const Subexpr2<R>& right) const
+    {
+        return {clone_subexpr(), right.clone()};
+    }
+    Operator<Mul<CommonType>> operator*(const Subexpr2<R>& right) const
+    {
+        return {clone_subexpr(), right.clone()};
+    }
+    Operator<Div<CommonType>> operator/(const Subexpr2<R>& right) const
+    {
+        return {clone_subexpr(), right.clone()};
+    }
 
     // Compare, right side constant
-    Query operator>(R right) { return create<Less>(right, static_cast<Subexpr2<L>&>(*this)); }
-    Query operator<(R right) { return create<Greater>(right, static_cast<Subexpr2<L>&>(*this)); }
-    Query operator>=(R right) { return create<LessEqual>(right, static_cast<Subexpr2<L>&>(*this)); }
-    Query operator<=(R right) { return create<GreaterEqual>(right, static_cast<Subexpr2<L>&>(*this)); }
-    Query operator==(R right) { return create<Equal>(right, static_cast<Subexpr2<L>&>(*this)); }
-    Query operator!=(R right) { return create<NotEqual>(right, static_cast<Subexpr2<L>&>(*this)); }
+    Query operator>(R right)
+    {
+        return create<Less>(right, static_cast<Subexpr2<L>&>(*this));
+    }
+    Query operator<(R right)
+    {
+        return create<Greater>(right, static_cast<Subexpr2<L>&>(*this));
+    }
+    Query operator>=(R right)
+    {
+        return create<LessEqual>(right, static_cast<Subexpr2<L>&>(*this));
+    }
+    Query operator<=(R right)
+    {
+        return create<GreaterEqual>(right, static_cast<Subexpr2<L>&>(*this));
+    }
+    Query operator==(R right)
+    {
+        return create<Equal>(right, static_cast<Subexpr2<L>&>(*this));
+    }
+    Query operator!=(R right)
+    {
+        return create<NotEqual>(right, static_cast<Subexpr2<L>&>(*this));
+    }
 
     // Purpose of this method is to intercept the creation of a condition and test if it's supported by the old
     // query_engine.hpp which is faster. If it's supported, create a query_engine.hpp node, otherwise create a
@@ -569,12 +659,30 @@ public:
     }
 
     // Compare, right side subexpression
-    Query operator==(const Subexpr2<R>& right) { return create2<Equal>(right); }
-    Query operator!=(const Subexpr2<R>& right) { return create2<NotEqual>(right); }
-    Query operator>(const Subexpr2<R>& right) { return create2<Greater>(right); }
-    Query operator<(const Subexpr2<R>& right) { return create2<Less>(right); }
-    Query operator>=(const Subexpr2<R>& right) { return create2<GreaterEqual>(right); }
-    Query operator<=(const Subexpr2<R>& right) { return create2<LessEqual>(right); }
+    Query operator==(const Subexpr2<R>& right)
+    {
+        return create2<Equal>(right);
+    }
+    Query operator!=(const Subexpr2<R>& right)
+    {
+        return create2<NotEqual>(right);
+    }
+    Query operator>(const Subexpr2<R>& right)
+    {
+        return create2<Greater>(right);
+    }
+    Query operator<(const Subexpr2<R>& right)
+    {
+        return create2<Less>(right);
+    }
+    Query operator>=(const Subexpr2<R>& right)
+    {
+        return create2<GreaterEqual>(right);
+    }
+    Query operator<=(const Subexpr2<R>& right)
+    {
+        return create2<LessEqual>(right);
+    }
 };
 
 // With this wrapper class we can define just 20 overloads inside Overloads<L, R> instead of 5 * 20 = 100. Todo: We
@@ -593,7 +701,9 @@ class Subexpr2 : public Subexpr,
                  public Overloads<T, OldDateTime>,
                  public Overloads<T, null> {
 public:
-    virtual ~Subexpr2() {}
+    virtual ~Subexpr2()
+    {
+    }
 
 #define RLM_U2(t, o) using Overloads<T, t>::operator o;
 #define RLM_U(o)                                                                                                     \
@@ -647,7 +757,9 @@ struct NullableVector {
         typename std::conditional<std::is_same<Underlying, bool>::value || std::is_same<Underlying, int>::value,
                                   int64_t, Underlying>::type;
 
-    NullableVector() {}
+    NullableVector()
+    {
+    }
 
     NullableVector& operator=(const NullableVector& other)
     {
@@ -666,7 +778,10 @@ struct NullableVector {
         m_null = other.m_null;
     }
 
-    ~NullableVector() { dealloc(); }
+    ~NullableVector()
+    {
+        dealloc();
+    }
 
     T operator[](size_t index) const
     {
@@ -912,12 +1027,24 @@ struct OperatorOptionalAdapter {
 template <class T>
 class Value : public ValueBase, public Subexpr2<T> {
 public:
-    Value() { init(false, ValueBase::default_size, T()); }
-    Value(T v) { init(false, ValueBase::default_size, v); }
+    Value()
+    {
+        init(false, ValueBase::default_size, T());
+    }
+    Value(T v)
+    {
+        init(false, ValueBase::default_size, v);
+    }
 
-    Value(bool from_link_list, size_t values) { init(from_link_list, values, T()); }
+    Value(bool from_link_list, size_t values)
+    {
+        init(from_link_list, values, T());
+    }
 
-    Value(bool from_link_list, size_t values, T v) { init(from_link_list, values, v); }
+    Value(bool from_link_list, size_t values, T v)
+    {
+        init(from_link_list, values, v);
+    }
 
     Value(const Value&) = default;
     Value& operator=(const Value&) = default;
@@ -936,7 +1063,10 @@ public:
         ValueBase::m_values = values;
     }
 
-    void evaluate(size_t, ValueBase& destination) override { destination.import(*this); }
+    void evaluate(size_t, ValueBase& destination) override
+    {
+        destination.import(*this);
+    }
 
 
     template <class TOperator>
@@ -1020,15 +1150,30 @@ public:
         export2<Timestamp>(destination);
     }
 
-    REALM_FORCEINLINE void export_bool(ValueBase& destination) const override { export2<bool>(destination); }
+    REALM_FORCEINLINE void export_bool(ValueBase& destination) const override
+    {
+        export2<bool>(destination);
+    }
 
-    REALM_FORCEINLINE void export_int64_t(ValueBase& destination) const override { export2<int64_t>(destination); }
+    REALM_FORCEINLINE void export_int64_t(ValueBase& destination) const override
+    {
+        export2<int64_t>(destination);
+    }
 
-    REALM_FORCEINLINE void export_float(ValueBase& destination) const override { export2<float>(destination); }
+    REALM_FORCEINLINE void export_float(ValueBase& destination) const override
+    {
+        export2<float>(destination);
+    }
 
-    REALM_FORCEINLINE void export_int(ValueBase& destination) const override { export2<int>(destination); }
+    REALM_FORCEINLINE void export_int(ValueBase& destination) const override
+    {
+        export2<int>(destination);
+    }
 
-    REALM_FORCEINLINE void export_double(ValueBase& destination) const override { export2<double>(destination); }
+    REALM_FORCEINLINE void export_double(ValueBase& destination) const override
+    {
+        export2<double>(destination);
+    }
     REALM_FORCEINLINE void export_StringData(ValueBase& destination) const override
     {
         export2<StringData>(destination);
@@ -1037,7 +1182,10 @@ public:
     {
         export2<BinaryData>(destination);
     }
-    REALM_FORCEINLINE void export_RowIndex(ValueBase& destination) const override { export2<RowIndex>(destination); }
+    REALM_FORCEINLINE void export_RowIndex(ValueBase& destination) const override
+    {
+        export2<RowIndex>(destination);
+    }
     REALM_FORCEINLINE void export_null(ValueBase& destination) const override
     {
         Value<null>& d = static_cast<Value<null>&>(destination);
@@ -1114,7 +1262,10 @@ public:
         return not_found; // no match
     }
 
-    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override { return make_subexpr<Value<T>>(*this); }
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
+    {
+        return make_subexpr<Value<T>>(*this);
+    }
 
     NullableVector<T> m_storage;
 };
@@ -1411,7 +1562,9 @@ struct FindNullLinks : public LinkMapFunction {
 };
 
 struct MakeLinkVector : public LinkMapFunction {
-    MakeLinkVector(std::vector<size_t>& result) : m_links(result) {}
+    MakeLinkVector(std::vector<size_t>& result) : m_links(result)
+    {
+    }
 
     bool consume(size_t row_index) override
     {
@@ -1428,7 +1581,10 @@ struct CountLinks : public LinkMapFunction {
         return true;
     }
 
-    size_t result() const { return m_link_count; }
+    size_t result() const
+    {
+        return m_link_count;
+    }
 
     size_t m_link_count = 0;
 };
@@ -1525,13 +1681,25 @@ public:
         return counter.result();
     }
 
-    void map_links(size_t row, LinkMapFunction& lm) { map_links(0, row, lm); }
+    void map_links(size_t row, LinkMapFunction& lm)
+    {
+        map_links(0, row, lm);
+    }
 
-    bool only_unary_links() const { return m_only_unary_links; }
+    bool only_unary_links() const
+    {
+        return m_only_unary_links;
+    }
 
-    const Table* base_table() const { return m_base_table; }
+    const Table* base_table() const
+    {
+        return m_base_table;
+    }
 
-    const Table* target_table() const { return m_target_table; }
+    const Table* target_table() const
+    {
+        return m_target_table;
+    }
 
     std::vector<const ColumnBase*> m_link_columns;
 
@@ -1638,9 +1806,15 @@ public:
         m_column = &m_link_map.target_table()->get_column_base(m_column_ndx);
     }
 
-    bool is_nullable() const noexcept { return m_link_map.base_table()->is_nullable(m_column->get_column_index()); }
+    bool is_nullable() const noexcept
+    {
+        return m_link_map.base_table()->is_nullable(m_column->get_column_index());
+    }
 
-    const Table* get_base_table() const override { return m_link_map.base_table(); }
+    const Table* get_base_table() const override
+    {
+        return m_link_map.base_table();
+    }
 
     void set_base_table(const Table* table) override
     {
@@ -1674,7 +1848,10 @@ public:
         }
     }
 
-    bool links_exist() const { return m_link_map.m_link_columns.size() > 0; }
+    bool links_exist() const
+    {
+        return m_link_map.m_link_columns.size() > 0;
+    }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches = nullptr) const override
     {
@@ -1693,7 +1870,10 @@ public:
         }
     }
 
-    size_t column_ndx() const { return m_column->get_column_index(); }
+    size_t column_ndx() const
+    {
+        return m_column->get_column_index();
+    }
 
 private:
     // Column index of payload column of m_table
@@ -1860,13 +2040,21 @@ inline Query operator!=(BinaryData left, const Columns<BinaryData>& right)
 template <bool has_links>
 class UnaryLinkCompare : public Expression {
 public:
-    UnaryLinkCompare(LinkMap lm) : m_link_map(std::move(lm)) {}
+    UnaryLinkCompare(LinkMap lm) : m_link_map(std::move(lm))
+    {
+    }
 
-    void set_base_table(const Table* table) override { m_link_map.set_base_table(table); }
+    void set_base_table(const Table* table) override
+    {
+        m_link_map.set_base_table(table);
+    }
 
     // Return main table of query (table on which table->where()... is invoked). Note that this is not the same as
     // any linked-to payload tables
-    const Table* get_base_table() const override { return m_link_map.base_table(); }
+    const Table* get_base_table() const override
+    {
+        return m_link_map.base_table();
+    }
 
     size_t find_first(size_t start, size_t end) const override
     {
@@ -1901,7 +2089,9 @@ private:
 
 class LinkCount : public Subexpr2<Int> {
 public:
-    LinkCount(LinkMap link_map) : m_link_map(std::move(link_map)) {}
+    LinkCount(LinkMap link_map) : m_link_map(std::move(link_map))
+    {
+    }
     LinkCount(LinkCount const& other, QueryNodeHandoverPatches* patches)
         : Subexpr2<Int>(other), m_link_map(other.m_link_map, patches)
     {
@@ -1912,9 +2102,15 @@ public:
         return make_subexpr<LinkCount>(*this, patches);
     }
 
-    const Table* get_base_table() const override { return m_link_map.base_table(); }
+    const Table* get_base_table() const override
+    {
+        return m_link_map.base_table();
+    }
 
-    void set_base_table(const Table* table) override { m_link_map.set_base_table(table); }
+    void set_base_table(const Table* table) override
+    {
+        m_link_map.set_base_table(table);
+    }
 
     void evaluate(size_t index, ValueBase& destination) override
     {
@@ -1932,10 +2128,17 @@ struct ConstantRowValueHandoverPatch : public QueryNodeHandoverPatch {
 
 class ConstantRowValue : public Subexpr2<Link> {
 public:
-    ConstantRowValue(const ConstRow& row) : m_row(row) {}
+    ConstantRowValue(const ConstRow& row) : m_row(row)
+    {
+    }
 
-    void set_base_table(const Table*) override {}
-    const Table* get_base_table() const override { return nullptr; }
+    void set_base_table(const Table*) override
+    {
+    }
+    const Table* get_base_table() const override
+    {
+        return nullptr;
+    }
 
     void evaluate(size_t, ValueBase& destination) override
     {
@@ -2004,7 +2207,10 @@ public:
         return make_expression<UnaryLinkCompare<true>>(m_link_map);
     }
 
-    LinkCount count() const { return LinkCount(m_link_map); }
+    LinkCount count() const
+    {
+        return LinkCount(m_link_map);
+    }
 
     template <typename C>
     SubColumns<C> column(size_t column_ndx) const
@@ -2012,10 +2218,19 @@ public:
         return SubColumns<C>(Columns<C>(column_ndx, m_link_map.target_table()), m_link_map);
     }
 
-    const LinkMap& link_map() const { return m_link_map; }
+    const LinkMap& link_map() const
+    {
+        return m_link_map;
+    }
 
-    const Table* get_base_table() const override { return m_link_map.base_table(); }
-    void set_base_table(const Table* table) override { m_link_map.set_base_table(table); }
+    const Table* get_base_table() const override
+    {
+        return m_link_map.base_table();
+    }
+    void set_base_table(const Table* table) override
+    {
+        m_link_map.set_base_table(table);
+    }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
@@ -2201,7 +2416,10 @@ public:
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and binds it to a Query at a later time
-    const Table* get_base_table() const override { return m_link_map.base_table(); }
+    const Table* get_base_table() const override
+    {
+        return m_link_map.base_table();
+    }
 
     template <class ColType2 = ColType>
     void evaluate_internal(size_t index, ValueBase& destination)
@@ -2276,11 +2494,20 @@ public:
         }
     }
 
-    bool links_exist() const { return m_link_map.m_link_columns.size() > 0; }
+    bool links_exist() const
+    {
+        return m_link_map.m_link_columns.size() > 0;
+    }
 
-    bool is_nullable() const { return m_nullable; }
+    bool is_nullable() const
+    {
+        return m_nullable;
+    }
 
-    size_t column_ndx() const noexcept { return m_sg ? get_column_base().get_column_index() : m_column; }
+    size_t column_ndx() const noexcept
+    {
+        return m_sg ? get_column_base().get_column_index() : m_column;
+    }
 
 private:
     LinkMap m_link_map;
@@ -2320,14 +2547,19 @@ class Average;
 template <typename T>
 class SubColumns : public Subexpr {
 public:
-    SubColumns(Columns<T> column, LinkMap link_map) : m_column(std::move(column)), m_link_map(std::move(link_map)) {}
+    SubColumns(Columns<T> column, LinkMap link_map) : m_column(std::move(column)), m_link_map(std::move(link_map))
+    {
+    }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches*) const override
     {
         return make_subexpr<SubColumns<T>>(*this);
     }
 
-    const Table* get_base_table() const override { return m_link_map.base_table(); }
+    const Table* get_base_table() const override
+    {
+        return m_link_map.base_table();
+    }
 
     void set_base_table(const Table* table) override
     {
@@ -2341,13 +2573,25 @@ public:
         REALM_ASSERT(false);
     }
 
-    SubColumnAggregate<T, aggregate_operations::Minimum<T>> min() const { return {m_column, m_link_map}; }
+    SubColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
+    {
+        return {m_column, m_link_map};
+    }
 
-    SubColumnAggregate<T, aggregate_operations::Maximum<T>> max() const { return {m_column, m_link_map}; }
+    SubColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
+    {
+        return {m_column, m_link_map};
+    }
 
-    SubColumnAggregate<T, aggregate_operations::Sum<T>> sum() const { return {m_column, m_link_map}; }
+    SubColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
+    {
+        return {m_column, m_link_map};
+    }
 
-    SubColumnAggregate<T, aggregate_operations::Average<T>> average() const { return {m_column, m_link_map}; }
+    SubColumnAggregate<T, aggregate_operations::Average<T>> average() const
+    {
+        return {m_column, m_link_map};
+    }
 
 private:
     Columns<T> m_column;
@@ -2371,7 +2615,10 @@ public:
         return make_subexpr<SubColumnAggregate>(*this, patches);
     }
 
-    const Table* get_base_table() const override { return m_link_map.base_table(); }
+    const Table* get_base_table() const override
+    {
+        return m_link_map.base_table();
+    }
 
     void set_base_table(const Table* table) override
     {
@@ -2425,11 +2672,19 @@ struct SubQueryCountHandoverPatch : QueryNodeHandoverPatch {
 
 class SubQueryCount : public Subexpr2<Int> {
 public:
-    SubQueryCount(Query q, LinkMap link_map) : m_query(std::move(q)), m_link_map(std::move(link_map)) {}
+    SubQueryCount(Query q, LinkMap link_map) : m_query(std::move(q)), m_link_map(std::move(link_map))
+    {
+    }
 
-    const Table* get_base_table() const override { return m_link_map.base_table(); }
+    const Table* get_base_table() const override
+    {
+        return m_link_map.base_table();
+    }
 
-    void set_base_table(const Table* table) override { m_link_map.set_base_table(table); }
+    void set_base_table(const Table* table) override
+    {
+        m_link_map.set_base_table(table);
+    }
 
     void evaluate(size_t index, ValueBase& destination) override
     {
@@ -2485,7 +2740,10 @@ public:
         REALM_ASSERT(m_link_map.target_table() == m_query.get_table());
     }
 
-    SubQueryCount count() const { return SubQueryCount(m_query, m_link_map); }
+    SubQueryCount count() const
+    {
+        return SubQueryCount(m_query, m_link_map);
+    }
 
 private:
     Query m_query;
@@ -2507,8 +2765,14 @@ public:
         m_result = Derived::apply(m_result, value);
     }
 
-    bool is_null() const { return m_count == 0; }
-    ResultType result() const { return m_result; }
+    bool is_null() const
+    {
+        return m_count == 0;
+    }
+    ResultType result() const
+    {
+        return m_result;
+    }
 
 protected:
     size_t m_count = 0;
@@ -2518,23 +2782,44 @@ protected:
 template <typename T>
 class Minimum : public BaseAggregateOperation<T, Minimum<T>> {
 public:
-    static T initial_value() { return std::numeric_limits<T>::max(); }
-    static T apply(T a, T b) { return std::min(a, b); }
+    static T initial_value()
+    {
+        return std::numeric_limits<T>::max();
+    }
+    static T apply(T a, T b)
+    {
+        return std::min(a, b);
+    }
 };
 
 template <typename T>
 class Maximum : public BaseAggregateOperation<T, Maximum<T>> {
 public:
-    static T initial_value() { return std::numeric_limits<T>::min(); }
-    static T apply(T a, T b) { return std::max(a, b); }
+    static T initial_value()
+    {
+        return std::numeric_limits<T>::min();
+    }
+    static T apply(T a, T b)
+    {
+        return std::max(a, b);
+    }
 };
 
 template <typename T>
 class Sum : public BaseAggregateOperation<T, Sum<T>> {
 public:
-    static T initial_value() { return T(); }
-    static T apply(T a, T b) { return a + b; }
-    bool is_null() const { return false; }
+    static T initial_value()
+    {
+        return T();
+    }
+    static T apply(T a, T b)
+    {
+        return a + b;
+    }
+    bool is_null() const
+    {
+        return false;
+    }
 };
 
 template <typename T>
@@ -2542,16 +2827,27 @@ class Average : public BaseAggregateOperation<T, Average<T>, double> {
     using Base = BaseAggregateOperation<T, Average<T>, double>;
 
 public:
-    static double initial_value() { return 0; }
-    static double apply(double a, T b) { return a + b; }
-    double result() const { return Base::m_result / Base::m_count; }
+    static double initial_value()
+    {
+        return 0;
+    }
+    static double apply(double a, T b)
+    {
+        return a + b;
+    }
+    double result() const
+    {
+        return Base::m_result / Base::m_count;
+    }
 };
 }
 
 template <class oper, class TLeft>
 class UnaryOperator : public Subexpr2<typename oper::type> {
 public:
-    UnaryOperator(std::unique_ptr<TLeft> left) : m_left(std::move(left)) {}
+    UnaryOperator(std::unique_ptr<TLeft> left) : m_left(std::move(left))
+    {
+    }
 
     UnaryOperator(const UnaryOperator& other, QueryNodeHandoverPatches* patches)
         : m_left(other.m_left->clone(patches))
@@ -2570,12 +2866,18 @@ public:
     UnaryOperator& operator=(UnaryOperator&&) = default;
 
     // See comment in base class
-    void set_base_table(const Table* table) override { m_left->set_base_table(table); }
+    void set_base_table(const Table* table) override
+    {
+        m_left->set_base_table(table);
+    }
 
     // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
     // and
     // binds it to a Query at a later time
-    const Table* get_base_table() const override { return m_left->get_base_table(); }
+    const Table* get_base_table() const override
+    {
+        return m_left->get_base_table();
+    }
 
     // destination = operator(left)
     void evaluate(size_t index, ValueBase& destination) override

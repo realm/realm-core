@@ -419,7 +419,9 @@ void StringColumn::set(size_t ndx, StringData value)
 class StringColumn::EraseLeafElem : public Array::EraseHandler {
 public:
     StringColumn& m_column;
-    EraseLeafElem(StringColumn& column, bool nullable) noexcept : m_column(column), m_nullable(nullable) {}
+    EraseLeafElem(StringColumn& column, bool nullable) noexcept : m_column(column), m_nullable(nullable)
+    {
+    }
     bool erase_leaf_elem(MemRef leaf_mem, ArrayParent* parent, size_t leaf_ndx_in_parent,
                          size_t elem_ndx_in_leaf) override
     {
@@ -469,7 +471,10 @@ public:
         leaf.erase(ndx); // Throws
         return false;
     }
-    void destroy_leaf(MemRef leaf_mem) noexcept override { Array::destroy_deep(leaf_mem, m_column.get_alloc()); }
+    void destroy_leaf(MemRef leaf_mem) noexcept override
+    {
+        Array::destroy_deep(leaf_mem, m_column.get_alloc());
+    }
     void replace_root_by_leaf(MemRef leaf_mem) override
     {
         std::unique_ptr<Array> leaf;
@@ -928,10 +933,20 @@ namespace {
 struct BinToStrAdaptor {
     typedef StringData value_type;
     const ArrayBigBlobs& m_big_blobs;
-    BinToStrAdaptor(const ArrayBigBlobs& big_blobs) noexcept : m_big_blobs(big_blobs) {}
-    ~BinToStrAdaptor() noexcept {}
-    size_t size() const noexcept { return m_big_blobs.size(); }
-    StringData get(size_t ndx) const noexcept { return m_big_blobs.get_string(ndx); }
+    BinToStrAdaptor(const ArrayBigBlobs& big_blobs) noexcept : m_big_blobs(big_blobs)
+    {
+    }
+    ~BinToStrAdaptor() noexcept
+    {
+    }
+    size_t size() const noexcept
+    {
+        return m_big_blobs.size();
+    }
+    StringData get(size_t ndx) const noexcept
+    {
+        return m_big_blobs.get_string(ndx);
+    }
 };
 
 } // anonymous namespace
@@ -1294,7 +1309,9 @@ StringColumn::LeafType StringColumn::get_block(size_t ndx, ArrayParent** ap, siz
 
 class StringColumn::CreateHandler : public ColumnBase::CreateHandler {
 public:
-    CreateHandler(Allocator& alloc) : m_alloc(alloc) {}
+    CreateHandler(Allocator& alloc) : m_alloc(alloc)
+    {
+    }
     ref_type create_leaf(size_t size) override
     {
         MemRef mem = ArrayString::create_array(size, m_alloc); // Throws
@@ -1314,7 +1331,9 @@ ref_type StringColumn::create(Allocator& alloc, size_t size)
 
 class StringColumn::SliceHandler : public ColumnBase::SliceHandler {
 public:
-    SliceHandler(Allocator& alloc, bool nullable) : m_alloc(alloc), m_nullable(nullable) {}
+    SliceHandler(Allocator& alloc, bool nullable) : m_alloc(alloc), m_nullable(nullable)
+    {
+    }
     MemRef slice_leaf(MemRef leaf_mem, size_t offset, size_t size, Allocator& target_alloc) override
     {
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());

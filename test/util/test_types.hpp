@@ -36,8 +36,13 @@
 #define TEST_TYPES_EX(name, list, enabled, allow_concur, ...)                                                        \
     template <class>                                                                                                 \
     struct Realm_UnitTest__##name : realm::test_util::unit_test::TestBase {                                          \
-        static bool test_enabled() { return bool(enabled); }                                                         \
-        Realm_UnitTest__##name(realm::test_util::unit_test::TestContext& c) : TestBase(c) {}                         \
+        static bool test_enabled()                                                                                   \
+        {                                                                                                            \
+            return bool(enabled);                                                                                    \
+        }                                                                                                            \
+        Realm_UnitTest__##name(realm::test_util::unit_test::TestContext& c) : TestBase(c)                            \
+        {                                                                                                            \
+        }                                                                                                            \
         void test_run();                                                                                             \
     };                                                                                                               \
     realm::test_util::unit_test::RegisterTypeTests<Realm_UnitTest__##name, __VA_ARGS__> realm_unit_test_reg__##name( \
@@ -82,7 +87,9 @@ struct RegisterTypeTests<Test, Type, Types...> {
 };
 template <template <class> class Test>
 struct RegisterTypeTests<Test> {
-    RegisterTypeTests(TestList&, bool, const char*, const char*, const char*, long) {}
+    RegisterTypeTests(TestList&, bool, const char*, const char*, const char*, long)
+    {
+    }
 };
 
 } // namespace unit_test

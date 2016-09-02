@@ -67,115 +67,211 @@ struct TestStruct {
 
 class match1 {
 public:
-    match1(bool target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field1 == m_target; }
+    match1(bool target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field1 == m_target;
+    }
+
 private:
     const bool m_target;
 };
 class match2 {
 public:
-    match2(bool target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field2 == m_target; }
+    match2(bool target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field2 == m_target;
+    }
+
 private:
     const bool m_target;
 };
 class match3 {
 public:
-    match3(int target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field3 == m_target; }
+    match3(int target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field3 == m_target;
+    }
+
 private:
     const int m_target;
 };
 class match4 {
 public:
-    match4(int target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field4 == m_target; }
+    match4(int target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field4 == m_target;
+    }
+
 private:
     const int m_target;
 };
 class match5 {
 public:
-    match5(int target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field5 == m_target; }
+    match5(int target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field5 == m_target;
+    }
+
 private:
     const int m_target;
 };
 class match6 {
 public:
-    match6(int target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field6 == m_target; }
+    match6(int target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field6 == m_target;
+    }
+
 private:
     const int m_target;
 };
 class match7 {
 public:
-    match7(int target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field7 == m_target; }
+    match7(int target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field7 == m_target;
+    }
+
 private:
     const int m_target;
 };
 class match8 {
 public:
-    match8(int64_t target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field8 == m_target; }
+    match8(int64_t target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field8 == m_target;
+    }
+
 private:
     const int64_t m_target;
 };
 class match9 {
 public:
-    match9(const std::string& target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field9 == m_target; }
+    match9(const std::string& target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field9 == m_target;
+    }
+
 private:
     const std::string& m_target;
 };
 class match10 {
 public:
-    match10(const std::string& target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field10 == m_target; }
+    match10(const std::string& target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field10 == m_target;
+    }
+
 private:
     const std::string& m_target;
 };
 class match11 {
 public:
-    match11(const std::string& target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field11 == m_target; }
+    match11(const std::string& target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field11 == m_target;
+    }
+
 private:
     const std::string& m_target;
 };
 class match9n {
 public:
-    match9n(const std::string& target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field9 != m_target; }
+    match9n(const std::string& target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field9 != m_target;
+    }
+
 private:
     const std::string& m_target;
 };
 class match10n {
 public:
-    match10n(const std::string& target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field10 != m_target; }
+    match10n(const std::string& target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field10 != m_target;
+    }
+
 private:
     const std::string& m_target;
 };
 class match11n {
 public:
-    match11n(const std::string& target) : m_target(target) {}
-    bool operator()(const TestStruct& v) const { return v.field11 != m_target; }
+    match11n(const std::string& target) : m_target(target)
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field11 != m_target;
+    }
+
 private:
     const std::string& m_target;
 };
 class columns2 {
 public:
-    columns2() {}
-    bool operator()(const TestStruct& v) const { return v.field2 == 1 && v.field3 == 3; }
+    columns2()
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field2 == 1 && v.field3 == 3;
+    }
 };
 class columns3 {
 public:
-    columns3() {}
-    bool operator()(const TestStruct& v) const { return v.field2 == 1 && v.field3 == 3 && v.field4 == 15; }
+    columns3()
+    {
+    }
+    bool operator()(const TestStruct& v) const
+    {
+        return v.field2 == 1 && v.field3 == 3 && v.field4 == 15;
+    }
 };
 class columns4 {
 public:
-    columns4() {}
+    columns4()
+    {
+    }
     bool operator()(const TestStruct& v) const
     {
         return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL;
@@ -183,7 +279,9 @@ public:
 };
 class columns5 {
 public:
-    columns5() {}
+    columns5()
+    {
+    }
     bool operator()(const TestStruct& v) const
     {
         return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL && v.field6 == 0x7FFFLL;
@@ -191,7 +289,9 @@ public:
 };
 class columns6 {
 public:
-    columns6() {}
+    columns6()
+    {
+    }
     bool operator()(const TestStruct& v) const
     {
         return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL && v.field6 == 0x7FFFLL &&
@@ -200,7 +300,9 @@ public:
 };
 class columns7 {
 public:
-    columns7() {}
+    columns7()
+    {
+    }
     bool operator()(const TestStruct& v) const
     {
         return v.field2 == 1 && v.field3 == 3 && v.field4 == 15 && v.field5 == 0x7FLL && v.field6 == 0x7FFFLL &&

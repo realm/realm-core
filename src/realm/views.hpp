@@ -50,7 +50,10 @@ public:
                    std::vector<bool> ascending = {});
 
     // returns whether this descriptor is valid and can be used to sort
-    explicit operator bool() const noexcept { return !m_columns.empty(); }
+    explicit operator bool() const noexcept
+    {
+        return !m_columns.empty();
+    }
 
     // handover support
     using HandoverPatch = std::unique_ptr<SortDescriptorHandoverPatch>;
@@ -89,7 +92,10 @@ public:
 
     // These two methods are overridden by TableView and LinkView.
     virtual uint_fast64_t sync_if_needed() const = 0;
-    virtual bool is_in_sync() const { return true; }
+    virtual bool is_in_sync() const
+    {
+        return true;
+    }
 
     void check_cookie() const
     {

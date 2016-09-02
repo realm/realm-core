@@ -142,7 +142,9 @@ public:
 
     virtual void verify() const = 0;
 
-    virtual ~History() noexcept {}
+    virtual ~History() noexcept
+    {
+    }
 };
 
 

@@ -69,7 +69,9 @@ namespace {
 
 class MyTrivialReplication : public TrivialReplication {
 public:
-    MyTrivialReplication(const std::string& path) : TrivialReplication(path) {}
+    MyTrivialReplication(const std::string& path) : TrivialReplication(path)
+    {
+    }
 
     void replay_transacts(SharedGroup& target, util::Logger& replay_logger)
     {
@@ -88,9 +90,15 @@ public:
         // No-op
     }
 
-    HistoryType get_history_type() const noexcept override { return hist_None; }
+    HistoryType get_history_type() const noexcept override
+    {
+        return hist_None;
+    }
 
-    _impl::History* get_history() override { return nullptr; }
+    _impl::History* get_history() override
+    {
+        return nullptr;
+    }
 
 private:
     version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override

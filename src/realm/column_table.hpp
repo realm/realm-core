@@ -54,8 +54,14 @@ public:
     void adj_acc_clear_root_table() noexcept override;
     void adj_acc_swap_rows(size_t, size_t) noexcept override;
     void mark(int) noexcept override;
-    bool supports_search_index() const noexcept override { return false; }
-    StringIndex* create_search_index() override { return nullptr; }
+    bool supports_search_index() const noexcept override
+    {
+        return false;
+    }
+    StringIndex* create_search_index() override
+    {
+        return nullptr;
+    }
 
     void verify() const override;
     void verify(const Table&, size_t) const override;
@@ -66,8 +72,13 @@ protected:
     Table* const m_table;
 
     struct SubtableMap {
-        ~SubtableMap() noexcept {}
-        bool empty() const noexcept { return m_entries.empty(); }
+        ~SubtableMap() noexcept
+        {
+        }
+        bool empty() const noexcept
+        {
+            return m_entries.empty();
+        }
         Table* find(size_t subtable_ndx) const noexcept;
         void add(size_t subtable_ndx, Table*);
         // Returns true if, and only if at least one entry was detached and
@@ -177,7 +188,9 @@ public:
     /// table. Otherwise you should pass zero.
     SubtableColumn(Allocator&, ref_type, Table* table, size_t column_ndx);
 
-    ~SubtableColumn() noexcept override {}
+    ~SubtableColumn() noexcept override
+    {
+    }
 
     size_t get_subtable_size(size_t ndx) const noexcept;
 

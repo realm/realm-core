@@ -159,7 +159,9 @@ struct ForEachType {
 /// Base case for empty type list.
 template <template <class T, int i> class Op, int i>
 struct ForEachType<void, Op, i> {
-    static void exec() {}
+    static void exec()
+    {
+    }
     template <class A>
     static void exec(const A&)
     {
@@ -216,7 +218,10 @@ struct HasType {
 /// Base case for empty type list.
 template <template <class T, int i> class Pred, int i>
 struct HasType<void, Pred, i> {
-    static bool exec() { return false; }
+    static bool exec()
+    {
+        return false;
+    }
     template <class A>
     static bool exec(const A&)
     {

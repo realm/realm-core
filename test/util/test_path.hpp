@@ -82,8 +82,14 @@ class TestPathGuard {
 public:
     TestPathGuard(const std::string& path);
     ~TestPathGuard() noexcept;
-    operator std::string() const { return m_path; }
-    const char* c_str() const { return m_path.c_str(); }
+    operator std::string() const
+    {
+        return m_path;
+    }
+    const char* c_str() const
+    {
+        return m_path.c_str();
+    }
     TestPathGuard(const TestPathGuard&) = delete;
     TestPathGuard& operator=(const TestPathGuard&) = delete;
 
@@ -98,8 +104,15 @@ class TestDirGuard {
 public:
     TestDirGuard(const std::string& path);
     ~TestDirGuard() noexcept;
-    operator std::string() const { return m_path; }
-    const char* c_str() const { return m_path.c_str(); }
+    operator std::string() const
+    {
+        return m_path;
+    }
+    const char* c_str() const
+    {
+        return m_path.c_str();
+    }
+
 private:
     std::string m_path;
     void clean_dir(const std::string& path);

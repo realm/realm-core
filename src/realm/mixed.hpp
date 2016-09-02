@@ -114,16 +114,29 @@ public:
 
     // These are shortcuts for Mixed(StringData(c_str)), and are
     // needed to avoid unwanted implicit conversion of char* to bool.
-    Mixed(char* c_str) noexcept { set_string(c_str); }
-    Mixed(const char* c_str) noexcept { set_string(c_str); }
+    Mixed(char* c_str) noexcept
+    {
+        set_string(c_str);
+    }
+    Mixed(const char* c_str) noexcept
+    {
+        set_string(c_str);
+    }
 
     struct subtable_tag {
     };
-    Mixed(subtable_tag) noexcept : m_type(type_Table) {}
+    Mixed(subtable_tag) noexcept : m_type(type_Table)
+    {
+    }
 
-    ~Mixed() noexcept {}
+    ~Mixed() noexcept
+    {
+    }
 
-    DataType get_type() const noexcept { return m_type; }
+    DataType get_type() const noexcept
+    {
+        return m_type;
+    }
 
     int64_t get_int() const noexcept;
     bool get_bool() const noexcept;

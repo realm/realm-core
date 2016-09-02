@@ -80,7 +80,10 @@ class WriteLogCollector : public Replication, private _impl::History {
 public:
     using version_type = _impl::History::version_type;
     WriteLogCollector(const std::string& database_name, const char* encryption_key);
-    std::string get_database_path() override { return m_database_name; }
+    std::string get_database_path() override
+    {
+        return m_database_name;
+    }
     void initialize(SharedGroup&) override;
     void initiate_session(version_type) override;
     void terminate_session() noexcept override;
@@ -88,8 +91,12 @@ public:
     version_type do_prepare_commit(version_type) override;
     void do_finalize_commit() noexcept override;
     void do_abort_transact() noexcept override;
-    void do_interrupt() noexcept override {}
-    void do_clear_interrupt() noexcept override {}
+    void do_interrupt() noexcept override
+    {
+    }
+    void do_clear_interrupt() noexcept override
+    {
+    }
     void commit_log_close() noexcept override;
     void transact_log_reserve(size_t size, char** new_begin, char** new_end) override;
     void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
@@ -183,7 +190,9 @@ protected:
         std::string name;
         mutable util::File::Map<CommitLogHeader> map;
         mutable uint64_t last_seen_mmap_counter = 0;
-        CommitLogMetadata(std::string log_name) : name(log_name) {}
+        CommitLogMetadata(std::string log_name) : name(log_name)
+        {
+        }
     };
 
     class MergingIndexTranslator;

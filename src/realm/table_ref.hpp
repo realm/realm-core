@@ -126,11 +126,17 @@ class BasicTable;
 template <class T>
 class BasicTableRef : util::bind_ptr<T> {
 public:
-    constexpr BasicTableRef() noexcept {}
-    ~BasicTableRef() noexcept {}
+    constexpr BasicTableRef() noexcept
+    {
+    }
+    ~BasicTableRef() noexcept
+    {
+    }
 
     // Copy construct
-    BasicTableRef(const BasicTableRef& r) noexcept : util::bind_ptr<T>(r) {}
+    BasicTableRef(const BasicTableRef& r) noexcept : util::bind_ptr<T>(r)
+    {
+    }
     template <class U>
     BasicTableRef(const BasicTableRef<U>& r) noexcept : util::bind_ptr<T>(r)
     {
@@ -142,7 +148,9 @@ public:
     BasicTableRef& operator=(const BasicTableRef<U>&) noexcept;
 
     // Move construct
-    BasicTableRef(BasicTableRef&& r) noexcept : util::bind_ptr<T>(std::move(r)) {}
+    BasicTableRef(BasicTableRef&& r) noexcept : util::bind_ptr<T>(std::move(r))
+    {
+    }
     template <class U>
     BasicTableRef(BasicTableRef<U>&& r) noexcept : util::bind_ptr<T>(std::move(r))
     {
@@ -195,7 +203,10 @@ public:
 // Dereference
 #ifdef __clang__
     // Clang has a bug that causes it to effectively ignore the 'using' declaration.
-    T& operator*() const noexcept { return util::bind_ptr<T>::operator*(); }
+    T& operator*() const noexcept
+    {
+        return util::bind_ptr<T>::operator*();
+    }
 #else
     using util::bind_ptr<T>::operator*;
 #endif
@@ -203,12 +214,27 @@ public:
 
     using util::bind_ptr<T>::operator bool;
 
-    T* get() const noexcept { return util::bind_ptr<T>::get(); }
-    void reset() noexcept { util::bind_ptr<T>::reset(); }
-    void reset(T* t) noexcept { util::bind_ptr<T>::reset(t); }
+    T* get() const noexcept
+    {
+        return util::bind_ptr<T>::get();
+    }
+    void reset() noexcept
+    {
+        util::bind_ptr<T>::reset();
+    }
+    void reset(T* t) noexcept
+    {
+        util::bind_ptr<T>::reset(t);
+    }
 
-    void swap(BasicTableRef& r) noexcept { this->util::bind_ptr<T>::swap(r); }
-    friend void swap(BasicTableRef& a, BasicTableRef& b) noexcept { a.swap(b); }
+    void swap(BasicTableRef& r) noexcept
+    {
+        this->util::bind_ptr<T>::swap(r);
+    }
+    friend void swap(BasicTableRef& a, BasicTableRef& b) noexcept
+    {
+        a.swap(b);
+    }
 
     template <class U>
     friend BasicTableRef<U> unchecked_cast(BasicTableRef<Table>) noexcept;
@@ -234,7 +260,10 @@ private:
 
 public:
     /// Same as 'table[i]' where 'table' is the referenced table.
-    RowAccessor operator[](size_t i) const noexcept { return (*this->get())[i]; }
+    RowAccessor operator[](size_t i) const noexcept
+    {
+        return (*this->get())[i];
+    }
 
 private:
     friend class SubtableColumnBase;
@@ -247,7 +276,9 @@ private:
     template <class>
     friend class BasicTableRef;
 
-    explicit BasicTableRef(T* t) noexcept : util::bind_ptr<T>(t) {}
+    explicit BasicTableRef(T* t) noexcept : util::bind_ptr<T>(t)
+    {
+    }
 
     typedef typename util::bind_ptr<T>::casting_move_tag casting_move_tag;
     template <class U>

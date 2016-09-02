@@ -36,16 +36,37 @@ public:
     typedef typename Tab::spec_type spec_type;
     typedef Tab table_type;
 
-    bool is_empty() const noexcept { return m_impl.is_empty(); }
-    bool is_attached() const noexcept { return m_impl.is_attached(); }
-    size_t size() const noexcept { return m_impl.size(); }
+    bool is_empty() const noexcept
+    {
+        return m_impl.is_empty();
+    }
+    bool is_attached() const noexcept
+    {
+        return m_impl.is_attached();
+    }
+    size_t size() const noexcept
+    {
+        return m_impl.size();
+    }
 
     // Get row index in the source table this view is "looking" at.
-    size_t get_source_ndx(size_t row_ndx) const noexcept { return m_impl.get_source_ndx(row_ndx); }
+    size_t get_source_ndx(size_t row_ndx) const noexcept
+    {
+        return m_impl.get_source_ndx(row_ndx);
+    }
 
-    void to_json(std::ostream& out) const { m_impl.to_json(out); }
-    void to_string(std::ostream& out, size_t limit = 500) const { m_impl.to_string(out, limit); }
-    void row_to_string(size_t row_ndx, std::ostream& out) const { m_impl.row_to_string(row_ndx, out); }
+    void to_json(std::ostream& out) const
+    {
+        m_impl.to_json(out);
+    }
+    void to_string(std::ostream& out, size_t limit = 500) const
+    {
+        m_impl.to_string(out, limit);
+    }
+    void row_to_string(size_t row_ndx, std::ostream& out) const
+    {
+        m_impl.row_to_string(row_ndx, out);
+    }
 
 private:
     typedef typename Tab::spec_type Spec;
@@ -65,9 +86,15 @@ private:
     typedef typename Spec::template ColNames<ConstCol, const View*> ConstColsAccessor;
 
 public:
-    ColsAccessor column() noexcept { return ColsAccessor(static_cast<View*>(this)); }
+    ColsAccessor column() noexcept
+    {
+        return ColsAccessor(static_cast<View*>(this));
+    }
 
-    ConstColsAccessor column() const noexcept { return ConstColsAccessor(static_cast<const View*>(this)); }
+    ConstColsAccessor column() const noexcept
+    {
+        return ConstColsAccessor(static_cast<const View*>(this));
+    }
 
 private:
     template <int col_idx>
@@ -109,7 +136,9 @@ protected:
 
     Impl m_impl;
 
-    BasicTableViewBase() {}
+    BasicTableViewBase()
+    {
+    }
     BasicTableViewBase(const BasicTableViewBase& tv, typename Impl::HandoverPatch& patch, ConstSourcePayload mode)
         : m_impl(tv.m_impl, patch, mode)
     {
@@ -118,10 +147,18 @@ protected:
         : m_impl(tv.m_impl, patch, mode)
     {
     }
-    BasicTableViewBase(Impl i) : m_impl(std::move(i)) {}
+    BasicTableViewBase(Impl i) : m_impl(std::move(i))
+    {
+    }
 
-    Impl* get_impl() noexcept { return &m_impl; }
-    const Impl* get_impl() const noexcept { return &m_impl; }
+    Impl* get_impl() noexcept
+    {
+        return &m_impl;
+    }
+    const Impl* get_impl() const noexcept
+    {
+        return &m_impl;
+    }
 };
 
 
@@ -159,9 +196,14 @@ private:
     typedef BasicTableViewBase<Tab, BasicTableView<Tab>, TableView> Base;
 
 public:
-    BasicTableView() {}
+    BasicTableView()
+    {
+    }
     BasicTableView& operator=(BasicTableView);
-    friend BasicTableView move(BasicTableView& tv) { return BasicTableView(&tv); }
+    friend BasicTableView move(BasicTableView& tv)
+    {
+        return BasicTableView(&tv);
+    }
 
     // Deleting
     void remove(size_t ndx, RemoveMode underlying_mode = RemoveMode::ordered);
@@ -169,15 +211,27 @@ public:
     void clear(RemoveMode underlying_mode = RemoveMode::ordered);
 
     // Resort after requery
-    void apply_same_order(BasicTableView& order) { Base::m_impl.apply_same_order(order.m_impl); }
+    void apply_same_order(BasicTableView& order)
+    {
+        Base::m_impl.apply_same_order(order.m_impl);
+    }
 
-    Tab& get_parent() noexcept { return static_cast<Tab&>(Base::m_impl.get_parent()); }
+    Tab& get_parent() noexcept
+    {
+        return static_cast<Tab&>(Base::m_impl.get_parent());
+    }
 
-    const Tab& get_parent() const noexcept { return static_cast<const Tab&>(Base::m_impl.get_parent()); }
+    const Tab& get_parent() const noexcept
+    {
+        return static_cast<const Tab&>(Base::m_impl.get_parent());
+    }
 
 
 public:
-    void move_assign(BasicTableView<Tab>& tv) { Base::m_impl.move_assign(tv.m_impl); }
+    void move_assign(BasicTableView<Tab>& tv)
+    {
+        Base::m_impl.move_assign(tv.m_impl);
+    }
     using HandoverPatch = TableViewHandoverPatch;
 
     std::unique_ptr<BasicTableView<Tab>> clone_for_handover(std::unique_ptr<HandoverPatch>& patch,
@@ -212,11 +266,18 @@ public:
     {
     }
 
-    void apply_patch(TableView::HandoverPatch& patch, Group& group) { Base::m_impl.apply_patch(patch, group); }
+    void apply_patch(TableView::HandoverPatch& patch, Group& group)
+    {
+        Base::m_impl.apply_patch(patch, group);
+    }
 
 private:
-    BasicTableView(BasicTableView* tv) : Base(move(tv->m_impl)) {}
-    BasicTableView(TableView tv) : Base(std::move(tv)) {}
+    BasicTableView(BasicTableView* tv) : Base(move(tv->m_impl))
+    {
+    }
+    BasicTableView(TableView tv) : Base(std::move(tv))
+    {
+    }
 
     template <class Subtab>
     Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx)
@@ -256,17 +317,24 @@ private:
     typedef BasicTableViewBase<const Tab, BasicTableView<const Tab>, ConstTableView> Base;
 
 public:
-    BasicTableView() {}
+    BasicTableView()
+    {
+    }
     BasicTableView& operator=(BasicTableView tv)
     {
         Base::m_impl = move(tv.m_impl);
         return *this;
     }
-    friend BasicTableView move(BasicTableView& tv) { return BasicTableView(&tv); }
+    friend BasicTableView move(BasicTableView& tv)
+    {
+        return BasicTableView(&tv);
+    }
 
     /// Construct BasicTableView<const Tab> from BasicTableView<Tab>.
     ///
-    BasicTableView(BasicTableView<Tab> tv) : Base(std::move(tv.m_impl)) {}
+    BasicTableView(BasicTableView<Tab> tv) : Base(std::move(tv.m_impl))
+    {
+    }
 
     /// Assign BasicTableView<Tab> to BasicTableView<const Tab>.
     ///
@@ -276,11 +344,18 @@ public:
         return *this;
     }
 
-    const Tab& get_parent() const noexcept { return static_cast<const Tab&>(Base::m_impl.get_parent()); }
+    const Tab& get_parent() const noexcept
+    {
+        return static_cast<const Tab&>(Base::m_impl.get_parent());
+    }
 
 private:
-    BasicTableView(BasicTableView* tv) : Base(move(tv->m_impl)) {}
-    BasicTableView(ConstTableView tv) : Base(std::move(tv)) {}
+    BasicTableView(BasicTableView* tv) : Base(move(tv->m_impl))
+    {
+    }
+    BasicTableView(ConstTableView tv) : Base(std::move(tv))
+    {
+    }
 
     template <class Subtab>
     const Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx) const

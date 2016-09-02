@@ -37,7 +37,10 @@ public:
     BinaryColumn(Allocator&, ref_type, bool nullable = false, size_t column_ndx = npos);
 
     size_t size() const noexcept final;
-    bool is_empty() const noexcept { return size() == 0; }
+    bool is_empty() const noexcept
+    {
+        return size() == 0;
+    }
     bool is_nullable() const noexcept override;
 
     BinaryData get(size_t ndx) const noexcept;

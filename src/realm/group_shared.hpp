@@ -48,7 +48,9 @@ class WriteLogCollector;
 /// Thrown by SharedGroup::open() if the lock file is already open in another
 /// process which can't share mutexes with this process
 struct IncompatibleLockFile : std::runtime_error {
-    IncompatibleLockFile(const std::string& msg) : std::runtime_error("Incompatible lock file. " + msg) {}
+    IncompatibleLockFile(const std::string& msg) : std::runtime_error("Incompatible lock file. " + msg)
+    {
+    }
 };
 
 
@@ -613,9 +615,15 @@ public:
         m_shared_group.begin_read(); // Throws
     }
 
-    ~ReadTransaction() noexcept { m_shared_group.end_read(); }
+    ~ReadTransaction() noexcept
+    {
+        m_shared_group.end_read();
+    }
 
-    bool has_table(StringData name) const noexcept { return get_group().has_table(name); }
+    bool has_table(StringData name) const noexcept
+    {
+        return get_group().has_table(name);
+    }
 
     ConstTableRef get_table(size_t table_ndx) const
     {
@@ -656,7 +664,10 @@ public:
             m_shared_group->rollback();
     }
 
-    bool has_table(StringData name) const noexcept { return get_group().has_table(name); }
+    bool has_table(StringData name) const noexcept
+    {
+        return get_group().has_table(name);
+    }
 
     TableRef get_table(size_t table_ndx) const
     {
@@ -796,7 +807,11 @@ public:
         if (m_read_lock)
             m_shared_group.release_read_lock(*m_read_lock);
     }
-    void release() noexcept { m_read_lock = 0; }
+    void release() noexcept
+    {
+        m_read_lock = 0;
+    }
+
 private:
     SharedGroup& m_shared_group;
     ReadLockInfo* m_read_lock;
@@ -1034,7 +1049,10 @@ inline int SharedGroup::get_file_format_version() const noexcept
 // not all of the non-public parts of the SharedGroup class.
 class _impl::SharedGroupFriend {
 public:
-    static Group& get_group(SharedGroup& sg) noexcept { return sg.m_group; }
+    static Group& get_group(SharedGroup& sg) noexcept
+    {
+        return sg.m_group;
+    }
 
     template <class O>
     static void advance_read(SharedGroup& sg, O* obs, SharedGroup::VersionID ver)
@@ -1070,7 +1088,10 @@ public:
         sg.do_open(file, no_create, is_backend, options); // Throws
     }
 
-    static int get_file_format_version(const SharedGroup& sg) noexcept { return sg.get_file_format_version(); }
+    static int get_file_format_version(const SharedGroup& sg) noexcept
+    {
+        return sg.get_file_format_version();
+    }
 
     static SharedGroup::version_type get_version_of_latest_snapshot(SharedGroup& sg)
     {

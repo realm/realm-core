@@ -113,8 +113,14 @@ struct SharedWithEmulated {
     InterprocessMutex::SharedPart m_shared_part;
     int m_value;
 
-    SharedWithEmulated(std::string name) { m_mutex.set_shared_part(m_shared_part, name, "0"); }
-    ~SharedWithEmulated() { m_mutex.release_shared_part(); }
+    SharedWithEmulated(std::string name)
+    {
+        m_mutex.set_shared_part(m_shared_part, name, "0");
+    }
+    ~SharedWithEmulated()
+    {
+        m_mutex.release_shared_part();
+    }
 
     // 10000 takes less than 0.1 sec
     void increment_10000_times()
@@ -156,7 +162,10 @@ struct Robust {
         // Do not unlock
     }
 
-    void recover() { m_recover_called = true; }
+    void recover()
+    {
+        m_recover_called = true;
+    }
 
     void recover_throw()
     {
@@ -168,7 +177,9 @@ struct Robust {
 
 class QueueMonitor {
 public:
-    QueueMonitor() : m_closed(false) {}
+    QueueMonitor() : m_closed(false)
+    {
+    }
 
     bool get(int& value)
     {
@@ -236,7 +247,9 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
 
 class bowl_of_stones_semaphore {
 public:
-    bowl_of_stones_semaphore(int initial_number_of_stones = 0) : m_num_stones(initial_number_of_stones) {}
+    bowl_of_stones_semaphore(int initial_number_of_stones = 0) : m_num_stones(initial_number_of_stones)
+    {
+    }
     void get_stone(int num_to_get)
     {
         LockGuard lock(m_mutex);

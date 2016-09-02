@@ -548,7 +548,9 @@ void Table::init(ConstSubspecRef shared_spec, ArrayParent* parent_column, size_t
 
 
 struct Table::InsertSubtableColumns : SubtableUpdater {
-    InsertSubtableColumns(size_t i, DataType t, bool nullable) : m_column_ndx(i), m_type(t), m_nullable(nullable) {}
+    InsertSubtableColumns(size_t i, DataType t, bool nullable) : m_column_ndx(i), m_type(t), m_nullable(nullable)
+    {
+    }
     void update(const SubtableColumn& subtables, Array& subcolumns) override
     {
         size_t row_ndx = subcolumns.get_ndx_in_parent();
@@ -575,7 +577,9 @@ private:
 
 
 struct Table::EraseSubtableColumns : SubtableUpdater {
-    EraseSubtableColumns(size_t i) : m_column_ndx(i) {}
+    EraseSubtableColumns(size_t i) : m_column_ndx(i)
+    {
+    }
     void update(const SubtableColumn&, Array& subcolumns) override
     {
         ref_type column_ref = to_ref(subcolumns.get(m_column_ndx));
@@ -596,7 +600,9 @@ private:
 
 
 struct Table::RenameSubtableColumns : SubtableUpdater {
-    void update(const SubtableColumn&, Array&) override {}
+    void update(const SubtableColumn&, Array&) override
+    {
+    }
     void update_accessor(Table& table) override
     {
         bool bump_global = false;
@@ -605,7 +611,9 @@ struct Table::RenameSubtableColumns : SubtableUpdater {
 };
 
 struct Table::MoveSubtableColumns : SubtableUpdater {
-    MoveSubtableColumns(size_t col_ndx_1, size_t col_ndx_2) : m_col_ndx_1(col_ndx_1), m_col_ndx_2(col_ndx_2) {}
+    MoveSubtableColumns(size_t col_ndx_1, size_t col_ndx_2) : m_col_ndx_1(col_ndx_1), m_col_ndx_2(col_ndx_2)
+    {
+    }
 
     void update(const SubtableColumn&, Array& subcolumns) override
     {
@@ -3928,7 +3936,9 @@ const Table* Table::get_link_chain_target(const std::vector<size_t>& link_chain)
 namespace {
 
 struct AggrState {
-    AggrState(const Table& target_table) : table(target_table), cache(table.get_alloc()), added_row(false) {}
+    AggrState(const Table& target_table) : table(target_table), cache(table.get_alloc()), added_row(false)
+    {
+    }
 
     const Table& table;
     const StringIndex* dst_index;

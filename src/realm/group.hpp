@@ -457,7 +457,9 @@ public:
             /// Row index which will be removed.
             size_t row_ndx;
 
-            row() : is_ordered_removal(0) {}
+            row() : is_ordered_removal(0)
+            {
+            }
 
             bool operator==(const row&) const noexcept;
             bool operator!=(const row&) const noexcept;
@@ -524,14 +526,20 @@ public:
     bool operator==(const Group&) const;
 
     /// Compare two groups for inequality. See operator==().
-    bool operator!=(const Group& g) const { return !(*this == g); }
+    bool operator!=(const Group& g) const
+    {
+        return !(*this == g);
+    }
 
     void verify() const;
 #ifdef REALM_DEBUG
     void print() const;
     void print_free() const;
     MemStats stats();
-    void enable_mem_diagnostics(bool enable = true) { m_alloc.enable_debug(enable); }
+    void enable_mem_diagnostics(bool enable = true)
+    {
+        m_alloc.enable_debug(enable);
+    }
     void to_dot(std::ostream&) const;
     void to_dot() const; // To std::cerr (for GDB)
     void to_dot(const char* file_path) const;
@@ -1108,7 +1116,9 @@ class Group::TableWriter {
 public:
     virtual ref_type write_names(_impl::OutputStream&) = 0;
     virtual ref_type write_tables(_impl::OutputStream&) = 0;
-    virtual ~TableWriter() noexcept {}
+    virtual ~TableWriter() noexcept
+    {
+    }
 };
 
 inline const Table* Group::do_get_table(size_t table_ndx, DescMatcher desc_matcher) const
@@ -1140,7 +1150,10 @@ inline void Group::set_replication(Replication* repl) noexcept
 // not all of the non-public parts of the Group class.
 class _impl::GroupFriend {
 public:
-    static Allocator& get_alloc(Group& group) noexcept { return group.m_alloc; }
+    static Allocator& get_alloc(Group& group) noexcept
+    {
+        return group.m_alloc;
+    }
 
     static Table& get_table(Group& group, size_t ndx_in_group)
     {
@@ -1200,11 +1213,20 @@ public:
         group.send_cascade_notification(notification);
     }
 
-    static Replication* get_replication(const Group& group) noexcept { return group.get_replication(); }
+    static Replication* get_replication(const Group& group) noexcept
+    {
+        return group.get_replication();
+    }
 
-    static void set_replication(Group& group, Replication* repl) noexcept { group.set_replication(repl); }
+    static void set_replication(Group& group, Replication* repl) noexcept
+    {
+        group.set_replication(repl);
+    }
 
-    static void detach(Group& group) noexcept { group.detach(); }
+    static void detach(Group& group) noexcept
+    {
+        group.detach();
+    }
 
     static void attach_shared(Group& group, ref_type new_top_ref, size_t new_file_size, bool writable)
     {
@@ -1247,7 +1269,10 @@ public:
         Group::get_version_and_history_type(top, version, history_type);
     }
 
-    static ref_type get_history_ref(const Group& group) noexcept { return Group::get_history_ref(group.m_top); }
+    static ref_type get_history_ref(const Group& group) noexcept
+    {
+        return Group::get_history_ref(group.m_top);
+    }
 
     static ref_type get_history_ref(Allocator& alloc, ref_type top_ref) noexcept
     {
@@ -1267,7 +1292,10 @@ public:
         group.prepare_history_parent(history_root, history_type); // Throws
     }
 
-    static int get_file_format_version(const Group& group) noexcept { return group.get_file_format_version(); }
+    static int get_file_format_version(const Group& group) noexcept
+    {
+        return group.get_file_format_version();
+    }
 
     static void set_file_format_version(Group& group, int file_format_version) noexcept
     {

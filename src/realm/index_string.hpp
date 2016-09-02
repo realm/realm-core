@@ -67,7 +67,9 @@ public:
     StringIndex(ColumnBase* target_column, Allocator&);
     StringIndex(ref_type, ArrayParent*, size_t ndx_in_parent, ColumnBase* target_column, bool allow_duplicate_values,
                 Allocator&);
-    ~StringIndex() noexcept {}
+    ~StringIndex() noexcept
+    {
+    }
     void set_target(ColumnBase* target_column) noexcept;
 
     // Accessor concept:
@@ -178,8 +180,12 @@ private:
         size_t ref1;
         size_t ref2;
         enum ChangeType { none, insert_before, insert_after, split } type;
-        NodeChange(ChangeType t, size_t r1 = 0, size_t r2 = 0) : ref1(r1), ref2(r2), type(t) {}
-        NodeChange() : ref1(0), ref2(0), type(none) {}
+        NodeChange(ChangeType t, size_t r1 = 0, size_t r2 = 0) : ref1(r1), ref2(r2), type(t)
+        {
+        }
+        NodeChange() : ref1(0), ref2(0), type(none)
+        {
+        }
     };
 
     // B-Tree functions
@@ -222,12 +228,18 @@ struct GetIndexData<int64_t> {
 
 template <>
 struct GetIndexData<StringData> {
-    static StringData get_index_data(StringData data, StringIndex::StringConversionBuffer&) { return data; }
+    static StringData get_index_data(StringData data, StringIndex::StringConversionBuffer&)
+    {
+        return data;
+    }
 };
 
 template <>
 struct GetIndexData<null> {
-    static StringData get_index_data(null, StringIndex::StringConversionBuffer&) { return null{}; }
+    static StringData get_index_data(null, StringIndex::StringConversionBuffer&)
+    {
+        return null{};
+    }
 };
 
 template <>

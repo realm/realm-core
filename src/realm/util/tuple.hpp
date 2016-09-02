@@ -33,7 +33,9 @@ struct Tuple {
     typedef Tuple<typename L::tail> tail_type;
     head_type m_head;
     tail_type m_tail;
-    Tuple(const head_type& h, const tail_type& t) : m_head(h), m_tail(t) {}
+    Tuple(const head_type& h, const tail_type& t) : m_head(h), m_tail(t)
+    {
+    }
 };
 template <>
 struct Tuple<void> {
@@ -127,7 +129,10 @@ struct TupleAt {
 };
 template <class L>
 struct TupleAt<L, 0> {
-    static typename L::head exec(const util::Tuple<L>& t) { return t.m_head; }
+    static typename L::head exec(const util::Tuple<L>& t)
+    {
+        return t.m_head;
+    }
 };
 
 template <class Ch, class Tr, class T>

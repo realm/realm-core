@@ -30,7 +30,9 @@ public:
     typedef int64_t value_type;
 
     explicit ArrayInteger(Allocator&) noexcept;
-    ~ArrayInteger() noexcept override {}
+    ~ArrayInteger() noexcept override
+    {
+    }
 
     void create(Type type = type_Normal, bool context_flag = false);
 
@@ -52,7 +54,10 @@ public:
     /// limit.
     void adjust_ge(int_fast64_t limit, int_fast64_t diff);
 
-    int64_t operator[](size_t ndx) const noexcept { return get(ndx); }
+    int64_t operator[](size_t ndx) const noexcept
+    {
+        return get(ndx);
+    }
     int64_t front() const noexcept;
     int64_t back() const noexcept;
 

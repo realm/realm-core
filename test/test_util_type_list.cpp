@@ -63,9 +63,18 @@ static util::Mutex magicMutex;
 static int magic;
 
 struct Person {
-    void set_name(std::string name) { m_name = name; }
-    void set_age(int age) { m_age = age; }
-    void set_married(bool married) { m_married = married; }
+    void set_name(std::string name)
+    {
+        m_name = name;
+    }
+    void set_age(int age)
+    {
+        m_age = age;
+    }
+    void set_married(bool married)
+    {
+        m_married = married;
+    }
 
     std::string m_name;
     int m_age = 0;
@@ -78,9 +87,18 @@ struct DoSomething;
 
 template <int idx>
 struct DoSomething<std::string, idx> {
-    static void exec() { magic += idx; }
-    static void exec(Person* p) { p->set_name("John Doe"); }
-    static void exec(Person* p, int child) { p->m_children[child].set_name("John Doe Jr."); }
+    static void exec()
+    {
+        magic += idx;
+    }
+    static void exec(Person* p)
+    {
+        p->set_name("John Doe");
+    }
+    static void exec(Person* p, int child)
+    {
+        p->m_children[child].set_name("John Doe Jr.");
+    }
     template <class L>
     static void exec(Person* p, int child, util::Tuple<L> tuple)
     {
@@ -90,9 +108,18 @@ struct DoSomething<std::string, idx> {
 
 template <int idx>
 struct DoSomething<int, idx> {
-    static void exec() { magic += 2 * idx; }
-    static void exec(Person* p) { p->set_age(30); }
-    static void exec(Person* p, int child) { p->m_children[child].set_age(10); }
+    static void exec()
+    {
+        magic += 2 * idx;
+    }
+    static void exec(Person* p)
+    {
+        p->set_age(30);
+    }
+    static void exec(Person* p, int child)
+    {
+        p->m_children[child].set_age(10);
+    }
     template <class L>
     static void exec(Person* p, int child, util::Tuple<L> tuple)
     {
@@ -102,9 +129,18 @@ struct DoSomething<int, idx> {
 
 template <int idx>
 struct DoSomething<bool, idx> {
-    static void exec() { magic += 3 * idx; }
-    static void exec(Person* p) { p->set_married(true); }
-    static void exec(Person* p, int child) { p->m_children[child].set_married(false); }
+    static void exec()
+    {
+        magic += 3 * idx;
+    }
+    static void exec(Person* p)
+    {
+        p->set_married(true);
+    }
+    static void exec(Person* p, int child)
+    {
+        p->m_children[child].set_married(false);
+    }
     template <class L>
     static void exec(Person* p, int child, util::Tuple<L> tuple)
     {

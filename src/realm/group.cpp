@@ -46,7 +46,10 @@ namespace {
 
 class Initialization {
 public:
-    Initialization() { realm::cpuid_init(); }
+    Initialization()
+    {
+        realm::cpuid_init();
+    }
 };
 
 Initialization initialization;
@@ -731,7 +734,9 @@ void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
 
 class Group::DefaultTableWriter : public Group::TableWriter {
 public:
-    DefaultTableWriter(const Group& group) : m_group(group) {}
+    DefaultTableWriter(const Group& group) : m_group(group)
+    {
+    }
     ref_type write_names(_impl::OutputStream& out) override
     {
         bool deep = true;                                                // Deep
@@ -1086,7 +1091,9 @@ public:
 
 class InsertColumnUpdater : public _impl::TableFriend::AccessorUpdater {
 public:
-    InsertColumnUpdater(size_t col_ndx) : m_col_ndx(col_ndx) {}
+    InsertColumnUpdater(size_t col_ndx) : m_col_ndx(col_ndx)
+    {
+    }
 
     void update(Table& table) override
     {
@@ -1095,7 +1102,9 @@ public:
         tf::mark_link_target_tables(table, m_col_ndx + 1);
     }
 
-    void update_parent(Table&) override {}
+    void update_parent(Table&) override
+    {
+    }
 
 private:
     size_t m_col_ndx;
@@ -1104,7 +1113,9 @@ private:
 
 class EraseColumnUpdater : public _impl::TableFriend::AccessorUpdater {
 public:
-    EraseColumnUpdater(size_t col_ndx) : m_col_ndx(col_ndx) {}
+    EraseColumnUpdater(size_t col_ndx) : m_col_ndx(col_ndx)
+    {
+    }
 
     void update(Table& table) override
     {
@@ -1113,7 +1124,9 @@ public:
         tf::mark_link_target_tables(table, m_col_ndx);
     }
 
-    void update_parent(Table&) override {}
+    void update_parent(Table&) override
+    {
+    }
 
 private:
     size_t m_col_ndx;
@@ -1122,7 +1135,9 @@ private:
 
 class MoveColumnUpdater : public _impl::TableFriend::AccessorUpdater {
 public:
-    MoveColumnUpdater(size_t col_ndx_1, size_t col_ndx_2) : m_col_ndx_1(col_ndx_1), m_col_ndx_2(col_ndx_2) {}
+    MoveColumnUpdater(size_t col_ndx_1, size_t col_ndx_2) : m_col_ndx_1(col_ndx_1), m_col_ndx_2(col_ndx_2)
+    {
+    }
 
     void update(Table& table) override
     {
@@ -1130,7 +1145,9 @@ public:
         tf::adj_move_column(table, m_col_ndx_1, m_col_ndx_2);
     }
 
-    void update_parent(Table&) override {}
+    void update_parent(Table&) override
+    {
+    }
 
 private:
     size_t m_col_ndx_1;
@@ -1151,7 +1168,9 @@ private:
 // transaction log enough to skip these checks.
 class Group::TransactAdvancer {
 public:
-    TransactAdvancer(Group& group, bool& schema_changed) : m_group(group), m_schema_changed(schema_changed) {}
+    TransactAdvancer(Group& group, bool& schema_changed) : m_group(group), m_schema_changed(schema_changed)
+    {
+    }
 
     bool insert_group_level_table(size_t table_ndx, size_t num_tables, StringData) noexcept
     {
@@ -1893,7 +1912,10 @@ public:
     {
         m_chunks.insert(m_chunks.end(), verifier.m_chunks.begin(), verifier.m_chunks.end());
     }
-    void handle(ref_type ref, size_t allocated, size_t) override { add(ref, allocated); }
+    void handle(ref_type ref, size_t allocated, size_t) override
+    {
+        add(ref, allocated);
+    }
     void canonicalize()
     {
         // Sort the chunks in order of increasing ref, then merge adjacent
@@ -1916,7 +1938,10 @@ public:
             m_chunks.erase(i_1 + 1, end);
         }
     }
-    void clear() { m_chunks.clear(); }
+    void clear()
+    {
+        m_chunks.clear();
+    }
     void check_total_coverage()
     {
         REALM_ASSERT_3(m_chunks.size(), ==, 1);
@@ -1928,7 +1953,10 @@ private:
     struct Chunk {
         ref_type ref;
         size_t size;
-        bool operator<(const Chunk& c) const { return ref < c.ref; }
+        bool operator<(const Chunk& c) const
+        {
+            return ref < c.ref;
+        }
     };
     std::vector<Chunk> m_chunks;
     ref_type m_ref_begin, m_immutable_ref_end, m_mutable_ref_end, m_baseline;
