@@ -26,15 +26,24 @@
 
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 
 namespace realm {
 
+struct SyncConfig;
+struct SyncSession;
+
 namespace _impl {
 struct SyncClient;
-struct SyncSession;
 }
 
-using SyncLoginFunction = std::function<void(const Realm::Config&)>;
+enum class SyncSessionStopPolicy {
+    Immediately,                    // Immediately stop the session as soon as all Realms/Sessions go out of scope.
+    LiveIndefinitely,               // Never stop the session.
+    AfterChangesUploaded,           // Once all Realms/Sessions go out of scope, wait for uploads to complete and stop.
+};
+
+using SyncLoginFunction = std::function<void(const std::string&, const SyncConfig&)>;
 
 class SyncLoggerFactory {
 public:
@@ -42,6 +51,7 @@ public:
 };
 
 class SyncManager {
+friend struct SyncSession;
 public:
     static SyncManager& shared();
 
@@ -50,16 +60,27 @@ public:
     void set_error_handler(std::function<sync::Client::ErrorHandler>);
     void set_login_function(SyncLoginFunction);
 
+    std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
+    std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
+
     SyncLoginFunction& get_sync_login_function();
-    std::unique_ptr<_impl::SyncSession> create_session(std::string realm_path) const;
 
 private:
+    void dropped_last_reference_to_session(SyncSession*);
+
+    // Immediately remove the session with the given path from the session map.
+    // For use by SyncSession only.
+    void unregister_session(const std::string& path);
+
     SyncManager() = default;
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
 
     std::shared_ptr<_impl::SyncClient> get_sync_client() const;
     std::shared_ptr<_impl::SyncClient> create_sync_client() const;
+
+    std::shared_ptr<SyncSession> get_existing_active_session_locked(const std::string& path) const;
+    std::shared_ptr<SyncSession> get_existing_dying_session_locked(const std::string& path) const;
 
     mutable std::mutex m_mutex;
 
@@ -71,6 +92,21 @@ private:
     std::function<sync::Client::ErrorHandler> m_error_handler;
 
     mutable std::shared_ptr<_impl::SyncClient> m_sync_client;
+
+    // Protects m_active_sessions and m_dying_sessions
+    mutable std::mutex m_session_mutex;
+
+    // Active sync sessions are owned by one or more pieces of client code. When the last
+    // reference to an active sync session is dropped, the session begins the process of dying.
+    // Depending on the session's configuration, death may be immediate, or it may involve
+    // waiting for all pending changes to be uploaded to the server. Dying sessions are owned
+    // primarily by us, but ownership may be shared with the SyncSession itself if it needs
+    // to ensure it lives until the completion of an asynchronous callback it has registered.
+    // The SyncSession will let us know when it has performed its pre-death work by calling
+    // `unregister_session`. If client code requests a sync session for which we have a dying
+    // session, we will revive the session and move back it back to active status.
+    std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_active_sessions;
+    std::unordered_map<std::string, std::shared_ptr<SyncSession>> m_dying_sessions;
 };
 
 } // namespace realm
