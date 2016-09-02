@@ -56,8 +56,12 @@ public:
 
     bool is_valid() const;
 
-    // Construct a new user. If `make_if_absent` is false, a 'removed' user will be returned for which all set
-    // operations are no-ops and all get operations cause an assert to fail.
+    // Construct a new user.
+    //
+    // If `make_if_absent` is false and the user is absent or removed, a 'removed' user will be returned for which all
+    // set operations are no-ops and all get operations cause an assert to fail.
+    //
+    // If `make_if_absent` is true and the user was previously marked for deletion, it will be unmarked.
     SyncUserMetadata(SyncMetadataManager& manager, std::string identity, bool make_if_absent=true);
 
     SyncUserMetadata(Schema schema, SharedRealm realm, RowExpr row);

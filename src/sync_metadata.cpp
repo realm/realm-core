@@ -141,7 +141,15 @@ SyncUserMetadata::SyncUserMetadata(SyncMetadataManager& manager, std::string ide
         }
     }
     m_row = table->get(row_idx);
-    m_invalid = m_row.get_bool(m_schema.idx_marked_for_removal);
+    if (make_if_absent) {
+        // User existed in the table, but had been marked for deletion. Unmark it.
+        m_realm->begin_transaction();
+        table->set_bool(m_schema.idx_marked_for_removal, row_idx, false);
+        m_realm->commit_transaction();
+        m_invalid = false;
+    } else {
+        m_invalid = m_row.get_bool(m_schema.idx_marked_for_removal);
+    }
 }
 
 bool SyncUserMetadata::is_valid() const
