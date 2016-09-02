@@ -151,9 +151,6 @@ bool SyncUserMetadata::is_valid() const
 
 std::string SyncUserMetadata::identity() const
 {
-    // Metadata is only expected to be read out upon initial configuration, so it is a precondition that the binding
-    // must complete all reading out of metadata before allowing any code to mark metadata for removal.
-    REALM_ASSERT(!m_invalid);
     m_realm->verify_thread();
     StringData result = m_row.get_string(m_schema.idx_identity);
     return result;
