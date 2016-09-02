@@ -115,7 +115,8 @@ def doBuildCocoa() {
 
                   # We only need an armv7s slice for CocoaPods, and the podspec never uses
                   # the debug build of core, so remove that slice
-                  lipo -remove armv7s core/librealm-ios-dbg.a -o core/librealm-ios-dbg.a
+                  lipo -remove armv7s core/librealm-iphone-dbg.a -o core/librealm-ios-dbg.a
+                  mv core/librealm-iphone.a core/librealm-ios.a
 
                   tar cf "$dir/core-$version.tar.xz" --xz core || exit 1
               )
