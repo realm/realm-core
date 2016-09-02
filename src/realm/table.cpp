@@ -2310,8 +2310,13 @@ void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
 void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
 {
     size_t num_cols = m_spec.get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx);
+    // We must start with backlink columns in case the corresponding link
+    // columns are in the same table so that the link columns are not updated
+    // twice. Backlink columns will nullify the rows in connected link columns
+    // first so by the time we get to the link column in this loop, the rows to
+    // be removed have already been nullified.
+    for (size_t col_ndx = num_cols; col_ndx > 0; --col_ndx) {
+        ColumnBase& col = get_column_base(col_ndx - 1);
         size_t prior_num_rows = m_size;
         col.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
     }
