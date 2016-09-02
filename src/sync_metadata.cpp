@@ -199,9 +199,6 @@ void SyncUserMetadata::mark_for_removal()
 
 void SyncUserMetadata::remove()
 {
-    if (m_invalid) {
-        return;
-    }
     m_invalid = true;
     m_realm->begin_transaction();
     TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), c_sync_userMetadata);
