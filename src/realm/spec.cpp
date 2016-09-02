@@ -328,14 +328,13 @@ size_t Spec::get_subspec_ndx_after(size_t column_ndx, size_t skip_column_ndx) co
 
 size_t Spec::get_subspec_entries_for_col_type(ColumnType type) const noexcept
 {
-    size_t num_entries = 0;
     if (type == col_type_Table || type == col_type_Link || type == col_type_LinkList) {
-        ++num_entries;
+        return 1; // index of dest column
     }
     else if (type == col_type_BackLink) {
-        num_entries += 2; // table and column refs
+        return 2; // index of table and index of linked column
     }
-    return num_entries;
+    return 0; // no entries for other column types (subspec array is sparse)
 }
 
 
