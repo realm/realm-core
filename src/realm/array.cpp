@@ -1000,10 +1000,8 @@ size_t find_zero(uint64_t v)
     uint64_t hasZeroByte;
 
     // Bisection optimization, speeds up small bitwidths with high match frequency. More partions than 2 do NOT pay
-    // off because
-    // the work done by test_zero() is wasted for the cases where the value exists in first half, but useful if it
-    // exists in last
-    // half. Sweet spot turns out to be the widths and partitions below.
+    // off because the work done by test_zero() is wasted for the cases where the value exists in first half, but
+    // useful if it exists in last half. Sweet spot turns out to be the widths and partitions below.
     if (width <= 8) {
         hasZeroByte = has_zero_element<width>(v | 0xffffffff00000000ULL);
         if (eq ? !hasZeroByte : (v & 0x00000000ffffffffULL) == 0) {
