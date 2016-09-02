@@ -498,8 +498,8 @@ struct alignas(8) SharedGroup::SharedInfo {
 };
 
 
-SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType hist_type):
-    size_of_mutex(sizeof(shared_writemutex)),
+SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType hist_type)
+    : size_of_mutex(sizeof(shared_writemutex))
 #ifndef _WIN32
     , size_of_condvar(sizeof(room_to_write))
 #endif
@@ -680,8 +680,8 @@ const std::string SharedGroupOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("T
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-void SharedGroup::do_open(const std::string& path, bool no_create_file,
-                          bool is_backend, const SharedGroupOptions options)
+void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_backend,
+                          const SharedGroupOptions options)
 {
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
@@ -731,9 +731,9 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file,
             // init_complete = 0. Need to fill with zeros before constructing
             // due to the bit field members. Otherwise we would write
             // uninitialized bits to the file.
-            alignas(SharedInfo) char buffer[sizeof (SharedInfo)] = {0};
+            alignas(SharedInfo) char buffer[sizeof(SharedInfo)] = {0};
             new (buffer) SharedInfo(options.durability, history_type); // Throws
-            m_file.write(buffer, sizeof buffer); // Throws
+            m_file.write(buffer, sizeof buffer);                       // Throws
 
             // Mark the file as completely initialized via a memory
             // mapping. Since this is done as a separate final step (involving
@@ -1006,9 +1006,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file,
             }
 
 #ifndef _WIN32
-            m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit", options.temp_dir);
+            m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit",
+                                                   options.temp_dir);
 #ifdef REALM_ASYNC_DAEMON
-            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix, "daemon_ready", options.temp_dir);
+            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix, "daemon_ready",
+                                                   options.temp_dir);
             m_work_to_do.set_shared_part(info->work_to_do, m_lockfile_prefix, "work_ready", options.temp_dir);
             m_room_to_write.set_shared_part(info->room_to_write, m_lockfile_prefix, "allow_write", options.temp_dir);
             // In async mode, we need to make sure the daemon is running and ready:

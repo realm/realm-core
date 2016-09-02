@@ -58,14 +58,36 @@ std::string create_string(size_t length)
     return std::string{buf, length};
 }
 
-enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
-            ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
-            CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
-            COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, CLOSE_AND_REOPEN, GET_ALL_COLUMN_NAMES,
-            CREATE_TABLE_VIEW, COMPACT, SWAP_ROWS,
+enum INS {
+    ADD_TABLE,
+    INSERT_TABLE,
+    REMOVE_TABLE,
+    INSERT_ROW,
+    ADD_EMPTY_ROW,
+    INSERT_COLUMN,
+    ADD_COLUMN,
+    REMOVE_COLUMN,
+    SET,
+    REMOVE_ROW,
+    ADD_COLUMN_LINK,
+    ADD_COLUMN_LINK_LIST,
+    CLEAR_TABLE,
+    MOVE_TABLE,
+    INSERT_COLUMN_LINK,
+    ADD_SEARCH_INDEX,
+    REMOVE_SEARCH_INDEX,
+    COMMIT,
+    ROLLBACK,
+    ADVANCE,
+    MOVE_LAST_OVER,
+    CLOSE_AND_REOPEN,
+    GET_ALL_COLUMN_NAMES,
+    CREATE_TABLE_VIEW,
+    COMPACT,
+    SWAP_ROWS,
 
-            COUNT
-         };
+    COUNT
+};
 
 DataType get_type(unsigned char c)
 {
@@ -536,7 +558,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     int32_t row_ndx1 = get_int32(s) % t->size();
                     int32_t row_ndx2 = get_int32(s) % t->size();
                     if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->swap_rows(" << row_ndx1 << ", " << row_ndx2 << ");\n";
+                        *log << "g.get_table(" << table_ndx << ")->swap_rows(" << row_ndx1 << ", " << row_ndx2
+                             << ");\n";
                     }
                     t->swap_rows(row_ndx1, row_ndx2);
                 }

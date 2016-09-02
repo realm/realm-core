@@ -132,9 +132,8 @@ TEST(Upgrade_Database_2_3)
         const char* encryption_key = nullptr;
         bool allow_upgrade = false;
 
-        CHECK_THROW(
-            SharedGroup(temp_copy, no_create, SharedGroupOptions(durability, encryption_key, allow_upgrade)),
-            FileFormatUpgradeRequired);
+        CHECK_THROW(SharedGroup(temp_copy, no_create, SharedGroupOptions(durability, encryption_key, allow_upgrade)),
+                    FileFormatUpgradeRequired);
     }
 
     // Automatic upgrade from SharedGroup
@@ -885,12 +884,8 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
 
     // Callback should be triggered here because the file still needs to be upgraded
     upgrade_callback = successful_callback;
-    SharedGroup sg2(temp_copy,
-                    no_create,
-                    SharedGroupOptions(durability,
-                                       encryption_key,
-                                       allow_file_format_upgrade,
-                                       upgrade_callback));
+    SharedGroup sg2(temp_copy, no_create,
+                    SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     CHECK(did_upgrade);
     CHECK_EQUAL(old_version, 3);
     CHECK(new_version >= 5);

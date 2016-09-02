@@ -11395,8 +11395,7 @@ TEST(LangBindHelper_SessionHistoryConsistency)
 
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = realm::make_client_history(path, crypt_key());
-        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroupOptions(crypt_key())),
-                          LogicError::mixed_history_type);
+        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroupOptions(crypt_key())), LogicError::mixed_history_type);
     }
 }
 
@@ -11760,8 +11759,7 @@ TEST(LangBindHelper_InRealmHistory_Downgrade)
     {
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = make_client_history(path, crypt_key());
-        CHECK_THROW(SharedGroup(*hist, SharedGroupOptions(crypt_key())),
-                    InvalidDatabase);
+        CHECK_THROW(SharedGroup(*hist, SharedGroupOptions(crypt_key())), InvalidDatabase);
     }
 }
 
@@ -11784,8 +11782,7 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
 
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path);
-        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroupOptions(crypt_key())),
-                          LogicError::mixed_history_type);
+        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroupOptions(crypt_key())), LogicError::mixed_history_type);
     }
     // The Realm is still at its initial empty state
     {
@@ -11795,8 +11792,7 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
 
         // In-Realm history
         std::unique_ptr<Replication> hist_2 = make_in_realm_history(path);
-        CHECK_LOGIC_ERROR(SharedGroup(*hist_2, SharedGroupOptions(crypt_key())),
-                          LogicError::mixed_history_type);
+        CHECK_LOGIC_ERROR(SharedGroup(*hist_2, SharedGroupOptions(crypt_key())), LogicError::mixed_history_type);
     }
 }
 
@@ -12239,7 +12235,6 @@ TEST(LangBindHelper_SwapSimple)
     CHECK_EQUAL(tr->get_int(0, 4), 7);
     CHECK_EQUAL(tr->get_int(0, 7), 4);
 }
-
 
 
 #endif

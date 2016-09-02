@@ -83,9 +83,8 @@ InterprocessCondVar::~InterprocessCondVar() noexcept
 }
 
 
-
-void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path,
-                                          std::string condvar_name, std::string tmp_path)
+void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, std::string condvar_name,
+                                          std::string tmp_path)
 {
     close();
     uses_emulation = true;

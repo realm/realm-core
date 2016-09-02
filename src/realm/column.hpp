@@ -427,7 +427,8 @@ public:
 
     void move_assign(Column&);
 
-    static size_t get_size_from_ref(ref_type root_ref, Allocator& alloc) {
+    static size_t get_size_from_ref(ref_type root_ref, Allocator& alloc)
+    {
         return ColumnBase::get_size_from_ref(root_ref, alloc);
     }
 
@@ -603,7 +604,7 @@ private:
 // Implementation:
 
 
-template<>
+template <>
 inline size_t IntNullColumn::get_size_from_ref(ref_type root_ref, Allocator& alloc)
 {
     // FIXME: Speed improvement possible by not creating instance, but tricky! This slow method is OK so far

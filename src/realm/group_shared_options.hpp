@@ -31,26 +31,29 @@ struct SharedGroupOptions {
     enum class Durability : uint16_t {
         Full,
         MemOnly,
-        Async    ///< Not yet supported on windows.
+        Async ///< Not yet supported on windows.
     };
 
-    explicit SharedGroupOptions(Durability level = Durability::Full,
-                       const char* key = nullptr,
-                       bool allow_upgrade = true,
-                       std::function<void(int,int)> file_upgrade_callback = std::function<void(int,int)>(),
-                       std::string temp_directory = sys_tmp_dir):
-        durability(level),
-        encryption_key(key),
-        allow_file_format_upgrade(allow_upgrade),
-        upgrade_callback(file_upgrade_callback),
-        temp_dir(temp_directory) {}
+    explicit SharedGroupOptions(Durability level = Durability::Full, const char* key = nullptr,
+                                bool allow_upgrade = true,
+                                std::function<void(int, int)> file_upgrade_callback = std::function<void(int, int)>(),
+                                std::string temp_directory = sys_tmp_dir)
+        : durability(level)
+        , encryption_key(key)
+        , allow_file_format_upgrade(allow_upgrade)
+        , upgrade_callback(file_upgrade_callback)
+        , temp_dir(temp_directory)
+    {
+    }
 
-    explicit SharedGroupOptions(const char* key):
-        durability(Durability::Full),
-        encryption_key(key),
-        allow_file_format_upgrade(true),
-        upgrade_callback(std::function<void(int,int)>()),
-        temp_dir(sys_tmp_dir) {}
+    explicit SharedGroupOptions(const char* key)
+        : durability(Durability::Full)
+        , encryption_key(key)
+        , allow_file_format_upgrade(true)
+        , upgrade_callback(std::function<void(int, int)>())
+        , temp_dir(sys_tmp_dir)
+    {
+    }
 
     /// The persistence level of the Realm file. See Durability.
     Durability durability;
@@ -78,11 +81,12 @@ struct SharedGroupOptions {
     /// previous version and the version just upgraded to, respectively.
     /// If the callback function throws, the Realm file will safely abort the
     /// upgrade (rollback the transaction) but the SharedGroup will not be opened.
-    std::function<void(int,int)> upgrade_callback;
+    std::function<void(int, int)> upgrade_callback;
 
     /// A path to a directory where Realm can write temporary files or pipes to.
     /// This string should include a trailing slash '/'.
     std::string temp_dir;
+
 private:
     const static std::string sys_tmp_dir;
 };

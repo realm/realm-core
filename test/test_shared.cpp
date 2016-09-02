@@ -849,7 +849,8 @@ TEST(Shared_ManyReaders)
 
         // Create 8*N shared group accessors
         for (int i = 0; i < 8 * N; ++i)
-            shared_groups[i].reset(new SharedGroup(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly)));
+            shared_groups[i].reset(
+                new SharedGroup(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly)));
 
         // Initiate 2*N read transactions with progressive changes
         for (int i = 0; i < 2 * N; ++i) {

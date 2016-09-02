@@ -61,10 +61,10 @@ int main(int argc, char* argv[])
     int c;
     extern char* optarg;
 
-    bool use_shared    = false;
+    bool use_shared = false;
     SharedGroupOptions::Durability dlevel = SharedGroupOptions::Durability::Full;
-    bool do_insert     = false;
-    bool use_group     = false;
+    bool do_insert = false;
+    bool use_group = false;
     bool random_insert = false;
 
     // FIXME: 'getopt' is POSIX/Linux specific. We should replace with

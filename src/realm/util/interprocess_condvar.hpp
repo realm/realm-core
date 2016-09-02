@@ -71,8 +71,7 @@ public:
     /// You need to bind the emulation to a SharedPart in shared/mmapped memory.
     /// The SharedPart is assumed to have been initialized (possibly by another process)
     /// earlier through a call to init_shared_part.
-    void set_shared_part(SharedPart& shared_part, std::string path, std::string condvar_name,
-                         std::string tmp_path);
+    void set_shared_part(SharedPart& shared_part, std::string path, std::string condvar_name, std::string tmp_path);
 
     /// Initialize the shared part of a process shared condition variable.
     /// A process shared condition variables may be represented by any number of

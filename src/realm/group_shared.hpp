@@ -133,7 +133,6 @@ struct IncompatibleLockFile : std::runtime_error {
 ///    in progress"
 class SharedGroup {
 public:
-
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and the
@@ -145,8 +144,7 @@ public:
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and
     /// the upgrade will be aborted.
-    explicit SharedGroup(Replication& repl,
-                         const SharedGroupOptions options = SharedGroupOptions());
+    explicit SharedGroup(Replication& repl, const SharedGroupOptions options = SharedGroupOptions());
 
     struct unattached_tag {
     };
@@ -522,8 +520,7 @@ private:
 #endif
     std::function<void(int, int)> m_upgrade_callback;
 
-    void do_open(const std::string& file, bool no_create, bool is_backend,
-                 const SharedGroupOptions options);
+    void do_open(const std::string& file, bool no_create, bool is_backend, const SharedGroupOptions options);
 
     // Ring buffer management
     bool ringbuf_is_empty() const noexcept;
@@ -730,10 +727,8 @@ private:
 struct SharedGroup::BadVersion : std::exception {
 };
 
-inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
-                                const SharedGroupOptions options):
-    m_group(Group::shared_tag()),
-    m_upgrade_callback(std::move(options.upgrade_callback))
+inline SharedGroup::SharedGroup(const std::string& file, bool no_create, const SharedGroupOptions options)
+    : m_group(Group::shared_tag()), m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(file, no_create, options); // Throws
 }
@@ -742,15 +737,13 @@ inline SharedGroup::SharedGroup(unattached_tag) noexcept : m_group(Group::shared
 {
 }
 
-inline SharedGroup::SharedGroup(Replication& repl, const SharedGroupOptions options):
-    m_group(Group::shared_tag()),
-    m_upgrade_callback(std::move(options.upgrade_callback))
+inline SharedGroup::SharedGroup(Replication& repl, const SharedGroupOptions options)
+    : m_group(Group::shared_tag()), m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(repl, options); // Throws
 }
 
-inline void SharedGroup::open(const std::string& path, bool no_create_file,
-                              const SharedGroupOptions options)
+inline void SharedGroup::open(const std::string& path, bool no_create_file, const SharedGroupOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -772,8 +765,8 @@ inline void SharedGroup::open(Replication& repl, const SharedGroupOptions option
     gf::set_replication(m_group, &repl);
 
     std::string file = repl.get_database_path();
-    bool no_create   = false;
-    bool is_backend  = false;
+    bool no_create = false;
+    bool is_backend = false;
     do_open(file, no_create, is_backend, options); // Throws
 }
 
