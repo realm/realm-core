@@ -151,7 +151,10 @@ private:
 // prefix. The second part identifies the value and uses CamelCase
 // with uppercase initial.
 
-enum mode { mode_Foo, mode_FooBar };
+enum mode {
+    mode_Foo,
+    mode_FooBar,
+};
 
 
 // Order of class members (roughly):
