@@ -31,6 +31,7 @@ public:
     TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx = npos);
 
     static ref_type create(Allocator& alloc, size_t size, bool nullable);
+    static size_t get_size_from_ref(ref_type root_ref, Allocator& alloc) noexcept;
 
     /// Get the number of entries in this column. This operation is relatively
     /// slow.
@@ -67,12 +68,12 @@ public:
     void update_from_parent(size_t old_baseline) noexcept override;
     void set_ndx_in_parent(size_t ndx) noexcept override;
     void refresh_accessor_tree(size_t new_col_ndx, const Spec&) override;
-#ifdef REALM_DEBUG
+
     void verify() const override;
     void to_dot(std::ostream&, StringData title = StringData()) const override;
     void do_dump_node_structure(std::ostream&, int level) const override;
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const override;
-#endif
+
     void add(const Timestamp& ts = Timestamp {});
     Timestamp get(size_t row_ndx) const noexcept;
     void set(size_t row_ndx, const Timestamp& ts);
@@ -118,7 +119,7 @@ private:
         if (size() == 0) {
             if (result_index)
                 *result_index = npos;
-            return Timestamp(null{});
+            return Timestamp{};
         }
 
         Timestamp best = get(0);

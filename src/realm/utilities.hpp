@@ -19,7 +19,7 @@
 #ifndef REALM_UTILITIES_HPP
 #define REALM_UTILITIES_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <cstdlib>
 #include <cstdlib> // size_t
 #include <cstdio>

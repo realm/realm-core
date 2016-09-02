@@ -57,10 +57,8 @@ public:
     bool supports_search_index() const noexcept override { return false; }
     StringIndex* create_search_index() override { return nullptr; }
 
-#ifdef REALM_DEBUG
     void verify() const override;
     void verify(const Table&, size_t) const override;
-#endif
 
 protected:
     /// A pointer to the table that this column is part of. For a free-standing
@@ -160,10 +158,8 @@ protected:
     /// \param row_ndx Must be `realm::npos` if appending.
     void do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows);
 
-#ifdef REALM_DEBUG
     std::pair<ref_type, size_t>
     get_to_dot_parent(size_t ndx_in_parent) const override;
-#endif
 
     friend class Table;
 };

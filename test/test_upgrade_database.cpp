@@ -19,7 +19,7 @@
 #include "testsettings.hpp"
 #ifdef TEST_GROUP
 
-#include <stdint.h>
+#include <cstdint>
 #include <algorithm>
 #include <fstream>
 
@@ -127,12 +127,12 @@ TEST(Upgrade_Database_2_3)
         CHECK_OR_RETURN(File::copy(path, temp_copy));
 
         bool no_create = false;
-        SharedGroup::DurabilityLevel durability = SharedGroup::durability_Full;
+        SharedGroupOptions::Durability durability = SharedGroupOptions::Durability::Full;
         const char* encryption_key = nullptr;
         bool allow_upgrade = false;
 
         CHECK_THROW(
-            SharedGroup(temp_copy, no_create, durability, encryption_key, allow_upgrade),
+            SharedGroup(temp_copy, no_create, SharedGroupOptions(durability, encryption_key, allow_upgrade)),
             FileFormatUpgradeRequired);
     }
 
@@ -822,7 +822,7 @@ TEST(Upgrade_DatabaseWithCallback)
     // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
     // in version 3
     bool no_create = false;
-    SharedGroup::DurabilityLevel durability = SharedGroup::DurabilityLevel::durability_Full;
+    SharedGroupOptions::Durability durability = SharedGroupOptions::Durability::Full;
     const char* encryption_key = nullptr;
     bool allow_file_format_upgrade = true;
     std::function<void(int, int)> upgrade_callback;
@@ -837,12 +837,8 @@ TEST(Upgrade_DatabaseWithCallback)
 
     upgrade_callback = callback;
 
-    SharedGroup sg(temp_copy,
-                   no_create,
-                   durability,
-                   encryption_key,
-                   allow_file_format_upgrade,
-                   upgrade_callback);
+    SharedGroup sg(temp_copy, no_create,
+                   SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
 
     CHECK(did_upgrade);
     CHECK_EQUAL(old_version, 3);
@@ -863,7 +859,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
     // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
     // in version 3
     bool no_create = false;
-    SharedGroup::DurabilityLevel durability = SharedGroup::DurabilityLevel::durability_Full;
+    SharedGroupOptions::Durability durability = SharedGroupOptions::Durability::Full;
     const char* encryption_key = nullptr;
     bool allow_file_format_upgrade = true;
     std::function<void(int, int)> upgrade_callback;
@@ -883,12 +879,8 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
     upgrade_callback = exception_callback;
     bool exception_thrown = false;
     try {
-        SharedGroup sg1(temp_copy,
-                        no_create,
-                        durability,
-                        encryption_key,
-                        allow_file_format_upgrade,
-                        upgrade_callback);
+        SharedGroup sg1(temp_copy, no_create,
+                        SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     }
     catch (...) {
         exception_thrown = true;
@@ -900,22 +892,18 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
     upgrade_callback = successful_callback;
     SharedGroup sg2(temp_copy,
                     no_create,
-                    durability,
-                    encryption_key,
-                    allow_file_format_upgrade,
-                    upgrade_callback);
+                    SharedGroupOptions(durability,
+                                       encryption_key,
+                                       allow_file_format_upgrade,
+                                       upgrade_callback));
     CHECK(did_upgrade);
     CHECK_EQUAL(old_version, 3);
     CHECK(new_version >= 5);
 
     // Callback should not be triggered here because the file is already upgraded
     did_upgrade = false;
-    SharedGroup sg3(temp_copy,
-                    no_create,
-                    durability,
-                    encryption_key,
-                    allow_file_format_upgrade,
-                    upgrade_callback);
+    SharedGroup sg3(temp_copy, no_create,
+                    SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     CHECK(!did_upgrade);
 }
 

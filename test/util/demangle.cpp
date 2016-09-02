@@ -53,7 +53,7 @@ std::string demangle(const std::string& mangled_name)
 {
 #ifdef REALM_HAVE_CXXABI_DEMANGLE
     int status = 0;
-    std::unique_ptr<char[], Free> buffer(abi::__cxa_demangle(mangled_name.c_str(), 0, 0, &status));
+    std::unique_ptr<char[], Free> buffer(abi::__cxa_demangle(mangled_name.c_str(), nullptr, nullptr, &status));
     if (!buffer)
         return mangled_name;
     std::string demangled_name = buffer.get();

@@ -117,7 +117,6 @@ private:
 
     TableRef m_origin_table;
     LinkListColumn& m_origin_column;
-    mutable size_t m_ref_count;
 
     using HandoverPatch = LinkViewHandoverPatch;
     static void generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<HandoverPatch>& patch);
@@ -168,8 +167,7 @@ public:
 inline LinkView::LinkView(const ctor_cookie&, Table* origin_table, LinkListColumn& column, size_t row_ndx):
     RowIndexes(IntegerColumn::unattached_root_tag(), column.get_alloc()), // Throws
     m_origin_table(origin_table->get_table_ref()),
-    m_origin_column(column),
-    m_ref_count(0)
+    m_origin_column(column)
 {
     Array& root = *m_row_indexes.get_root_array();
     root.set_parent(&column, row_ndx);

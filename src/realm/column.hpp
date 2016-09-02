@@ -19,7 +19,7 @@
 #ifndef REALM_COLUMN_HPP
 #define REALM_COLUMN_HPP
 
-#include <stdint.h> // unint8_t etc
+#include <cstdint> // unint8_t etc
 #include <cstdlib> // size_t
 #include <vector>
 #include <memory>
@@ -169,7 +169,7 @@ public:
     virtual void detach(void) = 0;
     virtual bool is_attached(void) const noexcept = 0;
 
-    static size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&) noexcept;
+    static size_t get_size_from_type_and_ref(ColumnType, ref_type, Allocator&, bool) noexcept;
 
     // These assume that the right column compile-time type has been
     // figured out.
@@ -268,12 +268,13 @@ public:
     ///    (`root->m_ndx_in_parent`) is valid.
     virtual void refresh_accessor_tree(size_t new_col_ndx, const Spec&);
 
-#ifdef REALM_DEBUG
     virtual void verify() const = 0;
     virtual void verify(const Table&, size_t col_ndx) const;
     virtual void to_dot(std::ostream&, StringData title = StringData()) const = 0;
-    void dump_node_structure() const; // To std::cerr (for GDB)
     virtual void do_dump_node_structure(std::ostream&, int level) const = 0;
+
+#ifdef REALM_DEBUG
+    void dump_node_structure() const; // To std::cerr (for GDB)
     void bptree_to_dot(const Array* root, std::ostream& out) const;
 #endif
 
@@ -307,11 +308,8 @@ protected:
 
     static ref_type create(Allocator&, size_t size, CreateHandler&);
 
-#ifdef REALM_DEBUG
     class LeafToDot;
-    virtual void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
-                             std::ostream&) const = 0;
-#endif
+    virtual void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const = 0;
 
     template<class Column>
     static int compare_values(const Column* column, size_t row1, size_t row2) noexcept;
@@ -431,6 +429,10 @@ public:
     MemRef clone_deep(Allocator&) const override;
 
     void move_assign(Column&);
+
+    static size_t get_size_from_ref(ref_type root_ref, Allocator& alloc) {
+        return ColumnBase::get_size_from_ref(root_ref, alloc);
+    }
 
     size_t size() const noexcept override;
     bool is_empty() const noexcept { return size() == 0; }
@@ -552,13 +554,13 @@ public:
     /// \param row_ndx Must be `realm::npos` if appending.
     void insert_without_updating_index(size_t row_ndx, T value, size_t num_rows);
 
-#ifdef REALM_DEBUG
     void verify() const override;
-    using ColumnBase::verify;
     void to_dot(std::ostream&, StringData title) const override;
+    void do_dump_node_structure(std::ostream&, int) const override;
+#ifdef REALM_DEBUG
+    using ColumnBase::verify;
     void tree_to_dot(std::ostream&) const;
     MemStats stats() const;
-    void do_dump_node_structure(std::ostream&, int) const override;
 #endif
 
     //@{
@@ -587,9 +589,9 @@ protected:
     /// if the leaf type is Array::type_HasRefs.
     void clear_without_updating_index();
 
-#ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
                      std::ostream&) const override;
+#ifdef REALM_DEBUG
     static void dump_node_structure(const Array& root, std::ostream&, int level);
 #endif
 
@@ -608,6 +610,18 @@ private:
 };
 
 // Implementation:
+
+
+template<>
+inline size_t IntNullColumn::get_size_from_ref(ref_type root_ref, Allocator& alloc)
+{
+    // FIXME: Speed improvement possible by not creating instance, but tricky! This slow method is OK so far
+    // because it's only invoked by Table::get_size_from_ref() which is only used for subtables which we
+    // currently 2016) do not expose publicly.
+    IntNullColumn inc(alloc, root_ref);
+    return inc.size();
+}
+
 
 inline bool ColumnBase::supports_search_index() const noexcept
 {
@@ -1440,18 +1454,20 @@ void Column<T>::do_erase(size_t row_ndx, size_t num_rows_to_erase, bool is_last)
     }
 }
 
-#ifdef REALM_DEBUG
-
 template<class T>
 void Column<T>::verify() const
 {
+#ifdef REALM_DEBUG
     m_tree.verify();
+#endif
 }
 
+// LCOV_EXCL_START
 
 template<class T>
 void Column<T>::to_dot(std::ostream& out, StringData title) const
 {
+#ifdef REALM_DEBUG
     ref_type ref = get_root_array()->get_ref();
     out << "subgraph cluster_integer_column" << ref << " {" << std::endl;
     out << " label = \"Integer column";
@@ -1460,7 +1476,37 @@ void Column<T>::to_dot(std::ostream& out, StringData title) const
     out << "\";" << std::endl;
     tree_to_dot(out);
     out << "}" << std::endl;
+#else
+    static_cast<void>(out);
+    static_cast<void>(title);
+#endif
 }
+
+template<class T>
+void Column<T>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent, std::ostream& out) const
+{
+#ifdef REALM_DEBUG
+    BpTree<T>::leaf_to_dot(leaf_mem, parent, ndx_in_parent, out, get_alloc());
+#else
+    static_cast<void>(leaf_mem);
+    static_cast<void>(parent);
+    static_cast<void>(ndx_in_parent);
+    static_cast<void>(out);
+#endif
+}
+
+template<class T>
+void Column<T>::do_dump_node_structure(std::ostream& out, int level) const
+{
+#ifdef REALM_DEBUG
+    dump_node_structure(*get_root_array(), out, level);
+#else
+    static_cast<void>(out);
+    static_cast<void>(level);
+#endif
+}
+
+#ifdef REALM_DEBUG
 
 template<class T>
 void Column<T>::tree_to_dot(std::ostream& out) const
@@ -1468,12 +1514,6 @@ void Column<T>::tree_to_dot(std::ostream& out) const
     ColumnBase::bptree_to_dot(get_root_array(), out);
 }
 
-template<class T>
-void Column<T>::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
-                            std::ostream& out) const
-{
-    BpTree<T>::leaf_to_dot(leaf_mem, parent, ndx_in_parent, out, get_alloc());
-}
 
 template<class T>
 MemStats Column<T>::stats() const
@@ -1488,19 +1528,12 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level);
 }
 
 template<class T>
-void Column<T>::do_dump_node_structure(std::ostream& out, int level) const
-{
-    dump_node_structure(*get_root_array(), out, level);
-}
-
-template<class T>
 void Column<T>::dump_node_structure(const Array& root, std::ostream& out, int level)
 {
     root.dump_bptree_structure(out, level, &_impl::leaf_dumper);
 }
 
-#endif // REALM_DEBUG
-
+#endif // LCOV_EXCL_STOP ignore debug functions
 
 } // namespace realm
 
