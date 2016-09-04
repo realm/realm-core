@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 
 if(REALM_PLATFORM STREQUAL "Android")
     # This must be before project()
-    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/CMake/android.toolchain.cmake")
+    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/tools/cmake/android.toolchain.cmake")
     set(ANDROID_ABI "arm64-v8a" CACHE STRING "")
 endif()
 
