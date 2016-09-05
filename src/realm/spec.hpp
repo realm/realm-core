@@ -172,6 +172,7 @@ private:
     ColumnInfo get_column_info(size_t column_ndx) const noexcept;
 
     size_t get_subspec_ndx_after(size_t column_ndx, size_t skip_column_ndx) const noexcept;
+    size_t get_subspec_entries_for_col_type(ColumnType type) const noexcept;
     bool has_subspec() const noexcept;
 
     // Returns false if the spec has no columns, otherwise it returns

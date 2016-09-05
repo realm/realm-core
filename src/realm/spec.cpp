@@ -275,6 +275,14 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
         // Table columns and link type columns have a single subspec.
         size_t old_subspec_ndx = get_subspec_ndx(from_ndx);
         size_t new_subspec_ndx = get_subspec_ndx_after(to_ndx, from_ndx);
+        // The new_subspec_ndx calculation has skipped entry from_ndx because it
+        // has an entry in the subspec still. If the entry that replaces
+        // from_ndx has any entries in the subspec then we need to retroactivly
+        // account for them now.
+        if (from_ndx < to_ndx) {
+            ColumnType to_type = ColumnType(m_types.get(to_ndx));
+            new_subspec_ndx += get_subspec_entries_for_col_type(to_type);
+        }
         if (old_subspec_ndx != new_subspec_ndx) {
             m_subspecs.move_rotate(old_subspec_ndx, new_subspec_ndx);
         }
@@ -309,18 +317,26 @@ size_t Spec::get_subspec_ndx_after(size_t column_ndx, size_t skip_column_ndx) co
         }
 
         ColumnType type = ColumnType(m_types.get(i));
-        if (type == col_type_Table || type == col_type_Link || type == col_type_LinkList) {
-            ++subspec_ndx;
-        }
-        else if (type == col_type_BackLink) {
-            subspec_ndx += 2; // table and column refs
-        }
+        subspec_ndx += get_subspec_entries_for_col_type(type);
     }
     return subspec_ndx;
 }
 
 
-void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref, ArrayParent*& keys_parent, size_t& keys_ndx)
+size_t Spec::get_subspec_entries_for_col_type(ColumnType type) const noexcept
+{
+    if (type == col_type_Table || type == col_type_Link || type == col_type_LinkList) {
+        return 1; // index of dest column
+    }
+    else if (type == col_type_BackLink) {
+        return 2; // index of table and index of linked column
+    }
+    return 0; // no entries for other column types (subspec array is sparse)
+}
+
+
+void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
+                                  ArrayParent*& keys_parent, size_t& keys_ndx)
 {
     REALM_ASSERT(get_column_type(column_ndx) == col_type_String);
 
