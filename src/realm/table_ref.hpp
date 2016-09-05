@@ -46,8 +46,8 @@ class BasicTable;
 /// actual table at any specific point in time, but this state of
 /// attachment of the accessor has nothing to do with the function of
 /// the smart pointer. Also, in the rest of the documentation of this
-/// class, whenever you see `Table::foo`, you are supposed to read it
-/// as, `Table::foo` or `BasicTable<Spec>::foo`.
+/// class, whenever you see `Table::%foo`, you are supposed to read it
+/// as, `Table::%foo` or `BasicTable<Spec>::%foo`.
 ///
 ///
 /// Table accessors are either created directly by an application via
