@@ -280,7 +280,9 @@ struct Common<T1, T2, true, false, b> {
 
 
 struct RowIndex {
-    enum DetachedTag { Detached };
+    enum DetachedTag {
+        Detached,
+    };
 
     explicit RowIndex()
         : m_row_index(npos)

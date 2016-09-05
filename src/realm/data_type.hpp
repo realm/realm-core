@@ -41,7 +41,10 @@ enum DataType {
 };
 
 /// See Descriptor::set_link_type().
-enum LinkType { link_Strong, link_Weak };
+enum LinkType {
+    link_Strong,
+    link_Weak,
+};
 
 } // namespace realm
 

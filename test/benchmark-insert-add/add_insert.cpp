@@ -30,7 +30,11 @@ using namespace realm::util;
 
 namespace {
 
-enum Mode { mode_UseShared, mode_UseGroup, mode_UseTable };
+enum Mode {
+    mode_UseShared,
+    mode_UseGroup,
+    mode_UseTable,
+};
 
 REALM_TABLE_5(TestTable, x, Int, s1, String, b, Bool, s2, String, s3, String)
 

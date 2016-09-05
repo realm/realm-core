@@ -233,7 +233,11 @@ public:
     virtual void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
     virtual void adj_acc_clear_root_table() noexcept;
 
-    enum { mark_Recursive = 0x01, mark_LinkTargets = 0x02, mark_LinkOrigins = 0x04 };
+    enum {
+        mark_Recursive = 0x01,
+        mark_LinkTargets = 0x02,
+        mark_LinkOrigins = 0x04,
+    };
 
     virtual void mark(int type) noexcept;
 

@@ -34,7 +34,10 @@
 
 namespace realm {
 
-enum Feature { feature_Debug, feature_Replication };
+enum Feature {
+    feature_Debug,
+    feature_Replication,
+};
 
 class Version {
 public:

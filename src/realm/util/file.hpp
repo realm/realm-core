@@ -134,7 +134,10 @@ public:
     /// open file.
     bool is_attached() const noexcept;
 
-    enum AccessMode { access_ReadOnly, access_ReadWrite };
+    enum AccessMode {
+        access_ReadOnly,
+        access_ReadWrite,
+    };
 
     enum CreateMode {
         create_Auto,  ///< Create the file if it does not already exist.

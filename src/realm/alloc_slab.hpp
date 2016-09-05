@@ -341,7 +341,9 @@ private:
     };
 
     // Values of each used bit in m_flags
-    enum { flags_SelectBit = 1 };
+    enum {
+        flags_SelectBit = 1,
+    };
 
     // 24 bytes
     struct Header {
@@ -387,7 +389,11 @@ private:
     size_t m_num_section_bases = 0;
     AttachMode m_attach_mode = attach_None;
     bool m_file_on_streaming_form = false;
-    enum FeeeSpaceState { free_space_Clean, free_space_Dirty, free_space_Invalid };
+    enum FeeeSpaceState {
+        free_space_Clean,
+        free_space_Dirty,
+        free_space_Invalid,
+    };
 
     /// When set to free_space_Invalid, the free lists are no longer
     /// up-to-date. This happens if do_free() or

@@ -84,7 +84,12 @@ public:
     static void print_all(std::ostream& out, const std::initializer_list<Printable>& values, bool quote);
 
 private:
-    enum class Type { Bool, Int, Uint, String } m_type;
+    enum class Type {
+        Bool,
+        Int,
+        Uint,
+        String,
+    } m_type;
 
     union {
         uintmax_t m_uint;

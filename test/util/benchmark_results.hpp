@@ -32,7 +32,11 @@ public:
     BenchmarkResults(int max_lead_text_width, const char* results_file_stem = "results");
     ~BenchmarkResults();
 
-    enum ChangeType { change_Percent, change_DropFactor, change_RiseFactor };
+    enum ChangeType {
+        change_Percent,
+        change_DropFactor,
+        change_RiseFactor,
+    };
 
     /// Use submit_single() when you know there is only going to be a single datapoint.
     void submit_single(const char* ident, const char* lead_text, double seconds, ChangeType = change_Percent);

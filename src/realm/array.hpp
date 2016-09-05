@@ -993,7 +993,11 @@ public:
     static char* get_header_from_data(char*) noexcept;
     static const char* get_data_from_header(const char*) noexcept;
 
-    enum WidthType { wtype_Bits = 0, wtype_Multiply = 1, wtype_Ignore = 2 };
+    enum WidthType {
+        wtype_Bits = 0,
+        wtype_Multiply = 1,
+        wtype_Ignore = 2,
+    };
 
     static bool get_is_inner_bptree_node_from_header(const char*) noexcept;
     static bool get_hasrefs_from_header(const char*) noexcept;

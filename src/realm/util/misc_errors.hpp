@@ -26,7 +26,9 @@ namespace realm {
 namespace util {
 namespace error {
 
-enum misc_errors { unknown = 1 };
+enum misc_errors {
+    unknown = 1,
+};
 
 std::error_code make_error_code(misc_errors);
 

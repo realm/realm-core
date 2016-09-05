@@ -620,7 +620,13 @@ public:
 
 
     // Pivot / aggregate operation types. Experimental! Please do not document method publicly.
-    enum AggrType { aggr_count, aggr_sum, aggr_avg, aggr_min, aggr_max };
+    enum AggrType {
+        aggr_count,
+        aggr_sum,
+        aggr_avg,
+        aggr_min,
+        aggr_max,
+    };
 
     // Simple pivot aggregate method. Experimental! Please do not document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, AggrType op, Table& result,

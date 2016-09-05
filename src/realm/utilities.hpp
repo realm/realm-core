@@ -174,9 +174,18 @@ ReturnType type_punning(OriginalType variable) noexcept
     return both.out;
 }
 
-enum FindRes { FindRes_not_found, FindRes_single, FindRes_column };
+enum FindRes {
+    FindRes_not_found,
+    FindRes_single,
+    FindRes_column,
+};
 
-enum IndexMethod { index_FindFirst, index_FindAll, index_FindAll_nocopy, index_Count };
+enum IndexMethod {
+    index_FindFirst,
+    index_FindAll,
+    index_FindAll_nocopy,
+    index_Count,
+};
 
 
 // realm::is_any<T, U1, U2, U3, ...> ==

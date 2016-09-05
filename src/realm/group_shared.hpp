@@ -342,7 +342,11 @@ public:
 
     //@}
 
-    enum TransactStage { transact_Ready, transact_Reading, transact_Writing };
+    enum TransactStage {
+        transact_Ready,
+        transact_Reading,
+        transact_Writing,
+    };
 
     /// Get the current transaction type
     TransactStage get_transact_stage() const noexcept;
