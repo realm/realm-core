@@ -311,7 +311,7 @@ build_apple()
             fi
         fi
         tag="$sdk$platform_suffix"
-        CXX="xcrun -sdk $sdk c++" $MAKE -C "src/realm" "librealm-$tag.a" "librealm-$tag-dbg.a" BASE_DENOM="$tag" CFLAGS_ARCH="$cflags_arch" COMPILER_IS_GCC_LIKE=YES || exit 1
+        CC="xcrun -sdk $sdk clang" $MAKE -C "src/realm" "librealm-$tag.a" "librealm-$tag-dbg.a" BASE_DENOM="$tag" CFLAGS_ARCH="$cflags_arch" COMPILER_IS_GCC_LIKE=YES || exit 1
         mkdir "$temp_dir/platforms/$tag" || exit 1
         cp "src/realm/librealm-$tag.a"     "$temp_dir/platforms/$tag/librealm.a"     || exit 1
         cp "src/realm/librealm-$tag-dbg.a" "$temp_dir/platforms/$tag/librealm-dbg.a" || exit 1
