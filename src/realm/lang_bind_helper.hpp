@@ -107,7 +107,7 @@ public:
 
     using VersionID = SharedGroup::VersionID;
 
-    /// \defgroup lang_bind_helper_continuous_transactions Continuous Transactions
+    /// \defgroup lang_bind_helper_transactions Continuous Transactions
     ///
     /// advance_read() is equivalent to terminating the current read transaction
     /// (SharedGroup::end_read()), and initiating a new one
