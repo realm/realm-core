@@ -152,8 +152,23 @@ void Realm::open_with_config(const Config& config,
 #if REALM_VER_MAJOR >= 2
             history = realm::make_in_realm_history(config.path);
 #else
-            history = realm::make_client_history(config.path, config.encryption_key.data());       
+            history = realm::make_client_history(config.path, config.encryption_key.data());
 #endif
+
+#ifdef REALM_GROUP_SHARED_OPTIONS_HPP
+            SharedGroupOptions options;
+            options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
+                                                    SharedGroupOptions::Durability::Full;
+            options.encryption_key = config.encryption_key.data();
+            options.allow_file_format_upgrade = !config.disable_format_upgrade;
+            options.upgrade_callback = [&](int from_version, int to_version) {
+                if (realm) {
+                    realm->upgrade_initial_version = from_version;
+                    realm->upgrade_final_version = to_version;
+                }
+            };
+            shared_group = std::make_unique<SharedGroup>(*history, options);
+#else
             SharedGroup::DurabilityLevel durability = config.in_memory ? SharedGroup::durability_MemOnly :
                                                                            SharedGroup::durability_Full;
             shared_group = std::make_unique<SharedGroup>(*history, durability, config.encryption_key.data(), !config.disable_format_upgrade,
@@ -163,6 +178,7 @@ void Realm::open_with_config(const Config& config,
                     realm->upgrade_final_version = to_version;
                 }
             });
+#endif
         }
     }
     catch (...) {
