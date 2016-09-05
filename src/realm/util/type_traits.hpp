@@ -83,7 +83,7 @@ struct LeastUnsigned;
 /// Member `type` is `unsigned` if `unsigned` has at least `bits`
 /// value bits, otherwise it is the same as
 /// `LeastUnsigned<bits>::%type`.
-template<int bits>
+template <int bits>
 struct FastestUnsigned;
 
 

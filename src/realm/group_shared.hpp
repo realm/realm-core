@@ -467,7 +467,7 @@ public:
     /// if the importing SharedGroup is viewing a version of the database that
     /// is different from the exporting SharedGroup. The call to
     /// import_from_handover is not thread-safe.
-    template<typename T>
+    template <typename T>
     std::unique_ptr<T> import_from_handover(std::unique_ptr<Handover<T>> handover);
 
     // We need two cases for handling of LinkViews, because they are ref counted.

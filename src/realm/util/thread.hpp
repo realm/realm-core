@@ -266,7 +266,7 @@ class RobustLockGuard {
 public:
     /// \param m the mutex to guard
     /// \param func See RobustMutex::lock().
-    template<class TFunc>
+    template <class TFunc>
     RobustLockGuard(RobustMutex& m, TFunc func);
     ~RobustLockGuard() noexcept;
 

@@ -28,7 +28,9 @@ namespace _impl {
 /// \cond doxygen_skip
 /// Doxygen warns about a recursive class relation, but this is intentional.
 
-template<size_t...> struct Indexes {};
+template <size_t...>
+struct Indexes {
+};
 template <size_t N, size_t... I>
 struct GenIndexes : GenIndexes<N - 1, N - 1, I...> {
 };

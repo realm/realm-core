@@ -905,8 +905,7 @@ public:
     ///
     /// \return True if, and only if the handler has returned true for
     /// all visited leafs.
-    bool visit_bptree_leaves(size_t elem_ndx_offset, size_t elems_in_tree,
-                             VisitHandler& handler);
+    bool visit_bptree_leaves(size_t elem_ndx_offset, size_t elems_in_tree, VisitHandler& handler);
 
 
     class UpdateHandler;

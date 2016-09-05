@@ -139,8 +139,7 @@ public:
     /// \param broken_reciprocal_backlinks If true, link columns must assume
     /// that reciprocal backlinks have already been removed. Non-link columns
     /// should ignore this argument.
-    virtual void move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-                                    bool broken_reciprocal_backlinks) = 0;
+    virtual void move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool broken_reciprocal_backlinks) = 0;
 
     /// Remove all elements from this column.
     ///
@@ -953,9 +952,8 @@ typename ColumnTypeTraits<T>::minmax_type Column<T>::maximum(size_t start, size_
     return aggregate<T, R, act_Max, NotNull>(*this, 0, start, end, limit, return_ndx);
 }
 
-template<class T>
-void Column<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf,
-                         LeafInfo& inout_leaf_info) const noexcept
+template <class T>
+void Column<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf, LeafInfo& inout_leaf_info) const noexcept
 {
     m_tree.get_leaf(ndx, ndx_in_leaf, inout_leaf_info);
 }

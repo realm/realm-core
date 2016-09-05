@@ -534,7 +534,7 @@ private:
     /// \cond doxygen_skip
     /// Doxygen can't find these friend classes even though this is valid C++.
 
-    template<class, int, class>
+    template <class, int, class>
     friend class _impl::QueryColumnBase;
 
     template <class, int, class>
