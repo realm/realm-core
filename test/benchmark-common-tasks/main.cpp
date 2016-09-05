@@ -464,12 +464,12 @@ struct BenchmarkGetLinkList : Benchmark {
 const char* to_lead_cstr(SharedGroupOptions::Durability level)
 {
     switch (level) {
-        case SharedGroupOptions::Durability::Full:
+        case SharedGroupOptions::Durability::full:
             return "Full   ";
-        case SharedGroupOptions::Durability::MemOnly:
+        case SharedGroupOptions::Durability::mem_only:
             return "MemOnly";
 #ifndef _WIN32
-        case SharedGroupOptions::Durability::Async:
+        case SharedGroupOptions::Durability::async:
             return "Async  ";
 #endif
     }
@@ -479,12 +479,12 @@ const char* to_lead_cstr(SharedGroupOptions::Durability level)
 const char* to_ident_cstr(SharedGroupOptions::Durability level)
 {
     switch (level) {
-        case SharedGroupOptions::Durability::Full:
+        case SharedGroupOptions::Durability::full:
             return "Full";
-        case SharedGroupOptions::Durability::MemOnly:
+        case SharedGroupOptions::Durability::mem_only:
             return "MemOnly";
 #ifndef _WIN32
-        case SharedGroupOptions::Durability::Async:
+        case SharedGroupOptions::Durability::async:
             return "Async";
 #endif
     }
@@ -512,15 +512,15 @@ void run_benchmark(TestContext& test_context, BenchmarkResults& results)
     typedef std::pair<SharedGroupOptions::Durability, const char*> config_pair;
     std::vector<config_pair> configs;
 
-    configs.push_back(config_pair(SharedGroupOptions::Durability::MemOnly, nullptr));
+    configs.push_back(config_pair(SharedGroupOptions::Durability::mem_only, nullptr));
 #if REALM_ENABLE_ENCRYPTION
-    configs.push_back(config_pair(SharedGroupOptions::Durability::MemOnly, crypt_key(true)));
+    configs.push_back(config_pair(SharedGroupOptions::Durability::mem_only, crypt_key(true)));
 #endif
 
-    configs.push_back(config_pair(SharedGroupOptions::Durability::Full, nullptr));
+    configs.push_back(config_pair(SharedGroupOptions::Durability::full, nullptr));
 
 #if REALM_ENABLE_ENCRYPTION
-    configs.push_back(config_pair(SharedGroupOptions::Durability::Full, crypt_key(true)));
+    configs.push_back(config_pair(SharedGroupOptions::Durability::full, crypt_key(true)));
 #endif
 
     Timer timer(Timer::type_UserTime);

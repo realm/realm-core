@@ -40,7 +40,7 @@ REALM_TABLE_2(Alpha,
 int main()
 {
     bool no_create = false;
-    SharedGroupOptions::Durability dlevel = SharedGroupOptions::Durability::Full;
+    SharedGroupOptions::Durability dlevel = SharedGroupOptions::Durability::full;
 
     File::try_remove(DIR "/benchmark-prealloc.realm");
     SharedGroup sg(DIR "/benchmark-prealloc.realm", no_create, {dlevel});

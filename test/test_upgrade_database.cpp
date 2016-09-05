@@ -128,7 +128,7 @@ TEST(Upgrade_Database_2_3)
         CHECK_OR_RETURN(File::copy(path, temp_copy));
 
         bool no_create = false;
-        SharedGroupOptions::Durability durability = SharedGroupOptions::Durability::Full;
+        SharedGroupOptions::Durability durability = SharedGroupOptions::Durability::full;
         const char* encryption_key = nullptr;
         bool allow_upgrade = false;
 
@@ -823,7 +823,7 @@ TEST(Upgrade_DatabaseWithCallback)
     // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
     // in version 3
     bool no_create = false;
-    SharedGroupOptions::Durability durability = SharedGroupOptions::Durability::Full;
+    SharedGroupOptions::Durability durability = SharedGroupOptions::Durability::full;
     const char* encryption_key = nullptr;
     bool allow_file_format_upgrade = true;
     std::function<void(int, int)> upgrade_callback;
@@ -860,7 +860,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
     // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
     // in version 3
     bool no_create = false;
-    SharedGroupOptions::Durability durability = SharedGroupOptions::Durability::Full;
+    SharedGroupOptions::Durability durability = SharedGroupOptions::Durability::full;
     const char* encryption_key = nullptr;
     bool allow_file_format_upgrade = true;
     std::function<void(int, int)> upgrade_callback;

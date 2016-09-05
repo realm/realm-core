@@ -29,12 +29,12 @@ struct SharedGroupOptions {
     /// The persistence level of the SharedGroup.
     /// uint16_t is the type of SharedGroup::SharedInfo::durability
     enum class Durability : uint16_t {
-        Full,
-        MemOnly,
-        Async    ///< Not yet supported on windows.
+        full,
+        mem_only,
+        async    ///< Not yet supported on windows.
     };
 
-    explicit SharedGroupOptions(Durability level = Durability::Full,
+    explicit SharedGroupOptions(Durability level = Durability::full,
                        const char* key = nullptr,
                        bool allow_upgrade = true,
                        std::function<void(int,int)> file_upgrade_callback = std::function<void(int,int)>(),
@@ -46,7 +46,7 @@ struct SharedGroupOptions {
         temp_dir(temp_directory) {}
 
     explicit SharedGroupOptions(const char* key):
-        durability(Durability::Full),
+        durability(Durability::full),
         encryption_key(key),
         allow_file_format_upgrade(true),
         upgrade_callback(std::function<void(int,int)>()),
