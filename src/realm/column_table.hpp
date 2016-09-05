@@ -167,6 +167,8 @@ protected:
                                 _impl::TableFriend::AccessorUpdater&);
 
     /// \param row_ndx Must be `realm::npos` if appending.
+    /// \param value The value to place in any newly created rows.
+    /// \param num_rows The number of rows to insert.
     void do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows);
 
     std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
@@ -180,13 +182,18 @@ public:
     /// Create a subtable column accessor and attach it to a
     /// preexisting underlying structure of arrays.
     ///
+    /// \param alloc The allocator to provide new memory.
+    ///
+    /// \param ref The memory reference of the underlying subtable that
+    /// we are creating an accessor for.
+    ///
     /// \param table If this column is used as part of a table you must
     /// pass a pointer to that table. Otherwise you must pass null.
     ///
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
     /// table. Otherwise you should pass zero.
-    SubtableColumn(Allocator&, ref_type, Table* table, size_t column_ndx);
+    SubtableColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx);
 
     ~SubtableColumn() noexcept override
     {

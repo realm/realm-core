@@ -38,7 +38,7 @@ public:
 
     void add(int64_t value);
     void set(size_t ndx, int64_t value);
-    void set_uint(size_t ndx, uint64_t value) noexcept;
+    void set_uint(size_t ndx, uint_fast64_t value) noexcept;
     int64_t get(size_t ndx) const noexcept;
     uint64_t get_uint(size_t ndx) const noexcept;
     static int64_t get(const char* header, size_t ndx) noexcept;

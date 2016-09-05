@@ -100,7 +100,7 @@ struct TypeCount<void> {
 /// \tparam List The list of types, constructed using TypeCons<>. Note
 /// that 'void' is interpreted as a zero-length list.
 ///
-/// \tparam Pred Must be such that `Pred<T>::value` is true if, and
+/// \tparam Pred Must be such that `Pred<T>::%value` is true if, and
 /// only if the predicate is satisfied for `T`.
 template <class List, template <class> class Pred>
 struct FindType {
@@ -124,14 +124,14 @@ struct FindType<void, Pred> {
 /// that 'void' is interpreted as a zero-length list.
 template <class List, template <class T, int i> class Op, int i = 0>
 struct ForEachType {
-    /// Execute the `Op<T,i>::exec()` for each type `T` at index `i`
+    /// Execute the `Op<T,i>::%exec()` for each type `T` at index `i`
     /// in `List`.
     static void exec()
     {
         Op<typename List::head, i>::exec();
         ForEachType<typename List::tail, Op, i + 1>::exec();
     }
-    /// Execute the `Op<T,i>::exec(a)` for each type `T` at index `i`
+    /// Execute the `Op<T,i>::%exec(a)` for each type `T` at index `i`
     /// in `List`.
     template <class A>
     static void exec(const A& a)
@@ -139,7 +139,7 @@ struct ForEachType {
         Op<typename List::head, i>::exec(a);
         ForEachType<typename List::tail, Op, i + 1>::exec(a);
     }
-    /// Execute the `Op<T,i>::exec(a,b)` for each type `T` at index
+    /// Execute the `Op<T,i>::%exec(a,b)` for each type `T` at index
     /// `i` in `List`.
     template <class A, class B>
     static void exec(const A& a, const B& b)
@@ -147,7 +147,7 @@ struct ForEachType {
         Op<typename List::head, i>::exec(a, b);
         ForEachType<typename List::tail, Op, i + 1>::exec(a, b);
     }
-    /// Execute the `Op<T,i>::exec(a,b,c)` for each type `T` at index
+    /// Execute the `Op<T,i>::%exec(a,b,c)` for each type `T` at index
     /// `i` in `List`.
     template <class A, class B, class C>
     static void exec(const A& a, const B& b, const C& c)
@@ -186,27 +186,27 @@ struct ForEachType<void, Op, i> {
 /// that 'void' is interpreted as a zero-length list.
 template <class List, template <class T, int i> class Pred, int i = 0>
 struct HasType {
-    /// Execute the `Op<T,i>::exec()` for each type `T` at index `i`
+    /// Execute the `Op<T,i>::%exec()` for each type `T` at index `i`
     /// in `List`.
     static bool exec()
     {
         return Pred<typename List::head, i>::exec() || HasType<typename List::tail, Pred, i + 1>::exec();
     }
-    /// Execute the `Op<T,i>::exec(a)` for each type `T` at index `i`
+    /// Execute the `Op<T,i>::%exec(a)` for each type `T` at index `i`
     /// in `List`.
     template <class A>
     static bool exec(const A& a)
     {
         return Pred<typename List::head, i>::exec(a) || HasType<typename List::tail, Pred, i + 1>::exec(a);
     }
-    /// Execute the `Op<T,i>::exec(a,b)` for each type `T` at index
+    /// Execute the `Op<T,i>::%exec(a,b)` for each type `T` at index
     /// `i` in `List`.
     template <class A, class B>
     static bool exec(const A& a, const B& b)
     {
         return Pred<typename List::head, i>::exec(a, b) || HasType<typename List::tail, Pred, i + 1>::exec(a, b);
     }
-    /// Execute the `Op<T,i>::exec(a,b,c)` for each type `T` at index
+    /// Execute the `Op<T,i>::%exec(a,b,c)` for each type `T` at index
     /// `i` in `List`.
     template <class A, class B, class C>
     static bool exec(const A& a, const B& b, const C& c)

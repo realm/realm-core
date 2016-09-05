@@ -91,18 +91,32 @@ public:
     /// \throw LogicError Thrown if this column is not nullable.
     virtual void set_null(size_t row_ndx);
 
-    //@{
-
-    /// `insert_rows()` inserts the specified number of elements into this column
+    /// Inserts the specified number of elements into this column
     /// starting at the specified row index. The new elements will have the
     /// default value for the column type.
     ///
-    /// `erase_rows()` removes the specified number of consecutive elements from
+    /// \param row_ndx The row to start insertion at. If the row_ndx is less
+    /// than prior_num_rows then previous rows from row_ndx onwards will be
+    /// moved ahead by num_rows_to_insert.
+    ///
+    /// \param num_rows_to_insert The number of rows to insert. There is no
+    /// restriction on this value.
+    ///
+    /// \param prior_num_rows The number of elements in this column prior to the
+    /// modification.
+    ///
+    /// \param nullable Specifies whether or not this column is nullable. This
+    /// function may assert if nullable does not agree with \a is_nullable()
+    virtual void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool nullable) = 0;
+
+    /// Removes the specified number of consecutive elements from
     /// this column, starting at the specified row index.
     ///
-    /// `move_last_row_over()` removes the element at the specified row index by
-    /// moving the element at the last row index over it. This reduces the
-    /// number of elements by one.
+    /// \param row_ndx The row to start removal at (inclusive). This must be
+    /// less than prior_num_rows.
+    ///
+    /// \param num_rows_to_erase The number of rows to erase.
+    /// The row_ndx + num_rows_to_erase must be less than prior_num_rows.
     ///
     /// \param prior_num_rows The number of elements in this column prior to the
     /// modification.
@@ -110,13 +124,23 @@ public:
     /// \param broken_reciprocal_backlinks If true, link columns must assume
     /// that reciprocal backlinks have already been removed. Non-link columns
     /// should ignore this argument.
-
-    virtual void insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool nullable) = 0;
     virtual void erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                             bool broken_reciprocal_backlinks) = 0;
-    virtual void move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool broken_reciprocal_backlinks) = 0;
 
-    //@}
+    /// Removes the element at the specified row index by
+    /// moving the element at the last row index over it. This reduces the
+    /// number of elements by one.
+    ///
+    /// \param row_ndx The row to erase. Must be less than prior_num_rows.
+    ///
+    /// \param prior_num_rows The number of elements in this column prior to the
+    /// modification.
+    ///
+    /// \param broken_reciprocal_backlinks If true, link columns must assume
+    /// that reciprocal backlinks have already been removed. Non-link columns
+    /// should ignore this argument.
+    virtual void move_last_row_over(size_t row_ndx, size_t prior_num_rows,
+                                    bool broken_reciprocal_backlinks) = 0;
 
     /// Remove all elements from this column.
     ///
@@ -142,9 +166,9 @@ public:
     {
     }
 
-    // Getter function for index. For integer index, the caller must supply a buffer that we can store the
-    // extracted value in (it may be bitpacked, so we cannot return a pointer in to the Array as we do with
-    // String index).
+    // Getter function for index. For integer index, the caller must supply a
+    // buffer that we can store the extracted value in (it may be bitpacked, so
+    // we cannot return a pointer in to the Array as we do with String index).
     virtual StringData get_index_data(size_t, StringIndex::StringConversionBuffer& buffer) const noexcept = 0;
 
     // Search index
@@ -624,6 +648,8 @@ public:
     void clear(size_t, bool) override;
 
     /// \param row_ndx Must be `realm::npos` if appending.
+    /// \param value The value to store at the specified row.
+    /// \param num_rows The number of rows to insert.
     void insert_without_updating_index(size_t row_ndx, T value, size_t num_rows);
 
     void verify() const override;
@@ -927,9 +953,9 @@ typename ColumnTypeTraits<T>::minmax_type Column<T>::maximum(size_t start, size_
     return aggregate<T, R, act_Max, NotNull>(*this, 0, start, end, limit, return_ndx);
 }
 
-template <class T>
-void Column<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf, typename BpTree<T>::LeafInfo& inout_leaf_info) const
-    noexcept
+template<class T>
+void Column<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf,
+                         LeafInfo& inout_leaf_info) const noexcept
 {
     m_tree.get_leaf(ndx, ndx_in_leaf, inout_leaf_info);
 }

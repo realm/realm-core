@@ -60,6 +60,41 @@ public:
     ~SlabAlloc() noexcept override;
     SlabAlloc();
 
+    /// \struct Config
+    /// \brief Storage for combining setup flags for initialization to
+    /// the SlabAlloc.
+    ///
+    /// \var Config::is_shared
+    /// Must be true if, and only if we are called on behalf of SharedGroup.
+    ///
+    /// \var Config::read_only
+    /// Open the file in read-only mode. This implies \a Config::no_create.
+    ///
+    /// \var Config::no_create
+    /// Fail if the file does not already exist.
+    ///
+    /// \var Config::skip_validate
+    /// Skip validation of file header. In a
+    /// set of overlapping SharedGroups, only the first one (the one
+    /// that creates/initlializes the coordination file) may validate
+    /// the header, otherwise it will result in a race condition.
+    ///
+    /// \var Config::encryption_key
+    /// 32-byte key to use to encrypt and decrypt the backing storage,
+    /// or nullptr to disable encryption.
+    ///
+    /// \var Config::session_initiator
+    /// If set, the caller is the session initiator and
+    /// guarantees exclusive access to the file. If attaching in
+    /// read/write mode, the file is modified: files on streaming form
+    /// is changed to non-streaming form, and if needed the file size
+    /// is adjusted to match mmap boundaries.
+    /// Must be set to false if is_shared is false.
+    ///
+    /// \var Config::clear_file
+    /// Always initialize the file as if it was a newly
+    /// created file and ignore any pre-existing contents. Requires that
+    /// Config::session_initiator be true as well.
     struct Config {
         bool is_shared = false;
         bool read_only = false;
@@ -98,40 +133,15 @@ public:
     /// Except for \a path, the parameters are passed in through a
     /// configuration object.
     ///
-    /// \param is_shared Must be true if, and only if we are called on
-    /// behalf of SharedGroup.
-    ///
-    /// \param read_only Open the file in read-only mode. This implies
-    /// \a no_create.
-    ///
-    /// \param no_create Fail if the file does not already exist.
-    ///
-    /// \param bool skip_validate Skip validation of file header. In a
-    /// set of overlapping SharedGroups, only the first one (the one
-    /// that creates/initlializes the coordination file) may validate
-    /// the header, otherwise it will result in a race condition.
-    ///
-    /// \param encryption_key 32-byte key to use to encrypt and decrypt
-    /// the backing storage, or nullptr to disable encryption.
-    ///
-    /// \param session_initiator if set, the caller is the session initiator and
-    /// guarantees exclusive access to the file. If attaching in read/write mode,
-    /// the file is modified: files on streaming form is changed to non-streaming
-    /// form, and if needed the file size is adjusted to match mmap boundaries.
-    /// Must be set to false if is_shared is false.
-    ///
-    /// \param clear_file Always initialize the file as if it was a newly
-    /// created file and ignore any pre-existing contents. Requires that
-    /// session_initiator be true as well.
-    ///
     /// \return The `ref` of the root node, or zero if there is none.
     ///
-    /// Please note that attach_file can fail to attach to a file due to a collision
-    /// with a writer extending the file. This can only happen if the caller is *not*
-    /// the session initiator. When this happens, attach_file() throws SlabAlloc::Retry,
-    /// and the caller must retry the call. The caller should check if it has become
-    /// the session initiator before retrying. This can happen if the conflicting thread
-    /// (or process) terminates or crashes before the next retry.
+    /// Please note that attach_file can fail to attach to a file due to a
+    /// collision with a writer extending the file. This can only happen if the
+    /// caller is *not* the session initiator. When this happens, attach_file()
+    /// throws SlabAlloc::Retry, and the caller must retry the call. The caller
+    /// should check if it has become the session initiator before retrying.
+    /// This can happen if the conflicting thread (or process) terminates or
+    /// crashes before the next retry.
     ///
     /// \throw util::File::AccessError
     /// \throw SlabAlloc::Retry

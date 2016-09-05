@@ -25,9 +25,10 @@
 namespace realm {
 namespace _impl {
 
-template <size_t...>
-struct Indexes {
-};
+/// \cond doxygen_skip
+/// Doxygen warns about a recursive class relation, but this is intentional.
+
+template<size_t...> struct Indexes {};
 template <size_t N, size_t... I>
 struct GenIndexes : GenIndexes<N - 1, N - 1, I...> {
 };
@@ -35,6 +36,8 @@ template <size_t... I>
 struct GenIndexes<0, I...> {
     typedef Indexes<I...> type;
 };
+
+/// \endcond
 
 template <class F, class... A, size_t... I>
 auto call_with_tuple(F func, std::tuple<A...> args, Indexes<I...>) -> decltype(func(std::get<I>(args)...))
