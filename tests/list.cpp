@@ -32,6 +32,7 @@
 
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
+#include <realm/version.hpp>
 
 using namespace realm;
 
@@ -42,6 +43,7 @@ TEST_CASE("list") {
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"origin", {
+            {"pk", PropertyType::Int, "", "", true},
             {"array", PropertyType::Array, "target"}
         }},
         {"target", {
@@ -59,6 +61,8 @@ TEST_CASE("list") {
 
     auto origin = r->read_group().get_table("class_origin");
     auto target = r->read_group().get_table("class_target");
+    auto other_origin = r->read_group().get_table("class_other_origin");
+    auto other_target = r->read_group().get_table("class_other_target");
 
     r->begin_transaction();
 
@@ -67,12 +71,19 @@ TEST_CASE("list") {
         target->set_int(0, i, i);
 
     origin->add_empty_row(2);
-    LinkViewRef lv = origin->get_linklist(0, 0);
+    origin->set_int_unique(0, 0, 1);
+    origin->set_int_unique(0, 1, 2);
+    LinkViewRef lv = origin->get_linklist(1, 0);
     for (int i = 0; i < 10; ++i)
         lv->add(i);
-    LinkViewRef lv2 = origin->get_linklist(0, 1);
+    LinkViewRef lv2 = origin->get_linklist(1, 1);
     for (int i = 0; i < 10; ++i)
         lv2->add(i);
+
+    other_target->add_empty_row();
+    other_origin->add_empty_row();
+    LinkViewRef other_lv = other_origin->get_linklist(0, 0);
+    other_lv->add(0);
 
     r->commit_transaction();
 
@@ -206,7 +217,7 @@ TEST_CASE("list") {
 
             auto get_list = [&] {
                 auto r = Realm::get_shared_realm(config);
-                auto lv = r->read_group().get_table("class_origin")->get_linklist(0, 0);
+                auto lv = r->read_group().get_table("class_origin")->get_linklist(1, 0);
                 return List(r, lv);
             };
             auto change_list = [&] {
@@ -256,18 +267,48 @@ TEST_CASE("list") {
             }
         }
 
+        SECTION("modifying a different table does not send a change notification") {
+            auto token = require_no_change();
+            write([&] { other_lv->add(0); });
+        }
+
+        SECTION("changes are reported correctly for multiple tables") {
+            List lst2(r, other_lv);
+            CollectionChangeSet other_changes;
+            auto token1 = lst2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                other_changes = std::move(c);
+            });
+            auto token2 = require_change();
+
+            write([&] {
+                lv->add(1);
+
+                other_origin->insert_empty_row(0);
+                other_lv->add(0);
+
+                lv->add(2);
+            });
+            REQUIRE_INDICES(change.insertions, 10, 11);
+            REQUIRE_INDICES(other_changes.insertions, 1);
+
+            write([&] {
+                lv->add(3);
+                other_origin->move_last_over(1);
+                lv->add(4);
+            });
+            REQUIRE_INDICES(change.insertions, 12, 13);
+            REQUIRE_INDICES(other_changes.deletions, 0, 1);
+
+            write([&] {
+                lv->add(5);
+                other_origin->clear();
+                lv->add(6);
+            });
+            REQUIRE_INDICES(change.insertions, 14, 15);
+        }
+
         SECTION("tables-of-interest are tracked properly for multiple source versions") {
-            auto other_origin = r->read_group().get_table("class_other_origin");
-            auto other_target = r->read_group().get_table("class_other_target");
-
-            r->begin_transaction();
-            other_target->add_empty_row();
-            other_origin->add_empty_row();
-            LinkViewRef lv2 = other_origin->get_linklist(0, 0);
-            lv2->add(0);
-            r->commit_transaction();
-
-            List lst2(r, lv2);
+            List lst2(r, other_lv);
 
             // Add a callback for list1, advance the version, then add a
             // callback for list2, so that the notifiers added at each source
@@ -316,20 +357,39 @@ TEST_CASE("list") {
 
         SECTION("moving the list's containing row does not break notifications") {
             auto token = require_change();
+
+            // insert rows before it
             write([&] {
                 origin->insert_empty_row(0, 2);
                 lv->add(1);
             });
             REQUIRE_INDICES(change.insertions, 10);
+            REQUIRE(lst.size() == 11);
+            REQUIRE(lst.get(10).get_index() == 1);
 
+            // delete the row after it, then the row before it so that it
+            // is moved by the deletion
             write([&] {
-                // delete the row after it, then the row before it so that it
-                // is moved by the deletion
                 origin->move_last_over(3);
                 origin->move_last_over(0);
                 lv->add(2);
             });
             REQUIRE_INDICES(change.insertions, 11);
+            REQUIRE(lst.size() == 12);
+            REQUIRE(lst.get(11).get_index() == 2);
+
+#if REALM_VER_MAJOR >= 2
+            // add a new row with the same primary key
+            write([&] {
+                size_t row = origin->add_empty_row(2);
+                origin->set_int_unique(0, 2, 1);
+                origin->get_linklist(1, 2)->add(3);
+            });
+            REQUIRE(origin->size() == 3);
+            REQUIRE_INDICES(change.insertions, 12);
+            REQUIRE(lst.size() == 13);
+            REQUIRE(lst.get(12).get_index() == 3);
+#endif
         }
     }
 
