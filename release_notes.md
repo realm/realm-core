@@ -54,6 +54,8 @@
 * When creating a `SharedGroup`, optionally allow setting the temporary 
   directory to when making named pipes fails. This is to fix a bug
   involving mkfifo on recent android devices (#1959).
+* Bug fixed in test harness: In some cases some tests and checks would be
+  counted twice due to counters not being reset at all the right times.
 
 ----------------------------------------------
 

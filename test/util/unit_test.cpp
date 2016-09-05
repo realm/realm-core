@@ -321,9 +321,9 @@ public:
     IntraTestLogger intra_test_logger;
     SharedContextImpl& shared_context;
     Mutex mutex;
-    std::atomic<long long> num_checks{0};
-    long long num_failed_checks = 0;
-    long num_failed_tests = 0;
+    std::atomic<long long> num_checks;
+    long long num_failed_checks;
+    long num_failed_tests;
     bool errors_seen;
 
     ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* attached_logger):
@@ -338,6 +338,14 @@ public:
 
     void run(SharedContextImpl::Entry, UniqueLock&);
     void finalize(UniqueLock&);
+
+private:
+    void clear_counters()
+    {
+        num_checks = 0;
+        num_failed_checks = 0;
+        num_failed_tests = 0;
+    }
 };
 
 
@@ -514,6 +522,8 @@ bool TestList::run(Config config)
 
 void TestList::ThreadContextImpl::run()
 {
+    clear_counters();
+
     UniqueLock lock(shared_context.mutex);
     shared_context.reporter.thread_begin(*this);
 
@@ -538,12 +548,15 @@ void TestList::ThreadContextImpl::run()
         }
     }
 
+    ++shared_context.num_ended_threads;
     finalize(lock);
 }
 
 
 void TestList::ThreadContextImpl::nonconcur_run()
 {
+    clear_counters();
+
     UniqueLock lock(shared_context.mutex);
 
     for (auto entry : shared_context.no_concur_tests)
@@ -588,7 +601,6 @@ void TestList::ThreadContextImpl::finalize(UniqueLock&)
     shared_context.num_checks        += num_checks;
     shared_context.num_failed_checks += num_failed_checks;
 
-    ++shared_context.num_ended_threads;
     shared_context.reporter.thread_end(*this);
 }
 
