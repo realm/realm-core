@@ -2,6 +2,7 @@
 
 ### Bugfixes
 
+* Fix subspecs not updating properly after a move operation.
 * Fixed various crashes when using subtables. The crash will occur when the first column
   of the subtable if of type `col_type_Timestamp` or if it is nullable and of type Bool, Int
   or OldDateTime. Caused by bad static `get_size_from_ref()` methods of columns. (#2101)
