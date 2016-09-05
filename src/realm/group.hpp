@@ -532,8 +532,8 @@ public:
     /// Compare two groups for inequality. See operator==().
     bool operator!=(const Group& g) const { return !(*this == g); }
 
-#ifdef REALM_DEBUG
     void verify() const;
+#ifdef REALM_DEBUG
     void print() const;
     void print_free() const;
     MemStats stats();
@@ -541,8 +541,6 @@ public:
     void to_dot(std::ostream&) const;
     void to_dot() const; // To std::cerr (for GDB)
     void to_dot(const char* file_path) const;
-#else
-    void verify() const {}
 #endif
 
 private:
@@ -703,10 +701,7 @@ private:
     /// Must be called from within a write transaction
     void upgrade_file_format(int target_file_format_version);
 
-#ifdef REALM_DEBUG
-    std::pair<ref_type, size_t>
-    get_to_dot_parent(size_t ndx_in_parent) const override;
-#endif
+    std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
 
     void send_cascade_notification(const CascadeNotification& notification) const;
     void send_schema_change_notification() const;

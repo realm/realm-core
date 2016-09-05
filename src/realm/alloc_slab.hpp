@@ -19,7 +19,7 @@
 #ifndef REALM_ALLOC_SLAB_HPP
 #define REALM_ALLOC_SLAB_HPP
 
-#include <stdint.h> // unint8_t etc
+#include <cstdint> // unint8_t etc
 #include <vector>
 #include <string>
 #include <atomic>
@@ -303,9 +303,9 @@ public:
     /// \sa get_file_format_version()
     void set_file_format_version(int) noexcept;
 
+    void verify() const override;
 #ifdef REALM_DEBUG
     void enable_debug(bool enable) { m_debug_out = enable; }
-    void verify() const override;
     bool is_all_free() const;
     void print() const;
 #endif
@@ -415,9 +415,7 @@ private:
     chunks m_free_space;
     chunks m_free_read_only;
 
-#ifdef REALM_DEBUG
     bool m_debug_out = false;
-#endif
     struct hash_entry {
         ref_type ref = 0;
         const char* addr = nullptr;

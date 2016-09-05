@@ -139,6 +139,10 @@ void LinkColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         size_t target_row_ndx = to_size_t(value_2 - 1);
         m_backlink_column->swap_backlinks(target_row_ndx, row_ndx_1, row_ndx_2);
     }
+
+    set(row_ndx_1, value_2);
+    set(row_ndx_2, value_1);
+
 }
 
 
@@ -196,10 +200,10 @@ void LinkColumn::do_nullify_link(size_t row_ndx, size_t)
 }
 
 
-#ifdef REALM_DEBUG
 
 void LinkColumn::verify(const Table& table, size_t col_ndx) const
 {
+#ifdef REALM_DEBUG
     LinkColumnBase::verify(table, col_ndx);
 
     std::vector<BacklinkColumn::VerifyPair> pairs;
@@ -224,6 +228,8 @@ void LinkColumn::verify(const Table& table, size_t col_ndx) const
 
     // All backlinks must have been matched by a forward link
     REALM_ASSERT_3(backlinks_seen, ==, pairs.size());
+#else
+    static_cast<void>(table);
+    static_cast<void>(col_ndx);
+#endif
 }
-
-#endif // REALM_DEBUG

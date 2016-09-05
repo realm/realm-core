@@ -759,20 +759,16 @@ Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive
 
 // Aggregates =================================================================================
 
-size_t Query::peek_tableview(size_t tv_index) const
+size_t Query::peek_tablerow(size_t tablerow) const
 {
-    REALM_ASSERT(m_view);
 #ifdef REALM_DEBUG
     m_view->check_cookie();
 #endif
-    REALM_ASSERT_3(tv_index, <, m_view->size());
-
-    // Cannot use to_size_t() because the get() may return -1
-    size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(tv_index));
 
     if (has_conditions())
         return root_node()->find_first(tablerow, tablerow + 1);
 
+    // Query has no conditions, so all rows match, also the user given argument
     return tablerow;
 }
 
@@ -788,7 +784,7 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
     }
 
     if (end == size_t(-1))
-        end = m_view ? m_view->size() : m_table->size();
+        end = m_table->size();
 
     const ColType& column =
         m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
@@ -816,12 +812,13 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
             aggregate_internal(action, ColumnTypeTraits<T>::id, ColType::nullable, root_node(), &st, start, end, &source_column);
         }
         else {
-            for (size_t t = start; t < end && st.m_match_count < limit; t++) {
-                size_t r = peek_tableview(t);
-                if (r != not_found) {
-                    int64_t view_row_index = m_view->m_row_indexes.get(t);
-                    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(view_row_index));
-                    st.template match<action, false>(r, 0, source_column.get_next(size_t(view_row_index))); //       m_view->m_row_indexes.get(t)));
+            for (size_t t = 0; t < m_view->size(); t++) {
+                size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
+                if (tablerow >= start && tablerow < end && peek_tablerow(tablerow) != not_found) {
+                    st.template match<action, false>(tablerow, 0, source_column.get_next(tablerow));
+                    if (st.m_match_count >= limit) {
+                        break;
+                    }
                 }
             }
         }
@@ -1144,11 +1141,10 @@ size_t Query::find(size_t begin)
     }
 
     if (m_view) {
-        size_t end = m_view->size();
-        for (; begin < end; begin++) {
-            size_t res = peek_tableview(begin);
-            if (res != not_found)
-                return begin;
+        for (size_t t = 0; t < m_view->size(); t++) {
+            size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
+            if (tablerow >= begin && peek_tablerow(tablerow) != not_found)
+                return tablerow;
         }
         return not_found;
     }
@@ -1159,45 +1155,38 @@ size_t Query::find(size_t begin)
     }
 }
 
-void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit) const
+void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit) const
 {
     if (limit == 0 || m_table->is_degenerate())
         return;
 
-    REALM_ASSERT_3(start, <=, m_table->size());
+    REALM_ASSERT_3(begin, <=, m_table->size());
 
     init();
 
     if (end == size_t(-1))
-        end = m_view ? m_view->size() : m_table->size();
-
-    // User created query with no criteria; return everything
-    if (!has_conditions()) {
-        IntegerColumn& refs = ret.m_row_indexes;
-        size_t end_pos = (limit != size_t(-1)) ? std::min(end, start + limit) : end;
-
-        if (m_view) {
-            for (size_t i = start; i < end_pos; ++i)
-                refs.add(m_view->m_row_indexes.get(i));
-        }
-        else {
-            for (size_t i = start; i < end_pos; ++i)
-                refs.add(i);
-        }
-        return;
-    }
+        end = m_table->size();
 
     if (m_view) {
-        for (size_t begin = start; begin < end && ret.size() < limit; begin++) {
-            size_t res = peek_tableview(begin);
-            if (res != not_found)
-                ret.m_row_indexes.add(res);
+        for (size_t t = 0; t < m_view->size() && ret.size() < limit; t++) {
+            size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
+            if (tablerow >= begin && tablerow < end && peek_tablerow(tablerow) != not_found) {
+                ret.m_row_indexes.add(tablerow);
+            }
         }
     }
     else {
-        QueryState<int64_t> st;
-        st.init(act_FindAll, &ret.m_row_indexes, limit);
-        aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, false, root_node(), &st, start, end, nullptr);
+        if (!has_conditions()) {
+            IntegerColumn& refs = ret.m_row_indexes;
+            for (size_t i = begin; i < end && refs.size() < limit; ++i) {
+                refs.add(i);
+            }
+        }
+        else {
+            QueryState<int64_t> st;
+            st.init(act_FindAll, &ret.m_row_indexes, limit);
+            aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, false, root_node(), &st, begin, end, nullptr);
+        }
     }
 }
 
@@ -1215,21 +1204,27 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
         return 0;
 
     if (end == size_t(-1))
-        end = m_view ? m_view->size() : m_table->size();
+        end = m_table->size();
 
     if (!has_conditions()) {
         // User created query with no criteria; count all
-        return (limit < end - start ? limit : end - start);
+        if (m_view) {
+            return (limit < m_view->size() - start ? limit : m_view->size() - start);
+        }
+        else {
+            return (limit < end - start ? limit : end - start);
+        }
     }
 
     init();
     size_t cnt = 0;
 
     if (m_view) {
-        for (size_t begin = start; begin < end && cnt < limit; begin++) {
-            size_t res = peek_tableview(begin);
-            if (res != not_found)
+        for (size_t t = 0; t < m_view->size() && cnt < limit; t++) {
+            size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
+            if (tablerow >= start && tablerow < end && peek_tablerow(tablerow) != not_found) {
                 cnt++;
+            }
         }
     }
     else {
@@ -1244,47 +1239,15 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 
 
 // todo, not sure if start, end and limit could be useful for delete.
-size_t Query::remove(size_t start, size_t end, size_t limit)
+size_t Query::remove()
 {
-    if (limit == 0 || m_table->is_degenerate())
+    if (m_table->is_degenerate())
         return 0;
 
-    if (end == not_found)
-        end = m_view ? m_view->size() : m_table->size();
-
-    size_t results = 0;
-
-    if (m_view) {
-        for (;;) {
-            if (start + results == end || results == limit)
-                return results;
-
-            init();
-            size_t r = peek_tableview(start + results);
-            if (r != not_found) {
-                m_table->remove(r);
-                results++;
-            }
-            else {
-                return results;
-            }
-        }
-    }
-    else {
-        size_t r = start;
-        for (;;) {
-            // Every remove invalidates the array cache in the nodes
-            // so we have to re-initialize it before searching
-            init();
-
-            r = find_internal(r, end - results);
-            if (r == not_found || r == m_table->size() || results == limit)
-                break;
-            ++results;
-            m_table->remove(r);
-        }
-        return results;
-    }
+    TableView tv = find_all();
+    size_t rows = tv.size();
+    tv.clear();    
+    return rows;
 }
 
 #if REALM_MULTITHREAD_QUERY

@@ -89,11 +89,9 @@ public:
     /// that this is at the expense of loosing the `noexcept` guarantee.
     void update_from_ref(ref_type ref);
 
-#ifdef REALM_DEBUG
     void verify() const override;
     void to_dot(std::ostream&, StringData title) const override;
     void do_dump_node_structure(std::ostream&, int) const override;
-#endif
 
 private:
     /// \param row_ndx Must be `realm::npos` if appending.
@@ -123,10 +121,8 @@ private:
 
     bool m_nullable = false;
 
-#ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
                      std::ostream&) const override;
-#endif
 
     friend class Array;
     friend class ColumnBase;

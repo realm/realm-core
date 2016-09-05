@@ -233,12 +233,10 @@ public:
         return BinaryData(); // FIXME: Not yet implemented
     }
 
-#ifdef REALM_DEBUG
     void verify() const override
     {
         // No-op
     }
-#endif
 
 private:
     Buffer<char> m_incoming_changeset;
@@ -253,8 +251,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -440,7 +438,7 @@ TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
     // Add the first table
     {
         std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         wt.add_table("table_1");
         wt.commit();
@@ -448,13 +446,13 @@ TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)
 
     // Create a SharedGroup to which we can apply a foreign transaction
     std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     ReadTransaction rt(sg);
 
     // Add the second table in a "foreign" transaction
     {
         std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         wt.add_table("table_2");
         wt.commit();
@@ -477,7 +475,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
     // Add the table
     {
         std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         wt.add_table("table");
         wt.commit();
@@ -485,13 +483,13 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithFreshSharedGroup)
 
     // Create a SharedGroup to which we can apply a foreign transaction
     std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     ReadTransaction rt(sg);
 
     // remove the table in a "foreign" transaction
     {
         std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         wt.get_group().remove_table("table");
         wt.commit();
@@ -507,19 +505,19 @@ TEST(LangBindHelper_AdvanceReadTransact_CreateManyTables)
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         wt.add_table("table");
         wt.commit();
     }
 
     std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     ReadTransaction rt(sg);
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
 
         WriteTransaction wt(sg_w);
         for (int i = 0; i < 16; ++i) {
@@ -541,7 +539,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg_w);
 
         TableRef table = wt.add_table("table1");
@@ -555,7 +553,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
     }
 
     std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     ReadTransaction rt(sg);
 
     ConstTableRef table1 = rt.get_table("table1");
@@ -563,7 +561,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTable)
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
 
         WriteTransaction wt(sg_w);
         wt.get_group().insert_table(0, "new table");
@@ -588,7 +586,7 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTableOrdered)
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg_w);
 
         wt.add_table("table1");
@@ -599,12 +597,12 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertTableOrdered)
     }
 
     std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     ReadTransaction rt(sg);
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         CHECK_EQUAL(wt.get_group().size(), 2);
         wt.get_group().insert_table(0, "table0");
@@ -630,7 +628,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableOrdered)
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg_w);
 
         wt.add_table("table0");
@@ -643,12 +641,12 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableOrdered)
     }
 
     std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     ReadTransaction rt(sg);
 
     {
         std::unique_ptr<Replication> hist_w(realm::make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         CHECK_EQUAL(wt.get_group().size(), 3);
         wt.get_group().remove_table(0);
@@ -678,8 +676,8 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkColumnInNewTable)
 
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
     {
         WriteTransaction wt(sg_w);
         TableRef a = wt.get_or_add_table("a");
@@ -706,8 +704,8 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -760,8 +758,8 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -932,7 +930,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         other_w->add_empty_row(1);
         other_w->set_int      (0, 0, 9);
         other_w->set_float    (1, 0, 17.0f);
-        other_w->set_subtable (2, 0, 0); // FIXME: Set something
+        other_w->set_subtable (2, 0, nullptr); // FIXME: Set something
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -954,8 +952,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -1292,8 +1290,8 @@ TEST(LangBindHelper_AdvanceReadTransact_EnumeratedStrings)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -1346,8 +1344,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -1480,8 +1478,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -2054,8 +2052,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -2658,8 +2656,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -2940,8 +2938,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -3021,7 +3019,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
     {
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.get_table("parent");
-        parent_w->set_subtable(1, 0, 0); // Clear
+        parent_w->set_subtable(1, 0, nullptr); // Clear
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -3037,8 +3035,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -3363,8 +3361,8 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -3492,8 +3490,8 @@ TEST(LangBindHelper_AdvanceReadTransact_ChangeLinkTargets)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a continuous read transaction
     ReadTransaction rt(sg);
@@ -3643,8 +3641,8 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     // setup two tables with empty linklists inside
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -3730,8 +3728,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
 
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -6314,8 +6312,8 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
 
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -6836,8 +6834,8 @@ TEST(LangBindHelper_AdvanceReadTransact_InsertLink)
 
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -6873,8 +6871,8 @@ TEST(LangBindHelper_AdvanceReadTransact_NonEndRowInsertWithLinks)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -6970,8 +6968,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -7073,8 +7071,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
 
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -7192,8 +7190,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg_w);
@@ -7290,8 +7288,8 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg_w);
@@ -7399,7 +7397,7 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg.begin_read());
 
     LangBindHelper::promote_to_write(sg);
@@ -7414,7 +7412,7 @@ TEST(LangBindHelper_AdvanceReadTransact_IntIndex)
 
     // open a second copy that'll be advanced over the write
     std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
     TableRef t_r = g_r.get_table("target");
 
@@ -7435,7 +7433,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg);
@@ -7452,7 +7450,7 @@ TEST(LangBindHelper_AdvanceReadTransact_TableClear)
 
     {
         std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
 
         WriteTransaction wt(sg_w);
         wt.get_table("table")->clear();
@@ -7476,7 +7474,7 @@ TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg);
@@ -7495,7 +7493,7 @@ TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
 
     {
         std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
 
         // Remove the first row via unordered removal, resulting in the '2' row
         // moving to index 0 (with ordered removal it would instead move to index 1)
@@ -7627,7 +7625,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg);
@@ -7651,7 +7649,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
     }
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
 
     {
         // With an empty change, parse_complete() and nothing else should be called
@@ -7797,7 +7795,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
 
     // Add some initial data and then begin a read transaction at that version
     {
@@ -7814,7 +7812,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
     // the read transaction is using
     {
         std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg_w);
         wt.get_table("Table")->set_int(0, 0, 20);
         wt.commit();
@@ -7852,14 +7850,14 @@ TEST(LangBindHelper_ImplicitTransactions)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     {
         WriteTransaction wt(sg);
         wt.add_table<TestTableShared>("table")->add_empty_row();
         wt.commit();
     }
     std::unique_ptr<Replication> hist2(make_client_history(path, crypt_key()));
-    SharedGroup sg2(*hist2, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg2(*hist2, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg.begin_read());
     TestTableShared::Ref table = g.get_table<TestTableShared>("table");
     for (int i = 0; i < 100; i++) {
@@ -7901,7 +7899,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     {
         Group* group = const_cast<Group*>(&sg.begin_read());
         {
@@ -7976,7 +7974,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadGroupLevelTableRemoval)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
         LangBindHelper::promote_to_write(sg);
@@ -8004,7 +8002,7 @@ TEST(LangBindHelper_RollbackCircularReferenceRemoval)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
         LangBindHelper::promote_to_write(sg);
@@ -8044,7 +8042,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t;
     {
@@ -8077,7 +8075,7 @@ TEST(LangBindHelper_TableLinkingRemovalIssue)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
         LangBindHelper::promote_to_write(sg);
@@ -8112,7 +8110,7 @@ TEST(LangBindHelper_RollbackTableRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
         LangBindHelper::promote_to_write(sg);
@@ -8142,7 +8140,7 @@ TEST(LangBindHelper_RollbackTableRemove2)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     {
         LangBindHelper::promote_to_write(sg);
@@ -8183,7 +8181,7 @@ TEST(LangBindHelper_ContinuousTransactions_RollbackTableRemoval)
 
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
     TableRef filler = group->get_or_add_table("filler");
@@ -8201,8 +8199,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveSelectedTable)
 {
     SHARED_GROUP_TEST_PATH(path);
     ShortCircuitHistory hist(path);
-    SharedGroup sg(hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg_w);
@@ -8244,7 +8242,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t, t2;
     {
@@ -8271,7 +8269,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     TableRef t;
     {
@@ -8304,7 +8302,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
     TableRef origin = group->add_table("origin");
@@ -8350,7 +8348,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_Links)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
     TableRef origin = group->add_table("origin");
@@ -8396,7 +8394,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_LinkLists)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
     TableRef origin = group->add_table("origin");
@@ -8444,7 +8442,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
     // adapted from earlier move last over test
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
 
     CHECK_EQUAL(0, group->size());
@@ -8559,7 +8557,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TableClear)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg.begin_read());
 
     LangBindHelper::promote_to_write(sg);
@@ -8590,7 +8588,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_IntIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg.begin_read());
 
     LangBindHelper::promote_to_write(sg);
@@ -8621,7 +8619,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
 
     {
         WriteTransaction wt(sg);
@@ -8793,7 +8791,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     // shutdown/initialization of shared group.
     std::unique_ptr<Replication> hist1(make_client_history(path, crypt_key()));
     {
-        SharedGroup sg(*hist1, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist1, SharedGroupOptions(crypt_key()));
         {
             WriteTransaction wt(sg);
             TableRef tr = wt.add_table("table");
@@ -8806,7 +8804,7 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     }
     {
         std::unique_ptr<Replication> hist2(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist2, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist2, SharedGroupOptions(crypt_key()));
         {
             WriteTransaction wt(sg);
             TableRef tr = wt.get_table("table");
@@ -8823,7 +8821,7 @@ TEST(LangBindHelper_ImplicitTransactions_LinkList)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
     TableRef origin = group->add_table("origin");
@@ -8843,7 +8841,7 @@ TEST(LangBindHelper_ImplicitTransactions_StringIndex)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group* group = const_cast<Group*>(&sg.begin_read());
     LangBindHelper::promote_to_write(sg);
     TableRef table = group->add_table("a");
@@ -8863,7 +8861,7 @@ void multiple_trackers_writer_thread(std::string path)
     // transactions, then quit. No waiting.
     Random random(random_int<unsigned long>());
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     for (int i = 0; i < 10; ++i) {
         WriteTransaction wt(sg);
         TestTableInts::Ref tr = wt.get_table<TestTableInts>("table");
@@ -8885,7 +8883,7 @@ void multiple_trackers_reader_thread(TestContext& test_context, std::string path
     Random random(random_int<unsigned long>());
 
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg.begin_read());
     TableRef tr = g.get_table("table");
     Query q = tr->where().equal(0, 42);
@@ -8922,7 +8920,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     {
         WriteTransaction wt(sg);
         TableRef tr = wt.add_table("table");
@@ -9082,7 +9080,7 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
 
     for (int i = 0; i < 100; ++i) {
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         sg.begin_read();
         LangBindHelper::promote_to_write(sg);
         LangBindHelper::commit_and_continue_as_read(sg);
@@ -9110,7 +9108,7 @@ TEST(LangBindHelper_ImplicitTransactions_DetachRowAccessorOnMoveLastOver)
     Row rows[10];
 
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group& group = const_cast<Group&>(sg.begin_read());
 
     LangBindHelper::promote_to_write(sg);
@@ -9148,10 +9146,10 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     const Group& group = sg.begin_read();
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -9186,11 +9184,11 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfDescriptor)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     const Group& group = sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -9224,11 +9222,11 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfLinkList)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     const Group& group = sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -9265,7 +9263,7 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist{make_client_history(path, crypt_key())};
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     const Group& group = sg.begin_read();
 
     // Create some tables and rows.
@@ -9322,14 +9320,14 @@ TEST(LangBindHelper_MemOnly)
     // Verify that the db is empty after populating and then re-opening a file
     {
         ShortCircuitHistory hist(path);
-        SharedGroup sg(hist, SharedGroup::durability_MemOnly);
+        SharedGroup sg(hist, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
         WriteTransaction wt(sg);
         wt.add_table("table");
         wt.commit();
     }
     {
         ShortCircuitHistory hist(path);
-        SharedGroup sg(hist, SharedGroup::durability_MemOnly);
+        SharedGroup sg(hist, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
         ReadTransaction rt(sg);
         CHECK(rt.get_group().is_empty());
     }
@@ -9337,8 +9335,8 @@ TEST(LangBindHelper_MemOnly)
     // Verify that basic replication functionality works
 
     ShortCircuitHistory hist(path);
-    SharedGroup sg_r(hist, SharedGroup::durability_MemOnly);
-    SharedGroup sg_w(hist, SharedGroup::durability_MemOnly);
+    SharedGroup sg_r(hist, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+    SharedGroup sg_w(hist, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
     ReadTransaction rt(sg_r);
 
     {
@@ -9357,11 +9355,11 @@ TEST(LangBindHelper_ImplicitTransactions_SearchIndex)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     const Group& group = sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     // Add initial data
@@ -9416,11 +9414,11 @@ TEST(LangBindHelper_HandoverQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -9456,7 +9454,7 @@ TEST(LangBindHelper_HandoverQuery)
         // Untyped interface
         std::unique_ptr<SharedGroup::Handover<Query>> handover;
         {
-            sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
+            sg_w.open(*hist_w, SharedGroupOptions(crypt_key()));
             sg_w.begin_read();
             LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
@@ -9492,11 +9490,11 @@ TEST(LangBindHelper_SubqueryHandoverDependentViews)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -9543,11 +9541,11 @@ TEST(LangBindHelper_HandoverPartialQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -9588,11 +9586,11 @@ TEST(LangBindHelper_HandoverWithPinning)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -9620,8 +9618,16 @@ TEST(LangBindHelper_HandoverWithPinning)
         }
 
         // Advance the SharedGroup past the handover version
+        // also check that pinning during a write transaction actually
+        // refers to pinning of the most recent commit.
         {
+            auto token_a = sg_w.pin_version();
             LangBindHelper::promote_to_write(sg_w);
+            auto token_b = sg_w.pin_version();
+            bool token_eq = token_a == token_b;
+            CHECK(token_eq);
+            sg_w.unpin_version(token_a);
+            sg_w.unpin_version(token_b);
 
             TableRef table = group_w.get_table("table2");
             table->add_empty_row();
@@ -9652,11 +9658,11 @@ TEST(LangBindHelper_HandoverNestedTableViews)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -9697,11 +9703,11 @@ TEST(LangBindHelper_HandoverAccessors)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -9752,7 +9758,7 @@ TEST(LangBindHelper_HandoverAccessors)
         {
             TableView tv;
             Row row;
-            sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
+            sg_w.open(*hist_w, SharedGroupOptions(crypt_key()));
             sg_w.begin_read();
             LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table2");
@@ -9922,7 +9928,7 @@ struct HandoverControl {
 void handover_writer(std::string path)
 {
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg.begin_read());
     TheTable::Ref table = g.get_table<TheTable>("table");
     Random random(random_int<unsigned long>());
@@ -9948,7 +9954,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
                       TestContext& test_context, std::string path)
 {
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     // We need to ensure that the initial version observed is *before* the final
     // one written by the writer thread. We do this (simplisticly) by locking on
     // to the initial version before even starting the writer.
@@ -9987,7 +9993,7 @@ void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* contro
                        TestContext& test_context, std::string path)
 {
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     for (;;) {
         std::unique_ptr<SharedGroup::Handover<TableView>> handover;
         SharedGroup::VersionID version;
@@ -10022,7 +10028,7 @@ void attacher(std::string path)
 {
     for (int i = 0; i < 100; ++i) {
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         Group& g = const_cast<Group&>(sg.begin_read());
         g.verify();
         TheTable::Ref table = g.get_table<TheTable>("table");
@@ -10042,7 +10048,7 @@ TEST(LangBindHelper_RacingAttachers)
     SHARED_GROUP_TEST_PATH(path);
     {
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         Group& g = sg.begin_write();
         TheTable::Ref table = g.add_table<TheTable>("table");
         table->add_empty_row(10000);
@@ -10062,7 +10068,7 @@ TEST(LangBindHelper_HandoverBetweenThreads)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group& g = sg.begin_write();
     TheTable::Ref table = g.add_table<TheTable>("table");
     sg.commit();
@@ -10085,11 +10091,11 @@ TEST(LangBindHelper_HandoverDependentViews)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -10147,11 +10153,11 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
     for (int detached = 0; detached < 2; detached++) {
         SHARED_GROUP_TEST_PATH(path);
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         sg.begin_read();
 
         std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         Group& group_w = const_cast<Group&>(sg_w.begin_read());
         std::unique_ptr<SharedGroup::Handover<TableView>> handover;
         SharedGroup::VersionID vid;
@@ -10236,11 +10242,11 @@ TEST(LangBindHelper_HandoverTableRef)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<SharedGroup::Handover<Table>> handover;
@@ -10265,11 +10271,11 @@ TEST(LangBindHelper_HandoverLinkView)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group& group = const_cast<Group&>(sg.begin_read());
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<SharedGroup::Handover<LinkView>> handover;
@@ -10368,11 +10374,11 @@ TEST(LangBindHelper_HandoverDistinctView)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -10432,11 +10438,11 @@ TEST(LangBindHelper_HandoverWithReverseDependency)
     // FIXME: This testcase is wrong!
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     SharedGroup::VersionID vid;
@@ -10477,10 +10483,10 @@ TEST(LangBindHelper_HandoverTableViewFromBacklink)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -10523,10 +10529,10 @@ TEST(LangBindHelper_HandoverOutOfSyncTableViewFromBacklinksToDeletedRow)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -10586,11 +10592,11 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     // First setup data so that we can do a query on links
@@ -10691,11 +10697,11 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery;
@@ -10800,11 +10806,11 @@ TEST(LangBindHelper_HandoverQuerySubQuery)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery;
@@ -10872,9 +10878,9 @@ TEST(LangBindHelper_VersionControl)
     {
         // Create a new shared db
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         // first create 'num_version' versions
         sg.begin_read();
         {
@@ -11006,7 +11012,7 @@ TEST(LangBindHelper_LinkListCrash)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     {
         WriteTransaction wt(sg);
         TableRef points = wt.add_table("Point");
@@ -11015,7 +11021,7 @@ TEST(LangBindHelper_LinkListCrash)
     }
 
     std::unique_ptr<Replication> hist2(make_client_history(path, crypt_key()));
-    SharedGroup sg2(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg2(*hist, SharedGroupOptions(crypt_key()));
     Group& g2 = const_cast<Group&>(sg2.begin_read());
     for (int i = 0; i < 2; ++i) {
         WriteTransaction wt(sg);
@@ -11040,13 +11046,13 @@ TEST(LangBindHelper_OpenCloseOpen)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
     group_w.add_table("bar");
     LangBindHelper::commit_and_continue_as_read(sg_w);
     sg_w.close();
-    sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
+    sg_w.open(*hist_w, SharedGroupOptions(crypt_key()));
     sg_w.begin_read();
     LangBindHelper::promote_to_write(sg_w);
     group_w.add_table("foo");
@@ -11059,7 +11065,7 @@ TEST(LangBindHelper_MixedCommitSizes)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
 
     Group& g = const_cast<Group&>(sg.begin_read());
 
@@ -11104,7 +11110,7 @@ TEST(LangBindHelper_RollbackToInitialState1)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     sg_w.begin_read();
     LangBindHelper::promote_to_write(sg_w);
     LangBindHelper::rollback_and_continue_as_read(sg_w);
@@ -11115,7 +11121,7 @@ TEST(LangBindHelper_RollbackToInitialState2)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     sg_w.begin_write();
     sg_w.rollback();
 }
@@ -11128,7 +11134,7 @@ TEST(LangBindHelper_Compact)
 
     {
         std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         WriteTransaction w(sg_w);
         TableRef table = w.get_or_add_table("test");
         table->add_column(type_Int, "int");
@@ -11141,7 +11147,7 @@ TEST(LangBindHelper_Compact)
     }
     {
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
@@ -11150,14 +11156,14 @@ TEST(LangBindHelper_Compact)
 
     {
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         CHECK_EQUAL(true, sg.compact());
         sg.close();
     }
 
     {
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
@@ -11180,7 +11186,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
 
     {
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key(true)));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key(true)));
         WriteTransaction wt(sg);
         TableRef table = wt.get_or_add_table("test");
         table->add_column(type_String, "string");
@@ -11197,7 +11203,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
 
     {
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key(true)));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key(true));
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key(true)));
         ReadTransaction r(sg);
         ConstTableRef table = r.get_table("test");
         CHECK_EQUAL(N, table->size());
@@ -11211,7 +11217,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     SHARED_GROUP_TEST_PATH(path);
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     {
         WriteTransaction w(sg_w);
         TableRef table = w.add_table("test");
@@ -11224,7 +11230,7 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     }
 
     std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
     ReadTransaction r(sg_r);
     ConstTableRef table_r = r.get_table("test");
 
@@ -11274,11 +11280,11 @@ TEST(LangBindHelper_HandoverFuzzyTest)
 
     {
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         sg.begin_read();
 
         std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
         Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
         // First setup data so that we can do a query on links
@@ -11316,7 +11322,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
         // Async thread
         //************************************************************************************************
         std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         sg.begin_read();
 
         while (!end_signal) {
@@ -11346,7 +11352,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     };
 
     std::unique_ptr<Replication> hist(make_client_history(path, crypt_key()));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     Group& group = const_cast<Group&>(sg.begin_read());
 
     // Create and export query
@@ -11394,7 +11400,7 @@ TEST(LangBindHelper_TableViewClear)
     size_t number_of_line = 18;
 
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     // set up tables:
@@ -11492,7 +11498,7 @@ TEST(LangBindHelper_SessionHistoryConsistency)
 
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = realm::make_client_history(path, crypt_key());
-        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroup::durability_Full, crypt_key()),
+        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroupOptions(crypt_key())),
                           LogicError::mixed_history_type);
     }
 }
@@ -11503,7 +11509,7 @@ TEST(LangBindHelper_CommitlogSplitWorld)
     std::unique_ptr<Replication> hist_w = realm::make_client_history(path, crypt_key());
     SharedGroup::unattached_tag tag;
     SharedGroup sg_w(tag);
-    sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
+    sg_w.open(*hist_w, SharedGroupOptions(crypt_key()));
     {
         // Change the db so that we get the log files mapped
         WriteTransaction wt(sg_w);
@@ -11517,7 +11523,7 @@ TEST(LangBindHelper_CommitlogSplitWorld)
     sg_w.close();
     // initiate a new session, creating new log files on demand
     std::unique_ptr<Replication> hist = realm::make_client_history(path, crypt_key());
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     {
         // Actually do something, to get the new log files created
         // These changes are not used for anything, except forcing use
@@ -11529,7 +11535,7 @@ TEST(LangBindHelper_CommitlogSplitWorld)
     }
     // reopen the first one, now with stale mmappings bound to the
     // deleted log files
-    sg_w.open(*hist_w, SharedGroup::durability_Full, crypt_key());
+    sg_w.open(*hist_w, SharedGroupOptions(crypt_key()));
     // try to commit something in one sg and advance_read in the other
     // to trigger an error updating the accessors, because the commitlogs
     // are now different commitlogs, so communication of accessor updates
@@ -11559,8 +11565,8 @@ TEST(LangBindHelper_InRealmHistory_Basics)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist = make_in_realm_history(path);
     std::unique_ptr<Replication> hist_w = make_in_realm_history(path);
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
 
     // Start a read transaction (to be repeatedly advanced)
     ReadTransaction rt(sg);
@@ -11735,7 +11741,7 @@ TEST(LangBindHelper_InRealmHistory_RollbackAndContinueAsRead)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     {
         Group* group = const_cast<Group*>(&sg.begin_read());
         {
@@ -11812,14 +11818,14 @@ TEST(LangBindHelper_InRealmHistory_Upgrade)
     {
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = make_client_history(path_1, crypt_key());
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
     {
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path_1);
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
@@ -11833,7 +11839,7 @@ TEST(LangBindHelper_InRealmHistory_Upgrade)
     {
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path_2);
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
@@ -11846,7 +11852,7 @@ TEST(LangBindHelper_InRealmHistory_Downgrade)
     {
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path);
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
@@ -11857,7 +11863,7 @@ TEST(LangBindHelper_InRealmHistory_Downgrade)
     {
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = make_client_history(path, crypt_key());
-        CHECK_THROW(SharedGroup(*hist, SharedGroup::durability_Full, crypt_key()),
+        CHECK_THROW(SharedGroup(*hist, SharedGroupOptions(crypt_key())),
                     InvalidDatabase);
     }
 }
@@ -11881,18 +11887,18 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
 
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path);
-        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroup::durability_Full, crypt_key()),
+        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroupOptions(crypt_key())),
                           LogicError::mixed_history_type);
     }
     // The Realm is still at its initial empty state
     {
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = realm::make_client_history(path, crypt_key());
-        SharedGroup sg(*hist, SharedGroup::durability_Full, crypt_key());
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
 
         // In-Realm history
         std::unique_ptr<Replication> hist_2 = make_in_realm_history(path);
-        CHECK_LOGIC_ERROR(SharedGroup(*hist_2, SharedGroup::durability_Full, crypt_key()),
+        CHECK_LOGIC_ERROR(SharedGroup(*hist_2, SharedGroupOptions(crypt_key())),
                           LogicError::mixed_history_type);
     }
 }
@@ -11904,7 +11910,7 @@ TEST(LangBindHelper_StaleLinkIndexOnTableClear)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -11937,7 +11943,7 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -11978,7 +11984,7 @@ TEST(LangBindHelper_RollbackInsertZeroRows)
 {
     SHARED_GROUP_TEST_PATH(shared_path)
     std::unique_ptr<Replication> hist_w(make_client_history(shared_path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
@@ -12017,8 +12023,8 @@ TEST(LangBindHelper_IsRowAttachedAfterClear)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
@@ -12090,7 +12096,7 @@ TEST(LangBindHelper_RollbackRemoveZeroRows)
 {
     SHARED_GROUP_TEST_PATH(path)
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
@@ -12130,7 +12136,7 @@ TEST_TYPES(LangBindHelper_AddEmptyRowsAndRollBackTimestamp, std::true_type, std:
     constexpr bool nullable_toggle = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
     TableRef t = g.insert_table(0, "");
@@ -12150,7 +12156,7 @@ TEST_TYPES(LangBindHelper_EmptyWrites, std::true_type, std::false_type)
     constexpr bool nullable_toggle = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
@@ -12172,7 +12178,7 @@ TEST_TYPES(LangBindHelper_SetTimestampRollback, std::true_type, std::false_type)
     constexpr bool nullable_toggle = TEST_TYPE::value;
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
 
     TableRef t = g.add_table("");
@@ -12191,8 +12197,8 @@ TEST_TYPES(LangBindHelper_SetTimestampAdvanceRead, std::true_type, std::false_ty
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
@@ -12213,8 +12219,8 @@ TEST(LangbindHelper_BoolSearchIndexCommitPromote)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
 
     TableRef t = g.add_table("");
@@ -12253,8 +12259,8 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, crypt_key());
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
     Group& g_r = const_cast<Group&>(sg_r.begin_read());
 
@@ -12277,6 +12283,65 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     sg_r.close();
     sg_w.commit();
 }
+
+// Found by AFL
+TEST(LangBindHelper_SwapSimple)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    TableRef t = g.add_table("t0");
+    t->add_column(type_Int, "t_int");
+    t->add_column_link(type_Link, "t_link", *t);
+    const size_t num_rows = 10;
+    t->add_empty_row(num_rows);
+    for (size_t i = 0; i < num_rows; ++i) {
+        t->set_int(0, i, i);
+    }
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w);
+    g.verify();
+    for (size_t i = 0; i < num_rows; ++i) {
+        CHECK_EQUAL(t->get_int(0, i), i);
+    }
+    t->swap_rows(7, 4);
+    CHECK_EQUAL(t->get_int(0, 4), 7);
+    CHECK_EQUAL(t->get_int(0, 7), 4);
+    g.remove_table(0);
+
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    TableRef tw = g.get_table(0);
+    TableRef tr = g_r.get_table(0);
+
+    CHECK_EQUAL(tw->get_int(0, 4), 4);
+    CHECK_EQUAL(tw->get_int(0, 7), 7);
+    CHECK_EQUAL(tr->get_int(0, 4), 4);
+    CHECK_EQUAL(tr->get_int(0, 7), 7);
+
+    LangBindHelper::promote_to_write(sg_w);
+    tw->swap_rows(7, 4);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+
+    CHECK_EQUAL(tw->get_int(0, 4), 7);
+    CHECK_EQUAL(tw->get_int(0, 7), 4);
+    CHECK_EQUAL(tr->get_int(0, 4), 7);
+    CHECK_EQUAL(tr->get_int(0, 7), 4);
+}
+
 
 
 #endif

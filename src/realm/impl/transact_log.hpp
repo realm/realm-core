@@ -2066,7 +2066,7 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 inline Timestamp TransactLogParser::read_timestamp()
 {
     REALM_ASSERT(false);
-    return Timestamp(null{});
+    return Timestamp{};
 }
 
 
