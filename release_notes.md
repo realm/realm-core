@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.0.0-rc3 Release notes
 
 ### Bugfixes
 
