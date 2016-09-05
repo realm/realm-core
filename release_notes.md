@@ -10,6 +10,7 @@
 
 * Refactored the `SharedGroup` constructors and open methods to use a new
   `SharedGroupOptions` parameter which stores all options together.
+* Renamed the Durability options enum values to lower case to conform to style.
 * BREAKING! Until now, a Query would return indexes into a restricting view if such was 
   present (a view given in the `.where(&view) method`, or it would return indexes into the
   Table if no restricting view was present. This would make query results useless if you did 
