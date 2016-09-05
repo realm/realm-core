@@ -6,7 +6,7 @@
 ///
 /// Topics that will be covered include (but not limited to):
 ///
-/// - \ref primer_intro "Introduction"
+/// - <a href="https://github.com/realm/realm-core-private/blob/master/doc/primer/primer_intro.md">Introduction</a>
 /// - \ref primer_architecture "Global Architecture"
 /// - API Entrypoints (how to use the API),
 /// - Development methodology.
