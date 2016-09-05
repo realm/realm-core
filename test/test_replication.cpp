@@ -3238,6 +3238,45 @@ TEST(Replication_CascadeRemove_ColumnLink)
 }
 
 
+TEST(Replication_LinkListSelfLinkNullification)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    util::Logger& replay_logger = test_context.logger;
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef t = wt.add_table("t");
+        t->add_column_link(type_LinkList, "l", *t);
+        t->add_empty_row(2);
+        LinkViewRef ll = t->get_linklist(0, 1);
+        ll->add(1);
+        ll->add(1);
+        ll->add(0);
+        LinkViewRef ll2 = t->get_linklist(0, 0);
+        ll2->add(0);
+        ll2->add(1);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef t = wt.get_table("t");
+        t->move_last_over(0);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    ReadTransaction rt_2{sg_2};
+    check(test_context, sg_1, rt_2);
+}
+
+
 TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 {
     SHARED_GROUP_TEST_PATH(path_1);
