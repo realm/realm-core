@@ -147,11 +147,20 @@ TEST_TYPES(TimestampColumn_Index, std::true_type, std::false_type)
 
 TEST(TimestampColumn_Is_Nullable)
 {
-    constexpr bool nullable = true;
-    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
-    TimestampColumn c(Allocator::get_default(), ref);
-    CHECK(c.is_nullable());
-    c.destroy();
+    bool nullable = true;
+    {
+        ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
+        TimestampColumn c(Allocator::get_default(), ref);
+        CHECK_EQUAL(c.is_nullable(), nullable);
+        c.destroy();
+    }
+    nullable = false;
+    {
+        ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
+        TimestampColumn c(Allocator::get_default(), ref);
+        CHECK_EQUAL(c.is_nullable(), nullable);
+        c.destroy();
+    }
 }
 
 TEST(TimestampColumn_Set_Null_With_Index)
