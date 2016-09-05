@@ -335,8 +335,7 @@ size_t Spec::get_subspec_entries_for_col_type(ColumnType type) const noexcept
 }
 
 
-void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
-                                  ArrayParent*& keys_parent, size_t& keys_ndx)
+void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref, ArrayParent*& keys_parent, size_t& keys_ndx)
 {
     REALM_ASSERT(get_column_type(column_ndx) == col_type_String);
 

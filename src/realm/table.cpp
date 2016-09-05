@@ -1111,7 +1111,6 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
         Spec& target_spec = std::get<0>(t);
         target_spec.set_backlink_origin_column(std::get<1>(t), std::get<2>(t));
     }
-
 }
 
 
