@@ -145,22 +145,13 @@ TEST_TYPES(TimestampColumn_Index, std::true_type, std::false_type)
     c.destroy();
 }
 
-TEST(TimestampColumn_Is_Nullable)
+TEST_TYPES(TimestampColumn_Is_Nullable, std::true_type, std::false_type)
 {
-    bool nullable = true;
-    {
-        ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
-        TimestampColumn c(Allocator::get_default(), ref);
-        CHECK_EQUAL(c.is_nullable(), nullable);
-        c.destroy();
-    }
-    nullable = false;
-    {
-        ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable);
-        TimestampColumn c(Allocator::get_default(), ref);
-        CHECK_EQUAL(c.is_nullable(), nullable);
-        c.destroy();
-    }
+    constexpr bool nullable_toggle = TEST_TYPE::value;
+    ref_type ref = TimestampColumn::create(Allocator::get_default(), 0, nullable_toggle);
+    TimestampColumn c(Allocator::get_default(), ref);
+    CHECK_EQUAL(c.is_nullable(), nullable_toggle);
+    c.destroy();
 }
 
 TEST(TimestampColumn_Set_Null_With_Index)
