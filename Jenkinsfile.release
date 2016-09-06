@@ -102,14 +102,16 @@ def pushPackages(packages, fileType, distroName, distroVersion) {
 node {
   setBuildName("${RPM_VERSION}")
   
-  def packages = ['realm', 'realm-devel', 'realm-node', 'realm-node-devel', 'realm-utils']
-  dir("packages") {
-    pullPackages(packages, 'rpm', 'el', 6)
-    pullPackages(packages, 'rpm', 'el', 7)
-    pullPackages(packages, 'deb', 'ubuntu', 'xenial')
+  def rpmPackages = ['realm', 'realm-devel', 'realm-node', 'realm-node-devel', 'realm-utils']
+  def debPackages = ['librealm', 'librealm-dev', 'librealm-node', 'librealm-node-dev', 'realm-utils']
 
-    pushPackages(packages, 'rpm', 'el', 6)
-    pushPackages(packages, 'rpm', 'el', 7)
-    pushPackages(packages, 'deb', 'ubuntu', 'xenial')
+  dir("packages") {
+    pullPackages(rpmPackages, 'rpm', 'el', 6)
+    pullPackages(rpmPackages, 'rpm', 'el', 7)
+    pullPackages(debPackages, 'deb', 'ubuntu', 'xenial')
+
+    pushPackages(rpmPackages, 'rpm', 'el', 6)
+    pushPackages(rpmPackages, 'rpm', 'el', 7)
+    pushPackages(debPackages, 'deb', 'ubuntu', 'xenial')
   }
 }

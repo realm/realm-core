@@ -67,7 +67,7 @@ cd /out
 fpm \
     -t deb \
     -s dir \
-    -n realm \
+    -n librealm \
     --license "Realm License" \
     --version ${VERSION} \
     --iteration ${ITERATION} \
@@ -84,7 +84,7 @@ fpm \
 fpm \
     -t deb \
     -s dir \
-    -n realm-devel \
+    -n librealm-dev \
     --license "Realm License" \
     --version ${VERSION} \
     --iteration ${ITERATION} \
@@ -93,7 +93,7 @@ fpm \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "realm = ${VERSION}-${ITERATION}" \
+    -d "librealm = ${VERSION}-${ITERATION}" \
     -d "libssl-dev" \
     -C /devel \
     usr/lib usr/include usr/bin
@@ -101,7 +101,7 @@ fpm \
 fpm \
     -t deb \
     -s dir \
-    -n realm-node \
+    -n librealm-node \
     --license "Realm License" \
     --version ${VERSION} \
     --iteration ${ITERATION} \
@@ -116,7 +116,7 @@ fpm \
 fpm \
     -t deb \
     -s dir \
-    -n realm-node-devel \
+    -n librealm-node-dev \
     --license "Realm License" \
     --version ${VERSION} \
     --iteration ${ITERATION} \
@@ -125,7 +125,7 @@ fpm \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "realm-devel = ${VERSION}-${ITERATION}" \
+    -d "librealm-dev = ${VERSION}-${ITERATION}" \
     -C /node-devel \
     usr/lib
 
@@ -141,6 +141,6 @@ fpm \
     --category "Applications/Databases" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "realm = ${VERSION}-${ITERATION}" \
+    -d "librealm = ${VERSION}-${ITERATION}" \
     -C /utils \
     usr/bin
