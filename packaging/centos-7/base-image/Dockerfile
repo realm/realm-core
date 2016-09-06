@@ -8,4 +8,4 @@ RUN yum -y install \
         centos-release-scl-rh \
     && yum-config-manager --enable rhel-server-rhscl-7-rpms
 
-RUN curl -s $PACKAGECLOUD_URL | bash
+RUN curl -s $PACKAGECLOUD_URL/script.rpm.sh | bash
