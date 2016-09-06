@@ -11,5 +11,5 @@ RUN touch /var/lib/rpm/* \
         epel-release \
         centos-release-scl-rh \
     && yum-config-manager --enable rhel-server-rhscl-6-rpms \
-    && curl -s $PACKAGECLOUD_URL | bash \
+    && curl -s $PACKAGECLOUD_URL/script.rpm.sh | bash \
     && yum clean all
