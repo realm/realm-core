@@ -6,11 +6,7 @@ if(REALM_PLATFORM STREQUAL "Android")
     set(ANDROID_ABI "arm64-v8a" CACHE STRING "")
 endif()
 
-# Custom CMake modules
 project(Realm)
-include(GNUInstallDirs)
-include(CheckIncludeFiles)
-enable_testing()
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake" ${CMAKE_MODULE_PATH})
 
 cmake_policy(SET CMP0048 NEW)
@@ -22,12 +18,18 @@ set(REALM_VERSION_PATCH 1)
 set(REALM_SOVERSION "9.0.0")
 
 if(REALM_PLATFORM STREQUAL "Android")
+    set(ANDROID_OPENSSL_VERSION "1.0.1t")
     set(REALM_LIBTYPE "STATIC")
     find_library(ANDROID_LIBRARY android)
     find_library(ANDROID_LOG_LIBRARY log)
     list(APPEND PLATFORM_LIBRARIES ${ANDROID_LIBRARY})
     list(APPEND PLATFORM_LIBRARIES ${ANDROID_LOG_LIBRARY})
 endif()
+
+function(JOIN VALUES GLUE OUTPUT)
+    string (REPLACE ";" "${GLUE}" _TMP_STR "${VALUES}")
+    set (${OUTPUT} "${_TMP_STR}" PARENT_SCOPE)
+endfunction()
 
 project(
     realm
@@ -122,7 +124,7 @@ endif(APPLE)
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-if(NOT APPLE)
+if(NOT APPLE AND NOT REALM_PLATFORM STREQUAL "Android")
     include(FindOpenSSL)
 endif()
 
