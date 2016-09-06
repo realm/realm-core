@@ -73,6 +73,16 @@ public:
         return false;
     }
 
+    bool add_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
+    {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
+            log("table->add_int(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
+            m_table->add_int(col_ndx, row_ndx, value); // Throws
+            return true;
+        }
+        return false;
+    }
+
     bool set_bool(size_t col_ndx, size_t row_ndx, bool value, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {

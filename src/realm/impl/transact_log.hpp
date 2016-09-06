@@ -50,35 +50,36 @@ enum Instruction {
     instr_Set                   =  6,
     instr_SetUnique             =  7,
     instr_SetDefault            =  8,
-    instr_NullifyLink           =  9, // Set link to null due to target being erased
-    instr_InsertSubstring       = 10,
-    instr_EraseFromString       = 11,
-    instr_InsertEmptyRows       = 12,
-    instr_EraseRows             = 13, // Remove (multiple) rows
-    instr_SwapRows              = 14,
-    instr_ChangeLinkTargets     = 15, // Replace links pointing to row A with links to row B
-    instr_ClearTable            = 16, // Remove all rows in selected table
-    instr_OptimizeTable         = 17,
-    instr_SelectDescriptor      = 18, // Select descriptor from currently selected root table
-    instr_InsertColumn          = 19, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
-    instr_InsertLinkColumn      = 20, // do, but for a link-type column
-    instr_InsertNullableColumn  = 21, // Insert nullable column
-    instr_EraseColumn           = 22, // Remove column from selected descriptor
-    instr_EraseLinkColumn       = 23, // Remove link-type column from selected descriptor
-    instr_RenameColumn          = 24, // Rename column in selected descriptor
-    instr_MoveColumn            = 25, // Move column in selected descriptor
-    instr_AddSearchIndex        = 26, // Add a search index to a column
-    instr_RemoveSearchIndex     = 27, // Remove a search index from a column
-    instr_SetLinkType           = 28, // Strong/weak
-    instr_SelectLinkList        = 29,
-    instr_LinkListSet           = 30, // Assign to link list entry
-    instr_LinkListInsert        = 31, // Insert entry into link list
-    instr_LinkListMove          = 32, // Move an entry within a link list
-    instr_LinkListSwap          = 33, // Swap two entries within a link list
-    instr_LinkListErase         = 34, // Remove an entry from a link list
-    instr_LinkListNullify       = 35, // Remove an entry from a link list due to linked row being erased
-    instr_LinkListClear         = 36, // Ramove all entries from a link list
-    instr_LinkListSetAll        = 37, // Assign to link list entry
+    instr_AddInteger            =  9, // Add value to integer field
+    instr_NullifyLink           = 10, // Set link to null due to target being erased
+    instr_InsertSubstring       = 11,
+    instr_EraseFromString       = 12,
+    instr_InsertEmptyRows       = 13,
+    instr_EraseRows             = 14, // Remove (multiple) rows
+    instr_SwapRows              = 15,
+    instr_ChangeLinkTargets     = 16, // Replace links pointing to row A with links to row B
+    instr_ClearTable            = 17, // Remove all rows in selected table
+    instr_OptimizeTable         = 18,
+    instr_SelectDescriptor      = 19, // Select descriptor from currently selected root table
+    instr_InsertColumn          = 20, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
+    instr_InsertLinkColumn      = 21, // do, but for a link-type column
+    instr_InsertNullableColumn  = 22, // Insert nullable column
+    instr_EraseColumn           = 23, // Remove column from selected descriptor
+    instr_EraseLinkColumn       = 24, // Remove link-type column from selected descriptor
+    instr_RenameColumn          = 25, // Rename column in selected descriptor
+    instr_MoveColumn            = 26, // Move column in selected descriptor
+    instr_AddSearchIndex        = 27, // Add a search index to a column
+    instr_RemoveSearchIndex     = 28, // Remove a search index from a column
+    instr_SetLinkType           = 29, // Strong/weak
+    instr_SelectLinkList        = 30,
+    instr_LinkListSet           = 31, // Assign to link list entry
+    instr_LinkListInsert        = 32, // Insert entry into link list
+    instr_LinkListMove          = 33, // Move an entry within a link list
+    instr_LinkListSwap          = 34, // Swap two entries within a link list
+    instr_LinkListErase         = 35, // Remove an entry from a link list
+    instr_LinkListNullify       = 36, // Remove an entry from a link list due to linked row being erased
+    instr_LinkListClear         = 37, // Ramove all entries from a link list
+    instr_LinkListSetAll        = 38, // Assign to link list entry
 };
 
 
@@ -138,6 +139,7 @@ public:
     bool change_link_targets(size_t, size_t) { return true; }
     bool clear_table() { return true; }
     bool set_int(size_t, size_t, int_fast64_t, Instruction, size_t) { return true; }
+    bool add_int(size_t, size_t, int_fast64_t) { return true; }
     bool set_bool(size_t, size_t, bool, Instruction) { return true; }
     bool set_float(size_t, size_t, float, Instruction) { return true; }
     bool set_double(size_t, size_t, double, Instruction) { return true; }
@@ -205,6 +207,7 @@ public:
     bool clear_table();
 
     bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t, Instruction = instr_Set, size_t = 0);
+    bool add_int(size_t col_ndx, size_t row_ndx, int_fast64_t);
     bool set_bool(size_t col_ndx, size_t row_ndx, bool, Instruction = instr_Set);
     bool set_float(size_t col_ndx, size_t row_ndx, float, Instruction = instr_Set);
     bool set_double(size_t col_ndx, size_t row_ndx, double, Instruction = instr_Set);
@@ -310,6 +313,7 @@ public:
     void move_column(const Descriptor&, size_t from, size_t to);
 
     void set_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value, Instruction variant = instr_Set);
+    void add_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value);
     void set_bool(const Table*, size_t col_ndx, size_t ndx, bool value, Instruction variant = instr_Set);
     void set_float(const Table*, size_t col_ndx, size_t ndx, float value, Instruction variant = instr_Set);
     void set_double(const Table*, size_t col_ndx, size_t ndx, double value, Instruction variant = instr_Set);
@@ -1021,6 +1025,20 @@ inline void TransactLogConvenientEncoder::set_int(const Table* t, size_t col_ndx
     m_encoder.set_int(col_ndx, ndx, value, variant, prior_num_rows); // Throws
 }
 
+
+inline bool TransactLogEncoder::add_int(size_t col_ndx, size_t ndx, int_fast64_t value)
+{
+    append_simple_instr(instr_AddInteger, util::tuple(col_ndx, ndx, value)); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::add_int(const Table* t, size_t col_ndx,
+                                                  size_t ndx, int_fast64_t value)
+{
+    select_table(t); // Throws
+    m_encoder.add_int(col_ndx, ndx, value);
+}
+
 inline bool TransactLogEncoder::set_bool(size_t col_ndx, size_t ndx, bool value,
                                          Instruction variant)
 {
@@ -1675,6 +1693,14 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             parser_error();
             return;
         }
+        case instr_AddInteger: {
+            size_t col_ndx = read_int<size_t>(); // Throws
+            size_t row_ndx = read_int<size_t>(); // Throws
+            int_fast64_t value = read_int<int64_t>(); // Throws
+            if (!handler.add_int(col_ndx, row_ndx, value)) // Throws
+                parser_error();
+            return;
+        }
         case instr_NullifyLink: {
             size_t col_ndx = read_int<size_t>(); // Throws
             size_t row_ndx = read_int<size_t>(); // Throws
@@ -2295,6 +2321,13 @@ public:
                  size_t prior_num_rows)
     {
         m_encoder.set_int(col_ndx, row_ndx, value, variant, prior_num_rows);
+        append_instruction();
+        return true;
+    }
+
+    bool add_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
+    {
+        m_encoder.add_int(col_ndx, row_ndx, -value);
         append_instruction();
         return true;
     }

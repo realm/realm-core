@@ -1386,6 +1386,11 @@ public:
         return true; // No-op
     }
 
+    bool add_int(size_t, size_t, int_fast64_t) noexcept
+    {
+        return true; // No-op
+    }
+
     bool set_bool(size_t, size_t, bool, _impl::Instruction) noexcept
     {
         return true; // No-op
