@@ -71,7 +71,7 @@ int main(int argc, char* argv[])
     extern char* optarg;
 
     bool use_shared    = false;
-    SharedGroupOptions::Durability dlevel = SharedGroupOptions::Durability::Full;
+    SharedGroupOptions::Durability dlevel = SharedGroupOptions::Durability::full;
     bool do_insert     = false;
     bool use_group     = false;
     bool random_insert = false;
@@ -90,15 +90,15 @@ int main(int argc, char* argv[])
             case 's':
                 use_shared = true;
                 if (strcmp(optarg, "mem") == 0) {
-                    dlevel = SharedGroupOptions::Durability::MemOnly;
+                    dlevel = SharedGroupOptions::Durability::mem_only;
                 }
                 else {
                     if (strcmp(optarg, "full") == 0) {
-                        dlevel = SharedGroupOptions::Durability::Full;
+                        dlevel = SharedGroupOptions::Durability::full;
                     }
                     else {
                         if (strcmp(optarg, "async") == 0) {
-                            dlevel = SharedGroupOptions::Durability::Async;
+                            dlevel = SharedGroupOptions::Durability::async;
                         }
                         else {
                             std::cout << "durability must be either mem or full" << std::endl;

@@ -731,7 +731,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file,
     REALM_ASSERT(!is_attached());
 
 #ifndef REALM_ASYNC_DAEMON
-    if (options.durability == Durability::Async)
+    if (options.durability == Durability::async)
         throw std::runtime_error("Async mode not yet supported on Windows, iOS and watchOS");
 #endif
 
@@ -934,7 +934,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file,
             // if we're opening a MemOnly file that isn't already opened by
             // someone else then it's a file which should have been deleted on
             // close previously, but wasn't (perhaps due to the process crashing)
-            cfg.clear_file = options.durability == Durability::MemOnly && begin_new_session;
+            cfg.clear_file = options.durability == Durability::mem_only && begin_new_session;
 
             cfg.encryption_key = options.encryption_key;
             ref_type top_ref;
@@ -1056,7 +1056,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file,
             m_work_to_do.set_shared_part(info->work_to_do, m_lockfile_prefix, "work_ready", options.temp_dir);
             m_room_to_write.set_shared_part(info->room_to_write, m_lockfile_prefix, "allow_write", options.temp_dir);
             // In async mode, we need to make sure the daemon is running and ready:
-            if (options.durability == Durability::Async && !is_backend) {
+            if (options.durability == Durability::async && !is_backend) {
                 while (info->daemon_ready == 0) {
                     if (info->daemon_started == 0) {
                         spawn_daemon(path);
@@ -1095,7 +1095,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file,
     // std::cerr << "open completed" << std::endl;
 
 #ifdef REALM_ASYNC_DAEMON
-    if (options.durability == Durability::Async) {
+    if (options.durability == Durability::async) {
         if (is_backend) {
             do_async_commits();
         }
@@ -1240,7 +1240,7 @@ void SharedGroup::close() noexcept
 
             // If the db file is just backing for a transient data structure,
             // we can delete it when done.
-            if (Durability(info->durability) == Durability::MemOnly) {
+            if (Durability(info->durability) == Durability::mem_only) {
                 try {
                     util::File::remove(m_db_path.c_str());
                 }
@@ -1704,7 +1704,7 @@ void SharedGroup::do_begin_write()
     }
 
 #ifdef REALM_ASYNC_DAEMON
-    if (info->durability == static_cast<uint16_t>(Durability::Async)) {
+    if (info->durability == static_cast<uint16_t>(Durability::async)) {
 
         m_balancemutex.lock(); // Throws
 
@@ -1885,12 +1885,12 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
     //     << " Read lock at version " << oldest_version << std::endl;
     switch (Durability(info->durability)) {
-        case Durability::Full:
+        case Durability::full:
             out.commit(new_top_ref); // Throws
             break;
-        case Durability::MemOnly:
-        case Durability::Async:
-            // In Durability::MemOnly mode, we just use the file as backing for
+        case Durability::mem_only:
+        case Durability::async:
+            // In Durability::mem_only mode, we just use the file as backing for
             // the shared memory. So we never actually flush the data to disk
             // (the OS may do so opportinisticly, or when swapping). So in this
             // mode the file on disk may very likely be in an invalid state.

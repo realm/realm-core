@@ -9320,14 +9320,14 @@ TEST(LangBindHelper_MemOnly)
     // Verify that the db is empty after populating and then re-opening a file
     {
         ShortCircuitHistory hist(path);
-        SharedGroup sg(hist, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+        SharedGroup sg(hist, SharedGroupOptions(SharedGroupOptions::Durability::mem_only));
         WriteTransaction wt(sg);
         wt.add_table("table");
         wt.commit();
     }
     {
         ShortCircuitHistory hist(path);
-        SharedGroup sg(hist, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+        SharedGroup sg(hist, SharedGroupOptions(SharedGroupOptions::Durability::mem_only));
         ReadTransaction rt(sg);
         CHECK(rt.get_group().is_empty());
     }
@@ -9335,8 +9335,8 @@ TEST(LangBindHelper_MemOnly)
     // Verify that basic replication functionality works
 
     ShortCircuitHistory hist(path);
-    SharedGroup sg_r(hist, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
-    SharedGroup sg_w(hist, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+    SharedGroup sg_r(hist, SharedGroupOptions(SharedGroupOptions::Durability::mem_only));
+    SharedGroup sg_w(hist, SharedGroupOptions(SharedGroupOptions::Durability::mem_only));
     ReadTransaction rt(sg_r);
 
     {
