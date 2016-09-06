@@ -970,15 +970,15 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
-    _impl::History* hist = get_history(); // Throws
-    if (!hist)
+    using gf = _impl::GroupFriend;
+    Replication* repl = gf::get_replication(m_group);
+    if (!repl)
         throw LogicError(LogicError::no_history);
 
     // Mark all managed space (beyond the attached file) as free.
-    using gf = _impl::GroupFriend;
     gf::reset_free_space_tracking(m_group); // Throws
 
-    BinaryData uncommitted_changes = hist->get_uncommitted_changes();
+    BinaryData uncommitted_changes = repl->get_uncommitted_changes();
 
     // FIXME: We are currently creating two transaction log parsers, one here,
     // and one in advance_transact(). That is wasteful as the parser creation is
@@ -1001,8 +1001,6 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
 
     do_end_write();
 
-    Replication* repl = gf::get_replication(m_group);
-    REALM_ASSERT(repl); // Presence of `repl` follows from the presence of `hist`
     repl->abort_transact();
 
     m_transact_stage = transact_Reading;
