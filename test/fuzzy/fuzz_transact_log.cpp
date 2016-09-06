@@ -17,7 +17,6 @@
  **************************************************************************/
 
 #include <realm/group_shared.hpp>
-#include <realm/commit_log.hpp>
 #include "../test.hpp"
 
 #include <cstdio>
