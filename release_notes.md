@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Added debian packages for Ubuntu 16.04.
 
 -----------
 

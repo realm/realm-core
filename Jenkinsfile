@@ -136,21 +136,26 @@ stage 'build-packages'
 parallel(
   generic: doBuildPackage('generic', 'tgz'),
   centos7: doBuildPackage('centos-7', 'rpm'),
-  centos6: doBuildPackage('centos-6', 'rpm')
+  centos6: doBuildPackage('centos-6', 'rpm'),
+  ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
 )
 
-if (['next-major', 'ajl/jenkinsfile'].contains(env.BRANCH_NAME)) {
+if (['next-major'].contains(env.BRANCH_NAME)) {
   stage 'publish-packages'
   parallel(
     generic: doPublishGeneric(),
     centos7: doPublish('centos-7', 'rpm', 'el', 7),
-    centos6: doPublish('centos-6', 'rpm', 'el', 6)
+    centos6: doPublish('centos-6', 'rpm', 'el', 6),
+    ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
   )
   
   if (gitTag != "") {
     stage 'trigger release'
-    build job: 'sync_release/realm-core-rpm-release',
+    build job: 'sync_release/realm-core-release',
       wait: false,
-      parameters: [[$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${rpmVersion}-${env.BUILD_NUMBER}"]]
+      parameters: [
+        [$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${rpmVersion}-${env.BUILD_NUMBER}"],
+        [$class: 'StringParameterValue', name: 'DEB_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"]
+      ]
   }
 }
