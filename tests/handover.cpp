@@ -94,7 +94,11 @@ TEST_CASE("handover") {
 #else
         auto history = realm::make_client_history(config.path, config.encryption_key.data());   
 #endif
+#ifdef REALM_GROUP_SHARED_OPTIONS_HPP
+        SharedGroup shared_group(*history, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+#else
         SharedGroup shared_group(*history, SharedGroup::durability_MemOnly);
+#endif
 
         auto get_current_version = [&]() -> SharedGroup::VersionID {
             shared_group.begin_read();
