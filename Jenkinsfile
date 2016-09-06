@@ -140,7 +140,7 @@ parallel(
   ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
 )
 
-if (['next-major', 'ajl/build-ubuntu'].contains(env.BRANCH_NAME)) {
+if (['next-major'].contains(env.BRANCH_NAME)) {
   stage 'publish-packages'
   parallel(
     generic: doPublishGeneric(),
