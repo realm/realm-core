@@ -140,7 +140,7 @@ parallel(
   ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
 )
 
-if (['next-major', 'ajl/build-ubuntu'].contains(env.BRANCH_NAME)) {
+if (['next-major'].contains(env.BRANCH_NAME)) {
   stage 'publish-packages'
   parallel(
     generic: doPublishGeneric(),
@@ -153,6 +153,9 @@ if (['next-major', 'ajl/build-ubuntu'].contains(env.BRANCH_NAME)) {
     stage 'trigger release'
     build job: 'sync_release/realm-core-release',
       wait: false,
-      parameters: [[$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${rpmVersion}-${env.BUILD_NUMBER}"]]
+      parameters: [
+        [$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${rpmVersion}-${env.BUILD_NUMBER}"],
+        [$class: 'StringParameterValue', name: 'DEB_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"]
+      ]
   }
 }
