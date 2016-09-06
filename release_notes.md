@@ -29,6 +29,7 @@
 * When creating a `SharedGroup`, optionally allow setting the temporary 
   directory to when making named pipes fails. This is to fix a bug
   involving mkfifo on recent android devices (#1959).
+* Added debian packages for Ubuntu 16.04.
 
 -----------
 
