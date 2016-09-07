@@ -60,7 +60,7 @@ enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, IN
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
             CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
             COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, CLOSE_AND_REOPEN, GET_ALL_COLUMN_NAMES,
-            CREATE_TABLE_VIEW, COMPACT, SWAP_ROWS,
+            CREATE_TABLE_VIEW, COMPACT, SWAP_ROWS, MOVE_COLUMN,
 
             COUNT
          };
@@ -309,6 +309,21 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.get_table(" << table_ndx << ")->remove_column(" << col_ndx << ");\n";
                     }
                     t->remove_column(col_ndx);
+                }
+            }
+            else if (instr == MOVE_COLUMN && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->get_column_count() > 1) {
+                    // There's a chance that we randomly choose to move a column
+                    // index with itself, but that's ok lets test that case too
+                    size_t col_ndx1 = get_next(s) % t->get_column_count();
+                    size_t col_ndx2 = get_next(s) % t->get_column_count();
+                    if (log) {
+                        *log << "_impl::TableFriend::move_column(*(g.get_table("
+                            << table_ndx << ")->get_descriptor()), " << col_ndx1 << ", " << col_ndx2 << ");\n";
+                    }
+                    _impl::TableFriend::move_column(*(t->get_descriptor()), col_ndx1, col_ndx2);
                 }
             }
             else if (instr == ADD_SEARCH_INDEX && g.size() > 0) {
