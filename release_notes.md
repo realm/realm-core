@@ -2,6 +2,9 @@
 
 ### Bugfixes
 
+* Fixed a bug where find() on a Query constructed from a restricting view
+  did not correctly return an row index into the underlying table.
+  (issue #2127)
 * Fixed a bug where linked tables were not updated after a table move operation, when
   run through the replicator.
 * Fixed a bug where moving a column to itself caused a crash.
