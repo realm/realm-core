@@ -6,11 +6,11 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* New instruction for `Table::add_int()`.
 
 ### Enhancements
 
-* Lorem ipsum.
+* Added `Table::add_int()` for implementing CRDT counters.
 
 -----------
 
