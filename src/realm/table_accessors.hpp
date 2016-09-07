@@ -87,7 +87,7 @@ struct SpecBase {
     ///
     /// \endcode
     ///
-    /// Note that 'i' in Col<i> links the name that you specify to a
+    /// Note that 'i' in `Col<i>` links the name that you specify to a
     /// particular column index. You may specify the column names in
     /// any order. Multiple names may refer to the same column, and
     /// you do not have to specify a name for every column.

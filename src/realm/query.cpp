@@ -1134,8 +1134,14 @@ size_t Query::find(size_t begin)
 
     // User created query with no criteria; return first
     if (!has_conditions()) {
-        if (m_view)
-            return m_view->size() == 0 ? not_found : begin;
+        if (m_view) {
+            for (size_t t = 0; t < m_view->size(); t++) {
+                size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
+                if (tablerow >= begin)
+                    return tablerow;
+            }
+            return not_found;
+        }
         else
             return m_table->size() == 0 ? not_found : begin;
     }

@@ -1,4 +1,4 @@
-# Files
+# Files {#primer_files} #
 
 ![Files diagram](images/files_schematic.jpg)
 
