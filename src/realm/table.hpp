@@ -456,6 +456,15 @@ public:
     /// Realm Object Server and may be relaxed in the future. A violation of
     /// these rules results in a LogicError being thrown.
     ///
+    /// add_int() adds a 64-bit signed integer to the current value of the
+    /// cell.  If the addition would cause signed integer overflow or
+    /// underflow, the addition "wraps around" with semantics similar to
+    /// unsigned integer arithmetic, such that Table::max_integer + 1 ==
+    /// Table::min_integer and Table::min_integer - 1 == Table::max_integer.
+    /// Note that the wrapping is platform-independent (all platforms wrap in
+    /// the same way regardless of integer representation). If the existing
+    /// value in the cell is null, a LogicError exception is thrown.
+    ///
     /// insert_substring() inserts the specified string into the currently
     /// stored string at the specified position. The position must be less than
     /// or equal to the size of the currently stored string.
@@ -474,6 +483,13 @@ public:
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
+    // FIXME: These limits should be chosen independently of the underlying
+    // platform's choice to define int64_t and independent of the integer
+    // representation. The current values only work for 2's complement, which is
+    // not guaranteed by the standard.
+    static constexpr int_fast64_t max_integer = std::numeric_limits<int64_t>::max();
+    static constexpr int_fast64_t min_integer = std::numeric_limits<int64_t>::min();
+
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value, bool is_default = false);
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value, bool is_default = false);
@@ -490,6 +506,8 @@ public:
     void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default = false);
     void nullify_link(size_t column_ndx, size_t row_ndx);
     void set_null(size_t column_ndx, size_t row_ndx, bool is_default = false);
+
+    void add_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
 
     void insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
     void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t substring_size = realm::npos);

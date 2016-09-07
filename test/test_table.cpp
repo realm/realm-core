@@ -1506,6 +1506,29 @@ TEST_TYPES(Table_SetStringUnique, std::true_type, std::false_type)
 }
 
 
+TEST(Table_AddInt)
+{
+    Table t;
+    t.add_column(type_Int, "i");
+    t.add_column(type_Int, "ni", /*nullable*/ true);
+    t.add_empty_row(1);
+
+    t.add_int(0, 0, 1);
+    CHECK_EQUAL(t.get_int(0, 0), 1);
+
+    // Check that signed integers wrap around. This invariant is necessary for
+    // full commutativity.
+    t.add_int(0, 0, Table::max_integer);
+    CHECK_EQUAL(t.get_int(0, 0), Table::min_integer);
+    t.add_int(0, 0, -1);
+    CHECK_EQUAL(t.get_int(0, 0), Table::max_integer);
+
+    // add_int() has no effect on a NULL
+    CHECK(t.is_null(1, 0));
+    CHECK_LOGIC_ERROR(t.add_int(1, 0, 123), LogicError::illegal_combination);
+}
+
+
 TEST(Table_SetUniqueAccessorUpdating)
 {
     Group g;

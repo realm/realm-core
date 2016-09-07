@@ -7754,6 +7754,7 @@ public:
     bool link_list_move(size_t, size_t) { return false; }
     bool link_list_swap(size_t, size_t) { return false; }
     bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) { return false; }
+    bool add_int(size_t, size_t, int_fast64_t) { return false; }
     bool set_bool(size_t, size_t, bool, _impl::Instruction) { return false; }
     bool set_float(size_t, size_t, float, _impl::Instruction) { return false; }
     bool set_double(size_t, size_t, double, _impl::Instruction) { return false; }

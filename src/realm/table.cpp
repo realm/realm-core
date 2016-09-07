@@ -266,6 +266,9 @@
 using namespace realm;
 using namespace realm::util;
 
+const int_fast64_t realm::Table::max_integer;
+const int_fast64_t realm::Table::min_integer;
+
 
 // fixme, we need to gather all these typetraits definitions to just 1 single
 
@@ -2946,6 +2949,38 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_defa
 
     if (Replication* repl = get_repl())
         repl->set_int(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+}
+
+void Table::add_int(size_t col_ndx, size_t ndx, int_fast64_t value)
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(ndx, <, m_size);
+    bump_version();
+
+    auto add_wrap = [](int64_t a, int64_t b) -> int64_t {
+        uint64_t ua = uint64_t(a);
+        uint64_t ub = uint64_t(b);
+        return int64_t(ua + ub);
+    };
+
+    if (is_nullable(col_ndx)) {
+        auto& col = get_column_int_null(col_ndx);
+        Optional<int64_t> old = col.get(ndx);
+        if (old) {
+            col.set(ndx, add_wrap(*old, value));
+        }
+        else {
+            throw LogicError{LogicError::illegal_combination};
+        }
+    }
+    else {
+        auto& col = get_column(col_ndx);
+        int64_t old = col.get(ndx);
+        col.set(ndx, add_wrap(old, value));
+    }
+
+    if (Replication* repl = get_repl())
+        repl->add_int(this, col_ndx, ndx, value); // Throws
 }
 
 Timestamp Table::get_timestamp(size_t col_ndx, size_t ndx) const noexcept

@@ -6,11 +6,12 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* New instruction for `Table::add_int()`, which impacts the transaction log
+  format.
 
 ### Enhancements
 
-* Lorem ipsum.
+* Added `Table::add_int()` for implementing CRDT counters.
 
 -----------
 
