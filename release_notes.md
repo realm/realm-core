@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed a bug where find() on a Query constructed from a restricting view
+  did not correctly return an row index into the underlying table.
+  (issue #2127)
 
 ### Breaking changes
 
