@@ -363,9 +363,10 @@ void CollectionChangeBuilder::swap(size_t ndx_1, size_t ndx_2, bool track_moves)
     auto move_2 = m_move_mapping.find(ndx_2);
     bool have_move_1 = move_1 != end(m_move_mapping) && move_1->first == ndx_1;
     bool have_move_2 = move_2 != end(m_move_mapping) && move_2->first == ndx_2;
-    if (have_move_1 && have_move_2)
+    if (have_move_1 && have_move_2) {
         // both are already moves, so just swap the destinations
         std::swap(move_1->second, move_2->second);
+    }
     else if (have_move_1) {
         update_move(move_1, ndx_2, ndx_1);
     }
@@ -399,7 +400,7 @@ void CollectionChangeBuilder::subsume(size_t old_ndx, size_t new_ndx, bool track
     REALM_ASSERT_DEBUG(insertions.contains(new_ndx));
     REALM_ASSERT_DEBUG(!m_move_mapping.count(new_ndx));
 
-    // If the source row was already moved, update the exist move
+    // If the source row was already moved, update the existing move
     auto it = m_move_mapping.find(old_ndx);
     if (it != m_move_mapping.end() && it->first == old_ndx) {
         m_move_mapping[new_ndx] = it->second;
@@ -439,14 +440,14 @@ struct RowInfo {
 //
 // This function is not strictly required, as calculate_moves_sorted() will
 // produce correct results even for the scenarios where this function is used.
-// However, this function has asymtotically better worst-case performance and
+// However, this function has asymptotically better worst-case performance and
 // extremely cheap best-case performance, and is guaranteed to produce a minimal
 // diff when the only row moves are due to move_last_over().
 void calculate_moves_unsorted(std::vector<RowInfo>& new_rows, IndexSet& removed,
                               IndexSet const& move_candidates,
                               CollectionChangeSet& changeset)
 {
-    // Here we track which row we expect to see, which in the absense of swap()
+    // Here we track which row we expect to see, which in the absence of swap()
     // is always the row immediately after the last row which was not moved.
     size_t expected = 0;
     for (auto& row : new_rows) {

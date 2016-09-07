@@ -41,7 +41,7 @@ public:
 
     // Calculate where rows need to be inserted or deleted from old_rows to turn
     // it into new_rows, and check all matching rows for modifications
-    // If `move_candidates` is supplied they it will eb used to do more accurate
+    // If `move_candidates` is supplied they it will be used to do more accurate
     // determination of which rows moved. This is only supported when the rows
     // are in table order (i.e. not sorted or from a LinkList)
     static CollectionChangeBuilder calculate(std::vector<size_t> const& old_rows,
