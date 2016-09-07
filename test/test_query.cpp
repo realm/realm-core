@@ -9284,6 +9284,30 @@ TEST(Query_CombineWithEmptyQueryDoesntCrash)
     }
 }
 
+// Check that sub queries take into account restricting views, but still
+// return row index into the underlying table
+TEST(Query_AccuntForRestrictingViews)
+{
+    Table table;
+    size_t col_id = table.add_column(type_Int, "id");
+    table.add_empty_row(3);
+    table.set_int(col_id, 0, 42);
+    table.set_int(col_id, 1, 43);
+    table.set_int(col_id, 2, 44);
+
+    {
+        // Create initial table view
+        TableView results = table.where().equal(col_id, 44).find_all();
+        CHECK_EQUAL(1, results.size());
+        CHECK_EQUAL(44, results.get(0).get_int(col_id));
+
+        // Create query based on restricting view
+        Query q = Query(results.get_parent().where(&results));
+        size_t table_index = q.find(0);
+        CHECK_EQUAL(2, table_index);
+    }
+}
+
 namespace {
 struct QueryInitHelper;
 
