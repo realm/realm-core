@@ -9284,7 +9284,7 @@ TEST(Query_CombineWithEmptyQueryDoesntCrash)
     }
 }
 
-// Check that sub queries take into account restricting views, but still
+// Check that queries take into account restricting views, but still
 // return row index into the underlying table
 TEST(Query_AccountForRestrictingViews)
 {
