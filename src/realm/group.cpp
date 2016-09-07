@@ -22,8 +22,8 @@
 #include <fstream>
 
 #ifdef REALM_DEBUG
-#  include <iostream>
-#  include <iomanip>
+    #include <iostream>
+    #include <iomanip>
 #endif
 
 #include <realm/util/file_mapper.hpp>
@@ -603,7 +603,7 @@ void Group::remove_table(size_t table_ndx)
     // information for Group::TransactAdvancer to handle them.
     size_t n = table->get_column_count();
     for (size_t i = n; i > 0; --i)
-        table->remove_column(i-1);
+        table->remove_column(i - 1);
 
     int64_t ref_64 = m_tables.get(table_ndx);
     REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));
@@ -1042,8 +1042,8 @@ void Group::to_string(std::ostream& out) const
 
 
     // Print header
-    out << std::setw(int(index_width+1)) << std::left << " ";
-    out << std::setw(int(name_width+1))  << std::left << "tables";
+    out << std::setw(int(index_width + 1)) << std::left << " ";
+    out << std::setw(int(name_width + 1))  << std::left << "tables";
     out << std::setw(int(rows_width))    << std::left << "rows"    << std::endl;
 
     // Print tables
@@ -1103,7 +1103,7 @@ public:
     {
         typedef _impl::TableFriend tf;
         tf::adj_insert_column(table, m_col_ndx); // Throws
-        tf::mark_link_target_tables(table, m_col_ndx+1);
+        tf::mark_link_target_tables(table, m_col_ndx + 1);
     }
 
     void update_parent(Table&) override
@@ -1149,6 +1149,8 @@ public:
     {
         using tf = _impl::TableFriend;
         tf::adj_move_column(table, m_col_ndx_1, m_col_ndx_2);
+        size_t min_ndx = std::min(m_col_ndx_1, m_col_ndx_2);
+        tf::mark_link_target_tables(table, min_ndx);
     }
 
     void update_parent(Table&) override
@@ -1257,7 +1259,7 @@ public:
                 begin = m_group.m_table_accessors.begin() + to_table_ndx;
                 end = m_group.m_table_accessors.begin() + from_table_ndx + 1;
                 Table* table = end[-1];
-                std::copy_backward(begin, end-1, end);
+                std::copy_backward(begin, end - 1, end);
                 begin[0] = table;
             }
             for (iter i = begin; i != end; ++i) {
@@ -1286,7 +1288,7 @@ public:
         if (group_level_ndx < m_group.m_table_accessors.size()) {
             if (Table* table = m_group.m_table_accessors[group_level_ndx]) {
                 const size_t* path_begin = path;
-                const size_t* path_end = path_begin + 2*levels;
+                const size_t* path_end = path_begin + 2 * levels;
                 for (;;) {
                     typedef _impl::TableFriend tf;
                     tf::mark(*table);
@@ -1359,10 +1361,9 @@ public:
 
     bool swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
     {
-        if (REALM_UNLIKELY(!m_table))
-            return false;
         using tf = _impl::TableFriend;
-        tf::adj_acc_swap_rows(*m_table, row_ndx_1, row_ndx_2);
+        if (m_table)
+            tf::adj_acc_swap_rows(*m_table, row_ndx_1, row_ndx_2);
         return true;
     }
 
@@ -1504,11 +1505,11 @@ public:
         if (m_table) {
             REALM_ASSERT(!m_table->has_shared_type());
             typedef _impl::TableFriend tf;
-            Descriptor* desc = tf::get_root_table_desc_accessor(*m_table);
+            DescriptorRef desc = tf::get_root_table_desc_accessor(*m_table);
             int i = 0;
             while (desc) {
                 if (i >= levels) {
-                    m_desc.reset(desc);
+                    m_desc = desc;
                     break;
                 }
                 typedef _impl::DescriptorFriend df;
@@ -1976,8 +1977,11 @@ private:
 
 } // anonymous namespace
 
+#endif
+
 void Group::verify() const
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT(is_attached());
 
     m_alloc.verify();
@@ -2024,7 +2028,7 @@ void Group::verify() const
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     {
         REALM_ASSERT(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 ||
-                     (get_file_format_version() >=4 && m_top.size() == 9));
+                     (get_file_format_version() >= 4 && m_top.size() == 9));
         Allocator& alloc = m_top.get_alloc();
         ArrayInteger pos(alloc), len(alloc), ver(alloc);
         size_t pos_ndx = 3, len_ndx = 4, ver_ndx = 5;
@@ -2097,8 +2101,10 @@ void Group::verify() const
     // At this point we have accounted for all memory managed by the slab
     // allocator
     mem_usage_1.check_total_coverage();
+#endif
 }
 
+#ifdef REALM_DEBUG
 
 MemStats Group::stats()
 {
@@ -2193,10 +2199,11 @@ void Group::to_dot(const char* file_path) const
     to_dot(out);
 }
 
+#endif
 
 std::pair<ref_type, size_t> Group::get_to_dot_parent(size_t ndx_in_parent) const
 {
     return std::make_pair(m_tables.get_ref(), ndx_in_parent);
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+// LCOV_EXCL_STOP ignore debug functions

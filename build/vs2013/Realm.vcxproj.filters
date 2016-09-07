@@ -125,6 +125,12 @@
     <ClCompile Include="..\..\src\realm\column_timestamp.cpp" />
     <ClCompile Include="..\..\test\test_column_timestamp.cpp" />
     <ClCompile Include="..\..\src\realm\util\interprocess_condvar.cpp" />
+    <ClCompile Include="..\..\src\realm\schema_dumper.cpp">
+      <Filter>Reader</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\win32\getopt.cpp">
+      <Filter>Reader</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\realm.hpp" />
@@ -242,9 +248,17 @@
     <ClInclude Include="..\..\src\realm\null.hpp" />
     <ClInclude Include="..\..\src\realm\column_timestamp.hpp" />
     <ClInclude Include="..\..\src\realm\timestamp.hpp" />
+    <ClInclude Include="..\..\src\win32\getopt.h">
+      <Filter>Reader</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
     <None Include="..\..\src\realm\util\config.sh" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Reader">
+      <UniqueIdentifier>{072bfcbc-e613-4e20-bf35-7be6c594c168}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

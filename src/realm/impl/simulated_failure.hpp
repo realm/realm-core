@@ -19,13 +19,13 @@
 #ifndef REALM_IMPL_SIMULATED_FAILURE_HPP
 #define REALM_IMPL_SIMULATED_FAILURE_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <system_error>
 
 #include <realm/util/features.h>
 
 #ifdef REALM_DEBUG
-#  define REALM_ENABLE_SIMULATED_FAILURE
+    #define REALM_ENABLE_SIMULATED_FAILURE
 #endif
 
 namespace realm {

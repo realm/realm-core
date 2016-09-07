@@ -49,8 +49,12 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 } // anonymous namespace
 
+
+#endif
+
 void SubtableColumnBase::verify() const
 {
+#ifdef REALM_DEBUG
     if (root_is_leaf()) {
         IntegerColumn::verify();
         REALM_ASSERT(get_root_array()->has_refs());
@@ -58,16 +62,20 @@ void SubtableColumnBase::verify() const
     }
 
     get_root_array()->verify_bptree(&verify_leaf);
+#endif
 }
 
 void SubtableColumnBase::verify(const Table& table, size_t col_ndx) const
 {
+#ifdef REALM_DEBUG
     IntegerColumn::verify(table, col_ndx);
 
     REALM_ASSERT(m_table == &table);
-}
-
+#else
+    static_cast<void>(table);
+    static_cast<void>(col_ndx);
 #endif
+}
 
 
 Table* SubtableColumnBase::get_subtable_ptr(size_t subtable_ndx)
@@ -260,7 +268,7 @@ void SubtableColumnBase::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_p
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+// LCOV_EXCL_START ignore debug functions
 
 std::pair<ref_type, size_t> SubtableColumnBase::get_to_dot_parent(size_t ndx_in_parent) const
 {
@@ -268,7 +276,7 @@ std::pair<ref_type, size_t> SubtableColumnBase::get_to_dot_parent(size_t ndx_in_
     return std::make_pair(p.first.get_ref(), p.second);
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+// LCOV_EXCL_STOP ignore debug functions
 
 size_t SubtableColumn::get_subtable_size(size_t ndx) const noexcept
 {
@@ -341,7 +349,7 @@ void SubtableColumn::set(size_t row_ndx, const Table* subtable)
 
 
 void SubtableColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
-                             bool broken_reciprocal_backlinks)
+                                bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(num_rows_to_erase <= prior_num_rows);
@@ -356,7 +364,7 @@ void SubtableColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
 
 
 void SubtableColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-                                     bool broken_reciprocal_backlinks)
+                                        bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx < prior_num_rows);
@@ -448,7 +456,7 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     int indent = level * 2;
-    out << std::setw(indent) << "" << "Subtable leaf (size: "<<leaf.size()<<")\n";
+    out << std::setw(indent) << "" << "Subtable leaf (size: " << leaf.size() << ")\n";
 }
 
 } // anonymous namespace

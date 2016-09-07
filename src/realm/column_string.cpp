@@ -578,7 +578,7 @@ void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     // Copying string data from a column to itself requires an
     // intermediate copy of the data (constr:bptree-copy-to-self).
     std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
-    std::copy(value.data(), value.data()+value.size(), buffer.get());
+    std::copy(value.data(), value.data() + value.size(), buffer.get());
     StringData copy_of_value(value.is_null() ? nullptr : buffer.get(), value.size());
 
     if (m_search_index) {
@@ -1023,7 +1023,7 @@ bool StringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_ref, bool
             continue;
 
         // Don't bother auto enumerating if there are too few duplicates
-        if (!enforce && n/2 < keys.size()) {
+        if (!enforce && n / 2 < keys.size()) {
             keys.destroy(); // cleanup
             return false;
         }
@@ -1128,7 +1128,7 @@ void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_ro
             new_sibling_ref = m_array->bptree_insert(row_ndx_2, state); // Throws
         }
 
-      insert_done:
+insert_done:
         if (REALM_UNLIKELY(new_sibling_ref)) {
             bool is_append = row_ndx_2 == realm::npos;
             introduce_new_root(new_sibling_ref, state, is_append); // Throws
@@ -1258,7 +1258,7 @@ std::unique_ptr<const ArrayParent> StringColumn::get_leaf(size_t ndx, size_t& ou
 }
 
 StringColumn::LeafType StringColumn::get_block(size_t ndx, ArrayParent** ap, size_t& off,
-                                              bool use_retval) const
+                                               bool use_retval) const
 {
     static_cast<void>(use_retval);
     REALM_ASSERT_3(use_retval, ==, false); // retval optimization not supported. See Array on how to implement
@@ -1399,7 +1399,7 @@ ref_type StringColumn::write(size_t slice_offset, size_t slice_size,
     else {
         SliceHandler handler(get_alloc(), m_nullable);
         ref = ColumnBaseSimple::write(m_array.get(), slice_offset, slice_size,
-                                table_size, handler, out); // Throws
+                                      table_size, handler, out); // Throws
     }
     return ref;
 }
@@ -1441,8 +1441,8 @@ void StringColumn::refresh_root_accessor()
     bool old_root_is_medium = !m_array->get_context_flag();
 
     bool root_type_changed = old_root_is_leaf != new_root_is_leaf ||
-        (old_root_is_leaf && (old_root_is_small != new_root_is_small ||
-                              (!old_root_is_small && old_root_is_medium != new_root_is_medium)));
+                             (old_root_is_leaf && (old_root_is_small != new_root_is_small ||
+                                                   (!old_root_is_small && old_root_is_medium != new_root_is_medium)));
     if (!root_type_changed) {
         // Keep, but refresh old root accessor
         if (old_root_is_leaf) {
@@ -1504,8 +1504,9 @@ void StringColumn::refresh_root_accessor()
     m_array.reset(new_root);
 }
 
+// LCOV_EXCL_START ignore debug functions
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -1538,8 +1539,11 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 } // anonymous namespace
 
+#endif
+
 void StringColumn::verify() const
 {
+#ifdef REALM_DEBUG
     if (root_is_leaf()) {
         bool long_strings = m_array->has_refs();
         if (!long_strings) {
@@ -1570,11 +1574,13 @@ void StringColumn::verify() const
         m_search_index->verify();
         m_search_index->verify_entries(*this);
     }
+#endif
 }
 
 
 void StringColumn::verify(const Table& table, size_t col_ndx) const
 {
+#ifdef REALM_DEBUG
     ColumnBase::verify(table, col_ndx);
 
     typedef _impl::TableFriend tf;
@@ -1584,13 +1590,18 @@ void StringColumn::verify(const Table& table, size_t col_ndx) const
     REALM_ASSERT_3(column_has_search_index, ==, bool(m_search_index));
     if (column_has_search_index) {
         REALM_ASSERT(m_search_index->get_ndx_in_parent() ==
-                       get_root_array()->get_ndx_in_parent() + 1);
+                     get_root_array()->get_ndx_in_parent() + 1);
     }
+#else
+    static_cast<void>(table);
+    static_cast<void>(col_ndx);
+#endif
 }
 
 
 void StringColumn::to_dot(std::ostream& out, StringData title) const
 {
+#ifdef REALM_DEBUG
     ref_type ref = m_array->get_ref();
     out << "subgraph cluster_string_column" << ref << " {" << std::endl;
     out << " label = \"String column";
@@ -1599,11 +1610,16 @@ void StringColumn::to_dot(std::ostream& out, StringData title) const
     out << "\";" << std::endl;
     tree_to_dot(out);
     out << "}" << std::endl;
+#else
+    static_cast<void>(out);
+    static_cast<void>(title);
+#endif
 }
 
 void StringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_in_parent,
-                                       std::ostream& out) const
+                               std::ostream& out) const
 {
+#ifdef REALM_DEBUG
     bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
     if (!long_strings) {
         // Small strings
@@ -1628,8 +1644,15 @@ void StringColumn::leaf_to_dot(MemRef leaf_mem, ArrayParent* parent, size_t ndx_
     leaf.set_parent(parent, ndx_in_parent);
     bool is_strings = true;
     leaf.to_dot(out, is_strings);
+#else
+    static_cast<void>(leaf_mem);
+    static_cast<void>(parent);
+    static_cast<void>(ndx_in_parent);
+    static_cast<void>(out);
+#endif
 }
 
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -1664,17 +1687,24 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
         }
     }
     int indent = level * 2;
-    out << std::setw(indent) << "" << leaf_type << " (size: "<<leaf_size<<")\n";
+    out << std::setw(indent) << "" << leaf_type << " (size: " << leaf_size << ")\n";
 }
 
 } // anonymous namespace
 
+#endif
+
 void StringColumn::do_dump_node_structure(std::ostream& out, int level) const
 {
+#ifdef REALM_DEBUG
     m_array->dump_bptree_structure(out, level, &leaf_dumper);
     int indent = level * 2;
     out << std::setw(indent) << "" << "Search index\n";
-    m_search_index->do_dump_node_structure(out, level+1);
+    m_search_index->do_dump_node_structure(out, level + 1);
+#else
+    static_cast<void>(out);
+    static_cast<void>(level);
+#endif
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+// LCOV_EXCL_STOP ignore debug functions

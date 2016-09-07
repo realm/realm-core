@@ -46,8 +46,8 @@ class BasicTable;
 /// actual table at any specific point in time, but this state of
 /// attachment of the accessor has nothing to do with the function of
 /// the smart pointer. Also, in the rest of the documentation of this
-/// class, whenever you see `Table::foo`, you are supposed to read it
-/// as, `Table::foo` or `BasicTable<Spec>::foo`.
+/// class, whenever you see `Table::%foo`, you are supposed to read it
+/// as, `Table::%foo` or `BasicTable<Spec>::%foo`.
 ///
 ///
 /// Table accessors are either created directly by an application via
@@ -257,7 +257,7 @@ typedef BasicTableRef<const Table> ConstTableRef;
 
 
 template<class C, class T, class U>
-inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const BasicTableRef<U>& p)
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const BasicTableRef<U>& p)
 {
     out << static_cast<const void*>(&*p);
     return out;

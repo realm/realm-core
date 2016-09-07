@@ -44,8 +44,9 @@ namespace util {
 
 /// A separate thread of execution.
 ///
-/// This class is a C++03 compatible reproduction of a subset of
-/// std::thread from C++11 (when discounting Thread::start()).
+/// This class is a C++03 compatible reproduction of a subset of std::thread
+/// from C++11 (when discounting Thread::start(), Thread::set_name(), and
+/// Thread::get_name()).
 class Thread {
 public:
     Thread();
@@ -66,6 +67,17 @@ public:
     bool joinable() noexcept;
 
     void join();
+
+    // If supported by the platform, set the name of the calling thread (mainly
+    // for debugging purposes). The name will be silently clamped to whatever
+    // limit the platform places on these names. Linux places a limit of 15
+    // characters for these names.
+    static void set_name(const std::string&);
+
+    // If supported by the platform, this function assigns the name of the
+    // calling thread to \a name, and returns true, otherwise it does nothing
+    // and returns false.
+    static bool get_name(std::string& name);
 
 private:
     pthread_t m_id;
@@ -246,9 +258,10 @@ public:
 /// A simple robust mutex ownership wrapper.
 class RobustLockGuard {
 public:
-    /// \param recover_func See RobustMutex::lock().
+    /// \param m the mutex to guard
+    /// \param func See RobustMutex::lock().
     template<class TFunc>
-    RobustLockGuard(RobustMutex&, TFunc func);
+    RobustLockGuard(RobustMutex& m, TFunc func);
     ~RobustLockGuard() noexcept;
 
 private:

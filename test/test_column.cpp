@@ -406,8 +406,8 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     CHECK_EQUAL(10, c.find_first(4294967296LL));
 
 
-// Partial find is not fully implemented yet
-/*
+    // Partial find is not fully implemented yet
+    /*
     // TEST(Column_PartialFind1)
 
     c.clear();
@@ -419,7 +419,7 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     CHECK_EQUAL(-1, c.find_first(partial_count+1, 0, partial_count));
     CHECK_EQUAL(-1, c.find_first(0, 1, partial_count));
     CHECK_EQUAL(partial_count-1, c.find_first(partial_count-1, partial_count-1, partial_count));
-*/
+    */
 
 
     // TEST(Column_HeaderParse)
@@ -428,6 +428,7 @@ TEST_TYPES(Column_Basic, IntegerColumn, IntNullColumn)
     bool is_equal = c.compare(column);
     CHECK(is_equal);
 
+    CHECK_LOGIC_ERROR(c.set_string(6, "FooBar"), LogicError::type_mismatch);
 
     // TEST(Column_Destroy)
 
@@ -460,20 +461,20 @@ TEST_TYPES(Column_FindLeafs, IntegerColumn, IntNullColumn)
     // Create values that span multible leaves
     // we use 5 to ensure that we get two levels
     // when testing with REALM_MAX_BPNODE_SIZE=4
-    for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE*5; ++i)
+    for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 5; ++i)
         a.add(0);
 
     // Set sentinel values at before and after each break
     a.set(0, 1);
-    a.set(REALM_MAX_BPNODE_SIZE-1, 2);
+    a.set(REALM_MAX_BPNODE_SIZE - 1, 2);
     a.set(REALM_MAX_BPNODE_SIZE, 3);
-    a.set(REALM_MAX_BPNODE_SIZE*2-1, 4);
-    a.set(REALM_MAX_BPNODE_SIZE*2, 5);
-    a.set(REALM_MAX_BPNODE_SIZE*3-1, 6);
-    a.set(REALM_MAX_BPNODE_SIZE*3, 7);
-    a.set(REALM_MAX_BPNODE_SIZE*4-1, 8);
-    a.set(REALM_MAX_BPNODE_SIZE*4, 9);
-    a.set(REALM_MAX_BPNODE_SIZE*5-1, 10);
+    a.set(REALM_MAX_BPNODE_SIZE * 2 - 1, 4);
+    a.set(REALM_MAX_BPNODE_SIZE * 2, 5);
+    a.set(REALM_MAX_BPNODE_SIZE * 3 - 1, 6);
+    a.set(REALM_MAX_BPNODE_SIZE * 3, 7);
+    a.set(REALM_MAX_BPNODE_SIZE * 4 - 1, 8);
+    a.set(REALM_MAX_BPNODE_SIZE * 4, 9);
+    a.set(REALM_MAX_BPNODE_SIZE * 5 - 1, 10);
 
     size_t res1 = a.find_first(1);
     size_t res2 = a.find_first(2);
@@ -487,15 +488,15 @@ TEST_TYPES(Column_FindLeafs, IntegerColumn, IntNullColumn)
     size_t res10 = a.find_first(10);
 
     CHECK_EQUAL(0, res1);
-    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE-1, res2);
+    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE - 1, res2);
     CHECK_EQUAL(REALM_MAX_BPNODE_SIZE, res3);
-    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE*2-1, res4);
-    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE*2, res5);
-    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE*3-1, res6);
-    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE*3, res7);
-    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE*4-1, res8);
-    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE*4, res9);
-    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE*5-1, res10);
+    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE * 2 - 1, res4);
+    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE * 2, res5);
+    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE * 3 - 1, res6);
+    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE * 3, res7);
+    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE * 4 - 1, res8);
+    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE * 4, res9);
+    CHECK_EQUAL(REALM_MAX_BPNODE_SIZE * 5 - 1, res10);
 
     a.destroy();
 }
@@ -603,11 +604,11 @@ TEST_TYPES(Column_FindAllIntMax, IntegerColumn, IntNullColumn)
 }
 
 
-TEST(Column_LowerUpperBound)
+TEST_TYPES(Column_LowerUpperBound, IntegerColumn, FloatColumn)
 {
     // Create column with sorted members
-    ref_type ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn col(Allocator::get_default(), ref);
+    ref_type ref = TEST_TYPE::create(Allocator::get_default());
+    TEST_TYPE col(Allocator::get_default(), ref);
     col.add(5);
     for (size_t i = 5; i < 100; i += 5)
         col.add(i);
@@ -745,11 +746,11 @@ TEST_TYPES(Column_Average, IntegerColumn, IntNullColumn)
     CHECK_EQUAL(10, c.average());
 
     c.add(30);
-    CHECK_EQUAL(0, c.average(0,0));     // None
-    CHECK_EQUAL(10, c.average(0,1));    // first
-    CHECK_EQUAL(0, c.average(1,1));     // None
-    CHECK_EQUAL(30, c.average(1,2));    // second
-    CHECK_EQUAL(20, c.average(0,2));    // both
+    CHECK_EQUAL(0, c.average(0, 0));    // None
+    CHECK_EQUAL(10, c.average(0, 1));   // first
+    CHECK_EQUAL(0, c.average(1, 1));    // None
+    CHECK_EQUAL(30, c.average(1, 2));   // second
+    CHECK_EQUAL(20, c.average(0, 2));   // both
 
     c.destroy();
 }
@@ -779,35 +780,35 @@ TEST_TYPES(Column_SumAverage, IntegerColumn, IntNullColumn)
     for (int i = 0; i < 100; i++)
         sum += unwrap(c.get(i));
     CHECK_EQUAL(sum, c.sum());
-    CHECK_EQUAL(sum/100.0, c.average());
+    CHECK_EQUAL(sum / 100.0, c.average());
 
     // Sum of entire range, given explicit range
     sum = 0;
     for (int i = 0; i < 100; i++)
         sum += unwrap(c.get(i));
     CHECK_EQUAL(sum, c.sum(0, 100));
-    CHECK_EQUAL(sum/100.0, c.average(0,100));
+    CHECK_EQUAL(sum / 100.0, c.average(0, 100));
 
     // Start to N
     sum = 0;
     for (int i = 0; i < 63; i++)
         sum += unwrap(c.get(i));
     CHECK_EQUAL(sum, c.sum(0, 63));
-    CHECK_EQUAL(sum/63.0, c.average(0, 63));
+    CHECK_EQUAL(sum / 63.0, c.average(0, 63));
 
     // N to end
     sum = 0;
     for (int i = 47; i < 100; i++)
         sum += unwrap(c.get(i));
     CHECK_EQUAL(sum, c.sum(47, 100));
-    CHECK_EQUAL(sum/(100.0-47.0), c.average(47, 100));
+    CHECK_EQUAL(sum / (100.0 - 47.0), c.average(47, 100));
 
     // N to M
     sum = 0;
     for (int i = 55; i < 79; i++)
         sum += unwrap(c.get(i));
     CHECK_EQUAL(sum, c.sum(55, 79));
-    CHECK_EQUAL(sum/(79.0-55.0), c.average(55, 79));
+    CHECK_EQUAL(sum / (79.0 - 55.0), c.average(55, 79));
 
     c.destroy();
 }

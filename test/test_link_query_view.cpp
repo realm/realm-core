@@ -979,7 +979,7 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(0).get_index(), 1);
     CHECK_EQUAL(tv.get(1).get_index(), 2);
     CHECK_EQUAL(tv.get(2).get_index(), 0);
-    
+
     lvr = table2->get_linklist(col_link2, 1);
     lvr->clear();
     lvr->add(2);
@@ -1444,8 +1444,8 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
     lvr->add(1);
     lvr->add(0);
 
-    CHECK_EQUAL(1, data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find());
-    CHECK_EQUAL(0, data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find());
+    CHECK_EQUAL(0, data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find());
+    CHECK_EQUAL(1, data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find());
     CHECK_EQUAL(not_found, data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find());
 }
 
@@ -1544,7 +1544,7 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListMultipleMatches)
     const size_t count = round_up(std::max(REALM_MAX_BPNODE_SIZE * 8, 100), 4);
     data_table->add_empty_row(count);
     for (size_t i = 0; i < count; ++i) {
-        char str[2]{};
+        char str[2] {};
         str[0] = 'a' + (i % 4);
         data_table->set_string(0, i, StringData(str, 1));
     }
@@ -1820,7 +1820,7 @@ TEST(BackLink_Query_LinkList)
     auto add_row = [&](std::vector<size_t> link_targets, int64_t i, double d, const char* string) {
         size_t row = source->add_empty_row();
         auto link_view = source->get_linklist(col_linklist, row);
-        for (auto link_target: link_targets)
+        for (auto link_target : link_targets)
             link_view->add(link_target);
         source->set_int(col_int, row, i);
         source->set_double(col_double, row, d);
@@ -1881,7 +1881,7 @@ TEST(BackLink_Query_MultipleLevels)
     auto add_person = [&](std::string name, int age, std::vector<size_t> children) {
         size_t row = people->add_empty_row();
         auto children_link_view = people->get_linklist(col_children, row);
-        for (auto child: children)
+        for (auto child : children)
             children_link_view->add(child);
         people->set_string(col_name, row, name);
         people->set_int(col_age, row, age);

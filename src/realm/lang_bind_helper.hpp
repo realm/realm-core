@@ -107,9 +107,7 @@ public:
 
     using VersionID = SharedGroup::VersionID;
 
-    //@{
-
-    /// Continuous transactions.
+    /// \defgroup lang_bind_helper_transactions Continuous Transactions
     ///
     /// advance_read() is equivalent to terminating the current read transaction
     /// (SharedGroup::end_read()), and initiating a new one
@@ -159,15 +157,14 @@ public:
     /// wants to terminate the transaction after commit_and_continue_as_read()
     /// or rollback_and_continue_as_read() has thrown an exception.
     ///
-    /// \param history The modification history accessor associated with the
-    /// specified SharedGroup object.
-    ///
     /// \param observer An optional custom replication instruction handler. The
     /// application may pass such a handler to observe the sequence of
     /// modifications that advances (or rolls back) the state of the Realm.
     ///
     /// \throw SharedGroup::BadVersion Thrown by advance_read() if the specified
     /// version does not correspond to a bound (or tethered) snapshot.
+    ///
+    //@{
 
     static void advance_read(SharedGroup&, VersionID = VersionID());
     template<class O> static void advance_read(SharedGroup&, O&& observer, VersionID = VersionID());
@@ -309,12 +306,12 @@ inline Table* LangBindHelper::get_or_add_table(Group& group, StringData name, bo
 
 inline void LangBindHelper::unbind_table_ptr(const Table* t) noexcept
 {
-   t->unbind_ptr();
+    t->unbind_ptr();
 }
 
 inline void LangBindHelper::bind_table_ptr(const Table* t) noexcept
 {
-   t->bind_ptr();
+    t->bind_ptr();
 }
 
 inline void LangBindHelper::set_mixed_subtable(Table& parent, size_t col_ndx,

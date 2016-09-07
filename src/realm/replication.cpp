@@ -320,8 +320,8 @@ public:
         m_link_list.reset();
         m_table = m_group.get_table(group_level_ndx); // Throws
         for (int i = 0; i < levels; ++i) {
-            size_t col_ndx = path[2*i + 0];
-            size_t row_ndx = path[2*i + 1];
+            size_t col_ndx = path[2 * i + 0];
+            size_t row_ndx = path[2 * i + 1];
             if (REALM_UNLIKELY(REALM_COVER_NEVER(col_ndx >= m_table->get_column_count())))
                 return false;
             if (REALM_UNLIKELY(REALM_COVER_NEVER(row_ndx >= m_table->size())))
@@ -417,7 +417,7 @@ public:
     }
 
     bool insert_link_column(size_t col_ndx, DataType type, StringData name,
-                       size_t link_target_table_ndx, size_t backlink_col_ndx)
+                            size_t link_target_table_ndx, size_t backlink_col_ndx)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= m_desc->get_column_count()))) {
@@ -774,7 +774,7 @@ namespace {
 class InputStreamImpl: public _impl::NoCopyInputStream {
 public:
     InputStreamImpl(const char* data, size_t size) noexcept:
-        m_begin(data), m_end(data+size) {}
+        m_begin(data), m_end(data + size) {}
 
     ~InputStreamImpl() noexcept {}
 

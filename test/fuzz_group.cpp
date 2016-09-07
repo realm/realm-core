@@ -23,7 +23,7 @@
 #include "test.hpp"
 
 #include <ctime>
-#include <stdio.h>
+#include <cstdio>
 #include <fstream>
 
 using namespace realm;
@@ -34,14 +34,14 @@ using namespace realm::util;
 #define REALM_VERIFY true
 
 #if REALM_VERIFY
-    #define REALM_DO_IF_VERIFY(log, op) \
+#define REALM_DO_IF_VERIFY(log, op) \
         do { \
             if (log) *log << #op << ";\n"; \
             op; \
         } \
         while(false)
 #else
-    #define REALM_DO_IF_VERIFY(log, owner) \
+#define REALM_DO_IF_VERIFY(log, owner) \
         do {} while(false)
 #endif
 
@@ -60,9 +60,10 @@ enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, IN
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
             CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
             COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, CLOSE_AND_REOPEN, GET_ALL_COLUMN_NAMES,
-            CREATE_TABLE_VIEW, COMPACT,
+            CREATE_TABLE_VIEW, COMPACT, SWAP_ROWS, MOVE_COLUMN,
 
-            COUNT};
+            COUNT
+         };
 
 DataType get_type(unsigned char c)
 {
@@ -97,7 +98,8 @@ unsigned char get_next(State& s)
     return byte;
 }
 
-int64_t get_int64(State& s) {
+int64_t get_int64(State& s)
+{
     int64_t v = 0;
     for (size_t t = 0; t < 8; t++) {
         unsigned char c = get_next(s);
@@ -106,7 +108,8 @@ int64_t get_int64(State& s) {
     return v;
 }
 
-int32_t get_int32(State& s) {
+int32_t get_int32(State& s)
+{
     int32_t v = 0;
     for (size_t t = 0; t < 4; t++) {
         unsigned char c = get_next(s);
@@ -115,17 +118,20 @@ int32_t get_int32(State& s) {
     return v;
 }
 
-std::string create_column_name(State& s) {
+std::string create_column_name(State& s)
+{
     const size_t length = get_next(s) % (Descriptor::max_column_name_length + 1);
     return create_string(length);
 }
 
-std::string create_table_name(State& s) {
+std::string create_table_name(State& s)
+{
     const size_t length = get_next(s) % (Group::max_table_name_length + 1);
     return create_string(length);
 }
 
-std::string get_current_time_stamp() {
+std::string get_current_time_stamp()
+{
     std::time_t t = std::time(nullptr);
     const int str_size = 100;
     char str_buffer [str_size] = { 0 };
@@ -168,8 +174,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "std::unique_ptr<Replication> hist_r(make_client_history(path, key));\n";
             *log << "std::unique_ptr<Replication> hist_w(make_client_history(path, key));\n";
 
-            *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);\n";
-            *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);\n";
+            *log << "SharedGroup sg_r(*hist_r, SharedGroupOptions(key));\n";
+            *log << "SharedGroup sg_w(*hist_w, SharedGroupOptions(key));\n";
 
             *log << "Group& g = const_cast<Group&>(sg_w.begin_write());\n";
             *log << "Group& g_r = const_cast<Group&>(sg_r.begin_read());\n";
@@ -181,8 +187,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         std::unique_ptr<Replication> hist_r(make_client_history(path, key));
         std::unique_ptr<Replication> hist_w(make_client_history(path, key));
 
-        SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);
+        SharedGroup sg_r(*hist_r, SharedGroupOptions(key));
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
         Group& g = const_cast<Group&>(sg_w.begin_write());
         Group& g_r = const_cast<Group&>(sg_r.begin_read());
         std::vector<TableView> table_views;
@@ -303,6 +309,21 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.get_table(" << table_ndx << ")->remove_column(" << col_ndx << ");\n";
                     }
                     t->remove_column(col_ndx);
+                }
+            }
+            else if (instr == MOVE_COLUMN && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->get_column_count() > 1) {
+                    // There's a chance that we randomly choose to move a column
+                    // index with itself, but that's ok lets test that case too
+                    size_t col_ndx1 = get_next(s) % t->get_column_count();
+                    size_t col_ndx2 = get_next(s) % t->get_column_count();
+                    if (log) {
+                        *log << "_impl::TableFriend::move_column(*(g.get_table("
+                            << table_ndx << ")->get_descriptor()), " << col_ndx1 << ", " << col_ndx2 << ");\n";
+                    }
+                    _impl::TableFriend::move_column(*(t->get_descriptor()), col_ndx1, col_ndx2);
                 }
             }
             else if (instr == ADD_SEARCH_INDEX && g.size() > 0) {
@@ -453,7 +474,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                     size_t target_link_ndx = get_next(s) % target->size();
                                     if (log) {
                                         *log << "g.get_table(" << table_ndx << ")->get_linklist(" << col_ndx << ", "
-                                            << row_ndx << ")->set(" << linklist_row << ", " << target_link_ndx << ");\n";
+                                             << row_ndx << ")->set(" << linklist_row << ", " << target_link_ndx << ");\n";
                                     }
                                     links->set(linklist_row, target_link_ndx);
                                 }
@@ -461,7 +482,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                     size_t target_link_ndx = get_next(s) % target->size();
                                     if (log) {
                                         *log << "g.get_table(" << table_ndx << ")->get_linklist(" << col_ndx << ", "
-                                            << row_ndx << ")->add(" << target_link_ndx << ");\n";
+                                             << row_ndx << ")->add(" << target_link_ndx << ");\n";
                                     }
                                     links->add(target_link_ndx);
                                 }
@@ -506,6 +527,18 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.get_table(" << table_ndx << ")->move_last_over(" << row_ndx << ");\n";
                     }
                     t->move_last_over(row_ndx);
+                }
+            }
+            else if (instr == SWAP_ROWS && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->size() > 0) {
+                    int32_t row_ndx1 = get_int32(s) % t->size();
+                    int32_t row_ndx2 = get_int32(s) % t->size();
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->swap_rows(" << row_ndx1 << ", " << row_ndx2 << ");\n";
+                    }
+                    t->swap_rows(row_ndx1, row_ndx2);
                 }
             }
             else if (instr == COMMIT) {
@@ -650,7 +683,7 @@ int run_fuzzy(int argc, const char* argv[])
         if (arg == "--log") {
             log = util::some<std::ostream&>(std::cout);
         }
-        else if (arg == "--name"){
+        else if (arg == "--name") {
             name = argv[++i];
         }
         else {

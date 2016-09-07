@@ -123,7 +123,7 @@ inline OldDateTime::OldDateTime(int year, int month, int day, int hours, int min
 template<class Ch, class Tr>
 inline std::basic_ostream<Ch, Tr>& operator<<(std::basic_ostream<Ch, Tr>& out, const OldDateTime& d)
 {
-    out << "OldDateTime("<<d.m_time<<")";
+    out << "OldDateTime(" << d.m_time << ")";
     return out;
 }
 

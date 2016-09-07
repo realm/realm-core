@@ -103,7 +103,7 @@ TEST(File_Streambuf)
         File f(path, File::mode_Read);
         char buffer[256];
         size_t n = f.read(buffer);
-        std::string s_1(buffer, buffer+n);
+        std::string s_1(buffer, buffer + n);
         std::ostringstream out;
         out << "Line " << 1 << std::endl;
         out << "Line " << 2 << std::endl;

@@ -267,7 +267,7 @@ void BacklinkColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     // Nullify forward links to the removed target rows
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
         auto handler = [=](size_t origin_row_ndx) {
-            m_origin_column->do_nullify_link(origin_row_ndx, row_ndx+i); // Throws
+            m_origin_column->do_nullify_link(origin_row_ndx, row_ndx + i); // Throws
         };
         bool do_destroy = true;
         for_each_link(row_ndx, do_destroy, handler); // Throws
@@ -395,7 +395,9 @@ int BacklinkColumn::compare_values(size_t, size_t) const noexcept
     return 0;
 }
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+// LCOV_EXCL_START ignore debug functions
+
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -410,8 +412,11 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 } // anonymous namespace
 
+#endif
+
 void BacklinkColumn::verify() const
 {
+#ifdef REALM_DEBUG
     if (root_is_leaf()) {
         get_root_array()->verify();
         REALM_ASSERT(get_root_array()->has_refs());
@@ -419,10 +424,12 @@ void BacklinkColumn::verify() const
     }
 
     get_root_array()->verify_bptree(&verify_leaf);
+#endif
 }
 
 void BacklinkColumn::verify(const Table& table, size_t col_ndx) const
 {
+#ifdef REALM_DEBUG
     IntegerColumn::verify(table, col_ndx);
 
     // Check that the origin column specifies the right target
@@ -434,23 +441,28 @@ void BacklinkColumn::verify(const Table& table, size_t col_ndx) const
     typedef _impl::TableFriend tf;
     const Spec& spec = tf::get_spec(table);
     REALM_ASSERT_3(origin_table_ndx, ==, spec.get_opposite_link_table_ndx(col_ndx));
+#else
+    static_cast<void>(table);
+    static_cast<void>(col_ndx);
+#endif
 }
 
-
+#ifdef REALM_DEBUG
 void BacklinkColumn::get_backlinks(std::vector<VerifyPair>& pairs)
 {
     VerifyPair pair;
     size_t n = size();
-    for (size_t i = 0; i < n ; ++i) {
+    for (size_t i = 0; i < n; ++i) {
         pair.target_row_ndx = i;
         size_t m = get_backlink_count(i);
         for (size_t j = 0; j < m; ++j) {
-            pair.origin_row_ndx = get_backlink(i,j);
+            pair.origin_row_ndx = get_backlink(i, j);
             pairs.push_back(pair);
         }
     }
     sort(pairs.begin(), pairs.end());
 }
+#endif
 
 std::pair<ref_type, size_t> BacklinkColumn::get_to_dot_parent(size_t ndx_in_parent) const
 {
@@ -458,4 +470,4 @@ std::pair<ref_type, size_t> BacklinkColumn::get_to_dot_parent(size_t ndx_in_pare
     return std::make_pair(p.first.get_ref(), p.second);
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+// LCOV_EXCL_STOP ignore debug functions

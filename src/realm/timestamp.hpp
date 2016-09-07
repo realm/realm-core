@@ -19,7 +19,7 @@
 #ifndef REALM_TIMESTAMP_HPP
 #define REALM_TIMESTAMP_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <ostream>
 #include <realm/util/assert.hpp>
 
@@ -86,7 +86,7 @@ public:
     }
 
     // Note that these operators do not work if one of the Timestamps are null! Please use realm::Greater, realm::Equal
-    // etc instead. This is in order to collect all treatment of null behaviour in a single place for all 
+    // etc instead. This is in order to collect all treatment of null behaviour in a single place for all
     // types (query_conditions.hpp) to ensure that all types sort and compare null vs. non-null in the same manner,
     // especially for int/float where we cannot override operators. This design is open for discussion, though, because
     // it has usability drawbacks
@@ -108,12 +108,14 @@ private:
     bool m_is_null;
 };
 
+// LCOV_EXCL_START
 template<class C, class T>
 inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const Timestamp& d)
 {
     out << "Timestamp(" << d.m_seconds << ", " << d.m_nanoseconds << ")";
     return out;
 }
+// LCOV_EXCL_STOP
 
 } // namespace realm
 

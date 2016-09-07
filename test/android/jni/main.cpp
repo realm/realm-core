@@ -17,7 +17,7 @@
  **************************************************************************/
 
 #include <jni.h>
-#include <errno.h>
+#include <cerrno>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -71,7 +71,7 @@ void android_main(struct android_app* state)
 
     LOGI("Starting unit tests...");
 
-    test_all(0,0);
+    test_all(0, 0);
 
     LOGI("Done running unit tests...");
 

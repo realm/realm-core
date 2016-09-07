@@ -23,13 +23,13 @@
 #include <sstream>
 
 namespace {
-    std::locale locale_classic = std::locale::classic();
+std::locale locale_classic = std::locale::classic();
 }
 
 namespace realm {
 namespace util {
 
-void Printable::print(std::ostream &out, bool quote) const
+void Printable::print(std::ostream& out, bool quote) const
 {
     switch (m_type) {
         case Printable::Type::Bool:

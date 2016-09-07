@@ -89,11 +89,9 @@ public:
     /// that this is at the expense of loosing the `noexcept` guarantee.
     void update_from_ref(ref_type ref);
 
-#ifdef REALM_DEBUG
     void verify() const override;
     void to_dot(std::ostream&, StringData title) const override;
     void do_dump_node_structure(std::ostream&, int) const override;
-#endif
 
 private:
     /// \param row_ndx Must be `realm::npos` if appending.
@@ -123,10 +121,8 @@ private:
 
     bool m_nullable = false;
 
-#ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
                      std::ostream&) const override;
-#endif
 
     friend class Array;
     friend class ColumnBase;
@@ -137,11 +133,13 @@ private:
 
 // Implementation
 
+// LCOV_EXCL_START
 inline StringData BinaryColumn::get_index_data(size_t, StringIndex::StringConversionBuffer&) const noexcept
 {
     REALM_ASSERT(false && "Index not implemented for BinaryColumn.");
     REALM_UNREACHABLE();
 }
+// LCOV_EXCL_STOP
 
 inline size_t BinaryColumn::size() const noexcept
 {
@@ -230,7 +228,7 @@ inline StringData BinaryColumn::get_string(size_t ndx) const noexcept
 {
     BinaryData bin = get(ndx);
     REALM_ASSERT_3(0, <, bin.size());
-    return StringData(bin.data(), bin.size()-1);
+    return StringData(bin.data(), bin.size() - 1);
 }
 
 inline void BinaryColumn::set_string(size_t ndx, StringData value)
@@ -366,7 +364,7 @@ inline void BinaryColumn::insert_string(size_t row_ndx, StringData value)
 }
 
 inline size_t BinaryColumn::get_size_from_ref(ref_type root_ref,
-                                                   Allocator& alloc) noexcept
+                                              Allocator& alloc) noexcept
 {
     const char* root_header = alloc.translate(root_ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);

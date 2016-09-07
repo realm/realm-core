@@ -199,6 +199,83 @@ TEST(Descriptor_MoveColumn)
 }
 
 
+TEST(Descriptor_MoveColumnSparseLinks)
+{
+    using df = _impl::DescriptorFriend;
+
+    Group group;
+    TableRef table = group.add_table("t");
+    TableRef t1 = group.add_table("t1");
+    TableRef t2 = group.add_table("t2");
+    TableRef t3 = group.add_table("t3");
+    TableRef t4 = group.add_table("t4");
+    TableRef t5 = group.add_table("t5");
+    DescriptorRef desc = table->get_descriptor();
+
+    table->add_column(type_Int, "i0");
+    table->add_column_link(type_Link, "l1", *t1);
+    table->add_column(type_Int, "i2");
+    table->add_column_link(type_Link, "l3", *t3);
+    table->add_column(type_Int, "i4");
+    table->add_column_link(type_Link, "l5", *t5);
+    table->add_column(type_Int, "i6");
+
+    auto check_original_order = [this, &desc]() {
+        // Sanity check
+        CHECK_EQUAL(7, desc->get_column_count());
+        CHECK_EQUAL("i0", desc->get_column_name(0));
+        CHECK_EQUAL("l1", desc->get_column_name(1));
+        CHECK_EQUAL("i2", desc->get_column_name(2));
+        CHECK_EQUAL("l3", desc->get_column_name(3));
+        CHECK_EQUAL("i4", desc->get_column_name(4));
+        CHECK_EQUAL("l5", desc->get_column_name(5));
+        CHECK_EQUAL("i6", desc->get_column_name(6));
+        CHECK_EQUAL(1, desc->get_column_link_target(1));
+        CHECK_EQUAL(3, desc->get_column_link_target(3));
+        CHECK_EQUAL(5, desc->get_column_link_target(5));
+    };
+    check_original_order();
+    group.verify();
+
+    df::move_column(*desc, 1, 3); // link to link move
+    CHECK_EQUAL("i2", desc->get_column_name(1));
+    CHECK_EQUAL("l1", desc->get_column_name(3));
+    CHECK_EQUAL(3, desc->get_column_link_target(2));
+    CHECK_EQUAL(1, desc->get_column_link_target(3));
+    CHECK_EQUAL(5, desc->get_column_link_target(5));
+    group.verify();
+
+    df::move_column(*desc, 3, 1);   // undo
+    check_original_order();
+    group.verify();
+
+
+    df::move_column(*desc, 0, 5);   // non link to link
+    CHECK_EQUAL("l1", desc->get_column_name(0));
+    CHECK_EQUAL("i0", desc->get_column_name(5));
+    CHECK_EQUAL(1, desc->get_column_link_target(0));
+    CHECK_EQUAL(3, desc->get_column_link_target(2));
+    CHECK_EQUAL(5, desc->get_column_link_target(4));
+    group.verify();
+
+    df::move_column(*desc, 5, 0);   // undo
+    check_original_order();
+    group.verify();
+
+    df::move_column(*desc, 1, 6);   // link to non link
+    CHECK_EQUAL("i2", desc->get_column_name(1));
+    CHECK_EQUAL("l1", desc->get_column_name(6));
+    CHECK_EQUAL(3, desc->get_column_link_target(2));
+    CHECK_EQUAL(5, desc->get_column_link_target(4));
+    CHECK_EQUAL(1, desc->get_column_link_target(6));
+    group.verify();
+
+    df::move_column(*desc, 6, 1);   // undo
+    check_original_order();
+    group.verify();
+}
+
+
 TEST(Descriptor_EmptyAndDuplicateNames)
 {
     TableRef table = Table::create();
@@ -396,9 +473,9 @@ TEST(Descriptor_Subtables)
     // Add some subtables
     table->add_empty_row(3);
     TableRef subtab_1, subtab_2, subtab_3;
-    subtab_1 = table->get_subtable(0,0);
-    subtab_2 = table->get_subtable(0,1);
-    subtab_3 = table->get_subtable(0,2);
+    subtab_1 = table->get_subtable(0, 0);
+    subtab_2 = table->get_subtable(0, 1);
+    subtab_3 = table->get_subtable(0, 2);
 
     // Add second level subtables
     subtab_1->add_empty_row(1);
@@ -411,9 +488,9 @@ TEST(Descriptor_Subtables)
     CHECK_EQUAL(subdesc, subtab_3->get_descriptor());
 
     // Check that all second level subtables have same descriptor
-    CHECK_EQUAL(subsubdesc, subtab_1->get_subtable(0,0)->get_descriptor());
-    CHECK_EQUAL(subsubdesc, subtab_2->get_subtable(0,0)->get_descriptor());
-    CHECK_EQUAL(subsubdesc, subtab_3->get_subtable(0,0)->get_descriptor());
+    CHECK_EQUAL(subsubdesc, subtab_1->get_subtable(0, 0)->get_descriptor());
+    CHECK_EQUAL(subsubdesc, subtab_2->get_subtable(0, 0)->get_descriptor());
+    CHECK_EQUAL(subsubdesc, subtab_3->get_subtable(0, 0)->get_descriptor());
 
     // Clear and reobtain fixed refs
     desc.reset();
@@ -427,17 +504,17 @@ TEST(Descriptor_Subtables)
     desc.reset();
     desc = subdesc->get_parent();
     table = desc->get_root_table();
-    subtab_1 = table->get_subtable(0,0);
-    subtab_2 = table->get_subtable(0,1);
-    subtab_3 = table->get_subtable(0,2);
+    subtab_1 = table->get_subtable(0, 0);
+    subtab_2 = table->get_subtable(0, 1);
+    subtab_3 = table->get_subtable(0, 2);
 
     // Recheck
     CHECK_EQUAL(subdesc, subtab_1->get_descriptor());
     CHECK_EQUAL(subdesc, subtab_2->get_descriptor());
     CHECK_EQUAL(subdesc, subtab_3->get_descriptor());
-    CHECK_EQUAL(subsubdesc, subtab_1->get_subtable(0,0)->get_descriptor());
-    CHECK_EQUAL(subsubdesc, subtab_2->get_subtable(0,0)->get_descriptor());
-    CHECK_EQUAL(subsubdesc, subtab_3->get_subtable(0,0)->get_descriptor());
+    CHECK_EQUAL(subsubdesc, subtab_1->get_subtable(0, 0)->get_descriptor());
+    CHECK_EQUAL(subsubdesc, subtab_2->get_subtable(0, 0)->get_descriptor());
+    CHECK_EQUAL(subsubdesc, subtab_3->get_subtable(0, 0)->get_descriptor());
 }
 
 
@@ -446,7 +523,7 @@ TEST(Descriptor_Subtables2)
     TableRef table = Table::create();
     table->add_column(type_Table, "");
     table->add_empty_row(1);
-    TableRef subtab = table->get_subtable(0,0);
+    TableRef subtab = table->get_subtable(0, 0);
     DescriptorRef subdesc = subtab->get_descriptor();
     table->remove_column(0);
     CHECK(!subtab->is_attached());
@@ -625,7 +702,7 @@ TEST(Descriptor_IllegalOps)
         desc->add_column(type_Table, "subtable", &subdesc);
         subdesc->add_column(type_Int, "int");
         table->add_empty_row();
-        TableRef subtable = table->get_subtable(0,0);
+        TableRef subtable = table->get_subtable(0, 0);
         CHECK_LOGIC_ERROR(desc->add_column_link(type_Link, "link", *subtable),
                           LogicError::wrong_kind_of_table);
     }
@@ -704,8 +781,7 @@ TEST(Descriptor_TwoStringColumnTypesEquality)
     t2.add_empty_row(10);
     t3.add_empty_row(10);
 
-    for (int i = 0; i < 10; ++i)
-    {
+    for (int i = 0; i < 10; ++i) {
         t1.set_string(0, i, StringData("a", 1));
         t2.set_string(0, i, StringData("a", 1));
         t3.set_string(0, i, StringData("a", 1));

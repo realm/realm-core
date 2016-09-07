@@ -24,17 +24,17 @@
 
 #include <sys/stat.h>
 #ifndef _WIN32
-#  include <unistd.h>
-#  include <sys/types.h>
+    #include <unistd.h>
+    #include <sys/types.h>
 #endif
 
 // File permissions for Windows
 // http://stackoverflow.com/questions/592448/c-how-to-set-file-permissions-cross-platform
 #ifdef _WIN32
-#  include <io.h>
-typedef int mode_t2;
-static const mode_t2 S_IWUSR = mode_t2(_S_IWRITE);
-static const mode_t2 MS_MODE_MASK = 0x0000ffff;
+    #include <io.h>
+    typedef int mode_t2;
+    static const mode_t2 S_IWUSR = mode_t2(_S_IWRITE);
+    static const mode_t2 MS_MODE_MASK = 0x0000ffff;
 #endif
 
 #include <realm.hpp>
@@ -133,7 +133,7 @@ TEST(Group_UnattachedErrorHandling)
                       LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.rename_table(0, "bar", false),
                       LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.move_table(0,1),
+    CHECK_LOGIC_ERROR(group.move_table(0, 1),
                       LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.commit(),
                       LogicError::detached_accessor);
@@ -267,7 +267,7 @@ TEST(Group_OpenUnencryptedFileWithKey)
 #ifndef _WIN32
 TEST(Group_Permissions)
 {
-    if(getuid() == 0) {
+    if (getuid() == 0) {
         std::cout << "Group_Permissions test skipped because you are running it as root\n\n";
         return;
     }
@@ -278,7 +278,7 @@ TEST(Group_Permissions)
         TableRef t1 = group1.add_table("table1");
         t1->add_column(type_String, "s");
         t1->add_column(type_Int,    "i");
-        for(size_t i=0; i<4; ++i) {
+        for (size_t i = 0; i < 4; ++i) {
             t1->insert_empty_row(i);
             t1->set_string(0, i, "a");
             t1->set_int(1, i, 3);
@@ -375,8 +375,8 @@ TEST(Group_BadBuffer)
 
     // Produce an invalid buffer
     char buffer[32];
-    for (size_t i=0; i<sizeof buffer; ++i)
-        buffer[i] = char((i+192)%128);
+    for (size_t i = 0; i < sizeof buffer; ++i)
+        buffer[i] = char((i + 192) % 128);
 
     {
         Group group((Group::unattached_tag()));
@@ -723,16 +723,16 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     first->add_empty_row(2);
     third->add_empty_row(2);
     fourth->add_empty_row(2);
-    first->set_link(0,0,0);  // first[0].one   = third[0]
-    first->set_link(0,1,1);  // first[1].one   = third[1]
-    third->set_link(0,0,1);  // third[0].two   = fourth[1]
-    third->set_link(0,1,0);  // third[1].two   = fourth[0]
-    third->set_link(1,0,1);  // third[0].three = third[1]
-    third->set_link(1,1,1);  // third[1].three = third[1]
-    fourth->set_link(0,0,0); // fourth[0].four = first[0]
-    fourth->set_link(0,1,0); // fourth[1].four = first[0]
-    fourth->set_link(1,0,0); // fourth[0].five = third[0]
-    fourth->set_link(1,1,1); // fourth[1].five = third[1]
+    first->set_link(0, 0, 0); // first[0].one   = third[0]
+    first->set_link(0, 1, 1); // first[1].one   = third[1]
+    third->set_link(0, 0, 1); // third[0].two   = fourth[1]
+    third->set_link(0, 1, 0); // third[1].two   = fourth[0]
+    third->set_link(1, 0, 1); // third[0].three = third[1]
+    third->set_link(1, 1, 1); // third[1].three = third[1]
+    fourth->set_link(0, 0, 0); // fourth[0].four = first[0]
+    fourth->set_link(0, 1, 0); // fourth[1].four = first[0]
+    fourth->set_link(1, 0, 0); // fourth[0].five = third[0]
+    fourth->set_link(1, 1, 1); // fourth[1].five = third[1]
 
     group.verify();
 
@@ -759,22 +759,22 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     CHECK_EQUAL(first, fourth->get_link_target(0));
     CHECK_EQUAL(third, fourth->get_link_target(1));
 
-    third->set_link(0,0,0);  // third[0].two   = fourth[0]
-    fourth->set_link(0,1,1); // fourth[1].four = first[1]
-    first->set_link(0,0,1);  // first[0].one   = third[1]
+    third->set_link(0, 0, 0); // third[0].two   = fourth[0]
+    fourth->set_link(0, 1, 1); // fourth[1].four = first[1]
+    first->set_link(0, 0, 1); // first[0].one   = third[1]
 
     group.verify();
 
     CHECK_EQUAL(2, first->size());
-    CHECK_EQUAL(1, first->get_link(0,0));
-    CHECK_EQUAL(1, first->get_link(0,1));
+    CHECK_EQUAL(1, first->get_link(0, 0));
+    CHECK_EQUAL(1, first->get_link(0, 1));
     CHECK_EQUAL(1, first->get_backlink_count(0, *fourth, 0));
     CHECK_EQUAL(1, first->get_backlink_count(1, *fourth, 0));
     CHECK_EQUAL(2, third->size());
-    CHECK_EQUAL(0, third->get_link(0,0));
-    CHECK_EQUAL(0, third->get_link(0,1));
-    CHECK_EQUAL(1, third->get_link(1,0));
-    CHECK_EQUAL(1, third->get_link(1,1));
+    CHECK_EQUAL(0, third->get_link(0, 0));
+    CHECK_EQUAL(0, third->get_link(0, 1));
+    CHECK_EQUAL(1, third->get_link(1, 0));
+    CHECK_EQUAL(1, third->get_link(1, 1));
     CHECK_EQUAL(0, third->get_backlink_count(0, *first,  0));
     CHECK_EQUAL(2, third->get_backlink_count(1, *first,  0));
     CHECK_EQUAL(0, third->get_backlink_count(0, *third,  1));
@@ -782,10 +782,10 @@ TEST(Group_RemoveTableMovesTableWithLinksOver)
     CHECK_EQUAL(1, third->get_backlink_count(0, *fourth, 1));
     CHECK_EQUAL(1, third->get_backlink_count(1, *fourth, 1));
     CHECK_EQUAL(2, fourth->size());
-    CHECK_EQUAL(0, fourth->get_link(0,0));
-    CHECK_EQUAL(1, fourth->get_link(0,1));
-    CHECK_EQUAL(0, fourth->get_link(1,0));
-    CHECK_EQUAL(1, fourth->get_link(1,1));
+    CHECK_EQUAL(0, fourth->get_link(0, 0));
+    CHECK_EQUAL(1, fourth->get_link(0, 1));
+    CHECK_EQUAL(0, fourth->get_link(1, 0));
+    CHECK_EQUAL(1, fourth->get_link(1, 1));
     CHECK_EQUAL(2, fourth->get_backlink_count(0, *third, 0));
     CHECK_EQUAL(0, fourth->get_backlink_count(1, *third, 0));
 }
@@ -983,7 +983,7 @@ TEST(Group_TableAccessorLeftBehind)
         CHECK(table->is_attached());
         table->add_column(type_Table, "sub");
         table->add_empty_row();
-        subtable = table->get_subtable(0,0);
+        subtable = table->get_subtable(0, 0);
         CHECK(subtable->is_attached());
     }
     CHECK(!table->is_attached());
@@ -1007,7 +1007,7 @@ TEST(Group_Invalid2)
     const char* const str = "invalid data";
     const size_t size = strlen(str);
     char* const data = new char[strlen(str)];
-    std::copy(str, str+size, data);
+    std::copy(str, str + size, data);
     CHECK_THROW(Group(BinaryData(data, size)), InvalidDatabase);
     delete[] data;
 }
@@ -1281,7 +1281,7 @@ TEST(Group_Serialize_Optimized)
     table->add("search_target", 9, true, Fri);
 
     const size_t res = table->column().first.find_first("search_target");
-    CHECK_EQUAL(table->size()-1, res);
+    CHECK_EQUAL(table->size() - 1, res);
 
 #ifdef REALM_DEBUG
     to_mem.verify();
@@ -1414,82 +1414,82 @@ TEST(Group_Subtable)
     sub->add_column(type_Int, "bar");
     sub.reset();
 
-    for (int i=0; i<n; ++i) {
+    for (int i = 0; i < n; ++i) {
         table->add_empty_row();
-        table->set_int(0, i, 100+i);
-        if (i%2 == 0) {
-            TableRef st = table->get_subtable(1,i);
+        table->set_int(0, i, 100 + i);
+        if (i % 2 == 0) {
+            TableRef st = table->get_subtable(1, i);
             st->add_empty_row();
-            st->set_int(0, 0, 200+i);
+            st->set_int(0, 0, 200 + i);
         }
-        if (i%3 == 1) {
+        if (i % 3 == 1) {
             table->set_mixed(2, i, Mixed::subtable_tag());
-            TableRef st = table->get_subtable(2,i);
+            TableRef st = table->get_subtable(2, i);
             st->add_column(type_Int, "banach");
             st->add_empty_row();
-            st->set_int(0, 0, 700+i);
+            st->set_int(0, 0, 700 + i);
         }
     }
 
     CHECK_EQUAL(n, table->size());
 
-    for (int i=0; i<n; ++i) {
-        CHECK_EQUAL(100+i, table->get_int(0,i));
+    for (int i = 0; i < n; ++i) {
+        CHECK_EQUAL(100 + i, table->get_int(0, i));
         {
-            TableRef st = table->get_subtable(1,i);
-            CHECK_EQUAL(i%2 == 0 ? 1 : 0, st->size());
+            TableRef st = table->get_subtable(1, i);
+            CHECK_EQUAL(i % 2 == 0 ? 1 : 0, st->size());
             if (i%2 == 0)
-                CHECK_EQUAL(200+i, st->get_int(0,0));
-            if (i%3 == 0) {
+                CHECK_EQUAL(200 + i, st->get_int(0, 0));
+            if (i % 3 == 0) {
                 st->add_empty_row();
-                st->set_int(0, st->size()-1, 300+i);
+                st->set_int(0, st->size() - 1, 300 + i);
             }
         }
-        CHECK_EQUAL(i%3 == 1 ? type_Table : type_Int, table->get_mixed_type(2,i));
-        if (i%3 == 1) {
-            TableRef st = table->get_subtable(2,i);
+        CHECK_EQUAL(i % 3 == 1 ? type_Table : type_Int, table->get_mixed_type(2, i));
+        if (i % 3 == 1) {
+            TableRef st = table->get_subtable(2, i);
             CHECK_EQUAL(1, st->size());
-            CHECK_EQUAL(700+i, st->get_int(0,0));
+            CHECK_EQUAL(700 + i, st->get_int(0, 0));
         }
-        if (i%8 == 3) {
-            if (i%3 != 1)
+        if (i % 8 == 3) {
+            if (i % 3 != 1)
                 table->set_mixed(2, i, Mixed::subtable_tag());
-            TableRef st = table->get_subtable(2,i);
+            TableRef st = table->get_subtable(2, i);
             if (i%3 != 1)
                 st->add_column(type_Int, "banach");
             st->add_empty_row();
-            st->set_int(0, st->size()-1, 800+i);
+            st->set_int(0, st->size() - 1, 800 + i);
         }
     }
 
-    for (int i=0; i<n; ++i) {
-        CHECK_EQUAL(100+i, table->get_int(0,i));
+    for (int i = 0; i < n; ++i) {
+        CHECK_EQUAL(100 + i, table->get_int(0, i));
         {
-            TableRef st = table->get_subtable(1,i);
-            size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
+            TableRef st = table->get_subtable(1, i);
+            size_t expected_size = (i % 2 == 0 ? 1 : 0) + (i % 3 == 0 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
             size_t ndx = 0;
-            if (i%2 == 0) {
-                CHECK_EQUAL(200+i, st->get_int(0, ndx));
+            if (i % 2 == 0) {
+                CHECK_EQUAL(200 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%3 == 0) {
-                CHECK_EQUAL(300+i, st->get_int(0, ndx));
+            if (i % 3 == 0) {
+                CHECK_EQUAL(300 + i, st->get_int(0, ndx));
                 ++ndx;
             }
         }
-        CHECK_EQUAL(i%3 == 1 || i%8 == 3 ? type_Table : type_Int, table->get_mixed_type(2,i));
-        if (i%3 == 1 || i%8 == 3) {
-            TableRef st = table->get_subtable(2,i);
-            size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
+        CHECK_EQUAL(i % 3 == 1 || i % 8 == 3 ? type_Table : type_Int, table->get_mixed_type(2, i));
+        if (i % 3 == 1 || i % 8 == 3) {
+            TableRef st = table->get_subtable(2, i);
+            size_t expected_size = (i % 3 == 1 ? 1 : 0) + (i % 8 == 3 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
             size_t ndx = 0;
-            if (i%3 == 1) {
-                CHECK_EQUAL(700+i, st->get_int(0, ndx));
+            if (i % 3 == 1) {
+                CHECK_EQUAL(700 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%8 == 3) {
-                CHECK_EQUAL(800+i, st->get_int(0, ndx));
+            if (i % 8 == 3) {
+                CHECK_EQUAL(800 + i, st->get_int(0, ndx));
                 ++ndx;
             }
         }
@@ -1501,88 +1501,88 @@ TEST(Group_Subtable)
     Group g2(path_1, crypt_key());
     TableRef table2 = g2.get_table("test");
 
-    for (int i=0; i<n; ++i) {
-        CHECK_EQUAL(100+i, table2->get_int(0,i));
+    for (int i = 0; i < n; ++i) {
+        CHECK_EQUAL(100 + i, table2->get_int(0, i));
         {
-            TableRef st = table2->get_subtable(1,i);
-            size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0);
+            TableRef st = table2->get_subtable(1, i);
+            size_t expected_size = (i % 2 == 0 ? 1 : 0) + (i % 3 == 0 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
             size_t ndx = 0;
-            if (i%2 == 0) {
-                CHECK_EQUAL(200+i, st->get_int(0, ndx));
+            if (i % 2 == 0) {
+                CHECK_EQUAL(200 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%3 == 0) {
-                CHECK_EQUAL(300+i, st->get_int(0, ndx));
+            if (i % 3 == 0) {
+                CHECK_EQUAL(300 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%5 == 0) {
+            if (i % 5 == 0) {
                 st->add_empty_row();
-                st->set_int(0, st->size()-1, 400+i);
+                st->set_int(0, st->size() - 1, 400 + i);
             }
         }
-        CHECK_EQUAL(i%3 == 1 || i%8 == 3 ? type_Table : type_Int, table2->get_mixed_type(2,i));
-        if (i%3 == 1 || i%8 == 3) {
-            TableRef st = table2->get_subtable(2,i);
-            size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0);
+        CHECK_EQUAL(i % 3 == 1 || i % 8 == 3 ? type_Table : type_Int, table2->get_mixed_type(2, i));
+        if (i % 3 == 1 || i % 8 == 3) {
+            TableRef st = table2->get_subtable(2, i);
+            size_t expected_size = (i % 3 == 1 ? 1 : 0) + (i % 8 == 3 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
             size_t ndx = 0;
-            if (i%3 == 1) {
-                CHECK_EQUAL(700+i, st->get_int(0, ndx));
+            if (i % 3 == 1) {
+                CHECK_EQUAL(700 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%8 == 3) {
-                CHECK_EQUAL(800+i, st->get_int(0, ndx));
+            if (i % 8 == 3) {
+                CHECK_EQUAL(800 + i, st->get_int(0, ndx));
                 ++ndx;
             }
         }
-        if (i%7 == 4) {
-            if (i%3 != 1 && i%8 != 3)
+        if (i % 7 == 4) {
+            if (i % 3 != 1 && i % 8 != 3)
                 table2->set_mixed(2, i, Mixed::subtable_tag());
-            TableRef st = table2->get_subtable(2,i);
-            if (i%3 != 1 && i%8 != 3)
+            TableRef st = table2->get_subtable(2, i);
+            if (i % 3 != 1 && i % 8 != 3)
                 st->add_column(type_Int, "banach");
             st->add_empty_row();
-            st->set_int(0, st->size()-1, 900+i);
+            st->set_int(0, st->size() - 1, 900 + i);
         }
     }
 
-    for (int i=0; i<n; ++i) {
-        CHECK_EQUAL(100+i, table2->get_int(0,i));
+    for (int i = 0; i < n; ++i) {
+        CHECK_EQUAL(100 + i, table2->get_int(0, i));
         {
-            TableRef st = table2->get_subtable(1,i);
-            size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
+            TableRef st = table2->get_subtable(1, i);
+            size_t expected_size = (i % 2 == 0 ? 1 : 0) + (i % 3 == 0 ? 1 : 0) + (i % 5 == 0 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
             size_t ndx = 0;
-            if (i%2 == 0) {
-                CHECK_EQUAL(200+i, st->get_int(0, ndx));
+            if (i % 2 == 0) {
+                CHECK_EQUAL(200 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%3 == 0) {
-                CHECK_EQUAL(300+i, st->get_int(0, ndx));
+            if (i % 3 == 0) {
+                CHECK_EQUAL(300 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%5 == 0) {
-                CHECK_EQUAL(400+i, st->get_int(0, ndx));
+            if (i % 5 == 0) {
+                CHECK_EQUAL(400 + i, st->get_int(0, ndx));
                 ++ndx;
             }
         }
-        CHECK_EQUAL(i%3 == 1 || i%8 == 3 || i%7 == 4 ? type_Table : type_Int, table2->get_mixed_type(2,i));
-        if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
-            TableRef st = table2->get_subtable(2,i);
-            size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
+        CHECK_EQUAL(i % 3 == 1 || i % 8 == 3 || i % 7 == 4 ? type_Table : type_Int, table2->get_mixed_type(2, i));
+        if (i % 3 == 1 || i % 8 == 3 || i % 7 == 4) {
+            TableRef st = table2->get_subtable(2, i);
+            size_t expected_size = (i % 3 == 1 ? 1 : 0) + (i % 8 == 3 ? 1 : 0) + (i % 7 == 4 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
             size_t ndx = 0;
-            if (i%3 == 1) {
-                CHECK_EQUAL(700+i, st->get_int(0, ndx));
+            if (i % 3 == 1) {
+                CHECK_EQUAL(700 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%8 == 3) {
-                CHECK_EQUAL(800+i, st->get_int(0, ndx));
+            if (i % 8 == 3) {
+                CHECK_EQUAL(800 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%7 == 4) {
-                CHECK_EQUAL(900+i, st->get_int(0, ndx));
+            if (i % 7 == 4) {
+                CHECK_EQUAL(900 + i, st->get_int(0, ndx));
                 ++ndx;
             }
         }
@@ -1594,42 +1594,42 @@ TEST(Group_Subtable)
     Group g3(path_2, crypt_key());
     TableRef table3 = g2.get_table("test");
 
-    for (int i=0; i<n; ++i) {
-        CHECK_EQUAL(100+i, table3->get_int(0,i));
+    for (int i = 0; i < n; ++i) {
+        CHECK_EQUAL(100 + i, table3->get_int(0, i));
         {
-            TableRef st = table3->get_subtable(1,i);
-            size_t expected_size = (i%2 == 0 ? 1 : 0) + (i%3 == 0 ? 1 : 0) + (i%5 == 0 ? 1 : 0);
+            TableRef st = table3->get_subtable(1, i);
+            size_t expected_size = (i % 2 == 0 ? 1 : 0) + (i % 3 == 0 ? 1 : 0) + (i % 5 == 0 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
             size_t ndx = 0;
-            if (i%2 == 0) {
-                CHECK_EQUAL(200+i, st->get_int(0, ndx));
+            if (i % 2 == 0) {
+                CHECK_EQUAL(200 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%3 == 0) {
-                CHECK_EQUAL(300+i, st->get_int(0, ndx));
+            if (i % 3 == 0) {
+                CHECK_EQUAL(300 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%5 == 0) {
-                CHECK_EQUAL(400+i, st->get_int(0, ndx));
+            if (i % 5 == 0) {
+                CHECK_EQUAL(400 + i, st->get_int(0, ndx));
                 ++ndx;
             }
         }
-        CHECK_EQUAL(i%3 == 1 || i%8 == 3 || i%7 == 4 ? type_Table : type_Int, table3->get_mixed_type(2,i));
-        if (i%3 == 1 || i%8 == 3 || i%7 == 4) {
-            TableRef st = table3->get_subtable(2,i);
-            size_t expected_size = (i%3 == 1 ? 1 : 0) + (i%8 == 3 ? 1 : 0) + (i%7 == 4 ? 1 : 0);
+        CHECK_EQUAL(i % 3 == 1 || i % 8 == 3 || i % 7 == 4 ? type_Table : type_Int, table3->get_mixed_type(2, i));
+        if (i % 3 == 1 || i % 8 == 3 || i % 7 == 4) {
+            TableRef st = table3->get_subtable(2, i);
+            size_t expected_size = (i % 3 == 1 ? 1 : 0) + (i % 8 == 3 ? 1 : 0) + (i % 7 == 4 ? 1 : 0);
             CHECK_EQUAL(expected_size, st->size());
             size_t ndx = 0;
-            if (i%3 == 1) {
-                CHECK_EQUAL(700+i, st->get_int(0, ndx));
+            if (i % 3 == 1) {
+                CHECK_EQUAL(700 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%8 == 3) {
-                CHECK_EQUAL(800+i, st->get_int(0, ndx));
+            if (i % 8 == 3) {
+                CHECK_EQUAL(800 + i, st->get_int(0, ndx));
                 ++ndx;
             }
-            if (i%7 == 4) {
-                CHECK_EQUAL(900+i, st->get_int(0, ndx));
+            if (i % 7 == 4) {
+                CHECK_EQUAL(900 + i, st->get_int(0, ndx));
                 ++ndx;
             }
         }
@@ -1694,10 +1694,10 @@ TEST(Group_MultiLevelSubtables)
         table->set_int(0, 0, 6661010);
         // Get a second ref to A (compare)
         CHECK_EQUAL(table->get_subtable(1, 0), a);
-        CHECK_EQUAL(table->get_subtable(1, 0)->get_int(0,0), 6661011);
+        CHECK_EQUAL(table->get_subtable(1, 0)->get_int(0, 0), 6661011);
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
-        CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
+        CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0, 0), 6661012);
         g.write(path_2, crypt_key());
     }
     {
@@ -1713,10 +1713,10 @@ TEST(Group_MultiLevelSubtables)
         b->set_int(0, 0, 6661013);
         // Get a third ref to A (compare)
         a = table->get_subtable(1, 0);
-        CHECK_EQUAL(table->get_subtable(1, 0)->get_int(0,0), 6661011);
+        CHECK_EQUAL(table->get_subtable(1, 0)->get_int(0, 0), 6661011);
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
-        CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
+        CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0, 0), 6661013);
         g.write(path_3, crypt_key());
     }
 
@@ -1736,10 +1736,10 @@ TEST(Group_MultiLevelSubtables)
         table->set_int(0, 0, 6661010);
         // Get a second ref to A (compare)
         CHECK_EQUAL(table->get_subtable(2, 0), a);
-        CHECK_EQUAL(table->get_subtable(2, 0)->get_int(0,0), 6661011);
+        CHECK_EQUAL(table->get_subtable(2, 0)->get_int(0, 0), 6661011);
         // get a second ref to B (compare)
         CHECK_EQUAL(a->get_subtable(1, 0), b);
-        CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661012);
+        CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0, 0), 6661012);
         g.write(path_4, crypt_key());
     }
     {
@@ -1755,10 +1755,10 @@ TEST(Group_MultiLevelSubtables)
         b->set_int(0, 0, 6661013);
         // Get a third ref to A (compare)
         a = table->get_subtable(2, 0);
-        CHECK_EQUAL(table->get_subtable(2, 0)->get_int(0,0), 6661011);
+        CHECK_EQUAL(table->get_subtable(2, 0)->get_int(0, 0), 6661011);
         // Get third ref to B and verify last mod
         b = a->get_subtable(1, 0);
-        CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0,0), 6661013);
+        CHECK_EQUAL(a->get_subtable(1, 0)->get_int(0, 0), 6661013);
         g.write(path_5, crypt_key());
     }
 }
@@ -1776,7 +1776,7 @@ TEST(Group_CommitSubtable)
     sub_1.reset();
     table->add_empty_row();
 
-    TableRef subtable = table->get_subtable(0,0);
+    TableRef subtable = table->get_subtable(0, 0);
     subtable->add_empty_row();
 
     group.commit();
@@ -1784,12 +1784,12 @@ TEST(Group_CommitSubtable)
     table->add_empty_row();
     group.commit();
 
-    subtable = table->get_subtable(0,0);
+    subtable = table->get_subtable(0, 0);
     subtable->add_empty_row();
     group.commit();
 
     table->add_empty_row();
-    subtable = table->get_subtable(0,0);
+    subtable = table->get_subtable(0, 0);
     subtable->add_empty_row();
     group.commit();
 }
@@ -1805,8 +1805,8 @@ TEST(Group_CommitSubtableMixed)
 
     table->add_empty_row();
 
-    table->clear_subtable(0,0);
-    TableRef subtable = table->get_subtable(0,0);
+    table->clear_subtable(0, 0);
+    TableRef subtable = table->get_subtable(0, 0);
     subtable->add_column(type_Int, "int");
     subtable->add_empty_row();
 
@@ -1815,12 +1815,12 @@ TEST(Group_CommitSubtableMixed)
     table->add_empty_row();
     group.commit();
 
-    subtable = table->get_subtable(0,0);
+    subtable = table->get_subtable(0, 0);
     subtable->add_empty_row();
     group.commit();
 
     table->add_empty_row();
-    subtable = table->get_subtable(0,0);
+    subtable = table->get_subtable(0, 0);
     subtable->add_empty_row();
     group.commit();
 }
@@ -1834,7 +1834,7 @@ TEST(Group_CommitDegenerateSubtable)
     table->add_column(type_Table, "");
     table->get_subdescriptor(0)->add_column(type_Int, "");
     table->add_empty_row();
-    TableRef subtab = table->get_subtable(0,0);
+    TableRef subtab = table->get_subtable(0, 0);
     CHECK(subtab->is_degenerate());
     group.commit();
     CHECK(subtab->is_degenerate());
@@ -1935,7 +1935,7 @@ TEST(Group_IndexString)
     size_t r2 = table->column().first.find_first("jeff");
     size_t r3 = table->column().first.find_first("jim");
     size_t r4 = table->column().first.find_first("jimbo");
-     size_t r5 = table->column().first.find_first("johnny");
+    size_t r5 = table->column().first.find_first("johnny");
     CHECK_EQUAL(0, r2);
     CHECK_EQUAL(1, r3);
     CHECK_EQUAL(5, r4);
@@ -2014,7 +2014,7 @@ TEST(Group_CommitLinkListChange)
     target->add_column(type_Int, "");
     origin->add_empty_row();
     target->add_empty_row();
-    LinkViewRef link_list = origin->get_linklist(0,0);
+    LinkViewRef link_list = origin->get_linklist(0, 0);
     link_list->add(0);
     group.commit();
     group.verify();
@@ -2385,7 +2385,7 @@ TEST(Group_AddEmptyRowCrash)
 {
     // Exposes former bug in ColumnBase::build().
 
-    size_t a = REALM_MAX_BPNODE_SIZE*REALM_MAX_BPNODE_SIZE;
+    size_t a = REALM_MAX_BPNODE_SIZE * REALM_MAX_BPNODE_SIZE;
     size_t b = REALM_MAX_BPNODE_SIZE;
 
     Group group;

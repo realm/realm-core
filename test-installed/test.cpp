@@ -22,7 +22,7 @@
 using namespace realm;
 
 REALM_TABLE_1(TestTable,
-                value, Int)
+              value, Int)
 
 int main()
 {
@@ -33,7 +33,7 @@ int main()
     // being able to find `realmd` (typically in
     // /usr/local/libexec/).
     bool no_create = false;
-    SharedGroup sg("test.realm", no_create, SharedGroup::durability_Async);
+    SharedGroup sg("test.realm", no_create, SharedGroupOptions(SharedGroupOptions::durability_Async));
     {
         WriteTransaction wt(sg);
         TestTable::Ref test = wt.get_table<TestTable>("test");

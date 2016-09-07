@@ -53,7 +53,7 @@ template<class BT>
 class TimestampColumn::CreateHandler: public ColumnBase::CreateHandler {
 public:
     CreateHandler(typename BT::value_type value, Allocator& alloc):
-    m_value(value), m_alloc(alloc) {}
+        m_value(value), m_alloc(alloc) {}
 
     ref_type create_leaf(size_t size) override
     {
@@ -82,6 +82,14 @@ ref_type TimestampColumn::create(Allocator& alloc, size_t size, bool nullable)
     top.set_as_ref(1, nanoseconds_ref);
 
     return top.get_ref();
+}
+
+
+size_t TimestampColumn::get_size_from_ref(ref_type root_ref, Allocator& alloc) noexcept
+{
+    const char* root_header = alloc.translate(root_ref);
+    ref_type seconds_ref = to_ref(Array::get(root_header, 0));
+    return IntNullColumn::get_size_from_ref(seconds_ref, alloc);
 }
 
 
@@ -121,7 +129,7 @@ void TimestampColumn::set_null(size_t row_ndx)
 }
 
 void TimestampColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t /*prior_num_rows*/,
-    bool nullable)
+                                  bool nullable)
 {
     bool is_append = row_ndx == size();
     size_t row_ndx_or_npos = is_append ? realm::npos : row_ndx;
@@ -150,7 +158,7 @@ void TimestampColumn::erase(size_t row_ndx, bool is_last)
 }
 
 void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t /*prior_num_rows*/,
-    bool /*broken_reciprocal_backlinks*/)
+                                 bool /*broken_reciprocal_backlinks*/)
 {
     bool is_last = (row_ndx + num_rows_to_erase) == size();
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
@@ -167,7 +175,7 @@ void TimestampColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_
 }
 
 void TimestampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-    bool /*broken_reciprocal_backlinks*/)
+                                         bool /*broken_reciprocal_backlinks*/)
 {
     size_t last_row_ndx = prior_num_rows - 1;
 
@@ -262,16 +270,16 @@ void TimestampColumn::destroy_search_index() noexcept
 }
 
 void TimestampColumn::set_search_index_ref(ref_type ref, ArrayParent* parent,
-        size_t ndx_in_parent, bool allow_duplicate_values)
+                                           size_t ndx_in_parent, bool allow_duplicate_values)
 {
     REALM_ASSERT(!m_search_index);
     m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this,
-                !allow_duplicate_values, get_alloc())); // Throws
+                                         !allow_duplicate_values, get_alloc())); // Throws
 }
 
 
 ref_type TimestampColumn::write(size_t /*slice_offset*/, size_t /*slice_size*/, size_t /*table_size*/,
-    _impl::OutputStream&) const
+                                _impl::OutputStream&) const
 {
     // FIXME: Dummy implementation
     return 0;
@@ -310,10 +318,11 @@ void TimestampColumn::refresh_accessor_tree(size_t new_col_ndx, const Spec& spec
     }
 }
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+// LCOV_EXCL_START ignore debug functions
 
 void TimestampColumn::verify() const
 {
+#ifdef REALM_DEBUG
     REALM_ASSERT_3(m_seconds->size(), ==, m_nanoseconds->size());
 
     for (size_t t = 0; t < size(); t++) {
@@ -322,8 +331,8 @@ void TimestampColumn::verify() const
 
     m_seconds->verify();
     m_nanoseconds->verify();
+#endif
 }
-
 
 void TimestampColumn::to_dot(std::ostream&, StringData /*title*/) const
 {
@@ -340,7 +349,7 @@ void TimestampColumn::leaf_to_dot(MemRef, ArrayParent*, size_t /*ndx_in_parent*/
     // FIXME: Dummy implementation
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+// LCOV_EXCL_STOP ignore debug functions
 
 void TimestampColumn::add(const Timestamp& ts)
 {
@@ -359,7 +368,7 @@ void TimestampColumn::add(const Timestamp& ts)
 Timestamp TimestampColumn::get(size_t row_ndx) const noexcept
 {
     util::Optional<int64_t> seconds = m_seconds->get(row_ndx);
-    return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds->get(row_ndx))) : Timestamp(null{});
+    return seconds ? Timestamp(*seconds, int32_t(m_nanoseconds->get(row_ndx))) : Timestamp{};
 }
 
 void TimestampColumn::set(size_t row_ndx, const Timestamp& ts)

@@ -20,7 +20,7 @@
 #include <realm/commit_log.hpp>
 #include "../test.hpp"
 
-#include <stdio.h>
+#include <cstdio>
 #include <fstream>
 
 using namespace realm;
@@ -29,8 +29,7 @@ using namespace realm::util;
 struct InputStreamAdapter : _impl::InputStream {
     InputStreamAdapter(std::ifstream& s) : m_stream(s) {}
 
-    size_t read(char* buffer, size_t size) final
-    {
+    size_t read(char* buffer, size_t size) final {
         return m_stream.read(buffer, size).gcount();
     }
 

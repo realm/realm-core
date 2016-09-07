@@ -24,11 +24,11 @@
 #include <map>
 
 #ifdef REALM_DEBUG
-#  include <iostream>
+    #include <iostream>
 #endif
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
-#  include <cstdlib>
+    #include <cstdlib>
 #endif
 
 #include <realm/util/encrypted_file_mapping.hpp>
@@ -45,7 +45,7 @@ using namespace realm::util;
 namespace {
 
 #ifdef REALM_SLAB_ALLOC_DEBUG
-std::map<ref_type, void*> malloc_debug_map;
+    std::map<ref_type, void*> malloc_debug_map;
 #endif
 
 class InvalidFreeSpace: std::exception {
@@ -74,7 +74,7 @@ struct SlabAlloc::MappedFile {
     /// Indicates if attaching to the file was succesfull
     bool m_success = false;
 
-    ~MappedFile() 
+    ~MappedFile()
     {
         m_file.close();
     }
@@ -212,8 +212,8 @@ SlabAlloc::~SlabAlloc() noexcept
                     print();
 #  ifndef REALM_SLAB_ALLOC_DEBUG
                     std::cerr << "To get the stack-traces of the corresponding allocations,"
-                        "first compile with REALM_SLAB_ALLOC_DEBUG defined,"
-                        "then run under Valgrind with --leak-check=full\n";
+                              "first compile with REALM_SLAB_ALLOC_DEBUG defined,"
+                              "then run under Valgrind with --leak-check=full\n";
                     REALM_TERMINATE("SlabAlloc detected a leak");
 #  endif
                 }
@@ -266,8 +266,8 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 
 #if REALM_ENABLE_MEMDEBUG
                 // Pick a *random* match instead of just the first. This will increase the chance of catching
-                // use-after-free bugs in Core. It's chosen such that the mathematical average of all picked 
-                // positions is the middle of the list. 
+                // use-after-free bugs in Core. It's chosen such that the mathematical average of all picked
+                // positions is the middle of the list.
                 iter j = i;
                 while (j != rend && (size > j->size || fastrand() % (m_free_space.size() / 2 + 1) != 0)) {
                     j++;
@@ -320,7 +320,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
         size_t copy_on_write = curr_ref_end - m_baseline;
 
         // Allocate 20% of that (for the first few number of slabs the math below will just result in 1 page each)
-        size_t min_size = 0.2 * copy_on_write;
+        size_t min_size = static_cast<size_t>(0.2 * copy_on_write);
 
         if (new_size < min_size)
             new_size = min_size;
@@ -336,10 +336,10 @@ MemRef SlabAlloc::do_alloc(const size_t size)
         const size_t update = 5000000;
         if ((memstat_slab_size + new_size) / update > memstat_slab_size / update) {
             std::cerr << "Size of all allocated slabs:    " << (memstat_slab_size + new_size) / 1024 << " KB\n" <<
-                "Sum of size for do_alloc(size): " << memstat_requested / 1024 << " KB\n" <<
-                "Average physical memory usage:  " << memstat_rss / memstat_rss_ctr / 1024 << " KB\n" <<
-                "Page size:                      " << page_size() / 1024 << " KB\n" <<
-                "Number of all allocated slabs:  " << memstat_slabs << "\n\n";
+                      "Sum of size for do_alloc(size): " << memstat_requested / 1024 << " KB\n" <<
+                      "Average physical memory usage:  " << memstat_rss / memstat_rss_ctr / 1024 << " KB\n" <<
+                      "Page size:                      " << page_size() / 1024 << " KB\n" <<
+                      "Number of all allocated slabs:  " << memstat_slabs << "\n\n";
         }
         memstat_slab_size += new_size;
         memstat_slabs += 1;
@@ -396,7 +396,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 
     // Get size from segment
     size_t size = read_only ? Array::get_byte_size_from_header(addr) :
-        Array::get_capacity_from_header(addr);
+                  Array::get_capacity_from_header(addr);
     ref_type ref_end = ref + size;
 
 #ifdef REALM_DEBUG
@@ -476,7 +476,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
 
     // Copy existing segment
     char* new_addr = new_mem.get_addr();
-    std::copy(addr, addr+old_size, new_addr);
+    std::copy(addr, addr + old_size, new_addr);
 
     // Add old segment to freelist
     do_free(ref, addr);
@@ -484,7 +484,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
 #ifdef REALM_DEBUG
     if (REALM_COVER_NEVER(m_debug_out)) {
         std::cerr << "Realloc orig_ref: " << ref << " old_size: " << old_size << " "
-            "new_ref: " << new_mem.get_ref() << " new_size: " << new_size << "\n";
+                  "new_ref: " << new_mem.get_ref() << " new_size: " << new_size << "\n";
     }
 #endif // REALM_DEBUG
 
@@ -502,8 +502,8 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
     // we shift by 16 two times. On 32-bitters it's undefined to shift by
     // 32. Shifting twice x16 however, is defined and gives zero. On 64-bitters
     // the compiler should reduce it to a single 32 bit shift.
-    cache_index = cache_index ^(cache_index >> 16);
-    cache_index = (cache_index ^(cache_index >> 8)) & 0xFF;
+    cache_index = cache_index ^ (cache_index >> 16);
+    cache_index = (cache_index ^ (cache_index >> 8)) & 0xFF;
     if (cache[cache_index].ref == ref && cache[cache_index].version == version)
         return const_cast<char*>(cache[cache_index].addr);
 
@@ -545,7 +545,7 @@ char* SlabAlloc::do_translate(ref_type ref) const noexcept
         iter i = upper_bound(m_slabs.begin(), m_slabs.end(), ref, &ref_less_than_slab_ref_end);
         REALM_ASSERT_DEBUG(i != m_slabs.end());
 
-        ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i-1)->ref_end;
+        ref_type slab_ref = i == m_slabs.begin() ? m_baseline : (i - 1)->ref_end;
         addr = i->addr + (ref - slab_ref);
     }
     cache[cache_index].addr = addr;
@@ -645,7 +645,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             m_baseline = get_section_base(section_index);
             m_num_local_mappings = m_file_mappings->m_num_global_mappings;
             m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[m_num_local_mappings]);
-            for (size_t k=0; k<m_num_local_mappings; ++k) {
+            for (size_t k = 0; k < m_num_local_mappings; ++k) {
                 m_local_mappings[k] = m_file_mappings->m_global_mappings[k];
             }
         }
@@ -736,14 +736,13 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     // releases the MappedFile structure containing the mutex.
     std::unique_lock<Mutex> lock2(move(lock));
 
-    // make sure the database is not on streaming format. If we did not do this, 
+    // make sure the database is not on streaming format. If we did not do this,
     // a later commit would have to do it. That would require coordination with
     // anybody concurrently joining the session, so it seems easier to do it at
     // session initialization, even if it means writing the database during open.
     if (cfg.session_initiator && m_file_on_streaming_form) {
         const Header& header = *reinterpret_cast<const Header*>(m_data);
-        const StreamingFooter& footer =
-            *(reinterpret_cast<const StreamingFooter*>(m_data+size) - 1);
+        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(m_data + size) - 1);
         // Don't compare file format version fields as they are allowed to differ.
         // Also don't compare reserved fields (todo, is it correct to ignore?)
         static_cast<void>(header);
@@ -812,7 +811,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
                 // actual size of the file.
                 size = get_upper_section_boundary(size);
                 m_file_mappings->m_file.prealloc(0, size);
-                m_file_mappings->m_initial_mapping.remap(m_file_mappings->m_file, 
+                m_file_mappings->m_initial_mapping.remap(m_file_mappings->m_file,
                                                          File::access_ReadOnly, size);
                 m_data = m_file_mappings->m_initial_mapping.get_addr();
                 m_baseline = size;
@@ -905,7 +904,7 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
     if (slot_selector == 0 && top_ref == 0xFFFFFFFFFFFFFFFFULL) {
         if (REALM_UNLIKELY(size < sizeof (Header) + sizeof (StreamingFooter)))
             throw InvalidDatabase("Realm file in streaming form has bad size", path);
-        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(data+size) - 1);
+        const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(data + size) - 1);
         top_ref = footer.m_top_ref;
         if (REALM_UNLIKELY(footer.m_magic_cookie != footer_magic_cookie))
             throw InvalidDatabase("Bad Realm file header (#1)", path);
@@ -1019,11 +1018,10 @@ void SlabAlloc::remap(size_t file_size)
         }
 
         // Add any additional mappings needed to fully map the larger file
-        for (size_t k = m_file_mappings->m_num_global_mappings; k < num_additional_mappings; ++k)
-        {
+        for (size_t k = m_file_mappings->m_num_global_mappings; k < num_additional_mappings; ++k) {
             size_t section_start_offset = get_section_base(k + m_file_mappings->m_first_additional_mapping);
             size_t section_size = get_section_base(1 + k + m_file_mappings->m_first_additional_mapping) - section_start_offset;
-            m_file_mappings->m_global_mappings[k] = 
+            m_file_mappings->m_global_mappings[k] =
                 std::make_shared<const util::File::Map<char>>(m_file_mappings->m_file, section_start_offset, File::access_ReadOnly, section_size);
         }
 
@@ -1038,7 +1036,7 @@ void SlabAlloc::remap(size_t file_size)
         if (num_additional_mappings > m_num_local_mappings) {
             m_num_local_mappings = num_additional_mappings;
             m_local_mappings.reset(new std::shared_ptr<const util::File::Map<char>>[m_num_local_mappings]);
-            for (size_t k=0; k<m_num_local_mappings; ++k) {
+            for (size_t k = 0; k < m_num_local_mappings; ++k) {
                 m_local_mappings[k] = m_file_mappings->m_global_mappings[k];
             }
         }
@@ -1082,7 +1080,7 @@ size_t SlabAlloc::get_section_index(size_t pos) const noexcept
 {
     // size_t section_base_number = pos/m_initial_section_size;
     size_t section_base_number = pos >> m_section_shifts;
-    size_t section_group_number = section_base_number/16;
+    size_t section_group_number = section_base_number / 16;
     size_t index;
     if (section_group_number == 0) {
         // first 16 entries aligns 1:1
@@ -1091,7 +1089,7 @@ size_t SlabAlloc::get_section_index(size_t pos) const noexcept
     else {
         // remaning entries are exponential
         size_t log_index = log2(section_group_number);
-        size_t section_index_in_group = (section_base_number >> (1+log_index)) & 0x7;
+        size_t section_index_in_group = (section_base_number >> (1 + log_index)) & 0x7;
         index = (16 + (log_index * 8)) + section_index_in_group;
     }
     return index;
@@ -1106,8 +1104,8 @@ size_t SlabAlloc::compute_section_base(size_t index) const noexcept
     }
     else {
         size_t section_index_in_group = index & 7;
-        size_t log_index = (index - section_index_in_group)/8 - 2;
-        size_t section_base_number = (8 + section_index_in_group)<<(1+log_index);
+        size_t log_index = (index - section_index_in_group) / 8 - 2;
+        size_t section_base_number = (8 + section_index_in_group) << (1 + log_index);
         // base = m_initial_section_size * section_base_number;
         base = section_base_number << m_section_shifts;
     }
@@ -1115,8 +1113,8 @@ size_t SlabAlloc::compute_section_base(size_t index) const noexcept
 }
 
 size_t SlabAlloc::find_section_in_range(size_t start_pos,
-                                             size_t free_chunk_size,
-                                             size_t request_size) const noexcept
+                                        size_t free_chunk_size,
+                                        size_t request_size) const noexcept
 {
     size_t end_of_block = start_pos + free_chunk_size;
     size_t alloc_pos = start_pos;
@@ -1160,7 +1158,21 @@ void SlabAlloc::set_file_format_version(int file_format_version) noexcept
 }
 
 
+void SlabAlloc::verify() const
+{
+#ifdef REALM_DEBUG
+    // Make sure that all free blocks fit within a slab
+    for (const auto& chunk : m_free_space) {
+        slabs::const_iterator slab =
+            upper_bound(m_slabs.begin(), m_slabs.end(), chunk.ref, &ref_less_than_slab_ref_end);
+        REALM_ASSERT(slab != m_slabs.end());
 
+        ref_type slab_ref_end = slab->ref_end;
+        ref_type chunk_ref_end = chunk.ref + chunk.size;
+        REALM_ASSERT_3(chunk_ref_end, <=, slab_ref_end);
+    }
+#endif
+}
 
 #ifdef REALM_DEBUG
 
@@ -1185,21 +1197,7 @@ bool SlabAlloc::is_all_free() const
 }
 
 
-void SlabAlloc::verify() const
-{
-    // Make sure that all free blocks fit within a slab
-    for (const auto& chunk : m_free_space) {
-        slabs::const_iterator slab =
-            upper_bound(m_slabs.begin(), m_slabs.end(), chunk.ref, &ref_less_than_slab_ref_end);
-        REALM_ASSERT(slab != m_slabs.end());
-
-        ref_type slab_ref_end = slab->ref_end;
-        ref_type chunk_ref_end = chunk.ref + chunk.size;
-        REALM_ASSERT_3(chunk_ref_end, <=, slab_ref_end);
-    }
-}
-
-
+// LCOV_EXCL_START
 void SlabAlloc::print() const
 {
     size_t allocated_for_slabs = m_slabs.empty() ? 0 : m_slabs.back().ref_end - m_baseline;
@@ -1253,5 +1251,6 @@ void SlabAlloc::print() const
     }
     std::cout << std::flush;
 }
+// LCOV_EXCL_STOP
 
 #endif // REALM_DEBUG

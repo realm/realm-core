@@ -100,9 +100,9 @@ void BasicArray_AddGet(TestContext& test_context, T values[], size_t num_values)
     for (size_t i = 0; i < num_values; ++i) {
         f.add(values[i]);
 
-        CHECK_EQUAL(i+1, f.size());
+        CHECK_EQUAL(i + 1, f.size());
 
-        for (size_t j=0; j<i; ++j)
+        for (size_t j = 0; j < i; ++j)
             CHECK_EQUAL(values[j], f.get(j));
     }
 
@@ -131,7 +131,7 @@ void BasicArray_AddManyValues(TestContext& test_context)
         f.add(T(i));
         T val = f.get(i);
         CHECK_EQUAL(T(i), val);
-        CHECK_EQUAL(i+1, f.size());
+        CHECK_EQUAL(i + 1, f.size());
     }
     for (size_t i = 0; i < repeats; ++i) {
         T val = f.get(i);

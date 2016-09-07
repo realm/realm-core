@@ -35,7 +35,7 @@ int main(int argc, char* argv [])
     spawns = atoi(argv[2]);
     const int reads_per_write = atoi(argv[3]);
     int pid = 0;
-    for (int i=0; i < spawns - 1; i++) {
+    for (int i = 0; i < spawns - 1; i++) {
         pid = fork();
         if (pid == 0) {
             spawns = 0;
@@ -45,18 +45,17 @@ int main(int argc, char* argv [])
     srand(time(NULL));
     if (spawns) {
         char name[100];
-        sprintf(name,"%s_%s_%s.prof", argv[1], argv[2], argv[3]);
+        sprintf(name, "%s_%s_%s.prof", argv[1], argv[2], argv[3]);
         if (strcmp("0", argv[1]))
             ProfilerStart(name);
     }
     {
-        SharedGroup db("parallel_benchmark.realm", true, SharedGroup::durability_Async);
+        SharedGroup db("parallel_benchmark.realm", true, SharedGroupOptions(SharedGroupOptions::Durability::Async));
 
         for (size_t round = 0; round < 20; ++round) {
 
             for (size_t i = 0; i < 1000000; ++i) {
-                if (reads_per_write != 0 && (i % reads_per_write) == 0)
-                {
+                if (reads_per_write != 0 && (i % reads_per_write) == 0) {
                     WriteTransaction trx(db);
 
                     TableRef t = trx.get_table("test");

@@ -268,7 +268,7 @@ private:
     static const int max_enc_bytes_per_int = 10;
     static const int max_enc_bytes_per_double = sizeof (double);
     static const int max_enc_bytes_per_num = max_enc_bytes_per_int <
-        max_enc_bytes_per_double ? max_enc_bytes_per_double : max_enc_bytes_per_int;
+                                             max_enc_bytes_per_double ? max_enc_bytes_per_double : max_enc_bytes_per_int;
 
     TransactLogStream& m_stream;
 
@@ -607,22 +607,20 @@ char* TransactLogEncoder::encode_int(char* ptr, T value)
     // this value could have been increased to 15 (one less than the
     // number of value bits in 'unsigned').
     const int bits_per_byte = 7;
-    const int max_bytes = (num_bits + (bits_per_byte-1)) / bits_per_byte;
+    const int max_bytes = (num_bits + (bits_per_byte - 1)) / bits_per_byte;
     static_assert(max_bytes <= max_enc_bytes_per_int, "Bad max_enc_bytes_per_int");
     // An explicit constant maximum number of iterations is specified
     // in the hope that it will help the optimizer (to do loop
     // unrolling, for example).
     typedef unsigned char uchar;
-    for (int i=0; i<max_bytes; ++i) {
-        if (value >> (bits_per_byte-1) == 0)
+    for (int i = 0; i < max_bytes; ++i) {
+        if (value >> (bits_per_byte - 1) == 0)
             break;
-        *reinterpret_cast<uchar*>(ptr) =
-            uchar((1U<<bits_per_byte) | unsigned(value & ((1U<<bits_per_byte)-1)));
+        *reinterpret_cast<uchar*>(ptr) = uchar((1U << bits_per_byte) | unsigned(value & ((1U << bits_per_byte) - 1)));
         ++ptr;
         value >>= bits_per_byte;
     }
-    *reinterpret_cast<uchar*>(ptr) =
-        uchar(negative ? (1U<<(bits_per_byte-1)) | unsigned(value) : value);
+    *reinterpret_cast<uchar*>(ptr) = uchar(negative ? (1U << (bits_per_byte - 1)) | unsigned(value) : value);
     return ++ptr;
 }
 
@@ -637,8 +635,8 @@ inline char* TransactLogEncoder::encode_bool(char* ptr, bool value)
 inline char* TransactLogEncoder::encode_float(char* ptr, float value)
 {
     static_assert(std::numeric_limits<float>::is_iec559 &&
-                          sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
-                          "Unsupported 'float' representation");
+                  sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
+                  "Unsupported 'float' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
     return std::copy(val_ptr, val_ptr + sizeof value, ptr);
 }
@@ -646,8 +644,8 @@ inline char* TransactLogEncoder::encode_float(char* ptr, float value)
 inline char* TransactLogEncoder::encode_double(char* ptr, double value)
 {
     static_assert(std::numeric_limits<double>::is_iec559 &&
-                          sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
-                          "Unsupported 'double' representation");
+                  sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
+                  "Unsupported 'double' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
     return std::copy(val_ptr, val_ptr + sizeof value, ptr);
 }
@@ -741,7 +739,7 @@ void TransactLogEncoder::append_mixed_instr(Instruction instr, const util::Tuple
             return;
         }
         case type_Timestamp: {
-            Timestamp ts= value.get_timestamp();
+            Timestamp ts = value.get_timestamp();
             int64_t seconds = ts.get_seconds();
             int32_t nano_seconds = ts.get_nanoseconds();
             auto numbers_3 = append(numbers_2, seconds);
@@ -825,7 +823,7 @@ inline void TransactLogConvenientEncoder::select_link_list(const LinkView& list)
     // here. We assume that the list given to on_link_list_destroyed() can
     // *never* be the same as the list argument given here. We resolve the
     // race by a) always updating m_selected_link_list in do_select_link_list()
-    // and b) only atomically and conditionally updating it in 
+    // and b) only atomically and conditionally updating it in
     // on_link_list_destroyed().
     if (&list != m_selected_link_list) {
         do_select_link_list(list); // Throws
@@ -843,8 +841,8 @@ inline bool TransactLogEncoder::insert_group_level_table(size_t table_ndx, size_
 }
 
 inline void TransactLogConvenientEncoder::insert_group_level_table(size_t table_ndx,
-                                                                   size_t prior_num_tables,
-                                                                   StringData name)
+        size_t prior_num_tables,
+        StringData name)
 {
     unselect_all();
     m_encoder.insert_group_level_table(table_ndx, prior_num_tables, name); // Throws
@@ -869,7 +867,7 @@ inline bool TransactLogEncoder::rename_group_level_table(size_t table_ndx, Strin
 }
 
 inline void TransactLogConvenientEncoder::rename_group_level_table(size_t table_ndx,
-                                                                   StringData new_name)
+        StringData new_name)
 {
     unselect_all();
     m_encoder.rename_group_level_table(table_ndx, new_name); // Throws
@@ -975,7 +973,7 @@ inline bool TransactLogEncoder::rename_column(size_t col_ndx, StringData new_nam
 }
 
 inline void TransactLogConvenientEncoder::rename_column(const Descriptor& desc, size_t col_ndx,
-                                       StringData name)
+                                                        StringData name)
 {
     select_desc(desc); // Throws
     m_encoder.rename_column(col_ndx, name); // Throws
@@ -1002,7 +1000,7 @@ inline bool TransactLogEncoder::set_int(size_t col_ndx, size_t ndx, int_fast64_t
 }
 
 inline void TransactLogConvenientEncoder::set_int(const Table* t, size_t col_ndx,
-                                 size_t ndx, int_fast64_t value)
+                                                  size_t ndx, int_fast64_t value)
 {
     select_table(t); // Throws
     m_encoder.set_int(col_ndx, ndx, value); // Throws
@@ -1028,7 +1026,7 @@ inline bool TransactLogEncoder::set_bool(size_t col_ndx, size_t ndx, bool value)
 }
 
 inline void TransactLogConvenientEncoder::set_bool(const Table* t, size_t col_ndx,
-                                  size_t ndx, bool value)
+                                                   size_t ndx, bool value)
 {
     select_table(t); // Throws
     m_encoder.set_bool(col_ndx, ndx, value); // Throws
@@ -1041,7 +1039,7 @@ inline bool TransactLogEncoder::set_float(size_t col_ndx, size_t ndx, float valu
 }
 
 inline void TransactLogConvenientEncoder::set_float(const Table* t, size_t col_ndx,
-                                   size_t ndx, float value)
+                                                    size_t ndx, float value)
 {
     select_table(t); // Throws
     m_encoder.set_float(col_ndx, ndx, value); // Throws
@@ -1054,7 +1052,7 @@ inline bool TransactLogEncoder::set_double(size_t col_ndx, size_t ndx, double va
 }
 
 inline void TransactLogConvenientEncoder::set_double(const Table* t, size_t col_ndx,
-                                    size_t ndx, double value)
+                                                     size_t ndx, double value)
 {
     select_table(t); // Throws
     m_encoder.set_double(col_ndx, ndx, value); // Throws
@@ -1072,7 +1070,7 @@ inline bool TransactLogEncoder::set_string(size_t col_ndx, size_t ndx, StringDat
 }
 
 inline void TransactLogConvenientEncoder::set_string(const Table* t, size_t col_ndx,
-                                    size_t ndx, StringData value)
+                                                     size_t ndx, StringData value)
 {
     select_table(t); // Throws
     m_encoder.set_string(col_ndx, ndx, value); // Throws
@@ -1110,7 +1108,7 @@ inline bool TransactLogEncoder::set_binary(size_t col_ndx, size_t row_ndx, Binar
 }
 
 inline void TransactLogConvenientEncoder::set_binary(const Table* t, size_t col_ndx,
-                                    size_t ndx, BinaryData value)
+                                                     size_t ndx, BinaryData value)
 {
     select_table(t); // Throws
     m_encoder.set_binary(col_ndx, ndx, value); // Throws
@@ -1150,7 +1148,7 @@ inline bool TransactLogEncoder::set_table(size_t col_ndx, size_t ndx)
 }
 
 inline void TransactLogConvenientEncoder::set_table(const Table* t, size_t col_ndx,
-                                   size_t ndx)
+                                                    size_t ndx)
 {
     select_table(t); // Throws
     m_encoder.set_table(col_ndx, ndx); // Throws
@@ -1163,7 +1161,7 @@ inline bool TransactLogEncoder::set_mixed(size_t col_ndx, size_t ndx, const Mixe
 }
 
 inline void TransactLogConvenientEncoder::set_mixed(const Table* t, size_t col_ndx,
-                                   size_t ndx, const Mixed& value)
+                                                    size_t ndx, const Mixed& value)
 {
     select_table(t); // Throws
     m_encoder.set_mixed(col_ndx, ndx, value); // Throws
@@ -1181,7 +1179,7 @@ inline bool TransactLogEncoder::set_link(size_t col_ndx, size_t ndx,
 }
 
 inline void TransactLogConvenientEncoder::set_link(const Table* t, size_t col_ndx,
-                                  size_t ndx, size_t value)
+                                                   size_t ndx, size_t value)
 {
     select_table(t); // Throws
     size_t target_group_level_ndx = t->get_descriptor()->get_column_link_target(col_ndx);
@@ -1308,7 +1306,7 @@ inline bool TransactLogEncoder::change_link_targets(size_t row_ndx, size_t new_r
 }
 
 inline void TransactLogConvenientEncoder::change_link_targets(const Table* t, size_t row_ndx,
-                                                      size_t new_row_ndx)
+        size_t new_row_ndx)
 {
     select_table(t); // Throws
     m_encoder.change_link_targets(row_ndx, new_row_ndx);
@@ -1383,7 +1381,7 @@ inline bool TransactLogEncoder::link_list_set(size_t link_ndx, size_t value)
 }
 
 inline void TransactLogConvenientEncoder::link_list_set(const LinkView& list, size_t link_ndx,
-                                       size_t value)
+                                                        size_t value)
 {
     select_link_list(list); // Throws
     m_encoder.link_list_set(link_ndx, value); // Throws
@@ -1433,7 +1431,7 @@ inline bool TransactLogEncoder::link_list_insert(size_t link_ndx, size_t value)
 }
 
 inline void TransactLogConvenientEncoder::link_list_insert(const LinkView& list, size_t link_ndx,
-                                          size_t value)
+                                                           size_t value)
 {
     select_link_list(list); // Throws
     m_encoder.link_list_insert(link_ndx, value); // Throws
@@ -1731,14 +1729,14 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             int levels = read_int<int>(); // Throws
             if (levels < 0 || levels > m_max_levels)
                 parser_error();
-            m_path.reserve(0, 2*levels); // Throws
+            m_path.reserve(0, 2 * levels); // Throws
             size_t* path = m_path.data();
             size_t group_level_ndx = read_int<size_t>(); // Throws
             for (int i = 0; i != levels; ++i) {
                 size_t col_ndx = read_int<size_t>(); // Throws
                 size_t row_ndx = read_int<size_t>(); // Throws
-                path[2*i + 0] = col_ndx;
-                path[2*i + 1] = row_ndx;
+                path[2 * i + 0] = col_ndx;
+                path[2 * i + 1] = row_ndx;
             }
             if (!handler.select_table(group_level_ndx, levels, path)) // Throws
                 parser_error();
@@ -1955,7 +1953,7 @@ T TransactLogParser::read_int()
 {
     T value = 0;
     int part = 0;
-    const int max_bytes = (std::numeric_limits<T>::digits+1+6)/7;
+    const int max_bytes = (std::numeric_limits<T>::digits + 1 + 6) / 7;
     for (int i = 0; i != max_bytes; ++i) {
         char c;
         if (!read_char(c))
@@ -1965,14 +1963,14 @@ T TransactLogParser::read_int()
             goto bad_transact_log; // Only the first 8 bits may be used in each byte
         if ((part & 0x80) == 0) {
             T p = part & 0x3F;
-            if (util::int_shift_left_with_overflow_detect(p, i*7))
+            if (util::int_shift_left_with_overflow_detect(p, i * 7))
                 goto bad_transact_log;
             value |= p;
             break;
         }
-        if (i == max_bytes-1)
+        if (i == max_bytes - 1)
             goto bad_transact_log; // Too many bytes
-        value |= T(part & 0x7F) << (i*7);
+        value |= T(part & 0x7F) << (i * 7);
     }
     if (part & 0x40) {
         // The real value is negative. Because 'value' is positive at
@@ -1987,7 +1985,7 @@ T TransactLogParser::read_int()
     }
     return value;
 
-  bad_transact_log:
+bad_transact_log:
     throw BadTransactLog();
 }
 
@@ -2035,8 +2033,8 @@ inline bool TransactLogParser::read_bool()
 inline float TransactLogParser::read_float()
 {
     static_assert(std::numeric_limits<float>::is_iec559 &&
-                          sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
-                          "Unsupported 'float' representation");
+                  sizeof (float) * std::numeric_limits<unsigned char>::digits == 32,
+                  "Unsupported 'float' representation");
     float value;
     read_bytes(reinterpret_cast<char*>(&value), sizeof value); // Throws
     return value;
@@ -2046,8 +2044,8 @@ inline float TransactLogParser::read_float()
 inline double TransactLogParser::read_double()
 {
     static_assert(std::numeric_limits<double>::is_iec559 &&
-                          sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
-                          "Unsupported 'double' representation");
+                  sizeof (double) * std::numeric_limits<unsigned char>::digits == 64,
+                  "Unsupported 'double' representation");
     double value;
     read_bytes(reinterpret_cast<char*>(&value), sizeof value); // Throws
     return value;
@@ -2068,7 +2066,7 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 inline Timestamp TransactLogParser::read_timestamp()
 {
     REALM_ASSERT(false);
-    return Timestamp(null{});
+    return Timestamp{};
 }
 
 
@@ -2426,7 +2424,7 @@ public:
                            size_t backlink_col_idx)
     {
         DataType type = type_Link; // The real type of the column doesn't matter here,
-                                   // but the encoder asserts that it's actually a link type.
+        // but the encoder asserts that it's actually a link type.
         m_encoder.insert_link_column(col_idx, type, "", target_table_idx, backlink_col_idx);
         append_instruction();
         return true;
@@ -2613,7 +2611,7 @@ public:
             m_current--;
             begin = m_buffer + m_instr_order[m_current].begin;
             end   = m_buffer + m_instr_order[m_current].end;
-            return end-begin;
+            return end - begin;
         }
         return 0;
     }
