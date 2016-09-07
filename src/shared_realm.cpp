@@ -657,12 +657,12 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
     return util::none;
 }
 
-Realm::HandoverPackage::HandoverPackage(HandoverPackage&&) = default;
-Realm::HandoverPackage& Realm::HandoverPackage::operator=(HandoverPackage&&) = default;
+Realm::ThreadSafeReference::ThreadSafeReference(ThreadSafeReference&&) = default;
+Realm::ThreadSafeReference& Realm::ThreadSafeReference::operator=(ThreadSafeReference&&) = default;
 
 // Precondition: `m_version` is not greater than `new_version`
 // Postcondition: `m_version` is equal to `new_version`
-void Realm::HandoverPackage::advance_to_version(VersionID new_version)
+void Realm::ThreadSafeReference::advance_to_version(VersionID new_version)
 {
     if (new_version == m_version_id) {
         return;
@@ -678,13 +678,13 @@ void Realm::HandoverPackage::advance_to_version(VersionID new_version)
     realm->m_group = &const_cast<Group&>(realm->m_shared_group->begin_read(m_version_id));
 
     // Import handover, advance version, and then repackage for handover
-    auto objects = realm->accept_handover(std::move(*this));
+    AnyThreadConfined value = realm->resolve_thread_safe_reference(std::move(*this));
     transaction::advance(*realm->m_shared_group, realm->m_binding_context.get(),
                          realm->m_config.schema_mode, new_version);
-    *this = realm->package_for_handover(std::move(objects));
+    *this = realm->obtain_thread_safe_reference(std::move(value));
 }
 
-Realm::HandoverPackage::~HandoverPackage()
+Realm::ThreadSafeReference::~ThreadSafeReference()
 {
     if (is_awaiting_import()) {
         get_coordinator().get_realm()->m_shared_group->unpin_version(m_version_id);
@@ -692,30 +692,27 @@ Realm::HandoverPackage::~HandoverPackage()
     }
 }
 
-Realm::HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over)
+realm::Realm::ThreadSafeReference realm::Realm::obtain_thread_safe_reference(AnyThreadConfined value)
 {
     verify_thread();
     if (is_in_transaction()) {
         throw InvalidTransactionException("Cannot package handover during a write transaction.");
     }
 
-    HandoverPackage handover;
+    ThreadSafeReference reference;
     auto version_id = m_shared_group->pin_version();
-    handover.m_version_id = version_id;
-    handover.m_source_realm = shared_from_this();
+    reference.m_version_id = version_id;
+    reference.m_source_realm = shared_from_this();
     // Since `m_source_realm` is used to determine if we need to unpin when destroyed,
     // `m_source_realm` should only be set after `pin_version` succeeds in case it throws.
 
-    handover.m_objects.reserve(objects_to_hand_over.size());
-    for (auto &object : objects_to_hand_over) {
-        REALM_ASSERT(object.get_realm().get() == this);
-        handover.m_objects.push_back(object.export_for_handover());
-    }
+    REALM_ASSERT(value.get_realm().get() == this);
+    reference.m_handover = std::make_unique<_impl::AnyHandover>(value.export_for_handover());
 
-    return handover;
+    return reference;
 }
 
-std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage handover)
+AnyThreadConfined realm::Realm::resolve_thread_safe_reference(Realm::ThreadSafeReference handover)
 {
     verify_thread();
 
@@ -752,16 +749,12 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
         }
     }
 
-    std::vector<AnyThreadConfined> objects;
-    objects.reserve(handover.m_objects.size());
-    for (auto &object : handover.m_objects) {
-        objects.push_back(std::move(object).import_from_handover(shared_from_this()));
-    }
+    AnyThreadConfined value = std::move(*handover.m_handover).import_from_handover(shared_from_this());
 
     // Avoid weird partial-refresh semantics when importing old packages
     refresh();
 
-    return objects;
+    return value;
 }
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)

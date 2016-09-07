@@ -120,7 +120,7 @@ enum class SchemaMode : uint8_t {
 
 class Realm : public std::enable_shared_from_this<Realm> {
 public:
-    class HandoverPackage;
+    class ThreadSafeReference;
 
     // A callback function to be called during a migration for Automatic and
     // Manual schema modes. It is passed a SharedRealm at the version before
@@ -223,32 +223,32 @@ public:
     ~Realm();
 
     // Pins the current version and exports each object for handover.
-    HandoverPackage package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over);
+    ThreadSafeReference obtain_thread_safe_reference(AnyThreadConfined objects_to_hand_over);
 
     // Unpins the handover version, ending the current read transaction and beginning a new one at this version,
     // importing each object for handover.
-    std::vector<AnyThreadConfined> accept_handover(Realm::HandoverPackage handover);
+    AnyThreadConfined resolve_thread_safe_reference(Realm::ThreadSafeReference handover);
 
-    // Opaque type representing a vector of packaged objects for handover
-    class HandoverPackage {
+    // Opaque type representing an object for handover
+    class ThreadSafeReference {
     public:
-        HandoverPackage(const HandoverPackage&) = delete;
-        HandoverPackage& operator=(const HandoverPackage&) = delete;
-        HandoverPackage(HandoverPackage&&);
-        HandoverPackage& operator=(HandoverPackage&&);
-        ~HandoverPackage();
+        ThreadSafeReference(const ThreadSafeReference&) = delete;
+        ThreadSafeReference& operator=(const ThreadSafeReference&) = delete;
+        ThreadSafeReference(ThreadSafeReference&&);
+        ThreadSafeReference& operator=(ThreadSafeReference&&);
+        ~ThreadSafeReference();
 
         bool is_awaiting_import() const { return m_source_realm != nullptr; };
 
     private:
-        friend HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over);
-        friend std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage handover);
+        friend ThreadSafeReference realm::Realm::obtain_thread_safe_reference(AnyThreadConfined objects_to_hand_over);
+        friend AnyThreadConfined realm::Realm::resolve_thread_safe_reference(Realm::ThreadSafeReference handover);
 
         VersionID m_version_id;
-        std::vector<_impl::AnyHandover> m_objects;
+        std::unique_ptr<_impl::AnyHandover> m_handover; // FIXME: Remove this extra layer of indirection.
         SharedRealm m_source_realm; // Strong reference keeps alive so version stays pinned! Don't touch!!
 
-        HandoverPackage() = default;
+        ThreadSafeReference() = default;
 
         _impl::RealmCoordinator& get_coordinator() const { return *m_source_realm->m_coordinator; }
         void mark_not_awaiting_import() { m_source_realm = nullptr; };
