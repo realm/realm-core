@@ -231,8 +231,8 @@ public:
     /// Returns the number of tables in this group.
     size_t size() const noexcept;
 
-    //@{
-
+    /// \defgroup group_table_access Table Accessors
+    ///
     /// has_table() returns true if, and only if this group contains a table
     /// with the specified name.
     ///
@@ -316,6 +316,8 @@ public:
     ///
     /// \throw CrossTableLinkTarget Thrown by remove_table() if the specified
     /// table is the target of a link column of a different table.
+    ///
+    //@{
 
     static const size_t max_table_name_length = 63;
 
@@ -381,9 +383,11 @@ public:
 
     /// Write this database to the specified output stream.
     ///
+    /// \param out The destination output stream to write to.
+    ///
     /// \param pad If true, the file is padded to ensure the footer is aligned
     /// to the end of a page
-    void write(std::ostream&, bool pad = false) const;
+    void write(std::ostream& out, bool pad = false) const;
 
     /// Write this database to a new file. It is an error to specify a
     /// file that already exists. This is to protect against

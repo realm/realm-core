@@ -748,12 +748,17 @@ public:
     /// (see add_search_index()) will not be carried over to the new
     /// table.
     ///
+    /// \param out The destination output stream buffer.
+    ///
     /// \param offset Index of first row to include (if `slice_size >
     /// 0`). Must be less than, or equal to size().
     ///
     /// \param slice_size Number of rows to include. May be zero. If
     /// `slice_size > size() - offset`, then the effective size of
     /// the written slice will be `size() - offset`.
+    ///
+    /// \param override_table_name Custom name to write out instead of
+    /// the actual table name.
     ///
     /// \throw std::out_of_range If `offset > size()`.
     ///
@@ -762,7 +767,7 @@ public:
     /// of general utility. This is unfortunate, because it pulls
     /// quite a large amount of code into the core library to support
     /// it.
-    void write(std::ostream&, size_t offset = 0, size_t slice_size = npos,
+    void write(std::ostream& out, size_t offset = 0, size_t slice_size = npos,
                StringData override_table_name = StringData()) const;
 
     // Conversion

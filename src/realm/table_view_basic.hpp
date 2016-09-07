@@ -26,8 +26,8 @@
 namespace realm {
 
 
-/// Common base class for BasicTableView<Tab> and BasicTableView<const
-/// Tab>.
+/// %Common base class for `BasicTableView<Tab>` and `BasicTableView<const
+/// Tab>`.
 ///
 /// \tparam Impl Is either TableView or ConstTableView.
 template<class Tab, class View, class Impl>
