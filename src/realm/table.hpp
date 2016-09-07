@@ -462,7 +462,8 @@ public:
     /// unsigned integer arithmetic, such that Table::max_integer + 1 ==
     /// Table::min_integer and Table::min_integer - 1 == Table::max_integer.
     /// Note that the wrapping is platform-independent (all platforms wrap in
-    /// the same way regardless of integer representation).
+    /// the same way regardless of integer representation). If the existing
+    /// value in the cell is null, a LogicError exception is thrown.
     ///
     /// insert_substring() inserts the specified string into the currently
     /// stored string at the specified position. The position must be less than

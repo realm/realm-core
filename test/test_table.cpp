@@ -1525,8 +1525,7 @@ TEST(Table_AddInt)
 
     // add_int() has no effect on a NULL
     CHECK(t.is_null(1, 0));
-    t.add_int(1, 0, 123);
-    CHECK(t.is_null(1, 0));
+    CHECK_LOGIC_ERROR(t.add_int(1, 0, 123), LogicError::illegal_combination);
 }
 
 

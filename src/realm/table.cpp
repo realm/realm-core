@@ -2970,9 +2970,7 @@ void Table::add_int(size_t col_ndx, size_t ndx, int_fast64_t value)
             col.set(ndx, add_wrap(*old, value));
         }
         else {
-            // Don't do anything if the value was null (and also don't generate
-            // an instruction in replication).
-            return;
+            throw LogicError{LogicError::illegal_combination};
         }
     }
     else {
