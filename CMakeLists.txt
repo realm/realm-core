@@ -26,11 +26,6 @@ if(REALM_PLATFORM STREQUAL "Android")
     list(APPEND PLATFORM_LIBRARIES ${ANDROID_LOG_LIBRARY})
 endif()
 
-function(JOIN VALUES GLUE OUTPUT)
-    string (REPLACE ";" "${GLUE}" _TMP_STR "${VALUES}")
-    set (${OUTPUT} "${_TMP_STR}" PARENT_SCOPE)
-endfunction()
-
 project(
     realm
     VERSION ${REALM_VERSION_MAJOR}.${REALM_VERSION_MINOR}.${REALM_VERSION_PATCH}
