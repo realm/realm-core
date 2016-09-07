@@ -51,7 +51,7 @@
 
 using namespace realm;
 using namespace realm::util;
-
+using Durability = SharedGroupOptions::Durability;
 
 namespace {
 
@@ -507,7 +507,7 @@ struct alignas(8) SharedGroup::SharedInfo {
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
     Ringbuffer readers;
 
-    SharedInfo(DurabilityLevel, Replication::HistoryType);
+    SharedInfo(Durability, Replication::HistoryType);
     ~SharedInfo() noexcept {}
 
     void init_versioning(ref_type top_ref, size_t file_size, uint64_t initial_version)
@@ -526,7 +526,7 @@ struct alignas(8) SharedGroup::SharedInfo {
 };
 
 
-SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryType hist_type):
+SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType hist_type):
     size_of_mutex(sizeof(shared_writemutex)),
 #ifndef _WIN32
     size_of_condvar(sizeof(room_to_write)),
@@ -537,7 +537,7 @@ SharedGroup::SharedInfo::SharedInfo(DurabilityLevel dura, Replication::HistoryTy
 #endif
     shared_controlmutex() // Throws
 {
-    durability = dura; // durability level is fixed from creation
+    durability = static_cast<uint16_t>(dura); // durability level is fixed from creation
     REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_type)>(hist_type + 0));
     history_type = hist_type;
 #ifndef _WIN32
@@ -700,6 +700,7 @@ void spawn_daemon(const std::string& file)
 
 } // anonymous namespace
 
+const std::string SharedGroupOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
 //
@@ -719,19 +720,18 @@ void spawn_daemon(const std::string& file)
 // initializing process crashes and leaves the shared memory in an
 // undefined state.
 
-void SharedGroup::do_open(const std::string& path, bool no_create_file, DurabilityLevel durability,
-                          bool is_backend, const char* encryption_key,
-                          bool allow_upgrafe_file_format)
+void SharedGroup::do_open(const std::string& path, bool no_create_file,
+                          bool is_backend, const SharedGroupOptions options)
 {
     // Exception safety: Since do_open() is called from constructors, if it
     // throws, it must leave the file closed.
 
-    // FIXME: Asses the exception safety of this function.
+    // FIXME: Assess the exception safety of this function.
 
     REALM_ASSERT(!is_attached());
 
 #ifndef REALM_ASYNC_DAEMON
-    if (durability == durability_Async)
+    if (options.durability == Durability::Async)
         throw std::runtime_error("Async mode not yet supported on Windows, iOS and watchOS");
 #endif
 
@@ -739,7 +739,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
     m_coordination_dir = path + ".management";
     m_lockfile_path = path + ".lock";
     try_make_dir(m_coordination_dir);
-    m_key = encryption_key;
+    m_key = options.encryption_key;
     m_lockfile_prefix = m_coordination_dir + "/access_control";
     SlabAlloc& alloc = m_group.m_alloc;
 
@@ -772,7 +772,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             // due to the bit field members. Otherwise we would write
             // uninitialized bits to the file.
             alignas(SharedInfo) char buffer[sizeof (SharedInfo)] = {0};
-            new (buffer) SharedInfo(durability, history_type); // Throws
+            new (buffer) SharedInfo(options.durability, history_type); // Throws
             m_file.write(buffer, sizeof buffer); // Throws
 
             // Mark the file as completely initialized via a memory
@@ -934,9 +934,9 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             // if we're opening a MemOnly file that isn't already opened by
             // someone else then it's a file which should have been deleted on
             // close previously, but wasn't (perhaps due to the process crashing)
-            cfg.clear_file = durability == durability_MemOnly && begin_new_session;
+            cfg.clear_file = options.durability == Durability::MemOnly && begin_new_session;
 
-            cfg.encryption_key = encryption_key;
+            cfg.encryption_key = options.encryption_key;
             ref_type top_ref;
             try {
                 top_ref = alloc.attach_file(path, cfg); // Throws
@@ -987,7 +987,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                     repl->initiate_session(version); // Throws
 
 #ifndef _WIN32
-                if (encryption_key) {
+                if (options.encryption_key) {
                     static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
                     info->session_initiator_pid = uint_fast64_t(getpid());
                 }
@@ -1009,7 +1009,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                 // inconsistency is a logic error, as the user is required to
                 // make sure that all possible concurrent session participants
                 // use the same durability setting for the same Realm file.
-                if (info->durability != durability)
+                if (Durability(info->durability) != options.durability)
                     throw LogicError(LogicError::mixed_durability);
 
                 // History type must be consistent across a session. An
@@ -1020,7 +1020,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
                     throw LogicError(LogicError::mixed_history_type);
 
 #ifndef _WIN32
-                if (encryption_key && info->session_initiator_pid != uint64_t(getpid())) {
+                if (options.encryption_key && info->session_initiator_pid != uint64_t(getpid())) {
                     std::stringstream ss;
                     ss << path << ": Encrypted interprocess sharing is currently unsupported."
                        << "SharedGroup has been opened by pid: " << info->session_initiator_pid
@@ -1050,13 +1050,13 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             }
 
 #ifndef _WIN32
-            m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit");
+            m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit", options.temp_dir);
 #ifdef REALM_ASYNC_DAEMON
-            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix, "daemon_ready");
-            m_work_to_do.set_shared_part(info->work_to_do, m_lockfile_prefix, "work_ready");
-            m_room_to_write.set_shared_part(info->room_to_write, m_lockfile_prefix, "allow_write");
+            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix, "daemon_ready", options.temp_dir);
+            m_work_to_do.set_shared_part(info->work_to_do, m_lockfile_prefix, "work_ready", options.temp_dir);
+            m_room_to_write.set_shared_part(info->room_to_write, m_lockfile_prefix, "allow_write", options.temp_dir);
             // In async mode, we need to make sure the daemon is running and ready:
-            if (durability == durability_Async && !is_backend) {
+            if (options.durability == Durability::Async && !is_backend) {
                 while (info->daemon_ready == 0) {
                     if (info->daemon_started == 0) {
                         spawn_daemon(path);
@@ -1095,7 +1095,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
     // std::cerr << "open completed" << std::endl;
 
 #ifdef REALM_ASYNC_DAEMON
-    if (durability == durability_Async) {
+    if (options.durability == Durability::Async) {
         if (is_backend) {
             do_async_commits();
         }
@@ -1119,7 +1119,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
             gf::set_file_format_version(m_group, target_file_format_version);
         }
         else {
-            upgrade_file_format(allow_upgrafe_file_format, target_file_format_version); // Throws
+            upgrade_file_format(options.allow_file_format_upgrade, target_file_format_version); // Throws
         }
     }
     catch (...) {
@@ -1142,7 +1142,7 @@ bool SharedGroup::compact()
     if (m_transact_stage != transact_Ready) {
         throw std::runtime_error(m_db_path + ": compact is not supported whithin a transaction");
     }
-    DurabilityLevel dura;
+    Durability dura;
     {
         std::string tmp_path = m_db_path + ".tmp_compaction_space";
         SharedInfo* info = m_file_map.get_addr();
@@ -1177,14 +1177,19 @@ bool SharedGroup::compact()
             static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
         }
         end_read();
-        dura = DurabilityLevel(info->durability);
+        dura = Durability(info->durability);
         // We need to release any shared mapping *before* releasing the control mutex.
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
         m_group.m_alloc.detach();
     }
     close();
-    do_open(m_db_path, true, dura, false, m_key, false);
+
+    SharedGroupOptions new_options;
+    new_options.durability = dura;
+    new_options.encryption_key = m_key;
+    new_options.allow_file_format_upgrade = false;
+    do_open(m_db_path, true, false, new_options);
     return true;
 }
 
@@ -1235,7 +1240,7 @@ void SharedGroup::close() noexcept
 
             // If the db file is just backing for a transient data structure,
             // we can delete it when done.
-            if (info->durability == durability_MemOnly) {
+            if (Durability(info->durability) == Durability::MemOnly) {
                 try {
                     util::File::remove(m_db_path.c_str());
                 }
@@ -1699,7 +1704,7 @@ void SharedGroup::do_begin_write()
     }
 
 #ifdef REALM_ASYNC_DAEMON
-    if (info->durability == durability_Async) {
+    if (info->durability == static_cast<uint16_t>(Durability::Async)) {
 
         m_balancemutex.lock(); // Throws
 
@@ -1879,13 +1884,13 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     ref_type new_top_ref = out.write_group(); // Throws
     // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
     //     << " Read lock at version " << oldest_version << std::endl;
-    switch (DurabilityLevel(info->durability)) {
-        case durability_Full:
+    switch (Durability(info->durability)) {
+        case Durability::Full:
             out.commit(new_top_ref); // Throws
             break;
-        case durability_MemOnly:
-        case durability_Async:
-            // In durability_MemOnly mode, we just use the file as backing for
+        case Durability::MemOnly:
+        case Durability::Async:
+            // In Durability::MemOnly mode, we just use the file as backing for
             // the shared memory. So we never actually flush the data to disk
             // (the OS may do so opportinisticly, or when swapping). So in this
             // mode the file on disk may very likely be in an invalid state.

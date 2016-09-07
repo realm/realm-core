@@ -60,7 +60,7 @@ enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, IN
             ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
             CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
             COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, CLOSE_AND_REOPEN, GET_ALL_COLUMN_NAMES,
-            CREATE_TABLE_VIEW, COMPACT,
+            CREATE_TABLE_VIEW, COMPACT, SWAP_ROWS, MOVE_COLUMN,
 
             COUNT
          };
@@ -174,8 +174,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "std::unique_ptr<Replication> hist_r(make_client_history(path, key));\n";
             *log << "std::unique_ptr<Replication> hist_w(make_client_history(path, key));\n";
 
-            *log << "SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);\n";
-            *log << "SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);\n";
+            *log << "SharedGroup sg_r(*hist_r, SharedGroupOptions(key));\n";
+            *log << "SharedGroup sg_w(*hist_w, SharedGroupOptions(key));\n";
 
             *log << "Group& g = const_cast<Group&>(sg_w.begin_write());\n";
             *log << "Group& g_r = const_cast<Group&>(sg_r.begin_read());\n";
@@ -187,8 +187,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         std::unique_ptr<Replication> hist_r(make_client_history(path, key));
         std::unique_ptr<Replication> hist_w(make_client_history(path, key));
 
-        SharedGroup sg_r(*hist_r, SharedGroup::durability_Full, key);
-        SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, key);
+        SharedGroup sg_r(*hist_r, SharedGroupOptions(key));
+        SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
         Group& g = const_cast<Group&>(sg_w.begin_write());
         Group& g_r = const_cast<Group&>(sg_r.begin_read());
         std::vector<TableView> table_views;
@@ -309,6 +309,21 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.get_table(" << table_ndx << ")->remove_column(" << col_ndx << ");\n";
                     }
                     t->remove_column(col_ndx);
+                }
+            }
+            else if (instr == MOVE_COLUMN && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->get_column_count() > 1) {
+                    // There's a chance that we randomly choose to move a column
+                    // index with itself, but that's ok lets test that case too
+                    size_t col_ndx1 = get_next(s) % t->get_column_count();
+                    size_t col_ndx2 = get_next(s) % t->get_column_count();
+                    if (log) {
+                        *log << "_impl::TableFriend::move_column(*(g.get_table("
+                            << table_ndx << ")->get_descriptor()), " << col_ndx1 << ", " << col_ndx2 << ");\n";
+                    }
+                    _impl::TableFriend::move_column(*(t->get_descriptor()), col_ndx1, col_ndx2);
                 }
             }
             else if (instr == ADD_SEARCH_INDEX && g.size() > 0) {
@@ -512,6 +527,18 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.get_table(" << table_ndx << ")->move_last_over(" << row_ndx << ");\n";
                     }
                     t->move_last_over(row_ndx);
+                }
+            }
+            else if (instr == SWAP_ROWS && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->size() > 0) {
+                    int32_t row_ndx1 = get_int32(s) % t->size();
+                    int32_t row_ndx2 = get_int32(s) % t->size();
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->swap_rows(" << row_ndx1 << ", " << row_ndx2 << ");\n";
+                    }
+                    t->swap_rows(row_ndx1, row_ndx2);
                 }
             }
             else if (instr == COMMIT) {

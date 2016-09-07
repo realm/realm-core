@@ -125,6 +125,8 @@ def doBuildCocoa() {
               cp core-*.tar.xz realm-core-latest.tar.xz
             '''
             archive '*core-*.*.*.tar.xz'
+
+            sh 'sh build.sh clean'
         }
       } finally {
         collectCompilerWarnings('clang')
@@ -177,6 +179,8 @@ def doBuildDotNetOsx() {
               cp realm-core-dotnet-cocoa-*.tar.bz2 realm-core-dotnet-cocoa-latest.tar.bz2
             '''
             archive '*core-*.*.*.tar.bz2'
+
+            sh 'sh build.sh clean'
         }
       } finally {
         collectCompilerWarnings('clang')
@@ -297,6 +301,9 @@ def doBuildNodeInOsx() {
           sh 'sh build.sh build-node-package'
           sh 'cp realm-core-node-*.tar.gz realm-core-node-osx-latest.tar.gz'
           archive '*realm-core-node-osx-*.*.*.tar.gz'
+
+          sh 'sh build.sh clean'
+
           withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
             sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core'
           }

@@ -6156,6 +6156,80 @@ TEST(Table_InsertColumnMaintainsBacklinkIndices)
 }
 
 
+TEST(Table_MultipleLinkColumnsToSelf)
+{
+    Group g;
+    TableRef t = g.add_table("A");
+    t->insert_column_link(0, type_Link, "e", *t);
+    t->insert_column_link(1, type_LinkList, "f", *t);
+    t->add_empty_row();
+    t->get_linklist(1, 0)->add(0);
+    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 1);
+    g.verify();
+    t->get_linklist(0, 0)->add(0);
+    g.verify();
+}
+
+
+TEST(Table_MultipleLinkColumnsToOther)
+{
+    Group g;
+    TableRef t = g.add_table("A");
+    TableRef t2 = g.add_table("B");
+    t->insert_column_link(0, type_Link, "e", *t2);
+    t->insert_column_link(1, type_LinkList, "f", *t);
+    t->add_empty_row();
+    t->get_linklist(1, 0)->add(0);
+    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 1);
+    g.verify();
+    t->get_linklist(0, 0)->add(0);
+    g.verify();
+}
+
+
+TEST(Table_MultipleLinkColumnsMoveTables)
+{
+    Group g;
+    TableRef t = g.add_table("A");
+    TableRef t2 = g.add_table("B");
+    t->insert_column_link(0, type_Link, "e", *t);
+    t->insert_column_link(1, type_LinkList, "f", *t);
+    t->add_empty_row();
+    t->get_linklist(1, 0)->add(0);
+    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 1);
+    g.verify();
+    t->get_linklist(0, 0)->add(0);
+    g.verify();
+    g.move_table(0, 1);
+    g.verify();
+    g.move_table(1, 0);
+    g.verify();
+}
+
+
+TEST(Table_MultipleLinkColumnsMoveTablesCrossLinks)
+{
+    Group g;
+    TableRef t = g.add_table("A");
+    TableRef t2 = g.add_table("B");
+    t->insert_column_link(0, type_Link, "e", *t2);
+    t->insert_column_link(1, type_LinkList, "f", *t);
+    t->insert_column_link(2, type_Link, "g", *t2);
+    t->add_empty_row();
+    t->get_linklist(1, 0)->add(0);
+    g.move_table(0, 1);
+    g.verify();
+    _impl::TableFriend::move_column(*t->get_descriptor(), 1, 2);
+    g.verify();
+    t->get_linklist(2, 0)->add(0);
+    g.verify();
+    g.move_table(1, 0);
+    g.verify();
+    _impl::TableFriend::move_column(*t->get_descriptor(), 1, 0);
+    g.verify();
+}
+
+
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
@@ -6868,7 +6942,7 @@ TEST(Table_StaleLinkIndexOnTableRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist, SharedGroup::durability_Full, crypt_key());
+    SharedGroup sg_w(*hist, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 
     LangBindHelper::promote_to_write(sg_w);
@@ -7049,37 +7123,93 @@ TEST(Table_getVersionCounterAfterRowAccessor)
     int_fast64_t ver = t.get_version_counter();
     int_fast64_t newVer;
 
-#define _CHECK_VER_BUMP() \
-    newVer = t.get_version_counter();\
-    CHECK_GREATER(newVer, ver); \
-    ver = newVer;
+    auto check_ver_bump = [&]() {
+        newVer = t.get_version_counter();
+        CHECK_GREATER(newVer, ver);
+        ver = newVer;
+    };
 
     t.set_bool(col_bool, 0, true);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_int(col_int, 0, 42);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_string(col_string, 0, "foo");
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_float(col_float, 0, 0.42f);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_double(col_double, 0, 0.42);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_olddatetime(col_date, 0, 1234);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_binary(col_binary, 0, BinaryData("binary", 7));
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_timestamp(col_timestamp, 0, Timestamp(777, 888));
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 
     t.set_null(0, 0);
-    _CHECK_VER_BUMP();
+    check_ver_bump();
 }
+
+
+// This test a bug where get_size_from_type_and_ref() returned off-by-one on nullable integer columns.
+// It seems to be only invoked from Table::get_size_from_ref() which is fast static method that lets
+// you find the size of a Table without having to create an instance of it. This seems to be only done
+// on subtables, so the bug has not been triggered in public.
+TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
+{
+    constexpr bool nullable_toggle = TEST_TYPE::value;
+    Group g;
+    TableRef t = g.add_table("table");
+    t->add_column(type_Int, "int", nullable_toggle);
+    t->add_column(type_Bool, "bool", nullable_toggle);
+    t->add_column(type_String, "string", nullable_toggle);
+    t->add_column(type_Binary, "binary", nullable_toggle);
+    t->add_column(type_Double, "double");
+    t->add_column(type_Float, "float");
+    t->add_column(type_Mixed, "mixed");
+    t->add_column(type_Timestamp, "timestamp");
+    t->add_column_link(type_Link, "link", *t);
+    t->add_column_link(type_LinkList, "LinkList", *t);
+
+    auto check_column_sizes = [this, &t](size_t num_rows) {
+        t->clear();
+        t->add_empty_row(num_rows);
+        CHECK_EQUAL(t->size(), num_rows);
+        using tf = _impl::TableFriend;
+        Spec& t_spec = tf::get_spec(*t);
+        size_t actual_num_cols = t_spec.get_column_count();
+        for (size_t col_ndx = 0; col_ndx < actual_num_cols; ++col_ndx) {
+            ColumnType col_type = t_spec.get_column_type(col_ndx);
+            ColumnBase& base = tf::get_column(*t, col_ndx);
+            ref_type col_ref = base.get_ref();
+            bool nullable = (t_spec.get_column_attr(col_ndx) & col_attr_Nullable) == col_attr_Nullable;
+            size_t col_size = ColumnBase::get_size_from_type_and_ref(col_type, col_ref, base.get_alloc(), nullable);
+            CHECK_EQUAL(col_size, num_rows);
+        }
+    };
+
+    // Test leafs
+    check_column_sizes(REALM_MAX_BPNODE_SIZE - 1);
+
+    // Test empty
+    check_column_sizes(0);
+
+    // Test internal nodes
+    check_column_sizes(REALM_MAX_BPNODE_SIZE + 1);
+
+    // Test on boundary for good measure
+    check_column_sizes(REALM_MAX_BPNODE_SIZE);
+
+    // Try with more levels in the tree
+    check_column_sizes(10 * REALM_MAX_BPNODE_SIZE);
+}
+
 
 #endif // TEST_TABLE

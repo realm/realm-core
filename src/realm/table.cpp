@@ -892,6 +892,10 @@ void Table::move_root_column(size_t from, size_t to)
 {
     REALM_ASSERT_3(from, <, m_spec.get_public_column_count());
     REALM_ASSERT_3(to,   <, m_spec.get_public_column_count());
+
+    if (from == to)
+        return;
+
     do_move_root_column(from, to);
     adj_move_column(from, to);
     update_link_target_tables_after_column_move(from, to);
@@ -1061,12 +1065,25 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
 
     size_t origin_table_ndx = get_index_in_group();
 
+    // If multiple link columns exist to the same table, updating the backlink
+    // columns one by one is risky, because we use Spec::find_backlink_column
+    // to figure out which backlink column should be updated. If we update them
+    // as we find them, the next iteration might find the column that we have
+    // just updated, thinking it should be updated once more.
+    //
+    // Therefore, we figure out which backlink columns need to be updated first,
+    // and then we actually update them in the second pass.
+    //
+    // Tuples are: (target spec, backlink column index, new column index).
+    std::vector<std::tuple<Spec&, size_t, size_t>> update_backlink_columns;
+    update_backlink_columns.reserve(m_spec.get_public_column_count());
+
     // Update backlink columns pointing to the column that was moved.
     if (is_link_type(m_spec.get_column_type(moved_to))) {
         LinkColumnBase* link_col = static_cast<LinkColumnBase*>(m_cols[moved_to]);
         Spec& target_spec = link_col->get_target_table().m_spec;
         size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, moved_from);
-        target_spec.set_backlink_origin_column(backlink_col_ndx, moved_to);
+        update_backlink_columns.emplace_back(target_spec, backlink_col_ndx, moved_to);
     }
 
     // Update backlink columns pointing to any link columns between the source and
@@ -1080,7 +1097,7 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
             Spec& target_spec = link_col->get_target_table().m_spec;
             size_t old_col_ndx = col_ndx + 1;
             size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
-            target_spec.set_backlink_origin_column(backlink_col_ndx, col_ndx);
+            update_backlink_columns.emplace_back(target_spec, backlink_col_ndx, col_ndx);
         }
     }
     else if (moved_from > moved_to) {
@@ -1092,9 +1109,15 @@ void Table::update_link_target_tables_after_column_move(size_t moved_from, size_
             Spec& target_spec = link_col->get_target_table().m_spec;
             size_t old_col_ndx = col_ndx - 1;
             size_t backlink_col_ndx = target_spec.find_backlink_column(origin_table_ndx, old_col_ndx);
-            target_spec.set_backlink_origin_column(backlink_col_ndx, col_ndx);
+            update_backlink_columns.emplace_back(target_spec, backlink_col_ndx, col_ndx);
         }
     }
+
+    for (auto& t : update_backlink_columns) {
+        Spec& target_spec = std::get<0>(t);
+        target_spec.set_backlink_origin_column(std::get<1>(t), std::get<2>(t));
+    }
+
 }
 
 
@@ -1977,7 +2000,10 @@ size_t Table::get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
     const char* columns_header = alloc.translate(columns_ref);
     REALM_ASSERT_3(Array::get_size_from_header(columns_header), !=, 0);
     ref_type first_col_ref = to_ref(Array::get(columns_header, 0));
-    size_t size = ColumnBase::get_size_from_type_and_ref(first_col_type, first_col_ref, alloc);
+    Spec spec(alloc);
+    spec.init(spec_ref);
+    bool nullable = (spec.get_column_attr(0) & col_attr_Nullable) == col_attr_Nullable;
+    size_t size = ColumnBase::get_size_from_type_and_ref(first_col_type, first_col_ref, alloc, nullable);
     return size;
 }
 
@@ -2307,8 +2333,13 @@ void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
 void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
 {
     size_t num_cols = m_spec.get_column_count();
-    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx);
+    // We must start with backlink columns in case the corresponding link
+    // columns are in the same table so that the link columns are not updated
+    // twice. Backlink columns will nullify the rows in connected link columns
+    // first so by the time we get to the link column in this loop, the rows to
+    // be removed have already been nullified.
+    for (size_t col_ndx = num_cols; col_ndx > 0; --col_ndx) {
+        ColumnBase& col = get_column_base(col_ndx - 1);
         size_t prior_num_rows = m_size;
         col.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
     }
