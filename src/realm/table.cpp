@@ -2957,10 +2957,10 @@ void Table::add_int(size_t col_ndx, size_t ndx, int_fast64_t value)
     REALM_ASSERT_3(ndx, <, m_size);
     bump_version();
 
-    auto add_wrap = [](int_fast64_t a, int_fast64_t b) -> int_fast64_t {
-        uint_fast64_t ua = static_cast<uint_fast64_t>(a);
-        uint_fast64_t ub = static_cast<uint_fast64_t>(b);
-        return util::from_twos_compl<int_fast64_t>(ua + ub);
+    auto add_wrap = [](int64_t a, int64_t b) -> int64_t {
+        uint64_t ua = uint64_t(a);
+        uint64_t ub = uint64_t(b);
+        return util::from_twos_compl<int64_t>(ua + ub);
     };
 
     if (is_nullable(col_ndx)) {
