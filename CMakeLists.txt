@@ -9,6 +9,8 @@ endif()
 project(Realm)
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake" ${CMAKE_MODULE_PATH})
 
+message(${ANDROID_TOOLCHAIN_ROOT})
+
 cmake_policy(SET CMP0048 NEW)
 
 # Project version

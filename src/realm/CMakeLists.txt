@@ -225,82 +225,21 @@ target_link_libraries(
 )
 
 if(REALM_ENABLE_ENCRYPTION)
-    if(REALM_PLATFORM STREQUAL "Android")
+    if(ANDROID)
         include(ExternalProject)
 
-        # We patch one file in order not to include too many dependencies
-        set(PATCH_CMD sed
-                -i.backup
-                /OPENSSL_cleanse/d
-                crypto/sha/sha256.c
-        )
-
-        # Set the config step command
-        set(CONFIGURE_CMD ${ssl_conf_wrapper}
-                ./config
-                no-idea
-                no-camellia
-                no-seed
-                no-bf
-                no-cast
-                no-des
-                no-rc2
-                no-rc4
-                no-rc5
-                no-md2
-                no-md4
-                no-ripemd
-                no-mdc2
-                no-rsa
-                no-dsa
-                no-dh
-                no-ec
-                no-ecdsa
-                no-ecdh
-                no-sock
-                no-ssl2
-                no-ssl3
-                no-err
-                no-krb5
-                no-engine
-                no-srtp
-                no-speed
-                -DOPENSSL_NO_SHA512
-                -DOPENSSL_NO_SHA0
-                -w
-                -fPIC
-        )
-
-        # Get the list of include folders provided by the android toolchain
-        get_property(inc_dirs DIRECTORY PROPERTY INCLUDE_DIRECTORIES)
-
-        # Join them into a single string
-        JOIN("${inc_dirs}" " -I" includes)
-
-        # Get the first element of the STL include list provided by the android toolcahin
-        list(GET ANDROID_STL_INCLUDE_DIRS 0 stdarg_folder)
-
-        # Add the tr1 folder. That's where stdarg.h is located
-        set(DEPEND_INCLUDES "-I${includes} -I${stdarg_folder}/tr1")
-
-        # Generate the build script. This wrapper is needed in order to be able to pass
-        # environment variables and to avoid cmake trying to be smart about auto escaping
-        configure_file(${CMAKE_MODULE_PATH}/android-openssl-build.in android-openssl-build)
-        set(build_wrapper ${PROJECT_BINARY_DIR}/src/realm/android-openssl-build)
-
-        # Configure the config wrapper
-        configure_file(${CMAKE_MODULE_PATH}/openssl-config-wrapper.in openssl-config-wrapper)
-        set(ssl_conf_wrapper ${PROJECT_BINARY_DIR}/openssl-config-wrapper)
+        # Generate the build script with info provided by the android toolchain
+        configure_file(${CMAKE_MODULE_PATH}/android-build-openssl.sh.in ${PROJECT_BINARY_DIR}/android-build-openssl.sh @ONLY)
 
         ExternalProject_Add(openssl
-                URL http://www.openssl.org/source/openssl-${ANDROID_OPENSSL_VERSION}.tar.gz
-                PATCH_COMMAND ${PATCH_CMD}
-                CONFIGURE_COMMAND ${CONFIGURE_CMD}
-                BUILD_COMMAND ${build_wrapper}
-                BUILD_IN_SOURCE 1
+            URL http://www.openssl.org/source/openssl-${ANDROID_OPENSSL_VERSION}.tar.gz
+            CONFIGURE_COMMAND ""
+            BUILD_COMMAND "${PROJECT_BINARY_DIR}/android-build-openssl.sh"
+            INSTALL_COMMAND ""
+            BUILD_IN_SOURCE 1
         )
-        ExternalProject_Get_Property(openssl install_dir)
         add_dependencies(realm openssl)
+        include_directories(${PROJECT_BINARY_DIR}/libcrypto/include)
     elseif(NOT APPLE)
         target_link_libraries(realm ${OPENSSL_LIBRARIES})
     endif()
