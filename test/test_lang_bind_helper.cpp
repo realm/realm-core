@@ -12366,4 +12366,36 @@ TEST(LangBindHelper_RollbackMoveSame) {
 }
 
 
+TEST(LangBindHelper_ColumnMoveUpdatesLinkedTables)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+    Group& g_r = const_cast<Group&>(sg_r.begin_read());
+
+    TableRef t0 = g.add_table("t0");
+    TableRef t1 = g.add_table("t1");
+
+    t0->add_column_link(type_Link, "l0", *t1);
+    t0->add_column(type_Int, "i1");
+    t0->add_empty_row();
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+    LangBindHelper::promote_to_write(sg_w);
+
+    _impl::TableFriend::move_column(*(t0->get_descriptor()), 0, 1);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+    LangBindHelper::advance_read(sg_r);
+    g_r.verify();
+}
+
+
+
 #endif
