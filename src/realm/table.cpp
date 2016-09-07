@@ -2960,7 +2960,7 @@ void Table::add_int(size_t col_ndx, size_t ndx, int_fast64_t value)
     auto add_wrap = [](int64_t a, int64_t b) -> int64_t {
         uint64_t ua = uint64_t(a);
         uint64_t ub = uint64_t(b);
-        return util::from_twos_compl<int64_t>(ua + ub);
+        return int64_t(ua + ub);
     };
 
     if (is_nullable(col_ndx)) {

@@ -6,7 +6,8 @@
 
 ### Breaking changes
 
-* New instruction for `Table::add_int()`.
+* New instruction for `Table::add_int()`, which impacts the transaction log
+  format.
 
 ### Enhancements
 
