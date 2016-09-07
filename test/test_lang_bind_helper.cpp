@@ -12536,8 +12536,8 @@ TEST(LangBindHelper_SwapSimple)
 // Found by AFL
 TEST(LangBindHelper_RollbackMoveSame) {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
-    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
@@ -12559,8 +12559,8 @@ TEST(LangBindHelper_RollbackMoveSame) {
 TEST(LangBindHelper_ColumnMoveUpdatesLinkedTables)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
-    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     SharedGroup sg_r(*hist_r, SharedGroupOptions(crypt_key()));
     SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_write());
