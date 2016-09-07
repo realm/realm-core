@@ -9286,7 +9286,7 @@ TEST(Query_CombineWithEmptyQueryDoesntCrash)
 
 // Check that sub queries take into account restricting views, but still
 // return row index into the underlying table
-TEST(Query_AccuntForRestrictingViews)
+TEST(Query_AccountForRestrictingViews)
 {
     Table table;
     size_t col_id = table.add_column(type_Int, "id");
