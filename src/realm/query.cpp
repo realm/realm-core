@@ -1141,7 +1141,7 @@ size_t Query::find(size_t begin)
         if (m_view) {
             for (size_t t = 0; t < m_view->size(); t++) {
                 size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
-                if (tablerow >= begin && peek_tablerow(tablerow) != not_found)
+                if (tablerow >= begin)
                     return tablerow;
             }
             return not_found;
