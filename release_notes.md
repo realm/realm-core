@@ -2,6 +2,9 @@
 
 ### Bugfixes
 
+* Fixed a bug where linked tables were not updated after a table move operation, when
+  run through the replicator.
+* Fixed a bug where moving a column to itself caused a crash.
 * Fix subspecs not updating properly after a move operation.
 * Fixed various crashes when using subtables. The crash will occur when the first column
   of the subtable if of type `col_type_Timestamp` or if it is nullable and of type Bool, Int
