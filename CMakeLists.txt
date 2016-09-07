@@ -17,7 +17,7 @@ set(REALM_VERSION_MINOR 5)
 set(REALM_VERSION_PATCH 1)
 set(REALM_SOVERSION "9.0.0")
 
-if(REALM_PLATFORM STREQUAL "Android")
+if(ANDROID)
     set(ANDROID_OPENSSL_VERSION "1.0.1t")
     set(REALM_LIBTYPE "STATIC")
     find_library(ANDROID_LIBRARY android)
@@ -119,7 +119,7 @@ endif(APPLE)
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-if(NOT APPLE AND NOT REALM_PLATFORM STREQUAL "Android")
+if(NOT APPLE AND NOT ANDROID)
     include(FindOpenSSL)
 endif()
 
