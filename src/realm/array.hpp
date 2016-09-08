@@ -1056,6 +1056,10 @@ protected:
 
     bool do_erase_bptree_elem(size_t elem_ndx, EraseHandler&);
 
+    template<IndexMethod>
+    size_t from_list(StringData value, IntegerColumn& result, ref_type& result_ref,
+                     const IntegerColumn& rows, ColumnBase* column) const;
+
     template<IndexMethod method, class T>
     size_t index_string(StringData value, IntegerColumn& result, ref_type& result_ref,
                         ColumnBase* column) const;

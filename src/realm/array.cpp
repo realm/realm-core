@@ -2796,6 +2796,76 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
     return find_first<Equal>(value, start, end);
 }
 
+namespace realm {
+
+template<>
+size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result, ref_type& result_ref, const IntegerColumn& rows, ColumnBase* column) const
+{
+    static_cast<void>(result);
+    static_cast<void>(result_ref);
+    const size_t first_row_ref = to_size_t(rows.get(0)); //FIXME: find it
+
+    // for integer index, get_index_data fills out 'buffer' and makes str point at it
+    StringIndex::StringConversionBuffer buffer;
+    StringData str = column->get_index_data(first_row_ref, buffer);
+    if (str != value)
+        return not_found;
+    return first_row_ref;
+}
+
+template<>
+size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, ref_type& result_ref, const IntegerColumn& rows, ColumnBase* column) const
+{
+    static_cast<void>(result);
+    static_cast<void>(result_ref);
+    const size_t first_row_ref = to_size_t(rows.get(0));
+
+    // for integer index, get_index_data fills out 'buffer' and makes str point at it
+    StringIndex::StringConversionBuffer buffer;
+    StringData str = column->get_index_data(first_row_ref, buffer);
+    if (str != value)
+        return 0;
+
+    size_t count = rows.size();
+    return count;
+}
+
+template<>
+size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, ref_type& result_ref, const IntegerColumn& rows, ColumnBase* column) const
+{
+    static_cast<void>(result_ref);
+    const size_t first_row_ref = to_size_t(rows.get(0));
+
+    // for integer index, get_index_data fills out 'buffer' and makes str point at it
+    StringIndex::StringConversionBuffer buffer;
+    StringData str = column->get_index_data(first_row_ref, buffer);
+    if (str != value)
+        return size_t(FindRes_not_found);
+
+    // Copy all matches into result column
+    for (size_t i = 0; i < rows.size(); ++i)
+        result.add(to_size_t(rows.get(i)));
+
+    return size_t(FindRes_column);
+}
+
+template<>
+size_t Array::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& result, ref_type& result_ref, const IntegerColumn& rows, ColumnBase* column) const
+{
+    static_cast<void>(result);
+    const size_t first_row_ref = to_size_t(rows.get(0));
+
+    // for integer index, get_index_data fills out 'buffer' and makes str point at it
+    StringIndex::StringConversionBuffer buffer;
+    StringData str = column->get_index_data(first_row_ref, buffer);
+    if (str != value)
+        return size_t(FindRes_not_found);
+
+    result_ref = to_ref(rows.get_ref());
+    return size_t(FindRes_column);
+}
+
+}
 
 template<IndexMethod method, class T>
 size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
@@ -2880,72 +2950,10 @@ size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& re
         const char* sub_header = m_alloc.translate(to_ref(ref));
         const bool sub_isindex = get_context_flag_from_header(sub_header);
 
-        // List of values with common prefix up to this point, in sorted order.
-        // The list contains a row literal (tagged) or a ref to another list storing duplicates.
+        // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
-            const bool sub_isleaf = !get_is_inner_bptree_node_from_header(sub_header);
-            size_t sub_count = -1;
-
-            // In most cases the row list will just be an array but there
-            // might be so many matches that it has branched into a column
-            if (sub_isleaf) {
-                if (get_count)
-                    sub_count = get_size_from_header(sub_header);
-                const uint_least8_t sub_width = get_width_from_header(sub_header);
-                const char* sub_data = get_data_from_header(sub_header);
-                const size_t first_row_ref = to_size_t(get_direct(sub_data, sub_width, 0));
-
-                // for integer index, get_index_data fills out 'buffer' and makes str point at it
-                StringIndex::StringConversionBuffer buffer;
-                StringData str = column->get_index_data(first_row_ref, buffer);
-                if (str.is_null() != value.is_null() || str != value) {
-                    if (get_count)
-                        return 0;
-                    return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
-                }
-
-                result_ref = to_ref(ref);
-
-                if (all) {
-                    // Copy all matches into result column
-                    const size_t sub_size = get_size_from_header(sub_header);
-
-                    for (size_t i = 0; i < sub_size; ++i) {
-                        size_t row_ref = to_size_t(get_direct(sub_data, sub_width, i));
-                        result.add(row_ref);
-                    }
-                }
-                else {
-                    return allnocopy ? size_t(FindRes_column) :
-                           first ? to_size_t(get_direct(sub_data, sub_width, 0)) : sub_count;
-                }
-            }
-            else {
-                const IntegerColumn sub(m_alloc, to_ref(ref));
-                const size_t first_row_ref = to_size_t(sub.get(0));
-
-                if (get_count)
-                    sub_count = sub.size();
-
-                // for integer index, get_index_data fills out 'buffer' and makes str point at it
-                StringIndex::StringConversionBuffer buffer;
-                StringData str = column->get_index_data(first_row_ref, buffer);
-                if (str != value)
-                    return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
-
-                result_ref = to_ref(ref);
-                if (all) {
-                    // Copy all matches into result column
-                    for (size_t i = 0; i < sub.size(); ++i)
-                        result.add(to_size_t(sub.get(i)));
-                }
-                else {
-                    return allnocopy ? size_t(FindRes_column) : first ? to_size_t(sub.get(0)) : sub_count;
-                }
-            }
-
-            REALM_ASSERT_3(method, !=, index_FindAll_nocopy);
-            return size_t(FindRes_column);
+            const IntegerColumn sub(m_alloc, to_ref(ref));
+            return from_list<method>(value, result, result_ref, sub, column);
         }
 
         // Recurse into sub-index;
