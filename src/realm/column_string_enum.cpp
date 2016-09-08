@@ -207,14 +207,6 @@ void StringEnumColumn::find_all(IntegerColumn& res, size_t key_ndx, size_t begin
     IntegerColumn::find_all(res, key_ndx, begin, end);
 }
 
-FindRes StringEnumColumn::find_all_indexref(StringData value, size_t& dst) const
-{
-//    REALM_ASSERT(value.m_data); fixme
-    REALM_ASSERT(m_search_index);
-
-    return m_search_index->find_all(value, dst);
-}
-
 size_t StringEnumColumn::find_first(size_t key_ndx, size_t begin, size_t end) const
 {
     // Find key

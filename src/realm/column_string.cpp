@@ -997,15 +997,6 @@ size_t StringColumn::upper_bound_string(StringData value) const noexcept
 }
 
 
-FindRes StringColumn::find_all_indexref(StringData value, size_t& dst) const
-{
-    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
-    REALM_ASSERT(m_search_index);
-
-    return m_search_index->find_all(value, dst);
-}
-
-
 bool StringColumn::auto_enumerate(ref_type& keys_ref, ref_type& values_ref, bool enforce) const
 {
     Allocator& alloc = m_array->get_alloc();

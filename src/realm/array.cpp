@@ -2849,22 +2849,6 @@ size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, 
     return size_t(FindRes_column);
 }
 
-template<>
-size_t Array::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& result, ref_type& result_ref, const IntegerColumn& rows, ColumnBase* column) const
-{
-    static_cast<void>(result);
-    const size_t first_row_ref = to_size_t(rows.get(0));
-
-    // for integer index, get_index_data fills out 'buffer' and makes str point at it
-    StringIndex::StringConversionBuffer buffer;
-    StringData str = column->get_index_data(first_row_ref, buffer);
-    if (str != value)
-        return size_t(FindRes_not_found);
-
-    result_ref = to_ref(rows.get_ref());
-    return size_t(FindRes_column);
-}
-
 }
 
 template<IndexMethod method, class T>
@@ -2881,11 +2865,6 @@ size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& re
     // Returns FindRes_column, if more than one match found: the matching row literals
     // are copied into `column`
     bool all(method == index_FindAll);
-    // Same as `index_FindAll` but does not copy matching rows into `column`
-    // returns FindRes_not_found if there are no matches
-    // returns FindRes_single and the row index (literal) in `result_ref`
-    // or returns FindRes_column and the reference to a column of duplicates in `result_ref`
-    bool allnocopy(method == index_FindAll_nocopy); // Return FindRes_not_found
 
     const char* data = m_data;
     const char* header;
@@ -2910,7 +2889,7 @@ size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& re
 
         // If key is outside range, we know there can be no match
         if (pos == offsets_size)
-            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+            return first ? not_found : 0;
 
         // Get entry under key
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -2928,7 +2907,7 @@ size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& re
         key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
         if (stored_key != key) // keys don't match so return not found (0 implies FindRes_not_found if `all==true`)
-            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+            return first ? not_found : 0;
 
         // Literal row index (tagged)
         if (ref & 1) {
@@ -2944,7 +2923,7 @@ size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& re
 
                 return first ? row_ref : get_count ? 1 : FindRes_single;
             }
-            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+            return first ? not_found : 0;
         }
 
         const char* sub_header = m_alloc.translate(to_ref(ref));
@@ -2985,13 +2964,6 @@ void Array::index_string_find_all(IntegerColumn& result, StringData value, Colum
     size_t dummy;
 
     index_string<index_FindAll, StringData>(value, result, dummy, column);
-}
-
-
-FindRes Array::index_string_find_all_no_copy(StringData value, ref_type& res_ref, ColumnBase* column) const
-{
-    IntegerColumn dummy;
-    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, res_ref, column));
 }
 
 

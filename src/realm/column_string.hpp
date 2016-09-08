@@ -85,8 +85,6 @@ public:
 
     void set_string(size_t, StringData) override;
 
-    FindRes find_all_indexref(StringData value, size_t& dst) const;
-
     bool is_nullable() const noexcept final;
 
     // Search index

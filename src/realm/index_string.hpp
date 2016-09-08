@@ -107,8 +107,6 @@ public:
     template<class T>
     void find_all(IntegerColumn& result, T value) const;
     template<class T>
-    FindRes find_all(T value, ref_type& ref) const;
-    template<class T>
     size_t count(T value) const;
     template<class T>
     void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx);
@@ -462,14 +460,6 @@ void StringIndex::find_all(IntegerColumn& result, T value) const
     // Use direct access method
     StringConversionBuffer buffer;
     return m_array->index_string_find_all(result, to_str(value, buffer), m_target_column);
-}
-
-template<class T>
-FindRes StringIndex::find_all(T value, ref_type& ref) const
-{
-    // Use direct access method
-    StringConversionBuffer buffer;
-    return m_array->index_string_find_all_no_copy(to_str(value, buffer), ref, m_target_column);
 }
 
 template<class T>
