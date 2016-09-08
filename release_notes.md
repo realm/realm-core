@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.0.0-rc4 Release notes
 
 ### Bugfixes
 
@@ -17,12 +17,6 @@
 ### Enhancements
 
 * Added `Table::add_int()` for implementing CRDT counters.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
