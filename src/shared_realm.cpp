@@ -18,7 +18,6 @@
 
 #include "shared_realm.hpp"
 
-#include "impl/handover.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "impl/transact_log_handler.hpp"
 
@@ -26,7 +25,7 @@
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "schema.hpp"
-#include "thread_confined.hpp"
+#include "thread_safe_reference.hpp"
 
 #include "util/format.hpp"
 
@@ -657,99 +656,74 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
     return util::none;
 }
 
-Realm::ThreadSafeReference::ThreadSafeReference(ThreadSafeReference&&) = default;
-Realm::ThreadSafeReference& Realm::ThreadSafeReference::operator=(ThreadSafeReference&&) = default;
-
-// Precondition: `m_version` is not greater than `new_version`
-// Postcondition: `m_version` is equal to `new_version`
-void Realm::ThreadSafeReference::advance_to_version(VersionID new_version)
-{
-    if (new_version == m_version_id) {
-        return;
-    }
-    REALM_ASSERT_DEBUG(new_version > m_version_id);
-
-    // Open `Realm` at handover version
-    _impl::RealmCoordinator& coordinator = get_coordinator();
-    Realm::Config config = coordinator.get_config();
-    config.cache = false;
-    SharedRealm realm = coordinator.get_realm(config);
-    REALM_ASSERT(!realm->is_in_read_transaction());
-    realm->m_group = &const_cast<Group&>(realm->m_shared_group->begin_read(m_version_id));
-
-    // Import handover, advance version, and then repackage for handover
-    AnyThreadConfined value = realm->resolve_thread_safe_reference(std::move(*this));
-    transaction::advance(*realm->m_shared_group, realm->m_binding_context.get(),
-                         realm->m_config.schema_mode, new_version);
-    *this = realm->obtain_thread_safe_reference(std::move(value));
-}
-
-Realm::ThreadSafeReference::~ThreadSafeReference()
-{
-    if (is_awaiting_import()) {
-        get_coordinator().get_realm()->m_shared_group->unpin_version(m_version_id);
-        mark_not_awaiting_import();
-    }
-}
-
-realm::Realm::ThreadSafeReference realm::Realm::obtain_thread_safe_reference(AnyThreadConfined value)
+template <typename T>
+realm::ThreadSafeReference<T> realm::Realm::obtain_thread_safe_reference(T value)
 {
     verify_thread();
     if (is_in_transaction()) {
-        throw InvalidTransactionException("Cannot package handover during a write transaction.");
+        throw InvalidTransactionException("Cannot obtain thread safe reference during a write transaction.");
     }
-
-    ThreadSafeReference reference;
-    auto version_id = m_shared_group->pin_version();
-    reference.m_version_id = version_id;
-    reference.m_source_realm = shared_from_this();
-    // Since `m_source_realm` is used to determine if we need to unpin when destroyed,
-    // `m_source_realm` should only be set after `pin_version` succeeds in case it throws.
-
-    REALM_ASSERT(value.get_realm().get() == this);
-    reference.m_handover = std::make_unique<_impl::AnyHandover>(value.export_for_handover());
-
-    return reference;
+    return ThreadSafeReference<T>(value);
 }
 
-AnyThreadConfined realm::Realm::resolve_thread_safe_reference(Realm::ThreadSafeReference handover)
+template realm::ThreadSafeReference<Object> realm::Realm::obtain_thread_safe_reference(Object value);
+template realm::ThreadSafeReference<List> realm::Realm::obtain_thread_safe_reference(List value);
+template realm::ThreadSafeReference<Results> realm::Realm::obtain_thread_safe_reference(Results value);
+
+template <typename T>
+T realm::Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
 {
     verify_thread();
-
-    if (!handover.is_awaiting_import()) {
-        throw std::logic_error("Handover package must not be imported more than once.");
-    }
-
-    auto unpin_version = util::make_scope_exit([&]() noexcept {
-        m_shared_group->unpin_version(handover.m_version_id);
-        handover.mark_not_awaiting_import();
-    });
-
     if (is_in_transaction()) {
-        throw InvalidTransactionException("Cannot accept handover during a write transaction.");
+        throw InvalidTransactionException("Cannot resolve thread safe reference during a write transaction.");
+    }
+    if (reference.is_invalidated()) {
+        throw std::logic_error("Cannot resolve thread safe reference more than once.");
+    }
+    if (!reference.has_same_config(*this)) {
+        throw MismatchedRealmException("Cannot resolve thread safe reference in Realm with different configuration"
+                                       "than the source Realm.");
     }
 
-    // Ensure we're on the same version as the handover
+    // Ensure we're on the same version as the reference
     if (!m_group) {
-        // A read transaction doesn't yet exist, so create at the handover version
-        m_group = &const_cast<Group&>(m_shared_group->begin_read(handover.m_version_id));
+        // A read transaction doesn't yet exist, so create at the reference's version
+        m_group = &const_cast<Group&>(m_shared_group->begin_read(reference.m_version_id));
         add_schema_change_handler();
     }
     else {
+        // A read transaction does exist, but let's make sure that its version matches the reference's
         auto current_version = m_shared_group->get_version_of_current_transaction();
+        SharedGroup::VersionID reference_version = SharedGroup::VersionID(reference.m_version_id);
 
-        if (handover.m_version_id <= current_version) {
-            // The handover is behind, so advance it to our version
-            handover.advance_to_version(current_version);
-        } else {
-            // We're behind, so advance to the handover's version
+        // If the reference's version is behind, advance it to our version
+        if (reference_version < current_version) {
+            // Duplicate config for uncached Realm so we don't advance the user's Realm
+            Realm::Config config = m_coordinator->get_config();
+            config.cache = false;
+            SharedRealm temporary_realm = m_coordinator->get_realm(config);
+            REALM_ASSERT(!temporary_realm->is_in_read_transaction());
+
+            // Begin read in temporary Realm at reference's version
+            temporary_realm->m_group =
+                &const_cast<Group&>(temporary_realm->m_shared_group->begin_read(reference_version));
+
+            // With reference imported, advance temporary Realm to our version
+            T imported_value = std::move(reference).import_into_realm(temporary_realm);
+            transaction::advance(*temporary_realm->m_shared_group, temporary_realm->m_binding_context.get(),
+                                 temporary_realm->m_config.schema_mode, current_version);
+            reference = ThreadSafeReference<T>(imported_value);
+
+        }
+        // If we're behind, advance ourselves to the reference's version
+        else if (reference_version > current_version) {
+
             transaction::advance(*m_shared_group, m_binding_context.get(),
-                                 m_config.schema_mode, handover.m_version_id);
+                                 m_config.schema_mode, reference_version);
             m_coordinator->process_available_async(*this);
         }
     }
-
-    AnyThreadConfined value = std::move(*handover.m_handover).import_from_handover(shared_from_this());
+    T value = std::move(reference).import_into_realm(shared_from_this());
 
     // Avoid weird partial-refresh semantics when importing old packages
     refresh();
@@ -757,5 +731,12 @@ AnyThreadConfined realm::Realm::resolve_thread_safe_reference(Realm::ThreadSafeR
     return value;
 }
 
+template Object realm::Realm::resolve_thread_safe_reference(ThreadSafeReference<Object> reference);
+template List realm::Realm::resolve_thread_safe_reference(ThreadSafeReference<List> reference);
+template Results realm::Realm::resolve_thread_safe_reference(ThreadSafeReference<Results> reference);
+
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
 : std::logic_error(util::format(message.data(), path)) { }
+
+MismatchedRealmException::MismatchedRealmException(StringData message)
+: std::logic_error(message.data()) { }

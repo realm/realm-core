@@ -32,7 +32,6 @@
 #include <thread>
 
 namespace realm {
-class AnyThreadConfined;
 class BinaryData;
 class BindingContext;
 class Group;
@@ -41,6 +40,8 @@ class Replication;
 class SharedGroup;
 class StringData;
 struct SyncConfig;
+class ThreadSafeReferenceBase;
+template <typename T> class ThreadSafeReference;
 struct VersionID;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
@@ -120,8 +121,6 @@ enum class SchemaMode : uint8_t {
 
 class Realm : public std::enable_shared_from_this<Realm> {
 public:
-    class ThreadSafeReference;
-
     // A callback function to be called during a migration for Automatic and
     // Manual schema modes. It is passed a SharedRealm at the version before
     // the migration, the SharedRealm in the migration, and a mutable reference
@@ -221,39 +220,15 @@ public:
     Realm(Realm&&) = delete;
     Realm& operator=(Realm&&) = delete;
     ~Realm();
+    
+    // Construct a thread safe reference, pinning the version in the process.
+    template <typename T>
+    ThreadSafeReference<T> obtain_thread_safe_reference(T value);
 
-    // Pins the current version and exports each object for handover.
-    ThreadSafeReference obtain_thread_safe_reference(AnyThreadConfined objects_to_hand_over);
-
-    // Unpins the handover version, ending the current read transaction and beginning a new one at this version,
-    // importing each object for handover.
-    AnyThreadConfined resolve_thread_safe_reference(Realm::ThreadSafeReference handover);
-
-    // Opaque type representing an object for handover
-    class ThreadSafeReference {
-    public:
-        ThreadSafeReference(const ThreadSafeReference&) = delete;
-        ThreadSafeReference& operator=(const ThreadSafeReference&) = delete;
-        ThreadSafeReference(ThreadSafeReference&&);
-        ThreadSafeReference& operator=(ThreadSafeReference&&);
-        ~ThreadSafeReference();
-
-        bool is_awaiting_import() const { return m_source_realm != nullptr; };
-
-    private:
-        friend ThreadSafeReference realm::Realm::obtain_thread_safe_reference(AnyThreadConfined objects_to_hand_over);
-        friend AnyThreadConfined realm::Realm::resolve_thread_safe_reference(Realm::ThreadSafeReference handover);
-
-        VersionID m_version_id;
-        std::unique_ptr<_impl::AnyHandover> m_handover; // FIXME: Remove this extra layer of indirection.
-        SharedRealm m_source_realm; // Strong reference keeps alive so version stays pinned! Don't touch!!
-
-        ThreadSafeReference() = default;
-
-        _impl::RealmCoordinator& get_coordinator() const { return *m_source_realm->m_coordinator; }
-        void mark_not_awaiting_import() { m_source_realm = nullptr; };
-        void advance_to_version(VersionID version);
-    };
+    // Advances the read transaction to the latest version, resolving the thread safe reference and unpinning the
+    // version in the process.
+    template <typename T>
+    T resolve_thread_safe_reference(ThreadSafeReference<T> reference);
 
     static SharedRealm make_shared_realm(Config config) {
         struct make_shared_enabler : public Realm {
@@ -272,6 +247,7 @@ public:
         friend class _impl::RealmCoordinator;
         friend class _impl::ResultsNotifier;
         friend class _impl::AnyHandover;
+        friend class ThreadSafeReferenceBase;
 
         // ResultsNotifier and ListNotifier need access to the SharedGroup
         // to be able to call the handover functions, which are not very wrappable
@@ -368,6 +344,11 @@ private:
 class MismatchedConfigException : public std::logic_error {
 public:
     MismatchedConfigException(StringData message, StringData path);
+};
+
+class MismatchedRealmException : public std::logic_error {
+public:
+    MismatchedRealmException(StringData message);
 };
 
 class InvalidTransactionException : public std::logic_error {

@@ -8,7 +8,7 @@ set(HEADERS
 
 set(SOURCES
     collection_change_indices.cpp
-    handover.cpp
+    thread_safe_reference.cpp
     index_set.cpp
     list.cpp
     main.cpp

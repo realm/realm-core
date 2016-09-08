@@ -25,7 +25,7 @@
 #include "object_schema.hpp"
 #include "property.hpp"
 #include "schema.hpp"
-#include "thread_confined.hpp"
+#include "thread_safe_reference.hpp"
 
 #include <realm/history.hpp>
 #include <realm/util/optional.hpp>
@@ -53,7 +53,7 @@ static Property nullable(Property p) {
     return p;
 }
 
-TEST_CASE("handover") {
+TEST_CASE("thread safe reference") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -80,11 +80,11 @@ TEST_CASE("handover") {
     r->commit_transaction();
 
     SECTION("disallowed during write transactions") {
-        SECTION("export") {
+        SECTION("obtain") {
             r->begin_transaction();
             REQUIRE_THROWS(r->obtain_thread_safe_reference(foo));
         }
-        SECTION("import") {
+        SECTION("resolve") {
             auto ref = r->obtain_thread_safe_reference(foo);
             r->begin_transaction();
             REQUIRE_THROWS(r->resolve_thread_safe_reference(std::move(ref)));
@@ -102,27 +102,27 @@ TEST_CASE("handover") {
             return version;
         };
 
-        auto handover_version = get_current_version();
+        auto reference_version = get_current_version();
         auto ref = util::make_optional(r->obtain_thread_safe_reference(foo));
         r->begin_transaction(); r->commit_transaction(); // Advance version
 
-        REQUIRE(get_current_version() != handover_version); // Ensure advanced
-        REQUIRE_NOTHROW(shared_group.begin_read(handover_version)); shared_group.end_read(); // Ensure pinned
+        REQUIRE(get_current_version() != reference_version); // Ensure advanced
+        REQUIRE_NOTHROW(shared_group.begin_read(reference_version)); shared_group.end_read(); // Ensure pinned
 
-        SECTION("destroyed without being imported") {
-            ref = {}; // Destroy handover, unpinning version
+        SECTION("destroyed without being resolved") {
+            ref = {}; // Destroy thread safe reference, unpinning version
         }
-        SECTION("exception thrown on import") {
-            r->begin_transaction(); // Get into invalid state for accepting handover
+        SECTION("exception thrown on resolve") {
+            r->begin_transaction(); // Get into state that'll throw exception on resolve
             REQUIRE_THROWS(r->resolve_thread_safe_reference(std::move(*ref)));
             r->commit_transaction();
         }
         r->begin_transaction(); r->commit_transaction(); // Clean up old versions
-        REQUIRE_THROWS(shared_group.begin_read(handover_version)); // Ensure unpinned
+        REQUIRE_THROWS(shared_group.begin_read(reference_version)); // Ensure unpinned
     }
 
     SECTION("version mismatch") {
-        SECTION("import into older version") {
+        SECTION("resolves at older version") {
             r->begin_transaction();
             Object num = create_object(r, int_object);
             num.row().set_int(0, 7);
@@ -144,7 +144,7 @@ TEST_CASE("handover") {
                 return r->obtain_thread_safe_reference(num);
             }).get();
             REQUIRE(num.row().get_int(0) == 7);
-            Object num_prime = r->resolve_thread_safe_reference(std::move(ref)).get_object();
+            Object num_prime = r->resolve_thread_safe_reference(std::move(ref));
             REQUIRE(num_prime.row().get_int(0) == 9);
             REQUIRE(num.row().get_int(0) == 9);
             r->begin_transaction();
@@ -153,7 +153,7 @@ TEST_CASE("handover") {
             REQUIRE(num_prime.row().get_int(0) == 11);
             REQUIRE(num.row().get_int(0) == 11);
         }
-        SECTION("import into newer version") {
+        SECTION("resolve at newer version") {
             r->begin_transaction();
             Object num = create_object(r, int_object);
             num.row().set_int(0, 7);
@@ -173,7 +173,7 @@ TEST_CASE("handover") {
                 r->commit_transaction();
                 REQUIRE(num.row().get_int(0) == 9);
 
-                Object num_prime = r->resolve_thread_safe_reference(std::move(ref)).get_object();
+                Object num_prime = r->resolve_thread_safe_reference(std::move(ref));
                 REQUIRE(num_prime.row().get_int(0) == 9);
                 r->begin_transaction();
                 num_prime.row().set_int(0, 11);
@@ -185,7 +185,7 @@ TEST_CASE("handover") {
             r->refresh();
             REQUIRE(num.row().get_int(0) == 11);
         }
-        SECTION("import multiple versions") {
+        SECTION("resolve references at multiple versions") {
             auto commit_new_num = [&](int value) -> Object {
                 r->begin_transaction();
                 Object num = create_object(r, int_object);
@@ -198,8 +198,8 @@ TEST_CASE("handover") {
             auto ref2 = r->obtain_thread_safe_reference(commit_new_num(2));
             std::thread([ref1 = std::move(ref1), ref2 = std::move(ref2), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
-                Object num1 = r->resolve_thread_safe_reference(std::move(ref1)).get_object();
-                Object num2 = r->resolve_thread_safe_reference(std::move(ref2)).get_object();
+                Object num1 = r->resolve_thread_safe_reference(std::move(ref1));
+                Object num2 = r->resolve_thread_safe_reference(std::move(ref2));
 
                 REQUIRE(num1.row().get_int(0) == 1);
                 REQUIRE(num2.row().get_int(0) == 2);
@@ -217,7 +217,7 @@ TEST_CASE("handover") {
         auto ref = r->obtain_thread_safe_reference(num);
         SECTION("same realm") {
             {
-                Object num = r->resolve_thread_safe_reference(std::move(ref)).get_object();
+                Object num = r->resolve_thread_safe_reference(std::move(ref));
                 REQUIRE(num.row().get_int(0) == 7);
                 r->begin_transaction();
                 num.row().set_int(0, 9);
@@ -230,7 +230,7 @@ TEST_CASE("handover") {
             {
                 config.cache = false;
                 SharedRealm r = Realm::get_shared_realm(config);
-                Object num = r->resolve_thread_safe_reference(std::move(ref)).get_object();
+                Object num = r->resolve_thread_safe_reference(std::move(ref));
                 REQUIRE(num.row().get_int(0) == 7);
                 r->begin_transaction();
                 num.row().set_int(0, 9);
@@ -280,8 +280,8 @@ TEST_CASE("handover") {
             auto ref_num = r->obtain_thread_safe_reference(num);
             std::thread([ref_str = std::move(ref_str), ref_num = std::move(ref_num), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
-                Object str = r->resolve_thread_safe_reference(std::move(ref_str)).get_object();
-                Object num = r->resolve_thread_safe_reference(std::move(ref_num)).get_object();
+                Object str = r->resolve_thread_safe_reference(std::move(ref_str));
+                Object num = r->resolve_thread_safe_reference(std::move(ref_num));
 
                 REQUIRE(str.row().get_string(0).is_null());
                 REQUIRE(num.row().get_int(0) == 0);
@@ -313,7 +313,7 @@ TEST_CASE("handover") {
             auto ref = r->obtain_thread_safe_reference(lst);
             std::thread([ref = std::move(ref), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
-                List lst = r->resolve_thread_safe_reference(std::move(ref)).get_list();
+                List lst = r->resolve_thread_safe_reference(std::move(ref));
 
                 REQUIRE(lst.size() == 1);
                 REQUIRE(lst.get(0).get_int(0) == 0);
@@ -361,7 +361,7 @@ TEST_CASE("handover") {
             auto ref = r->obtain_thread_safe_reference(results);
             std::thread([ref = std::move(ref), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
-                Results results = r->resolve_thread_safe_reference(std::move(ref)).get_results();
+                Results results = r->resolve_thread_safe_reference(std::move(ref));
 
                 REQUIRE(results.size() == 3);
                 REQUIRE(results.get(0).get_string(0) == "D");
@@ -406,9 +406,9 @@ TEST_CASE("handover") {
             std::thread([ref_num = std::move(ref_num), ref_lst = std::move(ref_lst),
                          ref_results = std::move(ref_results), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
-                Object num = r->resolve_thread_safe_reference(std::move(ref_num)).get_object();
-                List lst = r->resolve_thread_safe_reference(std::move(ref_lst)).get_list();
-                Results results = r->resolve_thread_safe_reference(std::move(ref_results)).get_results();
+                Object num = r->resolve_thread_safe_reference(std::move(ref_num));
+                List lst = r->resolve_thread_safe_reference(std::move(ref_lst));
+                Results results = r->resolve_thread_safe_reference(std::move(ref_results));
 
                 REQUIRE(lst.size() == 0);
                 REQUIRE(results.size() == 1);
@@ -449,12 +449,12 @@ TEST_CASE("handover") {
         auto ref = r->obtain_thread_safe_reference(num);
         std::thread([ref = std::move(ref), config]() mutable {
             SharedRealm r = Realm::get_shared_realm(config);
-            Object num = r->resolve_thread_safe_reference(std::move(ref)).get_object();
+            Object num = r->resolve_thread_safe_reference(std::move(ref));
             REQUIRE(num.get_object_schema().name == "int_object");
         }).join();
     }
 
-    SECTION("disallow multiple imports") {
+    SECTION("disallow multiple resolves") {
         auto ref = r->obtain_thread_safe_reference(foo);
         r->resolve_thread_safe_reference(std::move(ref));
         REQUIRE_THROWS(r->resolve_thread_safe_reference(std::move(ref)));
