@@ -231,8 +231,17 @@ public:
     ParentNode(const ParentNode& from, QueryNodeHandoverPatches* patches) :
         m_child(from.m_child ? from.m_child->clone(patches) : nullptr),
         m_condition_column_idx(from.m_condition_column_idx), m_dD(from.m_dD), m_dT(from.m_dT),
-        m_probes(from.m_probes), m_matches(from.m_matches), m_table(from.m_table)
+        m_probes(from.m_probes), m_matches(from.m_matches), 
+        // If a copy is created for handover, we should clear said copys
+        // table reference. Even though the copy is patched later on a different
+        // thread and thus has its table reference reset, the reset of a smartptr to a
+        // table which is otherwise manipulated on this thread constitutes a race.
+        m_table()
     {
+        // Only if a copy is created for the local thread, should we copy its
+        // table reference:
+        if (patches == nullptr)
+            m_table = from.m_table;
     }
 
     void add_child(std::unique_ptr<ParentNode> child)
