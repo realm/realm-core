@@ -117,7 +117,15 @@ public:
 
     Realm::Config get_configuration() const;
 
-    SyncMetadataManager(std::string path);
+
+    /// Construct the metadata manager.
+    ///
+    /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make
+    /// the object store handle generating and persisting an encryption key for the metadata database. Otherwise, an
+    /// exception will be thrown.
+    SyncMetadataManager(std::string path,
+                        bool should_encrypt,
+                        util::Optional<std::vector<char>> encryption_key=none);
 
 private:
     SyncUserMetadataResults get_users(bool marked) const;
