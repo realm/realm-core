@@ -240,6 +240,10 @@ download_openssl()
     # dependencies due to being written in asm
     sed '/OPENSSL_cleanse/d' 'openssl/crypto/sha/sha256.c' > sha_tmp
     mv sha_tmp 'openssl/crypto/sha/sha256.c'
+
+    # openssl/config won't report failure which cause the script silently using the previous lib instead which is wrong.
+    # Insert an exit to the config script to make sure the build stops when fails.
+    sed -i '/echo \"This system (\$OUT) is not supported\. See file INSTALL for details\.\"/a \ \ exit 1' openssl/config || exit 1
 }
 
 # Setup OS specific stuff
