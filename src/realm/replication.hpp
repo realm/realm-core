@@ -50,7 +50,7 @@ class Logger;
 
 /// Replication is enabled by passing an instance of an implementation of this
 /// class to the SharedGroup constructor.
-class Replication : public _impl::TransactLogConvenientEncoder, protected _impl::TransactLogStream {
+class Replication : public _impl::TransactLogConvenientEncoder {
 public:
     // Be sure to keep this type aligned with what is actually used in
     // SharedGroup.
@@ -383,7 +383,10 @@ public:
     }
 
 protected:
-    Replication();
+    Replication(_impl::TransactLogStream& stream)
+        : _impl::TransactLogConvenientEncoder(stream)
+    {
+    }
 
 
     //@{
@@ -435,7 +438,11 @@ public:
 protected:
     typedef Replication::version_type version_type;
 
-    TrivialReplication(const std::string& database_file);
+    TrivialReplication(const std::string& database_file)
+        : Replication(m_stream)
+        , m_database_file(database_file)
+    {
+    }
 
     virtual version_type prepare_changeset(const char* data, size_t size, version_type orig_version) = 0;
     virtual void finalize_changeset() noexcept = 0;
@@ -454,25 +461,17 @@ protected:
     void do_abort_transact() noexcept override;
     void do_interrupt() noexcept override;
     void do_clear_interrupt() noexcept override;
-    void transact_log_reserve(size_t n, char** new_begin, char** new_end) override;
-    void transact_log_append(const char* data, size_t size, char** new_begin, char** new_end) override;
 
 private:
     const std::string m_database_file;
-    util::Buffer<char> m_transact_log_buffer;
-    bool m_history_updated;
-    void internal_transact_log_reserve(size_t, char** new_begin, char** new_end);
+    bool m_history_updated = false;
+    _impl::TransactLogBufferStream m_stream;
 
     size_t transact_log_size();
 };
 
 
 // Implementation:
-
-inline Replication::Replication()
-    : _impl::TransactLogConvenientEncoder(static_cast<_impl::TransactLogStream&>(*this))
-{
-}
 
 inline void Replication::initiate_transact(version_type current_version, bool history_updated)
 {
@@ -510,11 +509,6 @@ inline bool Replication::is_sync_agent() const noexcept
     return false;
 }
 
-inline TrivialReplication::TrivialReplication(const std::string& database_file)
-    : m_database_file(database_file)
-{
-}
-
 inline bool TrivialReplication::is_history_updated() const noexcept
 {
     return m_history_updated;
@@ -522,29 +516,14 @@ inline bool TrivialReplication::is_history_updated() const noexcept
 
 inline BinaryData TrivialReplication::get_uncommitted_changes() const noexcept
 {
-    const char* data = m_transact_log_buffer.data();
+    const char* data = m_stream.data();
     size_t size = write_position() - data;
     return BinaryData(data, size);
 }
 
 inline size_t TrivialReplication::transact_log_size()
 {
-    return write_position() - m_transact_log_buffer.data();
-}
-
-inline void TrivialReplication::transact_log_reserve(size_t n, char** new_begin, char** new_end)
-{
-    internal_transact_log_reserve(n, new_begin, new_end);
-}
-
-inline void TrivialReplication::internal_transact_log_reserve(size_t n, char** new_begin, char** new_end)
-{
-    char* data = m_transact_log_buffer.data();
-    size_t size = write_position() - data;
-    m_transact_log_buffer.reserve_extra(size, n);
-    data = m_transact_log_buffer.data(); // May have changed
-    *new_begin = data + size;
-    *new_end = data + m_transact_log_buffer.size();
+    return write_position() - m_stream.data();
 }
 
 } // namespace realm
