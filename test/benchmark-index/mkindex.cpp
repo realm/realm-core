@@ -33,7 +33,7 @@ REALM_TABLE_7(IndexTable,
 
 
 
-int main(int argc, char* argv[])
+int main()
 {
     Group* g = new Group();
 
@@ -58,7 +58,7 @@ int main(int argc, char* argv[])
     printf("\nOptimizing\n");
     t->optimize();
     printf("Creating index\n");
-    t->column().s1.set_index();
+    t->column().s1.add_search_index();
     printf("Writing to disk\n");
     g->write("test.realm");
 }
