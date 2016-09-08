@@ -80,38 +80,26 @@ def pullPackages(packages, fileType, distroName, distroVersion) {
   def masterToken = getMasterToken(repoName)
   def readToken = getReadToken(masterToken, repoName)
   for(packageName in packages) {
-    if(distroName == 'el') {
-      sh "curl -L -s -f -O -XGET https://${readToken}:@packagecloud.io/realm/sync-devel/${distroName}/${distroVersion}/x86_64/${packageName}-${RPM_VERSION}.${distroName}${distroVersion}.x86_64.rpm"
-    } else if(distroName == 'ubuntu') {
-      sh "curl -L -s -f -O -XGET https://${readToken}:@packagecloud.io/realm/sync-devel/${distroName}/${distroVersion}/amd64/${packageName}_${DEB_VERSION}_amd64.deb"
-    }
+    sh "curl -L -s -f -O -XGET https://${readToken}:@packagecloud.io/realm/sync-devel/${distroName}/${distroVersion}/x86_64/${packageName}-${RPM_VERSION}.${distroName}${distroVersion}.x86_64.rpm"
   }
 }
 
 def pushPackages(packages, fileType, distroName, distroVersion) {
   def distroId = getPackageCloudDistributionID(fileType, distroName, distroVersion)
   for(packageName in packages) {
-    if(distroName == 'el') {
-      pushToPackageCloud('sync', "${packageName}-${RPM_VERSION}.${distroName}${distroVersion}.x86_64.rpm", distroId)
-    } else if(distroName == 'ubuntu') {
-      pushToPackageCloud('sync', "${packageName}_${DEB_VERSION}_amd64.deb", distroId)
-    }
+    pushToPackageCloud('sync', "${packageName}-${RPM_VERSION}.${distroName}${distroVersion}.x86_64.rpm", distroId)
   }
 }
 
 node {
   setBuildName("${RPM_VERSION}")
   
-  def rpmPackages = ['realm', 'realm-devel', 'realm-node', 'realm-node-devel', 'realm-utils']
-  def debPackages = ['librealm', 'librealm-dev', 'librealm-node', 'librealm-node-dev', 'realm-utils']
-
+  def packages = ['realm', 'realm-devel', 'realm-node', 'realm-node-devel', 'realm-utils']
   dir("packages") {
-    pullPackages(rpmPackages, 'rpm', 'el', 6)
-    pullPackages(rpmPackages, 'rpm', 'el', 7)
-    pullPackages(debPackages, 'deb', 'ubuntu', 'xenial')
+    pullPackages(packages, 'rpm', 'el', 6)
+    pullPackages(packages, 'rpm', 'el', 7)
 
-    pushPackages(rpmPackages, 'rpm', 'el', 6)
-    pushPackages(rpmPackages, 'rpm', 'el', 7)
-    pushPackages(debPackages, 'deb', 'ubuntu', 'xenial')
+    pushPackages(packages, 'rpm', 'el', 6)
+    pushPackages(packages, 'rpm', 'el', 7)
   }
 }

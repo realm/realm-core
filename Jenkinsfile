@@ -75,12 +75,9 @@ try {
 
     if (gitTag != "") {
       stage 'trigger release'
-      build job: 'sync_release/realm-core-release',
+      build job: 'sync_release/realm-core-rpm-release',
         wait: false,
-        parameters: [
-          [$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"],
-          [$class: 'StringParameterValue', name: 'DEB_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"]
-        ]
+        parameters: [[$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"]]
     }
   }
 } catch(Exception e) {
