@@ -60,7 +60,8 @@ try {
   parallel(
     generic: doBuildPackage('generic', 'tgz'),
     centos7: doBuildPackage('centos-7', 'rpm'),
-    centos6: doBuildPackage('centos-6', 'rpm')
+    centos6: doBuildPackage('centos-6', 'rpm'),
+    ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
   )
 
   if (['master', 'next-major'].contains(env.BRANCH_NAME)) {
@@ -68,7 +69,8 @@ try {
     parallel(
       generic: doPublishGeneric(),
       centos7: doPublish('centos-7', 'rpm', 'el', 7),
-      centos6: doPublish('centos-6', 'rpm', 'el', 6)
+      centos6: doPublish('centos-6', 'rpm', 'el', 6),
+      ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
     )
 
     if (gitTag != "") {
