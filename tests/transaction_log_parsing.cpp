@@ -1385,6 +1385,84 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.modified(0, 0));
         }
 
+        SECTION("moving an observed object with swap() does not interfere with tracking") {
+            Row r1 = target->get(1), r2 = target->get(3);
+
+            // swap two observed rows
+            auto changes = observe({r1, r2}, [&] {
+                target->swap_rows(r1.get_index(), r2.get_index());
+                r1.set_int(0, 5);
+                r2.set_int(1, 5);
+            });
+
+            REQUIRE(changes.modified(0, 0));
+            REQUIRE_FALSE(changes.modified(0, 1));
+            REQUIRE_FALSE(changes.modified(0, 2));
+
+            REQUIRE_FALSE(changes.modified(1, 0));
+            REQUIRE(changes.modified(1, 1));
+            REQUIRE_FALSE(changes.modified(1, 2));
+
+            // swap with just first row observed
+            changes = observe({r1, r2}, [&] {
+                r1.set_int(0, 5);
+                target->swap_rows(r1.get_index(), 5);
+                r1.set_int(1, 5);
+            });
+
+            REQUIRE(changes.modified(0, 0));
+            REQUIRE(changes.modified(0, 1));
+            REQUIRE_FALSE(changes.modified(0, 2));
+
+            // swap with just second row observed
+            changes = observe({r1, r2}, [&] {
+                r2.set_int(0, 5);
+                target->swap_rows(r2.get_index(), 0);
+                r2.set_int(1, 5);
+            });
+
+            REQUIRE(changes.modified(1, 0));
+            REQUIRE(changes.modified(1, 1));
+            REQUIRE_FALSE(changes.modified(1, 2));
+        }
+
+        SECTION("subsuming an observed object updates tracking to the new object") {
+            Row r = target->get(1);
+            auto changes = observe({r}, [&] {
+                size_t row = target->add_empty_row();
+                r.set_int(1, 5);
+                target->set_int_unique(0, row, r.get_int(0));
+                r.set_int(2, 5);
+            });
+            REQUIRE_FALSE(changes.modified(0, 0));
+            REQUIRE(changes.modified(0, 1));
+            REQUIRE(changes.modified(0, 2));
+
+            // add two rows so that the new row doesn't just get moved over the old one
+            changes = observe({r}, [&] {
+                size_t row = target->add_empty_row(2);
+                r.set_int(1, 6);
+                target->set_int_unique(0, row, r.get_int(0));
+                r.set_int(2, 6);
+            });
+            REQUIRE_FALSE(changes.modified(0, 0));
+            REQUIRE(changes.modified(0, 1));
+            REQUIRE(changes.modified(0, 2));
+
+            // subsume "backwards" where the new row is before the old one
+            Row r1 = target->get(0);
+            Row r2 = target->get(1);
+            Row r3 = target->back();
+            changes = observe({r}, [&] {
+                r.set_int(1, 6);
+                target->set_int_unique(0, 2, r.get_int(0));
+                r.set_int(2, 6);
+            });
+            REQUIRE_FALSE(changes.modified(0, 0));
+            REQUIRE(changes.modified(0, 1));
+            REQUIRE(changes.modified(0, 2));
+        }
+
         SECTION("inserting a column into an observed table does not break tracking") {
             Row r = target->get(0);
             auto changes = observe({r}, [&] {
@@ -1570,6 +1648,16 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {10, 11}));
         }
 
+        SECTION("array: moving the observed object via swap() does not interrupt tracking") {
+            Row r = origin->get(0);
+            auto changes = observe({r}, [&] {
+                lv->add(0);
+                origin->swap_rows(0, 2);
+                lv->add(0);
+            });
+            REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {10, 11}));
+        }
+
         SECTION("array: moving the observed object via move_last_over() does not interrupt tracking") {
             Row r = origin->get(0);
 
@@ -1583,6 +1671,26 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 lv->add(0);
             });
             REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {10, 11}));
+        }
+
+        SECTION("array: moving the observed object via primary key subsumption does not interrupt tracking") {
+            Row r = origin->get(0);
+            auto changes = observe({r}, [&] {
+                size_t row = origin->add_empty_row();
+                lv->add(0);
+                origin->set_int_unique(0, row, r.get_int(0));
+                lv->add(0);
+            });
+            REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {10, 11}));
+
+            // add two rows so that the new row doesn't just get moved over the old one
+            changes = observe({r}, [&] {
+                size_t row = origin->add_empty_row(2);
+                lv->add(0);
+                origin->set_int_unique(0, row, r.get_int(0));
+                lv->add(0);
+            });
+            REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {12, 13}));
         }
     }
 }
