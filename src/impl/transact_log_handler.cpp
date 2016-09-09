@@ -229,7 +229,7 @@ void adjust_for_move(size_t& value, size_t from, size_t to)
         value = to;
     else if (value > from && value < to)
         --value;
-    else if (value < from && value > to)
+    else if (value < from && value >= to)
         ++value;
 }
 
@@ -298,6 +298,7 @@ public:
             return;
         }
 
+        std::sort(begin(m_observers), end(m_observers));
         func(*this);
         context->did_change(m_observers, invalidated);
     }
@@ -339,20 +340,43 @@ public:
         return true;
     }
 
-    bool erase_rows(size_t row_ndx, size_t, size_t last_row_ndx, bool unordered)
+    bool erase_rows(size_t row_ndx, size_t rows_to_erase, size_t prior_size, bool unordered)
     {
-        for (size_t i = 0; i < m_observers.size(); ++i) {
-            auto& o = m_observers[i];
-            if (o.table_ndx == current_table()) {
-                if (o.row_ndx == row_ndx) {
-                    invalidate(&o);
-                    --i;
-                }
-                else if (unordered && o.row_ndx == last_row_ndx) {
-                    o.row_ndx = row_ndx;
-                }
-                else if (!unordered && o.row_ndx > row_ndx) {
-                    o.row_ndx -= 1;
+        REALM_ASSERT(unordered || rows_to_erase == 1);
+        size_t last_row_ndx = prior_size - 1;
+
+        if (unordered) {
+            auto end = m_observers.end();
+            auto row_it = lower_bound(begin(m_observers), end, ObserverState{current_table(), row_ndx, nullptr});
+            auto last_it = lower_bound(row_it, end, ObserverState{current_table(), last_row_ndx, nullptr});
+            bool have_row = row_it != end && row_it->table_ndx == current_table() && row_it->row_ndx == row_ndx;
+            bool have_last = last_it != end && last_it->table_ndx == current_table() && last_it->row_ndx == last_row_ndx;
+            if (have_row && have_last) {
+                invalidated.push_back(row_it->info);
+                row_it->info = last_it->info;
+                row_it->changes = std::move(last_it->changes);
+                m_observers.erase(last_it);
+            }
+            else if (have_row) {
+                invalidated.push_back(row_it->info);
+                m_observers.erase(row_it);
+            }
+            else if (have_last) {
+                last_it->row_ndx = row_ndx;
+                std::rotate(row_it, last_it, end);
+            }
+        }
+        else {
+            for (size_t i = 0; i < m_observers.size(); ++i) {
+                auto& o = m_observers[i];
+                if (o.table_ndx == current_table()) {
+                    if (o.row_ndx == row_ndx) {
+                        invalidate(&o);
+                        --i;
+                    }
+                    else if (o.row_ndx > row_ndx) {
+                        o.row_ndx -= rows_to_erase;
+                    }
                 }
             }
         }
