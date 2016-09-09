@@ -479,6 +479,18 @@ def readGitSha() {
   return sha
 }
 
+def get_version() {
+  def dependencies = readProperties file: 'dependencies.list'
+  def gitTag = readGitTag()
+  def gitSha = readGitSha()
+  if (gitTag == "") {
+    return "${dependencies.VERSION}-${gitSha}"
+  }
+  else {
+    return "${dependencies.VERSION}"
+  }
+}
+
 def getDeviceNames(String commandOutput) {
   def deviceNames = []
   for (line in commandOutput.split('\n')) {
@@ -526,14 +538,7 @@ def doPublishGeneric() {
   return {
     node {
       getArchive()
-      def version
-      if (gitTag == "") {
-        version = "${dependencies.VERSION}-${gitSha}"
-      }
-      else {
-        version = "${dependencies.VERSION}"
-      }
-
+      def version = get_version()
       def topdir = pwd()
       dir('packaging/out') {
         unstash "packages-generic"
