@@ -484,7 +484,7 @@ def get_version() {
   def gitTag = readGitTag()
   def gitSha = readGitSha()
   if (gitTag == "") {
-    return "${dependencies.VERSION}-${gitSha}"
+    return "${dependencies.VERSION}-g${gitSha}"
   }
   else {
     return "${dependencies.VERSION}"
