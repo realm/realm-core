@@ -3476,7 +3476,7 @@ TEST(Replication_NullInteger)
 }
 
 
-ONLY(Replication_SetUnique)
+TEST(Replication_SetUnique)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
