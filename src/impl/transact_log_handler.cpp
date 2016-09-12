@@ -35,6 +35,7 @@ struct MarkDirtyMixin  {
     bool mark_dirty(size_t row, size_t col) { static_cast<Derived *>(this)->mark_dirty(row, col); return true; }
 
 #if REALM_VER_MAJOR >= 2
+    bool add_int(size_t col, size_t row, int_fast64_t) { return mark_dirty(row, col); }
     bool set_int(size_t col, size_t row, int_fast64_t, _impl::Instruction, size_t) { return mark_dirty(row, col); }
     bool set_bool(size_t col, size_t row, bool, _impl::Instruction) { return mark_dirty(row, col); }
     bool set_float(size_t col, size_t row, float, _impl::Instruction) { return mark_dirty(row, col); }
