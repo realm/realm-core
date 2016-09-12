@@ -2796,6 +2796,43 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
     return find_first<Equal>(value, start, end);
 }
 
+class SortedListComparator {
+public:
+    SortedListComparator(ColumnBase& column_values) : values(column_values) {}
+    // Must return true iff value of ndx is less than needle.
+    bool operator()(int64_t ndx, StringData needle) // used in lower_bound
+    {
+        // The buffer is needed when for when this is an integer index.
+        StringIndex::StringConversionBuffer buffer;
+        StringData a = values.get_index_data(ndx, buffer);
+        if (a.is_null() && !needle.is_null())
+            return true;
+        else if (needle.is_null() && !a.is_null())
+            return false;
+        else if (a.is_null() && needle.is_null())
+            return false;
+
+        if (a == needle)
+            return false;
+        // The StringData::operator< uses a lexicograpical comparison, but we
+        // should use our utf8 sort to compare strings here because thats how
+        // they were put into this ordered column in the first place.
+        return utf8_compare(a, needle);
+    }
+    // Must return true iff value of needle is less than value at ndx.
+    bool operator()(StringData needle, int64_t ndx) // used in upper_bound
+    {
+        StringIndex::StringConversionBuffer buffer;
+        StringData a = values.get_index_data(ndx, buffer);
+        if (needle == a) {
+            return false;
+        }
+        return !(*this)(ndx, needle);
+    }
+private:
+    ColumnBase& values;
+};
+
 namespace realm {
 
 template<>
@@ -2803,11 +2840,27 @@ size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result
 {
     static_cast<void>(result);
     static_cast<void>(result_ref);
-    const size_t first_row_ref = to_size_t(rows.get(0)); //FIXME: find it
 
-    // for integer index, get_index_data fills out 'buffer' and makes str point at it
+    SortedListComparator slc(*column);
+
+    auto it_end = rows.cend();
+    auto lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    if (lower == it_end) {
+        return not_found;
+    }
+
+    // The buffer is needed when for when this is an integer index.
     StringIndex::StringConversionBuffer buffer;
-    StringData str = column->get_index_data(first_row_ref, buffer);
+    StringData found_value = column->get_index_data(*lower, buffer);
+    if (found_value != value) {
+        return not_found;
+    }
+
+    const size_t first_row_ref = to_size_t(*lower);
+
+    // The buffer is needed when for when this is an integer index.
+    StringIndex::StringConversionBuffer buffer2;
+    StringData str = column->get_index_data(first_row_ref, buffer2);
     if (str != value)
         return not_found;
     return first_row_ref;
@@ -2818,15 +2871,26 @@ size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, re
 {
     static_cast<void>(result);
     static_cast<void>(result_ref);
-    const size_t first_row_ref = to_size_t(rows.get(0));
 
-    // for integer index, get_index_data fills out 'buffer' and makes str point at it
+    SortedListComparator slc(*column);
+
+    IntegerColumn::const_iterator it_end = rows.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    if (lower == it_end) {
+        return 0;
+    }
+
+    const size_t first_row_ref = to_size_t(*lower);
+
+    // The buffer is needed when for when this is an integer index.
     StringIndex::StringConversionBuffer buffer;
     StringData str = column->get_index_data(first_row_ref, buffer);
     if (str != value)
         return 0;
 
-    size_t count = rows.size();
+    IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value, slc);
+    size_t count = upper - lower;
+
     return count;
 }
 
@@ -2834,22 +2898,34 @@ template<>
 size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, ref_type& result_ref, const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result_ref);
-    const size_t first_row_ref = to_size_t(rows.get(0));
 
-    // for integer index, get_index_data fills out 'buffer' and makes str point at it
+    SortedListComparator slc(*column);
+
+    auto it_end = rows.cend();
+    auto lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    if (lower == it_end) {
+        return size_t(FindRes_not_found);
+    }
+    const size_t first_row_ref = to_size_t(*lower);
+
+    // The buffer is needed when for when this is an integer index.
     StringIndex::StringConversionBuffer buffer;
     StringData str = column->get_index_data(first_row_ref, buffer);
     if (str != value)
         return size_t(FindRes_not_found);
 
+    auto upper = std::upper_bound(lower, it_end, value, slc);
+
     // Copy all matches into result column
-    for (size_t i = 0; i < rows.size(); ++i)
-        result.add(to_size_t(rows.get(i)));
+    for (auto it = lower; it != upper; ++it) {
+        const size_t cur_row_ref = to_size_t(*it);
+        result.add(cur_row_ref);
+    }
 
     return size_t(FindRes_column);
 }
 
-}
+}   // namespace realm
 
 template<IndexMethod method, class T>
 size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
@@ -2913,7 +2989,7 @@ size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& re
         if (ref & 1) {
             size_t row_ref = size_t(uint64_t(ref) >> 1);
 
-            // for integer index, get_index_data fills out 'buffer' and makes str point at it
+            // The buffer is needed when for when this is an integer index.
             StringIndex::StringConversionBuffer buffer;
             StringData str = column->get_index_data(row_ref, buffer);
             if (str == value) {
