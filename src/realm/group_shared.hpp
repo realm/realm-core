@@ -777,11 +777,29 @@ inline SharedGroup::SharedGroup(Replication& repl, const SharedGroupOptions opti
     open(repl, options); // Throws
 }
 
+namespace _impl {
+    // Only the one matching the REALM_DEBUG setting will be defined, so a link-time
+    // error against one of these functions indicates that the library was compiled
+    // with a different setting than what is currently being built.
+    //
+    // This is necessary because we are not binary compatible with ourselves across
+    // REALM_DEBUG settings. FIXME: Remove this limitation.
+    void please_rebuild_with_REALM_DEBUG_defined_as_0();
+    void please_rebuild_with_REALM_DEBUG_defined_as_1();
+}
+#if REALM_DEBUG
+#define REALM_DEBUG_NOT 0
+#else
+#define REALM_DEBUG_NOT 1
+#endif
+
 inline void SharedGroup::open(const std::string& path, bool no_create_file,
                               const SharedGroupOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
+
+    REALM_CONCAT(_impl::please_rebuild_with_REALM_DEBUG_defined_as_, REALM_DEBUG_NOT)();
 
     bool is_backend = false;
     do_open(path, no_create_file, is_backend, options); // Throws
@@ -791,6 +809,8 @@ inline void SharedGroup::open(Replication& repl, const SharedGroupOptions option
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
+
+    REALM_CONCAT(_impl::please_rebuild_with_REALM_DEBUG_defined_as_, REALM_DEBUG_NOT)();
 
     REALM_ASSERT(!is_attached());
 
