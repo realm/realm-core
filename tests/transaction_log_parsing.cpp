@@ -46,7 +46,11 @@ public:
 #else
     : m_history(make_client_history(path))
 #endif
+#ifdef REALM_GROUP_SHARED_OPTIONS_HPP
+    , m_sg(*m_history, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly))
+#else
     , m_sg(*m_history, SharedGroup::durability_MemOnly)
+#endif
     , m_realm(r)
     , m_group(m_sg.begin_read())
     , m_linkview(lv)
@@ -155,7 +159,11 @@ TEST_CASE("Transaction log parsing: schema change validation") {
         auto history = make_client_history(config.path);
 #endif
 
+#ifdef REALM_GROUP_SHARED_OPTIONS_HPP
+        SharedGroup sg(*history, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+#else
         SharedGroup sg(*history, SharedGroup::durability_MemOnly);
+#endif
 
         SECTION("adding a table is allowed") {
             WriteTransaction wt(sg);
@@ -245,7 +253,11 @@ TEST_CASE("Transaction log parsing: schema change validation") {
         auto history = make_client_history(config.path);
 #endif
 
+#ifdef REALM_GROUP_SHARED_OPTIONS_HPP
+        SharedGroup sg(*history, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+#else
         SharedGroup sg(*history, SharedGroup::durability_MemOnly);
+#endif
 
         SECTION("adding a table is allowed") {
             WriteTransaction wt(sg);
@@ -353,7 +365,11 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 #else
             auto history = make_client_history(config.path);
 #endif
+#ifdef REALM_GROUP_SHARED_OPTIONS_HPP
+            SharedGroup sg(*history, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+#else
             SharedGroup sg(*history, SharedGroup::durability_MemOnly);
+#endif
             sg.begin_read();
 
             r->begin_transaction();
@@ -1048,7 +1064,11 @@ TEST_CASE("DeepChangeChecker") {
 #else
         auto history = make_client_history(config.path);
 #endif
+#ifdef REALM_GROUP_SHARED_OPTIONS_HPP
+        SharedGroup sg(*history, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+#else
         SharedGroup sg(*history, SharedGroup::durability_MemOnly);
+#endif
         Group const& g = sg.begin_read();
 
         r->begin_transaction();
