@@ -2,6 +2,12 @@
 
 ### Bugfixes
 
+* Fixed a bug where find() on a Query constructed from a restricting view
+  did not correctly return an row index into the underlying table.
+  (issue #2127)
+* Fixed a bug where linked tables were not updated after a table move operation, when
+  run through the replicator.
+* Fixed a bug where moving a column to itself caused a crash.
 * Fix subspecs not updating properly after a move operation.
 * Fixed various crashes when using subtables. The crash will occur when the first column
   of the subtable if of type `col_type_Timestamp` or if it is nullable and of type Bool, Int
@@ -26,6 +32,7 @@
 * When creating a `SharedGroup`, optionally allow setting the temporary 
   directory to when making named pipes fails. This is to fix a bug
   involving mkfifo on recent android devices (#1959).
+* Added debian packages for Ubuntu 16.04.
 
 -----------
 

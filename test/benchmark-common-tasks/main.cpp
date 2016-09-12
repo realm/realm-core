@@ -58,6 +58,7 @@ const double min_duration_s = 0.1;
 const double min_warmup_time_s = 0.05;
 
 struct Benchmark {
+    virtual ~Benchmark() {}
     virtual const char* name() const = 0;
     virtual void before_all(SharedGroup&)
     {
@@ -156,6 +157,116 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
             t->set_string(0, i, s);
         }
         tr.commit();
+    }
+};
+
+struct BenchmarkWithStringsFewDup : BenchmarkWithStringsTable {
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkWithStringsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("StringOnly");
+        t->add_empty_row(BASE_SIZE * 4);
+        Random r;
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+            std::stringstream ss;
+            ss << r.draw_int(0, BASE_SIZE * 2);
+            auto s = ss.str();
+            t->set_string(0, i, s);
+        }
+        t->add_search_index(0);
+        tr.commit();
+    }
+};
+
+struct BenchmarkWithStringsManyDup : BenchmarkWithStringsTable {
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkWithStringsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("StringOnly");
+        t->add_empty_row(BASE_SIZE * 4);
+        Random r;
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+            std::stringstream ss;
+            ss << r.draw_int(0, 100);
+            auto s = ss.str();
+            t->set_string(0, i, s);
+        }
+        t->add_search_index(0);
+        tr.commit();
+    }
+};
+
+struct BenchmarkDistinctStringFewDupes : BenchmarkWithStringsFewDup {
+    const char* name() const { return "DistinctStringFewDupes"; }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        ConstTableView view = table->get_distinct_view(0);
+    }
+};
+
+struct BenchmarkDistinctStringManyDupes : BenchmarkWithStringsManyDup {
+    const char* name() const { return "DistinctStringManyDupes"; }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        ConstTableView view = table->get_distinct_view(0);
+    }
+};
+
+struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
+    const char* name() const { return "FindAllStringFewDupes"; }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        ConstTableView view = table->where().equal(0, StringData("10", 2)).find_all();
+    }
+};
+
+struct BenchmarkFindAllStringManyDupes : BenchmarkWithStringsManyDup {
+    const char* name() const { return "FindAllStringManyDupes"; }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        ConstTableView view = table->where().equal(0, StringData("10", 2)).find_all();
+    }
+};
+
+struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
+    const char* name() const { return "FindFirstStringFewDupes"; }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        std::vector<std::string> strs = { "10", "20", "30", "40", "50", "60", "70", "80", "90", "100", };
+        for (auto s : strs) {
+            table->where().equal(0, StringData(s)).find();
+        }
+    }
+};
+
+struct BenchmarkFindFirstStringManyDupes : BenchmarkWithStringsManyDup {
+    const char* name() const { return "FindFirstStringManyDupes"; }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        std::vector<std::string> strs = { "10", "20", "30", "40", "50", "60", "70", "80", "90", "100", };
+        for (auto s : strs) {
+            table->where().equal(0, StringData(s)).find();
+        }
     }
 };
 
@@ -605,16 +716,15 @@ void run_benchmark(TestContext& test_context, BenchmarkResults& results)
         benchmark.before_all(*group);
 
         // Warm-up and initial measuring:
-        Timer t_baseline(Timer::type_UserTime);
         size_t num_warmup_reps = 1;
         double time_to_execute_warmup_reps = 0;
         while (time_to_execute_warmup_reps < min_warmup_time_s && num_warmup_reps < max_repetitions) {
             num_warmup_reps *= 10;
-            Timer t_baseline(Timer::type_UserTime);
+            Timer t(Timer::type_UserTime);
             for (size_t i = 0; i < num_warmup_reps; ++i) {
-                run_benchmark_once(benchmark, *group, t_baseline);
+                run_benchmark_once(benchmark, *group, t);
             }
-            time_to_execute_warmup_reps = t_baseline.get_elapsed_time();
+            time_to_execute_warmup_reps = t.get_elapsed_time();
         }
 
         size_t required_reps = size_t(min_duration_s / (time_to_execute_warmup_reps / num_warmup_reps));
@@ -660,6 +770,12 @@ TEST(benchmark_common_tasks_main)
     BENCH(BenchmarkSortInt);
     BENCH(BenchmarkDistinctIntFewDupes);
     BENCH(BenchmarkDistinctIntManyDupes);
+    BENCH(BenchmarkDistinctStringFewDupes);
+    BENCH(BenchmarkDistinctStringManyDupes);
+    BENCH(BenchmarkFindAllStringFewDupes);
+    BENCH(BenchmarkFindAllStringManyDupes);
+    BENCH(BenchmarkFindFirstStringFewDupes);
+    BENCH(BenchmarkFindFirstStringManyDupes);
     BENCH(BenchmarkInsert);
     BENCH(BenchmarkGetString);
     BENCH(BenchmarkSetString);

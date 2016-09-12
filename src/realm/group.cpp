@@ -1148,6 +1148,8 @@ public:
     {
         using tf = _impl::TableFriend;
         tf::adj_move_column(table, m_col_ndx_1, m_col_ndx_2);
+        size_t min_ndx = std::min(m_col_ndx_1, m_col_ndx_2);
+        tf::mark_link_target_tables(table, min_ndx);
     }
 
     void update_parent(Table&) override

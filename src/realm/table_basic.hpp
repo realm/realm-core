@@ -31,6 +31,12 @@
 #include <realm/table_accessors.hpp>
 #include <realm/table_view_basic.hpp>
 
+/*****************************************************************************
+ *                                                                           *
+ *      THIS INTERFACE IS DEPRECATED AND MAY BE REMOVED WITHOUT NOTICE       *
+ *                                                                           *
+ ****************************************************************************/
+
 namespace realm {
 
 

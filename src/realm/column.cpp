@@ -291,7 +291,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height, Allocator
                         Array::destroy_deep(child, alloc);
                         throw;
                     }
-                    // LCOV_EXCL_END
+                    // LCOV_EXCL_STOP
                     ++num_children;
                 }
                 v = orig_rest_size - rest_size; // total_elems_in_tree
@@ -302,7 +302,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height, Allocator
                 new_inner_node.destroy_deep();
                 throw;
             }
-            // LCOV_EXCL_END
+            // LCOV_EXCL_STOP
             node = new_inner_node.get_ref();
             ++height;
             // Overflow is impossible here is all nodes will have elems_per_child <= orig_rest_size
@@ -315,7 +315,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height, Allocator
             Array::destroy_deep(node, alloc);
         throw;
     }
-    // LCOV_EXCL_END
+    // LCOV_EXCL_STOP
 }
 
 

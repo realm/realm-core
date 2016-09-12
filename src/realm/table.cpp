@@ -889,7 +889,11 @@ void Table::erase_root_column(size_t col_ndx)
 void Table::move_root_column(size_t from, size_t to)
 {
     REALM_ASSERT_3(from, <, m_spec.get_public_column_count());
-    REALM_ASSERT_3(to, <, m_spec.get_public_column_count());
+    REALM_ASSERT_3(to,   <, m_spec.get_public_column_count());
+
+    if (from == to)
+        return;
+
     do_move_root_column(from, to);
     adj_move_column(from, to);
     update_link_target_tables_after_column_move(from, to);
