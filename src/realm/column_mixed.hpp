@@ -48,6 +48,12 @@ public:
     /// Create a mixed column wrapper and attach it to a preexisting
     /// underlying structure of arrays.
     ///
+    /// \param alloc The memory allocator to change the underlying
+    /// structure in memory.
+    ///
+    /// \param ref The memory reference of the MixedColumn for which
+    /// this accessor should be creator for.
+    ///
     /// \param table If this column is used as part of a table you
     /// must pass a pointer to that table. Otherwise you must pass
     /// null
@@ -55,7 +61,7 @@ public:
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
     /// table. Otherwise you should pass zero.
-    MixedColumn(Allocator&, ref_type, Table* table, size_t column_ndx);
+    MixedColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx);
 
     ~MixedColumn() noexcept override;
 
@@ -106,7 +112,7 @@ public:
     void set_binary(size_t ndx, BinaryData value);
     void set_subtable(size_t ndx, const Table* value);
 
-    void insert_int(size_t ndx, int64_t value);
+    void insert_int(size_t ndx, int_fast64_t value);
     void insert_bool(size_t ndx, bool value);
     void insert_olddatetime(size_t ndx, OldDateTime value);
     void insert_timestamp(size_t ndx, Timestamp value);
@@ -149,12 +155,10 @@ public:
     void mark(int) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
-#ifdef REALM_DEBUG
     void verify() const override;
     void verify(const Table&, size_t) const override;
     void to_dot(std::ostream&, StringData title) const override;
     void do_dump_node_structure(std::ostream&, int) const override;
-#endif
 
 private:
     enum MixedColType {
@@ -223,8 +227,8 @@ private:
 
 #ifdef REALM_DEBUG
     void do_verify(const Table*, size_t col_ndx) const;
-    void leaf_to_dot(MemRef, ArrayParent*, size_t, std::ostream&) const override;
 #endif
+    void leaf_to_dot(MemRef, ArrayParent*, size_t, std::ostream&) const override;
 };
 
 // LCOV_EXCL_START
@@ -239,12 +243,8 @@ inline StringData MixedColumn::get_index_data(size_t, StringIndex::StringConvers
 
 class MixedColumn::RefsColumn: public SubtableColumnBase {
 public:
-    RefsColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx):
-        SubtableColumnBase(alloc, ref, table, column_ndx)
-    {
-    }
-
-    ~RefsColumn() noexcept override {}
+    RefsColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx);
+    ~RefsColumn() noexcept override;
 
     using SubtableColumnBase::get_subtable_ptr;
 

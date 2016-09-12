@@ -1,8 +1,5 @@
 # Global Architecture {#primer_architecture} #
 
-If you haven't done so previously, please review the \ref primer_intro
-"Introduction". It contains some links and stuff to get you set-up and ready to
-follow along.
 For a more detailed view on the files used and how they interact, review
 \ref primer_files "Core files".
 

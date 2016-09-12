@@ -16,18 +16,19 @@
  *
  **************************************************************************/
 
+#include <cstring>
 #include <stdexcept>
 
 #include <realm/util/thread.hpp>
 
 #if !defined _WIN32
-#  include <unistd.h>
+    #include <unistd.h>
 #endif
 
 // "Process shared mutexes" are not officially supported on Android,
 // but they appear to work anyway.
 #if (defined(_POSIX_THREAD_PROCESS_SHARED) && _POSIX_THREAD_PROCESS_SHARED > 0) || REALM_ANDROID
-#  define REALM_HAVE_PTHREAD_PROCESS_SHARED
+    #define REALM_HAVE_PTHREAD_PROCESS_SHARED
 #endif
 
 // Unfortunately Older Ubuntu releases such as 10.04 reports support
@@ -38,17 +39,17 @@
 // Support was added to glibc 2.12, so we disable for earlier versions
 // of glibs
 #ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
-#  if !defined _WIN32 // 'robust' not supported by our windows pthreads port
-#    if _POSIX_THREADS >= 200809L
-#      ifdef __GNU_LIBRARY__
-#        if __GLIBC__ >= 2  && __GLIBC_MINOR__ >= 12
-#          define REALM_HAVE_ROBUST_PTHREAD_MUTEX
-#        endif
-#      else
-#        define REALM_HAVE_ROBUST_PTHREAD_MUTEX
-#      endif
-#    endif
-#  endif
+    #if !defined _WIN32 // 'robust' not supported by our windows pthreads port
+        #if _POSIX_THREADS >= 200809L
+            #ifdef __GNU_LIBRARY__
+                #if __GLIBC__ >= 2  && __GLIBC_MINOR__ >= 12
+                    #define REALM_HAVE_ROBUST_PTHREAD_MUTEX
+                #endif
+            #else
+                #define REALM_HAVE_ROBUST_PTHREAD_MUTEX
+            #endif
+        #endif
+    #endif
 #endif
 
 
@@ -66,8 +67,7 @@ namespace {
 #if defined _WIN32 && defined REALM_DEBUG
 void free_threadpool();
 
-class Initialization
-{
+class Initialization {
 public:
     ~Initialization()
     {
@@ -96,6 +96,50 @@ void Thread::join()
         join_failed(r); // Throws
     m_joinable = false;
 }
+
+
+void Thread::set_name(const std::string& name)
+{
+#if defined _GNU_SOURCE && !REALM_ANDROID && !REALM_PLATFORM_APPLE
+    const size_t max = 16;
+    size_t n = name.size();
+    if (n > max - 1)
+        n = max - 1;
+    char name_2[max];
+    std::copy(name.data(), name.data() + n, name_2);
+    name_2[n] = '\0';
+    pthread_t id = pthread_self();
+    int r = pthread_setname_np(id, name_2);
+    if (REALM_UNLIKELY(r != 0))
+        throw std::runtime_error("pthread_setname_np() failed.");
+#elif REALM_PLATFORM_APPLE
+    int r = pthread_setname_np(name.data());
+    if (REALM_UNLIKELY(r != 0))
+        throw std::runtime_error("pthread_setname_np() failed.");
+#else
+    static_cast<void>(name);
+#endif
+}
+
+
+bool Thread::get_name(std::string& name)
+{
+#if (defined _GNU_SOURCE && !REALM_ANDROID) || REALM_PLATFORM_APPLE
+    const size_t max = 64;
+    char name_2[max];
+    pthread_t id = pthread_self();
+    int r = pthread_getname_np(id, name_2, max);
+    if (REALM_UNLIKELY(r != 0))
+        throw std::runtime_error("pthread_getname_np() failed.");
+    name_2[max - 1] = '\0';              // Eliminate any risk of buffer overrun in strlen().
+    name.assign(name_2, strlen(name_2)); // Throws
+    return true;
+#else
+    static_cast<void>(name);
+    return false;
+#endif
+}
+
 
 REALM_NORETURN void Thread::create_failed(int)
 {

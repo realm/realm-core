@@ -30,7 +30,7 @@ namespace test_util {
 ///
 /// This function is thread-safe as long as there are no concurrent invocations
 /// of always_encrypt().
-const char* crypt_key(bool always=false);
+const char* crypt_key(bool always = false);
 
 /// Returns true if global mode "always encrypt" is enabled.
 ///

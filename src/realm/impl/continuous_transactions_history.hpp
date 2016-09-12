@@ -19,10 +19,11 @@
 #ifndef REALM_IMPL_CONTINUOUS_TRANSACTIONS_HISTORY_HPP
 #define REALM_IMPL_CONTINUOUS_TRANSACTIONS_HISTORY_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <memory>
 
 #include <realm/column_binary.hpp>
+#include <realm/version_id.hpp>
 
 namespace realm {
 
@@ -34,7 +35,7 @@ namespace _impl {
 /// transactions.
 class History {
 public:
-    using version_type = uint_fast64_t;
+    using version_type = VersionID::version_type;
 
     /// May be called during a read transaction to gain early access to the
     /// history as it appears in a new snapshot that succeeds the one bound in
@@ -140,9 +141,7 @@ public:
     /// until initiation of the commit operation).
     virtual BinaryData get_uncommitted_changes() noexcept = 0;
 
-#ifdef REALM_DEBUG
     virtual void verify() const = 0;
-#endif
 
     virtual ~History() noexcept {}
 };
@@ -161,7 +160,7 @@ public:
 class InRealmHistory: public History {
 public:
     void initialize(Group&);
-
+    
     /// Must never be called more than once per transaction. Returns the version
     /// produced by the added changeset.
     version_type add_changeset(BinaryData);
@@ -171,9 +170,7 @@ public:
     void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override;
     void set_oldest_bound_version(version_type) override;
 
-#ifdef REALM_DEBUG
     void verify() const override;
-#endif
 
 private:
     Group* m_group = 0;

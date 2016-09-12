@@ -457,6 +457,15 @@ public:
     /// in the Realm Object Server and may be relaxed in the future. A violation of
     /// these rules results in a LogicError being thrown.
     ///
+    /// add_int() adds a 64-bit signed integer to the current value of the
+    /// cell.  If the addition would cause signed integer overflow or
+    /// underflow, the addition "wraps around" with semantics similar to
+    /// unsigned integer arithmetic, such that Table::max_integer + 1 ==
+    /// Table::min_integer and Table::min_integer - 1 == Table::max_integer.
+    /// Note that the wrapping is platform-independent (all platforms wrap in
+    /// the same way regardless of integer representation). If the existing
+    /// value in the cell is null, a LogicError exception is thrown.
+    ///
     /// insert_substring() inserts the specified string into the currently
     /// stored string at the specified position. The position must be less than
     /// or equal to the size of the currently stored string.
@@ -475,6 +484,13 @@ public:
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
+    // FIXME: These limits should be chosen independently of the underlying
+    // platform's choice to define int64_t and independent of the integer
+    // representation. The current values only work for 2's complement, which is
+    // not guaranteed by the standard.
+    static constexpr int_fast64_t max_integer = std::numeric_limits<int64_t>::max();
+    static constexpr int_fast64_t min_integer = std::numeric_limits<int64_t>::min();
+
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value, bool is_default = false);
     void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value, bool is_default = false);
@@ -492,6 +508,8 @@ public:
     void nullify_link(size_t column_ndx, size_t row_ndx);
     void set_null(size_t column_ndx, size_t row_ndx, bool is_default = false);
     void set_null_unique(size_t col_ndx, size_t row_ndx);
+
+    void add_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
 
     void insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
     void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t substring_size = realm::npos);
@@ -623,7 +641,7 @@ public:
     TableView      get_range_view(size_t begin, size_t end);
     ConstTableView get_range_view(size_t begin, size_t end) const;
 
-    TableView      get_backlink_view(size_t row_ndx, Table *src_table,
+    TableView      get_backlink_view(size_t row_ndx, Table* src_table,
                                      size_t src_col_ndx);
 
 
@@ -732,12 +750,17 @@ public:
     /// (see add_search_index()) will not be carried over to the new
     /// table.
     ///
+    /// \param out The destination output stream buffer.
+    ///
     /// \param offset Index of first row to include (if `slice_size >
     /// 0`). Must be less than, or equal to size().
     ///
-    /// \param slice_size Number of rows to include. May be zero. If 
-    /// `slice_size > size() - offset`, then the effective size of 
+    /// \param slice_size Number of rows to include. May be zero. If
+    /// `slice_size > size() - offset`, then the effective size of
     /// the written slice will be `size() - offset`.
+    ///
+    /// \param override_table_name Custom name to write out instead of
+    /// the actual table name.
     ///
     /// \throw std::out_of_range If `offset > size()`.
     ///
@@ -746,7 +769,7 @@ public:
     /// of general utility. This is unfortunate, because it pulls
     /// quite a large amount of code into the core library to support
     /// it.
-    void write(std::ostream&, size_t offset = 0, size_t slice_size = npos,
+    void write(std::ostream& out, size_t offset = 0, size_t slice_size = npos,
                StringData override_table_name = StringData()) const;
 
     // Conversion
@@ -789,15 +812,13 @@ public:
     bool is_degenerate() const noexcept;
 
     // Debug
-#ifdef REALM_DEBUG
     void verify() const;
+#ifdef REALM_DEBUG
     void to_dot(std::ostream&, StringData title = StringData()) const;
     void print() const;
     MemStats stats() const;
     void dump_node_structure() const; // To std::cerr (for GDB)
     void dump_node_structure(std::ostream&, int level) const;
-#else
-    void verify() const {}
 #endif
 
     class Parent;
@@ -923,7 +944,7 @@ private:
     size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
 
     void upgrade_file_format();
-    
+
     // Upgrades OldDateTime columns to Timestamp columns
     void upgrade_olddatetime();
 
@@ -1139,7 +1160,7 @@ private:
 
     static size_t get_size_from_ref(ref_type top_ref, Allocator&) noexcept;
     static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
-                                         Allocator&) noexcept;
+                                    Allocator&) noexcept;
 
     const Table* get_parent_table_ptr(size_t* column_ndx_out = nullptr) const noexcept;
     Table* get_parent_table_ptr(size_t* column_ndx_out = nullptr) noexcept;
@@ -1285,6 +1306,7 @@ private:
     void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_acc_erase_row(size_t row_ndx) noexcept;
     void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+    void adj_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept;
 
     /// Adjust this table accessor and its subordinates after move_last_over()
     /// (or its inverse).
@@ -1324,6 +1346,7 @@ private:
     void adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_row_acc_erase_row(size_t row_ndx) noexcept;
     void adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+    void adj_row_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept;
 
     /// Called by adj_acc_move_over() to adjust row accessors.
     void adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
@@ -1492,7 +1515,7 @@ inline void Table::move_last_over(size_t row_ndx)
 inline void Table::remove_last()
 {
     if (!is_empty())
-        remove(size()-1);
+        remove(size() - 1);
 }
 
 // A good place to start if you want to understand the memory ordering
@@ -1818,12 +1841,12 @@ inline Table::ConstRowExpr Table::front() const noexcept
 
 inline Table::RowExpr Table::back() noexcept
 {
-    return get(m_size-1);
+    return get(m_size - 1);
 }
 
 inline Table::ConstRowExpr Table::back() const noexcept
 {
-    return get(m_size-1);
+    return get(m_size - 1);
 }
 
 inline Table::RowExpr Table::operator[](size_t row_ndx) noexcept
@@ -2109,7 +2132,7 @@ public:
     }
 
     static size_t get_size_from_ref(ref_type spec_ref, ref_type columns_ref,
-                                         Allocator& alloc) noexcept
+                                    Allocator& alloc) noexcept
     {
         return Table::get_size_from_ref(spec_ref, columns_ref, alloc);
     }
@@ -2164,7 +2187,7 @@ public:
     }
 
     static size_t get_num_strong_backlinks(const Table& table,
-                                                size_t row_ndx) noexcept
+                                           size_t row_ndx) noexcept
     {
         return table.get_num_strong_backlinks(row_ndx);
     }
@@ -2181,7 +2204,7 @@ public:
     }
 
     static size_t* record_subtable_path(const Table& table, size_t* begin,
-                                             size_t* end) noexcept
+                                        size_t* end) noexcept
     {
         return table.record_subtable_path(begin, end);
     }
@@ -2261,6 +2284,11 @@ public:
     static void adj_acc_swap_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
     {
         table.adj_acc_swap_rows(row_ndx_1, row_ndx_2);
+    }
+
+    static void adj_acc_subsume_row(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
+    {
+        table.adj_acc_subsume_row(row_ndx_1, row_ndx_2);
     }
 
     static void adj_acc_move_over(Table& table, size_t from_row_ndx,

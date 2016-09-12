@@ -19,7 +19,7 @@
 #ifndef REALM_UTIL_TYPE_TRAITS_HPP
 #define REALM_UTIL_TYPE_TRAITS_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <climits>
 #include <cwchar>
 #include <limits>
@@ -81,7 +81,7 @@ struct LeastUnsigned;
 
 /// Member `type` is `unsigned` if `unsigned` has at least `bits`
 /// value bits, otherwise it is the same as
-/// `LeastUnsigned<bits>::type`.
+/// `LeastUnsigned<bits>::%type`.
 template<int bits>
 struct FastestUnsigned;
 
@@ -97,7 +97,7 @@ struct Promote {
 
 template<class A, class B>
 struct ArithBinOpType {
-    typedef decltype(A()+B()) type;
+    typedef decltype(A() + B()) type;
 };
 
 
@@ -106,9 +106,9 @@ struct ChooseWidestInt {
 private:
     typedef std::numeric_limits<A> lim_a;
     typedef std::numeric_limits<B> lim_b;
-    static_assert(lim_a::is_specialized && lim_b::is_specialized,
+    static_assert(lim_a::is_specialized&& lim_b::is_specialized,
                   "std::numeric_limits<> must be specialized for both types");
-    static_assert(lim_a::is_integer && lim_b::is_integer,
+    static_assert(lim_a::is_integer&& lim_b::is_integer,
                   "Both types must be integers");
 public:
     typedef typename std::conditional<(lim_a::digits >= lim_b::digits), A, B>::type type;
@@ -134,7 +134,7 @@ private:
     template<int>
     struct dummy {
         template<class T>
-    struct pred {
+        struct pred {
             static const bool value = std::numeric_limits<T>::digits >= bits;
         };
     };

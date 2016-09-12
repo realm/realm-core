@@ -16,7 +16,7 @@
  *
  **************************************************************************/
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <stdexcept>
@@ -105,16 +105,16 @@ public:
     void summary(const SharedContext& context, const Summary& results_summary) override
     {
         m_out <<
-            "<?xml version=\"1.0\"?>\n"
-            "<unittest-results "
-            "tests=\"" << results_summary.num_executed_tests << "\" "
-            "failedtests=\"" << results_summary.num_failed_tests << "\" "
-            "checks=\"" << results_summary.num_executed_checks << "\" "
-            "failures=\"" << results_summary.num_failed_checks << "\" "
-            "time=\"" << results_summary.elapsed_seconds << "\">\n";
+              "<?xml version=\"1.0\"?>\n"
+              "<unittest-results "
+              "tests=\"" << results_summary.num_executed_tests << "\" "
+              "failedtests=\"" << results_summary.num_failed_tests << "\" "
+              "checks=\"" << results_summary.num_executed_checks << "\" "
+              "failures=\"" << results_summary.num_failed_checks << "\" "
+              "time=\"" << results_summary.elapsed_seconds << "\">\n";
         std::ostringstream out;
         out.imbue(std::locale::classic());
-        for (const auto& p: m_tests) {
+        for (const auto& p : m_tests) {
             auto key = p.first;
             const test& t = p.second;
             size_t test_index    = key.first;
@@ -123,12 +123,12 @@ public:
             out.str(std::string());
             out << details.test_name;
             if (context.num_recurrences > 1)
-                out << '#' << (recurrence_index+1);
+                out << '#' << (recurrence_index + 1);
             std::string test_name = out.str();
             m_out <<
-                "  <test suite=\""<< xml_escape(details.suite_name) <<"\" "
-                "name=\"" << xml_escape(test_name) << "\" "
-                "time=\"" << t.elapsed_seconds << "\"";
+                  "  <test suite=\"" << xml_escape(details.suite_name) << "\" "
+                  "name=\"" << xml_escape(test_name) << "\" "
+                  "time=\"" << t.elapsed_seconds << "\"";
             if (t.failures.empty()) {
                 m_out << "/>\n";
                 continue;
@@ -139,12 +139,12 @@ public:
             for (fail_iter i_2 = t.failures.begin(); i_2 != fails_end; ++i_2) {
                 std::string msg = xml_escape(i_2->message);
                 m_out << "    <failure message=\"" << i_2->file_name << ""
-                    "(" << i_2->line_number << ") : " << msg << "\"/>\n";
+                      "(" << i_2->line_number << ") : " << msg << "\"/>\n";
             }
             m_out << "  </test>\n";
         }
         m_out <<
-            "</unittest-results>\n";
+              "</unittest-results>\n";
     }
 
 protected:
@@ -259,9 +259,9 @@ public:
     {
     }
 
-    void do_log(std::string message) override final
+    void do_log(Logger::Level level, std::string message) override final
     {
-        Logger::do_log(m_base_logger, message); // Throws
+        Logger::do_log(m_base_logger, level, message); // Throws
     }
 
 private:
@@ -321,13 +321,13 @@ public:
     IntraTestLogger intra_test_logger;
     SharedContextImpl& shared_context;
     Mutex mutex;
-    std::atomic<long long> num_checks{0};
-    long long num_failed_checks = 0;
-    long num_failed_tests = 0;
+    std::atomic<long long> num_checks;
+    long long num_failed_checks;
+    long num_failed_tests;
     bool errors_seen;
 
     ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* attached_logger):
-        ThreadContext(sc, ti, attached_logger ? *attached_logger : sc.report_logger),
+        ThreadContext(sc, ti, attached_logger ? * attached_logger : sc.report_logger),
         intra_test_logger(ThreadContext::report_logger, sc.intra_test_log_level),
         shared_context(sc)
     {
@@ -338,6 +338,14 @@ public:
 
     void run(SharedContextImpl::Entry, UniqueLock&);
     void finalize(UniqueLock&);
+
+private:
+    void clear_counters()
+    {
+        num_checks = 0;
+        num_failed_checks = 0;
+        num_failed_tests = 0;
+    }
 };
 
 
@@ -392,7 +400,7 @@ bool TestList::run(Config config)
     std::vector<SharedContextImpl::Entry> concur_tests, no_concur_tests;
     size_t num_executed_tests = 0;
     for (int i = 0; i < config.num_repetitions; ++i) {
-        for (auto p: included_tests) {
+        for (auto p : included_tests) {
             SharedContextImpl::Entry entry;
             entry.test = p.first;
             entry.test_index = p.second;
@@ -442,7 +450,7 @@ bool TestList::run(Config config)
         if (config.per_thread_log_path.empty()) {
             for (int i = 0; i != num_threads; ++i) {
                 formatter.str(std::string());
-                formatter << "Thread["<<std::setw(thread_digits)<<(i+1)<<"]: ";
+                formatter << "Thread[" << std::setw(thread_digits) << (i + 1) << "]: ";
                 loggers[i].reset(new util::PrefixLogger(formatter.str(), shared_logger));
             }
         }
@@ -451,10 +459,10 @@ bool TestList::run(Config config)
             auto j = format.rfind('%');
             if (j == std::string::npos)
                 throw std::runtime_error("No '%' in per-thread log path");
-            std::string a = format.substr(0,j), b = format.substr(j+1);
+            std::string a = format.substr(0, j), b = format.substr(j + 1);
             for (int i = 0; i != num_threads; ++i) {
                 formatter.str(std::string());
-                formatter << a<<std::setw(thread_digits)<<(i+1)<<b;
+                formatter << a << std::setw(thread_digits) << (i + 1) << b;
                 std::string path = formatter.str();
                 shared_logger.info("Logging to %1", path);
                 loggers[i].reset(new util::FileLogger(path));
@@ -476,6 +484,12 @@ bool TestList::run(Config config)
         // First execute regular (concurrent) tests
         {
             auto thread = [&](int i) {
+                {
+                    std::ostringstream out;
+                    out.imbue(std::locale::classic());
+                    out << "test-thread-" << (i + 1);
+                    Thread::set_name(out.str());
+                }
                 thread_contexts[i]->run();
             };
             std::unique_ptr<Thread[]> threads(new Thread[num_threads]);
@@ -508,6 +522,8 @@ bool TestList::run(Config config)
 
 void TestList::ThreadContextImpl::run()
 {
+    clear_counters();
+
     UniqueLock lock(shared_context.mutex);
     shared_context.reporter.thread_begin(*this);
 
@@ -532,15 +548,18 @@ void TestList::ThreadContextImpl::run()
         }
     }
 
+    ++shared_context.num_ended_threads;
     finalize(lock);
 }
 
 
 void TestList::ThreadContextImpl::nonconcur_run()
 {
+    clear_counters();
+
     UniqueLock lock(shared_context.mutex);
 
-    for (auto entry: shared_context.no_concur_tests)
+    for (auto entry : shared_context.no_concur_tests)
         run(entry, lock);
 
     finalize(lock);
@@ -560,7 +579,7 @@ void TestList::ThreadContextImpl::run(SharedContextImpl::Entry entry, UniqueLock
         (*test.run_func)(test_context);
     }
     catch (std::exception& ex) {
-        std::string message = "Unhandled exception "+get_type_name(ex)+": "+ex.what();
+        std::string message = "Unhandled exception " + get_type_name(ex) + ": " + ex.what();
         test_context.test_failed(message);
     }
     catch (...) {
@@ -582,7 +601,6 @@ void TestList::ThreadContextImpl::finalize(UniqueLock&)
     shared_context.num_checks        += num_checks;
     shared_context.num_failed_checks += num_failed_checks;
 
-    ++shared_context.num_ended_threads;
     shared_context.reporter.thread_end(*this);
 }
 
@@ -615,9 +633,9 @@ REALM_NORETURN void TestContext::abort()
 {
     const SharedContext& context = thread_context.shared_context;
     const char* format = context.num_threads == 1 ?
-        "Aborting due to failure" :
-        "Aborting due to failure in test thread %1";
-    context.report_logger.info(format, m_thread_context.thread_index+1);
+                         "Aborting due to failure" :
+                         "Aborting due to failure in test thread %1";
+    context.report_logger.info(format, m_thread_context.thread_index + 1);
     ::abort();
 }
 
@@ -659,7 +677,7 @@ void TestContext::test_failed(const std::string& message)
 void TestContext::cond_failed(const char* file, long line, const char* macro_name,
                               const char* cond_text)
 {
-    std::string msg = std::string(macro_name)+"("+cond_text+") failed";
+    std::string msg = std::string(macro_name) + "(" + cond_text + ") failed";
     check_failed(file, line, msg);
 }
 
@@ -668,7 +686,7 @@ void TestContext::compare_failed(const char* file, long line, const char* macro_
                                  const char* a_text, const char* b_text,
                                  const std::string& a_val, const std::string& b_val)
 {
-    std::string msg = std::string(macro_name)+"("+a_text+", "+b_text+") failed with ("+a_val+", "+b_val+")";
+    std::string msg = std::string(macro_name) + "(" + a_text + ", " + b_text + ") failed with (" + a_val + ", " + b_val + ")";
     check_failed(file, line, msg);
 }
 
@@ -680,8 +698,8 @@ void TestContext::inexact_compare_failed(const char* file, long line, const char
 {
     std::ostringstream out;
     out.precision(std::numeric_limits<long double>::digits10 + 1);
-    out << macro_name<<"("<<a_text<<", "<<b_text<<", "<<eps_text<<") "
-        "failed with ("<<a<<", "<<b<<", "<<eps<<")";
+    out << macro_name << "(" << a_text << ", " << b_text << ", " << eps_text << ") "
+        "failed with (" << a << ", " << b << ", " << eps << ")";
     check_failed(file, line, out.str());
 }
 
@@ -690,7 +708,7 @@ void TestContext::throw_failed(const char* file, long line, const char* expr_tex
                                const char* exception_name)
 {
     std::ostringstream out;
-    out << "CHECK_THROW("<<expr_text<<", "<<exception_name<<") failed: Did not throw";
+    out << "CHECK_THROW(" << expr_text << ", " << exception_name << ") failed: Did not throw";
     check_failed(file, line, out.str());
 }
 
@@ -699,8 +717,8 @@ void TestContext::throw_ex_failed(const char* file, long line, const char* expr_
                                   const char* exception_name, const char* exception_cond_text)
 {
     std::ostringstream out;
-    out << "CHECK_THROW_EX("<<expr_text<<", "<<exception_name<<", "<<
-        exception_cond_text<<") failed: Did not throw";
+    out << "CHECK_THROW_EX(" << expr_text << ", " << exception_name << ", " <<
+        exception_cond_text << ") failed: Did not throw";
     check_failed(file, line, out.str());
 }
 
@@ -709,8 +727,8 @@ void TestContext::throw_ex_cond_failed(const char* file, long line, const char* 
                                        const char* exception_name, const char* exception_cond_text)
 {
     std::ostringstream out;
-    out << "CHECK_THROW_EX("<<expr_text<<", "<<exception_name<<", "<<
-        exception_cond_text<<") failed: Did throw, but condition failed";
+    out << "CHECK_THROW_EX(" << expr_text << ", " << exception_name << ", " <<
+        exception_cond_text << ") failed: Did throw, but condition failed";
     check_failed(file, line, out.str());
 }
 
@@ -718,7 +736,7 @@ void TestContext::throw_ex_cond_failed(const char* file, long line, const char* 
 void TestContext::throw_any_failed(const char* file, long line, const char* expr_text)
 {
     std::ostringstream out;
-    out << "CHECK_THROW_ANY("<<expr_text<<") failed: Did not throw";
+    out << "CHECK_THROW_ANY(" << expr_text << ") failed: Did not throw";
     check_failed(file, line, out.str());
 }
 
@@ -826,10 +844,10 @@ void SimpleReporter::begin(const TestContext& context)
     const TestDetails& details = context.test_details;
     util::Logger& logger = context.thread_context.report_logger;
     auto format = context.thread_context.shared_context.num_recurrences == 1 ?
-        "%1:%2: Begin %3" :
-        "%1:%2: Begin %3#%4";
+                  "%1:%2: Begin %3" :
+                  "%1:%2: Begin %3#%4";
     logger.info(format, details.file_name, details.line_number, details.test_name,
-                context.recurrence_index+1);
+                context.recurrence_index + 1);
 }
 
 void SimpleReporter::fail(const TestContext& context, const char* file_name, long line_number,
@@ -838,9 +856,9 @@ void SimpleReporter::fail(const TestContext& context, const char* file_name, lon
     const TestDetails& details = context.test_details;
     util::Logger& logger = context.thread_context.report_logger;
     auto format = context.thread_context.shared_context.num_recurrences == 1 ?
-        "%1:%2: ERROR in %3: %5" :
-        "%1:%2: ERROR in %3#%4: %5";
-    logger.info(format, file_name, line_number, details.test_name, context.recurrence_index+1,
+                  "%1:%2: ERROR in %3: %5" :
+                  "%1:%2: ERROR in %3#%4: %5";
+    logger.info(format, file_name, line_number, details.test_name, context.recurrence_index + 1,
                 message);
 }
 
@@ -870,8 +888,8 @@ void SimpleReporter::summary(const SharedContext& context, const Summary& result
     logger.info("Test time: %1", Timer::format(results_summary.elapsed_seconds));
     if (results_summary.num_excluded_tests >= 1) {
         auto format = results_summary.num_excluded_tests == 1 ?
-            "Note: One test was excluded!" :
-            "Note: %1 tests were excluded!";
+                      "Note: One test was excluded!" :
+                      "Note: %1 tests were excluded!";
         logger.info(format, results_summary.num_excluded_tests);
     }
 }

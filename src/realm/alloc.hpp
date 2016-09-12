@@ -19,7 +19,7 @@
 #ifndef REALM_ALLOC_HPP
 #define REALM_ALLOC_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <cstddef>
 #include <atomic>
 
@@ -58,7 +58,7 @@ private:
     char* m_addr;
     ref_type m_ref;
 #if REALM_ENABLE_MEMDEBUG
-    // Allocator that created m_ref. Used to verify that the ref is valid whenever you call 
+    // Allocator that created m_ref. Used to verify that the ref is valid whenever you call
     // get_ref()/get_addr and that it e.g. has not been free'ed
     const Allocator* m_alloc = nullptr;
 #endif
@@ -81,7 +81,7 @@ private:
 /// \sa SlabAlloc
 class Allocator {
 public:
-	static constexpr int CURRENT_FILE_FORMAT_VERSION = 5;
+    static constexpr int CURRENT_FILE_FORMAT_VERSION = 5;
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -123,15 +123,15 @@ public:
 
     virtual ~Allocator() noexcept;
 
-#ifdef REALM_DEBUG
     virtual void verify() const = 0;
 
+#ifdef REALM_DEBUG
     /// Terminate the program precisely when the specified 'ref' is
     /// freed (or reallocated). You can use this to detect whether the
     /// ref is freed (or reallocated), and even to get a stacktrace at
     /// the point where it happens. Call watch(0) to stop watching
     /// that ref.
-    void watch(ref_type);
+    void watch(ref_type ref) { m_debug_watch = ref; }
 #endif
 
     Replication* get_replication() noexcept;
@@ -206,14 +206,12 @@ public:
 protected:
     size_t m_baseline = 0; // Separation line between immutable and mutable refs.
 
-    Replication* m_replication;
+    Replication* m_replication = nullptr;
 
     /// See get_file_format_version().
     int m_file_format_version = 0;
 
-#ifdef REALM_DEBUG
-    ref_type m_watch;
-#endif
+    ref_type m_debug_watch = 0;
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -249,8 +247,8 @@ protected:
     // be more obvious to place it in Group, but that would add a runtime overhead,
     // and access is time critical.
     //
-    // This means that multiple threads that allocate Realm objects through the 
-    // default allocator will share this variable, which is a logical design flaw 
+    // This means that multiple threads that allocate Realm objects through the
+    // default allocator will share this variable, which is a logical design flaw
     // that can make sync_if_needed() re-run queries even though it is not required.
     // It must be atomic because it's shared.
     std::atomic<uint_fast64_t> m_table_versioning_counter;
@@ -308,8 +306,8 @@ inline ref_type to_ref(int_fast64_t v) noexcept
 
 inline int64_t to_int64(size_t value) noexcept
 {
-//    FIXME: Enable once we get clang warning flags correct
-//    REALM_ASSERT_DEBUG(value <= std::numeric_limits<int64_t>::max());
+    //    FIXME: Enable once we get clang warning flags correct
+    //    REALM_ASSERT_DEBUG(value <= std::numeric_limits<int64_t>::max());
     return static_cast<int64_t>(value);
 }
 
@@ -385,7 +383,7 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_siz
                                   size_t new_size)
 {
 #ifdef REALM_DEBUG
-    if (ref == m_watch)
+    if (ref == m_debug_watch)
         REALM_TERMINATE("Allocator watch: Ref was reallocated");
 #endif
     return do_realloc(ref, addr, old_size, new_size);
@@ -394,7 +392,7 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_siz
 inline void Allocator::free_(ref_type ref, const char* addr) noexcept
 {
 #ifdef REALM_DEBUG
-    if (ref == m_watch)
+    if (ref == m_debug_watch)
         REALM_TERMINATE("Allocator watch: Ref was freed");
 #endif
     return do_free(ref, addr);
@@ -417,12 +415,8 @@ inline bool Allocator::is_read_only(ref_type ref) const noexcept
     return ref < m_baseline;
 }
 
-inline Allocator::Allocator() noexcept:
-    m_replication(nullptr)
+inline Allocator::Allocator() noexcept
 {
-#ifdef REALM_DEBUG
-    m_watch = 0;
-#endif
     m_table_versioning_counter = 0;
 }
 
@@ -434,13 +428,6 @@ inline Replication* Allocator::get_replication() noexcept
 {
     return m_replication;
 }
-
-#ifdef REALM_DEBUG
-inline void Allocator::watch(ref_type ref)
-{
-    m_watch = ref;
-}
-#endif
 
 inline int Allocator::get_file_format_version() const noexcept
 {

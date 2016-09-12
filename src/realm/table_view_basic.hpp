@@ -26,8 +26,8 @@
 namespace realm {
 
 
-/// Common base class for BasicTableView<Tab> and BasicTableView<const
-/// Tab>.
+/// %Common base class for `BasicTableView<Tab>` and `BasicTableView<const
+/// Tab>`.
 ///
 /// \tparam Impl Is either TableView or ConstTableView.
 template<class Tab, class View, class Impl>
@@ -47,7 +47,7 @@ public:
     }
 
     void to_json(std::ostream& out) const { m_impl.to_json(out); }
-    void to_string(std::ostream& out, size_t limit=500) const
+    void to_string(std::ostream& out, size_t limit = 500) const
     {
         m_impl.to_string(out, limit);
     }
@@ -204,16 +204,16 @@ public:
     }
     using HandoverPatch = TableViewHandoverPatch;
 
-    std::unique_ptr<BasicTableView<Tab>>
-    clone_for_handover(std::unique_ptr<HandoverPatch>& patch, ConstSourcePayload mode) const
+    std::unique_ptr<BasicTableView<Tab>> clone_for_handover(
+                                          std::unique_ptr<HandoverPatch>& patch, ConstSourcePayload mode) const
     {
         patch.reset(new HandoverPatch);
         std::unique_ptr<BasicTableView<Tab>> retval(new BasicTableView<Tab>(*this, *patch, mode));
         return retval;
     }
 
-    std::unique_ptr<BasicTableView<Tab>>
-    clone_for_handover(std::unique_ptr<HandoverPatch>& patch, MutableSourcePayload mode)
+    std::unique_ptr<BasicTableView<Tab>> clone_for_handover(
+                                          std::unique_ptr<HandoverPatch>& patch, MutableSourcePayload mode)
     {
         patch.reset(new HandoverPatch);
         std::unique_ptr<BasicTableView<Tab>> retval(new BasicTableView<Tab>(*this, *patch, mode));
@@ -251,14 +251,14 @@ private:
     Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx)
     {
         return get_parent().template
-            get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
+               get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
     }
 
     template<class Subtab>
     const Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx) const
     {
         return get_parent().template
-            get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
+               get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
     }
 
     friend class BasicTableView<const Tab>;
@@ -285,7 +285,7 @@ private:
 ///
 template<class Tab>
 class BasicTableView<const Tab>:
-    public BasicTableViewBase<const Tab, BasicTableView<const Tab>, ConstTableView> {
+        public BasicTableViewBase<const Tab, BasicTableView<const Tab>, ConstTableView> {
 private:
     typedef BasicTableViewBase<const Tab, BasicTableView<const Tab>, ConstTableView> Base;
 
@@ -296,7 +296,7 @@ public:
 
     /// Construct BasicTableView<const Tab> from BasicTableView<Tab>.
     ///
-        BasicTableView(BasicTableView<Tab> tv): Base(std::move(tv.m_impl)) {}
+    BasicTableView(BasicTableView<Tab> tv): Base(std::move(tv.m_impl)) {}
 
     /// Assign BasicTableView<Tab> to BasicTableView<const Tab>.
     ///
@@ -319,7 +319,7 @@ private:
     const Subtab* get_subtable_ptr(size_t column_ndx, size_t ndx) const
     {
         return get_parent().template
-            get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
+               get_subtable_ptr<Subtab>(column_ndx, Base::m_impl.get_source_ndx(ndx));
     }
 
     template<class, int, class, bool>

@@ -1,3 +1,31 @@
+librealm (2.0.0-rc4~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Radu Tutueanu <rt@realm.io>  Thu, 08 Sep 2016 09:35:49 +0200
+
+
+librealm (2.0.0-rc3~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- James Stone <js@realm.io>  Fri, 02 Sep 2016 17:38:20 +0200
+
+
+librealm (2.0.0-rc2~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Radu Tutueanu <rt@realm.io>  Tue, 30 Aug 2016 17:02:25 +0200
+
+
+librealm (2.0.0-rc1~@CODENAME@-1) UNRELEASED; urgency=low
+
+  * Tracking upstream release.
+
+ -- Radu Tutueanu <rt@realm.io>  Mon, 29 Aug 2016 16:50:37 +0200
+
+
 librealm (2.0.0-rc0~@CODENAME@-1) UNRELEASED; urgency=low
 
   * Tracking upstream release.

@@ -79,12 +79,11 @@ public:
     void adj_acc_erase_row(size_t) noexcept override;
     void adj_acc_move_over(size_t, size_t) noexcept override;
     void adj_acc_swap_rows(size_t, size_t) noexcept override;
+    void adj_acc_subsume_row(size_t, size_t) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
-#ifdef REALM_DEBUG
     void verify() const override;
     void verify(const Table&, size_t) const override;
-#endif
 
 protected:
     void do_discard_child_accessors() noexcept override;
@@ -98,10 +97,10 @@ private:
 
     // The accessors stored in `m_list_accessors` are sorted by their row index.
     // When a LinkList accessor is destroyed because the last shared_ptr pointing
-    // to it dies, its entry is implicitly replaced by a tombstone (an entry with 
-    // an empty `m_list`). These tombstones are pruned at a later time by 
-    // `prune_list_accessor_tombstones`. This is done to amortize the O(n) cost 
-    // of `std::vector::erase` that would otherwise be incurred each time an 
+    // to it dies, its entry is implicitly replaced by a tombstone (an entry with
+    // an empty `m_list`). These tombstones are pruned at a later time by
+    // `prune_list_accessor_tombstones`. This is done to amortize the O(n) cost
+    // of `std::vector::erase` that would otherwise be incurred each time an
     // accessor is removed.
     mutable std::vector<list_entry> m_list_accessors;
     mutable std::atomic<bool> m_list_accessors_contains_tombstones;
@@ -148,9 +147,7 @@ private:
     void prune_list_accessor_tombstones() noexcept;
     void validate_list_accessors() const noexcept;
 
-#ifdef REALM_DEBUG
     std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
-#endif
 
     friend class BacklinkColumn;
     friend class LinkView;
@@ -165,8 +162,8 @@ private:
 
 inline LinkListColumn::LinkListColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx):
     LinkColumnBase(alloc, ref, table, column_ndx)
-{ 
-    m_list_accessors_contains_tombstones.store(false); 
+{
+    m_list_accessors_contains_tombstones.store(false);
 }
 
 inline LinkListColumn::~LinkListColumn() noexcept

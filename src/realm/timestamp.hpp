@@ -19,7 +19,7 @@
 #ifndef REALM_TIMESTAMP_HPP
 #define REALM_TIMESTAMP_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <ostream>
 #include <realm/util/assert.hpp>
 
@@ -86,7 +86,7 @@ public:
     }
 
     // Note that these operators do not work if one of the Timestamps are null! Please use realm::Greater, realm::Equal
-    // etc instead. This is in order to collect all treatment of null behaviour in a single place for all 
+    // etc instead. This is in order to collect all treatment of null behaviour in a single place for all
     // types (query_conditions.hpp) to ensure that all types sort and compare null vs. non-null in the same manner,
     // especially for int/float where we cannot override operators. This design is open for discussion, though, because
     // it has usability drawbacks

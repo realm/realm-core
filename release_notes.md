@@ -20,6 +20,123 @@
 
 ----------------------------------------------
 
+# 2.0.0-rc4 Release notes
+
+### Bugfixes
+
+* Fixed a bug where find() on a Query constructed from a restricting view
+  did not correctly return an row index into the underlying table.
+  (issue #2127)
+* Fixed a bug where linked tables were not updated after a table move operation, when
+  run through the replicator.
+* Fixed a bug where moving a column to itself caused a crash.
+
+### Breaking changes
+
+* New instruction for `Table::add_int()`, which impacts the transaction log
+  format.
+
+### Enhancements
+
+* Added `Table::add_int()` for implementing CRDT counters.
+
+----------------------------------------------
+
+# 2.0.0-rc3 Release notes
+
+### Bugfixes
+
+* Fixed a bug with link columns incorrectly updating on a `move_last_over`
+  operation when the link points to the same table.
+* Fix subspecs not updating properly after a move operation.
+* Fixed various crashes when using subtables. The crash will occur when the first column
+  of the subtable if of type `col_type_Timestamp` or if it is nullable and of type Bool, Int
+  or OldDateTime. Caused by bad static `get_size_from_ref()` methods of columns. (#2101)
+* Fixed a bug with link columns incorrectly updating on a `move_last_over`
+  operation when the link points to the same table.
+
+### Breaking changes
+
+* Refactored the `SharedGroup` constructors and open methods to use a new
+  `SharedGroupOptions` parameter which stores all options together.
+* BREAKING! Until now, a Query would return indexes into a restricting view if such was 
+  present (a view given in the `.where(&view) method`, or it would return indexes into the
+  Table if no restricting view was present. This would make query results useless if you did 
+  not know whether or not a restricting view was present. This fix make it *always* return 
+  indexes into the Table in all cases. Also, any `begin` and `end` arguments could point into 
+  eitherthe View or the Table. These now always point into the Table. Also see 
+  https://github.com/realm/realm-core/issues/1565
+
+### Enhancements
+
+* Accessors pointing to subsumed rows are updated to the new row rather than detached.
+
+-----------
+
+### Internals
+
+* When creating a `SharedGroup`, optionally allow setting the temporary 
+  directory to when making named pipes fails. This is to fix a bug
+  involving mkfifo on recent android devices (#1959).
+* Bug fixed in test harness: In some cases some tests and checks would be
+  counted twice due to counters not being reset at all the right times.
+
+----------------------------------------------
+
+# 2.0.0-rc2 Release notes
+
+### Enhancements
+
+* Add back log level prefixes for `StderrLogger` and `StreamLogger`
+
+----------------------------------------------
+
+# 2.0.0-rc1 Release notes
+
+### Breaking changes
+
+* API Breaking change: Added log level argument to util::Logger::do_log().
+  Existing implementations can ignore the argument, or use it to add log level
+  info to the log output.
+* API Breaking change: The WriteLogCollector is no longer available.
+  To create a history object for SharedGroup, make_in_realm_history()
+  must now be used instead of make_client_history().
+* The commit logs have been moved into the Realm file. This means we no longer
+  need the .log_a, .log_b and .log files, significantly reducing the number of
+  both files and open file handles. This is a breaking change, since versions
+  without .log files cannot interoperate with earlier versions which still
+  uses separate .log files. (issues #2065, #1354).
+* The version for .lock-file data has been bumped to reflect that this is
+  an API breaking change.
+
+### Enhancements
+
+* Elimination of the .log files also eliminates all locking related to
+  accessing  the .log files, making read-transactions lock-free.
+* The critical phase of commits have been reduced significantly in length.
+  If a process is killed while in the critical phase, any other process
+  working jointly on the same Realm file is barred from updating the Realm
+  file until the next session. Reducing the length of the critical phase
+  reduces the risk of any user experiencing this limitation.
+  (issues #2065, #1354)
+
+-----------
+
+### Internals
+
+* Added support for very large commit history entries. (issues #2038, #2050)
+  This also implies an API change (but to the internal API) to the
+  History::get_changesets() method, which must be taken into account by
+  any derived classes.
+* Support for setting and getting thread names (`util::Thread::set_name()` and
+  `util::Thread::get_name()`) when the platform supports
+  it. `util::Thread::set_name()` is now used by the test harness as a help while
+  debugging. Also, the terminate handler (in `util/terminate.cpp`) writes out
+  the name of the terminating thread if the name is available.
+* Fixed doxygen warnings.
+
+----------------------------------------------
+
 # 2.0.0-rc0 Release notes
 
 ### Internals

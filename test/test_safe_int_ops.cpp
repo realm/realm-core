@@ -24,7 +24,7 @@
 #include <iostream>
 #include <typeinfo>
 
-#include <stdint.h>
+#include <cstdint>
 
 #include <realm/util/type_list.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -155,7 +155,7 @@ void test_two_args(TestContext& test_context, const std::set<super_int>& values)
                 T_2 v_2 = *i_2;
                 super_int s_1(v_1), s_2(v_2);
                 bool add_overflow_1 = s_1.add_with_overflow_detect(s_2) ||
-                    s_1.cast_has_overflow<T_1>();
+                                      s_1.cast_has_overflow<T_1>();
                 bool add_overflow_2 = int_add_with_overflow_detect(v_1, v_2);
                 CHECK_EQUAL(add_overflow_1, add_overflow_2);
                 if (!add_overflow_1 && !add_overflow_2)
@@ -167,13 +167,13 @@ void test_two_args(TestContext& test_context, const std::set<super_int>& values)
                 T_2 v_2 = *i_2;
                 super_int s_1(v_1), s_2(v_2);
                 bool sub_overflow_1 = s_1.subtract_with_overflow_detect(s_2) ||
-                    s_1.cast_has_overflow<T_1>();
+                                      s_1.cast_has_overflow<T_1>();
                 bool sub_overflow_2 = int_subtract_with_overflow_detect(v_1, v_2);
                 CHECK_EQUAL(sub_overflow_1, sub_overflow_2);
                 if (!sub_overflow_1 && !sub_overflow_2)
                     CHECK_EQUAL(s_1, super_int(v_1));
             }
-/*
+            /*
             // Multiplication
             {
                 T_1 v_1 = *i_1;
@@ -188,7 +188,7 @@ void test_two_args(TestContext& test_context, const std::set<super_int>& values)
                         CHECK_EQUAL(s_1, super_int(v_1));
                 }
             }
-*/
+            */
         }
     }
 }
@@ -290,14 +290,14 @@ TEST_IF(SafeIntOps_General, TEST_DURATION >= 1)
         }
     }
 
-/*
+    /*
     {
         typedef std::set<super_int>::const_iterator iter;
         iter end = values.end();
         for (iter i = values.begin(); i != end; ++i)
             std::cout << *i << "\n";
     }
-*/
+    */
 
     ForEachType<types, test_two_args_1>::exec(&test_context, &values);
 }

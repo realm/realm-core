@@ -80,7 +80,7 @@ void LinkColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t pri
     // Remove backlinks to the removed origin rows
     if (!broken_reciprocal_backlinks) {
         for (size_t i = 0; i < num_rows_to_erase; ++i)
-            remove_backlinks(row_ndx+i);
+            remove_backlinks(row_ndx + i);
     }
 
     // Update backlinks to the moved origin rows
@@ -139,6 +139,10 @@ void LinkColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         size_t target_row_ndx = to_size_t(value_2 - 1);
         m_backlink_column->swap_backlinks(target_row_ndx, row_ndx_1, row_ndx_2);
     }
+
+    set(row_ndx_1, value_2);
+    set(row_ndx_2, value_1);
+
 }
 
 
@@ -196,10 +200,10 @@ void LinkColumn::do_nullify_link(size_t row_ndx, size_t)
 }
 
 
-#ifdef REALM_DEBUG
 
 void LinkColumn::verify(const Table& table, size_t col_ndx) const
 {
+#ifdef REALM_DEBUG
     LinkColumnBase::verify(table, col_ndx);
 
     std::vector<BacklinkColumn::VerifyPair> pairs;
@@ -215,7 +219,7 @@ void LinkColumn::verify(const Table& table, size_t col_ndx) const
         typedef std::vector<BacklinkColumn::VerifyPair>::const_iterator iter;
         BacklinkColumn::VerifyPair search_value;
         search_value.origin_row_ndx = i;
-        std::pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
+        std::pair<iter, iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
         // Exactly one corresponding backlink must exist
         REALM_ASSERT(range.second - range.first == 1);
         REALM_ASSERT_3(range.first->target_row_ndx, ==, target_row_ndx);
@@ -224,6 +228,8 @@ void LinkColumn::verify(const Table& table, size_t col_ndx) const
 
     // All backlinks must have been matched by a forward link
     REALM_ASSERT_3(backlinks_seen, ==, pairs.size());
+#else
+    static_cast<void>(table);
+    static_cast<void>(col_ndx);
+#endif
 }
-
-#endif // REALM_DEBUG

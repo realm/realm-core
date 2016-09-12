@@ -142,7 +142,7 @@ inline ArrayBinary::ArrayBinary(Allocator& allocator) noexcept:
 inline void ArrayBinary::create()
 {
     size_t init_size = 0;
-    BinaryData defaults = BinaryData(0, 0); // This init value is ignored because size = 0
+    BinaryData defaults = BinaryData{}; // This init value is ignored because size = 0
     MemRef mem = create_array(init_size, get_alloc(), defaults); // Throws
     init_from_mem(mem);
 }
@@ -206,7 +206,7 @@ inline void ArrayBinary::truncate(size_t new_size)
 {
     REALM_ASSERT_3(new_size, <, m_offsets.size());
 
-    size_t blob_size = new_size ? to_size_t(m_offsets.get(new_size-1)) : 0;
+    size_t blob_size = new_size ? to_size_t(m_offsets.get(new_size - 1)) : 0;
 
     m_offsets.truncate(new_size);
     m_blob.truncate(blob_size);
@@ -232,7 +232,7 @@ inline void ArrayBinary::destroy()
 }
 
 inline size_t ArrayBinary::get_size_from_header(const char* header,
-                                                     Allocator& alloc) noexcept
+                                                Allocator& alloc) noexcept
 {
     ref_type offsets_ref = to_ref(Array::get(header, 0));
     const char* offsets_header = alloc.translate(offsets_ref);

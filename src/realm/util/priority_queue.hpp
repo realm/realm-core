@@ -38,8 +38,7 @@ namespace util {
 /// Note: As opposed to `std::priority_queue`, this does not store elements in a heap
 /// internally. Instead, elements are stored in sorted order. Users of this class are
 /// allowed to operate on this assumption.
-template<class T, class Container = std::vector<T>,
-    class Compare = std::less<typename Container::value_type>>
+template<class T, class Container = std::vector<T>, class Compare = std::less<typename Container::value_type>>
 class PriorityQueue : private Compare {
 public:
     using container_type  = Container;
@@ -50,7 +49,7 @@ public:
     using const_reverse_iterator = typename Container::const_reverse_iterator;
     using const_iterator         = typename Container::const_iterator;
 
-    //{@
+    //@{
     /// Construct a PriorityQueue, optionally providing a comparator object.
     PriorityQueue(const Compare& comparator, const Container& cont);
 
@@ -73,7 +72,7 @@ public:
     bool empty() const;
     size_type size() const;
 
-    //{@
+    //@{
     /// Push an element to the priority queue.
     ///
     /// If insertion to the underlying `Container` invalidates

@@ -19,7 +19,7 @@
 #ifndef REALM_QUERY_CONDITIONS_HPP
 #define REALM_QUERY_CONDITIONS_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <string>
 
 #include <realm/unicode.hpp>
@@ -33,8 +33,7 @@ enum {cond_Equal, cond_NotEqual, cond_Greater, cond_Less, cond_VTABLE_FINDER_COU
 
 // Quick hack to make "Queries with Integer null columns" able to compile in Visual Studio 2015 which doesn't full support sfinae
 // (real cause hasn't been investigated yet, cannot exclude that we don't obey c++11 standard)
-struct HackClass
-{
+struct HackClass {
     template<class A, class B, class C>
     bool can_match(A, B, C) { REALM_ASSERT(false); return false; }
     template<class A, class B, class C>
@@ -104,7 +103,7 @@ struct Equal {
 struct NotEqual {
     static const int avx = 0x0B; // _CMP_FALSE_OQ
     bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const { return v1 != v2; }
-   // bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v1 != v2; }
+    // bool operator()(BinaryData v1, BinaryData v2, bool = false, bool = false) const { return v1 != v2; }
 
     template<class T>
     bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const
@@ -319,7 +318,8 @@ struct NotNull {
 struct Less {
     static const int avx = 0x11; // _CMP_LT_OQ
     template<class T>
-    bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const {
+    bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const
+    {
         if (v1null || v2null)
             return false;
 
@@ -335,7 +335,8 @@ struct Less {
 struct LessEqual : public HackClass {
     static const int avx = 0x12;  // _CMP_LE_OQ
     template<class T>
-    bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const {
+    bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const
+    {
         if (v1null && v2null)
             return true;
 
@@ -349,7 +350,8 @@ struct LessEqual : public HackClass {
 struct GreaterEqual : public HackClass {
     static const int avx = 0x1D;  // _CMP_GE_OQ
     template<class T>
-    bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const {
+    bool operator()(const T& v1, const T& v2, bool v1null = false, bool v2null = false) const
+    {
         if (v1null && v2null)
             return true;
 
@@ -364,16 +366,14 @@ struct GreaterEqual : public HackClass {
 // CompareLess is a temporary hack to have a generalized way to compare any realm types. Todo, enable correct <
 // operator of StringData (currently gives circular header dependency with utf8.hpp)
 template<class T>
-struct CompareLess
-{
+struct CompareLess {
     static bool compare(T v1, T v2, bool = false, bool = false)
     {
         return v1 < v2;
     }
 };
 template<>
-struct CompareLess<StringData>
-{
+struct CompareLess<StringData> {
     static bool compare(StringData v1, StringData v2, bool = false, bool = false)
     {
         bool ret = utf8_compare(v1.data(), v2.data());

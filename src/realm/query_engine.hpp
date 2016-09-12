@@ -115,7 +115,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <map>
 
 #if defined(_MSC_FULL_VER) && _MSC_FULL_VER >= 160040219
-#  include <immintrin.h>
+    #include <immintrin.h>
 #endif
 
 namespace realm {
@@ -425,8 +425,7 @@ struct CostHeuristic<IntNullColumn> {
 
 }
 
-class ColumnNodeBase : public ParentNode
-{
+class ColumnNodeBase : public ParentNode {
 protected:
     ColumnNodeBase(size_t column_idx)
     {
@@ -507,7 +506,7 @@ protected:
     using LeafInfo = typename ColType::LeafInfo;
 
     size_t aggregate_local_impl(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
-                           SequentialGetterBase* source_column, int c)
+                                SequentialGetterBase* source_column, int c)
     {
         REALM_ASSERT(m_children.size() > 0);
         m_local_matches = 0;
@@ -588,7 +587,7 @@ protected:
         // Clear leaf cache
         m_leaf_end = 0;
         m_array_ptr.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
-        m_array_ptr.reset(new(&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
+        m_array_ptr.reset(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
 
         if (m_child)
             m_child->init();
@@ -716,13 +715,20 @@ protected:
     static TFind_callback_specialized get_specialized_callback(Action action, DataType col_id, bool nullable)
     {
         switch (action) {
-            case act_Count: return get_specialized_callback_2_int<act_Count>(col_id, nullable);
-            case act_Sum: return get_specialized_callback_2<act_Sum>(col_id, nullable);
-            case act_Max: return get_specialized_callback_2<act_Max>(col_id, nullable);
-            case act_Min: return get_specialized_callback_2<act_Min>(col_id, nullable);
-            case act_FindAll: return get_specialized_callback_2_int<act_FindAll>(col_id, nullable);
-            case act_CallbackIdx: return get_specialized_callback_2_int<act_CallbackIdx>(col_id, nullable);
-            default: break;
+            case act_Count:
+                return get_specialized_callback_2_int<act_Count>(col_id, nullable);
+            case act_Sum:
+                return get_specialized_callback_2<act_Sum>(col_id, nullable);
+            case act_Max:
+                return get_specialized_callback_2<act_Max>(col_id, nullable);
+            case act_Min:
+                return get_specialized_callback_2<act_Min>(col_id, nullable);
+            case act_FindAll:
+                return get_specialized_callback_2_int<act_FindAll>(col_id, nullable);
+            case act_CallbackIdx:
+                return get_specialized_callback_2_int<act_CallbackIdx>(col_id, nullable);
+            default:
+                break;
         }
         REALM_ASSERT(false); // Invalid aggregate function
         return nullptr;
@@ -732,10 +738,14 @@ protected:
     static TFind_callback_specialized get_specialized_callback_2(DataType col_id, bool nullable)
     {
         switch (col_id) {
-            case type_Int: return get_specialized_callback_3<TAction, type_Int>(nullable);
-            case type_Float: return get_specialized_callback_3<TAction, type_Float>(nullable);
-            case type_Double: return get_specialized_callback_3<TAction, type_Double>(nullable);
-            default: break;
+            case type_Int:
+                return get_specialized_callback_3<TAction, type_Int>(nullable);
+            case type_Float:
+                return get_specialized_callback_3<TAction, type_Float>(nullable);
+            case type_Double:
+                return get_specialized_callback_3<TAction, type_Double>(nullable);
+            default:
+                break;
         }
         REALM_ASSERT(false); // Invalid aggregate source column
         return nullptr;
@@ -756,7 +766,8 @@ protected:
     {
         if (nullable) {
             return &BaseType::template find_callback_specialization<TConditionFunction, TAction, TDataType, true>;
-        } else {
+        }
+        else {
             return &BaseType::template find_callback_specialization<TConditionFunction, TAction, TDataType, false>;
         }
     }
@@ -899,7 +910,7 @@ public:
         m_condition_column_idx = column;
     }
 
-    TimestampNode(null, size_t column) : TimestampNode(Timestamp(null{}), column)
+    TimestampNode(null, size_t column) : TimestampNode(Timestamp{}, column)
     {
     }
 
@@ -1089,7 +1100,7 @@ protected:
 template<>
 class StringNode<Equal>: public StringNodeBase {
 public:
-    StringNode(StringData v, size_t column): StringNodeBase(v,column)
+    StringNode(StringData v, size_t column): StringNodeBase(v, column)
     {
     }
     ~StringNode() noexcept override
@@ -1367,10 +1378,10 @@ public:
             else if (m_last[c] >= end)
                 continue;
             // already search this range and *did* match
-           else if (m_was_match[c] && m_last[c] >= start) {
+            else if (m_was_match[c] && m_last[c] >= start) {
                 if (index > m_last[c])
                     index = m_last[c];
-               continue;
+                continue;
             }
 
             m_start[c] = start;

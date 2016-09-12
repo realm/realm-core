@@ -231,8 +231,8 @@ public:
     /// Returns the number of tables in this group.
     size_t size() const noexcept;
 
-    //@{
-
+    /// \defgroup group_table_access Table Accessors
+    ///
     /// has_table() returns true if, and only if this group contains a table
     /// with the specified name.
     ///
@@ -316,6 +316,8 @@ public:
     ///
     /// \throw CrossTableLinkTarget Thrown by remove_table() if the specified
     /// table is the target of a link column of a different table.
+    ///
+    //@{
 
     static const size_t max_table_name_length = 63;
 
@@ -381,9 +383,11 @@ public:
 
     /// Write this database to the specified output stream.
     ///
+    /// \param out The destination output stream to write to.
+    ///
     /// \param pad If true, the file is padded to ensure the footer is aligned
     /// to the end of a page
-    void write(std::ostream&, bool pad=false) const;
+    void write(std::ostream& out, bool pad = false) const;
 
     /// Write this database to a new file. It is an error to specify a
     /// file that already exists. This is to protect against
@@ -400,7 +404,7 @@ public:
     /// types that are derived from util::File::AccessError, the
     /// derived exception type is thrown. In particular,
     /// util::File::Exists will be thrown if the file exists already.
-    void write(const std::string& file, const char* encryption_key=0) const;
+    void write(const std::string& file, const char* encryption_key = 0) const;
 
     /// Write this database to a memory buffer.
     ///
@@ -515,7 +519,7 @@ public:
     // Conversion
     template<class S>
     void to_json(S& out, size_t link_depth = 0,
-        std::map<std::string, std::string>* renames = nullptr) const;
+                 std::map<std::string, std::string>* renames = nullptr) const;
     void to_string(std::ostream& out) const;
 
     /// Compare two groups for equality. Two groups are equal if, and
@@ -528,8 +532,8 @@ public:
     /// Compare two groups for inequality. See operator==().
     bool operator!=(const Group& g) const { return !(*this == g); }
 
-#ifdef REALM_DEBUG
     void verify() const;
+#ifdef REALM_DEBUG
     void print() const;
     void print_free() const;
     MemStats stats();
@@ -537,8 +541,6 @@ public:
     void to_dot(std::ostream&) const;
     void to_dot() const; // To std::cerr (for GDB)
     void to_dot(const char* file_path) const;
-#else
-    void verify() const {}
 #endif
 
 private:
@@ -699,10 +701,7 @@ private:
     /// Must be called from within a write transaction
     void upgrade_file_format(int target_file_format_version);
 
-#ifdef REALM_DEBUG
-    std::pair<ref_type, size_t>
-    get_to_dot_parent(size_t ndx_in_parent) const override;
-#endif
+    std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
 
     void send_cascade_notification(const CascadeNotification& notification) const;
     void send_schema_change_notification() const;

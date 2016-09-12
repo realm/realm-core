@@ -48,8 +48,8 @@ public:
         m_logger = logger;
     }
 
-    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value,
-                 _impl::Instruction variant, size_t prior_num_rows)
+    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value, _impl::Instruction variant,
+                 size_t prior_num_rows)
     {
         static_cast<void>(prior_num_rows);
         static_cast<void>(variant);
@@ -68,6 +68,16 @@ public:
             // waste of time, because all possible side-effects have already
             // been carried out.
             m_table->set_int(col_ndx, row_ndx, value); // Throws
+            return true;
+        }
+        return false;
+    }
+
+    bool add_int(size_t col_ndx, size_t row_ndx, int_fast64_t value)
+    {
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
+            log("table->add_int(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
+            m_table->add_int(col_ndx, row_ndx, value); // Throws
             return true;
         }
         return false;
@@ -103,8 +113,8 @@ public:
         return false;
     }
 
-    bool set_string(size_t col_ndx, size_t row_ndx, StringData value,
-                    _impl::Instruction variant, size_t prior_num_rows)
+    bool set_string(size_t col_ndx, size_t row_ndx, StringData value, _impl::Instruction variant,
+                    size_t prior_num_rows)
     {
         static_cast<void>(prior_num_rows);
         static_cast<void>(variant);
@@ -202,8 +212,7 @@ public:
         return false;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, size_t,
-                  _impl::Instruction)
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx, size_t, _impl::Instruction)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             if (target_row_ndx == realm::npos) {
@@ -323,8 +332,8 @@ public:
         m_link_list.reset();
         m_table = m_group.get_table(group_level_ndx); // Throws
         for (int i = 0; i < levels; ++i) {
-            size_t col_ndx = path[2*i + 0];
-            size_t row_ndx = path[2*i + 1];
+            size_t col_ndx = path[2 * i + 0];
+            size_t row_ndx = path[2 * i + 1];
             if (REALM_UNLIKELY(REALM_COVER_NEVER(col_ndx >= m_table->get_column_count())))
                 return false;
             if (REALM_UNLIKELY(REALM_COVER_NEVER(row_ndx >= m_table->size())))
@@ -420,7 +429,7 @@ public:
     }
 
     bool insert_link_column(size_t col_ndx, DataType type, StringData name,
-                       size_t link_target_table_ndx, size_t backlink_col_ndx)
+                            size_t link_target_table_ndx, size_t backlink_col_ndx)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx <= m_desc->get_column_count()))) {
@@ -430,7 +439,7 @@ public:
                 using tf = _impl::TableFriend;
                 Table* link_target_table = &gf::get_table(m_group, link_target_table_ndx); // Throws
                 LinkTargetInfo link(link_target_table, backlink_col_ndx);
-                tf::insert_column(*m_desc, col_ndx, type, name, link); // Throws
+                tf::insert_column_unless_exists(*m_desc, col_ndx, type, name, link); // Throws
                 return true;
             }
         }
@@ -689,10 +698,7 @@ public:
         return set_link(col_ndx, row_ndx, realm::npos, target_group_level_ndx, _impl::instr_Set);
     }
 
-    bool link_list_nullify(size_t link_ndx, size_t prior_size)
-    {
-        return link_list_erase(link_ndx, prior_size);
-    }
+    bool link_list_nullify(size_t link_ndx, size_t prior_size) { return link_list_erase(link_ndx, prior_size); }
 
 private:
     Group& m_group;
@@ -786,7 +792,7 @@ namespace {
 class InputStreamImpl: public _impl::NoCopyInputStream {
 public:
     InputStreamImpl(const char* data, size_t size) noexcept:
-        m_begin(data), m_end(data+size) {}
+        m_begin(data), m_end(data + size) {}
 
     ~InputStreamImpl() noexcept {}
 

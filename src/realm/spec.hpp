@@ -175,6 +175,7 @@ private:
     ColumnInfo get_column_info(size_t column_ndx) const noexcept;
 
     size_t get_subspec_ndx_after(size_t column_ndx, size_t skip_column_ndx) const noexcept;
+    size_t get_subspec_entries_for_col_type(ColumnType type) const noexcept;
     bool has_subspec() const noexcept;
 
     // Returns false if the spec has no columns, otherwise it returns
@@ -437,7 +438,7 @@ inline bool Spec::has_subspec() const noexcept
     return (m_top.size() >= 4) && (m_top.get_as_ref(3) != 0);
 }
 
-inline bool Spec::operator!=(const Spec &s) const noexcept
+inline bool Spec::operator!=(const Spec& s) const noexcept
 {
     return !(*this == s);
 }
@@ -463,7 +464,7 @@ inline ConstSubspecRef::ConstSubspecRef(const Array* parent,
 }
 
 inline ConstSubspecRef::ConstSubspecRef(SubspecRef r) noexcept:
-        m_parent(r.m_parent),
+    m_parent(r.m_parent),
     m_ndx_in_parent(r.m_ndx_in_parent)
 {
 }

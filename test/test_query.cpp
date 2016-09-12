@@ -743,8 +743,7 @@ TEST(Query_NextGenSyntaxMonkey0)
     // table size to test out-of-bounds bugs.
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (int iter = 1; iter < 10 + TEST_DURATION * 1000; iter++)
-    {
+    for (int iter = 1; iter < 10 + TEST_DURATION * 1000; iter++) {
         const size_t rows = 1 + random.draw_int_mod(2 * REALM_MAX_BPNODE_SIZE);
         Table table;
 
@@ -803,7 +802,7 @@ TEST(Query_NextGenSyntaxMonkey)
         // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
         const size_t rows =
             1 + random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
-            (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
+                                            (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -1768,7 +1767,7 @@ TEST(Query_LimitUntyped2)
     CHECK_EQUAL(2, ndx);
 
     // Timestamp
-/*
+    /*
     ts = q.maximum_timestamp(3, nullptr, 0, -1, 1);
     CHECK_EQUAL(Timestamp(10000, 10000), ts);
     q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
@@ -1783,7 +1782,7 @@ TEST(Query_LimitUntyped2)
     CHECK_EQUAL(Timestamp(40000, 40000), ts);
     q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
     CHECK_EQUAL(2, ndx);
-*/
+    */
     // float
     sumf = q.maximum_float(1, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumf);
@@ -2989,7 +2988,7 @@ TEST(Query_DoubleCoordinates)
     // This unit test can be used as benchmark. Just enable this for loop
     //    for (size_t t = 0; t < 1000; t++) {
     Query q = table->column<double>(0) >= 100. && table->column<double>(0) <= 110. &&
-        table->column<double>(1) >= 100. && table->column<double>(1) <= 110.;
+              table->column<double>(1) >= 100. && table->column<double>(1) <= 110.;
 
     size_t c = q.count();
     REALM_ASSERT(c == expected);
@@ -3285,73 +3284,6 @@ TEST(Query_Delete)
     CHECK_EQUAL(0, ttt.size());
 }
 
-TEST(Query_DeleteRange)
-{
-    TupleTableType ttt;
-
-    ttt.add(0, "X");
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "X");
-    ttt.add(5, "X");
-
-    TupleTableType::Query q = ttt.where().second.equal("X");
-    size_t r = q.remove(1, 4);
-
-    CHECK_EQUAL(3, r);
-    CHECK_EQUAL(3, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(4, ttt[1].first);
-    CHECK_EQUAL(5, ttt[2].first);
-}
-
-TEST(Query_DeleteRange_where)
-{
-    TupleTableType ttt;
-
-    ttt.add(0, "X");
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "X");
-    ttt.add(5, "X");
-
-    TupleTableType::View tv = ttt.where().second.equal("X").find_all();
-    TupleTableType::Query q = ttt.where(&tv).second.equal("X");
-
-    size_t r = q.remove(1, 4);
-
-    CHECK_EQUAL(3, r);
-    CHECK_EQUAL(3, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(4, ttt[1].first);
-    CHECK_EQUAL(5, ttt[2].first);
-}
-
-TEST(Query_DeleteLimit)
-{
-    TupleTableType ttt;
-
-    ttt.add(0, "X");
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "X");
-    ttt.add(5, "X");
-
-    TupleTableType::Query q = ttt.where().second.equal("X");
-    size_t r = q.remove(1, 4, 2);
-
-    CHECK_EQUAL(2, r);
-    CHECK_EQUAL(4, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(3, ttt[1].first);
-    CHECK_EQUAL(4, ttt[2].first);
-    CHECK_EQUAL(5, ttt[3].first);
-}
-
-
 
 TEST(Query_Simple)
 {
@@ -3523,7 +3455,7 @@ TEST(Query_SubtableBug)
     sub->add_column(type_Bool, "sub 2");
     CHECK_EQUAL(2, table->get_column_count());
 
-    for (int i = 0; i<5; i++) {
+    for (int i = 0; i < 5; i++) {
         table->insert_empty_row(i);
         table->set_int(0, i, 100);
     }
@@ -4055,7 +3987,7 @@ TEST(Query_Sort_And_Requery_Typed1)
     TupleTableType::View tv = q.find_all();
 
     size_t match = ttt.where(&tv).first.equal(7).find();
-    CHECK_EQUAL(match, 6);
+    CHECK_EQUAL(match, 8);
 
     tv.column().first.sort();
 
@@ -4081,13 +4013,13 @@ TEST(Query_Sort_And_Requery_Typed1)
     CHECK_EQUAL(match, 0);
 
     match = ttt.where(&tv).second.not_equal("X").find(1);
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, 3);
 
     match = ttt.where(&tv).second.not_equal("X").find(2);
-    CHECK_EQUAL(match, 5);
+    CHECK_EQUAL(match, 3);
 
     match = ttt.where(&tv).second.not_equal("X").find(6);
-    CHECK_EQUAL(match, 6);
+    CHECK_EQUAL(match, 7);
 }
 
 
@@ -8255,14 +8187,14 @@ TEST(Query_DeepLink)
     size_t col_bool = table->add_column(type_Bool, "bool");
     size_t col_linklist = table->add_column_link(type_LinkList, "list", *table);
 
-    for(size_t j = 0; j < N; ++j) {
+    for (size_t j = 0; j < N; ++j) {
         table->add_empty_row();
         table->set_int(col_int, j, j);
         table->set_bool(col_bool, j, (j % 2) == 0);
 
         LinkViewRef links = table->get_linklist(col_linklist, j);
         TableView view = table->where().find_all();
-        for(size_t i = 0; i < view.size(); ++i) {
+        for (size_t i = 0; i < view.size(); ++i) {
             links->add(i);
         }
     }
@@ -8358,8 +8290,7 @@ TEST(Query_BrokenFindGT)
 TEST(Query_FuzzyFind)
 {
     // TEST_DURATION is normally 0.
-    for (size_t iter = 0; iter < 50 + TEST_DURATION * 2000; iter++)
-    {
+    for (size_t iter = 0; iter < 50 + TEST_DURATION * 2000; iter++) {
         Group group;
         TableRef table = group.add_table("test");
         size_t col = table->add_column(type_Int, "int");
@@ -8983,7 +8914,7 @@ TEST(Query_Timestamp)
     table.set_timestamp(0, 0, Timestamp(111, 222));
     table.set_timestamp(0, 1, Timestamp(111, 333));
     table.set_timestamp(0, 2, Timestamp(333, 444));
-    table.set_timestamp(0, 3, Timestamp(null{}));
+    table.set_timestamp(0, 3, Timestamp{});
     table.set_timestamp(0, 4, Timestamp(0, 0));
     table.set_timestamp(0, 5, Timestamp(-1000, 0));
 
@@ -9016,7 +8947,7 @@ TEST(Query_Timestamp)
     match = (first < Timestamp(0, 0)).count();
     CHECK_EQUAL(match, 1);
 
-    match = (first != Timestamp(null{})).count();
+    match = (first != Timestamp{}).count();
     CHECK_EQUAL(match, 5);
 
     match = (first != null{}).count();
@@ -9032,7 +8963,7 @@ TEST(Query_Timestamp)
     match = (Timestamp(111, 222) == first).find();
     CHECK_EQUAL(match, 0);
 
-    match = (Timestamp(null{}) == first).find();
+    match = (Timestamp{} == first).find();
     CHECK_EQUAL(match, 3);
 
     match = (Timestamp(111, 222) > first).find();
@@ -9101,10 +9032,10 @@ TEST(Query_Timestamp_Null)
     Columns<Timestamp> first = table.column<Timestamp>(0);
     Columns<Timestamp> second = table.column<Timestamp>(1);
 
-    match = (first == Timestamp(null{})).find();
+    match = (first == Timestamp{}).find();
     CHECK_EQUAL(match, npos);
 
-    match = (second == Timestamp(null{})).find();
+    match = (second == Timestamp{}).find();
     CHECK_EQUAL(match, 0);
 }
 
@@ -9146,18 +9077,20 @@ TEST(Query_SyncViewIfNeeded)
     size_t col_links = source->add_column_link(type_LinkList, "link", *target);
     size_t col_id = target->add_column(type_Int, "id");
 
-    auto reset_table_contents = [&]{
+    auto reset_table_contents = [&] {
         source->clear();
         target->clear();
 
-        for (size_t i = 0; i < 15; ++i) {
+        for (size_t i = 0; i < 15; ++i)
+        {
             target->add_empty_row();
             target->set_int(col_id, i, i);
         }
 
         source->add_empty_row();
         LinkViewRef ll = source->get_linklist(col_links, 0);
-        for (size_t i = 6; i < 15; ++i) {
+        for (size_t i = 6; i < 15; ++i)
+        {
             ll->add(i);
         }
     };
@@ -9281,6 +9214,30 @@ TEST(Query_CombineWithEmptyQueryDoesntCrash)
 
         Query q3 = table.where() || q1;
         CHECK_EQUAL(1, q3.count());
+    }
+}
+
+// Check that queries take into account restricting views, but still
+// return row index into the underlying table
+TEST(Query_AccountForRestrictingViews)
+{
+    Table table;
+    size_t col_id = table.add_column(type_Int, "id");
+    table.add_empty_row(3);
+    table.set_int(col_id, 0, 42);
+    table.set_int(col_id, 1, 43);
+    table.set_int(col_id, 2, 44);
+
+    {
+        // Create initial table view
+        TableView results = table.where().equal(col_id, 44).find_all();
+        CHECK_EQUAL(1, results.size());
+        CHECK_EQUAL(44, results.get(0).get_int(col_id));
+
+        // Create query based on restricting view
+        Query q = Query(results.get_parent().where(&results));
+        size_t table_index = q.find(0);
+        CHECK_EQUAL(2, table_index);
     }
 }
 
@@ -9426,8 +9383,8 @@ TEST(Query_TableInitialization)
 
     auto repl = make_in_realm_history(path);
     auto repl2 = make_in_realm_history(path);
-    SharedGroup sg(*repl, SharedGroup::durability_MemOnly);
-    SharedGroup sg2(*repl2, SharedGroup::durability_MemOnly);
+    SharedGroup sg(*repl, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+    SharedGroup sg2(*repl2, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
     Group& g = const_cast<Group&>(sg.begin_read());
     LangBindHelper::promote_to_write(sg);
 

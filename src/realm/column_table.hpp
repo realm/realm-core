@@ -57,10 +57,8 @@ public:
     bool supports_search_index() const noexcept override { return false; }
     StringIndex* create_search_index() override { return nullptr; }
 
-#ifdef REALM_DEBUG
     void verify() const override;
     void verify(const Table&, size_t) const override;
-#endif
 
 protected:
     /// A pointer to the table that this column is part of. For a free-standing
@@ -152,18 +150,18 @@ protected:
     ref_type clone_table_columns(const Table*);
 
     size_t* record_subtable_path(size_t* begin,
-                                      size_t* end) noexcept override;
+                                 size_t* end) noexcept override;
 
     void update_table_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                                 _impl::TableFriend::AccessorUpdater&);
 
     /// \param row_ndx Must be `realm::npos` if appending.
+    /// \param value The value to place in any newly created rows.
+    /// \param num_rows The number of rows to insert.
     void do_insert(size_t row_ndx, int_fast64_t value, size_t num_rows);
 
-#ifdef REALM_DEBUG
     std::pair<ref_type, size_t>
     get_to_dot_parent(size_t ndx_in_parent) const override;
-#endif
 
     friend class Table;
 };
@@ -175,13 +173,18 @@ public:
     /// Create a subtable column accessor and attach it to a
     /// preexisting underlying structure of arrays.
     ///
+    /// \param alloc The allocator to provide new memory.
+    ///
+    /// \param ref The memory reference of the underlying subtable that
+    /// we are creating an accessor for.
+    ///
     /// \param table If this column is used as part of a table you must
     /// pass a pointer to that table. Otherwise you must pass null.
     ///
     /// \param column_ndx If this column is used as part of a table
     /// you must pass the logical index of the column within that
     /// table. Otherwise you should pass zero.
-    SubtableColumn(Allocator&, ref_type, Table* table, size_t column_ndx);
+    SubtableColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx);
 
     ~SubtableColumn() noexcept override {}
 
@@ -258,7 +261,7 @@ inline void SubtableColumnBase::erase_rows(size_t row_ndx, size_t num_rows_to_er
                                            bool broken_reciprocal_backlinks)
 {
     IntegerColumn::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
-                       broken_reciprocal_backlinks); // Throws
+                              broken_reciprocal_backlinks); // Throws
 
     const bool fix_ndx_in_parent = true;
     bool last_entry_removed =
@@ -523,7 +526,7 @@ inline SubtableColumnBase::~SubtableColumnBase() noexcept
 
 inline bool SubtableColumnBase::compare_subtable_rows(const Table& a, const Table& b)
 {
-    return _impl::TableFriend::compare_rows(a,b);
+    return _impl::TableFriend::compare_rows(a, b);
 }
 
 inline ref_type SubtableColumnBase::clone_table_columns(const Table* t)

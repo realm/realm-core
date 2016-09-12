@@ -53,7 +53,7 @@ BinaryData ArrayBlob::get_at(size_t& pos) const noexcept
     else {
         // All data is in this array
         pos = 0;
-        if (offset < size()){
+        if (offset < size()) {
             return {get(offset), size() - offset};
         }
         else {
@@ -141,7 +141,7 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
         }
 
         // Insert the data
-        modify_begin = std::copy(data, data+data_size, modify_begin);
+        modify_begin = std::copy(data, data + data_size, modify_begin);
         if (add_zero_term)
             *modify_begin = 0;
 

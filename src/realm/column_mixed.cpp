@@ -25,6 +25,14 @@
 using namespace realm;
 using namespace realm::util;
 
+MixedColumn::RefsColumn::RefsColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
+    : SubtableColumnBase(alloc, ref, table, column_ndx)
+{
+}
+
+MixedColumn::RefsColumn::~RefsColumn() noexcept
+{
+}
 
 MixedColumn::~MixedColumn() noexcept
 {
@@ -155,9 +163,9 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
             }
             else {
                 // FIXME: But this will lead to unbounded in-file leaking in
-                // for(;;) { insert_binary(i, ...); erase(i); }  
+                // for(;;) { insert_binary(i, ...); erase(i); }
                 // (not important because Mixed is not officially supported)
-                m_timestamp_data->set(data_row_ndx, Timestamp(null{}));
+                m_timestamp_data->set(data_row_ndx, Timestamp{});
             }
             goto carry_on;
         }
@@ -173,7 +181,7 @@ MixedColumn::MixedColType MixedColumn::clear_value(size_t row_ndx, MixedColType 
     }
     REALM_ASSERT(false);
 
-  carry_on:
+carry_on:
     if (old_type != new_type)
         m_types->set(row_ndx, new_type);
     m_data->set(row_ndx, 0);
@@ -244,9 +252,12 @@ DataType MixedColumn::get_type(size_t ndx) const noexcept
     REALM_ASSERT_3(ndx, <, m_types->size());
     MixedColType coltype = MixedColType(m_types->get(ndx));
     switch (coltype) {
-        case mixcol_IntNeg:    return type_Int;
-        case mixcol_DoubleNeg: return type_Double;
-        default: return DataType(coltype);   // all others must be in sync with ColumnType
+        case mixcol_IntNeg:
+            return type_Int;
+        case mixcol_DoubleNeg:
+            return type_Double;
+        default:
+            return DataType(coltype);   // all others must be in sync with ColumnType
     }
 }
 
@@ -497,16 +508,18 @@ ref_type MixedColumn::write(size_t slice_offset, size_t slice_size,
     return top.write(out, deep, only_if_modified); // Throws
 }
 
-
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+// LCOV_EXCL_START ignore debug functions
 
 void MixedColumn::verify() const
 {
-    do_verify(0,0);
+#ifdef REALM_DEBUG
+    do_verify(0, 0);
+#endif
 }
 
 void MixedColumn::verify(const Table& table, size_t col_ndx) const
 {
+#ifdef REALM_DEBUG
     do_verify(&table, col_ndx);
 
     // Verify each sub-table
@@ -519,28 +532,21 @@ void MixedColumn::verify(const Table& table, size_t col_ndx) const
         REALM_ASSERT_3(subtable->get_parent_row_index(), ==, i);
         subtable->verify();
     }
+#else
+    static_cast<void>(table);
+    static_cast<void>(col_ndx);
+#endif
 }
 
-
-void MixedColumn::do_verify(const Table* table, size_t col_ndx) const
+void MixedColumn::do_dump_node_structure(std::ostream& out, int level) const
 {
-    m_array->verify();
-    m_types->verify();
-    if (table) {
-        m_data->verify(*table, col_ndx);
-    }
-    else {
-        m_data->verify();
-    }
-    if (m_binary_data)
-        m_binary_data->verify();
-
-    // types and refs should be in sync
-    size_t types_len = m_types->size();
-    size_t refs_len  = m_data->size();
-    REALM_ASSERT_3(types_len, ==, refs_len);
+#ifdef REALM_DEBUG
+    m_types->do_dump_node_structure(out, level); // FIXME: How to do this?
+#else
+    static_cast<void>(out);
+    static_cast<void>(level);
+#endif
 }
-
 
 void MixedColumn::leaf_to_dot(MemRef, ArrayParent*, size_t, std::ostream&) const
 {
@@ -548,6 +554,7 @@ void MixedColumn::leaf_to_dot(MemRef, ArrayParent*, size_t, std::ostream&) const
 
 void MixedColumn::to_dot(std::ostream& out, StringData title) const
 {
+#ifdef REALM_DEBUG
     ref_type ref = get_ref();
     out << "subgraph cluster_mixed_column" << ref << " {" << std::endl;
     out << " label = \"Mixed column";
@@ -572,11 +579,31 @@ void MixedColumn::to_dot(std::ostream& out, StringData title) const
     }
 
     out << "}" << std::endl;
+#else
+    static_cast<void>(out);
+    static_cast<void>(title);
+#endif
 }
 
-void MixedColumn::do_dump_node_structure(std::ostream& out, int level) const
+#ifdef REALM_DEBUG
+
+void MixedColumn::do_verify(const Table* table, size_t col_ndx) const
 {
-    m_types->do_dump_node_structure(out, level); // FIXME: How to do this?
+    m_array->verify();
+    m_types->verify();
+    if (table) {
+        m_data->verify(*table, col_ndx);
+    }
+    else {
+        m_data->verify();
+    }
+    if (m_binary_data)
+        m_binary_data->verify();
+
+    // types and refs should be in sync
+    size_t types_len = m_types->size();
+    size_t refs_len = m_data->size();
+    REALM_ASSERT_3(types_len, ==, refs_len);
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions

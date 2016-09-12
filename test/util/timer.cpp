@@ -24,14 +24,14 @@
 #include <realm/util/features.h>
 
 #if defined _WIN32
-#  define NOMINMAX
-#  include <windows.h>
+    #define NOMINMAX
+    #include <windows.h>
 #elif REALM_PLATFORM_APPLE
-#  include <sys/resource.h>
-#  include <mach/mach_time.h>
-#  include <sys/time.h>
+    #include <sys/resource.h>
+    #include <mach/mach_time.h>
+    #include <sys/time.h>
 #else
-#  include <time.h>
+    #include <ctime>
 #endif
 
 #include "timer.hpp"
@@ -104,9 +104,9 @@ double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const
 namespace {
 
 #ifdef CLOCK_MONOTONIC_RAW
-const clockid_t real_time_clock_id = CLOCK_MONOTONIC_RAW; // (since Linux 2.6.28; Linux-specific)
+    const clockid_t real_time_clock_id = CLOCK_MONOTONIC_RAW; // (since Linux 2.6.28; Linux-specific)
 #else
-const clockid_t real_time_clock_id = CLOCK_MONOTONIC;
+    const clockid_t real_time_clock_id = CLOCK_MONOTONIC;
 #endif
 
 const clockid_t user_time_clock_id = CLOCK_PROCESS_CPUTIME_ID;
@@ -145,7 +145,7 @@ uint_fast64_t Timer::get_timer_ticks() const
         time.tv_nsec += 1000000000;
     }
     return uint_fast64_t(time.tv_sec - init_time->tv_sec) *
-        1000000000 + (time.tv_nsec - init_time->tv_nsec);
+           1000000000 + (time.tv_nsec - init_time->tv_nsec);
 }
 
 double Timer::calc_elapsed_seconds(uint_fast64_t ticks) const
@@ -163,13 +163,13 @@ std::string Timer::format(double seconds)
 }
 
 namespace {
-    // FIXME: This should be std::llround once we switch to >= C++11.
-    int64_t round_to_int64(double x)
-    {
-        // FIXME: Assumes x >= 0.
-        // FIXME: The adding of 0.5 is error-prone, see: http://blog.frama-c.com/index.php?post/2013/05/02/nearbyintf1
-        return static_cast<int64_t>(x + 0.5);
-    }
+// FIXME: This should be std::llround once we switch to >= C++11.
+int64_t round_to_int64(double x)
+{
+    // FIXME: Assumes x >= 0.
+    // FIXME: The adding of 0.5 is error-prone, see: http://blog.frama-c.com/index.php?post/2013/05/02/nearbyintf1
+    return static_cast<int64_t>(x + 0.5);
+}
 }
 
 

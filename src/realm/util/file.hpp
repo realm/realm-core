@@ -20,14 +20,14 @@
 #define REALM_UTIL_FILE_HPP
 
 #include <cstddef>
-#include <stdint.h>
+#include <cstdint>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <streambuf>
 
 #ifndef _WIN32
-#  include <dirent.h> // POSIX.1-2001
+    #include <dirent.h> // POSIX.1-2001
 #endif
 
 #include <realm/util/features.h>
@@ -493,7 +493,7 @@ private:
     void* m_handle;
     bool m_have_lock; // Only valid when m_handle is not null
 
-    SizeType get_file_position();  // POSIX version not needed because it's only used by Windows version of resize().
+    SizeType get_file_position(); // POSIX version not needed because it's only used by Windows version of resize().
 #else
     int m_fd;
 #endif
@@ -759,7 +759,7 @@ public:
 
 class DirScanner {
 public:
-    DirScanner(const std::string& path, bool allow_missing=false);
+    DirScanner(const std::string& path, bool allow_missing = false);
     ~DirScanner() noexcept;
     bool next(std::string& name);
 private:
@@ -833,10 +833,19 @@ inline void File::open(const std::string& path, Mode m)
     CreateMode c = create_Auto;
     int flags = 0;
     switch (m) {
-        case mode_Read:   a = access_ReadOnly; c = create_Never; break;
-        case mode_Update:                      c = create_Never; break;
-        case mode_Write:  flags = flag_Trunc;                    break;
-        case mode_Append: flags = flag_Append;                   break;
+        case mode_Read:
+            a = access_ReadOnly;
+            c = create_Never;
+            break;
+        case mode_Update:
+            c = create_Never;
+            break;
+        case mode_Write:
+            flags = flag_Trunc;
+            break;
+        case mode_Append:
+            flags = flag_Append;
+            break;
     }
     open(path, a, c, flags);
 }

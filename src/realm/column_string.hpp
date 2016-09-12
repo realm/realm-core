@@ -69,7 +69,7 @@ public:
 
     size_t count(StringData value) const;
     size_t find_first(StringData value, size_t begin = 0,
-                           size_t end = npos) const;
+                      size_t end = npos) const;
     void find_all(IntegerColumn& result, StringData value, size_t begin = 0,
                   size_t end = npos) const;
 
@@ -118,7 +118,7 @@ public:
     };
 
     std::unique_ptr<const ArrayParent> get_leaf(size_t ndx, size_t& out_ndx_in_parent,
-                      LeafType& out_leaf_type) const;
+                                                LeafType& out_leaf_type) const;
 
     static ref_type create(Allocator&, size_t size = 0);
 
@@ -136,19 +136,17 @@ public:
     void update_from_parent(size_t old_baseline) noexcept override;
     void refresh_accessor_tree(size_t, const Spec&) override;
 
-#ifdef REALM_DEBUG
     void verify() const override;
     void verify(const Table&, size_t) const override;
     void to_dot(std::ostream&, StringData title) const override;
     void do_dump_node_structure(std::ostream&, int) const override;
-#endif
 
 private:
     std::unique_ptr<StringIndex> m_search_index;
     bool m_nullable;
 
     LeafType get_block(size_t ndx, ArrayParent**, size_t& off,
-                      bool use_retval = false) const;
+                       bool use_retval = false) const;
 
     /// If you are appending and have the size of the column readily available,
     /// call the 4 argument version instead. If you are not appending, either
@@ -189,10 +187,8 @@ private:
 
     void refresh_root_accessor();
 
-#ifdef REALM_DEBUG
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent,
                      std::ostream&) const override;
-#endif
 
     friend class Array;
     friend class ColumnBase;
@@ -317,7 +313,7 @@ inline const StringIndex* StringColumn::get_search_index() const noexcept
 }
 
 inline size_t StringColumn::get_size_from_ref(ref_type root_ref,
-                                                   Allocator& alloc) noexcept
+                                              Allocator& alloc) noexcept
 {
     const char* root_header = alloc.translate(root_ref);
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
