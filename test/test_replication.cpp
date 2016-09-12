@@ -3476,7 +3476,7 @@ TEST(Replication_NullInteger)
 }
 
 
-TEST(Replication_SetUnique)
+ONLY(Replication_SetUnique)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
@@ -3502,6 +3502,7 @@ TEST(Replication_SetUnique)
         table1->set_int_unique(0, 0, 123);
         table1->set_string_unique(1, 0, "Hello, World!");
         table1->set_null_unique(2, 0);
+        CHECK_EQUAL(table1->size(), 1);
         table1->set_string_unique(3, 0, "Hello, World!");
         wt.commit();
     }
@@ -3512,7 +3513,7 @@ TEST(Replication_SetUnique)
 
         CHECK_EQUAL(table2->get_int(0, 0), 123);
         CHECK_EQUAL(table2->get_string(1, 0), "Hello, World!");
-        CHECK_EQUAL(table2->get_int(2, 0), 123);
+        CHECK(table2->is_null(2, 0));
         CHECK_EQUAL(table2->get_string(3, 0), "Hello, World!");
     }
 }
