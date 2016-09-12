@@ -12417,7 +12417,8 @@ TEST(LangBindHelper_SwapSimple)
 
 
 // Found by AFL
-TEST(LangBindHelper_RollbackMoveSame) {
+TEST(LangBindHelper_RollbackMoveSame)
+{
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_r(make_client_history(path, crypt_key()));
     std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
@@ -12468,7 +12469,6 @@ TEST(LangBindHelper_ColumnMoveUpdatesLinkedTables)
     LangBindHelper::advance_read(sg_r);
     g_r.verify();
 }
-
 
 
 #endif

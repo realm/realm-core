@@ -58,14 +58,37 @@ std::string create_string(size_t length)
     return std::string{buf, length};
 }
 
-enum INS {  ADD_TABLE, INSERT_TABLE, REMOVE_TABLE, INSERT_ROW, ADD_EMPTY_ROW, INSERT_COLUMN,
-            ADD_COLUMN, REMOVE_COLUMN, SET, REMOVE_ROW, ADD_COLUMN_LINK, ADD_COLUMN_LINK_LIST,
-            CLEAR_TABLE, MOVE_TABLE, INSERT_COLUMN_LINK, ADD_SEARCH_INDEX, REMOVE_SEARCH_INDEX,
-            COMMIT, ROLLBACK, ADVANCE, MOVE_LAST_OVER, CLOSE_AND_REOPEN, GET_ALL_COLUMN_NAMES,
-            CREATE_TABLE_VIEW, COMPACT, SWAP_ROWS, MOVE_COLUMN,
+enum INS {
+    ADD_TABLE,
+    INSERT_TABLE,
+    REMOVE_TABLE,
+    INSERT_ROW,
+    ADD_EMPTY_ROW,
+    INSERT_COLUMN,
+    ADD_COLUMN,
+    REMOVE_COLUMN,
+    SET,
+    REMOVE_ROW,
+    ADD_COLUMN_LINK,
+    ADD_COLUMN_LINK_LIST,
+    CLEAR_TABLE,
+    MOVE_TABLE,
+    INSERT_COLUMN_LINK,
+    ADD_SEARCH_INDEX,
+    REMOVE_SEARCH_INDEX,
+    COMMIT,
+    ROLLBACK,
+    ADVANCE,
+    MOVE_LAST_OVER,
+    CLOSE_AND_REOPEN,
+    GET_ALL_COLUMN_NAMES,
+    CREATE_TABLE_VIEW,
+    COMPACT,
+    SWAP_ROWS,
+    MOVE_COLUMN,
 
-            COUNT
-         };
+    COUNT
+};
 
 DataType get_type(unsigned char c)
 {
@@ -320,8 +343,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     size_t col_ndx1 = get_next(s) % t->get_column_count();
                     size_t col_ndx2 = get_next(s) % t->get_column_count();
                     if (log) {
-                        *log << "_impl::TableFriend::move_column(*(g.get_table("
-                            << table_ndx << ")->get_descriptor()), " << col_ndx1 << ", " << col_ndx2 << ");\n";
+                        *log << "_impl::TableFriend::move_column(*(g.get_table(" << table_ndx
+                             << ")->get_descriptor()), " << col_ndx1 << ", " << col_ndx2 << ");\n";
                     }
                     _impl::TableFriend::move_column(*(t->get_descriptor()), col_ndx1, col_ndx2);
                 }

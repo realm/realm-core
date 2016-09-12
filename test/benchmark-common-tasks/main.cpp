@@ -58,7 +58,9 @@ const double min_duration_s = 0.1;
 const double min_warmup_time_s = 0.05;
 
 struct Benchmark {
-    virtual ~Benchmark() {}
+    virtual ~Benchmark()
+    {
+    }
     virtual const char* name() const = 0;
     virtual void before_all(SharedGroup&)
     {
@@ -199,7 +201,10 @@ struct BenchmarkWithStringsManyDup : BenchmarkWithStringsTable {
 };
 
 struct BenchmarkDistinctStringFewDupes : BenchmarkWithStringsFewDup {
-    const char* name() const { return "DistinctStringFewDupes"; }
+    const char* name() const
+    {
+        return "DistinctStringFewDupes";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -210,7 +215,10 @@ struct BenchmarkDistinctStringFewDupes : BenchmarkWithStringsFewDup {
 };
 
 struct BenchmarkDistinctStringManyDupes : BenchmarkWithStringsManyDup {
-    const char* name() const { return "DistinctStringManyDupes"; }
+    const char* name() const
+    {
+        return "DistinctStringManyDupes";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -221,7 +229,10 @@ struct BenchmarkDistinctStringManyDupes : BenchmarkWithStringsManyDup {
 };
 
 struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
-    const char* name() const { return "FindAllStringFewDupes"; }
+    const char* name() const
+    {
+        return "FindAllStringFewDupes";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -232,7 +243,10 @@ struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
 };
 
 struct BenchmarkFindAllStringManyDupes : BenchmarkWithStringsManyDup {
-    const char* name() const { return "FindAllStringManyDupes"; }
+    const char* name() const
+    {
+        return "FindAllStringManyDupes";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -243,13 +257,18 @@ struct BenchmarkFindAllStringManyDupes : BenchmarkWithStringsManyDup {
 };
 
 struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
-    const char* name() const { return "FindFirstStringFewDupes"; }
+    const char* name() const
+    {
+        return "FindFirstStringFewDupes";
+    }
 
     void operator()(SharedGroup& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        std::vector<std::string> strs = { "10", "20", "30", "40", "50", "60", "70", "80", "90", "100", };
+        std::vector<std::string> strs = {
+            "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
+        };
         for (auto s : strs) {
             table->where().equal(0, StringData(s)).find();
         }
@@ -257,13 +276,18 @@ struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
 };
 
 struct BenchmarkFindFirstStringManyDupes : BenchmarkWithStringsManyDup {
-    const char* name() const { return "FindFirstStringManyDupes"; }
+    const char* name() const
+    {
+        return "FindFirstStringManyDupes";
+    }
 
     void operator()(SharedGroup& group)
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("StringOnly");
-        std::vector<std::string> strs = { "10", "20", "30", "40", "50", "60", "70", "80", "90", "100", };
+        std::vector<std::string> strs = {
+            "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
+        };
         for (auto s : strs) {
             table->where().equal(0, StringData(s)).find();
         }

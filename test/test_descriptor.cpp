@@ -244,12 +244,12 @@ TEST(Descriptor_MoveColumnSparseLinks)
     CHECK_EQUAL(5, desc->get_column_link_target(5));
     group.verify();
 
-    df::move_column(*desc, 3, 1);   // undo
+    df::move_column(*desc, 3, 1); // undo
     check_original_order();
     group.verify();
 
 
-    df::move_column(*desc, 0, 5);   // non link to link
+    df::move_column(*desc, 0, 5); // non link to link
     CHECK_EQUAL("l1", desc->get_column_name(0));
     CHECK_EQUAL("i0", desc->get_column_name(5));
     CHECK_EQUAL(1, desc->get_column_link_target(0));
@@ -257,11 +257,11 @@ TEST(Descriptor_MoveColumnSparseLinks)
     CHECK_EQUAL(5, desc->get_column_link_target(4));
     group.verify();
 
-    df::move_column(*desc, 5, 0);   // undo
+    df::move_column(*desc, 5, 0); // undo
     check_original_order();
     group.verify();
 
-    df::move_column(*desc, 1, 6);   // link to non link
+    df::move_column(*desc, 1, 6); // link to non link
     CHECK_EQUAL("i2", desc->get_column_name(1));
     CHECK_EQUAL("l1", desc->get_column_name(6));
     CHECK_EQUAL(3, desc->get_column_link_target(2));
@@ -269,7 +269,7 @@ TEST(Descriptor_MoveColumnSparseLinks)
     CHECK_EQUAL(1, desc->get_column_link_target(6));
     group.verify();
 
-    df::move_column(*desc, 6, 1);   // undo
+    df::move_column(*desc, 6, 1); // undo
     check_original_order();
     group.verify();
 }
