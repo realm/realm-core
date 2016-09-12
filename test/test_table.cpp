@@ -71,13 +71,6 @@ using unit_test::TestContext;
 // check-testcase` (or one of its friends) from the command line.
 
 
-namespace {
-
-REALM_TABLE_2(TupleTableType, first, Int, second, String)
-
-} // anonymous namespace
-
-
 #ifdef JAVA_MANY_COLUMNS_CRASH
 
 REALM_TABLE_3(SubtableType, year, Int, daysSinceLastVisit, Int, conceptId, String)
@@ -251,11 +244,15 @@ TEST(Table_DeleteCrash)
 TEST(Table_OptimizeCrash)
 {
     // This will crash at the .add() method
-    TupleTableType ttt;
+    Table ttt;
+    ttt.add_column(type_Int, "first");
+    ttt.add_column(type_String, "second");
     ttt.optimize();
-    ttt.column().second.add_search_index();
+    ttt.add_search_index(1);
     ttt.clear();
-    ttt.add(1, "AA");
+    ttt.add_empty_row(1);
+    ttt.set_int(0, 0, 1);
+    ttt.set_string(1, 0, "AA");
 }
 
 TEST(Table_DateTimeMinMax)
@@ -906,21 +903,38 @@ namespace {
 
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
-REALM_TABLE_4(TestTable, first, Int, second, Int, third, Bool, fourth, Enum<Days>)
+class TestTable : public Table {
+public:
+    TestTable(Allocator& a) : Table(a) { init(); }
+    TestTable() { init(); }
+    void init()
+    {
+        add_column(type_Int, "first");
+        add_column(type_Int, "second");
+        add_column(type_Bool, "third");
+        add_column(type_Int, "fourth");
+    }
+    void add(int first, int second, bool third, Days forth)
+    {
+        size_t ndx = add_empty_row(1);
+        set_int(0, ndx, first);
+        set_int(1, ndx, second);
+        set_bool(2, ndx, third);
+        set_int(3, ndx, forth);
+    }
+};
 
 } // anonymous namespace
 
 TEST(Table_2)
 {
     TestTable table;
-
     table.add(0, 10, true, Wed);
-    const TestTable::Cursor r = table.back(); // last item
 
-    CHECK_EQUAL(0, r.first);
-    CHECK_EQUAL(10, r.second);
-    CHECK_EQUAL(true, r.third);
-    CHECK_EQUAL(Wed, r.fourth);
+    CHECK_EQUAL(0, table.get_int(0, 0));
+    CHECK_EQUAL(10, table.get_int(1, 0));
+    CHECK_EQUAL(true, table.get_bool(2, 0));
+    CHECK_EQUAL(Wed, table.get_int(3, 0));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -936,14 +950,14 @@ TEST(Table_3)
     }
 
     // Test column searching
-    CHECK_EQUAL(size_t(0), table.column().first.find_first(0));
-    CHECK_EQUAL(size_t(-1), table.column().first.find_first(1));
-    CHECK_EQUAL(size_t(0), table.column().second.find_first(10));
-    CHECK_EQUAL(size_t(-1), table.column().second.find_first(100));
-    CHECK_EQUAL(size_t(0), table.column().third.find_first(true));
-    CHECK_EQUAL(size_t(-1), table.column().third.find_first(false));
-    CHECK_EQUAL(size_t(0), table.column().fourth.find_first(Wed));
-    CHECK_EQUAL(size_t(-1), table.column().fourth.find_first(Mon));
+    CHECK_EQUAL(size_t(0), table.find_first_int(0, 0));
+    CHECK_EQUAL(size_t(-1), table.find_first_int(0, 1));
+    CHECK_EQUAL(size_t(0), table.find_first_int(1, 10));
+    CHECK_EQUAL(size_t(-1), table.find_first_int(1, 100));
+    CHECK_EQUAL(size_t(0), table.find_first_bool(2, true));
+    CHECK_EQUAL(size_t(-1), table.find_first_bool(2, false));
+    CHECK_EQUAL(size_t(0), table.find_first_int(3, Wed));
+    CHECK_EQUAL(size_t(-1), table.find_first_int(3, Mon));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -952,7 +966,21 @@ TEST(Table_3)
 
 namespace {
 
-REALM_TABLE_2(TestTableEnum, first, Enum<Days>, second, String)
+class TestTableEnum : public Table {
+public:
+    TestTableEnum()
+    {
+        add_column(type_Int, "first");
+        add_column(type_String, "second");
+    }
+
+    void add(Days first, std::string second)
+    {
+        size_t ndx = add_empty_row(1);
+        set_int(0, ndx, first);
+        set_string(1, ndx, second);
+    }
+};
 
 } // anonymous namespace
 
@@ -962,15 +990,15 @@ TEST(Table_4)
 
     table.add(Mon, "Hello");
     table.add(Mon, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
-    const TestTableEnum::Cursor r = table.back(); // last item
 
-    CHECK_EQUAL(Mon, r.first);
-    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello", r.second);
+    CHECK_EQUAL(Mon, table.get_int(0, 0));
+    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello",
+                table.get_string(1, 1));
 
     // Test string column searching
-    CHECK_EQUAL(size_t(1), table.column().second.find_first(
-                               "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
-    CHECK_EQUAL(size_t(-1), table.column().second.find_first("Foo"));
+    CHECK_EQUAL(size_t(1), table.find_first_string(
+                               1, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
+    CHECK_EQUAL(size_t(-1), table.find_first_string(1, "Foo"));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -979,7 +1007,20 @@ TEST(Table_4)
 
 namespace {
 
-REALM_TABLE_2(TestTableFloats, first, Float, second, Double)
+class TestTableFloats : public Table {
+public:
+    TestTableFloats()
+    {
+        add_column(type_Float, "first");
+        add_column(type_Double, "second");
+    }
+    void add(float first, double second)
+    {
+        size_t ndx = add_empty_row(1);
+        set_float(0, ndx, first);
+        set_double(1, ndx, second);
+    }
+};
 
 } // anonymous namespace
 
@@ -989,10 +1030,9 @@ TEST(Table_Float2)
 
     table.add(1.1f, 2.2);
     table.add(1.1f, 2.2);
-    const TestTableFloats::Cursor r = table.back(); // last item
 
-    CHECK_EQUAL(1.1f, r.first);
-    CHECK_EQUAL(2.2, r.second);
+    CHECK_EQUAL(1.1f, table.get_float(0, 0));
+    CHECK_EQUAL(2.2, table.get_double(1, 1));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -1012,13 +1052,13 @@ TEST(Table_Delete)
     table.remove(4);
     table.remove(7);
 
-    CHECK_EQUAL(1, table[0].second);
-    CHECK_EQUAL(2, table[1].second);
-    CHECK_EQUAL(3, table[2].second);
-    CHECK_EQUAL(4, table[3].second);
-    CHECK_EQUAL(6, table[4].second);
-    CHECK_EQUAL(7, table[5].second);
-    CHECK_EQUAL(8, table[6].second);
+    CHECK_EQUAL(1, table.get_int(1, 0));
+    CHECK_EQUAL(2, table.get_int(1, 1));
+    CHECK_EQUAL(3, table.get_int(1, 2));
+    CHECK_EQUAL(4, table.get_int(1, 3));
+    CHECK_EQUAL(6, table.get_int(1, 4));
+    CHECK_EQUAL(7, table.get_int(1, 5));
+    CHECK_EQUAL(8, table.get_int(1, 6));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -1287,7 +1327,7 @@ TEST(Table_HighLevelCopy)
 
     CHECK(table2 == table);
 
-    TestTable::Ref table3 = table.copy();
+    auto table3 = table.copy();
 
 #ifdef REALM_DEBUG
     table3->verify();
@@ -1660,11 +1700,11 @@ TEST(Table_FindAllInt)
     table.add(0, 20, true, Wed);
 
     // Search for a value that does not exits
-    const TestTable::View v0 = table.column().second.find_all(5);
+    auto v0 = table.find_all_int(1, 5);
     CHECK_EQUAL(0, v0.size());
 
     // Search for a value with several matches
-    const TestTable::View v = table.column().second.find_all(20);
+    auto v = table.find_all_int(1, 20);
 
     CHECK_EQUAL(5, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));
@@ -1694,7 +1734,7 @@ TEST(Table_SortedInt)
     table.add(0, 2, true, Wed);  // 9: 1
 
     // Search for a value that does not exits
-    TestTable::View v = table.column().second.get_sorted_view();
+    auto v = table.get_sorted_view(1);
     CHECK_EQUAL(table.size(), v.size());
 
     CHECK_EQUAL(2, v.get_source_ndx(0));
@@ -1731,18 +1771,18 @@ TEST(Table_Sorted_Query_where)
     table.add(0, 2, true, Wed);   // 9: 1
 
     // Count booleans
-    size_t count_original = table.where().third.equal(false).count();
+    size_t count_original = table.where().equal(2, false).count();
     CHECK_EQUAL(4, count_original);
 
     // Get a view containing the complete table
-    TestTable::View v = table.column().first.find_all(0);
+    auto v = table.find_all_int(0, 0);
     CHECK_EQUAL(table.size(), v.size());
 
     // Count booleans
-    size_t count_view = table.where(&v).third.equal(false).count();
+    size_t count_view = table.where(&v).equal(2, false).count();
     CHECK_EQUAL(4, count_view);
 
-    TestTable::View v_sorted = table.column().second.get_sorted_view();
+    auto v_sorted = table.get_sorted_view(1);
     CHECK_EQUAL(table.size(), v_sorted.size());
 
 #ifdef REALM_DEBUG
@@ -1816,22 +1856,22 @@ TEST(Table_IndexString)
     table.add(Sun, "johnny");
     table.add(Mon, "jennifer"); // duplicate
 
-    table.column().second.add_search_index();
-    CHECK(table.column().second.has_search_index());
+    table.add_search_index(1);
+    CHECK(table.has_search_index(1));
 
-    const size_t r1 = table.column().second.find_first("jimmi");
+    const size_t r1 = table.find_first_string(1, "jimmi");
     CHECK_EQUAL(not_found, r1);
 
-    const size_t r2 = table.column().second.find_first("jeff");
-    const size_t r3 = table.column().second.find_first("jim");
-    const size_t r4 = table.column().second.find_first("jimbo");
-    const size_t r5 = table.column().second.find_first("johnny");
+    const size_t r2 = table.find_first_string(1, "jeff");
+    const size_t r3 = table.find_first_string(1, "jim");
+    const size_t r4 = table.find_first_string(1, "jimbo");
+    const size_t r5 = table.find_first_string(1, "johnny");
     CHECK_EQUAL(0, r2);
     CHECK_EQUAL(1, r3);
     CHECK_EQUAL(5, r4);
     CHECK_EQUAL(6, r5);
 
-    const size_t c1 = table.column().second.count("jennifer");
+    const size_t c1 = table.count_string(1, "jennifer");
     CHECK_EQUAL(2, c1);
 }
 
@@ -1849,10 +1889,10 @@ TEST(Table_IndexStringTwice)
     table.add(Sun, "johnny");
     table.add(Mon, "jennifer"); // duplicate
 
-    table.column().second.add_search_index();
-    CHECK_EQUAL(true, table.column().second.has_search_index());
-    table.column().second.add_search_index();
-    CHECK_EQUAL(true, table.column().second.has_search_index());
+    table.add_search_index(1);
+    CHECK_EQUAL(true, table.has_search_index(1));
+    table.add_search_index(1);
+    CHECK_EQUAL(true, table.has_search_index(1));
 }
 
 
@@ -2198,10 +2238,10 @@ TEST(Table_Distinct)
     table.add(Sun, "D");
     table.add(Mon, "D");
 
-    table.column().second.add_search_index();
-    CHECK(table.column().second.has_search_index());
+    table.add_search_index(1);
+    CHECK(table.has_search_index(1));
 
-    TestTableEnum::View view = table.column().second.get_distinct_view();
+    auto view = table.get_distinct_view(1);
 
     CHECK_EQUAL(4, view.size());
     CHECK_EQUAL(0, view.get_source_ndx(0));
@@ -2223,10 +2263,10 @@ TEST(Table_DistinctEnums)
     table.add(Sun, "D");
     table.add(Mon, "D");
 
-    table.column().first.add_search_index();
-    CHECK(table.column().first.has_search_index());
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
 
-    TestTableEnum::View view = table.column().first.get_distinct_view();
+    auto view = table.get_distinct_view(0);
 
     CHECK_EQUAL(7, view.size());
     CHECK_EQUAL(0, view.get_source_ndx(0));
@@ -2390,68 +2430,68 @@ TEST(Table_IndexInt)
     table.add(0, 9, true, Wed);
 
     // Create index for column two
-    table.column().second.add_search_index();
+    table.add_search_index(1);
 
     // Search for a value that does not exits
-    const size_t r1 = table.column().second.find_first(2);
+    const size_t r1 = table.find_first_int(1, 2);
     CHECK_EQUAL(npos, r1);
 
     // Find existing values
-    CHECK_EQUAL(0, table.column().second.find_first(1));
-    CHECK_EQUAL(1, table.column().second.find_first(15));
-    CHECK_EQUAL(2, table.column().second.find_first(10));
-    CHECK_EQUAL(3, table.column().second.find_first(20));
-    CHECK_EQUAL(4, table.column().second.find_first(11));
-    CHECK_EQUAL(5, table.column().second.find_first(45));
-    // CHECK_EQUAL(6, table.column().second.find_first(10)); // only finds first match
-    CHECK_EQUAL(7, table.column().second.find_first(0));
-    CHECK_EQUAL(8, table.column().second.find_first(30));
-    CHECK_EQUAL(9, table.column().second.find_first(9));
+    CHECK_EQUAL(0, table.find_first_int(1, 1));
+    CHECK_EQUAL(1, table.find_first_int(1, 15));
+    CHECK_EQUAL(2, table.find_first_int(1, 10));
+    CHECK_EQUAL(3, table.find_first_int(1, 20));
+    CHECK_EQUAL(4, table.find_first_int(1, 11));
+    CHECK_EQUAL(5, table.find_first_int(1, 45));
+    // CHECK_EQUAL(6, table.find_first_int(1, 10)); // only finds first match
+    CHECK_EQUAL(7, table.find_first_int(1, 0));
+    CHECK_EQUAL(8, table.find_first_int(1, 30));
+    CHECK_EQUAL(9, table.find_first_int(1, 9));
 
     // Change some values
-    table[2].second = 13;
-    table[9].second = 100;
+    table.set_int(1, 2, 13);
+    table.set_int(1, 9, 100);
 
-    CHECK_EQUAL(0, table.column().second.find_first(1));
-    CHECK_EQUAL(1, table.column().second.find_first(15));
-    CHECK_EQUAL(2, table.column().second.find_first(13));
-    CHECK_EQUAL(3, table.column().second.find_first(20));
-    CHECK_EQUAL(4, table.column().second.find_first(11));
-    CHECK_EQUAL(5, table.column().second.find_first(45));
-    CHECK_EQUAL(6, table.column().second.find_first(10));
-    CHECK_EQUAL(7, table.column().second.find_first(0));
-    CHECK_EQUAL(8, table.column().second.find_first(30));
-    CHECK_EQUAL(9, table.column().second.find_first(100));
+    CHECK_EQUAL(0, table.find_first_int(1, 1));
+    CHECK_EQUAL(1, table.find_first_int(1, 15));
+    CHECK_EQUAL(2, table.find_first_int(1, 13));
+    CHECK_EQUAL(3, table.find_first_int(1, 20));
+    CHECK_EQUAL(4, table.find_first_int(1, 11));
+    CHECK_EQUAL(5, table.find_first_int(1, 45));
+    CHECK_EQUAL(6, table.find_first_int(1, 10));
+    CHECK_EQUAL(7, table.find_first_int(1, 0));
+    CHECK_EQUAL(8, table.find_first_int(1, 30));
+    CHECK_EQUAL(9, table.find_first_int(1, 100));
 
     // Insert values
     table.add(0, 29, true, Wed);
     // TODO: More than add
 
-    CHECK_EQUAL(0, table.column().second.find_first(1));
-    CHECK_EQUAL(1, table.column().second.find_first(15));
-    CHECK_EQUAL(2, table.column().second.find_first(13));
-    CHECK_EQUAL(3, table.column().second.find_first(20));
-    CHECK_EQUAL(4, table.column().second.find_first(11));
-    CHECK_EQUAL(5, table.column().second.find_first(45));
-    CHECK_EQUAL(6, table.column().second.find_first(10));
-    CHECK_EQUAL(7, table.column().second.find_first(0));
-    CHECK_EQUAL(8, table.column().second.find_first(30));
-    CHECK_EQUAL(9, table.column().second.find_first(100));
-    CHECK_EQUAL(10, table.column().second.find_first(29));
+    CHECK_EQUAL(0, table.find_first_int(1, 1));
+    CHECK_EQUAL(1, table.find_first_int(1, 15));
+    CHECK_EQUAL(2, table.find_first_int(1, 13));
+    CHECK_EQUAL(3, table.find_first_int(1, 20));
+    CHECK_EQUAL(4, table.find_first_int(1, 11));
+    CHECK_EQUAL(5, table.find_first_int(1, 45));
+    CHECK_EQUAL(6, table.find_first_int(1, 10));
+    CHECK_EQUAL(7, table.find_first_int(1, 0));
+    CHECK_EQUAL(8, table.find_first_int(1, 30));
+    CHECK_EQUAL(9, table.find_first_int(1, 100));
+    CHECK_EQUAL(10, table.find_first_int(1, 29));
 
     // Delete some values
     table.remove(0);
     table.remove(5);
     table.remove(8);
 
-    CHECK_EQUAL(0, table.column().second.find_first(15));
-    CHECK_EQUAL(1, table.column().second.find_first(13));
-    CHECK_EQUAL(2, table.column().second.find_first(20));
-    CHECK_EQUAL(3, table.column().second.find_first(11));
-    CHECK_EQUAL(4, table.column().second.find_first(45));
-    CHECK_EQUAL(5, table.column().second.find_first(0));
-    CHECK_EQUAL(6, table.column().second.find_first(30));
-    CHECK_EQUAL(7, table.column().second.find_first(100));
+    CHECK_EQUAL(0, table.find_first_int(1, 15));
+    CHECK_EQUAL(1, table.find_first_int(1, 13));
+    CHECK_EQUAL(2, table.find_first_int(1, 20));
+    CHECK_EQUAL(3, table.find_first_int(1, 11));
+    CHECK_EQUAL(4, table.find_first_int(1, 45));
+    CHECK_EQUAL(5, table.find_first_int(1, 0));
+    CHECK_EQUAL(6, table.find_first_int(1, 30));
+    CHECK_EQUAL(7, table.find_first_int(1, 100));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -2461,7 +2501,24 @@ TEST(Table_IndexInt)
 
 namespace {
 
-REALM_TABLE_4(TestTableAE, first, Int, second, String, third, Bool, fourth, Enum<Days>)
+class TestTableAE : public Table {
+public:
+    TestTableAE()
+    {
+        add_column(type_Int, "first");
+        add_column(type_String, "second");
+        add_column(type_Bool, "third");
+        add_column(type_Int, "fourth");
+    }
+    void add(int first, std::string second, bool third, Days forth)
+    {
+        size_t ndx = add_empty_row(1);
+        set_int(0, ndx, first);
+        set_string(1, ndx, second);
+        set_bool(2, ndx, third);
+        set_int(3, ndx, forth);
+    }
+};
 
 } // anonymous namespace
 
@@ -2481,37 +2538,37 @@ TEST(Table_AutoEnumeration)
 
     for (size_t i = 0; i < 5; ++i) {
         const size_t n = i * 5;
-        CHECK_EQUAL(1, table[0 + n].first);
-        CHECK_EQUAL(2, table[1 + n].first);
-        CHECK_EQUAL(5, table[2 + n].first);
-        CHECK_EQUAL(8, table[3 + n].first);
-        CHECK_EQUAL(9, table[4 + n].first);
+        CHECK_EQUAL(1, table.get_int(0, 0 + n));
+        CHECK_EQUAL(2, table.get_int(0, 1 + n));
+        CHECK_EQUAL(5, table.get_int(0, 2 + n));
+        CHECK_EQUAL(8, table.get_int(0, 3 + n));
+        CHECK_EQUAL(9, table.get_int(0, 4 + n));
 
-        CHECK_EQUAL("abd", table[0 + n].second);
-        CHECK_EQUAL("eftg", table[1 + n].second);
-        CHECK_EQUAL("hijkl", table[2 + n].second);
-        CHECK_EQUAL("mnopqr", table[3 + n].second);
-        CHECK_EQUAL("stuvxyz", table[4 + n].second);
+        CHECK_EQUAL("abd", table.get_string(1, 0 + n));
+        CHECK_EQUAL("eftg", table.get_string(1, 1 + n));
+        CHECK_EQUAL("hijkl", table.get_string(1, 2 + n));
+        CHECK_EQUAL("mnopqr", table.get_string(1, 3 + n));
+        CHECK_EQUAL("stuvxyz", table.get_string(1, 4 + n));
 
-        CHECK_EQUAL(true, table[0 + n].third);
-        CHECK_EQUAL(true, table[1 + n].third);
-        CHECK_EQUAL(true, table[2 + n].third);
-        CHECK_EQUAL(true, table[3 + n].third);
-        CHECK_EQUAL(true, table[4 + n].third);
+        CHECK_EQUAL(true, table.get_bool(2, 0 + n));
+        CHECK_EQUAL(true, table.get_bool(2, 1 + n));
+        CHECK_EQUAL(true, table.get_bool(2, 2 + n));
+        CHECK_EQUAL(true, table.get_bool(2, 3 + n));
+        CHECK_EQUAL(true, table.get_bool(2, 4 + n));
 
-        CHECK_EQUAL(Mon, table[0 + n].fourth);
-        CHECK_EQUAL(Tue, table[1 + n].fourth);
-        CHECK_EQUAL(Wed, table[2 + n].fourth);
-        CHECK_EQUAL(Thu, table[3 + n].fourth);
-        CHECK_EQUAL(Fri, table[4 + n].fourth);
+        CHECK_EQUAL(Mon, table.get_int(3, 0 + n));
+        CHECK_EQUAL(Tue, table.get_int(3, 1 + n));
+        CHECK_EQUAL(Wed, table.get_int(3, 2 + n));
+        CHECK_EQUAL(Thu, table.get_int(3, 3 + n));
+        CHECK_EQUAL(Fri, table.get_int(3, 4 + n));
     }
 
     // Verify counts
-    const size_t count1 = table.column().second.count("abd");
-    const size_t count2 = table.column().second.count("eftg");
-    const size_t count3 = table.column().second.count("hijkl");
-    const size_t count4 = table.column().second.count("mnopqr");
-    const size_t count5 = table.column().second.count("stuvxyz");
+    const size_t count1 = table.count_string(1, "abd");
+    const size_t count2 = table.count_string(1, "eftg");
+    const size_t count3 = table.count_string(1, "hijkl");
+    const size_t count4 = table.count_string(1, "mnopqr");
+    const size_t count5 = table.count_string(1, "stuvxyz");
     CHECK_EQUAL(5, count1);
     CHECK_EQUAL(5, count2);
     CHECK_EQUAL(5, count3);
@@ -2534,59 +2591,61 @@ TEST(Table_AutoEnumerationFindFindAll)
 
     table.optimize();
 
-    size_t t = table.column().second.find_first("eftg");
+    size_t t = table.find_first_string(1, "eftg");
     CHECK_EQUAL(1, t);
 
-    TestTableAE::View tv = table.column().second.find_all("eftg");
+    auto tv = table.find_all_string(1, "eftg");
     CHECK_EQUAL(5, tv.size());
-    CHECK_EQUAL("eftg", tv[0].second);
-    CHECK_EQUAL("eftg", tv[1].second);
-    CHECK_EQUAL("eftg", tv[2].second);
-    CHECK_EQUAL("eftg", tv[3].second);
-    CHECK_EQUAL("eftg", tv[4].second);
+    CHECK_EQUAL("eftg", tv.get_string(1, 0));
+    CHECK_EQUAL("eftg", tv.get_string(1, 1));
+    CHECK_EQUAL("eftg", tv.get_string(1, 2));
+    CHECK_EQUAL("eftg", tv.get_string(1, 3));
+    CHECK_EQUAL("eftg", tv.get_string(1, 4));
 }
-
-namespace {
-
-REALM_TABLE_4(TestTableEnum4, col1, String, col2, String, col3, String, col4, String)
-
-} // anonymous namespace
 
 TEST(Table_AutoEnumerationOptimize)
 {
-    TestTableEnum4 t;
+    Table t;
+    t.add_column(type_String, "col1");
+    t.add_column(type_String, "col2");
+    t.add_column(type_String, "col3");
+    t.add_column(type_String, "col4");
 
     // Insert non-optimzable strings
     std::string s;
     for (size_t i = 0; i < 10; ++i) {
-        t.add(s.c_str(), s.c_str(), s.c_str(), s.c_str());
+        auto ndx = t.add_empty_row(1);
+        t.set_string(0, ndx, s.c_str());
+        t.set_string(1, ndx, s.c_str());
+        t.set_string(2, ndx, s.c_str());
+        t.set_string(3, ndx, s.c_str());
         s += "x";
     }
     t.optimize();
 
     // AutoEnumerate in reverse order
     for (size_t i = 0; i < 10; ++i) {
-        t[i].col4 = "test";
+        t.set_string(3, i, "test");
     }
     t.optimize();
     for (size_t i = 0; i < 10; ++i) {
-        t[i].col3 = "test";
+        t.set_string(2, i, "test");
     }
     t.optimize();
     for (size_t i = 0; i < 10; ++i) {
-        t[i].col2 = "test";
+        t.set_string(1, i, "test");
     }
     t.optimize();
     for (size_t i = 0; i < 10; ++i) {
-        t[i].col1 = "test";
+        t.set_string(0, i, "test");
     }
     t.optimize();
 
     for (size_t i = 0; i < 10; ++i) {
-        CHECK_EQUAL("test", t[i].col1);
-        CHECK_EQUAL("test", t[i].col2);
-        CHECK_EQUAL("test", t[i].col3);
-        CHECK_EQUAL("test", t[i].col4);
+        CHECK_EQUAL("test", t.get_string(0, i));
+        CHECK_EQUAL("test", t.get_string(1, i));
+        CHECK_EQUAL("test", t.get_string(2, i));
+        CHECK_EQUAL("test", t.get_string(3, i));
     }
 
 #ifdef REALM_DEBUG
@@ -2594,34 +2653,32 @@ TEST(Table_AutoEnumerationOptimize)
 #endif
 }
 
-namespace {
-
-REALM_TABLE_1(TestSubtabEnum2, str, String)
-REALM_TABLE_1(TestSubtabEnum1, subtab, Subtable<TestSubtabEnum2>)
-
-} // anonymous namespace
-
 TEST(Table_OptimizeSubtable)
 {
-    TestSubtabEnum1 t;
-    t.add();
-    t.add();
+    Table t;
+    DescriptorRef descr;
+    t.add_column(type_Table, "sub", false, &descr);
+    descr->add_column(type_String, "str");
+    t.add_empty_row();
+    t.add_empty_row();
 
     {
         // Non-enumerable
-        TestSubtabEnum2::Ref r = t[0].subtab;
+        auto r = t.get_subtable(0, 0);
         std::string s;
         for (int i = 0; i < 100; ++i) {
-            r->add(s.c_str());
+            auto ndx = r->add_empty_row();
+            r->set_string(0, ndx, s.c_str());
             s += 'x';
         }
     }
 
     {
         // Enumerable
-        TestSubtabEnum2::Ref r = t[1].subtab;
+        auto r = t.get_subtable(0, 1);
         for (int i = 0; i < 100; ++i) {
-            r->add("foo");
+            auto ndx = r->add_empty_row();
+            r->set_string(0, ndx, "foo");
         }
         r->optimize();
     }
@@ -2629,40 +2686,45 @@ TEST(Table_OptimizeSubtable)
     // Verify
     {
         // Non-enumerable
-        TestSubtabEnum2::Ref r = t[0].subtab;
+        auto r = t.get_subtable(0, 0);
         std::string s;
         for (size_t i = 0; i < r->size(); ++i) {
-            CHECK_EQUAL(s.c_str(), r[i].str);
+            CHECK_EQUAL(s.c_str(), r->get_string(0, i));
             s += 'x';
         }
     }
     {
         // Non-enumerable
-        TestSubtabEnum2::Ref r = t[1].subtab;
+        auto r = t.get_subtable(0, 1);
         for (size_t i = 0; i < r->size(); ++i) {
-            CHECK_EQUAL("foo", r[i].str);
+            CHECK_EQUAL("foo", r->get_string(0, i));
         }
     }
 }
 
 TEST(Table_OptimizeCompare)
 {
-    TestSubtabEnum2 t1, t2;
+    Table t1, t2;
+    t1.add_column(type_String, "str");
+    t2.add_column(type_String, "str");
+
+    t1.add_empty_row(100);
     for (int i = 0; i < 100; ++i) {
-        t1.add("foo");
+        t1.set_string(0, i, "foo");
     }
+    t2.add_empty_row(100);
     for (int i = 0; i < 100; ++i) {
-        t2.add("foo");
+        t2.set_string(0, i, "foo");
     }
     t1.optimize();
     CHECK(t1 == t2);
-    t1[50].str = "bar";
+    t1.set_string(0, 50, "bar");
     CHECK(t1 != t2);
-    t1[50].str = "foo";
+    t1.set_string(0, 50, "foo");
     CHECK(t1 == t2);
-    t2[50].str = "bar";
+    t2.set_string(0, 50, "bar");
     CHECK(t1 != t2);
-    t2[50].str = "foo";
+    t2.set_string(0, 50, "foo");
     CHECK(t1 == t2);
 }
 
@@ -2674,12 +2736,11 @@ TEST(Table_SlabAlloc)
     TestTable table(alloc);
 
     table.add(0, 10, true, Wed);
-    const TestTable::Cursor r = table.back(); // last item
 
-    CHECK_EQUAL(0, r.first);
-    CHECK_EQUAL(10, r.second);
-    CHECK_EQUAL(true, r.third);
-    CHECK_EQUAL(Wed, r.fourth);
+    CHECK_EQUAL(0, table.get_int(0, 0));
+    CHECK_EQUAL(10, table.get_int(1, 0));
+    CHECK_EQUAL(true, table.get_bool(2, 0));
+    CHECK_EQUAL(Wed, table.get_int(3, 0));
 
     // Add some more rows
     table.add(1, 10, true, Wed);
@@ -3498,29 +3559,30 @@ TEST(Table_Mixed)
 #endif
 }
 
-
 namespace {
 REALM_TABLE_1(TestTableMX, first, Mixed)
 } // anonymous namespace
 
 TEST(Table_Mixed2)
 {
-    TestTableMX table;
+    Table table;
+    table.add_column(type_Mixed, "first");
 
-    table.add(int64_t(1));
-    table.add(true);
-    table.add(OldDateTime(1234));
-    table.add("test");
+    table.add_empty_row(4);
+    table.set_mixed(0, 0, int64_t(1));
+    table.set_mixed(0, 1, true);
+    table.set_mixed(0, 2, OldDateTime(1234));
+    table.set_mixed(0, 3, "test");
 
-    CHECK_EQUAL(type_Int, table[0].first.get_type());
-    CHECK_EQUAL(type_Bool, table[1].first.get_type());
-    CHECK_EQUAL(type_OldDateTime, table[2].first.get_type());
-    CHECK_EQUAL(type_String, table[3].first.get_type());
+    CHECK_EQUAL(type_Int, table.get_mixed_type(0, 0));
+    CHECK_EQUAL(type_Bool, table.get_mixed_type(0, 1));
+    CHECK_EQUAL(type_OldDateTime, table.get_mixed_type(0, 2));
+    CHECK_EQUAL(type_String, table.get_mixed_type(0, 3));
 
-    CHECK_EQUAL(1, table[0].first.get_int());
-    CHECK_EQUAL(true, table[1].first.get_bool());
-    CHECK_EQUAL(1234, table[2].first.get_olddatetime());
-    CHECK_EQUAL("test", table[3].first.get_string());
+    CHECK_EQUAL(1, table.get_mixed(0, 0));
+    CHECK_EQUAL(true, table.get_mixed(0, 1));
+    CHECK_EQUAL(OldDateTime(1234), table.get_mixed(0, 2));
+    CHECK_EQUAL("test", table.get_mixed(0, 3));
 }
 
 
