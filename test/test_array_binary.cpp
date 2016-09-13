@@ -105,7 +105,7 @@ TEST(ArrayBinary_Basic)
     CHECK_EQUAL(4, c.get(0).size());
     CHECK_EQUAL(1, c.size());
 
-    c.add(BinaryData("defg", 5)); //non-empty
+    c.add(BinaryData("defg", 5)); // non-empty
     CHECK_EQUAL("abc", c.get(0).data());
     CHECK_EQUAL("defg", c.get(1).data());
     CHECK_EQUAL(4, c.get(0).size());

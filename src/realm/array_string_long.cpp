@@ -57,12 +57,12 @@ void ArrayStringLong::set(size_t ndx, StringData value)
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
     size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
-    size_t end   = to_size_t(m_offsets.get(ndx));
+    size_t end = to_size_t(m_offsets.get(ndx));
     bool add_zero_term = true;
     m_blob.replace(begin, end, value.data(), value.size(), add_zero_term);
 
     size_t new_end = begin + value.size() + 1;
-    int64_t diff =  int64_t(new_end) - int64_t(end);
+    int64_t diff = int64_t(new_end) - int64_t(end);
     m_offsets.adjust(ndx, m_offsets.size(), diff);
     if (m_nullable)
         m_nulls.set(ndx, !value.is_null());
@@ -87,7 +87,7 @@ void ArrayStringLong::erase(size_t ndx)
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
     size_t begin = 0 < ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
-    size_t end   = to_size_t(m_offsets.get(ndx));
+    size_t end = to_size_t(m_offsets.get(ndx));
 
     m_blob.erase(begin, end);
     m_offsets.erase(ndx);
@@ -115,8 +115,7 @@ void ArrayStringLong::set_null(size_t ndx)
     }
 }
 
-size_t ArrayStringLong::count(StringData value, size_t begin,
-                              size_t end) const noexcept
+size_t ArrayStringLong::count(StringData value, size_t begin, size_t end) const noexcept
 {
     size_t num_matches = 0;
 
@@ -132,13 +131,12 @@ size_t ArrayStringLong::count(StringData value, size_t begin,
     return num_matches;
 }
 
-size_t ArrayStringLong::find_first(StringData value, size_t begin,
-                                   size_t end) const noexcept
+size_t ArrayStringLong::find_first(StringData value, size_t begin, size_t end) const noexcept
 {
     size_t n = size();
     if (end == npos)
         end = n;
-    REALM_ASSERT_7(begin, <= , n, &&, end, <= , n);
+    REALM_ASSERT_7(begin, <=, n, &&, end, <=, n);
     REALM_ASSERT_3(begin, <=, end);
 
     for (size_t i = begin; i < end; ++i) {
@@ -150,8 +148,8 @@ size_t ArrayStringLong::find_first(StringData value, size_t begin,
     return not_found;
 }
 
-void ArrayStringLong::find_all(IntegerColumn& result, StringData value, size_t add_offset,
-                               size_t begin, size_t end) const
+void ArrayStringLong::find_all(IntegerColumn& result, StringData value, size_t add_offset, size_t begin,
+                               size_t end) const
 {
     size_t begin_2 = begin;
     for (;;) {
@@ -187,11 +185,11 @@ StringData ArrayStringLong::get(const char* header, size_t ndx, Allocator& alloc
     if (0 < ndx) {
         std::pair<int64_t, int64_t> p = get_two(offsets_header, ndx - 1);
         begin = to_size_t(p.first);
-        end   = to_size_t(p.second);
+        end = to_size_t(p.second);
     }
     else {
         begin = 0;
-        end   = to_size_t(Array::get(offsets_header, 0));
+        end = to_size_t(Array::get(offsets_header, 0));
     }
     --end; // Discount the terminating zero
 
@@ -211,7 +209,7 @@ ref_type ArrayStringLong::bptree_leaf_insert(size_t ndx, StringData value, TreeI
         ndx = leaf_size;
     if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
         insert(ndx, value); // Throws
-        return 0; // Leaf was not split
+        return 0;           // Leaf was not split
     }
 
     // Split leaf node
@@ -224,8 +222,8 @@ ref_type ArrayStringLong::bptree_leaf_insert(size_t ndx, StringData value, TreeI
     else {
         for (size_t i = ndx; i != leaf_size; ++i)
             new_leaf.add(get(i)); // Throws
-        truncate(ndx); // Throws
-        add(value); // Throws
+        truncate(ndx);            // Throws
+        add(value);               // Throws
         state.m_split_offset = ndx + 1;
     }
     state.m_split_size = leaf_size + 1;
@@ -280,7 +278,7 @@ MemRef ArrayStringLong::slice(size_t offset, size_t slice_size, Allocator& targe
     _impl::ShallowArrayDestroyGuard dg(&array_slice);
     array_slice.create(); // Throws
     size_t begin = offset;
-    size_t end   = offset + slice_size;
+    size_t end = offset + slice_size;
     for (size_t i = begin; i != end; ++i) {
         StringData value = get(i);
         array_slice.add(value); // Throws
@@ -290,7 +288,7 @@ MemRef ArrayStringLong::slice(size_t offset, size_t slice_size, Allocator& targe
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void ArrayStringLong::to_dot(std::ostream& out, StringData title) const
 {

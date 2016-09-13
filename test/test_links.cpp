@@ -33,11 +33,7 @@ namespace {
 
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
-REALM_TABLE_4(TestTableLinks,
-              first,  String,
-              second, Int,
-              third,  Bool,
-              fourth, Enum<Days>)
+REALM_TABLE_4(TestTableLinks, first, String, second, Int, third, Bool, fourth, Enum<Days>)
 
 } // Anonymous namespace
 
@@ -205,7 +201,8 @@ TEST(Links_SetLinkLogicErrors)
     CHECK_LOGIC_ERROR(origin->set_link(0, 1, 0), LogicError::row_index_out_of_range);
     CHECK_LOGIC_ERROR(origin->set_link(0, 0, 1), LogicError::target_row_index_out_of_range);
 
-    // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_link() does not properly check it yet.
+    // FIXME: Must also check that Logic::type_mismatch is thrown on column type mismatch, but Table::set_link() does
+    // not properly check it yet.
 
     group.remove_table("origin");
     CHECK_LOGIC_ERROR(origin->set_link(0, 0, 0), LogicError::detached_accessor);
@@ -217,9 +214,9 @@ TEST(Links_Deletes)
     Group group;
 
     TestTableLinks::Ref table1 = group.add_table<TestTableLinks>("table1");
-    table1->add("test1", 1, true,  Mon);
+    table1->add("test1", 1, true, Mon);
     table1->add("test2", 2, false, Tue);
-    table1->add("test3", 3, true,  Wed);
+    table1->add("test3", 3, true, Wed);
 
     // create table with links to table1
     TableRef table2 = group.add_table("table2");
@@ -254,9 +251,9 @@ TEST(Links_Deletes)
     CHECK(table2->is_null_link(col_link, 1));
 
     // add target rows again with links
-    table1->add("test1", 1, true,  Mon);
+    table1->add("test1", 1, true, Mon);
     table1->add("test2", 2, false, Tue);
-    table1->add("test3", 3, true,  Wed);
+    table1->add("test3", 3, true, Wed);
     table2->set_link(col_link, 0, 1);
     table2->set_link(col_link, 1, 0);
 
@@ -283,9 +280,9 @@ TEST(Links_Inserts)
     Group group;
 
     TestTableLinks::Ref table1 = group.add_table<TestTableLinks>("table1");
-    table1->add("test1", 1, true,  Mon);
+    table1->add("test1", 1, true, Mon);
     table1->add("test2", 2, false, Tue);
-    table1->add("test3", 3, true,  Wed);
+    table1->add("test3", 3, true, Wed);
 
     // create table with links to table1
     TableRef table2 = group.add_table("table2");
@@ -314,9 +311,9 @@ TEST(Links_InsertTrackedByBacklinks)
     Group group;
 
     TestTableLinks::Ref table1 = group.add_table<TestTableLinks>("table1");
-    table1->add("test1", 1, true,  Mon);
+    table1->add("test1", 1, true, Mon);
     table1->add("test2", 2, false, Tue);
-    table1->add("test3", 3, true,  Wed);
+    table1->add("test3", 3, true, Wed);
 
     // create table with links to table1
     TableRef table2 = group.add_table("table2");
@@ -360,9 +357,9 @@ TEST(Links_Multi)
     Group group;
 
     TestTableLinks::Ref table1 = group.add_table<TestTableLinks>("table1");
-    table1->add("test1", 1, true,  Mon);
+    table1->add("test1", 1, true, Mon);
     table1->add("test2", 2, false, Tue);
-    table1->add("test3", 3, true,  Wed);
+    table1->add("test3", 3, true, Wed);
 
     // create table with links to table1
     TableRef table2 = group.add_table("table2");
@@ -429,9 +426,9 @@ TEST(Links_MultiToSame)
     Group group;
 
     TestTableLinks::Ref table1 = group.add_table<TestTableLinks>("table1");
-    table1->add("test1", 1, true,  Mon);
+    table1->add("test1", 1, true, Mon);
     table1->add("test2", 2, false, Tue);
-    table1->add("test3", 3, true,  Wed);
+    table1->add("test3", 3, true, Wed);
 
     // create table with multiple links to table1
     TableRef table2 = group.add_table("table2");
@@ -457,9 +454,9 @@ TEST(Links_LinkList_TableOps)
     Group group;
 
     TestTableLinks::Ref target = group.add_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
@@ -484,7 +481,6 @@ TEST(Links_LinkList_TableOps)
     origin->insert_empty_row(1);
     origin->insert_empty_row(2);
     origin->clear();
-
 }
 
 
@@ -493,9 +489,9 @@ TEST(Links_LinkList_Basics)
     Group group;
 
     TestTableLinks::Ref target = group.add_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
@@ -617,9 +613,9 @@ TEST(Links_LinkList_Inserts)
     Group group;
 
     TestTableLinks::Ref target = group.add_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
@@ -664,9 +660,9 @@ TEST(Links_LinkList_Backlinks)
     Group group;
 
     TestTableLinks::Ref target = group.add_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
@@ -692,9 +688,9 @@ TEST(Links_LinkList_Backlinks)
     CHECK(links->is_empty());
 
     // re-add rows to target
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // add more rows with links
     origin->add_empty_row();
@@ -743,9 +739,9 @@ TEST(Links_LinkList_AccessorUpdates)
     Group group;
 
     TestTableLinks::Ref target = group.add_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
@@ -798,9 +794,9 @@ TEST(Links_LinkListInsert_AccessorUpdates)
     Group group;
 
     TestTableLinks::Ref target = group.add_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
@@ -877,9 +873,9 @@ TEST(Links_LinkList_SwapRows)
     Group group;
 
     TestTableLinks::Ref target = group.add_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
@@ -1011,9 +1007,9 @@ TEST(Links_LinkList_FindByOrigin)
     Group group;
 
     TestTableLinks::Ref target = group.add_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
@@ -1063,9 +1059,9 @@ TEST(Links_Transactions)
     SHARED_GROUP_TEST_PATH(path);
     SharedGroup sg(path);
 
-    size_t name_col   = 0;
-    size_t dog_col    = 1;
-    size_t tim_row    = 0;
+    size_t name_col = 0;
+    size_t dog_col = 1;
+    size_t tim_row = 0;
     size_t harvey_row = 0;
 
     {
@@ -1126,9 +1122,9 @@ TEST(Links_RemoveTargetRows)
     Group group;
 
     TestTableLinks::Ref target = group.add_table<TestTableLinks>("target");
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
 
     // create table with links to target table
     TableRef origin = group.add_table("origin");
@@ -1154,9 +1150,9 @@ TEST(Links_RemoveTargetRows)
     CHECK_EQUAL(0, links->size());
 
     // re-add targets and links
-    target->add("test1", 1, true,  Mon);
+    target->add("test1", 1, true, Mon);
     target->add("test2", 2, false, Tue);
-    target->add("test3", 3, true,  Wed);
+    target->add("test3", 3, true, Wed);
     links->add(2);
     links->add(1);
     links->add(0);
@@ -1184,7 +1180,7 @@ TEST(Links_RemoveLastTargetColumn)
     TableRef target = group_2.add_table("target");
     target->add_column(type_Int, "t");
     target->add_empty_row();
-    origin->add_column_link(type_Link,     "o_1", *target);
+    origin->add_column_link(type_Link, "o_1", *target);
     origin->add_column_link(type_LinkList, "o_2", *target);
     origin->add_empty_row();
     origin->set_link(0, 0, 0);
@@ -1313,7 +1309,8 @@ TEST(Links_RandomizedOperations)
             }
             else if (tables.size() < 10) {
                 // create table
-                refs[tables.size()] = group.get_or_add_table("table"); // FIXME: Lasse, did you really want to re-get the same table every time?
+                refs[tables.size()] = group.get_or_add_table(
+                    "table"); // FIXME: Lasse, did you really want to re-get the same table every time?
                 tables.push_back(std::vector<size_t>());
             }
         }
