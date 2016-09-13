@@ -317,8 +317,8 @@ TEST_TYPES(TimestampColumn_SwapRows, std::true_type, std::false_type)
     StringIndex* index = c.create_search_index();
     CHECK(index);
 
-    Timestamp one {1, 1};
-    Timestamp three {3, 3};
+    Timestamp one{1, 1};
+    Timestamp three{3, 3};
     c.add(one);
     c.add(Timestamp{2, 2});
     c.add(three);
@@ -333,7 +333,6 @@ TEST_TYPES(TimestampColumn_SwapRows, std::true_type, std::false_type)
     index->destroy();
     c.destroy_search_index();
     c.destroy();
-
 }
 
 TEST_TYPES(TimestampColumn_DeleteWithIndex, std::true_type, std::false_type)
@@ -352,7 +351,6 @@ TEST_TYPES(TimestampColumn_DeleteWithIndex, std::true_type, std::false_type)
     index->destroy();
     c.destroy_search_index();
     c.destroy();
-
 }
 
 
@@ -441,7 +439,7 @@ TEST(TimestampColumn_LargeNegativeTimestampSearchIndexErase)
 
 namespace { // anonymous namespace
 
-template<class T, class C>
+template <class T, class C>
 bool compare(T&& a, T&& b, C&& condition)
 {
     return condition(a, b, a.is_null(), b.is_null());
@@ -507,15 +505,13 @@ TEST(TimestampColumn_Operators)
           compare(StringData(""), StringData(""), realm::Greater()));
 
     // Repeat with other operators than Greater
-    CHECK(compare(Timestamp{}, Timestamp{}, realm::Less()) ==
-          compare(StringData{}, StringData{}, realm::Less()));
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::Less()) == compare(StringData{}, StringData{}, realm::Less()));
     CHECK(compare(Timestamp(0, 0), Timestamp{}, realm::Less()) ==
           compare(StringData(""), StringData{}, realm::Less()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Less()) ==
           compare(StringData(""), StringData(""), realm::Less()));
 
-    CHECK(compare(Timestamp{}, Timestamp{}, realm::Equal()) ==
-          compare(StringData{}, StringData{}, realm::Equal()));
+    CHECK(compare(Timestamp{}, Timestamp{}, realm::Equal()) == compare(StringData{}, StringData{}, realm::Equal()));
     CHECK(compare(Timestamp(0, 0), Timestamp{}, realm::Equal()) ==
           compare(StringData(""), StringData{}, realm::Equal()));
     CHECK(compare(Timestamp(0, 0), Timestamp(0, 0), realm::Equal()) ==
@@ -661,7 +657,6 @@ TEST(TimestampColumn_AggregateBug)
     ts = t.where().minimum_timestamp(0, &index);
     CHECK_EQUAL(2, index);
     CHECK_EQUAL(ts, Timestamp(1, 0));
-
 }
 
 TEST(Table_DistinctTimestamp)

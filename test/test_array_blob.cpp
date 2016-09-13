@@ -105,9 +105,9 @@ TEST(ArrayBlob_General)
     CHECK_EQUAL(t3, blob.get(l3 + l2 + l1 + l2));
 
     // Test replace
-    blob.replace(l3, l3 + l2, t1, l1); // replace with smaller
+    blob.replace(l3, l3 + l2, t1, l1);                     // replace with smaller
     blob.replace(l3 + l1 + l1, l3 + l1 + l1 + l2, t3, l3); // replace with bigger
-    blob.replace(l3 + l1, l3 + l1 + l1, t4, l1); // replace with same
+    blob.replace(l3 + l1, l3 + l1 + l1, t4, l1);           // replace with same
 
     CHECK_EQUAL(t3, blob.get(0));
     CHECK_EQUAL(t1, blob.get(l3));
@@ -241,7 +241,8 @@ TEST(ArrayBlob_Null)
         std::vector<std::string> v;
 
         for (size_t i = 0; i < 2000; i++) {
-            unsigned char rnd = static_cast<unsigned char>(random.draw_int<unsigned int>());  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
+            unsigned char rnd = static_cast<unsigned char>(
+                random.draw_int<unsigned int>()); //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
 
             // Add more often than removing, so that we grow
             if (rnd < 80 && a.size() > 0) {
@@ -296,7 +297,6 @@ TEST(ArrayBlob_Null)
         a.destroy();
     }
 }
-
 
 
 #endif // TEST_ARRAY_BLOB

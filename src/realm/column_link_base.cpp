@@ -24,7 +24,6 @@
 using namespace realm;
 
 
-
 void LinkColumnBase::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
     IntegerColumn::refresh_accessor_tree(col_ndx, spec); // Throws
@@ -39,7 +38,7 @@ void LinkColumnBase::check_cascade_break_backlinks_to(size_t target_table_ndx, s
     // Stop if the target row was already visited
     CascadeState::row target_row;
     target_row.table_ndx = target_table_ndx;
-    target_row.row_ndx   = target_row_ndx;
+    target_row.row_ndx = target_row_ndx;
     auto i = std::upper_bound(state.rows.begin(), state.rows.end(), target_row);
     bool already_seen = i != state.rows.begin() && i[-1] == target_row;
     if (already_seen)
@@ -53,7 +52,7 @@ void LinkColumnBase::check_cascade_break_backlinks_to(size_t target_table_ndx, s
         return;
 
     // Recurse
-    state.rows.insert(i, target_row); // Throws
+    state.rows.insert(i, target_row);                                       // Throws
     tf::cascade_break_backlinks_to(*m_target_table, target_row_ndx, state); // Throws
 }
 
@@ -75,12 +74,10 @@ void LinkColumnBase::verify(const Table& table, size_t col_ndx) const
 
     // Check that m_backlink_column is the column specified by the target table spec
     const Spec& target_spec = tf::get_spec(*m_target_table);
-    size_t backlink_col_ndx =
-        target_spec.find_backlink_column(table.get_index_in_group(), col_ndx);
+    size_t backlink_col_ndx = target_spec.find_backlink_column(table.get_index_in_group(), col_ndx);
     REALM_ASSERT(m_backlink_column == &tf::get_column(*m_target_table, backlink_col_ndx));
 #else
     static_cast<void>(table);
     static_cast<void>(col_ndx);
 #endif // REALM_DEBUG
 }
-

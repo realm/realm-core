@@ -26,8 +26,8 @@ namespace test_util {
 
 class BowlOfStonesSemaphore {
 public:
-    BowlOfStonesSemaphore(int initial_number_of_stones = 0):
-        m_num_stones(initial_number_of_stones)
+    BowlOfStonesSemaphore(int initial_number_of_stones = 0)
+        : m_num_stones(initial_number_of_stones)
     {
     }
     void get_stone()
@@ -43,6 +43,7 @@ public:
         ++m_num_stones;
         m_cond_var.notify();
     }
+
 private:
     util::Mutex m_mutex;
     int m_num_stones;
