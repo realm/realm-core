@@ -119,6 +119,7 @@
   file until the next session. Reducing the length of the critical phase
   reduces the risk of any user experiencing this limitation.
   (issues #2065, #1354)
+* Added debian packages for Ubuntu 16.04.
 
 -----------
 

@@ -89,7 +89,7 @@ fpm \
     --license "Realm License" \
     --version ${VERSION} \
     --iteration ${ITERATION} \
-    --description "Development headers and tools for the realm-core C++ library" \
+    --description "Development headers and tools for the realm-core database component" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
@@ -107,7 +107,7 @@ fpm \
     --license "Realm License" \
     --version ${VERSION} \
     --iteration ${ITERATION} \
-    --description "Realm-core C++ library for node" \
+    --description "Realm-core database component for node" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
@@ -123,7 +123,7 @@ fpm \
     --license "Realm License" \
     --version ${VERSION} \
     --iteration ${ITERATION} \
-    --description "Development realm-core C++ library for node" \
+    --description "Development realm-core database component for node" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \

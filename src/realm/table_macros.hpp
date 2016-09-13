@@ -31,6 +31,11 @@
 
 #include <realm/table_basic.hpp>
 
+/*****************************************************************************
+ *                                                                           *
+ *      THIS INTERFACE IS DEPRECATED AND MAY BE REMOVED WITHOUT NOTICE       *
+ *                                                                           *
+ ****************************************************************************/
 
 #define REALM_TABLE_1(Table, name1, type1) \
 struct Table##Spec: ::realm::SpecBase { \
