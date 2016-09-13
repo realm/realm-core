@@ -145,7 +145,6 @@ Available modes are:
     dist-pull:
     dist-checkout:
     dist-copy:
-    dist-deb:
     jenkins-pull-request:               Run by Jenkins for each pull request whenever it changes
     jenkins-pipeline-unit-tests:        Run by Jenkins as part of the core pipeline whenever master changes
     jenkins-pipeline-coverage:          Run by Jenkins as part of the core pipeline whenever master changes
@@ -1376,7 +1375,6 @@ EOF
         # update dependencies.list
         sed -i.bck "s/^VERSION.*/VERSION=$realm_version/" dependencies.list && rm -f dependencies.list.bck
 
-        sh tools/add-deb-changelog.sh "$realm_version" "$(pwd)/debian/changelog.in" librealm || exit 1
         sh build.sh release-notes-prerelease || exit 1
         exit 0
         ;;
@@ -1994,7 +1992,6 @@ EOF
                 cat >"$TEMP_DIR/transfer/include" <<EOF
 /README.*
 /build.sh
-/librealm.spec
 /config
 /Makefile
 /src/generic.mk
@@ -2959,7 +2956,6 @@ EOF
 /test
 /test-installed
 /doc
-/debian
 EOF
         cat >"$TEMP_DIR/exclude" <<EOF
 .gitignore
@@ -2981,13 +2977,6 @@ EOF
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             (cd "$TARGET_DIR" && pandoc README.md -o README.pdf) || exit 1
         fi
-        exit 0
-        ;;
-
-    "dist-deb")
-        codename=$(lsb_release -s -c)
-        (cd debian && sed -e "s/@CODENAME@/$codename/g" changelog.in > changelog) || exit 1
-        dpkg-buildpackage -rfakeroot -us -uc || exit 1
         exit 0
         ;;
 
