@@ -1258,7 +1258,8 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             fn();
             realm->commit_transaction();
 
-            _impl::transaction::advance(sg, &observer, SchemaMode::Automatic);
+            _impl::NotifierPackage notifiers;
+            _impl::transaction::advance(sg, &observer, SchemaMode::Automatic, notifiers);
             return observer;
         };
 
@@ -1282,7 +1283,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_FALSE(changes.modified(0, 2));
         }
 
-#if REALM_MAJOR_VER >= 2
         SECTION("SetDefault does not mark as changed") {
             Row r = target->get(0);
             auto changes = observe({r}, [&] {
@@ -1292,7 +1292,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_FALSE(changes.modified(0, 1));
             REQUIRE_FALSE(changes.modified(0, 2));
         }
-#endif
 
         SECTION("multiple properties on a single object are handled properly") {
             Row r = target->get(0);

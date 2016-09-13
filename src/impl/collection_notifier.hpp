@@ -133,6 +133,7 @@ public:
     // ------------------------------------------------------------------------
     // API for RealmCoordinator to manage running things and calling callbacks
 
+    bool is_for_realm(Realm&) const noexcept;
     Realm* get_realm() const noexcept { return m_realm.get(); }
 
     // Get the SharedGroup version which this collection can attach to (if it's
@@ -147,10 +148,8 @@ public:
 
     // Prepare to deliver the new collection and call callbacks. Returns the
     // transaction version which it can deliver to if applicable, and a
-    // default-constructed version if this notifier has nothing to deliver to
-    // this Realm (either due to being for a different Realm, or just because
-    // nothing has changed since it last delivered).
-    VersionID package_for_delivery(Realm&);
+    // default-constructed version if this notifier has nothing to deliver.
+    VersionID package_for_delivery();
 
     // Deliver the new state to the target collection using the given SharedGroup
     virtual void deliver(SharedGroup&) { }
@@ -180,8 +179,8 @@ public:
     template <typename T>
     class Handle;
 
-protected:
     bool have_callbacks() const noexcept { return m_have_callbacks; }
+protected:
     void add_changes(CollectionChangeBuilder change) { m_accumulated_changes.merge(std::move(change)); }
     void set_table(Table const& table);
     std::unique_lock<std::mutex> lock_target();
@@ -266,6 +265,52 @@ public:
             std::shared_ptr<T>::reset();
         }
     }
+};
+
+// A package of CollectionNotifiers for a single Realm instance which is passed
+// around to the various places which need to actually trigger the notifications
+class NotifierPackage {
+public:
+    NotifierPackage() = default;
+
+    // Package the error if it's non-null, and otherwise the subset of the
+    // notifiers which are for the given realm and are ready to deliver without
+    // blocking
+    NotifierPackage(Realm& realm, std::exception_ptr error,
+                    std::vector<std::shared_ptr<CollectionNotifier>> notifiers);
+
+    // Package the error if it's non-null, and otherwise gather the subset of
+    // the given notifiers which are for the given realm, including ones which
+    // are not yet ready to deliver and will need to block
+    NotifierPackage(Realm& realm, std::exception_ptr error,
+                    std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
+                    std::condition_variable& cv, std::unique_lock<std::mutex>& lock);
+
+    explicit operator bool() { return !m_notifiers.empty(); }
+
+    // Get the version which this package can deliver into, or VersionID{} if
+    // it has not yet been packaged
+    VersionID version() { return m_version; }
+
+    // Package the notifiers for delivery, blocking if they aren't ready for
+    // delivery into the given sg.
+    // No-op if it has already been called or if this was created with the
+    // constructor that does not take a cv and lock.
+    void package_and_wait(SharedGroup& sg);
+
+    // Sent the before-change notifications
+    void before_advance();
+    // Deliver the payload associated with the contained notifiers and/or the error
+    void deliver(SharedGroup& sg);
+    // Sent the after-change notifications
+    void after_advance();
+
+private:
+    VersionID m_version;
+    std::vector<std::shared_ptr<CollectionNotifier>> m_notifiers;
+    std::condition_variable* m_cv = nullptr;
+    std::unique_lock<std::mutex>* m_lock = nullptr;
+    std::exception_ptr m_error;
 };
 
 } // namespace _impl

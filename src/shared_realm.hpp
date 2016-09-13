@@ -314,6 +314,8 @@ private:
     // File format versions populated when a file format upgrade takes place during realm opening
     int upgrade_initial_version = 0, upgrade_final_version = 0;
 
+    bool m_is_sending_notifications = false;
+
     void set_schema(Schema schema, uint64_t version);
     bool reset_file_if_needed(Schema& schema, uint64_t version, std::vector<SchemaChange>& changes_required);
 

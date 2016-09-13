@@ -87,6 +87,9 @@ TEST_CASE("list") {
 
     r->commit_transaction();
 
+    auto r2 = coordinator.get_realm();
+    auto r2_lv = r2->read_group().get_table("class_origin")->get_linklist(1, 0);
+
     SECTION("add_notification_block()") {
         CollectionChangeSet change;
         List lst(r, lv);
@@ -336,18 +339,19 @@ TEST_CASE("list") {
         SECTION("modifications are reported for rows that are moved and then moved back in a second transaction") {
             auto token = require_change();
 
-            r->begin_transaction();
-            lv->get(5).set_int(0, 10);
-            lv->get(1).set_int(0, 10);
-            lv->move(5, 8);
-            lv->move(1, 2);
-            r->commit_transaction();
+            r2->begin_transaction();
+            r2_lv->get(5).set_int(0, 10);
+            r2_lv->get(1).set_int(0, 10);
+            r2_lv->move(5, 8);
+            r2_lv->move(1, 2);
+            r2->commit_transaction();
 
             coordinator.on_change();
 
-            write([&]{
-                lv->move(8, 5);
-            });
+            r2->begin_transaction();
+            r2_lv->move(8, 5);
+            r2->commit_transaction();
+            advance_and_notify(*r);
 
             REQUIRE_INDICES(change.deletions, 1);
             REQUIRE_INDICES(change.insertions, 2);

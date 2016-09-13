@@ -26,6 +26,7 @@
 #include "property.hpp"
 #include "schema.hpp"
 #include "thread_confined.hpp"
+#include "impl/realm_coordinator.hpp"
 
 #include <realm/history.hpp>
 #include <realm/util/optional.hpp>
@@ -114,11 +115,13 @@ TEST_CASE("handover") {
     }
 
     SECTION("version mismatch") {
+        auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
         SECTION("import into older version") {
             r->begin_transaction();
             Object num = create_object(r, int_object);
             num.row().set_int(0, 7);
             r->commit_transaction();
+            coordinator->on_change();
 
             REQUIRE(num.row().get_int(0) == 7);
             auto h = std::async([config]() -> auto {
