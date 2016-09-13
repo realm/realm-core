@@ -20,10 +20,10 @@
 #include <vector>
 
 #ifdef _WIN32
-    #define NOMINMAX
-    #include <windows.h>
+#define NOMINMAX
+#include <windows.h>
 #else
-    #include <ctype.h>
+#include <ctype.h>
 #endif
 
 #include <realm/util/safe_int_ops.hpp>
@@ -32,9 +32,9 @@
 #include <clocale>
 
 #ifdef _MSC_VER
-    #include <codecvt>
+#include <codecvt>
 #else
-    #include <locale>
+#include <locale>
 #endif
 
 
@@ -42,11 +42,13 @@ using namespace realm;
 
 namespace {
 
+// clang-format off
 /*
-// Converts unicodes 0...0x6ff (up to Arabic) to their respective lower case characters using a popular UnicodeData.txt
-// file (http://www.opensource.apple.com/source/Heimdal/Heimdal-247.9/lib/wind/UnicodeData.txt) that contains case
-// conversion information. The conversion does not take your current locale in count; it can be slightly wrong in some
-// countries! If the input is already lower case, or outside range 0...0x6ff, then input value is returned untouched.
+// Converts unicodes 0...0x6ff (up to Arabic) to their respective lower case characters using a popular
+// UnicodeData.txtfile (http://www.opensource.apple.com/source/Heimdal/Heimdal-247.9/lib/wind/UnicodeData.txt) that
+// contains case conversion information. The conversion does not take your current locale in count; it can be
+// slightly wrong in some countries! If the input is already lower case, or outside range 0...0x6ff, then input value
+// is returned untouched.
 uint32_t to_lower(uint32_t character)
 {
     static const int16_t lowers[] = {
@@ -66,6 +68,7 @@ uint32_t to_lower(uint32_t character)
     return ret;
 }
 */
+// clang-format on
 
 std::wstring utf8_to_wstring(StringData str)
 {
@@ -112,6 +115,7 @@ bool set_string_compare_method(string_compare_method_t method, StringCompareCall
 }
 
 
+// clang-format off
 // Returns the number of bytes in a UTF-8 sequence whose leading byte is as specified.
 size_t sequence_length(char lead)
 {
@@ -125,13 +129,15 @@ size_t sequence_length(char lead)
 
     return lengths[static_cast<unsigned char>(lead)];
 }
+// clang-format on
 
 // Check if the next UTF-8 sequence in [begin, end) is identical to
 // the one beginning at begin2. If it is, 'begin' is advanced
 // accordingly.
 inline bool equal_sequence(const char*& begin, const char* end, const char* begin2)
 {
-    if (begin[0] != begin2[0]) return false;
+    if (begin[0] != begin2[0])
+        return false;
 
     size_t i = 1;
     if (static_cast<int>(std::char_traits<char>::to_int_type(begin[0])) & 0x80) {
@@ -191,6 +197,7 @@ bool utf8_compare(StringData string1, StringData string2)
 
     constexpr size_t last_latin_extended_2_unicode = 591;
 
+    // clang-format off
     static const uint32_t collation_order_core_similar[last_latin_extended_2_unicode + 1] = {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 456, 457, 458, 459, 460, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 461, 462, 463, 464, 8130, 465, 466, 467,
         468, 469, 470, 471, 472, 473, 474, 475, 8178, 8248, 8433, 8569, 8690, 8805, 8912, 9002, 9093, 9182, 476, 477, 478, 479, 480, 481, 482, 9290, 9446, 9511, 9595, 9690, 9818, 9882, 9965, 10051, 10156, 10211, 10342, 10408, 10492, 10588,
@@ -217,8 +224,10 @@ bool utf8_compare(StringData string1, StringData string2)
         265, 264, 282, 283, 292, 321, 316, 339, 338, 350, 354, 361, 374, 376, 405, 421, 420, 423, 422, 431, 430, 440, 468, 467, 466, 469, 480, 479, 478, 481, 524, 523, 525, 528, 553, 552, 565, 564, 571, 579, 578, 580, 135, 142, 141, 589, 534, 85, 86, 87, 71, 225, 224, 223, 357, 356, 355, 380, 379, 378, 159, 158, 307, 306, 396, 395, 499, 498, 518, 517, 512, 511, 516, 515, 514, 513, 256, 174, 173, 170, 169, 573, 572, 281, 280, 275, 274, 335, 334, 404, 403, 415, 414, 577, 576, 329, 222, 221, 220, 269,
         268, 293, 535, 367, 366, 172, 171, 180, 179, 411, 410, 176, 175, 178, 177, 253, 252, 255, 254, 318, 317, 320, 319, 417, 416, 419, 418, 450, 449, 452, 451, 520, 519, 522, 521, 464, 463, 483, 482, 261, 260, 289, 288, 377, 227, 427, 426, 567, 566, 155, 154, 249, 248, 409, 408, 413, 412, 392, 391, 407, 406, 547, 546, 358, 381, 485, 326, 219, 437, 168, 203, 202, 351, 484, 465, 568, 591, 590, 184, 510, 529, 251, 250, 331, 330, 436, 435, 448, 447, 551, 550
     };
+    // clang-format on
 
-    bool use_internal_sort_order = (string_compare_method == STRING_COMPARE_CORE) || (string_compare_method == STRING_COMPARE_CORE_SIMILAR);
+    bool use_internal_sort_order =
+        (string_compare_method == STRING_COMPARE_CORE) || (string_compare_method == STRING_COMPARE_CORE_SIMILAR);
 
     if (use_internal_sort_order) {
         // Core-only method. Compares in us_EN locale (sorting may be slightly inaccurate in some countries). Will
@@ -428,8 +437,8 @@ util::Optional<std::string> case_map(StringData source, bool upper)
         size_t n = source.size();
         for (size_t i = 0; i < n; ++i) {
             char c = source[i];
-            if (traits::lt(0x60, c) &&
-                    traits::lt(c, 0x7B)) c = traits::to_char_type(traits::to_int_type(c) - 0x20);
+            if (traits::lt(0x60, c) && traits::lt(c, 0x7B))
+                c = traits::to_char_type(traits::to_int_type(c) - 0x20);
             result[i] = c;
         }
     }
@@ -437,8 +446,8 @@ util::Optional<std::string> case_map(StringData source, bool upper)
         size_t n = source.size();
         for (size_t i = 0; i < n; ++i) {
             char c = source[i];
-            if (traits::lt(0x40, c) &&
-                    traits::lt(c, 0x5B)) c = traits::to_char_type(traits::to_int_type(c) + 0x20);
+            if (traits::lt(0x40, c) && traits::lt(c, 0x5B))
+                c = traits::to_char_type(traits::to_int_type(c) + 0x20);
             result[i] = c;
         }
     }
@@ -471,7 +480,7 @@ bool equal_case_fold(StringData haystack, const char* needle_upper, const char* 
     const char* i = begin;
     while (i != end) {
         if (!equal_sequence(i, end, needle_lower + (i - begin)) &&
-                !equal_sequence(i, end, needle_upper + (i - begin)))
+            !equal_sequence(i, end, needle_upper + (i - begin)))
             return false;
     }
     return true;
@@ -480,8 +489,7 @@ bool equal_case_fold(StringData haystack, const char* needle_upper, const char* 
 
 // Test if needle is a substring of haystack. The signature is similar
 // in spirit to std::search().
-size_t search_case_fold(StringData haystack, const char* needle_upper, const char* needle_lower,
-                        size_t needle_size)
+size_t search_case_fold(StringData haystack, const char* needle_upper, const char* needle_lower, size_t needle_size)
 {
     // FIXME: This solution is very inefficient. Consider deploying the Boyer-Moore algorithm.
     size_t i = 0;

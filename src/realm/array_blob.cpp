@@ -46,7 +46,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t data_
     // (not needed if we append to end)
     if (begin != m_size) {
         const char* old_begin = m_data + end;
-        const char* old_end   = m_data + m_size;
+        const char* old_end = m_data + m_size;
         if (remove_size < add_size) { // expand gap
             char* new_end = m_data + new_size;
             std::copy_backward(old_begin, old_end, new_end);
@@ -66,7 +66,7 @@ void ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t data_
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void ArrayBlob::verify() const
 {
@@ -93,7 +93,7 @@ void ArrayBlob::to_dot(std::ostream& out, StringData title) const
 
     // Values
     out << "<TD>";
-    out << size() << " bytes"; //TODO: write content
+    out << size() << " bytes"; // TODO: write content
     out << "</TD>" << std::endl;
 
     out << "</TR></TABLE>>];" << std::endl;

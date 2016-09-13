@@ -58,7 +58,8 @@ namespace {
 TEST(Util_ScopeExit_Basics)
 {
     bool called = false;
-    auto handler = [&]() noexcept {
+    auto handler = [&]() noexcept
+    {
         called = true;
     };
     {

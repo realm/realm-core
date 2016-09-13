@@ -24,17 +24,18 @@
 namespace realm {
 
 
-class ArrayBlob: public Array {
+class ArrayBlob : public Array {
 public:
     explicit ArrayBlob(Allocator&) noexcept;
-    ~ArrayBlob() noexcept override {}
+    ~ArrayBlob() noexcept override
+    {
+    }
 
     const char* get(size_t index) const noexcept;
     bool is_null(size_t index) const noexcept;
     void add(const char* data, size_t data_size, bool add_zero_term = false);
     void insert(size_t pos, const char* data, size_t data_size, bool add_zero_term = false);
-    void replace(size_t begin, size_t end, const char* data, size_t data_size,
-                 bool add_zero_term = false);
+    void replace(size_t begin, size_t end, const char* data, size_t data_size, bool add_zero_term = false);
     void erase(size_t begin, size_t end);
 
     /// Get the specified element without the cost of constructing an
@@ -63,18 +64,15 @@ public:
 
 private:
     size_t calc_byte_len(size_t for_size, size_t width) const override;
-    size_t calc_item_count(size_t bytes,
-                           size_t width) const noexcept override;
+    size_t calc_item_count(size_t bytes, size_t width) const noexcept override;
 };
-
-
 
 
 // Implementation:
 
 // Creates new array (but invalid, call init_from_ref() to init)
-inline ArrayBlob::ArrayBlob(Allocator& allocator) noexcept:
-    Array(allocator)
+inline ArrayBlob::ArrayBlob(Allocator& allocator) noexcept
+    : Array(allocator)
 {
 }
 
@@ -93,8 +91,7 @@ inline void ArrayBlob::add(const char* data, size_t data_size, bool add_zero_ter
     replace(m_size, m_size, data, data_size, add_zero_term);
 }
 
-inline void ArrayBlob::insert(size_t pos, const char* data, size_t data_size,
-                              bool add_zero_term)
+inline void ArrayBlob::insert(size_t pos, const char* data, size_t data_size, bool add_zero_term)
 {
     replace(pos, pos, data, data_size, add_zero_term);
 }

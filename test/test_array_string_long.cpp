@@ -119,7 +119,7 @@ TEST_TYPES(ArrayStringLong_Basic, non_nullable, nullable)
     CHECK_EQUAL("abc", c.get(0)); // single
     CHECK_EQUAL(1, c.size());
 
-    c.add("defg"); //non-empty
+    c.add("defg"); // non-empty
     CHECK_EQUAL("abc", c.get(0));
     CHECK_EQUAL("defg", c.get(1));
     CHECK_EQUAL(2, c.size());
@@ -404,7 +404,8 @@ TEST(ArrayStringLong_Null)
         std::vector<std::string> v;
 
         for (size_t i = 0; i < 2000; i++) {
-            unsigned char rnd = static_cast<unsigned char>(random.draw_int<unsigned int>());  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
+            unsigned char rnd = static_cast<unsigned char>(
+                random.draw_int<unsigned int>()); //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
 
             // Add more often than removing, so that we grow
             if (rnd < 80 && a.size() > 0) {
@@ -458,7 +459,6 @@ TEST(ArrayStringLong_Null)
         }
         a.destroy();
     }
-
 }
 
 #endif // TEST_ARRAY_STRING_LONG

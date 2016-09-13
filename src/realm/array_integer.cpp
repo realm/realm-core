@@ -33,7 +33,7 @@ void ArrayInteger::create(Array::Type type, bool context_flag)
 
 // Find max and min value, but break search if difference exceeds 'maxdiff' (in which case *min and *max is set to 0)
 // Useful for counting-sort functions
-template<size_t w>
+template <size_t w>
 bool ArrayInteger::minmax(size_t from, size_t to, uint64_t maxdiff, int64_t* min, int64_t* max) const
 {
     int64_t min2;
@@ -92,7 +92,7 @@ MemRef ArrayIntNull::create_array(Type type, bool context_flag, size_t size, val
     if (value) {
         if (arr.m_width == 64) {
             int_fast64_t null_value = val ^ 1; // Just anything different from value.
-            arr.Array::set(0, null_value); // Throws
+            arr.Array::set(0, null_value);     // Throws
         }
         else {
             // For all other bit widths, we use the upper bound to represent null (also stored at index 0).
@@ -225,7 +225,8 @@ void ArrayIntNull::avoid_null_collision(int64_t value)
     }
 }
 
-void ArrayIntNull::find_all(IntegerColumn* result, value_type value, size_t col_offset, size_t begin, size_t end) const
+void ArrayIntNull::find_all(IntegerColumn* result, value_type value, size_t col_offset, size_t begin,
+                            size_t end) const
 {
     // FIXME: We can't use the fast Array::find_all here, because it would put the wrong indices
     // in the result column. Since find_all may be invoked many times for different leaves in the
@@ -259,7 +260,8 @@ namespace {
 
 // FIXME: Move this logic to BpTree.
 struct ArrayIntNullLeafInserter {
-    static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, size_t ndx, util::Optional<int64_t> value, Array::TreeInsertBase& state)
+    static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, size_t ndx, util::Optional<int64_t> value,
+                                Array::TreeInsertBase& state)
     {
         size_t leaf_size = self.size();
         REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
@@ -267,7 +269,7 @@ struct ArrayIntNullLeafInserter {
             ndx = leaf_size;
         if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
             self.insert(ndx, value); // Throws
-            return 0; // Leaf was not split
+            return 0;                // Leaf was not split
         }
 
         // Split leaf node
@@ -282,7 +284,7 @@ struct ArrayIntNullLeafInserter {
                 new_leaf.add(self.get(i)); // Throws
             }
             self.truncate(ndx); // Throws
-            self.add(value); // Throws
+            self.add(value);    // Throws
             state.m_split_offset = ndx + 1;
         }
         state.m_split_size = leaf_size + 1;
@@ -310,7 +312,7 @@ MemRef ArrayIntNull::slice(size_t offset, size_t slice_size, Allocator& target_a
     array_slice.add(null_value());
 
     size_t begin = offset + 1;
-    size_t end   = offset + slice_size + 1;
+    size_t end = offset + slice_size + 1;
     for (size_t i = begin; i != end; ++i) {
         int_fast64_t value = Array::get(i);
         array_slice.add(value); // Throws

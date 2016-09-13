@@ -74,21 +74,117 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
 {
     // Interesting boundary values to test
     int64_t v[] = {
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
-        30, 31, 32, 33, 62, 63, 64, 65, 126, 127, 128, 129, 254, 255,
-        256, 257, 32765, 32766, 32767, 32768, 32769, 65533, 65534, 65535, 65536, 65537, 2147483648LL,
-        2147483647LL, 2147483646LL, 2147483649LL, 4294967296LL, 4294967295LL,
-        4294967297LL, 4294967294LL, 9223372036854775807LL, 9223372036854775806LL,
-        -1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15, -16, -17,
-        -30, -31, -32, -33, -62, -63, -64, -65, -126, -127, -128, -129, -254, -255,
-        -256, -257, -32766, -32767, -32768, -32769, -65535, -65536, -65537, -2147483648LL,
-        -2147483647LL, -2147483646LL, -2147483649LL, -4294967296LL, -4294967295LL,
-        4294967297LL, -4294967294LL, -9223372036854775807LL, (-9223372036854775807LL - 1), -9223372036854775806LL,
-        /* (-9223372036854775807LL - 1) because -9223372036854775808LL is buggy; it's seen as a minus token and then a right-hand-side
-        exceeding long long's range. Furthermore, std::numeric_limits<int64_t>::min is typedef'ed to 'long long' which cannot be used in
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        30,
+        31,
+        32,
+        33,
+        62,
+        63,
+        64,
+        65,
+        126,
+        127,
+        128,
+        129,
+        254,
+        255,
+        256,
+        257,
+        32765,
+        32766,
+        32767,
+        32768,
+        32769,
+        65533,
+        65534,
+        65535,
+        65536,
+        65537,
+        2147483648LL,
+        2147483647LL,
+        2147483646LL,
+        2147483649LL,
+        4294967296LL,
+        4294967295LL,
+        4294967297LL,
+        4294967294LL,
+        9223372036854775807LL,
+        9223372036854775806LL,
+        -1,
+        -2,
+        -3,
+        -4,
+        -5,
+        -6,
+        -7,
+        -8,
+        -9,
+        -10,
+        -11,
+        -12,
+        -13,
+        -14,
+        -15,
+        -16,
+        -17,
+        -30,
+        -31,
+        -32,
+        -33,
+        -62,
+        -63,
+        -64,
+        -65,
+        -126,
+        -127,
+        -128,
+        -129,
+        -254,
+        -255,
+        -256,
+        -257,
+        -32766,
+        -32767,
+        -32768,
+        -32769,
+        -65535,
+        -65536,
+        -65537,
+        -2147483648LL,
+        -2147483647LL,
+        -2147483646LL,
+        -2147483649LL,
+        -4294967296LL,
+        -4294967295LL,
+        4294967297LL,
+        -4294967294LL,
+        -9223372036854775807LL,
+        (-9223372036854775807LL - 1),
+        -9223372036854775806LL,
+        /* (-9223372036854775807LL - 1) because -9223372036854775808LL is buggy; it's seen as a minus token and then a
+        right-hand-side
+        exceeding long long's range. Furthermore, std::numeric_limits<int64_t>::min is typedef'ed to 'long long' which
+        cannot be used in
         initializer list for int64_t */
     };
-
 
 
     for (size_t w = 0; w < sizeof(v) / sizeof(*v); w++) {
@@ -216,7 +312,6 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
 
                             a.set(match, v[w]);
                             a.set(match + off, v[w]);
-
                         }
                     }
 
@@ -274,7 +369,6 @@ TEST_IF(ColumnLarge_Less, TEST_DURATION >= 3)
                     }
                 }
             }
-
         }
         a.destroy();
     }
@@ -296,8 +390,9 @@ TEST_IF(ColumnLarge_Monkey2, TEST_DURATION >= 2)
     for (int current_bitwidth = 0; current_bitwidth < 65; ++current_bitwidth) {
         for (size_t iter = 0; iter < ITER_PER_BITWIDTH; ++iter) {
 
-//            if (random.chance(1, 10))
-//                std::cout << "Input bitwidth around ~"<<current_bitwidth<<", , a.Size()="<<a.size()<<"\n";
+            //            if (random.chance(1, 10))
+            //                std::cout << "Input bitwidth around ~"<<current_bitwidth<<", ,
+            //                a.Size()="<<a.size()<<"\n";
 
             if (random.draw_int_mod(ITER_PER_BITWIDTH / 100) == 0) {
                 trend = random.draw_int_mod(10);

@@ -26,4 +26,3 @@ std::map<File::UniqueID, std::weak_ptr<InterprocessMutex::LockInfo>> Interproces
 Mutex InterprocessMutex::s_mutex;
 
 #endif
-
