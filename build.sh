@@ -1992,7 +1992,6 @@ EOF
                 cat >"$TEMP_DIR/transfer/include" <<EOF
 /README.*
 /build.sh
-/librealm.spec
 /config
 /Makefile
 /src/generic.mk
