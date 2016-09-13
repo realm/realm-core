@@ -106,6 +106,46 @@ void StringIndex::insert_with_offset(size_t row_ndx, StringData value, size_t of
 }
 
 
+void StringIndex::insert_to_existing_list(size_t row, StringData value, IntegerColumn& list)
+{
+    SortedListComparator slc(*m_target_column);
+    IntegerColumn::const_iterator it_end = list.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(list.cbegin(), it_end, value, slc);
+
+    if (lower == it_end) {
+        // Not found and everything is less, just append it to the end.
+        list.add(row);
+    }
+    else {
+        size_t lower_row = to_size_t(*lower);
+        StringConversionBuffer buffer;  // Used when this is an IntegerIndex
+        StringData lower_value = m_target_column->get_index_data(lower_row, buffer);
+        if (lower_value != value) {
+            list.insert(lower.get_col_ndx(), row);
+        }
+        else {
+            // At this point there exists duplicates of this value, we need to
+            // insert value beside it's duplicates so that rows are also sorted
+            // in ascending order.
+            IntegerColumn::const_iterator upper = std::upper_bound(lower, list.cend(), value, slc);
+
+            // find insert position (the list has to be kept in sorted order)
+            // In most cases the refs will be added to the end. So we test for that
+            // first to see if we can avoid the binary search for insert position
+            IntegerColumn::const_iterator last = upper - ptrdiff_t(1);
+            size_t last_ref_of_value = to_size_t(*last);
+            if (row >= last_ref_of_value) {
+                list.insert(*upper, row);
+            }
+            else {
+                IntegerColumn::const_iterator inner_lower = std::lower_bound(lower, upper, row);
+                list.insert(inner_lower.get_col_ndx(), row);
+            }
+        }
+    }
+}
+
+
 void StringIndex::insert_row_list(size_t ref, size_t offset, StringData value)
 {
     REALM_ASSERT(!m_array->is_inner_bptree_node()); // only works in leaves
@@ -418,13 +458,26 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
             m_array->set(ins_pos_refs, row_list.get_ref());
         }
         else {
-            // These strings have the same prefix up to this point but they are actually not
-            // equal. Extend the tree recursivly until the prefix of these strings is different.
-            StringIndex subindex(m_target_column, m_array->get_alloc());
-            subindex.insert_with_offset(row_ndx2, v2, suboffset);
-            subindex.insert_with_offset(row_ndx, value, suboffset);
-            // Join the string of SubIndices to the current position of m_array
-            m_array->set(ins_pos_refs, subindex.get_ref());
+            if (offset / s_index_key_length > s_max_tree_depth) {
+                // These strings have the same prefix up to this point but we
+                // don't want to recurse further, create a list in sorted order.
+                bool row_ndx_first = value < v2;
+                Array row_list(alloc);
+                row_list.create(Array::type_Normal); // Throws
+                row_list.add(row_ndx_first ? row_ndx : row_ndx2);
+                row_list.add(row_ndx_first ? row_ndx2 : row_ndx);
+                m_array->set(ins_pos_refs, row_list.get_ref());
+
+            }
+            else {
+                // These strings have the same prefix up to this point but they are actually not
+                // equal. Extend the tree recursivly until the prefix of these strings is different.
+                StringIndex subindex(m_target_column, m_array->get_alloc());
+                subindex.insert_with_offset(row_ndx2, v2, suboffset);
+                subindex.insert_with_offset(row_ndx, value, suboffset);
+                // Join the string of SubIndices to the current position of m_array
+                m_array->set(ins_pos_refs, subindex.get_ref());
+            }
         }
         return true;
     }
@@ -437,35 +490,50 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
         IntegerColumn sub(alloc, ref); // Throws
         sub.set_parent(m_array.get(), ins_pos_refs);
 
-        size_t r1 = to_size_t(sub.get(0));
-        // for integer index, get_func fills out 'buffer' and makes str point at it
-        StringConversionBuffer buffer;
-        StringData v2 = get(r1, buffer);
-        if (v2 == value) {
+        SortedListComparator slc(*m_target_column);
+        IntegerColumn::const_iterator lower = std::lower_bound(sub.cbegin(), sub.cend(), value, slc);
+
+        // If we found the value in this list, add the duplicate to the list.
+        if (lower != sub.cend()) {
             if (m_deny_duplicate_values)
                 throw LogicError(LogicError::unique_constraint_violation);
-            // find insert position (the list has to be kept in sorted order)
-            // In most cases the refs will be added to the end. So we test for that
-            // first to see if we can avoid the binary search for insert position
-            size_t last_ref = size_t(sub.back());
-            if (row_ndx > last_ref) {
-                sub.add(row_ndx);
-            }
-            else {
-                size_t pos = sub.lower_bound(row_ndx);
-                if (pos == sub.size()) {
-                    sub.add(row_ndx);
-                }
-                else {
-                    sub.insert(pos, row_ndx);
-                }
-            }
+
+            insert_to_existing_list(row_ndx, value, sub);
         }
         else {
-            StringIndex subindex(m_target_column, m_array->get_alloc());
-            subindex.insert_row_list(sub.get_ref(), suboffset, v2);
-            subindex.insert_with_offset(row_ndx, value, suboffset);
-            m_array->set(ins_pos_refs, subindex.get_ref());
+            if (offset / s_index_key_length > s_max_tree_depth) {
+                insert_to_existing_list(row_ndx, value, sub);
+            }
+            else {
+                bool contains_only_duplicates = true;
+                if (sub.size() > 1) {
+                    size_t first_ref = to_size_t(sub.get(0));
+                    size_t last_ref = to_size_t(sub.back());
+                    // Since the list is kept in sorted order, the first and
+                    // last values will be the same only if the whole list is
+                    // storing duplicate values.
+                    if (m_target_column->compare_values(first_ref, last_ref) != 0) {
+                        contains_only_duplicates = false;
+                    }
+                }
+                // If the list only stores duplicates we are free to branch and
+                // and create a sub index with this existing list as one of the
+                // leafs, but if the list doesn't only contain duplicates we
+                // must respect that we store a common key prefix up to this
+                // point and insert into the existing list.
+                if (contains_only_duplicates) {
+                    size_t row_of_any_dup = to_size_t(sub.get(0));
+                    // The buffer is needed for when this is an integer index.
+                    StringConversionBuffer buffer;
+                    StringData v2 = get(row_of_any_dup, buffer);
+                    StringIndex subindex(m_target_column, m_array->get_alloc());
+                    subindex.insert_row_list(sub.get_ref(), suboffset, v2);
+                    subindex.insert_with_offset(row_ndx, value, suboffset);
+                    m_array->set(ins_pos_refs, subindex.get_ref());
+                } else {
+                    insert_to_existing_list(row_ndx, value, sub);
+                }
+            }
         }
         return true;
     }
@@ -810,6 +878,45 @@ void StringIndex::node_add_key(ref_type ref)
     int64_t key = new_offsets.back();
     offsets.add(key);
     m_array->add(ref);
+}
+
+SortedListComparator::SortedListComparator(ColumnBase& column_values):
+    values(column_values)
+{
+}
+
+
+// Must return true iff value of ndx is less than needle.
+bool SortedListComparator::operator()(int64_t ndx, StringData needle) // used in lower_bound
+{
+    // The buffer is needed when for when this is an integer index.
+    StringIndex::StringConversionBuffer buffer;
+    StringData a = values.get_index_data(ndx, buffer);
+    if (a.is_null() && !needle.is_null())
+        return true;
+    else if (needle.is_null() && !a.is_null())
+        return false;
+    else if (a.is_null() && needle.is_null())
+        return false;
+
+    if (a == needle)
+        return false;
+    // The StringData::operator< uses a lexicograpical comparison, but we
+    // should use our utf8 sort to compare strings here because thats how
+    // they were put into this ordered column in the first place.
+    return utf8_compare(a, needle);
+}
+
+
+// Must return true iff value of needle is less than value at ndx.
+bool SortedListComparator::operator()(StringData needle, int64_t ndx) // used in upper_bound
+{
+    StringIndex::StringConversionBuffer buffer;
+    StringData a = values.get_index_data(ndx, buffer);
+    if (needle == a) {
+        return false;
+    }
+    return !(*this)(ndx, needle);
 }
 
 

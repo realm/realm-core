@@ -2796,42 +2796,6 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
     return find_first<Equal>(value, start, end);
 }
 
-class SortedListComparator {
-public:
-    SortedListComparator(ColumnBase& column_values) : values(column_values) {}
-    // Must return true iff value of ndx is less than needle.
-    bool operator()(int64_t ndx, StringData needle) // used in lower_bound
-    {
-        // The buffer is needed when for when this is an integer index.
-        StringIndex::StringConversionBuffer buffer;
-        StringData a = values.get_index_data(ndx, buffer);
-        if (a.is_null() && !needle.is_null())
-            return true;
-        else if (needle.is_null() && !a.is_null())
-            return false;
-        else if (a.is_null() && needle.is_null())
-            return false;
-
-        if (a == needle)
-            return false;
-        // The StringData::operator< uses a lexicograpical comparison, but we
-        // should use our utf8 sort to compare strings here because thats how
-        // they were put into this ordered column in the first place.
-        return utf8_compare(a, needle);
-    }
-    // Must return true iff value of needle is less than value at ndx.
-    bool operator()(StringData needle, int64_t ndx) // used in upper_bound
-    {
-        StringIndex::StringConversionBuffer buffer;
-        StringData a = values.get_index_data(ndx, buffer);
-        if (needle == a) {
-            return false;
-        }
-        return !(*this)(ndx, needle);
-    }
-private:
-    ColumnBase& values;
-};
 
 namespace realm {
 

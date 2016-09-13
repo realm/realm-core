@@ -129,6 +129,14 @@ public:
 
     typedef int32_t key_type;
 
+    // max_tree_depth specifies the number of levels of recursive string indexes
+    // allowed before storing everything in lists. This is to avoid nesting
+    // to too deep of a level. Since every SubStringIndex stores 4 bytes, this
+    // means that a StringIndex is helpful for strings of a common prefix up to
+    // 4 times this limit (400 bytes shared). Lists are stored in sorted order,
+    // so strings sharing a common prefix of more than this limit will use a
+    // binary search of approximate complexity log2(n) from `std::lower_bound`.
+    static const size_t s_max_tree_depth = 100;
     static const size_t s_index_key_length = 4;
     static key_type create_key(StringData) noexcept;
     static key_type create_key(StringData, size_t) noexcept;
@@ -165,6 +173,7 @@ private:
 
     void insert_with_offset(size_t row_ndx, StringData value, size_t offset);
     void insert_row_list(size_t ref, size_t offset, StringData value);
+    void insert_to_existing_list(size_t row, StringData value, IntegerColumn& list);
     key_type get_last_key() const;
 
     /// Add small signed \a diff to all elements that are greater than, or equal
@@ -201,6 +210,15 @@ private:
 #endif
 };
 
+
+class SortedListComparator {
+public:
+    SortedListComparator(ColumnBase& column_values);
+    bool operator()(int64_t ndx, StringData needle);
+    bool operator()(StringData needle, int64_t ndx);
+private:
+    ColumnBase& values;
+};
 
 
 

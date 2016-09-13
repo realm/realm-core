@@ -92,6 +92,7 @@ public:
     ptrdiff_t operator-(const ColumnRandIterator<ColumnDataType>& rawIterator);
     const ColumnDataType operator*() const;
     ColumnDataType* operator->();
+    size_t get_col_ndx() const;
 protected:
     size_t col_ndx;
     size_t cached_column_size;
@@ -1695,6 +1696,12 @@ template<class ColumnDataType>
 ColumnDataType* ColumnRandIterator<ColumnDataType>::operator->()
 {
     return col->get(col_ndx);
+}
+
+template<class ColumnDataType>
+size_t ColumnRandIterator<ColumnDataType>::get_col_ndx() const
+{
+    return col_ndx;
 }
 
 
