@@ -580,8 +580,22 @@ void StringIndex::distinct(IntegerColumn& result) const
                 }
                 else {
                     IntegerColumn sub(alloc, to_ref(ref)); // Throws
-                    size_t r = to_size_t(sub.get(0)); // get first match
-                    result.add(r);
+                    if (sub.size() == 1) {  // Optimization.
+                        size_t r = to_size_t(sub.get(0)); // get first match
+                        result.add(r);
+                    }
+                    else {
+                        // Add all unique values from this sorted list
+                        IntegerColumn::const_iterator it = sub.cbegin();
+                        IntegerColumn::const_iterator it_end = sub.cend();
+                        SortedListComparator slc(*m_target_column);
+                        StringConversionBuffer buffer;
+                        while (it != it_end) {
+                            result.add(to_size_t(*it));
+                            StringData it_data = get(*it, buffer);
+                            it = std::upper_bound(it, it_end, it_data, slc);
+                        }
+                    }
                 }
             }
         }
