@@ -300,54 +300,6 @@ creating OS X application. The command is:
 
     sh build.sh build-osx-framework
 
-
-Packaging for Debian/Ubuntu
----------------------------
-
-It is possible to create Debian/Ubuntu packages (`.deb`) by running the
-following command:
-
-    sh build.sh dist-deb
-
-
-Packaging for Fedora
---------------------
-
-Fedora is distributing binary packages as `.rpm` files. In order to create
-packages for Fedora, you need to install a few packages:
-
-    sudo yum install rpmdevtools rpmbuild
-
-First, you must initialize you RPM build system:
-
-    rpmdev-setuptree
-
-This command will create a directory structure in your home directory
-where the `.rpm` will be created.
-
-Second, you must copy the relevant `.spec` files after you have
-updated the changelog and version number in the `.spec` file. The core
-library and each binding have a `.spec` file. For the core, the
-command is:
-
-    cp librealm.spec $HOME/rpmbuild/SPECS
-
-Next, you create a `tar.gz` file with the core, and copy it to the
-build area:
-
-    mkdir /tmp/librealm-0.1.5
-    sh build.sh dist-copy /tmp/librealm-0.1.5
-    (cd /tmp && tar czf librealm-0.1.5.tar.gz librealm-0.1.5)
-    mv /tmp/librealm-0.1.5.tar.gz $HOME/rpmbuild/SOURCES
-
-Finally, you can build the `.rpm` files:
-
-    cd $HOME/rpmbuld/SPECS
-    rpmbuild -bb librealm.spec
-
-The `.rpm` files can be found in `$HOME/rpmbuild/RPMS`.
-
-
 Building a distribution package
 -------------------------------
 

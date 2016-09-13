@@ -71,7 +71,7 @@ TEST(MixedColumn_Int)
     int64_t min_val = std::numeric_limits<int64_t>::min();
     int64_t all_bit = 0xFFFFFFFFFFFFFFFFULL; // FIXME: Undefined cast from unsigned to signed
 
-    c.insert_int(0,       2);
+    c.insert_int(0, 2);
     c.insert_int(1, min_val);
     c.insert_int(2, max_val);
     c.insert_int(3, all_bit);
@@ -82,23 +82,23 @@ TEST(MixedColumn_Int)
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Int, c.get_type(i));
 
-    CHECK_EQUAL(      2, c.get_int(0));
+    CHECK_EQUAL(2, c.get_int(0));
     CHECK_EQUAL(min_val, c.get_int(1));
     CHECK_EQUAL(max_val, c.get_int(2));
     CHECK_EQUAL(all_bit, c.get_int(3));
 
-    c.set_int(0,    400);
-    c.set_int(1,      0);
+    c.set_int(0, 400);
+    c.set_int(1, 0);
     c.set_int(2, -99999);
-    c.set_int(3,      1);
+    c.set_int(3, 1);
 
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Int, c.get_type(i));
 
-    CHECK_EQUAL(   400, c.get_int(0));
-    CHECK_EQUAL(     0, c.get_int(1));
+    CHECK_EQUAL(400, c.get_int(0));
+    CHECK_EQUAL(0, c.get_int(1));
     CHECK_EQUAL(-99999, c.get_int(2));
-    CHECK_EQUAL(     1, c.get_int(3));
+    CHECK_EQUAL(1, c.get_int(3));
     CHECK_EQUAL(4, c.size());
 
     c.destroy();
@@ -112,10 +112,8 @@ TEST(MixedColumn_Float)
 
     uint32_t v = 0xFFFFFFFF;
     float f = float(v);
-    float fval1[] = { 0.0f, 100.123f, -111.222f, f };
-    float fval2[] = { -0.0f, -100.123f, std::numeric_limits<float>::max(),
-                      std::numeric_limits<float>::min()
-                    };
+    float fval1[] = {0.0f, 100.123f, -111.222f, f};
+    float fval2[] = {-0.0f, -100.123f, std::numeric_limits<float>::max(), std::numeric_limits<float>::min()};
 
     // Test insert
     for (size_t i = 0; i < 4; ++i)
@@ -189,9 +187,9 @@ TEST(MixedColumn_Bool)
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Bool, c.get_type(i));
 
-    CHECK_EQUAL(true,  c.get_bool(0));
+    CHECK_EQUAL(true, c.get_bool(0));
     CHECK_EQUAL(false, c.get_bool(1));
-    CHECK_EQUAL(true,  c.get_bool(2));
+    CHECK_EQUAL(true, c.get_bool(2));
 
     c.set_bool(0, false);
     c.set_bool(1, true);
@@ -202,7 +200,7 @@ TEST(MixedColumn_Bool)
         CHECK_EQUAL(type_Bool, c.get_type(i));
 
     CHECK_EQUAL(false, c.get_bool(0));
-    CHECK_EQUAL(true,  c.get_bool(1));
+    CHECK_EQUAL(true, c.get_bool(1));
     CHECK_EQUAL(false, c.get_bool(2));
 
     c.destroy();
@@ -214,27 +212,27 @@ TEST(MixedColumn_Date)
     ref_type ref = MixedColumn::create(Allocator::get_default());
     MixedColumn c(Allocator::get_default(), ref, nullptr, 0);
 
-    c.insert_olddatetime(0,     2);
-    c.insert_olddatetime(1,   100);
+    c.insert_olddatetime(0, 2);
+    c.insert_olddatetime(1, 100);
     c.insert_olddatetime(2, 20000);
     CHECK_EQUAL(3, c.size());
 
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_OldDateTime, c.get_type(i));
 
-    CHECK_EQUAL(    2, c.get_olddatetime(0));
-    CHECK_EQUAL(  100, c.get_olddatetime(1));
+    CHECK_EQUAL(2, c.get_olddatetime(0));
+    CHECK_EQUAL(100, c.get_olddatetime(1));
     CHECK_EQUAL(20000, c.get_olddatetime(2));
 
-    c.set_olddatetime(0,   400);
-    c.set_olddatetime(1,     0);
+    c.set_olddatetime(0, 400);
+    c.set_olddatetime(1, 0);
     c.set_olddatetime(2, 99999);
 
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_OldDateTime, c.get_type(i));
 
-    CHECK_EQUAL(  400, c.get_olddatetime(0));
-    CHECK_EQUAL(    0, c.get_olddatetime(1));
+    CHECK_EQUAL(400, c.get_olddatetime(0));
+    CHECK_EQUAL(0, c.get_olddatetime(1));
     CHECK_EQUAL(99999, c.get_olddatetime(2));
     CHECK_EQUAL(3, c.size());
 
@@ -256,17 +254,17 @@ TEST(MixedColumn_Timestamp)
         CHECK_EQUAL(type_Timestamp, c.get_type(i));
 
     CHECK_EQUAL(4, c.size());
-//    CHECK(c.get_timestamp(0) == Timestamp(null()));
-//    operator== should not be called for null according to column_timestamp.hpp:38
+    //    CHECK(c.get_timestamp(0) == Timestamp(null()));
+    //    operator== should not be called for null according to column_timestamp.hpp:38
     CHECK(c.get_timestamp(1) == Timestamp(100, 200));
     CHECK(c.get_timestamp(2) == Timestamp(0, 0)); // Should *not* equal null
     CHECK(c.get_timestamp(3) == Timestamp(-1000, 0));
 
     // MixedColumn has not implemented is_null
-//    CHECK(c.is_null(0));
-//    CHECK(!c.is_null(1));
-//    CHECK(!c.is_null(2));
-//    CHECK(!c.is_null(3));
+    //    CHECK(c.is_null(0));
+    //    CHECK(!c.is_null(1));
+    //    CHECK(!c.is_null(2));
+    //    CHECK(!c.is_null(3));
 
     c.set_timestamp(0, Timestamp(555, 666));
     for (size_t i = 0; i < c.size(); ++i)
@@ -290,8 +288,8 @@ TEST(MixedColumn_String)
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_String, c.get_type(i));
 
-    CHECK_EQUAL("aaa",     c.get_string(0));
-    CHECK_EQUAL("bbbbb",   c.get_string(1));
+    CHECK_EQUAL("aaa", c.get_string(0));
+    CHECK_EQUAL("bbbbb", c.get_string(1));
     CHECK_EQUAL("ccccccc", c.get_string(2));
 
     c.set_string(0, "dd");
@@ -302,8 +300,8 @@ TEST(MixedColumn_String)
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_String, c.get_type(i));
 
-    CHECK_EQUAL("dd",        c.get_string(0));
-    CHECK_EQUAL("",          c.get_string(1));
+    CHECK_EQUAL("dd", c.get_string(0));
+    CHECK_EQUAL("", c.get_string(1));
     CHECK_EQUAL("eeeeeeeee", c.get_string(2));
 
     c.destroy();
@@ -323,8 +321,8 @@ TEST(MixedColumn_Binary)
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Binary, c.get_type(i));
 
-    CHECK_EQUAL("aaa",     c.get_binary(0).data());
-    CHECK_EQUAL("bbbbb",   c.get_binary(1).data());
+    CHECK_EQUAL("aaa", c.get_binary(0).data());
+    CHECK_EQUAL("bbbbb", c.get_binary(1).data());
     CHECK_EQUAL("ccccccc", c.get_binary(2).data());
 
     c.set_binary(0, BinaryData("dd", 3));
@@ -335,8 +333,8 @@ TEST(MixedColumn_Binary)
     for (size_t i = 0; i < c.size(); ++i)
         CHECK_EQUAL(type_Binary, c.get_type(i));
 
-    CHECK_EQUAL("dd",        c.get_binary(0).data());
-    CHECK_EQUAL("",          c.get_binary(1).data());
+    CHECK_EQUAL("dd", c.get_binary(0).data());
+    CHECK_EQUAL("", c.get_binary(1).data());
     CHECK_EQUAL("eeeeeeeee", c.get_binary(2).data());
 
     c.destroy();
@@ -384,12 +382,12 @@ TEST(MixedColumn_Mixed)
     // Check types
     CHECK_EQUAL(type_Timestamp, c.get_type(0));
     CHECK_EQUAL(type_Double, c.get_type(1));
-    CHECK_EQUAL(type_Float,  c.get_type(2));
-    CHECK_EQUAL(type_Table,  c.get_type(3));
+    CHECK_EQUAL(type_Float, c.get_type(2));
+    CHECK_EQUAL(type_Table, c.get_type(3));
     CHECK_EQUAL(type_Binary, c.get_type(4));
     CHECK_EQUAL(type_String, c.get_type(5));
-    CHECK_EQUAL(type_OldDateTime,   c.get_type(6));
-    CHECK_EQUAL(type_Bool,   c.get_type(7));
+    CHECK_EQUAL(type_OldDateTime, c.get_type(6));
+    CHECK_EQUAL(type_Bool, c.get_type(7));
     CHECK_EQUAL(type_Int, c.get_type(8));
 
     // Check values
@@ -416,13 +414,13 @@ TEST(MixedColumn_Mixed)
 
     CHECK_EQUAL(type_Timestamp, c.get_type(8));
     CHECK_EQUAL(type_Double, c.get_type(7));
-    CHECK_EQUAL(type_Float,  c.get_type(6));
-    CHECK_EQUAL(type_Table,  c.get_type(5));
+    CHECK_EQUAL(type_Float, c.get_type(6));
+    CHECK_EQUAL(type_Table, c.get_type(5));
     CHECK_EQUAL(type_Binary, c.get_type(4));
     CHECK_EQUAL(type_String, c.get_type(3));
-    CHECK_EQUAL(type_OldDateTime,   c.get_type(2));
-    CHECK_EQUAL(type_Bool,   c.get_type(1));
-    CHECK_EQUAL(type_Int,    c.get_type(0));
+    CHECK_EQUAL(type_OldDateTime, c.get_type(2));
+    CHECK_EQUAL(type_Bool, c.get_type(1));
+    CHECK_EQUAL(type_Int, c.get_type(0));
 
     c.destroy();
 }
@@ -440,13 +438,13 @@ TEST(MixedColumn_SubtableSize)
     c.insert_subtable(4, nullptr);
 
     // No table instantiated yet (zero ref)
-    CHECK_EQUAL( 0, c.get_subtable_size(0));
+    CHECK_EQUAL(0, c.get_subtable_size(0));
 
     {
         // Empty table (no columns)
         TableRef t1 = c.get_subtable_ptr(1)->get_table_ref();
         CHECK(t1->is_empty());
-        CHECK_EQUAL( 0, c.get_subtable_size(1));
+        CHECK_EQUAL(0, c.get_subtable_size(1));
     }
 
     {
@@ -454,7 +452,7 @@ TEST(MixedColumn_SubtableSize)
         TableRef t2 = c.get_subtable_ptr(2)->get_table_ref();
         CHECK(t2->is_empty());
         t2->add_column(type_Int, "col1");
-        CHECK_EQUAL( 0, c.get_subtable_size(2));
+        CHECK_EQUAL(0, c.get_subtable_size(2));
     }
 
     {
@@ -483,7 +481,13 @@ TEST(MixedColumn_SubtableSize)
 
 TEST(MixedColumn_WriteLeak)
 {
-    class NullBuffer : public std::streambuf { public: int overflow(int c) { return c; } };
+    class NullBuffer : public std::streambuf {
+    public:
+        int overflow(int c)
+        {
+            return c;
+        }
+    };
 
     NullBuffer null_buffer;
     std::ostream null_stream(&null_buffer);

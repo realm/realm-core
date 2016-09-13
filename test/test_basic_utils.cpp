@@ -31,8 +31,13 @@ using namespace realm::util;
 
 namespace {
 struct Foo {
-    void func() {}
-    void modify() { c = 123; }
+    void func()
+    {
+    }
+    void modify()
+    {
+        c = 123;
+    }
     char c;
 };
 }

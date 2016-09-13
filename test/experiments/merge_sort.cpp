@@ -17,7 +17,6 @@
  **************************************************************************/
 
 
-
 /*
 //56 ms
 void merge_core(Array *a1, Array *a2, Array *res) {
@@ -130,13 +129,6 @@ void merge_core(Array *a0, Array *a1, Array *res) {
     volatile size_t wush2 = wush;
 }
 */
-
-
-
-
-
-
-
 
 
 /*
@@ -334,7 +326,6 @@ Array *merge(Array *ArrayList, bool delete_old) {
 
     return res;
 }*/
-
 
 
 /*
@@ -652,4 +643,3 @@ void merge_core(Array *a0, Array *a1, Array *res) {
     volatile size_t wush2 = wush;
 }
 */
-

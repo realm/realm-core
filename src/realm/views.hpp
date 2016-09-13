@@ -46,12 +46,14 @@ public:
     // `column_indices` must be non-empty, and each vector within it must also
     // be non-empty. `ascending` must either be empty or have one entry for each
     // column index chain.
-    SortDescriptor(Table const& table,
-                   std::vector<std::vector<size_t>> column_indices,
-                   std::vector<bool> ascending={});
+    SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices,
+                   std::vector<bool> ascending = {});
 
     // returns whether this descriptor is valid and can be used to sort
-    explicit operator bool() const noexcept { return !m_columns.empty(); }
+    explicit operator bool() const noexcept
+    {
+        return !m_columns.empty();
+    }
 
     // handover support
     using HandoverPatch = std::unique_ptr<SortDescriptorHandoverPatch>;
@@ -60,6 +62,7 @@ public:
 
     class Sorter;
     Sorter sorter(IntegerColumn const& row_indexes) const;
+
 private:
     std::vector<std::vector<const ColumnBase*>> m_columns;
     std::vector<bool> m_ascending;
@@ -89,7 +92,10 @@ public:
 
     // These two methods are overridden by TableView and LinkView.
     virtual uint_fast64_t sync_if_needed() const = 0;
-    virtual bool is_in_sync() const { return true; }
+    virtual bool is_in_sync() const
+    {
+        return true;
+    }
 
     void check_cookie() const
     {

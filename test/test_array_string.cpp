@@ -200,7 +200,7 @@ TEST(ArrayString_Basic)
     // TEST(ArrayString_Add1)
 
     c.add("a");
-    CHECK_EQUAL("",  c.get(0));
+    CHECK_EQUAL("", c.get(0));
     CHECK_EQUAL("a", c.get(1));
     CHECK_EQUAL(2, c.size());
 
@@ -208,8 +208,8 @@ TEST(ArrayString_Basic)
     // TEST(ArrayString_Add2)
 
     c.add("bb");
-    CHECK_EQUAL("",   c.get(0));
-    CHECK_EQUAL("a",  c.get(1));
+    CHECK_EQUAL("", c.get(0));
+    CHECK_EQUAL("a", c.get(1));
     CHECK_EQUAL("bb", c.get(2));
     CHECK_EQUAL(3, c.size());
 
@@ -217,9 +217,9 @@ TEST(ArrayString_Basic)
     // TEST(ArrayString_Add3)
 
     c.add("ccc");
-    CHECK_EQUAL("",    c.get(0));
-    CHECK_EQUAL("a",   c.get(1));
-    CHECK_EQUAL("bb",  c.get(2));
+    CHECK_EQUAL("", c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("bb", c.get(2));
     CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL(4, c.size());
 
@@ -227,10 +227,10 @@ TEST(ArrayString_Basic)
     // TEST(ArrayString_Add4)
 
     c.add("dddd");
-    CHECK_EQUAL("",     c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("bb",   c.get(2));
-    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL("", c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("bb", c.get(2));
+    CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL(5, c.size());
 
@@ -238,10 +238,10 @@ TEST(ArrayString_Basic)
     // TEST(ArrayString_Add8)
 
     c.add("eeeeeeee");
-    CHECK_EQUAL("",     c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("bb",   c.get(2));
-    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL("", c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("bb", c.get(2));
+    CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL(6, c.size());
@@ -250,10 +250,10 @@ TEST(ArrayString_Basic)
     // TEST(ArrayString_Add16)
 
     c.add("ffffffffffffffff");
-    CHECK_EQUAL("",     c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("bb",   c.get(2));
-    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL("", c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("bb", c.get(2));
+    CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
@@ -264,10 +264,10 @@ TEST(ArrayString_Basic)
 
     c.add("gggggggggggggggggggggggggggggggg");
 
-    CHECK_EQUAL("",     c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("bb",   c.get(2));
-    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL("", c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("bb", c.get(2));
+    CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
@@ -282,10 +282,10 @@ TEST(ArrayString_Basic)
     c.set(2, "a");
     c.set(3, "");
 
-    CHECK_EQUAL("ccc",  c.get(0));
-    CHECK_EQUAL("bb",   c.get(1));
-    CHECK_EQUAL("a",    c.get(2));
-    CHECK_EQUAL("",     c.get(3));
+    CHECK_EQUAL("ccc", c.get(0));
+    CHECK_EQUAL("bb", c.get(1));
+    CHECK_EQUAL("a", c.get(2));
+    CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
@@ -298,11 +298,11 @@ TEST(ArrayString_Basic)
     // Insert in middle
     c.insert(4, "xx");
 
-    CHECK_EQUAL("ccc",  c.get(0));
-    CHECK_EQUAL("bb",   c.get(1));
-    CHECK_EQUAL("a",    c.get(2));
-    CHECK_EQUAL("",     c.get(3));
-    CHECK_EQUAL("xx",   c.get(4));
+    CHECK_EQUAL("ccc", c.get(0));
+    CHECK_EQUAL("bb", c.get(1));
+    CHECK_EQUAL("a", c.get(2));
+    CHECK_EQUAL("", c.get(3));
+    CHECK_EQUAL("xx", c.get(4));
     CHECK_EQUAL("dddd", c.get(5));
     CHECK_EQUAL("eeeeeeee", c.get(6));
     CHECK_EQUAL("ffffffffffffffff", c.get(7));
@@ -315,11 +315,11 @@ TEST(ArrayString_Basic)
     // Erase from end
     c.erase(8);
 
-    CHECK_EQUAL("ccc",  c.get(0));
-    CHECK_EQUAL("bb",   c.get(1));
-    CHECK_EQUAL("a",    c.get(2));
-    CHECK_EQUAL("",     c.get(3));
-    CHECK_EQUAL("xx",   c.get(4));
+    CHECK_EQUAL("ccc", c.get(0));
+    CHECK_EQUAL("bb", c.get(1));
+    CHECK_EQUAL("a", c.get(2));
+    CHECK_EQUAL("", c.get(3));
+    CHECK_EQUAL("xx", c.get(4));
     CHECK_EQUAL("dddd", c.get(5));
     CHECK_EQUAL("eeeeeeee", c.get(6));
     CHECK_EQUAL("ffffffffffffffff", c.get(7));
@@ -331,10 +331,10 @@ TEST(ArrayString_Basic)
     // Erase from top
     c.erase(0);
 
-    CHECK_EQUAL("bb",   c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("",     c.get(2));
-    CHECK_EQUAL("xx",   c.get(3));
+    CHECK_EQUAL("bb", c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("", c.get(2));
+    CHECK_EQUAL("xx", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
@@ -346,9 +346,9 @@ TEST(ArrayString_Basic)
     // Erase from middle
     c.erase(3);
 
-    CHECK_EQUAL("bb",   c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("",     c.get(2));
+    CHECK_EQUAL("bb", c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("", c.get(2));
     CHECK_EQUAL("dddd", c.get(3));
     CHECK_EQUAL("eeeeeeee", c.get(4));
     CHECK_EQUAL("ffffffffffffffff", c.get(5));
@@ -382,10 +382,10 @@ TEST(ArrayString_Basic)
     c.insert(0, "xxxxx");
 
     CHECK_EQUAL("xxxxx", c.get(0));
-    CHECK_EQUAL("a",     c.get(1));
-    CHECK_EQUAL("b",     c.get(2));
-    CHECK_EQUAL("c",     c.get(3));
-    CHECK_EQUAL("d",     c.get(4));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("b", c.get(2));
+    CHECK_EQUAL("c", c.get(3));
+    CHECK_EQUAL("d", c.get(4));
     CHECK_EQUAL(5, c.size());
 
 
@@ -395,11 +395,11 @@ TEST(ArrayString_Basic)
     c.insert(3, "xxxxxxxxxx");
 
     CHECK_EQUAL("xxxxx", c.get(0));
-    CHECK_EQUAL("a",     c.get(1));
-    CHECK_EQUAL("b",     c.get(2));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("b", c.get(2));
     CHECK_EQUAL("xxxxxxxxxx", c.get(3));
-    CHECK_EQUAL("c",     c.get(4));
-    CHECK_EQUAL("d",     c.get(5));
+    CHECK_EQUAL("c", c.get(4));
+    CHECK_EQUAL("d", c.get(5));
     CHECK_EQUAL(6, c.size());
 
 
@@ -494,9 +494,9 @@ TEST(ArrayString_Basic)
 
     c.clear();
 
-    const char buf_1[] = { 'a', 0, 'b', 0, 'c' };
-    const char buf_2[] = { 0, 'a', 0, 'b', 0 };
-    const char buf_3[] = { 0, 0, 0, 0, 0 };
+    const char buf_1[] = {'a', 0, 'b', 0, 'c'};
+    const char buf_2[] = {0, 'a', 0, 'b', 0};
+    const char buf_3[] = {0, 0, 0, 0, 0};
 
     c.add(StringData(buf_1, sizeof buf_1));
     c.add(StringData(buf_2, sizeof buf_2));
@@ -617,7 +617,8 @@ TEST(ArrayString_Null)
         // ArrayString capacity starts at 128 bytes, so we need lots of elements
         // to test if relocation works
         for (size_t i = 0; i < 100; i++) {
-            unsigned char rnd = static_cast<unsigned char>(random.draw_int<unsigned int>());  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
+            unsigned char rnd = static_cast<unsigned char>(
+                random.draw_int<unsigned int>()); //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
 
             // Add more often than removing, so that we grow
             if (rnd < 80 && a.size() > 0) {
@@ -671,7 +672,6 @@ TEST(ArrayString_Null)
         }
         a.destroy();
     }
-
 }
 
 
@@ -726,8 +726,8 @@ TEST(ArrayString_Null2)
         // Keeps width = 0
         a.add("");
 
-        // Now add an "a" which will relocate the array. In this case the column is nullable, so it should not flag the
-        // empty string as being null during relocation (width expansion)
+        // Now add an "a" which will relocate the array. In this case the column is nullable, so it should not flag
+        // the empty string as being null during relocation (width expansion)
         a.add("a");
 
         StringData sd = a.get(0);

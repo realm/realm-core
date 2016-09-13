@@ -25,8 +25,8 @@
 #include <algorithm>
 
 #ifdef REALM_DEBUG
-    #include <cstdio>
-    #include <iostream>
+#include <cstdio>
+#include <iostream>
 #endif
 
 #include <cstring>
@@ -41,7 +41,8 @@ namespace realm {
 namespace util {
 
 SharedFileInfo::SharedFileInfo(const uint8_t* key, int file_descriptor)
-    : fd(file_descriptor), cryptor(key)
+    : fd(file_descriptor)
+    , cryptor(key)
 {
 }
 
@@ -82,7 +83,7 @@ const size_t metadata_size = sizeof(iv_table);
 const size_t blocks_per_metadata_block = block_size / metadata_size;
 
 // map an offset in the data to the actual location in the file
-template<typename Int>
+template <typename Int>
 Int real_offset(Int pos)
 {
     REALM_ASSERT(pos >= 0);
@@ -92,7 +93,7 @@ Int real_offset(Int pos)
 }
 
 // map a location in the file to the offset in the data
-template<typename Int>
+template <typename Int>
 Int fake_offset(Int pos)
 {
     REALM_ASSERT(pos >= 0);
@@ -259,8 +260,7 @@ void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) noexcept
             // In the extremely unlikely case that both the old and new versions have
             // the same hash we won't know which IV to use, so bump the IV until
             // they're different.
-        }
-        while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
+        } while (REALM_UNLIKELY(memcmp(iv.hmac1, iv.hmac2, 4) == 0));
 
         check_write(fd, iv_table_pos(pos), &iv, sizeof(iv));
         check_write(fd, real_offset(pos), m_rw_buffer.get(), block_size);
@@ -271,8 +271,7 @@ void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) noexcept
     }
 }
 
-void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
-                       const char* src, const char* stored_iv) noexcept
+void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* src, const char* stored_iv) noexcept
 {
     uint8_t iv[aes_block_size] = {0};
     memcpy(iv, stored_iv, 4);
@@ -287,8 +286,8 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst,
     REALM_ASSERT(err == kCCSuccess);
     REALM_ASSERT(bytesEncrypted == block_size);
 #else
-    AES_cbc_encrypt(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<uint8_t*>(dst),
-                    block_size, mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);
+    AES_cbc_encrypt(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<uint8_t*>(dst), block_size,
+                    mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);
 #endif
 }
 
@@ -403,7 +402,7 @@ void EncryptedFileMapping::write_page(size_t page) noexcept
         EncryptedFileMapping* m = m_file.mappings[i];
         if (m != this && page < m->m_page_count) {
             m->mark_outdated(page);
-            //if (m->m_up_to_date_pages[page])
+            // if (m->m_up_to_date_pages[page])
             //    memcpy(m->page_addr(page), page_addr(page), m_page_size);
         }
     }
@@ -417,8 +416,7 @@ void EncryptedFileMapping::validate_page(size_t page) noexcept
     if (!m_up_to_date_pages[page])
         return;
 
-    if (!m_file.cryptor.read(m_file.fd, page << m_page_shift,
-                             m_validate_buffer.get(), 1 << m_page_shift))
+    if (!m_file.cryptor.read(m_file.fd, page << m_page_shift, m_validate_buffer.get(), 1 << m_page_shift))
         return;
 
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
@@ -430,9 +428,8 @@ void EncryptedFileMapping::validate_page(size_t page) noexcept
     }
 
     if (memcmp(m_validate_buffer.get(), page_addr(page), 1 << m_page_shift)) {
-        std::cerr << "mismatch " << this << ": fd(" << m_file.fd << ") page("
-                  << page << "/" << m_page_count << ") " << m_validate_buffer.get() << " "
-                  << page_addr(page) << std::endl;
+        std::cerr << "mismatch " << this << ": fd(" << m_file.fd << ") page(" << page << "/" << m_page_count << ") "
+                  << m_validate_buffer.get() << " " << page_addr(page) << std::endl;
         REALM_TERMINATE("");
     }
 #else
@@ -550,4 +547,3 @@ File::SizeType data_size_to_encrypted_size(File::SizeType size) noexcept
 
 } // namespace util {
 } // namespace realm {
-

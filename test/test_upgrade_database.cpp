@@ -25,8 +25,8 @@
 
 #include <sys/stat.h>
 #ifndef _WIN32
-    #include <unistd.h>
-    #include <sys/types.h>
+#include <unistd.h>
+#include <sys/types.h>
 #endif
 
 #include <realm.hpp>
@@ -77,9 +77,9 @@ TEST(Upgrade_Database_2_3)
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
 
-    // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
-    // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
-    // even read using Get()) without upgrading the database first.
+// Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
+// it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot
+// even read using Get()) without upgrading the database first.
 
 #if TEST_READ_UPGRADE_MODE
     CHECK_OR_RETURN(File::exists(path));
@@ -131,9 +131,8 @@ TEST(Upgrade_Database_2_3)
         const char* encryption_key = nullptr;
         bool allow_upgrade = false;
 
-        CHECK_THROW(
-            SharedGroup(temp_copy, no_create, SharedGroupOptions(durability, encryption_key, allow_upgrade)),
-            FileFormatUpgradeRequired);
+        CHECK_THROW(SharedGroup(temp_copy, no_create, SharedGroupOptions(durability, encryption_key, allow_upgrade)),
+                    FileFormatUpgradeRequired);
     }
 
     // Automatic upgrade from SharedGroup
@@ -256,7 +255,7 @@ TEST(Upgrade_Database_2_3)
         }
     }
 
-#else // test write mode
+#else  // test write mode
     char leafsize[20];
     sprintf(leafsize, "%d", REALM_MAX_BPNODE_SIZE);
     File::try_remove(path);
@@ -372,9 +371,8 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
         CHECK(f != 0);
         CHECK(t->get_string(6, 0) == "");
         CHECK(!(t->get_string(6, 0) != ""));
-
     }
-#else // test write mode
+#else  // test write mode
     File::try_remove(path);
 
     Group g;
@@ -421,7 +419,6 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-
 
 
 // Same as above test, but upgrading through WriteTransaction instead of ReadTransaction
@@ -515,7 +512,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
             CHECK(!(t->get_string(6, 0) != ""));
         }
     }
-#else // test write mode
+#else  // test write mode
     File::try_remove(path);
 
     Group g;
@@ -562,7 +559,6 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-
 
 
 // Test reading/writing of old version 2 BinaryColumn.
@@ -624,7 +620,7 @@ TEST(Upgrade_Database_Binary)
     CHECK(f == 0);
 
 
-#else // test write mode
+#else  // test write mode
     File::try_remove(path);
 
     Group g;
@@ -650,7 +646,6 @@ TEST(Upgrade_Database_Binary)
 }
 
 
-
 // Test upgrading a database with single column containing strings with embedded NULs
 TEST(Upgrade_Database_Strings_With_NUL)
 {
@@ -659,11 +654,9 @@ TEST(Upgrade_Database_Strings_With_NUL)
 
     // entries in this array must have length == index
     const char* const nul_strings[] = {
-        "", // length == 0
-        "\0",  // length == 1 etc.
-        "\0\0",
-        "\0\0\0",
-        "\0\0\0\0",
+        "",   // length == 0
+        "\0", // length == 1 etc.
+        "\0\0", "\0\0\0", "\0\0\0\0",
     };
     constexpr size_t num_nul_strings = sizeof(nul_strings) / sizeof(nul_strings[0]);
 
@@ -704,13 +697,16 @@ TEST(Upgrade_Database_Strings_With_NUL)
             case 0:
                 t->set_string(0, reserved_row_index, StringData("12345678901234567890")); // length == 20
             case 1:
-                t->set_string(0, reserved_row_index, StringData("1234567890123456789012345678901234567890123456789012345678901234567890")); // length == 70
+                t->set_string(
+                    0, reserved_row_index,
+                    StringData(
+                        "1234567890123456789012345678901234567890123456789012345678901234567890")); // length == 70
             default:
                 break;
         }
     }
 
-#else // test write mode
+#else  // test write mode
     File::try_remove(path);
 
     Group g;
@@ -744,9 +740,10 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format_new)
 {
     // The method `inline void SharedGroup::upgrade_file_format()` will first have a fast non-threadsafe
     // test for seeing if the file needs to be upgraded. Then it will make a slower thread-safe check inside a
-    // write transaction (transaction acts like a mutex). In debug mode, the `inline void SharedGroup::upgrade_file_format()`
-    // method will sleep 0.2 second between the non-threadsafe and the threadsafe test, to ensure that two threads opening
-    // the same database file will both think the database needs upgrade in the first check.
+    // write transaction (transaction acts like a mutex). In debug mode, the `inline void
+    // SharedGroup::upgrade_file_format()` method will sleep 0.2 second between the non-threadsafe and the threadsafe
+    // test, to ensure that two threads opening the same database file will both think the database needs upgrade in
+    // the first check.
 
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
@@ -757,9 +754,7 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format_new)
     util::Thread t[10];
 
     for (auto& tt : t) {
-        tt.start([&]() {
-            SharedGroup sg(temp_copy);
-        });
+        tt.start([&]() { SharedGroup sg(temp_copy); });
     }
 
     for (auto& tt : t)
@@ -866,9 +861,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
 
     bool did_upgrade = false;
     int old_version, new_version;
-    auto exception_callback = [&](int, int) {
-        throw std::exception();
-    };
+    auto exception_callback = [&](int, int) { throw std::exception(); };
     auto successful_callback = [&](int from, int to) {
         did_upgrade = true;
         old_version = from;
@@ -890,12 +883,8 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
 
     // Callback should be triggered here because the file still needs to be upgraded
     upgrade_callback = successful_callback;
-    SharedGroup sg2(temp_copy,
-                    no_create,
-                    SharedGroupOptions(durability,
-                                       encryption_key,
-                                       allow_file_format_upgrade,
-                                       upgrade_callback));
+    SharedGroup sg2(temp_copy, no_create,
+                    SharedGroupOptions(durability, encryption_key, allow_file_format_upgrade, upgrade_callback));
     CHECK(did_upgrade);
     CHECK_EQUAL(old_version, 3);
     CHECK(new_version >= 5);
@@ -967,7 +956,7 @@ TEST(Upgrade_Database_4_5_DateTime1)
         CHECK_EQUAL(t->size(), 3);
     }
 
-#else // test write mode
+#else  // test write mode
     // NOTE: This code must be executed from an old file-format-version 4 core in order to create
     // a file-format-version 4 test file!
     char leafsize[20];
@@ -1007,7 +996,6 @@ TEST(Upgrade_Database_4_5_DateTime1)
 
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
-
 }
 
 #endif // TEST_GROUP

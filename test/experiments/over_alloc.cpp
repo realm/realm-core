@@ -25,8 +25,7 @@ using namespace realm;
 
 namespace {
 
-REALM_TABLE_1(MyTable,
-              text, String)
+REALM_TABLE_1(MyTable, text, String)
 
 } // namespace
 
@@ -44,7 +43,8 @@ int main()
         File::try_remove("over_alloc_1.realm");
         File::try_remove("over_alloc_1.realm.lock");
         SharedGroup db("over_alloc_1.realm");
-        if (!db.is_valid()) throw runtime_error("Failed to open database 1");
+        if (!db.is_valid())
+            throw runtime_error("Failed to open database 1");
 
         for (int i = 0; i < n_outer; ++i) {
             {
@@ -63,7 +63,8 @@ int main()
         File::try_remove("over_alloc_2.realm");
         File::try_remove("over_alloc_2.realm.lock");
         SharedGroup db("over_alloc_2.realm");
-        if (!db.is_valid()) throw runtime_error("Failed to open database 2");
+        if (!db.is_valid())
+            throw runtime_error("Failed to open database 2");
 
         {
             Group& group = db.begin_write();

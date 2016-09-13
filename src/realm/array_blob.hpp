@@ -24,12 +24,14 @@
 namespace realm {
 
 
-class ArrayBlob: public Array {
+class ArrayBlob : public Array {
 public:
     static constexpr size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
     explicit ArrayBlob(Allocator&) noexcept;
-    ~ArrayBlob() noexcept override {}
+    ~ArrayBlob() noexcept override
+    {
+    }
 
     const char* get(size_t index) const noexcept;
     BinaryData get_at(size_t& pos) const noexcept;
@@ -66,18 +68,15 @@ public:
 
 private:
     size_t calc_byte_len(size_t for_size, size_t width) const override;
-    size_t calc_item_count(size_t bytes,
-                           size_t width) const noexcept override;
+    size_t calc_item_count(size_t bytes, size_t width) const noexcept override;
 };
-
-
 
 
 // Implementation:
 
 // Creates new array (but invalid, call init_from_ref() to init)
-inline ArrayBlob::ArrayBlob(Allocator& allocator) noexcept:
-    Array(allocator)
+inline ArrayBlob::ArrayBlob(Allocator& allocator) noexcept
+    : Array(allocator)
 {
 }
 
@@ -96,8 +95,7 @@ inline ref_type ArrayBlob::add(const char* data, size_t data_size, bool add_zero
     return replace(m_size, m_size, data, data_size, add_zero_term);
 }
 
-inline void ArrayBlob::insert(size_t pos, const char* data, size_t data_size,
-                              bool add_zero_term)
+inline void ArrayBlob::insert(size_t pos, const char* data, size_t data_size, bool add_zero_term)
 {
     replace(pos, pos, data, data_size, add_zero_term);
 }

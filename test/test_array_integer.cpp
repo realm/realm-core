@@ -355,7 +355,7 @@ TEST(ArrayIntNull_Find)
 
     int64_t t6;
     size_t i6;
-    bool found = a.maximum(t6, 0 , npos, &i6);
+    bool found = a.maximum(t6, 0, npos, &i6);
     CHECK_EQUAL(100, i6);
     CHECK_EQUAL(0x100, t6);
     CHECK_EQUAL(found, true);
@@ -371,7 +371,6 @@ TEST(ArrayIntNull_Find)
         CHECK_EQUAL(a[static_cast<size_t>(col.get(1))], 0x44);
 
         col.destroy();
-
     }
     a.destroy();
 }
