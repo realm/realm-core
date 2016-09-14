@@ -129,7 +129,7 @@ public:
 
     typedef int32_t key_type;
 
-    // max_tree_depth specifies the number of levels of recursive string indexes
+    // s_max_offset specifies the number of levels of recursive string indexes
     // allowed before storing everything in lists. This is to avoid nesting
     // to too deep of a level. Since every SubStringIndex stores 4 bytes, this
     // means that a StringIndex is helpful for strings of a common prefix up to

@@ -119,7 +119,8 @@ void StringIndex::insert_to_existing_list(size_t row, StringData value, IntegerC
     else {
         size_t lower_row = to_size_t(*lower);
         StringConversionBuffer buffer;  // Used when this is an IntegerIndex
-        StringData lower_value = m_target_column->get_index_data(lower_row, buffer);
+        StringData lower_value = get(lower_row, buffer);
+
         if (lower_value != value) {
             list.insert(lower.get_col_ndx(), row);
         }
@@ -459,7 +460,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
             m_array->set(ins_pos_refs, row_list.get_ref());
         }
         else {
-            if (offset > s_max_offset) {
+            if (suboffset > s_max_offset) {
                 // These strings have the same prefix up to this point but we
                 // don't want to recurse further, create a list in sorted order.
                 bool row_ndx_first = value < v2;
@@ -492,10 +493,11 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
         sub.set_parent(m_array.get(), ins_pos_refs);
 
         SortedListComparator slc(*m_target_column);
-        IntegerColumn::const_iterator lower = std::lower_bound(sub.cbegin(), sub.cend(), value, slc);
+        IntegerColumn::const_iterator it_end = sub.cend();
+        IntegerColumn::const_iterator lower = std::lower_bound(sub.cbegin(), it_end, value, slc);
 
         bool value_exists_in_list = false;
-        if (lower != sub.cend()) {
+        if (lower != it_end) {
             StringConversionBuffer buffer;
             StringData lower_value = get(*lower, buffer);
             if (lower_value == value) {
@@ -511,7 +513,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
             insert_to_existing_list(row_ndx, value, sub);
         }
         else {
-            if (offset > s_max_offset) {
+            if (suboffset > s_max_offset) {
                 insert_to_existing_list(row_ndx, value, sub);
             }
             else {
@@ -937,10 +939,12 @@ bool SortedListComparator::operator()(int64_t ndx, StringData needle) // used in
 
     if (a == needle)
         return false;
-    // The StringData::operator< uses a lexicograpical comparison, but we
-    // should use our utf8 sort to compare strings here because thats how
-    // they were put into this ordered column in the first place.
-    return utf8_compare(a, needle);
+
+    // The StringData::operator< uses a lexicograpical comparison, therefore we
+    // cannot use our utf8_compare here because we need to be consistent with
+    // using the same compare method as how these strings were they were put
+    // into this ordered column in the first place.
+    return a < needle;
 }
 
 
@@ -954,7 +958,6 @@ bool SortedListComparator::operator()(StringData needle, int64_t ndx) // used in
     }
     return !(*this)(ndx, needle);
 }
-
 
 #ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
@@ -1038,6 +1041,8 @@ void StringIndex::verify_entries(const StringColumn& column) const
 
         size_t ndx = results.find_first(i);
         REALM_ASSERT(ndx != not_found);
+        size_t found = count(value);
+        REALM_ASSERT_EX(found >= 1, found);
         results.clear();
     }
     results.destroy(); // clean-up
