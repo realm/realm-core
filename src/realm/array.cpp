@@ -2807,8 +2807,8 @@ size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result
 
     SortedListComparator slc(*column);
 
-    auto it_end = rows.cend();
-    auto lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    IntegerColumn::const_iterator it_end = rows.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
     if (lower == it_end) {
         return not_found;
     }
@@ -2865,8 +2865,8 @@ size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, 
 
     SortedListComparator slc(*column);
 
-    auto it_end = rows.cend();
-    auto lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    IntegerColumn::const_iterator it_end = rows.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
     if (lower == it_end) {
         return size_t(FindRes_not_found);
     }
@@ -2878,10 +2878,10 @@ size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, 
     if (str != value)
         return size_t(FindRes_not_found);
 
-    auto upper = std::upper_bound(lower, it_end, value, slc);
+    IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value, slc);
 
     // Copy all matches into result column
-    for (auto it = lower; it != upper; ++it) {
+    for (IntegerColumn::const_iterator it = lower; it != upper; ++it) {
         const size_t cur_row_ref = to_size_t(*it);
         result.add(cur_row_ref);
     }
