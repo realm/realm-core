@@ -2809,24 +2809,17 @@ size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result
 
     IntegerColumn::const_iterator it_end = rows.cend();
     IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
-    if (lower == it_end) {
+    if (lower == it_end)
         return not_found;
-    }
-
-    // The buffer is needed when for when this is an integer index.
-    StringIndex::StringConversionBuffer buffer;
-    StringData found_value = column->get_index_data(*lower, buffer);
-    if (found_value != value) {
-        return not_found;
-    }
 
     const size_t first_row_ref = to_size_t(*lower);
 
     // The buffer is needed when for when this is an integer index.
-    StringIndex::StringConversionBuffer buffer2;
-    StringData str = column->get_index_data(first_row_ref, buffer2);
+    StringIndex::StringConversionBuffer buffer;
+    StringData str = column->get_index_data(first_row_ref, buffer);
     if (str != value)
         return not_found;
+
     return first_row_ref;
 }
 
@@ -2840,9 +2833,8 @@ size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, re
 
     IntegerColumn::const_iterator it_end = rows.cend();
     IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
-    if (lower == it_end) {
+    if (lower == it_end)
         return 0;
-    }
 
     const size_t first_row_ref = to_size_t(*lower);
 
@@ -2867,9 +2859,9 @@ size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, 
 
     IntegerColumn::const_iterator it_end = rows.cend();
     IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
-    if (lower == it_end) {
+    if (lower == it_end)
         return size_t(FindRes_not_found);
-    }
+
     const size_t first_row_ref = to_size_t(*lower);
 
     // The buffer is needed when for when this is an integer index.
