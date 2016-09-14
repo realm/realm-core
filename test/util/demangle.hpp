@@ -34,7 +34,7 @@ std::string demangle(const std::string&);
 
 
 /// Get the demangled name of the specified type.
-template<class T>
+template <class T>
 inline std::string get_type_name()
 {
     return demangle(typeid(T).name());
@@ -42,7 +42,7 @@ inline std::string get_type_name()
 
 
 /// Get the demangled name of the type of the specified argument.
-template<typename T>
+template <typename T>
 inline std::string get_type_name(const T& v)
 {
     return demangle(typeid(v).name());

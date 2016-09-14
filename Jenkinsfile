@@ -60,7 +60,8 @@ try {
   parallel(
     generic: doBuildPackage('generic', 'tgz'),
     centos7: doBuildPackage('centos-7', 'rpm'),
-    centos6: doBuildPackage('centos-6', 'rpm')
+    centos6: doBuildPackage('centos-6', 'rpm'),
+    ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
   )
 
   if (['master', 'next-major'].contains(env.BRANCH_NAME)) {
@@ -68,7 +69,8 @@ try {
     parallel(
       generic: doPublishGeneric(),
       centos7: doPublish('centos-7', 'rpm', 'el', 7),
-      centos6: doPublish('centos-6', 'rpm', 'el', 6)
+      centos6: doPublish('centos-6', 'rpm', 'el', 6),
+      ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
     )
 
     if (gitTag != "") {
@@ -482,7 +484,7 @@ def get_version() {
   def gitTag = readGitTag()
   def gitSha = readGitSha()
   if (gitTag == "") {
-    return "${dependencies.VERSION}-${gitSha}"
+    return "${dependencies.VERSION}-g${gitSha}"
   }
   else {
     return "${dependencies.VERSION}"
@@ -502,7 +504,7 @@ def getDeviceNames(String commandOutput) {
 def doBuildPackage(distribution, fileType) {
   return {
     node('docker') {
-      getArchive()
+      getSourceArchive()
 
       withCredentials([[$class: 'StringBinding', credentialsId: 'packagecloud-sync-devel-master-token', variable: 'PACKAGECLOUD_MASTER_TOKEN']]) {
         sh "sh packaging/package.sh ${distribution}"
@@ -519,7 +521,7 @@ def doBuildPackage(distribution, fileType) {
 def doPublish(distribution, fileType, distroName, distroVersion) {
   return {
     node {
-      getArchive()
+      getSourceArchive()
       packaging = load './packaging/publish.groovy'
 
       dir('packaging/out') {
@@ -535,7 +537,7 @@ def doPublish(distribution, fileType, distroName, distroVersion) {
 def doPublishGeneric() {
   return {
     node {
-      getArchive()
+      getSourceArchive()
       def version = get_version()
       def topdir = pwd()
       dir('packaging/out') {
@@ -576,4 +578,10 @@ def getArchive() {
     sh 'rm -rf *'
     unstash 'core-source'
     sh 'unzip -o -q core.zip'
+}
+
+def getSourceArchive() {
+  checkout scm
+  sh 'git clean -ffdx -e .????????'
+  sh 'git submodule update --init'
 }

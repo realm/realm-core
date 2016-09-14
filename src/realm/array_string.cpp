@@ -21,9 +21,9 @@
 #include <cstring>
 
 #ifdef REALM_DEBUG
-    #include <cstdio>
-    #include <iostream>
-    #include <iomanip>
+#include <cstdio>
+#include <iostream>
+#include <iomanip>
 #endif
 
 #include <realm/utilities.hpp>
@@ -121,7 +121,7 @@ void ArrayString::set(size_t ndx, StringData value)
         else {
             // m_width == 0. Expand to new width.
             while (new_end != base) {
-                REALM_ASSERT_3(new_width, <= , max_width);
+                REALM_ASSERT_3(new_width, <=, max_width);
                 *--new_end = static_cast<char>(new_width);
                 {
                     char* new_begin = new_end - (new_width - 1);
@@ -144,7 +144,7 @@ void ArrayString::set(size_t ndx, StringData value)
     static_assert(max_width <= max_width, "Padding size must fit in 7-bits");
 
     if (value.is_null()) {
-        REALM_ASSERT_3(m_width, <= , 128);
+        REALM_ASSERT_3(m_width, <=, 128);
         *end = static_cast<char>(m_width);
     }
     else {
@@ -207,7 +207,8 @@ size_t ArrayString::calc_byte_len(size_t num_items, size_t width) const
 
 size_t ArrayString::calc_item_count(size_t bytes, size_t width) const noexcept
 {
-    if (width == 0) return size_t(-1); // zero-width gives infinite space
+    if (width == 0)
+        return size_t(-1); // zero-width gives infinite space
 
     size_t bytes_without_header = bytes - header_size;
     return bytes_without_header / width;
@@ -283,8 +284,7 @@ size_t ArrayString::find_first(StringData value, size_t begin, size_t end) const
     return not_found;
 }
 
-void ArrayString::find_all(IntegerColumn& result, StringData value, size_t add_offset,
-                           size_t begin, size_t end)
+void ArrayString::find_all(IntegerColumn& result, StringData value, size_t add_offset, size_t begin, size_t end)
 {
     size_t begin_2 = begin;
     for (;;) {
@@ -313,10 +313,11 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
 {
     size_t leaf_size = size();
     REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
-    if (leaf_size < ndx) ndx = leaf_size;
+    if (leaf_size < ndx)
+        ndx = leaf_size;
     if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
         insert(ndx, value); // Throws
-        return 0; // Leaf was not split
+        return 0;           // Leaf was not split
     }
 
     // Split leaf node
@@ -329,8 +330,8 @@ ref_type ArrayString::bptree_leaf_insert(size_t ndx, StringData value, TreeInser
     else {
         for (size_t i = ndx; i != leaf_size; ++i)
             new_leaf.add(get(i)); // Throws
-        truncate(ndx); // Throws
-        add(value); // Throws
+        truncate(ndx);            // Throws
+        add(value);               // Throws
         state.m_split_offset = ndx + 1;
     }
     state.m_split_size = leaf_size + 1;
@@ -358,7 +359,7 @@ MemRef ArrayString::slice(size_t offset, size_t slice_size, Allocator& target_al
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void ArrayString::string_stats() const
 {
@@ -369,7 +370,8 @@ void ArrayString::string_stats() const
         StringData str = get(i);
         size_t str_size = str.size() + 1;
         total += str_size;
-        if (str_size > longest) longest = str_size;
+        if (str_size > longest)
+            longest = str_size;
     }
 
     size_t array_size = m_size * m_width;

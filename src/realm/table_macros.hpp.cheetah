@@ -41,6 +41,12 @@ directiveStartToken = %
 
 #include <realm/table_basic.hpp>
 
+/*****************************************************************************
+ *                                                                           *
+ *      THIS INTERFACE IS DEPRECATED AND MAY BE REMOVED WITHOUT NOTICE       *
+ *                                                                           *
+ ****************************************************************************/
+
 
 %for $i in range($max_cols)
 %set $num_cols = $i + 1

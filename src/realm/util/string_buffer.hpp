@@ -36,7 +36,9 @@ namespace util {
 class StringBuffer {
 public:
     StringBuffer() noexcept;
-    ~StringBuffer() noexcept {}
+    ~StringBuffer() noexcept
+    {
+    }
 
     std::string str() const;
 
@@ -103,12 +105,10 @@ private:
 };
 
 
-
-
-
 // Implementation:
 
-inline StringBuffer::StringBuffer() noexcept: m_size(0)
+inline StringBuffer::StringBuffer() noexcept
+    : m_size(0)
 {
 }
 

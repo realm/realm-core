@@ -19,11 +19,14 @@
 /*
 Thread bug detector. Background:
 
-Existing thread bug detectors can only identify a non-exclusive access (r/w) in the moment it occurs at runtime. However
-a few data races only occur under certain rare conditions. This wrapper can force some of these conditions to reveal and
+Existing thread bug detectors can only identify a non-exclusive access (r/w) in the moment it occurs at runtime.
+However
+a few data races only occur under certain rare conditions. This wrapper can force some of these conditions to reveal
+and
 is perfect to use in combination with existing thread bug detectors but can also be used alone.
 
-Use by #including this file in the file(s) that call pthreads functions. If you #include pthread.h then include this file
+Use by #including this file in the file(s) that call pthreads functions. If you #include pthread.h then include this
+file
 *after* it because it works by wrapping pthread functions by macro-redefining their function names.
 */
 
@@ -31,10 +34,10 @@ Use by #including this file in the file(s) that call pthreads functions. If you 
 #define REALM_PTHREAD_TEST_HPP
 
 #ifdef _WIN32
-    #define NOMINMAX
-    #include <Windows.h>
+#define NOMINMAX
+#include <Windows.h>
 #else
-    #include <unistd.h>
+#include <unistd.h>
 #endif
 
 inline unsigned int ptf_fastrand()
@@ -72,7 +75,7 @@ inline void ptf_randsleep(void)
         sched_yield();
     }
     else if (r < 999) {
-        // Wake up in time slice according to normal OS scheduling
+// Wake up in time slice according to normal OS scheduling
 #ifdef _WIN32
         Sleep(0);
 #else
@@ -142,9 +145,9 @@ inline int ptf_pthread_cond_broadcast(pthread_cond_t* cond)
     ptf_randsleep();
 }
 
-#define ptf_surround(arg) \
-    ptf_randsleep(); \
-    arg; \
+#define ptf_surround(arg)                                                                                            \
+    ptf_randsleep();                                                                                                 \
+    arg;                                                                                                             \
     ptf_randsleep();
 
 #define pthread_mutex_lock ptf_pthread_mutex_lock

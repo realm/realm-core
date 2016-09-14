@@ -35,7 +35,7 @@ namespace util {
 /// otherwise it matches TypeCons<H2,T2>.
 ///
 /// Note that 'void' is interpreted as a zero-length list.
-template<class H, class T>
+template <class H, class T>
 struct TypeCons {
     typedef H head;
     typedef T tail;
@@ -49,12 +49,12 @@ struct TypeCons {
 /// that 'void' is interpreted as a zero-length list.
 ///
 /// \tparam T The new type to be appended.
-template<class List, class T>
+template <class List, class T>
 struct TypeAppend {
     typedef TypeCons<typename List::head, typename TypeAppend<typename List::tail, T>::type> type;
 };
 /// Base case for empty type list.
-template<class T>
+template <class T>
 struct TypeAppend<void, T> {
     typedef TypeCons<T, void> type;
 };
@@ -67,12 +67,12 @@ struct TypeAppend<void, T> {
 /// that 'void' is interpreted as a zero-length list.
 ///
 /// \tparam i The index of the list element to get.
-template<class List, int i>
+template <class List, int i>
 struct TypeAt {
     typedef typename TypeAt<typename List::tail, i - 1>::type type;
 };
 /// Base case for empty type list.
-template<class List>
+template <class List>
 struct TypeAt<List, 0> {
     typedef typename List::head type;
 };
@@ -83,12 +83,12 @@ struct TypeAt<List, 0> {
 ///
 /// \tparam List The list of types, constructed using TypeCons<>. Note
 /// that 'void' is interpreted as a zero-length list.
-template<class List>
+template <class List>
 struct TypeCount {
     static const int value = 1 + TypeCount<typename List::tail>::value;
 };
 /// Base case for empty type list.
-template<>
+template <>
 struct TypeCount<void> {
     static const int value = 0;
 };
@@ -102,16 +102,17 @@ struct TypeCount<void> {
 ///
 /// \tparam Pred Must be such that `Pred<T>::%value` is true if, and
 /// only if the predicate is satisfied for `T`.
-template<class List, template<class> class Pred>
+template <class List, template <class> class Pred>
 struct FindType {
 private:
-    typedef typename List::head                                type_1;
+    typedef typename List::head type_1;
     typedef typename FindType<typename List::tail, Pred>::type type_2;
+
 public:
     typedef typename std::conditional<Pred<type_1>::value, type_1, type_2>::type type;
 };
 /// Base case for empty type list.
-template<template<class> class Pred>
+template <template <class> class Pred>
 struct FindType<void, Pred> {
     typedef void type;
 };
@@ -121,7 +122,7 @@ struct FindType<void, Pred> {
 ///
 /// \tparam List The list of types, constructed using TypeCons<>. Note
 /// that 'void' is interpreted as a zero-length list.
-template<class List, template<class T, int i> class Op, int i = 0>
+template <class List, template <class T, int i> class Op, int i = 0>
 struct ForEachType {
     /// Execute the `Op<T,i>::%exec()` for each type `T` at index `i`
     /// in `List`.
@@ -132,7 +133,7 @@ struct ForEachType {
     }
     /// Execute the `Op<T,i>::%exec(a)` for each type `T` at index `i`
     /// in `List`.
-    template<class A>
+    template <class A>
     static void exec(const A& a)
     {
         Op<typename List::head, i>::exec(a);
@@ -140,7 +141,7 @@ struct ForEachType {
     }
     /// Execute the `Op<T,i>::%exec(a,b)` for each type `T` at index
     /// `i` in `List`.
-    template<class A, class B>
+    template <class A, class B>
     static void exec(const A& a, const B& b)
     {
         Op<typename List::head, i>::exec(a, b);
@@ -148,7 +149,7 @@ struct ForEachType {
     }
     /// Execute the `Op<T,i>::%exec(a,b,c)` for each type `T` at index
     /// `i` in `List`.
-    template<class A, class B, class C>
+    template <class A, class B, class C>
     static void exec(const A& a, const B& b, const C& c)
     {
         Op<typename List::head, i>::exec(a, b, c);
@@ -156,15 +157,23 @@ struct ForEachType {
     }
 };
 /// Base case for empty type list.
-template<template<class T, int i> class Op, int i>
+template <template <class T, int i> class Op, int i>
 struct ForEachType<void, Op, i> {
-    static void exec() {}
-    template<class A>
-    static void exec(const A&) {}
-    template<class A, class B>
-    static void exec(const A&, const B&) {}
-    template<class A, class B, class C>
-    static void exec(const A&, const B&, const C&) {}
+    static void exec()
+    {
+    }
+    template <class A>
+    static void exec(const A&)
+    {
+    }
+    template <class A, class B>
+    static void exec(const A&, const B&)
+    {
+    }
+    template <class A, class B, class C>
+    static void exec(const A&, const B&, const C&)
+    {
+    }
 };
 
 
@@ -175,7 +184,7 @@ struct ForEachType<void, Op, i> {
 ///
 /// \tparam List The list of types, constructed using TypeCons<>. Note
 /// that 'void' is interpreted as a zero-length list.
-template<class List, template<class T, int i> class Pred, int i = 0>
+template <class List, template <class T, int i> class Pred, int i = 0>
 struct HasType {
     /// Execute the `Op<T,i>::%exec()` for each type `T` at index `i`
     /// in `List`.
@@ -185,21 +194,21 @@ struct HasType {
     }
     /// Execute the `Op<T,i>::%exec(a)` for each type `T` at index `i`
     /// in `List`.
-    template<class A>
+    template <class A>
     static bool exec(const A& a)
     {
         return Pred<typename List::head, i>::exec(a) || HasType<typename List::tail, Pred, i + 1>::exec(a);
     }
     /// Execute the `Op<T,i>::%exec(a,b)` for each type `T` at index
     /// `i` in `List`.
-    template<class A, class B>
+    template <class A, class B>
     static bool exec(const A& a, const B& b)
     {
         return Pred<typename List::head, i>::exec(a, b) || HasType<typename List::tail, Pred, i + 1>::exec(a, b);
     }
     /// Execute the `Op<T,i>::%exec(a,b,c)` for each type `T` at index
     /// `i` in `List`.
-    template<class A, class B, class C>
+    template <class A, class B, class C>
     static bool exec(const A& a, const B& b, const C& c)
     {
         return Pred<typename List::head, i>::exec(a, b, c) ||
@@ -207,15 +216,27 @@ struct HasType {
     }
 };
 /// Base case for empty type list.
-template<template<class T, int i> class Pred, int i>
+template <template <class T, int i> class Pred, int i>
 struct HasType<void, Pred, i> {
-    static bool exec() { return false; }
-    template<class A>
-    static bool exec(const A&) { return false; }
-    template<class A, class B>
-    static bool exec(const A&, const B&) { return false; }
-    template<class A, class B, class C>
-    static bool exec(const A&, const B&, const C&) { return false; }
+    static bool exec()
+    {
+        return false;
+    }
+    template <class A>
+    static bool exec(const A&)
+    {
+        return false;
+    }
+    template <class A, class B>
+    static bool exec(const A&, const B&)
+    {
+        return false;
+    }
+    template <class A, class B, class C>
+    static bool exec(const A&, const B&, const C&)
+    {
+        return false;
+    }
 };
 
 

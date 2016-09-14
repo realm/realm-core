@@ -50,9 +50,7 @@ std::streamsize MemoryInputStreambuf::showmanyc()
     return m_end - m_curr;
 }
 
-pos_type MemoryInputStreambuf::seekoff(off_type off,
-                                       std::ios_base::seekdir dir, 
-                                       std::ios_base::openmode which)
+pos_type MemoryInputStreambuf::seekoff(off_type off, std::ios_base::seekdir dir, std::ios_base::openmode which)
 {
     REALM_ASSERT(which == std::ios_base::in);
 
@@ -76,8 +74,7 @@ pos_type MemoryInputStreambuf::seekoff(off_type off,
     return m_curr - m_begin;
 }
 
-pos_type MemoryInputStreambuf::seekpos(pos_type pos,
-                                       std::ios_base::openmode which)
+pos_type MemoryInputStreambuf::seekpos(pos_type pos, std::ios_base::openmode which)
 {
     REALM_ASSERT(which == std::ios_base::in);
 
@@ -88,4 +85,3 @@ pos_type MemoryInputStreambuf::seekpos(pos_type pos,
 
     return pos;
 }
-

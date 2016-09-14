@@ -67,7 +67,6 @@ void Printable::print_all(std::ostream& out, const std::initializer_list<Printab
             out << ", ";
         is_first = false;
         value.print(out, quote);
-
     }
     out << "]";
 }

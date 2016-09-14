@@ -130,15 +130,15 @@ bool is_null(const char* v)
 } // anonymous namespace
 
 
-Importer::Importer():
-    Quiet(false),
-    Separator(',')
+Importer::Importer()
+    : Quiet(false)
+    , Separator(',')
 {
 }
 
 // Convert string to int64_t. Set can_fail = true if you also want to verify if your string was of that type. In this
 // case, provide the optional 'success' argument. If the string is null (as defined by is_null()) it will return 0
-template<bool can_fail>
+template <bool can_fail>
 int64_t Importer::parse_integer(const char* col, bool* success)
 {
     int64_t x = 0;
@@ -193,11 +193,12 @@ int64_t Importer::parse_integer(const char* col, bool* success)
 
 // Convert string to bool. Set can_fail = true if you also want to verify if your string was of that type. In this
 // case, provide the optional 'success' argument. If the string is null (as defined by is_null()) it will return false
-template<bool can_fail>
+template <bool can_fail>
 bool Importer::parse_bool(const char* col, bool* success)
 {
     // Must be tuples of {true value, false value}
-    static const char* a[] = {"True", "False", "true", "false", "TRUE", "FALSE", "1", "0", "Yes", "No", "yes", "no", "YES", "NO"};
+    static const char* a[] = {"True", "False", "true", "false", "TRUE", "FALSE", "1",
+                              "0",    "Yes",   "No",   "yes",   "no",   "YES",   "NO"};
 
     char c = *col;
 
@@ -236,13 +237,13 @@ bool Importer::parse_bool(const char* col, bool* success)
         return false;
 }
 
-// Convert string to float. Supports normal representation (1.234) and scientific (-4.43e6). Set can_fail = true if you
-// also want to verify if your string was of that type. In this case, provide the optional 'success' argument. If the
-// string is null (as defined by is_null()) it will return 0.0
+// Convert string to float. Supports normal representation (1.234) and scientific (-4.43e6). Set can_fail = true if
+// you also want to verify if your string was of that type. In this case, provide the optional 'success' argument.
+// If the string is null (as defined by is_null()) it will return 0.0
 //
 // If the string contains more than 6 significant digits (5.259862, -9.1869e11), it will return *success = false
 // because a 32-bit float cannot represent so many significants. In that case, use double instead
-template<bool can_fail>
+template <bool can_fail>
 float Importer::parse_float(const char* col, bool* success)
 {
     bool s;
@@ -260,10 +261,10 @@ float Importer::parse_float(const char* col, bool* success)
     return static_cast<float>(d);
 }
 
-// Convert string to double. Supports normal representation (1.234) and scientific (-4.43e6). Set can_fail = true if you
-// also want to verify if your string was of that type. In this case, provide the optional 'success' argument. If the
-// string is null (as defined by is_null()) it will return 0.0
-template<bool can_fail>
+// Convert string to double. Supports normal representation (1.234) and scientific (-4.43e6). Set can_fail = true if
+// you also want to verify if your string was of that type. In this case, provide the optional 'success' argument.
+// If the string is null (as defined by is_null()) it will return 0.0
+template <bool can_fail>
 double Importer::parse_double(const char* col, bool* success, size_t* significants)
 {
     const char* orig_col = col;
@@ -358,7 +359,7 @@ double Importer::parse_double(const char* col, bool* success, size_t* significan
 // Takes a row of payload and returns a vector of Realm types that can represent them. If a value can be represented
 // by multiple Realm types, it prioritizes Bool > Int > Float > Double > String. If Empty_as_string == true, then
 // empty strings turns into String type.
-std::vector<DataType> Importer::types (std::vector<std::string> v)
+std::vector<DataType> Importer::types(std::vector<std::string> v)
 {
     std::vector<DataType> res;
 
@@ -398,7 +399,8 @@ std::vector<DataType> Importer::lowest_common(std::vector<DataType> types1, std:
             res.push_back(type_String);
         else if (types1[t] == type_Double || types2[t] == type_Double)
             res.push_back(type_Double);
-        else if ((types1[t] == type_Float && types2[t] == type_Int) || (types2[t] == type_Float && types1[t] == type_Int)) {
+        else if ((types1[t] == type_Float && types2[t] == type_Int) ||
+                 (types2[t] == type_Float && types1[t] == type_Int)) {
             // This covers the special case where first values are integers and suddenly radix points occur. In this
             // case we must import as double, because a float may not be precise enough to hold the number of
             // significant digits in the integers. Todo: We could keep track of the significant digits seen in all
@@ -466,7 +468,7 @@ nextfield:
 
     if (src[m_curpos] == '"') {
         m_curpos++;
-payload:
+    payload:
         // Field in quotes - can only end with another quote
         while (src[m_curpos] != '"') {
             // m_row is only used to display file line number in an err msg. We need to include field-embedded breaks
@@ -492,16 +494,17 @@ payload:
             while (src[m_curpos] == ' ')
                 m_curpos++;
         }
-
     }
     else {
 
-        // Field not in quotes - cannot contain quotes or commas. So read until quote or comma or eof. Even though it's
+        // Field not in quotes - cannot contain quotes or commas. So read until quote or comma or eof. Even though
+        // it's
         // non-conforming, some CSV files can contain non-quoted line breaks, so we need to test if we can't test for
         // new record by just testing for 0a/0d.
         size_t fields = payload.back().size();
 
-        while (src[m_curpos] != Separator && src[m_curpos] != 0 && ((src[m_curpos] != 0xd && src[m_curpos] != 0xa) || (fields < m_fields && m_fields != size_t(-1)) )) {
+        while (src[m_curpos] != Separator && src[m_curpos] != 0 &&
+               ((src[m_curpos] != 0xd && src[m_curpos] != 0xa) || (fields < m_fields && m_fields != size_t(-1)))) {
             m_row += src[m_curpos] == 0xa;
             payload.back().back().push_back(src[m_curpos]);
             m_curpos++;
@@ -529,7 +532,9 @@ payload:
                 std::string s = payload[payload.size() - 1][0];
                 if (s.length() > 100)
                     s = s.substr(0, 100);
-                sprintf(buf, "Wrong number of delimitors around line %lld (+|- 3) in csv file. First few characters of line: %s", static_cast<unsigned long long>(m_row - 1),  s.c_str());
+                sprintf(buf, "Wrong number of delimitors around line %lld (+|- 3) in csv file. First few characters "
+                             "of line: %s",
+                        static_cast<unsigned long long>(m_row - 1), s.c_str());
                 throw std::runtime_error(buf);
             }
         }
@@ -544,14 +549,15 @@ end:
     return payload.size() - original_size;
 }
 
-size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* import_scheme, std::vector<std::string>* column_names,
-                            size_t type_detection_rows, size_t skip_first_rows,
-                            size_t import_rows)
+size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* import_scheme,
+                            std::vector<std::string>* column_names, size_t type_detection_rows,
+                            size_t skip_first_rows, size_t import_rows)
 {
-    std::vector<std::vector<std::string>> payload;  // Used to build a 2D string vector with rows and columns of .csv content.
-    std::vector<std::string> header;                // Column names (will be either auto-detected or read from cmd line args)
-    std::vector<DataType> scheme;                   // Scheme (will be either auto-detected or read from cmd line args)
-    bool header_present = false;                    // Used only in auto-detection mode.
+    std::vector<std::vector<std::string>>
+        payload;                     // Used to build a 2D string vector with rows and columns of .csv content.
+    std::vector<std::string> header; // Column names (will be either auto-detected or read from cmd line args)
+    std::vector<DataType> scheme;    // Scheme (will be either auto-detected or read from cmd line args)
+    bool header_present = false;     // Used only in auto-detection mode.
 
     m_top = 0;
     m_curpos = 0;
@@ -560,7 +566,8 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
     m_row = 1;
 
     if (import_scheme == nullptr) {
-        // Header detection: 1) If first line is strings-only and next line has at least 1 occurence of non-string, then
+        // Header detection: 1) If first line is strings-only and next line has at least 1 occurence of non-string,
+        // then
         // header is present. 2) If first line has at least one occurence of non-string or empty-field, then header is
         // not present. 3) If first two lines are strings-only, we can't tell, and treat both as payload
 
@@ -587,7 +594,8 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
                 only_strings2 = false;
         }
 
-        // For the first row, the last column is allowed to be "" and still be header. The only reason we allow this is
+        // For the first row, the last column is allowed to be "" and still be header. The only reason we allow this
+        // is
         // because the "flight-database" we use internally and for demonstration purpose is "malformed" that way.
         if (scheme1[scheme1.size() - 1] != type_String && payload[0][payload[0].size() - 1] != "")
             only_strings1 = false;
@@ -689,21 +697,24 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
 
                     if (type_detection_rows > 0) {
                         if (scheme[col] != type_String && is_null(payload[row][col].c_str()) && Empty_as_string)
-                            sstm << "Column " << col << " was auto detected to be of type " << DataTypeToText(scheme[col])
-                                 << " using the first " << type_detection_rows << " rows of CSV file, but in row "
-                                 << imported_rows << " of cvs file the field contained the NULL value '"
-                                 << payload[row][col].c_str() << "'. Please increase the 'type_detection_rows' argument or set "
-                                 << "Empty_as_string = false/void the -e flag to convert such fields to 0, 0.0 or false";
+                            sstm << "Column " << col << " was auto detected to be of type "
+                                 << DataTypeToText(scheme[col]) << " using the first " << type_detection_rows
+                                 << " rows of CSV file, but in row " << imported_rows
+                                 << " of cvs file the field contained the NULL value '" << payload[row][col].c_str()
+                                 << "'. Please increase the 'type_detection_rows' argument or set "
+                                 << "Empty_as_string = false/void the -e flag to convert such fields to 0, 0.0 or "
+                                    "false";
                         else
-                            sstm << "Column " << col << " was auto detected to be of type " << DataTypeToText(scheme[col])
-                                 << " using the first " << type_detection_rows << " rows of CSV file, but in row "
-                                 << imported_rows << " of cvs file the field contained '" << payload[row][col].c_str()
+                            sstm << "Column " << col << " was auto detected to be of type "
+                                 << DataTypeToText(scheme[col]) << " using the first " << type_detection_rows
+                                 << " rows of CSV file, but in row " << imported_rows
+                                 << " of cvs file the field contained '" << payload[row][col].c_str()
                                  << "' which is of another type. Please increase the 'type_detection_rows' argument";
                     }
                     else
                         sstm << "Column " << col << " was specified to be of type " << DataTypeToText(scheme[col])
-                             << ", but in row " << imported_rows << " of cvs file," << "the field contained '"
-                             << payload[row][col].c_str() << "' which is of another type";
+                             << ", but in row " << imported_rows << " of cvs file,"
+                             << "the field contained '" << payload[row][col].c_str() << "' which is of another type";
 
                     throw std::runtime_error(sstm.str());
                 }
@@ -721,11 +732,9 @@ size_t Importer::import_csv(FILE* file, Table& table, std::vector<DataType>* imp
         }
         payload.clear();
         tokenize(payload, record_chunks);
-    }
-    while (payload.size() > 0);
+    } while (payload.size() > 0);
 
     return imported_rows;
-
 }
 
 size_t Importer::import_csv_auto(FILE* file, Table& table, size_t type_detection_rows, size_t import_rows)
@@ -733,13 +742,8 @@ size_t Importer::import_csv_auto(FILE* file, Table& table, size_t type_detection
     return import_csv(file, table, nullptr, nullptr, type_detection_rows, 0, import_rows);
 }
 
-size_t Importer::import_csv_manual(FILE* file, Table& table, std::vector<DataType> scheme, std::vector<std::string> column_names,
-                                   size_t skip_first_rows, size_t import_rows)
+size_t Importer::import_csv_manual(FILE* file, Table& table, std::vector<DataType> scheme,
+                                   std::vector<std::string> column_names, size_t skip_first_rows, size_t import_rows)
 {
     return import_csv(file, table, &scheme, &column_names, 0, skip_first_rows, import_rows);
 }
-
-
-
-
-
