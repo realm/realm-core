@@ -236,7 +236,7 @@ def buildDiffCoverage() {
           sh 'sh build.sh jenkins-pipeline-coverage'
 
           sh 'mkdir -p coverage'
-          sh "diff-cover gcovr.xml " +
+          sh "diff-cover build.make.cover/gcovr.xml " +
             "--compare-branch=origin/${env.CHANGE_TARGET} " +
             "--html-report coverage/diff-coverage-report.html " +
             "| grep -F Coverage: " +
