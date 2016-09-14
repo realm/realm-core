@@ -1022,9 +1022,11 @@ TEST_TYPES(StringIndex_Zero_Crash, non_nullable, nullable)
     CHECK_EQUAL(2, t);
 }
 
-TEST(StringIndex_Zero_Crash2)
+TEST_TYPES(StringIndex_Zero_Crash2, std::true_type, std::false_type)
 {
     Random random(random_int<unsigned long>());
+
+    constexpr bool add_common_prefix = TEST_TYPE::value;
 
     for (size_t iter = 0; iter < 10 + TEST_DURATION * 100 ; iter++) {
         // StringIndex could crash if strings ended with one or more 0-bytes
@@ -1043,10 +1045,12 @@ TEST(StringIndex_Zero_Crash2)
                 // Generate string with equal probability of being empty, null, short, medium and long, and with
                 // their contents having equal proability of being either random or a duplicate of a previous
                 // string. When it's random, each char must have equal probability of being 0 or non-0e
-                char buf[] = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
-                char* buf1 = static_cast<char*>(malloc(sizeof(buf)));
-                memcpy(buf1, buf, sizeof(buf));
-                char buf2[] = "                                                                                         ";
+                static std::string buf = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+
+                std::string copy = buf;
+
+                static std::string buf2 = "                                                                                         ";
+                std::string copy2 = buf2;
                 StringData sd;
 
                 size_t len = random.draw_int_max<size_t>(3);
@@ -1059,27 +1063,38 @@ TEST(StringIndex_Zero_Crash2)
                 else
                     len = random.draw_int_max<size_t>(90);
 
+                copy = copy.substr(0, len);
+                if (add_common_prefix) {
+                    std::string prefix(StringIndex::s_max_offset, 'a');
+                    copy = prefix + copy;
+                }
+
                 if (random.draw_int_max<int>(1) == 0) {
                     // duplicate string
-                    sd = StringData(buf1, len);
+                    sd = StringData(copy);
                 }
                 else {
                     // random string
                     for (size_t t = 0; t < len; t++) {
                         if (random.draw_int_max<int>(100) > 20)
-                            buf2[t] = 0;                        // zero byte
+                            copy2[t] = 0;                        // zero byte
                         else
-                            buf2[t] = static_cast<char>(random.draw_int<int>());  // random byte
+                            copy2[t] = static_cast<char>(random.draw_int<int>());  // random byte
                     }
                     // no generated string can equal "null" (our vector magic value for null) because
                     // len == 4 is not possible
-                    sd = StringData(buf2, len);
+                    copy2 = copy2.substr(0, len);
+                    if (add_common_prefix) {
+                        std::string prefix(StringIndex::s_max_offset, 'a');
+                        copy2 = prefix + copy2;
+                    }
+                    sd = StringData(copy2);
                 }
 
                 size_t pos = random.draw_int_max<size_t>(table.size());
                 table.insert_empty_row(pos);
                 table.set_string(0, pos, sd);
-                free(buf1);
+                table.verify();
             }
             else if (table.size() > 0) {
                 // delete
@@ -1096,7 +1111,6 @@ TEST(StringIndex_Zero_Crash2)
                 StringData sd2 = table.get_string(0, t);
                 CHECK_EQUAL(sd, sd2);
             }
-
         }
     }
 }
@@ -1334,6 +1348,149 @@ TEST(StringIndex_Deny_Duplicates)
     CHECK(col.get(col.size() - 1) == duplicate);
     CHECK(col.count(duplicate) == num_repeats);
 
+    col.destroy();
+}
+
+
+TEST(StringIndex_MaxBytes)
+{
+    std::string std_max(StringIndex::s_max_offset, 'a');
+    std::string std_over_max(std_max + "a");
+    std::string std_under_max(StringIndex::s_max_offset >> 1, 'a');
+    StringData max(std_max);
+    StringData over_max(std_over_max);
+    StringData under_max(std_under_max);
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, true);
+
+    const StringIndex& ndx = *col.create_search_index();
+
+    CHECK_EQUAL(col.size(), 0);
+
+    auto duplicate_check = [&](size_t num_dups, StringData s) {
+        CHECK(col.size() == 0);
+        for (size_t i = 0; i < num_dups; ++i) {
+            col.add(s);
+        }
+        CHECK_EQUAL(col.size(), num_dups);
+        CHECK(ndx.has_duplicate_values() == (num_dups > 1));
+        ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+        IntegerColumn results(Allocator::get_default(), results_ref);
+        ndx.distinct(results);
+        CHECK_EQUAL(results.size(), 1);
+        CHECK_EQUAL(results.get(0), 0);
+        CHECK_EQUAL(col.get(0), s);
+        CHECK_EQUAL(col.count(s), num_dups);
+        CHECK_EQUAL(col.find_first(s), 0);
+        results.clear();
+        col.find_all(results, s);
+        CHECK_EQUAL(results.size(), num_dups);
+        results.destroy();
+        col.clear();
+    };
+
+    std::vector<size_t> num_duplicates_list = { 1, 10, REALM_MAX_BPNODE_SIZE - 1, REALM_MAX_BPNODE_SIZE, REALM_MAX_BPNODE_SIZE + 1 };
+    for (auto& dups : num_duplicates_list) {
+        duplicate_check(dups, under_max);
+        duplicate_check(dups, max);
+        duplicate_check(dups, over_max);
+    }
+    col.destroy();
+}
+
+
+// There is a corner case where two very long strings are
+// inserted into the string index which are identical except
+// for the characters at the end (they have an identical very
+// long prefix). This was causing a stack overflow because of
+// the recursive nature of the insert function.
+TEST(StringIndex_InsertLongPrefix) {
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, true);
+
+    const StringIndex& ndx = *col.create_search_index();
+
+    col.add("test_index_string1");
+    col.add("test_index_string2");
+
+    CHECK(col.has_search_index());
+    CHECK_EQUAL(col.find_first("test_index_string1"), 0);
+    CHECK_EQUAL(col.find_first("test_index_string2"), 1);
+
+    std::string std_base(107, 'a');
+    std::string std_base_b = std_base + "b";
+    std::string std_base_c = std_base + "c";
+    StringData base_b(std_base_b);
+    StringData base_c(std_base_c);
+    col.add(base_b);
+    col.add(base_c);
+
+    CHECK_EQUAL(col.find_first(base_b), 2);
+    CHECK_EQUAL(col.find_first(base_c), 3);
+
+    // To trigger the bug, the length must be more than 10000.
+    // Array::destroy_deep() will stack overflow at around recursion depths of
+    // lengths > 90000 on mac and less on android devices.
+    std::string std_base2(100000, 'a');
+    std::string std_base2_b = std_base2 + "b";
+    std::string std_base2_c = std_base2 + "c";
+    StringData base2(std_base2);
+    StringData base2_b(std_base2_b);
+    StringData base2_c(std_base2_c);
+    col.add(base2_b);
+    col.add(base2_c);
+
+    CHECK_EQUAL(col.find_first(base2_b), 4);
+    CHECK_EQUAL(col.find_first(base2_c), 5);
+
+    col.add(base2);
+    CHECK(!ndx.has_duplicate_values());
+    ndx.verify();
+    col.add(base2_b); // adds a duplicate in the middle of the list
+
+    CHECK(ndx.has_duplicate_values());
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+    ndx.distinct(results);
+    CHECK_EQUAL(results.size(), 7);
+    CHECK_EQUAL(col.find_first(base2_b), 4);
+    results.clear();
+    ndx.find_all(results, base2_b);
+    CHECK_EQUAL(results.size(), 2);
+    CHECK_EQUAL(results.get(0), 4);
+    CHECK_EQUAL(results.get(1), 7);
+    results.clear();
+    CHECK_EQUAL(ndx.count(base2_b), 2);
+    col.verify();
+
+    col.erase(7);
+    CHECK_EQUAL(col.find_first(base2_b), 4);
+    CHECK_EQUAL(ndx.count(base2_b), 1);
+    ndx.distinct(results);
+    CHECK_EQUAL(results.size(), 7); // unchanged
+    results.clear();
+    ndx.find_all(results, base2_b);
+    CHECK_EQUAL(results.size(), 1);
+    CHECK_EQUAL(results.get(0), 4);
+    results.clear();
+    col.verify();
+
+    col.set_string(6, base2_b);
+    CHECK_EQUAL(ndx.count(base2_b), 2);
+    CHECK_EQUAL(col.find_first(base2_b), 4);
+    ndx.distinct(results);
+    CHECK_EQUAL(results.size(), 6);
+    results.clear();
+    ndx.find_all(results, base2_b);
+    CHECK_EQUAL(results.size(), 2);
+    CHECK_EQUAL(results.get(0), 4);
+    CHECK_EQUAL(results.get(1), 6);
+    col.verify();
+
+    results.destroy();
+
+    col.clear(); // calls recursive function Array::destroy_deep()
     col.destroy();
 }
 

@@ -959,11 +959,12 @@ bool SortedListComparator::operator()(StringData needle, int64_t ndx) // used in
     return !(*this)(ndx, needle);
 }
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+// LCOV_EXCL_START ignore debug functions
 
 
 void StringIndex::verify() const
 {
+#ifdef REALM_DEBUG
     m_array->verify();
 
     Allocator& alloc = m_array->get_alloc();
@@ -1024,8 +1025,10 @@ void StringIndex::verify() const
         }
     }
     // FIXME: Extend verification along the lines of IntegerColumn::verify().
+#endif
 }
 
+#ifdef REALM_DEBUG
 
 void StringIndex::verify_entries(const StringColumn& column) const
 {

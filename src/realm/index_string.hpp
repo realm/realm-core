@@ -119,8 +119,8 @@ public:
     /// By default, duplicate values are allowed.
     void set_allow_duplicate_values(bool) noexcept;
 
-#ifdef REALM_DEBUG
     void verify() const;
+#ifdef REALM_DEBUG
     void verify_entries(const StringColumn& column) const;
     void do_dump_node_structure(std::ostream&, int) const;
     void to_dot() const;
