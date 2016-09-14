@@ -390,11 +390,12 @@ public:
     ///
     /// This operation is usually followed by Table::move_last_over()
     /// as part of Table::set_int_unique() or Table::set_string_unique()
-    /// detecting a collision.
+    /// or Table::set_null_unique() detecting a collision.
     ///
     /// \sa Table::move_last_over()
     /// \sa Table::set_int_unique()
     /// \sa Table::set_string_unique()
+    /// \sa Table::set_null_unique()
     void change_link_targets(size_t row_ndx, size_t new_row_ndx);
 
     // Get cell values. Will assert if the requested type does not match the column type
@@ -440,8 +441,8 @@ public:
     /// producing an oversized string or binary data value will cause an
     /// exception to be thrown.
     ///
-    /// The "unique" variants (set_int_unique(), set_string_unique()) are
-    /// intended to be used in the implementation of primary key support. They
+    /// The "unique" variants (set_int_unique(), set_string_unique(), set_null_unique())
+    /// are intended to be used in the implementation of primary key support. They
     /// check if the given column already contains one or more values that are
     /// equal to \a value, and if there are conflicts, it calls
     /// Table::change_link_targets() for the conflicting row to be replaced by
@@ -451,9 +452,9 @@ public:
     ///
     /// NOTE:  It is an error to call either function after adding elements to a
     /// linklist in the object. In general, calling set_int_unique() or
-    /// set_string_unique() should be the first thing that happens after
-    /// creating a row. These limitations are imposed by limitations in the
-    /// Realm Object Server and may be relaxed in the future. A violation of
+    /// set_string_unique() or set_null_unique() should be the first thing that
+    /// happens after creating a row. These limitations are imposed by limitations
+    /// in the Realm Object Server and may be relaxed in the future. A violation of
     /// these rules results in a LogicError being thrown.
     ///
     /// add_int() adds a 64-bit signed integer to the current value of the
@@ -506,6 +507,7 @@ public:
     void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default = false);
     void nullify_link(size_t column_ndx, size_t row_ndx);
     void set_null(size_t column_ndx, size_t row_ndx, bool is_default = false);
+    void set_null_unique(size_t col_ndx, size_t row_ndx);
 
     void add_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
 
@@ -935,6 +937,10 @@ private:
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
     template<class ColType, class T>
+    size_t do_find_unique(ColType& col, size_t ndx, T&& value);
+    template<class ColType>
+    size_t do_set_unique_null(ColType& col, size_t ndx);
+    template<class ColType, class T>
     size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
 
     void upgrade_file_format();
@@ -1109,6 +1115,9 @@ private:
 
     const ColumnBase& get_column_base(size_t column_ndx) const noexcept;
     ColumnBase& get_column_base(size_t column_ndx);
+
+    const ColumnBaseWithIndex& get_column_base_indexed(size_t ndx) const noexcept;
+    ColumnBaseWithIndex& get_column_base_indexed(size_t ndx);
 
     template<class T, ColumnType col_type>
     T& get_column(size_t ndx);

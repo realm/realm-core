@@ -1456,23 +1456,55 @@ TEST(Table_SetIntUnique)
     Table table;
     table.add_column(type_Int, "ints");
     table.add_column(type_Int, "ints_null", true);
+    table.add_column(type_Int, "ints_null", true);
     table.add_empty_row(10);
 
     CHECK_LOGIC_ERROR(table.set_int_unique(0, 0, 123), LogicError::no_search_index);
     CHECK_LOGIC_ERROR(table.set_int_unique(1, 0, 123), LogicError::no_search_index);
+    CHECK_LOGIC_ERROR(table.set_null_unique(2, 0), LogicError::no_search_index);
     table.add_search_index(0);
     table.add_search_index(1);
+    table.add_search_index(2);
 
     table.set_int_unique(0, 0, 123);
-    table.set_int_unique(1, 0, 123);
+    CHECK_EQUAL(table.size(), 10);
 
-    // Check that conflicting SetIntUniques result in rows being deleted.
-    table.set_int_unique(0, 1, 123);
+    table.set_int_unique(1, 0, 123);
+    CHECK_EQUAL(table.size(), 10);
+
+    table.set_int_unique(2, 0, 123);
+    CHECK_EQUAL(table.size(), 10);
+
+    // Check that conflicting SetIntUniques result in rows being deleted. First a collision in column 0:
+    table.set_int_unique(0, 1, 123); // This will delete a row
     CHECK_EQUAL(table.size(), 9);
     table.set_int_unique(1, 1, 123);
     CHECK_EQUAL(table.size(), 9);
-    table.set_int_unique(1, 2, 123);
+    table.set_int_unique(2, 1, 123);
+    CHECK_EQUAL(table.size(), 9);
+
+    // Collision in column 1:
+    table.set_int_unique(1, 0, 123); // This will delete a row
     CHECK_EQUAL(table.size(), 8);
+    table.set_int_unique(0, 0, 123);
+    CHECK_EQUAL(table.size(), 8);
+    table.set_int_unique(2, 0, 123);
+    CHECK_EQUAL(table.size(), 8);
+
+    // Collision in column 2:
+    table.set_int_unique(2, 1, 123); // This will delete a row
+    CHECK_EQUAL(table.size(), 7);
+    table.set_int_unique(0, 1, 123);
+    CHECK_EQUAL(table.size(), 7);
+    table.set_int_unique(1, 1, 123);
+    CHECK_EQUAL(table.size(), 7);
+
+    // Since table.add_empty_row(10); filled the column with all nulls, only two rows should now remain
+    table.set_null_unique(2, 0);
+    CHECK_EQUAL(table.size(), 2);
+
+    table.set_null_unique(2, 1);
+    CHECK_EQUAL(table.size(), 1);
 }
 
 
