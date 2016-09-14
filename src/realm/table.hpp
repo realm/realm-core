@@ -943,7 +943,7 @@ private:
     template<class ColType, class T>
     size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
 
-    void upgrade_file_format();
+    void upgrade_file_format(bool after_timestamp = false);
 
     // Upgrades OldDateTime columns to Timestamp columns
     void upgrade_olddatetime();

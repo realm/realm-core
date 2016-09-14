@@ -81,7 +81,7 @@ private:
 /// \sa SlabAlloc
 class Allocator {
 public:
-    static constexpr int CURRENT_FILE_FORMAT_VERSION = 5;
+    static constexpr int CURRENT_FILE_FORMAT_VERSION = 6;
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -156,7 +156,7 @@ public:
     /// to the file format version specified by the attached file (or attached
     /// memory buffer) at the time of attachment. If no file (or buffer) is
     /// currently attached, the returned value has no meaning. If the Realm file
-    /// format is later upgraded, the file form,at version filed must be updated
+    /// format is later upgraded, the file format version filed must be updated
     /// to reflect that fact.
     ///
     /// In shared mode (when a Realm file is opened via a SharedGroup instance)
@@ -196,9 +196,11 @@ public:
     ///     When opening an older database file, all DateTime columns will be
     ///     automatically upgraded Timestamp columns.
     ///
+    ///   6 Introduced a new non-compatible structure for StringIndex
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in AllocSlab::validate_buffer(), the file
-    /// format selection loginc in
+    /// format selection logic in
     /// Group::get_target_file_format_version_for_session(), and the file format
     /// upgrade logic in Group::upgrade_file_format().
     int get_file_format_version() const noexcept;
