@@ -44,7 +44,9 @@
   debugging. Also, the terminate handler (in `util/terminate.cpp`) writes out
   the name of the terminating thread if the name is available.
 * Fixed doxygen warnings.
-
+* Removed ("deleted") the default copy constructor for RowBase. This constructor
+  was used by accident by derived classes, which led to a data race. Said race was
+  benign, but would be reported by the thread sanitizer.
 ----------------------------------------------
 
 # 1.5.1 Release notes
