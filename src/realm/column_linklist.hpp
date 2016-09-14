@@ -42,7 +42,7 @@ class TransactLogConvenientEncoder;
 /// The individual values in the column are either refs to Columns containing the
 /// row positions in the target table, or in the case where they are empty, a zero
 /// ref.
-class LinkListColumn : public LinkColumnBase, public ArrayParent {
+class LinkListColumn : public LinkColumnBase {
 public:
     using LinkColumnBase::LinkColumnBase;
     LinkListColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx);
@@ -120,10 +120,6 @@ private:
     void add_backlink(size_t target_row, size_t source_row);
     void remove_backlink(size_t target_row, size_t source_row);
 
-    // ArrayParent overrides
-    void update_child_ref(size_t child_ndx, ref_type new_ref) override;
-    ref_type get_child_ref(size_t child_ndx) const noexcept override;
-
     // These helpers are needed because of the way the B+-tree of links is
     // traversed in cascade_break_backlinks_to() and
     // cascade_break_backlinks_to_all_rows().
@@ -146,8 +142,6 @@ private:
 
     void prune_list_accessor_tombstones() noexcept;
     void validate_list_accessors() const noexcept;
-
-    std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
 
     friend class BacklinkColumn;
     friend class LinkView;

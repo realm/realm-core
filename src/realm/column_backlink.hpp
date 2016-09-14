@@ -34,7 +34,7 @@ namespace realm {
 /// The individual values in the column are either refs to Columns containing
 /// the row indexes in the origin table that links to it, or in the case where
 /// there is a single link, a tagged ref encoding the origin row position.
-class BacklinkColumn : public IntegerColumn, public ArrayParent {
+class BacklinkColumn : public IntegerColumn {
 public:
     BacklinkColumn(Allocator&, ref_type, size_t col_ndx = npos);
     ~BacklinkColumn() noexcept override
@@ -90,13 +90,6 @@ public:
     };
     void get_backlinks(std::vector<VerifyPair>&); // Sorts
 #endif
-
-protected:
-    // ArrayParent overrides
-    void update_child_ref(size_t child_ndx, ref_type new_ref) override;
-    ref_type get_child_ref(size_t child_ndx) const noexcept override;
-
-    std::pair<ref_type, size_t> get_to_dot_parent(size_t) const override;
 
 private:
     TableRef m_origin_table;

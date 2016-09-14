@@ -168,6 +168,32 @@ protected:
     friend class Array;
 };
 
+template <class T>
+class SimpleParent : public ArrayParent {
+public:
+    SimpleParent(T& t)
+        : m_target(t)
+    {
+    }
+
+    void update_child_ref(size_t child_ndx, ref_type new_ref) override
+    {
+        m_target.set(child_ndx, new_ref); // Throws
+    }
+    ref_type get_child_ref(size_t child_ndx) const noexcept override
+    {
+        return m_target.get_as_ref(child_ndx);
+    }
+
+    std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override
+    {
+        return m_target.get_to_dot_parent(ndx_in_parent);
+    }
+
+private:
+    T& m_target;
+};
+
 struct TreeInsertBase {
     size_t m_split_offset;
     size_t m_split_size;

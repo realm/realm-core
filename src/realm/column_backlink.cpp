@@ -28,7 +28,6 @@
 
 using namespace realm;
 
-
 void BacklinkColumn::add_backlink(size_t row_ndx, size_t origin_row_ndx)
 {
     uint64_t value = IntegerColumn::get_uint(row_ndx);
@@ -54,7 +53,8 @@ void BacklinkColumn::add_backlink(size_t row_ndx, size_t origin_row_ndx)
         ref = to_ref(value);
     }
     IntegerColumn backlink_list(get_alloc(), ref); // Throws
-    backlink_list.set_parent(this, row_ndx);
+    SimpleParent<IntegerColumn> bridge(*this);
+    backlink_list.set_parent(&bridge, row_ndx);
     backlink_list.add(int_fast64_t(origin_row_ndx)); // Throws
 }
 
@@ -115,7 +115,8 @@ void BacklinkColumn::remove_one_backlink(size_t row_ndx, size_t origin_row_ndx)
     // the right one and remove it.
     ref_type ref = to_ref(value);
     IntegerColumn backlink_list(get_alloc(), ref); // Throws
-    backlink_list.set_parent(this, row_ndx);
+    SimpleParent<IntegerColumn> bridge(*this);
+    backlink_list.set_parent(&bridge, row_ndx);
     int_fast64_t value_2 = int_fast64_t(origin_row_ndx);
     size_t backlink_ndx = backlink_list.find_first(value_2);
     REALM_ASSERT_3(backlink_ndx, !=, not_found);
@@ -163,7 +164,8 @@ void BacklinkColumn::update_backlink(size_t row_ndx, size_t old_origin_row_ndx, 
     // Find match in backlink list and replace
     ref_type ref = to_ref(value);
     IntegerColumn backlink_list(get_alloc(), ref); // Throws
-    backlink_list.set_parent(this, row_ndx);
+    SimpleParent<IntegerColumn> bridge(*this);
+    backlink_list.set_parent(&bridge, row_ndx);
     int_fast64_t value_2 = int_fast64_t(old_origin_row_ndx);
     size_t backlink_ndx = backlink_list.find_first(value_2);
     REALM_ASSERT_3(backlink_ndx, !=, not_found);
@@ -190,7 +192,8 @@ void BacklinkColumn::swap_backlinks(size_t row_ndx, size_t origin_row_ndx_1, siz
     // Find matches in backlink list and replace
     ref_type ref = to_ref(value);
     IntegerColumn backlink_list(get_alloc(), ref); // Throws
-    backlink_list.set_parent(this, row_ndx);
+    SimpleParent<IntegerColumn> bridge(*this);
+    backlink_list.set_parent(&bridge, row_ndx);
     size_t num_backlinks = backlink_list.size();
     for (size_t i = 0; i < num_backlinks; ++i) {
         uint64_t r = backlink_list.get_uint(i);
@@ -344,17 +347,6 @@ void BacklinkColumn::clear(size_t num_rows, bool)
 }
 
 
-void BacklinkColumn::update_child_ref(size_t child_ndx, ref_type new_ref)
-{
-    IntegerColumn::set(child_ndx, new_ref); // Throws
-}
-
-
-ref_type BacklinkColumn::get_child_ref(size_t child_ndx) const noexcept
-{
-    return IntegerColumn::get_as_ref(child_ndx);
-}
-
 void BacklinkColumn::cascade_break_backlinks_to(size_t row_ndx, CascadeState& state)
 {
     if (state.track_link_nullifications) {
@@ -452,10 +444,5 @@ void BacklinkColumn::get_backlinks(std::vector<VerifyPair>& pairs)
     sort(pairs.begin(), pairs.end());
 }
 #endif
-
-std::pair<ref_type, size_t> BacklinkColumn::get_to_dot_parent(size_t ndx_in_parent) const
-{
-    return IntegerColumn::get_to_dot_parent(ndx_in_parent);
-}
 
 // LCOV_EXCL_STOP ignore debug functions
