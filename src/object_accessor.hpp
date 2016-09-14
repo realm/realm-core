@@ -214,7 +214,10 @@ namespace realm {
                 m_row.set_bool(column, Accessor::to_bool(ctx, value));
                 break;
             case PropertyType::Int:
-                m_row.set_int(column, Accessor::to_long(ctx, value));
+                if (property.is_primary)
+                    m_row.set_int_unique(column, Accessor::to_long(ctx, value));
+                else
+                    m_row.set_int(column, Accessor::to_long(ctx, value));
                 break;
             case PropertyType::Float:
                 m_row.set_float(column, Accessor::to_float(ctx, value));
@@ -224,7 +227,10 @@ namespace realm {
                 break;
             case PropertyType::String: {
                 auto string_value = Accessor::to_string(ctx, value);
-                m_row.set_string(column, string_value);
+                if (property.is_primary)
+                    m_row.set_string_unique(column, string_value);
+                else
+                    m_row.set_string(column, string_value);
                 break;
             }
             case PropertyType::Data:
