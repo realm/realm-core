@@ -236,12 +236,8 @@ public:
         // table reference. Even though the copy is patched later on a different
         // thread and thus has its table reference reset, the reset of a smartptr to a
         // table which is otherwise manipulated on this thread constitutes a race.
-        m_table()
+        m_table(patches ? ConstTableRef() : from.m_table)
     {
-        // Only if a copy is created for the local thread, should we copy its
-        // table reference:
-        if (patches == nullptr)
-            m_table = from.m_table;
     }
 
     void add_child(std::unique_ptr<ParentNode> child)
@@ -301,7 +297,6 @@ protected:
         if (src.m_column) {
             if (patches) {
                 dst_idx = src.m_column->get_column_index();
-                REALM_ASSERT_DEBUG(dst_idx < m_table->get_column_count());
             }
             else
                 dst.init(src.m_column);
