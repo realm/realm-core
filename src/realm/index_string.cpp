@@ -811,7 +811,7 @@ namespace {
 bool has_duplicate_values(const Array& node, ColumnBase* target_col) noexcept
 {
     Allocator& alloc = node.get_alloc();
-    Array child(alloc);
+    BpTreeNode child(alloc);
     size_t n = node.size();
     REALM_ASSERT(n >= 1);
     if (node.is_inner_bptree_node()) {
