@@ -57,6 +57,8 @@
 
 ### Breaking changes
 
+* Changed the format of the StringIndex structure to not recursivly store
+  strings past a certain depth. This is a file format breaking change.
 * Refactored the `SharedGroup` constructors and open methods to use a new
   `SharedGroupOptions` parameter which stores all options together.
 * BREAKING! Until now, a Query would return indexes into a restricting view if such was 
