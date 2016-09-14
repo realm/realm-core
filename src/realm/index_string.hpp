@@ -136,7 +136,7 @@ public:
     // 4 times this limit (400 bytes shared). Lists are stored in sorted order,
     // so strings sharing a common prefix of more than this limit will use a
     // binary search of approximate complexity log2(n) from `std::lower_bound`.
-    static const size_t s_max_tree_depth = 100;
+    static const size_t s_max_offset = 400; // max depth * s_index_key_length
     static const size_t s_index_key_length = 4;
     static key_type create_key(StringData) noexcept;
     static key_type create_key(StringData, size_t) noexcept;
@@ -419,11 +419,13 @@ void StringIndex::set(size_t row_ndx, T new_value)
     // Note that insert_with_offset() throws UniqueConstraintViolation.
 
     if (REALM_LIKELY(new_value2 != old_value)) {
-        size_t offset = 0; // First key from beginning of string
-        insert_with_offset(row_ndx, new_value2, offset); // Throws
-
+        // We must erase this row first because erase uses find_first which
+        // might find the duplicate if we insert before erasing.
         bool is_last = true; // To avoid updating refs
         erase<T>(row_ndx, is_last); // Throws
+
+        size_t offset = 0; // First key from beginning of string
+        insert_with_offset(row_ndx, new_value2, offset); // Throws
     }
 }
 

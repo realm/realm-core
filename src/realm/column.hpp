@@ -1610,7 +1610,7 @@ cached_column_size = col->size();
 template<class ColumnDataType>
 ColumnRandIterator<ColumnDataType>::operator bool() const
 {
-return col_ndx < cached_column_size;
+return col_ndx >= 0 && col_ndx < cached_column_size;
 }
 
 template<class ColumnDataType>
@@ -1683,7 +1683,7 @@ ColumnRandIterator<ColumnDataType> ColumnRandIterator<ColumnDataType>::operator-
 
 template<class ColumnDataType>
 ptrdiff_t ColumnRandIterator<ColumnDataType>::operator-(const ColumnRandIterator<ColumnDataType>& other) {
-    return std::max(other.col_ndx, col_ndx) - std::min(other.col_ndx, col_ndx);
+    return col_ndx - other.col_ndx;
 }
 
 template<class ColumnDataType>

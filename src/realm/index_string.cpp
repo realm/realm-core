@@ -135,7 +135,7 @@ void StringIndex::insert_to_existing_list(size_t row, StringData value, IntegerC
             IntegerColumn::const_iterator last = upper - ptrdiff_t(1);
             size_t last_ref_of_value = to_size_t(*last);
             if (row >= last_ref_of_value) {
-                list.insert(*upper, row);
+                list.insert(upper.get_col_ndx(), row);
             }
             else {
                 IntegerColumn::const_iterator inner_lower = std::lower_bound(lower, upper, row);
@@ -442,11 +442,12 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
     // Single match (lowest bit set indicates literal row_ndx)
     if ((slot_value & 1) != 0) {
         size_t row_ndx2 = to_size_t(slot_value / 2);
-        // for integer index, get_func fills out 'buffer' and makes str point at it
+        // The buffer is needed for when this is an integer index.
         StringConversionBuffer buffer;
         StringData v2 = get(row_ndx2, buffer);
         if (v2 == value) {
-            // Strings are equal but this is not a list. Create a list and add both rows.
+            // Strings are equal but this is not a list.
+            // Create a list and add both rows.
 
             if (m_deny_duplicate_values)
                 throw LogicError(LogicError::unique_constraint_violation);
@@ -458,7 +459,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
             m_array->set(ins_pos_refs, row_list.get_ref());
         }
         else {
-            if (offset / s_index_key_length > s_max_tree_depth) {
+            if (offset > s_max_offset) {
                 // These strings have the same prefix up to this point but we
                 // don't want to recurse further, create a list in sorted order.
                 bool row_ndx_first = value < v2;
@@ -467,11 +468,11 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
                 row_list.add(row_ndx_first ? row_ndx : row_ndx2);
                 row_list.add(row_ndx_first ? row_ndx2 : row_ndx);
                 m_array->set(ins_pos_refs, row_list.get_ref());
-
             }
             else {
-                // These strings have the same prefix up to this point but they are actually not
-                // equal. Extend the tree recursivly until the prefix of these strings is different.
+                // These strings have the same prefix up to this point but they
+                // are actually not equal. Extend the tree recursivly until the
+                // prefix of these strings is different.
                 StringIndex subindex(m_target_column, m_array->get_alloc());
                 subindex.insert_with_offset(row_ndx2, v2, suboffset);
                 subindex.insert_with_offset(row_ndx, value, suboffset);
@@ -493,15 +494,24 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
         SortedListComparator slc(*m_target_column);
         IntegerColumn::const_iterator lower = std::lower_bound(sub.cbegin(), sub.cend(), value, slc);
 
-        // If we found the value in this list, add the duplicate to the list.
+        bool value_exists_in_list = false;
         if (lower != sub.cend()) {
+            StringConversionBuffer buffer;
+            StringData lower_value = get(*lower, buffer);
+            if (lower_value == value) {
+                value_exists_in_list = true;
+            }
+        }
+
+        // If we found the value in this list, add the duplicate to the list.
+        if (value_exists_in_list) {
             if (m_deny_duplicate_values)
                 throw LogicError(LogicError::unique_constraint_violation);
 
             insert_to_existing_list(row_ndx, value, sub);
         }
         else {
-            if (offset / s_index_key_length > s_max_tree_depth) {
+            if (offset > s_max_offset) {
                 insert_to_existing_list(row_ndx, value, sub);
             }
             else {
@@ -509,10 +519,13 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
                 if (sub.size() > 1) {
                     size_t first_ref = to_size_t(sub.get(0));
                     size_t last_ref = to_size_t(sub.back());
+                    StringIndex::StringConversionBuffer first_buffer, last_buffer;
+                    StringData first_str = get(first_ref, first_buffer);
+                    StringData last_str = get(last_ref, last_buffer);
                     // Since the list is kept in sorted order, the first and
                     // last values will be the same only if the whole list is
                     // storing duplicate values.
-                    if (m_target_column->compare_values(first_ref, last_ref) != 0) {
+                    if (first_str != last_str) {
                         contains_only_duplicates = false;
                     }
                 }
@@ -725,9 +738,9 @@ void StringIndex::do_delete(size_t row_ndx, StringData value, size_t offset)
             else {
                 IntegerColumn sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(m_array.get(), pos_refs);
-                size_t r = sub.lower_bound(row_ndx);
+                size_t r = sub.find_first(row_ndx);
                 size_t sub_size = sub.size(); // Slow
-                REALM_ASSERT(r != sub_size);
+                REALM_ASSERT_EX(r != sub_size, r, sub_size);
                 bool is_last = r == sub_size - 1;
                 sub.erase(r, is_last);
 
@@ -781,31 +794,13 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
                 IntegerColumn sub(alloc, to_ref(ref)); // Throws
                 sub.set_parent(m_array.get(), pos_refs);
 
-                size_t old_pos = sub.lower_bound(row_ndx);
-                size_t new_pos = sub.lower_bound(new_row_ndx);
+                size_t old_pos = sub.find_first(row_ndx);
                 size_t sub_size = sub.size();
-                REALM_ASSERT(old_pos != sub_size);
-                REALM_ASSERT(size_t(sub.get(new_pos)) != new_row_ndx);
+                REALM_ASSERT_EX(old_pos != sub_size, old_pos, sub_size);
 
-                // The payload-value exists in multiple rows, and these rows indexes are stored in an IntegerColumn.
-                // They must be in increasing order, so we cannot just use "set()". We must delete the old row index
-                // and insert the new at the correct position computed above.
-                if (new_pos < old_pos) {
-                    sub.insert_without_updating_index(new_pos, new_row_ndx, 1);
-                    bool is_last = old_pos + 1 == sub.size() - 1;
-                    sub.erase_without_updating_index(old_pos + 1, is_last);
-                }
-                else if (new_pos > old_pos) {
-                    // we're removing the old entry from before the new entry,
-                    // so shift back one
-                    --new_pos;
-                    sub.erase_without_updating_index(old_pos, false);
-                    sub.insert_without_updating_index(new_pos, new_row_ndx, 1);
-                }
-                else {
-                    sub.set(new_pos, new_row_ndx);
-                }
-
+                bool is_last = (old_pos == sub_size - 1);
+                sub.erase_without_updating_index(old_pos, is_last);
+                insert_to_existing_list(new_row_ndx, value, sub);
             }
         }
     }
@@ -814,7 +809,7 @@ void StringIndex::do_update_ref(StringData value, size_t row_ndx, size_t new_row
 
 namespace {
 
-bool has_duplicate_values(const Array& node) noexcept
+bool has_duplicate_values(const Array& node, ColumnBase* target_col) noexcept
 {
     Allocator& alloc = node.get_alloc();
     Array child(alloc);
@@ -825,7 +820,7 @@ bool has_duplicate_values(const Array& node) noexcept
         for (size_t i = 1; i < n; ++i) {
             ref_type ref = node.get_as_ref(i);
             child.init_from_ref(ref);
-            if (has_duplicate_values(child))
+            if (has_duplicate_values(child, target_col))
                 return true;
         }
         return false;
@@ -843,15 +838,42 @@ bool has_duplicate_values(const Array& node) noexcept
 
         bool is_subindex = child.get_context_flag();
         if (is_subindex) {
-            if (has_duplicate_values(child))
+            if (has_duplicate_values(child, target_col))
                 return true;
             continue;
         }
 
         // Child is root of B+-tree of row indexes
         size_t num_rows = child.is_inner_bptree_node() ? child.get_bptree_size() : child.size();
-        if (num_rows > 1)
-            return true;
+        if (num_rows > 1) {
+            IntegerColumn sub(alloc, ref); // Throws
+            size_t first_row = to_size_t(sub.get(0));
+            size_t last_row = to_size_t(sub.back());
+            StringIndex::StringConversionBuffer first_buffer, last_buffer;
+            StringData first_str = target_col->get_index_data(first_row, first_buffer);
+            StringData last_str = target_col->get_index_data(last_row, last_buffer);
+            // Since the list is kept in sorted order, the first and
+            // last values will be the same only if the whole list is
+            // storing duplicate values.
+            if (first_str == last_str) {
+                return true;
+            }
+            // There may also be several short lists combined, so we need to
+            // check each of these individually for duplicates.
+            IntegerColumn::const_iterator it = sub.cbegin();
+            IntegerColumn::const_iterator it_end = sub.cend();
+            SortedListComparator slc(*target_col);
+            StringIndex::StringConversionBuffer buffer;
+            while (it != it_end) {
+                StringData it_data = target_col->get_index_data(*it, buffer);
+                IntegerColumn::const_iterator next = std::upper_bound(it, it_end, it_data, slc);
+                size_t count_of_value = next - it; // row index subtraction in `sub`
+                if (count_of_value > 1) {
+                    return true;
+                }
+                it = next;
+            }
+        }
     }
 
     return false;
@@ -862,7 +884,7 @@ bool has_duplicate_values(const Array& node) noexcept
 
 bool StringIndex::has_duplicate_values() const noexcept
 {
-    return ::has_duplicate_values(*m_array);
+    return ::has_duplicate_values(*m_array, m_target_column);
 }
 
 
@@ -936,10 +958,68 @@ bool SortedListComparator::operator()(StringData needle, int64_t ndx) // used in
 
 #ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
 
+
 void StringIndex::verify() const
 {
     m_array->verify();
 
+    Allocator& alloc = m_array->get_alloc();
+    const size_t array_size = m_array->size();
+
+    // Get first matching row for every key
+    if (m_array->is_inner_bptree_node()) {
+        for (size_t i = 1; i < array_size; ++i) {
+            size_t ref = m_array->get_as_ref(i);
+            StringIndex ndx(ref, nullptr, 0, m_target_column,
+                            m_deny_duplicate_values, alloc);
+            ndx.verify();
+        }
+    }
+    else {
+        size_t column_size = m_target_column->size();
+        for (size_t i = 1; i < array_size; ++i) {
+            int64_t ref = m_array->get(i);
+
+            // low bit set indicate literal ref (shifted)
+            if (ref & 1) {
+                size_t r = to_size_t((uint64_t(ref) >> 1));
+                REALM_ASSERT_EX(r < column_size, r, column_size);
+            }
+            else {
+                // A real ref either points to a list or a subindex
+                char* header = alloc.translate(to_ref(ref));
+                if (Array::get_context_flag_from_header(header)) {
+                    StringIndex ndx(to_ref(ref), m_array.get(), i, m_target_column,
+                                    m_deny_duplicate_values, alloc);
+                    ndx.verify();
+                }
+                else {
+                    IntegerColumn sub(alloc, to_ref(ref)); // Throws
+                    IntegerColumn::const_iterator it = sub.cbegin();
+                    IntegerColumn::const_iterator it_end = sub.cend();
+                    SortedListComparator slc(*m_target_column);
+                    StringConversionBuffer buffer, buffer_prev;
+                    StringData previous_string = get(*it, buffer_prev);
+                    size_t last_row = *it;
+
+                    // Check that strings listed in sub are in sorted order
+                    // and if there are duplicates, that the row numbers are
+                    // sorted in the group of duplicates.
+                    while (it != it_end) {
+                        StringData it_data = get(*it, buffer);
+                        size_t it_row = *it;
+                        REALM_ASSERT_EX(previous_string <= it_data, previous_string.data(), it_data.data());
+                        if (it != sub.cbegin() && previous_string == it_data) {
+                            REALM_ASSERT_EX(it_row > last_row, it_row, last_row);
+                        }
+                        last_row = it_row;
+                        previous_string = get(*it, buffer_prev);
+                        ++it;
+                    }
+                }
+            }
+        }
+    }
     // FIXME: Extend verification along the lines of IntegerColumn::verify().
 }
 
