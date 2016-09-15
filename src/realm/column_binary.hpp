@@ -136,11 +136,20 @@ private:
 
 class BinaryIterator {
 public:
-    BinaryIterator() {}
+    BinaryIterator()
+    {
+    }
     // TODO: When WriteLogCollector is removed, there is no need for this
-    BinaryIterator(BinaryData binary) : m_binary(binary) {}
+    BinaryIterator(BinaryData binary)
+        : m_binary(binary)
+    {
+    }
 
-    BinaryIterator(BinaryColumn* col, size_t ndx) : m_binary_col(col), m_ndx(ndx) {}
+    BinaryIterator(BinaryColumn* col, size_t ndx)
+        : m_binary_col(col)
+        , m_ndx(ndx)
+    {
+    }
 
     BinaryData get_next() noexcept
     {

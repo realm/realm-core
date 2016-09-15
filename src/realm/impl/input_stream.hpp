@@ -199,7 +199,9 @@ public:
     static constexpr unsigned NB_BUFFERS = 8;
 
     ChangesetInputStream(History& hist, version_type begin_version, version_type end_version)
-        : m_history(hist), m_begin_version(begin_version), m_end_version(end_version)
+        : m_history(hist)
+        , m_begin_version(begin_version)
+        , m_end_version(end_version)
     {
         get_changeset();
     }
@@ -221,7 +223,7 @@ public:
                 get_changeset();
             }
         }
-        return false;  // End of input
+        return false; // End of input
     }
 
 private:

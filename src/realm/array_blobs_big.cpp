@@ -46,9 +46,9 @@ void ArrayBigBlobs::add(BinaryData value, bool add_zero_term)
     }
     else {
         ArrayBlob new_blob(m_alloc);
-        new_blob.create(); // Throws
+        new_blob.create();                                                      // Throws
         ref_type ref = new_blob.add(value.data(), value.size(), add_zero_term); // Throws
-        Array::add(from_ref(ref)); // Throws
+        Array::add(from_ref(ref));                                              // Throws
     }
 }
 
@@ -66,7 +66,7 @@ void ArrayBigBlobs::set(size_t ndx, BinaryData value, bool add_zero_term)
     }
     else if (ref == 0 && value.data() != nullptr) {
         ArrayBlob new_blob(m_alloc);
-        new_blob.create(); // Throws
+        new_blob.create();                                             // Throws
         ref = new_blob.add(value.data(), value.size(), add_zero_term); // Throws
         Array::set_as_ref(ndx, ref);
         return;
@@ -74,7 +74,7 @@ void ArrayBigBlobs::set(size_t ndx, BinaryData value, bool add_zero_term)
     else if (ref != 0 && value.data() != nullptr) {
         blob.init_from_ref(ref);
         blob.set_parent(this, ndx);
-        blob.clear(); // Throws
+        blob.clear();                                                           // Throws
         ref_type new_ref = blob.add(value.data(), value.size(), add_zero_term); // Throws
         if (new_ref != ref) {
             Array::set_as_ref(ndx, new_ref);
@@ -100,7 +100,7 @@ void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
     }
     else {
         ArrayBlob new_blob(m_alloc);
-        new_blob.create(); // Throws
+        new_blob.create();                                                      // Throws
         ref_type ref = new_blob.add(value.data(), value.size(), add_zero_term); // Throws
 
         Array::insert(ndx, int64_t(ref)); // Throws

@@ -77,7 +77,7 @@ public:
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->add_int(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->add_int(col_ndx, row_ndx, value); // Throws
+            m_table->add_int(col_ndx, row_ndx, value);                   // Throws
             return true;
         }
         return false;
@@ -695,7 +695,10 @@ public:
         return set_link(col_ndx, row_ndx, realm::npos, target_group_level_ndx, _impl::instr_Set);
     }
 
-    bool link_list_nullify(size_t link_ndx, size_t prior_size) { return link_list_erase(link_ndx, prior_size); }
+    bool link_list_nullify(size_t link_ndx, size_t prior_size)
+    {
+        return link_list_erase(link_ndx, prior_size);
+    }
 
 private:
     Group& m_group;

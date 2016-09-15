@@ -228,10 +228,10 @@ struct Logger::State {
     int m_param_num = 1;
     std::ostringstream m_formatter;
     std::locale m_locale = std::locale::classic();
-    State(Logger::Level level, const char* s):
-        m_level(level),
-        m_message(s),
-        m_search(m_message)
+    State(Logger::Level level, const char* s)
+        : m_level(level)
+        , m_message(s)
+        , m_search(m_message)
     {
         m_formatter.imbue(m_locale);
     }
@@ -324,7 +324,8 @@ inline void Logger::do_log(Logger& logger, Level level, std::string message)
     logger.do_log(level, std::move(message));
 }
 
-template<class... Params> void Logger::do_log(Level level, const char* message, Params... params)
+template <class... Params>
+void Logger::do_log(Level level, const char* message, Params... params)
 {
     State state(level, message);
     log_impl(state, params...);
@@ -446,7 +447,7 @@ inline Logger::Level RootLogger::get() const noexcept
 inline void StderrLogger::do_log(Level level, std::string message)
 {
     std::cerr << get_level_prefix(level) << message << '\n'; // Throws
-    std::cerr.flush(); // Throws
+    std::cerr.flush();                                       // Throws
 }
 
 inline StreamLogger::StreamLogger(std::ostream& out) noexcept
@@ -457,7 +458,7 @@ inline StreamLogger::StreamLogger(std::ostream& out) noexcept
 inline void StreamLogger::do_log(Level level, std::string message)
 {
     m_out << get_level_prefix(level) << message << '\n'; // Throws
-    m_out.flush(); // Throws
+    m_out.flush();                                       // Throws
 }
 
 inline FileLogger::FileLogger(std::string path)

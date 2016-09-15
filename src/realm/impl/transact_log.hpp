@@ -42,44 +42,45 @@ namespace _impl {
 /// Transaction log instruction encoding
 /// NOTE: Any change to this enum is a file-format breaking change.
 enum Instruction {
-    instr_InsertGroupLevelTable =  1,
-    instr_EraseGroupLevelTable  =  2, // Remove columnless table from group
-    instr_RenameGroupLevelTable =  3,
-    instr_MoveGroupLevelTable   =  4,
-    instr_SelectTable           =  5,
-    instr_Set                   =  6,
-    instr_SetUnique             =  7,
-    instr_SetDefault            =  8,
-    instr_AddInteger            =  9, // Add value to integer field
-    instr_NullifyLink           = 10, // Set link to null due to target being erased
-    instr_InsertSubstring       = 11,
-    instr_EraseFromString       = 12,
-    instr_InsertEmptyRows       = 13,
-    instr_EraseRows             = 14, // Remove (multiple) rows
-    instr_SwapRows              = 15,
-    instr_ChangeLinkTargets     = 16, // Replace links pointing to row A with links to row B
-    instr_ClearTable            = 17, // Remove all rows in selected table
-    instr_OptimizeTable         = 18,
-    instr_SelectDescriptor      = 19, // Select descriptor from currently selected root table
-    instr_InsertColumn          = 20, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
-    instr_InsertLinkColumn      = 21, // do, but for a link-type column
-    instr_InsertNullableColumn  = 22, // Insert nullable column
-    instr_EraseColumn           = 23, // Remove column from selected descriptor
-    instr_EraseLinkColumn       = 24, // Remove link-type column from selected descriptor
-    instr_RenameColumn          = 25, // Rename column in selected descriptor
-    instr_MoveColumn            = 26, // Move column in selected descriptor
-    instr_AddSearchIndex        = 27, // Add a search index to a column
-    instr_RemoveSearchIndex     = 28, // Remove a search index from a column
-    instr_SetLinkType           = 29, // Strong/weak
-    instr_SelectLinkList        = 30,
-    instr_LinkListSet           = 31, // Assign to link list entry
-    instr_LinkListInsert        = 32, // Insert entry into link list
-    instr_LinkListMove          = 33, // Move an entry within a link list
-    instr_LinkListSwap          = 34, // Swap two entries within a link list
-    instr_LinkListErase         = 35, // Remove an entry from a link list
-    instr_LinkListNullify       = 36, // Remove an entry from a link list due to linked row being erased
-    instr_LinkListClear         = 37, // Ramove all entries from a link list
-    instr_LinkListSetAll        = 38, // Assign to link list entry
+    instr_InsertGroupLevelTable = 1,
+    instr_EraseGroupLevelTable = 2, // Remove columnless table from group
+    instr_RenameGroupLevelTable = 3,
+    instr_MoveGroupLevelTable = 4,
+    instr_SelectTable = 5,
+    instr_Set = 6,
+    instr_SetUnique = 7,
+    instr_SetDefault = 8,
+    instr_AddInteger = 9,   // Add value to integer field
+    instr_NullifyLink = 10, // Set link to null due to target being erased
+    instr_InsertSubstring = 11,
+    instr_EraseFromString = 12,
+    instr_InsertEmptyRows = 13,
+    instr_EraseRows = 14, // Remove (multiple) rows
+    instr_SwapRows = 15,
+    instr_ChangeLinkTargets = 16, // Replace links pointing to row A with links to row B
+    instr_ClearTable = 17,        // Remove all rows in selected table
+    instr_OptimizeTable = 18,
+    instr_SelectDescriptor = 19, // Select descriptor from currently selected root table
+    instr_InsertColumn =
+        20, // Insert new non-nullable column into to selected descriptor (nullable is instr_InsertNullableColumn)
+    instr_InsertLinkColumn = 21,     // do, but for a link-type column
+    instr_InsertNullableColumn = 22, // Insert nullable column
+    instr_EraseColumn = 23,          // Remove column from selected descriptor
+    instr_EraseLinkColumn = 24,      // Remove link-type column from selected descriptor
+    instr_RenameColumn = 25,         // Rename column in selected descriptor
+    instr_MoveColumn = 26,           // Move column in selected descriptor
+    instr_AddSearchIndex = 27,       // Add a search index to a column
+    instr_RemoveSearchIndex = 28,    // Remove a search index from a column
+    instr_SetLinkType = 29,          // Strong/weak
+    instr_SelectLinkList = 30,
+    instr_LinkListSet = 31,     // Assign to link list entry
+    instr_LinkListInsert = 32,  // Insert entry into link list
+    instr_LinkListMove = 33,    // Move an entry within a link list
+    instr_LinkListSwap = 34,    // Swap two entries within a link list
+    instr_LinkListErase = 35,   // Remove an entry from a link list
+    instr_LinkListNullify = 36, // Remove an entry from a link list due to linked row being erased
+    instr_LinkListClear = 37,   // Ramove all entries from a link list
+    instr_LinkListSetAll = 38,  // Assign to link list entry
 };
 
 
@@ -154,28 +155,94 @@ public:
     }
 
     // Must have table selected:
-    bool insert_empty_rows(size_t, size_t, size_t, bool) { return true; }
-    bool erase_rows(size_t, size_t, size_t, bool) { return true; }
-    bool swap_rows(size_t, size_t) { return true; }
-    bool change_link_targets(size_t, size_t) { return true; }
-    bool clear_table() { return true; }
-    bool set_int(size_t, size_t, int_fast64_t, Instruction, size_t) { return true; }
-    bool add_int(size_t, size_t, int_fast64_t) { return true; }
-    bool set_bool(size_t, size_t, bool, Instruction) { return true; }
-    bool set_float(size_t, size_t, float, Instruction) { return true; }
-    bool set_double(size_t, size_t, double, Instruction) { return true; }
-    bool set_string(size_t, size_t, StringData, Instruction, size_t) { return true; }
-    bool set_binary(size_t, size_t, BinaryData, Instruction) { return true; }
-    bool set_olddatetime(size_t, size_t, OldDateTime, Instruction) { return true; }
-    bool set_timestamp(size_t, size_t, Timestamp, Instruction) { return true; }
-    bool set_table(size_t, size_t, Instruction) { return true; }
-    bool set_mixed(size_t, size_t, const Mixed&, Instruction) { return true; }
-    bool set_link(size_t, size_t, size_t, size_t, Instruction) { return true; }
-    bool set_null(size_t, size_t, Instruction, size_t) { return true; }
-    bool nullify_link(size_t, size_t, size_t) { return true; }
-    bool insert_substring(size_t, size_t, size_t, StringData) { return true; }
-    bool erase_substring(size_t, size_t, size_t, size_t) { return true; }
-    bool optimize_table() { return true; }
+    bool insert_empty_rows(size_t, size_t, size_t, bool)
+    {
+        return true;
+    }
+    bool erase_rows(size_t, size_t, size_t, bool)
+    {
+        return true;
+    }
+    bool swap_rows(size_t, size_t)
+    {
+        return true;
+    }
+    bool change_link_targets(size_t, size_t)
+    {
+        return true;
+    }
+    bool clear_table()
+    {
+        return true;
+    }
+    bool set_int(size_t, size_t, int_fast64_t, Instruction, size_t)
+    {
+        return true;
+    }
+    bool add_int(size_t, size_t, int_fast64_t)
+    {
+        return true;
+    }
+    bool set_bool(size_t, size_t, bool, Instruction)
+    {
+        return true;
+    }
+    bool set_float(size_t, size_t, float, Instruction)
+    {
+        return true;
+    }
+    bool set_double(size_t, size_t, double, Instruction)
+    {
+        return true;
+    }
+    bool set_string(size_t, size_t, StringData, Instruction, size_t)
+    {
+        return true;
+    }
+    bool set_binary(size_t, size_t, BinaryData, Instruction)
+    {
+        return true;
+    }
+    bool set_olddatetime(size_t, size_t, OldDateTime, Instruction)
+    {
+        return true;
+    }
+    bool set_timestamp(size_t, size_t, Timestamp, Instruction)
+    {
+        return true;
+    }
+    bool set_table(size_t, size_t, Instruction)
+    {
+        return true;
+    }
+    bool set_mixed(size_t, size_t, const Mixed&, Instruction)
+    {
+        return true;
+    }
+    bool set_link(size_t, size_t, size_t, size_t, Instruction)
+    {
+        return true;
+    }
+    bool set_null(size_t, size_t, Instruction, size_t)
+    {
+        return true;
+    }
+    bool nullify_link(size_t, size_t, size_t)
+    {
+        return true;
+    }
+    bool insert_substring(size_t, size_t, size_t, StringData)
+    {
+        return true;
+    }
+    bool erase_substring(size_t, size_t, size_t, size_t)
+    {
+        return true;
+    }
+    bool optimize_table()
+    {
+        return true;
+    }
 
     // Must have descriptor selected:
     bool insert_link_column(size_t, DataType, StringData, size_t, size_t)
@@ -216,15 +283,38 @@ public:
     }
 
     // Must have linklist selected:
-    bool link_list_set(size_t, size_t, size_t) { return true; }
-    bool link_list_insert(size_t, size_t, size_t) { return true; }
-    bool link_list_move(size_t, size_t) { return true; }
-    bool link_list_swap(size_t, size_t) { return true; }
-    bool link_list_erase(size_t, size_t) { return true; }
-    bool link_list_nullify(size_t, size_t) { return true; }
-    bool link_list_clear(size_t) { return true; }
+    bool link_list_set(size_t, size_t, size_t)
+    {
+        return true;
+    }
+    bool link_list_insert(size_t, size_t, size_t)
+    {
+        return true;
+    }
+    bool link_list_move(size_t, size_t)
+    {
+        return true;
+    }
+    bool link_list_swap(size_t, size_t)
+    {
+        return true;
+    }
+    bool link_list_erase(size_t, size_t)
+    {
+        return true;
+    }
+    bool link_list_nullify(size_t, size_t)
+    {
+        return true;
+    }
+    bool link_list_clear(size_t)
+    {
+        return true;
+    }
 
-    void parse_complete() {}
+    void parse_complete()
+    {
+    }
 };
 // LCOV_EXCL_STOP (NullInstructionObserver)
 
@@ -313,7 +403,10 @@ private:
     // This value is used in Set* instructions in place of the 'type' field in
     // the stream to indicate that the value of the Set* instruction is NULL,
     // which doesn't have a type.
-    static constexpr int set_null_sentinel() { return -1; }
+    static constexpr int set_null_sentinel()
+    {
+        return -1;
+    }
 
     TransactLogStream& m_stream;
 
@@ -368,7 +461,8 @@ public:
     void set_double(const Table*, size_t col_ndx, size_t ndx, double value, Instruction variant = instr_Set);
     void set_string(const Table*, size_t col_ndx, size_t ndx, StringData value, Instruction variant = instr_Set);
     void set_binary(const Table*, size_t col_ndx, size_t ndx, BinaryData value, Instruction variant = instr_Set);
-    void set_olddatetime(const Table*, size_t col_ndx, size_t ndx, OldDateTime value, Instruction variant = instr_Set);
+    void set_olddatetime(const Table*, size_t col_ndx, size_t ndx, OldDateTime value,
+                         Instruction variant = instr_Set);
     void set_timestamp(const Table*, size_t col_ndx, size_t ndx, Timestamp value, Instruction variant = instr_Set);
     void set_table(const Table*, size_t col_ndx, size_t ndx, Instruction variant = instr_Set);
     void set_mixed(const Table*, size_t col_ndx, size_t ndx, const Mixed& value, Instruction variant = instr_Set);
@@ -707,7 +801,7 @@ struct TransactLogEncoder::EncodeNumber {
         *ptr = encode_int(*ptr, value_2);
     }
 };
-template<>
+template <>
 struct TransactLogEncoder::EncodeNumber<char> {
     void operator()(char value, char** ptr)
     {
@@ -716,7 +810,7 @@ struct TransactLogEncoder::EncodeNumber<char> {
         ++(*ptr);
     }
 };
-template<>
+template <>
 struct TransactLogEncoder::EncodeNumber<bool> {
     void operator()(bool value, char** ptr)
     {
@@ -737,7 +831,7 @@ struct TransactLogEncoder::EncodeNumber<double> {
         *ptr = encode_double(*ptr, value);
     }
 };
-template<>
+template <>
 struct TransactLogEncoder::EncodeNumber<DataType> {
     void operator()(DataType type, char** ptr)
     {
@@ -1046,8 +1140,8 @@ inline void TransactLogConvenientEncoder::move_column(const Descriptor& desc, si
 }
 
 
-inline bool TransactLogEncoder::set_int(size_t col_ndx, size_t ndx, int_fast64_t value,
-                                        Instruction variant, size_t prior_num_rows)
+inline bool TransactLogEncoder::set_int(size_t col_ndx, size_t ndx, int_fast64_t value, Instruction variant,
+                                        size_t prior_num_rows)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault || variant == instr_SetUnique, variant);
     if (REALM_UNLIKELY(variant == instr_SetUnique))
@@ -1057,8 +1151,7 @@ inline bool TransactLogEncoder::set_int(size_t col_ndx, size_t ndx, int_fast64_t
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_int(const Table* t, size_t col_ndx,
-                                                  size_t ndx, int_fast64_t value,
+inline void TransactLogConvenientEncoder::set_int(const Table* t, size_t col_ndx, size_t ndx, int_fast64_t value,
                                                   Instruction variant)
 {
     select_table(t); // Throws
@@ -1073,62 +1166,56 @@ inline bool TransactLogEncoder::add_int(size_t col_ndx, size_t ndx, int_fast64_t
     return true;
 }
 
-inline void TransactLogConvenientEncoder::add_int(const Table* t, size_t col_ndx,
-                                                  size_t ndx, int_fast64_t value)
+inline void TransactLogConvenientEncoder::add_int(const Table* t, size_t col_ndx, size_t ndx, int_fast64_t value)
 {
     select_table(t); // Throws
     m_encoder.add_int(col_ndx, ndx, value);
 }
 
-inline bool TransactLogEncoder::set_bool(size_t col_ndx, size_t ndx, bool value,
-                                         Instruction variant)
+inline bool TransactLogEncoder::set_bool(size_t col_ndx, size_t ndx, bool value, Instruction variant)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
     append_simple_instr(variant, util::tuple(type_Bool, col_ndx, ndx, value)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_bool(const Table* t, size_t col_ndx,
-                                                   size_t ndx, bool value,
+inline void TransactLogConvenientEncoder::set_bool(const Table* t, size_t col_ndx, size_t ndx, bool value,
                                                    Instruction variant)
 {
-    select_table(t); // Throws
+    select_table(t);                                  // Throws
     m_encoder.set_bool(col_ndx, ndx, value, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_float(size_t col_ndx, size_t ndx, float value,
-                                          Instruction variant)
+inline bool TransactLogEncoder::set_float(size_t col_ndx, size_t ndx, float value, Instruction variant)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
     append_simple_instr(variant, util::tuple(type_Float, col_ndx, ndx, value)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_float(const Table* t, size_t col_ndx,
-                                                    size_t ndx, float value,
+inline void TransactLogConvenientEncoder::set_float(const Table* t, size_t col_ndx, size_t ndx, float value,
                                                     Instruction variant)
 {
-    select_table(t); // Throws
+    select_table(t);                                   // Throws
     m_encoder.set_float(col_ndx, ndx, value, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_double(size_t col_ndx, size_t ndx, double value,
-                                           Instruction variant)
+inline bool TransactLogEncoder::set_double(size_t col_ndx, size_t ndx, double value, Instruction variant)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
     append_simple_instr(instr_Set, util::tuple(type_Double, col_ndx, ndx, value)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_double(const Table* t, size_t col_ndx,
-                                    size_t ndx, double value, Instruction variant)
+inline void TransactLogConvenientEncoder::set_double(const Table* t, size_t col_ndx, size_t ndx, double value,
+                                                     Instruction variant)
 {
-    select_table(t); // Throws
+    select_table(t);                                    // Throws
     m_encoder.set_double(col_ndx, ndx, value, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_string(size_t col_ndx, size_t ndx, StringData value,
-                                           Instruction variant, size_t prior_num_rows)
+inline bool TransactLogEncoder::set_string(size_t col_ndx, size_t ndx, StringData value, Instruction variant,
+                                           size_t prior_num_rows)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault || variant == instr_SetUnique, variant);
     if (value.is_null()) {
@@ -1143,16 +1230,15 @@ inline bool TransactLogEncoder::set_string(size_t col_ndx, size_t ndx, StringDat
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_string(const Table* t, size_t col_ndx,
-                                    size_t ndx, StringData value, Instruction variant)
+inline void TransactLogConvenientEncoder::set_string(const Table* t, size_t col_ndx, size_t ndx, StringData value,
+                                                     Instruction variant)
 {
     select_table(t); // Throws
     size_t prior_num_rows = (variant == instr_SetUnique ? t->size() : 0);
     m_encoder.set_string(col_ndx, ndx, value, variant, prior_num_rows); // Throws
 }
 
-inline bool TransactLogEncoder::set_binary(size_t col_ndx, size_t row_ndx, BinaryData value,
-                                           Instruction variant)
+inline bool TransactLogEncoder::set_binary(size_t col_ndx, size_t row_ndx, BinaryData value, Instruction variant)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
     if (value.is_null()) {
@@ -1165,106 +1251,89 @@ inline bool TransactLogEncoder::set_binary(size_t col_ndx, size_t row_ndx, Binar
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_binary(const Table* t, size_t col_ndx,
-                                    size_t ndx, BinaryData value, Instruction variant)
+inline void TransactLogConvenientEncoder::set_binary(const Table* t, size_t col_ndx, size_t ndx, BinaryData value,
+                                                     Instruction variant)
 {
-    select_table(t); // Throws
+    select_table(t);                                    // Throws
     m_encoder.set_binary(col_ndx, ndx, value, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_olddatetime(size_t col_ndx, size_t ndx,
-                                                OldDateTime value,
-                                                Instruction variant)
+inline bool TransactLogEncoder::set_olddatetime(size_t col_ndx, size_t ndx, OldDateTime value, Instruction variant)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
-    append_simple_instr(variant, util::tuple(type_OldDateTime, col_ndx, ndx,
-                                             value.get_olddatetime())); // Throws
+    append_simple_instr(variant, util::tuple(type_OldDateTime, col_ndx, ndx, value.get_olddatetime())); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_olddatetime(const Table* t, size_t col_ndx,
-                                                          size_t ndx,
-                                                          OldDateTime value,
-                                                          Instruction variant)
+inline void TransactLogConvenientEncoder::set_olddatetime(const Table* t, size_t col_ndx, size_t ndx,
+                                                          OldDateTime value, Instruction variant)
 {
-    select_table(t); // Throws
+    select_table(t);                                         // Throws
     m_encoder.set_olddatetime(col_ndx, ndx, value, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_timestamp(size_t col_ndx, size_t ndx,
-                                              Timestamp value,
-                                              Instruction variant)
+inline bool TransactLogEncoder::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value, Instruction variant)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
-    append_simple_instr(variant, util::tuple(type_Timestamp, col_ndx, ndx,
-                                             value.get_seconds(), value.get_nanoseconds())); // Throws
+    append_simple_instr(
+        variant, util::tuple(type_Timestamp, col_ndx, ndx, value.get_seconds(), value.get_nanoseconds())); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_timestamp(const Table* t,
-                                                        size_t col_ndx,
-                                                        size_t ndx,
-                                                        Timestamp value,
+inline void TransactLogConvenientEncoder::set_timestamp(const Table* t, size_t col_ndx, size_t ndx, Timestamp value,
                                                         Instruction variant)
 {
-    select_table(t); // Throws
+    select_table(t);                                       // Throws
     m_encoder.set_timestamp(col_ndx, ndx, value, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_table(size_t col_ndx, size_t ndx,
-                                          Instruction variant)
+inline bool TransactLogEncoder::set_table(size_t col_ndx, size_t ndx, Instruction variant)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
     append_simple_instr(variant, util::tuple(type_Table, col_ndx, ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_table(const Table* t, size_t col_ndx,
-                                                    size_t ndx, Instruction variant)
+inline void TransactLogConvenientEncoder::set_table(const Table* t, size_t col_ndx, size_t ndx, Instruction variant)
 {
-    select_table(t); // Throws
+    select_table(t);                            // Throws
     m_encoder.set_table(col_ndx, ndx, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_mixed(size_t col_ndx, size_t ndx,
-                                          const Mixed& value,
-                                          Instruction variant)
+inline bool TransactLogEncoder::set_mixed(size_t col_ndx, size_t ndx, const Mixed& value, Instruction variant)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
     append_mixed_instr(variant, util::tuple(type_Mixed, col_ndx, ndx), value); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_mixed(const Table* t, size_t col_ndx,
-                                   size_t ndx, const Mixed& value, Instruction variant)
+inline void TransactLogConvenientEncoder::set_mixed(const Table* t, size_t col_ndx, size_t ndx, const Mixed& value,
+                                                    Instruction variant)
 {
-    select_table(t); // Throws
+    select_table(t);                                   // Throws
     m_encoder.set_mixed(col_ndx, ndx, value, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_link(size_t col_ndx, size_t ndx,
-                                         size_t value, size_t target_group_level_ndx,
+inline bool TransactLogEncoder::set_link(size_t col_ndx, size_t ndx, size_t value, size_t target_group_level_ndx,
                                          Instruction variant)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault, variant);
     // Map `realm::npos` to zero, and `n` to `n+1`, where `n` is a target row
     // index.
     size_t value_2 = size_t(1) + value;
-    append_simple_instr(variant, util::tuple(type_Link, col_ndx, ndx, value_2,
-                                             target_group_level_ndx)); // Throws
+    append_simple_instr(variant, util::tuple(type_Link, col_ndx, ndx, value_2, target_group_level_ndx)); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_link(const Table* t, size_t col_ndx,
-                                  size_t ndx, size_t value, Instruction variant)
+inline void TransactLogConvenientEncoder::set_link(const Table* t, size_t col_ndx, size_t ndx, size_t value,
+                                                   Instruction variant)
 {
     select_table(t); // Throws
     size_t target_group_level_ndx = t->get_descriptor()->get_column_link_target(col_ndx);
     m_encoder.set_link(col_ndx, ndx, value, target_group_level_ndx, variant); // Throws
 }
 
-inline bool TransactLogEncoder::set_null(size_t col_ndx, size_t ndx, Instruction variant,
-                                         size_t prior_num_rows)
+inline bool TransactLogEncoder::set_null(size_t col_ndx, size_t ndx, Instruction variant, size_t prior_num_rows)
 {
     REALM_ASSERT_EX(variant == instr_Set || variant == instr_SetDefault || variant == instr_SetUnique, variant);
     if (REALM_UNLIKELY(variant == instr_SetUnique)) {
@@ -1276,8 +1345,8 @@ inline bool TransactLogEncoder::set_null(size_t col_ndx, size_t ndx, Instruction
     return true;
 }
 
-inline void TransactLogConvenientEncoder::set_null(const Table* t, size_t col_ndx,
-                                                   size_t row_ndx, Instruction variant)
+inline void TransactLogConvenientEncoder::set_null(const Table* t, size_t col_ndx, size_t row_ndx,
+                                                   Instruction variant)
 {
     select_table(t); // Throws
     size_t prior_num_rows = (variant == instr_SetUnique ? t->size() : 0);
@@ -1455,7 +1524,7 @@ inline bool TransactLogEncoder::link_list_set(size_t link_ndx, size_t value, siz
 
 inline void TransactLogConvenientEncoder::link_list_set(const LinkView& list, size_t link_ndx, size_t value)
 {
-    select_link_list(list); // Throws
+    select_link_list(list);                                // Throws
     m_encoder.link_list_set(link_ndx, value, list.size()); // Throws
 }
 
@@ -1467,8 +1536,8 @@ inline bool TransactLogEncoder::link_list_nullify(size_t link_ndx, size_t prior_
 
 inline void TransactLogConvenientEncoder::link_list_nullify(const LinkView& list, size_t link_ndx)
 {
-    select_link_list(list); // Throws
-    size_t prior_size = list.size(); // Instruction is emitted before the fact.
+    select_link_list(list);                            // Throws
+    size_t prior_size = list.size();                   // Instruction is emitted before the fact.
     m_encoder.link_list_nullify(link_ndx, prior_size); // Throws
 }
 
@@ -1522,8 +1591,7 @@ inline void TransactLogConvenientEncoder::set_link_list(const LinkView& list, co
     m_encoder.link_list_set_all(values); // Throws
 }
 
-inline bool TransactLogEncoder::link_list_insert(size_t link_ndx, size_t value,
-                                                 size_t prior_size)
+inline bool TransactLogEncoder::link_list_insert(size_t link_ndx, size_t value, size_t prior_size)
 {
     append_simple_instr(instr_LinkListInsert, util::tuple(link_ndx, value, prior_size)); // Throws
     return true;
@@ -1531,8 +1599,8 @@ inline bool TransactLogEncoder::link_list_insert(size_t link_ndx, size_t value,
 
 inline void TransactLogConvenientEncoder::link_list_insert(const LinkView& list, size_t link_ndx, size_t value)
 {
-    select_link_list(list); // Throws
-    size_t prior_size = list.size() - 1; // The instruction is emitted after the fact.
+    select_link_list(list);                                  // Throws
+    size_t prior_size = list.size() - 1;                     // The instruction is emitted after the fact.
     m_encoder.link_list_insert(link_ndx, value, prior_size); // Throws
 }
 
@@ -1570,8 +1638,8 @@ inline bool TransactLogEncoder::link_list_erase(size_t link_ndx, size_t prior_si
 
 inline void TransactLogConvenientEncoder::link_list_erase(const LinkView& list, size_t link_ndx)
 {
-    select_link_list(list); // Throws
-    size_t prior_size = list.size(); // The instruction is emitted before the fact.
+    select_link_list(list);                          // Throws
+    size_t prior_size = list.size();                 // The instruction is emitted before the fact.
     m_encoder.link_list_erase(link_ndx, prior_size); // Throws
 }
 
@@ -1643,13 +1711,14 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
     char instr_ch;
     if (!read_char(instr_ch))
         parser_error(); // Throws
-//    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << std::dec << "\n";
+    //    std::cerr << "parsing " << util::promote(instr) << " @ " << std::hex << long(m_input_begin) << std::dec <<
+    //    "\n";
     Instruction instr = Instruction(instr_ch);
     switch (instr) {
         case instr_SetDefault:
         case instr_SetUnique:
         case instr_Set: {
-            int type = read_int<int>(); // Throws
+            int type = read_int<int>();          // Throws
             size_t col_ndx = read_int<size_t>(); // Throws
             size_t row_ndx = read_int<size_t>(); // Throws
             size_t prior_num_rows = 0;
@@ -1665,49 +1734,49 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
 
             switch (DataType(type)) {
                 case type_Int: {
-                    int_fast64_t value = read_int<int64_t>(); // Throws
+                    int_fast64_t value = read_int<int64_t>();                             // Throws
                     if (!handler.set_int(col_ndx, row_ndx, value, instr, prior_num_rows)) // Throws
                         parser_error();
                     return;
                 }
                 case type_Bool: {
-                    bool value = read_bool(); // Throws
+                    bool value = read_bool();                              // Throws
                     if (!handler.set_bool(col_ndx, row_ndx, value, instr)) // Throws
                         parser_error();
                     return;
                 }
                 case type_Float: {
-                    float value = read_float(); // Throws
+                    float value = read_float();                             // Throws
                     if (!handler.set_float(col_ndx, row_ndx, value, instr)) // Throws
                         parser_error();
                     return;
                 }
                 case type_Double: {
-                    double value = read_double(); // Throws
+                    double value = read_double();                            // Throws
                     if (!handler.set_double(col_ndx, row_ndx, value, instr)) // Throws
                         parser_error();
                     return;
                 }
                 case type_String: {
-                    StringData value = read_string(m_string_buffer); // Throws
+                    StringData value = read_string(m_string_buffer);                         // Throws
                     if (!handler.set_string(col_ndx, row_ndx, value, instr, prior_num_rows)) // Throws
                         parser_error();
                     return;
                 }
                 case type_Binary: {
-                    BinaryData value = read_binary(m_string_buffer); // Throws
+                    BinaryData value = read_binary(m_string_buffer);         // Throws
                     if (!handler.set_binary(col_ndx, row_ndx, value, instr)) // Throws
                         parser_error();
                     return;
                 }
                 case type_OldDateTime: {
-                    int_fast64_t value = read_int<int_fast64_t>(); // Throws
+                    int_fast64_t value = read_int<int_fast64_t>();                // Throws
                     if (!handler.set_olddatetime(col_ndx, row_ndx, value, instr)) // Throws
                         parser_error();
                     return;
                 }
                 case type_Timestamp: {
-                    int64_t seconds = read_int<int64_t>(); // Throws
+                    int64_t seconds = read_int<int64_t>();     // Throws
                     int32_t nanoseconds = read_int<int32_t>(); // Throws
                     Timestamp value = Timestamp(seconds, nanoseconds);
                     if (!handler.set_timestamp(col_ndx, row_ndx, value, instr)) // Throws
@@ -1721,7 +1790,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 }
                 case type_Mixed: {
                     Mixed value;
-                    read_mixed(&value); // Throws
+                    read_mixed(&value);                                     // Throws
                     if (!handler.set_mixed(col_ndx, row_ndx, value, instr)) // Throws
                         parser_error();
                     return;
@@ -1730,7 +1799,7 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                     size_t value = read_int<size_t>(); // Throws
                     // Map zero to realm::npos, and `n+1` to `n`, where `n` is a target row index.
                     size_t target_row_ndx = size_t(value - 1);
-                    size_t target_group_level_ndx = read_int<size_t>(); // Throws
+                    size_t target_group_level_ndx = read_int<size_t>();                                     // Throws
                     if (!handler.set_link(col_ndx, row_ndx, target_row_ndx, target_group_level_ndx, instr)) // Throws
                         parser_error();
                     return;
@@ -1745,9 +1814,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_AddInteger: {
-            size_t col_ndx = read_int<size_t>(); // Throws
-            size_t row_ndx = read_int<size_t>(); // Throws
-            int_fast64_t value = read_int<int64_t>(); // Throws
+            size_t col_ndx = read_int<size_t>();           // Throws
+            size_t row_ndx = read_int<size_t>();           // Throws
+            int_fast64_t value = read_int<int64_t>();      // Throws
             if (!handler.add_int(col_ndx, row_ndx, value)) // Throws
                 parser_error();
             return;
@@ -1833,9 +1902,9 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_LinkListSet: {
-            size_t link_ndx = read_int<size_t>(); // Throws
-            size_t value = read_int<size_t>(); // Throws
-            size_t prior_size = read_int<size_t>(); // Throws
+            size_t link_ndx = read_int<size_t>();                    // Throws
+            size_t value = read_int<size_t>();                       // Throws
+            size_t prior_size = read_int<size_t>();                  // Throws
             if (!handler.link_list_set(link_ndx, value, prior_size)) // Throws
                 parser_error();
             return;
@@ -1844,16 +1913,16 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             // todo, log that it's a SetAll we're doing
             size_t size = read_int<size_t>(); // Throws
             for (size_t i = 0; i < size; i++) {
-                size_t link = read_int<size_t>(); // Throws
+                size_t link = read_int<size_t>();          // Throws
                 if (!handler.link_list_set(i, link, size)) // Throws
                     parser_error();
             }
             return;
         }
         case instr_LinkListInsert: {
-            size_t link_ndx = read_int<size_t>(); // Throws
-            size_t value = read_int<size_t>(); // Throws
-            size_t prior_size = read_int<size_t>(); // Throws
+            size_t link_ndx = read_int<size_t>();                       // Throws
+            size_t value = read_int<size_t>();                          // Throws
+            size_t prior_size = read_int<size_t>();                     // Throws
             if (!handler.link_list_insert(link_ndx, value, prior_size)) // Throws
                 parser_error();
             return;
@@ -1873,15 +1942,15 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_LinkListErase: {
-            size_t link_ndx = read_int<size_t>(); // Throws
-            size_t prior_size = read_int<size_t>(); // Throws
+            size_t link_ndx = read_int<size_t>();               // Throws
+            size_t prior_size = read_int<size_t>();             // Throws
             if (!handler.link_list_erase(link_ndx, prior_size)) // Throws
                 parser_error();
             return;
         }
         case instr_LinkListNullify: {
-            size_t link_ndx = read_int<size_t>(); // Throws
-            size_t prior_size = read_int<size_t>(); // Throws
+            size_t link_ndx = read_int<size_t>();                 // Throws
+            size_t prior_size = read_int<size_t>();               // Throws
             if (!handler.link_list_nullify(link_ndx, prior_size)) // Throws
                 parser_error();
             return;
@@ -2362,8 +2431,7 @@ public:
         return true;
     }
 
-    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value, Instruction variant,
-                 size_t prior_num_rows)
+    bool set_int(size_t col_ndx, size_t row_ndx, int_fast64_t value, Instruction variant, size_t prior_num_rows)
     {
         m_encoder.set_int(col_ndx, row_ndx, value, variant, prior_num_rows);
         append_instruction();
@@ -2398,8 +2466,7 @@ public:
         return true;
     }
 
-    bool set_string(size_t col_ndx, size_t row_ndx, StringData value, Instruction variant,
-                    size_t prior_num_rows)
+    bool set_string(size_t col_ndx, size_t row_ndx, StringData value, Instruction variant, size_t prior_num_rows)
     {
         m_encoder.set_string(col_ndx, row_ndx, value, variant, prior_num_rows);
         append_instruction();
@@ -2448,8 +2515,7 @@ public:
         return true;
     }
 
-    bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t target_group_level_ndx,
-                  Instruction variant)
+    bool set_link(size_t col_ndx, size_t row_ndx, size_t value, size_t target_group_level_ndx, Instruction variant)
     {
         m_encoder.set_link(col_ndx, row_ndx, value, target_group_level_ndx, variant);
         append_instruction();
@@ -2688,7 +2754,7 @@ public:
         if (m_current != 0) {
             m_current--;
             begin = m_buffer + m_instr_order[m_current].begin;
-            end   = m_buffer + m_instr_order[m_current].end;
+            end = m_buffer + m_instr_order[m_current].end;
             return (end > begin);
         }
         return false;

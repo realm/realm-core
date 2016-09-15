@@ -7671,50 +7671,182 @@ public:
     }
 
     // Default no-op implmentations of all of the mutation instructions
-    bool insert_group_level_table(size_t, size_t, StringData) { return false; }
-    bool erase_group_level_table(size_t, size_t) { return false; }
-    bool rename_group_level_table(size_t, StringData) { return false; }
-    bool move_group_level_table(size_t, size_t) { return false; }
-    bool insert_column(size_t, DataType, StringData, bool) { return false; }
-    bool insert_link_column(size_t, DataType, StringData, size_t, size_t) { return false; }
-    bool erase_column(size_t) { return false; }
-    bool erase_link_column(size_t, size_t, size_t) { return false; }
-    bool rename_column(size_t, StringData) { return false; }
-    bool move_column(size_t, size_t) { return false; }
-    bool add_search_index(size_t) { return false; }
-    bool remove_search_index(size_t) { return false; }
-    bool add_primary_key(size_t) { return false; }
-    bool remove_primary_key() { return false; }
-    bool set_link_type(size_t, LinkType) { return false; }
-    bool insert_empty_rows(size_t, size_t, size_t, bool) { return false; }
-    bool erase_rows(size_t, size_t, size_t, bool) { return false; }
-    bool swap_rows(size_t, size_t) { return false; }
-    bool change_link_targets(size_t, size_t) { return false; }
-    bool clear_table() noexcept { return false; }
-    bool link_list_set(size_t, size_t, size_t) { return false; }
-    bool link_list_insert(size_t, size_t, size_t) { return false; }
-    bool link_list_erase(size_t, size_t) { return false; }
-    bool link_list_nullify(size_t, size_t) { return false; }
-    bool link_list_clear(size_t) { return false; }
-    bool link_list_move(size_t, size_t) { return false; }
-    bool link_list_swap(size_t, size_t) { return false; }
-    bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) { return false; }
-    bool add_int(size_t, size_t, int_fast64_t) { return false; }
-    bool set_bool(size_t, size_t, bool, _impl::Instruction) { return false; }
-    bool set_float(size_t, size_t, float, _impl::Instruction) { return false; }
-    bool set_double(size_t, size_t, double, _impl::Instruction) { return false; }
-    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t) { return false; }
-    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction) { return false; }
-    bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction) { return false; }
-    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction) { return false; }
-    bool set_table(size_t, size_t, _impl::Instruction) { return false; }
-    bool set_mixed(size_t, size_t, const Mixed&, _impl::Instruction) { return false; }
-    bool set_link(size_t, size_t, size_t, size_t, _impl::Instruction) { return false; }
-    bool set_null(size_t, size_t, _impl::Instruction, size_t) { return false; }
-    bool nullify_link(size_t, size_t, size_t) { return false; }
-    bool insert_substring(size_t, size_t, size_t, StringData) { return false; }
-    bool erase_substring(size_t, size_t, size_t, size_t) { return false; }
-    bool optimize_table() { return false; }
+    bool insert_group_level_table(size_t, size_t, StringData)
+    {
+        return false;
+    }
+    bool erase_group_level_table(size_t, size_t)
+    {
+        return false;
+    }
+    bool rename_group_level_table(size_t, StringData)
+    {
+        return false;
+    }
+    bool move_group_level_table(size_t, size_t)
+    {
+        return false;
+    }
+    bool insert_column(size_t, DataType, StringData, bool)
+    {
+        return false;
+    }
+    bool insert_link_column(size_t, DataType, StringData, size_t, size_t)
+    {
+        return false;
+    }
+    bool erase_column(size_t)
+    {
+        return false;
+    }
+    bool erase_link_column(size_t, size_t, size_t)
+    {
+        return false;
+    }
+    bool rename_column(size_t, StringData)
+    {
+        return false;
+    }
+    bool move_column(size_t, size_t)
+    {
+        return false;
+    }
+    bool add_search_index(size_t)
+    {
+        return false;
+    }
+    bool remove_search_index(size_t)
+    {
+        return false;
+    }
+    bool add_primary_key(size_t)
+    {
+        return false;
+    }
+    bool remove_primary_key()
+    {
+        return false;
+    }
+    bool set_link_type(size_t, LinkType)
+    {
+        return false;
+    }
+    bool insert_empty_rows(size_t, size_t, size_t, bool)
+    {
+        return false;
+    }
+    bool erase_rows(size_t, size_t, size_t, bool)
+    {
+        return false;
+    }
+    bool swap_rows(size_t, size_t)
+    {
+        return false;
+    }
+    bool change_link_targets(size_t, size_t)
+    {
+        return false;
+    }
+    bool clear_table() noexcept
+    {
+        return false;
+    }
+    bool link_list_set(size_t, size_t, size_t)
+    {
+        return false;
+    }
+    bool link_list_insert(size_t, size_t, size_t)
+    {
+        return false;
+    }
+    bool link_list_erase(size_t, size_t)
+    {
+        return false;
+    }
+    bool link_list_nullify(size_t, size_t)
+    {
+        return false;
+    }
+    bool link_list_clear(size_t)
+    {
+        return false;
+    }
+    bool link_list_move(size_t, size_t)
+    {
+        return false;
+    }
+    bool link_list_swap(size_t, size_t)
+    {
+        return false;
+    }
+    bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t)
+    {
+        return false;
+    }
+    bool add_int(size_t, size_t, int_fast64_t)
+    {
+        return false;
+    }
+    bool set_bool(size_t, size_t, bool, _impl::Instruction)
+    {
+        return false;
+    }
+    bool set_float(size_t, size_t, float, _impl::Instruction)
+    {
+        return false;
+    }
+    bool set_double(size_t, size_t, double, _impl::Instruction)
+    {
+        return false;
+    }
+    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t)
+    {
+        return false;
+    }
+    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction)
+    {
+        return false;
+    }
+    bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction)
+    {
+        return false;
+    }
+    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction)
+    {
+        return false;
+    }
+    bool set_table(size_t, size_t, _impl::Instruction)
+    {
+        return false;
+    }
+    bool set_mixed(size_t, size_t, const Mixed&, _impl::Instruction)
+    {
+        return false;
+    }
+    bool set_link(size_t, size_t, size_t, size_t, _impl::Instruction)
+    {
+        return false;
+    }
+    bool set_null(size_t, size_t, _impl::Instruction, size_t)
+    {
+        return false;
+    }
+    bool nullify_link(size_t, size_t, size_t)
+    {
+        return false;
+    }
+    bool insert_substring(size_t, size_t, size_t, StringData)
+    {
+        return false;
+    }
+    bool erase_substring(size_t, size_t, size_t, size_t)
+    {
+        return false;
+    }
+    bool optimize_table()
+    {
+        return false;
+    }
 };
 
 struct AdvanceReadTransact {
@@ -7938,7 +8070,10 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) const { throw ObserverError(); }
+            bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) const
+            {
+                throw ObserverError();
+            }
         } parser(test_context);
 
         LangBindHelper::advance_read(sg, parser);
@@ -10133,8 +10268,8 @@ namespace {
 
 void attacher(std::string path)
 {
-        std::unique_ptr<Replication> hist(make_in_realm_history(path));
-        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     for (int i = 0; i < 100; ++i) {
         Group& g = const_cast<Group&>(sg.begin_read());
         g.verify();
@@ -11607,8 +11742,7 @@ TEST(LangBindHelper_SessionHistoryConsistency)
 
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = realm::make_in_realm_history(path);
-        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroupOptions(crypt_key())),
-                          LogicError::mixed_history_type);
+        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroupOptions(crypt_key())), LogicError::mixed_history_type);
     }
 }
 

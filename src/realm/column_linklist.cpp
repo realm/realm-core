@@ -503,7 +503,7 @@ void LinkListColumn::adj_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx)
 }
 
 
-template<bool fix_ndx_in_parent>
+template <bool fix_ndx_in_parent>
 void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
     prune_list_accessor_tombstones();

@@ -577,14 +577,14 @@ inline void RowFuncs<T, R>::set_null(size_t col_ndx)
     table()->set_null(col_ndx, row_ndx()); // Throws
 }
 
-template<class T, class R>
-inline void RowFuncs<T,R>::set_null_unique(size_t col_ndx)
+template <class T, class R>
+inline void RowFuncs<T, R>::set_null_unique(size_t col_ndx)
 {
     table()->set_null_unique(col_ndx, row_ndx()); // Throws
 }
 
-template<class T, class R>
-inline void RowFuncs<T,R>::insert_substring(size_t col_ndx, size_t pos, StringData value)
+template <class T, class R>
+inline void RowFuncs<T, R>::insert_substring(size_t col_ndx, size_t pos, StringData value)
 {
     table()->insert_substring(col_ndx, row_ndx(), pos, value); // Throws
 }

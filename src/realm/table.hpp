@@ -499,7 +499,7 @@ public:
     void set_bool(size_t column_ndx, size_t row_ndx, bool value, bool is_default = false);
     void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value, bool is_default = false);
     void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value, bool is_default = false);
-    template<class E>
+    template <class E>
     void set_enum(size_t column_ndx, size_t row_ndx, E value);
     void set_float(size_t column_ndx, size_t row_ndx, float value, bool is_default = false);
     void set_double(size_t column_ndx, size_t row_ndx, double value, bool is_default = false);
@@ -953,11 +953,11 @@ private:
     void do_change_link_targets(size_t row_ndx, size_t new_row_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
-    template<class ColType, class T>
+    template <class ColType, class T>
     size_t do_find_unique(ColType& col, size_t ndx, T&& value);
-    template<class ColType>
+    template <class ColType>
     size_t do_set_unique_null(ColType& col, size_t ndx);
-    template<class ColType, class T>
+    template <class ColType, class T>
     size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
 
     void upgrade_file_format();
@@ -1135,7 +1135,7 @@ private:
     const ColumnBaseWithIndex& get_column_base_indexed(size_t ndx) const noexcept;
     ColumnBaseWithIndex& get_column_base_indexed(size_t ndx);
 
-    template<class T, ColumnType col_type>
+    template <class T, ColumnType col_type>
     T& get_column(size_t ndx);
 
     template <class T, ColumnType col_type>
@@ -2302,8 +2302,7 @@ public:
         table.adj_acc_subsume_row(row_ndx_1, row_ndx_2);
     }
 
-    static void adj_acc_move_over(Table& table, size_t from_row_ndx,
-                                  size_t to_row_ndx) noexcept
+    static void adj_acc_move_over(Table& table, size_t from_row_ndx, size_t to_row_ndx) noexcept
     {
         table.adj_acc_move_over(from_row_ndx, to_row_ndx);
     }

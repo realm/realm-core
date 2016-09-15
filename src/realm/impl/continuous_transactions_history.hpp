@@ -92,8 +92,8 @@ public:
     /// of update_early_from_top_ref(). In that case, the caller may assume that
     /// the memory references stay valid for the remainder of the transaction
     /// (up until initiation of the commit operation).
-    virtual void get_changesets(version_type begin_version, version_type end_version,
-                                BinaryIterator* buffer) const noexcept = 0;
+    virtual void get_changesets(version_type begin_version, version_type end_version, BinaryIterator* buffer) const
+        noexcept = 0;
 
     /// \brief Specify the version of the oldest bound snapshot.
     ///
@@ -161,7 +161,7 @@ public:
 class InRealmHistory : public History {
 public:
     void initialize(Group&);
-    
+
     /// Must never be called more than once per transaction. Returns the version
     /// produced by the added changeset.
     version_type add_changeset(BinaryData);

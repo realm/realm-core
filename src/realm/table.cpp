@@ -2836,8 +2836,9 @@ Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 
 } // namespace realm;
 
-template<class ColType, class T>
-size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value) {
+template <class ColType, class T>
+size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
+{
     size_t found_ndx = not_found;
 
     // The following loop relies on unsigned overflow, so be sure that `not_found`
@@ -2879,7 +2880,7 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value) {
     return ndx;
 }
 
-template<class ColType>
+template <class ColType>
 size_t Table::do_set_unique_null(ColType& col, size_t ndx)
 {
     ndx = do_find_unique(col, ndx, null{});
@@ -2887,7 +2888,7 @@ size_t Table::do_set_unique_null(ColType& col, size_t ndx)
     return ndx;
 }
 
-template<class ColType, class T>
+template <class ColType, class T>
 size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
 {
     ndx = do_find_unique(col, ndx, value);

@@ -45,9 +45,8 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
         bool nullable = false;
         ref_type hist_ref = BinaryColumn::create(alloc, size, nullable); // Throws
         _impl::DeepArrayRefDestroyGuard dg(hist_ref, alloc);
-        m_changesets = std::make_unique<BinaryColumn>(alloc, hist_ref, nullable); // Throws
-        gf::prepare_history_parent(*m_group, *m_changesets->get_root_array(),
-                                   Replication::hist_InRealm); // Throws
+        m_changesets = std::make_unique<BinaryColumn>(alloc, hist_ref, nullable);                         // Throws
+        gf::prepare_history_parent(*m_group, *m_changesets->get_root_array(), Replication::hist_InRealm); // Throws
         // Note: gf::prepare_history_parent() also ensures the the root array
         // has a slot for the history ref.
         m_changesets->get_root_array()->update_parent(); // Throws

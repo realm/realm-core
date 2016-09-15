@@ -160,7 +160,7 @@ void col_type_deleg(Op& op, ColumnType type, bool nullable)
         case col_type_Int:
         case col_type_Bool:
         case col_type_OldDateTime:
-            if(nullable)
+            if (nullable)
                 op.template call<IntNullColumn>();
             else
                 op.template call<IntegerColumn>();
