@@ -37,12 +37,12 @@
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
-    #include <unistd.h>
-    #include <sys/wait.h>
-    #define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
+#include <unistd.h>
+#include <sys/wait.h>
+#define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
-    #define NOMINMAX
-    #include <windows.h>
+#define NOMINMAX
+#include <windows.h>
 #endif
 
 
@@ -104,7 +104,7 @@ TEST(LangBindHelper_SetSubtable)
     t2.set_int(0, 1, 12);
     t2.set_int(1, 1, 100);
 
-    t1.set_subtable( 0, 0, &t2);
+    t1.set_subtable(0, 0, &t2);
 
     TableRef sub = t1.get_subtable(0, 0);
 
@@ -137,22 +137,17 @@ TEST(LangBindHelper_LinkView)
 
 namespace {
 
-REALM_TABLE_4(TestTableShared,
-              first,  Int,
-              second, Int,
-              third,  Bool,
-              fourth, String)
+REALM_TABLE_4(TestTableShared, first, Int, second, Int, third, Bool, fourth, String)
 
-REALM_TABLE_1(TestTableInts,
-              first,  Int)
+REALM_TABLE_1(TestTableInts, first, Int)
 
 
-class ShortCircuitHistory: public TrivialReplication, public _impl::History {
+class ShortCircuitHistory : public TrivialReplication, public _impl::History {
 public:
     using version_type = _impl::History::version_type;
 
-    ShortCircuitHistory(const std::string& database_file):
-        TrivialReplication(database_file)
+    ShortCircuitHistory(const std::string& database_file)
+        : TrivialReplication(database_file)
     {
     }
 
@@ -166,8 +161,7 @@ public:
         // No-op
     }
 
-    version_type prepare_changeset(const char* data, size_t size,
-                                   version_type orig_version) override
+    version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
         m_incoming_changeset = Buffer<char>(size); // Throws
         std::copy(data, data + size, m_incoming_changeset.data());
@@ -389,8 +383,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(foo, group.get_table("foo"));
     ConstTableRef bar = group.get_table("bar");
     CHECK_EQUAL(3, bar->get_column_count());
-    CHECK_EQUAL(type_Int,    bar->get_column_type(0));
-    CHECK_EQUAL(type_Float,  bar->get_column_type(1));
+    CHECK_EQUAL(type_Int, bar->get_column_type(0));
+    CHECK_EQUAL(type_Float, bar->get_column_type(1));
     CHECK_EQUAL(type_Double, bar->get_column_type(2));
 
     // Clear tables
@@ -412,8 +406,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(0, foo->size());
     CHECK(bar->is_attached());
     CHECK_EQUAL(3, bar->get_column_count());
-    CHECK_EQUAL(type_Int,    bar->get_column_type(0));
-    CHECK_EQUAL(type_Float,  bar->get_column_type(1));
+    CHECK_EQUAL(type_Int, bar->get_column_type(0));
+    CHECK_EQUAL(type_Float, bar->get_column_type(1));
     CHECK_EQUAL(type_Double, bar->get_column_type(2));
     CHECK_EQUAL(0, bar->size());
     CHECK_EQUAL(foo, group.get_table("foo"));
@@ -725,7 +719,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
         WriteTransaction wt(sg_w);
         TableRef foo_w = wt.add_table("links");
         link_col = foo_w->add_column_link(type_LinkList, "links", *foo_w); // just link to self
-        size_t val_col = foo_w->add_column(type_Int, "vals"); // just link to self
+        size_t val_col = foo_w->add_column(type_Int, "vals");              // just link to self
         foo_w->add_empty_row(4);
         foo_w->set_int(val_col, 0, 40);
         foo_w->set_int(val_col, 1, 20);
@@ -770,11 +764,11 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         TableRef strings_w = wt.add_table("strings");
         strings_w->add_column(type_String, "a");
         strings_w->add_column(type_Binary, "b", true);
-        strings_w->add_column(type_Mixed,  "c"); // Strings
-        strings_w->add_column(type_Mixed,  "d"); // Binary data
+        strings_w->add_column(type_Mixed, "c"); // Strings
+        strings_w->add_column(type_Mixed, "d"); // Binary data
         strings_w->add_empty_row();
         TableRef other_w = wt.add_table("other");
-        other_w->add_column(type_Int,   "A");
+        other_w->add_column(type_Int, "A");
         other_w->add_column(type_Float, "B");
         other_w->add_column(type_Table, "C");
         other_w->add_empty_row();
@@ -788,20 +782,21 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     CHECK_EQUAL(4, strings->get_column_count());
     CHECK_EQUAL(type_String, strings->get_column_type(0));
     CHECK_EQUAL(type_Binary, strings->get_column_type(1));
-    CHECK_EQUAL(type_Mixed,  strings->get_column_type(2));
-    CHECK_EQUAL(type_Mixed,  strings->get_column_type(3));
+    CHECK_EQUAL(type_Mixed, strings->get_column_type(2));
+    CHECK_EQUAL(type_Mixed, strings->get_column_type(3));
     CHECK_EQUAL(1, strings->size());
     ConstTableRef other = group.get_table("other");
     CHECK(other->is_attached());
     CHECK_EQUAL(3, other->get_column_count());
-    CHECK_EQUAL(type_Int,   other->get_column_type(0));
+    CHECK_EQUAL(type_Int, other->get_column_type(0));
     CHECK_EQUAL(type_Float, other->get_column_type(1));
     CHECK_EQUAL(type_Table, other->get_column_type(2));
     CHECK_EQUAL(1, other->size());
 
-    size_t leaf_x4    = 4 * REALM_MAX_BPNODE_SIZE;
+    size_t leaf_x4 = 4 * REALM_MAX_BPNODE_SIZE;
     size_t leaf_x4p16 = leaf_x4 + 16;
 
+    // clang-format off
     // Change root type in various string columns (including mixed)
     struct Step { size_t m_str_size, m_num_rows; };
     Step steps[] = {
@@ -825,10 +820,11 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         { 0, leaf_x4 }, { 3071, 1 }, { 0, leaf_x4 }, { 4095, 1 }, { 0, leaf_x4 }, { 6143, 1 },
         { 0, leaf_x4 }, { 8191, 1 }
     };
+    // clang-format on
     std::ostringstream out;
     out << std::left;
 
-    for (size_t i = 0; i < sizeof steps / sizeof * steps; ++i) {
+    for (size_t i = 0; i < sizeof steps / sizeof *steps; ++i) {
         Step step = steps[i];
         out.str("");
         out << std::setfill('x') << std::setw(int(step.m_str_size)) << "A";
@@ -856,10 +852,10 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
                 strings_w->clear();
                 strings_w->add_empty_row(step.m_num_rows);
             }
-            strings_w->set_string (0, 0, str);
-            strings_w->set_binary (1, 0, bin);
-            strings_w->set_mixed  (2, 0, str_mix);
-            strings_w->set_mixed  (3, 0, bin_mix);
+            strings_w->set_string(0, 0, str);
+            strings_w->set_binary(1, 0, bin);
+            strings_w->set_mixed(2, 0, str_mix);
+            strings_w->set_mixed(3, 0, bin_mix);
             wt.commit();
         }
         LangBindHelper::advance_read(sg);
@@ -869,18 +865,18 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         CHECK_EQUAL(4, strings->get_column_count());
         CHECK_EQUAL(type_String, strings->get_column_type(0));
         CHECK_EQUAL(type_Binary, strings->get_column_type(1));
-        CHECK_EQUAL(type_Mixed,  strings->get_column_type(2));
-        CHECK_EQUAL(type_Mixed,  strings->get_column_type(3));
+        CHECK_EQUAL(type_Mixed, strings->get_column_type(2));
+        CHECK_EQUAL(type_Mixed, strings->get_column_type(3));
         CHECK_EQUAL(step.m_num_rows, strings->size());
-        CHECK_EQUAL(str,     strings->get_string (0, 0));
-        CHECK_EQUAL(bin,     strings->get_binary (1, 0));
-        CHECK_EQUAL(str_mix, strings->get_mixed  (2, 0));
-        CHECK_EQUAL(bin_mix, strings->get_mixed  (3, 0));
+        CHECK_EQUAL(str, strings->get_string(0, 0));
+        CHECK_EQUAL(bin, strings->get_binary(1, 0));
+        CHECK_EQUAL(str_mix, strings->get_mixed(2, 0));
+        CHECK_EQUAL(bin_mix, strings->get_mixed(3, 0));
         if (step.m_num_rows >= 2) {
-            CHECK_EQUAL(StringData(""), strings->get_string (0, 1));
-            CHECK_EQUAL(BinaryData(), strings->get_binary (1, 1));
-            CHECK_EQUAL(int64_t(),    strings->get_mixed  (2, 1));
-            CHECK_EQUAL(int64_t(),    strings->get_mixed  (3, 1));
+            CHECK_EQUAL(StringData(""), strings->get_string(0, 1));
+            CHECK_EQUAL(BinaryData(), strings->get_binary(1, 1));
+            CHECK_EQUAL(int64_t(), strings->get_mixed(2, 1));
+            CHECK_EQUAL(int64_t(), strings->get_mixed(3, 1));
         }
     }
 
@@ -888,7 +884,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     CHECK_EQUAL(2, group.size());
     CHECK(other->is_attached());
     CHECK_EQUAL(3, other->get_column_count());
-    CHECK_EQUAL(type_Int,   other->get_column_type(0));
+    CHECK_EQUAL(type_Int, other->get_column_type(0));
     CHECK_EQUAL(type_Float, other->get_column_type(1));
     CHECK_EQUAL(type_Table, other->get_column_type(2));
     CHECK_EQUAL(1, other->size());
@@ -896,9 +892,9 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         WriteTransaction wt(sg_w);
         TableRef other_w = wt.get_table("other");
         other_w->add_empty_row(leaf_x4p16 - 1);
-        other_w->set_int      (0, (leaf_x4p16 - 16) / 3 + 1, 7);
-        other_w->set_float    (1, (leaf_x4p16 - 16) / 3 + 2, 13.0f);
-        other_w->set_subtable (2, (leaf_x4p16 - 16) / 3 + 3, 0); // FIXME: Set something
+        other_w->set_int(0, (leaf_x4p16 - 16) / 3 + 1, 7);
+        other_w->set_float(1, (leaf_x4p16 - 16) / 3 + 2, 13.0f);
+        other_w->set_subtable(2, (leaf_x4p16 - 16) / 3 + 3, 0); // FIXME: Set something
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -906,19 +902,19 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     CHECK_EQUAL(2, group.size());
     CHECK(other->is_attached());
     CHECK_EQUAL(3, other->get_column_count());
-    CHECK_EQUAL(type_Int,   other->get_column_type(0));
+    CHECK_EQUAL(type_Int, other->get_column_type(0));
     CHECK_EQUAL(type_Float, other->get_column_type(1));
     CHECK_EQUAL(type_Table, other->get_column_type(2));
     CHECK_EQUAL(leaf_x4p16, other->size());
-    CHECK_EQUAL(0,     other->get_int      (0, (leaf_x4p16 - 16) / 3 + 0));
-    CHECK_EQUAL(0.0f,  other->get_float    (1, (leaf_x4p16 - 16) / 3 + 1));
-//    CHECK_EQUAL(???,   other->get_subtable (2, (leaf_x4p16-16)/3+2));
-    CHECK_EQUAL(7,     other->get_int      (0, (leaf_x4p16 - 16) / 3 + 1));
-    CHECK_EQUAL(13.0f, other->get_float    (1, (leaf_x4p16 - 16) / 3 + 2));
-//    CHECK_EQUAL(???,   other->get_subtable (2, (leaf_x4p16-16)/3+3));
-    CHECK_EQUAL(0,     other->get_int      (0, (leaf_x4p16 - 16) / 3 + 2));
-    CHECK_EQUAL(0.0f,  other->get_float    (1, (leaf_x4p16 - 16) / 3 + 3));
-//    CHECK_EQUAL(???,   other->get_subtable (2, (leaf_x4p16-16)/3+4));
+    CHECK_EQUAL(0, other->get_int(0, (leaf_x4p16 - 16) / 3 + 0));
+    CHECK_EQUAL(0.0f, other->get_float(1, (leaf_x4p16 - 16) / 3 + 1));
+    //    CHECK_EQUAL(???,   other->get_subtable (2, (leaf_x4p16-16)/3+2));
+    CHECK_EQUAL(7, other->get_int(0, (leaf_x4p16 - 16) / 3 + 1));
+    CHECK_EQUAL(13.0f, other->get_float(1, (leaf_x4p16 - 16) / 3 + 2));
+    //    CHECK_EQUAL(???,   other->get_subtable (2, (leaf_x4p16-16)/3+3));
+    CHECK_EQUAL(0, other->get_int(0, (leaf_x4p16 - 16) / 3 + 2));
+    CHECK_EQUAL(0.0f, other->get_float(1, (leaf_x4p16 - 16) / 3 + 3));
+    //    CHECK_EQUAL(???,   other->get_subtable (2, (leaf_x4p16-16)/3+4));
 
     // Change root type from inner node to leaf in non-string columns
     {
@@ -926,9 +922,9 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
         TableRef other_w = wt.get_table("other");
         other_w->clear();
         other_w->add_empty_row(1);
-        other_w->set_int      (0, 0, 9);
-        other_w->set_float    (1, 0, 17.0f);
-        other_w->set_subtable (2, 0, nullptr); // FIXME: Set something
+        other_w->set_int(0, 0, 9);
+        other_w->set_float(1, 0, 17.0f);
+        other_w->set_subtable(2, 0, nullptr); // FIXME: Set something
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -936,13 +932,13 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     CHECK_EQUAL(2, group.size());
     CHECK(other->is_attached());
     CHECK_EQUAL(3, other->get_column_count());
-    CHECK_EQUAL(type_Int,   other->get_column_type(0));
+    CHECK_EQUAL(type_Int, other->get_column_type(0));
     CHECK_EQUAL(type_Float, other->get_column_type(1));
     CHECK_EQUAL(type_Table, other->get_column_type(2));
     CHECK_EQUAL(1, other->size());
-    CHECK_EQUAL(9,     other->get_int      (0, 0));
-    CHECK_EQUAL(17.0f, other->get_float    (1, 0));
-//    CHECK_EQUAL(???,   other->get_subtable (2,0));
+    CHECK_EQUAL(9, other->get_int(0, 0));
+    CHECK_EQUAL(17.0f, other->get_float(1, 0));
+    //    CHECK_EQUAL(???,   other->get_subtable (2,0));
 }
 
 
@@ -974,12 +970,12 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     ConstTableRef table = group.get_table("t");
     for (size_t row_ndx = 0; row_ndx < 3; ++row_ndx) {
         for (size_t col_ndx = 0; col_ndx < 3; ++col_ndx) {
-            CHECK_EQUAL(type_Int, table->get_mixed_type(col_ndx, row_ndx))&&
-            CHECK_EQUAL(0, table->get_mixed(col_ndx, row_ndx).get_int());
+            CHECK_EQUAL(type_Int, table->get_mixed_type(col_ndx, row_ndx)) &&
+                CHECK_EQUAL(0, table->get_mixed(col_ndx, row_ndx).get_int());
         }
     }
 
-    using int_type = decltype (Mixed().get_int());
+    using int_type = decltype(Mixed().get_int());
 
     auto set_subtab = [this](TableRef table_w, size_t col_ndx, size_t row_ndx, int_type value) {
         table_w->set_mixed(col_ndx, row_ndx, Mixed(Mixed::subtable_tag()));
@@ -991,14 +987,12 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
 
     auto check_subtab = [this](ConstTableRef table_r, size_t col_ndx, size_t row_ndx, int_type value) {
         ConstTableRef subtab = table_r->get_subtable(col_ndx, row_ndx);
-        return CHECK_EQUAL(1, subtab->get_column_count()) &&
-               CHECK_EQUAL(type_Int, subtab->get_column_type(0)) &&
-               CHECK_EQUAL(1, subtab->size()) &&
-               CHECK_EQUAL(value, subtab->get_int(0, 0));
+        return CHECK_EQUAL(1, subtab->get_column_count()) && CHECK_EQUAL(type_Int, subtab->get_column_type(0)) &&
+               CHECK_EQUAL(1, subtab->size()) && CHECK_EQUAL(value, subtab->get_int(0, 0));
     };
 
     // Change value types (round 1 of 2)
-    char bin_1[] = { 'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i' };
+    char bin_1[] = {'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i'};
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
@@ -1015,27 +1009,21 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0))&&
-    CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 1))&&
-    CHECK_EQUAL(true, table->get_mixed(0, 1).get_bool());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(0, 2))&&
-    CHECK_EQUAL(OldDateTime(3), table->get_mixed(0, 2).get_olddatetime());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(1, 0))&&
-    CHECK_EQUAL(4.0f, table->get_mixed(1, 0).get_float());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1))&&
-    CHECK_EQUAL(5.0, table->get_mixed(1, 1).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(1, 2))&&
-    CHECK_EQUAL("Hadamard", table->get_mixed(1, 2).get_string());
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(2, 0))&&
-    CHECK_EQUAL(BinaryData(bin_1), table->get_mixed(2, 0).get_binary());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(2, 1))&&
-    check_subtab(table, 2, 1, 6);
-    CHECK_EQUAL(type_Int, table->get_mixed_type(2, 2))&&
-    CHECK_EQUAL(0, table->get_mixed(2, 2).get_int());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) && CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 1)) && CHECK_EQUAL(true, table->get_mixed(0, 1).get_bool());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(0, 2)) &&
+        CHECK_EQUAL(OldDateTime(3), table->get_mixed(0, 2).get_olddatetime());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(1, 0)) && CHECK_EQUAL(4.0f, table->get_mixed(1, 0).get_float());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(1, 1)) && CHECK_EQUAL(5.0, table->get_mixed(1, 1).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(1, 2)) &&
+        CHECK_EQUAL("Hadamard", table->get_mixed(1, 2).get_string());
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(2, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_1), table->get_mixed(2, 0).get_binary());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(2, 1)) && check_subtab(table, 2, 1, 6);
+    CHECK_EQUAL(type_Int, table->get_mixed_type(2, 2)) && CHECK_EQUAL(0, table->get_mixed(2, 2).get_int());
 
     // Change value types (round 2 of 2)
-    char bin_2[] = { 'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i' };
+    char bin_2[] = {'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i'};
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
@@ -1051,24 +1039,18 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0))&&
-    CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 1))&&
-    CHECK_EQUAL(20.0f, table->get_mixed(0, 1).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2))&&
-    CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0))&&
-    check_subtab(table, 1, 0, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 1))&&
-    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 1).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2))&&
-    CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0))&&
-    CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 1))&&
-    CHECK_EQUAL("Banach", table->get_mixed(2, 1).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 2))&&
-    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 2).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) && CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 1)) && CHECK_EQUAL(20.0f, table->get_mixed(0, 1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2)) && CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0)) && check_subtab(table, 1, 0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 1)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) && CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) && CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 1)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 1).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 2).get_olddatetime());
 
     // Insert rows before
     {
@@ -1079,24 +1061,21 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 8 + 0))&&
-    CHECK_EQUAL(2, table->get_mixed(0, 8 + 0).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 8 + 1))&&
-    CHECK_EQUAL(20.0f, table->get_mixed(0, 8 + 1).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 8 + 2))&&
-    CHECK_EQUAL(false, table->get_mixed(0, 8 + 2).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 8 + 0))&&
-    check_subtab(table, 1, 8 + 0, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 8 + 1))&&
-    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 8 + 1).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 8 + 2))&&
-    CHECK_EQUAL(40, table->get_mixed(1, 8 + 2).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 8 + 0))&&
-    CHECK_EQUAL(50.0, table->get_mixed(2, 8 + 0).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 8 + 1))&&
-    CHECK_EQUAL("Banach", table->get_mixed(2, 8 + 1).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 8 + 2))&&
-    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 8 + 2).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 8 + 0)) && CHECK_EQUAL(2, table->get_mixed(0, 8 + 0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 8 + 1)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 8 + 1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 8 + 2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 8 + 2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 8 + 0)) && check_subtab(table, 1, 8 + 0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 8 + 1)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 8 + 1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 8 + 2)) && CHECK_EQUAL(40, table->get_mixed(1, 8 + 2).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 8 + 0)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2, 8 + 0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 8 + 1)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 8 + 1).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 8 + 2)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 8 + 2).get_olddatetime());
 
     // Move rows by remove() (ordered removal)
     {
@@ -1108,24 +1087,21 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 6 + 0))&&
-    CHECK_EQUAL(2, table->get_mixed(0, 6 + 0).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 6 + 1))&&
-    CHECK_EQUAL(20.0f, table->get_mixed(0, 6 + 1).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 6 + 2))&&
-    CHECK_EQUAL(false, table->get_mixed(0, 6 + 2).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 6 + 0))&&
-    check_subtab(table, 1, 6 + 0, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 6 + 1))&&
-    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 6 + 1).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 6 + 2))&&
-    CHECK_EQUAL(40, table->get_mixed(1, 6 + 2).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 6 + 0))&&
-    CHECK_EQUAL(50.0, table->get_mixed(2, 6 + 0).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 6 + 1))&&
-    CHECK_EQUAL("Banach", table->get_mixed(2, 6 + 1).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 6 + 2))&&
-    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 6 + 2).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 6 + 0)) && CHECK_EQUAL(2, table->get_mixed(0, 6 + 0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 6 + 1)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0, 6 + 1).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 6 + 2)) &&
+        CHECK_EQUAL(false, table->get_mixed(0, 6 + 2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 6 + 0)) && check_subtab(table, 1, 6 + 0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 6 + 1)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 6 + 1).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 6 + 2)) && CHECK_EQUAL(40, table->get_mixed(1, 6 + 2).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 6 + 0)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2, 6 + 0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 6 + 1)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 6 + 1).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 6 + 2)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 6 + 2).get_olddatetime());
 
     // Move rows by move_last_over() (unordered removal)
     {
@@ -1138,24 +1114,18 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0))&&
-    CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 4))&&
-    CHECK_EQUAL(20.0f, table->get_mixed(0, 4).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2))&&
-    CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0))&&
-    check_subtab(table, 1, 0, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 4))&&
-    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 4).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2))&&
-    CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0))&&
-    CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 4))&&
-    CHECK_EQUAL("Banach", table->get_mixed(2, 4).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 2))&&
-    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 2).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 0)) && CHECK_EQUAL(2, table->get_mixed(0, 0).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 4)) && CHECK_EQUAL(20.0f, table->get_mixed(0, 4).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 2)) && CHECK_EQUAL(false, table->get_mixed(0, 2).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 0)) && check_subtab(table, 1, 0, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 4)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 4).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 2)) && CHECK_EQUAL(40, table->get_mixed(1, 2).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 0)) && CHECK_EQUAL(50.0, table->get_mixed(2, 0).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 4)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 4).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 2)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 2).get_olddatetime());
 
     // Swap rows
     {
@@ -1167,59 +1137,50 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 4))&&
-    CHECK_EQUAL(2, table->get_mixed(0, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 0))&&
-    CHECK_EQUAL(20.0f, table->get_mixed(0, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 5))&&
-    CHECK_EQUAL(false, table->get_mixed(0, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 4))&&
-    check_subtab(table, 1, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 0))&&
-    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 5))&&
-    CHECK_EQUAL(40, table->get_mixed(1, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 4))&&
-    CHECK_EQUAL(50.0, table->get_mixed(2, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2, 0))&&
-    CHECK_EQUAL("Banach", table->get_mixed(2, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 5))&&
-    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 5).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0, 4)) && CHECK_EQUAL(2, table->get_mixed(0, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0, 0)) && CHECK_EQUAL(20.0f, table->get_mixed(0, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0, 5)) && CHECK_EQUAL(false, table->get_mixed(0, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1, 4)) && check_subtab(table, 1, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1, 5)) && CHECK_EQUAL(40, table->get_mixed(1, 5).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2, 4)) && CHECK_EQUAL(50.0, table->get_mixed(2, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2, 0).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2, 5)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2, 5).get_olddatetime());
 
     // Insert columns before
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
-        table_w->insert_column(0, type_Int,      "x1");
+        table_w->insert_column(0, type_Int, "x1");
         table_w->insert_column(0, type_OldDateTime, "x2");
-        table_w->insert_column(1, type_Float,    "x3");
-        table_w->insert_column(0, type_Double,   "x4");
-        table_w->insert_column(2, type_String,   "x5");
-        table_w->insert_column(1, type_Binary,   "x6");
-        table_w->insert_column(3, type_Table,    "x7");
-        table_w->insert_column(2, type_Mixed,    "x8");
+        table_w->insert_column(1, type_Float, "x3");
+        table_w->insert_column(0, type_Double, "x4");
+        table_w->insert_column(2, type_String, "x5");
+        table_w->insert_column(1, type_Binary, "x6");
+        table_w->insert_column(3, type_Table, "x7");
+        table_w->insert_column(2, type_Mixed, "x8");
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0 + 8, 4))&&
-    CHECK_EQUAL(2, table->get_mixed(0 + 8, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0 + 8, 0))&&
-    CHECK_EQUAL(20.0f, table->get_mixed(0 + 8, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0 + 8, 5))&&
-    CHECK_EQUAL(false, table->get_mixed(0 + 8, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1 + 8, 4))&&
-    check_subtab(table, 1 + 8, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1 + 8, 0))&&
-    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1 + 8, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1 + 8, 5))&&
-    CHECK_EQUAL(40, table->get_mixed(1 + 8, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2 + 8, 4))&&
-    CHECK_EQUAL(50.0, table->get_mixed(2 + 8, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2 + 8, 0))&&
-    CHECK_EQUAL("Banach", table->get_mixed(2 + 8, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2 + 8, 5))&&
-    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2 + 8, 5).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0 + 8, 4)) && CHECK_EQUAL(2, table->get_mixed(0 + 8, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0 + 8, 0)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0 + 8, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0 + 8, 5)) &&
+        CHECK_EQUAL(false, table->get_mixed(0 + 8, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1 + 8, 4)) && check_subtab(table, 1 + 8, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1 + 8, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1 + 8, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1 + 8, 5)) && CHECK_EQUAL(40, table->get_mixed(1 + 8, 5).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2 + 8, 4)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2 + 8, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2 + 8, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2 + 8, 0).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2 + 8, 5)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2 + 8, 5).get_olddatetime());
 
     // Remove columns before
     {
@@ -1231,24 +1192,21 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(0 + 6, 4))&&
-    CHECK_EQUAL(2, table->get_mixed(0 + 6, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(0 + 6, 0))&&
-    CHECK_EQUAL(20.0f, table->get_mixed(0 + 6, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(0 + 6, 5))&&
-    CHECK_EQUAL(false, table->get_mixed(0 + 6, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(1 + 6, 4))&&
-    check_subtab(table, 1 + 6, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(1 + 6, 0))&&
-    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1 + 6, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(1 + 6, 5))&&
-    CHECK_EQUAL(40, table->get_mixed(1 + 6, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(2 + 6, 4))&&
-    CHECK_EQUAL(50.0, table->get_mixed(2 + 6, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(2 + 6, 0))&&
-    CHECK_EQUAL("Banach", table->get_mixed(2 + 6, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2 + 6, 5))&&
-    CHECK_EQUAL(OldDateTime(60), table->get_mixed(2 + 6, 5).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(0 + 6, 4)) && CHECK_EQUAL(2, table->get_mixed(0 + 6, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(0 + 6, 0)) &&
+        CHECK_EQUAL(20.0f, table->get_mixed(0 + 6, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(0 + 6, 5)) &&
+        CHECK_EQUAL(false, table->get_mixed(0 + 6, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(1 + 6, 4)) && check_subtab(table, 1 + 6, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(1 + 6, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(1 + 6, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(1 + 6, 5)) && CHECK_EQUAL(40, table->get_mixed(1 + 6, 5).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(2 + 6, 4)) &&
+        CHECK_EQUAL(50.0, table->get_mixed(2 + 6, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(2 + 6, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(2 + 6, 0).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(2 + 6, 5)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(2 + 6, 5).get_olddatetime());
 
     // Move columns around
     {
@@ -1263,24 +1221,18 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
-    CHECK_EQUAL(type_Int, table->get_mixed_type(8, 4))&&
-    CHECK_EQUAL(2, table->get_mixed(8, 4).get_int());
-    CHECK_EQUAL(type_Float, table->get_mixed_type(8, 0))&&
-    CHECK_EQUAL(20.0f, table->get_mixed(8, 0).get_float());
-    CHECK_EQUAL(type_Bool, table->get_mixed_type(8, 5))&&
-    CHECK_EQUAL(false, table->get_mixed(8, 5).get_bool());
-    CHECK_EQUAL(type_Table, table->get_mixed_type(7, 4))&&
-    check_subtab(table, 7, 4, 30);
-    CHECK_EQUAL(type_Binary, table->get_mixed_type(7, 0))&&
-    CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(7, 0).get_binary());
-    CHECK_EQUAL(type_Int, table->get_mixed_type(7, 5))&&
-    CHECK_EQUAL(40, table->get_mixed(7, 5).get_int());
-    CHECK_EQUAL(type_Double, table->get_mixed_type(3, 4))&&
-    CHECK_EQUAL(50.0, table->get_mixed(3, 4).get_double());
-    CHECK_EQUAL(type_String, table->get_mixed_type(3, 0))&&
-    CHECK_EQUAL("Banach", table->get_mixed(3, 0).get_string());
-    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(3, 5))&&
-    CHECK_EQUAL(OldDateTime(60), table->get_mixed(3, 5).get_olddatetime());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(8, 4)) && CHECK_EQUAL(2, table->get_mixed(8, 4).get_int());
+    CHECK_EQUAL(type_Float, table->get_mixed_type(8, 0)) && CHECK_EQUAL(20.0f, table->get_mixed(8, 0).get_float());
+    CHECK_EQUAL(type_Bool, table->get_mixed_type(8, 5)) && CHECK_EQUAL(false, table->get_mixed(8, 5).get_bool());
+    CHECK_EQUAL(type_Table, table->get_mixed_type(7, 4)) && check_subtab(table, 7, 4, 30);
+    CHECK_EQUAL(type_Binary, table->get_mixed_type(7, 0)) &&
+        CHECK_EQUAL(BinaryData(bin_2), table->get_mixed(7, 0).get_binary());
+    CHECK_EQUAL(type_Int, table->get_mixed_type(7, 5)) && CHECK_EQUAL(40, table->get_mixed(7, 5).get_int());
+    CHECK_EQUAL(type_Double, table->get_mixed_type(3, 4)) && CHECK_EQUAL(50.0, table->get_mixed(3, 4).get_double());
+    CHECK_EQUAL(type_String, table->get_mixed_type(3, 0)) &&
+        CHECK_EQUAL("Banach", table->get_mixed(3, 0).get_string());
+    CHECK_EQUAL(type_OldDateTime, table->get_mixed_type(3, 5)) &&
+        CHECK_EQUAL(OldDateTime(60), table->get_mixed(3, 5).get_olddatetime());
 }
 
 
@@ -1354,11 +1306,11 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.add_table("t");
-        table_w->add_column(type_Int,    "i0");
+        table_w->add_column(type_Int, "i0");
         table_w->add_column(type_String, "s1");
         table_w->add_column(type_String, "s2");
-        table_w->add_column(type_Int,    "i3");
-        table_w->add_column(type_Int,    "i4");
+        table_w->add_column(type_Int, "i3");
+        table_w->add_column(type_Int, "i4");
         table_w->add_search_index(0);
         table_w->add_search_index(2);
         table_w->add_search_index(4);
@@ -1401,7 +1353,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
         int_fast64_t v = 7;
         size_t n = table_w->size();
         for (size_t i = 0; i < n; ++i) {
-//            std::cerr << i << " " << v << "\n";
+            //            std::cerr << i << " " << v << "\n";
             std::string out(util::to_string(v));
             table_w->set_string(1, i, out);
             table_w->set_int(3, i, v);
@@ -1430,7 +1382,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     CHECK(table->has_search_index(7));
     CHECK_NOT(table->has_search_index(8));
     CHECK_EQUAL(12, table->find_first_string(3, "931"));
-    CHECK_EQUAL(4,  table->find_first_int(7, 315));
+    CHECK_EQUAL(4, table->find_first_int(7, 315));
 
     // Move the indexed columns by removal
     {
@@ -1447,7 +1399,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     CHECK_NOT(table->has_search_index(4));
     CHECK(table->has_search_index(5));
     CHECK_NOT(table->has_search_index(6));
-    CHECK_EQUAL(3,  table->find_first_string(2, "738"));
+    CHECK_EQUAL(3, table->find_first_string(2, "738"));
     CHECK_EQUAL(13, table->find_first_int(5, 508));
 
     // Move the indexed columns directly
@@ -1468,7 +1420,7 @@ TEST(LangBindHelper_AdvanceReadTransact_SearchIndex)
     CHECK(table->has_search_index(3));
     CHECK_NOT(table->has_search_index(5));
     CHECK_EQUAL(12, table->find_first_string(4, "931"));
-    CHECK_EQUAL(4,  table->find_first_int(3, 315));
+    CHECK_EQUAL(4, table->find_first_int(3, 315));
 }
 
 
@@ -1555,22 +1507,22 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, subtab_0_0->get_column_count());
-    CHECK_EQUAL(type_Int,   subtab_0_0->get_column_type(0));
+    CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
     CHECK_EQUAL(type_Float, subtab_0_0->get_column_type(1));
     CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
     CHECK_EQUAL("f", subtab_0_0->get_column_name(1));
     CHECK_EQUAL(2, subtab_0_1->get_column_count());
-    CHECK_EQUAL(type_Int,   subtab_0_1->get_column_type(0));
+    CHECK_EQUAL(type_Int, subtab_0_1->get_column_type(0));
     CHECK_EQUAL(type_Float, subtab_0_1->get_column_type(1));
     CHECK_EQUAL("x", subtab_0_1->get_column_name(0));
     CHECK_EQUAL("f", subtab_0_1->get_column_name(1));
     CHECK_EQUAL(2, subtab_1_0->get_column_count());
-    CHECK_EQUAL(type_Int,    subtab_1_0->get_column_type(0));
+    CHECK_EQUAL(type_Int, subtab_1_0->get_column_type(0));
     CHECK_EQUAL(type_Double, subtab_1_0->get_column_type(1));
     CHECK_EQUAL("x", subtab_1_0->get_column_name(0));
     CHECK_EQUAL("d", subtab_1_0->get_column_name(1));
     CHECK_EQUAL(2, subtab_1_1->get_column_count());
-    CHECK_EQUAL(type_Int,    subtab_1_1->get_column_type(0));
+    CHECK_EQUAL(type_Int, subtab_1_1->get_column_type(0));
     CHECK_EQUAL(type_Double, subtab_1_1->get_column_type(1));
     CHECK_EQUAL("x", subtab_1_1->get_column_name(0));
     CHECK_EQUAL("d", subtab_1_1->get_column_name(1));
@@ -1582,10 +1534,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         TableRef subtab_0_0_w = parent_w->get_subtable(0, 0);
         TableRef subtab_1_1_w = parent_w->get_subtable(1, 1);
         subtab_1_1_w->add_empty_row();
-        subtab_0_0_w->set_int    (0, 0, 10000);
-        subtab_0_0_w->set_float  (1, 0, 10010.0f);
-        subtab_1_1_w->set_int    (0, 0, 11100);
-        subtab_1_1_w->set_double (1, 0, 11110.0);
+        subtab_0_0_w->set_int(0, 0, 10000);
+        subtab_0_0_w->set_float(1, 0, 10010.0f);
+        subtab_1_1_w->set_int(0, 0, 11100);
+        subtab_1_1_w->set_double(1, 0, 11110.0);
         parent_w->add_empty_row();
         wt.commit();
     }
@@ -1600,10 +1552,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10000,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10010.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11100,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11110.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10000, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10010.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11100, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11110.0, subtab_1_1->get_double(1, 0));
 
     // Insert a row and a column before all the subtables
     {
@@ -1613,10 +1565,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->insert_empty_row(0);
         TableRef subtab_0_0_w = parent_w->get_subtable(1, 1);
         TableRef subtab_1_1_w = parent_w->get_subtable(2, 2);
-        subtab_0_0_w->set_int    (0, 0, 10001);
-        subtab_0_0_w->set_float  (1, 0, 10011.0f);
-        subtab_1_1_w->set_int    (0, 0, 11101);
-        subtab_1_1_w->set_double (1, 0, 11111.0);
+        subtab_0_0_w->set_int(0, 0, 10001);
+        subtab_0_0_w->set_float(1, 0, 10011.0f);
+        subtab_1_1_w->set_int(0, 0, 11101);
+        subtab_1_1_w->set_double(1, 0, 11111.0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -1634,10 +1586,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10001,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10011.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11101,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11111.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10001, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10011.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11101, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11111.0, subtab_1_1->get_double(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
     CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 2));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(2, 1));
@@ -1651,10 +1603,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->insert_empty_row(2);
         TableRef subtab_0_0_w = parent_w->get_subtable(1, 1);
         TableRef subtab_1_1_w = parent_w->get_subtable(3, 3);
-        subtab_0_0_w->set_int    (0, 0, 10002);
-        subtab_0_0_w->set_float  (1, 0, 10012.0f);
-        subtab_1_1_w->set_int    (0, 0, 11102);
-        subtab_1_1_w->set_double (1, 0, 11112.0);
+        subtab_0_0_w->set_int(0, 0, 10002);
+        subtab_0_0_w->set_float(1, 0, 10012.0f);
+        subtab_1_1_w->set_int(0, 0, 11102);
+        subtab_1_1_w->set_double(1, 0, 11112.0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -1662,7 +1614,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     CHECK_EQUAL(4, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
     CHECK_EQUAL(type_Table, parent->get_column_type(1));
-    CHECK_EQUAL(type_Int,   parent->get_column_type(2));
+    CHECK_EQUAL(type_Int, parent->get_column_type(2));
     CHECK_EQUAL(type_Table, parent->get_column_type(3));
     CHECK_EQUAL(5, parent->size());
     CHECK(subtab_0_0->is_attached());
@@ -1673,10 +1625,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10002,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10012.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11102,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11112.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10002, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10012.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11102, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11112.0, subtab_1_1->get_double(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
     CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 3));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(3, 1));
@@ -1689,10 +1641,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->insert_column(4, type_Table, "dummy_3");
         TableRef subtab_0_0_w = parent_w->get_subtable(1, 1);
         TableRef subtab_1_1_w = parent_w->get_subtable(3, 3);
-        subtab_0_0_w->set_int    (0, 0, 10003);
-        subtab_0_0_w->set_float  (1, 0, 10013.0f);
-        subtab_1_1_w->set_int    (0, 0, 11103);
-        subtab_1_1_w->set_double (1, 0, 11113.0);
+        subtab_0_0_w->set_int(0, 0, 10003);
+        subtab_0_0_w->set_float(1, 0, 10013.0f);
+        subtab_1_1_w->set_int(0, 0, 11103);
+        subtab_1_1_w->set_double(1, 0, 11113.0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -1700,7 +1652,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     CHECK_EQUAL(5, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
     CHECK_EQUAL(type_Table, parent->get_column_type(1));
-    CHECK_EQUAL(type_Int,   parent->get_column_type(2));
+    CHECK_EQUAL(type_Int, parent->get_column_type(2));
     CHECK_EQUAL(type_Table, parent->get_column_type(3));
     CHECK_EQUAL(type_Table, parent->get_column_type(4));
     CHECK_EQUAL(5, parent->size());
@@ -1712,10 +1664,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10003,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10013.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11103,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11113.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10003, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10013.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11103, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11113.0, subtab_1_1->get_double(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
     CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 3));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(3, 1));
@@ -1729,10 +1681,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->remove(2);
         TableRef subtab_0_0_w = parent_w->get_subtable(1, 1);
         TableRef subtab_1_1_w = parent_w->get_subtable(2, 2);
-        subtab_0_0_w->set_int    (0, 0, 10004);
-        subtab_0_0_w->set_float  (1, 0, 10014.0f);
-        subtab_1_1_w->set_int    (0, 0, 11104);
-        subtab_1_1_w->set_double (1, 0, 11114.0);
+        subtab_0_0_w->set_int(0, 0, 10004);
+        subtab_0_0_w->set_float(1, 0, 10014.0f);
+        subtab_1_1_w->set_int(0, 0, 11104);
+        subtab_1_1_w->set_double(1, 0, 11114.0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -1747,10 +1699,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10004,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10014.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11104,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11114.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10004, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10014.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11104, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11114.0, subtab_1_1->get_double(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
     CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 2));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(2, 1));
@@ -1764,10 +1716,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->remove(0);
         TableRef subtab_0_0_w = parent_w->get_subtable(0, 0);
         TableRef subtab_1_1_w = parent_w->get_subtable(1, 1);
-        subtab_0_0_w->set_int    (0, 0, 10005);
-        subtab_0_0_w->set_float  (1, 0, 10015.0f);
-        subtab_1_1_w->set_int    (0, 0, 11105);
-        subtab_1_1_w->set_double (1, 0, 11115.0);
+        subtab_0_0_w->set_int(0, 0, 10005);
+        subtab_0_0_w->set_float(1, 0, 10015.0f);
+        subtab_1_1_w->set_int(0, 0, 11105);
+        subtab_1_1_w->set_double(1, 0, 11115.0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -1777,10 +1729,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     CHECK_EQUAL(type_Table, parent->get_column_type(1));
     CHECK_EQUAL(type_Table, parent->get_column_type(2));
     CHECK_EQUAL(3, parent->size());
-    CHECK_EQUAL(10005,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10015.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11105,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11115.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10005, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10015.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11105, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11115.0, subtab_1_1->get_double(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
     CHECK_EQUAL(subtab_0_1, parent->get_subtable(0, 1));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
@@ -1794,10 +1746,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         parent_w->remove(2);
         TableRef subtab_0_0_w = parent_w->get_subtable(0, 0);
         TableRef subtab_1_1_w = parent_w->get_subtable(1, 1);
-        subtab_0_0_w->set_int    (0, 0, 10006);
-        subtab_0_0_w->set_float  (1, 0, 10016.0f);
-        subtab_1_1_w->set_int    (0, 0, 11106);
-        subtab_1_1_w->set_double (1, 0, 11116.0);
+        subtab_0_0_w->set_int(0, 0, 10006);
+        subtab_0_0_w->set_float(1, 0, 10016.0f);
+        subtab_1_1_w->set_int(0, 0, 11106);
+        subtab_1_1_w->set_double(1, 0, 11116.0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -1806,10 +1758,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
     CHECK_EQUAL(type_Table, parent->get_column_type(1));
     CHECK_EQUAL(2, parent->size());
-    CHECK_EQUAL(10006,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10016.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11106,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11116.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10006, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10016.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11106, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11116.0, subtab_1_1->get_double(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
     CHECK_EQUAL(subtab_0_1, parent->get_subtable(0, 1));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
@@ -1821,20 +1773,20 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         TableRef parent_w = wt.get_table("parent");
         parent_w->remove(1);
         TableRef subtab_0_0_w = parent_w->get_subtable(0, 0);
-        subtab_0_0_w->set_int   (0, 0, 10007);
-        subtab_0_0_w->set_float (1, 0, 10017.0f);
+        subtab_0_0_w->set_int(0, 0, 10007);
+        subtab_0_0_w->set_float(1, 0, 10017.0f);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
-    CHECK( subtab_0_0->is_attached());
+    CHECK(subtab_0_0->is_attached());
     CHECK(!subtab_0_1->is_attached());
-    CHECK( subtab_1_0->is_attached());
+    CHECK(subtab_1_0->is_attached());
     CHECK(!subtab_1_1->is_attached());
-    CHECK_EQUAL(10007,    subtab_0_0->get_int   (0, 0));
-    CHECK_EQUAL(10017.0f, subtab_0_0->get_float (1, 0));
+    CHECK_EQUAL(10007, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10017.0f, subtab_0_0->get_float(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
     {
@@ -1842,20 +1794,20 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
         TableRef parent_w = wt.get_table("parent");
         parent_w->remove_column(1);
         TableRef subtab_0_0_w = parent_w->get_subtable(0, 0);
-        subtab_0_0_w->set_int   (0, 0, 10008);
-        subtab_0_0_w->set_float (1, 0, 10018.0f);
+        subtab_0_0_w->set_int(0, 0, 10008);
+        subtab_0_0_w->set_float(1, 0, 10018.0f);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
-    CHECK( subtab_0_0->is_attached());
+    CHECK(subtab_0_0->is_attached());
     CHECK(!subtab_0_1->is_attached());
     CHECK(!subtab_1_0->is_attached());
     CHECK(!subtab_1_1->is_attached());
-    CHECK_EQUAL(10008,    subtab_0_0->get_int   (0, 0));
-    CHECK_EQUAL(10018.0f, subtab_0_0->get_float (1, 0));
+    CHECK_EQUAL(10008, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10018.0f, subtab_0_0->get_float(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
 
     // Clear subtable
@@ -1935,7 +1887,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     CHECK(!subtab_0_0->is_attached());
     CHECK(!subtab_0_1->is_attached());
     CHECK(!subtab_1_0->is_attached());
-    CHECK( subtab_1_1->is_attached());
+    CHECK(subtab_1_1->is_attached());
     CHECK_EQUAL(1, subtab_1_1->size());
     CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0, 0));
 
@@ -2140,22 +2092,22 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, subtab_0_0->get_column_count());
-    CHECK_EQUAL(type_Int,   subtab_0_0->get_column_type(0));
+    CHECK_EQUAL(type_Int, subtab_0_0->get_column_type(0));
     CHECK_EQUAL(type_Float, subtab_0_0->get_column_type(1));
     CHECK_EQUAL("x", subtab_0_0->get_column_name(0));
     CHECK_EQUAL("f", subtab_0_0->get_column_name(1));
     CHECK_EQUAL(2, subtab_0_1->get_column_count());
-    CHECK_EQUAL(type_Int,   subtab_0_1->get_column_type(0));
+    CHECK_EQUAL(type_Int, subtab_0_1->get_column_type(0));
     CHECK_EQUAL(type_Float, subtab_0_1->get_column_type(1));
     CHECK_EQUAL("x", subtab_0_1->get_column_name(0));
     CHECK_EQUAL("f", subtab_0_1->get_column_name(1));
     CHECK_EQUAL(2, subtab_1_0->get_column_count());
-    CHECK_EQUAL(type_Int,    subtab_1_0->get_column_type(0));
+    CHECK_EQUAL(type_Int, subtab_1_0->get_column_type(0));
     CHECK_EQUAL(type_Double, subtab_1_0->get_column_type(1));
     CHECK_EQUAL("x", subtab_1_0->get_column_name(0));
     CHECK_EQUAL("d", subtab_1_0->get_column_name(1));
     CHECK_EQUAL(2, subtab_1_1->get_column_count());
-    CHECK_EQUAL(type_Int,    subtab_1_1->get_column_type(0));
+    CHECK_EQUAL(type_Int, subtab_1_1->get_column_type(0));
     CHECK_EQUAL(type_Double, subtab_1_1->get_column_type(1));
     CHECK_EQUAL("x", subtab_1_1->get_column_name(0));
     CHECK_EQUAL("d", subtab_1_1->get_column_name(1));
@@ -2167,10 +2119,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         TableRef subtab_0_0_w = parent_w->get_subtable(0, 0);
         TableRef subtab_1_1_w = parent_w->get_subtable(1, 1);
         subtab_1_1_w->add_empty_row();
-        subtab_0_0_w->set_int    (0, 0, 10000);
-        subtab_0_0_w->set_float  (1, 0, 10010.0f);
-        subtab_1_1_w->set_int    (0, 0, 11100);
-        subtab_1_1_w->set_double (1, 0, 11110.0);
+        subtab_0_0_w->set_int(0, 0, 10000);
+        subtab_0_0_w->set_float(1, 0, 10010.0f);
+        subtab_1_1_w->set_int(0, 0, 11100);
+        subtab_1_1_w->set_double(1, 0, 11110.0);
         parent_w->add_empty_row();
         wt.commit();
     }
@@ -2185,10 +2137,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10000,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10010.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11100,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11110.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10000, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10010.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11100, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11110.0, subtab_1_1->get_double(1, 0));
 
     // Insert a row and a column before all the subtables
     {
@@ -2198,10 +2150,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->insert_empty_row(0);
         TableRef subtab_0_0_w = parent_w->get_subtable(1, 1);
         TableRef subtab_1_1_w = parent_w->get_subtable(2, 2);
-        subtab_0_0_w->set_int    (0, 0, 10001);
-        subtab_0_0_w->set_float  (1, 0, 10011.0f);
-        subtab_1_1_w->set_int    (0, 0, 11101);
-        subtab_1_1_w->set_double (1, 0, 11111.0);
+        subtab_0_0_w->set_int(0, 0, 10001);
+        subtab_0_0_w->set_float(1, 0, 10011.0f);
+        subtab_1_1_w->set_int(0, 0, 11101);
+        subtab_1_1_w->set_double(1, 0, 11111.0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2219,10 +2171,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10001,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10011.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11101,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11111.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10001, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10011.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11101, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11111.0, subtab_1_1->get_double(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
     CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 2));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(2, 1));
@@ -2235,14 +2187,14 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->insert_column(2, type_Int, "dummy_2");
         parent_w->insert_empty_row(2);
         parent_w->set_mixed(3, 2, "Lopadotemachoselachogaleokranioleipsanodrimhypotrimmatosilphio"
-                            "paraomelitokatakechy­menokichlepikossyphophattoperisteralektryonopte"
-                            "kephalliokigklopeleiolagoiosiraiobaphetraganopterygon");
+                                  "paraomelitokatakechy­menokichlepikossyphophattoperisteralektryonopte"
+                                  "kephalliokigklopeleiolagoiosiraiobaphetraganopterygon");
         TableRef subtab_0_0_w = parent_w->get_subtable(1, 1);
         TableRef subtab_1_1_w = parent_w->get_subtable(3, 3);
-        subtab_0_0_w->set_int    (0, 0, 10002);
-        subtab_0_0_w->set_float  (1, 0, 10012.0f);
-        subtab_1_1_w->set_int    (0, 0, 11102);
-        subtab_1_1_w->set_double (1, 0, 11112.0);
+        subtab_0_0_w->set_int(0, 0, 10002);
+        subtab_0_0_w->set_float(1, 0, 10012.0f);
+        subtab_1_1_w->set_int(0, 0, 11102);
+        subtab_1_1_w->set_double(1, 0, 11112.0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2250,7 +2202,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     CHECK_EQUAL(4, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
     CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
-    CHECK_EQUAL(type_Int,   parent->get_column_type(2));
+    CHECK_EQUAL(type_Int, parent->get_column_type(2));
     CHECK_EQUAL(type_Mixed, parent->get_column_type(3));
     CHECK_EQUAL(5, parent->size());
     CHECK(subtab_0_0->is_attached());
@@ -2261,10 +2213,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10002,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10012.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11102,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11112.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10002, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10012.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11102, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11112.0, subtab_1_1->get_double(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
     CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 3));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(3, 1));
@@ -2277,10 +2229,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->insert_column(4, type_Table, "dummy_3");
         TableRef subtab_0_0_w = parent_w->get_subtable(1, 1);
         TableRef subtab_1_1_w = parent_w->get_subtable(3, 3);
-        subtab_0_0_w->set_int    (0, 0, 10003);
-        subtab_0_0_w->set_float  (1, 0, 10013.0f);
-        subtab_1_1_w->set_int    (0, 0, 11103);
-        subtab_1_1_w->set_double (1, 0, 11113.0);
+        subtab_0_0_w->set_int(0, 0, 10003);
+        subtab_0_0_w->set_float(1, 0, 10013.0f);
+        subtab_1_1_w->set_int(0, 0, 11103);
+        subtab_1_1_w->set_double(1, 0, 11113.0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2288,7 +2240,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     CHECK_EQUAL(5, parent->get_column_count());
     CHECK_EQUAL(type_Table, parent->get_column_type(0));
     CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
-    CHECK_EQUAL(type_Int,   parent->get_column_type(2));
+    CHECK_EQUAL(type_Int, parent->get_column_type(2));
     CHECK_EQUAL(type_Mixed, parent->get_column_type(3));
     CHECK_EQUAL(type_Table, parent->get_column_type(4));
     CHECK_EQUAL(5, parent->size());
@@ -2300,10 +2252,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10003,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10013.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11103,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11113.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10003, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10013.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11103, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11113.0, subtab_1_1->get_double(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
     CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 3));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(3, 1));
@@ -2317,10 +2269,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->remove(2);
         TableRef subtab_0_0_w = parent_w->get_subtable(1, 1);
         TableRef subtab_1_1_w = parent_w->get_subtable(2, 2);
-        subtab_0_0_w->set_int    (0, 0, 10004);
-        subtab_0_0_w->set_float  (1, 0, 10014.0f);
-        subtab_1_1_w->set_int    (0, 0, 11104);
-        subtab_1_1_w->set_double (1, 0, 11114.0);
+        subtab_0_0_w->set_int(0, 0, 10004);
+        subtab_0_0_w->set_float(1, 0, 10014.0f);
+        subtab_1_1_w->set_int(0, 0, 11104);
+        subtab_1_1_w->set_double(1, 0, 11114.0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2335,10 +2287,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     CHECK_EQUAL(0, subtab_0_1->size());
     CHECK_EQUAL(0, subtab_1_0->size());
     CHECK_EQUAL(1, subtab_1_1->size());
-    CHECK_EQUAL(10004,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10014.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11104,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11114.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10004, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10014.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11104, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11114.0, subtab_1_1->get_double(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(1, 1));
     CHECK_EQUAL(subtab_0_1, parent->get_subtable(1, 2));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(2, 1));
@@ -2352,10 +2304,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->remove(0);
         TableRef subtab_0_0_w = parent_w->get_subtable(0, 0);
         TableRef subtab_1_1_w = parent_w->get_subtable(1, 1);
-        subtab_0_0_w->set_int    (0, 0, 10005);
-        subtab_0_0_w->set_float  (1, 0, 10015.0f);
-        subtab_1_1_w->set_int    (0, 0, 11105);
-        subtab_1_1_w->set_double (1, 0, 11115.0);
+        subtab_0_0_w->set_int(0, 0, 10005);
+        subtab_0_0_w->set_float(1, 0, 10015.0f);
+        subtab_1_1_w->set_int(0, 0, 11105);
+        subtab_1_1_w->set_double(1, 0, 11115.0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2365,10 +2317,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
     CHECK_EQUAL(type_Table, parent->get_column_type(2));
     CHECK_EQUAL(3, parent->size());
-    CHECK_EQUAL(10005,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10015.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11105,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11115.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10005, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10015.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11105, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11115.0, subtab_1_1->get_double(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
     CHECK_EQUAL(subtab_0_1, parent->get_subtable(0, 1));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
@@ -2382,10 +2334,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->remove(2);
         TableRef subtab_0_0_w = parent_w->get_subtable(0, 0);
         TableRef subtab_1_1_w = parent_w->get_subtable(1, 1);
-        subtab_0_0_w->set_int    (0, 0, 10006);
-        subtab_0_0_w->set_float  (1, 0, 10016.0f);
-        subtab_1_1_w->set_int    (0, 0, 11106);
-        subtab_1_1_w->set_double (1, 0, 11116.0);
+        subtab_0_0_w->set_int(0, 0, 10006);
+        subtab_0_0_w->set_float(1, 0, 10016.0f);
+        subtab_1_1_w->set_int(0, 0, 11106);
+        subtab_1_1_w->set_double(1, 0, 11116.0);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2394,10 +2346,10 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     CHECK_EQUAL(type_Mixed, parent->get_column_type(0));
     CHECK_EQUAL(type_Mixed, parent->get_column_type(1));
     CHECK_EQUAL(2, parent->size());
-    CHECK_EQUAL(10006,    subtab_0_0->get_int    (0, 0));
-    CHECK_EQUAL(10016.0f, subtab_0_0->get_float  (1, 0));
-    CHECK_EQUAL(11106,    subtab_1_1->get_int    (0, 0));
-    CHECK_EQUAL(11116.0,  subtab_1_1->get_double (1, 0));
+    CHECK_EQUAL(10006, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10016.0f, subtab_0_0->get_float(1, 0));
+    CHECK_EQUAL(11106, subtab_1_1->get_int(0, 0));
+    CHECK_EQUAL(11116.0, subtab_1_1->get_double(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
     CHECK_EQUAL(subtab_0_1, parent->get_subtable(0, 1));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
@@ -2409,20 +2361,20 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         TableRef parent_w = wt.get_table("parent");
         parent_w->remove(1);
         TableRef subtab_0_0_w = parent_w->get_subtable(0, 0);
-        subtab_0_0_w->set_int   (0, 0, 10007);
-        subtab_0_0_w->set_float (1, 0, 10017.0f);
+        subtab_0_0_w->set_int(0, 0, 10007);
+        subtab_0_0_w->set_float(1, 0, 10017.0f);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(2, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
-    CHECK( subtab_0_0->is_attached());
+    CHECK(subtab_0_0->is_attached());
     CHECK(!subtab_0_1->is_attached());
-    CHECK( subtab_1_0->is_attached());
+    CHECK(subtab_1_0->is_attached());
     CHECK(!subtab_1_1->is_attached());
-    CHECK_EQUAL(10007,    subtab_0_0->get_int   (0, 0));
-    CHECK_EQUAL(10017.0f, subtab_0_0->get_float (1, 0));
+    CHECK_EQUAL(10007, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10017.0f, subtab_0_0->get_float(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
     CHECK_EQUAL(subtab_1_0, parent->get_subtable(1, 0));
     {
@@ -2430,20 +2382,20 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         TableRef parent_w = wt.get_table("parent");
         parent_w->remove_column(1);
         TableRef subtab_0_0_w = parent_w->get_subtable(0, 0);
-        subtab_0_0_w->set_int   (0, 0, 10008);
-        subtab_0_0_w->set_float (1, 0, 10018.0f);
+        subtab_0_0_w->set_int(0, 0, 10008);
+        subtab_0_0_w->set_float(1, 0, 10018.0f);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
     group.verify();
     CHECK_EQUAL(1, parent->get_column_count());
     CHECK_EQUAL(1, parent->size());
-    CHECK( subtab_0_0->is_attached());
+    CHECK(subtab_0_0->is_attached());
     CHECK(!subtab_0_1->is_attached());
     CHECK(!subtab_1_0->is_attached());
     CHECK(!subtab_1_1->is_attached());
-    CHECK_EQUAL(10008,    subtab_0_0->get_int   (0, 0));
-    CHECK_EQUAL(10018.0f, subtab_0_0->get_float (1, 0));
+    CHECK_EQUAL(10008, subtab_0_0->get_int(0, 0));
+    CHECK_EQUAL(10018.0f, subtab_0_0->get_float(1, 0));
     CHECK_EQUAL(subtab_0_0, parent->get_subtable(0, 0));
 
     // Remove subtable
@@ -2520,7 +2472,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
     CHECK(!subtab_0_0->is_attached());
     CHECK(!subtab_0_1->is_attached());
     CHECK(!subtab_1_0->is_attached());
-    CHECK( subtab_1_1->is_attached());
+    CHECK(subtab_1_1->is_attached());
     CHECK_EQUAL(1, subtab_1_1->size());
     CHECK_EQUAL("pneumonoultramicroscopicsilicovolcanoconiosis", subtab_1_1->get_string(0, 0));
 
@@ -2705,7 +2657,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(1, row_1.get_index());
     CHECK_EQUAL(3, row_2.get_index());
-    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(27, row_1.get_int(0));
     CHECK_EQUAL(227, row_2.get_int(0));
     {
         WriteTransaction wt(sg_w);
@@ -2725,7 +2677,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(2, row_1.get_index());
     CHECK_EQUAL(6, row_2.get_index());
-    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(27, row_1.get_int(0));
     CHECK_EQUAL(227, row_2.get_int(0));
 
     // Check that removal of rows (other than row_1 and row_2) does not detach
@@ -2748,7 +2700,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(1, row_1.get_index());
     CHECK_EQUAL(3, row_2.get_index());
-    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(27, row_1.get_int(0));
     CHECK_EQUAL(227, row_2.get_int(0));
     {
         WriteTransaction wt(sg_w);
@@ -2767,7 +2719,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
-    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(27, row_1.get_int(0));
     CHECK_EQUAL(227, row_2.get_int(0));
 
     // Check that removal of first row detaches row_1
@@ -2803,7 +2755,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
-    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(27, row_1.get_int(0));
     CHECK_EQUAL(227, row_2.get_int(0));
 
     // Check that removal of second row detaches row_2
@@ -2839,7 +2791,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
-    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(27, row_1.get_int(0));
     CHECK_EQUAL(227, row_2.get_int(0));
 
     // Check that adding a new row with the same primary key attaches row_1 to that row
@@ -2895,7 +2847,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
-    CHECK_EQUAL(27,  row_1.get_int(1));
+    CHECK_EQUAL(27, row_1.get_int(1));
     CHECK_EQUAL(227, row_2.get_int(1));
     {
         WriteTransaction wt(sg_w);
@@ -2913,7 +2865,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(parent.get(), row_2.get_table());
     CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(1, row_2.get_index());
-    CHECK_EQUAL(27,  row_1.get_int(0));
+    CHECK_EQUAL(27, row_1.get_int(0));
     CHECK_EQUAL(227, row_2.get_int(0));
 
     // Check that removal of the last column detaches all row accessors
@@ -3000,9 +2952,9 @@ TEST(LangBindHelper_AdvanceReadTransact_SubtableRowAccessors)
     LangBindHelper::advance_read(sg);
     group.verify();
     ConstTableRef parent = rt.get_table("parent");
-    ConstTableRef mixed   = parent->get_subtable(0, 0);
+    ConstTableRef mixed = parent->get_subtable(0, 0);
     ConstTableRef regular = parent->get_subtable(1, 0);
-    CHECK(mixed   && mixed->is_attached()   && mixed->size()   == 1);
+    CHECK(mixed && mixed->is_attached() && mixed->size() == 1);
     CHECK(regular && regular->is_attached() && regular->size() == 1);
     ConstRow row_m = (*mixed)[0];
     ConstRow row_r = (*regular)[0];
@@ -3113,9 +3065,9 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
         ConstTableRef regular_0 = parent->get_subtable(0, 0);
         ConstTableRef regular_1 = parent->get_subtable(0, 1);
         ConstTableRef regular_4 = parent->get_subtable(0, 4);
-        ConstTableRef   mixed_0 = parent->get_subtable(1, 0);
-        ConstTableRef   mixed_1 = parent->get_subtable(1, 1);
-        ConstTableRef   mixed_4 = parent->get_subtable(1, 4);
+        ConstTableRef mixed_0 = parent->get_subtable(1, 0);
+        ConstTableRef mixed_1 = parent->get_subtable(1, 1);
+        ConstTableRef mixed_4 = parent->get_subtable(1, 4);
         CHECK(row_0.is_attached());
         CHECK(row_1.is_attached());
         CHECK(row_4.is_attached());
@@ -3203,9 +3155,9 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
         ConstTableRef regular_0 = parent->get_subtable(0, 0);
         ConstTableRef regular_2 = parent->get_subtable(0, 2);
         ConstTableRef regular_3 = parent->get_subtable(0, 3);
-        ConstTableRef   mixed_0 = parent->get_subtable(1, 0);
-        ConstTableRef   mixed_2 = parent->get_subtable(1, 2);
-        ConstTableRef   mixed_3 = parent->get_subtable(1, 3);
+        ConstTableRef mixed_0 = parent->get_subtable(1, 0);
+        ConstTableRef mixed_2 = parent->get_subtable(1, 2);
+        ConstTableRef mixed_3 = parent->get_subtable(1, 3);
         CHECK(row_0.is_attached());
         CHECK(row_2.is_attached());
         CHECK(row_3.is_attached());
@@ -3305,8 +3257,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MoveLastOver)
         ConstRow row_3 = (*parent)[3];
         ConstTableRef regular_1 = parent->get_subtable(0, 1);
         ConstTableRef regular_3 = parent->get_subtable(0, 3);
-        ConstTableRef   mixed_1 = parent->get_subtable(1, 1);
-        ConstTableRef   mixed_3 = parent->get_subtable(1, 3);
+        ConstTableRef mixed_1 = parent->get_subtable(1, 1);
+        ConstTableRef mixed_3 = parent->get_subtable(1, 3);
         CHECK(row_1.is_attached());
         CHECK(row_3.is_attached());
         CHECK_EQUAL(1, row_1.get_index());
@@ -3444,9 +3396,9 @@ TEST(LangBindHelper_AdvanceReadTransact_SimpleSwapRows)
         ConstTableRef regular_0 = table->get_subtable(0, 0);
         ConstTableRef regular_1 = table->get_subtable(0, 1);
         ConstTableRef regular_4 = table->get_subtable(0, 4);
-        ConstTableRef   mixed_0 = table->get_subtable(1, 0);
-        ConstTableRef   mixed_1 = table->get_subtable(1, 1);
-        ConstTableRef   mixed_4 = table->get_subtable(1, 4);
+        ConstTableRef mixed_0 = table->get_subtable(1, 0);
+        ConstTableRef mixed_1 = table->get_subtable(1, 1);
+        ConstTableRef mixed_4 = table->get_subtable(1, 4);
 
         CHECK(row_0.is_attached());
         CHECK(row_1.is_attached());
@@ -3547,7 +3499,7 @@ TEST(LangBindHelper_AdvanceReadTransact_ChangeLinkTargets)
     LangBindHelper::advance_read(sg);
     group.verify();
 
-    ConstRow row_int_0_replaced_by_row_2  = group.get_table(0)->get(0);
+    ConstRow row_int_0_replaced_by_row_2 = group.get_table(0)->get(0);
     ConstRow row_link_0_replaced_by_row_2 = group.get_table(1)->get(0);
     CHECK_EQUAL(row_link_0_replaced_by_row_2.get_link(0), 0);
 
@@ -3709,15 +3661,22 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
 
 namespace {
 
-template<typename T>
+template <typename T>
 class ConcurrentQueue {
 public:
-    ConcurrentQueue(size_t size) : sz(size)
+    ConcurrentQueue(size_t size)
+        : sz(size)
     {
         data.reset(new T[sz]);
     }
-    inline bool is_full() { return writer - reader == sz; }
-    inline bool is_empty() { return writer - reader == 0; }
+    inline bool is_full()
+    {
+        return writer - reader == sz;
+    }
+    inline bool is_empty()
+    {
+        return writer - reader == 0;
+    }
     void put(T& e)
     {
         std::unique_lock<std::mutex> lock(mutex);
@@ -3753,6 +3712,7 @@ public:
         closed = true;
         not_empty_or_closed.notify_all();
     }
+
 private:
     std::mutex mutex;
     std::condition_variable not_full;
@@ -3777,11 +3737,11 @@ void deleter_thread(ConcurrentQueue<LinkViewRef>& queue)
         // random delay goes *after* get(), so that it comes
         // after the potentially synchronizing locking
         // operation inside queue.get()
-        while (delay > 0) delay--;
+        while (delay > 0)
+            delay--;
         // just let 'r' die
     }
 }
-
 }
 
 TEST(LangBindHelper_ConcurrentLinkViewDeletes)
@@ -3866,7 +3826,6 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     queue.close();
     deleter.join();
 }
-
 
 
 TEST(LangBindHelper_AdvanceReadTransact_Links)
@@ -4005,9 +3964,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         WriteTransaction wt(sg_w);
         TableRef origin_1_w = wt.get_table("origin_1");
         origin_1_w->add_empty_row(2);
-        origin_1_w->set_link(0, 1, 0); // O_1_L_3[1] -> T_1[0]
-        origin_1_w->set_link(2, 0, 0); // O_1_L_4[0] -> T_2[0]
-        origin_1_w->set_link(2, 1, 1); // O_1_L_4[1] -> T_2[1]
+        origin_1_w->set_link(0, 1, 0);          // O_1_L_3[1] -> T_1[0]
+        origin_1_w->set_link(2, 0, 0);          // O_1_L_4[0] -> T_2[0]
+        origin_1_w->set_link(2, 1, 1);          // O_1_L_4[1] -> T_2[1]
         origin_1_w->get_linklist(4, 1)->add(0); // O_1_LL_1[1] -> T_1[0]
         wt.commit();
     }
@@ -4030,16 +3989,16 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     CHECK_EQUAL(5, origin_2->get_column_count());
     CHECK_EQUAL(1, target_1->get_column_count());
     CHECK_EQUAL(1, target_2->get_column_count());
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(2));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(3));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(2));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(3));
     CHECK_EQUAL(type_LinkList, origin_1->get_column_type(4));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(1));
     CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(3));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(4));
     CHECK_EQUAL(target_1, origin_1->get_link_target(0));
     CHECK_EQUAL(target_2, origin_1->get_link_target(2));
     CHECK_EQUAL(target_1, origin_1->get_link_target(4));
@@ -4181,11 +4140,11 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         WriteTransaction wt(sg_w);
         TableRef origin_2_w = wt.get_table("origin_2");
         origin_2_w->insert_empty_row(2);
-        origin_2_w->set_link(0, 2, 1);  // O_2_L_2[2] -> T_1[1]
+        origin_2_w->set_link(0, 2, 1); // O_2_L_2[2] -> T_1[1]
         origin_2_w->set_int(1, 2, 19);
         // linklist is empty by default
         origin_2_w->set_int(3, 2, 0);
-        origin_2_w->set_link(4, 2, 0);  // O_2_L_4[2] -> T_2[0]
+        origin_2_w->set_link(4, 2, 0); // O_2_L_4[2] -> T_2[0]
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -4435,7 +4394,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         TableRef origin_2_w = wt.get_table("origin_2");
         LinkViewRef link_list_1_2_w = origin_1_w->get_linklist(4, 2);
         LinkViewRef link_list_2_2_w = origin_2_w->get_linklist(2, 2);
-        link_list_1_2_w->clear(); // Remove  O_1_LL_1[2] -> T_1[1]
+        link_list_1_2_w->clear();    // Remove  O_1_LL_1[2] -> T_1[1]
         link_list_2_2_w->move(0, 1); // [ 0, 1 ] -> [ 1, 0 ]
         wt.commit();
     }
@@ -4695,7 +4654,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         WriteTransaction wt(sg_w);
         TableRef origin_1_w = wt.get_table("origin_1");
         TableRef origin_2_w = wt.get_table("origin_2");
-        origin_1_w->add_empty_row();   // [ 2, 1 ] -> [ 2, 1, 3 ]
+        origin_1_w->add_empty_row(); // [ 2, 1 ] -> [ 2, 1, 3 ]
         origin_1_w->set_link(2, 2, 0);
         origin_2_w->move_last_over(0); // [ 0, 1 ] -> [ 1 ]
         // Removes  O_2_L_2[0]  -> T_1[1]  and  O_2_LL_3[1] -> T_2[0]  and
@@ -4813,16 +4772,16 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         TableRef origin_2_w = wt.get_table("origin_2");
         origin_1_w->move_last_over(1); // [ 2, 3 ] -> [ 2 ]
         // Removes  O_1_L_4[1] -> T_2[0]
-        origin_2_w->add_empty_row(3); // [] -> [ 3, 4, 5 ]
-        origin_2_w->set_link(0, 0, 0);         // O_2_L_2[0]  -> T_1[0]
-        origin_2_w->set_link(0, 2, 1);         // O_2_L_2[2]  -> T_1[1]
+        origin_2_w->add_empty_row(3);           // [] -> [ 3, 4, 5 ]
+        origin_2_w->set_link(0, 0, 0);          // O_2_L_2[0]  -> T_1[0]
+        origin_2_w->set_link(0, 2, 1);          // O_2_L_2[2]  -> T_1[1]
         origin_2_w->get_linklist(2, 0)->add(1); // O_2_LL_3[0] -> T_2[1]
         origin_2_w->get_linklist(2, 1)->add(0); // O_2_LL_3[1] -> T_2[0]
         origin_2_w->get_linklist(2, 1)->add(1); // O_2_LL_3[1] -> T_2[1]
         origin_2_w->get_linklist(2, 2)->add(1); // O_2_LL_3[2] -> T_2[1]
         origin_2_w->get_linklist(2, 2)->add(0); // O_2_LL_3[2] -> T_2[0]
-        origin_2_w->set_link(4, 0, 1);         // O_2_L_4[0]  -> T_2[1]
-        origin_2_w->set_link(4, 2, 0);         // O_2_L_4[2]  -> T_2[0]
+        origin_2_w->set_link(4, 0, 1);          // O_2_L_4[0]  -> T_2[1]
+        origin_2_w->set_link(4, 2, 0);          // O_2_L_4[2]  -> T_2[0]
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -4880,10 +4839,10 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     {
         WriteTransaction wt(sg_w);
         TableRef origin_1_w = wt.get_table("origin_1");
-        origin_1_w->add_empty_row(2); // [ 2 ] -> [ 2, 4, 5 ]
-        origin_1_w->set_link(0, 2, 0); // O_1_L_3[2] -> T_1[0]
-        origin_1_w->set_link(2, 0, 1); // O_1_L_4[0] -> T_2[1]
-        origin_1_w->set_link(2, 2, 0); // O_1_L_4[2] -> T_2[0]
+        origin_1_w->add_empty_row(2);           // [ 2 ] -> [ 2, 4, 5 ]
+        origin_1_w->set_link(0, 2, 0);          // O_1_L_3[2] -> T_1[0]
+        origin_1_w->set_link(2, 0, 1);          // O_1_L_4[0] -> T_2[1]
+        origin_1_w->set_link(2, 2, 0);          // O_1_L_4[2] -> T_2[0]
         origin_1_w->get_linklist(4, 1)->add(0); // O_1_LL_1[1] -> T_1[0]
         origin_1_w->get_linklist(4, 1)->add(0); // O_1_LL_1[1] -> T_1[0] (double)
         origin_1_w->get_linklist(4, 2)->add(1); // O_1_LL_1[2] -> T_1[1]
@@ -5121,11 +5080,11 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         TableRef origin_2_w = wt.get_table("origin_2");
         TableRef target_1_w = wt.get_table("target_1");
         TableRef target_2_w = wt.get_table("target_2");
-        target_1_w->add_empty_row();   // [ 2, 1 ] -> [ 2, 1, 3 ]
-        origin_1_w->set_link(0, 2, 2);         // O_1_L_3[2]  -> T_1[2]
+        target_1_w->add_empty_row();            // [ 2, 1 ] -> [ 2, 1, 3 ]
+        origin_1_w->set_link(0, 2, 2);          // O_1_L_3[2]  -> T_1[2]
         origin_1_w->get_linklist(4, 1)->add(2); // O_1_LL_1[1] -> T_1[2]
-        origin_2_w->set_link(0, 0, 2);         // O_2_L_2[0]  -> T_1[2]
-        target_2_w->move_last_over(0); // [ 0, 1 ] -> [ 1 ]
+        origin_2_w->set_link(0, 0, 2);          // O_2_L_2[0]  -> T_1[2]
+        target_2_w->move_last_over(0);          // [ 0, 1 ] -> [ 1 ]
         // Removes  O_1_L_4[0]  -> T_2[1]  and  O_1_L_4[2]  -> T_2[0]  and
         //          O_2_LL_3[0] -> T_2[1]  and  O_2_LL_3[1] -> T_2[1]  and
         //          O_2_LL_3[2] -> T_2[1]  and  O_2_L_4[2]  -> T_2[0]
@@ -5272,14 +5231,14 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         TableRef target_2_w = wt.get_table("target_2");
         target_1_w->move_last_over(1); // [ 2, 3 ] -> [ 2 ]
         // Removes  O_1_L_3[2] -> T_1[1]  and  O_1_LL_1[1] -> T_1[1]  and  O_2_L_2[0] -> T_1[1]
-        target_2_w->add_empty_row(3); // [] -> [ 3, 4, 5 ]
-        origin_1_w->set_link(2, 0, 1);         // O_1_L_4[0]  -> T_2[1]
-        origin_1_w->set_link(2, 2, 0);         // O_1_L_4[2]  -> T_2[0]
+        target_2_w->add_empty_row(3);           // [] -> [ 3, 4, 5 ]
+        origin_1_w->set_link(2, 0, 1);          // O_1_L_4[0]  -> T_2[1]
+        origin_1_w->set_link(2, 2, 0);          // O_1_L_4[2]  -> T_2[0]
         origin_2_w->get_linklist(2, 0)->add(1); // O_2_LL_3[0] -> T_2[1]
         origin_2_w->get_linklist(2, 0)->add(1); // O_2_LL_3[0] -> T_2[1]
         origin_2_w->get_linklist(2, 2)->add(0); // O_2_LL_3[2] -> T_2[0]
-        origin_2_w->set_link(4, 0, 0);         // O_2_L_4[0]  -> T_2[0]
-        origin_2_w->set_link(4, 1, 1);         // O_2_L_4[1]  -> T_2[1]
+        origin_2_w->set_link(4, 0, 0);          // O_2_L_4[0]  -> T_2[0]
+        origin_2_w->set_link(4, 1, 1);          // O_2_L_4[1]  -> T_2[1]
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -5348,13 +5307,13 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         TableRef target_1_w = wt.get_table("target_1");
         TableRef origin_1_w = wt.get_table("origin_1");
         TableRef origin_2_w = wt.get_table("origin_2");
-        target_1_w->add_empty_row(2); // [ 2 ] -> [ 2, 4, 5 ]
-        origin_1_w->set_link(0, 0, 1); // O_1_L_3[0] -> T_1[1]
-        origin_1_w->set_link(0, 2, 0); // O_1_L_3[2] -> T_1[0]
+        target_1_w->add_empty_row(2);           // [ 2 ] -> [ 2, 4, 5 ]
+        origin_1_w->set_link(0, 0, 1);          // O_1_L_3[0] -> T_1[1]
+        origin_1_w->set_link(0, 2, 0);          // O_1_L_3[2] -> T_1[0]
         origin_1_w->get_linklist(4, 0)->add(1); // O_1_LL_1[0] -> T_1[1]
         origin_1_w->get_linklist(4, 0)->add(0); // O_1_LL_1[0] -> T_1[0]
-        origin_2_w->set_link(0, 0, 0); // O_2_L_2[0] -> T_1[0]
-        origin_2_w->set_link(0, 2, 1); // O_2_L_2[2] -> T_1[1]
+        origin_2_w->set_link(0, 0, 0);          // O_2_L_2[0] -> T_1[0]
+        origin_2_w->set_link(0, 2, 1);          // O_2_L_2[2] -> T_1[1]
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -5723,22 +5682,22 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     // from it
     CHECK_EQUAL(5, origin_1->get_column_count());
     CHECK_EQUAL(5, origin_2->get_column_count());
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(2));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(3));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(2));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(3));
     CHECK_EQUAL(type_LinkList, origin_1->get_column_type(4));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(1));
     CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(3));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(4));
     {
         WriteTransaction wt(sg_w);
         TableRef origin_1_w = wt.get_table("origin_1");
         TableRef origin_2_w = wt.get_table("origin_2");
-        origin_1_w->insert_column(2, type_Table,  "foo_1");
-        origin_2_w->insert_column(0, type_Table,  "foo_2");
+        origin_1_w->insert_column(2, type_Table, "foo_1");
+        origin_2_w->insert_column(0, type_Table, "foo_2");
         origin_2_w->insert_column(6, type_String, "foo_3");
         wt.commit();
     }
@@ -5746,19 +5705,19 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.verify();
     CHECK_EQUAL(6, origin_1->get_column_count());
     CHECK_EQUAL(7, origin_2->get_column_count());
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
-    CHECK_EQUAL(type_Table,    origin_1->get_column_type(2));
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(3));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(4));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Table, origin_1->get_column_type(2));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(3));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(4));
     CHECK_EQUAL(type_LinkList, origin_1->get_column_type(5));
-    CHECK_EQUAL(type_Table,    origin_2->get_column_type(0));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(1));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(2));
+    CHECK_EQUAL(type_Table, origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(1));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(2));
     CHECK_EQUAL(type_LinkList, origin_2->get_column_type(3));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(4));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(5));
-    CHECK_EQUAL(type_String,   origin_2->get_column_type(6));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(4));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(5));
+    CHECK_EQUAL(type_String, origin_2->get_column_type(6));
     CHECK_EQUAL(3, origin_1->size());
     CHECK_EQUAL(3, origin_2->size());
     CHECK(link_list_1_0->is_attached());
@@ -5833,19 +5792,19 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.verify();
     CHECK_EQUAL(7, origin_1->get_column_count());
     CHECK_EQUAL(6, origin_2->get_column_count());
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
-    CHECK_EQUAL(type_Table,    origin_1->get_column_type(2));
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(3));
-    CHECK_EQUAL(type_Mixed,    origin_1->get_column_type(4));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(5));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Table, origin_1->get_column_type(2));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(3));
+    CHECK_EQUAL(type_Mixed, origin_1->get_column_type(4));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(5));
     CHECK_EQUAL(type_LinkList, origin_1->get_column_type(6));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(1));
     CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
-    CHECK_EQUAL(type_String,   origin_2->get_column_type(5));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(3));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(4));
+    CHECK_EQUAL(type_String, origin_2->get_column_type(5));
     CHECK(link_list_1_0->is_attached());
     CHECK(link_list_1_1->is_attached());
     CHECK(link_list_1_2->is_attached());
@@ -5919,16 +5878,16 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.verify();
     CHECK_EQUAL(5, origin_1->get_column_count());
     CHECK_EQUAL(5, origin_2->get_column_count());
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(2));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(3));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(2));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(3));
     CHECK_EQUAL(type_LinkList, origin_1->get_column_type(4));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(1));
     CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(3));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(4));
     CHECK(link_list_1_0->is_attached());
     CHECK(link_list_1_1->is_attached());
     CHECK(link_list_1_2->is_attached());
@@ -5999,7 +5958,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         TableRef target_1_w = wt.get_table("target_1");
         TableRef target_2_w = wt.get_table("target_2");
         origin_1_w->insert_column_link(2, type_LinkList, "bar_1", *target_2_w);
-        origin_2_w->insert_column_link(0, type_Link,     "bar_2", *target_1_w);
+        origin_2_w->insert_column_link(0, type_Link, "bar_2", *target_1_w);
         origin_2_w->insert_column_link(6, type_LinkList, "bar_3", *target_2_w);
         origin_2_w->set_link(0, 0, 2);
         origin_2_w->set_link(0, 1, 0);
@@ -6009,18 +5968,18 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.verify();
     CHECK_EQUAL(6, origin_1->get_column_count());
     CHECK_EQUAL(7, origin_2->get_column_count());
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
     CHECK_EQUAL(type_LinkList, origin_1->get_column_type(2));
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(3));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(4));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(3));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(4));
     CHECK_EQUAL(type_LinkList, origin_1->get_column_type(5));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(1));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(2));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(1));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(2));
     CHECK_EQUAL(type_LinkList, origin_2->get_column_type(3));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(4));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(5));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(4));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(5));
     CHECK_EQUAL(type_LinkList, origin_2->get_column_type(6));
     CHECK_EQUAL(1, origin_1->get_link(0, 0));
     CHECK(origin_1->is_null_link(0, 1));
@@ -6127,18 +6086,18 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.verify();
     CHECK_EQUAL(7, origin_1->get_column_count());
     CHECK_EQUAL(6, origin_2->get_column_count());
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
     CHECK_EQUAL(type_LinkList, origin_1->get_column_type(2));
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(3));
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(4));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(5));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(3));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(4));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(5));
     CHECK_EQUAL(type_LinkList, origin_1->get_column_type(6));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(1));
     CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(3));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(4));
     CHECK_EQUAL(type_LinkList, origin_2->get_column_type(5));
     CHECK_EQUAL(1, origin_1->get_link(0, 0));
     CHECK(origin_1->is_null_link(0, 1));
@@ -6167,15 +6126,15 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     CHECK(link_list_2_0_x->is_attached());
     CHECK(link_list_2_1_x->is_attached());
     CHECK(link_list_2_2_x->is_attached());
-    CHECK_EQUAL(link_list_1_0,   origin_1->get_linklist(6, 0));
-    CHECK_EQUAL(link_list_1_1,   origin_1->get_linklist(6, 1));
-    CHECK_EQUAL(link_list_1_2,   origin_1->get_linklist(6, 2));
+    CHECK_EQUAL(link_list_1_0, origin_1->get_linklist(6, 0));
+    CHECK_EQUAL(link_list_1_1, origin_1->get_linklist(6, 1));
+    CHECK_EQUAL(link_list_1_2, origin_1->get_linklist(6, 2));
     CHECK_EQUAL(link_list_1_0_x, origin_1->get_linklist(2, 0));
     CHECK_EQUAL(link_list_1_1_x, origin_1->get_linklist(2, 1));
     CHECK_EQUAL(link_list_1_2_x, origin_1->get_linklist(2, 2));
-    CHECK_EQUAL(link_list_2_0,   origin_2->get_linklist(2, 0));
-    CHECK_EQUAL(link_list_2_1,   origin_2->get_linklist(2, 1));
-    CHECK_EQUAL(link_list_2_2,   origin_2->get_linklist(2, 2));
+    CHECK_EQUAL(link_list_2_0, origin_2->get_linklist(2, 0));
+    CHECK_EQUAL(link_list_2_1, origin_2->get_linklist(2, 1));
+    CHECK_EQUAL(link_list_2_2, origin_2->get_linklist(2, 2));
     CHECK_EQUAL(link_list_2_0_x, origin_2->get_linklist(5, 0));
     CHECK_EQUAL(link_list_2_1_x, origin_2->get_linklist(5, 1));
     CHECK_EQUAL(link_list_2_2_x, origin_2->get_linklist(5, 2));
@@ -6255,16 +6214,16 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.verify();
     CHECK_EQUAL(5, origin_1->get_column_count());
     CHECK_EQUAL(5, origin_2->get_column_count());
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
-    CHECK_EQUAL(type_Link,     origin_1->get_column_type(2));
-    CHECK_EQUAL(type_Int,      origin_1->get_column_type(3));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
+    CHECK_EQUAL(type_Link, origin_1->get_column_type(2));
+    CHECK_EQUAL(type_Int, origin_1->get_column_type(3));
     CHECK_EQUAL(type_LinkList, origin_1->get_column_type(4));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(1));
     CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
-    CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
-    CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+    CHECK_EQUAL(type_Int, origin_2->get_column_type(3));
+    CHECK_EQUAL(type_Link, origin_2->get_column_type(4));
     CHECK_EQUAL(3, origin_1->size());
     CHECK_EQUAL(3, origin_2->size());
     CHECK_EQUAL(1, origin_1->get_link(0, 0));
@@ -6348,9 +6307,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     CHECK_EQUAL(2, target_1->get_column_count());
     CHECK_EQUAL(2, target_2->get_column_count());
     CHECK_EQUAL(type_Mixed, target_1->get_column_type(0));
-    CHECK_EQUAL(type_Int,   target_1->get_column_type(1));
-    CHECK_EQUAL(type_Int,   target_2->get_column_type(0));
-    CHECK_EQUAL(type_Link,  target_2->get_column_type(1));
+    CHECK_EQUAL(type_Int, target_1->get_column_type(1));
+    CHECK_EQUAL(type_Int, target_2->get_column_type(0));
+    CHECK_EQUAL(type_Link, target_2->get_column_type(1));
     CHECK_EQUAL(3, target_1->size());
     CHECK_EQUAL(3, target_2->size());
     CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
@@ -6384,7 +6343,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     CHECK_EQUAL(1, target_1->get_column_count());
     CHECK_EQUAL(1, target_2->get_column_count());
     CHECK_EQUAL(type_Mixed, target_1->get_column_type(0));
-    CHECK_EQUAL(type_Link,  target_2->get_column_type(0));
+    CHECK_EQUAL(type_Link, target_2->get_column_type(0));
     CHECK_EQUAL(3, target_1->size());
     CHECK_EQUAL(3, target_2->size());
     CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
@@ -6419,7 +6378,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
     group.verify();
     CHECK_EQUAL(0, target_1->get_column_count());
     CHECK_EQUAL(1, target_2->get_column_count());
-    CHECK_EQUAL(type_Link,  target_2->get_column_type(0));
+    CHECK_EQUAL(type_Link, target_2->get_column_type(0));
     CHECK_EQUAL(3, origin_1->size());
     CHECK_EQUAL(3, origin_2->size());
     CHECK_EQUAL(0, target_1->size());
@@ -6506,7 +6465,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("table");
-        table_w->add_column_link(type_Link,     "foo", *table_w);
+        table_w->add_column_link(type_Link, "foo", *table_w);
         table_w->add_column_link(type_LinkList, "bar", *table_w);
         wt.commit();
     }
@@ -6514,7 +6473,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     group.verify();
     CHECK(table->is_attached());
     CHECK_EQUAL(2, table->get_column_count());
-    CHECK_EQUAL(type_Link,     table->get_column_type(0));
+    CHECK_EQUAL(type_Link, table->get_column_type(0));
     CHECK_EQUAL(type_LinkList, table->get_column_type(1));
     CHECK_EQUAL(table, table->get_link_target(0));
     CHECK_EQUAL(table, table->get_link_target(1));
@@ -6565,7 +6524,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     {
         WriteTransaction wt(sg_w);
         TableRef table_2_w = wt.add_table("table_2");
-        table_2_w->add_column_link(type_Link,     "foo", *table_2_w);
+        table_2_w->add_column_link(type_Link, "foo", *table_2_w);
         table_2_w->add_column_link(type_LinkList, "bar", *table_2_w);
         table_2_w->add_empty_row();
         table_2_w->set_link(0, 0, 0);
@@ -6576,7 +6535,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     group.verify();
     ConstTableRef table_2 = group.get_table("table_2");
     CHECK_EQUAL(2, table_2->get_column_count());
-    CHECK_EQUAL(type_Link,     table_2->get_column_type(0));
+    CHECK_EQUAL(type_Link, table_2->get_column_type(0));
     CHECK_EQUAL(type_LinkList, table_2->get_column_type(1));
     CHECK_EQUAL(table_2, table_2->get_link_target(0));
     CHECK_EQUAL(table_2, table_2->get_link_target(1));
@@ -6598,9 +6557,9 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     // same transaction.
     {
         WriteTransaction wt(sg_w);
-        TableRef table_w   = wt.get_table("table");
+        TableRef table_w = wt.get_table("table");
         TableRef table_2_w = wt.get_table("table_2");
-        table_w->add_column_link(type_Link,       "foobar", *table_2_w);
+        table_w->add_column_link(type_Link, "foobar", *table_2_w);
         table_2_w->add_column_link(type_LinkList, "barfoo", *table_w);
         wt.commit();
     }
@@ -6610,18 +6569,18 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK(table_2->is_attached());
     CHECK_EQUAL(3, table->get_column_count());
     CHECK_EQUAL(3, table_2->get_column_count());
-    CHECK_EQUAL(type_Link,     table->get_column_type(0));
+    CHECK_EQUAL(type_Link, table->get_column_type(0));
     CHECK_EQUAL(type_LinkList, table->get_column_type(1));
-    CHECK_EQUAL(type_Link,     table->get_column_type(2));
-    CHECK_EQUAL(type_Link,     table_2->get_column_type(0));
+    CHECK_EQUAL(type_Link, table->get_column_type(2));
+    CHECK_EQUAL(type_Link, table_2->get_column_type(0));
     CHECK_EQUAL(type_LinkList, table_2->get_column_type(1));
     CHECK_EQUAL(type_LinkList, table_2->get_column_type(2));
-    CHECK_EQUAL(table,   table->get_link_target(0));
-    CHECK_EQUAL(table,   table->get_link_target(1));
+    CHECK_EQUAL(table, table->get_link_target(0));
+    CHECK_EQUAL(table, table->get_link_target(1));
     CHECK_EQUAL(table_2, table->get_link_target(2));
     CHECK_EQUAL(table_2, table_2->get_link_target(0));
     CHECK_EQUAL(table_2, table_2->get_link_target(1));
-    CHECK_EQUAL(table,   table_2->get_link_target(2));
+    CHECK_EQUAL(table, table_2->get_link_target(2));
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(1, table_2->size());
     CHECK_EQUAL(0, table->get_link(0, 0));
@@ -6645,7 +6604,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK_EQUAL(0, row_2.get_index());
     ConstLinkViewRef link_list_3 = table_2->get_linklist(2, 0);
     CHECK_EQUAL(table_2, &link_list_3->get_origin_table());
-    CHECK_EQUAL(table,   &link_list_3->get_target_table());
+    CHECK_EQUAL(table, &link_list_3->get_target_table());
     CHECK(link_list_3->is_empty());
     CHECK_EQUAL(1, table->get_backlink_count(0, *table, 0));
     CHECK_EQUAL(1, table->get_backlink_count(0, *table, 1));
@@ -6655,7 +6614,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK_EQUAL(0, table_2->get_backlink_count(0, *table, 2));
     {
         WriteTransaction wt(sg_w);
-        TableRef table_w   = wt.get_table("table");
+        TableRef table_w = wt.get_table("table");
         TableRef table_2_w = wt.get_table("table_2");
         table_w->set_link(2, 0, 0);
         table_2_w->get_linklist(2, 0)->add(0);
@@ -6689,7 +6648,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK(link_list_3->is_attached());
     CHECK_EQUAL(link_list_3, table_2->get_linklist(2, 0));
     CHECK_EQUAL(table_2, &link_list_3->get_origin_table());
-    CHECK_EQUAL(table,   &link_list_3->get_target_table());
+    CHECK_EQUAL(table, &link_list_3->get_target_table());
     CHECK_EQUAL(1, link_list_3->size());
     ConstRow row_3 = link_list_3->get(0);
     CHECK_EQUAL(table, row_3.get_table());
@@ -6705,7 +6664,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         TableRef table_3_w = wt.add_table("table_3");
         TableRef table_4_w = wt.add_table("table_4");
         table_3_w->add_column_link(type_LinkList, "foobar_2", *table_4_w);
-        table_4_w->add_column_link(type_Link,     "barfoo_2", *table_3_w);
+        table_4_w->add_column_link(type_Link, "barfoo_2", *table_3_w);
         table_3_w->add_empty_row();
         table_4_w->add_empty_row();
         table_3_w->get_linklist(0, 0)->add(0);
@@ -6719,7 +6678,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK_EQUAL(1, table_3->get_column_count());
     CHECK_EQUAL(1, table_4->get_column_count());
     CHECK_EQUAL(type_LinkList, table_3->get_column_type(0));
-    CHECK_EQUAL(type_Link,     table_4->get_column_type(0));
+    CHECK_EQUAL(type_Link, table_4->get_column_type(0));
     CHECK_EQUAL(table_4, table_3->get_link_target(0));
     CHECK_EQUAL(table_3, table_4->get_link_target(0));
     CHECK_EQUAL(1, table_3->size());
@@ -6739,7 +6698,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     // relationship cycles
     {
         WriteTransaction wt(sg_w);
-        TableRef table_w   = wt.get_table("table");
+        TableRef table_w = wt.get_table("table");
         TableRef table_2_w = wt.get_table("table_2");
         TableRef table_3_w = wt.get_table("table_3");
         table_w->remove_column(0);
@@ -6759,12 +6718,12 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK_EQUAL(0, table_3->get_column_count());
     CHECK_EQUAL(1, table_4->get_column_count());
     CHECK_EQUAL(type_LinkList, table->get_column_type(0));
-    CHECK_EQUAL(type_Link,     table->get_column_type(1));
+    CHECK_EQUAL(type_Link, table->get_column_type(1));
     CHECK_EQUAL(type_LinkList, table_2->get_column_type(0));
-    CHECK_EQUAL(type_Link,     table_4->get_column_type(0));
-    CHECK_EQUAL(table,   table->get_link_target(0));
+    CHECK_EQUAL(type_Link, table_4->get_column_type(0));
+    CHECK_EQUAL(table, table->get_link_target(0));
     CHECK_EQUAL(table_2, table->get_link_target(1));
-    CHECK_EQUAL(table,   table_2->get_link_target(0));
+    CHECK_EQUAL(table, table_2->get_link_target(0));
     CHECK_EQUAL(table_3, table_4->get_link_target(0));
     CHECK_EQUAL(1, table->size());
     CHECK_EQUAL(1, table_2->size());
@@ -6785,7 +6744,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK(link_list_3->is_attached());
     CHECK_EQUAL(link_list_3, table_2->get_linklist(0, 0));
     CHECK_EQUAL(table_2, &link_list_3->get_origin_table());
-    CHECK_EQUAL(table,   &link_list_3->get_target_table());
+    CHECK_EQUAL(table, &link_list_3->get_target_table());
     CHECK_EQUAL(1, link_list_3->size());
     row_3 = link_list_3->get(0);
     CHECK_EQUAL(table, row_3.get_table());
@@ -6795,7 +6754,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK(table_4->is_null_link(0, 0));
     {
         WriteTransaction wt(sg_w);
-        TableRef table_w   = wt.get_table("table");
+        TableRef table_w = wt.get_table("table");
         TableRef table_2_w = wt.get_table("table_2");
         TableRef table_4_w = wt.get_table("table_4");
         table_w->remove_column(1);
@@ -6831,7 +6790,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK(!link_list_3->is_attached());
     {
         WriteTransaction wt(sg_w);
-        TableRef table_w   = wt.get_table("table");
+        TableRef table_w = wt.get_table("table");
         table_w->remove_column(0);
         wt.commit();
     }
@@ -6854,8 +6813,8 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     // Check that a row can be removed even when it participates in a link cycle
     {
         WriteTransaction wt(sg_w);
-        TableRef table_w   = wt.get_table("table");
-        table_w->add_column_link(type_Link,     "a", *table_w);
+        TableRef table_w = wt.get_table("table");
+        table_w->add_column_link(type_Link, "a", *table_w);
         table_w->add_column_link(type_LinkList, "b", *table_w);
         table_w->add_empty_row();
         table_w->set_link(0, 0, 0);
@@ -6866,7 +6825,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     group.verify();
     CHECK(table->is_attached());
     CHECK_EQUAL(2, table->get_column_count());
-    CHECK_EQUAL(type_Link,     table->get_column_type(0));
+    CHECK_EQUAL(type_Link, table->get_column_type(0));
     CHECK_EQUAL(type_LinkList, table->get_column_type(1));
     CHECK_EQUAL(table, table->get_link_target(0));
     CHECK_EQUAL(table, table->get_link_target(1));
@@ -6895,7 +6854,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     group.verify();
     CHECK(table->is_attached());
     CHECK_EQUAL(2, table->get_column_count());
-    CHECK_EQUAL(type_Link,     table->get_column_type(0));
+    CHECK_EQUAL(type_Link, table->get_column_type(0));
     CHECK_EQUAL(type_LinkList, table->get_column_type(1));
     CHECK_EQUAL(table, table->get_link_target(0));
     CHECK_EQUAL(table, table->get_link_target(1));
@@ -6904,7 +6863,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK_EQUAL(0, table->get_link(0, 1));
     CHECK(!link_list->is_attached());
     CHECK_NOT_EQUAL(link_list, table->get_linklist(1, 0));
-    link_list   = table->get_linklist(1, 0);
+    link_list = table->get_linklist(1, 0);
     link_list_2 = table->get_linklist(1, 1);
     CHECK_EQUAL(1, link_list->size());
     CHECK_EQUAL(1, link_list_2->size());
@@ -6922,7 +6881,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     group.verify();
     CHECK(table->is_attached());
     CHECK_EQUAL(2, table->get_column_count());
-    CHECK_EQUAL(type_Link,     table->get_column_type(0));
+    CHECK_EQUAL(type_Link, table->get_column_type(0));
     CHECK_EQUAL(type_LinkList, table->get_column_type(1));
     CHECK_EQUAL(table, table->get_link_target(0));
     CHECK_EQUAL(table, table->get_link_target(1));
@@ -6942,7 +6901,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
         WriteTransaction wt(sg_w);
         TableRef table_2_w = wt.get_table("table_2");
         TableRef table_3_w = wt.get_table("table_3");
-        table_2_w->add_column_link(type_Link,     "col_1", *table_3_w);
+        table_2_w->add_column_link(type_Link, "col_1", *table_3_w);
         table_3_w->add_column_link(type_LinkList, "col_2", *table_2_w);
         table_2_w->add_empty_row();
         table_3_w->add_empty_row();
@@ -6956,7 +6915,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK(table_3->is_attached());
     CHECK_EQUAL(1, table_2->get_column_count());
     CHECK_EQUAL(1, table_3->get_column_count());
-    CHECK_EQUAL(type_Link,     table_2->get_column_type(0));
+    CHECK_EQUAL(type_Link, table_2->get_column_type(0));
     CHECK_EQUAL(type_LinkList, table_3->get_column_type(0));
     CHECK_EQUAL(table_3, table_2->get_link_target(0));
     CHECK_EQUAL(table_2, table_3->get_link_target(0));
@@ -6984,7 +6943,7 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkCycles)
     CHECK(table_3->is_attached());
     CHECK_EQUAL(1, table_2->get_column_count());
     CHECK_EQUAL(1, table_3->get_column_count());
-    CHECK_EQUAL(type_Link,     table_2->get_column_type(0));
+    CHECK_EQUAL(type_Link, table_2->get_column_type(0));
     CHECK_EQUAL(type_LinkList, table_3->get_column_type(0));
     CHECK_EQUAL(table_3, table_2->get_link_target(0));
     CHECK_EQUAL(table_2, table_3->get_link_target(0));
@@ -7055,7 +7014,7 @@ TEST(LangBindHelper_AdvanceReadTransact_NonEndRowInsertWithLinks)
         WriteTransaction wt(sg_w);
         TableRef foo_w = wt.add_table("foo");
         TableRef bar_w = wt.add_table("bar");
-        foo_w->add_column_link(type_Link,     "l",  *bar_w);
+        foo_w->add_column_link(type_Link, "l", *bar_w);
         bar_w->add_column_link(type_LinkList, "ll", *foo_w);
         foo_w->add_empty_row(4);
         bar_w->add_empty_row(4);
@@ -7150,10 +7109,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
 
     {
         WriteTransaction wt(sg_w);
-        TableRef alpha_w   = wt.add_table("alpha");
-        TableRef beta_w    = wt.add_table("beta");
-        TableRef gamma_w   = wt.add_table("gamma");
-        TableRef delta_w   = wt.add_table("delta");
+        TableRef alpha_w = wt.add_table("alpha");
+        TableRef beta_w = wt.add_table("beta");
+        TableRef gamma_w = wt.add_table("gamma");
+        TableRef delta_w = wt.add_table("delta");
         TableRef epsilon_w = wt.add_table("epsilon");
         alpha_w->add_column(type_Int, "alpha-1");
         beta_w->add_column_link(type_Link, "beta-1", *delta_w);
@@ -7166,10 +7125,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableWithColumns)
     group.verify();
 
     CHECK_EQUAL(5, group.size());
-    ConstTableRef alpha   = group.get_table("alpha");
-    ConstTableRef beta    = group.get_table("beta");
-    ConstTableRef gamma   = group.get_table("gamma");
-    ConstTableRef delta   = group.get_table("delta");
+    ConstTableRef alpha = group.get_table("alpha");
+    ConstTableRef beta = group.get_table("beta");
+    ConstTableRef gamma = group.get_table("gamma");
+    ConstTableRef delta = group.get_table("delta");
     ConstTableRef epsilon = group.get_table("epsilon");
 
     // Remove table with columns, but no link columns, and table is not a link
@@ -7262,23 +7221,23 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
         names[1] = wt.get_group().get_table_name(1);
         names[2] = wt.get_group().get_table_name(2);
         names[3] = wt.get_group().get_table_name(3);
-        TableRef first_w  = wt.get_table(names[0]);
-        TableRef third_w  = wt.get_table(names[2]);
+        TableRef first_w = wt.get_table(names[0]);
+        TableRef third_w = wt.get_table(names[2]);
         TableRef fourth_w = wt.get_table(names[3]);
-        first_w->add_column_link(type_Link,  "one",   *third_w);
-        third_w->add_column_link(type_Link,  "two",   *fourth_w);
-        third_w->add_column_link(type_Link,  "three", *third_w);
-        fourth_w->add_column_link(type_Link, "four",  *first_w);
-        fourth_w->add_column_link(type_Link, "five",  *third_w);
+        first_w->add_column_link(type_Link, "one", *third_w);
+        third_w->add_column_link(type_Link, "two", *fourth_w);
+        third_w->add_column_link(type_Link, "three", *third_w);
+        fourth_w->add_column_link(type_Link, "four", *first_w);
+        fourth_w->add_column_link(type_Link, "five", *third_w);
         first_w->add_empty_row(2);
         third_w->add_empty_row(2);
         fourth_w->add_empty_row(2);
-        first_w->set_link(0, 0, 0); // first[0].one   = third[0]
-        first_w->set_link(0, 1, 1); // first[1].one   = third[1]
-        third_w->set_link(0, 0, 1); // third[0].two   = fourth[1]
-        third_w->set_link(0, 1, 0); // third[1].two   = fourth[0]
-        third_w->set_link(1, 0, 1); // third[0].three = third[1]
-        third_w->set_link(1, 1, 1); // third[1].three = third[1]
+        first_w->set_link(0, 0, 0);  // first[0].one   = third[0]
+        first_w->set_link(0, 1, 1);  // first[1].one   = third[1]
+        third_w->set_link(0, 0, 1);  // third[0].two   = fourth[1]
+        third_w->set_link(0, 1, 0);  // third[1].two   = fourth[0]
+        third_w->set_link(1, 0, 1);  // third[0].three = third[1]
+        third_w->set_link(1, 1, 1);  // third[1].three = third[1]
         fourth_w->set_link(0, 0, 0); // fourth[0].four = first[0]
         fourth_w->set_link(0, 1, 0); // fourth[1].four = first[0]
         fourth_w->set_link(1, 0, 0); // fourth[0].five = third[0]
@@ -7288,9 +7247,9 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
     LangBindHelper::advance_read(sg);
     group.verify();
 
-    ConstTableRef first  = group.get_table(names[0]);
+    ConstTableRef first = group.get_table(names[0]);
     ConstTableRef second = group.get_table(names[1]);
-    ConstTableRef third  = group.get_table(names[2]);
+    ConstTableRef third = group.get_table(names[2]);
     ConstTableRef fourth = group.get_table(names[3]);
 
     {
@@ -7310,10 +7269,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
     CHECK_EQUAL("one", first->get_column_name(0));
     CHECK_EQUAL(third, first->get_link_target(0));
     CHECK_EQUAL(2, third->get_column_count());
-    CHECK_EQUAL("two",   third->get_column_name(0));
+    CHECK_EQUAL("two", third->get_column_name(0));
     CHECK_EQUAL("three", third->get_column_name(1));
     CHECK_EQUAL(fourth, third->get_link_target(0));
-    CHECK_EQUAL(third,  third->get_link_target(1));
+    CHECK_EQUAL(third, third->get_link_target(1));
     CHECK_EQUAL(2, fourth->get_column_count());
     CHECK_EQUAL("four", fourth->get_column_name(0));
     CHECK_EQUAL("five", fourth->get_column_name(1));
@@ -7322,12 +7281,12 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
 
     {
         WriteTransaction wt(sg_w);
-        TableRef first_w  = wt.get_table(names[0]);
-        TableRef third_w  = wt.get_table(names[2]);
+        TableRef first_w = wt.get_table(names[0]);
+        TableRef third_w = wt.get_table(names[2]);
         TableRef fourth_w = wt.get_table(names[3]);
-        third_w->set_link(0, 0, 0); // third[0].two   = fourth[0]
+        third_w->set_link(0, 0, 0);  // third[0].two   = fourth[0]
         fourth_w->set_link(0, 1, 1); // fourth[1].four = first[1]
-        first_w->set_link(0, 0, 1); // first[0].one   = third[1]
+        first_w->set_link(0, 0, 1);  // first[0].one   = third[1]
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -7343,10 +7302,10 @@ TEST(LangBindHelper_AdvanceReadTransact_RemoveTableMovesTableWithLinksOver)
     CHECK_EQUAL(0, third->get_link(0, 1));
     CHECK_EQUAL(1, third->get_link(1, 0));
     CHECK_EQUAL(1, third->get_link(1, 1));
-    CHECK_EQUAL(0, third->get_backlink_count(0, *first,  0));
-    CHECK_EQUAL(2, third->get_backlink_count(1, *first,  0));
-    CHECK_EQUAL(0, third->get_backlink_count(0, *third,  1));
-    CHECK_EQUAL(2, third->get_backlink_count(1, *third,  1));
+    CHECK_EQUAL(0, third->get_backlink_count(0, *first, 0));
+    CHECK_EQUAL(2, third->get_backlink_count(1, *first, 0));
+    CHECK_EQUAL(0, third->get_backlink_count(0, *third, 1));
+    CHECK_EQUAL(2, third->get_backlink_count(1, *third, 1));
     CHECK_EQUAL(1, third->get_backlink_count(0, *fourth, 1));
     CHECK_EQUAL(1, third->get_backlink_count(1, *fourth, 1));
     CHECK_EQUAL(2, fourth->size());
@@ -7381,7 +7340,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
 
     ConstRow target_row_0, target_row_1;
 
-    auto perform_change = [&](std::function<void (Table&)> func) {
+    auto perform_change = [&](std::function<void(Table&)> func) {
         // Ensure there are two rows in each table, with each row in `origin`
         // pointing to the corresponding row in `target`
         {
@@ -7419,38 +7378,28 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLink)
     };
 
     // Break link by nullifying
-    perform_change([](Table & origin) {
-        origin[1].nullify_link(0);
-    });
+    perform_change([](Table& origin) { origin[1].nullify_link(0); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target.size(), 1);
 
     // Break link by reassign
-    perform_change([](Table & origin) {
-        origin[1].set_link(0, 0);
-    });
+    perform_change([](Table& origin) { origin[1].set_link(0, 0); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target.size(), 1);
 
     // Avoid breaking link by reassigning self
-    perform_change([](Table & origin) {
-        origin[1].set_link(0, 1);
-    });
+    perform_change([](Table& origin) { origin[1].set_link(0, 1); });
     // Should not delete anything
     CHECK(target_row_0 && target_row_1);
     CHECK_EQUAL(target.size(), 2);
 
     // Break link by explicit row removal
-    perform_change([](Table & origin) {
-        origin[1].move_last_over();
-    });
+    perform_change([](Table& origin) { origin[1].move_last_over(); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target.size(), 1);
 
     // Break link by clearing table
-    perform_change([](Table & origin) {
-        origin.clear();
-    });
+    perform_change([](Table& origin) { origin.clear(); });
     CHECK(!target_row_0 && !target_row_1);
     CHECK_EQUAL(target.size(), 0);
 }
@@ -7479,7 +7428,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 
     ConstRow target_row_0, target_row_1;
 
-    auto perform_change = [&](std::function<void (Table&)> func) {
+    auto perform_change = [&](std::function<void(Table&)> func) {
         // Ensure there are two rows in each table, with the first row in `origin`
         // linking to the first row in `target`, and the second row in `origin`
         // linking to both rows in `target`
@@ -7520,45 +7469,33 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     };
 
     // Break link by clearing list
-    perform_change([](Table & origin) {
-        origin[1].get_linklist(0)->clear();
-    });
+    perform_change([](Table& origin) { origin[1].get_linklist(0)->clear(); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target.size(), 1);
 
     // Break link by removal from list
-    perform_change([](Table & origin) {
-        origin[1].get_linklist(0)->remove(1);
-    });
+    perform_change([](Table& origin) { origin[1].get_linklist(0)->remove(1); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target.size(), 1);
 
     // Break link by reassign
-    perform_change([](Table & origin) {
-        origin[1].get_linklist(0)->set(1, 0);
-    });
+    perform_change([](Table& origin) { origin[1].get_linklist(0)->set(1, 0); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target.size(), 1);
 
     // Avoid breaking link by reassigning self
-    perform_change([](Table & origin) {
-        origin[1].get_linklist(0)->set(1, 1);
-    });
+    perform_change([](Table& origin) { origin[1].get_linklist(0)->set(1, 1); });
     // Should not delete anything
     CHECK(target_row_0 && target_row_1);
     CHECK_EQUAL(target.size(), 2);
 
     // Break link by explicit row removal
-    perform_change([](Table & origin) {
-        origin[1].move_last_over();
-    });
+    perform_change([](Table& origin) { origin[1].move_last_over(); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target.size(), 1);
 
     // Break link by clearing table
-    perform_change([](Table & origin) {
-        origin.clear();
-    });
+    perform_change([](Table& origin) { origin.clear(); });
     CHECK(!target_row_0 && !target_row_1);
     CHECK_EQUAL(target.size(), 0);
 }
@@ -7686,7 +7623,10 @@ namespace {
 // the entire interface
 class NoOpTransactionLogParser {
 public:
-    NoOpTransactionLogParser(TestContext& context) : test_context(context) { }
+    NoOpTransactionLogParser(TestContext& context)
+        : test_context(context)
+    {
+    }
 
     size_t get_current_table() const
     {
@@ -7707,7 +7647,9 @@ private:
     size_t m_current_linkview_row = realm::npos;
 
 public:
-    void parse_complete() { }
+    void parse_complete()
+    {
+    }
 
     bool select_table(size_t group_level_ndx, int, const size_t*)
     {
@@ -7723,7 +7665,10 @@ public:
     }
 
     // subtables not supported
-    bool select_descriptor(int, const size_t*) { return false; }
+    bool select_descriptor(int, const size_t*)
+    {
+        return false;
+    }
 
     // Default no-op implmentations of all of the mutation instructions
     bool insert_group_level_table(size_t, size_t, StringData) { return false; }
@@ -7773,18 +7718,18 @@ public:
 };
 
 struct AdvanceReadTransact {
-    template<typename Func>
+    template <typename Func>
     static void call(SharedGroup& sg, Func&& func)
     {
-        LangBindHelper::advance_read(sg, std::forward < Func && > (func));
+        LangBindHelper::advance_read(sg, std::forward<Func&&>(func));
     }
 };
 
 struct PromoteThenRollback {
-    template<typename Func>
+    template <typename Func>
     static void call(SharedGroup& sg, Func&& func)
     {
-        LangBindHelper::promote_to_write(sg, std::forward < Func && > (func));
+        LangBindHelper::promote_to_write(sg, std::forward<Func&&>(func));
         LangBindHelper::rollback_and_continue_as_read(sg);
     }
 };
@@ -7827,7 +7772,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         WriteTransaction wt(sg_w);
         wt.commit();
 
-        struct foo: NoOpTransactionLogParser {
+        struct foo : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
             bool called = false;
@@ -7852,8 +7797,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
 
             size_t expected_table = 0;
 
-            bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert,
-                                   size_t prior_num_rows, bool unordered)
+            bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool unordered)
             {
                 CHECK_EQUAL(expected_table, get_current_table());
                 ++expected_table;
@@ -7894,8 +7838,7 @@ TEST_TYPES(LangBindHelper_AdvanceReadTransact_TransactLog, AdvanceReadTransact, 
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
-            bool erase_rows(size_t row_ndx, size_t num_rows_to_erase,
-                            size_t prior_num_rows, bool unordered)
+            bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool unordered)
             {
                 CHECK_EQUAL(0, row_ndx);
                 CHECK_EQUAL(1, num_rows_to_erase);
@@ -7989,7 +7932,8 @@ TEST(LangBindHelper_AdvanceReadTransact_ErrorInObserver)
         wt.commit();
     }
 
-    struct ObserverError { };
+    struct ObserverError {
+    };
     try {
         struct : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
@@ -8197,10 +8141,9 @@ TEST(LangBindHelper_RollbackCircularReferenceRemoval)
         LangBindHelper::rollback_and_continue_as_read(sg);
         CHECK_EQUAL(2, group->size());
 
-//        // Version 2: This works
-//        LangBindHelper::commit_and_continue_as_read(sg);
-//        CHECK_EQUAL(1, group->size());
-
+        //        // Version 2: This works
+        //        LangBindHelper::commit_and_continue_as_read(sg);
+        //        CHECK_EQUAL(1, group->size());
     }
     group->verify();
 }
@@ -8298,7 +8241,6 @@ TEST(LangBindHelper_RollbackTableRemove)
 
         LangBindHelper::rollback_and_continue_as_read(sg);
         CHECK_EQUAL(2, group->size());
-
     }
     group->verify();
 }
@@ -8416,7 +8358,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadLinkColumnRemove)
     {
         // add a column
         LangBindHelper::promote_to_write(sg);
-        t  = group->get_or_add_table("a_table");
+        t = group->get_or_add_table("a_table");
         t2 = group->get_or_add_table("b_table");
         t->add_column_link(type_Link, "bruno", *t2);
         CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
@@ -8651,9 +8593,9 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_MoveLastOverSubtables)
     ConstTableRef regular_0 = parent->get_subtable(0, 0);
     ConstTableRef regular_1 = parent->get_subtable(0, 1);
     ConstTableRef regular_4 = parent->get_subtable(0, 4);
-    ConstTableRef   mixed_0 = parent->get_subtable(1, 0);
-    ConstTableRef   mixed_1 = parent->get_subtable(1, 1);
-    ConstTableRef   mixed_4 = parent->get_subtable(1, 4);
+    ConstTableRef mixed_0 = parent->get_subtable(1, 0);
+    ConstTableRef mixed_1 = parent->get_subtable(1, 1);
+    ConstTableRef mixed_4 = parent->get_subtable(1, 4);
     CHECK(row_0.is_attached());
     CHECK(row_1.is_attached());
     CHECK(row_4.is_attached());
@@ -8824,8 +8766,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
 
             size_t expected_table = 1;
 
-            bool erase_rows(size_t row_ndx, size_t num_rows_to_erase,
-                            size_t prior_num_rows, bool unordered)
+            bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool unordered)
             {
                 CHECK_EQUAL(expected_table, get_current_table());
                 --expected_table;
@@ -8862,15 +8803,14 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
     table2->move_last_over(0);
 
     {
-        struct foo: NoOpTransactionLogParser {
+        struct foo : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
             size_t expected_table = 1;
             bool link_list_insert_called = false;
             bool set_link_called = false;
 
-            bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert,
-                                   size_t prior_num_rows, bool unordered)
+            bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool unordered)
             {
                 CHECK_EQUAL(expected_table, get_current_table());
                 --expected_table;
@@ -8929,7 +8869,7 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
     link_table->get_linklist(1, 0)->clear();
 
     {
-        struct foo: NoOpTransactionLogParser {
+        struct foo : NoOpTransactionLogParser {
             using NoOpTransactionLogParser::NoOpTransactionLogParser;
 
             size_t list_ndx = 0;
@@ -9103,8 +9043,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         threads[i].start([&] { multiple_trackers_writer_thread(path); });
     sched_yield();
     for (int i = 0; i < read_thread_count; ++i) {
-        threads[write_thread_count + i].
-        start([&] { multiple_trackers_reader_thread(test_context, path); });
+        threads[write_thread_count + i].start([&] { multiple_trackers_reader_thread(test_context, path); });
     }
 
     // Wait for all writer threads to complete
@@ -9255,8 +9194,8 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
         sg.end_read();
     }
 
-    // the miminum filesize (after a commit) is one or two pages, depending on the
-    // page size.
+// the miminum filesize (after a commit) is one or two pages, depending on the
+// page size.
 #if REALM_ENABLE_ENCRYPTION
     if (crypt_key())
         // Encrypted files are always at least a 4096 byte header plus payload
@@ -9344,7 +9283,6 @@ TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfTable)
     sg.end_read();
     sg_w.end_read();
 }
-
 
 
 TEST(LangBindHelper_ImplicitTransactions_ContinuedUseOfDescriptor)
@@ -9699,7 +9637,7 @@ TEST(LangBindHelper_SubqueryHandoverDependentViews)
 
             CHECK(tv.is_in_sync());
             CHECK(tv.is_attached());
-            CHECK_EQUAL(26, tv.size());//BOOM! fail with 50
+            CHECK_EQUAL(26, tv.size()); // BOOM! fail with 50
         }
     }
 }
@@ -9903,10 +9841,10 @@ TEST(LangBindHelper_HandoverAccessors)
         }
         {
             LangBindHelper::advance_read(sg, vid);
-            //sg_w.end_read();
+            // sg_w.end_read();
             sg_w.close();
             // importing tv
-            std::unique_ptr<TestTableInts::View> tv( sg.import_from_handover(move(handover)) );
+            std::unique_ptr<TestTableInts::View> tv(sg.import_from_handover(move(handover)));
             CHECK(tv->is_attached());
             CHECK_EQUAL(100, tv->size());
             for (int i = 0; i < 100; ++i)
@@ -9976,20 +9914,19 @@ TEST(LangBindHelper_HandoverAccessors)
             CHECK_EQUAL(7, row.get_int(0));
             handover_row = sg_w.export_for_handover(row);
             CHECK(row.is_attached());
-
         }
         {
             LangBindHelper::advance_read(sg, vid);
             sg_w.close();
             // importing tv:
-            std::unique_ptr<TableView> tv( sg.import_from_handover(move(handover2)) );
+            std::unique_ptr<TableView> tv(sg.import_from_handover(move(handover2)));
             CHECK(tv->is_attached());
             CHECK(tv->is_in_sync());
             CHECK_EQUAL(100, tv->size());
             for (int i = 0; i < 100; ++i)
                 CHECK_EQUAL(i, tv->get_int(0, i));
             // importing one without payload:
-            std::unique_ptr<TableView> tv3( sg.import_from_handover(move(handover3)) );
+            std::unique_ptr<TableView> tv3(sg.import_from_handover(move(handover3)));
             CHECK(tv3->is_attached());
             CHECK(!tv3->is_in_sync());
             tv3->sync_if_needed();
@@ -9998,7 +9935,7 @@ TEST(LangBindHelper_HandoverAccessors)
                 CHECK_EQUAL(i, tv3->get_int(0, i));
 
             // one with payload:
-            std::unique_ptr<TableView> tv4( sg.import_from_handover(move(handover4)) );
+            std::unique_ptr<TableView> tv4(sg.import_from_handover(move(handover4)));
             CHECK(tv4->is_attached());
             CHECK(tv4->is_in_sync());
             CHECK_EQUAL(100, tv4->size());
@@ -10006,27 +9943,24 @@ TEST(LangBindHelper_HandoverAccessors)
                 CHECK_EQUAL(i, tv4->get_int(0, i));
 
             // verify that subsequent imports are all without payload:
-            std::unique_ptr<TableView> tv5( sg.import_from_handover(move(handover5)) );
+            std::unique_ptr<TableView> tv5(sg.import_from_handover(move(handover5)));
             CHECK(tv5->is_attached());
             CHECK(!tv5->is_in_sync());
 
-            std::unique_ptr<TableView> tv6( sg.import_from_handover(move(handover6)) );
+            std::unique_ptr<TableView> tv6(sg.import_from_handover(move(handover6)));
             CHECK(tv6->is_attached());
             CHECK(!tv6->is_in_sync());
 
-            std::unique_ptr<TableView> tv7( sg.import_from_handover(move(handover7)) );
+            std::unique_ptr<TableView> tv7(sg.import_from_handover(move(handover7)));
             CHECK(tv7->is_attached());
             CHECK(!tv7->is_in_sync());
 
             // importing row:
-            std::unique_ptr<Row> row( sg.import_from_handover(move(handover_row)) );
+            std::unique_ptr<Row> row(sg.import_from_handover(move(handover_row)));
             CHECK(row->is_attached());
             CHECK_EQUAL(7, row->get_int(0));
-
         }
-
     }
-
 }
 
 namespace {
@@ -10039,7 +9973,7 @@ namespace {
 // verifies them (by comparing with its own local, but identical query)
 REALM_TABLE_1(TheTable, first, Int)
 
-template<typename T>
+template <typename T>
 struct HandoverControl {
     Mutex m_lock;
     CondVar m_changed;
@@ -10049,9 +9983,10 @@ struct HandoverControl {
     void put(std::unique_ptr<T> h, SharedGroup::VersionID v)
     {
         LockGuard lg(m_lock);
-        //std::cout << "put " << h << std::endl;
-        while (m_handover != nullptr) m_changed.wait(lg);
-        //std::cout << " -- put " << h << std::endl;
+        // std::cout << "put " << h << std::endl;
+        while (m_handover != nullptr)
+            m_changed.wait(lg);
+        // std::cout << " -- put " << h << std::endl;
         m_handover = move(h);
         m_version = v;
         m_changed.notify_all();
@@ -10059,9 +9994,10 @@ struct HandoverControl {
     void get(std::unique_ptr<T>& h, SharedGroup::VersionID& v)
     {
         LockGuard lg(m_lock);
-        //std::cout << "get " << std::endl;
-        while (m_handover == nullptr) m_changed.wait(lg);
-        //std::cout << " -- get " << m_handover << std::endl;
+        // std::cout << "get " << std::endl;
+        while (m_handover == nullptr)
+            m_changed.wait(lg);
+        // std::cout << " -- get " << m_handover << std::endl;
         h = move(m_handover);
         v = m_version;
         m_handover = nullptr;
@@ -10070,7 +10006,8 @@ struct HandoverControl {
     bool try_get(std::unique_ptr<T>& h, SharedGroup::VersionID& v)
     {
         LockGuard lg(m_lock);
-        if (m_handover == nullptr) return false;
+        if (m_handover == nullptr)
+            return false;
         h = move(m_handover);
         v = m_version;
         m_handover = nullptr;
@@ -10086,11 +10023,14 @@ struct HandoverControl {
     void wait_feedback()
     {
         LockGuard lg(m_lock);
-        while (!m_has_feedback) m_changed.wait(lg);
+        while (!m_has_feedback)
+            m_changed.wait(lg);
         m_has_feedback = false;
     }
     HandoverControl(const HandoverControl&) = delete;
-    HandoverControl() {}
+    HandoverControl()
+    {
+    }
 };
 
 void handover_writer(std::string path)
@@ -10118,8 +10058,8 @@ void handover_writer(std::string path)
 }
 
 
-void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control,
-                      TestContext& test_context, std::string path)
+void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control, TestContext& test_context,
+                      std::string path)
 {
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
@@ -10142,8 +10082,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
         CHECK(!tv.is_in_sync());
         tv.sync_if_needed();
         CHECK(tv.is_in_sync());
-        control->put(sg.export_for_handover(tv, MutableSourcePayload::Move),
-                     sg.get_version_of_current_transaction());
+        control->put(sg.export_for_handover(tv, MutableSourcePayload::Move), sg.get_version_of_current_transaction());
 
         // here we need to allow the reciever to get hold on the proper version before
         // we go through the loop again and advance_read().
@@ -10157,8 +10096,8 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
     writer.join();
 }
 
-void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* control,
-                       TestContext& test_context, std::string path)
+void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* control, TestContext& test_context,
+                       std::string path)
 {
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
     SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
@@ -10251,7 +10190,6 @@ TEST(LangBindHelper_HandoverBetweenThreads)
     verifier.start([&] { handover_verifier(&control, test_context, path); });
     querier.join();
     verifier.join();
-
 }
 
 
@@ -10301,7 +10239,7 @@ TEST(LangBindHelper_HandoverDependentViews)
             LangBindHelper::advance_read(sg, vid);
             sg_w.close();
             // importing tv:
-            std::unique_ptr<TableView> tv2(sg.import_from_handover(move(handover2)) );
+            std::unique_ptr<TableView> tv2(sg.import_from_handover(move(handover2)));
             // CHECK(tv1.is_in_sync()); -- not possible, tv1 is now owned by tv2 and not reachable
             CHECK(tv2->is_in_sync());
             // CHECK(tv1.is_attached());
@@ -10831,7 +10769,7 @@ TEST(LangBindHelper_HandoverWithLinkQueries)
         handoverQuery2 = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
     }
 
-    SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction();// vid == 2
+    SharedGroup::VersionID vid = sg_w.get_version_of_current_transaction(); // vid == 2
     {
         LangBindHelper::advance_read(sg, vid);
         std::unique_ptr<Query> q(sg.import_from_handover(move(handoverQuery)));
@@ -10908,13 +10846,16 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         Query query = source->column<Link>(col_link) == target->get(0);
         handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
 
-        Query queryOr = source->column<Link>(col_link) == target->get(0) || source->column<Link>(col_link) == target->get(1);
+        Query queryOr =
+            source->column<Link>(col_link) == target->get(0) || source->column<Link>(col_link) == target->get(1);
         handoverQueryOr = sg_w.export_for_handover(queryOr, ConstSourcePayload::Copy);
 
-        Query queryAnd = source->column<Link>(col_link) == target->get(0) && source->column<Link>(col_link) == target->get(0);
+        Query queryAnd =
+            source->column<Link>(col_link) == target->get(0) && source->column<Link>(col_link) == target->get(0);
         handoverQueryAnd = sg_w.export_for_handover(queryAnd, ConstSourcePayload::Copy);
 
-        Query queryNot = !(source->column<Link>(col_link) == target->get(0)) && source->column<Link>(col_link) == target->get(1);
+        Query queryNot =
+            !(source->column<Link>(col_link) == target->get(0)) && source->column<Link>(col_link) == target->get(1);
         handoverQueryNot = sg_w.export_for_handover(queryNot, ConstSourcePayload::Copy);
 
         Query queryAndAndOr = source->where().group().and_query(queryOr).end_group().and_query(queryAnd);
@@ -10927,7 +10868,7 @@ TEST(LangBindHelper_HandoverQueryLinksTo)
         handoverQueryLinksToDetached = sg_w.export_for_handover(queryLinksToDetached, ConstSourcePayload::Copy);
     }
 
-    SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction(); // vid == 2
+    SharedGroup::VersionID vid = sg_w.get_version_of_current_transaction(); // vid == 2
     {
         // Import the queries into the read-only shared group.
         LangBindHelper::advance_read(sg, vid);
@@ -11008,7 +10949,7 @@ TEST(LangBindHelper_HandoverQuerySubQuery)
         handoverQuery = sg_w.export_for_handover(query, ConstSourcePayload::Copy);
     }
 
-    SharedGroup::VersionID vid =  sg_w.get_version_of_current_transaction(); // vid == 2
+    SharedGroup::VersionID vid = sg_w.get_version_of_current_transaction(); // vid == 2
     {
         // Import the queries into the read-only shared group.
         LangBindHelper::advance_read(sg, vid);
@@ -11032,8 +10973,7 @@ TEST(LangBindHelper_HandoverQuerySubQuery)
 }
 
 
-
-REALM_TABLE_1(MyTable, first,  Int)
+REALM_TABLE_1(MyTable, first, Int)
 
 #ifndef _WIN32
 
@@ -11129,7 +11069,8 @@ TEST(LangBindHelper_VersionControl)
         MyTable::ConstRef t = g.get_table<MyTable>("test");
         CHECK_EQUAL(old_version, t[old_version].first);
         for (int k = num_random_tests; k; --k) {
-            int new_version = random() % num_versions; // FIXME: Use of wrong random generator. See note at beginning of file.
+            int new_version =
+                random() % num_versions; // FIXME: Use of wrong random generator. See note at beginning of file.
             // std::cerr << "Random jump: version " << old_version << " -> " << new_version << std::endl;
             if (new_version < old_version) {
                 CHECK(versions[new_version] < versions[old_version]);
@@ -11441,7 +11382,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
     size_t numberOfDogsPerOwner = 20;
 
     std::vector<SharedGroup::VersionID> vids;
-    std::vector <std::unique_ptr<SharedGroup::Handover<Query>>> qs;
+    std::vector<std::unique_ptr<SharedGroup::Handover<Query>>> qs;
     std::mutex vector_mutex;
 
     std::atomic<bool> end_signal(false);
@@ -11531,7 +11472,7 @@ TEST(LangBindHelper_HandoverFuzzyTest)
 
     Thread slaves[threads];
     for (int i = 0; i != threads; ++i) {
-        slaves[i].start([ = ] { async(); });
+        slaves[i].start([=] { async(); });
     }
 
     // Main thread
@@ -11872,8 +11813,8 @@ TEST(LangBindHelper_InRealmHistory_Basics)
     CHECK_EQUAL(foo, group.get_table("foo"));
     ConstTableRef bar = group.get_table("bar");
     CHECK_EQUAL(3, bar->get_column_count());
-    CHECK_EQUAL(type_Int,    bar->get_column_type(0));
-    CHECK_EQUAL(type_Float,  bar->get_column_type(1));
+    CHECK_EQUAL(type_Int, bar->get_column_type(0));
+    CHECK_EQUAL(type_Float, bar->get_column_type(1));
     CHECK_EQUAL(type_Double, bar->get_column_type(2));
 
     // Clear tables
@@ -11895,8 +11836,8 @@ TEST(LangBindHelper_InRealmHistory_Basics)
     CHECK_EQUAL(0, foo->size());
     CHECK(bar->is_attached());
     CHECK_EQUAL(3, bar->get_column_count());
-    CHECK_EQUAL(type_Int,    bar->get_column_type(0));
-    CHECK_EQUAL(type_Float,  bar->get_column_type(1));
+    CHECK_EQUAL(type_Int, bar->get_column_type(0));
+    CHECK_EQUAL(type_Float, bar->get_column_type(1));
     CHECK_EQUAL(type_Double, bar->get_column_type(2));
     CHECK_EQUAL(0, bar->size());
     CHECK_EQUAL(foo, group.get_table("foo"));
@@ -12088,8 +12029,7 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
 
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path);
-        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroupOptions(crypt_key())),
-                          LogicError::mixed_history_type);
+        CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroupOptions(crypt_key())), LogicError::mixed_history_type);
     }
 }
 
@@ -12457,7 +12397,8 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     g.add_table("dgrpnpgmjbchktdgagmqlihjckcdhpjccsjhnqlcjnbterse");
     g.add_table("pknglaqnckqbffehqfgjnrepcfohoedkhiqsiedlotmaqitm");
     g.get_table(0)->add_column(type_Double, "ggotpkoshbrcrmmqbagbfjetajlrrlbpjhhqrngfgdteilmj", true);
-    g.get_table(1)->add_column_link(type_LinkList, "dtkiipajqdsfglbptieibknaoeeohqdlhftqmlriphobspjr", *g.get_table(0));
+    g.get_table(1)->add_column_link(type_LinkList, "dtkiipajqdsfglbptieibknaoeeohqdlhftqmlriphobspjr",
+                                    *g.get_table(0));
     g.get_table(0)->add_empty_row(375);
     g.add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil");
     sg_r.close();
@@ -12534,7 +12475,8 @@ TEST(LangBindHelper_SwapSimple)
 
 
 // Found by AFL
-TEST(LangBindHelper_RollbackMoveSame) {
+TEST(LangBindHelper_RollbackMoveSame)
+{
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
@@ -12585,7 +12527,6 @@ TEST(LangBindHelper_ColumnMoveUpdatesLinkedTables)
     LangBindHelper::advance_read(sg_r);
     g_r.verify();
 }
-
 
 
 #endif

@@ -38,14 +38,14 @@ TEST(Optional_NoneConstructor)
 
 TEST(Optional_ValueConstructor)
 {
-    Optional<std::string> a { "foo" };
+    Optional<std::string> a{"foo"};
     CHECK(bool(a));
 }
 
 TEST(Optional_MoveConstructor)
 {
-    Optional<std::string> a { "foo" };
-    Optional<std::string> b { std::move(a) };
+    Optional<std::string> a{"foo"};
+    Optional<std::string> b{std::move(a)};
     CHECK(bool(a));
     CHECK(bool(b));
     CHECK_EQUAL(*a, "");
@@ -54,8 +54,8 @@ TEST(Optional_MoveConstructor)
 
 TEST(Optional_CopyConstructor)
 {
-    Optional<std::string> a { "foo" };
-    Optional<std::string> b { a };
+    Optional<std::string> a{"foo"};
+    Optional<std::string> b{a};
     CHECK(bool(a));
     CHECK(bool(b));
     CHECK_EQUAL(*a, "foo");
@@ -65,7 +65,7 @@ TEST(Optional_CopyConstructor)
 TEST(Optional_MoveValueConstructor)
 {
     std::string a = "foo";
-    Optional<std::string> b { std::move(a) };
+    Optional<std::string> b{std::move(a)};
     CHECK(bool(b));
     CHECK_EQUAL(*b, "foo");
     CHECK_EQUAL(a, "");
@@ -73,7 +73,7 @@ TEST(Optional_MoveValueConstructor)
 
 TEST(Optional_CopyAssignment)
 {
-    Optional<std::string> a { "foo" };
+    Optional<std::string> a{"foo"};
     Optional<std::string> b;
     b = a;
     CHECK(bool(a));
@@ -81,8 +81,8 @@ TEST(Optional_CopyAssignment)
     CHECK_EQUAL(*a, "foo");
     CHECK_EQUAL(*b, "foo");
 
-    Optional<std::string> c { "foo" };
-    Optional<std::string> d { "bar" };
+    Optional<std::string> c{"foo"};
+    Optional<std::string> d{"bar"};
     d = c;
     CHECK(bool(c));
     CHECK(bool(d));
@@ -90,7 +90,7 @@ TEST(Optional_CopyAssignment)
     CHECK_EQUAL(*d, "foo");
 
     Optional<std::string> e;
-    Optional<std::string> f { "foo" };
+    Optional<std::string> f{"foo"};
     f = e;
     CHECK(!bool(e));
     CHECK(!bool(f));
@@ -98,22 +98,22 @@ TEST(Optional_CopyAssignment)
 
 TEST(Optional_MoveAssignment)
 {
-    Optional<std::string> a { "foo" };
+    Optional<std::string> a{"foo"};
     Optional<std::string> b;
     b = std::move(a);
     CHECK(bool(a));
     CHECK(bool(b));
     CHECK_EQUAL(*b, "foo");
 
-    Optional<std::string> c { "foo" };
-    Optional<std::string> d { "bar" };
+    Optional<std::string> c{"foo"};
+    Optional<std::string> d{"bar"};
     d = std::move(c);
     CHECK(bool(c));
     CHECK(bool(d));
     CHECK_EQUAL(*d, "foo");
 
     Optional<std::string> e;
-    Optional<std::string> f { "foo" };
+    Optional<std::string> f{"foo"};
     f = std::move(e);
     CHECK(!bool(e));
     CHECK(!bool(f));
@@ -122,11 +122,11 @@ TEST(Optional_MoveAssignment)
 TEST(Optional_ValueAssignment)
 {
     Optional<std::string> o;
-    o = std::string { "foo" };
+    o = std::string{"foo"};
     CHECK(bool(o));
     CHECK_EQUAL(*o, "foo");
 
-    o = std::string { "bar" };
+    o = std::string{"bar"};
     CHECK(bool(o));
     CHECK_EQUAL(*o, "bar");
 }
@@ -135,8 +135,14 @@ namespace {
 
 struct SetBooleanOnDestroy {
     bool& m_b;
-    explicit SetBooleanOnDestroy(bool& b) : m_b(b) {}
-    ~SetBooleanOnDestroy() { m_b = true; }
+    explicit SetBooleanOnDestroy(bool& b)
+        : m_b(b)
+    {
+    }
+    ~SetBooleanOnDestroy()
+    {
+        m_b = true;
+    }
 };
 
 } // unnamed namespace
@@ -145,7 +151,7 @@ TEST(Optional_Destructor)
 {
     bool b = false;
     {
-        Optional<SetBooleanOnDestroy> x { SetBooleanOnDestroy(b) };
+        Optional<SetBooleanOnDestroy> x{SetBooleanOnDestroy(b)};
     }
     CHECK(b);
 }
@@ -154,7 +160,7 @@ TEST(Optional_DestroyOnAssignNone)
 {
     bool b = false;
     {
-        Optional<SetBooleanOnDestroy> x { SetBooleanOnDestroy(b) };
+        Optional<SetBooleanOnDestroy> x{SetBooleanOnDestroy(b)};
         x = realm::none;
         CHECK(b);
     }
@@ -164,7 +170,7 @@ TEST(Optional_DestroyOnAssignNone)
 TEST(Optional_References)
 {
     int n = 0;
-    Optional<int&> x { n };
+    Optional<int&> x{n};
     if (x) {
         x.value() = 123;
     }
@@ -177,15 +183,19 @@ TEST(Optional_References)
 TEST(Optional_PolymorphicReferences)
 {
     struct Foo {
-        virtual ~Foo() {}
+        virtual ~Foo()
+        {
+        }
     };
-    struct Bar: Foo {
-        virtual ~Bar() {}
+    struct Bar : Foo {
+        virtual ~Bar()
+        {
+        }
     };
 
     Bar bar;
-    Optional<Bar&> bar_ref { bar };
-    Optional<Foo&> foo_ref { bar_ref };
+    Optional<Bar&> bar_ref{bar};
+    Optional<Foo&> foo_ref{bar_ref};
     CHECK(foo_ref);
     CHECK_EQUAL(&foo_ref.value(), &bar);
 }
@@ -255,10 +265,10 @@ TEST(Optional_ReferenceBinding)
 TEST(Optional_ValueDoesntGenerateWarning)
 {
     // Shouldn't generate any warnings:
-    const Optional<int> i { 1 };
+    const Optional<int> i{1};
     CHECK(*i);
     int one = 1;
-    const Optional<int&> ii { one };
+    const Optional<int&> ii{one};
     CHECK(*ii);
 }
 
@@ -266,14 +276,14 @@ TEST(Optional_ConstExpr)
 {
     // Should compile:
     constexpr Optional<int> a;
-    constexpr Optional<int> b { none };
-    constexpr Optional<int> c { 1 };
+    constexpr Optional<int> b{none};
+    constexpr Optional<int> c{1};
     CHECK_EQUAL(bool(c), true);
     constexpr int d = *c;
     CHECK_EQUAL(1, d);
-    constexpr bool e { Optional<int>{ 1 } };
+    constexpr bool e{Optional<int>{1}};
     CHECK_EQUAL(true, e);
-    constexpr bool f { Optional<int>{ none } };
+    constexpr bool f{Optional<int>{none}};
     CHECK_EQUAL(false, f);
     constexpr int g = b.value_or(1234);
     CHECK_EQUAL(1234, g);
@@ -285,14 +295,14 @@ TEST(Optional_ReferenceConstExpr)
 {
     // Should compile:
     constexpr Optional<const int&> a;
-    constexpr Optional<const int&> b { none };
-    constexpr Optional<const int&> c { global_i };
+    constexpr Optional<const int&> b{none};
+    constexpr Optional<const int&> c{global_i};
     CHECK_EQUAL(bool(c), true);
     constexpr int d = *c;
     CHECK_EQUAL(0, d);
-    constexpr bool e { Optional<const int&>{ global_i } };
+    constexpr bool e{Optional<const int&>{global_i}};
     CHECK_EQUAL(true, e);
-    constexpr bool f { Optional<const int&>{ none } };
+    constexpr bool f{Optional<const int&>{none}};
     CHECK_EQUAL(false, f);
 }
 #endif

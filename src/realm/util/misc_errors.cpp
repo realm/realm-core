@@ -25,7 +25,7 @@ using namespace realm::util;
 
 namespace {
 
-class misc_category: public std::error_category {
+class misc_category : public std::error_category {
     const char* name() const noexcept override;
     std::string message(int) const override;
 };

@@ -150,7 +150,7 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
     return get_ref();
 }
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 size_t ArrayBlob::blob_size() const noexcept
 {

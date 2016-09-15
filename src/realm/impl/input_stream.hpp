@@ -45,15 +45,17 @@ public:
     /// availble.
     virtual size_t read(char* buffer, size_t size) = 0;
 
-    virtual ~InputStream() noexcept {}
+    virtual ~InputStream() noexcept
+    {
+    }
 };
 
 
-class SimpleInputStream: public InputStream {
+class SimpleInputStream : public InputStream {
 public:
-    SimpleInputStream(const char* data, size_t size) noexcept:
-        m_ptr(data),
-        m_end(data + size)
+    SimpleInputStream(const char* data, size_t size) noexcept
+        : m_ptr(data)
+        , m_end(data + size)
     {
     }
     size_t read(char* buffer, size_t size) override
@@ -65,6 +67,7 @@ public:
         std::copy(begin, end, buffer);
         return n;
     }
+
 private:
     const char* m_ptr;
     const char* const m_end;
@@ -80,16 +83,18 @@ public:
     /// contiguous memory chunk.
     virtual bool next_block(const char*& begin, const char*& end) = 0;
 
-    virtual ~NoCopyInputStream() noexcept {}
+    virtual ~NoCopyInputStream() noexcept
+    {
+    }
 };
 
 
-class NoCopyInputStreamAdaptor: public NoCopyInputStream {
+class NoCopyInputStreamAdaptor : public NoCopyInputStream {
 public:
-    NoCopyInputStreamAdaptor(InputStream& in, char* buffer, size_t buffer_size) noexcept:
-        m_in(in),
-        m_buffer(buffer),
-        m_buffer_size(buffer_size)
+    NoCopyInputStreamAdaptor(InputStream& in, char* buffer, size_t buffer_size) noexcept
+        : m_in(in)
+        , m_buffer(buffer)
+        , m_buffer_size(buffer_size)
     {
     }
     bool next_block(const char*& begin, const char*& end) override
@@ -99,6 +104,7 @@ public:
         end = m_buffer + n;
         return n;
     }
+
 private:
     InputStream& m_in;
     char* m_buffer;
@@ -106,11 +112,11 @@ private:
 };
 
 
-class SimpleNoCopyInputStream: public NoCopyInputStream {
+class SimpleNoCopyInputStream : public NoCopyInputStream {
 public:
-    SimpleNoCopyInputStream(const char* data, size_t size):
-        m_data(data),
-        m_size(size)
+    SimpleNoCopyInputStream(const char* data, size_t size)
+        : m_data(data)
+        , m_size(size)
     {
     }
 
@@ -130,10 +136,11 @@ private:
     size_t m_size;
 };
 
-class MultiLogNoCopyInputStream: public NoCopyInputStream {
+class MultiLogNoCopyInputStream : public NoCopyInputStream {
 public:
-    MultiLogNoCopyInputStream(const BinaryData* logs_begin, const BinaryData* logs_end):
-        m_logs_begin(logs_begin), m_logs_end(logs_end)
+    MultiLogNoCopyInputStream(const BinaryData* logs_begin, const BinaryData* logs_end)
+        : m_logs_begin(logs_begin)
+        , m_logs_end(logs_end)
     {
         if (m_logs_begin != m_logs_end)
             m_curr_buf_remaining_size = m_logs_begin->size();
@@ -186,7 +193,7 @@ private:
 };
 
 
-class ChangesetInputStream: public NoCopyInputStream {
+class ChangesetInputStream : public NoCopyInputStream {
 public:
     using version_type = History::version_type;
     static constexpr unsigned NB_BUFFERS = 8;

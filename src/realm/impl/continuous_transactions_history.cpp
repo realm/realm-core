@@ -67,8 +67,7 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
 }
 
 
-void InRealmHistory::update_early_from_top_ref(version_type new_version, size_t new_file_size,
-                                               ref_type new_top_ref)
+void InRealmHistory::update_early_from_top_ref(version_type new_version, size_t new_file_size, ref_type new_top_ref)
 {
     using gf = _impl::GroupFriend;
     gf::remap(*m_group, new_file_size); // Throws
@@ -94,7 +93,8 @@ void InRealmHistory::get_changesets(version_type begin_version, version_type end
     REALM_ASSERT(end_version <= m_base_version + m_size);
     version_type n_version_type = end_version - begin_version;
     version_type offset_version_type = begin_version - m_base_version;
-    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(n_version_type) && !util::int_cast_has_overflow<size_t>(offset_version_type));
+    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(n_version_type) &&
+                 !util::int_cast_has_overflow<size_t>(offset_version_type));
     size_t n = size_t(n_version_type);
     size_t offset = size_t(offset_version_type);
     for (size_t i = 0; i < n; ++i)

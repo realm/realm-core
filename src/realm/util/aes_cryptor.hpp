@@ -25,12 +25,12 @@
 #if REALM_ENABLE_ENCRYPTION
 
 #if REALM_PLATFORM_APPLE
-    #include <CommonCrypto/CommonCrypto.h>
+#include <CommonCrypto/CommonCrypto.h>
 #elif !defined(_WIN32)
-    #include <openssl/aes.h>
-    #include <openssl/sha.h>
+#include <openssl/aes.h>
+#include <openssl/sha.h>
 #else
-    #  error Encryption is not yet implemented for this platform.
+#error Encryption is not yet implemented for this platform.
 #endif
 
 namespace realm {
@@ -74,8 +74,7 @@ private:
 
     void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const;
     bool check_hmac(const void* data, size_t len, const uint8_t* hmac) const;
-    void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src,
-               const char* stored_iv) noexcept;
+    void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src, const char* stored_iv) noexcept;
     iv_table& get_iv_table(int fd, off_t data_pos) noexcept;
 };
 
@@ -86,7 +85,6 @@ struct SharedFileInfo {
 
     SharedFileInfo(const uint8_t* key, int file_descriptor);
 };
-
 }
 }
 

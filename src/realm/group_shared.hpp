@@ -20,7 +20,7 @@
 #define REALM_GROUP_SHARED_HPP
 
 #ifdef REALM_DEBUG
-    #include <ctime> // usleep()
+#include <ctime> // usleep()
 #endif
 
 #include <functional>
@@ -28,7 +28,7 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #ifndef _WIN32
-    #include <realm/util/interprocess_condvar.hpp>
+#include <realm/util/interprocess_condvar.hpp>
 #endif
 #include <realm/util/interprocess_mutex.hpp>
 #include <realm/group.hpp>
@@ -47,9 +47,9 @@ class WriteLogCollector;
 
 /// Thrown by SharedGroup::open() if the lock file is already open in another
 /// process which can't share mutexes with this process
-struct IncompatibleLockFile: std::runtime_error {
-    IncompatibleLockFile(const std::string& msg):
-        std::runtime_error("Incompatible lock file. " + msg)
+struct IncompatibleLockFile : std::runtime_error {
+    IncompatibleLockFile(const std::string& msg)
+        : std::runtime_error("Incompatible lock file. " + msg)
     {
     }
 };
@@ -136,7 +136,6 @@ struct IncompatibleLockFile: std::runtime_error {
 ///    in progress"
 class SharedGroup {
 public:
-
     /// \brief Same as calling the corresponding version of open() on a instance
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and the
@@ -148,10 +147,10 @@ public:
     /// constructed in the unattached state. Exception safety note: if the
     /// `upgrade_callback` throws, then the file will be closed properly and
     /// the upgrade will be aborted.
-    explicit SharedGroup(Replication& repl,
-                         const SharedGroupOptions options = SharedGroupOptions());
+    explicit SharedGroup(Replication& repl, const SharedGroupOptions options = SharedGroupOptions());
 
-    struct unattached_tag {};
+    struct unattached_tag {
+    };
 
     /// Create a SharedGroup instance in its unattached state. It may
     /// then be attached to a database file later by calling
@@ -350,7 +349,7 @@ public:
     enum TransactStage {
         transact_Ready,
         transact_Reading,
-        transact_Writing
+        transact_Writing,
     };
 
     /// Get the current transaction type
@@ -446,29 +445,29 @@ public:
     /// part of the import.
 
     /// Type used to support handover of accessors between shared groups.
-    template<typename T>
+    template <typename T>
     struct Handover;
 
     /// thread-safe/const export (mode is Stay or Copy)
     /// during export, the following operations on the shared group is locked:
     /// - advance_read(), promote_to_write(), commit_and_continue_as_read(),
     ///   rollback_and_continue_as_read(), close()
-    template<typename T>
+    template <typename T>
     std::unique_ptr<Handover<T>> export_for_handover(const T& accessor, ConstSourcePayload mode);
 
     // specialization for handover of Rows
-    template<typename T>
+    template <typename T>
     std::unique_ptr<Handover<BasicRow<T>>> export_for_handover(const BasicRow<T>& accessor);
 
     // destructive export (mode is Move)
-    template<typename T>
+    template <typename T>
     std::unique_ptr<Handover<T>> export_for_handover(T& accessor, MutableSourcePayload mode);
 
     /// Import an accessor wrapped in a handover object. The import will fail
     /// if the importing SharedGroup is viewing a version of the database that
     /// is different from the exporting SharedGroup. The call to
     /// import_from_handover is not thread-safe.
-    template<typename T>
+    template <typename T>
     std::unique_ptr<T> import_from_handover(std::unique_ptr<Handover<T>> handover);
 
     // We need two cases for handling of LinkViews, because they are ref counted.
@@ -503,10 +502,10 @@ private:
     struct SharedInfo;
     struct ReadCount;
     struct ReadLockInfo {
-        uint_fast64_t   m_version    = std::numeric_limits<version_type>::max();
-        uint_fast32_t   m_reader_idx = 0;
-        ref_type        m_top_ref    = 0;
-        size_t          m_file_size  = 0;
+        uint_fast64_t m_version = std::numeric_limits<version_type>::max();
+        uint_fast32_t m_reader_idx = 0;
+        ref_type m_top_ref = 0;
+        size_t m_file_size = 0;
     };
     class ReadLockUnlockGuard;
 
@@ -539,21 +538,20 @@ private:
 #endif
     std::function<void(int, int)> m_upgrade_callback;
 
-    void do_open(const std::string& file, bool no_create, bool is_backend,
-                 const SharedGroupOptions options);
+    void do_open(const std::string& file, bool no_create, bool is_backend, const SharedGroupOptions options);
 
     // Ring buffer management
-    bool        ringbuf_is_empty() const noexcept;
+    bool ringbuf_is_empty() const noexcept;
     size_t ringbuf_size() const noexcept;
     size_t ringbuf_capacity() const noexcept;
-    bool        ringbuf_is_first(size_t ndx) const noexcept;
-    void        ringbuf_remove_first() noexcept;
+    bool ringbuf_is_first(size_t ndx) const noexcept;
+    void ringbuf_remove_first() noexcept;
     size_t ringbuf_find(uint64_t version) const noexcept;
-    ReadCount&  ringbuf_get(size_t ndx) noexcept;
-    ReadCount&  ringbuf_get_first() noexcept;
-    ReadCount&  ringbuf_get_last() noexcept;
-    void        ringbuf_put(const ReadCount& v);
-    void        ringbuf_expand();
+    ReadCount& ringbuf_get(size_t ndx) noexcept;
+    ReadCount& ringbuf_get_first() noexcept;
+    ReadCount& ringbuf_get_last() noexcept;
+    void ringbuf_put(const ReadCount& v);
+    void ringbuf_expand();
 
     /// Grab a read lock on the snapshot associated with the specified
     /// version. If `version_id == VersionID()`, a read lock will be grabbed on
@@ -601,15 +599,19 @@ private:
 
     //@{
     /// See LangBindHelper.
-    template<class O> void advance_read(O* observer, VersionID);
-    template<class O> void promote_to_write(O* observer);
+    template <class O>
+    void advance_read(O* observer, VersionID);
+    template <class O>
+    void promote_to_write(O* observer);
     version_type commit_and_continue_as_read();
-    template<class O> void rollback_and_continue_as_read(O* observer);
+    template <class O>
+    void rollback_and_continue_as_read(O* observer);
     //@}
 
     /// Returns true if, and only if _impl::History::update_early_from_top_ref()
     /// was called during the execution of this function.
-    template<class O> bool do_advance_read(O* observer, VersionID, _impl::History&);
+    template <class O>
+    bool do_advance_read(O* observer, VersionID, _impl::History&);
 
     /// If there is an associated \ref Replication object, then this function
     /// returns `repl->get_history()` where `repl` is that Replication object,
@@ -624,8 +626,8 @@ private:
 
 class ReadTransaction {
 public:
-    ReadTransaction(SharedGroup& sg):
-        m_shared_group(sg)
+    ReadTransaction(SharedGroup& sg)
+        : m_shared_group(sg)
     {
         m_shared_group.begin_read(); // Throws
     }
@@ -650,7 +652,7 @@ public:
         return get_group().get_table(name); // Throws
     }
 
-    template<class T>
+    template <class T>
     BasicTableRef<const T> get_table(StringData name) const
     {
         return get_group().get_table<T>(name); // Throws
@@ -668,8 +670,8 @@ private:
 
 class WriteTransaction {
 public:
-    WriteTransaction(SharedGroup& sg):
-        m_shared_group(&sg)
+    WriteTransaction(SharedGroup& sg)
+        : m_shared_group(&sg)
     {
         m_shared_group->begin_write(); // Throws
     }
@@ -705,19 +707,19 @@ public:
         return get_group().get_or_add_table(name, was_added); // Throws
     }
 
-    template<class T>
+    template <class T>
     BasicTableRef<T> get_table(StringData name) const
     {
         return get_group().get_table<T>(name); // Throws
     }
 
-    template<class T>
+    template <class T>
     BasicTableRef<T> add_table(StringData name, bool require_unique_name = true) const
     {
         return get_group().add_table<T>(name, require_unique_name); // Throws
     }
 
-    template<class T>
+    template <class T>
     BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return get_group().get_or_add_table<T>(name, was_added); // Throws
@@ -749,36 +751,31 @@ private:
 };
 
 
-
-
-
-
 // Implementation:
 
-struct SharedGroup::BadVersion: std::exception {};
+struct SharedGroup::BadVersion : std::exception {
+};
 
-inline SharedGroup::SharedGroup(const std::string& file, bool no_create,
-                                const SharedGroupOptions options):
-    m_group(Group::shared_tag()),
-    m_upgrade_callback(std::move(options.upgrade_callback))
+inline SharedGroup::SharedGroup(const std::string& file, bool no_create, const SharedGroupOptions options)
+    : m_group(Group::shared_tag())
+    , m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(file, no_create, options); // Throws
 }
 
-inline SharedGroup::SharedGroup(unattached_tag) noexcept:
-    m_group(Group::shared_tag())
+inline SharedGroup::SharedGroup(unattached_tag) noexcept
+    : m_group(Group::shared_tag())
 {
 }
 
-inline SharedGroup::SharedGroup(Replication& repl, const SharedGroupOptions options):
-    m_group(Group::shared_tag()),
-    m_upgrade_callback(std::move(options.upgrade_callback))
+inline SharedGroup::SharedGroup(Replication& repl, const SharedGroupOptions options)
+    : m_group(Group::shared_tag())
+    , m_upgrade_callback(std::move(options.upgrade_callback))
 {
     open(repl, options); // Throws
 }
 
-inline void SharedGroup::open(const std::string& path, bool no_create_file,
-                              const SharedGroupOptions options)
+inline void SharedGroup::open(const std::string& path, bool no_create_file, const SharedGroupOptions options)
 {
     // Exception safety: Since open() is called from constructors, if it throws,
     // it must leave the file closed.
@@ -800,8 +797,8 @@ inline void SharedGroup::open(Replication& repl, const SharedGroupOptions option
     gf::set_replication(m_group, &repl);
 
     std::string file = repl.get_database_path();
-    bool no_create   = false;
-    bool is_backend  = false;
+    bool no_create = false;
+    bool is_backend = false;
     do_open(file, no_create, is_backend, options); // Throws
 }
 
@@ -822,9 +819,9 @@ inline SharedGroup::version_type SharedGroup::get_version_of_bound_snapshot() co
 
 class SharedGroup::ReadLockUnlockGuard {
 public:
-    ReadLockUnlockGuard(SharedGroup& shared_group, ReadLockInfo& read_lock) noexcept:
-        m_shared_group(shared_group),
-        m_read_lock(&read_lock)
+    ReadLockUnlockGuard(SharedGroup& shared_group, ReadLockInfo& read_lock) noexcept
+        : m_shared_group(shared_group)
+        , m_read_lock(&read_lock)
     {
     }
     ~ReadLockUnlockGuard() noexcept
@@ -836,20 +833,21 @@ public:
     {
         m_read_lock = 0;
     }
+
 private:
     SharedGroup& m_shared_group;
     ReadLockInfo* m_read_lock;
 };
 
 
-template<typename T>
+template <typename T>
 struct SharedGroup::Handover {
     std::unique_ptr<typename T::HandoverPatch> patch;
     std::unique_ptr<T> clone;
     VersionID version;
 };
 
-template<typename T>
+template <typename T>
 std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const T& accessor, ConstSourcePayload mode)
 {
     if (m_transact_stage != transact_Reading)
@@ -866,7 +864,7 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(const
 }
 
 
-template<typename T>
+template <typename T>
 std::unique_ptr<SharedGroup::Handover<BasicRow<T>>> SharedGroup::export_for_handover(const BasicRow<T>& accessor)
 {
     if (m_transact_stage != transact_Reading)
@@ -879,7 +877,7 @@ std::unique_ptr<SharedGroup::Handover<BasicRow<T>>> SharedGroup::export_for_hand
 }
 
 
-template<typename T>
+template <typename T>
 std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(T& accessor, MutableSourcePayload mode)
 {
     if (m_transact_stage != transact_Reading)
@@ -892,7 +890,7 @@ std::unique_ptr<SharedGroup::Handover<T>> SharedGroup::export_for_handover(T& ac
 }
 
 
-template<typename T>
+template <typename T>
 std::unique_ptr<T> SharedGroup::import_from_handover(std::unique_ptr<SharedGroup::Handover<T>> handover)
 {
     if (handover->version != get_version_of_current_transaction()) {
@@ -903,7 +901,7 @@ std::unique_ptr<T> SharedGroup::import_from_handover(std::unique_ptr<SharedGroup
     return result;
 }
 
-template<class O>
+template <class O>
 inline void SharedGroup::advance_read(O* observer, VersionID version_id)
 {
     if (m_transact_stage != transact_Reading)
@@ -920,7 +918,7 @@ inline void SharedGroup::advance_read(O* observer, VersionID version_id)
     do_advance_read(observer, version_id, *hist); // Throws
 }
 
-template<class O>
+template <class O>
 inline void SharedGroup::promote_to_write(O* observer)
 {
     if (m_transact_stage != transact_Reading)
@@ -932,7 +930,7 @@ inline void SharedGroup::promote_to_write(O* observer)
 
     do_begin_write(); // Throws
     try {
-        VersionID version = VersionID(); // Latest
+        VersionID version = VersionID();                                  // Latest
         bool history_updated = do_advance_read(observer, version, *hist); // Throws
 
         Replication* repl = m_group.get_replication();
@@ -954,7 +952,7 @@ inline void SharedGroup::promote_to_write(O* observer)
     m_transact_stage = transact_Writing;
 }
 
-template<class O>
+template <class O>
 inline void SharedGroup::rollback_and_continue_as_read(O* observer)
 {
     if (m_transact_stage != transact_Writing)
@@ -981,7 +979,7 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
     if (observer && uncommitted_changes.size()) {
         _impl::ReversedNoCopyInputStream reversed_in(reverser);
         parser.parse(reversed_in, *observer); // Throws
-        observer->parse_complete(); // Throws
+        observer->parse_complete();           // Throws
     }
 
     ref_type top_ref = m_read_lock.m_top_ref;
@@ -998,7 +996,7 @@ inline void SharedGroup::rollback_and_continue_as_read(O* observer)
     m_transact_stage = transact_Reading;
 }
 
-template<class O>
+template <class O>
 inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _impl::History& hist)
 {
     ReadLockInfo new_read_lock;
@@ -1026,7 +1024,7 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
         version_type new_version = new_read_lock.m_version;
         _impl::ChangesetInputStream in(hist, old_version, new_version);
         parser.parse(in, *observer); // Throws
-        observer->parse_complete(); // Throws
+        observer->parse_complete();  // Throws
     }
 
     // The old read lock must be retained for as long as the change history is
@@ -1079,13 +1077,13 @@ public:
         return sg.m_group;
     }
 
-    template<class O>
+    template <class O>
     static void advance_read(SharedGroup& sg, O* obs, SharedGroup::VersionID ver)
     {
         sg.advance_read(obs, ver); // Throws
     }
 
-    template<class O>
+    template <class O>
     static void promote_to_write(SharedGroup& sg, O* obs)
     {
         sg.promote_to_write(obs); // Throws
@@ -1096,7 +1094,7 @@ public:
         return sg.commit_and_continue_as_read(); // Throws
     }
 
-    template<class O>
+    template <class O>
     static void rollback_and_continue_as_read(SharedGroup& sg, O* obs)
     {
         sg.rollback_and_continue_as_read(obs); // Throws

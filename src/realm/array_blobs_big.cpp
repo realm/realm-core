@@ -108,8 +108,7 @@ void ArrayBigBlobs::insert(size_t ndx, BinaryData value, bool add_zero_term)
 }
 
 
-size_t ArrayBigBlobs::count(BinaryData value, bool is_string,
-                            size_t begin, size_t end) const noexcept
+size_t ArrayBigBlobs::count(BinaryData value, bool is_string, size_t begin, size_t end) const noexcept
 {
     size_t num_matches = 0;
 
@@ -126,8 +125,7 @@ size_t ArrayBigBlobs::count(BinaryData value, bool is_string,
 }
 
 
-size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string,
-                                 size_t begin, size_t end) const noexcept
+size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string, size_t begin, size_t end) const noexcept
 {
     if (end == npos)
         end = m_size;
@@ -164,8 +162,8 @@ size_t ArrayBigBlobs::find_first(BinaryData value, bool is_string,
 }
 
 
-void ArrayBigBlobs::find_all(IntegerColumn& result, BinaryData value, bool is_string, size_t add_offset,
-                             size_t begin, size_t end)
+void ArrayBigBlobs::find_all(IntegerColumn& result, BinaryData value, bool is_string, size_t add_offset, size_t begin,
+                             size_t end)
 {
     size_t begin_2 = begin;
     for (;;) {
@@ -178,8 +176,7 @@ void ArrayBigBlobs::find_all(IntegerColumn& result, BinaryData value, bool is_st
 }
 
 
-ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term,
-                                           TreeInsertBase& state)
+ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term, TreeInsertBase& state)
 {
     size_t leaf_size = size();
     REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
@@ -211,7 +208,7 @@ ref_type ArrayBigBlobs::bptree_leaf_insert(size_t ndx, BinaryData value, bool ad
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void ArrayBigBlobs::verify() const
 {

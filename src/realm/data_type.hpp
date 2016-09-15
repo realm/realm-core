@@ -27,24 +27,24 @@ namespace realm {
 // Note: Value assignments must be kept in sync with "com/realm/ColumnType.java"
 // Note: Any change to this enum is a file-format breaking change.
 enum DataType {
-    type_Int         =  0,
-    type_Bool        =  1,
-    type_Float       =  9,
-    type_Double      = 10,
-    type_String      =  2,
-    type_Binary      =  4,
-    type_OldDateTime =  7,
-    type_Timestamp   =  8,
-    type_Table       =  5,
-    type_Mixed       =  6,
-    type_Link        = 12,
-    type_LinkList    = 13
+    type_Int = 0,
+    type_Bool = 1,
+    type_Float = 9,
+    type_Double = 10,
+    type_String = 2,
+    type_Binary = 4,
+    type_OldDateTime = 7,
+    type_Timestamp = 8,
+    type_Table = 5,
+    type_Mixed = 6,
+    type_Link = 12,
+    type_LinkList = 13
 };
 
 /// See Descriptor::set_link_type().
 enum LinkType {
     link_Strong,
-    link_Weak
+    link_Weak,
 };
 
 } // namespace realm
