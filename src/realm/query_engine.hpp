@@ -1157,6 +1157,7 @@ public:
             m_last_start = 0;
 
             if (m_index_matches->is_empty()) {
+                m_index_matches->destroy();
                 m_index_matches_destroy = false;
                 m_index_matches.reset();
                 m_index_getter.reset();
