@@ -28,7 +28,9 @@
 
 namespace realm {
 
-namespace _impl { class DescriptorFriend; }
+namespace _impl {
+class DescriptorFriend;
+}
 
 
 /// Accessor for table type descriptors.
@@ -161,13 +163,11 @@ public:
 
     size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = nullptr, bool nullable = false);
 
-    void insert_column(size_t col_ndx, DataType type, StringData name,
-                       DescriptorRef* subdesc = nullptr, bool nullable = false);
+    void insert_column(size_t col_ndx, DataType type, StringData name, DescriptorRef* subdesc = nullptr,
+                       bool nullable = false);
 
-    size_t add_column_link(DataType type, StringData name, Table& target,
-                           LinkType = link_Weak);
-    void insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target,
-                            LinkType = link_Weak);
+    size_t add_column_link(DataType type, StringData name, Table& target, LinkType = link_Weak);
+    void insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target, LinkType = link_Weak);
     //@}
 
     /// Remove the specified column from each of the associated
@@ -419,13 +419,18 @@ private:
     // for initialization through make_shared
     struct PrivateTag {
     };
+
 public:
-    Descriptor(const PrivateTag&) : Descriptor() {}
+    Descriptor(const PrivateTag&)
+        : Descriptor()
+    {
+    }
+
 private:
     // Table associated with root descriptor. Detached iff null.
     TableRef m_root_table;
     DescriptorRef m_parent; // Null iff detached or root descriptor.
-    Spec* m_spec; // Valid if attached. Owned iff valid and `m_parent`.
+    Spec* m_spec;           // Valid if attached. Owned iff valid and `m_parent`.
 
     // Whenever a subtable descriptor accessor is created, it is
     // stored in this map. This ensures that when get_subdescriptor()
@@ -514,8 +519,6 @@ private:
 };
 
 
-
-
 // Implementation:
 
 inline size_t Descriptor::get_column_count() const noexcept
@@ -554,16 +557,15 @@ inline size_t Descriptor::get_column_link_target(size_t column_ndx) const noexce
     return m_spec->get_opposite_link_table_ndx(column_ndx);
 }
 
-inline size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc,
-                                     bool nullable)
+inline size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc, bool nullable)
 {
     size_t col_ndx = m_spec->get_public_column_count();
     insert_column(col_ndx, type, name, subdesc, nullable); // Throws
     return col_ndx;
 }
 
-inline void Descriptor::insert_column(size_t col_ndx, DataType type, StringData name,
-                                      DescriptorRef* subdesc, bool nullable)
+inline void Descriptor::insert_column(size_t col_ndx, DataType type, StringData name, DescriptorRef* subdesc,
+                                      bool nullable)
 {
     typedef _impl::TableFriend tf;
 
@@ -581,16 +583,15 @@ inline void Descriptor::insert_column(size_t col_ndx, DataType type, StringData 
         *subdesc = get_subdescriptor(col_ndx);
 }
 
-inline size_t Descriptor::add_column_link(DataType type, StringData name, Table& target,
-                                          LinkType link_type)
+inline size_t Descriptor::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
 {
     size_t col_ndx = m_spec->get_public_column_count();
     insert_column_link(col_ndx, type, name, target, link_type); // Throws
     return col_ndx;
 }
 
-inline void Descriptor::insert_column_link(size_t col_ndx, DataType type, StringData name,
-                                           Table& target, LinkType link_type)
+inline void Descriptor::insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target,
+                                           LinkType link_type)
 {
     typedef _impl::TableFriend tf;
 
@@ -726,7 +727,9 @@ inline bool Descriptor::is_attached() const noexcept
     return bool(m_root_table);
 }
 
-inline Descriptor::subdesc_entry::subdesc_entry(size_t n, DescriptorRef d) : m_column_ndx(n), m_subdesc(d)
+inline Descriptor::subdesc_entry::subdesc_entry(size_t n, DescriptorRef d)
+    : m_column_ndx(n)
+    , m_subdesc(d)
 {
 }
 
@@ -781,8 +784,7 @@ public:
         return *desc.m_spec;
     }
 
-    static size_t* record_subdesc_path(const Descriptor& desc, size_t* begin,
-                                       size_t* end) noexcept
+    static size_t* record_subdesc_path(const Descriptor& desc, size_t* begin, size_t* end) noexcept
     {
         return desc.record_subdesc_path(begin, end);
     }

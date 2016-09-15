@@ -387,8 +387,8 @@ TEST(File_Exists)
     File file;
     file.open(path, File::mode_Write); // Create the file
     file.close();
-    CHECK_THROW_EX(file.open(path, File::access_ReadWrite, File::create_Must, File::flag_Trunc),
-                   File::Exists, e.get_path() == std::string(path));
+    CHECK_THROW_EX(file.open(path, File::access_ReadWrite, File::create_Must, File::flag_Trunc), File::Exists,
+                   e.get_path() == std::string(path));
 }
 
 

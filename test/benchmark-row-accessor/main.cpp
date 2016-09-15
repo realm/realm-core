@@ -57,8 +57,7 @@ enum DetachOrder { AttachOrder, RevAttOrder, RandomOrder };
 ///       }
 ///     }
 ///
-void heap(Timer& timer, BenchmarkResults& results, int n,
-          const char* ident, const char* lead_text)
+void heap(Timer& timer, BenchmarkResults& results, int n, const char* ident, const char* lead_text)
 {
     Table table;
     table.add_empty_row();
@@ -100,9 +99,8 @@ void heap(Timer& timer, BenchmarkResults& results, int n,
 ///       }
 ///     }
 ///
-void balloon(Timer& timer, BenchmarkResults& results,
-             int balloon_size, DetachOrder detach_order,
-             const char* ident, const char* lead_text)
+void balloon(Timer& timer, BenchmarkResults& results, int balloon_size, DetachOrder detach_order, const char* ident,
+             const char* lead_text)
 {
     Table table;
     table.add_empty_row();
@@ -143,22 +141,22 @@ int main()
     Timer timer_total(Timer::type_UserTime);
     Timer timer(Timer::type_UserTime);
 
-    heap(timer, results,    1, "heap_1",    "Heap 1");
-    heap(timer, results,   10, "heap_10",   "Heap 10");
-    heap(timer, results,  100, "heap_100",  "Heap 100");
+    heap(timer, results, 1, "heap_1", "Heap 1");
+    heap(timer, results, 10, "heap_10", "Heap 10");
+    heap(timer, results, 100, "heap_100", "Heap 100");
     heap(timer, results, 1000, "heap_1000", "Heap 1000");
 
-    balloon(timer, results, 10, AttachOrder, "balloon_10",         "Balloon 10");
+    balloon(timer, results, 10, AttachOrder, "balloon_10", "Balloon 10");
     balloon(timer, results, 10, RevAttOrder, "balloon_10_reverse", "Balloon 10 (reverse)");
-    balloon(timer, results, 10, RandomOrder, "balloon_10_random",  "Balloon 10 (random)");
+    balloon(timer, results, 10, RandomOrder, "balloon_10_random", "Balloon 10 (random)");
 
-    balloon(timer, results, 100, AttachOrder, "balloon_100",         "Balloon 100");
+    balloon(timer, results, 100, AttachOrder, "balloon_100", "Balloon 100");
     balloon(timer, results, 100, RevAttOrder, "balloon_100_reverse", "Balloon 100 (reverse)");
-    balloon(timer, results, 100, RandomOrder, "balloon_100_random",  "Balloon 100 (random)");
+    balloon(timer, results, 100, RandomOrder, "balloon_100_random", "Balloon 100 (random)");
 
-    balloon(timer, results, 1000, AttachOrder, "balloon_1000",         "Balloon 1000");
+    balloon(timer, results, 1000, AttachOrder, "balloon_1000", "Balloon 1000");
     balloon(timer, results, 1000, RevAttOrder, "balloon_1000_reverse", "Balloon 1000 (reverse)");
-    balloon(timer, results, 1000, RandomOrder, "balloon_1000_random",  "Balloon 1000 (random)");
+    balloon(timer, results, 1000, RandomOrder, "balloon_1000_random", "Balloon 1000 (random)");
 
     results.submit_single("total_time", "Total time", timer_total);
 }

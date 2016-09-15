@@ -26,9 +26,13 @@ using namespace realm;
 using namespace realm::util;
 
 struct InputStreamAdapter : _impl::InputStream {
-    InputStreamAdapter(std::ifstream& s) : m_stream(s) {}
+    InputStreamAdapter(std::ifstream& s)
+        : m_stream(s)
+    {
+    }
 
-    size_t read(char* buffer, size_t size) final {
+    size_t read(char* buffer, size_t size) final
+    {
         return m_stream.read(buffer, size).gcount();
     }
 
@@ -38,7 +42,8 @@ struct InputStreamAdapter : _impl::InputStream {
 int main(int argc, const char* argv[])
 {
     if (argc == 1) {
-        fprintf(stderr, "Usage: %s <LOGFILE>\n(where <LOGFILE> is a transaction log file that will be replayed.)", argv[0]);
+        fprintf(stderr, "Usage: %s <LOGFILE>\n(where <LOGFILE> is a transaction log file that will be replayed.)",
+                argv[0]);
         exit(1);
     }
 

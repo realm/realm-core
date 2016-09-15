@@ -92,8 +92,8 @@ TEST_IF(Strings_Monkey2, TEST_DURATION >= 1)
 
     for (size_t iter = 0; iter < ITER; iter++) {
 
-//        if (random.chance(1, 10))
-//            std::cout << "Input bitwidth around ~"<<current_bitwidth<<", , a.Size()="<<a.size()<<"\n";
+        //        if (random.chance(1, 10))
+        //            std::cout << "Input bitwidth around ~"<<current_bitwidth<<", , a.Size()="<<a.size()<<"\n";
 
         if (random.draw_int_mod(ITER / 100) == 0) {
             trend = random.draw_int_mod(10);

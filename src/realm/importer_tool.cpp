@@ -110,7 +110,8 @@ int main(int argc, char* argv[])
 
     // Parse from 1'st argument until before source and destination args
     for (int a = 1; a < argc - 2; ++a) {
-        abort2(strlen(argv[a]) == 0 || argv[a][strlen(argv[a]) - 1] == '=' || argv[a + 1][0] == '=', "Please remove space characters before and after '=' signs in command line flags");
+        abort2(strlen(argv[a]) == 0 || argv[a][strlen(argv[a]) - 1] == '=' || argv[a + 1][0] == '=',
+               "Please remove space characters before and after '=' signs in command line flags");
 
         if (strncmp(argv[a], "-a=", 3) == 0)
             auto_detection_flag = atoi(&argv[a][3]);
@@ -164,10 +165,13 @@ int main(int argc, char* argv[])
 
     // Check invalid combinations of flags
     abort2(auto_detection_flag > 0 && skip_rows_flag > 0, "-a flag and -s flag cannot be used at the same time");
-    abort2(auto_detection_flag > 0 && scheme.size() > 0, "-a flag cannot be used when scheme is specified manually with -t flag");
-    abort2(empty_as_string_flag && scheme.size() > 0, "-e flag cannot be used when scheme is specified manually with -t flag");
+    abort2(auto_detection_flag > 0 && scheme.size() > 0,
+           "-a flag cannot be used when scheme is specified manually with -t flag");
+    abort2(empty_as_string_flag && scheme.size() > 0,
+           "-e flag cannot be used when scheme is specified manually with -t flag");
 
-    abort2(!force_flag && util::File::exists(argv[argc - 1]), "Destination file '%s' already exists.", argv[argc - 1]);
+    abort2(!force_flag && util::File::exists(argv[argc - 1]), "Destination file '%s' already exists.",
+           argv[argc - 1]);
 
     if (util::File::exists(argv[argc - 1]))
         util::File::try_remove(argv[argc - 1]);
@@ -188,17 +192,18 @@ int main(int argc, char* argv[])
     try {
         if (scheme.size() > 0) {
             // Manual specification of scheme
-            imported_rows = importer.import_csv_manual(in_file, table, scheme, column_names, skip_rows_flag, import_rows_flag ? import_rows_flag : static_cast<size_t>(-1));
+            imported_rows = importer.import_csv_manual(in_file, table, scheme, column_names, skip_rows_flag,
+                                                       import_rows_flag ? import_rows_flag : static_cast<size_t>(-1));
         }
         else if (argc >= 3) {
             // Auto detection
             abort2(skip_rows_flag > 0, "-s flag cannot be used in Simple auto-import mode");
-            imported_rows = importer.import_csv_auto(in_file, table, auto_detection_flag ? auto_detection_flag : 10000, import_rows_flag ? import_rows_flag : static_cast<size_t>(-1));
+            imported_rows =
+                importer.import_csv_auto(in_file, table, auto_detection_flag ? auto_detection_flag : 10000,
+                                         import_rows_flag ? import_rows_flag : static_cast<size_t>(-1));
         }
         else {
-
         }
-
     }
     catch (const std::runtime_error& error) {
         std::cerr << error.what();
@@ -211,6 +216,4 @@ int main(int argc, char* argv[])
         std::cout << "Imported " << imported_rows << " rows into table named '" << tablename << "'\n";
 
     return 0;
-
-
 }

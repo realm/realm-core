@@ -26,7 +26,7 @@
 #include <mutex>
 
 #ifndef _WIN32
-    #include <unistd.h>
+#include <unistd.h>
 #endif
 
 #include <realm/group_shared_options.hpp>
@@ -34,7 +34,7 @@
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #ifndef _WIN32
-    #include <realm/util/interprocess_condvar.hpp>
+#include <realm/util/interprocess_condvar.hpp>
 #endif
 #include <realm/util/interprocess_mutex.hpp>
 
@@ -106,7 +106,6 @@ struct Shared {
             m_value = int(f);
         }
     }
-
 };
 
 struct SharedWithEmulated {
@@ -114,8 +113,14 @@ struct SharedWithEmulated {
     InterprocessMutex::SharedPart m_shared_part;
     int m_value;
 
-    SharedWithEmulated(std::string name) { m_mutex.set_shared_part(m_shared_part, name, "0"); }
-    ~SharedWithEmulated() { m_mutex.release_shared_part(); }
+    SharedWithEmulated(std::string name)
+    {
+        m_mutex.set_shared_part(m_shared_part, name, "0");
+    }
+    ~SharedWithEmulated()
+    {
+        m_mutex.release_shared_part();
+    }
 
     // 10000 takes less than 0.1 sec
     void increment_10000_times()
@@ -137,7 +142,6 @@ struct SharedWithEmulated {
             m_value = int(f);
         }
     }
-
 };
 
 struct Robust {
@@ -173,7 +177,8 @@ struct Robust {
 
 class QueueMonitor {
 public:
-    QueueMonitor(): m_closed(false)
+    QueueMonitor()
+        : m_closed(false)
     {
     }
 
@@ -243,8 +248,8 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
 
 class bowl_of_stones_semaphore {
 public:
-    bowl_of_stones_semaphore(int initial_number_of_stones = 0):
-        m_num_stones(initial_number_of_stones)
+    bowl_of_stones_semaphore(int initial_number_of_stones = 0)
+        : m_num_stones(initial_number_of_stones)
     {
     }
     void get_stone(int num_to_get)
@@ -260,6 +265,7 @@ public:
         ++m_num_stones;
         m_cond_var.notify_all();
     }
+
 private:
     Mutex m_mutex;
     int m_num_stones;
@@ -267,9 +273,7 @@ private:
 };
 
 
-
 } // anonymous namespace
-
 
 
 TEST(Thread_Join)
@@ -412,18 +416,15 @@ TEST_IF(Thread_RobustMutex, TEST_THREAD_ROBUSTNESS)
     }
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover_throw, &robust)),
-                RobustMutex::NotRecoverable);
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover_throw, &robust)), RobustMutex::NotRecoverable);
     CHECK(robust.m_recover_called);
 
     // Check that successive attempts at locking will throw
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)),
-                RobustMutex::NotRecoverable);
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)), RobustMutex::NotRecoverable);
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)),
-                RobustMutex::NotRecoverable);
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)), RobustMutex::NotRecoverable);
     CHECK(!robust.m_recover_called);
 }
 
@@ -569,17 +570,16 @@ void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessC
 }
 
 
-void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter,
-                       InterprocessMutex* mutex, InterprocessCondVar* cv)
+void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, InterprocessMutex* mutex,
+                       InterprocessCondVar* cv)
 {
     std::lock_guard<InterprocessMutex> l(*mutex);
-    ++ *wait_counter;
+    ++*wait_counter;
     feedback->add_stone();
     cv->wait(*mutex, nullptr);
-    -- *wait_counter;
+    --*wait_counter;
     feedback->add_stone();
 }
-
 
 
 void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
@@ -587,7 +587,6 @@ void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
     std::lock_guard<InterprocessMutex> l(*mutex);
     cv->wait(*mutex, nullptr);
 }
-
 }
 
 // Verify, that a wait on a condition variable actually waits

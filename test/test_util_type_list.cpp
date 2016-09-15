@@ -63,9 +63,18 @@ static util::Mutex magicMutex;
 static int magic;
 
 struct Person {
-    void set_name(std::string name) { m_name = name; }
-    void set_age(int age) { m_age = age; }
-    void set_married(bool married) { m_married = married; }
+    void set_name(std::string name)
+    {
+        m_name = name;
+    }
+    void set_age(int age)
+    {
+        m_age = age;
+    }
+    void set_married(bool married)
+    {
+        m_married = married;
+    }
 
     std::string m_name;
     int m_age = 0;
@@ -73,69 +82,96 @@ struct Person {
     std::map<int, Person> m_children;
 };
 
-template<class T, int i>
+template <class T, int i>
 struct DoSomething;
 
-template<int idx>
+template <int idx>
 struct DoSomething<std::string, idx> {
-    static void exec() { magic += idx; }
-    static void exec(Person* p) { p->set_name("John Doe"); }
-    static void exec(Person* p, int child) { p->m_children[child].set_name("John Doe Jr."); }
-    template<class L>
+    static void exec()
+    {
+        magic += idx;
+    }
+    static void exec(Person* p)
+    {
+        p->set_name("John Doe");
+    }
+    static void exec(Person* p, int child)
+    {
+        p->m_children[child].set_name("John Doe Jr.");
+    }
+    template <class L>
     static void exec(Person* p, int child, util::Tuple<L> tuple)
     {
         p->m_children[child].set_name(util::at<idx>(tuple));
     }
 };
 
-template<int idx>
+template <int idx>
 struct DoSomething<int, idx> {
-    static void exec() { magic += 2 * idx; }
-    static void exec(Person* p) { p->set_age(30); }
-    static void exec(Person* p, int child) { p->m_children[child].set_age(10); }
-    template<class L>
+    static void exec()
+    {
+        magic += 2 * idx;
+    }
+    static void exec(Person* p)
+    {
+        p->set_age(30);
+    }
+    static void exec(Person* p, int child)
+    {
+        p->m_children[child].set_age(10);
+    }
+    template <class L>
     static void exec(Person* p, int child, util::Tuple<L> tuple)
     {
         p->m_children[child].set_age(util::at<idx>(tuple));
     }
 };
 
-template<int idx>
+template <int idx>
 struct DoSomething<bool, idx> {
-    static void exec() { magic += 3 * idx; }
-    static void exec(Person* p) { p->set_married(true); }
-    static void exec(Person* p, int child) { p->m_children[child].set_married(false); }
-    template<class L>
+    static void exec()
+    {
+        magic += 3 * idx;
+    }
+    static void exec(Person* p)
+    {
+        p->set_married(true);
+    }
+    static void exec(Person* p, int child)
+    {
+        p->m_children[child].set_married(false);
+    }
+    template <class L>
     static void exec(Person* p, int child, util::Tuple<L> tuple)
     {
         p->m_children[child].set_married(util::at<idx>(tuple));
     }
 };
 
-template<class T, int i>
+template <class T, int i>
 struct NotEqual;
 
-template<int idx>
+template <int idx>
 struct NotEqual<std::string, idx> {
-    template<class L>
+    template <class L>
     static bool exec(Person* p, util::Tuple<L> tuple)
     {
         return p->m_name != util::at<idx>(tuple);
     }
 };
 
-template<int idx>
+template <int idx>
 struct NotEqual<int, idx> {
-    template<class L>
+    template <class L>
     static bool exec(Person* p, util::Tuple<L> tuple)
     {
         return p->m_age != util::at<idx>(tuple);
     }
 };
 
-template<int idx>
+template <int idx>
 struct NotEqual<bool, idx> {
-    template<class L>
+    template <class L>
     static bool exec(Person* p, util::Tuple<L> tuple)
     {
         return p->m_married != util::at<idx>(tuple);
@@ -149,8 +185,8 @@ TEST(TypeList_Basic)
     auto person_info = (util::tuple(), std::string("Paul"), 20, true);
     auto person_info1 = (util::tuple(), std::string("John Doe"), 30, true);
 
-    using Dummy1   = util::TypeAppend<void, std::string>::type;
-    using Dummy2   = util::TypeAppend<Dummy1, int>::type;
+    using Dummy1 = util::TypeAppend<void, std::string>::type;
+    using Dummy2 = util::TypeAppend<Dummy1, int>::type;
     using TypeList = util::TypeAppend<Dummy2, bool>::type;
 
     {

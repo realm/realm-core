@@ -38,7 +38,7 @@ DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
     {
         DescriptorRef subdesc;
         SubspecRef subspec_ref = m_spec->get_subtable_spec(column_ndx);
-        std::unique_ptr<Spec> subspec(new Spec(subspec_ref)); // Throws
+        std::unique_ptr<Spec> subspec(new Spec(subspec_ref));             // Throws
         subdesc = std::make_shared<Descriptor>(Descriptor::PrivateTag()); // Throws
         m_subdesc_map.push_back(subdesc_entry(column_ndx, subdesc));      // Throws
         subdesc->attach(m_root_table.get(), shared_from_this(), subspec.get());
