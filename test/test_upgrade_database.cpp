@@ -1010,4 +1010,123 @@ TEST(Upgrade_Database_4_5_DateTime1)
 
 }
 
+
+namespace {
+
+std::string generate_random_string(realm::test_util::Random& rand, size_t length)
+{
+    std::string rand_string;
+    for (size_t t = 0; t < length; ++t) {
+        // likely to excercise null characters and duplicate values
+        rand_string += static_cast<unsigned char>(rand.draw_int_max<int>(10));
+    }
+    return rand_string;
+}
+
+Timestamp generate_random_timestamp(realm::test_util::Random& rand)
+{
+    int seconds = rand.draw_int_max<int>(10);
+    int nanoseconds = rand.draw_int_max<int>(10);
+    return Timestamp(seconds, nanoseconds);
+}
+
+} // end anonymous namespace
+
+// Open an existing database-file-format-version 5 file and
+// check that it automatically upgrades to version 6.
+TEST(Upgrade_Database_5_6_StringIndex)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+    util::to_string(REALM_MAX_BPNODE_SIZE) + "_5_to_6_stringindex.realm";
+
+#if TEST_READ_UPGRADE_MODE
+
+    // Automatic upgrade from SharedGroup
+    {
+        CHECK_OR_RETURN(File::exists(path));
+        SHARED_GROUP_TEST_PATH(temp_copy);
+
+        // Make a copy of the version 4 database so that we keep the
+        // original file intact and unmodified
+        CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+        // Constructing this SharedGroup will trigger an upgrade
+        // for all tables because the file is in version 4
+        SharedGroup sg(temp_copy);
+
+        WriteTransaction rt(sg);
+        TableRef t = rt.get_table("t1");
+        TableRef t2 = rt.get_table("t2");
+
+        size_t int_ndx = 0;
+        size_t str_ndx = 4;
+        size_t ts_ndx = 6;
+
+        // The following checks are actually deterministic because we seed the
+        // random number generator in the same way as when we wrote the file.
+        size_t num_rows = 500;
+        CHECK_EQUAL(t->size(), num_rows);
+        CHECK(t->has_search_index(int_ndx));
+        CHECK(t->has_search_index(str_ndx));
+        CHECK(t->has_search_index(ts_ndx));
+
+        realm::test_util::Random rand(1234567890);
+        for (size_t i = 0; i < num_rows; ++i) {
+            // 2 * StringIndex::s_max_offset == 800
+            std::string r = ::generate_random_string(rand, 800);
+            StringData rsd(r);
+            Timestamp rts = ::generate_random_timestamp(rand);
+            int ri = rand.draw_int_max(100);
+
+            CHECK_EQUAL(t->get_string(str_ndx, i), rsd);
+            CHECK_EQUAL(t->get_timestamp(ts_ndx, i), rts);
+            CHECK_EQUAL(t->get_int(int_ndx, i), ri);
+        }
+        t->verify();
+        t2->verify();
+    }
+
+#else  // test write mode
+    // NOTE: This code must be executed from an old file-format-version 5
+    // core in order to create a file-format-version 5 test file!
+    char leafsize[20];
+    sprintf(leafsize, "%d", REALM_MAX_BPNODE_SIZE);
+    File::try_remove(path);
+
+    Group g;
+    TableRef t = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+
+    size_t int_ndx = t->add_column(type_Int, "int");
+    t->add_column(type_Bool, "bool");
+    t->add_column(type_Float, "float");
+    t->add_column(type_Double, "double");
+    size_t str_ndx = t->add_column(type_String, "string");
+    t->add_column(type_Binary, "binary");
+    size_t ts_ndx = t->add_column(type_Timestamp, "timestamp");
+    t->add_column(type_Table, "table");
+    t->add_column(type_Mixed, "mixed");
+    t->add_column_link(type_Link, "link", *t2);
+    t->add_column_link(type_LinkList, "linklist", *t2);
+    t->add_search_index(int_ndx);
+    t->add_search_index(str_ndx);
+    t->add_search_index(ts_ndx);
+
+    size_t num_rows = 500;
+    realm::test_util::Random rand(1234567890);
+    for (size_t i = 0; i < num_rows; ++i) {
+        size_t row = t->add_empty_row();
+        // 2 * StringIndex::s_max_offset == 800
+        std::string r = ::generate_random_string(rand, 800);
+        StringData rsd(r);
+        t->set_string(str_ndx, row, rsd);
+        t->set_timestamp(ts_ndx, row, ::generate_random_timestamp(rand));
+        t->set_int(int_ndx, row, rand.draw_int_max(100));
+    }
+
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+}
+
+
 #endif // TEST_GROUP
