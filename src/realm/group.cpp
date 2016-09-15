@@ -143,7 +143,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     if (current_file_format_version <= 2 && target_file_format_version >= 3) {
         for (size_t t = 0; t < m_tables.size(); t++) {
             TableRef table = get_table(t);
-            table->upgrade_file_format();
+            table->upgrade_file_format(target_file_format_version);
         }
     }
 
@@ -164,7 +164,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     if (current_file_format_version <= 5 && target_file_format_version >= 6) {
         for (size_t t = 0; t < m_tables.size(); t++) {
             TableRef table = get_table(t);
-            table->upgrade_file_format(true); // rebuilds indexes
+            table->upgrade_file_format(target_file_format_version);
         }
     }
 

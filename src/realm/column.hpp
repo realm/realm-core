@@ -77,10 +77,10 @@ template<typename ColumnDataType>
 class ColumnRandIterator : public std::iterator<std::random_access_iterator_tag, ColumnDataType, ptrdiff_t, size_t>
 {
 public:
-    ColumnRandIterator(Column<ColumnDataType> const* src_col, size_t ndx = 0);
+    ColumnRandIterator(const Column<ColumnDataType>* src_col, size_t ndx = 0);
     operator bool() const;
-    bool operator==(ColumnRandIterator<ColumnDataType> const& other) const;
-    bool operator!=(ColumnRandIterator<ColumnDataType> const& other) const;
+    bool operator==(const ColumnRandIterator<ColumnDataType>& other) const;
+    bool operator!=(const ColumnRandIterator<ColumnDataType>& other) const;
     ColumnRandIterator<ColumnDataType>& operator+=(const ptrdiff_t& movement);
     ColumnRandIterator<ColumnDataType>& operator-=(const ptrdiff_t& movement);
     ColumnRandIterator<ColumnDataType>& operator++();
@@ -91,12 +91,11 @@ public:
     ColumnRandIterator<ColumnDataType> operator-(const ptrdiff_t& movement);
     ptrdiff_t operator-(const ColumnRandIterator<ColumnDataType>& rawIterator);
     const ColumnDataType operator*() const;
-    ColumnDataType* operator->();
     size_t get_col_ndx() const;
 protected:
     size_t col_ndx;
     size_t cached_column_size;
-    Column<ColumnDataType> const* col;
+    const Column<ColumnDataType>* col;
 };
 
 /// Base class for all column types.
@@ -1601,7 +1600,7 @@ void Column<T>::dump_node_structure(const Array& root, std::ostream& out, int le
 
 
 template<class ColumnDataType>
-ColumnRandIterator<ColumnDataType>::ColumnRandIterator(Column<ColumnDataType> const* src_col, size_t ndx)
+ColumnRandIterator<ColumnDataType>::ColumnRandIterator(const Column<ColumnDataType>* src_col, size_t ndx)
 : col_ndx(ndx), col(src_col)
 {
 cached_column_size = col->size();
@@ -1614,13 +1613,13 @@ return col_ndx >= 0 && col_ndx < cached_column_size;
 }
 
 template<class ColumnDataType>
-bool ColumnRandIterator<ColumnDataType>::operator==(ColumnRandIterator<ColumnDataType> const& other) const
+bool ColumnRandIterator<ColumnDataType>::operator==(const ColumnRandIterator<ColumnDataType>& other) const
 {
     return (col_ndx == other.col_ndx);
 }
 
 template<class ColumnDataType>
-bool ColumnRandIterator<ColumnDataType>::operator!=(ColumnRandIterator<ColumnDataType> const& other) const
+bool ColumnRandIterator<ColumnDataType>::operator!=(const ColumnRandIterator<ColumnDataType>& other) const
 {
     return !(*this == other);
 }
@@ -1688,12 +1687,6 @@ ptrdiff_t ColumnRandIterator<ColumnDataType>::operator-(const ColumnRandIterator
 
 template<class ColumnDataType>
 const ColumnDataType ColumnRandIterator<ColumnDataType>::operator*() const
-{
-    return col->get(col_ndx);
-}
-
-template<class ColumnDataType>
-ColumnDataType* ColumnRandIterator<ColumnDataType>::operator->()
 {
     return col->get(col_ndx);
 }

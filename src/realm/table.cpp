@@ -1591,7 +1591,7 @@ bool Table::has_search_index(size_t col_ndx) const noexcept
 }
 
 
-void Table::upgrade_file_format(bool after_timestamp)
+void Table::upgrade_file_format(size_t target_file_format_version)
 {
     for (size_t col_ndx = 0; col_ndx < get_column_count(); col_ndx++) {
         if (!has_search_index(col_ndx)) {
@@ -1632,15 +1632,15 @@ void Table::upgrade_file_format(bool after_timestamp)
                 // Indices are not support on these column types
                 break;
             case col_type_Timestamp: {
-                if (!after_timestamp) {
-                    // Introduced after latest file format upgrade
-                    break;
-                }
-                else {
+                if (target_file_format_version == 6) {
                     TimestampColumn& col = get_column_timestamp(col_ndx);
                     col.get_search_index()->clear();
                     col.populate_search_index();
                     continue;
+                }
+                else {
+                    // Introduced after version 5 file format upgrade
+                    break;
                 }
             }
         }

@@ -54,7 +54,12 @@ bit set, then the remaining upper bits specify the row index at which the string
 it must be interpreted as a reference to a Column that stores the row indexes at which the string is stored.
 
 If a Column is used, then all row indexes are guaranteed to be sorted increasingly, which means you an search in it
-using our binary search functions such as upper_bound() and lower_bound().
+using our binary search functions such as upper_bound() and lower_bound(). Each duplicate value will be stored in
+the same Column, but Columns may contain more than just duplicates if the depth of the tree exceeds the value
+`s_max_offset` This is to avoid stack overflow problems with many of our recursive functions if we have two very
+long strings that have a long common prefix but differ in the last couple bytes. If a Column stores more than just
+duplicates, then the list is kept sorted in ascending order by string value and within the groups of common
+strings, the rows are sorted in ascending order.
 */
 
 namespace realm {
