@@ -2223,6 +2223,41 @@ void Table::change_link_targets(size_t row_ndx, size_t new_row_ndx)
     if (REALM_UNLIKELY(new_row_ndx >= m_size))
         throw LogicError(LogicError::row_index_out_of_range);
 
+    // Replace links through backlink columns.
+    //
+    // This bypasses handling of cascading rows, and we have decided that this is OK, because
+    // ChangeLinkTargets is always followed by MoveLastOver, so breaking the last strong link
+    // to a row that is being subsumed will have no observable effect, while honoring the
+    // cascading behavior would complicate the calling code somewhat (having to take
+    // into account whether or not the row was removed as a consequence of cascade, leading
+    // to bugs in case this was forgotten).
+
+    size_t backlink_col_start = m_spec.get_public_column_count();
+    size_t backlink_col_end   = m_spec.get_column_count();
+    for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
+        REALM_ASSERT(m_spec.get_column_type(col_ndx) == col_type_BackLink);
+
+        auto& col = get_column_backlink(col_ndx);
+        auto& origin_table = col.get_origin_table();
+        size_t origin_col_ndx = col.get_origin_column_index();
+        ColumnType origin_col_type = origin_table.get_real_column_type(origin_col_ndx);
+        while (col.get_backlink_count(row_ndx) > 0) {
+            size_t origin_row_ndx = col.get_backlink(row_ndx, 0);
+
+            if (origin_col_type == col_type_Link) {
+                origin_table.set_link(origin_col_ndx, origin_row_ndx, new_row_ndx);
+            }
+            else if (origin_col_type == col_type_LinkList) {
+                LinkViewRef links = origin_table.get_linklist(origin_col_ndx, origin_row_ndx);
+                for (size_t j = 0; j < links->size(); ++j) {
+                    if (links->get(j).get_index() == row_ndx) {
+                        links->set(j, new_row_ndx);
+                    }
+                }
+            }
+        }
+    }
+
     do_change_link_targets(row_ndx, new_row_ndx);
 
     if (Replication* repl = get_repl()) {
@@ -2372,42 +2407,6 @@ void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 
 void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
 {
-    // Replace links through backlink columns, WITHOUT generating SetLink instructions.
-    //
-    // This bypasses handling of cascading rows, and we have decided that this is OK, because
-    // ChangeLinkTargets is always followed by MoveLastOver, so breaking the last strong link
-    // to a row that is being subsumed will have no observable effect, while honoring the
-    // cascading behavior would complicate the calling code somewhat (having to take
-    // into account whether or not the row was removed as a consequence of cascade, leading
-    // to bugs in case this was forgotten).
-
-    size_t backlink_col_start = m_spec.get_public_column_count();
-    size_t backlink_col_end   = m_spec.get_column_count();
-    for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
-        REALM_ASSERT(m_spec.get_column_type(col_ndx) == col_type_BackLink);
-
-        auto& col = get_column_backlink(col_ndx);
-        auto& origin_table = col.get_origin_table();
-        size_t origin_col_ndx = col.get_origin_column_index();
-        ColumnType origin_col_type = origin_table.get_real_column_type(origin_col_ndx);
-        while (col.get_backlink_count(row_ndx) > 0) {
-            size_t origin_row_ndx = col.get_backlink(row_ndx, 0);
-
-            if (origin_col_type == col_type_Link) {
-                origin_table.do_set_link(origin_col_ndx, origin_row_ndx, new_row_ndx);
-            }
-            else if (origin_col_type == col_type_LinkList) {
-                LinkViewRef links = origin_table.get_linklist(origin_col_ndx, origin_row_ndx);
-                for (size_t j = 0; j < links->size(); ++j) {
-                    using llf = _impl::LinkListFriend;
-                    if (links->get(j).get_index() == row_ndx) {
-                        llf::do_set(*links, j, new_row_ndx);
-                    }
-                }
-            }
-        }
-    }
-
     // Copy linklist contents from row_ndx to new_row_ndx. row_ndx and
     // new_row_ndx represent the loser and winner of a PK merge conflict
     // (respectively), and the winner should end up with all the links.
@@ -2423,7 +2422,8 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
     // winning or the losing row are empty. This means we can "merge" the rows
     // by simply moving all elements to the winning row, and rely on OT to
     // redirect any subsequent linklist operations to the winner.
-    for (size_t col_ndx = 0; col_ndx < backlink_col_start; ++col_ndx) {
+    size_t col_end = m_spec.get_public_column_count();
+    for (size_t col_ndx = 0; col_ndx < col_end; ++col_ndx) {
         if (m_spec.get_column_type(col_ndx) == col_type_LinkList) {
             auto& col = get_column_link_list(col_ndx);
             bool old_is_empty = !col.has_links(row_ndx);
@@ -2860,48 +2860,33 @@ Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 template<class ColType, class T>
 size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
 {
-    size_t found_ndx = not_found;
+    size_t found_ndx = col.find_first(value);
 
-    // The following loop relies on unsigned overflow, so be sure that `not_found`
-    // is what we expect it to be.
-    static_assert(not_found == size_t(-1), "not_found != -1");
-
-    while (true) {
-        // Deliberate overflow; first iteration will start from 0,
-        // because not_found == size_t(-1).
-        found_ndx = col.find_first(value, found_ndx + 1);
-
-        if (found_ndx == ndx) {
-            // SetUnique is idempotent (i.e. finding a matching value on the same row
-            // index is perfectly fine).
-            continue;
-        }
-        else if (found_ndx == not_found) {
-            // No more matches.
-            break;
-        }
-
-        // Unique constraint violation!
-        // RESOLUTION: Let the new row subsume the identity of the old row,
-        // and delete the old row.
-        change_link_targets(found_ndx, ndx);
-        adj_row_acc_subsume_row(found_ndx, ndx);
-
-        if (ndx == size() - 1) {
-            // Row will be moved by move_last_over, adjust index.
-            ndx = found_ndx;
-        }
-
-        move_last_over(found_ndx);
-
-        // Since we removed an element, we need to re-check the element that was just
-        // moved into the "found_ndx" spot by move_last_over.
-        --found_ndx;
+    if (found_ndx == not_found) {
+        col.set(ndx, value);
+        return ndx;
     }
 
-    col.set(ndx, value);
+    // There were duplicates. Keep one, and delete all others.
+    
+    while (true) {
+        size_t i = col.find_first(value, found_ndx + 1);
+        if (i == not_found)
+            break;
+        change_link_targets(i, found_ndx);
+        adj_row_acc_subsume_row(i, found_ndx);
+        if (ndx == size() - 1)
+            ndx = i;
+        move_last_over(i);
+    }
 
-    return ndx;
+    change_link_targets(ndx, found_ndx);
+    adj_row_acc_subsume_row(ndx, found_ndx);
+    if (found_ndx == size() - 1) {
+        found_ndx = ndx;
+    }
+    move_last_over(ndx);
+    return found_ndx;
 }
 
 int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
@@ -2909,7 +2894,7 @@ int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
     return get<int64_t>(col_ndx, ndx);
 }
 
-void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
+size_t Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2934,6 +2919,8 @@ void Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 
     if (Replication* repl = get_repl())
         repl->set_int(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
+
+    return ndx;
 }
 
 void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
@@ -3145,7 +3132,7 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value, bool is_def
 }
 
 
-void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
+size_t Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
 {
     if (REALM_UNLIKELY(value.size() > max_string_size))
         throw LogicError(LogicError::string_too_big);
@@ -3177,15 +3164,17 @@ void Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
     //FIXME: String and StringEnum columns should have a common base class
     if (actual_type == ColumnType::col_type_String) {
         StringColumn& col = get_column_string(col_ndx);
-        do_set_unique(col, ndx, value); // Throws
+        ndx = do_set_unique(col, ndx, value); // Throws
     }
     else {
         StringEnumColumn& col = get_column_string_enum(col_ndx);
-        do_set_unique(col, ndx, value); // Throws
+        ndx = do_set_unique(col, ndx, value); // Throws
     }
 
     if (Replication* repl = get_repl())
         repl->set_string(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
+
+    return ndx;
 }
 
 void Table::insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData value)

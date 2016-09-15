@@ -1469,10 +1469,12 @@ TEST(Table_SetIntUnique)
     // Check that conflicting SetIntUniques result in rows being deleted.
     table.set_int_unique(0, 1, 123);
     CHECK_EQUAL(table.size(), 9);
+
     table.set_int_unique(1, 1, 123);
-    CHECK_EQUAL(table.size(), 9);
-    table.set_int_unique(1, 2, 123);
     CHECK_EQUAL(table.size(), 8);
+
+    table.set_int_unique(1, 2, 123);
+    CHECK_EQUAL(table.size(), 7);
 }
 
 

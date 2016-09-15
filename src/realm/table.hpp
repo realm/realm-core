@@ -444,10 +444,12 @@ public:
     /// intended to be used in the implementation of primary key support. They
     /// check if the given column already contains one or more values that are
     /// equal to \a value, and if there are conflicts, it calls
-    /// Table::change_link_targets() for the conflicting row to be replaced by
-    /// \a row_ndx, followed by a Table::move_last_over() of the offending row.
-    /// Users intending to implement primary keys must therefore manually check
-    /// for duplicates if they want to raise an error instead.
+    /// Table::change_link_targets() for the row_ndx to be replaced by the
+    /// existing row, followed by a Table::move_last_over() of row_ndx. The
+    /// return value is always a row index of a row that contains \a value in
+    /// the specified column, possibly different from \a row_ndx if a conflict
+    /// occurred.  Users intending to implement primary keys must therefore
+    /// manually check for duplicates if they want to raise an error instead.
     ///
     /// NOTE:  It is an error to call either function after adding elements to a
     /// linklist in the object. In general, calling set_int_unique() or
@@ -491,7 +493,7 @@ public:
     static constexpr int_fast64_t min_integer = std::numeric_limits<int64_t>::min();
 
     void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value, bool is_default = false);
-    void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
+    size_t set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
     void set_bool(size_t column_ndx, size_t row_ndx, bool value, bool is_default = false);
     void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value, bool is_default = false);
     void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value, bool is_default = false);
@@ -500,7 +502,7 @@ public:
     void set_float(size_t column_ndx, size_t row_ndx, float value, bool is_default = false);
     void set_double(size_t column_ndx, size_t row_ndx, double value, bool is_default = false);
     void set_string(size_t column_ndx, size_t row_ndx, StringData value, bool is_default = false);
-    void set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
+    size_t set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
     void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default = false);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value, bool is_default = false);
     void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default = false);
