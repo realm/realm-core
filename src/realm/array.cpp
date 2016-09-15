@@ -2845,9 +2845,9 @@ size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, re
         return 0;
 
     IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value, slc);
-    size_t count = upper - lower;
+    size_t cnt = upper - lower;
 
-    return count;
+    return cnt;
 }
 
 template<>
