@@ -494,6 +494,7 @@ def get_version() {
   }
 }
 
+@NonCPS
 def getDeviceNames(String commandOutput) {
   def deviceNames = []
   for (line in commandOutput.split('\n')) {

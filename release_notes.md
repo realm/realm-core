@@ -1,4 +1,4 @@
-# 2.0.0-rc5 Release notes
+# 2.0.0-rc6 Release notes
 
 ### Enhancements
 
