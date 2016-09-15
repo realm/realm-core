@@ -1824,7 +1824,6 @@ const ColumnBase& Table::get_column_base(size_t ndx) const noexcept
     return *m_cols[ndx];
 }
 
-
 ColumnBase& Table::get_column_base(size_t ndx)
 {
     REALM_ASSERT_DEBUG(ndx < m_spec.get_column_count());
@@ -1832,7 +1831,6 @@ ColumnBase& Table::get_column_base(size_t ndx)
     REALM_ASSERT_DEBUG(m_cols.size() == m_spec.get_column_count());
     return *m_cols[ndx];
 }
-
 
 const IntegerColumn& Table::get_column(size_t ndx) const noexcept
 {
@@ -2857,18 +2855,18 @@ Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 
 } // namespace realm;
 
+
 template<class ColType, class T>
-size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
+size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
 {
     size_t found_ndx = col.find_first(value);
 
     if (found_ndx == not_found) {
-        col.set(ndx, value);
         return ndx;
     }
 
     // There were duplicates. Keep one, and delete all others.
-    
+
     size_t i = found_ndx + 1;
     while (true) {
         i = col.find_first(value, i);
@@ -2885,7 +2883,6 @@ size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
         // No need to adjust found_ndx, because we're searching linearly.
         move_last_over(i);
     }
-
     if (found_ndx == ndx)
         return ndx; // Idempotence; perfectly fine.
 
@@ -2898,6 +2895,23 @@ size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
     return found_ndx;
 }
 
+
+template<class ColType>
+size_t Table::do_set_unique_null(ColType& col, size_t ndx)
+{
+    ndx = do_find_unique(col, ndx, null{});
+    col.set_null(ndx);
+    return ndx;
+}
+
+template<class ColType, class T>
+size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
+{
+    ndx = do_find_unique(col, ndx, value);
+    col.set(ndx, value);
+    return ndx;
+}
+
 int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
 {
     return get<int64_t>(col_ndx, ndx);
@@ -2907,7 +2921,6 @@ size_t Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
-    bump_version();
 
     if (!has_search_index(col_ndx)) {
         throw LogicError{LogicError::no_search_index};
@@ -2916,6 +2929,8 @@ size_t Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
     // FIXME: See the definition of check_lists_are_empty() for an explanation
     // of why this is needed.
     check_lists_are_empty(ndx); // Throws
+
+    bump_version();
 
     if (is_nullable(col_ndx)) {
         auto& col = get_column_int_null(col_ndx);
@@ -3507,6 +3522,32 @@ bool Table::is_null(size_t col_ndx, size_t row_ndx) const noexcept
     return col.is_null(row_ndx);
 }
 
+void Table::set_null_unique(size_t col_ndx, size_t row_ndx)
+{
+    if (!is_nullable(col_ndx)) {
+        throw LogicError{LogicError::column_not_nullable};
+    }
+    REALM_ASSERT(!is_link_type(m_spec.get_column_type(col_ndx))); // Use nullify_link().
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(row_ndx, <, m_size);
+
+    if (!has_search_index(col_ndx)) {
+        throw LogicError{LogicError::no_search_index};
+    }
+
+    // FIXME: See the definition of check_lists_are_empty() for an explanation
+    // of why this is needed.
+    check_lists_are_empty(row_ndx); // Throws
+
+    bump_version();
+
+    // Only valid for int columns; use `set_string_unique` to set null strings
+    auto& col = get_column_int_null(col_ndx);
+    row_ndx = do_set_unique_null(col, row_ndx); // Throws
+
+    if (Replication* repl = get_repl())
+        repl->set_null(this, col_ndx, row_ndx, _impl::instr_SetUnique); // Throws
+}
 
 void Table::set_null(size_t col_ndx, size_t row_ndx, bool is_default)
 {
@@ -3514,6 +3555,8 @@ void Table::set_null(size_t col_ndx, size_t row_ndx, bool is_default)
         throw LogicError{LogicError::column_not_nullable};
     }
     REALM_ASSERT(!is_link_type(m_spec.get_column_type(col_ndx))); // Use nullify_link().
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(row_ndx, <, m_size);
 
     bump_version();
     ColumnBase& col = get_column_base(col_ndx);
@@ -5385,7 +5428,7 @@ void Table::check_lists_are_empty(size_t row_ndx) const
     // key of a row that contains lists (including linklists) after those lists
     // have been populated. This limitation may be lifted in the future, but for
     // now it is necessary to ensure that all lists are empty before setting a
-    // primary key (by way of set_int_unique() or set_string_unique()).
+    // primary key (by way of set_int_unique() or set_string_unique() or set_null_unique()).
 
     for (size_t i = 0; i < get_column_count(); ++i) {
         if (get_column_type(i) == type_LinkList) {

@@ -1239,7 +1239,8 @@ inline void TransactLogConvenientEncoder::set_null(const Table* t, size_t col_nd
                                                    size_t row_ndx, Instruction variant)
 {
     select_table(t); // Throws
-    m_encoder.set_null(col_ndx, row_ndx, variant); // Throws
+    size_t prior_num_rows = (variant == instr_SetUnique ? t->size() : 0);
+    m_encoder.set_null(col_ndx, row_ndx, variant, prior_num_rows); // Throws
 }
 
 inline bool TransactLogEncoder::nullify_link(size_t col_ndx, size_t ndx,

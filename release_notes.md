@@ -1,3 +1,11 @@
+# 2.0.0-rc5 Release notes
+
+### Enhancements
+
+* Added debian packages for Ubuntu 16.04.
+
+----------------------------------------------
+
 # 2.0.0-rc4 Release notes
 
 ### Bugfixes
