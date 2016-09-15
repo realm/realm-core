@@ -1,22 +1,8 @@
 # 2.0.0-rc5 Release notes
 
-### Bugfixes
-
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
-
 ### Enhancements
 
 * Added debian packages for Ubuntu 16.04.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
