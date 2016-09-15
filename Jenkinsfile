@@ -90,7 +90,7 @@ try {
 
 def doBuildCocoa() {
   return {
-    node('osx') {
+    node('osx_vegas') {
       getArchive()
 
       try {
@@ -145,7 +145,7 @@ def doBuildCocoa() {
 
 def doBuildDotNetOsx() {
   return {
-    node('osx') {
+    node('osx_vegas') {
       getArchive()
 
       try {
@@ -295,7 +295,7 @@ def doBuildNodeInDocker() {
 
 def doBuildNodeInOsx() {
   return {
-    node('osx') {
+    node('osx_vegas') {
       getArchive()
 
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
