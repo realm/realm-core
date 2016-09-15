@@ -2869,16 +2869,25 @@ size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
 
     // There were duplicates. Keep one, and delete all others.
     
+    size_t i = found_ndx + 1;
     while (true) {
-        size_t i = col.find_first(value, found_ndx + 1);
+        i = col.find_first(value, i);
         if (i == not_found)
             break;
+        if (i == ndx) {
+            i += 1;
+            continue; // Special-case when `value` is 0/null.
+        }
         change_link_targets(i, found_ndx);
         adj_row_acc_subsume_row(i, found_ndx);
         if (ndx == size() - 1)
             ndx = i;
+        // No need to adjust found_ndx, because we're searching linearly.
         move_last_over(i);
     }
+
+    if (found_ndx == ndx)
+        return ndx; // Idempotence; perfectly fine.
 
     change_link_targets(ndx, found_ndx);
     adj_row_acc_subsume_row(ndx, found_ndx);
