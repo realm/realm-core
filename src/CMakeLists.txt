@@ -34,6 +34,7 @@ set(HEADERS
 
     impl/android/external_commit_helper.hpp
     impl/apple/external_commit_helper.hpp
+    impl/apple/keychain_helper.hpp
     impl/generic/external_commit_helper.hpp
 
     impl/collection_change_builder.hpp
@@ -60,7 +61,7 @@ set(HEADERS
     util/format.hpp)
 
 if(APPLE)
-    list(APPEND SOURCES impl/apple/external_commit_helper.cpp)
+    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
 elseif(REALM_PLATFORM STREQUAL "Android")
     list(APPEND SOURCES impl/android/external_commit_helper.cpp)
 else()
