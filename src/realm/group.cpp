@@ -125,7 +125,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file foprmat
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 5, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 6, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -134,14 +134,14 @@ void Group::upgrade_file_format(int target_file_format_version)
     // following upgrade logic when SlabAlloc::validate_buffer() is changed (or
     // vice versa).
     REALM_ASSERT_EX(current_file_format_version == 2 || current_file_format_version == 3 ||
-                        current_file_format_version == 4,
+                        current_file_format_version == 4 || current_file_format_version == 5,
                     current_file_format_version);
 
     // Upgrade from 2 to 3
     if (current_file_format_version <= 2 && target_file_format_version >= 3) {
         for (size_t t = 0; t < m_tables.size(); t++) {
             TableRef table = get_table(t);
-            table->upgrade_file_format();
+            table->upgrade_file_format(target_file_format_version);
         }
     }
 
@@ -155,6 +155,14 @@ void Group::upgrade_file_format(int target_file_format_version)
         for (size_t t = 0; t < m_tables.size(); t++) {
             TableRef table = get_table(t);
             table->upgrade_olddatetime();
+        }
+    }
+
+    // Upgrade from 5 to 6 (new StringIndex format)
+    if (current_file_format_version <= 5 && target_file_format_version >= 6) {
+        for (size_t t = 0; t < m_tables.size(); t++) {
+            TableRef table = get_table(t);
+            table->upgrade_file_format(target_file_format_version);
         }
     }
 

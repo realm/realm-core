@@ -505,7 +505,6 @@ public:
     size_t index_string_find_first(StringData value, ColumnBase* column) const;
     void index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const;
     size_t index_string_count(StringData value, ColumnBase* column) const;
-    FindRes index_string_find_all_no_copy(StringData value, size_t& res_ref, ColumnBase* column) const;
 
     /// This one may change the represenation of the array, so be carefull if
     /// you call it after ensure_minimum_width().
@@ -1079,6 +1078,10 @@ protected:
     void create_bptree_offsets(Array& offsets, int_fast64_t first_value);
 
     bool do_erase_bptree_elem(size_t elem_ndx, EraseHandler&);
+
+    template <IndexMethod>
+    size_t from_list(StringData value, IntegerColumn& result, ref_type& result_ref, const IntegerColumn& rows,
+                     ColumnBase* column) const;
 
     template <IndexMethod method, class T>
     size_t index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const;
