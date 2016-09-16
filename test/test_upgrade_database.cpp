@@ -1011,33 +1011,23 @@ TEST(Upgrade_Database_4_5_DateTime1)
 }
 
 
-namespace {
-
-std::string generate_random_string(realm::test_util::Random& rand, size_t length)
-{
-    std::string rand_string;
-    for (size_t t = 0; t < length; ++t) {
-        // likely to excercise null characters and duplicate values
-        rand_string += static_cast<unsigned char>(rand.draw_int_max<int>(10));
-    }
-    return rand_string;
-}
-
-Timestamp generate_random_timestamp(realm::test_util::Random& rand)
-{
-    int seconds = rand.draw_int_max<int>(10);
-    int nanoseconds = rand.draw_int_max<int>(10);
-    return Timestamp(seconds, nanoseconds);
-}
-
-} // end anonymous namespace
-
 // Open an existing database-file-format-version 5 file and
 // check that it automatically upgrades to version 6.
 TEST(Upgrade_Database_5_6_StringIndex)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
     util::to_string(REALM_MAX_BPNODE_SIZE) + "_5_to_6_stringindex.realm";
+
+    // use a common prefix which will not cause a stack overflow but is larger
+    // than StringIndex::s_max_offset
+    const int common_prefix_length = 500;
+    std::string std_base2(common_prefix_length, 'a');
+    std::string std_base2_b = std_base2 + "b";
+    std::string std_base2_c = std_base2 + "c";
+    StringData base2(std_base2);
+    StringData base2_b(std_base2_b);
+    StringData base2_c(std_base2_c);
+
 
 #if TEST_READ_UPGRADE_MODE
 
@@ -1061,27 +1051,38 @@ TEST(Upgrade_Database_5_6_StringIndex)
         size_t int_ndx = 0;
         size_t str_ndx = 4;
         size_t ts_ndx = 6;
+        size_t num_rows = 6;
 
-        // The following checks are actually deterministic because we seed the
-        // random number generator in the same way as when we wrote the file.
-        size_t num_rows = 500;
         CHECK_EQUAL(t->size(), num_rows);
         CHECK(t->has_search_index(int_ndx));
         CHECK(t->has_search_index(str_ndx));
         CHECK(t->has_search_index(ts_ndx));
 
-        realm::test_util::Random rand(1234567890);
-        for (size_t i = 0; i < num_rows; ++i) {
-            // 2 * StringIndex::s_max_offset == 800
-            std::string r = ::generate_random_string(rand, 800);
-            StringData rsd(r);
-            Timestamp rts = ::generate_random_timestamp(rand);
-            int ri = rand.draw_int_max(100);
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2_b), 0);
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2_c), 1);
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2), 4);
+        CHECK_EQUAL(t->get_distinct_view(str_ndx).size(), 4);
+        CHECK_EQUAL(t->size(), 6);
 
-            CHECK_EQUAL(t->get_string(str_ndx, i), rsd);
-            CHECK_EQUAL(t->get_timestamp(ts_ndx, i), rts);
-            CHECK_EQUAL(t->get_int(int_ndx, i), ri);
-        }
+        // If the StringIndexes were not updated we couldn't do this
+        // on a format 5 file and find it again.
+        std::string std_base2_d = std_base2 + "d";
+        StringData base2_d(std_base2_d);
+        t->add_empty_row();
+        t->set_string(str_ndx, 6, base2_d);
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2_d), 6);
+
+        // And if the indexes were using the old format, adding a long
+        // prefix string would cause a stack overflow.
+        std::string big_base(90000, 'a');
+        std::string big_base_b = big_base + "b";
+        std::string big_base_c = big_base + "c";
+        StringData b(big_base_b);
+        StringData c(big_base_c);
+        t->add_empty_row(2);
+        t->set_string(str_ndx, 7, b);
+        t->set_string(str_ndx, 8, c);
+
         t->verify();
         t2->verify();
     }
@@ -1112,21 +1113,16 @@ TEST(Upgrade_Database_5_6_StringIndex)
     t->add_search_index(str_ndx);
     t->add_search_index(ts_ndx);
 
-    size_t num_rows = 500;
-    realm::test_util::Random rand(1234567890);
-    for (size_t i = 0; i < num_rows; ++i) {
-        size_t row = t->add_empty_row();
-        // 2 * StringIndex::s_max_offset == 800
-        std::string r = ::generate_random_string(rand, 800);
-        StringData rsd(r);
-        t->set_string(str_ndx, row, rsd);
-        t->set_timestamp(ts_ndx, row, ::generate_random_timestamp(rand));
-        t->set_int(int_ndx, row, rand.draw_int_max(100));
-    }
+    t->add_empty_row(6);
+    t->set_string(str_ndx, 0, base2_b);
+    t->set_string(str_ndx, 1, base2_c);
+    t->set_string(str_ndx, 2, "aaaaaaaaaa");
+    t->set_string(str_ndx, 3, "aaaaaaaaaa");
+    t->set_string(str_ndx, 4, base2);
+    t->set_string(str_ndx, 5, base2);
 
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
 }
-
 
 #endif // TEST_GROUP
