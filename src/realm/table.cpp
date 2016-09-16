@@ -2214,7 +2214,7 @@ void Table::change_link_targets(size_t row_ndx, size_t new_row_ndx)
     // to bugs in case this was forgotten).
 
     size_t backlink_col_start = m_spec.get_public_column_count();
-    size_t backlink_col_end   = m_spec.get_column_count();
+    size_t backlink_col_end = m_spec.get_column_count();
     for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
         REALM_ASSERT(m_spec.get_column_type(col_ndx) == col_type_BackLink);
 
