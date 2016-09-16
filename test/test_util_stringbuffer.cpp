@@ -139,35 +139,33 @@ TEST(Utils_StringBuffer)
     }
 
     // resize()
-    {
-        // size reduction
-        {
-            StringBuffer sb;
-            sb.append_c_str("foo");
-            sb.resize(1);
+    {// size reduction
+     {StringBuffer sb;
+    sb.append_c_str("foo");
+    sb.resize(1);
 
-            CHECK(sb.size() == 1);
-            CHECK(sb.str() == "f");
-        }
+    CHECK(sb.size() == 1);
+    CHECK(sb.str() == "f");
+}
 
-        // size increase
-        {
-            StringBuffer sb;
-            sb.append_c_str("foo");
-            sb.resize(10);
+// size increase
+{
+    StringBuffer sb;
+    sb.append_c_str("foo");
+    sb.resize(10);
 
-            CHECK(sb.size() == 10);
-            CHECK(sb.str().size() == 10);
-        }
-    }
+    CHECK(sb.size() == 10);
+    CHECK(sb.str().size() == 10);
+}
+}
 
-    // overflow detection
-    {
-        StringBuffer sb;
-        sb.append("foo");
-        CHECK_THROW(sb.append("foo", static_cast<size_t>(-1)), BufferSizeOverflow);
-        CHECK_THROW(sb.reserve(static_cast<size_t>(-1)), BufferSizeOverflow);
-    }
+// overflow detection
+{
+    StringBuffer sb;
+    sb.append("foo");
+    CHECK_THROW(sb.append("foo", static_cast<size_t>(-1)), BufferSizeOverflow);
+    CHECK_THROW(sb.reserve(static_cast<size_t>(-1)), BufferSizeOverflow);
+}
 }
 
 #endif

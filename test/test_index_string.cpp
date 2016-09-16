@@ -78,18 +78,8 @@ const char s6[] = "Johnny";
 const char s7[] = "Sam";
 
 // integers used by integer index tests
-const int64_t ints[] = {
-    0x1111,
-    0x11112222,
-    0x11113333,
-    0x1111333,
-    0x111122223333ull,
-    0x1111222233334ull,
-    0x22223333,
-    0x11112227,
-    0x11112227,
-    0x78923
-};
+const int64_t ints[] = {0x1111,     0x11112222, 0x11113333, 0x1111333, 0x111122223333ull, 0x1111222233334ull,
+                        0x22223333, 0x11112227, 0x11112227, 0x78923};
 
 struct nullable {
     static constexpr bool value = true;
@@ -460,7 +450,7 @@ TEST_TYPES(StringIndex_Insert, non_nullable, nullable)
     CHECK_EQUAL(2, col.find_first(s2));
     CHECK_EQUAL(3, col.find_first(s3));
     CHECK_EQUAL(4, col.find_first(s4));
-    //CHECK_EQUAL(5, ndx.find_first(s1)); // duplicate
+    // CHECK_EQUAL(5, ndx.find_first(s1)); // duplicate
 
     // Append item in end of column
     col.insert(6, s6);
@@ -922,7 +912,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
     const StringIndex& ndx = *col.create_search_index();
 
     const size_t MAX_LENGTH = 16; // Test medium
-    char tmp[MAX_LENGTH]; // this is a bit of a hack, that relies on the string being copied in column.add()
+    char tmp[MAX_LENGTH];         // this is a bit of a hack, that relies on the string being copied in column.add()
 
     for (size_t length = 1; length <= MAX_LENGTH; ++length) {
 
@@ -1039,7 +1029,7 @@ TEST(StringIndex_Zero_Crash2)
 {
     Random random(random_int<unsigned long>());
 
-    for (size_t iter = 0; iter < 10 + TEST_DURATION * 100 ; iter++) {
+    for (size_t iter = 0; iter < 10 + TEST_DURATION * 100; iter++) {
         // StringIndex could crash if strings ended with one or more 0-bytes
         Table table;
         table.add_column(type_String, "", true);
@@ -1049,17 +1039,19 @@ TEST(StringIndex_Zero_Crash2)
         for (size_t i = 0; i < 100 + TEST_DURATION * 1000; i++) {
             unsigned char action = static_cast<unsigned char>(random.draw_int_max<unsigned int>(100));
             if (action == 0) {
-//                table.remove_search_index(0);
+                //                table.remove_search_index(0);
                 table.add_search_index(0);
             }
             else if (action > 48 && table.size() < 10) {
                 // Generate string with equal probability of being empty, null, short, medium and long, and with
                 // their contents having equal proability of being either random or a duplicate of a previous
                 // string. When it's random, each char must have equal probability of being 0 or non-0e
-                char buf[] = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+                char buf[] =
+                    "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
                 char* buf1 = static_cast<char*>(malloc(sizeof(buf)));
                 memcpy(buf1, buf, sizeof(buf));
-                char buf2[] = "                                                                                         ";
+                char buf2[] =
+                    "                                                                                         ";
                 StringData sd;
 
                 size_t len = random.draw_int_max<size_t>(3);
@@ -1080,9 +1072,9 @@ TEST(StringIndex_Zero_Crash2)
                     // random string
                     for (size_t t = 0; t < len; t++) {
                         if (random.draw_int_max<int>(100) > 20)
-                            buf2[t] = 0;                        // zero byte
+                            buf2[t] = 0; // zero byte
                         else
-                            buf2[t] = static_cast<char>(random.draw_int<int>());  // random byte
+                            buf2[t] = static_cast<char>(random.draw_int<int>()); // random byte
                     }
                     // no generated string can equal "null" (our vector magic value for null) because
                     // len == 4 is not possible
@@ -1109,7 +1101,6 @@ TEST(StringIndex_Zero_Crash2)
                 StringData sd2 = table.get_string(0, t);
                 CHECK_EQUAL(sd, sd2);
             }
-
         }
     }
 }
@@ -1146,7 +1137,6 @@ TEST(StringIndex_Integer_Increasing)
         }
 
         CHECK_EQUAL(c, ref_count);
-
     }
 }
 

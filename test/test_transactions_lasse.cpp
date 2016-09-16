@@ -23,12 +23,12 @@
 #include <iostream>
 
 #ifdef _WIN32
-    #define NOMINMAX
-    #include <windows.h> // Sleep(), sched_yield()
-    #include <pthread.h> // pthread_win32_process_attach_np()
+#define NOMINMAX
+#include <windows.h> // Sleep(), sched_yield()
+#include <pthread.h> // pthread_win32_process_attach_np()
 #else
-    #include <sched.h>  // sched_yield()
-    #include <unistd.h> // usleep()
+#include <sched.h>  // sched_yield()
+#include <unistd.h> // usleep()
 #endif
 
 #include <realm.hpp>
@@ -102,7 +102,7 @@ REALM_FORCEINLINE void rand_sleep(Random& random)
         sched_yield();
     }
     else if (r <= 254) {
-        // Release current time slice and get time slice according to normal scheduling
+// Release current time slice and get time slice according to normal scheduling
 #ifdef _MSC_VER
         Sleep(0);
 #else
@@ -110,7 +110,7 @@ REALM_FORCEINLINE void rand_sleep(Random& random)
 #endif
     }
     else {
-        // Release time slices for at least 200 ms
+// Release time slices for at least 200 ms
 #ifdef _MSC_VER
         Sleep(200);
 #else
@@ -122,7 +122,6 @@ REALM_FORCEINLINE void rand_sleep(Random& random)
 } // anonymous namespace
 
 
-
 // *************************************************************************************
 // *
 // *        Stress test 1
@@ -131,9 +130,9 @@ REALM_FORCEINLINE void rand_sleep(Random& random)
 
 namespace {
 
-const int ITER1 =    2000;
-const int READERS1 =   10;
-const int WRITERS1 =   10;
+const int ITER1 = 2000;
+const int READERS1 = 10;
+const int WRITERS1 = 10;
 
 void write_thread(TestContext& test_context, std::string path, int thread_ndx)
 {
@@ -191,7 +190,7 @@ TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
     }
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-    pthread_win32_process_attach_np ();
+    pthread_win32_process_attach_np();
 #endif
 
     for (int i = 0; i < READERS1; ++i)
@@ -220,9 +219,9 @@ TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
 
 namespace {
 
-const int      THREADS2 = 30;
-const int      ITER2    = 2000;
-const unsigned GROUPS2  = 30;
+const int THREADS2 = 30;
+const int ITER2 = 2000;
+const unsigned GROUPS2 = 30;
 
 void create_groups(std::string path)
 {
@@ -276,13 +275,18 @@ namespace {
 
 // Must be fast because important edge case is 0 delay.
 struct FastRand {
-    FastRand(): u(1), v(1) {}
+    FastRand()
+        : u(1)
+        , v(1)
+    {
+    }
     unsigned int operator()()
     {
         v = 36969 * (v & 65535) + (v >> 16);
         u = 18000 * (u & 65535) + (u >> 16);
         return (v << 16) + u;
     }
+
 private:
     unsigned int u;
     unsigned int v;
@@ -295,9 +299,9 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    const int ITER =     20;
-    const int WRITERS =   4;
-    const int READERS =   4;
+    const int ITER = 20;
+    const int WRITERS = 4;
+    const int READERS = 4;
     const size_t ROWS = 1 * 1000 * 1000 + 1000; // + 1000 to add extra depth level if REALM_MAX_BPNODE_SIZE = 1000
     std::atomic<bool> terminate{false};
 
@@ -358,7 +362,7 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
     }
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-    pthread_win32_process_attach_np ();
+    pthread_win32_process_attach_np();
 #endif
 
     for (int i = 0; i < WRITERS; ++i)
@@ -373,7 +377,8 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
     }
 
     // Terminate reader threads cleanly
-    terminate = true; // FIXME: Oops - this 'write' participates in a data race - http://stackoverflow.com/questions/12878344/volatile-in-c11
+    terminate = true; // FIXME: Oops - this 'write' participates in a data race -
+    // http://stackoverflow.com/questions/12878344/volatile-in-c11
     for (int i = 0; i < READERS; ++i) {
         bool reader_has_thrown = read_threads[i].join();
         CHECK(!reader_has_thrown);
@@ -392,9 +397,9 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    const int ITER =    2000;
-    const int READERS =   20;
-    const int WRITERS =   20;
+    const int ITER = 2000;
+    const int READERS = 20;
+    const int WRITERS = 20;
     std::atomic<bool> terminate{false};
 
     auto write_thread = [&](int thread_ndx) {
@@ -446,7 +451,7 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
     }
 
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-    pthread_win32_process_attach_np ();
+    pthread_win32_process_attach_np();
 #endif
 
     for (int i = 0; i < READERS; ++i)

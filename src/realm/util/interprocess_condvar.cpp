@@ -23,8 +23,8 @@
 #include <sstream>
 
 #ifdef REALM_CONDVAR_EMULATION
-    #include <unistd.h>
-    #include <poll.h>
+#include <unistd.h>
+#include <poll.h>
 #endif
 
 using namespace realm;
@@ -62,10 +62,6 @@ InterprocessCondVar::InterprocessCondVar()
 }
 
 
-
-
-
-
 void InterprocessCondVar::close() noexcept
 {
     if (uses_emulation) { // true if emulating a process shared condvar
@@ -87,9 +83,8 @@ InterprocessCondVar::~InterprocessCondVar() noexcept
 }
 
 
-
-void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path,
-                                          std::string condvar_name, std::string tmp_path)
+void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, std::string condvar_name,
+                                          std::string tmp_path)
 {
     close();
     uses_emulation = true;
@@ -337,5 +332,3 @@ void InterprocessCondVar::notify_all() noexcept
     m_shared_part->notify_all();
 #endif
 }
-
-

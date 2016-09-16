@@ -42,7 +42,7 @@ class TransactLogConvenientEncoder;
 /// The individual values in the column are either refs to Columns containing the
 /// row positions in the target table, or in the case where they are empty, a zero
 /// ref.
-class LinkListColumn: public LinkColumnBase, public ArrayParent {
+class LinkListColumn : public LinkColumnBase, public ArrayParent {
 public:
     using LinkColumnBase::LinkColumnBase;
     LinkListColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx);
@@ -92,7 +92,10 @@ private:
     struct list_entry {
         size_t m_row_ndx;
         std::weak_ptr<LinkView> m_list;
-        bool operator<(const list_entry& other) const { return m_row_ndx < other.m_row_ndx; }
+        bool operator<(const list_entry& other) const
+        {
+            return m_row_ndx < other.m_row_ndx;
+        }
     };
 
     // The accessors stored in `m_list_accessors` are sorted by their row index.
@@ -108,10 +111,8 @@ private:
     std::shared_ptr<LinkView> get_ptr(size_t row_ndx) const;
 
     void do_nullify_link(size_t row_ndx, size_t old_target_row_ndx) override;
-    void do_update_link(size_t row_ndx, size_t old_target_row_ndx,
-                        size_t new_target_row_ndx) override;
-    void do_swap_link(size_t row_ndx, size_t target_row_ndx_1,
-                      size_t target_row_ndx_2) override;
+    void do_update_link(size_t row_ndx, size_t old_target_row_ndx, size_t new_target_row_ndx) override;
+    void do_swap_link(size_t row_ndx, size_t target_row_ndx_1, size_t target_row_ndx_2) override;
 
     void unregister_linkview();
     ref_type get_row_ref(size_t row_ndx) const noexcept;
@@ -126,22 +127,21 @@ private:
     // These helpers are needed because of the way the B+-tree of links is
     // traversed in cascade_break_backlinks_to() and
     // cascade_break_backlinks_to_all_rows().
-    void cascade_break_backlinks_to__leaf(size_t row_ndx, const Array& link_list_leaf,
-                                          CascadeState&);
+    void cascade_break_backlinks_to__leaf(size_t row_ndx, const Array& link_list_leaf, CascadeState&);
     void cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf, CascadeState&);
 
     void discard_child_accessors() noexcept;
 
-    template<bool fix_ndx_in_parent>
+    template <bool fix_ndx_in_parent>
     void adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept;
 
-    template<bool fix_ndx_in_parent>
+    template <bool fix_ndx_in_parent>
     void adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept;
 
-    template<bool fix_ndx_in_parent>
+    template <bool fix_ndx_in_parent>
     void adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
 
-    template<bool fix_ndx_in_parent>
+    template <bool fix_ndx_in_parent>
     void adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept;
 
     void prune_list_accessor_tombstones() noexcept;
@@ -155,13 +155,10 @@ private:
 };
 
 
-
-
-
 // Implementation
 
-inline LinkListColumn::LinkListColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx):
-    LinkColumnBase(alloc, ref, table, column_ndx)
+inline LinkListColumn::LinkListColumn(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
+    : LinkColumnBase(alloc, ref, table, column_ndx)
 {
     m_list_accessors_contains_tombstones.store(false);
 }
@@ -241,8 +238,6 @@ inline void LinkListColumn::remove_backlink(size_t target_row, size_t source_row
 }
 
 
-} //namespace realm
+} // namespace realm
 
-#endif //REALM_COLUMN_LINKLIST_HPP
-
-
+#endif // REALM_COLUMN_LINKLIST_HPP

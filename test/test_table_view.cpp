@@ -67,20 +67,13 @@ using namespace test_util;
 
 namespace {
 
-REALM_TABLE_1(TestTableInt,
-              first, Int)
+REALM_TABLE_1(TestTableInt, first, Int)
 
-REALM_TABLE_2(TestTableInt2,
-              first,  Int,
-              second, Int)
+REALM_TABLE_2(TestTableInt2, first, Int, second, Int)
 
-REALM_TABLE_2(TestTableDate,
-              first, OldDateTime,
-              second, Int)
+REALM_TABLE_2(TestTableDate, first, OldDateTime, second, Int)
 
-REALM_TABLE_2(TestTableFloatDouble,
-              first, Float,
-              second, Double)
+REALM_TABLE_2(TestTableFloatDouble, first, Float, second, Double)
 
 
 } // anonymous namespace
@@ -196,7 +189,7 @@ TEST(TableView_GetSetInteger)
     table.add(1);
     table.add(2);
 
-    TestTableInt::View v; // Test empty construction
+    TestTableInt::View v;                 // Test empty construction
     v = table.column().first.find_all(2); // Test assignment
 
     CHECK_EQUAL(2, v.size());
@@ -211,20 +204,16 @@ TEST(TableView_GetSetInteger)
 }
 
 
-
 namespace {
-REALM_TABLE_3(TableFloats,
-              col_float, Float,
-              col_double, Double,
-              col_int, Int)
+REALM_TABLE_3(TableFloats, col_float, Float, col_double, Double, col_int, Int)
 }
 
 TEST(TableView_FloatsGetSet)
 {
     TableFloats table;
 
-    float  f_val[] = { 1.1f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f };
-    double d_val[] = { 1.2 , 2.2 , 3.2 , -1.2 , 2.3, 0.0  };
+    float f_val[] = {1.1f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f};
+    double d_val[] = {1.2, 2.2, 3.2, -1.2, 2.3, 0.0};
 
     CHECK_EQUAL(true, table.is_empty());
 
@@ -238,7 +227,7 @@ TEST(TableView_FloatsGetSet)
         CHECK_EQUAL(d_val[i], table.column().col_double[i]);
     }
 
-    TableFloats::View v; // Test empty construction
+    TableFloats::View v;                         // Test empty construction
     v = table.column().col_float.find_all(2.1f); // Test assignment
     CHECK_EQUAL(2, v.size());
 
@@ -261,8 +250,8 @@ TEST(TableView_FloatsGetSet)
 TEST(TableView_FloatsFindAndAggregations)
 {
     TableFloats table;
-    float  f_val[] = { 1.2f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f };
-    double d_val[] = { -1.2, 2.2 , 3.2 , -1.2 , 2.3 , 0.0  };
+    float f_val[] = {1.2f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f};
+    double d_val[] = {-1.2, 2.2, 3.2, -1.2, 2.3, 0.0};
     // v_some =        ^^^^              ^^^^
     double sum_f = 0.0;
     double sum_d = 0.0;
@@ -282,27 +271,23 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(3, v_some.get_source_ndx(1));
 
     // Test find_first
-    CHECK_EQUAL(0, v_all.column().col_double.find_first(-1.2) );
-    CHECK_EQUAL(5, v_all.column().col_double.find_first(0.0) );
-    CHECK_EQUAL(2, v_all.column().col_double.find_first(3.2) );
+    CHECK_EQUAL(0, v_all.column().col_double.find_first(-1.2));
+    CHECK_EQUAL(5, v_all.column().col_double.find_first(0.0));
+    CHECK_EQUAL(2, v_all.column().col_double.find_first(3.2));
 
-    CHECK_EQUAL(1, v_all.column().col_float.find_first(2.1f) );
-    CHECK_EQUAL(5, v_all.column().col_float.find_first(0.0f) );
-    CHECK_EQUAL(2, v_all.column().col_float.find_first(3.1f) );
+    CHECK_EQUAL(1, v_all.column().col_float.find_first(2.1f));
+    CHECK_EQUAL(5, v_all.column().col_float.find_first(0.0f));
+    CHECK_EQUAL(2, v_all.column().col_float.find_first(3.1f));
 
     // TODO: add for float as well
 
     double epsilon = std::numeric_limits<double>::epsilon();
 
     // Test sum
-    CHECK_APPROXIMATELY_EQUAL(sum_d,
-                              v_all.column().col_double.sum(),  10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f,
-                              v_all.column().col_float.sum(),   10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2,
-                              v_some.column().col_double.sum(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f),
-                              v_some.column().col_float.sum(),  10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.column().col_double.sum(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.column().col_float.sum(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.column().col_double.sum(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.column().col_float.sum(), 10 * epsilon);
 
     size_t ndx = not_found;
 
@@ -345,14 +330,10 @@ TEST(TableView_FloatsFindAndAggregations)
     CHECK_EQUAL(1, ndx);
 
     // Test avg
-    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0,
-                              v_all.column().col_double.average(),  10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0,
-                              v_some.column().col_double.average(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0,
-                              v_all.column().col_float.average(),   10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2,
-                              v_some.column().col_float.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.column().col_double.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.column().col_double.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.column().col_float.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.column().col_float.average(), 10 * epsilon);
 
     CHECK_EQUAL(1, v_some.column().col_float.count(1.2f));
     CHECK_EQUAL(2, v_some.column().col_double.count(-1.2));
@@ -445,8 +426,8 @@ TEST(TableView_Max)
 
     TestTableInt::View v = table.column().first.find_all(0);
     v[0].first = -1;
-    v[1].first =  2;
-    v[2].first =  1;
+    v[1].first = 2;
+    v[2].first = 1;
 
     int64_t max = v.column().first.maximum();
     CHECK_EQUAL(2, max);
@@ -480,8 +461,8 @@ TEST(TableView_Min)
 
     TestTableInt::View v = table.column().first.find_all(0);
     v[0].first = -1;
-    v[1].first =  2;
-    v[2].first =  1;
+    v[1].first = 2;
+    v[2].first = 1;
 
     int64_t min = v.column().first.minimum();
     CHECK_EQUAL(-1, min);
@@ -512,7 +493,6 @@ TEST(TableView_Min2)
     min = v.column().first.minimum(&ndx);
     CHECK_EQUAL(-3, min);
     CHECK_EQUAL(2, ndx);
-
 }
 
 
@@ -660,8 +640,7 @@ TEST(TableView_FindAll)
 
 namespace {
 
-REALM_TABLE_1(TestTableString,
-              first, String)
+REALM_TABLE_1(TestTableString, first, String)
 
 } // anonymous namespace
 
@@ -810,7 +789,8 @@ TEST(TableView_DoubleSortPrecision)
     CHECK_EQUAL(f2, tv[0].first);
     CHECK_EQUAL(f1, tv[1].first);
 
-    // If sort is stable, and compare makes a draw because the doubles are accidentially casted to float in Realm, then
+    // If sort is stable, and compare makes a draw because the doubles are accidentially casted to float in Realm,
+    // then
     // original order would be maintained. Check that it's not maintained:
     tv.column().second.sort();
     CHECK_EQUAL(d1, tv[0].second);
@@ -822,10 +802,10 @@ TEST(TableView_SortNullString)
     Table t;
     t.add_column(type_String, "s", true);
     t.add_empty_row(4);
-    t.set_string(0, 0, StringData(""));     // empty string
-    t.set_string(0, 1, realm::null());             // realm::null()
-    t.set_string(0, 2, StringData(""));     // empty string
-    t.set_string(0, 3, realm::null());             // realm::null()
+    t.set_string(0, 0, StringData("")); // empty string
+    t.set_string(0, 1, realm::null());  // realm::null()
+    t.set_string(0, 2, StringData("")); // empty string
+    t.set_string(0, 3, realm::null());  // realm::null()
 
     TableView tv;
 
@@ -942,10 +922,10 @@ TEST(TableView_Imperative_Clear)
     CHECK_EQUAL(1, t.size());
 }
 
-//exposes a bug in stacked tableview:
-//view V1 selects a subset of rows from Table T1
-//View V2 selects rows from  view V1
-//Then, some rows in V2 can be found, that are not in V1
+// exposes a bug in stacked tableview:
+// view V1 selects a subset of rows from Table T1
+// View V2 selects rows from  view V1
+// Then, some rows in V2 can be found, that are not in V1
 TEST(TableView_Stacked)
 {
     Table t;
@@ -953,17 +933,17 @@ TEST(TableView_Stacked)
     t.add_column(type_Int, "i2");
     t.add_column(type_String, "S1");
     t.add_empty_row(2);
-    t.set_int(0, 0, 1);         // 1
-    t.set_int(1, 0, 2);         // 2
-    t.set_string(2, 0, "A");    // "A"
-    t.set_int(0, 1, 2);         // 2
-    t.set_int(1, 1, 2);         // 2
-    t.set_string(2, 1, "B");    // "B"
+    t.set_int(0, 0, 1);      // 1
+    t.set_int(1, 0, 2);      // 2
+    t.set_string(2, 0, "A"); // "A"
+    t.set_int(0, 1, 2);      // 2
+    t.set_int(1, 1, 2);      // 2
+    t.set_string(2, 1, "B"); // "B"
 
     TableView tv = t.find_all_int(0, 2);
     TableView tv2 = tv.find_all_int(1, 2);
-    CHECK_EQUAL(1, tv2.size()); //evaluates tv2.size to 1 which is expected
-    CHECK_EQUAL("B", tv2.get_string(2, 0)); //evalates get_string(2,0) to "A" which is not expected
+    CHECK_EQUAL(1, tv2.size());             // evaluates tv2.size to 1 which is expected
+    CHECK_EQUAL("B", tv2.get_string(2, 0)); // evalates get_string(2,0) to "A" which is not expected
 }
 
 
@@ -1004,15 +984,15 @@ TEST(TableView_LowLevelSubtables)
 {
     Table table;
     std::vector<size_t> column_path;
-    table.add_column(type_Bool,  "enable");
+    table.add_column(type_Bool, "enable");
     table.add_column(type_Table, "subtab");
     table.add_column(type_Mixed, "mixed");
     column_path.push_back(1);
-    table.add_subcolumn(column_path, type_Bool,  "enable");
+    table.add_subcolumn(column_path, type_Bool, "enable");
     table.add_subcolumn(column_path, type_Table, "subtab");
     table.add_subcolumn(column_path, type_Mixed, "mixed");
     column_path.push_back(1);
-    table.add_subcolumn(column_path, type_Bool,  "enable");
+    table.add_subcolumn(column_path, type_Bool, "enable");
     table.add_subcolumn(column_path, type_Table, "subtab");
     table.add_subcolumn(column_path, type_Mixed, "mixed");
 
@@ -1037,7 +1017,7 @@ TEST(TableView_LowLevelSubtables)
             CHECK_EQUAL(3 + i_1, subsubview.size());
 
             for (int i_3 = 0; i_3 != 3 + i_1; ++i_3) {
-                CHECK_EQUAL(true,  bool(subsubview.get_subtable(1, i_3)));
+                CHECK_EQUAL(true, bool(subsubview.get_subtable(1, i_3)));
                 CHECK_EQUAL(false, bool(subsubview.get_subtable(2, i_3))); // Mixed
                 CHECK_EQUAL(0, subsubview.get_subtable_size(1, i_3));
                 CHECK_EQUAL(0, subsubview.get_subtable_size(2, i_3)); // Mixed
@@ -1045,7 +1025,7 @@ TEST(TableView_LowLevelSubtables)
 
             subview.clear_subtable(2, 1 + i_1); // Mixed
             TableRef subsubtab_mix = subview.get_subtable(2, 1 + i_1);
-            subsubtab_mix->add_column(type_Bool,  "enable");
+            subsubtab_mix->add_column(type_Bool, "enable");
             subsubtab_mix->add_column(type_Table, "subtab");
             subsubtab_mix->add_column(type_Mixed, "mixed");
             subsubtab_mix->add_empty_row(2 * (1 + i_1));
@@ -1055,14 +1035,14 @@ TEST(TableView_LowLevelSubtables)
             CHECK_EQUAL(1 + i_1, subsubview_mix.size());
 
             for (int i_3 = 0; i_3 != 1 + i_1; ++i_3) {
-                CHECK_EQUAL(true,  bool(subsubview_mix.get_subtable(1, i_3)));
+                CHECK_EQUAL(true, bool(subsubview_mix.get_subtable(1, i_3)));
                 CHECK_EQUAL(false, bool(subsubview_mix.get_subtable(2, i_3))); // Mixed
                 CHECK_EQUAL(0, subsubview_mix.get_subtable_size(1, i_3));
                 CHECK_EQUAL(0, subsubview_mix.get_subtable_size(2, i_3)); // Mixed
             }
         }
         for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true,           bool(subview.get_subtable(1, i_2)));
+            CHECK_EQUAL(true, bool(subview.get_subtable(1, i_2)));
             CHECK_EQUAL(i_2 == 1 + i_1, bool(subview.get_subtable(2, i_2))); // Mixed
             CHECK_EQUAL(i_2 == 0 + i_1 ? 2 * (3 + i_1) : 0, subview.get_subtable_size(1, i_2));
             CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (1 + i_1) : 0, subview.get_subtable_size(2, i_2)); // Mixed
@@ -1071,11 +1051,11 @@ TEST(TableView_LowLevelSubtables)
         view.clear_subtable(2, i_1); // Mixed
         TableRef subtab_mix = view.get_subtable(2, i_1);
         std::vector<size_t> subcol_path;
-        subtab_mix->add_column(type_Bool,  "enable");
+        subtab_mix->add_column(type_Bool, "enable");
         subtab_mix->add_column(type_Table, "subtab");
         subtab_mix->add_column(type_Mixed, "mixed");
         subcol_path.push_back(1);
-        subtab_mix->add_subcolumn(subcol_path, type_Bool,  "enable");
+        subtab_mix->add_subcolumn(subcol_path, type_Bool, "enable");
         subtab_mix->add_subcolumn(subcol_path, type_Table, "subtab");
         subtab_mix->add_subcolumn(subcol_path, type_Mixed, "mixed");
         subtab_mix->add_empty_row(2 * (3 + i_1));
@@ -1092,7 +1072,7 @@ TEST(TableView_LowLevelSubtables)
             CHECK_EQUAL(7 + i_1, subsubview.size());
 
             for (int i_3 = 0; i_3 != 7 + i_1; ++i_3) {
-                CHECK_EQUAL(true,  bool(subsubview.get_subtable(1, i_3)));
+                CHECK_EQUAL(true, bool(subsubview.get_subtable(1, i_3)));
                 CHECK_EQUAL(false, bool(subsubview.get_subtable(2, i_3))); // Mixed
                 CHECK_EQUAL(0, subsubview.get_subtable_size(1, i_3));
                 CHECK_EQUAL(0, subsubview.get_subtable_size(2, i_3)); // Mixed
@@ -1100,7 +1080,7 @@ TEST(TableView_LowLevelSubtables)
 
             subview_mix.clear_subtable(2, 2 + i_1); // Mixed
             TableRef subsubtab_mix = subview_mix.get_subtable(2, 2 + i_1);
-            subsubtab_mix->add_column(type_Bool,  "enable");
+            subsubtab_mix->add_column(type_Bool, "enable");
             subsubtab_mix->add_column(type_Table, "subtab");
             subsubtab_mix->add_column(type_Mixed, "mixed");
             subsubtab_mix->add_empty_row(2 * (5 + i_1));
@@ -1110,14 +1090,14 @@ TEST(TableView_LowLevelSubtables)
             CHECK_EQUAL(5 + i_1, subsubview_mix.size());
 
             for (int i_3 = 0; i_3 != 5 + i_1; ++i_3) {
-                CHECK_EQUAL(true,  bool(subsubview_mix.get_subtable(1, i_3)));
+                CHECK_EQUAL(true, bool(subsubview_mix.get_subtable(1, i_3)));
                 CHECK_EQUAL(false, bool(subsubview_mix.get_subtable(2, i_3))); // Mixed
                 CHECK_EQUAL(0, subsubview_mix.get_subtable_size(1, i_3));
                 CHECK_EQUAL(0, subsubview_mix.get_subtable_size(2, i_3)); // Mixed
             }
         }
         for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true,           bool(subview_mix.get_subtable(1, i_2)));
+            CHECK_EQUAL(true, bool(subview_mix.get_subtable(1, i_2)));
             CHECK_EQUAL(i_2 == 2 + i_1, bool(subview_mix.get_subtable(2, i_2))); // Mixed
             CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (7 + i_1) : 0, subview_mix.get_subtable_size(1, i_2));
             CHECK_EQUAL(i_2 == 2 + i_1 ? 2 * (5 + i_1) : 0, subview_mix.get_subtable_size(2, i_2)); // Mixed
@@ -1141,7 +1121,7 @@ TEST(TableView_LowLevelSubtables)
             ConstTableView const_subsubview = subsubtab->where().equal(0, true).find_all();
             CHECK_EQUAL(3 + i_1, const_subsubview.size());
             for (int i_3 = 0; i_3 != 3 + i_1; ++i_3) {
-                CHECK_EQUAL(true,  bool(const_subsubview.get_subtable(1, i_3)));
+                CHECK_EQUAL(true, bool(const_subsubview.get_subtable(1, i_3)));
                 CHECK_EQUAL(false, bool(const_subsubview.get_subtable(2, i_3))); // Mixed
                 CHECK_EQUAL(0, const_subsubview.get_subtable_size(1, i_3));
                 CHECK_EQUAL(0, const_subsubview.get_subtable_size(2, i_3)); // Mixed
@@ -1151,14 +1131,14 @@ TEST(TableView_LowLevelSubtables)
             ConstTableView const_subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
             CHECK_EQUAL(1 + i_1, const_subsubview_mix.size());
             for (int i_3 = 0; i_3 != 1 + i_1; ++i_3) {
-                CHECK_EQUAL(true,  bool(const_subsubview_mix.get_subtable(1, i_3)));
+                CHECK_EQUAL(true, bool(const_subsubview_mix.get_subtable(1, i_3)));
                 CHECK_EQUAL(false, bool(const_subsubview_mix.get_subtable(2, i_3))); // Mixed
                 CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(1, i_3));
                 CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(2, i_3)); // Mixed
             }
         }
         for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true,           bool(const_subview.get_subtable(1, i_2)));
+            CHECK_EQUAL(true, bool(const_subview.get_subtable(1, i_2)));
             CHECK_EQUAL(i_2 == 1 + i_1, bool(const_subview.get_subtable(2, i_2))); // Mixed
             CHECK_EQUAL(i_2 == 0 + i_1 ? 2 * (3 + i_1) : 0, const_subview.get_subtable_size(1, i_2));
             CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (1 + i_1) : 0, const_subview.get_subtable_size(2, i_2)); // Mixed
@@ -1172,7 +1152,7 @@ TEST(TableView_LowLevelSubtables)
             ConstTableView const_subsubview = subsubtab->where().equal(0, true).find_all();
             CHECK_EQUAL(7 + i_1, const_subsubview.size());
             for (int i_3 = 0; i_3 != 7 + i_1; ++i_3) {
-                CHECK_EQUAL(true,  bool(const_subsubview.get_subtable(1, i_3)));
+                CHECK_EQUAL(true, bool(const_subsubview.get_subtable(1, i_3)));
                 CHECK_EQUAL(false, bool(const_subsubview.get_subtable(2, i_3))); // Mixed
                 CHECK_EQUAL(0, const_subsubview.get_subtable_size(1, i_3));
                 CHECK_EQUAL(0, const_subsubview.get_subtable_size(2, i_3)); // Mixed
@@ -1182,14 +1162,14 @@ TEST(TableView_LowLevelSubtables)
             ConstTableView const_subsubview_mix = subsubtab_mix->where().equal(0, true).find_all();
             CHECK_EQUAL(5 + i_1, const_subsubview_mix.size());
             for (int i_3 = 0; i_3 != 5 + i_1; ++i_3) {
-                CHECK_EQUAL(true,  bool(const_subsubview_mix.get_subtable(1, i_3)));
+                CHECK_EQUAL(true, bool(const_subsubview_mix.get_subtable(1, i_3)));
                 CHECK_EQUAL(false, bool(const_subsubview_mix.get_subtable(2, i_3))); // Mixed
                 CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(1, i_3));
                 CHECK_EQUAL(0, const_subsubview_mix.get_subtable_size(2, i_3)); // Mixed
             }
         }
         for (int i_2 = 0; i_2 != 2 + i_1; ++i_2) {
-            CHECK_EQUAL(true,           bool(const_subview_mix.get_subtable(1, i_2)));
+            CHECK_EQUAL(true, bool(const_subview_mix.get_subtable(1, i_2)));
             CHECK_EQUAL(i_2 == 2 + i_1, bool(const_subview_mix.get_subtable(2, i_2))); // Mixed
             CHECK_EQUAL(i_2 == 1 + i_1 ? 2 * (7 + i_1) : 0, const_subview_mix.get_subtable_size(1, i_2));
             CHECK_EQUAL(i_2 == 2 + i_1 ? 2 * (5 + i_1) : 0, const_subview_mix.get_subtable_size(2, i_2)); // Mixed
@@ -1205,16 +1185,11 @@ TEST(TableView_LowLevelSubtables)
 
 namespace {
 
-REALM_TABLE_1(MyTable1,
-              val, Int)
+REALM_TABLE_1(MyTable1, val, Int)
 
-REALM_TABLE_2(MyTable2,
-              val, Int,
-              subtab, Subtable<MyTable1>)
+REALM_TABLE_2(MyTable2, val, Int, subtab, Subtable<MyTable1>)
 
-REALM_TABLE_2(MyTable3,
-              val, Int,
-              subtab, Subtable<MyTable2>)
+REALM_TABLE_2(MyTable3, val, Int, subtab, Subtable<MyTable2>)
 
 } // anonymous namespace
 
@@ -1245,14 +1220,14 @@ TEST(TableView_HighLevelSubtables)
     }
 
     {
-        MyTable2::Ref       s1 = v[0].subtab;
-        MyTable2::ConstRef  s2 = v[0].subtab;
-        MyTable2::Ref       s3 = v[0].subtab->get_table_ref();
-        MyTable2::ConstRef  s4 = v[0].subtab->get_table_ref();
-        MyTable2::Ref       s5 = v.column().subtab[0];
-        MyTable2::ConstRef  s6 = v.column().subtab[0];
-        MyTable2::Ref       s7 = v.column().subtab[0]->get_table_ref();
-        MyTable2::ConstRef  s8 = v.column().subtab[0]->get_table_ref();
+        MyTable2::Ref s1 = v[0].subtab;
+        MyTable2::ConstRef s2 = v[0].subtab;
+        MyTable2::Ref s3 = v[0].subtab->get_table_ref();
+        MyTable2::ConstRef s4 = v[0].subtab->get_table_ref();
+        MyTable2::Ref s5 = v.column().subtab[0];
+        MyTable2::ConstRef s6 = v.column().subtab[0];
+        MyTable2::Ref s7 = v.column().subtab[0]->get_table_ref();
+        MyTable2::ConstRef s8 = v.column().subtab[0]->get_table_ref();
         MyTable2::ConstRef cs1 = cv[0].subtab;
         MyTable2::ConstRef cs2 = cv[0].subtab->get_table_ref();
         MyTable2::ConstRef cs3 = cv.column().subtab[0];
@@ -1273,14 +1248,14 @@ TEST(TableView_HighLevelSubtables)
 
     t[0].subtab->add();
     {
-        MyTable1::Ref       s1 = v[0].subtab[0].subtab;
-        MyTable1::ConstRef  s2 = v[0].subtab[0].subtab;
-        MyTable1::Ref       s3 = v[0].subtab[0].subtab->get_table_ref();
-        MyTable1::ConstRef  s4 = v[0].subtab[0].subtab->get_table_ref();
-        MyTable1::Ref       s5 = v.column().subtab[0]->column().subtab[0];
-        MyTable1::ConstRef  s6 = v.column().subtab[0]->column().subtab[0];
-        MyTable1::Ref       s7 = v.column().subtab[0]->column().subtab[0]->get_table_ref();
-        MyTable1::ConstRef  s8 = v.column().subtab[0]->column().subtab[0]->get_table_ref();
+        MyTable1::Ref s1 = v[0].subtab[0].subtab;
+        MyTable1::ConstRef s2 = v[0].subtab[0].subtab;
+        MyTable1::Ref s3 = v[0].subtab[0].subtab->get_table_ref();
+        MyTable1::ConstRef s4 = v[0].subtab[0].subtab->get_table_ref();
+        MyTable1::Ref s5 = v.column().subtab[0]->column().subtab[0];
+        MyTable1::ConstRef s6 = v.column().subtab[0]->column().subtab[0];
+        MyTable1::Ref s7 = v.column().subtab[0]->column().subtab[0]->get_table_ref();
+        MyTable1::ConstRef s8 = v.column().subtab[0]->column().subtab[0]->get_table_ref();
         MyTable1::ConstRef cs1 = cv[0].subtab[0].subtab;
         MyTable1::ConstRef cs2 = cv[0].subtab[0].subtab->get_table_ref();
         MyTable1::ConstRef cs3 = cv.column().subtab[0]->column().subtab[0];
@@ -1300,44 +1275,44 @@ TEST(TableView_HighLevelSubtables)
     }
 
     v[0].subtab[0].val = 1;
-    CHECK_EQUAL(v[0].subtab[0].val,                     1);
-    CHECK_EQUAL(v.column().subtab[0]->column().val[0],  1);
-    CHECK_EQUAL(v[0].subtab->column().val[0],           1);
-    CHECK_EQUAL(v.column().subtab[0][0].val,            1);
+    CHECK_EQUAL(v[0].subtab[0].val, 1);
+    CHECK_EQUAL(v.column().subtab[0]->column().val[0], 1);
+    CHECK_EQUAL(v[0].subtab->column().val[0], 1);
+    CHECK_EQUAL(v.column().subtab[0][0].val, 1);
 
     v.column().subtab[0]->column().val[0] = 2;
-    CHECK_EQUAL(v[0].subtab[0].val,                     2);
-    CHECK_EQUAL(v.column().subtab[0]->column().val[0],  2);
-    CHECK_EQUAL(v[0].subtab->column().val[0],           2);
-    CHECK_EQUAL(v.column().subtab[0][0].val,            2);
+    CHECK_EQUAL(v[0].subtab[0].val, 2);
+    CHECK_EQUAL(v.column().subtab[0]->column().val[0], 2);
+    CHECK_EQUAL(v[0].subtab->column().val[0], 2);
+    CHECK_EQUAL(v.column().subtab[0][0].val, 2);
 
     v[0].subtab->column().val[0] = 3;
-    CHECK_EQUAL(v[0].subtab[0].val,                     3);
-    CHECK_EQUAL(v.column().subtab[0]->column().val[0],  3);
-    CHECK_EQUAL(v[0].subtab->column().val[0],           3);
-    CHECK_EQUAL(v.column().subtab[0][0].val,            3);
+    CHECK_EQUAL(v[0].subtab[0].val, 3);
+    CHECK_EQUAL(v.column().subtab[0]->column().val[0], 3);
+    CHECK_EQUAL(v[0].subtab->column().val[0], 3);
+    CHECK_EQUAL(v.column().subtab[0][0].val, 3);
 
     v.column().subtab[0][0].val = 4;
-    CHECK_EQUAL(v[0].subtab[0].val,                     4);
-    CHECK_EQUAL(v.column().subtab[0]->column().val[0],  4);
-    CHECK_EQUAL(v[0].subtab->column().val[0],           4);
-    CHECK_EQUAL(v.column().subtab[0][0].val,            4);
-    CHECK_EQUAL(cv[0].subtab[0].val,                    4);
+    CHECK_EQUAL(v[0].subtab[0].val, 4);
+    CHECK_EQUAL(v.column().subtab[0]->column().val[0], 4);
+    CHECK_EQUAL(v[0].subtab->column().val[0], 4);
+    CHECK_EQUAL(v.column().subtab[0][0].val, 4);
+    CHECK_EQUAL(cv[0].subtab[0].val, 4);
     CHECK_EQUAL(cv.column().subtab[0]->column().val[0], 4);
-    CHECK_EQUAL(cv[0].subtab->column().val[0],          4);
-    CHECK_EQUAL(cv.column().subtab[0][0].val,           4);
+    CHECK_EQUAL(cv[0].subtab->column().val[0], 4);
+    CHECK_EQUAL(cv.column().subtab[0][0].val, 4);
 
     v[0].subtab[0].subtab->add();
     v[0].subtab[0].subtab[0].val = 5;
-    CHECK_EQUAL(v[0].subtab[0].subtab[0].val,                               5);
-    CHECK_EQUAL(v.column().subtab[0]->column().subtab[0]->column().val[0],  5);
-    CHECK_EQUAL(cv[0].subtab[0].subtab[0].val,                              5);
+    CHECK_EQUAL(v[0].subtab[0].subtab[0].val, 5);
+    CHECK_EQUAL(v.column().subtab[0]->column().subtab[0]->column().val[0], 5);
+    CHECK_EQUAL(cv[0].subtab[0].subtab[0].val, 5);
     CHECK_EQUAL(cv.column().subtab[0]->column().subtab[0]->column().val[0], 5);
 
     v.column().subtab[0]->column().subtab[0]->column().val[0] = 6;
-    CHECK_EQUAL(v[0].subtab[0].subtab[0].val,                               6);
-    CHECK_EQUAL(v.column().subtab[0]->column().subtab[0]->column().val[0],  6);
-    CHECK_EQUAL(cv[0].subtab[0].subtab[0].val,                              6);
+    CHECK_EQUAL(v[0].subtab[0].subtab[0].val, 6);
+    CHECK_EQUAL(v.column().subtab[0]->column().subtab[0]->column().val[0], 6);
+    CHECK_EQUAL(cv[0].subtab[0].subtab[0].val, 6);
     CHECK_EQUAL(cv.column().subtab[0]->column().subtab[0]->column().val[0], 6);
 }
 
@@ -1351,7 +1326,7 @@ TEST(TableView_ToString)
     tbl.add(6, 12345678);
     tbl.add(4, 12345678);
 
-    std::string s  = "    first    second\n";
+    std::string s = "    first    second\n";
     std::string s0 = "0:      2    123456\n";
     std::string s1 = "1:      4   1234567\n";
     std::string s2 = "2:      6  12345678\n";
@@ -1407,7 +1382,7 @@ TEST(TableView_DynPivot)
 {
     TableRef table = Table::create();
     size_t column_ndx_sex = table->add_column(type_String, "sex");
-    size_t column_ndx_age = table->add_column(type_Int,    "age");
+    size_t column_ndx_age = table->add_column(type_Int, "age");
     table->add_column(type_Bool, "hired");
 
     size_t count = 5000;
@@ -1935,7 +1910,10 @@ TEST(TableView_BacklinksWithColumnInsertion)
 namespace {
 struct DistinctDirect {
     Table& table;
-    DistinctDirect(TableRef, TableRef t) : table(*t) { }
+    DistinctDirect(TableRef, TableRef t)
+        : table(*t)
+    {
+    }
 
     SortDescriptor operator()(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
     {
@@ -1963,7 +1941,10 @@ struct DistinctDirect {
 
 struct DistinctOverLink {
     Table& table;
-    DistinctOverLink(TableRef t, TableRef) : table(*t) { }
+    DistinctOverLink(TableRef t, TableRef)
+        : table(*t)
+    {
+    }
 
     SortDescriptor operator()(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
     {
@@ -2267,7 +2248,8 @@ NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
 {
     TestTableString table;
 
-    // This tests the expected sorting order with STRING_COMPARE_CORE_SIMILAR. See utf8_compare() in unicode.cpp. Only characters
+    // This tests the expected sorting order with STRING_COMPARE_CORE_SIMILAR. See utf8_compare() in unicode.cpp. Only
+    // characters
     // that have a visual representation are tested (control characters such as line feed are omitted).
     //
     // NOTE: Your editor must assume that Core source code is in utf8, and it must save as utf8, else this unit
@@ -2840,7 +2822,8 @@ NONCONCURRENT_TEST(TableView_SortOrder_Core)
 {
     TestTableString table;
 
-    // This tests the expected sorting order with STRING_COMPARE_CORE. See utf8_compare() in unicode.cpp. Only characters
+    // This tests the expected sorting order with STRING_COMPARE_CORE. See utf8_compare() in unicode.cpp. Only
+    // characters
     // that have a visual representation are tested (control characters such as line feed are omitted).
     //
     // NOTE: Your editor must assume that Core source code is in utf8, and it must save as utf8, else this unit

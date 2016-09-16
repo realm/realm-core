@@ -78,5 +78,3 @@ void OutputStream::do_write(const char* data, size_t size)
 
     m_out.write(data_1, size_1); // Throws
 }
-
-

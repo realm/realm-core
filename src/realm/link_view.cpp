@@ -74,11 +74,11 @@ void LinkView::do_insert(size_t link_ndx, size_t target_row_ndx)
     if (!m_row_indexes.is_attached()) {
         REALM_ASSERT_3(link_ndx, ==, 0);
         ref_type ref = IntegerColumn::create(m_origin_column.get_alloc()); // Throws
-        m_origin_column.set_row_ref(origin_row_ndx, ref); // Throws
-        m_row_indexes.init_from_parent(); // re-attach
+        m_origin_column.set_row_ref(origin_row_ndx, ref);                  // Throws
+        m_row_indexes.init_from_parent();                                  // re-attach
     }
 
-    m_row_indexes.insert(link_ndx, target_row_ndx); // Throws
+    m_row_indexes.insert(link_ndx, target_row_ndx);               // Throws
     m_origin_column.add_backlink(target_row_ndx, origin_row_ndx); // Throws
 }
 
@@ -103,13 +103,13 @@ void LinkView::set(size_t link_ndx, size_t target_row_ndx)
 
     CascadeState::row target_row;
     target_row.table_ndx = target_table.get_index_in_group();
-    target_row.row_ndx   = old_target_row_ndx;
+    target_row.row_ndx = old_target_row_ndx;
     CascadeState state;
     state.rows.push_back(target_row);
 
     typedef _impl::TableFriend tf;
     tf::cascade_break_backlinks_to(target_table, old_target_row_ndx, state); // Throws
-    tf::remove_backlink_broken_rows(target_table, state); // Throws
+    tf::remove_backlink_broken_rows(target_table, state);                    // Throws
 }
 
 
@@ -119,8 +119,8 @@ size_t LinkView::do_set(size_t link_ndx, size_t target_row_ndx)
     size_t old_target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
     size_t origin_row_ndx = get_origin_row_index();
     m_origin_column.remove_backlink(old_target_row_ndx, origin_row_ndx); // Throws
-    m_origin_column.add_backlink(target_row_ndx, origin_row_ndx); // Throws
-    m_row_indexes.set(link_ndx, target_row_ndx); // Throws
+    m_origin_column.add_backlink(target_row_ndx, origin_row_ndx);        // Throws
+    m_row_indexes.set(link_ndx, target_row_ndx);                         // Throws
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
     return old_target_row_ndx;
@@ -197,13 +197,13 @@ void LinkView::remove(size_t link_ndx)
 
     CascadeState::row target_row;
     target_row.table_ndx = target_table.get_index_in_group();
-    target_row.row_ndx   = target_row_ndx;
+    target_row.row_ndx = target_row_ndx;
     CascadeState state;
     state.rows.push_back(target_row);
 
     typedef _impl::TableFriend tf;
     tf::cascade_break_backlinks_to(target_table, target_row_ndx, state); // Throws
-    tf::remove_backlink_broken_rows(target_table, state); // Throws
+    tf::remove_backlink_broken_rows(target_table, state);                // Throws
 }
 
 
@@ -213,7 +213,7 @@ size_t LinkView::do_remove(size_t link_ndx)
     size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
     size_t origin_row_ndx = get_origin_row_index();
     m_origin_column.remove_backlink(target_row_ndx, origin_row_ndx); // Throws
-    m_row_indexes.erase(link_ndx); // Throws
+    m_row_indexes.erase(link_ndx);                                   // Throws
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
     return target_row_ndx;
@@ -238,7 +238,7 @@ void LinkView::clear()
 
     size_t origin_row_ndx = get_origin_row_index();
     CascadeState state;
-    state.stop_on_link_list_column  = &m_origin_column;
+    state.stop_on_link_list_column = &m_origin_column;
     state.stop_on_link_list_row_ndx = origin_row_ndx;
 
     typedef _impl::TableFriend tf;
@@ -252,7 +252,7 @@ void LinkView::clear()
             continue;
         CascadeState::row target_row;
         target_row.table_ndx = target_table.get_index_in_group();
-        target_row.row_ndx   = target_row_ndx;
+        target_row.row_ndx = target_row_ndx;
         auto i = std::upper_bound(state.rows.begin(), state.rows.end(), target_row);
         // This target row cannot already be in state.rows
         REALM_ASSERT(i == state.rows.begin() || i[-1] != target_row);

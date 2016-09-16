@@ -67,10 +67,10 @@ using unit_test::TestContext;
 
 namespace {
 
-class MyTrivialReplication: public TrivialReplication {
+class MyTrivialReplication : public TrivialReplication {
 public:
-    MyTrivialReplication(const std::string& path):
-        TrivialReplication(path)
+    MyTrivialReplication(const std::string& path)
+        : TrivialReplication(path)
     {
     }
 
@@ -102,8 +102,7 @@ public:
     }
 
 private:
-    version_type prepare_changeset(const char* data, size_t size,
-                                   version_type orig_version) override
+    version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
         m_incoming_changeset = Buffer<char>(size); // Throws
         std::copy(data, data + size, m_incoming_changeset.data());
@@ -125,27 +124,14 @@ private:
     std::vector<Buffer<char>> m_changesets;
 };
 
-REALM_TABLE_1(MySubsubsubtable,
-              first, Int)
+REALM_TABLE_1(MySubsubsubtable, first, Int)
 
-REALM_TABLE_3(MySubsubtable,
-              a, Int,
-              b, Subtable<MySubsubsubtable>,
-              c, Int)
+REALM_TABLE_3(MySubsubtable, a, Int, b, Subtable<MySubsubsubtable>, c, Int)
 
-REALM_TABLE_1(MySubtable,
-              t, Subtable<MySubsubtable>)
+REALM_TABLE_1(MySubtable, t, Subtable<MySubsubtable>)
 
-REALM_TABLE_9(MyTable,
-              my_int,         Int,
-              my_bool,        Bool,
-              my_float,       Float,
-              my_double,      Double,
-              my_string,      String,
-              my_binary,      Binary,
-              my_olddatetime, OldDateTime,
-              my_subtable,    Subtable<MySubtable>,
-              my_mixed,       Mixed)
+REALM_TABLE_9(MyTable, my_int, Int, my_bool, Bool, my_float, Float, my_double, Double, my_string, String, my_binary,
+              Binary, my_olddatetime, OldDateTime, my_subtable, Subtable<MySubtable>, my_mixed, Mixed)
 
 
 TEST(Replication_General)
@@ -166,16 +152,16 @@ TEST(Replication_General)
     {
         WriteTransaction wt(sg_1);
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        char buf[] = { '1' };
+        char buf[] = {'1'};
         BinaryData bin(buf);
         Mixed mix;
         mix.set_int(1);
-        table->set    (0, 2, true, 2.0f, 2.0, "xx",  bin, 728, 0, mix);
-        table->add       (3, true, 3.0f, 3.0, "xxx", bin, 729, 0, mix);
-        table->insert (0, 1, true, 1.0f, 1.0, "x",   bin, 727, 0, mix);
+        table->set(0, 2, true, 2.0f, 2.0, "xx", bin, 728, 0, mix);
+        table->add(3, true, 3.0f, 3.0, "xxx", bin, 729, 0, mix);
+        table->insert(0, 1, true, 1.0f, 1.0, "x", bin, 727, 0, mix);
 
-        table->add(3, true, 3.0f, 0.0, "", bin, 729, 0, mix);     // empty string
-        table->add(3, true, 3.0f, 1.0, "", bin, 729, 0, mix);     // empty string
+        table->add(3, true, 3.0f, 0.0, "", bin, 729, 0, mix); // empty string
+        table->add(3, true, 3.0f, 1.0, "", bin, 729, 0, mix); // empty string
         wt.commit();
     }
     {
@@ -194,12 +180,12 @@ TEST(Replication_General)
     {
         WriteTransaction wt(sg_1);
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        char buf[] = { '9' };
+        char buf[] = {'9'};
         BinaryData bin(buf);
         Mixed mix;
         mix.set_float(9.0f);
-        table->insert (2, 8, false, 8.0f, 8.0, "y8", bin, 282, 0, mix);
-        table->insert (1, 9, false, 9.0f, 9.0, "y9", bin, 292, 0, mix);
+        table->insert(2, 8, false, 8.0f, 8.0, "y8", bin, 282, 0, mix);
+        table->insert(1, 9, false, 9.0f, 9.0, "y9", bin, 292, 0, mix);
         wt.commit();
     }
     {
@@ -222,9 +208,9 @@ TEST(Replication_General)
         MyTable::ConstRef table = rt_2.get_table<MyTable>("my_table");
         CHECK_EQUAL(6, table->size());
         CHECK_EQUAL(10, table[0].my_int);
-        CHECK_EQUAL(3,  table[1].my_int);
-        CHECK_EQUAL(2,  table[2].my_int);
-        CHECK_EQUAL(8,  table[3].my_int);
+        CHECK_EQUAL(3, table[1].my_int);
+        CHECK_EQUAL(2, table[2].my_int);
+        CHECK_EQUAL(8, table[3].my_int);
 
         StringData sd1 = table[4].my_string.get();
 
@@ -454,9 +440,9 @@ TEST(Replication_Links)
         WriteTransaction wt(sg_1);
         TableRef origin_1 = wt.get_table("origin_1");
         origin_1->add_empty_row(2);
-        origin_1->set_link(0, 1, 0); // O_1_L_3[1] -> T_1[0]
-        origin_1->set_link(2, 0, 0); // O_1_L_4[0] -> T_2[0]
-        origin_1->set_link(2, 1, 1); // O_1_L_4[1] -> T_2[1]
+        origin_1->set_link(0, 1, 0);          // O_1_L_3[1] -> T_1[0]
+        origin_1->set_link(2, 0, 0);          // O_1_L_4[0] -> T_2[0]
+        origin_1->set_link(2, 1, 1);          // O_1_L_4[1] -> T_2[1]
         origin_1->get_linklist(4, 1)->add(0); // O_1_LL_1[1] -> T_1[0]
         wt.commit();
     }
@@ -485,16 +471,16 @@ TEST(Replication_Links)
         CHECK_EQUAL(5, origin_2->get_column_count());
         CHECK_EQUAL(1, target_1->get_column_count());
         CHECK_EQUAL(1, target_2->get_column_count());
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(2));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(3));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(2));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(3));
         CHECK_EQUAL(type_LinkList, origin_1->get_column_type(4));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(1));
         CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(3));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(4));
         CHECK_EQUAL(target_1, origin_1->get_link_target(0));
         CHECK_EQUAL(target_2, origin_1->get_link_target(2));
         CHECK_EQUAL(target_1, origin_1->get_link_target(4));
@@ -653,11 +639,11 @@ TEST(Replication_Links)
         WriteTransaction wt(sg_1);
         TableRef origin_2_w = wt.get_table("origin_2");
         origin_2_w->insert_empty_row(2);
-        origin_2_w->set_link(0, 2, 1);  // O_2_L_2[2] -> T_1[1]
+        origin_2_w->set_link(0, 2, 1); // O_2_L_2[2] -> T_1[1]
         origin_2_w->set_int(1, 2, 19);
         // linklist is empty by default
         origin_2_w->set_int(3, 2, 0);
-        origin_2_w->set_link(4, 2, 0);  // O_2_L_4[2] -> T_2[0]
+        origin_2_w->set_link(4, 2, 0); // O_2_L_4[2] -> T_2[0]
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger);
@@ -936,7 +922,7 @@ TEST(Replication_Links)
         TableRef origin_2_w = wt.get_table("origin_2");
         LinkViewRef link_list_1_2_w = origin_1_w->get_linklist(4, 2);
         LinkViewRef link_list_2_2_w = origin_2_w->get_linklist(2, 2);
-        link_list_1_2_w->clear(); // Remove  O_1_LL_1[2] -> T_1[1]
+        link_list_1_2_w->clear();    // Remove  O_1_LL_1[2] -> T_1[1]
         link_list_2_2_w->move(0, 1); // [ 0, 1 ] -> [ 1, 0 ]
         wt.commit();
     }
@@ -1225,7 +1211,7 @@ TEST(Replication_Links)
         WriteTransaction wt(sg_1);
         TableRef origin_1_w = wt.get_table("origin_1");
         TableRef origin_2_w = wt.get_table("origin_2");
-        origin_1_w->add_empty_row();   // [ 2, 1 ] -> [ 2, 1, 3 ]
+        origin_1_w->add_empty_row(); // [ 2, 1 ] -> [ 2, 1, 3 ]
         origin_1_w->set_link(2, 2, 0);
         origin_2_w->move_last_over(0); // [ 0, 1 ] -> [ 1 ]
         // Removes  O_2_L_2[0]  -> T_1[1]  and  O_2_LL_3[1] -> T_2[0]  and
@@ -1347,16 +1333,16 @@ TEST(Replication_Links)
         TableRef origin_2_w = wt.get_table("origin_2");
         origin_1_w->move_last_over(1); // [ 2, 3 ] -> [ 2 ]
         // Removes  O_1_L_4[1] -> T_2[0]
-        origin_2_w->add_empty_row(3); // [] -> [ 3, 4, 5 ]
-        origin_2_w->set_link(0, 0, 0);         // O_2_L_2[0]  -> T_1[0]
-        origin_2_w->set_link(0, 2, 1);         // O_2_L_2[2]  -> T_1[1]
+        origin_2_w->add_empty_row(3);           // [] -> [ 3, 4, 5 ]
+        origin_2_w->set_link(0, 0, 0);          // O_2_L_2[0]  -> T_1[0]
+        origin_2_w->set_link(0, 2, 1);          // O_2_L_2[2]  -> T_1[1]
         origin_2_w->get_linklist(2, 0)->add(1); // O_2_LL_3[0] -> T_2[1]
         origin_2_w->get_linklist(2, 1)->add(0); // O_2_LL_3[1] -> T_2[0]
         origin_2_w->get_linklist(2, 1)->add(1); // O_2_LL_3[1] -> T_2[1]
         origin_2_w->get_linklist(2, 2)->add(1); // O_2_LL_3[2] -> T_2[1]
         origin_2_w->get_linklist(2, 2)->add(0); // O_2_LL_3[2] -> T_2[0]
-        origin_2_w->set_link(4, 0, 1);         // O_2_L_4[0]  -> T_2[1]
-        origin_2_w->set_link(4, 2, 0);         // O_2_L_4[2]  -> T_2[0]
+        origin_2_w->set_link(4, 0, 1);          // O_2_L_4[0]  -> T_2[1]
+        origin_2_w->set_link(4, 2, 0);          // O_2_L_4[2]  -> T_2[0]
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger);
@@ -1419,10 +1405,10 @@ TEST(Replication_Links)
     {
         WriteTransaction wt(sg_1);
         TableRef origin_1_w = wt.get_table("origin_1");
-        origin_1_w->add_empty_row(2); // [ 2 ] -> [ 2, 4, 5 ]
-        origin_1_w->set_link(0, 2, 0); // O_1_L_3[2] -> T_1[0]
-        origin_1_w->set_link(2, 0, 1); // O_1_L_4[0] -> T_2[1]
-        origin_1_w->set_link(2, 2, 0); // O_1_L_4[2] -> T_2[0]
+        origin_1_w->add_empty_row(2);           // [ 2 ] -> [ 2, 4, 5 ]
+        origin_1_w->set_link(0, 2, 0);          // O_1_L_3[2] -> T_1[0]
+        origin_1_w->set_link(2, 0, 1);          // O_1_L_4[0] -> T_2[1]
+        origin_1_w->set_link(2, 2, 0);          // O_1_L_4[2] -> T_2[0]
         origin_1_w->get_linklist(4, 1)->add(0); // O_1_LL_1[1] -> T_1[0]
         origin_1_w->get_linklist(4, 1)->add(0); // O_1_LL_1[1] -> T_1[0] (double)
         origin_1_w->get_linklist(4, 2)->add(1); // O_1_LL_1[2] -> T_1[1]
@@ -1682,11 +1668,11 @@ TEST(Replication_Links)
         TableRef origin_2_w = wt.get_table("origin_2");
         TableRef target_1_w = wt.get_table("target_1");
         TableRef target_2_w = wt.get_table("target_2");
-        target_1_w->add_empty_row();   // [ 2, 1 ] -> [ 2, 1, 3 ]
-        origin_1_w->set_link(0, 2, 2);         // O_1_L_3[2]  -> T_1[2]
+        target_1_w->add_empty_row();            // [ 2, 1 ] -> [ 2, 1, 3 ]
+        origin_1_w->set_link(0, 2, 2);          // O_1_L_3[2]  -> T_1[2]
         origin_1_w->get_linklist(4, 1)->add(2); // O_1_LL_1[1] -> T_1[2]
-        origin_2_w->set_link(0, 0, 2);         // O_2_L_2[0]  -> T_1[2]
-        target_2_w->move_last_over(0); // [ 0, 1 ] -> [ 1 ]
+        origin_2_w->set_link(0, 0, 2);          // O_2_L_2[0]  -> T_1[2]
+        target_2_w->move_last_over(0);          // [ 0, 1 ] -> [ 1 ]
         // Removes  O_1_L_4[0]  -> T_2[1]  and  O_1_L_4[2]  -> T_2[0]  and
         //          O_2_LL_3[0] -> T_2[1]  and  O_2_LL_3[1] -> T_2[1]  and
         //          O_2_LL_3[2] -> T_2[1]  and  O_2_L_4[2]  -> T_2[0]
@@ -1865,14 +1851,14 @@ TEST(Replication_Links)
         TableRef target_2_w = wt.get_table("target_2");
         target_1_w->move_last_over(1); // [ 2, 3 ] -> [ 2 ]
         // Removes  O_1_L_3[2] -> T_1[1]  and  O_1_LL_1[1] -> T_1[1]  and  O_2_L_2[0] -> T_1[1]
-        target_2_w->add_empty_row(3); // [] -> [ 3, 4, 5 ]
-        origin_1_w->set_link(2, 0, 1);         // O_1_L_4[0]  -> T_2[1]
-        origin_1_w->set_link(2, 2, 0);         // O_1_L_4[2]  -> T_2[0]
+        target_2_w->add_empty_row(3);           // [] -> [ 3, 4, 5 ]
+        origin_1_w->set_link(2, 0, 1);          // O_1_L_4[0]  -> T_2[1]
+        origin_1_w->set_link(2, 2, 0);          // O_1_L_4[2]  -> T_2[0]
         origin_2_w->get_linklist(2, 0)->add(1); // O_2_LL_3[0] -> T_2[1]
         origin_2_w->get_linklist(2, 0)->add(1); // O_2_LL_3[0] -> T_2[1]
         origin_2_w->get_linklist(2, 2)->add(0); // O_2_LL_3[2] -> T_2[0]
-        origin_2_w->set_link(4, 0, 0);         // O_2_L_4[0]  -> T_2[0]
-        origin_2_w->set_link(4, 1, 1);         // O_2_L_4[1]  -> T_2[1]
+        origin_2_w->set_link(4, 0, 0);          // O_2_L_4[0]  -> T_2[0]
+        origin_2_w->set_link(4, 1, 1);          // O_2_L_4[1]  -> T_2[1]
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger);
@@ -1957,13 +1943,13 @@ TEST(Replication_Links)
         TableRef target_1_w = wt.get_table("target_1");
         TableRef origin_1_w = wt.get_table("origin_1");
         TableRef origin_2_w = wt.get_table("origin_2");
-        target_1_w->add_empty_row(2); // [ 2 ] -> [ 2, 4, 5 ]
-        origin_1_w->set_link(0, 0, 1); // O_1_L_3[0] -> T_1[1]
-        origin_1_w->set_link(0, 2, 0); // O_1_L_3[2] -> T_1[0]
+        target_1_w->add_empty_row(2);           // [ 2 ] -> [ 2, 4, 5 ]
+        origin_1_w->set_link(0, 0, 1);          // O_1_L_3[0] -> T_1[1]
+        origin_1_w->set_link(0, 2, 0);          // O_1_L_3[2] -> T_1[0]
         origin_1_w->get_linklist(4, 0)->add(1); // O_1_LL_1[0] -> T_1[1]
         origin_1_w->get_linklist(4, 0)->add(0); // O_1_LL_1[0] -> T_1[0]
-        origin_2_w->set_link(0, 0, 0); // O_2_L_2[0] -> T_1[0]
-        origin_2_w->set_link(0, 2, 1); // O_2_L_2[2] -> T_1[1]
+        origin_2_w->set_link(0, 0, 0);          // O_2_L_2[0] -> T_1[0]
+        origin_2_w->set_link(0, 2, 1);          // O_2_L_2[2] -> T_1[1]
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger);
@@ -2363,23 +2349,23 @@ TEST(Replication_Links)
         ConstTableRef origin_2 = rt.get_table("origin_2");
         CHECK_EQUAL(5, origin_1->get_column_count());
         CHECK_EQUAL(5, origin_2->get_column_count());
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(2));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(3));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(2));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(3));
         CHECK_EQUAL(type_LinkList, origin_1->get_column_type(4));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(1));
         CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(3));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(4));
     }
     {
         WriteTransaction wt(sg_1);
         TableRef origin_1_w = wt.get_table("origin_1");
         TableRef origin_2_w = wt.get_table("origin_2");
-        origin_1_w->insert_column(2, type_Table,  "foo_1");
-        origin_2_w->insert_column(0, type_Table,  "foo_2");
+        origin_1_w->insert_column(2, type_Table, "foo_1");
+        origin_2_w->insert_column(0, type_Table, "foo_2");
         origin_2_w->insert_column(6, type_String, "foo_3");
         wt.commit();
     }
@@ -2394,19 +2380,19 @@ TEST(Replication_Links)
         ConstTableRef target_2 = rt.get_table("target_2");
         CHECK_EQUAL(6, origin_1->get_column_count());
         CHECK_EQUAL(7, origin_2->get_column_count());
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
-        CHECK_EQUAL(type_Table,    origin_1->get_column_type(2));
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(3));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(4));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
+        CHECK_EQUAL(type_Table, origin_1->get_column_type(2));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(3));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(4));
         CHECK_EQUAL(type_LinkList, origin_1->get_column_type(5));
-        CHECK_EQUAL(type_Table,    origin_2->get_column_type(0));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(1));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(2));
+        CHECK_EQUAL(type_Table, origin_2->get_column_type(0));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(1));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(2));
         CHECK_EQUAL(type_LinkList, origin_2->get_column_type(3));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(4));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(5));
-        CHECK_EQUAL(type_String,   origin_2->get_column_type(6));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(4));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(5));
+        CHECK_EQUAL(type_String, origin_2->get_column_type(6));
         CHECK_EQUAL(3, origin_1->size());
         CHECK_EQUAL(3, origin_2->size());
         ConstLinkViewRef link_list_1_0 = origin_1->get_linklist(5, 0);
@@ -2483,19 +2469,19 @@ TEST(Replication_Links)
         ConstTableRef target_2 = rt.get_table("target_2");
         CHECK_EQUAL(7, origin_1->get_column_count());
         CHECK_EQUAL(6, origin_2->get_column_count());
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
-        CHECK_EQUAL(type_Table,    origin_1->get_column_type(2));
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(3));
-        CHECK_EQUAL(type_Mixed,    origin_1->get_column_type(4));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(5));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
+        CHECK_EQUAL(type_Table, origin_1->get_column_type(2));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(3));
+        CHECK_EQUAL(type_Mixed, origin_1->get_column_type(4));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(5));
         CHECK_EQUAL(type_LinkList, origin_1->get_column_type(6));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(1));
         CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
-        CHECK_EQUAL(type_String,   origin_2->get_column_type(5));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(3));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(4));
+        CHECK_EQUAL(type_String, origin_2->get_column_type(5));
         ConstLinkViewRef link_list_1_0 = origin_1->get_linklist(6, 0);
         ConstLinkViewRef link_list_1_1 = origin_1->get_linklist(6, 1);
         ConstLinkViewRef link_list_1_2 = origin_1->get_linklist(6, 2);
@@ -2571,16 +2557,16 @@ TEST(Replication_Links)
         ConstTableRef target_2 = rt.get_table("target_2");
         CHECK_EQUAL(5, origin_1->get_column_count());
         CHECK_EQUAL(5, origin_2->get_column_count());
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(2));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(3));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(2));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(3));
         CHECK_EQUAL(type_LinkList, origin_1->get_column_type(4));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(1));
         CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(3));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(4));
         ConstLinkViewRef link_list_1_0 = origin_1->get_linklist(4, 0);
         ConstLinkViewRef link_list_1_1 = origin_1->get_linklist(4, 1);
         ConstLinkViewRef link_list_1_2 = origin_1->get_linklist(4, 2);
@@ -2646,7 +2632,7 @@ TEST(Replication_Links)
         TableRef target_1_w = wt.get_table("target_1");
         TableRef target_2_w = wt.get_table("target_2");
         origin_1_w->insert_column_link(2, type_LinkList, "bar_1", *target_2_w);
-        origin_2_w->insert_column_link(0, type_Link,     "bar_2", *target_1_w);
+        origin_2_w->insert_column_link(0, type_Link, "bar_2", *target_1_w);
         origin_2_w->insert_column_link(6, type_LinkList, "bar_3", *target_2_w);
         origin_2_w->set_link(0, 0, 2);
         origin_2_w->set_link(0, 1, 0);
@@ -2663,18 +2649,18 @@ TEST(Replication_Links)
         ConstTableRef target_2 = rt.get_table("target_2");
         CHECK_EQUAL(6, origin_1->get_column_count());
         CHECK_EQUAL(7, origin_2->get_column_count());
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
         CHECK_EQUAL(type_LinkList, origin_1->get_column_type(2));
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(3));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(4));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(3));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(4));
         CHECK_EQUAL(type_LinkList, origin_1->get_column_type(5));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(1));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(2));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(1));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(2));
         CHECK_EQUAL(type_LinkList, origin_2->get_column_type(3));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(4));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(5));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(4));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(5));
         CHECK_EQUAL(type_LinkList, origin_2->get_column_type(6));
         CHECK_EQUAL(1, origin_1->get_link(0, 0));
         CHECK(origin_1->is_null_link(0, 1));
@@ -2783,18 +2769,18 @@ TEST(Replication_Links)
         ConstTableRef target_2 = rt.get_table("target_2");
         CHECK_EQUAL(7, origin_1->get_column_count());
         CHECK_EQUAL(6, origin_2->get_column_count());
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
         CHECK_EQUAL(type_LinkList, origin_1->get_column_type(2));
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(3));
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(4));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(5));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(3));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(4));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(5));
         CHECK_EQUAL(type_LinkList, origin_1->get_column_type(6));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(1));
         CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(3));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(4));
         CHECK_EQUAL(type_LinkList, origin_2->get_column_type(5));
         CHECK_EQUAL(1, origin_1->get_link(0, 0));
         CHECK(origin_1->is_null_link(0, 1));
@@ -2811,15 +2797,15 @@ TEST(Replication_Links)
         CHECK_EQUAL(0, origin_2->get_link(4, 0));
         CHECK_EQUAL(1, origin_2->get_link(4, 1));
         CHECK(origin_2->is_null_link(4, 2));
-        ConstLinkViewRef link_list_1_0   = origin_1->get_linklist(6, 0);
-        ConstLinkViewRef link_list_1_1   = origin_1->get_linklist(6, 1);
-        ConstLinkViewRef link_list_1_2   = origin_1->get_linklist(6, 2);
+        ConstLinkViewRef link_list_1_0 = origin_1->get_linklist(6, 0);
+        ConstLinkViewRef link_list_1_1 = origin_1->get_linklist(6, 1);
+        ConstLinkViewRef link_list_1_2 = origin_1->get_linklist(6, 2);
         ConstLinkViewRef link_list_1_0_x = origin_1->get_linklist(2, 0);
         ConstLinkViewRef link_list_1_1_x = origin_1->get_linklist(2, 1);
         ConstLinkViewRef link_list_1_2_x = origin_1->get_linklist(2, 2);
-        ConstLinkViewRef link_list_2_0   = origin_2->get_linklist(2, 0);
-        ConstLinkViewRef link_list_2_1   = origin_2->get_linklist(2, 1);
-        ConstLinkViewRef link_list_2_2   = origin_2->get_linklist(2, 2);
+        ConstLinkViewRef link_list_2_0 = origin_2->get_linklist(2, 0);
+        ConstLinkViewRef link_list_2_1 = origin_2->get_linklist(2, 1);
+        ConstLinkViewRef link_list_2_2 = origin_2->get_linklist(2, 2);
         ConstLinkViewRef link_list_2_0_x = origin_2->get_linklist(5, 0);
         ConstLinkViewRef link_list_2_1_x = origin_2->get_linklist(5, 1);
         ConstLinkViewRef link_list_2_2_x = origin_2->get_linklist(5, 2);
@@ -2907,16 +2893,16 @@ TEST(Replication_Links)
         ConstTableRef target_2 = rt.get_table("target_2");
         CHECK_EQUAL(5, origin_1->get_column_count());
         CHECK_EQUAL(5, origin_2->get_column_count());
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(1));
-        CHECK_EQUAL(type_Link,     origin_1->get_column_type(2));
-        CHECK_EQUAL(type_Int,      origin_1->get_column_type(3));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(1));
+        CHECK_EQUAL(type_Link, origin_1->get_column_type(2));
+        CHECK_EQUAL(type_Int, origin_1->get_column_type(3));
         CHECK_EQUAL(type_LinkList, origin_1->get_column_type(4));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(0));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(1));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(0));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(1));
         CHECK_EQUAL(type_LinkList, origin_2->get_column_type(2));
-        CHECK_EQUAL(type_Int,      origin_2->get_column_type(3));
-        CHECK_EQUAL(type_Link,     origin_2->get_column_type(4));
+        CHECK_EQUAL(type_Int, origin_2->get_column_type(3));
+        CHECK_EQUAL(type_Link, origin_2->get_column_type(4));
         CHECK_EQUAL(3, origin_1->size());
         CHECK_EQUAL(3, origin_2->size());
         CHECK_EQUAL(1, origin_1->get_link(0, 0));
@@ -2996,9 +2982,9 @@ TEST(Replication_Links)
         CHECK_EQUAL(2, target_1->get_column_count());
         CHECK_EQUAL(2, target_2->get_column_count());
         CHECK_EQUAL(type_Mixed, target_1->get_column_type(0));
-        CHECK_EQUAL(type_Int,   target_1->get_column_type(1));
-        CHECK_EQUAL(type_Int,   target_2->get_column_type(0));
-        CHECK_EQUAL(type_Link,  target_2->get_column_type(1));
+        CHECK_EQUAL(type_Int, target_1->get_column_type(1));
+        CHECK_EQUAL(type_Int, target_2->get_column_type(0));
+        CHECK_EQUAL(type_Link, target_2->get_column_type(1));
         CHECK_EQUAL(3, target_1->size());
         CHECK_EQUAL(3, target_2->size());
         CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
@@ -3040,7 +3026,7 @@ TEST(Replication_Links)
         CHECK_EQUAL(1, target_1->get_column_count());
         CHECK_EQUAL(1, target_2->get_column_count());
         CHECK_EQUAL(type_Mixed, target_1->get_column_type(0));
-        CHECK_EQUAL(type_Link,  target_2->get_column_type(0));
+        CHECK_EQUAL(type_Link, target_2->get_column_type(0));
         CHECK_EQUAL(3, target_1->size());
         CHECK_EQUAL(3, target_2->size());
         CHECK_EQUAL(1, target_1->get_backlink_count(0, *origin_1, 0));
@@ -3083,7 +3069,7 @@ TEST(Replication_Links)
         ConstTableRef target_2 = rt.get_table("target_2");
         CHECK_EQUAL(0, target_1->get_column_count());
         CHECK_EQUAL(1, target_2->get_column_count());
-        CHECK_EQUAL(type_Link,  target_2->get_column_type(0));
+        CHECK_EQUAL(type_Link, target_2->get_column_type(0));
         CHECK_EQUAL(3, origin_1->size());
         CHECK_EQUAL(3, origin_2->size());
         CHECK_EQUAL(0, target_1->size());
@@ -3160,7 +3146,7 @@ TEST(Replication_CascadeRemove_ColumnLink)
     ConstTableRef target;
     ConstRow target_row_0, target_row_1;
 
-    auto perform_change = [&](std::function<void (Table&)> func) {
+    auto perform_change = [&](std::function<void(Table&)> func) {
         // Ensure there are two rows in each table, with each row in `origin`
         // pointing to the corresponding row in `target`
         {
@@ -3201,38 +3187,28 @@ TEST(Replication_CascadeRemove_ColumnLink)
     };
 
     // Break link by nullifying
-    perform_change([](Table & origin) {
-        origin[1].nullify_link(0);
-    });
+    perform_change([](Table& origin) { origin[1].nullify_link(0); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by reassign
-    perform_change([](Table & origin) {
-        origin[1].set_link(0, 0);
-    });
+    perform_change([](Table& origin) { origin[1].set_link(0, 0); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target->size(), 1);
 
     // Avoid breaking link by reassigning self
-    perform_change([](Table & origin) {
-        origin[1].set_link(0, 1);
-    });
+    perform_change([](Table& origin) { origin[1].set_link(0, 1); });
     // Should not delete anything
     CHECK(target_row_0 && target_row_1);
     CHECK_EQUAL(target->size(), 2);
 
     // Break link by explicit row removal
-    perform_change([](Table & origin) {
-        origin[1].move_last_over();
-    });
+    perform_change([](Table& origin) { origin[1].move_last_over(); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by clearing table
-    perform_change([](Table & origin) {
-        origin.clear();
-    });
+    perform_change([](Table& origin) { origin.clear(); });
     CHECK(!target_row_0 && !target_row_1);
     CHECK_EQUAL(target->size(), 0);
 }
@@ -3303,7 +3279,7 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     ConstTableRef target;
     ConstRow target_row_0, target_row_1;
 
-    auto perform_change = [&](std::function<void (Table&)> func) {
+    auto perform_change = [&](std::function<void(Table&)> func) {
         // Ensure there are two rows in each table, with each row in `origin`
         // pointing to the corresponding row in `target`
         {
@@ -3345,45 +3321,33 @@ TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
     };
 
     // Break link by clearing list
-    perform_change([](Table & origin) {
-        origin[1].get_linklist(0)->clear();
-    });
+    perform_change([](Table& origin) { origin[1].get_linklist(0)->clear(); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by removal from list
-    perform_change([](Table & origin) {
-        origin[1].get_linklist(0)->remove(1);
-    });
+    perform_change([](Table& origin) { origin[1].get_linklist(0)->remove(1); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by reassign
-    perform_change([](Table & origin) {
-        origin[1].get_linklist(0)->set(1, 0);
-    });
+    perform_change([](Table& origin) { origin[1].get_linklist(0)->set(1, 0); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target->size(), 1);
 
     // Avoid breaking link by reassigning self
-    perform_change([](Table & origin) {
-        origin[1].get_linklist(0)->set(1, 1);
-    });
+    perform_change([](Table& origin) { origin[1].get_linklist(0)->set(1, 1); });
     // Should not delete anything
     CHECK(target_row_0 && target_row_1);
     CHECK_EQUAL(target->size(), 2);
 
     // Break link by explicit row removal
-    perform_change([](Table & origin) {
-        origin[1].move_last_over();
-    });
+    perform_change([](Table& origin) { origin[1].move_last_over(); });
     CHECK(target_row_0 && !target_row_1);
     CHECK_EQUAL(target->size(), 1);
 
     // Break link by clearing table
-    perform_change([](Table & origin) {
-        origin.clear();
-    });
+    perform_change([](Table& origin) { origin.clear(); });
     CHECK(!target_row_0 && !target_row_1);
     CHECK_EQUAL(target->size(), 0);
 }
@@ -3405,13 +3369,13 @@ TEST(Replication_NullStrings)
         TableRef table1 = wt.add_table("table");
         table1->add_column(type_String, "c1", true);
         table1->add_column(type_Binary, "b1", true);
-        table1->add_empty_row(3);                   // default value is null
+        table1->add_empty_row(3); // default value is null
 
-        table1->set_string(0, 1, StringData(""));   // empty string
-        table1->set_string(0, 2, realm::null());    // null
+        table1->set_string(0, 1, StringData("")); // empty string
+        table1->set_string(0, 2, realm::null());  // null
 
-        table1->set_binary(1, 1, BinaryData(""));   // empty string
-        table1->set_binary(1, 2, BinaryData());    // null
+        table1->set_binary(1, 1, BinaryData("")); // empty string
+        table1->set_binary(1, 2, BinaryData());   // null
 
         CHECK(table1->get_string(0, 0).is_null());
         CHECK(!table1->get_string(0, 1).is_null());
@@ -3453,7 +3417,7 @@ TEST(Replication_NullInteger)
         WriteTransaction wt(sg_1);
         TableRef table1 = wt.add_table("table");
         table1->add_column(type_Int, "c1", true);
-        table1->add_empty_row(3);                   // default value is null
+        table1->add_empty_row(3); // default value is null
 
         table1->set_int(0, 1, 0);
         table1->set_null(0, 2);
@@ -3677,9 +3641,9 @@ TEST(Replication_MoveSelectedLinkView)
         WriteTransaction wt(sg_1);
         TableRef origin = wt.get_table("origin");
         LinkViewRef link_list = origin->get_linklist(0, 1);
-        link_list->add(0); // Select the link list of the 2nd row
+        link_list->add(0);         // Select the link list of the 2nd row
         origin->move_last_over(0); // Move that link list
-        link_list->add(1); // Now modify it again
+        link_list->add(1);         // Now modify it again
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger);
