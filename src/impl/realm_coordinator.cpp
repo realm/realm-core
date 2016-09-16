@@ -101,7 +101,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
         }
     }
 
-    if (config.sync_config && !m_sync_session) {
+    if (config.sync_config && config.sync_config->create_session && !m_sync_session) {
         m_sync_session = SyncManager::shared().create_session(config.path);
         m_sync_session->set_sync_transact_callback([this] (VersionID, VersionID) {
             if (m_notifier)

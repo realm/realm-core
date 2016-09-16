@@ -38,6 +38,8 @@ public:
     std::string user_tag;
     std::string realm_url;
     std::function<SyncSessionErrorHandler> error_handler;
+    // Some bindings may want to handle the session in binding level.
+    bool create_session = true;
 };
 
 } // realm
