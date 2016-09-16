@@ -38,6 +38,8 @@ template<class T>
 class Column;
 template<class T>
 class BasicColumn;
+template <class T>
+class ColumnRandIterator;
 
 namespace util {
 template <class> class Optional;
@@ -48,7 +50,7 @@ using IntegerColumn = Column<int64_t>;
 using IntNullColumn = Column<util::Optional<int64_t>>;
 using DoubleColumn = Column<double>;
 using FloatColumn = Column<float>;
-
+using IntegerColumnIterator = ColumnRandIterator<int64_t>;
 } // namespace realm
 
 #endif // REALM_COLUMN_FWD_HPP

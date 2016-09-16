@@ -179,6 +179,8 @@ private:
     void insert_with_offset(size_t row_ndx, StringData value, size_t offset);
     void insert_row_list(size_t ref, size_t offset, StringData value);
     void insert_to_existing_list(size_t row, StringData value, IntegerColumn& list);
+    void insert_to_existing_list_at_lower(size_t row, StringData value, IntegerColumn& list,
+                                          const IntegerColumnIterator& lower);
     key_type get_last_key() const;
 
     /// Add small signed \a diff to all elements that are greater than, or equal
