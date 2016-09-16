@@ -533,8 +533,8 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
                     // Since the list is kept in sorted order, the first and
                     // last values will be the same only if the whole list is
                     // storing duplicate values.
-                    if (REALM_COVER_NEVER(first_str != last_str)) {
-                        contains_only_duplicates = false;
+                    if (first_str != last_str) {
+                        contains_only_duplicates = false; // LCOV_EXCL_LINE
                     }
                 }
                 REALM_ASSERT_DEBUG(contains_only_duplicates);
