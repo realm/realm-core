@@ -16,15 +16,6 @@
  *
  **************************************************************************/
 
-#include <ctime>
-
-#ifdef _WIN32
-#define NOMINMAX
-#include <windows.h>
-#else
-#include <unistd.h>
-#endif
-
 #include "random.hpp"
 
 
@@ -34,16 +25,8 @@ namespace test_util {
 
 unsigned long produce_nondeterministic_random_seed()
 {
-    typedef unsigned long ulong;
-    ulong value = ulong(time(nullptr));
-
-#ifdef _WIN32
-    value ^= ulong(GetCurrentProcessId());
-#else
-    value ^= ulong(getpid());
-#endif
-
-    return value;
+    std::random_device rd;
+    return rd();
 }
 
 
