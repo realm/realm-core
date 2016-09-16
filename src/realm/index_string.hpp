@@ -114,7 +114,7 @@ public:
     size_t find_first(T value) const;
     template <class T>
     void find_all(IntegerColumn& result, T value) const;
-    template<class T>
+    template <class T>
     size_t count(T value) const;
     template <class T>
     void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx);
@@ -236,10 +236,10 @@ public:
     SortedListComparator(ColumnBase& column_values);
     bool operator()(int64_t ndx, StringData needle);
     bool operator()(StringData needle, int64_t ndx);
+
 private:
     ColumnBase& values;
 };
-
 
 
 // Implementation:
@@ -453,10 +453,10 @@ void StringIndex::set(size_t row_ndx, T new_value)
     if (REALM_LIKELY(new_value2 != old_value)) {
         // We must erase this row first because erase uses find_first which
         // might find the duplicate if we insert before erasing.
-        bool is_last = true; // To avoid updating refs
+        bool is_last = true;        // To avoid updating refs
         erase<T>(row_ndx, is_last); // Throws
 
-        size_t offset = 0; // First key from beginning of string
+        size_t offset = 0;                               // First key from beginning of string
         insert_with_offset(row_ndx, new_value2, offset); // Throws
     }
 }
@@ -514,7 +514,7 @@ void StringIndex::find_all(IntegerColumn& result, T value) const
     return m_array->index_string_find_all(result, to_str(value, buffer), m_target_column);
 }
 
-template<class T>
+template <class T>
 size_t StringIndex::count(T value) const
 {
     // Use direct access method

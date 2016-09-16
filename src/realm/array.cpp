@@ -2798,8 +2798,9 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 
 namespace realm {
 
-template<>
-size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result, ref_type& result_ref, const IntegerColumn& rows, ColumnBase* column) const
+template <>
+size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result, ref_type& result_ref,
+                                         const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result);
     static_cast<void>(result_ref);
@@ -2822,8 +2823,9 @@ size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result
     return first_row_ref;
 }
 
-template<>
-size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, ref_type& result_ref, const IntegerColumn& rows, ColumnBase* column) const
+template <>
+size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, ref_type& result_ref,
+                                     const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result);
     static_cast<void>(result_ref);
@@ -2849,8 +2851,9 @@ size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, re
     return cnt;
 }
 
-template<>
-size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, ref_type& result_ref, const IntegerColumn& rows, ColumnBase* column) const
+template <>
+size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, ref_type& result_ref,
+                                       const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result_ref);
 
@@ -2880,9 +2883,9 @@ size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, 
     return size_t(FindRes_column);
 }
 
-}   // namespace realm
+} // namespace realm
 
-template<IndexMethod method, class T>
+template <IndexMethod method, class T>
 size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
 {
     // Return`realm::not_found`, or an index to the (any) match

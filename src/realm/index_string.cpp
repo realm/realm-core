@@ -140,7 +140,7 @@ void StringIndex::insert_to_existing_list(size_t row, StringData value, IntegerC
     }
     else {
         size_t lower_row = to_size_t(*lower);
-        StringConversionBuffer buffer;  // Used when this is an IntegerIndex
+        StringConversionBuffer buffer; // Used when this is an IntegerIndex
         StringData lower_value = get(lower_row, buffer);
 
         if (lower_value != value) {
@@ -596,8 +596,8 @@ void StringIndex::distinct(IntegerColumn& result) const
                 }
                 else {
                     IntegerColumn sub(alloc, to_ref(ref)); // Throws
-                    if (sub.size() == 1) {  // Optimization.
-                        size_t r = to_size_t(sub.get(0)); // get first match
+                    if (sub.size() == 1) {                 // Optimization.
+                        size_t r = to_size_t(sub.get(0));  // get first match
                         result.add(r);
                     }
                     else {
@@ -915,8 +915,8 @@ void StringIndex::node_add_key(ref_type ref)
     m_array->add(ref);
 }
 
-SortedListComparator::SortedListComparator(ColumnBase& column_values):
-    values(column_values)
+SortedListComparator::SortedListComparator(ColumnBase& column_values)
+    : values(column_values)
 {
 }
 
@@ -971,8 +971,7 @@ void StringIndex::verify() const
     if (m_array->is_inner_bptree_node()) {
         for (size_t i = 1; i < array_size; ++i) {
             size_t ref = m_array->get_as_ref(i);
-            StringIndex ndx(ref, nullptr, 0, m_target_column,
-                            m_deny_duplicate_values, alloc);
+            StringIndex ndx(ref, nullptr, 0, m_target_column, m_deny_duplicate_values, alloc);
             ndx.verify();
         }
     }
@@ -990,8 +989,7 @@ void StringIndex::verify() const
                 // A real ref either points to a list or a subindex
                 char* header = alloc.translate(to_ref(ref));
                 if (Array::get_context_flag_from_header(header)) {
-                    StringIndex ndx(to_ref(ref), m_array.get(), i, m_target_column,
-                                    m_deny_duplicate_values, alloc);
+                    StringIndex ndx(to_ref(ref), m_array.get(), i, m_target_column, m_deny_duplicate_values, alloc);
                     ndx.verify();
                 }
                 else {

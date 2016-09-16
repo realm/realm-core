@@ -193,7 +193,7 @@ enum FindRes {
 enum IndexMethod {
     index_FindFirst,
     index_FindAll,
-    index_Count
+    index_Count,
 };
 
 

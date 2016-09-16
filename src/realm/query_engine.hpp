@@ -1201,8 +1201,9 @@ public:
 
         if (m_condition_column->has_search_index()) {
 
-            m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
-            m_index_matches->get_root_array()->create(Array::type_Normal); // Throws
+            m_index_matches.reset(
+                new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
+            m_index_matches->get_root_array()->create(Array::type_Normal);                          // Throws
 
 
             if (m_column_type == col_type_StringEnum) {

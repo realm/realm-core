@@ -1018,7 +1018,7 @@ TEST_TYPES(StringIndex_Zero_Crash2, std::true_type, std::false_type)
 
     constexpr bool add_common_prefix = TEST_TYPE::value;
 
-    for (size_t iter = 0; iter < 10 + TEST_DURATION * 100 ; iter++) {
+    for (size_t iter = 0; iter < 10 + TEST_DURATION * 100; iter++) {
         // StringIndex could crash if strings ended with one or more 0-bytes
         Table table;
         table.add_column(type_String, "", true);
@@ -1035,11 +1035,13 @@ TEST_TYPES(StringIndex_Zero_Crash2, std::true_type, std::false_type)
                 // Generate string with equal probability of being empty, null, short, medium and long, and with
                 // their contents having equal proability of being either random or a duplicate of a previous
                 // string. When it's random, each char must have equal probability of being 0 or non-0e
-                static std::string buf = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+                static std::string buf =
+                    "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
 
                 std::string copy = buf;
 
-                static std::string buf2 = "                                                                                         ";
+                static std::string buf2 =
+                    "                                                                                         ";
                 std::string copy2 = buf2;
                 StringData sd;
 
@@ -1067,9 +1069,9 @@ TEST_TYPES(StringIndex_Zero_Crash2, std::true_type, std::false_type)
                     // random string
                     for (size_t t = 0; t < len; t++) {
                         if (random.draw_int_max<int>(100) > 20)
-                            copy2[t] = 0;                        // zero byte
+                            copy2[t] = 0; // zero byte
                         else
-                            copy2[t] = static_cast<char>(random.draw_int<int>());  // random byte
+                            copy2[t] = static_cast<char>(random.draw_int<int>()); // random byte
                     }
                     // no generated string can equal "null" (our vector magic value for null) because
                     // len == 4 is not possible
@@ -1379,7 +1381,9 @@ TEST(StringIndex_MaxBytes)
         col.clear();
     };
 
-    std::vector<size_t> num_duplicates_list = { 1, 10, REALM_MAX_BPNODE_SIZE - 1, REALM_MAX_BPNODE_SIZE, REALM_MAX_BPNODE_SIZE + 1 };
+    std::vector<size_t> num_duplicates_list = {
+        1, 10, REALM_MAX_BPNODE_SIZE - 1, REALM_MAX_BPNODE_SIZE, REALM_MAX_BPNODE_SIZE + 1,
+    };
     for (auto& dups : num_duplicates_list) {
         duplicate_check(dups, under_max);
         duplicate_check(dups, max);
@@ -1394,7 +1398,8 @@ TEST(StringIndex_MaxBytes)
 // for the characters at the end (they have an identical very
 // long prefix). This was causing a stack overflow because of
 // the recursive nature of the insert function.
-TEST(StringIndex_InsertLongPrefix) {
+TEST(StringIndex_InsertLongPrefix)
+{
     ref_type ref = StringColumn::create(Allocator::get_default());
     StringColumn col(Allocator::get_default(), ref, true);
 
