@@ -2861,6 +2861,9 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
 {
     size_t found_ndx = col.find_first(value);
 
+    if (found_ndx == ndx) {
+        found_ndx = col.find_first(value, found_ndx + 1); // Special-case when `value` is 0/null.
+    }
     if (found_ndx == not_found) {
         return ndx;
     }
