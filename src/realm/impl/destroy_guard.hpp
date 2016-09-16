@@ -30,7 +30,7 @@ namespace _impl {
 /// when the guard is destroyed. For arrays (`T` = `Array`) this means
 /// that the array is destroyed in a shallow fashion. See
 /// `DeepArrayDestroyGuard` for an alternative.
-template<class T>
+template <class T>
 class DestroyGuard {
 public:
     DestroyGuard() noexcept;
@@ -95,33 +95,30 @@ private:
 };
 
 
-
-
-
 // Implementation:
 
 // DestroyGuard<T>
 
-template<class T>
-inline DestroyGuard<T>::DestroyGuard() noexcept:
-    m_ptr(nullptr)
+template <class T>
+inline DestroyGuard<T>::DestroyGuard() noexcept
+    : m_ptr(nullptr)
 {
 }
 
-template<class T>
-inline DestroyGuard<T>::DestroyGuard(T* ptr) noexcept:
-    m_ptr(ptr)
+template <class T>
+inline DestroyGuard<T>::DestroyGuard(T* ptr) noexcept
+    : m_ptr(ptr)
 {
 }
 
-template<class T>
+template <class T>
 inline DestroyGuard<T>::~DestroyGuard() noexcept
 {
     if (m_ptr)
         m_ptr->destroy();
 }
 
-template<class T>
+template <class T>
 inline void DestroyGuard<T>::reset(T* ptr) noexcept
 {
     if (m_ptr)
@@ -129,13 +126,13 @@ inline void DestroyGuard<T>::reset(T* ptr) noexcept
     m_ptr = ptr;
 }
 
-template<class T>
+template <class T>
 inline T* DestroyGuard<T>::get() const noexcept
 {
     return m_ptr;
 }
 
-template<class T>
+template <class T>
 inline T* DestroyGuard<T>::release() noexcept
 {
     T* ptr = m_ptr;
@@ -146,13 +143,13 @@ inline T* DestroyGuard<T>::release() noexcept
 
 // DeepArrayDestroyGuard
 
-inline DeepArrayDestroyGuard::DeepArrayDestroyGuard() noexcept:
-    m_ptr(nullptr)
+inline DeepArrayDestroyGuard::DeepArrayDestroyGuard() noexcept
+    : m_ptr(nullptr)
 {
 }
 
-inline DeepArrayDestroyGuard::DeepArrayDestroyGuard(Array* ptr) noexcept:
-    m_ptr(ptr)
+inline DeepArrayDestroyGuard::DeepArrayDestroyGuard(Array* ptr) noexcept
+    : m_ptr(ptr)
 {
 }
 
@@ -184,16 +181,15 @@ inline Array* DeepArrayDestroyGuard::release() noexcept
 
 // DeepArrayRefDestroyGuard
 
-inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(Allocator& alloc) noexcept:
-    m_ref(0),
-    m_alloc(alloc)
+inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(Allocator& alloc) noexcept
+    : m_ref(0)
+    , m_alloc(alloc)
 {
 }
 
-inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(ref_type ref,
-                                                          Allocator& alloc) noexcept:
-    m_ref(ref),
-    m_alloc(alloc)
+inline DeepArrayRefDestroyGuard::DeepArrayRefDestroyGuard(ref_type ref, Allocator& alloc) noexcept
+    : m_ref(ref)
+    , m_alloc(alloc)
 {
 }
 

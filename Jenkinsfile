@@ -90,7 +90,7 @@ try {
 
 def doBuildCocoa() {
   return {
-    node('osx') {
+    node('osx_vegas') {
       getArchive()
 
       try {
@@ -145,7 +145,7 @@ def doBuildCocoa() {
 
 def doBuildDotNetOsx() {
   return {
-    node('osx') {
+    node('osx_vegas') {
       getArchive()
 
       try {
@@ -295,7 +295,7 @@ def doBuildNodeInDocker() {
 
 def doBuildNodeInOsx() {
   return {
-    node('osx') {
+    node('osx_vegas') {
       getArchive()
 
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
@@ -494,11 +494,13 @@ def get_version() {
   }
 }
 
+@NonCPS
 def getDeviceNames(String commandOutput) {
   def deviceNames = []
-  for (line in commandOutput.split('\n')) {
-    if (line.contains('\t')) {
-      deviceNames << line.split('\t')[0].trim()
+  def lines = commandOutput.split('\n')
+  for (i = 0; i < lines.size(); ++i) {
+    if (lines[i].contains('\t')) {
+      deviceNames << lines[i].split('\t')[0].trim()
     }
   }
   return deviceNames

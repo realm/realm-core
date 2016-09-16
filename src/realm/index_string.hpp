@@ -70,9 +70,11 @@ class Timestamp;
 class StringIndex {
 public:
     StringIndex(ColumnBase* target_column, Allocator&);
-    StringIndex(ref_type, ArrayParent*, size_t ndx_in_parent, ColumnBase* target_column,
-                bool allow_duplicate_values, Allocator&);
-    ~StringIndex() noexcept {}
+    StringIndex(ref_type, ArrayParent*, size_t ndx_in_parent, ColumnBase* target_column, bool allow_duplicate_values,
+                Allocator&);
+    ~StringIndex() noexcept
+    {
+    }
     void set_target(ColumnBase* target_column) noexcept;
 
     // Accessor concept:
@@ -89,31 +91,32 @@ public:
 
     // StringIndex interface:
 
-    static const size_t string_conversion_buffer_size = 12; // 12 is the biggest element size of any non-string/binary Realm type
+    // 12 is the biggest element size of any non-string/binary Realm type
+    static const size_t string_conversion_buffer_size = 12;
     using StringConversionBuffer = std::array<char, string_conversion_buffer_size>;
 
     bool is_empty() const;
 
-    template<class T>
+    template <class T>
     void insert(size_t row_ndx, T value, size_t num_rows, bool is_append);
-    template<class T>
+    template <class T>
     void insert(size_t row_ndx, util::Optional<T> value, size_t num_rows, bool is_append);
 
-    template<class T>
+    template <class T>
     void set(size_t row_ndx, T new_value);
-    template<class T>
+    template <class T>
     void set(size_t row_ndx, util::Optional<T> new_value);
 
-    template<class T>
+    template <class T>
     void erase(size_t row_ndx, bool is_last);
 
-    template<class T>
+    template <class T>
     size_t find_first(T value) const;
-    template<class T>
+    template <class T>
     void find_all(IntegerColumn& result, T value) const;
     template<class T>
     size_t count(T value) const;
-    template<class T>
+    template <class T>
     void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx);
 
     void clear();
@@ -147,7 +150,6 @@ public:
     static key_type create_key(StringData, size_t) noexcept;
 
 private:
-
     // m_array is a compact representation for storing the children of this StringIndex.
     // Children can be:
     // 1) a row number
@@ -171,7 +173,8 @@ private:
     ColumnBase* m_target_column;
     bool m_deny_duplicate_values;
 
-    struct inner_node_tag {};
+    struct inner_node_tag {
+    };
     StringIndex(inner_node_tag, Allocator&);
 
     static Array* create_node(Allocator&, bool is_leaf);
@@ -191,8 +194,18 @@ private:
         size_t ref1;
         size_t ref2;
         enum ChangeType { none, insert_before, insert_after, split } type;
-        NodeChange(ChangeType t, size_t r1 = 0, size_t r2 = 0) : ref1(r1), ref2(r2), type(t) {}
-        NodeChange() : ref1(0), ref2(0), type(none) {}
+        NodeChange(ChangeType t, size_t r1 = 0, size_t r2 = 0)
+            : ref1(r1)
+            , ref2(r2)
+            , type(t)
+        {
+        }
+        NodeChange()
+            : ref1(0)
+            , ref2(0)
+            , type(none)
+        {
+        }
     };
 
     // B-Tree functions
@@ -231,9 +244,11 @@ private:
 
 // Implementation:
 
-template<class T> struct GetIndexData;
+template <class T>
+struct GetIndexData;
 
-template<> struct GetIndexData<int64_t> {
+template <>
+struct GetIndexData<int64_t> {
     static StringData get_index_data(const int64_t& value, StringIndex::StringConversionBuffer& buffer)
     {
         const char* c = reinterpret_cast<const char*>(&value);
@@ -242,25 +257,29 @@ template<> struct GetIndexData<int64_t> {
     }
 };
 
-template<> struct GetIndexData<StringData> {
+template <>
+struct GetIndexData<StringData> {
     static StringData get_index_data(StringData data, StringIndex::StringConversionBuffer&)
     {
         return data;
     }
 };
 
-template<> struct GetIndexData<null> {
+template <>
+struct GetIndexData<null> {
     static StringData get_index_data(null, StringIndex::StringConversionBuffer&)
     {
         return null{};
     }
 };
 
-template<> struct GetIndexData<Timestamp> {
+template <>
+struct GetIndexData<Timestamp> {
     static StringData get_index_data(const Timestamp&, StringIndex::StringConversionBuffer&);
 };
 
-template<class T> struct GetIndexData<util::Optional<T>> {
+template <class T>
+struct GetIndexData<util::Optional<T>> {
     static StringData get_index_data(const util::Optional<T>& value, StringIndex::StringConversionBuffer& buffer)
     {
         if (value)
@@ -269,55 +288,58 @@ template<class T> struct GetIndexData<util::Optional<T>> {
     }
 };
 
-template<> struct GetIndexData<float> {
+template <>
+struct GetIndexData<float> {
     static StringData get_index_data(float, StringIndex::StringConversionBuffer&)
     {
         REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
     }
 };
 
-template<> struct GetIndexData<double> {
+template <>
+struct GetIndexData<double> {
     static StringData get_index_data(double, StringIndex::StringConversionBuffer&)
     {
         REALM_ASSERT_RELEASE(false); // LCOV_EXCL_LINE; Index on float not supported
     }
 };
 
-template<> struct GetIndexData<const char*>: GetIndexData<StringData> {};
+template <>
+struct GetIndexData<const char*> : GetIndexData<StringData> {
+};
 
 // to_str() is used by the integer index. The existing StringIndex is re-used for this
 // by making IntegerColumn convert its integers to strings by calling to_str().
 
-template<class T>
+template <class T>
 inline StringData to_str(T&& value, StringIndex::StringConversionBuffer& buffer)
 {
     return GetIndexData<typename std::remove_reference<T>::type>::get_index_data(value, buffer);
 }
 
 
-inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc):
-    m_array(create_node(alloc, true)), // Throws
-    m_target_column(target_column),
-    m_deny_duplicate_values(false)
+inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc)
+    : m_array(create_node(alloc, true)) // Throws
+    , m_target_column(target_column)
+    , m_deny_duplicate_values(false)
 {
 }
 
-inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
-                                ColumnBase* target_column,
-                                bool deny_duplicate_values, Allocator& alloc):
-    m_array(new Array(alloc)),
-    m_target_column(target_column),
-    m_deny_duplicate_values(deny_duplicate_values)
+inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, ColumnBase* target_column,
+                                bool deny_duplicate_values, Allocator& alloc)
+    : m_array(new Array(alloc))
+    , m_target_column(target_column)
+    , m_deny_duplicate_values(deny_duplicate_values)
 {
     REALM_ASSERT_EX(Array::get_context_flag_from_header(alloc.translate(ref)), ref, size_t(alloc.translate(ref)));
     m_array->init_from_ref(ref);
     set_parent(parent, ndx_in_parent);
 }
 
-inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc):
-    m_array(create_node(alloc, false)), // Throws
-    m_target_column(nullptr),
-    m_deny_duplicate_values(false)
+inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc)
+    : m_array(create_node(alloc, false)) // Throws
+    , m_target_column(nullptr)
+    , m_deny_duplicate_values(false)
 {
 }
 
@@ -335,21 +357,24 @@ inline StringIndex::key_type StringIndex::create_key(StringData str) noexcept
 {
     key_type key = 0;
 
-    if (str.size() >= 4) goto four;
+    if (str.size() >= 4)
+        goto four;
     if (str.size() < 2) {
-        if (str.size() == 0) goto none;
+        if (str.size() == 0)
+            goto none;
         goto one;
     }
-    if (str.size() == 2) goto two;
+    if (str.size() == 2)
+        goto two;
     goto three;
 
-    // Create 4 byte index key
-    // (encoded like this to allow literal comparisons
-    // independently of endianness)
+// Create 4 byte index key
+// (encoded like this to allow literal comparisons
+// independently of endianness)
 four:
-    key |= (key_type(static_cast<unsigned char>(str[3])) <<  0);
+    key |= (key_type(static_cast<unsigned char>(str[3])) << 0);
 three:
-    key |= (key_type(static_cast<unsigned char>(str[2])) <<  8);
+    key |= (key_type(static_cast<unsigned char>(str[2])) << 8);
 two:
     key |= (key_type(static_cast<unsigned char>(str[1])) << 16);
 one:
@@ -381,7 +406,7 @@ inline StringIndex::key_type StringIndex::create_key(StringData str, size_t offs
     return create_key(str.substr(offset));
 }
 
-template<class T>
+template <class T>
 void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_append)
 {
     REALM_ASSERT_3(row_ndx, !=, npos);
@@ -399,12 +424,12 @@ void StringIndex::insert(size_t row_ndx, T value, size_t num_rows, bool is_appen
 
     for (size_t i = 0; i < num_rows; ++i) {
         size_t row_ndx_2 = row_ndx + i;
-        size_t offset = 0; // First key from beginning of string
+        size_t offset = 0;                                            // First key from beginning of string
         insert_with_offset(row_ndx_2, to_str(value, buffer), offset); // Throws
     }
 }
 
-template<class T>
+template <class T>
 void StringIndex::insert(size_t row_ndx, util::Optional<T> value, size_t num_rows, bool is_append)
 {
     if (value) {
@@ -415,7 +440,7 @@ void StringIndex::insert(size_t row_ndx, util::Optional<T> value, size_t num_row
     }
 }
 
-template<class T>
+template <class T>
 void StringIndex::set(size_t row_ndx, T new_value)
 {
     StringConversionBuffer buffer;
@@ -436,7 +461,7 @@ void StringIndex::set(size_t row_ndx, T new_value)
     }
 }
 
-template<class T>
+template <class T>
 void StringIndex::set(size_t row_ndx, util::Optional<T> new_value)
 {
     if (new_value) {
@@ -447,7 +472,7 @@ void StringIndex::set(size_t row_ndx, util::Optional<T> new_value)
     }
 }
 
-template<class T>
+template <class T>
 void StringIndex::erase(size_t row_ndx, bool is_last)
 {
     StringConversionBuffer buffer;
@@ -473,7 +498,7 @@ void StringIndex::erase(size_t row_ndx, bool is_last)
         adjust_row_indexes(row_ndx, -1);
 }
 
-template<class T>
+template <class T>
 size_t StringIndex::find_first(T value) const
 {
     // Use direct access method
@@ -481,7 +506,7 @@ size_t StringIndex::find_first(T value) const
     return m_array->index_string_find_first(to_str(value, buffer), m_target_column);
 }
 
-template<class T>
+template <class T>
 void StringIndex::find_all(IntegerColumn& result, T value) const
 {
     // Use direct access method
@@ -497,61 +522,53 @@ size_t StringIndex::count(T value) const
     return m_array->index_string_count(to_str(value, buffer), m_target_column);
 }
 
-template<class T>
+template <class T>
 void StringIndex::update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
 {
     StringConversionBuffer buffer;
     do_update_ref(to_str(value, buffer), old_row_ndx, new_row_ndx, 0);
 }
 
-inline
-void StringIndex::destroy() noexcept
+inline void StringIndex::destroy() noexcept
 {
     return m_array->destroy_deep();
 }
 
-inline
-bool StringIndex::is_attached() const noexcept
+inline bool StringIndex::is_attached() const noexcept
 {
     return m_array->is_attached();
 }
 
-inline
-void StringIndex::refresh_accessor_tree(size_t, const Spec&)
+inline void StringIndex::refresh_accessor_tree(size_t, const Spec&)
 {
     m_array->init_from_parent();
 }
 
-inline
-ref_type StringIndex::get_ref() const noexcept
+inline ref_type StringIndex::get_ref() const noexcept
 {
     return m_array->get_ref();
 }
 
-inline
-void StringIndex::set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
+inline void StringIndex::set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
 {
     m_array->set_parent(parent, ndx_in_parent);
 }
 
-inline
-size_t StringIndex::get_ndx_in_parent() const noexcept
+inline size_t StringIndex::get_ndx_in_parent() const noexcept
 {
     return m_array->get_ndx_in_parent();
 }
 
-inline
-void StringIndex::set_ndx_in_parent(size_t ndx_in_parent) noexcept
+inline void StringIndex::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 {
     m_array->set_ndx_in_parent(ndx_in_parent);
 }
 
-inline
-void StringIndex::update_from_parent(size_t old_baseline) noexcept
+inline void StringIndex::update_from_parent(size_t old_baseline) noexcept
 {
     m_array->update_from_parent(old_baseline);
 }
 
-} //namespace realm
+} // namespace realm
 
 #endif // REALM_INDEX_STRING_HPP

@@ -27,7 +27,7 @@
 #include <functional>
 
 #ifdef _MSC_VER
-    #include <intrin.h>
+#include <intrin.h>
 #endif
 
 #include <realm/util/features.h>
@@ -35,26 +35,30 @@
 #include <realm/util/safe_int_ops.hpp>
 
 // GCC defines __i386__ and __x86_64__
-#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) || defined(__x86_64__) || defined(_M_X64))
-    #define REALM_X86_OR_X64
-    #define REALM_X86_OR_X64_TRUE true
+#if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) ||               \
+     defined(__x86_64__) || defined(_M_X64))
+#define REALM_X86_OR_X64
+#define REALM_X86_OR_X64_TRUE true
 #else
-    #define REALM_X86_OR_X64_TRUE false
+#define REALM_X86_OR_X64_TRUE false
 #endif
 
 // GCC defines __arm__
 #ifdef __arm__
-    #define REALM_ARCH_ARM
+#define REALM_ARCH_ARM
 #endif
 
-#if defined _LP64 || defined __LP64__ || defined __64BIT__ || defined _ADDR64 || defined _WIN64 || defined __arch64__ || (defined(__WORDSIZE) && __WORDSIZE == 64) || (defined __sparc && defined __sparcv9) || defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 || defined __ia64 || defined __IA64__
-    #define REALM_PTR_64
+#if defined _LP64 || defined __LP64__ || defined __64BIT__ || defined _ADDR64 || defined _WIN64 ||                   \
+    defined __arch64__ || (defined(__WORDSIZE) && __WORDSIZE == 64) || (defined __sparc && defined __sparcv9) ||     \
+    defined __x86_64 || defined __amd64 || defined __x86_64__ || defined _M_X64 || defined _M_IA64 ||                \
+    defined __ia64 || defined __IA64__
+#define REALM_PTR_64
 #endif
 
 
 #if defined(REALM_PTR_64) && defined(REALM_X86_OR_X64)
-    #define REALM_COMPILER_SSE  // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
-    #define REALM_COMPILER_AVX
+#define REALM_COMPILER_SSE // Compiler supports SSE 4.2 through __builtin_ accessors or back-end assembler
+#define REALM_COMPILER_AVX
 #endif
 
 namespace realm {
@@ -64,7 +68,7 @@ using StringCompareCallback = std::function<bool(const char* string1, const char
 extern signed char sse_support;
 extern signed char avx_support;
 
-template<int version>
+template <int version>
 REALM_FORCEINLINE bool sseavx()
 {
     /*
@@ -92,8 +96,8 @@ REALM_FORCEINLINE bool sseavx()
     if (version == 30)
         return (sse_support >= 0);
     else if (version == 42)
-        return (sse_support > 0);   // faster than == 1 (0 requres no immediate operand)
-    else if (version == 1) // avx
+        return (sse_support > 0); // faster than == 1 (0 requres no immediate operand)
+    else if (version == 1)        // avx
         return (avx_support >= 0);
     else if (version == 2) // avx2
         return (avx_support > 0);
@@ -111,7 +115,7 @@ size_t round_down(size_t p, size_t align);
 void millisleep(size_t milliseconds);
 
 #ifdef REALM_SLAB_ALLOC_TUNE
-    void process_mem_usage(double& vm_usage, double& resident_set);
+void process_mem_usage(double& vm_usage, double& resident_set);
 #endif
 // popcount
 int fast_popcount32(int32_t x);
@@ -124,18 +128,18 @@ inline int log2(size_t x)
     if (x == 0)
         return -1;
 #if defined(__GNUC__)
-#   ifdef REALM_PTR_64
+#ifdef REALM_PTR_64
     return 63 - __builtin_clzll(x); // returns int
-#   else
+#else
     return 31 - __builtin_clz(x); // returns int
-#   endif
+#endif
 #elif defined(_WIN32)
     unsigned long index = 0;
-#   ifdef REALM_PTR_64
+#ifdef REALM_PTR_64
     unsigned char c = _BitScanReverse64(&index, x); // outputs unsigned long
-#   else
+#else
     unsigned char c = _BitScanReverse(&index, x); // outputs unsigned long
-#   endif
+#endif
     return static_cast<int>(index);
 #else // not __GNUC__ and not _WIN32
     int r = 0;
@@ -148,7 +152,8 @@ inline int log2(size_t x)
 
 // Implementation:
 
-// Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and REF-bitflag.
+// Safe cast from 64 to 32 bits on 32 bit architecture. Differs from to_ref() by not testing alignment and
+// REF-bitflag.
 inline size_t to_size_t(int_fast64_t v) noexcept
 {
     REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<size_t>(v));
@@ -156,7 +161,7 @@ inline size_t to_size_t(int_fast64_t v) noexcept
 }
 
 
-template<typename ReturnType, typename OriginalType>
+template <typename ReturnType, typename OriginalType>
 ReturnType type_punning(OriginalType variable) noexcept
 {
     union Both {
@@ -194,18 +199,21 @@ enum IndexMethod {
 
 // realm::is_any<T, U1, U2, U3, ...> ==
 // std::is_same<T, U1>::value || std::is_same<T, U2>::value || std::is_same<T, U3>::value ...
-template<typename... T>
-struct is_any : std::false_type { };
+template <typename... T>
+struct is_any : std::false_type {
+};
 
-template<typename T, typename... Ts>
-struct is_any<T, T, Ts...> : std::true_type { };
+template <typename T, typename... Ts>
+struct is_any<T, T, Ts...> : std::true_type {
+};
 
-template<typename T, typename U, typename... Ts>
-struct is_any<T, U, Ts...> : is_any<T, Ts...> { };
+template <typename T, typename U, typename... Ts>
+struct is_any<T, U, Ts...> : is_any<T, Ts...> {
+};
 
 
 // Use safe_equal() instead of std::equal() when comparing sequences which can have a 0 elements.
-template<class InputIterator1, class InputIterator2>
+template <class InputIterator1, class InputIterator2>
 bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 first2)
 {
 #if defined(_MSC_VER) && defined(_DEBUG)
@@ -221,10 +229,17 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
 }
 
 
-template<class T>
+template <class T>
 struct Wrap {
-    Wrap(const T& v): m_value(v) {}
-    operator T() const { return m_value; }
+    Wrap(const T& v)
+        : m_value(v)
+    {
+    }
+    operator T() const
+    {
+        return m_value;
+    }
+
 private:
     T m_value;
 };
@@ -232,7 +247,7 @@ private:
 // PlacementDelete is intended for use with std::unique_ptr when it holds an object allocated with
 // placement new. It simply calls the object's destructor without freeing the memory.
 struct PlacementDelete {
-    template<class T>
+    template <class T>
     void operator()(T* v) const
     {
         v->~T();
@@ -242,4 +257,3 @@ struct PlacementDelete {
 } // namespace realm
 
 #endif // REALM_UTILITIES_HPP
-

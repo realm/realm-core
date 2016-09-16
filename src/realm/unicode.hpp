@@ -73,8 +73,8 @@ extern string_compare_method_t string_compare_method;
 //
 // Default is method = 0 if the function is never called
 //
-// NOT THREAD SAFE! Call once during initialization or make sure it's not called simultaneously with different arguments
-// The setting is remembered per-process; it does NOT need to be called prior to each sort
+// NOT THREAD SAFE! Call once during initialization or make sure it's not called simultaneously with different
+// arguments. The setting is remembered per-process; it does NOT need to be called prior to each sort
 bool set_string_compare_method(string_compare_method_t method, StringCompareCallback callback);
 
 
@@ -148,8 +148,7 @@ bool equal_case_fold(StringData haystack, const char* needle_upper, const char* 
 /// Assumes that the sizes of \a needle_upper and \a needle_lower are
 /// both equal to \a needle_size. Returns haystack.size() if the
 /// needle was not found.
-size_t search_case_fold(StringData haystack, const char* needle_upper,
-                        const char* needle_lower, size_t needle_size);
+size_t search_case_fold(StringData haystack, const char* needle_upper, const char* needle_lower, size_t needle_size);
 
 } // namespace realm
 

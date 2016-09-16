@@ -34,15 +34,16 @@ class LinkColumn;
 class LinkListColumn;
 
 // Templated classes
-template<class T>
+template <class T>
 class Column;
-template<class T>
+template <class T>
 class BasicColumn;
 template <class T>
 class ColumnRandIterator;
 
 namespace util {
-template <class> class Optional;
+template <class>
+class Optional;
 }
 
 // Shortcuts, aka typedefs.

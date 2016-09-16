@@ -86,18 +86,18 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     // Create table with all column types
     {
         DescriptorRef sub1;
-        table.add_column(type_Int, "int");              //  0
-        table.add_column(type_Bool, "bool");             //  1
-        table.add_column(type_OldDateTime, "date");             //  2
-        table.add_column(type_Float, "float");            //  3
+        table.add_column(type_Int, "int");                 //  0
+        table.add_column(type_Bool, "bool");               //  1
+        table.add_column(type_OldDateTime, "date");        //  2
+        table.add_column(type_Float, "float");             //  3
         table.add_column(type_Double, "double");           //  4
         table.add_column(type_String, "string");           //  5
         table.add_column(type_String, "string_long");      //  6
         table.add_column(type_String, "string_big_blobs"); //  7
         table.add_column(type_String, "string_enum");      //  8 - becomes StringEnumColumn
         table.add_column(type_Binary, "binary");           //  9
-        table.add_column(type_Table, "tables", &sub1);    // 10
-        table.add_column(type_Mixed, "mixed");            // 11
+        table.add_column(type_Table, "tables", &sub1);     // 10
+        table.add_column(type_Mixed, "mixed");             // 11
         sub1->add_column(type_Int, "sub_first");
         sub1->add_column(type_String, "sub_second");
     }
@@ -446,7 +446,6 @@ TEST(Json_LinkListCycle)
     ss.str("");
     table1->to_json(ss, 3);
     CHECK(json_test(ss.str(), "expected_json_linklist_cycle6", generate_all));
-
 }
 
 TEST(Json_LinkCycles)

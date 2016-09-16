@@ -78,18 +78,8 @@ const char s6[] = "Johnny";
 const char s7[] = "Sam";
 
 // integers used by integer index tests
-const int64_t ints[] = {
-    0x1111,
-    0x11112222,
-    0x11113333,
-    0x1111333,
-    0x111122223333ull,
-    0x1111222233334ull,
-    0x22223333,
-    0x11112227,
-    0x11112227,
-    0x78923
-};
+const int64_t ints[] = {0x1111,     0x11112222, 0x11113333, 0x1111333, 0x111122223333ull, 0x1111222233334ull,
+                        0x22223333, 0x11112227, 0x11112227, 0x78923};
 
 struct nullable {
     static constexpr bool value = true;
@@ -457,7 +447,7 @@ TEST_TYPES(StringIndex_Insert, non_nullable, nullable)
     CHECK_EQUAL(2, col.find_first(s2));
     CHECK_EQUAL(3, col.find_first(s3));
     CHECK_EQUAL(4, col.find_first(s4));
-    //CHECK_EQUAL(5, ndx.find_first(s1)); // duplicate
+    // CHECK_EQUAL(5, ndx.find_first(s1)); // duplicate
 
     // Append item in end of column
     col.insert(6, s6);
@@ -909,7 +899,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
     const StringIndex& ndx = *col.create_search_index();
 
     const size_t MAX_LENGTH = 16; // Test medium
-    char tmp[MAX_LENGTH]; // this is a bit of a hack, that relies on the string being copied in column.add()
+    char tmp[MAX_LENGTH];         // this is a bit of a hack, that relies on the string being copied in column.add()
 
     for (size_t length = 1; length <= MAX_LENGTH; ++length) {
 
@@ -1038,7 +1028,7 @@ TEST_TYPES(StringIndex_Zero_Crash2, std::true_type, std::false_type)
         for (size_t i = 0; i < 100 + TEST_DURATION * 1000; i++) {
             unsigned char action = static_cast<unsigned char>(random.draw_int_max<unsigned int>(100));
             if (action == 0) {
-//                table.remove_search_index(0);
+                //                table.remove_search_index(0);
                 table.add_search_index(0);
             }
             else if (action > 48 && table.size() < 10) {
@@ -1147,7 +1137,6 @@ TEST(StringIndex_Integer_Increasing)
         }
 
         CHECK_EQUAL(c, ref_count);
-
     }
 }
 

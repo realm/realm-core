@@ -1,22 +1,8 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
+# 2.0.0-rc6 Release notes
 
 ### Enhancements
 
 * Added debian packages for Ubuntu 16.04.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 

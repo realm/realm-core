@@ -42,7 +42,6 @@ int64_t to_int64(size_t value) noexcept;
 
 class MemRef {
 public:
-
     MemRef() noexcept;
     ~MemRef() noexcept;
 
@@ -93,8 +92,7 @@ public:
     ///
     /// Note: The underscore has been added because the name `realloc`
     /// would conflict with a macro on the Windows platform.
-    MemRef realloc_(ref_type, const char* addr, size_t old_size,
-                    size_t new_size);
+    MemRef realloc_(ref_type, const char* addr, size_t old_size, size_t new_size);
 
     /// Calls do_free().
     ///
@@ -131,7 +129,10 @@ public:
     /// ref is freed (or reallocated), and even to get a stacktrace at
     /// the point where it happens. Call watch(0) to stop watching
     /// that ref.
-    void watch(ref_type ref) { m_debug_watch = ref; }
+    void watch(ref_type ref)
+    {
+        m_debug_watch = ref;
+    }
 #endif
 
     Replication* get_replication() noexcept;
@@ -229,8 +230,7 @@ protected:
     /// the old chunk.
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef do_realloc(ref_type, const char* addr, size_t old_size,
-                              size_t new_size) = 0;
+    virtual MemRef do_realloc(ref_type, const char* addr, size_t old_size, size_t new_size) = 0;
 
     /// Release the specified chunk of memory.
     virtual void do_free(ref_type, const char* addr) noexcept = 0;
@@ -288,7 +288,6 @@ inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) no
 }
 
 
-
 // Implementation:
 
 inline int_fast64_t from_ref(ref_type v) noexcept
@@ -314,9 +313,9 @@ inline int64_t to_int64(size_t value) noexcept
 }
 
 
-inline MemRef::MemRef() noexcept:
-    m_addr(nullptr),
-    m_ref(0)
+inline MemRef::MemRef() noexcept
+    : m_addr(nullptr)
+    , m_ref(0)
 {
 }
 
@@ -324,9 +323,9 @@ inline MemRef::~MemRef() noexcept
 {
 }
 
-inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept:
-    m_addr(addr),
-    m_ref(ref)
+inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept
+    : m_addr(addr)
+    , m_ref(ref)
 {
     static_cast<void>(alloc);
 #if REALM_ENABLE_MEMDEBUG
@@ -334,9 +333,9 @@ inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept:
 #endif
 }
 
-inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept:
-    m_addr(alloc.translate(ref)),
-    m_ref(ref)
+inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept
+    : m_addr(alloc.translate(ref))
+    , m_ref(ref)
 {
     static_cast<void>(alloc);
 #if REALM_ENABLE_MEMDEBUG
@@ -381,8 +380,7 @@ inline MemRef Allocator::alloc(size_t size)
     return do_alloc(size);
 }
 
-inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_size,
-                                  size_t new_size)
+inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_size, size_t new_size)
 {
 #ifdef REALM_DEBUG
     if (ref == m_debug_watch)

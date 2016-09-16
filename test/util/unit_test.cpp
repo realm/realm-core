@@ -40,9 +40,7 @@ using namespace realm::test_util;
 using namespace realm::test_util::unit_test;
 
 
-
 // FIXME: Write quoted strings with escaped nonprintables
-
 
 
 namespace {
@@ -57,19 +55,19 @@ void replace_char(std::string& str, char c, const std::string& replacement)
 std::string xml_escape(const std::string& value)
 {
     std::string value_2 = value;
-    replace_char(value_2, '&',  "&amp;");
-    replace_char(value_2, '<',  "&lt;");
-    replace_char(value_2, '>',  "&gt;");
+    replace_char(value_2, '&', "&amp;");
+    replace_char(value_2, '<', "&lt;");
+    replace_char(value_2, '>', "&gt;");
     replace_char(value_2, '\'', "&apos;");
     replace_char(value_2, '\"', "&quot;");
     return value_2;
 }
 
 
-class XmlReporter: public Reporter {
+class XmlReporter : public Reporter {
 public:
-    XmlReporter(std::ostream& out):
-        m_out(out)
+    XmlReporter(std::ostream& out)
+        : m_out(out)
     {
     }
 
@@ -87,9 +85,9 @@ public:
               const std::string& message) override
     {
         failure f;
-        f.file_name   = file_name;
+        f.file_name = file_name;
         f.line_number = line_number;
-        f.message     = message;
+        f.message = message;
         auto key = key_type(context.test_index, context.recurrence_index);
         auto i = m_tests.find(key);
         i->second.failures.push_back(f);
@@ -104,20 +102,24 @@ public:
 
     void summary(const SharedContext& context, const Summary& results_summary) override
     {
-        m_out <<
-              "<?xml version=\"1.0\"?>\n"
-              "<unittest-results "
-              "tests=\"" << results_summary.num_executed_tests << "\" "
-              "failedtests=\"" << results_summary.num_failed_tests << "\" "
-              "checks=\"" << results_summary.num_executed_checks << "\" "
-              "failures=\"" << results_summary.num_failed_checks << "\" "
-              "time=\"" << results_summary.elapsed_seconds << "\">\n";
+        m_out << "<?xml version=\"1.0\"?>\n"
+                 "<unittest-results "
+                 "tests=\""
+              << results_summary.num_executed_tests << "\" "
+                                                       "failedtests=\""
+              << results_summary.num_failed_tests << "\" "
+                                                     "checks=\""
+              << results_summary.num_executed_checks << "\" "
+                                                        "failures=\""
+              << results_summary.num_failed_checks << "\" "
+                                                      "time=\""
+              << results_summary.elapsed_seconds << "\">\n";
         std::ostringstream out;
         out.imbue(std::locale::classic());
         for (const auto& p : m_tests) {
             auto key = p.first;
             const test& t = p.second;
-            size_t test_index    = key.first;
+            size_t test_index = key.first;
             int recurrence_index = key.second;
             const TestDetails details = context.test_list.get_test_details(test_index);
             out.str(std::string());
@@ -125,10 +127,11 @@ public:
             if (context.num_recurrences > 1)
                 out << '#' << (recurrence_index + 1);
             std::string test_name = out.str();
-            m_out <<
-                  "  <test suite=\"" << xml_escape(details.suite_name) << "\" "
-                  "name=\"" << xml_escape(test_name) << "\" "
-                  "time=\"" << t.elapsed_seconds << "\"";
+            m_out << "  <test suite=\"" << xml_escape(details.suite_name) << "\" "
+                                                                             "name=\""
+                  << xml_escape(test_name) << "\" "
+                                              "time=\""
+                  << t.elapsed_seconds << "\"";
             if (t.failures.empty()) {
                 m_out << "/>\n";
                 continue;
@@ -139,12 +142,12 @@ public:
             for (fail_iter i_2 = t.failures.begin(); i_2 != fails_end; ++i_2) {
                 std::string msg = xml_escape(i_2->message);
                 m_out << "    <failure message=\"" << i_2->file_name << ""
-                      "(" << i_2->line_number << ") : " << msg << "\"/>\n";
+                                                                        "("
+                      << i_2->line_number << ") : " << msg << "\"/>\n";
             }
             m_out << "  </test>\n";
         }
-        m_out <<
-              "</unittest-results>\n";
+        m_out << "</unittest-results>\n";
     }
 
 protected:
@@ -166,7 +169,7 @@ protected:
 };
 
 
-class WildcardFilter: public Filter {
+class WildcardFilter : public Filter {
 public:
     WildcardFilter(const std::string& filter)
     {
@@ -218,7 +221,7 @@ public:
     bool include(const TestDetails& details) override
     {
         const char* name_begin = details.test_name.data();
-        const char* name_end   = name_begin + details.test_name.size();
+        const char* name_end = name_begin + details.test_name.size();
         typedef patterns::const_iterator iter;
 
         // Say "no" if it matches an exclude pattern
@@ -249,13 +252,13 @@ private:
 };
 
 
-class IntraTestLogger: private Logger::LevelThreshold, public util::Logger {
+class IntraTestLogger : private Logger::LevelThreshold, public util::Logger {
 public:
-    IntraTestLogger(util::Logger& base_logger, Level threshold):
-        util::Logger::LevelThreshold(),
-        util::Logger(static_cast<util::Logger::LevelThreshold&>(*this)),
-        m_base_logger(base_logger),
-        m_level_threshold(threshold)
+    IntraTestLogger(util::Logger& base_logger, Level threshold)
+        : util::Logger::LevelThreshold()
+        , util::Logger(static_cast<util::Logger::LevelThreshold&>(*this))
+        , m_base_logger(base_logger)
+        , m_level_threshold(threshold)
     {
     }
 
@@ -278,13 +281,12 @@ private:
 } // anonymous namespace
 
 
-
 namespace realm {
 namespace test_util {
 namespace unit_test {
 
 
-class TestList::SharedContextImpl: public SharedContext {
+class TestList::SharedContextImpl : public SharedContext {
 public:
     Reporter& reporter;
     const bool abort_on_failure;
@@ -303,20 +305,18 @@ public:
     int num_ended_threads = 0;
     int last_thread_to_end = -1;
 
-    SharedContextImpl(const TestList& tests, int repetitions, int threads,
-                      util::Logger& l, Reporter& r, bool aof,
-                      util::Logger::Level itll):
-        SharedContext(tests, repetitions, threads, l),
-        reporter(r),
-        abort_on_failure(aof),
-        intra_test_log_level(itll)
+    SharedContextImpl(const TestList& tests, int repetitions, int threads, util::Logger& l, Reporter& r, bool aof,
+                      util::Logger::Level itll)
+        : SharedContext(tests, repetitions, threads, l)
+        , reporter(r)
+        , abort_on_failure(aof)
+        , intra_test_log_level(itll)
     {
     }
 };
 
 
-
-class TestList::ThreadContextImpl: public ThreadContext {
+class TestList::ThreadContextImpl : public ThreadContext {
 public:
     IntraTestLogger intra_test_logger;
     SharedContextImpl& shared_context;
@@ -326,10 +326,10 @@ public:
     long num_failed_tests;
     bool errors_seen;
 
-    ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* attached_logger):
-        ThreadContext(sc, ti, attached_logger ? * attached_logger : sc.report_logger),
-        intra_test_logger(ThreadContext::report_logger, sc.intra_test_log_level),
-        shared_context(sc)
+    ThreadContextImpl(SharedContextImpl& sc, int ti, util::Logger* attached_logger)
+        : ThreadContext(sc, ti, attached_logger ? *attached_logger : sc.report_logger)
+        , intra_test_logger(ThreadContext::report_logger, sc.intra_test_log_level)
+        , shared_context(sc)
     {
     }
 
@@ -349,19 +349,19 @@ private:
 };
 
 
-void TestList::add(RunFunc run_func, IsEnabledFunc is_enabled_func, bool allow_concur,
-                   const char* suite, const std::string& name, const char* file, long line)
+void TestList::add(RunFunc run_func, IsEnabledFunc is_enabled_func, bool allow_concur, const char* suite,
+                   const std::string& name, const char* file, long line)
 {
     Test test;
-    test.run_func        = run_func;
+    test.run_func = run_func;
     test.is_enabled_func = is_enabled_func;
-    test.allow_concur    = allow_concur;
-    test.details.suite_name  = suite;
-    test.details.test_name   = name;
-    test.details.file_name   = file;
+    test.allow_concur = allow_concur;
+    test.details.suite_name = suite;
+    test.details.test_name = name;
+    test.details.file_name = file;
     test.details.line_number = line;
     m_tests.reserve(m_tests.size() + 1); // Throws
-    m_test_storage.push_back(test); // Throws
+    m_test_storage.push_back(test);      // Throws
     m_tests.push_back(&m_test_storage.back());
 }
 
@@ -433,13 +433,12 @@ bool TestList::run(Config config)
     }
 
     // Execute
-    SharedContextImpl shared_context(*this, config.num_repetitions, num_threads, shared_logger,
-                                     reporter, config.abort_on_failure,
-                                     config.intra_test_log_level);
-    shared_context.concur_tests    = std::move(concur_tests);
+    SharedContextImpl shared_context(*this, config.num_repetitions, num_threads, shared_logger, reporter,
+                                     config.abort_on_failure, config.intra_test_log_level);
+    shared_context.concur_tests = std::move(concur_tests);
     shared_context.no_concur_tests = std::move(no_concur_tests);
     std::unique_ptr<std::unique_ptr<util::Logger>[]> loggers;
-    loggers.reset(new std::unique_ptr<util::Logger>[num_threads]);
+    loggers.reset(new std::unique_ptr<util::Logger>[ num_threads ]);
     if (num_threads != 1 || !config.per_thread_log_path.empty()) {
         std::unique_ptr<util::Logger> logger;
         std::ostringstream formatter;
@@ -477,7 +476,7 @@ bool TestList::run(Config config)
     }
     else {
         std::unique_ptr<std::unique_ptr<ThreadContextImpl>[]> thread_contexts;
-        thread_contexts.reset(new std::unique_ptr<ThreadContextImpl>[num_threads]);
+        thread_contexts.reset(new std::unique_ptr<ThreadContextImpl>[ num_threads ]);
         for (int i = 0; i < num_threads; ++i)
             thread_contexts[i].reset(new ThreadContextImpl(shared_context, i, loggers[i].get()));
 
@@ -506,14 +505,14 @@ bool TestList::run(Config config)
 
     // Summarize
     Summary results_summary;
-    results_summary.num_disabled_tests  = long(num_disabled);
-    results_summary.num_excluded_tests  = long(num_enabled - included_tests.size());
-    results_summary.num_included_tests  = long(included_tests.size());
-    results_summary.num_executed_tests  = long(num_executed_tests);
-    results_summary.num_failed_tests    = shared_context.num_failed_tests;
+    results_summary.num_disabled_tests = long(num_disabled);
+    results_summary.num_excluded_tests = long(num_enabled - included_tests.size());
+    results_summary.num_included_tests = long(included_tests.size());
+    results_summary.num_executed_tests = long(num_executed_tests);
+    results_summary.num_failed_tests = shared_context.num_failed_tests;
     results_summary.num_executed_checks = shared_context.num_checks;
-    results_summary.num_failed_checks   = shared_context.num_failed_checks;
-    results_summary.elapsed_seconds     = timer.get_elapsed_time();
+    results_summary.num_failed_checks = shared_context.num_failed_checks;
+    results_summary.elapsed_seconds = timer.get_elapsed_time();
     reporter.summary(shared_context, results_summary);
 
     return shared_context.num_failed_tests == 0;
@@ -597,8 +596,8 @@ void TestList::ThreadContextImpl::run(SharedContextImpl::Entry entry, UniqueLock
 
 void TestList::ThreadContextImpl::finalize(UniqueLock&)
 {
-    shared_context.num_failed_tests  += num_failed_tests;
-    shared_context.num_checks        += num_checks;
+    shared_context.num_failed_tests += num_failed_tests;
+    shared_context.num_checks += num_checks;
     shared_context.num_failed_checks += num_failed_checks;
 
     shared_context.reporter.thread_end(*this);
@@ -612,13 +611,13 @@ TestList& get_default_test_list()
 }
 
 
-TestContext::TestContext(TestList::ThreadContextImpl& tc, const TestDetails& td, size_t ti, int ri):
-    thread_context(tc),
-    test_details(td),
-    test_index(ti),
-    recurrence_index(ri),
-    logger(tc.intra_test_logger),
-    m_thread_context(tc)
+TestContext::TestContext(TestList::ThreadContextImpl& tc, const TestDetails& td, size_t ti, int ri)
+    : thread_context(tc)
+    , test_details(td)
+    , test_index(ti)
+    , recurrence_index(ri)
+    , logger(tc.intra_test_logger)
+    , m_thread_context(tc)
 {
 }
 
@@ -632,9 +631,8 @@ void TestContext::check_succeeded()
 REALM_NORETURN void TestContext::abort()
 {
     const SharedContext& context = thread_context.shared_context;
-    const char* format = context.num_threads == 1 ?
-                         "Aborting due to failure" :
-                         "Aborting due to failure in test thread %1";
+    const char* format =
+        context.num_threads == 1 ? "Aborting due to failure" : "Aborting due to failure in test thread %1";
     context.report_logger.info(format, m_thread_context.thread_index + 1);
     ::abort();
 }
@@ -674,38 +672,36 @@ void TestContext::test_failed(const std::string& message)
 }
 
 
-void TestContext::cond_failed(const char* file, long line, const char* macro_name,
-                              const char* cond_text)
+void TestContext::cond_failed(const char* file, long line, const char* macro_name, const char* cond_text)
 {
     std::string msg = std::string(macro_name) + "(" + cond_text + ") failed";
     check_failed(file, line, msg);
 }
 
 
-void TestContext::compare_failed(const char* file, long line, const char* macro_name,
-                                 const char* a_text, const char* b_text,
-                                 const std::string& a_val, const std::string& b_val)
+void TestContext::compare_failed(const char* file, long line, const char* macro_name, const char* a_text,
+                                 const char* b_text, const std::string& a_val, const std::string& b_val)
 {
-    std::string msg = std::string(macro_name) + "(" + a_text + ", " + b_text + ") failed with (" + a_val + ", " + b_val + ")";
+    std::string msg =
+        std::string(macro_name) + "(" + a_text + ", " + b_text + ") failed with (" + a_val + ", " + b_val + ")";
     check_failed(file, line, msg);
 }
 
 
-void TestContext::inexact_compare_failed(const char* file, long line, const char* macro_name,
-                                         const char* a_text, const char* b_text,
-                                         const char* eps_text, long double a, long double b,
+void TestContext::inexact_compare_failed(const char* file, long line, const char* macro_name, const char* a_text,
+                                         const char* b_text, const char* eps_text, long double a, long double b,
                                          long double eps)
 {
     std::ostringstream out;
     out.precision(std::numeric_limits<long double>::digits10 + 1);
     out << macro_name << "(" << a_text << ", " << b_text << ", " << eps_text << ") "
-        "failed with (" << a << ", " << b << ", " << eps << ")";
+                                                                                "failed with ("
+        << a << ", " << b << ", " << eps << ")";
     check_failed(file, line, out.str());
 }
 
 
-void TestContext::throw_failed(const char* file, long line, const char* expr_text,
-                               const char* exception_name)
+void TestContext::throw_failed(const char* file, long line, const char* expr_text, const char* exception_name)
 {
     std::ostringstream out;
     out << "CHECK_THROW(" << expr_text << ", " << exception_name << ") failed: Did not throw";
@@ -713,22 +709,22 @@ void TestContext::throw_failed(const char* file, long line, const char* expr_tex
 }
 
 
-void TestContext::throw_ex_failed(const char* file, long line, const char* expr_text,
-                                  const char* exception_name, const char* exception_cond_text)
+void TestContext::throw_ex_failed(const char* file, long line, const char* expr_text, const char* exception_name,
+                                  const char* exception_cond_text)
 {
     std::ostringstream out;
-    out << "CHECK_THROW_EX(" << expr_text << ", " << exception_name << ", " <<
-        exception_cond_text << ") failed: Did not throw";
+    out << "CHECK_THROW_EX(" << expr_text << ", " << exception_name << ", " << exception_cond_text
+        << ") failed: Did not throw";
     check_failed(file, line, out.str());
 }
 
 
-void TestContext::throw_ex_cond_failed(const char* file, long line, const char* expr_text,
-                                       const char* exception_name, const char* exception_cond_text)
+void TestContext::throw_ex_cond_failed(const char* file, long line, const char* expr_text, const char* exception_name,
+                                       const char* exception_cond_text)
 {
     std::ostringstream out;
-    out << "CHECK_THROW_EX(" << expr_text << ", " << exception_name << ", " <<
-        exception_cond_text << ") failed: Did throw, but condition failed";
+    out << "CHECK_THROW_EX(" << expr_text << ", " << exception_name << ", " << exception_cond_text
+        << ") failed: Did throw, but condition failed";
     check_failed(file, line, out.str());
 }
 
@@ -766,7 +762,7 @@ void Reporter::summary(const SharedContext&, const Summary&)
 }
 
 
-class PatternBasedFileOrder::state: public RefCountBase {
+class PatternBasedFileOrder::state : public RefCountBase {
 public:
     typedef std::map<const void*, int> major_map; // Key is address of TestDetails object
     major_map m_major_map;
@@ -810,8 +806,8 @@ bool PatternBasedFileOrder::operator()(const TestDetails& a, const TestDetails& 
     return i < 0;
 }
 
-PatternBasedFileOrder::wrap::wrap(const char** patterns_begin, const char** patterns_end):
-    m_state(new state(patterns_begin, patterns_end))
+PatternBasedFileOrder::wrap::wrap(const char** patterns_begin, const char** patterns_end)
+    : m_state(new state(patterns_begin, patterns_end))
 {
 }
 
@@ -819,8 +815,8 @@ PatternBasedFileOrder::wrap::~wrap()
 {
 }
 
-PatternBasedFileOrder::wrap::wrap(const wrap& w):
-    m_state(w.m_state)
+PatternBasedFileOrder::wrap::wrap(const wrap& w)
+    : m_state(w.m_state)
 {
 }
 
@@ -843,11 +839,9 @@ void SimpleReporter::begin(const TestContext& context)
 
     const TestDetails& details = context.test_details;
     util::Logger& logger = context.thread_context.report_logger;
-    auto format = context.thread_context.shared_context.num_recurrences == 1 ?
-                  "%1:%2: Begin %3" :
-                  "%1:%2: Begin %3#%4";
-    logger.info(format, details.file_name, details.line_number, details.test_name,
-                context.recurrence_index + 1);
+    auto format =
+        context.thread_context.shared_context.num_recurrences == 1 ? "%1:%2: Begin %3" : "%1:%2: Begin %3#%4";
+    logger.info(format, details.file_name, details.line_number, details.test_name, context.recurrence_index + 1);
 }
 
 void SimpleReporter::fail(const TestContext& context, const char* file_name, long line_number,
@@ -855,11 +849,9 @@ void SimpleReporter::fail(const TestContext& context, const char* file_name, lon
 {
     const TestDetails& details = context.test_details;
     util::Logger& logger = context.thread_context.report_logger;
-    auto format = context.thread_context.shared_context.num_recurrences == 1 ?
-                  "%1:%2: ERROR in %3: %5" :
-                  "%1:%2: ERROR in %3#%4: %5";
-    logger.info(format, file_name, line_number, details.test_name, context.recurrence_index + 1,
-                message);
+    auto format = context.thread_context.shared_context.num_recurrences == 1 ? "%1:%2: ERROR in %3: %5"
+                                                                             : "%1:%2: ERROR in %3#%4: %5";
+    logger.info(format, file_name, line_number, details.test_name, context.recurrence_index + 1, message);
 }
 
 void SimpleReporter::thread_end(const ThreadContext& context)
@@ -882,14 +874,13 @@ void SimpleReporter::summary(const SharedContext& context, const Summary& result
     }
     else {
         logger.info("FAILURE: %1 out of %2 tests failed (%3 out of %4 checks failed).",
-                    results_summary.num_failed_tests,  results_summary.num_executed_tests,
+                    results_summary.num_failed_tests, results_summary.num_executed_tests,
                     results_summary.num_failed_checks, results_summary.num_executed_checks);
     }
     logger.info("Test time: %1", Timer::format(results_summary.elapsed_seconds));
     if (results_summary.num_excluded_tests >= 1) {
-        auto format = results_summary.num_excluded_tests == 1 ?
-                      "Note: One test was excluded!" :
-                      "Note: %1 tests were excluded!";
+        auto format = results_summary.num_excluded_tests == 1 ? "Note: One test was excluded!"
+                                                              : "Note: %1 tests were excluded!";
         logger.info(format, results_summary.num_excluded_tests);
     }
 }
