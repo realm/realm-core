@@ -36,7 +36,7 @@ fi
 echo "Building core"
 
 cd ../../
-REALM_ENABLE_ENCRYPTION=yes sh build.sh config
+REALM_MAX_BPNODE_SIZE_DEBUG=4 REALM_ENABLE_ENCRYPTION=yes sh build.sh config
 CXX="$compiler" REALM_HAVE_CONFIG=yes make -j check-debug-norun "$flags"
 
 echo "Building fuzz target"
