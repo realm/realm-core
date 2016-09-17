@@ -346,7 +346,7 @@ namespace realm {
                 row_index = table->add_empty_row();
                 created = true;
                 Object object(realm, object_schema, table->get(row_index));
-                object.set_property_value_impl(ctx, primary_prop, primary_value, try_update);
+                object.set_property_value_impl(ctx, *primary_prop, primary_value, try_update);
             }
             else if (!try_update) {
                 throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value.", object_schema.name));
