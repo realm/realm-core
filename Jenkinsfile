@@ -337,6 +337,7 @@ def doBuildAndroid() {
               sh "sh build.sh config '${pwd()}/install'"
               sh "sh build.sh ${target}"
             }
+            archive 'realm-core-android-*.tar.gz'
 
             dir('test/android') {
                 sh '$ANDROID_HOME/tools/android update project -p . --target android-9'
