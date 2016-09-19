@@ -119,6 +119,8 @@ private:
     void advance_state(const State&);
 
     void create_sync_session();
+    // Destroy a sync session by removing it from the Sync Manager's "dying sessions" map.
+    // PRECONDITION: session is ready to be destroyed and deallocated immediately.
     void unregister();
 
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;

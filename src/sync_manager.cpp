@@ -75,6 +75,19 @@ SyncLoginFunction& SyncManager::get_sync_login_function()
     return m_login_function;
 }
 
+void SyncManager::set_client_should_reconnect_immediately(bool reconnect_immediately)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    using Reconnect = sync::Client::Reconnect;
+    m_client_reconnect_mode = reconnect_immediately ? Reconnect::immediately : Reconnect::normal;
+}
+
+void SyncManager::set_client_should_validate_ssl(bool validate_ssl)
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_client_validate_ssl = validate_ssl;
+}
+
 std::shared_ptr<SyncSession> SyncManager::get_existing_active_session(const std::string& path) const
 {
     std::lock_guard<std::mutex> lock(m_session_mutex);
@@ -175,5 +188,8 @@ std::shared_ptr<SyncClient> SyncManager::create_sync_client() const
         stderr_logger->set_level_threshold(m_log_level);
         logger = std::move(stderr_logger);
     }
-    return std::make_shared<SyncClient>(std::move(logger), std::move(m_error_handler));
+    return std::make_shared<SyncClient>(std::move(logger),
+                                        std::move(m_error_handler),
+                                        m_client_reconnect_mode,
+                                        m_client_validate_ssl);
 }

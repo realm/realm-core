@@ -60,6 +60,11 @@ public:
     void set_error_handler(std::function<sync::Client::ErrorHandler>);
     void set_login_function(SyncLoginFunction);
 
+    /// Control whether the sync client attempts to reconnect immediately. Only set this to `true` for testing purposes.
+    void set_client_should_reconnect_immediately(bool reconnect_immediately);
+    /// Control whether the sync client validates SSL certificates. Should *always* be `true` in production use.
+    void set_client_should_validate_ssl(bool validate_ssl);
+
     std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 
@@ -68,7 +73,8 @@ public:
 private:
     void dropped_last_reference_to_session(SyncSession*);
 
-    // Immediately remove the session with the given path from the session map.
+    // Immediately remove the session with the given path from the dying sessions map.
+    // PRECONDITION: session must have already been moved from the active sessions map to the dying sessions map.
     // For use by SyncSession only.
     void unregister_session(const std::string& path);
 
@@ -90,6 +96,8 @@ private:
     util::Logger::Level m_log_level = util::Logger::Level::info;
     SyncLoggerFactory* m_logger_factory = nullptr;
     std::function<sync::Client::ErrorHandler> m_error_handler;
+    sync::Client::Reconnect m_client_reconnect_mode = sync::Client::Reconnect::normal;
+    bool m_client_validate_ssl = true;
 
     mutable std::shared_ptr<_impl::SyncClient> m_sync_client;
 
