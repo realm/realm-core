@@ -91,6 +91,7 @@ public:
     size_t count(StringData value) const;
     size_t find_first(StringData value, size_t begin = 0, size_t end = npos) const;
     void find_all(IntegerColumn& res, StringData value, size_t begin = 0, size_t end = npos) const;
+    FindRes find_all_no_copy(StringData value, FindAllNoCopyResult& result) const;
 
     size_t count(size_t key_index) const;
     size_t find_first(size_t key_index, size_t begin = 0, size_t end = -1) const;

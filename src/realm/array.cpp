@@ -2799,7 +2799,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 namespace realm {
 
 template <>
-size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result, ref_type& result_ref,
+size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result, FindAllNoCopyResult& result_ref,
                                          const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result);
@@ -2824,7 +2824,7 @@ size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result
 }
 
 template <>
-size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, ref_type& result_ref,
+size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, FindAllNoCopyResult& result_ref,
                                      const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result);
@@ -2852,7 +2852,7 @@ size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, re
 }
 
 template <>
-size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, ref_type& result_ref,
+size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, FindAllNoCopyResult& result_ref,
                                        const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result_ref);
@@ -2883,10 +2883,62 @@ size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, 
     return size_t(FindRes_column);
 }
 
+template<>
+size_t Array::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& result,
+                                              FindAllNoCopyResult& result_ref,
+                                              const IntegerColumn& rows, ColumnBase* column) const
+{
+    static_cast<void>(result);
+
+    SortedListComparator slc(*column);
+    IntegerColumn::const_iterator it_end = rows.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    if (lower == it_end)
+        return size_t(FindRes_not_found);
+
+    const size_t first_row_ref = to_size_t(*lower);
+
+    // The buffer is needed when for when this is an integer index.
+    StringIndex::StringConversionBuffer buffer;
+    StringData str = column->get_index_data(first_row_ref, buffer);
+    if (str != value)
+        return size_t(FindRes_not_found);
+
+    // Optimization: check the last entry before trying upper bound.
+    IntegerColumn::const_iterator upper = it_end;
+    --upper;
+    // Single result if upper matches lower
+    if (upper.get_col_ndx() == lower.get_col_ndx()) {
+        result_ref.result = *lower;
+        return size_t(FindRes_single);
+    }
+
+    // Check string value at upper, if equal return matches in (lower, upper]
+    const size_t last_row_ref = to_size_t(*upper);
+    str = column->get_index_data(last_row_ref, buffer);
+    if (str == value) {
+        result_ref.result = rows.get_ref();
+        result_ref.start_ndx = lower.get_col_ndx();
+        result_ref.end_ndx = upper.get_col_ndx() + 1; // one past last match
+        return size_t(FindRes_column);
+    }
+
+    // Last result is not equal, find the upper bound of the range of results.
+    // Note that we are passing upper which is cend() - 1 here as we already
+    // checked the last item manually.
+    upper = std::upper_bound(lower, upper, value, slc);
+
+    result_ref.result = to_ref(rows.get_ref());
+    result_ref.start_ndx = lower.get_col_ndx();
+    result_ref.end_ndx = upper.get_col_ndx();
+    return size_t(FindRes_column);
+}
+
 } // namespace realm
 
 template <IndexMethod method, class T>
-size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const
+size_t Array::index_string(StringData value, IntegerColumn& result,
+                           FindAllNoCopyResult& result_ref, ColumnBase* column) const
 {
     // Return`realm::not_found`, or an index to the (any) match
     bool first(method == index_FindFirst);
@@ -2894,11 +2946,17 @@ size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& re
     bool get_count(method == index_Count);
     // Place all row indexes containing `value` into `result`
     // Returns one of FindRes_not_found[==0] if no matches found
-    // Returns FindRes_single, if one match found: the result row literal is both
-    // placed in `result_ref` and added to `column`
-    // Returns FindRes_column, if more than one match found: the matching row literals
-    // are copied into `column`
+    // Returns FindRes_single, if one match found: the result row literal is
+    // both placed in `result_ref` and added to `column`
+    // Returns FindRes_column, if more than one match found: the matching row
+    // literals are copied into `column`
     bool all(method == index_FindAll);
+    // Same as `index_FindAll` but does not copy matching rows into `column`
+    // returns FindRes_not_found if there are no matches
+    // returns FindRes_single and the row index (literal) in result_ref.result
+    // or returns FindRes_column and the reference to a column of duplicates in
+    // result_ref.result with the results in the bounds start_ndx, and end_ndx
+    bool allnocopy(method == index_FindAll_nocopy);
 
     const char* data = m_data;
     const char* header;
@@ -2923,7 +2981,7 @@ size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& re
 
         // If key is outside range, we know there can be no match
         if (pos == offsets_size)
-            return first ? not_found : 0;
+            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
 
         // Get entry under key
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -2941,7 +2999,7 @@ size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& re
         key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
         if (stored_key != key) // keys don't match so return not found (0 implies FindRes_not_found if `all==true`)
-            return first ? not_found : 0;
+            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
 
         // Literal row index (tagged)
         if (ref & 1) {
@@ -2951,13 +3009,13 @@ size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& re
             StringIndex::StringConversionBuffer buffer;
             StringData str = column->get_index_data(row_ref, buffer);
             if (str == value) {
-                result_ref = row_ref;
+                result_ref.result = row_ref;
                 if (all)
                     result.add(row_ref);
 
                 return first ? row_ref : get_count ? 1 : FindRes_single;
             }
-            return first ? not_found : 0;
+            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
         }
 
         const char* sub_header = m_alloc.translate(to_ref(ref));
@@ -2987,7 +3045,7 @@ size_t Array::index_string(StringData value, IntegerColumn& result, ref_type& re
 
 size_t Array::index_string_find_first(StringData value, ColumnBase* column) const
 {
-    size_t dummy;
+    FindAllNoCopyResult dummy;
     IntegerColumn dummycol;
     return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column);
 }
@@ -2995,17 +3053,21 @@ size_t Array::index_string_find_first(StringData value, ColumnBase* column) cons
 
 void Array::index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const
 {
-    size_t dummy;
-
+    FindAllNoCopyResult dummy;
     index_string<index_FindAll, StringData>(value, result, dummy, column);
 }
 
+FindRes Array::index_string_find_all_no_copy(StringData value, ColumnBase* column, FindAllNoCopyResult& result) const
+{
+    IntegerColumn dummy;
+    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, result, column));
+}
 
 size_t Array::index_string_count(StringData value, ColumnBase* column) const
 {
-    IntegerColumn dummy;
-    size_t dummysizet;
-    return index_string<index_Count, StringData>(value, dummy, dummysizet, column);
+    IntegerColumn dummy1;
+    FindAllNoCopyResult dummy2;
+    return index_string<index_Count, StringData>(value, dummy1, dummy2, column);
 }
 
 
