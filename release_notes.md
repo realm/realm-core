@@ -6,7 +6,13 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Changed the format of the StringIndex structure to not recursivly store
+  strings past a certain depth. This fixes crashes when storing strings
+  with a long common prefix in an index. This is a file format breaking change.
+  The file format has been incremented and old Realm files must upgrade.
+  The upgrade will rebuild any StringIndexes to the new format automatically
+  so other than the upgrade, this change should be effectivly invisible to
+  the bindings. (see #2153)
 
 ### Enhancements
 
@@ -67,8 +73,6 @@
 
 ### Breaking changes
 
-* Changed the format of the StringIndex structure to not recursivly store
-  strings past a certain depth. This is a file format breaking change.
 * Refactored the `SharedGroup` constructors and open methods to use a new
   `SharedGroupOptions` parameter which stores all options together.
 * BREAKING! Until now, a Query would return indexes into a restricting view if such was 
