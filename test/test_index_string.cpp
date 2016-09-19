@@ -293,53 +293,56 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
     col.create_search_index();
 
     {
-        ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn matches(Allocator::get_default(), int_col_ref);
-        col.find_all(matches, s1);
-        CHECK(!matches.is_empty());
-        if (matches.is_empty())
+        size_t index_ref;
+        FindRes fr = col.find_all_indexref(s1, index_ref);
+        CHECK_EQUAL(fr, FindRes_column);
+        if (fr != FindRes_column)
             return;
+
+        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
+        matches.get_root_array()->init_from_ref(index_ref);
 
         CHECK_EQUAL(3, matches.size());
         CHECK_EQUAL(0, matches.get(0));
         CHECK_EQUAL(4, matches.get(1));
         CHECK_EQUAL(5, matches.get(2));
-        matches.destroy();
     }
 
     // Remove a non-s1 row and change the order of the s1 rows
     col.move_last_over(1);
 
     {
-        ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn matches(Allocator::get_default(), int_col_ref);
-        col.find_all(matches, s1);
-        CHECK(!matches.is_empty());
-        if (matches.is_empty())
+        size_t index_ref;
+        FindRes fr = col.find_all_indexref(s1, index_ref);
+        CHECK_EQUAL(fr, FindRes_column);
+        if (fr != FindRes_column)
             return;
+
+        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
+        matches.get_root_array()->init_from_ref(index_ref);
 
         CHECK_EQUAL(3, matches.size());
         CHECK_EQUAL(0, matches.get(0));
         CHECK_EQUAL(1, matches.get(1));
         CHECK_EQUAL(4, matches.get(2));
-        matches.destroy();
     }
 
     // Move a s1 row over a s1 row
     col.move_last_over(1);
 
     {
-        ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn matches(Allocator::get_default(), int_col_ref);
-        col.find_all(matches, s1);
-        CHECK(!matches.is_empty());
-        if (matches.is_empty())
+        size_t index_ref;
+        FindRes fr = col.find_all_indexref(s1, index_ref);
+        CHECK_EQUAL(fr, FindRes_column);
+        if (fr != FindRes_column)
             return;
+
+        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
+        matches.get_root_array()->init_from_ref(index_ref);
 
         CHECK_EQUAL(2, matches.size());
         CHECK_EQUAL(0, matches.get(0));
         CHECK_EQUAL(1, matches.get(1));
-        matches.destroy();
     }
 
     col.destroy();
@@ -602,7 +605,7 @@ TEST_TYPES(StringIndex_Distinct, non_nullable, nullable)
     col.destroy();
 }
 
-TEST_TYPES(StringIndex_FindAllCopy, non_nullable, nullable)
+TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
@@ -624,31 +627,31 @@ TEST_TYPES(StringIndex_FindAllCopy, non_nullable, nullable)
     // Create a new index on column
     StringIndex& ndx = *col.create_search_index();
 
-    ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn matches(Allocator::get_default(), int_col_ref);
+    size_t ref_2 = not_found;
+    FindRes res1 = ndx.find_all(StringData("not there"), ref_2);
+    CHECK_EQUAL(FindRes_not_found, res1);
 
-    ndx.find_all(matches, StringData("not there"));
-    CHECK(matches.is_empty());
+    FindRes res2 = ndx.find_all(s1, ref_2);
+    CHECK_EQUAL(FindRes_single, res2);
+    CHECK_EQUAL(0, ref_2);
 
-    ndx.find_all(matches, s1);
-    CHECK_EQUAL(matches.size(), 1);
-    CHECK_EQUAL(0, matches.get(0));
-    matches.clear();
-
-    ndx.find_all(matches, s4);
-    CHECK_EQUAL(4, matches.size());
-    CHECK_EQUAL(6, matches.get(0));
-    CHECK_EQUAL(7, matches.get(1));
-    CHECK_EQUAL(8, matches.get(2));
-    CHECK_EQUAL(9, matches.get(3));
+    FindRes res3 = ndx.find_all(s4, ref_2);
+    CHECK_EQUAL(FindRes_column, res3);
+    const IntegerColumn results(Allocator::get_default(), ref_type(ref_2));
+    CHECK_EQUAL(4, results.size());
+    CHECK_EQUAL(6, results.get(0));
+    CHECK_EQUAL(7, results.get(1));
+    CHECK_EQUAL(8, results.get(2));
+    CHECK_EQUAL(9, results.get(3));
 
     // Clean up
-    matches.destroy();
     col.destroy();
 }
 
-
-TEST(StringIndex_FindAllCopy2_Int)
+// If a column contains a specific value in multiple rows, then the index will store a list of these row numbers
+// in form of a column. If you call find_all() on an index, it will return a *reference* to that column instead
+// of copying it to you, as a performance optimization.
+TEST(StringIndex_FindAllNoCopy2_Int)
 {
     // Create a column with duplcate values
     ref_type ref = IntegerColumn::create(Allocator::get_default());
@@ -660,30 +663,38 @@ TEST(StringIndex_FindAllCopy2_Int)
     // Create a new index on column
     col.create_search_index();
     StringIndex& ndx = *col.get_search_index();
+    size_t results = not_found;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
-        ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn matches(Allocator::get_default(), int_col_ref);
-        ndx.find_all(matches, ints[t]);
+        FindRes res = ndx.find_all(ints[t], results);
 
         size_t real = 0;
         for (size_t y = 0; y < sizeof(ints) / sizeof(ints[0]); y++) {
             if (ints[t] == ints[y])
                 real++;
         }
-        CHECK_EQUAL(real, matches.size());
-        for (size_t y = 0; y < real; y++)
-            CHECK_EQUAL(ints[t], ints[matches.get(y)]);
 
-        matches.destroy();
+        if (real == 1) {
+            CHECK_EQUAL(res, FindRes_single);
+            CHECK_EQUAL(ints[t], ints[results]);
+        }
+        else if (real > 1) {
+            CHECK_EQUAL(FindRes_column, res);
+            const IntegerColumn results2(Allocator::get_default(), ref_type(results));
+            CHECK_EQUAL(real, results2.size());
+            for (size_t y = 0; y < real; y++)
+                CHECK_EQUAL(ints[t], ints[results2.get(y)]);
+        }
     }
 
     // Clean up
     col.destroy();
 }
 
-
-TEST(StringIndex_FindAllCopy2_IntNull)
+// If a column contains a specific value in multiple rows, then the index will store a list of these row numbers
+// in form of a column. If you call find_all() on an index, it will return a *reference* to that column instead
+// of copying it to you, as a performance optimization.
+TEST(StringIndex_FindAllNoCopy2_IntNull)
 {
     // Create a column with duplcate values
     ref_type ref = IntNullColumn::create(Allocator::get_default());
@@ -696,31 +707,33 @@ TEST(StringIndex_FindAllCopy2_IntNull)
     // Create a new index on column
     col.create_search_index();
     StringIndex& ndx = *col.get_search_index();
+    size_t results = not_found;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
-        ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn matches(Allocator::get_default(), int_col_ref);
-        ndx.find_all(matches, ints[t]);
+        FindRes res = ndx.find_all(ints[t], results);
 
         size_t real = 0;
         for (size_t y = 0; y < sizeof(ints) / sizeof(ints[0]); y++) {
             if (ints[t] == ints[y])
                 real++;
         }
-        CHECK_EQUAL(real, matches.size());
-        for (size_t y = 0; y < real; y++)
-            CHECK_EQUAL(ints[t], ints[matches.get(y)]);
 
-        matches.destroy();
+        if (real == 1) {
+            CHECK_EQUAL(res, FindRes_single);
+            CHECK_EQUAL(ints[t], ints[results]);
+        }
+        else if (real > 1) {
+            CHECK_EQUAL(FindRes_column, res);
+            const IntegerColumn results2(Allocator::get_default(), ref_type(results));
+            CHECK_EQUAL(real, results2.size());
+            for (size_t y = 0; y < real; y++)
+                CHECK_EQUAL(ints[t], ints[results2.get(y)]);
+        }
     }
 
-    ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn matches(Allocator::get_default(), int_col_ref);
-
-    ndx.find_all(matches, null{});
-    CHECK_EQUAL(1, matches.size());
-    CHECK_EQUAL(matches.get(0), col.size() - 1);
-    matches.destroy();
+    FindRes res = ndx.find_all(null{}, results);
+    CHECK_EQUAL(FindRes_single, res);
+    CHECK_EQUAL(results, col.size() - 1);
 
     // Clean up
     col.destroy();
