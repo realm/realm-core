@@ -335,6 +335,7 @@ def doBuildAndroid() {
               sh "sh build.sh config '${pwd()}/install'"
               sh "sh build.sh ${target}"
             }
+            archive 'realm-core-android-*.tar.gz'
 
             dir('test/android') {
                 sh '$ANDROID_HOME/tools/android update project -p . --target android-9'
@@ -494,9 +495,10 @@ def get_version() {
 
 def getDeviceNames(String commandOutput) {
   def deviceNames = []
-  for (line in commandOutput.split('\n')) {
-    if (line.contains('\t')) {
-      deviceNames << line.split('\t')[0].trim()
+  def lines = commandOutput.split('\n')
+  for (i = 0; i < lines.size(); ++i) {
+    if (lines[i].contains('\t')) {
+      deviceNames << lines[i].split('\t')[0].trim()
     }
   }
   return deviceNames

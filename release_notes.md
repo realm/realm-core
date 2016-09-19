@@ -14,6 +14,8 @@
   or OldDateTime. Caused by bad static `get_size_from_ref()` methods of columns. (#2101)
 * Fixed a bug with link columns incorrectly updating on a `move_last_over`
   operation when the link points to the same table.
+* Fixed a race in the handover machinery which could cause crashes following handover
+  of a Query or a TableView. (#2117)
 
 ### Breaking changes
 
@@ -44,7 +46,9 @@
   debugging. Also, the terminate handler (in `util/terminate.cpp`) writes out
   the name of the terminating thread if the name is available.
 * Fixed doxygen warnings.
-
+* Removed ("deleted") the default copy constructor for RowBase. This constructor
+  was used by accident by derived classes, which led to a data race. Said race was
+  benign, but would be reported by the thread sanitizer.
 ----------------------------------------------
 
 # 1.5.1 Release notes
