@@ -28,11 +28,16 @@ namespace _impl {
 /// \cond doxygen_skip
 /// Doxygen warns about a recursive class relation, but this is intentional.
 
-template<size_t...> struct Indexes {};
+template <size_t...>
+struct Indexes {
+};
 template <size_t N, size_t... I>
 struct GenIndexes : GenIndexes<N - 1, N - 1, I...> {
 };
-template<size_t... I> struct GenIndexes<0, I...> { typedef Indexes<I...> type; };
+template <size_t... I>
+struct GenIndexes<0, I...> {
+    typedef Indexes<I...> type;
+};
 
 /// \endcond
 
@@ -52,8 +57,7 @@ auto call_with_tuple(F func, std::tuple<A...> args)
     -> decltype(_impl::call_with_tuple(std::move(func), std::move(args),
                                        typename _impl::GenIndexes<sizeof...(A)>::type()))
 {
-    return _impl::call_with_tuple(std::move(func), std::move(args),
-                                  typename _impl::GenIndexes<sizeof... (A)>::type());
+    return _impl::call_with_tuple(std::move(func), std::move(args), typename _impl::GenIndexes<sizeof...(A)>::type());
 }
 
 } // namespace util

@@ -37,12 +37,12 @@ enum Func {
     func_ShowLibexecdir
 };
 
-bool emit_cflags  = false;
+bool emit_cflags = false;
 bool emit_ldflags = false;
 
 void clear_emit_flags()
 {
-    emit_cflags  = false;
+    emit_cflags = false;
     emit_ldflags = false;
 }
 
@@ -73,17 +73,17 @@ void emit_flags()
 
     if (emit_ldflags) {
 #ifdef REALM_CONFIG_IOS
-#  ifdef REALM_DEBUG
+#ifdef REALM_DEBUG
         emit_flags("-lrealm-ios-dbg");
-#  else
-        emit_flags("-lrealm-ios");
-#  endif
 #else
-#  ifdef REALM_DEBUG
+        emit_flags("-lrealm-ios");
+#endif
+#else
+#ifdef REALM_DEBUG
         emit_flags("-lrealm-dbg");
-#  else
+#else
         emit_flags("-lrealm");
-#  endif
+#endif
 #endif
     }
 
@@ -93,7 +93,6 @@ void emit_flags()
 } // anonymous namespace
 
 
-
 int main(int argc, char* argv[])
 {
     Func func = func_EmitFlags;
@@ -101,7 +100,7 @@ int main(int argc, char* argv[])
     // Process command line
     {
         bool empty = argc == 1;
-        bool help  = false;
+        bool help = false;
         bool error = false;
 
         for (int i = 1; i < argc; ++i) {
@@ -167,20 +166,20 @@ int main(int argc, char* argv[])
 
         if (empty || error || help) {
             const char* prog = argv[0];
-            std::string msg =
-                "Synopsis: " + std::string(prog) + "\n\n"
-                "Options:\n"
-                "  --version     Show the version of Realm that this command was installed\n"
-                "                as part of\n"
-                "  --cflags      Output all pre-processor and compiler flags\n"
-                "  --libs        Output all linker flags\n"
-                "  --prefix      Show the Realm installation prefix\n"
-                "  --exec-prefix Show the Realm installation prefix for executables\n"
-                "  --includedir  Show the directory holding the Realm header files\n"
-                "  --bindir      Show the directory holding the Realm executables\n"
-                "  --libdir      Show the directory holding the Realm libraries\n"
-                "  --libexecdir  Show the directory holding the Realm executables to be run\n"
-                "                by programs rather than by users\n";
+            std::string msg = "Synopsis: " + std::string(prog) +
+                              "\n\n"
+                              "Options:\n"
+                              "  --version     Show the version of Realm that this command was installed\n"
+                              "                as part of\n"
+                              "  --cflags      Output all pre-processor and compiler flags\n"
+                              "  --libs        Output all linker flags\n"
+                              "  --prefix      Show the Realm installation prefix\n"
+                              "  --exec-prefix Show the Realm installation prefix for executables\n"
+                              "  --includedir  Show the directory holding the Realm header files\n"
+                              "  --bindir      Show the directory holding the Realm executables\n"
+                              "  --libdir      Show the directory holding the Realm libraries\n"
+                              "  --libexecdir  Show the directory holding the Realm executables to be run\n"
+                              "                by programs rather than by users\n";
             if (error) {
                 std::cerr << "ERROR: Bad command line.\n\n" << msg;
                 return 1;

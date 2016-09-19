@@ -24,7 +24,7 @@
 namespace realm {
 namespace util {
 
-template<class T>
+template <class T>
 class SharedPtr {
 public:
     SharedPtr(T* p)
@@ -42,7 +42,9 @@ public:
         decref();
     }
 
-    SharedPtr(const SharedPtr<T>& o) : m_ptr(o.m_ptr), m_count(o.m_count)
+    SharedPtr(const SharedPtr<T>& o)
+        : m_ptr(o.m_ptr)
+        , m_count(o.m_count)
     {
         incref();
     }
@@ -122,7 +124,6 @@ private:
     T* m_ptr;
     size_t* m_count;
 };
-
 }
 }
 
