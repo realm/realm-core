@@ -545,7 +545,7 @@ void Realm::write_copy(StringData path, BinaryData key)
 
 void Realm::notify()
 {
-    if (is_closed()) {
+    if (is_closed() || is_in_transaction()) {
         return;
     }
 
