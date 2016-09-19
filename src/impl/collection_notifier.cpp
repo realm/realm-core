@@ -182,7 +182,7 @@ size_t CollectionNotifier::add_callback(CollectionChangeCallback callback)
 
     std::lock_guard<std::mutex> lock(m_callback_mutex);
     auto token = next_token();
-    m_callbacks.push_back({std::move(callback), token, false});
+    m_callbacks.push_back({std::move(callback), {}, {}, token, false});
     if (m_callback_index == npos) { // Don't need to wake up if we're already sending notifications
         Realm::Internal::get_coordinator(*m_realm).send_commit_notifications(*m_realm);
         m_have_callbacks = true;
@@ -266,26 +266,49 @@ void CollectionNotifier::prepare_handover()
 
 void CollectionNotifier::before_advance()
 {
-    while (auto fn = next_callback(!m_changes_to_deliver.empty(), true))
-        fn.before(m_changes_to_deliver);
+    for_each_callback([&](auto& lock, auto& callback) {
+        if (callback.changes_to_deliver.empty()) {
+            return;
+        }
+
+        auto changes = callback.changes_to_deliver;
+        // acquire a local reference to the callback so that removing the
+        // callback from within it can't result in a dangling pointer
+        auto cb = callback.fn;
+        lock.unlock();
+        cb.before(changes);
+    });
 }
 
 void CollectionNotifier::after_advance()
 {
-    while (auto fn = next_callback(!m_changes_to_deliver.empty(), false))
-        fn.after(m_changes_to_deliver);
-    m_changes_to_deliver = {};
+    for_each_callback([&](auto& lock, auto& callback) {
+        if (callback.initial_delivered && callback.changes_to_deliver.empty()) {
+            return;
+        }
+        callback.initial_delivered = true;
+
+        auto changes = std::move(callback.changes_to_deliver);
+        // acquire a local reference to the callback so that removing the
+        // callback from within it can't result in a dangling pointer
+        auto cb = callback.fn;
+        lock.unlock();
+        cb.after(changes);
+    });
 }
 
 void CollectionNotifier::deliver_error(std::exception_ptr error)
 {
-    while (auto fn = next_callback(true, false)) {
-        fn.error(error);
-    }
+    for_each_callback([&](auto& lock, auto& callback) {
+        // acquire a local reference to the callback so that removing the
+        // callback from within it can't result in a dangling pointer
+        auto cb = callback.fn;
+        lock.unlock();
+        cb.error(error);
+    });
 
     // Remove all the callbacks as we never need to call anything ever again
     // after delivering an error
-    std::lock_guard<std::mutex> callback_lock(m_callback_mutex);
     m_callbacks.clear();
     m_error = true;
 }
@@ -300,26 +323,23 @@ bool CollectionNotifier::package_for_delivery()
 {
     if (!prepare_to_deliver())
         return false;
-    m_changes_to_deliver = std::move(m_accumulated_changes).finalize();
+    std::lock_guard<std::mutex> l(m_callback_mutex);
+    for (auto& callback : m_callbacks)
+        callback.changes_to_deliver = std::move(callback.accumulated_changes).finalize();
     return true;
 }
 
-CollectionChangeCallback CollectionNotifier::next_callback(bool has_changes, bool pre)
+template<typename Fn>
+void CollectionNotifier::for_each_callback(Fn&& fn)
 {
-    std::lock_guard<std::mutex> callback_lock(m_callback_mutex);
-
+    std::unique_lock<std::mutex> callback_lock(m_callback_mutex);
     for (++m_callback_index; m_callback_index < m_callbacks.size(); ++m_callback_index) {
-        auto& callback = m_callbacks[m_callback_index];
-        if (callback.initial_delivered && !has_changes) {
-            continue;
-        }
-        if (!pre)
-            callback.initial_delivered = true;
-        return callback.fn;
+        fn(callback_lock, m_callbacks[m_callback_index]);
+        if (!callback_lock.owns_lock())
+            callback_lock.lock();
     }
 
     m_callback_index = npos;
-    return nullptr;
 }
 
 void CollectionNotifier::attach_to(SharedGroup& sg)
@@ -335,6 +355,19 @@ void CollectionNotifier::detach()
     REALM_ASSERT(m_sg);
     do_detach_from(*m_sg);
     m_sg = nullptr;
+}
+
+void CollectionNotifier::add_changes(CollectionChangeBuilder change)
+{
+    std::lock_guard<std::mutex> lock(m_callback_mutex);
+    if (m_callbacks.size() == 1) {
+        m_callbacks[0].accumulated_changes.merge(std::move(change));
+    }
+    else {
+        for (auto& callback : m_callbacks) {
+            callback.accumulated_changes.merge(CollectionChangeBuilder(change));
+        }
+    }
 }
 
 NotifierPackage::NotifierPackage(std::exception_ptr error,

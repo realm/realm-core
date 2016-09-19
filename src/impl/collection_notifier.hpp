@@ -194,7 +194,7 @@ public:
 
     bool have_callbacks() const noexcept { return m_have_callbacks; }
 protected:
-    void add_changes(CollectionChangeBuilder change) { m_accumulated_changes.merge(std::move(change)); }
+    void add_changes(CollectionChangeBuilder change);
     void set_table(Table const& table);
     std::unique_lock<std::mutex> lock_target();
 
@@ -215,13 +215,12 @@ private:
 
     bool m_has_run = false;
     bool m_error = false;
-    CollectionChangeBuilder m_accumulated_changes;
-    CollectionChangeSet m_changes_to_deliver;
-
     std::vector<DeepChangeChecker::RelatedTable> m_related_tables;
 
     struct Callback {
         CollectionChangeCallback fn;
+        CollectionChangeBuilder accumulated_changes;
+        CollectionChangeSet changes_to_deliver;
         size_t token;
         bool initial_delivered;
     };
@@ -242,6 +241,9 @@ private:
     size_t m_callback_index = -1;
 
     CollectionChangeCallback next_callback(bool has_changes, bool pre);
+
+    template<typename Fn>
+    void for_each_callback(Fn&& fn);
 };
 
 // A smart pointer to a CollectionNotifier that unregisters the notifier when
