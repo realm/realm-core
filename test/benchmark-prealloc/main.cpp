@@ -28,9 +28,7 @@ using namespace realm::util;
 
 namespace {
 
-REALM_TABLE_2(Alpha,
-              foo, Int,
-              bar, Int)
+REALM_TABLE_2(Alpha, foo, Int, bar, Int)
 
 } // anonymous namespace
 
@@ -40,10 +38,10 @@ REALM_TABLE_2(Alpha,
 int main()
 {
     bool no_create = false;
-    SharedGroup::DurabilityLevel dlevel = SharedGroup::durability_Full;
+    SharedGroupOptions::Durability dlevel = SharedGroupOptions::Durability::Full;
 
     File::try_remove(DIR "/benchmark-prealloc.realm");
-    SharedGroup sg(DIR "/benchmark-prealloc.realm", no_create, dlevel);
+    SharedGroup sg(DIR "/benchmark-prealloc.realm", no_create, {dlevel});
 
     File::try_remove(DIR "/benchmark-prealloc-interfere1.realm");
     SharedGroup sg_interfere1(DIR "/benchmark-prealloc-interfere1.realm", no_create, dlevel);
@@ -65,7 +63,8 @@ int main()
                 {
                     WriteTransaction wt(sg);
                     Alpha::Ref t = wt.get_or_add_table<Alpha>("alpha");
-                    for (int j = 0; j < 1000; ++j) t->add(65536, 65536);
+                    for (int j = 0; j < 1000; ++j)
+                        t->add(65536, 65536);
                     wt.commit();
                 }
                 // Interference
@@ -73,19 +72,22 @@ int main()
                     {
                         WriteTransaction wt(sg_interfere1);
                         Alpha::Ref t = wt.get_or_add_table<Alpha>("alpha");
-                        for (int j = 0; j < 100; ++j) t->add(65536, 65536);
+                        for (int j = 0; j < 100; ++j)
+                            t->add(65536, 65536);
                         wt.commit();
                     }
                     {
                         WriteTransaction wt(sg_interfere2);
                         Alpha::Ref t = wt.get_or_add_table<Alpha>("alpha");
-                        for (int j = 0; j < 400; ++j) t->add(65536, 65536);
+                        for (int j = 0; j < 400; ++j)
+                            t->add(65536, 65536);
                         wt.commit();
                     }
                     {
                         WriteTransaction wt(sg_interfere3);
                         Alpha::Ref t = wt.get_or_add_table<Alpha>("alpha");
-                        for (int j = 0; j < 1600; ++j) t->add(65536, 65536);
+                        for (int j = 0; j < 1600; ++j)
+                            t->add(65536, 65536);
                         wt.commit();
                     }
                 }
@@ -94,7 +96,8 @@ int main()
         std::cerr << "\n";
 
         time_t end = time(0);
-        std::cerr << "Small write transactions per second = " << (( n_outer * n_inner * 7 / double(end - begin) )) << std::endl;
+        std::cerr << "Small write transactions per second = " << ((n_outer * n_inner * 7 / double(end - begin)))
+                  << std::endl;
     }
 
     {
@@ -116,6 +119,7 @@ int main()
         std::cerr << "\n";
 
         time_t end = time(0);
-        std::cerr << "Large write transactions per second = " << (( n_outer * n_inner / double(end - begin) )) << std::endl;
+        std::cerr << "Large write transactions per second = " << ((n_outer * n_inner / double(end - begin)))
+                  << std::endl;
     }
 }

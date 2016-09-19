@@ -28,10 +28,9 @@
 
 using namespace realm;
 
-TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
-                             MutableSourcePayload mode)
-    : RowIndexes(src, mode),
-      m_linked_column(src.m_linked_column)
+TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSourcePayload mode)
+    : RowIndexes(src, mode)
+    , m_linked_column(src.m_linked_column)
 {
     patch.was_in_sync = src.is_in_sync();
     // m_query must be exported after patch.was_in_sync is updated
@@ -54,11 +53,10 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch,
     m_limit = src.m_limit;
 }
 
-TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch,
-                             ConstSourcePayload mode)
-    : RowIndexes(src, mode),
-      m_linked_column(src.m_linked_column),
-      m_query(src.m_query, patch.query_patch, mode)
+TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch, ConstSourcePayload mode)
+    : RowIndexes(src, mode)
+    , m_linked_column(src.m_linked_column)
+    , m_query(src.m_query, patch.query_patch, mode)
 {
     if (mode == ConstSourcePayload::Stay)
         patch.was_in_sync = false;
@@ -140,7 +138,8 @@ size_t TableViewBase::find_first_string(size_t column_ndx, StringData value) con
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (is_row_attached(i) && get_string(column_ndx, i) == value) return i;
+        if (is_row_attached(i) && get_string(column_ndx, i) == value)
+            return i;
     return size_t(-1);
 }
 
@@ -151,7 +150,8 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Binary);
 
     for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (is_row_attached(i) && get_binary(column_ndx, i) == value) return i;
+        if (is_row_attached(i) && get_binary(column_ndx, i) == value)
+            return i;
     return size_t(-1);
 }
 
@@ -160,15 +160,16 @@ size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) con
 
 // count_target is ignored by all <int function> except Count. Hack because of bug in optional
 // arguments in clang and vs2010 (fixed in 2012)
-template<int function, typename T, typename R, class ColType>
-R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx, T count_target, size_t* return_ndx) const
+template <int function, typename T, typename R, class ColType>
+R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx,
+                           T count_target, size_t* return_ndx) const
 {
     check_cookie();
 
     using ColTypeTraits = ColumnTypeTraits<typename ColType::value_type>;
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColTypeTraits::id);
-    REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count
-                 || function == act_Average);
+    REALM_ASSERT(function == act_Sum || function == act_Max || function == act_Min || function == act_Count ||
+                 function == act_Average);
     REALM_ASSERT(m_table);
     REALM_ASSERT(column_ndx < m_table->get_column_count());
     if ((m_row_indexes.size() - m_num_detached_refs) == 0) {
@@ -220,13 +221,14 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
         int64_t signed_row_ndx = m_row_indexes.get(ss);
 
         // skip detached references:
-        if (signed_row_ndx == detached_ref) continue;
+        if (signed_row_ndx == detached_ref)
+            continue;
 
         row_ndx = to_size_t(signed_row_ndx);
 
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
             size_t ndx_in_leaf;
-            typename ColType::LeafInfo leaf{ &arrp, &arr };
+            typename ColType::LeafInfo leaf{&arrp, &arr};
             column->get_leaf(row_ndx, ndx_in_leaf, leaf);
             leaf_start = row_ndx - ndx_in_leaf;
             leaf_end = leaf_start + arrp->size();
@@ -263,9 +265,10 @@ R TableViewBase::aggregate(R(ColType::*aggregateMethod)(size_t, size_t, size_t, 
         return res;
 }
 
-// Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume we have leaf types
+// Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume we have leaf
+// types
 // and also assume numeric types that support arithmetic (+, /, etc).
-template<class C>
+template <class C>
 Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx) const
 {
     C compare = C();
@@ -360,7 +363,7 @@ OldDateTime TableViewBase::minimum_olddatetime(size_t column_ndx, size_t* return
 
 Timestamp TableViewBase::minimum_timestamp(size_t column_ndx, size_t* return_ndx) const
 {
-    return minmax_timestamp<realm::Less> (column_ndx, return_ndx);
+    return minmax_timestamp<realm::Less>(column_ndx, return_ndx);
 }
 
 // Average. The number of values used to compute the result is written to `value_count` by callee
@@ -446,9 +449,7 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
 
     // Set limit=-1 to print all rows, otherwise only print to limit
     const size_t row_count = num_attached_rows();
-    const size_t out_count = (limit == size_t(-1))
-                             ? row_count
-                             : (row_count < limit) ? row_count : limit;
+    const size_t out_count = (limit == size_t(-1)) ? row_count : (row_count < limit) ? row_count : limit;
 
     // Print rows
     size_t i = 0;
@@ -559,7 +560,6 @@ uint_fast64_t TableViewBase::sync_if_needed() const
     }
     return *m_last_seen_version;
 }
-
 
 
 void TableViewBase::adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept
@@ -740,13 +740,12 @@ void TableViewBase::do_sync()
         for (size_t i = 0; i < m_table->size(); i++)
             m_row_indexes.add(i);
     }
-    else  {
+    else {
         // valid query, so clear earlier results and reexecute it.
         if (m_row_indexes.is_attached())
             m_row_indexes.clear();
         else
-            m_row_indexes.init_from_ref(Allocator::get_default(),
-                                        IntegerColumn::create(Allocator::get_default()));
+            m_row_indexes.init_from_ref(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()));
         // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();

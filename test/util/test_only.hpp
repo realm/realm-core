@@ -21,16 +21,16 @@
 
 #include "unit_test.hpp"
 
-#define ONLY(name) \
-    realm::test_util::SetTestOnly realm_set_test_only__##name(#name); \
+#define ONLY(name)                                                                                                   \
+    realm::test_util::SetTestOnly realm_set_test_only__##name(#name);                                                \
     TEST(name)
 
-#define NONCUNCURRENT_ONLY(name) \
-    realm::test_util::SetTestOnly realm_set_test_only__##name(#name); \
+#define NONCUNCURRENT_ONLY(name)                                                                                     \
+    realm::test_util::SetTestOnly realm_set_test_only__##name(#name);                                                \
     NONCONCURRENT_TEST(name)
 
-#define ONLY_TYPES(name, ...) \
-    realm::test_util::SetTestOnly realm_set_test_only__##name(#name "*"); \
+#define ONLY_TYPES(name, ...)                                                                                        \
+    realm::test_util::SetTestOnly realm_set_test_only__##name(#name "*");                                            \
     TEST_TYPES(name, __VA_ARGS__)
 
 namespace realm {

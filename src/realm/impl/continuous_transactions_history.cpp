@@ -46,9 +46,8 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
         bool nullable = false;
         ref_type hist_ref = BinaryColumn::create(alloc, size, nullable); // Throws
         _impl::DeepArrayRefDestroyGuard dg(hist_ref, alloc);
-        m_changesets.reset(new BinaryColumn(alloc, hist_ref, nullable)); // Throws
-        gf::prepare_history_parent(*m_group, *m_changesets->get_root_array(),
-                                   Replication::hist_InRealm); // Throws
+        m_changesets.reset(new BinaryColumn(alloc, hist_ref, nullable));                                  // Throws
+        gf::prepare_history_parent(*m_group, *m_changesets->get_root_array(), Replication::hist_InRealm); // Throws
         // Note: gf::prepare_history_parent() also ensures the the root array
         // has a slot for the history ref.
         m_changesets->get_root_array()->update_parent(); // Throws
@@ -68,8 +67,7 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
 }
 
 
-void InRealmHistory::update_early_from_top_ref(version_type new_version, size_t new_file_size,
-                                               ref_type new_top_ref)
+void InRealmHistory::update_early_from_top_ref(version_type new_version, size_t new_file_size, ref_type new_top_ref)
 {
     using gf = _impl::GroupFriend;
     gf::remap(*m_group, new_file_size); // Throws
@@ -87,15 +85,16 @@ void InRealmHistory::update_from_parent(version_type version)
 }
 
 
-void InRealmHistory::get_changesets(version_type begin_version, version_type end_version,
-                                    BinaryData* buffer) const noexcept
+void InRealmHistory::get_changesets(version_type begin_version, version_type end_version, BinaryData* buffer) const
+    noexcept
 {
     REALM_ASSERT(begin_version <= end_version);
     REALM_ASSERT(begin_version >= m_base_version);
     REALM_ASSERT(end_version <= m_base_version + m_size);
     version_type n_version_type = end_version - begin_version;
     version_type offset_version_type = begin_version - m_base_version;
-    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(n_version_type) && !util::int_cast_has_overflow<size_t>(offset_version_type));
+    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(n_version_type) &&
+                 !util::int_cast_has_overflow<size_t>(offset_version_type));
     size_t n = size_t(n_version_type);
     size_t offset = size_t(offset_version_type);
     for (size_t i = 0; i < n; ++i)

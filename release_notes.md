@@ -2,10 +2,25 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed a bug where find() on a Query constructed from a restricting view
+  did not correctly return an row index into the underlying table.
+  (issue #2127)
+* Fixed a bug where linked tables were not updated after a table move operation, when
+  run through the replicator.
+* Fixed a bug where moving a column to itself caused a crash.
+* Fix subspecs not updating properly after a move operation.
+* Fixed various crashes when using subtables. The crash will occur when the first column
+  of the subtable if of type `col_type_Timestamp` or if it is nullable and of type Bool, Int
+  or OldDateTime. Caused by bad static `get_size_from_ref()` methods of columns. (#2101)
+* Fixed a bug with link columns incorrectly updating on a `move_last_over`
+  operation when the link points to the same table.
+* Fixed a race in the handover machinery which could cause crashes following handover
+  of a Query or a TableView. (#2117)
 
 ### Breaking changes
 
+* Refactored the `SharedGroup` constructors and open methods to use a new
+  `SharedGroupOptions` parameter which stores all options together.
 * BREAKING! Until now, a Query would return indexes into a restricting view if such was 
   present (a view given in the `.where(&view) method`, or it would return indexes into the
   Table if no restricting view was present. This would make query results useless if you did 
@@ -16,7 +31,10 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* When creating a `SharedGroup`, optionally allow setting the temporary 
+  directory to when making named pipes fails. This is to fix a bug
+  involving mkfifo on recent android devices (#1959).
+* Added debian packages for Ubuntu 16.04.
 
 -----------
 
@@ -27,7 +45,10 @@
   it. `util::Thread::set_name()` is now used by the test harness as a help while
   debugging. Also, the terminate handler (in `util/terminate.cpp`) writes out
   the name of the terminating thread if the name is available.
-
+* Fixed doxygen warnings.
+* Removed ("deleted") the default copy constructor for RowBase. This constructor
+  was used by accident by derived classes, which led to a data race. Said race was
+  benign, but would be reported by the thread sanitizer.
 ----------------------------------------------
 
 # 1.5.1 Release notes

@@ -68,8 +68,8 @@ void set_capacity(char* header, size_t value)
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[0] = uchar((value >> 16) & 0x000000FF);
-    h[1] = uchar((value >>  8) & 0x000000FF);
-    h[2] = uchar( value        & 0x000000FF);
+    h[1] = uchar((value >> 8) & 0x000000FF);
+    h[2] = uchar(value & 0x000000FF);
 }
 
 size_t get_capacity(const char* header)
@@ -155,8 +155,8 @@ TEST(Alloc_BadFile)
     {
         SlabAlloc alloc;
         SlabAlloc::Config cfg;
-        cfg.read_only     = true;
-        cfg.no_create     = true;
+        cfg.read_only = true;
+        cfg.no_create = true;
         CHECK_THROW(alloc.attach_file(path_1, cfg), InvalidDatabase);
         CHECK(!alloc.is_attached());
         CHECK_THROW(alloc.attach_file(path_1, cfg), InvalidDatabase);
@@ -296,7 +296,6 @@ TEST(Alloc_Fuzzy)
                 alloc.free_(r.get_ref(), r.get_addr());
                 refs.erase(refs.begin());
             }
-
         }
     }
 }

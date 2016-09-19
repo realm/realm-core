@@ -69,6 +69,7 @@ descriptor_fwd.hpp \
 descriptor.hpp \
 group.hpp \
 group_shared.hpp \
+group_shared_options.hpp \
 impl/continuous_transactions_history.hpp \
 handover_defs.hpp \
 replication.hpp \

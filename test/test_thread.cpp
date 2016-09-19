@@ -26,14 +26,15 @@
 #include <mutex>
 
 #ifndef _WIN32
-    #include <unistd.h>
+#include <unistd.h>
 #endif
 
+#include <realm/group_shared_options.hpp>
 #include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
 #ifndef _WIN32
-    #include <realm/util/interprocess_condvar.hpp>
+#include <realm/util/interprocess_condvar.hpp>
 #endif
 #include <realm/util/interprocess_mutex.hpp>
 
@@ -105,7 +106,6 @@ struct Shared {
             m_value = int(f);
         }
     }
-
 };
 
 struct SharedWithEmulated {
@@ -113,8 +113,14 @@ struct SharedWithEmulated {
     InterprocessMutex::SharedPart m_shared_part;
     int m_value;
 
-    SharedWithEmulated(std::string name) { m_mutex.set_shared_part(m_shared_part, name, "0"); }
-    ~SharedWithEmulated() { m_mutex.release_shared_part(); }
+    SharedWithEmulated(std::string name)
+    {
+        m_mutex.set_shared_part(m_shared_part, name, "0");
+    }
+    ~SharedWithEmulated()
+    {
+        m_mutex.release_shared_part();
+    }
 
     // 10000 takes less than 0.1 sec
     void increment_10000_times()
@@ -136,7 +142,6 @@ struct SharedWithEmulated {
             m_value = int(f);
         }
     }
-
 };
 
 struct Robust {
@@ -172,7 +177,8 @@ struct Robust {
 
 class QueueMonitor {
 public:
-    QueueMonitor(): m_closed(false)
+    QueueMonitor()
+        : m_closed(false)
     {
     }
 
@@ -242,8 +248,8 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
 
 class bowl_of_stones_semaphore {
 public:
-    bowl_of_stones_semaphore(int initial_number_of_stones = 0):
-        m_num_stones(initial_number_of_stones)
+    bowl_of_stones_semaphore(int initial_number_of_stones = 0)
+        : m_num_stones(initial_number_of_stones)
     {
     }
     void get_stone(int num_to_get)
@@ -259,6 +265,7 @@ public:
         ++m_num_stones;
         m_cond_var.notify_all();
     }
+
 private:
     Mutex m_mutex;
     int m_num_stones;
@@ -266,9 +273,7 @@ private:
 };
 
 
-
 } // anonymous namespace
-
 
 
 TEST(Thread_Join)
@@ -411,18 +416,15 @@ TEST_IF(Thread_RobustMutex, TEST_THREAD_ROBUSTNESS)
     }
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover_throw, &robust)),
-                RobustMutex::NotRecoverable);
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover_throw, &robust)), RobustMutex::NotRecoverable);
     CHECK(robust.m_recover_called);
 
     // Check that successive attempts at locking will throw
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)),
-                RobustMutex::NotRecoverable);
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)), RobustMutex::NotRecoverable);
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)),
-                RobustMutex::NotRecoverable);
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)), RobustMutex::NotRecoverable);
     CHECK(!robust.m_recover_called);
 }
 
@@ -568,17 +570,16 @@ void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessC
 }
 
 
-void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter,
-                       InterprocessMutex* mutex, InterprocessCondVar* cv)
+void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, InterprocessMutex* mutex,
+                       InterprocessCondVar* cv)
 {
     std::lock_guard<InterprocessMutex> l(*mutex);
-    ++ *wait_counter;
+    ++*wait_counter;
     feedback->add_stone();
     cv->wait(*mutex, nullptr);
-    -- *wait_counter;
+    --*wait_counter;
     feedback->add_stone();
 }
-
 
 
 void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
@@ -586,7 +587,6 @@ void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
     std::lock_guard<InterprocessMutex> l(*mutex);
     cv->wait(*mutex, nullptr);
 }
-
 }
 
 // Verify, that a wait on a condition variable actually waits
@@ -600,8 +600,9 @@ NONCONCURRENT_TEST(Thread_CondvarWaits)
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     changed.init_shared_part(condvar_part);
     Thread signal_thread;
     signals = 0;
@@ -631,8 +632,9 @@ NONCONCURRENT_TEST(Thread_CondvarIsStateless)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     Thread signal_thread;
     signal_state = 1;
     // send some signals:
@@ -666,8 +668,9 @@ NONCONCURRENT_TEST(Thread_CondvarTimeout)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     struct timespec time;
     time.tv_sec = 0;
     time.tv_nsec = 100000000; // 0.1 sec
@@ -691,8 +694,9 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i = 0; i < num_waiters; ++i) {
@@ -723,8 +727,9 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
     InterprocessCondVar::init_shared_part(condvar_part);
     bowl_of_stones_semaphore feedback(0);
     SHARED_GROUP_TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     const int num_waiters = 10;
     Thread waiters[num_waiters];
     for (int i = 0; i < num_waiters; ++i) {

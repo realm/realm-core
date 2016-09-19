@@ -31,13 +31,11 @@
 
 // Condvar Emulation is required if RobustMutex emulation is enabled
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    #define REALM_CONDVAR_EMULATION
+#define REALM_CONDVAR_EMULATION
 #endif
 
 namespace realm {
 namespace util {
-
-
 
 
 /// Condition variable for use in synchronization monitors.
@@ -54,12 +52,12 @@ public:
     InterprocessCondVar();
     ~InterprocessCondVar() noexcept;
 
-    /// To use the InterprocessCondVar, you also must place a structure of type
-    /// InterprocessCondVar::SharedPart in memory shared by multiple processes
-    /// or in a memory mapped file, and use set_shared_part() to associate
-    /// the condition variable with it's shared part. You must initialize
-    /// the shared part using InterprocessCondVar::init_shared_part(), but only before
-    /// first use and only when you have exclusive access to the shared part.
+/// To use the InterprocessCondVar, you also must place a structure of type
+/// InterprocessCondVar::SharedPart in memory shared by multiple processes
+/// or in a memory mapped file, and use set_shared_part() to associate
+/// the condition variable with it's shared part. You must initialize
+/// the shared part using InterprocessCondVar::init_shared_part(), but only before
+/// first use and only when you have exclusive access to the shared part.
 
 #ifdef REALM_CONDVAR_EMULATION
     struct SharedPart {
@@ -73,7 +71,7 @@ public:
     /// You need to bind the emulation to a SharedPart in shared/mmapped memory.
     /// The SharedPart is assumed to have been initialized (possibly by another process)
     /// earlier through a call to init_shared_part.
-    void set_shared_part(SharedPart& shared_part, std::string path, std::string condvar_name);
+    void set_shared_part(SharedPart& shared_part, std::string path, std::string condvar_name, std::string tmp_path);
 
     /// Initialize the shared part of a process shared condition variable.
     /// A process shared condition variables may be represented by any number of
@@ -116,8 +114,6 @@ private:
 #endif
     bool uses_emulation = false;
 };
-
-
 
 
 // Implementation:

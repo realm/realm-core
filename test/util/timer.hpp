@@ -34,7 +34,11 @@ public:
         type_RealTime
     };
 
-    Timer(Type type = type_RealTime): m_type(type) { reset(); }
+    Timer(Type type = type_RealTime)
+        : m_type(type)
+    {
+        reset();
+    }
 
     void reset();
 
@@ -49,7 +53,10 @@ public:
     }
 
     /// Same as get_elapsed_time().
-    operator double() const { return get_elapsed_time(); }
+    operator double() const
+    {
+        return get_elapsed_time();
+    }
 
     /// Format the elapsed time on the form 0h00m, 00m00s, 00.00s, or
     /// 000.0ms depending on magnitude.

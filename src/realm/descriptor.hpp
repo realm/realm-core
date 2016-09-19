@@ -28,7 +28,9 @@
 
 namespace realm {
 
-namespace _impl { class DescriptorFriend; }
+namespace _impl {
+class DescriptorFriend;
+}
 
 
 /// Accessor for table type descriptors.
@@ -87,8 +89,8 @@ public:
     /// returns `not_found`.
     size_t get_column_index(StringData name) const noexcept;
 
-    /// Get the index of the column to which links in the column at the specified
-    /// index refer.
+    /// Get the index of the column to which links in the column at the
+    /// specified index refer.
     ///
     /// The consequences of specifying a column index that is out of
     /// range, are undefined.
@@ -103,8 +105,8 @@ public:
     /// range, are undefined.
     bool is_nullable(size_t column_ndx) const noexcept;
 
-    //@{
-
+    /// \defgroup descriptor_column_accessors Accessing Columns Via A Descriptor
+    ///
     /// add_column() and add_column_link() are a shorthands for calling
     /// insert_column() and insert_column_link(), respectively, with a column
     /// index equal to the original number of columns. The returned value is
@@ -155,18 +157,17 @@ public:
     /// \sa Table::add_column_link()
     /// \sa Table::insert_column_link()
     /// \sa is_root()
+    //@{
 
     static const size_t max_column_name_length = 63;
 
     size_t add_column(DataType type, StringData name, DescriptorRef* subdesc = nullptr, bool nullable = false);
 
-    void insert_column(size_t col_ndx, DataType type, StringData name,
-                       DescriptorRef* subdesc = nullptr, bool nullable = false);
+    void insert_column(size_t col_ndx, DataType type, StringData name, DescriptorRef* subdesc = nullptr,
+                       bool nullable = false);
 
-    size_t add_column_link(DataType type, StringData name, Table& target,
-                           LinkType = link_Weak);
-    void insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target,
-                            LinkType = link_Weak);
+    size_t add_column_link(DataType type, StringData name, Table& target, LinkType = link_Weak);
+    void insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target, LinkType = link_Weak);
     //@}
 
     /// Remove the specified column from each of the associated
@@ -209,6 +210,8 @@ public:
     /// \param col_ndx The index of the column to be renamed. It is an error to
     /// specify an index that is greater than, or equal to the number of
     /// columns.
+    ///
+    /// \param new_name The new name of the column.
     ///
     /// \sa is_root()
     /// \sa Table::rename_column()
@@ -255,8 +258,8 @@ public:
     /// list columns (type_LinkList), links to the removed row are removed from
     /// the list.
     ///
-    /// When a row is cascade-removed there can no longer be any strong links to it,
-    /// but if there are any weak links, they will be removed or nullified.
+    /// When a row is cascade-removed there can no longer be any strong links to
+    /// it, but if there are any weak links, they will be removed or nullified.
     ///
     /// It is important to understand that this cascade-removal scheme is too
     /// simplistic to enable detection and removal of orphaned link-cycles. In
@@ -286,7 +289,9 @@ public:
     /// `type_LinkList`) to be modified. It is an error to specify an index that
     /// is greater than, or equal to the number of columns, or to specify the
     /// index of a non-link column.
-    void set_link_type(size_t col_ndx, LinkType);
+    ///
+    /// \param link_type The type of links the column should store.
+    void set_link_type(size_t col_ndx, LinkType link_type);
 
     //@{
     /// Get the descriptor for the specified subtable column.
@@ -331,8 +336,8 @@ public:
 
     //@{
     /// Get the target table associated with the specified link column. This
-    /// descriptor must be a root descriptor (is_root()), and the specified column must be a
-    /// link column (`type_Link` or `type_LinkList`).
+    /// descriptor must be a root descriptor (is_root()), and the specified
+    /// column must be a link column (`type_Link` or `type_LinkList`).
     TableRef get_link_target(size_t col_ndx) noexcept;
     ConstTableRef get_link_target(size_t col_ndx) const noexcept;
     //@}
@@ -414,12 +419,18 @@ private:
     // for initialization through make_shared
     struct PrivateTag {
     };
+
 public:
-    Descriptor(const PrivateTag&) : Descriptor() {}
+    Descriptor(const PrivateTag&)
+        : Descriptor()
+    {
+    }
+
 private:
-    TableRef m_root_table; // Table associated with root descriptor. Detached iff null.
+    // Table associated with root descriptor. Detached iff null.
+    TableRef m_root_table;
     DescriptorRef m_parent; // Null iff detached or root descriptor.
-    Spec* m_spec; // Valid if attached. Owned iff valid and `m_parent`.
+    Spec* m_spec;           // Valid if attached. Owned iff valid and `m_parent`.
 
     // Whenever a subtable descriptor accessor is created, it is
     // stored in this map. This ensures that when get_subdescriptor()
@@ -508,8 +519,6 @@ private:
 };
 
 
-
-
 // Implementation:
 
 inline size_t Descriptor::get_column_count() const noexcept
@@ -548,16 +557,15 @@ inline size_t Descriptor::get_column_link_target(size_t column_ndx) const noexce
     return m_spec->get_opposite_link_table_ndx(column_ndx);
 }
 
-inline size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc,
-                                     bool nullable)
+inline size_t Descriptor::add_column(DataType type, StringData name, DescriptorRef* subdesc, bool nullable)
 {
     size_t col_ndx = m_spec->get_public_column_count();
     insert_column(col_ndx, type, name, subdesc, nullable); // Throws
     return col_ndx;
 }
 
-inline void Descriptor::insert_column(size_t col_ndx, DataType type, StringData name,
-                                      DescriptorRef* subdesc, bool nullable)
+inline void Descriptor::insert_column(size_t col_ndx, DataType type, StringData name, DescriptorRef* subdesc,
+                                      bool nullable)
 {
     typedef _impl::TableFriend tf;
 
@@ -575,16 +583,15 @@ inline void Descriptor::insert_column(size_t col_ndx, DataType type, StringData 
         *subdesc = get_subdescriptor(col_ndx);
 }
 
-inline size_t Descriptor::add_column_link(DataType type, StringData name, Table& target,
-                                          LinkType link_type)
+inline size_t Descriptor::add_column_link(DataType type, StringData name, Table& target, LinkType link_type)
 {
     size_t col_ndx = m_spec->get_public_column_count();
     insert_column_link(col_ndx, type, name, target, link_type); // Throws
     return col_ndx;
 }
 
-inline void Descriptor::insert_column_link(size_t col_ndx, DataType type, StringData name,
-                                           Table& target, LinkType link_type)
+inline void Descriptor::insert_column_link(size_t col_ndx, DataType type, StringData name, Table& target,
+                                           LinkType link_type)
 {
     typedef _impl::TableFriend tf;
 
@@ -720,7 +727,9 @@ inline bool Descriptor::is_attached() const noexcept
     return bool(m_root_table);
 }
 
-inline Descriptor::subdesc_entry::subdesc_entry(size_t n, DescriptorRef d) : m_column_ndx(n), m_subdesc(d)
+inline Descriptor::subdesc_entry::subdesc_entry(size_t n, DescriptorRef d)
+    : m_column_ndx(n)
+    , m_subdesc(d)
 {
 }
 
@@ -775,8 +784,7 @@ public:
         return *desc.m_spec;
     }
 
-    static size_t* record_subdesc_path(const Descriptor& desc, size_t* begin,
-                                       size_t* end) noexcept
+    static size_t* record_subdesc_path(const Descriptor& desc, size_t* begin, size_t* end) noexcept
     {
         return desc.record_subdesc_path(begin, end);
     }

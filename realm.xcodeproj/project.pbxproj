@@ -300,6 +300,7 @@
 		48B1D2381C749D750066A961 /* crypt_key.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 48B1D2371C749D750066A961 /* crypt_key.hpp */; };
 		48B1D23A1C749D850066A961 /* crypt_key.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48B1D2391C749D850066A961 /* crypt_key.cpp */; };
 		48B1D23B1C749DF00066A961 /* crypt_key.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48B1D2391C749D850066A961 /* crypt_key.cpp */; };
+		4BE251771D6B0282009121FB /* group_shared_options.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4BE251761D6B0282009121FB /* group_shared_options.hpp */; };
 		4B07BA971D64860100A6D7E0 /* test_destructor_thread_safety.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4B07BA961D64860100A6D7E0 /* test_destructor_thread_safety.cpp */; };
 		520588CA16C1DA9D009DA6D8 /* data_type.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 520588C916C1DA9D009DA6D8 /* data_type.hpp */; };
 		52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */; };
@@ -856,6 +857,7 @@
 		4B3B03B51D1817D400E86FA2 /* test_impl_simulated_failure.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_impl_simulated_failure.cpp; sourceTree = "<group>"; };
 		4B3B03C11D182BC400E86FA2 /* importer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = importer.cpp; path = realm/importer.cpp; sourceTree = "<group>"; };
 		4B3B03C21D182BC400E86FA2 /* importer.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = importer.hpp; path = realm/importer.hpp; sourceTree = "<group>"; };
+		4BE251761D6B0282009121FB /* group_shared_options.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = group_shared_options.hpp; path = realm/group_shared_options.hpp; sourceTree = "<group>"; };
 		520588C916C1DA9D009DA6D8 /* data_type.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = data_type.hpp; path = realm/data_type.hpp; sourceTree = "<group>"; };
 		52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = lang_bind_helper.cpp; path = realm/lang_bind_helper.cpp; sourceTree = "<group>"; };
 		5219EB6718FB026100FF9232 /* verified_integer.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = verified_integer.cpp; sourceTree = "<group>"; };
@@ -1229,6 +1231,7 @@
 				365CCE17157CC37D00172BF8 /* group.hpp */,
 				365CCE7E157CCB4100172BF8 /* group_shared.cpp */,
 				365CCE7F157CCB4100172BF8 /* group_shared.hpp */,
+				4BE251761D6B0282009121FB /* group_shared_options.hpp */,
 				365CCE14157CC37D00172BF8 /* group_writer.cpp */,
 				365CCE15157CC37D00172BF8 /* group_writer.hpp */,
 				5D32058C1C880FFF00864053 /* handover_defs.hpp */,
@@ -1665,6 +1668,7 @@
 				3F5ED51119D08A11001FCFF4 /* file_mapper.hpp in Headers */,
 				365CCE5A157CC37D00172BF8 /* group.hpp in Headers */,
 				365CCE81157CCB4100172BF8 /* group_shared.hpp in Headers */,
+				4BE251771D6B0282009121FB /* group_shared_options.hpp in Headers */,
 				365CCE58157CC37D00172BF8 /* group_writer.hpp in Headers */,
 				5D32058F1C880FFF00864053 /* handover_defs.hpp in Headers */,
 				36E67FCB15A2EDDB00D131FB /* index_string.hpp in Headers */,

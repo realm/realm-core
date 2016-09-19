@@ -41,6 +41,13 @@ directiveStartToken = %
 
 #include <realm/table_basic.hpp>
 
+/*****************************************************************************
+ *                                                                           *
+ *      THIS INTERFACE IS DEPRECATED AND MAY BE REMOVED WITHOUT NOTICE       *
+ *                                                                           *
+ ****************************************************************************/
+
+// clang-format off
 
 %for $i in range($max_cols)
 %set $num_cols = $i + 1
@@ -139,4 +146,6 @@ typedef ::realm::BasicTable<Table##Spec> Table;
 
 
 %end for
+// clang-format on
+
 #endif // REALM_TABLE_MACROS_HPP

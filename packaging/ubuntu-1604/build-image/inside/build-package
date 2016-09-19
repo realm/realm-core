@@ -1,17 +1,20 @@
-#!/bin/bash -ex
+#!/bin/bash
+
+set -e
+
 # we should always set proper ownership before exiting, otherwise
 # the created packages will have root:root ownership and we'll be unable
 # to delete them from our host.
-trap 'chown -R --reference /build-inside/build-package /out/' EXIT
+trap 'chown -R --reference /inside/build-package /out/' EXIT
 
 clean_binaries() {
   # Remove unneeded information from binaries
   for path in $*; do
     cd "$path"
 
-    rm -rf usr/{lib64,libexec,bin}/*-dbg*
+    rm -rf usr/{lib,libexec,bin}/*-dbg*
 
-    for file in usr/{lib64,libexec,bin}/*; do
+    for file in usr/{lib,libexec,bin}/*; do
         if [ -f "$file"  ];then
             strip --strip-debug --strip-unneeded "$file"
             chrpath -d "$file" || true
@@ -33,17 +36,20 @@ REALM_ENABLE_ENCRYPTION=yes sh build.sh config /usr
 sh build.sh build
 sh build.sh build-node
 DESTDIR=/prod sh build.sh install-prod
-DESTDIR=/devel sh build.sh install-devel
+find /prod
 
-mkdir -p /node-devel/usr/lib64
-cp src/realm/librealm-node* /node-devel/usr/lib64
+DESTDIR=/devel sh build.sh install-devel
+find /devel
+
+mkdir -p /node-devel/usr/lib
+cp src/realm/librealm-node* /node-devel/usr/lib
 
 clean_binaries /prod /devel /node-devel
 
 # Reorganise a few files
 mkdir -p /utils/usr/bin
 mv /prod/usr/bin/realm-import /utils/usr/bin
-mv /prod/usr/lib64/*.so /devel/usr/lib64
+mv /prod/usr/lib/*.so /devel/usr/lib
 
 # Realm-node package
 doc_folder=usr/share/doc/realm-node-$VERSION
@@ -57,14 +63,14 @@ cd /out
 
 # don't forget to list all runtime dependencies for your package (i.e. all the
 # shared libraries you link to!)
+
 fpm \
-    -t rpm \
+    -t deb \
     -s dir \
-    -n realm \
-    --rpm-dist el6 \
+    -n librealm \
     --license "Realm License" \
     --version ${VERSION} \
-    --iteration ${BUILD_NUMBER} \
+    --iteration ${ITERATION} \
     --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
@@ -72,37 +78,34 @@ fpm \
     --maintainer "Realm <help@realm.io>" \
     --after-install /tmp/post-ldconf \
     --after-remove /tmp/post-ldconf \
-    -d "openssl" \
     -C /prod \
-    usr/lib64 usr/libexec
+    usr/lib usr/libexec
 
 fpm \
-    -t rpm \
+    -t deb \
     -s dir \
-    -n realm-devel \
-    --rpm-dist el6 \
+    -n librealm-dev \
     --license "Realm License" \
     --version ${VERSION} \
-    --iteration ${BUILD_NUMBER} \
-    --description "Development headers and tools for the realm-core C++ library" \
+    --iteration ${ITERATION} \
+    --description "Development headers and tools for the realm-core database component" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "realm = ${VERSION}-${BUILD_NUMBER}.el6" \
-    -d "openssl-devel" \
+    -d "librealm = ${VERSION}-${ITERATION}" \
+    -d "libssl-dev" \
     -C /devel \
-    usr/lib64 usr/include usr/bin
+    usr/lib usr/include usr/bin
 
 fpm \
-    -t rpm \
+    -t deb \
     -s dir \
-    -n realm-node \
-    --rpm-dist el6 \
+    -n librealm-node \
     --license "Realm License" \
     --version ${VERSION} \
-    --iteration ${BUILD_NUMBER} \
-    --description "Realm-core C++ library for node" \
+    --iteration ${ITERATION} \
+    --description "Realm-core database component for node" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
@@ -111,35 +114,33 @@ fpm \
     $doc_folder
 
 fpm \
-    -t rpm \
+    -t deb \
     -s dir \
-    -n realm-node-devel \
-    --rpm-dist el6 \
+    -n librealm-node-dev \
     --license "Realm License" \
     --version ${VERSION} \
-    --iteration ${BUILD_NUMBER} \
-    --description "Development realm-core C++ library for node" \
+    --iteration ${ITERATION} \
+    --description "Development realm-core database component for node" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "realm-devel = ${VERSION}-${BUILD_NUMBER}.el6" \
+    -d "librealm-dev = ${VERSION}-${ITERATION}" \
     -C /node-devel \
-    usr/lib64
+    usr/lib
 
 fpm \
-    -t rpm \
+    -t deb \
     -s dir \
     -n realm-utils \
-    --rpm-dist el6 \
     --license "Realm License" \
     --version ${VERSION} \
-    --iteration ${BUILD_NUMBER} \
+    --iteration ${ITERATION} \
     --description "Utilities to work with Realm files" \
     --url "https://realm.io" \
     --category "Applications/Databases" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "realm = ${VERSION}-${BUILD_NUMBER}.el6" \
+    -d "librealm = ${VERSION}-${ITERATION}" \
     -C /utils \
     usr/bin

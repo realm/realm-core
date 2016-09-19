@@ -145,22 +145,21 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
 {
     REALM_ASSERT(column_ndx <= m_types.size());
 
-    if (type != col_type_BackLink) // backlinks do not have names
+    if (type != col_type_BackLink)        // backlinks do not have names
         m_names.insert(column_ndx, name); // Throws
-    m_types.insert(column_ndx, type); // Throws
+    m_types.insert(column_ndx, type);     // Throws
     // FIXME: So far, attributes are never reported to the replication system
     m_attr.insert(column_ndx, attr); // Throws
 
-    bool is_subspec_type = type == col_type_Table || type == col_type_Link ||
-                           type == col_type_LinkList || type == col_type_BackLink;
+    bool is_subspec_type =
+        type == col_type_Table || type == col_type_Link || type == col_type_LinkList || type == col_type_BackLink;
     if (is_subspec_type) {
         Allocator& alloc = m_top.get_alloc();
         // `m_subspecs` array is only present when the spec contains a subtable column
         REALM_ASSERT_EX(m_subspecs.is_attached() == has_subspec(), m_subspecs.is_attached(), m_top.size());
         if (!m_subspecs.is_attached()) {
             bool context_flag = false;
-            MemRef subspecs_mem =
-                Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
+            MemRef subspecs_mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
             _impl::DeepArrayRefDestroyGuard dg(subspecs_mem.get_ref(), alloc);
             if (m_top.size() == 3) {
                 int_fast64_t v(from_ref(subspecs_mem.get_ref()));
@@ -219,7 +218,7 @@ void Spec::erase_column(size_t column_ndx)
 
         Array subspec_top(m_top.get_alloc());
         subspec_top.init_from_ref(subspec_ref);
-        subspec_top.destroy_deep(); // recursively delete entire subspec
+        subspec_top.destroy_deep();    // recursively delete entire subspec
         m_subspecs.erase(subspec_ndx); // Throws
     }
     else if (tf::is_link_type(type)) {
@@ -246,8 +245,8 @@ void Spec::erase_column(size_t column_ndx)
     REALM_ASSERT((column_ndx >= m_names.size()) == (type == col_type_BackLink));
     if (type != col_type_BackLink)
         m_names.erase(column_ndx); // Throws
-    m_types.erase(column_ndx);  // Throws
-    m_attr.erase(column_ndx);  // Throws
+    m_types.erase(column_ndx);     // Throws
+    m_attr.erase(column_ndx);      // Throws
 
     update_has_strong_link_columns();
 }
@@ -256,7 +255,7 @@ void Spec::erase_column(size_t column_ndx)
 void Spec::move_column(size_t from_ndx, size_t to_ndx)
 {
     REALM_ASSERT_3(from_ndx, <, m_types.size());
-    REALM_ASSERT_3(to_ndx,   <, m_types.size());
+    REALM_ASSERT_3(to_ndx, <, m_types.size());
     using tf = _impl::TableFriend;
 
     // If the moved column is a column type that has a subspec,
@@ -276,6 +275,14 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
         // Table columns and link type columns have a single subspec.
         size_t old_subspec_ndx = get_subspec_ndx(from_ndx);
         size_t new_subspec_ndx = get_subspec_ndx_after(to_ndx, from_ndx);
+        // The new_subspec_ndx calculation has skipped entry from_ndx because it
+        // has an entry in the subspec still. If the entry that replaces
+        // from_ndx has any entries in the subspec then we need to retroactivly
+        // account for them now.
+        if (from_ndx < to_ndx) {
+            ColumnType to_type = ColumnType(m_types.get(to_ndx));
+            new_subspec_ndx += get_subspec_entries_for_col_type(to_type);
+        }
         if (old_subspec_ndx != new_subspec_ndx) {
             m_subspecs.move_rotate(old_subspec_ndx, new_subspec_ndx);
         }
@@ -290,11 +297,9 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
 
 size_t Spec::get_subspec_ndx(size_t column_ndx) const noexcept
 {
-    REALM_ASSERT(column_ndx == get_column_count() ||
-                 get_column_type(column_ndx) == col_type_Table    ||
-                 get_column_type(column_ndx) == col_type_Link     ||
-                 get_column_type(column_ndx) == col_type_LinkList ||
-                 get_column_type(column_ndx) == col_type_BackLink );
+    REALM_ASSERT(column_ndx == get_column_count() || get_column_type(column_ndx) == col_type_Table ||
+                 get_column_type(column_ndx) == col_type_Link || get_column_type(column_ndx) == col_type_LinkList ||
+                 get_column_type(column_ndx) == col_type_BackLink);
 
     return get_subspec_ndx_after(column_ndx, column_ndx);
 }
@@ -312,19 +317,25 @@ size_t Spec::get_subspec_ndx_after(size_t column_ndx, size_t skip_column_ndx) co
         }
 
         ColumnType type = ColumnType(m_types.get(i));
-        if (type == col_type_Table || type == col_type_Link || type == col_type_LinkList) {
-            ++subspec_ndx;
-        }
-        else if (type == col_type_BackLink) {
-            subspec_ndx += 2; // table and column refs
-        }
+        subspec_ndx += get_subspec_entries_for_col_type(type);
     }
     return subspec_ndx;
 }
 
 
-void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
-                                  ArrayParent*& keys_parent, size_t& keys_ndx)
+size_t Spec::get_subspec_entries_for_col_type(ColumnType type) const noexcept
+{
+    if (type == col_type_Table || type == col_type_Link || type == col_type_LinkList) {
+        return 1; // index of dest column
+    }
+    else if (type == col_type_BackLink) {
+        return 2; // index of table and index of linked column
+    }
+    return 0; // no entries for other column types (subspec array is sparse)
+}
+
+
+void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref, ArrayParent*& keys_parent, size_t& keys_ndx)
 {
     REALM_ASSERT(get_column_type(column_ndx) == col_type_String);
 
@@ -351,7 +362,7 @@ void Spec::upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
 
     // Return parent info
     keys_parent = &m_enumkeys;
-    keys_ndx    = ins_pos;
+    keys_ndx = ins_pos;
 }
 
 
@@ -368,8 +379,7 @@ size_t Spec::get_enumkeys_ndx(size_t column_ndx) const noexcept
 }
 
 
-ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent,
-                                size_t* keys_ndx) noexcept
+ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent, size_t* keys_ndx) noexcept
 {
     size_t enumkeys_ndx = get_enumkeys_ndx(column_ndx);
 
@@ -386,8 +396,7 @@ ref_type Spec::get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent,
 size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const noexcept
 {
     REALM_ASSERT(column_ndx < get_column_count());
-    REALM_ASSERT(get_column_type(column_ndx) == col_type_Link ||
-                 get_column_type(column_ndx) == col_type_LinkList ||
+    REALM_ASSERT(get_column_type(column_ndx) == col_type_Link || get_column_type(column_ndx) == col_type_LinkList ||
                  get_column_type(column_ndx) == col_type_BackLink);
 
     // Group-level index of opposite table is stored as tagged int in the
@@ -406,8 +415,7 @@ size_t Spec::get_opposite_link_table_ndx(size_t column_ndx) const noexcept
 void Spec::set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx)
 {
     REALM_ASSERT(column_ndx < get_column_count());
-    REALM_ASSERT(get_column_type(column_ndx) == col_type_Link ||
-                 get_column_type(column_ndx) == col_type_LinkList ||
+    REALM_ASSERT(get_column_type(column_ndx) == col_type_Link || get_column_type(column_ndx) == col_type_LinkList ||
                  get_column_type(column_ndx) == col_type_BackLink);
 
     // position of target table is stored as tagged int
@@ -564,17 +572,17 @@ bool Spec::operator==(const Spec& spec) const noexcept
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void Spec::verify() const
 {
     REALM_ASSERT(m_names.size() == get_public_column_count());
-    REALM_ASSERT(m_types.size()  == get_column_count());
-    REALM_ASSERT(m_attr.size()  == get_column_count());
+    REALM_ASSERT(m_types.size() == get_column_count());
+    REALM_ASSERT(m_attr.size() == get_column_count());
 
-    REALM_ASSERT(m_types.get_ref()  == m_top.get_as_ref(0));
+    REALM_ASSERT(m_types.get_ref() == m_top.get_as_ref(0));
     REALM_ASSERT(m_names.get_ref() == m_top.get_as_ref(1));
-    REALM_ASSERT(m_attr.get_ref()  == m_top.get_as_ref(2));
+    REALM_ASSERT(m_attr.get_ref() == m_top.get_as_ref(2));
 }
 
 
@@ -598,8 +606,8 @@ void Spec::to_dot(std::ostream& out, StringData title) const
     bool have_subspecs = false;
     for (size_t i = 0; i < num_cols; ++i) {
         ColumnType type = ColumnType(m_types.get(i));
-        if (type == col_type_Table || type == col_type_Link
-                || type == col_type_LinkList || type == col_type_BackLink) {
+        if (type == col_type_Table || type == col_type_Link || type == col_type_LinkList ||
+            type == col_type_BackLink) {
             have_subspecs = true;
             break;
         }

@@ -27,7 +27,7 @@
 #include "../util/benchmark_results.hpp"
 #include "../util/test_path.hpp"
 #if REALM_ENABLE_ENCRYPTION
-    #include "../util/crypt_key.hpp"
+#include "../util/crypt_key.hpp"
 #endif
 
 using namespace realm;
@@ -58,16 +58,30 @@ const double min_duration_s = 0.1;
 const double min_warmup_time_s = 0.05;
 
 struct Benchmark {
+    virtual ~Benchmark()
+    {
+    }
     virtual const char* name() const = 0;
-    virtual void before_all(SharedGroup&) {}
-    virtual void after_all(SharedGroup&) {}
-    virtual void before_each(SharedGroup&) {}
-    virtual void after_each(SharedGroup&) {}
+    virtual void before_all(SharedGroup&)
+    {
+    }
+    virtual void after_all(SharedGroup&)
+    {
+    }
+    virtual void before_each(SharedGroup&)
+    {
+    }
+    virtual void after_each(SharedGroup&)
+    {
+    }
     virtual void operator()(SharedGroup&) = 0;
 };
 
 struct BenchmarkUnorderedTableViewClear : Benchmark {
-    const char* name() const { return "UnorderedTableViewClear"; }
+    const char* name() const
+    {
+        return "UnorderedTableViewClear";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -91,7 +105,10 @@ struct BenchmarkUnorderedTableViewClear : Benchmark {
 };
 
 struct AddTable : Benchmark {
-    const char* name() const { return "AddTable"; }
+    const char* name() const
+    {
+        return "AddTable";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -145,6 +162,138 @@ struct BenchmarkWithStrings : BenchmarkWithStringsTable {
     }
 };
 
+struct BenchmarkWithStringsFewDup : BenchmarkWithStringsTable {
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkWithStringsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("StringOnly");
+        t->add_empty_row(BASE_SIZE * 4);
+        Random r;
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+            std::stringstream ss;
+            ss << r.draw_int(0, BASE_SIZE * 2);
+            auto s = ss.str();
+            t->set_string(0, i, s);
+        }
+        t->add_search_index(0);
+        tr.commit();
+    }
+};
+
+struct BenchmarkWithStringsManyDup : BenchmarkWithStringsTable {
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkWithStringsTable::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("StringOnly");
+        t->add_empty_row(BASE_SIZE * 4);
+        Random r;
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+            std::stringstream ss;
+            ss << r.draw_int(0, 100);
+            auto s = ss.str();
+            t->set_string(0, i, s);
+        }
+        t->add_search_index(0);
+        tr.commit();
+    }
+};
+
+struct BenchmarkDistinctStringFewDupes : BenchmarkWithStringsFewDup {
+    const char* name() const
+    {
+        return "DistinctStringFewDupes";
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        ConstTableView view = table->get_distinct_view(0);
+    }
+};
+
+struct BenchmarkDistinctStringManyDupes : BenchmarkWithStringsManyDup {
+    const char* name() const
+    {
+        return "DistinctStringManyDupes";
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        ConstTableView view = table->get_distinct_view(0);
+    }
+};
+
+struct BenchmarkFindAllStringFewDupes : BenchmarkWithStringsFewDup {
+    const char* name() const
+    {
+        return "FindAllStringFewDupes";
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        ConstTableView view = table->where().equal(0, StringData("10", 2)).find_all();
+    }
+};
+
+struct BenchmarkFindAllStringManyDupes : BenchmarkWithStringsManyDup {
+    const char* name() const
+    {
+        return "FindAllStringManyDupes";
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        ConstTableView view = table->where().equal(0, StringData("10", 2)).find_all();
+    }
+};
+
+struct BenchmarkFindFirstStringFewDupes : BenchmarkWithStringsFewDup {
+    const char* name() const
+    {
+        return "FindFirstStringFewDupes";
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        std::vector<std::string> strs = {
+            "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
+        };
+        for (auto s : strs) {
+            table->where().equal(0, StringData(s)).find();
+        }
+    }
+};
+
+struct BenchmarkFindFirstStringManyDupes : BenchmarkWithStringsManyDup {
+    const char* name() const
+    {
+        return "FindFirstStringManyDupes";
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        std::vector<std::string> strs = {
+            "10", "20", "30", "40", "50", "60", "70", "80", "90", "100",
+        };
+        for (auto s : strs) {
+            table->where().equal(0, StringData(s)).find();
+        }
+    }
+};
+
 struct BenchmarkWithLongStrings : BenchmarkWithStrings {
     void before_all(SharedGroup& group)
     {
@@ -194,7 +343,10 @@ struct BenchmarkWithInts : BenchmarkWithIntsTable {
 };
 
 struct BenchmarkQuery : BenchmarkWithStrings {
-    const char* name() const { return "Query"; }
+    const char* name() const
+    {
+        return "Query";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -205,7 +357,10 @@ struct BenchmarkQuery : BenchmarkWithStrings {
 };
 
 struct BenchmarkSize : BenchmarkWithStrings {
-    const char* name() const { return "Size"; }
+    const char* name() const
+    {
+        return "Size";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -217,7 +372,10 @@ struct BenchmarkSize : BenchmarkWithStrings {
 };
 
 struct BenchmarkSort : BenchmarkWithStrings {
-    const char* name() const { return "Sort"; }
+    const char* name() const
+    {
+        return "Sort";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -228,18 +386,23 @@ struct BenchmarkSort : BenchmarkWithStrings {
 };
 
 struct BenchmarkEmptyCommit : Benchmark {
-    const char* name() const { return "EmptyCommit"; }
+    const char* name() const
+    {
+        return "EmptyCommit";
+    }
 
     void operator()(SharedGroup& group)
     {
         WriteTransaction tr(group);
         tr.commit();
     }
-
 };
 
 struct BenchmarkSortInt : BenchmarkWithInts {
-    const char* name() const { return "SortInt"; }
+    const char* name() const
+    {
+        return "SortInt";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -250,7 +413,10 @@ struct BenchmarkSortInt : BenchmarkWithInts {
 };
 
 struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
-    const char* name() const { return "DistinctIntNoDupes"; }
+    const char* name() const
+    {
+        return "DistinctIntNoDupes";
+    }
 
     void before_all(SharedGroup& group)
     {
@@ -275,7 +441,10 @@ struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
 };
 
 struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
-    const char* name() const { return "DistinctIntManyDupes"; }
+    const char* name() const
+    {
+        return "DistinctIntManyDupes";
+    }
 
     void before_all(SharedGroup& group)
     {
@@ -300,7 +469,10 @@ struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
 };
 
 struct BenchmarkInsert : BenchmarkWithStringsTable {
-    const char* name() const { return "Insert"; }
+    const char* name() const
+    {
+        return "Insert";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -315,7 +487,10 @@ struct BenchmarkInsert : BenchmarkWithStringsTable {
 };
 
 struct BenchmarkGetString : BenchmarkWithStrings {
-    const char* name() const { return "GetString"; }
+    const char* name() const
+    {
+        return "GetString";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -331,7 +506,10 @@ struct BenchmarkGetString : BenchmarkWithStrings {
 };
 
 struct BenchmarkSetString : BenchmarkWithStrings {
-    const char* name() const { return "SetString"; }
+    const char* name() const
+    {
+        return "SetString";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -346,7 +524,10 @@ struct BenchmarkSetString : BenchmarkWithStrings {
 };
 
 struct BenchmarkCreateIndex : BenchmarkWithStrings {
-    const char* name() const { return "CreateIndex"; }
+    const char* name() const
+    {
+        return "CreateIndex";
+    }
     void operator()(SharedGroup& group)
     {
         WriteTransaction tr(group);
@@ -357,7 +538,10 @@ struct BenchmarkCreateIndex : BenchmarkWithStrings {
 };
 
 struct BenchmarkGetLongString : BenchmarkWithLongStrings {
-    const char* name() const { return "GetLongString"; }
+    const char* name() const
+    {
+        return "GetLongString";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -373,7 +557,10 @@ struct BenchmarkGetLongString : BenchmarkWithLongStrings {
 };
 
 struct BenchmarkSetLongString : BenchmarkWithLongStrings {
-    const char* name() const { return "SetLongString"; }
+    const char* name() const
+    {
+        return "SetLongString";
+    }
 
     void operator()(SharedGroup& group)
     {
@@ -388,7 +575,10 @@ struct BenchmarkSetLongString : BenchmarkWithLongStrings {
 };
 
 struct BenchmarkQueryNot : Benchmark {
-    const char* name() const { return "QueryNot"; }
+    const char* name() const
+    {
+        return "QueryNot";
+    }
 
     void before_all(SharedGroup& group)
     {
@@ -421,7 +611,10 @@ struct BenchmarkQueryNot : Benchmark {
 };
 
 struct BenchmarkGetLinkList : Benchmark {
-    const char* name() const { return "GetLinkList"; }
+    const char* name() const
+    {
+        return "GetLinkList";
+    }
     static const size_t rows = 10000;
 
     void before_all(SharedGroup& group)
@@ -461,30 +654,30 @@ struct BenchmarkGetLinkList : Benchmark {
     }
 };
 
-const char* to_lead_cstr(SharedGroup::DurabilityLevel level)
+const char* to_lead_cstr(SharedGroupOptions::Durability level)
 {
     switch (level) {
-        case SharedGroup::durability_Full:
+        case SharedGroupOptions::Durability::Full:
             return "Full   ";
-        case SharedGroup::durability_MemOnly:
+        case SharedGroupOptions::Durability::MemOnly:
             return "MemOnly";
 #ifndef _WIN32
-        case SharedGroup::durability_Async:
+        case SharedGroupOptions::Durability::Async:
             return "Async  ";
 #endif
     }
     return nullptr;
 }
 
-const char* to_ident_cstr(SharedGroup::DurabilityLevel level)
+const char* to_ident_cstr(SharedGroupOptions::Durability level)
 {
     switch (level) {
-        case SharedGroup::durability_Full:
+        case SharedGroupOptions::Durability::Full:
             return "Full";
-        case SharedGroup::durability_MemOnly:
+        case SharedGroupOptions::Durability::MemOnly:
             return "MemOnly";
 #ifndef _WIN32
-        case SharedGroup::durability_Async:
+        case SharedGroupOptions::Durability::Async:
             return "Async";
 #endif
     }
@@ -506,57 +699,56 @@ void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
 
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
-template<typename B>
+template <typename B>
 void run_benchmark(TestContext& test_context, BenchmarkResults& results)
 {
-    typedef std::pair<SharedGroup::DurabilityLevel, const char*> config_pair;
+    typedef std::pair<SharedGroupOptions::Durability, const char*> config_pair;
     std::vector<config_pair> configs;
 
-    configs.push_back(config_pair(SharedGroup::durability_MemOnly, nullptr));
+    configs.push_back(config_pair(SharedGroupOptions::Durability::MemOnly, nullptr));
 #if REALM_ENABLE_ENCRYPTION
-    configs.push_back(config_pair(SharedGroup::durability_MemOnly, crypt_key(true)));
+    configs.push_back(config_pair(SharedGroupOptions::Durability::MemOnly, crypt_key(true)));
 #endif
 
-    configs.push_back(config_pair(SharedGroup::durability_Full, nullptr));
+    configs.push_back(config_pair(SharedGroupOptions::Durability::Full, nullptr));
 
 #if REALM_ENABLE_ENCRYPTION
-    configs.push_back(config_pair(SharedGroup::durability_Full, crypt_key(true)));
+    configs.push_back(config_pair(SharedGroupOptions::Durability::Full, crypt_key(true)));
 #endif
 
     Timer timer(Timer::type_UserTime);
 
     for (auto it = configs.begin(); it != configs.end(); ++it) {
-        SharedGroup::DurabilityLevel level = it->first;
+        SharedGroupOptions::Durability level = it->first;
         const char* key = it->second;
         B benchmark;
 
         // Generate the benchmark result texts:
         std::stringstream lead_text_ss;
         std::stringstream ident_ss;
-        lead_text_ss << benchmark.name() << " (" << to_lead_cstr(level)
-                     << ", " << (key == nullptr ? "EncryptionOff" : "EncryptionOn") << ")";
-        ident_ss     << benchmark.name() << "_" << to_ident_cstr(level)
-                     << (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
+        lead_text_ss << benchmark.name() << " (" << to_lead_cstr(level) << ", "
+                     << (key == nullptr ? "EncryptionOff" : "EncryptionOn") << ")";
+        ident_ss << benchmark.name() << "_" << to_ident_cstr(level)
+                 << (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
         std::string ident = ident_ss.str();
 
         // Open a SharedGroup:
         SHARED_GROUP_TEST_PATH(realm_path);
         std::unique_ptr<SharedGroup> group;
-        group.reset(new SharedGroup(realm_path, false, level, key));
+        group.reset(new SharedGroup(realm_path, false, SharedGroupOptions(level, key)));
 
         benchmark.before_all(*group);
 
         // Warm-up and initial measuring:
-        Timer t_baseline(Timer::type_UserTime);
         size_t num_warmup_reps = 1;
         double time_to_execute_warmup_reps = 0;
         while (time_to_execute_warmup_reps < min_warmup_time_s && num_warmup_reps < max_repetitions) {
             num_warmup_reps *= 10;
-            Timer t_baseline(Timer::type_UserTime);
+            Timer t(Timer::type_UserTime);
             for (size_t i = 0; i < num_warmup_reps; ++i) {
-                run_benchmark_once(benchmark, *group, t_baseline);
+                run_benchmark_once(benchmark, *group, t);
             }
-            time_to_execute_warmup_reps = t_baseline.get_elapsed_time();
+            time_to_execute_warmup_reps = t.get_elapsed_time();
         }
 
         size_t required_reps = size_t(min_duration_s / (time_to_execute_warmup_reps / num_warmup_reps));
@@ -590,8 +782,7 @@ TEST(benchmark_common_tasks_main)
     std::string results_file_stem = test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
 
-#define BENCH(B) \
-    run_benchmark<B>(test_context, results)
+#define BENCH(B) run_benchmark<B>(test_context, results)
 
     BENCH(BenchmarkUnorderedTableViewClear);
     BENCH(BenchmarkEmptyCommit);
@@ -603,6 +794,12 @@ TEST(benchmark_common_tasks_main)
     BENCH(BenchmarkSortInt);
     BENCH(BenchmarkDistinctIntFewDupes);
     BENCH(BenchmarkDistinctIntManyDupes);
+    BENCH(BenchmarkDistinctStringFewDupes);
+    BENCH(BenchmarkDistinctStringManyDupes);
+    BENCH(BenchmarkFindAllStringFewDupes);
+    BENCH(BenchmarkFindAllStringManyDupes);
+    BENCH(BenchmarkFindFirstStringFewDupes);
+    BENCH(BenchmarkFindFirstStringManyDupes);
     BENCH(BenchmarkInsert);
     BENCH(BenchmarkGetString);
     BENCH(BenchmarkSetString);
