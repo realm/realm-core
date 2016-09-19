@@ -31,7 +31,7 @@
 #endif
 
 #ifdef ANDROID
-    #include <android/log.h>
+#include <android/log.h>
 #endif
 
 
