@@ -368,9 +368,8 @@ NotifierPackage::NotifierPackage(Realm& realm, std::exception_ptr error,
 
 void NotifierPackage::package_and_wait(SharedGroup& sg)
 {
-    if (!m_lock || m_error)
+    if (!m_lock || m_error || !*this)
         return;
-    REALM_ASSERT(*this);
 
     using sgf = SharedGroupFriend;
     auto target_version = sgf::get_version_of_latest_snapshot(sg);
