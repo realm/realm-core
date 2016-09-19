@@ -476,8 +476,7 @@ void Realm::commit_transaction()
         throw InvalidTransactionException("Can't commit a non-existing write transaction");
     }
 
-    transaction::commit(*m_shared_group, m_binding_context.get());
-    m_coordinator->send_commit_notifications(*this);
+    m_coordinator->commit_write(*this);
 }
 
 void Realm::cancel_transaction()

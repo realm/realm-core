@@ -273,21 +273,43 @@ void RealmCoordinator::clear_all_caches()
     }
 }
 
-void RealmCoordinator::send_commit_notifications(Realm& source_realm)
+void RealmCoordinator::wake_up_notifier_worker()
+{
+    if (m_notifier) {
+        m_notifier->notify_others();
+    }
+}
+
+void RealmCoordinator::commit_write(Realm& realm)
 {
     REALM_ASSERT(!m_config.read_only());
+    REALM_ASSERT(realm.is_in_transaction());
+
+    {
+        // Need to acquire this lock before committing or another process could
+        // perform a write and notify us before we get the chance to set the
+        // skip version
+        std::lock_guard<std::mutex> l(m_notifier_mutex);
+
+        transaction::commit(Realm::Internal::get_shared_group(realm), realm.m_binding_context.get());
+
+        // Don't need to check m_new_notifiers because those don't skip versions
+        bool have_notifiers = std::any_of(m_notifiers.begin(), m_notifiers.end(),
+                                          [&](auto&& notifier) { return notifier->is_for_realm(realm); });
+        if (have_notifiers) {
+            m_notifier_skip_version = Realm::Internal::get_shared_group(realm).get_version_of_current_transaction();
+        }
+    }
+
     if (m_notifier) {
         m_notifier->notify_others();
     }
 #if REALM_ENABLE_SYNC
     if (m_sync_session) {
-        auto& sg = Realm::Internal::get_shared_group(source_realm);
+        auto& sg = Realm::Internal::get_shared_group(realm);
         auto version = LangBindHelper::get_version_of_latest_snapshot(sg);
         SyncSession::Internal::nonsync_transact_notify(*m_sync_session, version);
     }
-#else
-    // Silence "unused parameter 'source_realm'" warning
-    (void)source_realm;
 #endif
 }
 
@@ -541,10 +563,29 @@ void RealmCoordinator::run_async_notifiers()
     }
     REALM_ASSERT_3(m_advancer_sg->get_transact_stage(), ==, SharedGroup::transact_Ready);
 
+    auto skip_version = m_notifier_skip_version;
+    m_notifier_skip_version = {0, 0};
+
     // Make a copy of the notifiers vector and then release the lock to avoid
     // blocking other threads trying to register or unregister notifiers while we run them
     auto notifiers = m_notifiers;
     lock.unlock();
+
+    if (skip_version.version) {
+        REALM_ASSERT(version >= skip_version);
+        IncrementalChangeInfo change_info(*m_notifier_sg, m_config.schema_mode, notifiers);
+        for (auto& notifier : notifiers)
+            notifier->add_required_change_info(change_info.current());
+        change_info.advance_to_final(skip_version);
+
+        for (auto& notifier : notifiers)
+            notifier->run();
+
+        lock.lock();
+        for (auto& notifier : notifiers)
+            notifier->prepare_handover();
+        lock.unlock();
+    }
 
     // Advance the non-new notifiers to the same version as we advanced the new
     // ones to (or the latest if there were no new ones)

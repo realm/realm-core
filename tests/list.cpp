@@ -273,6 +273,37 @@ TEST_CASE("list") {
             }
         }
 
+        SECTION("multiple callbacks for the same Lists can be skipped individually") {
+            auto token = require_no_change();
+            auto token2 = require_change();
+
+            r->begin_transaction();
+            lv->add(0);
+            token.suppress_next();
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            REQUIRE_INDICES(change.insertions, 10);
+        }
+
+        SECTION("multiple Lists for the same LinkView can be skipped individually") {
+            auto token = require_no_change();
+
+            List list2(r, lv);
+            auto token2 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            advance_and_notify(*r);
+
+            r->begin_transaction();
+            lv->add(0);
+            token.suppress_next();
+            r->commit_transaction();
+
+            advance_and_notify(*r);
+            REQUIRE_INDICES(change.insertions, 10);
+        }
+
         SECTION("modifying a different table does not send a change notification") {
             auto token = require_no_change();
             write([&] { other_lv->add(0); });

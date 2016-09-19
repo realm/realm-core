@@ -182,9 +182,9 @@ size_t CollectionNotifier::add_callback(CollectionChangeCallback callback)
 
     std::lock_guard<std::mutex> lock(m_callback_mutex);
     auto token = next_token();
-    m_callbacks.push_back({std::move(callback), {}, {}, token, false});
+    m_callbacks.push_back({std::move(callback), {}, {}, token, false, false});
     if (m_callback_index == npos) { // Don't need to wake up if we're already sending notifications
-        Realm::Internal::get_coordinator(*m_realm).send_commit_notifications(*m_realm);
+        Realm::Internal::get_coordinator(*m_realm).wake_up_notifier_worker();
         m_have_callbacks = true;
     }
     return token;
@@ -192,15 +192,12 @@ size_t CollectionNotifier::add_callback(CollectionChangeCallback callback)
 
 void CollectionNotifier::remove_callback(size_t token)
 {
+    // the callback needs to be destroyed after releasing the lock as destroying
+    // it could cause user code to be called
     Callback old;
     {
         std::lock_guard<std::mutex> lock(m_callback_mutex);
-        REALM_ASSERT(m_error || m_callbacks.size() > 0);
-
-        auto it = find_if(begin(m_callbacks), end(m_callbacks),
-                          [=](const auto& c) { return c.token == token; });
-        // We should only fail to find the callback if it was removed due to an error
-        REALM_ASSERT(m_error || it != end(m_callbacks));
+        auto it = find_callback(token);
         if (it == end(m_callbacks)) {
             return;
         }
@@ -215,6 +212,33 @@ void CollectionNotifier::remove_callback(size_t token)
 
         m_have_callbacks = !m_callbacks.empty();
     }
+}
+
+void CollectionNotifier::suppress_next_notification(size_t token)
+{
+    {
+        std::lock_guard<std::mutex> lock(m_realm_mutex);
+        REALM_ASSERT(m_realm);
+        m_realm->verify_thread();
+        m_realm->verify_in_write();
+    }
+
+    std::lock_guard<std::mutex> lock(m_callback_mutex);
+    auto it = find_callback(token);
+    if (it != end(m_callbacks)) {
+        it->skip_next = true;
+    }
+}
+
+std::vector<CollectionNotifier::Callback>::iterator CollectionNotifier::find_callback(size_t token)
+{
+    REALM_ASSERT(m_error || m_callbacks.size() > 0);
+
+    auto it = find_if(begin(m_callbacks), end(m_callbacks),
+                      [=](const auto& c) { return c.token == token; });
+    // We should only fail to find the callback if it was removed due to an error
+    REALM_ASSERT(m_error || it != end(m_callbacks));
+    return it;
 }
 
 void CollectionNotifier::unregister() noexcept
@@ -360,12 +384,16 @@ void CollectionNotifier::detach()
 void CollectionNotifier::add_changes(CollectionChangeBuilder change)
 {
     std::lock_guard<std::mutex> lock(m_callback_mutex);
-    if (m_callbacks.size() == 1) {
-        m_callbacks[0].accumulated_changes.merge(std::move(change));
-    }
-    else {
-        for (auto& callback : m_callbacks) {
-            callback.accumulated_changes.merge(CollectionChangeBuilder(change));
+    for (auto& callback : m_callbacks) {
+        if (callback.skip_next) {
+            REALM_ASSERT_DEBUG(callback.accumulated_changes.empty());
+            callback.skip_next = false;
+        }
+        else {
+            if (&callback == &m_callbacks.back())
+                callback.accumulated_changes.merge(std::move(change));
+            else
+                callback.accumulated_changes.merge(CollectionChangeBuilder(change));
         }
     }
 }

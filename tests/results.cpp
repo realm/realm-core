@@ -546,6 +546,196 @@ TEST_CASE("notifications: async delivery") {
     }
 }
 
+TEST_CASE("notifications: skip") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {
+            {"value", PropertyType::Int}
+        }},
+    });
+
+    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    auto table = r->read_group().get_table("class_object");
+
+    r->begin_transaction();
+    table->add_empty_row(10);
+    for (int i = 0; i < 10; ++i)
+        table->set_int(0, i, i * 2);
+    r->commit_transaction();
+
+    Results results(r, table->where());
+
+    auto add_callback = [](Results& results, int& calls, CollectionChangeSet& changes) {
+        return results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            ++calls;
+            changes = std::move(c);
+        });
+    };
+
+    auto make_local_change = [&](auto& token) {
+        r->begin_transaction();
+        table->add_empty_row();
+        token.suppress_next();
+        r->commit_transaction();
+    };
+
+    auto make_remote_change = [&] {
+        auto r2 = coordinator->get_realm();
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->add_empty_row();
+        r2->commit_transaction();
+    };
+
+    int calls1 = 0;
+    CollectionChangeSet changes1;
+    auto token1 = add_callback(results, calls1, changes1);
+
+    SECTION("no notification is sent when only callback is skipped") {
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        make_local_change(token1);
+        advance_and_notify(*r);
+
+        REQUIRE(calls1 == 1);
+        REQUIRE(changes1.empty());
+    }
+
+    SECTION("unskipped tokens for the same Results are still delivered") {
+        int calls2 = 0;
+        CollectionChangeSet changes2;
+        auto token2 = add_callback(results, calls2, changes2);
+
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls2 == 1);
+
+        make_local_change(token1);
+        advance_and_notify(*r);
+
+        REQUIRE(calls1 == 1);
+        REQUIRE(changes1.empty());
+        REQUIRE(calls2 == 2);
+        REQUIRE_INDICES(changes2.insertions, 10);
+    }
+
+    SECTION("unskipped tokens for different Results are still delivered") {
+        Results results2(r, table->where());
+        int calls2 = 0;
+        CollectionChangeSet changes2;
+        auto token2 = add_callback(results2, calls2, changes2);
+
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls2 == 1);
+
+        make_local_change(token1);
+        advance_and_notify(*r);
+
+        REQUIRE(calls1 == 1);
+        REQUIRE(changes1.empty());
+        REQUIRE(calls2 == 2);
+        REQUIRE_INDICES(changes2.insertions, 10);
+    }
+
+    SECTION("additional commits which occur before calculation are merged in") {
+        int calls2 = 0;
+        CollectionChangeSet changes2;
+        auto token2 = add_callback(results, calls2, changes2);
+
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls2 == 1);
+
+        make_local_change(token1);
+        make_remote_change();
+        advance_and_notify(*r);
+
+        REQUIRE(calls1 == 2);
+        REQUIRE_INDICES(changes1.insertions, 11);
+        REQUIRE(calls2 == 2);
+        REQUIRE_INDICES(changes2.insertions, 10, 11);
+    }
+
+    SECTION("additional commits which occur before delivery are merged in") {
+        int calls2 = 0;
+        CollectionChangeSet changes2;
+        auto token2 = add_callback(results, calls2, changes2);
+
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls2 == 1);
+
+        make_local_change(token1);
+        coordinator->on_change();
+        make_remote_change();
+        advance_and_notify(*r);
+
+        REQUIRE(calls1 == 2);
+        REQUIRE_INDICES(changes1.insertions, 11);
+        REQUIRE(calls2 == 2);
+        REQUIRE_INDICES(changes2.insertions, 10, 11);
+    }
+
+    SECTION("skipping must be done from within a write transaction") {
+        REQUIRE_THROWS(token1.suppress_next());
+    }
+
+    SECTION("skipping must be done from the Realm's thread") {
+        advance_and_notify(*r);
+        r->begin_transaction();
+        std::thread([&] {
+            REQUIRE_THROWS(token1.suppress_next());
+        }).join();
+        r->cancel_transaction();
+    }
+
+    SECTION("new notifiers do not interfere with skipping") {
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        CollectionChangeSet changes;
+
+        // new notifier at a version before the skipped one
+        auto r2 = coordinator->get_realm();
+        Results results2(r2, r2->read_group().get_table("class_object")->where());
+        int calls2 = 0;
+        auto token2 = add_callback(results2, calls2, changes);
+
+        make_local_change(token1);
+
+        // new notifier at the skipped version
+        auto r3 = coordinator->get_realm();
+        Results results3(r3, r3->read_group().get_table("class_object")->where());
+        int calls3 = 0;
+        auto token3 = add_callback(results3, calls3, changes);
+
+        make_remote_change();
+
+        // new notifier at version after the skipped one
+        auto r4 = coordinator->get_realm();
+        Results results4(r4, r4->read_group().get_table("class_object")->where());
+        int calls4 = 0;
+        auto token4 = add_callback(results4, calls4, changes);
+
+        coordinator->on_change();
+        r->notify();
+        r2->notify();
+        r3->notify();
+        r4->notify();
+
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 1);
+        REQUIRE(calls3 == 1);
+        REQUIRE(calls4 == 1);
+    }
+}
+
 #if REALM_PLATFORM_APPLE
 TEST_CASE("notifications: async error handling") {
     InMemoryTestFile config;
