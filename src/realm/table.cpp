@@ -2405,19 +2405,9 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
     for (size_t col_ndx = 0; col_ndx < col_end; ++col_ndx) {
         if (m_spec.get_column_type(col_ndx) == col_type_LinkList) {
             auto& col = get_column_link_list(col_ndx);
-            bool old_is_empty = !col.has_links(row_ndx);
-            bool new_is_empty = !col.has_links(new_row_ndx);
-            REALM_ASSERT_EX(old_is_empty || new_is_empty, old_is_empty, new_is_empty);
-            if (!old_is_empty) {
-                // because `to` is empty, swapping them is equivalent to moving
-                // the rows from `from` to `to`.
-                col.swap_rows(row_ndx, new_row_ndx);
-            }
-            else {
-                // don't need to move any rows, but we still need to update the
-                // LinkViews to reflect the change
-                col.adj_acc_subsume_row(row_ndx, new_row_ndx);
-            }
+            // don't need to move any rows, but we still need to update the
+            // LinkViews to reflect the change
+            col.adj_acc_subsume_row(row_ndx, new_row_ndx);
         }
     }
 
