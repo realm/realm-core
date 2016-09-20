@@ -170,6 +170,10 @@ endfunction()
 
 function(build_realm_sync sync_directory)
     get_filename_component(sync_directory ${sync_directory} ABSOLUTE)
+    if(APPLE)
+        find_library(FOUNDATION Foundation)
+        find_library(SECURITY Security)
+    endif()
     ExternalProject_Add(realm-sync-lib
         URL ""
         PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
@@ -198,6 +202,11 @@ function(build_realm_sync sync_directory)
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_COVERAGE ${sync_library_debug})
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_RELEASE ${sync_library_release})
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION ${sync_library_release})
+    if(APPLE)
+        set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES ${FOUNDATION} ${SECURITY})
+    else()
+        set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES -lcrypto -lssl)
+    endif()
 
     set(REALM_SYNC_INCLUDE_DIR ${sync_directory}/src PARENT_SCOPE)
 endfunction()
