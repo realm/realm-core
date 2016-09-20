@@ -86,6 +86,7 @@ enum INS {
     COMPACT,
     SWAP_ROWS,
     MOVE_COLUMN,
+    IS_NULL,
 
     COUNT
 };
@@ -691,6 +692,20 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 sg_r.begin_read();
                 REALM_DO_IF_VERIFY(log, g_r.verify());
+            }
+            else if (instr == IS_NULL && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->get_column_count() > 0 && t->size() > 0) {
+                    int32_t col_ndx = get_int32(s) % t->get_column_count();
+                    int32_t row_ndx = get_int32(s) % t->size();
+                    bool res = t->is_null(col_ndx, row_ndx);
+                    static_cast<void>(res);
+
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->is_null(" << col_ndx << ", " << row_ndx << ");\n";
+                    }
+                }
             }
         }
     }
