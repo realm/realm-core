@@ -383,6 +383,9 @@ public:
     /// FIXME: This function is not yet implemented in an exception-safe manner,
     /// therefore, if it throws, the application should not attempt to
     /// continue. If may not even be safe to destroy the SharedGroup object.
+    ///
+    /// WARNING / FIXME: compact() is should NOT be exposed publicly on Windows 
+    /// because it's not crash safe! It may corrupt your database if something fails
     bool compact();
 
 #ifdef REALM_DEBUG

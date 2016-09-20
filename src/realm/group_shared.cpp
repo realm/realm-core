@@ -1106,7 +1106,8 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     }
 }
 
-
+// WARNING / FIXME: compact() is should NOT be exposed publicly on Windows because it's not crash safe! It may
+// corrupt your database if something fails
 bool SharedGroup::compact()
 {
     // FIXME: ExcetionSafety: This function must be rewritten with exception
@@ -1165,7 +1166,7 @@ bool SharedGroup::compact()
     }
     close();
 #ifdef _WIN32
-    util::File::copy(tmp_path.c_str(), m_db_path.c_str());
+    util::File::move(tmp_path.c_str(), m_db_path.c_str());
 #endif
 
     SharedGroupOptions new_options;
