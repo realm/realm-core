@@ -293,15 +293,16 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
     col.create_search_index();
 
     {
-        size_t index_ref;
-        FindRes fr = col.find_all_indexref(s1, index_ref);
+        FindAllNoCopyResult result;
+        FindRes fr = col.find_all_no_copy(s1, result);
         CHECK_EQUAL(fr, FindRes_column);
         if (fr != FindRes_column)
             return;
 
         IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
-        matches.get_root_array()->init_from_ref(index_ref);
+        matches.get_root_array()->init_from_ref(result.result);
 
+        CHECK_EQUAL(3, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(3, matches.size());
         CHECK_EQUAL(0, matches.get(0));
         CHECK_EQUAL(4, matches.get(1));
@@ -312,15 +313,16 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
     col.move_last_over(1);
 
     {
-        size_t index_ref;
-        FindRes fr = col.find_all_indexref(s1, index_ref);
+        FindAllNoCopyResult result;
+        FindRes fr = col.find_all_no_copy(s1, result);
         CHECK_EQUAL(fr, FindRes_column);
         if (fr != FindRes_column)
             return;
 
         IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
-        matches.get_root_array()->init_from_ref(index_ref);
+        matches.get_root_array()->init_from_ref(result.result);
 
+        CHECK_EQUAL(3, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(3, matches.size());
         CHECK_EQUAL(0, matches.get(0));
         CHECK_EQUAL(1, matches.get(1));
@@ -331,15 +333,16 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
     col.move_last_over(1);
 
     {
-        size_t index_ref;
-        FindRes fr = col.find_all_indexref(s1, index_ref);
+        FindAllNoCopyResult result;
+        FindRes fr = col.find_all_no_copy(s1, result);
         CHECK_EQUAL(fr, FindRes_column);
         if (fr != FindRes_column)
             return;
 
         IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
-        matches.get_root_array()->init_from_ref(index_ref);
+        matches.get_root_array()->init_from_ref(result.result);
 
+        CHECK_EQUAL(2, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(2, matches.size());
         CHECK_EQUAL(0, matches.get(0));
         CHECK_EQUAL(1, matches.get(1));
@@ -627,17 +630,18 @@ TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
     // Create a new index on column
     StringIndex& ndx = *col.create_search_index();
 
-    size_t ref_2 = not_found;
-    FindRes res1 = ndx.find_all(StringData("not there"), ref_2);
+    FindAllNoCopyResult ref_2;
+    FindRes res1 = ndx.find_all_no_copy(StringData("not there"), ref_2);
     CHECK_EQUAL(FindRes_not_found, res1);
 
-    FindRes res2 = ndx.find_all(s1, ref_2);
+    FindRes res2 = ndx.find_all_no_copy(s1, ref_2);
     CHECK_EQUAL(FindRes_single, res2);
-    CHECK_EQUAL(0, ref_2);
+    CHECK_EQUAL(0, ref_2.result);
 
-    FindRes res3 = ndx.find_all(s4, ref_2);
+    FindRes res3 = ndx.find_all_no_copy(s4, ref_2);
     CHECK_EQUAL(FindRes_column, res3);
-    const IntegerColumn results(Allocator::get_default(), ref_type(ref_2));
+    const IntegerColumn results(Allocator::get_default(), ref_type(ref_2.result));
+    CHECK_EQUAL(4, ref_2.end_ndx - ref_2.start_ndx);
     CHECK_EQUAL(4, results.size());
     CHECK_EQUAL(6, results.get(0));
     CHECK_EQUAL(7, results.get(1));
@@ -663,10 +667,10 @@ TEST(StringIndex_FindAllNoCopy2_Int)
     // Create a new index on column
     col.create_search_index();
     StringIndex& ndx = *col.get_search_index();
-    size_t results = not_found;
+    FindAllNoCopyResult results;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
-        FindRes res = ndx.find_all(ints[t], results);
+        FindRes res = ndx.find_all_no_copy(ints[t], results);
 
         size_t real = 0;
         for (size_t y = 0; y < sizeof(ints) / sizeof(ints[0]); y++) {
@@ -676,14 +680,15 @@ TEST(StringIndex_FindAllNoCopy2_Int)
 
         if (real == 1) {
             CHECK_EQUAL(res, FindRes_single);
-            CHECK_EQUAL(ints[t], ints[results]);
+            CHECK_EQUAL(ints[t], ints[results.result]);
         }
         else if (real > 1) {
             CHECK_EQUAL(FindRes_column, res);
-            const IntegerColumn results2(Allocator::get_default(), ref_type(results));
-            CHECK_EQUAL(real, results2.size());
+            const IntegerColumn results_column(Allocator::get_default(), ref_type(results.result));
+            CHECK_EQUAL(real, results.end_ndx - results.start_ndx);
+            CHECK_EQUAL(real, results_column.size());
             for (size_t y = 0; y < real; y++)
-                CHECK_EQUAL(ints[t], ints[results2.get(y)]);
+                CHECK_EQUAL(ints[t], ints[results_column.get(y)]);
         }
     }
 
@@ -707,10 +712,10 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
     // Create a new index on column
     col.create_search_index();
     StringIndex& ndx = *col.get_search_index();
-    size_t results = not_found;
+    FindAllNoCopyResult results;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
-        FindRes res = ndx.find_all(ints[t], results);
+        FindRes res = ndx.find_all_no_copy(ints[t], results);
 
         size_t real = 0;
         for (size_t y = 0; y < sizeof(ints) / sizeof(ints[0]); y++) {
@@ -720,20 +725,21 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
 
         if (real == 1) {
             CHECK_EQUAL(res, FindRes_single);
-            CHECK_EQUAL(ints[t], ints[results]);
+            CHECK_EQUAL(ints[t], ints[results.result]);
         }
         else if (real > 1) {
             CHECK_EQUAL(FindRes_column, res);
-            const IntegerColumn results2(Allocator::get_default(), ref_type(results));
+            const IntegerColumn results2(Allocator::get_default(), ref_type(results.result));
+            CHECK_EQUAL(real, results.end_ndx - results.start_ndx);
             CHECK_EQUAL(real, results2.size());
             for (size_t y = 0; y < real; y++)
                 CHECK_EQUAL(ints[t], ints[results2.get(y)]);
         }
     }
 
-    FindRes res = ndx.find_all(null{}, results);
+    FindRes res = ndx.find_all_no_copy(null{}, results);
     CHECK_EQUAL(FindRes_single, res);
-    CHECK_EQUAL(results, col.size() - 1);
+    CHECK_EQUAL(results.result, col.size() - 1);
 
     // Clean up
     col.destroy();
