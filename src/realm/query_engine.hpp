@@ -1201,7 +1201,7 @@ public:
 
         if (m_condition_column->has_search_index()) {
             FindRes fr;
-            FindAllNoCopyResult res;
+            InternalFindResult res;
 
             if (m_column_type == col_type_StringEnum) {
                 fr = static_cast<const StringEnumColumn*>(m_condition_column)->find_all_no_copy(m_value, res);

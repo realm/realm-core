@@ -293,7 +293,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
     col.create_search_index();
 
     {
-        FindAllNoCopyResult result;
+        InternalFindResult result;
         FindRes fr = col.find_all_no_copy(s1, result);
         CHECK_EQUAL(fr, FindRes_column);
         if (fr != FindRes_column)
@@ -313,7 +313,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
     col.move_last_over(1);
 
     {
-        FindAllNoCopyResult result;
+        InternalFindResult result;
         FindRes fr = col.find_all_no_copy(s1, result);
         CHECK_EQUAL(fr, FindRes_column);
         if (fr != FindRes_column)
@@ -333,7 +333,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
     col.move_last_over(1);
 
     {
-        FindAllNoCopyResult result;
+        InternalFindResult result;
         FindRes fr = col.find_all_no_copy(s1, result);
         CHECK_EQUAL(fr, FindRes_column);
         if (fr != FindRes_column)
@@ -630,7 +630,7 @@ TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
     // Create a new index on column
     StringIndex& ndx = *col.create_search_index();
 
-    FindAllNoCopyResult ref_2;
+    InternalFindResult ref_2;
     FindRes res1 = ndx.find_all_no_copy(StringData("not there"), ref_2);
     CHECK_EQUAL(FindRes_not_found, res1);
 
@@ -667,7 +667,7 @@ TEST(StringIndex_FindAllNoCopy2_Int)
     // Create a new index on column
     col.create_search_index();
     StringIndex& ndx = *col.get_search_index();
-    FindAllNoCopyResult results;
+    InternalFindResult results;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
         FindRes res = ndx.find_all_no_copy(ints[t], results);
@@ -712,7 +712,7 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
     // Create a new index on column
     col.create_search_index();
     StringIndex& ndx = *col.get_search_index();
-    FindAllNoCopyResult results;
+    InternalFindResult results;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
         FindRes res = ndx.find_all_no_copy(ints[t], results);
@@ -770,7 +770,7 @@ TEST(StringIndex_FindAllNoCopyCommonPrefixStrings)
         col.add(spe);
         col.add(spe);
 
-        FindAllNoCopyResult results;
+        InternalFindResult results;
         FindRes res = ndx.find_all_no_copy(spb, results);
         CHECK_EQUAL(res, FindRes_single);
         CHECK_EQUAL(results.payload, start_row);

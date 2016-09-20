@@ -2799,7 +2799,7 @@ size_t Array::find_first(int64_t value, size_t start, size_t end) const
 namespace realm {
 
 template <>
-size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result, FindAllNoCopyResult& result_ref,
+size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
                                          const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result);
@@ -2824,7 +2824,7 @@ size_t Array::from_list<index_FindFirst>(StringData value, IntegerColumn& result
 }
 
 template <>
-size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, FindAllNoCopyResult& result_ref,
+size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
                                      const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result);
@@ -2852,7 +2852,7 @@ size_t Array::from_list<index_Count>(StringData value, IntegerColumn& result, Fi
 }
 
 template <>
-size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, FindAllNoCopyResult& result_ref,
+size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
                                        const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result_ref);
@@ -2885,7 +2885,7 @@ size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, 
 
 template<>
 size_t Array::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& result,
-                                              FindAllNoCopyResult& result_ref,
+                                              InternalFindResult& result_ref,
                                               const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result);
@@ -2908,7 +2908,7 @@ size_t Array::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& r
     IntegerColumn::const_iterator upper = it_end;
     --upper;
     // Single result if upper matches lower
-    if (upper.get_col_ndx() == lower.get_col_ndx()) {
+    if (upper == lower) {
         result_ref.payload = *lower;
         return size_t(FindRes_single);
     }
@@ -2938,7 +2938,7 @@ size_t Array::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& r
 
 template <IndexMethod method, class T>
 size_t Array::index_string(StringData value, IntegerColumn& result,
-                           FindAllNoCopyResult& result_ref, ColumnBase* column) const
+                           InternalFindResult& result_ref, ColumnBase* column) const
 {
     // Return`realm::not_found`, or an index to the (any) match
     bool first(method == index_FindFirst);
@@ -3045,7 +3045,7 @@ size_t Array::index_string(StringData value, IntegerColumn& result,
 
 size_t Array::index_string_find_first(StringData value, ColumnBase* column) const
 {
-    FindAllNoCopyResult dummy;
+    InternalFindResult dummy;
     IntegerColumn dummycol;
     return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column);
 }
@@ -3053,11 +3053,11 @@ size_t Array::index_string_find_first(StringData value, ColumnBase* column) cons
 
 void Array::index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const
 {
-    FindAllNoCopyResult dummy;
+    InternalFindResult dummy;
     index_string<index_FindAll, StringData>(value, result, dummy, column);
 }
 
-FindRes Array::index_string_find_all_no_copy(StringData value, ColumnBase* column, FindAllNoCopyResult& result) const
+FindRes Array::index_string_find_all_no_copy(StringData value, ColumnBase* column, InternalFindResult& result) const
 {
     IntegerColumn dummy;
     return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, result, column));
@@ -3066,7 +3066,7 @@ FindRes Array::index_string_find_all_no_copy(StringData value, ColumnBase* colum
 size_t Array::index_string_count(StringData value, ColumnBase* column) const
 {
     IntegerColumn dummy1;
-    FindAllNoCopyResult dummy2;
+    InternalFindResult dummy2;
     return index_string<index_Count, StringData>(value, dummy1, dummy2, column);
 }
 

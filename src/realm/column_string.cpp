@@ -933,7 +933,7 @@ void StringColumn::find_all(IntegerColumn& result, StringData value, size_t begi
 }
 
 
-FindRes StringColumn::find_all_no_copy(StringData value, FindAllNoCopyResult& result) const
+FindRes StringColumn::find_all_no_copy(StringData value, InternalFindResult& result) const
 {
     REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     REALM_ASSERT(m_search_index);

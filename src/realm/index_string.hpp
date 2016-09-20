@@ -115,7 +115,7 @@ public:
     template <class T>
     void find_all(IntegerColumn& result, T value) const;
     template <class T>
-    FindRes find_all_no_copy(T value, FindAllNoCopyResult& result) const;
+    FindRes find_all_no_copy(T value, InternalFindResult& result) const;
     template <class T>
     size_t count(T value) const;
     template <class T>
@@ -517,7 +517,7 @@ void StringIndex::find_all(IntegerColumn& result, T value) const
 }
 
 template<class T>
-FindRes StringIndex::find_all_no_copy(T value, FindAllNoCopyResult& result) const
+FindRes StringIndex::find_all_no_copy(T value, InternalFindResult& result) const
 {
     // Use direct access method
     StringConversionBuffer buffer;

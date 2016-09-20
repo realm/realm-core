@@ -200,7 +200,7 @@ enum IndexMethod {
 // Combined result of the index_FindAll_nocopy operation. The column returned
 // can contain results that are not matches but all matches are within the
 // returned start_ndx and end_ndx.
-struct FindAllNoCopyResult {
+struct InternalFindResult {
     // Reference to a IntegerColumn containing result rows, or a single row
     // value if the result is FindRes_single.
     size_t payload;
