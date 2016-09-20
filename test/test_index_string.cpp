@@ -1579,14 +1579,16 @@ TEST(StringIndex_InsertLongPrefixAndQuery)
     Group g;
     auto t = g.add_table("StringsOnly");
     t->add_column(type_String, "first");
-    t->add_search_index(0);
+    auto index = t->add_search_index(0);
 
     std::string base(StringIndex::s_max_offset, 'a');
     std::string str_a = base + "aaaaa";
+    std::string str_a0 = base + "aaaa0";
+    std::string str_ax = base + "aaaax";
     std::string str_b = base + "bbbbb";
     std::string str_c = base + "ccccc";
-    std::string str_x0 = base + "cccc0";
-    std::string str_x1 = base + "ccccx";
+    std::string str_c0 = base + "cccc0";
+    std::string str_cx = base + "ccccx";
 
     for (int i = 0; i < half_node_size * 3; i++) {
         auto ndx = t->add_empty_row(3);
@@ -1594,6 +1596,16 @@ TEST(StringIndex_InsertLongPrefixAndQuery)
         t->set_string(0, ndx + 1, str_b);
         t->set_string(0, ndx + 2, str_c);
     }
+    auto ndx = t->add_empty_row(3);
+    t->set_string(0, ndx, str_ax);
+    t->set_string(0, ndx + 1, str_ax);
+    t->set_string(0, ndx + 2, str_a0);
+    /*
+    {
+        std::ofstream o("index.dot");
+        index->to_dot(o, "");
+    }
+    */
 
     auto ndx_a = t->where().equal(0, StringData(str_a)).find();
     auto cnt = t->count_string(0, StringData(str_a));
@@ -1601,21 +1613,21 @@ TEST(StringIndex_InsertLongPrefixAndQuery)
     CHECK_EQUAL(ndx_a, 0);
     CHECK_EQUAL(cnt, half_node_size * 3);
     CHECK_EQUAL(tw_a.size(), half_node_size * 3);
-    ndx_a = t->where().equal(0, StringData(str_x0)).find();
+    ndx_a = t->where().equal(0, StringData(str_c0)).find();
     CHECK_EQUAL(ndx_a, npos);
-    ndx_a = t->where().equal(0, StringData(str_x1)).find();
+    ndx_a = t->where().equal(0, StringData(str_cx)).find();
     CHECK_EQUAL(ndx_a, npos);
     // Find string that is 'less' than strings in the table, but with identical last key
-    tw_a = t->where().equal(0, StringData(str_x0)).find_all();
+    tw_a = t->where().equal(0, StringData(str_c0)).find_all();
     CHECK_EQUAL(tw_a.size(), 0);
     // Find string that is 'greater' than strings in the table, but with identical last key
-    tw_a = t->where().equal(0, StringData(str_x1)).find_all();
+    tw_a = t->where().equal(0, StringData(str_cx)).find_all();
     CHECK_EQUAL(tw_a.size(), 0);
 
     // Same as above, but just for 'count' method
-    cnt = t->count_string(0, StringData(str_x0));
+    cnt = t->count_string(0, StringData(str_c0));
     CHECK_EQUAL(cnt, 0);
-    cnt = t->count_string(0, StringData(str_x1));
+    cnt = t->count_string(0, StringData(str_cx));
     CHECK_EQUAL(cnt, 0);
 }
 
