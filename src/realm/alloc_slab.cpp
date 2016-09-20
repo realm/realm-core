@@ -664,7 +664,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         m_file_mappings->m_file.set_encryption_key(cfg.encryption_key);
     File::CloseGuard fcg(m_file_mappings->m_file);
 
-    size_t size;
+    size_t size = 0;
     // The size of a database file must not exceed what can be encoded in
     // size_t.
     if (REALM_UNLIKELY(int_cast_with_overflow_detect(m_file_mappings->m_file.get_size(), size)))

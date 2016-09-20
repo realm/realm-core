@@ -535,30 +535,33 @@ namespace {
 
 void signaller(int* signals, InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
-    millisleep(1000);
-    *signals = 1;
+    millisleep(200);
     {
         std::lock_guard<InterprocessMutex> l(*mutex);
+        *signals = 1;
         // wakeup any waiters
         cv->notify_all();
     }
     // exit scope to allow waiters to get lock
-    millisleep(1000);
-    *signals = 2;
+    millisleep(200);
     {
         std::lock_guard<InterprocessMutex> l(*mutex);
+        *signals = 2;
         // wakeup any waiters, 2nd time
         cv->notify_all();
     }
-    millisleep(1000);
-    *signals = 3;
+    millisleep(200);
     {
         std::lock_guard<InterprocessMutex> l(*mutex);
+        *signals = 3;
         // wakeup any waiters, 2nd time
         cv->notify_all();
     }
-    millisleep(1000);
-    *signals = 4;
+    millisleep(200);
+    {
+        std::lock_guard<InterprocessMutex> l(*mutex);
+        *signals = 4;
+    }
 }
 
 void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessCondVar* cv)
@@ -736,14 +739,23 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
         waiters[i].start(std::bind(waiter_with_count, &feedback, &wait_counter, &mutex, &changed));
     }
     feedback.get_stone(num_waiters);
-    CHECK_EQUAL(wait_counter, num_waiters);
-    changed.notify();
+    {
+        std::lock_guard<InterprocessMutex> l(mutex);
+        CHECK_EQUAL(wait_counter, num_waiters);
+        changed.notify();
+    }
     feedback.get_stone(1);
-    CHECK_EQUAL(wait_counter, num_waiters - 1);
-    changed.notify();
+    {
+        std::lock_guard<InterprocessMutex> l(mutex);
+        CHECK_EQUAL(wait_counter, num_waiters - 1);
+        changed.notify();
+    }
     feedback.get_stone(1);
-    CHECK_EQUAL(wait_counter, num_waiters - 2);
-    changed.notify_all();
+    {
+        std::lock_guard<InterprocessMutex> l(mutex);
+        CHECK_EQUAL(wait_counter, num_waiters - 2);
+        changed.notify_all();
+    }
     for (int i = 0; i < num_waiters; ++i) {
         waiters[i].join();
     }
