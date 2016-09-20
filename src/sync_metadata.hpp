@@ -69,11 +69,9 @@ public:
 private:
     bool m_invalid = false;
 
-    SyncUserMetadata() = delete;
     util::Optional<std::string> get_optional_string_field(size_t col_idx) const;
 
     Schema m_schema;
-
     SharedRealm m_realm;
     Row m_row;
 };
@@ -93,9 +91,10 @@ public:
     }
 
     SyncMetadataResults(Results results, SharedRealm realm, typename T::Schema schema)
-    : m_results(results)
-    , m_realm(realm)
-    , m_schema(schema) { }
+    : m_schema(std::move(schema))
+    , m_realm(std::move(realm))
+    , m_results(std::move(results))
+    { }
 private:
     typename T::Schema m_schema;
     SharedRealm m_realm;
