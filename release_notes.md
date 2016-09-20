@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.0.0-rc7 Release notes
 
 ### Bugfixes
 
@@ -17,10 +17,6 @@
   The upgrade will rebuild any StringIndexes to the new format automatically
   so other than the upgrade, this change should be effectivly invisible to
   the bindings. (see #2153)
-
-### Enhancements
-
-* Lorem ipsum.
 
 -----------
 
