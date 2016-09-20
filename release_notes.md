@@ -4,6 +4,9 @@
 
 * Fixed a race in the handover machinery which could cause crashes following handover
   of a Query or a TableView. (#2117)
+* Reversed the decision process of resolving primary key conflicts. Instead of
+  letting the newest row win, the oldest row will now always win in order to not
+  lose subsequent changes.
 
 ### Breaking changes
 
