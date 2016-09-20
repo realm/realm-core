@@ -203,7 +203,7 @@ enum IndexMethod {
 struct FindAllNoCopyResult {
     // Reference to a IntegerColumn containing result rows, or a single row
     // value if the result is FindRes_single.
-    size_t result = -1;
+    size_t payload = -1;
     // Offset into the result column to start at.
     size_t start_ndx = -1;
     // Offset index in the result column to end at.

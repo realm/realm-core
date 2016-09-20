@@ -2909,7 +2909,7 @@ size_t Array::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& r
     --upper;
     // Single result if upper matches lower
     if (upper.get_col_ndx() == lower.get_col_ndx()) {
-        result_ref.result = *lower;
+        result_ref.payload = *lower;
         return size_t(FindRes_single);
     }
 
@@ -2917,7 +2917,7 @@ size_t Array::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& r
     const size_t last_row_ref = to_size_t(*upper);
     str = column->get_index_data(last_row_ref, buffer);
     if (str == value) {
-        result_ref.result = rows.get_ref();
+        result_ref.payload = rows.get_ref();
         result_ref.start_ndx = lower.get_col_ndx();
         result_ref.end_ndx = upper.get_col_ndx() + 1; // one past last match
         return size_t(FindRes_column);
@@ -2928,7 +2928,7 @@ size_t Array::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& r
     // checked the last item manually.
     upper = std::upper_bound(lower, upper, value, slc);
 
-    result_ref.result = to_ref(rows.get_ref());
+    result_ref.payload = to_ref(rows.get_ref());
     result_ref.start_ndx = lower.get_col_ndx();
     result_ref.end_ndx = upper.get_col_ndx();
     return size_t(FindRes_column);
@@ -2947,13 +2947,13 @@ size_t Array::index_string(StringData value, IntegerColumn& result,
     // Place all row indexes containing `value` into `result`
     // Returns one of FindRes_not_found[==0] if no matches found
     // Returns FindRes_single, if one match found: the result row literal is
-    // both placed in `result_ref` and added to `column`
+    // both placed in `result_ref.payload` and added to `column`
     // Returns FindRes_column, if more than one match found: the matching row
     // literals are copied into `column`
     bool all(method == index_FindAll);
     // Same as `index_FindAll` but does not copy matching rows into `column`
     // returns FindRes_not_found if there are no matches
-    // returns FindRes_single and the row index (literal) in result_ref.result
+    // returns FindRes_single and the row index (literal) in result_ref.payload
     // or returns FindRes_column and the reference to a column of duplicates in
     // result_ref.result with the results in the bounds start_ndx, and end_ndx
     bool allnocopy(method == index_FindAll_nocopy);
@@ -3009,7 +3009,7 @@ size_t Array::index_string(StringData value, IntegerColumn& result,
             StringIndex::StringConversionBuffer buffer;
             StringData str = column->get_index_data(row_ref, buffer);
             if (str == value) {
-                result_ref.result = row_ref;
+                result_ref.payload = row_ref;
                 if (all)
                     result.add(row_ref);
 

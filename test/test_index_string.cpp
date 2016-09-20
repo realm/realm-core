@@ -300,7 +300,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
             return;
 
         IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
-        matches.get_root_array()->init_from_ref(result.result);
+        matches.get_root_array()->init_from_ref(result.payload);
 
         CHECK_EQUAL(3, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(3, matches.size());
@@ -320,7 +320,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
             return;
 
         IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
-        matches.get_root_array()->init_from_ref(result.result);
+        matches.get_root_array()->init_from_ref(result.payload);
 
         CHECK_EQUAL(3, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(3, matches.size());
@@ -340,7 +340,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
             return;
 
         IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
-        matches.get_root_array()->init_from_ref(result.result);
+        matches.get_root_array()->init_from_ref(result.payload);
 
         CHECK_EQUAL(2, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(2, matches.size());
@@ -636,11 +636,11 @@ TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
 
     FindRes res2 = ndx.find_all_no_copy(s1, ref_2);
     CHECK_EQUAL(FindRes_single, res2);
-    CHECK_EQUAL(0, ref_2.result);
+    CHECK_EQUAL(0, ref_2.payload);
 
     FindRes res3 = ndx.find_all_no_copy(s4, ref_2);
     CHECK_EQUAL(FindRes_column, res3);
-    const IntegerColumn results(Allocator::get_default(), ref_type(ref_2.result));
+    const IntegerColumn results(Allocator::get_default(), ref_type(ref_2.payload));
     CHECK_EQUAL(4, ref_2.end_ndx - ref_2.start_ndx);
     CHECK_EQUAL(4, results.size());
     CHECK_EQUAL(6, results.get(0));
@@ -680,11 +680,11 @@ TEST(StringIndex_FindAllNoCopy2_Int)
 
         if (real == 1) {
             CHECK_EQUAL(res, FindRes_single);
-            CHECK_EQUAL(ints[t], ints[results.result]);
+            CHECK_EQUAL(ints[t], ints[results.payload]);
         }
         else if (real > 1) {
             CHECK_EQUAL(FindRes_column, res);
-            const IntegerColumn results_column(Allocator::get_default(), ref_type(results.result));
+            const IntegerColumn results_column(Allocator::get_default(), ref_type(results.payload));
             CHECK_EQUAL(real, results.end_ndx - results.start_ndx);
             CHECK_EQUAL(real, results_column.size());
             for (size_t y = 0; y < real; y++)
@@ -725,11 +725,11 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
 
         if (real == 1) {
             CHECK_EQUAL(res, FindRes_single);
-            CHECK_EQUAL(ints[t], ints[results.result]);
+            CHECK_EQUAL(ints[t], ints[results.payload]);
         }
         else if (real > 1) {
             CHECK_EQUAL(FindRes_column, res);
-            const IntegerColumn results2(Allocator::get_default(), ref_type(results.result));
+            const IntegerColumn results2(Allocator::get_default(), ref_type(results.payload));
             CHECK_EQUAL(real, results.end_ndx - results.start_ndx);
             CHECK_EQUAL(real, results2.size());
             for (size_t y = 0; y < real; y++)
@@ -739,7 +739,7 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
 
     FindRes res = ndx.find_all_no_copy(null{}, results);
     CHECK_EQUAL(FindRes_single, res);
-    CHECK_EQUAL(results.result, col.size() - 1);
+    CHECK_EQUAL(results.payload, col.size() - 1);
 
     // Clean up
     col.destroy();
