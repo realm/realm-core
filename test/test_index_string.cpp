@@ -745,6 +745,72 @@ TEST(StringIndex_FindAllNoCopy2_IntNull)
     col.destroy();
 }
 
+TEST(StringIndex_FindAllNoCopyCommonPrefixStrings)
+{
+    // Create a column with duplcate values
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref);
+    StringIndex& ndx = *col.create_search_index();
+
+    auto test_prefix_find = [&](std::string prefix) {
+        std::string prefix_b = prefix + "b";
+        std::string prefix_c = prefix + "c";
+        std::string prefix_d = prefix + "d";
+        std::string prefix_e = prefix + "e";
+        StringData spb(prefix_b);
+        StringData spc(prefix_c);
+        StringData spd(prefix_d);
+        StringData spe(prefix_e);
+
+        size_t start_row = col.size();
+        col.add(spb);
+        col.add(spc);
+        col.add(spc);
+        col.add(spe);
+        col.add(spe);
+        col.add(spe);
+
+        FindAllNoCopyResult results;
+        FindRes res = ndx.find_all_no_copy(spb, results);
+        CHECK_EQUAL(res, FindRes_single);
+        CHECK_EQUAL(results.payload, start_row);
+
+        res = ndx.find_all_no_copy(spc, results);
+        CHECK_EQUAL(res, FindRes_column);
+        CHECK_EQUAL(results.end_ndx - results.start_ndx, 2);
+        const IntegerColumn results_c(Allocator::get_default(), ref_type(results.payload));
+        CHECK_EQUAL(results_c.get(results.start_ndx), start_row + 1);
+        CHECK_EQUAL(results_c.get(results.start_ndx + 1), start_row + 2);
+        CHECK_EQUAL(col.get(results_c.get(results.start_ndx)), spc);
+        CHECK_EQUAL(col.get(results_c.get(results.start_ndx + 1)), spc);
+
+        res = ndx.find_all_no_copy(spd, results);
+        CHECK_EQUAL(res, FindRes_not_found);
+
+        res = ndx.find_all_no_copy(spe, results);
+        CHECK_EQUAL(res, FindRes_column);
+        CHECK_EQUAL(results.end_ndx - results.start_ndx, 3);
+        const IntegerColumn results_e(Allocator::get_default(), ref_type(results.payload));
+        CHECK_EQUAL(results_e.get(results.start_ndx), start_row + 3);
+        CHECK_EQUAL(results_e.get(results.start_ndx + 1), start_row + 4);
+        CHECK_EQUAL(results_e.get(results.start_ndx + 2), start_row + 5);
+        CHECK_EQUAL(col.get(results_e.get(results.start_ndx)), spe);
+        CHECK_EQUAL(col.get(results_e.get(results.start_ndx + 1)), spe);
+        CHECK_EQUAL(col.get(results_e.get(results.start_ndx + 2)), spe);
+    };
+
+    std::string std_max(StringIndex::s_max_offset, 'a');
+    std::string std_over_max = std_max + "a";
+    std::string std_under_max(StringIndex::s_max_offset >> 1, 'a');
+
+    test_prefix_find(std_max);
+    test_prefix_find(std_over_max);
+    test_prefix_find(std_under_max);
+
+    // Clean up
+    col.destroy();
+}
+
 
 TEST(StringIndex_Count_Int)
 {
