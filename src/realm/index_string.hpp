@@ -141,10 +141,10 @@ public:
     // allowed before storing everything in lists. This is to avoid nesting
     // to too deep of a level. Since every SubStringIndex stores 4 bytes, this
     // means that a StringIndex is helpful for strings of a common prefix up to
-    // 4 times this limit (400 bytes shared). Lists are stored in sorted order,
+    // 4 times this limit (200 bytes shared). Lists are stored in sorted order,
     // so strings sharing a common prefix of more than this limit will use a
     // binary search of approximate complexity log2(n) from `std::lower_bound`.
-    static const size_t s_max_offset = 400; // max depth * s_index_key_length
+    static const size_t s_max_offset = 200; // max depth * s_index_key_length
     static const size_t s_index_key_length = 4;
     static key_type create_key(StringData) noexcept;
     static key_type create_key(StringData, size_t) noexcept;
