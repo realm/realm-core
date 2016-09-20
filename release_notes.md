@@ -1,5 +1,11 @@
 # 2.0.0-rc6 Release notes
 
+### Bugfixes
+
+* Reversed the decision process of resolving primary key conflicts. Instead of
+  letting the newest row win, the oldest row will now always win in order to not
+  lose subsequent changes.
+
 ### Enhancements
 
 * Added debian packages for Ubuntu 16.04.
