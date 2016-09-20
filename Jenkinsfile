@@ -75,14 +75,6 @@ try {
         ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
       )
     }
-
-    if (gitTag != "") {
-      stage('trigger release') {
-        build job: 'sync_release/realm-core-rpm-release',
-          wait: false,
-          parameters: [[$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"]]
-      }
-    }
   }
 } catch(Exception e) {
   e.printStackTrace()
