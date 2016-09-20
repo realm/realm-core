@@ -18,7 +18,7 @@
 
 #include "sync_session.hpp"
 
-#include "sync_client.hpp"
+#include "impl/sync_client.hpp"
 #include "sync_manager.hpp"
 
 #include <realm/sync/protocol.hpp>
@@ -291,9 +291,9 @@ const SyncSession::State& SyncSession::State::error = Error();
 
 
 SyncSession::SyncSession(std::shared_ptr<SyncClient> client, std::string realm_path, SyncConfig config)
-: m_client(std::move(client))
+: m_config(std::move(config))
 , m_realm_path(std::move(realm_path))
-, m_config(std::move(config))
+, m_client(std::move(client))
 {
     std::lock_guard<std::mutex> lock(m_state_mutex);
     advance_state(State::connecting);
