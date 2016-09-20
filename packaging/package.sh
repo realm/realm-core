@@ -20,7 +20,7 @@ PACKAGECLOUD_URL="https://${PACKAGECLOUD_MASTER_TOKEN}:@packagecloud.io/install/
 if [ -z "$git_tag" ]; then
   info "No git tag exists.  Triggering -devel build"
   sha=$(git rev-parse HEAD | cut -b1-8)
-  ITERATION="g$sha"
+  ITERATION="0.$sha"
 elif [ "$git_tag" != "v${VERSION}" ]; then
   die "Git tag '$git_tag' does not match VERSION: '$VERSION'"
 else

@@ -1,3 +1,34 @@
+# NEXT RELEASE
+
+### Bugfixes
+
+* Fixed a race in the handover machinery which could cause crashes following handover
+  of a Query or a TableView. (#2117)
+
+### Breaking changes
+
+* Changed the format of the StringIndex structure to not recursivly store
+  strings past a certain depth. This fixes crashes when storing strings
+  with a long common prefix in an index. This is a file format breaking change.
+  The file format has been incremented and old Realm files must upgrade.
+  The upgrade will rebuild any StringIndexes to the new format automatically
+  so other than the upgrade, this change should be effectivly invisible to
+  the bindings. (see #2153)
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Removed ("deleted") the default copy constructor for RowBase. This constructor
+  was used by accident by derived classes, which led to a data race. Said race was
+  benign, but would be reported by the thread sanitizer.
+
+----------------------------------------------
+
 # 2.0.0-rc6 Release notes
 
 ### Bugfixes

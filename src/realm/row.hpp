@@ -233,6 +233,7 @@ protected:
     {
     }
 
+    RowBase(const RowBase&) = delete;
     using HandoverPatch = RowBaseHandoverPatch;
 
     RowBase(const RowBase& source, HandoverPatch& patch);
@@ -747,7 +748,7 @@ inline BasicRow<T>::BasicRow() noexcept
 
 template <class T>
 inline BasicRow<T>::BasicRow(const BasicRow<T>& row) noexcept
-    : RowBase(row)
+    : RowBase()
 {
     attach(const_cast<Table*>(row.m_table.get()), row.m_row_ndx);
 }
