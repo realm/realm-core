@@ -1149,7 +1149,7 @@ bool SharedGroup::compact()
         if (!disable_sync)
             file.sync(); // Throws
 #ifndef _WIN32
-        util::File::move(tmp_path.c_str(), m_db_path.c_str());
+        util::File::move(tmp_path, m_db_path);
 #endif
         {
             SharedInfo* r_info = m_reader_map.get_addr();
@@ -1166,7 +1166,7 @@ bool SharedGroup::compact()
     }
     close();
 #ifdef _WIN32
-    util::File::move(tmp_path.c_str(), m_db_path.c_str());
+    util::File::copy(tmp_path, m_db_path);
 #endif
 
     SharedGroupOptions new_options;

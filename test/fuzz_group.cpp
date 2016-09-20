@@ -673,10 +673,13 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 sg_w.commit();
 
+#ifndef _WIN32
+                // compact() isn't officially supported on Windows and also happens to fail in the fuzzer
                 if (log) {
                     *log << "REALM_ASSERT_RELEASE(sg_w.compact());\n";
                 }
                 REALM_ASSERT_RELEASE(sg_w.compact());
+#endif
 
                 if (log) {
                     *log << "sg_w.begin_write();\n";
