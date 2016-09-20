@@ -1260,35 +1260,31 @@ public:
         REALM_ASSERT(m_table);
 
         if (m_condition_column->has_search_index()) {
-            // The results column
-            size_t internal_start = start + m_results_start;
-            size_t internal_end = end + m_results_start;
             // Indexed string column
             if (!m_index_getter)
                 return not_found; // no matches in the index
 
-            if (m_last_start > internal_start)
-                m_last_indexed = m_results_start;
-            m_last_start = internal_start;
-
-            // Find the starting leaf: Search through leafs looking for
-            // indexes which are greater than or equal to `start`
             size_t f = not_found;
+
+            if (m_last_start > start)
+                m_last_indexed = m_results_start;
+            m_last_start = start;
+
             while (f == not_found && m_last_indexed < m_results_end) {
                 m_index_getter->cache_next(m_last_indexed);
                 f = m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start,
                                                          nullptr);
 
-                if (f >= internal_end || f == not_found) { // not in this leaf, continue
+                if (f >= (m_results_end - m_index_getter->m_leaf_start) || f == not_found) {
                     m_last_indexed = m_index_getter->m_leaf_end;
                 }
                 else {
-                    size_t found_ndx = to_size_t(m_index_getter->m_leaf_ptr->get(f));
-                    if (found_ndx >= internal_end)
+                    start = to_size_t(m_index_getter->m_leaf_ptr->get(f));
+                    if (start >= end)
                         return not_found;
                     else {
                         m_last_indexed = f + m_index_getter->m_leaf_start;
-                        return found_ndx - m_results_start; // undo internal transform
+                        return start;
                     }
                 }
             }

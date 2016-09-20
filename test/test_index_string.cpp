@@ -1579,7 +1579,7 @@ TEST(StringIndex_InsertLongPrefixAndQuery)
     Group g;
     auto t = g.add_table("StringsOnly");
     t->add_column(type_String, "first");
-    auto index = t->add_search_index(0);
+    t->add_search_index(0);
 
     std::string base(StringIndex::s_max_offset, 'a');
     std::string str_a = base + "aaaaa";
@@ -1649,11 +1649,11 @@ TEST(StringIndex_Fuzzy)
 
         std::string strings[chunkcount];
 
-        for (size_t t = 0; t < chunkcount; t++) {
+        for (size_t j = 0; j < chunkcount; j++) {
             size_t len = fastrand() % REALM_MAX_BPNODE_SIZE;
 
             for (size_t i = 0; i < len; i++)
-                strings[t] += char(fastrand());
+                strings[j] += char(fastrand());
         }
 
         for (size_t rows = 0; rows < rowcount; rows++) {
