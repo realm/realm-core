@@ -1213,31 +1213,37 @@ public:
             m_index_matches_destroy = false;
             m_last_indexed = 0;
             m_last_start = 0;
+            m_results_start = 0;
+            m_results_end = 0;
             switch (fr) {
                 case FindRes_single:
                     m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
                     m_index_matches->get_root_array()->create(Array::type_Normal); // Throws
                     m_index_matches->add(res.payload);
                     m_index_matches_destroy = true;        // we own m_index_matches, so we must destroy it
+                    m_results_start = 0;
+                    m_results_end = 1;
                     break;
                 case FindRes_column:
                     // todo: Apparently we can't use m_index.get_alloc() because it uses default allocator which simply makes
                     // translate(x) = x. Shouldn't it inherit owner column's allocator?!
                     m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), m_condition_column->get_alloc())); // Throws
                     m_index_matches->get_root_array()->init_from_ref(res.payload);
+                    m_last_indexed = res.start_ndx;
+                    m_last_start = res.start_ndx;
+                    m_results_start = res.start_ndx;
+                    m_results_end = res.end_ndx;
 
                     //FIXME: handle start and end of find_result!
                     break;
                 case FindRes_not_found:
                     m_index_matches.reset();
                     m_index_getter.reset();
-                    m_index_size = 0;
                     break;
             }
 
             if (m_index_matches) {
                 m_index_getter.reset(new SequentialGetter<IntegerColumn>(m_index_matches.get()));
-                m_index_size = m_index_getter->m_column->size();
             }
         }
         else if (m_column_type != col_type_String) {
@@ -1254,31 +1260,35 @@ public:
         REALM_ASSERT(m_table);
 
         if (m_condition_column->has_search_index()) {
+            // The results column
+            size_t internal_start = start + m_results_start;
+            size_t internal_end = end + m_results_start;
             // Indexed string column
             if (!m_index_getter)
                 return not_found; // no matches in the index
 
+            if (m_last_start > internal_start)
+                m_last_indexed = m_results_start;
+            m_last_start = internal_start;
+
+            // Find the starting leaf: Search through leafs looking for
+            // indexes which are greater than or equal to `start`
             size_t f = not_found;
-
-            if (m_last_start > start)
-                m_last_indexed = 0;
-            m_last_start = start;
-
-            while (f == not_found && m_last_indexed < m_index_size) {
+            while (f == not_found && m_last_indexed < m_results_end) {
                 m_index_getter->cache_next(m_last_indexed);
                 f = m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start,
                                                          nullptr);
 
-                if (f >= end || f == not_found) {
+                if (f >= internal_end || f == not_found) { // not in this leaf, continue
                     m_last_indexed = m_index_getter->m_leaf_end;
                 }
                 else {
-                    start = to_size_t(m_index_getter->m_leaf_ptr->get(f));
-                    if (start >= end)
+                    size_t found_ndx = to_size_t(m_index_getter->m_leaf_ptr->get(f));
+                    if (found_ndx >= internal_end)
                         return not_found;
                     else {
                         m_last_indexed = f + m_index_getter->m_leaf_start;
-                        return start;
+                        return found_ndx - m_results_start; // undo internal transform
                     }
                 }
             }
@@ -1363,7 +1373,8 @@ private:
     std::unique_ptr<IntegerColumn> m_index_matches;
     bool m_index_matches_destroy = false;
     std::unique_ptr<SequentialGetter<IntegerColumn>> m_index_getter;
-    size_t m_index_size;
+    size_t m_results_start;
+    size_t m_results_end;
     size_t m_last_start;
 };
 
