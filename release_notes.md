@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.0.0-rc7 Release notes
 
 ### Bugfixes
 
