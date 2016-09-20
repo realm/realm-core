@@ -699,12 +699,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 if (t->get_column_count() > 0 && t->size() > 0) {
                     int32_t col_ndx = get_int32(s) % t->get_column_count();
                     int32_t row_ndx = get_int32(s) % t->size();
-                    bool res = t->is_null(col_ndx, row_ndx);
-                    static_cast<void>(res);
-
                     if (log) {
                         *log << "g.get_table(" << table_ndx << ")->is_null(" << col_ndx << ", " << row_ndx << ");\n";
                     }
+                    bool res = t->is_null(col_ndx, row_ndx);
+                    static_cast<void>(res);
                 }
             }
         }
