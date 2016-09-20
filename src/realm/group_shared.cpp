@@ -1121,8 +1121,8 @@ bool SharedGroup::compact()
         throw std::runtime_error(m_db_path + ": compact is not supported whithin a transaction");
     }
     Durability dura;
+    std::string tmp_path = m_db_path + ".tmp_compaction_space";
     {
-        std::string tmp_path = m_db_path + ".tmp_compaction_space";
         SharedInfo* info = m_file_map.get_addr();
         std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
         if (info->num_participants > 1)
@@ -1147,7 +1147,9 @@ bool SharedGroup::compact()
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
             file.sync(); // Throws
+#ifndef _WIN32
         util::File::move(tmp_path.c_str(), m_db_path.c_str());
+#endif
         {
             SharedInfo* r_info = m_reader_map.get_addr();
             Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
@@ -1162,6 +1164,9 @@ bool SharedGroup::compact()
         m_group.m_alloc.detach();
     }
     close();
+#ifdef _WIN32
+    util::File::copy(tmp_path.c_str(), m_db_path.c_str());
+#endif
 
     SharedGroupOptions new_options;
     new_options.durability = dura;
