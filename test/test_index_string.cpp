@@ -1620,4 +1620,70 @@ TEST(StringIndex_InsertLongPrefixAndQuery)
 }
 
 
+TEST(StringIndex_Fuzzy)
+{
+    constexpr size_t chunkcount = 50;
+    constexpr size_t rowcount = 100 + 1000 * TEST_DURATION;
+
+    for (size_t main_rounds = 0; main_rounds < 1 + 10 * TEST_DURATION; main_rounds++) {
+
+        Group g;
+
+        auto t = g.add_table("StringsOnly");
+        t->add_column(type_String, "first");
+        t->add_column(type_String, "second");
+
+        t->add_search_index(0);
+
+        std::string strings[chunkcount];
+
+        for (size_t t = 0; t < chunkcount; t++) {
+            size_t len = fastrand() % REALM_MAX_BPNODE_SIZE;
+
+            for (size_t i = 0; i < len; i++)
+                strings[t] += char(fastrand());
+        }
+
+        for (size_t rows = 0; rows < rowcount; rows++) {
+            size_t chunks = fastrand() % 3;
+            std::string str;
+
+            for (size_t c = 0; c < chunks; c++) {
+                str += strings[fastrand() % chunkcount];
+            }
+
+            t->add_empty_row();
+            t->set_string(0, t->size() - 1, str);
+            t->set_string(1, t->size() - 1, str);
+        }
+
+        for (size_t rounds = 0; rounds < 1 + 10 * TEST_DURATION; rounds++) {
+            size_t matches[rowcount + chunkcount];
+
+            for (size_t r = 0; r < t->size(); r++) {
+                matches[r] = (t->column<String>(0) == t->get_string(0, r)).count();
+            }
+
+            for (size_t r = 0; r < t->size(); r++) {
+                CHECK_EQUAL(matches[r], (t->column<String>(1) == t->get_string(1, r)).count());
+            }
+
+            if (t->size() > 10)
+                t->remove(0);
+
+            size_t r1 = fastrand() % t->size();
+            size_t r2 = fastrand() % t->size();
+
+            t->set_string(0, r1, t->get_string(0, r2));
+            t->set_string(1, r1, t->get_string(1, r2));
+
+            r1 = fastrand() % t->size();
+            r2 = fastrand() % t->size();
+
+            t.get()->swap_rows(r1, r2);
+        }
+    }
+}
+
+
 #endif // TEST_INDEX_STRING
