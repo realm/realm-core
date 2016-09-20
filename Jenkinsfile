@@ -5,79 +5,83 @@ try {
   def gitSha
   def dependencies
 
-  stage 'gather-info'
-  node {
-    checkout([
-      $class: 'GitSCM',
-      branches: scm.branches,
-      gitTool: 'native git',
-      extensions: scm.extensions + [[$class: 'CleanCheckout']],
-      userRemoteConfigs: scm.userRemoteConfigs
-    ])
-    sh 'git archive -o core.zip HEAD'
-    stash includes: 'core.zip', name: 'core-source'
+  stage('gather-info') {
+    node {
+      checkout([
+        $class: 'GitSCM',
+        branches: scm.branches,
+        gitTool: 'native git',
+        extensions: scm.extensions + [[$class: 'CleanCheckout']],
+        userRemoteConfigs: scm.userRemoteConfigs
+      ])
+      sh 'git archive -o core.zip HEAD'
+      stash includes: 'core.zip', name: 'core-source'
 
-    dependencies = readProperties file: 'dependencies.list'
-    echo "VERSION: ${dependencies.VERSION}"
+      dependencies = readProperties file: 'dependencies.list'
+      echo "VERSION: ${dependencies.VERSION}"
 
-    gitTag = readGitTag()
-    gitSha = readGitSha()
-    echo "tag: ${gitTag}"
-    if (gitTag == "") {
-      echo "No tag given for this build"
-      setBuildName(gitSha)
-    } else {
-      if (gitTag != "v${dependencies.VERSION}") {
-        echo "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
+      gitTag = readGitTag()
+      gitSha = readGitSha()
+      echo "tag: ${gitTag}"
+      if (gitTag == "") {
+        echo "No tag given for this build"
+        setBuildName(gitSha)
       } else {
-        echo "Building release: '${gitTag}'"
-        setBuildName("Tag ${gitTag}")
+        if (gitTag != "v${dependencies.VERSION}") {
+          echo "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
+        } else {
+          echo "Building release: '${gitTag}'"
+          setBuildName("Tag ${gitTag}")
+        }
       }
     }
   }
 
-  stage 'check'
+  stage('check') {
+    parallelExecutors = [
+      checkLinuxRelease: doBuildInDocker('check'),
+      checkLinuxDebug: doBuildInDocker('check-debug'),
+      buildCocoa: doBuildCocoa(),
+      buildNodeLinux: doBuildNodeInDocker(),
+      buildNodeOsx: doBuildNodeInOsx(),
+      buildDotnetOsx: doBuildDotNetOsx(),
+      buildAndroid: doBuildAndroid(),
+      addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
+      //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
+    ]
 
-  parallelExecutors = [
-    checkLinuxRelease: doBuildInDocker('check'),
-    checkLinuxDebug: doBuildInDocker('check-debug'),
-    buildCocoa: doBuildCocoa(),
-    buildNodeLinux: doBuildNodeInDocker(),
-    buildNodeOsx: doBuildNodeInOsx(),
-    buildDotnetOsx: doBuildDotNetOsx(),
-    buildAndroid: doBuildAndroid(),
-    addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
-    //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
-  ]
+    if (env.CHANGE_TARGET) {
+      parallelExecutors['diffCoverage'] = buildDiffCoverage()
+    }
 
-  if (env.CHANGE_TARGET) {
-    parallelExecutors['diffCoverage'] = buildDiffCoverage()
+    parallel parallelExecutors
   }
 
-  parallel parallelExecutors
-
-  stage 'build-packages'
-  parallel(
-    generic: doBuildPackage('generic', 'tgz'),
-    centos7: doBuildPackage('centos-7', 'rpm'),
-    centos6: doBuildPackage('centos-6', 'rpm'),
-    ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
-  )
+  stage('build-packages') {
+    parallel(
+      generic: doBuildPackage('generic', 'tgz'),
+      centos7: doBuildPackage('centos-7', 'rpm'),
+      centos6: doBuildPackage('centos-6', 'rpm'),
+      ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
+    )
+  }
 
   if (['master', 'next-major'].contains(env.BRANCH_NAME)) {
-    stage 'publish-packages'
-    parallel(
-      generic: doPublishGeneric(),
-      centos7: doPublish('centos-7', 'rpm', 'el', 7),
-      centos6: doPublish('centos-6', 'rpm', 'el', 6),
-      ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
-    )
+    stage('publish-packages') {
+      parallel(
+        generic: doPublishGeneric(),
+        centos7: doPublish('centos-7', 'rpm', 'el', 7),
+        centos6: doPublish('centos-6', 'rpm', 'el', 6),
+        ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
+      )
+    }
 
     if (gitTag != "") {
-      stage 'trigger release'
-      build job: 'sync_release/realm-core-rpm-release',
-        wait: false,
-        parameters: [[$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"]]
+      stage('trigger release') {
+        build job: 'sync_release/realm-core-rpm-release',
+          wait: false,
+          parameters: [[$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"]]
+      }
     }
   }
 } catch(Exception e) {
