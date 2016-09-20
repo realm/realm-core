@@ -18,10 +18,6 @@
   so other than the upgrade, this change should be effectivly invisible to
   the bindings. (see #2153)
 
-### Enhancements
-
-* Lorem ipsum.
-
 -----------
 
 ### Internals
