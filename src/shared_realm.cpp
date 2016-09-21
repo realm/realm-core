@@ -36,7 +36,9 @@
 #include <realm/commit_log.hpp>
 #endif
 
+#ifdef REALM_SYNC
 #include <realm/sync/history.hpp>
+#endif
 #include <realm/util/scope_exit.hpp>
 
 using namespace realm;
@@ -150,6 +152,7 @@ void Realm::open_with_config(const Config& config,
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
         }
         else {
+#ifdef REALM_SYNC
             // FIXME: The SharedGroup constructor, when called below, will
             // throw a C++ exception if server_synchronization_mode is
             // inconsistent with the accessed Realm file. This exception
@@ -159,12 +162,15 @@ void Realm::open_with_config(const Config& config,
                 history = realm::sync::make_sync_history(config.path);
             }
             else {
+#endif
 #if REALM_VER_MAJOR >= 2
                 history = realm::make_in_realm_history(config.path);
 #else
                 history = realm::make_client_history(config.path, config.encryption_key.data());
 #endif
+#ifdef REALM_SYNC
             }
+#endif
 #ifdef REALM_GROUP_SHARED_OPTIONS_HPP
             SharedGroupOptions options;
             options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
@@ -595,6 +601,7 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
     return util::none;
 }
 
+#ifdef REALM_SYNC
 bool Realm::refresh_sync_access_token(std::string access_token, StringData path, util::Optional<std::string> sync_url)
 {
     auto coordinator = realm::_impl::RealmCoordinator::get_existing_coordinator(path);
@@ -605,6 +612,7 @@ bool Realm::refresh_sync_access_token(std::string access_token, StringData path,
         return false;
     }
 }
+#endif
 
 Realm::HandoverPackage::HandoverPackage(HandoverPackage&&) = default;
 Realm::HandoverPackage& Realm::HandoverPackage::operator=(HandoverPackage&&) = default;

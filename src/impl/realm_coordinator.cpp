@@ -26,9 +26,11 @@
 #include "object_store.hpp"
 #include "schema.hpp"
 
+#ifdef REALM_SYNC
 #include "sync_config.hpp"
 #include "sync_manager.hpp"
 #include "sync_session.hpp"
+#endif
 
 #include <realm/group_shared.hpp>
 #include <realm/lang_bind_helper.hpp>
@@ -101,6 +103,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
         }
     }
 
+#ifdef REALM_SYNC
     if (config.sync_config && config.sync_config->create_session && !m_sync_session) {
         m_sync_session = SyncManager::shared().create_session(config.path);
         m_sync_session->set_sync_transact_callback([this] (VersionID, VersionID) {
@@ -113,6 +116,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
         // Request the binding to bind the Realm at the earliest opportunity (immediately, or upon login).
         SyncManager::shared().get_sync_login_function()(config);
     }
+#endif
 
     auto realm = Realm::make_shared_realm(std::move(config));
     if (!config.read_only() && !m_notifier && config.automatic_change_notifications) {
@@ -230,11 +234,16 @@ void RealmCoordinator::send_commit_notifications(Realm& source_realm)
     if (m_notifier) {
         m_notifier->notify_others();
     }
+
+#ifdef REALM_SYNC
     if (m_sync_session) {
         auto& sg = Realm::Internal::get_shared_group(source_realm);
         auto version = LangBindHelper::get_version_of_latest_snapshot(sg);
         m_sync_session->nonsync_transact_notify(version);
     }
+#else
+    static_cast<void>(source_realm);
+#endif
 }
 
 void RealmCoordinator::pin_version(uint_fast64_t version, uint_fast32_t index)
@@ -611,8 +620,10 @@ void RealmCoordinator::notify_others()
     m_notifier->notify_others();
 }
 
+#ifdef REALM_SYNC
 void RealmCoordinator::refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url)
 {
     REALM_ASSERT(m_sync_session);
     m_sync_session->refresh_sync_access_token(std::move(access_token), std::move(server_url));
 }
+#endif

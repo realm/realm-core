@@ -39,7 +39,9 @@ class Realm;
 class Replication;
 class SharedGroup;
 class StringData;
+#ifdef REALM_SYNC
 struct SyncConfig;
+#endif
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
@@ -159,8 +161,10 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
+#ifdef REALM_SYNC
         /// A data structure storing data used to configure the Realm for sync support.
         std::shared_ptr<SyncConfig> sync_config;
+#endif
     };
 
     // Get a cached Realm or create a new one if no cached copies exists
@@ -300,9 +304,11 @@ public:
                                  std::unique_ptr<Group>& read_only_group,
                                  Realm* realm);
 
+#ifdef REALM_SYNC
     static bool refresh_sync_access_token(std::string access_token,
                                           StringData path,
                                           util::Optional<std::string> sync_url);
+#endif
 
 private:
     // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead

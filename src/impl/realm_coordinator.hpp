@@ -33,7 +33,9 @@ namespace _impl {
 class CollectionNotifier;
 class ExternalCommitHelper;
 class WeakRealmNotifier;
+#ifdef REALM_SYNC
 struct SyncSession;
+#endif
 
 // RealmCoordinator manages the weak cache of Realm instances and communication
 // between per-thread Realm instances for a given file
@@ -93,8 +95,10 @@ public:
 
     void notify_others();
 
+#ifdef REALM_SYNC
     // FIXME: Consider whether this function should live here
     void refresh_sync_access_token(std::string access_token, util::Optional<std::string> server_url);
+#endif
 
 private:
     Realm::Config m_config;
@@ -122,7 +126,9 @@ private:
 
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
 
+#ifdef REALM_SYNC
     std::unique_ptr<_impl::SyncSession> m_sync_session;
+#endif
 
     // must be called with m_notifier_mutex locked
     void pin_version(uint_fast64_t version, uint_fast32_t index);
