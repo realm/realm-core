@@ -795,73 +795,77 @@ size_t Array::adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64
 // pointed at are sorted increasingly
 //
 // This method is mostly used by query_engine to enumerate table row indexes in increasing order through a TableView
-size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
+size_t Array::find_gte(const int64_t target, size_t start, size_t end) const
 {
     switch (m_width) {
         case 0:
-            return find_gte<0>(target, start, indirection);
+            return find_gte<0>(target, start, end);
         case 1:
-            return find_gte<1>(target, start, indirection);
+            return find_gte<1>(target, start, end);
         case 2:
-            return find_gte<2>(target, start, indirection);
+            return find_gte<2>(target, start, end);
         case 4:
-            return find_gte<4>(target, start, indirection);
+            return find_gte<4>(target, start, end);
         case 8:
-            return find_gte<8>(target, start, indirection);
+            return find_gte<8>(target, start, end);
         case 16:
-            return find_gte<16>(target, start, indirection);
+            return find_gte<16>(target, start, end);
         case 32:
-            return find_gte<32>(target, start, indirection);
+            return find_gte<32>(target, start, end);
         case 64:
-            return find_gte<64>(target, start, indirection);
+            return find_gte<64>(target, start, end);
         default:
             return not_found;
     }
 }
 
 template <size_t w>
-size_t Array::find_gte(const int64_t target, size_t start, Array const* indirection) const
+size_t Array::find_gte(const int64_t target, size_t start, size_t end) const
 {
-    REALM_ASSERT(start < (indirection ? indirection->size() : size()));
+    REALM_ASSERT(start < size());
+
+    if (end > m_size) {
+        end = m_size;
+    }
 
 #ifdef REALM_DEBUG
     // Reference implementation to illustrate and test behaviour
     size_t ref = 0;
     size_t idx;
 
-    for (idx = start; idx < m_size; ++idx) {
-        if (get(indirection ? to_size_t(indirection->get(idx)) : idx) >= target) {
+    for (idx = start; idx < end; ++idx) {
+        if (get(idx) >= target) {
             ref = idx;
             break;
         }
     }
 
-    if (idx == m_size) {
+    if (idx == end) {
         ref = not_found;
     }
 #endif
 
     size_t ret;
 
-    if (start >= m_size || target > ubound_for_width(w)) {
+    if (start >= end || target > ubound_for_width(w)) {
         ret = not_found;
         goto exit;
     }
 
-    if (start + 2 < m_size) {
-        if (get<w>(indirection ? to_size_t(indirection->get(start)) : start) >= target) {
+    if (start + 2 < end) {
+        if (get<w>(start) >= target) {
             ret = start;
             goto exit;
         }
         ++start;
-        if (get<w>(indirection ? to_size_t(indirection->get(start)) : start) >= target) {
+        if (get<w>(start) >= target) {
             ret = start;
             goto exit;
         }
         ++start;
     }
 
-    if (target > get<w>(indirection ? to_size_t(indirection->get(m_size - 1)) : m_size - 1)) {
+    if (target > get<w>(end - 1)) {
         ret = not_found;
         goto exit;
     }
@@ -870,7 +874,7 @@ size_t Array::find_gte(const int64_t target, size_t start, Array const* indirect
     test_ndx = 1;
 
     for (size_t offset = start + test_ndx;; offset = start + test_ndx) {
-        if (offset < m_size && get<w>(indirection ? to_size_t(indirection->get(offset)) : offset) < target)
+        if (offset < end && get<w>(offset) < target)
             start += test_ndx;
         else
             break;
@@ -881,8 +885,8 @@ size_t Array::find_gte(const int64_t target, size_t start, Array const* indirect
     size_t high;
     high = start + test_ndx + 1;
 
-    if (high > m_size)
-        high = m_size;
+    if (high > end)
+        high = end;
 
     start--;
 
@@ -892,7 +896,7 @@ size_t Array::find_gte(const int64_t target, size_t start, Array const* indirect
     orig_high = high;
     while (high - start > 1) {
         size_t probe = (start + high) / 2; // FIXME: see lower_bound() for better approach wrt overflow
-        int64_t v = get<w>(indirection ? to_size_t(indirection->get(probe)) : probe);
+        int64_t v = get<w>(probe);
         if (v < target)
             start = probe;
         else

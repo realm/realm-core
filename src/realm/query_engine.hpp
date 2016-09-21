@@ -1267,7 +1267,7 @@ public:
             while (m_last_indexed < m_results_end) {
                 m_index_getter->cache_next(m_last_indexed);
                 size_t f = m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start,
-                                                                nullptr);
+                                                                m_results_end - m_index_getter->m_leaf_start);
 
                 if (f == not_found) {
                     // Not found in this leaf - move on to next
