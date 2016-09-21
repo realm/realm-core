@@ -599,7 +599,7 @@ public:
     /// \param indirection an \c Array containing valid indices of values in
     ///        this \c Array, sorted in ascending order
     /// \return the index of the value if found, or realm::not_found otherwise
-    size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
+    size_t find_gte(const int64_t target, size_t start, size_t end = size_t(-1)) const;
     void preset(int64_t min, int64_t max, size_t num_items);
     void preset(size_t bitwidth, size_t num_items);
 
@@ -1152,7 +1152,7 @@ private:
     bool minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const;
 
     template <size_t w>
-    size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
+    size_t find_gte(const int64_t target, size_t start, size_t end) const;
 
     template <size_t w>
     size_t adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff);
