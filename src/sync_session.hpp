@@ -95,7 +95,6 @@ struct SyncSession : public std::enable_shared_from_this<SyncSession> {
 
 private:
     struct State;
-    friend struct _impl::sync_session_states::Connecting;
     friend struct _impl::sync_session_states::WaitingForAccessToken;
     friend struct _impl::sync_session_states::Active;
     friend struct _impl::sync_session_states::Dying;

@@ -32,16 +32,10 @@ using namespace realm::_impl::sync_session_states;
 ///
 /// STATES:
 ///
-/// CONNECTING: upon entering this state, the underlying `sync::Session` is
-/// created.
-/// From: (initial state), LOGGED_OUT
-/// To:
-///    * WAITING_FOR_ACCESS_TOKEN: immediately
-///
 /// WAITING_FOR_ACCESS_TOKEN: upon entering this state, the binding is informed
 /// that the session wants an access token. The session is now waiting for the
 /// binding to provide the token.
-/// From: CONNECTING
+/// From: initial, LOGGED_OUT
 /// To:
 ///    * ACTIVE: when the binding successfully refreshes the token
 ///    * LOGGED_OUT: if asked to log out
@@ -77,7 +71,7 @@ using namespace realm::_impl::sync_session_states;
 /// owned by this session is destroyed, and the session is quiescent.
 /// From: WAITING_FOR_ACCESS_TOKEN, ACTIVE, DYING
 /// To:
-///    * CONNECTING: if the session is revived
+///    * WAITING_FOR_ACCESS_TOKEN: if the session is revived
 ///    * DEAD: if asked to close
 ///    * ERROR: if a fatal error occurs
 ///
@@ -99,7 +93,7 @@ struct SyncSession::State {
 
     virtual void nonsync_transact_notify(SyncSession&, sync::Session::version_type) const { }
 
-    virtual void revive_if_needed(SyncSession&) const { }
+    virtual bool revive_if_needed(SyncSession&) const { return false; }
 
     virtual void log_out(SyncSession&) const { }
 
@@ -107,7 +101,6 @@ struct SyncSession::State {
 
     virtual void close(SyncSession&) const { }
 
-    static const State& connecting;
     static const State& waiting_for_access_token;
     static const State& active;
     static const State& dying;
@@ -116,24 +109,7 @@ struct SyncSession::State {
     static const State& error;
 };
 
-struct sync_session_states::Connecting : public SyncSession::State {
-    void enter_state(SyncSession& session) const override
-    {
-        REALM_ASSERT(!session.m_session);
-        session.create_sync_session();
-        session.advance_state(waiting_for_access_token);
-    }
-
-    // We immediately transition to waiting_for_access_token so there's no need
-    // to handle anything here.
-};
-
 struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
-    void enter_state(SyncSession& session) const override
-    {
-        SyncManager::shared().get_sync_login_function()(session.m_realm_path, session.m_config);
-    }
-
     void refresh_access_token(SyncSession& session, const std::string& access_token,
                               const util::Optional<std::string>& server_url) const override
     {
@@ -231,10 +207,11 @@ struct sync_session_states::Dying : public SyncSession::State {
         });
     }
 
-    void revive_if_needed(SyncSession& session) const override
+    bool revive_if_needed(SyncSession& session) const override
     {
         // Revive.
         session.advance_state(active);
+        return false;
     }
 
     void log_out(SyncSession& session) const override
@@ -259,10 +236,12 @@ struct sync_session_states::LoggedOut : public SyncSession::State {
         session.m_server_url = util::none;
     }
 
-    void revive_if_needed(SyncSession& session) const override
+    bool revive_if_needed(SyncSession& session) const override
     {
         // Revive.
-        session.advance_state(connecting);
+        session.create_sync_session();
+        session.advance_state(waiting_for_access_token);
+        return true;
     }
 
     void close(SyncSession& session) const override
@@ -281,7 +260,6 @@ struct sync_session_states::Error : public SyncSession::State {
 };
 
 
-const SyncSession::State& SyncSession::State::connecting = Connecting();
 const SyncSession::State& SyncSession::State::waiting_for_access_token = WaitingForAccessToken();
 const SyncSession::State& SyncSession::State::active = Active();
 const SyncSession::State& SyncSession::State::dying = Dying();
@@ -295,8 +273,12 @@ SyncSession::SyncSession(std::shared_ptr<SyncClient> client, std::string realm_p
 , m_realm_path(std::move(realm_path))
 , m_client(std::move(client))
 {
-    std::lock_guard<std::mutex> lock(m_state_mutex);
-    advance_state(State::connecting);
+    create_sync_session();
+    {
+        std::lock_guard<std::mutex> lock(m_state_mutex);
+        advance_state(State::waiting_for_access_token);
+    }
+    SyncManager::shared().get_sync_login_function()(m_realm_path, m_config);
 }
 
 void SyncSession::create_sync_session()
@@ -404,8 +386,13 @@ void SyncSession::nonsync_transact_notify(sync::Session::version_type version)
 
 void SyncSession::revive_if_needed()
 {
-    std::lock_guard<std::mutex> lock(m_state_mutex);
-    m_state->revive_if_needed(*this);
+    bool need_login;
+    {
+        std::lock_guard<std::mutex> lock(m_state_mutex);
+        need_login = m_state->revive_if_needed(*this);
+    }
+    if (need_login)
+        SyncManager::shared().get_sync_login_function()(m_realm_path, m_config);
 }
 
 void SyncSession::log_out()
