@@ -1350,7 +1350,7 @@ ONLY(StringIndex_Fuzzy)
 
         Group g;
 
-        auto t = g.add_table("StringsOnly");
+        TableRef t = g.add_table("StringsOnly");
         t->add_column(type_String, "first");
         t->add_column(type_String, "second");
 
@@ -1379,17 +1379,17 @@ ONLY(StringIndex_Fuzzy)
                 str += strings[fastrand() % chunkcount];
             }
 
-            t->add_empty_row();
-            t->set_string(0, t->size() - 1, str);
-            t->set_string(1, t->size() - 1, str);
+            size_t row_ndx = t->add_empty_row();
+            t->set_string(0, row_ndx, str);
+            t->set_string(1, row_ndx, str);
         }
 
         for (size_t rounds = 0; rounds < 2 + 10 * TEST_DURATION; rounds++) {
 
-            for (size_t r = 0; r < t->size(); r++) {
+            for (size_t row_ndx = 0; row_ndx < t->size(); ++row_ndx) {
 
-                TableView tv0 = (t->column<String>(0) == t->get_string(0, r)).find_all();
-                TableView tv1 = (t->column<String>(1) == t->get_string(1, r)).find_all();
+                TableView tv0 = (t->column<String>(0) == t->get_string(0, row_ndx)).find_all();
+                TableView tv1 = (t->column<String>(1) == t->get_string(1, row_ndx)).find_all();
 
                 CHECK_EQUAL(tv0.size(), tv1.size());
 
