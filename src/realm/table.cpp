@@ -2213,11 +2213,11 @@ void Table::change_link_targets(size_t row_ndx, size_t new_row_ndx)
     if (REALM_UNLIKELY(new_row_ndx >= m_size))
         throw LogicError(LogicError::row_index_out_of_range);
 
-    do_change_link_targets(row_ndx, new_row_ndx);
-
     if (Replication* repl = get_repl()) {
         repl->change_link_targets(this, row_ndx, new_row_ndx);
     }
+
+    do_change_link_targets(row_ndx, new_row_ndx);
 }
 
 void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over)
@@ -2413,8 +2413,6 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
     for (size_t col_ndx = 0; col_ndx < col_end; ++col_ndx) {
         if (m_spec.get_column_type(col_ndx) == col_type_LinkList) {
             auto& col = get_column_link_list(col_ndx);
-            // don't need to move any rows, but we still need to update the
-            // LinkViews to reflect the change
             col.adj_acc_subsume_row(row_ndx, new_row_ndx);
         }
     }
@@ -2862,7 +2860,6 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
             continue;
         if (duplicate == not_found)
             break;
-        change_link_targets(duplicate, winner);
         if (ndx == size() - 1)
             ndx = duplicate;
         move_last_over(duplicate);
@@ -2871,7 +2868,6 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
     }
 
     // Delete candidate.
-    change_link_targets(ndx, winner);
     if (winner == size() - 1)
         winner = ndx;
     move_last_over(ndx);
