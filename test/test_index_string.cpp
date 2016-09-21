@@ -1657,7 +1657,13 @@ TEST(StringIndex_Fuzzy)
         }
 
         for (size_t rows = 0; rows < rowcount; rows++) {
-            size_t chunks = fastrand() % 3;
+            // Strings consisting of 2 concatenated strings are very interesting
+            size_t chunks;
+            if (fastrand() % 2 == 0)
+                chunks = fastrand() % 4;
+            else
+                chunks = 2;
+
             std::string str;
 
             for (size_t c = 0; c < chunks; c++) {
@@ -1668,16 +1674,18 @@ TEST(StringIndex_Fuzzy)
             t->set_string(0, t->size() - 1, str);
             t->set_string(1, t->size() - 1, str);
         }
-
+        
         for (size_t rounds = 0; rounds < 1 + 10 * TEST_DURATION; rounds++) {
-            size_t matches[rowcount + chunkcount];
-
             for (size_t r = 0; r < t->size(); r++) {
-                matches[r] = (t->column<String>(0) == t->get_string(0, r)).count();
-            }
+                
+                TableView tv0 = (t->column<String>(0) == t->get_string(0, r)).find_all();
+                TableView tv1 = (t->column<String>(1) == t->get_string(1, r)).find_all();
 
-            for (size_t r = 0; r < t->size(); r++) {
-                CHECK_EQUAL(matches[r], (t->column<String>(1) == t->get_string(1, r)).count());
+                CHECK_EQUAL(tv0.size(), tv1.size());
+
+                for (size_t v = 0; v < tv0.size(); v++) {
+                    CHECK_EQUAL(tv0.get_source_ndx(v), tv1.get_source_ndx(v));
+                }
             }
 
             if (t->size() > 10)
