@@ -1211,10 +1211,8 @@ public:
             }
 
             m_index_matches_destroy = false;
-            m_last_indexed = 0;
-            m_last_start = 0;
-            m_results_start = 0;
-            m_results_end = 0;
+            m_last_start = size_t(-1);
+
             switch (fr) {
                 case FindRes_single:
                     m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
@@ -1229,8 +1227,6 @@ public:
                     // translate(x) = x. Shouldn't it inherit owner column's allocator?!
                     m_index_matches.reset(new IntegerColumn(IntegerColumn::unattached_root_tag(), m_condition_column->get_alloc())); // Throws
                     m_index_matches->get_root_array()->init_from_ref(res.payload);
-                    m_last_indexed = res.start_ndx;
-                    m_last_start = res.start_ndx;
                     m_results_start = res.start_ndx;
                     m_results_end = res.end_ndx;
 
@@ -1264,27 +1260,30 @@ public:
             if (!m_index_getter)
                 return not_found; // no matches in the index
 
-            size_t f = not_found;
-
             if (m_last_start > start)
                 m_last_indexed = m_results_start;
             m_last_start = start;
 
-            while (f == not_found && m_last_indexed < m_results_end) {
+            while (m_last_indexed < m_results_end) {
                 m_index_getter->cache_next(m_last_indexed);
-                f = m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start,
-                                                         nullptr);
+                size_t f = m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start,
+                                                                nullptr);
 
-                if (f >= (m_results_end - m_index_getter->m_leaf_start) || f == not_found) {
+                if (f == not_found) {
+                    // Not found in this leaf - move on to next
                     m_last_indexed = m_index_getter->m_leaf_end;
                 }
+                else if (f >= (m_results_end - m_index_getter->m_leaf_start)) {
+                    // Found outside valid range
+                    return not_found;
+                }
                 else {
-                    start = to_size_t(m_index_getter->m_leaf_ptr->get(f));
-                    if (start >= end)
+                    size_t found_index = to_size_t(m_index_getter->m_leaf_ptr->get(f));
+                    if (found_index >= end)
                         return not_found;
                     else {
                         m_last_indexed = f + m_index_getter->m_leaf_start;
-                        return start;
+                        return found_index;
                     }
                 }
             }
