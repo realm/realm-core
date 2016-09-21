@@ -86,6 +86,7 @@ enum INS {
     COMPACT,
     SWAP_ROWS,
     MOVE_COLUMN,
+    SET_UNIQUE,
 
     COUNT
 };
@@ -691,6 +692,72 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 sg_r.begin_read();
                 REALM_DO_IF_VERIFY(log, g_r.verify());
+            }
+            else if (instr == SET_UNIQUE && g.size() > 0) {
+                // setting a unique value has a lot of prerequisites, so instead of (very) randomly selecting a
+                // suitable table and column we search for it. TODO: consider shuffle search order
+
+                for (size_t table_ndx = 0; table_ndx < g.size(); ++table_ndx) {
+                    TableRef t = g.get_table(table_ndx);
+                    if (t->size() == 0)
+                        continue;
+
+                    bool set_unique_called = false;
+                    for (size_t col_ndx = 0; col_ndx < t->get_column_count(); ++col_ndx) {
+                        if (!t->has_search_index(col_ndx)) {
+                            continue;
+                        }
+                        DataType type = t->get_column_type(col_ndx);
+                        switch (type) {
+                            case type_Int: {
+                                size_t row_ndx = get_int32(s) % t->size();
+                                bool set_null = t->is_nullable(col_ndx) ? get_next(s) % 2 == 0 : false;
+                                if (set_null) {
+                                    if (log) {
+                                        *log << "g.get_table(" << table_ndx << ")->set_null_unique(" << col_ndx << ", " << row_ndx << ");\n";
+                                    }
+                                    t->set_null_unique(col_ndx, row_ndx);
+                                }
+                                else {
+                                    int64_t value = get_int64(s);
+                                    if (log) {
+                                        *log << "g.get_table(" << table_ndx << ")->set_int_unique(" << col_ndx << ", " << row_ndx << ", " << value << ");\n";
+                                    }
+                                    t->set_int_unique(col_ndx, row_ndx, value);
+                                }
+                                break;
+                            }
+                            case type_String: {
+                                size_t row_ndx = get_int32(s) % t->size();
+                                bool set_null = t->is_nullable(col_ndx) ? get_next(s) % 2 == 0 : false;
+                                if (set_null) {
+                                    if (log) {
+                                        *log << "g.get_table(" << table_ndx << ")->set_string_unique(" << col_ndx << ", " << row_ndx << ", null{});\n";
+                                    }
+                                    t->set_string_unique(col_ndx, row_ndx, null{});
+                                }
+                                else {
+                                    std::string str = create_string(get_next(s));
+                                    if (log) {
+                                        *log << "g.get_table(" << table_ndx << ")->set_string_unique(" << col_ndx << ", " << row_ndx << ", \"" << str << "\");\n";
+                                    }
+                                    t->set_string_unique(col_ndx, row_ndx, str);
+                                }
+                                break;
+                            }
+                            default:
+                                continue;
+                        }
+
+                        set_unique_called = true;
+                        break;
+                    }
+                    
+                    if (set_unique_called) {
+                        break;
+                    }
+                }
+
             }
         }
     }
