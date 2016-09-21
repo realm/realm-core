@@ -8,19 +8,19 @@ info() { echo "===> $@"; }
 script_path="$(pushd "$(dirname $0)" >/dev/null; pwd)"
 src_path="$(pushd "$script_path/.." >/dev/null; pwd)"
 
-default="generic centos-6 centos-7"
+default="generic centos-6 centos-7 ubuntu-1604"
 distros=${@:-$default}
 
 git_tag=$(git describe --exact-match --tags HEAD 2>/dev/null || true)
 
 . ${src_path}/dependencies.list
 
-PACKAGECLOUD_URL="https://${PACKAGECLOUD_MASTER_TOKEN}:@packagecloud.io/install/repositories/realm/sync-devel/script.rpm.sh"
+PACKAGECLOUD_URL="https://${PACKAGECLOUD_MASTER_TOKEN}:@packagecloud.io/install/repositories/realm/sync-devel"
 
 if [ -z "$git_tag" ]; then
   info "No git tag exists.  Triggering -devel build"
   sha=$(git rev-parse HEAD | cut -b1-8)
-  ITERATION="g$sha"
+  ITERATION="0.$sha"
 elif [ "$git_tag" != "v${VERSION}" ]; then
   die "Git tag '$git_tag' does not match VERSION: '$VERSION'"
 else

@@ -18,7 +18,7 @@
 
 // #define USE_VLD
 #if defined(_MSC_VER) && defined(_DEBUG) && defined(USE_VLD)
-    #include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
+#include "C:\\Program Files (x86)\\Visual Leak Detector\\include\\vld.h"
 #endif
 
 #include <ctime>
@@ -52,12 +52,12 @@
 // like an unknown number of file descriptors can be left behind, presumably due
 // the way asynchronous DNS lookup is implemented.
 #if !defined _WIN32 && !REALM_PLATFORM_APPLE
-    #define ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
+#define ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
 #endif
 
 #ifdef ENABLE_FILE_DESCRIPTOR_LEAK_CHECK
-    #include <unistd.h>
-    #include <fcntl.h>
+#include <unistd.h>
+#include <fcntl.h>
 #endif
 
 using namespace realm;
@@ -69,6 +69,7 @@ unsigned long unit_test_random_seed;
 
 namespace {
 
+// clang-format off
 const char* file_order[] = {
     // When choosing order, please try to use these guidelines:
     //
@@ -115,7 +116,7 @@ const char* file_order[] = {
 
     "large_tests*.cpp"
 };
-
+// clang-format on
 
 void fix_max_open_files()
 {
@@ -163,7 +164,7 @@ long get_num_open_files()
 
 void fix_async_daemon_path()
 {
-    // `setenv()` is POSIX. _WIN32 has `_putenv_s()` instead.
+// `setenv()` is POSIX. _WIN32 has `_putenv_s()` instead.
 #ifndef _WIN32
     const char* async_daemon;
     // When running the unit-tests in Xcode, it runs them
@@ -171,22 +172,22 @@ void fix_async_daemon_path()
     // look for the daemon there
     const char* xcode_env = getenv("__XCODE_BUILT_PRODUCTS_DIR_PATHS");
     if (xcode_env) {
-#  ifdef REALM_DEBUG
+#ifdef REALM_DEBUG
         async_daemon = "realmd-dbg-noinst";
-#  else
+#else
         async_daemon = "realmd-noinst";
-#  endif
+#endif
     }
     else {
-#  ifdef REALM_COVER
+#ifdef REALM_COVER
         async_daemon = "../src/realm/realmd-cov-noinst";
-#  else
-#    ifdef REALM_DEBUG
+#else
+#ifdef REALM_DEBUG
         async_daemon = "../src/realm/realmd-dbg-noinst";
-#    else
+#else
         async_daemon = "../src/realm/realmd-noinst";
-#    endif
-#  endif
+#endif
+#endif
     }
     setenv("REALM_ASYNC_DAEMON", async_daemon, 0);
 #endif // _WIN32
@@ -223,8 +224,7 @@ void set_always_encrypt()
 
 void display_build_config()
 {
-    const char* with_debug =
-        Version::has_feature(feature_Debug) ? "Enabled" : "Disabled";
+    const char* with_debug = Version::has_feature(feature_Debug) ? "Enabled" : "Disabled";
 
 #if REALM_ENABLE_MEMDEBUG
     const char* memdebug = "Enabled";
@@ -234,9 +234,8 @@ void display_build_config()
 
 #if REALM_ENABLE_ENCRYPTION
     bool always_encrypt = is_always_encrypt_enabled();
-    const char* encryption = always_encrypt ?
-                             "Enabled at compile-time (always encrypt = yes)" :
-                             "Enabled at compile-time (always encrypt = no)";
+    const char* encryption = always_encrypt ? "Enabled at compile-time (always encrypt = yes)"
+                                            : "Enabled at compile-time (always encrypt = no)";
 #else
     const char* encryption = "Disabled at compile-time";
 #endif
@@ -253,38 +252,36 @@ void display_build_config()
     const char* compiler_avx = "No";
 #endif
 
-    const char* cpu_sse = realm::sseavx<42>() ? "4.2" :
-                          (realm::sseavx<30>() ? "3.0" : "None");
+    const char* cpu_sse = realm::sseavx<42>() ? "4.2" : (realm::sseavx<30>() ? "3.0" : "None");
 
     const char* cpu_avx = realm::sseavx<1>() ? "Yes" : "No";
 
-    std::cout <<
-              "\n"
-              "Realm version: " << Version::get_version() << " with Debug " << with_debug << "\n"
-              "Encryption: " << encryption << "\n"
-              "\n"
-              "REALM_MAX_BPNODE_SIZE = " << REALM_MAX_BPNODE_SIZE << "\n"
-              "REALM_MEMDEBUG = " << memdebug << "\n"
-              "\n"
+    std::cout << std::endl
+              << "Realm version: " << Version::get_version() << " with Debug " << with_debug << "\n"
+              << "Encryption: " << encryption << "\n"
+              << "\n"
+              << "REALM_MAX_BPNODE_SIZE = " << REALM_MAX_BPNODE_SIZE << "\n"
+              << "REALM_MEMDEBUG = " << memdebug << "\n"
+              << "\n"
               // Be aware that ps3/xbox have sizeof (void*) = 4 && sizeof (size_t) == 8
               // We decide to print size_t here
-              "sizeof (size_t) * 8 = " << (sizeof(size_t) * 8) << "\n"
-              "\n"
-              "Compiler supported SSE (auto detect):       " << compiler_sse << "\n"
-              "This CPU supports SSE (auto detect):        " << cpu_sse << "\n"
-              "Compiler supported AVX (auto detect):       " << compiler_avx << "\n"
-              "This CPU supports AVX (AVX1) (auto detect): " << cpu_avx << "\n"
-              "\n"
-              "Unit test random seed:                      " << unit_test_random_seed << "\n"
-              "\n";
+              << "sizeof (size_t) * 8 = " << (sizeof(size_t) * 8) << "\n"
+              << "\n"
+              << "Compiler supported SSE (auto detect):       " << compiler_sse << "\n"
+              << "This CPU supports SSE (auto detect):        " << cpu_sse << "\n"
+              << "Compiler supported AVX (auto detect):       " << compiler_avx << "\n"
+              << "This CPU supports AVX (AVX1) (auto detect): " << cpu_avx << "\n"
+              << "\n"
+              << "Unit test random seed:                      " << unit_test_random_seed << "\n"
+              << std::endl;
 }
 
 
 // Records elapsed time for each test and shows a "Top 5" at the end.
-class CustomReporter: public SimpleReporter {
+class CustomReporter : public SimpleReporter {
 public:
-    explicit CustomReporter(bool report_progress):
-        SimpleReporter(report_progress)
+    explicit CustomReporter(bool report_progress)
+        : SimpleReporter(report_progress)
     {
     }
 
@@ -295,9 +292,9 @@ public:
     void end(const TestContext& context, double elapsed_seconds) override
     {
         result r;
-        r.test_index       = context.test_index;
+        r.test_index = context.test_index;
         r.recurrence_index = context.recurrence_index;
-        r.elapsed_seconds  = elapsed_seconds;
+        r.elapsed_seconds = elapsed_seconds;
         m_results.push_back(r);
         SimpleReporter::end(context, elapsed_seconds);
     }
@@ -334,12 +331,13 @@ public:
         name_col_width += 2;
         size_t full_width = name_col_width + time_col_width;
         std::cout.fill('-');
-        std::cout << "\nTop " << n << " time usage:\n" << std::setw(int(full_width)) << "" << "\n";
+        std::cout << "\nTop " << n << " time usage:\n"
+                  << std::setw(int(full_width)) << ""
+                  << "\n";
         std::cout.fill(' ');
         for (const auto& row : rows) {
-            std::cout <<
-                      std::left  << std::setw(int(name_col_width)) << std::get<0>(row) <<
-                      std::right << std::setw(int(time_col_width)) << std::get<1>(row) << "\n";
+            std::cout << std::left << std::setw(int(name_col_width)) << std::get<0>(row) << std::right
+                      << std::setw(int(time_col_width)) << std::get<1>(row) << "\n";
         }
     }
 
@@ -388,7 +386,7 @@ bool run_tests(util::Logger* logger)
             if (bad)
                 throw std::runtime_error("Bad number of threads");
             if (config.num_threads > 1)
-                std::cout << "Number of test threads: "<< config.num_threads << "\n\n";
+                std::cout << "Number of test threads: " << config.num_threads << "\n\n";
         }
     }
 
@@ -400,8 +398,7 @@ bool run_tests(util::Logger* logger)
             in.imbue(std::locale::classic());
             in.flags(in.flags() & ~std::ios_base::skipws); // Do not accept white space
             in >> config.num_repetitions;
-            bool bad = !in || in.get() != std::char_traits<char>::eof() ||
-                       config.num_repetitions < 0;
+            bool bad = !in || in.get() != std::char_traits<char>::eof() || config.num_repetitions < 0;
             if (bad)
                 throw std::runtime_error("Bad number of repetitions");
         }

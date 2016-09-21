@@ -131,7 +131,7 @@ TEST(bounds)
 
     */
 
-// Define OLD, FINN or CURRENT inside the upper_count_int method in Array to benchmark different versions
+    // Define OLD, FINN or CURRENT inside the upper_count_int method in Array to benchmark different versions
     double score = 0;
 
     {
@@ -152,7 +152,7 @@ TEST(bounds)
         for (int i = 0; i < 1000; i++)
             index_table[i] = rand() % limit;
 
-        best = 9999; //std::numeric_limits<double>::max();
+        best = 9999; // std::numeric_limits<double>::max();
         for (int iter = 0; iter < 10; iter++) {
             t.reset();
             for (int j = 0; j < 100000; j++) {
@@ -166,7 +166,7 @@ TEST(bounds)
         std::cerr << "byte array, random indexing:     \t" << best << "\n";
         score += best;
 
-        best = 9999; //std::numeric_limits<double>::max();
+        best = 9999; // std::numeric_limits<double>::max();
         for (int iter = 0; iter < 10; iter++) {
             t.reset();
             for (int j = 0; j < 1000000; j++) {
@@ -180,7 +180,7 @@ TEST(bounds)
         std::cerr << "byte array, average direction:  \t" << best << "\n";
         score += best;
 
-        best = 9999; //std::numeric_limits<double>::max();
+        best = 9999; // std::numeric_limits<double>::max();
         for (int iter = 0; iter < 10; iter++) {
             t.reset();
             for (int j = 0; j < 1000000; j++) {
@@ -194,7 +194,7 @@ TEST(bounds)
         std::cerr << "byte array, always go left:     \t" << best << "\n";
         score += best;
 
-        best = 9999; //std::numeric_limits<double>::max();
+        best = 9999; // std::numeric_limits<double>::max();
         for (int iter = 0; iter < 10; iter++) {
             t.reset();
             for (int j = 0; j < 1000000; j++) {
@@ -227,7 +227,7 @@ TEST(bounds)
         for (int i = 0; i < 1000; i++)
             index_table[i] = rand() % limit;
 
-        best = 9999; //std::numeric_limits<double>::max();
+        best = 9999; // std::numeric_limits<double>::max();
         for (int iter = 0; iter < 10; iter++) {
             t.reset();
             for (int j = 0; j < 100000; j++) {
@@ -241,7 +241,7 @@ TEST(bounds)
         std::cerr << "32-bit array, random indexing:     \t" << best << "\n";
         score += best;
 
-        best = 9999; //std::numeric_limits<double>::max();
+        best = 9999; // std::numeric_limits<double>::max();
         for (int iter = 0; iter < 10; iter++) {
             t.reset();
             for (int j = 0; j < 30000; j++) {
@@ -254,7 +254,7 @@ TEST(bounds)
         }
         std::cerr << "32-bit array, average direction:\t" << best << "\n";
 
-        best = 9999; //std::numeric_limits<double>::max();
+        best = 9999; // std::numeric_limits<double>::max();
         for (int iter = 0; iter < 10; iter++) {
             t.reset();
             for (int j = 0; j < 30000; j++) {
@@ -268,12 +268,12 @@ TEST(bounds)
         std::cerr << "32-bit array, always go left:   \t" << best << "\n";
         score += best;
 
-        best = 9999; //std::numeric_limits<double>::max();
+        best = 9999; // std::numeric_limits<double>::max();
         for (int iter = 0; iter < 10; iter++) {
             t.reset();
             for (int j = 0; j < 30000; j++) {
                 for (int i = 0; i < val; i += val / 1000) {
-                    volatile size_t t = a.upper_bound_int(val);  // always go right
+                    volatile size_t t = a.upper_bound_int(val); // always go right
                 }
             }
             if (t < best)
@@ -282,8 +282,6 @@ TEST(bounds)
         std::cerr << "32-bit array, always go right:  \t" << best << "\n";
         score += best;
     }
-
-
 
 
     std::cerr << "sum: " << score;

@@ -158,7 +158,9 @@ size_t VerifiedInteger::size()
 void VerifiedInteger::find_all(IntegerColumn& c, int64_t value, size_t start, size_t end)
 {
     std::vector<int64_t>::iterator ita = v.begin() + start;
-    std::vector<int64_t>::iterator itb = end == size_t(-1) ? v.end() : v.begin() + (end == size_t(-1) ? v.size() : end);;
+    std::vector<int64_t>::iterator itb =
+        end == size_t(-1) ? v.end() : v.begin() + (end == size_t(-1) ? v.size() : end);
+    ;
     std::vector<size_t> result;
     while (ita != itb) {
         ita = std::find(ita, itb, value);

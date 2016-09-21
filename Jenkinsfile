@@ -5,77 +5,83 @@ try {
   def gitSha
   def dependencies
 
-  stage 'gather-info'
-  node {
-    checkout([
-      $class: 'GitSCM',
-      branches: scm.branches,
-      gitTool: 'native git',
-      extensions: scm.extensions + [[$class: 'CleanCheckout']],
-      userRemoteConfigs: scm.userRemoteConfigs
-    ])
-    sh 'git archive -o core.zip HEAD'
-    stash includes: 'core.zip', name: 'core-source'
+  stage('gather-info') {
+    node {
+      checkout([
+        $class: 'GitSCM',
+        branches: scm.branches,
+        gitTool: 'native git',
+        extensions: scm.extensions + [[$class: 'CleanCheckout']],
+        userRemoteConfigs: scm.userRemoteConfigs
+      ])
+      sh 'git archive -o core.zip HEAD'
+      stash includes: 'core.zip', name: 'core-source'
 
-    dependencies = readProperties file: 'dependencies.list'
-    echo "VERSION: ${dependencies.VERSION}"
+      dependencies = readProperties file: 'dependencies.list'
+      echo "VERSION: ${dependencies.VERSION}"
 
-    gitTag = readGitTag()
-    gitSha = readGitSha()
-    echo "tag: ${gitTag}"
-    if (gitTag == "") {
-      echo "No tag given for this build"
-      setBuildName(gitSha)
-    } else {
-      if (gitTag != "v${dependencies.VERSION}") {
-        echo "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
+      gitTag = readGitTag()
+      gitSha = readGitSha()
+      echo "tag: ${gitTag}"
+      if (gitTag == "") {
+        echo "No tag given for this build"
+        setBuildName(gitSha)
       } else {
-        echo "Building release: '${gitTag}'"
-        setBuildName("Tag ${gitTag}")
+        if (gitTag != "v${dependencies.VERSION}") {
+          echo "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
+        } else {
+          echo "Building release: '${gitTag}'"
+          setBuildName("Tag ${gitTag}")
+        }
       }
     }
   }
 
-  stage 'check'
+  stage('check') {
+    parallelExecutors = [
+      checkLinuxRelease: doBuildInDocker('check'),
+      checkLinuxDebug: doBuildInDocker('check-debug'),
+      buildCocoa: doBuildCocoa(),
+      buildNodeLinux: doBuildNodeInDocker(),
+      buildNodeOsx: doBuildNodeInOsx(),
+      buildDotnetOsx: doBuildDotNetOsx(),
+      buildAndroid: doBuildAndroid(),
+      addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
+      threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
+    ]
 
-  parallelExecutors = [
-    checkLinuxRelease: doBuildInDocker('check'),
-    checkLinuxDebug: doBuildInDocker('check-debug'),
-    buildCocoa: doBuildCocoa(),
-    buildNodeLinux: doBuildNodeInDocker(),
-    buildNodeOsx: doBuildNodeInOsx(),
-    buildDotnetOsx: doBuildDotNetOsx(),
-    buildAndroid: doBuildAndroid(),
-    addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
-    //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
-  ]
+    if (env.CHANGE_TARGET) {
+      parallelExecutors['diffCoverage'] = buildDiffCoverage()
+    }
 
-  if (env.CHANGE_TARGET) {
-    parallelExecutors['diffCoverage'] = buildDiffCoverage()
+    parallel parallelExecutors
   }
 
-  parallel parallelExecutors
-
-  stage 'build-packages'
-  parallel(
-    generic: doBuildPackage('generic', 'tgz'),
-    centos7: doBuildPackage('centos-7', 'rpm'),
-    centos6: doBuildPackage('centos-6', 'rpm')
-  )
+  stage('build-packages') {
+    parallel(
+      generic: doBuildPackage('generic', 'tgz'),
+      centos7: doBuildPackage('centos-7', 'rpm'),
+      centos6: doBuildPackage('centos-6', 'rpm'),
+      ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
+    )
+  }
 
   if (['master', 'next-major'].contains(env.BRANCH_NAME)) {
-    stage 'publish-packages'
-    parallel(
-      generic: doPublishGeneric(),
-      centos7: doPublish('centos-7', 'rpm', 'el', 7),
-      centos6: doPublish('centos-6', 'rpm', 'el', 6)
-    )
+    stage('publish-packages') {
+      parallel(
+        generic: doPublishGeneric(),
+        centos7: doPublish('centos-7', 'rpm', 'el', 7),
+        centos6: doPublish('centos-6', 'rpm', 'el', 6),
+        ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
+      )
+    }
 
     if (gitTag != "") {
-      stage 'trigger release'
-      build job: 'sync_release/realm-core-rpm-release',
-        wait: false,
-        parameters: [[$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"]]
+      stage('trigger release') {
+        build job: 'sync_release/realm-core-rpm-release',
+          wait: false,
+          parameters: [[$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"]]
+      }
     }
   }
 } catch(Exception e) {
@@ -124,6 +130,8 @@ def doBuildCocoa() {
               cp core-*.tar.xz realm-core-latest.tar.xz
             '''
             archive '*core-*.*.*.tar.xz'
+
+            sh 'sh build.sh clean'
         }
       } finally {
         collectCompilerWarnings('clang')
@@ -176,6 +184,8 @@ def doBuildDotNetOsx() {
               cp realm-core-dotnet-cocoa-*.tar.bz2 realm-core-dotnet-cocoa-latest.tar.bz2
             '''
             archive '*core-*.*.*.tar.bz2'
+
+            sh 'sh build.sh clean'
         }
       } finally {
         collectCompilerWarnings('clang')
@@ -296,6 +306,9 @@ def doBuildNodeInOsx() {
           sh 'sh build.sh build-node-package'
           sh 'cp realm-core-node-*.tar.gz realm-core-node-osx-latest.tar.gz'
           archive '*realm-core-node-osx-*.*.*.tar.gz'
+
+          sh 'sh build.sh clean'
+
           withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
             sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core'
           }
@@ -325,6 +338,7 @@ def doBuildAndroid() {
               sh "sh build.sh config '${pwd()}/install'"
               sh "sh build.sh ${target}"
             }
+            archive 'realm-core-android-*.tar.gz'
 
             dir('test/android') {
                 sh '$ANDROID_HOME/tools/android update project -p . --target android-9'
@@ -475,7 +489,7 @@ def get_version() {
   def gitTag = readGitTag()
   def gitSha = readGitSha()
   if (gitTag == "") {
-    return "${dependencies.VERSION}-${gitSha}"
+    return "${dependencies.VERSION}-g${gitSha}"
   }
   else {
     return "${dependencies.VERSION}"
@@ -484,9 +498,10 @@ def get_version() {
 
 def getDeviceNames(String commandOutput) {
   def deviceNames = []
-  for (line in commandOutput.split('\n')) {
-    if (line.contains('\t')) {
-      deviceNames << line.split('\t')[0].trim()
+  def lines = commandOutput.split('\n')
+  for (i = 0; i < lines.size(); ++i) {
+    if (lines[i].contains('\t')) {
+      deviceNames << lines[i].split('\t')[0].trim()
     }
   }
   return deviceNames
@@ -495,7 +510,7 @@ def getDeviceNames(String commandOutput) {
 def doBuildPackage(distribution, fileType) {
   return {
     node('docker') {
-      getArchive()
+      getSourceArchive()
 
       withCredentials([[$class: 'StringBinding', credentialsId: 'packagecloud-sync-devel-master-token', variable: 'PACKAGECLOUD_MASTER_TOKEN']]) {
         sh "sh packaging/package.sh ${distribution}"
@@ -512,7 +527,7 @@ def doBuildPackage(distribution, fileType) {
 def doPublish(distribution, fileType, distroName, distroVersion) {
   return {
     node {
-      getArchive()
+      getSourceArchive()
       packaging = load './packaging/publish.groovy'
 
       dir('packaging/out') {
@@ -528,7 +543,7 @@ def doPublish(distribution, fileType, distroName, distroVersion) {
 def doPublishGeneric() {
   return {
     node {
-      getArchive()
+      getSourceArchive()
       def version = get_version()
       def topdir = pwd()
       dir('packaging/out') {
@@ -569,4 +584,10 @@ def getArchive() {
     sh 'rm -rf *'
     unstash 'core-source'
     sh 'unzip -o -q core.zip'
+}
+
+def getSourceArchive() {
+  checkout scm
+  sh 'git clean -ffdx -e .????????'
+  sh 'git submodule update --init'
 }

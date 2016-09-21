@@ -31,8 +31,8 @@ class InRealmHistoryImpl : public TrivialReplication, private _impl::InRealmHist
 public:
     using version_type = TrivialReplication::version_type;
 
-    InRealmHistoryImpl(std::string realm_path):
-        TrivialReplication(realm_path)
+    InRealmHistoryImpl(std::string realm_path)
+        : TrivialReplication(realm_path)
     {
     }
 
@@ -53,8 +53,7 @@ public:
         // No-op
     }
 
-    version_type prepare_changeset(const char* data, size_t size,
-                                   version_type orig_version) override
+    version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
     {
         if (!is_history_updated())
             update_from_parent(orig_version); // Throws

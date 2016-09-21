@@ -73,15 +73,15 @@ TEST(Util_Logger_LevelToFromString)
         CHECK(in && in.get() == std::char_traits<char>::eof());
         CHECK_EQUAL(level, level_2);
     };
-    check(util::Logger::Level::all,   "all");
+    check(util::Logger::Level::all, "all");
     check(util::Logger::Level::trace, "trace");
     check(util::Logger::Level::debug, "debug");
     check(util::Logger::Level::detail, "detail");
-    check(util::Logger::Level::info,  "info");
-    check(util::Logger::Level::warn,  "warn");
+    check(util::Logger::Level::info, "info");
+    check(util::Logger::Level::warn, "warn");
     check(util::Logger::Level::error, "error");
     check(util::Logger::Level::fatal, "fatal");
-    check(util::Logger::Level::off,   "off");
+    check(util::Logger::Level::off, "off");
 }
 
 
@@ -195,7 +195,7 @@ TEST(Util_Logger_Prefix)
 
 TEST(Util_Logger_ThreadSafe)
 {
-    struct BalloonLogger: public util::RootLogger {
+    struct BalloonLogger : public util::RootLogger {
         std::vector<std::string> messages;
         void do_log(std::string message) override
         {

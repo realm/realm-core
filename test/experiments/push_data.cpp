@@ -29,16 +29,14 @@ using namespace realm;
 
 namespace {
 
-REALM_TABLE_2(MyTable,
-              number, Int,
-              text, String)
+REALM_TABLE_2(MyTable, number, Int, text, String)
 
 } // anonymous namespace
 
 
 int main(int argc, const char* const argv[])
 {
-    string database_file  = "/tmp/push_data.realm";
+    string database_file = "/tmp/push_data.realm";
 
     deque<string> positional_args;
     for (int i = 1; i < argc; ++i) {
@@ -58,12 +56,14 @@ int main(int argc, const char* const argv[])
     }
 
     if (positional_args.size() < 2) {
-bad_command_line:
-        std::cerr <<
-                  "ERROR: Bad command line.\n\n"
-                  "Synopsis: " << argv[0] << "  NUM-REPS  TEXT...\n\n"
-                  "Options:\n"
-                  "  --database-file STRING   (default: \"" << database_file << "\")\n";
+    bad_command_line:
+        std::cerr << "ERROR: Bad command line.\n"
+                  << "\n"
+                  << "Synopsis: " << argv[0] << "  NUM-REPS  TEXT...\n"
+                  << "\n"
+                  << "Options:"
+                  << "\n"
+                  << "  --database-file STRING   (default: \"" << database_file << "\")\n";
         return 1;
     }
 
@@ -71,12 +71,14 @@ bad_command_line:
     {
         istringstream in(positional_args[0]);
         in >> noskipws >> num_reps;
-        if (!in || !in.eof()) goto bad_command_line;
+        if (!in || !in.eof())
+            goto bad_command_line;
         positional_args.pop_front();
     }
 
     Group group(database_file.c_str());
-    if (!group.is_valid()) throw runtime_error("Failed to open database");
+    if (!group.is_valid())
+        throw runtime_error("Failed to open database");
 
     {
         if (group.has_table("my_table") && !group.has_table<MyTable>("my_table"))

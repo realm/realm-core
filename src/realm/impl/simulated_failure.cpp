@@ -28,13 +28,13 @@
 #include <realm/impl/simulated_failure.hpp>
 
 #if REALM_PLATFORM_APPLE || REALM_ANDROID
-    #define USE_PTHREADS_IMPL 1
+#define USE_PTHREADS_IMPL 1
 #else
-    #define USE_PTHREADS_IMPL 0
+#define USE_PTHREADS_IMPL 0
 #endif
 
 #if USE_PTHREADS_IMPL
-    #include <pthread.h>
+#include <pthread.h>
 #endif
 
 using namespace realm;
@@ -48,14 +48,16 @@ const int num_failure_types = SimulatedFailure::_num_failure_types;
 
 struct PrimeMode {
     virtual bool check_trigger() noexcept = 0;
-    virtual ~PrimeMode() noexcept {}
+    virtual ~PrimeMode() noexcept
+    {
+    }
 };
 
 struct PrimeState {
     std::unique_ptr<PrimeMode> slots[num_failure_types];
 };
 
-struct OneShotPrimeMode: PrimeMode {
+struct OneShotPrimeMode : PrimeMode {
     bool triggered = false;
     bool check_trigger() noexcept override
     {
@@ -66,14 +68,14 @@ struct OneShotPrimeMode: PrimeMode {
     }
 };
 
-struct RandomPrimeMode: PrimeMode {
+struct RandomPrimeMode : PrimeMode {
     std::mt19937_64 random;
     std::uniform_int_distribution<int> dist;
     int n;
-    RandomPrimeMode(int trigger_threshold, int m, uint_fast64_t seed):
-        random(seed),
-        dist(0, m - 1),
-        n(trigger_threshold)
+    RandomPrimeMode(int trigger_threshold, int m, uint_fast64_t seed)
+        : random(seed)
+        , dist(0, m - 1)
+        , n(trigger_threshold)
     {
         REALM_ASSERT(n >= 0 && m > 0);
     }
@@ -84,7 +86,7 @@ struct RandomPrimeMode: PrimeMode {
     }
 };
 
-#  if !USE_PTHREADS_IMPL
+#if !USE_PTHREADS_IMPL
 
 
 thread_local PrimeState t_prime_state;
@@ -95,7 +97,7 @@ PrimeState& get() noexcept
 }
 
 
-#  else // USE_PTHREADS_IMPL
+#else // USE_PTHREADS_IMPL
 
 
 pthread_key_t key;
@@ -133,7 +135,7 @@ PrimeState& get() noexcept
 }
 
 
-#  endif // USE_PTHREADS_IMPL
+#endif // USE_PTHREADS_IMPL
 
 } // unnamed namespace
 
@@ -173,7 +175,7 @@ bool SimulatedFailure::do_check_trigger(FailureType failure_type) noexcept
 
 namespace {
 
-class ErrorCategory: public std::error_category {
+class ErrorCategory : public std::error_category {
 public:
     const char* name() const noexcept override;
     std::string message(int) const override;

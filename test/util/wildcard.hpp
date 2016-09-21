@@ -57,20 +57,19 @@ private:
 };
 
 
-
 // Implementation
 
 inline bool wildcard_pattern::match(const char* c_str) const noexcept
 {
     const char* begin = c_str;
-    const char* end   = begin + std::strlen(c_str);
+    const char* end = begin + std::strlen(c_str);
     return match(begin, end);
 }
 
 inline wildcard_pattern::card::card(size_t begin, size_t end) noexcept
 {
     m_offset = begin;
-    m_size   = end - begin;
+    m_size = end - begin;
 }
 
 

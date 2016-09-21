@@ -22,15 +22,21 @@
 namespace realm {
 
 
-template<class Spec>
+template <class Spec>
 class BasicTable;
 
-template<class T>
-struct IsBasicTable { static const bool value = false; };
-template<class Spec>
-struct IsBasicTable<BasicTable<Spec>> { static const bool value = true; };
-template<class Spec>
-struct IsBasicTable<const BasicTable<Spec>> { static const bool value = true; };
+template <class T>
+struct IsBasicTable {
+    static const bool value = false;
+};
+template <class Spec>
+struct IsBasicTable<BasicTable<Spec>> {
+    static const bool value = true;
+};
+template <class Spec>
+struct IsBasicTable<const BasicTable<Spec>> {
+    static const bool value = true;
+};
 
 
 } // namespace realm
