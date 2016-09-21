@@ -62,7 +62,7 @@
  * to leaves. The minimum allowable value is 2.
  */
 #ifndef REALM_MAX_BPNODE_SIZE
-#define REALM_MAX_BPNODE_SIZE 1000
+#define REALM_MAX_BPNODE_SIZE 10
 #endif
 
 
