@@ -12,6 +12,10 @@
 * Fixed various crashes when using subtables. The crash will occur when the first column
   of the subtable if of type `col_type_Timestamp` or if it is nullable and of type Bool, Int
   or OldDateTime. Caused by bad static `get_size_from_ref()` methods of columns. (#2101)
+* Fixed a bug with link columns incorrectly updating on a `move_last_over`
+  operation when the link points to the same table.
+* Fixed a race in the handover machinery which could cause crashes following handover
+  of a Query or a TableView. (#2117)
 * TimestampColumn::is_nullable() mismatched its real nulability. Also, when adding a new
   Float/Double column to a Table with rowcount > 0, the new entries would be non-null
   even though the column was created as nullable.
