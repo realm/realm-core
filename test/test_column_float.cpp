@@ -515,6 +515,39 @@ TEST(DoubleColumn_InitOfEmptyColumn)
     CHECK_EQUAL(0.0, t.get_double(1, 0));
 }
 
+TEST(DoubleFloatColumn_InitOfEmptyColumnNullable)
+{
+    // Test for a bug where default values of newly added float/double columns did not obey their nullability
+    {
+        Table t;
+        t.add_column(type_Int, "dummy");
+        t.add_empty_row();
+        t.add_column(type_Double, "d2", true);
+        CHECK(t.is_null(1, 0));
+    }
+    {
+        Table t;
+        t.add_column(type_Int, "dummy");
+        t.add_empty_row();
+        t.add_column(type_Double, "d2", false);
+        CHECK(!t.is_null(1, 0));
+    }
+    {
+        Table t;
+        t.add_column(type_Int, "dummy");
+        t.add_empty_row();
+        t.add_column(type_Float, "d2", true);
+        CHECK(t.is_null(1, 0));
+    }
+    {
+        Table t;
+        t.add_column(type_Int, "dummy");
+        t.add_empty_row();
+        t.add_column(type_Float, "d2", false);
+        CHECK(!t.is_null(1, 0));
+    }
+}
+
 TEST(FloatColumn_InitOfEmptyColumn)
 {
     Table t;

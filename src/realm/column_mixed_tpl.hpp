@@ -493,7 +493,7 @@ inline void MixedColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
     // See if m_timestamp_data needs to be created.
     if (get_root_array()->size() >= 4) {
         ref_type ref = get_root_array()->get_as_ref(3);
-        m_timestamp_data.reset(new TimestampColumn(get_alloc(), ref)); // Throws
+        m_timestamp_data.reset(new TimestampColumn(true /*fixme*/, get_alloc(), ref)); // Throws
         m_timestamp_data->set_parent(get_root_array(), 3);
     }
 }
