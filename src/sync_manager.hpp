@@ -86,7 +86,7 @@ private:
     std::shared_ptr<_impl::SyncClient> create_sync_client() const;
 
     std::shared_ptr<SyncSession> get_existing_active_session_locked(const std::string& path) const;
-    std::shared_ptr<SyncSession> get_existing_dying_session_locked(const std::string& path) const;
+    std::unique_ptr<SyncSession> get_existing_dying_session_locked(const std::string& path);
 
     mutable std::mutex m_mutex;
 
@@ -114,7 +114,7 @@ private:
     // `unregister_session`. If client code requests a sync session for which we have a dying
     // session, we will revive the session and move back it back to active status.
     std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_active_sessions;
-    std::unordered_map<std::string, std::shared_ptr<SyncSession>> m_dying_sessions;
+    std::unordered_map<std::string, std::unique_ptr<SyncSession>> m_dying_sessions;
 };
 
 } // namespace realm
