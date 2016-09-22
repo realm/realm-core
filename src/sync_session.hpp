@@ -35,12 +35,10 @@ class RealmCoordinator;
 struct SyncClient;
 
 namespace sync_session_states {
-struct Connecting;
 struct WaitingForAccessToken;
 struct Active;
 struct Dying;
-struct Dead;
-struct LoggedOut;
+struct Inactive;
 struct Error;
 }
 }
@@ -52,10 +50,9 @@ class Session;
 using SyncSessionTransactCallback = void(VersionID old_version, VersionID new_version);
 
 struct SyncSession : public std::enable_shared_from_this<SyncSession> {
-
     bool is_valid() const;
 
-    std::string path() const { return m_realm_path; }
+    std::string const& path() const { return m_realm_path; }
 
     void wait_for_upload_completion(std::function<void()> callback);
     void wait_for_download_completion(std::function<void()> callback);
@@ -95,12 +92,10 @@ struct SyncSession : public std::enable_shared_from_this<SyncSession> {
 
 private:
     struct State;
-    friend struct _impl::sync_session_states::Connecting;
     friend struct _impl::sync_session_states::WaitingForAccessToken;
     friend struct _impl::sync_session_states::Active;
     friend struct _impl::sync_session_states::Dying;
-    friend struct _impl::sync_session_states::Dead;
-    friend struct _impl::sync_session_states::LoggedOut;
+    friend struct _impl::sync_session_states::Inactive;
     friend struct _impl::sync_session_states::Error;
 
     friend class realm::SyncManager;
@@ -108,20 +103,21 @@ private:
     SyncSession(std::shared_ptr<_impl::SyncClient>, std::string realm_path, SyncConfig);
 
     // If the sync session is currently `Dying`, ask it to stay alive instead.
-    // If the sync session is currently `LoggedOut`, recreate it. Otherwise, a no-op.
+    // If the sync session is currently `Inactive`, recreate it. Otherwise, a no-op.
     void revive_if_needed();
+
+    // Check if this sync session is actually inactive
+    bool is_inactive() const;
     // }
 
     void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);
     void set_error_handler(std::function<SyncSessionErrorHandler>);
     void nonsync_transact_notify(VersionID::version_type);
 
-    void advance_state(const State&);
+    void advance_state(std::unique_lock<std::mutex>& lock, const State&);
 
     void create_sync_session();
-    // Destroy a sync session by removing it from the Sync Manager's "dying sessions" map.
-    // PRECONDITION: session is ready to be destroyed and deallocated immediately.
-    void unregister();
+    void unregister(std::unique_lock<std::mutex>& lock);
 
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
     std::function<SyncSessionErrorHandler> m_error_handler;
@@ -129,7 +125,7 @@ private:
     mutable std::mutex m_state_mutex;
 
     const State* m_state = nullptr;
-    size_t m_death_count = 0;
+    size_t m_pending_upload_threads = 0;
 
     SyncConfig m_config;
 

@@ -125,10 +125,11 @@ SyncUserMetadataResults SyncMetadataManager::get_users(bool marked) const
 }
 
 SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, RowExpr row)
-: m_realm(realm)
-, m_schema(schema)
-, m_row(Row(row))
-, m_invalid(Row(row).get_bool(schema.idx_marked_for_removal)) { }
+: m_invalid(row.get_bool(schema.idx_marked_for_removal))
+, m_schema(std::move(schema))
+, m_realm(std::move(realm))
+, m_row(row)
+{ }
 
 SyncUserMetadata::SyncUserMetadata(SyncMetadataManager& manager, std::string identity, bool make_if_absent)
 : m_schema(manager.m_schema)
