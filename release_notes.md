@@ -16,7 +16,9 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Optimized query code on a string column with a search index to address a
+  performance regression observed in the recent format changes to the
+  string index (see #2173)
 
 ----------------------------------------------
 
