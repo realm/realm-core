@@ -2213,46 +2213,11 @@ void Table::change_link_targets(size_t row_ndx, size_t new_row_ndx)
     if (REALM_UNLIKELY(new_row_ndx >= m_size))
         throw LogicError(LogicError::row_index_out_of_range);
 
-    // Replace links through backlink columns.
-    //
-    // This bypasses handling of cascading rows, and we have decided that this is OK, because
-    // ChangeLinkTargets is always followed by MoveLastOver, so breaking the last strong link
-    // to a row that is being subsumed will have no observable effect, while honoring the
-    // cascading behavior would complicate the calling code somewhat (having to take
-    // into account whether or not the row was removed as a consequence of cascade, leading
-    // to bugs in case this was forgotten).
-
-    size_t backlink_col_start = m_spec.get_public_column_count();
-    size_t backlink_col_end = m_spec.get_column_count();
-    for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
-        REALM_ASSERT(m_spec.get_column_type(col_ndx) == col_type_BackLink);
-
-        auto& col = get_column_backlink(col_ndx);
-        auto& origin_table = col.get_origin_table();
-        size_t origin_col_ndx = col.get_origin_column_index();
-        ColumnType origin_col_type = origin_table.get_real_column_type(origin_col_ndx);
-        while (col.get_backlink_count(row_ndx) > 0) {
-            size_t origin_row_ndx = col.get_backlink(row_ndx, 0);
-
-            if (origin_col_type == col_type_Link) {
-                origin_table.set_link(origin_col_ndx, origin_row_ndx, new_row_ndx);
-            }
-            else if (origin_col_type == col_type_LinkList) {
-                LinkViewRef links = origin_table.get_linklist(origin_col_ndx, origin_row_ndx);
-                for (size_t j = 0; j < links->size(); ++j) {
-                    if (links->get(j).get_index() == row_ndx) {
-                        links->set(j, new_row_ndx);
-                    }
-                }
-            }
-        }
-    }
-
-    do_change_link_targets(row_ndx, new_row_ndx);
-
     if (Replication* repl = get_repl()) {
         repl->change_link_targets(this, row_ndx, new_row_ndx);
     }
+
+    do_change_link_targets(row_ndx, new_row_ndx);
 }
 
 void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over)
@@ -2395,28 +2360,37 @@ void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 
 void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
 {
-    // Copy linklist contents from row_ndx to new_row_ndx. row_ndx and
-    // new_row_ndx represent the loser and winner of a PK merge conflict
-    // (respectively), and the winner should end up with all the links.
+    // Replace links through backlink columns.
     //
-    // A precondition for this logic is that linklist modifications always come
-    // strictly after the primary key has been set, and that the primary key
-    // never changes. This ensures that we never have to merge linklists outside
-    // of operational transform, which we cannot do because we don't have enough
-    // information in Core to perform such a merge.
-    //
-    // Instead, by relying on this invariant it follows that at the point when
-    // a primary key merge conflict is resolved, all linklists of either the
-    // winning or the losing row are empty. This means we can "merge" the rows
-    // by simply moving all elements to the winning row, and rely on OT to
-    // redirect any subsequent linklist operations to the winner.
-    size_t col_end = m_spec.get_public_column_count();
-    for (size_t col_ndx = 0; col_ndx < col_end; ++col_ndx) {
-        if (m_spec.get_column_type(col_ndx) == col_type_LinkList) {
-            auto& col = get_column_link_list(col_ndx);
-            // don't need to move any rows, but we still need to update the
-            // LinkViews to reflect the change
-            col.adj_acc_subsume_row(row_ndx, new_row_ndx);
+    // This bypasses handling of cascading rows, and we have decided that this is OK, because
+    // ChangeLinkTargets is always followed by MoveLastOver, so breaking the last strong link
+    // to a row that is being subsumed will have no observable effect, while honoring the
+    // cascading behavior would complicate the calling code somewhat (having to take
+    // into account whether or not the row was removed as a consequence of cascade, leading
+    // to bugs in case this was forgotten).
+    size_t backlink_col_start = m_spec.get_public_column_count();
+    size_t backlink_col_end = m_spec.get_column_count();
+    for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
+        REALM_ASSERT(m_spec.get_column_type(col_ndx) == col_type_BackLink);
+
+        auto& col = get_column_backlink(col_ndx);
+        auto& origin_table = col.get_origin_table();
+        size_t origin_col_ndx = col.get_origin_column_index();
+        ColumnType origin_col_type = origin_table.get_real_column_type(origin_col_ndx);
+        while (col.get_backlink_count(row_ndx) > 0) {
+            size_t origin_row_ndx = col.get_backlink(row_ndx, 0);
+
+            if (origin_col_type == col_type_Link) {
+                origin_table.set_link(origin_col_ndx, origin_row_ndx, new_row_ndx);
+            }
+            else if (origin_col_type == col_type_LinkList) {
+                LinkViewRef links = origin_table.get_linklist(origin_col_ndx, origin_row_ndx);
+                for (size_t j = 0; j < links->size(); ++j) {
+                    if (links->get(j).get_index() == row_ndx) {
+                        links->set(j, new_row_ndx);
+                    }
+                }
+            }
         }
     }
 
@@ -2839,43 +2813,42 @@ Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 template <class ColType, class T>
 size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
 {
-    size_t found_ndx = col.find_first(value);
+    size_t winner = size_t(-1);
 
-    if (found_ndx == ndx) {
-        found_ndx = col.find_first(value, found_ndx + 1); // Special-case when `value` is 0/null.
-    }
-    if (found_ndx == not_found) {
-        return ndx;
-    }
-
-    // There were duplicates. Keep one, and delete all others.
-
-    size_t i = found_ndx + 1;
     while (true) {
-        i = col.find_first(value, i);
-        if (i == not_found)
+        winner = col.find_first(value, winner + 1);
+        if (winner == ndx)
+            continue;
+        if (winner == not_found)
+            return ndx;
+        else
             break;
-        if (i == ndx) {
-            i += 1;
-            continue; // Special-case when `value` is 0/null.
-        }
-        change_link_targets(i, found_ndx);
-        adj_row_acc_subsume_row(i, found_ndx);
-        if (ndx == size() - 1)
-            ndx = i;
-        // No need to adjust found_ndx, because we're searching linearly.
-        move_last_over(i);
     }
-    if (found_ndx == ndx)
-        return ndx; // Idempotence; perfectly fine.
 
-    change_link_targets(ndx, found_ndx);
-    adj_row_acc_subsume_row(ndx, found_ndx);
-    if (found_ndx == size() - 1) {
-        found_ndx = ndx;
+    REALM_ASSERT(winner != not_found);
+    REALM_ASSERT(winner != ndx);
+
+    // Delete additional duplicates.
+    size_t duplicate = winner;
+    while (true) {
+        duplicate = col.find_first(value, duplicate + 1);
+        if (duplicate == ndx)
+            continue;
+        if (duplicate == not_found)
+            break;
+        if (ndx == size() - 1)
+            ndx = duplicate;
+        move_last_over(duplicate);
+        // Re-check moved-last-over
+        duplicate -= 1;
     }
+
+    // Delete candidate.
+    if (winner == size() - 1)
+        winner = ndx;
     move_last_over(ndx);
-    return found_ndx;
+
+    return winner;
 }
 
 template <class ColType>
