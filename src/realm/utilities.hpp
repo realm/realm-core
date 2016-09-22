@@ -193,7 +193,21 @@ enum FindRes {
 enum IndexMethod {
     index_FindFirst,
     index_FindAll,
+    index_FindAll_nocopy,
     index_Count,
+};
+
+// Combined result of the index_FindAll_nocopy operation. The column returned
+// can contain results that are not matches but all matches are within the
+// returned start_ndx and end_ndx.
+struct InternalFindResult {
+    // Reference to a IntegerColumn containing result rows, or a single row
+    // value if the result is FindRes_single.
+    size_t payload;
+    // Offset into the result column to start at.
+    size_t start_ndx;
+    // Offset index in the result column to end at.
+    size_t end_ndx;
 };
 
 

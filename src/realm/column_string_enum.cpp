@@ -190,6 +190,15 @@ size_t StringEnumColumn::count(StringData value) const
 }
 
 
+FindRes StringEnumColumn::find_all_no_copy(StringData value, InternalFindResult& result) const
+{
+    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
+    REALM_ASSERT(m_search_index);
+
+    return m_search_index->find_all_no_copy(value, result);
+}
+
+
 void StringEnumColumn::find_all(IntegerColumn& res, StringData value, size_t begin, size_t end) const
 {
     if (m_search_index && begin == 0 && end == size_t(-1))

@@ -293,53 +293,59 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
     col.create_search_index();
 
     {
-        ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn matches(Allocator::get_default(), int_col_ref);
-        col.find_all(matches, s1);
-        CHECK(!matches.is_empty());
-        if (matches.is_empty())
+        InternalFindResult result;
+        FindRes fr = col.find_all_no_copy(s1, result);
+        CHECK_EQUAL(fr, FindRes_column);
+        if (fr != FindRes_column)
             return;
 
+        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
+        matches.get_root_array()->init_from_ref(result.payload);
+
+        CHECK_EQUAL(3, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(3, matches.size());
         CHECK_EQUAL(0, matches.get(0));
         CHECK_EQUAL(4, matches.get(1));
         CHECK_EQUAL(5, matches.get(2));
-        matches.destroy();
     }
 
     // Remove a non-s1 row and change the order of the s1 rows
     col.move_last_over(1);
 
     {
-        ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn matches(Allocator::get_default(), int_col_ref);
-        col.find_all(matches, s1);
-        CHECK(!matches.is_empty());
-        if (matches.is_empty())
+        InternalFindResult result;
+        FindRes fr = col.find_all_no_copy(s1, result);
+        CHECK_EQUAL(fr, FindRes_column);
+        if (fr != FindRes_column)
             return;
 
+        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
+        matches.get_root_array()->init_from_ref(result.payload);
+
+        CHECK_EQUAL(3, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(3, matches.size());
         CHECK_EQUAL(0, matches.get(0));
         CHECK_EQUAL(1, matches.get(1));
         CHECK_EQUAL(4, matches.get(2));
-        matches.destroy();
     }
 
     // Move a s1 row over a s1 row
     col.move_last_over(1);
 
     {
-        ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn matches(Allocator::get_default(), int_col_ref);
-        col.find_all(matches, s1);
-        CHECK(!matches.is_empty());
-        if (matches.is_empty())
+        InternalFindResult result;
+        FindRes fr = col.find_all_no_copy(s1, result);
+        CHECK_EQUAL(fr, FindRes_column);
+        if (fr != FindRes_column)
             return;
 
+        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
+        matches.get_root_array()->init_from_ref(result.payload);
+
+        CHECK_EQUAL(2, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(2, matches.size());
         CHECK_EQUAL(0, matches.get(0));
         CHECK_EQUAL(1, matches.get(1));
-        matches.destroy();
     }
 
     col.destroy();
@@ -602,7 +608,7 @@ TEST_TYPES(StringIndex_Distinct, non_nullable, nullable)
     col.destroy();
 }
 
-TEST_TYPES(StringIndex_FindAllCopy, non_nullable, nullable)
+TEST_TYPES(StringIndex_FindAllNoCopy, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
@@ -624,31 +630,32 @@ TEST_TYPES(StringIndex_FindAllCopy, non_nullable, nullable)
     // Create a new index on column
     StringIndex& ndx = *col.create_search_index();
 
-    ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn matches(Allocator::get_default(), int_col_ref);
+    InternalFindResult ref_2;
+    FindRes res1 = ndx.find_all_no_copy(StringData("not there"), ref_2);
+    CHECK_EQUAL(FindRes_not_found, res1);
 
-    ndx.find_all(matches, StringData("not there"));
-    CHECK(matches.is_empty());
+    FindRes res2 = ndx.find_all_no_copy(s1, ref_2);
+    CHECK_EQUAL(FindRes_single, res2);
+    CHECK_EQUAL(0, ref_2.payload);
 
-    ndx.find_all(matches, s1);
-    CHECK_EQUAL(matches.size(), 1);
-    CHECK_EQUAL(0, matches.get(0));
-    matches.clear();
-
-    ndx.find_all(matches, s4);
-    CHECK_EQUAL(4, matches.size());
-    CHECK_EQUAL(6, matches.get(0));
-    CHECK_EQUAL(7, matches.get(1));
-    CHECK_EQUAL(8, matches.get(2));
-    CHECK_EQUAL(9, matches.get(3));
+    FindRes res3 = ndx.find_all_no_copy(s4, ref_2);
+    CHECK_EQUAL(FindRes_column, res3);
+    const IntegerColumn results(Allocator::get_default(), ref_type(ref_2.payload));
+    CHECK_EQUAL(4, ref_2.end_ndx - ref_2.start_ndx);
+    CHECK_EQUAL(4, results.size());
+    CHECK_EQUAL(6, results.get(0));
+    CHECK_EQUAL(7, results.get(1));
+    CHECK_EQUAL(8, results.get(2));
+    CHECK_EQUAL(9, results.get(3));
 
     // Clean up
-    matches.destroy();
     col.destroy();
 }
 
-
-TEST(StringIndex_FindAllCopy2_Int)
+// If a column contains a specific value in multiple rows, then the index will store a list of these row numbers
+// in form of a column. If you call find_all() on an index, it will return a *reference* to that column instead
+// of copying it to you, as a performance optimization.
+TEST(StringIndex_FindAllNoCopy2_Int)
 {
     // Create a column with duplcate values
     ref_type ref = IntegerColumn::create(Allocator::get_default());
@@ -660,30 +667,39 @@ TEST(StringIndex_FindAllCopy2_Int)
     // Create a new index on column
     col.create_search_index();
     StringIndex& ndx = *col.get_search_index();
+    InternalFindResult results;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
-        ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn matches(Allocator::get_default(), int_col_ref);
-        ndx.find_all(matches, ints[t]);
+        FindRes res = ndx.find_all_no_copy(ints[t], results);
 
         size_t real = 0;
         for (size_t y = 0; y < sizeof(ints) / sizeof(ints[0]); y++) {
             if (ints[t] == ints[y])
                 real++;
         }
-        CHECK_EQUAL(real, matches.size());
-        for (size_t y = 0; y < real; y++)
-            CHECK_EQUAL(ints[t], ints[matches.get(y)]);
 
-        matches.destroy();
+        if (real == 1) {
+            CHECK_EQUAL(res, FindRes_single);
+            CHECK_EQUAL(ints[t], ints[results.payload]);
+        }
+        else if (real > 1) {
+            CHECK_EQUAL(FindRes_column, res);
+            const IntegerColumn results_column(Allocator::get_default(), ref_type(results.payload));
+            CHECK_EQUAL(real, results.end_ndx - results.start_ndx);
+            CHECK_EQUAL(real, results_column.size());
+            for (size_t y = 0; y < real; y++)
+                CHECK_EQUAL(ints[t], ints[results_column.get(y)]);
+        }
     }
 
     // Clean up
     col.destroy();
 }
 
-
-TEST(StringIndex_FindAllCopy2_IntNull)
+// If a column contains a specific value in multiple rows, then the index will store a list of these row numbers
+// in form of a column. If you call find_all() on an index, it will return a *reference* to that column instead
+// of copying it to you, as a performance optimization.
+TEST(StringIndex_FindAllNoCopy2_IntNull)
 {
     // Create a column with duplcate values
     ref_type ref = IntNullColumn::create(Allocator::get_default());
@@ -696,31 +712,100 @@ TEST(StringIndex_FindAllCopy2_IntNull)
     // Create a new index on column
     col.create_search_index();
     StringIndex& ndx = *col.get_search_index();
+    InternalFindResult results;
 
     for (size_t t = 0; t < sizeof(ints) / sizeof(ints[0]); t++) {
-        ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-        IntegerColumn matches(Allocator::get_default(), int_col_ref);
-        ndx.find_all(matches, ints[t]);
+        FindRes res = ndx.find_all_no_copy(ints[t], results);
 
         size_t real = 0;
         for (size_t y = 0; y < sizeof(ints) / sizeof(ints[0]); y++) {
             if (ints[t] == ints[y])
                 real++;
         }
-        CHECK_EQUAL(real, matches.size());
-        for (size_t y = 0; y < real; y++)
-            CHECK_EQUAL(ints[t], ints[matches.get(y)]);
 
-        matches.destroy();
+        if (real == 1) {
+            CHECK_EQUAL(res, FindRes_single);
+            CHECK_EQUAL(ints[t], ints[results.payload]);
+        }
+        else if (real > 1) {
+            CHECK_EQUAL(FindRes_column, res);
+            const IntegerColumn results2(Allocator::get_default(), ref_type(results.payload));
+            CHECK_EQUAL(real, results.end_ndx - results.start_ndx);
+            CHECK_EQUAL(real, results2.size());
+            for (size_t y = 0; y < real; y++)
+                CHECK_EQUAL(ints[t], ints[results2.get(y)]);
+        }
     }
 
-    ref_type int_col_ref = IntegerColumn::create(Allocator::get_default());
-    IntegerColumn matches(Allocator::get_default(), int_col_ref);
+    FindRes res = ndx.find_all_no_copy(null{}, results);
+    CHECK_EQUAL(FindRes_single, res);
+    CHECK_EQUAL(results.payload, col.size() - 1);
 
-    ndx.find_all(matches, null{});
-    CHECK_EQUAL(1, matches.size());
-    CHECK_EQUAL(matches.get(0), col.size() - 1);
-    matches.destroy();
+    // Clean up
+    col.destroy();
+}
+
+TEST(StringIndex_FindAllNoCopyCommonPrefixStrings)
+{
+    // Create a column with duplcate values
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref);
+    StringIndex& ndx = *col.create_search_index();
+
+    auto test_prefix_find = [&](std::string prefix) {
+        std::string prefix_b = prefix + "b";
+        std::string prefix_c = prefix + "c";
+        std::string prefix_d = prefix + "d";
+        std::string prefix_e = prefix + "e";
+        StringData spb(prefix_b);
+        StringData spc(prefix_c);
+        StringData spd(prefix_d);
+        StringData spe(prefix_e);
+
+        size_t start_row = col.size();
+        col.add(spb);
+        col.add(spc);
+        col.add(spc);
+        col.add(spe);
+        col.add(spe);
+        col.add(spe);
+
+        InternalFindResult results;
+        FindRes res = ndx.find_all_no_copy(spb, results);
+        CHECK_EQUAL(res, FindRes_single);
+        CHECK_EQUAL(results.payload, start_row);
+
+        res = ndx.find_all_no_copy(spc, results);
+        CHECK_EQUAL(res, FindRes_column);
+        CHECK_EQUAL(results.end_ndx - results.start_ndx, 2);
+        const IntegerColumn results_c(Allocator::get_default(), ref_type(results.payload));
+        CHECK_EQUAL(results_c.get(results.start_ndx), start_row + 1);
+        CHECK_EQUAL(results_c.get(results.start_ndx + 1), start_row + 2);
+        CHECK_EQUAL(col.get(results_c.get(results.start_ndx)), spc);
+        CHECK_EQUAL(col.get(results_c.get(results.start_ndx + 1)), spc);
+
+        res = ndx.find_all_no_copy(spd, results);
+        CHECK_EQUAL(res, FindRes_not_found);
+
+        res = ndx.find_all_no_copy(spe, results);
+        CHECK_EQUAL(res, FindRes_column);
+        CHECK_EQUAL(results.end_ndx - results.start_ndx, 3);
+        const IntegerColumn results_e(Allocator::get_default(), ref_type(results.payload));
+        CHECK_EQUAL(results_e.get(results.start_ndx), start_row + 3);
+        CHECK_EQUAL(results_e.get(results.start_ndx + 1), start_row + 4);
+        CHECK_EQUAL(results_e.get(results.start_ndx + 2), start_row + 5);
+        CHECK_EQUAL(col.get(results_e.get(results.start_ndx)), spe);
+        CHECK_EQUAL(col.get(results_e.get(results.start_ndx + 1)), spe);
+        CHECK_EQUAL(col.get(results_e.get(results.start_ndx + 2)), spe);
+    };
+
+    std::string std_max(StringIndex::s_max_offset, 'a');
+    std::string std_over_max = std_max + "a";
+    std::string std_under_max(StringIndex::s_max_offset >> 1, 'a');
+
+    test_prefix_find(std_max);
+    test_prefix_find(std_over_max);
+    test_prefix_find(std_under_max);
 
     // Clean up
     col.destroy();
@@ -1486,6 +1571,138 @@ TEST(StringIndex_InsertLongPrefix)
 
     col.clear(); // calls recursive function Array::destroy_deep()
     col.destroy();
+}
+
+TEST(StringIndex_InsertLongPrefixAndQuery)
+{
+    constexpr int half_node_size = REALM_MAX_BPNODE_SIZE / 2;
+    Group g;
+    auto t = g.add_table("StringsOnly");
+    t->add_column(type_String, "first");
+    t->add_search_index(0);
+
+    std::string base(StringIndex::s_max_offset, 'a');
+    std::string str_a = base + "aaaaa";
+    std::string str_a0 = base + "aaaa0";
+    std::string str_ax = base + "aaaax";
+    std::string str_b = base + "bbbbb";
+    std::string str_c = base + "ccccc";
+    std::string str_c0 = base + "cccc0";
+    std::string str_cx = base + "ccccx";
+
+    for (int i = 0; i < half_node_size * 3; i++) {
+        auto ndx = t->add_empty_row(3);
+        t->set_string(0, ndx, str_a);
+        t->set_string(0, ndx + 1, str_b);
+        t->set_string(0, ndx + 2, str_c);
+    }
+    auto ndx = t->add_empty_row(3);
+    t->set_string(0, ndx, str_ax);
+    t->set_string(0, ndx + 1, str_ax);
+    t->set_string(0, ndx + 2, str_a0);
+    /*
+    {
+        std::ofstream o("index.dot");
+        index->to_dot(o, "");
+    }
+    */
+
+    auto ndx_a = t->where().equal(0, StringData(str_a)).find();
+    auto cnt = t->count_string(0, StringData(str_a));
+    auto tw_a = t->where().equal(0, StringData(str_a)).find_all();
+    CHECK_EQUAL(ndx_a, 0);
+    CHECK_EQUAL(cnt, half_node_size * 3);
+    CHECK_EQUAL(tw_a.size(), half_node_size * 3);
+    ndx_a = t->where().equal(0, StringData(str_c0)).find();
+    CHECK_EQUAL(ndx_a, npos);
+    ndx_a = t->where().equal(0, StringData(str_cx)).find();
+    CHECK_EQUAL(ndx_a, npos);
+    // Find string that is 'less' than strings in the table, but with identical last key
+    tw_a = t->where().equal(0, StringData(str_c0)).find_all();
+    CHECK_EQUAL(tw_a.size(), 0);
+    // Find string that is 'greater' than strings in the table, but with identical last key
+    tw_a = t->where().equal(0, StringData(str_cx)).find_all();
+    CHECK_EQUAL(tw_a.size(), 0);
+
+    // Same as above, but just for 'count' method
+    cnt = t->count_string(0, StringData(str_c0));
+    CHECK_EQUAL(cnt, 0);
+    cnt = t->count_string(0, StringData(str_cx));
+    CHECK_EQUAL(cnt, 0);
+}
+
+
+TEST(StringIndex_Fuzzy)
+{
+    constexpr size_t chunkcount = 50;
+    constexpr size_t rowcount = 100 + 1000 * TEST_DURATION;
+
+    for (size_t main_rounds = 0; main_rounds < 1 + 10 * TEST_DURATION; main_rounds++) {
+
+        Group g;
+
+        auto t = g.add_table("StringsOnly");
+        t->add_column(type_String, "first");
+        t->add_column(type_String, "second");
+
+        t->add_search_index(0);
+
+        std::string strings[chunkcount];
+
+        for (size_t j = 0; j < chunkcount; j++) {
+            size_t len = fastrand() % REALM_MAX_BPNODE_SIZE;
+
+            for (size_t i = 0; i < len; i++)
+                strings[j] += char(fastrand());
+        }
+
+        for (size_t rows = 0; rows < rowcount; rows++) {
+            // Strings consisting of 2 concatenated strings are very interesting
+            size_t chunks;
+            if (fastrand() % 2 == 0)
+                chunks = fastrand() % 4;
+            else
+                chunks = 2;
+
+            std::string str;
+
+            for (size_t c = 0; c < chunks; c++) {
+                str += strings[fastrand() % chunkcount];
+            }
+
+            t->add_empty_row();
+            t->set_string(0, t->size() - 1, str);
+            t->set_string(1, t->size() - 1, str);
+        }
+        
+        for (size_t rounds = 0; rounds < 1 + 10 * TEST_DURATION; rounds++) {
+            for (size_t r = 0; r < t->size(); r++) {
+                
+                TableView tv0 = (t->column<String>(0) == t->get_string(0, r)).find_all();
+                TableView tv1 = (t->column<String>(1) == t->get_string(1, r)).find_all();
+
+                CHECK_EQUAL(tv0.size(), tv1.size());
+
+                for (size_t v = 0; v < tv0.size(); v++) {
+                    CHECK_EQUAL(tv0.get_source_ndx(v), tv1.get_source_ndx(v));
+                }
+            }
+
+            if (t->size() > 10)
+                t->remove(0);
+
+            size_t r1 = fastrand() % t->size();
+            size_t r2 = fastrand() % t->size();
+
+            t->set_string(0, r1, t->get_string(0, r2));
+            t->set_string(1, r1, t->get_string(1, r2));
+
+            r1 = fastrand() % t->size();
+            r2 = fastrand() % t->size();
+
+            t.get()->swap_rows(r1, r2);
+        }
+    }
 }
 
 
