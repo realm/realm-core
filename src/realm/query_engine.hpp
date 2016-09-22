@@ -302,6 +302,7 @@ protected:
         if (src.m_column) {
             if (patches) {
                 dst_idx = src.m_column->get_column_index();
+                REALM_ASSERT_DEBUG(dst_idx < m_table->get_column_count());
             }
             else
                 dst.init(src.m_column);
