@@ -697,8 +697,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t table_ndx = get_next(s) % g_r.size();
                 TableRef t = g_r.get_table(table_ndx);
                 if (t->get_column_count() > 0 && t->size() > 0) {
-                    int32_t col_ndx = get_int32(s) % t->get_column_count();
-                    int32_t row_ndx = get_int32(s) % t->size();
+                    size_t col_ndx = get_int32(s) % t->get_column_count();
+                    size_t row_ndx = get_int32(s) % t->size();
                     if (log) {
                         *log << "g_r.get_table(" << table_ndx << ")->is_null(" << col_ndx << ", " << row_ndx
                              << ");\n";
