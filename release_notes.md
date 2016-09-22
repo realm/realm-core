@@ -14,8 +14,6 @@
   or OldDateTime. Caused by bad static `get_size_from_ref()` methods of columns. (#2101)
 * Fixed a bug with link columns incorrectly updating on a `move_last_over`
   operation when the link points to the same table.
-* Fixed a race in the handover machinery which could cause crashes following handover
-  of a Query or a TableView. (#2117)
 
 ### Breaking changes
 
