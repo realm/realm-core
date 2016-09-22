@@ -1341,4 +1341,107 @@ TEST(StringIndex_Deny_Duplicates)
 }
 
 
+ONLY(StringIndex_Fuzzy)
+{
+    constexpr size_t chunkcount = 50;
+    constexpr size_t rowcount = 100 + 1000 * TEST_DURATION;
+
+    for (size_t main_rounds = 0; main_rounds < 1 + 10 * TEST_DURATION; main_rounds++) {
+
+        Group g;
+
+        TableRef t = g.add_table("StringsOnly");
+        t->add_column(type_String, "first");
+        t->add_column(type_String, "second");
+
+        t->add_search_index(0);
+
+        std::string strings[chunkcount];
+
+        for (size_t j = 0; j < chunkcount; j++) {
+            size_t len = fastrand() % REALM_MAX_BPNODE_SIZE;
+
+            for (size_t i = 0; i < len; i++)
+                strings[j] += char(fastrand());
+        }
+
+        for (size_t rows = 0; rows < rowcount; rows++) {
+            // Strings consisting of 2 concatenated strings are very interesting
+            size_t chunks;
+            if (fastrand() % 2 == 0)
+                chunks = fastrand() % 4;
+            else
+                chunks = 2;
+
+            std::string str;
+
+            for (size_t c = 0; c < chunks; c++) {
+                str += strings[fastrand() % chunkcount];
+            }
+
+            size_t row_ndx = t->add_empty_row();
+            t->set_string(0, row_ndx, str);
+            t->set_string(1, row_ndx, str);
+        }
+
+        for (size_t rounds = 0; rounds < 2 + 10 * TEST_DURATION; rounds++) {
+
+            for (size_t row_ndx = 0; row_ndx < t->size(); ++row_ndx) {
+
+                TableView tv0 = (t->column<String>(0) == t->get_string(0, row_ndx)).find_all();
+                TableView tv1 = (t->column<String>(1) == t->get_string(1, row_ndx)).find_all();
+
+                CHECK_EQUAL(tv0.size(), tv1.size());
+
+                for (size_t v = 0; v < tv0.size(); v++) {
+                    CHECK_EQUAL(tv0.get_source_ndx(v), tv1.get_source_ndx(v));
+                }
+            }
+
+
+            for (size_t r = 0; r < 5 + 1000 * TEST_DURATION; r++) {
+                size_t chunks;
+                if (fastrand() % 2 == 0)
+                    chunks = fastrand() % 4;
+                else
+                    chunks = 2;
+
+                std::string str;
+
+                for (size_t c = 0; c < chunks; c++) {
+                    str += strings[fastrand() % chunkcount];
+                }
+
+                TableView tv0 = (t->column<String>(0) == str).find_all();
+                TableView tv1 = (t->column<String>(1) == str).find_all();
+
+                if (tv0.size() == 0)
+                    int ii = 0;
+
+                CHECK_EQUAL(tv0.size(), tv1.size());
+
+                for (size_t v = 0; v < tv0.size(); v++) {
+                    CHECK_EQUAL(tv0.get_source_ndx(v), tv1.get_source_ndx(v));
+                }
+            }
+
+
+            if (t->size() > 10)
+                t->remove(0);
+
+            size_t r1 = fastrand() % t->size();
+            size_t r2 = fastrand() % t->size();
+
+            t->set_string(0, r1, t->get_string(0, r2));
+            t->set_string(1, r1, t->get_string(1, r2));
+
+            r1 = fastrand() % t->size();
+            r2 = fastrand() % t->size();
+
+            t.get()->swap_rows(r1, r2);
+        }
+    }
+}
+
+
 #endif // TEST_INDEX_STRING
