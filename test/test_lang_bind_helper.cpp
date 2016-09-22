@@ -2794,13 +2794,13 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(27, row_1.get_int(0));
     CHECK_EQUAL(227, row_2.get_int(0));
 
-    // Check that adding a new row with the same primary key attaches row_1 to that row
+    // Check that adding a new row with the same primary key leaves the row unchanged
     {
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.get_table("parent");
         parent_w->set_int_unique(0, 0, 27);
         parent_w->add_empty_row(2);
-        parent_w->set_int_unique(0, 2, 27);
+        parent_w->set_int_unique(0, 2, 27); // deletes row 2
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2808,7 +2808,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(3, parent->size());
     CHECK(row_1.is_attached());
     CHECK(row_2.is_attached());
-    CHECK_EQUAL(2, row_1.get_index());
+    CHECK_EQUAL(0, row_1.get_index());
     CHECK_EQUAL(27, row_1.get_int(0));
     CHECK_EQUAL(1, row_2.get_index());
     CHECK_EQUAL(227, row_2.get_int(0));
@@ -2816,7 +2816,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     {
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.get_table("parent");
-        parent_w->move_last_over(0);
+        parent_w->move_last_over(2);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -3574,33 +3574,33 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
 
         origin_->set_int(0, 3, 42); // for later tracking of this entry
         CHECK_EQUAL(origin_->get_linklist(1, 0)->size(), 1);
-        origin_->set_int_unique(0, 2, 1);
+        origin_->set_int_unique(0, 2, 1); // deletes row 2
         // origin[2] is set to same pk as origin[0]. Origin[2] wins so
         // origin[0] is lost. This then causes a move last over
         // of origin[3] into origin[0].
         CHECK_EQUAL(origin_->size(), 3);
-        CHECK_EQUAL(origin_->get_int(0, 0), 42);
+        CHECK_EQUAL(origin_->get_int(0, 0), 1);
         CHECK_EQUAL(origin_->get_int(0, 1), 2);
-        CHECK_EQUAL(origin_->get_int(0, 2), 1);
+        CHECK_EQUAL(origin_->get_int(0, 2), 42);
 
         // origin[1] should be unchanged
         CHECK_EQUAL(origin_->get_linklist(1, 1)->size(), 1);
-        // the winner should get the link(s) from the loser
-        CHECK_EQUAL(origin_->get_linklist(1, 2)->size(), 1);
+        // the winner should still be index 0
+        CHECK_EQUAL(origin_->get_linklist(1, 0)->size(), 1);
 
-        origin_->get_linklist(1, 2)->add(3);
+        origin_->get_linklist(1, 0)->add(3);
         wt.commit();
     }
 
     LangBindHelper::advance_read(sg);
     group.verify();
-    // lv1 is now origin[2], which has {1, 3}
+    // lv1 is still origin[0], which has {1, 3}
     // lv2 is now origin[1], which has {2}
 
     CHECK_EQUAL(origin->size(), 3);
-    CHECK_EQUAL(origin->get_int(0, 0), 42);
+    CHECK_EQUAL(origin->get_int(0, 0), 1);
     CHECK_EQUAL(origin->get_int(0, 1), 2);
-    CHECK_EQUAL(origin->get_int(0, 2), 1);
+    CHECK_EQUAL(origin->get_int(0, 2), 42);
 
     // LinkViews should still be attached and working
     CHECK(lv1->is_attached());
@@ -3620,32 +3620,32 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
         origin->add_empty_row(2);
         origin->set_int_unique(0, 4, 101);
         CHECK_EQUAL(origin->size(), 5);
+        CHECK_EQUAL(origin->get_linklist(1, 0)->size(), 2);
         CHECK_EQUAL(origin->get_linklist(1, 1)->size(), 1);
-        CHECK_EQUAL(origin->get_linklist(1, 2)->size(), 2);
-        origin->set_int_unique(0, 3, 2);
-        // origin[3] is set to same pk as origin[1]. Origin[3] wins so
-        // origin[1] is lost. This causes a move last over
-        // of origin[4] to origin[1]
+        origin->set_int_unique(0, 3, 2); // deletes row 2, row 1 unchanged
+        // origin[3] is set to same pk as origin[1]. Origin[1] wins so
+        // origin[3] is lost. This causes a move last over
+        // of origin[4] to origin[3]
         CHECK_EQUAL(origin->size(), 4);
 
-        // since origin[3] won, it should get the links from the looser
-        CHECK_EQUAL(origin->get_linklist(1, 0)->size(), 0);
-        CHECK_EQUAL(origin->get_linklist(1, 1)->size(), 0);
-        CHECK_EQUAL(origin->get_linklist(1, 2)->size(), 2);
-        CHECK_EQUAL(origin->get_linklist(1, 3)->size(), 1);
+        // since origin[1] won, it should get the links from the loser
+        CHECK_EQUAL(origin->get_linklist(1, 0)->size(), 2);
+        CHECK_EQUAL(origin->get_linklist(1, 1)->size(), 1);
+        CHECK_EQUAL(origin->get_linklist(1, 2)->size(), 0);
+        CHECK_EQUAL(origin->get_linklist(1, 3)->size(), 0);
 
         CHECK(lv1->is_attached());
         CHECK(lv2->is_attached());
         CHECK_EQUAL(lv1->size(), 2);
         CHECK_EQUAL(lv2->size(), 1);
 
-        origin->get_linklist(1, 3)->add(4);
+        origin->get_linklist(1, 1)->add(4);
 
         LangBindHelper::commit_and_continue_as_read(sg);
     }
     group.verify();
-    // lv1 is now origin[2], which has {1, 3}
-    // lv2 is now origin[3], which has {2, 4}
+    // lv1 is still origin[0], which has {1, 3}
+    // lv2 is still origin[1], which has {2, 4}
 
     CHECK(lv1->is_attached());
     CHECK(lv2->is_attached());
