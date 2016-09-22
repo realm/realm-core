@@ -1,16 +1,10 @@
-# NEXT RELEASE
+# 2.0.0-rc8 Release notes
 
 ### Bugfixes
 
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
+* Fixed a crash related to queries that was introduced in rc7. (#2186)
+* Fixed a bug triggered through set unique of primary keys through
+  the ROS. (#2180)
 
 -----------
 
