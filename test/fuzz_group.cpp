@@ -694,19 +694,38 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 REALM_DO_IF_VERIFY(log, g_r.verify());
             }
             else if (instr == SET_UNIQUE && g.size() > 0) {
-                // setting a unique value has a lot of prerequisites, so instead of (very) randomly selecting a
-                // suitable table and column we search for it. TODO: consider shuffle search order
+                // Setting a unique value has a lot of prerequisites, so instead of randomly trying to find a
+                // suitable table and column we search for it. TODO: consider shuffling the search order
 
                 for (size_t table_ndx = 0; table_ndx < g.size(); ++table_ndx) {
+
+                    // We are looking for a non-empty table
                     TableRef t = g.get_table(table_ndx);
                     if (t->size() == 0)
                         continue;
 
                     bool set_unique_called = false;
                     for (size_t col_ndx = 0; col_ndx < t->get_column_count(); ++col_ndx) {
+
+                        // The column we want to set a unique value on must a have a search index
                         if (!t->has_search_index(col_ndx)) {
                             continue;
                         }
+
+                        // Only integer and string columns are supported. We let the fuzzer choose to set either
+                        // null or a value (depending also on the nullability of the column).
+                        //
+                        // for integer columns, that means we call either of
+                        //  - set_null_unique
+                        //  - set_int_unique
+                        // while for string columns, both null and values are handled by
+                        //  - set_string_unique
+                        //
+                        // Due to an additional limitation involving non-empty lists, a specific kind of LogicError
+                        // may be thrown. This is handled for each case below and encoded as a CHECK in the generated
+                        // C++ unit tests when logging is enabled. Other kinds / types of exception are not handled,
+                        // but simply rethrown.
+
                         DataType type = t->get_column_type(col_ndx);
                         switch (type) {
                             case type_Int: {
