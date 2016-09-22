@@ -242,10 +242,6 @@ public:
         , m_matches(from.m_matches)
         , m_table(from.m_table)
     {
-        // Only if a copy is created for the local thread, should we copy its
-        // table reference:
-        if (patches == nullptr)
-            m_table = from.m_table;
     }
 
     void add_child(std::unique_ptr<ParentNode> child)
