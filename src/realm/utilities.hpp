@@ -101,7 +101,7 @@ REALM_FORCEINLINE bool sseavx()
         return (avx_support >= 0);
     else if (version == 2) // avx2
         return (avx_support > 0);
-
+    else return false;
 #else
     return false;
 #endif

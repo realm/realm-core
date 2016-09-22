@@ -229,6 +229,7 @@ protected:
     void attach(Table*, size_t row_ndx) noexcept;
     void reattach(Table*, size_t row_ndx) noexcept;
     void impl_detach() noexcept;
+
     RowBase()
     {
     }
