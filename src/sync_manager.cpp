@@ -28,7 +28,7 @@ using namespace realm::_impl;
 
 SyncManager& SyncManager::shared()
 {
-    static SyncManager manager;
+    static SyncManager& manager = *new SyncManager;
     return manager;
 }
 
