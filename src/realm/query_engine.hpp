@@ -240,7 +240,7 @@ public:
         , m_dT(from.m_dT)
         , m_probes(from.m_probes)
         , m_matches(from.m_matches)
-        , m_table(patches ? ConstTableRef() : from.m_table)
+        , m_table(from.m_table)
     {
     }
 
