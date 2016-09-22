@@ -73,9 +73,9 @@ public:
 private:
     void dropped_last_reference_to_session(SyncSession*);
 
-    // Immediately remove the session with the given path from the dying sessions map.
-    // PRECONDITION: session must have already been moved from the active sessions map to the dying sessions map.
-    // For use by SyncSession only.
+    // Stop tracking the session for the given path if it is inactive.
+    // No-op if the session is either still active or in the active sessions list
+    // due to someone holding a strong reference to it.
     void unregister_session(const std::string& path);
 
     SyncManager() = default;
@@ -86,7 +86,7 @@ private:
     std::shared_ptr<_impl::SyncClient> create_sync_client() const;
 
     std::shared_ptr<SyncSession> get_existing_active_session_locked(const std::string& path) const;
-    std::unique_ptr<SyncSession> get_existing_dying_session_locked(const std::string& path);
+    std::unique_ptr<SyncSession> get_existing_inactive_session_locked(const std::string& path);
 
     mutable std::mutex m_mutex;
 
@@ -101,20 +101,17 @@ private:
 
     mutable std::shared_ptr<_impl::SyncClient> m_sync_client;
 
-    // Protects m_active_sessions and m_dying_sessions
+    // Protects m_active_sessions and m_inactive_sessions
     mutable std::mutex m_session_mutex;
 
-    // Active sync sessions are owned by one or more pieces of client code. When the last
-    // reference to an active sync session is dropped, the session begins the process of dying.
-    // Depending on the session's configuration, death may be immediate, or it may involve
-    // waiting for all pending changes to be uploaded to the server. Dying sessions are owned
-    // primarily by us, but ownership may be shared with the SyncSession itself if it needs
-    // to ensure it lives until the completion of an asynchronous callback it has registered.
-    // The SyncSession will let us know when it has performed its pre-death work by calling
-    // `unregister_session`. If client code requests a sync session for which we have a dying
-    // session, we will revive the session and move back it back to active status.
+    // Active sessions are sessions which the client code holds a strong
+    // reference to. When the last strong reference is released, the session is
+    // moved to inactive sessions. Inactive sessions are promoted back to active
+    // sessions until the session itself calls unregister_session to remove
+    // itself from inactive sessions once it's done with whatever async cleanup
+    // it needs to do.
     std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_active_sessions;
-    std::unordered_map<std::string, std::unique_ptr<SyncSession>> m_dying_sessions;
+    std::unordered_map<std::string, std::unique_ptr<SyncSession>> m_inactive_sessions;
 };
 
 } // namespace realm
