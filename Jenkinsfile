@@ -99,7 +99,8 @@ def doBuildCocoa() {
           'UNITTEST_SHUFFLE=1',
           'UNITTEST_REANDOM_SEED=random',
           'UNITTEST_XML=1',
-          'UNITTEST_THREADS=1'
+          'UNITTEST_THREADS=1',
+          'DEVELOPER_DIR=/Applications/Xcode-7.3.1.app/Contents/Developer/'
         ]) {
             sh '''
               dir=$(pwd)
