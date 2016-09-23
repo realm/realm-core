@@ -23,7 +23,7 @@ namespace realm {
 
 
 TimestampColumn::TimestampColumn(bool nullable, Allocator& alloc, ref_type ref, size_t col_ndx)
-: ColumnBaseSimple(col_ndx)
+    : ColumnBaseSimple(col_ndx)
 {
     std::unique_ptr<Array> top;
     std::unique_ptr<BpTree<util::Optional<int64_t>>> seconds;
@@ -424,5 +424,4 @@ Timestamp TimestampColumn::minimum(size_t* result_index) const
 {
     return minmax<Less>(result_index);
 }
-
 }

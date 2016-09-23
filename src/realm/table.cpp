@@ -2035,9 +2035,11 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
         case col_type_Timestamp:
             return TimestampColumn::create(alloc, size, nullable); // Throws
         case col_type_Float:
-            return FloatColumn::create(alloc, Array::type_Normal, size, nullable ? null::get_null_float<Float>() : 0.0); // Throws
+            return FloatColumn::create(alloc, Array::type_Normal, size,
+                                       nullable ? null::get_null_float<Float>() : 0.0); // Throws
         case col_type_Double:
-            return DoubleColumn::create(alloc, Array::type_Normal, size, nullable ? null::get_null_float<Double>() : 0.0); // Throws
+            return DoubleColumn::create(alloc, Array::type_Normal, size,
+                                        nullable ? null::get_null_float<Double>() : 0.0); // Throws
         case col_type_String:
             return StringColumn::create(alloc, size); // Throws
         case col_type_Binary:
