@@ -92,14 +92,14 @@ def doBuildCocoa() {
       try {
         withEnv([
           'PATH=$PATH:/usr/local/bin',
-          'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer',
           'REALM_ENABLE_ENCRYPTION=yes',
           'REALM_ENABLE_ASSERTIONS=yes',
           'MAKEFLAGS=\'CFLAGS_DEBUG=-Oz\'',
           'UNITTEST_SHUFFLE=1',
           'UNITTEST_REANDOM_SEED=random',
           'UNITTEST_XML=1',
-          'UNITTEST_THREADS=1'
+          'UNITTEST_THREADS=1',
+          'DEVELOPER_DIR=/Applications/Xcode-7.3.1.app/Contents/Developer/'
         ]) {
             sh '''
               dir=$(pwd)
