@@ -53,6 +53,14 @@ LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<HandoverPatc
 
 void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
 {
+    do_insert(link_ndx, target_row_ndx);
+    if (Replication* repl = get_repl())
+        repl->link_list_insert(*this, link_ndx, target_row_ndx); // Throws
+}
+
+
+void LinkView::do_insert(size_t link_ndx, size_t target_row_ndx)
+{
     REALM_ASSERT(is_attached());
     REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, ||, link_ndx, ==, 0);
     REALM_ASSERT_7(m_row_indexes.is_attached(), ==, false, ||, link_ndx, <=, m_row_indexes.size());
@@ -72,9 +80,6 @@ void LinkView::insert(size_t link_ndx, size_t target_row_ndx)
 
     m_row_indexes.insert(link_ndx, target_row_ndx);               // Throws
     m_origin_column.add_backlink(target_row_ndx, origin_row_ndx); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->link_list_insert(*this, link_ndx, target_row_ndx); // Throws
 }
 
 

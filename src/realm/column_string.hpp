@@ -73,6 +73,7 @@ public:
     size_t count(StringData value) const;
     size_t find_first(StringData value, size_t begin = 0, size_t end = npos) const;
     void find_all(IntegerColumn& result, StringData value, size_t begin = 0, size_t end = npos) const;
+    FindRes find_all_no_copy(StringData value, InternalFindResult& result) const;
 
     int compare_values(size_t, size_t) const noexcept override;
 
@@ -85,8 +86,6 @@ public:
     //@}
 
     void set_string(size_t, StringData) override;
-
-    FindRes find_all_indexref(StringData value, size_t& dst) const;
 
     bool is_nullable() const noexcept final;
 

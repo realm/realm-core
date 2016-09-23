@@ -20,7 +20,6 @@
     <ClCompile Include="..\..\src\realm\column_string_enum.cpp" />
     <ClCompile Include="..\..\src\realm\column_table.cpp" />
     <ClCompile Include="..\..\src\realm\history.cpp" />
-    <ClCompile Include="..\..\src\realm\commit_log.cpp" />
     <ClCompile Include="..\..\src\realm\descriptor.cpp" />
     <ClCompile Include="..\..\src\realm\link_view.cpp" />
     <ClCompile Include="..\..\src\realm\replication.cpp" />
@@ -131,6 +130,7 @@
     <ClCompile Include="..\..\src\win32\getopt.cpp">
       <Filter>Reader</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\realm\util\logger.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\realm.hpp" />

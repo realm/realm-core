@@ -83,7 +83,6 @@ version.hpp \
 version_id.hpp \
 unicode.hpp \
 history.hpp \
-commit_log.hpp \
 link_view_fwd.hpp \
 link_view.hpp \
 views.hpp \
@@ -127,6 +126,7 @@ DEV_PROGRAMS     = realm-config
 
 librealm_a_SOURCES = \
 util/encrypted_file_mapping.cpp \
+util/logger.hpp \
 util/misc_errors.cpp \
 util/basic_system_errors.cpp \
 util/file.cpp \
@@ -183,7 +183,6 @@ version.cpp \
 views.cpp \
 replication.cpp \
 history.cpp \
-commit_log.cpp \
 disable_sync_to_disk.cpp
 
 # Format: CURRENT[:REVISION[:AGE]]

@@ -113,6 +113,46 @@ struct SetLeafElem : Array::UpdateHandler {
 
 } // anonymous namespace
 
+BinaryData BinaryColumn::get_at(size_t ndx, size_t& pos) const noexcept
+{
+    REALM_ASSERT_3(ndx, <, size());
+
+    if (root_is_leaf()) {
+        Array* arr = m_array.get();
+        bool is_big = arr->get_context_flag();
+        if (!is_big) {
+            // Small blobs
+            pos = 0;
+            REALM_ASSERT_DEBUG(dynamic_cast<ArrayBinary*>(arr) != nullptr);
+            return static_cast<ArrayBinary*>(arr)->get(ndx);
+        }
+        else {
+            // Big blobs
+            REALM_ASSERT_DEBUG(dynamic_cast<ArrayBigBlobs*>(arr) != nullptr);
+            return static_cast<ArrayBigBlobs*>(arr)->get_at(ndx, pos);
+        }
+    }
+    else {
+        // Non-leaf root
+        std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
+        const char* leaf_header = p.first.get_addr();
+        bool is_big = Array::get_context_flag_from_header(leaf_header);
+        if (!is_big) {
+            // Small blobs
+            pos = 0;
+            ArrayBinary leaf(m_array->get_alloc());
+            leaf.init_from_mem(p.first);
+            return leaf.get(p.second);
+        }
+        else {
+            // Big blobs
+            ArrayBigBlobs leaf(m_array->get_alloc(), m_nullable);
+            leaf.init_from_mem(p.first);
+            return leaf.get_at(p.second, pos);
+        }
+    }
+}
+
 void BinaryColumn::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_3(ndx, <, size());
