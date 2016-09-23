@@ -117,7 +117,7 @@ bool TimestampColumn::is_nullable() const noexcept
 bool TimestampColumn::is_null(size_t row_ndx) const noexcept
 {
     // If this assert triggers, this column object was instantiated with bad nullability flag in the
-    // constructor, comparedto what it was created with by the static ::create() method
+    // constructor, compared to what it was created with by the static ::create() method
     REALM_ASSERT_DEBUG(!(!m_nullable && m_seconds->is_null(row_ndx)));
 
     return m_seconds->is_null(row_ndx);
