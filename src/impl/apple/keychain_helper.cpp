@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "keychain_helper.hpp"
+#include "impl/apple/keychain_helper.hpp"
 
 #include "util/format.hpp"
 
