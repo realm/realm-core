@@ -1624,13 +1624,9 @@ TEST(Table_SetUniqueLoserAccessorUpdates)
     Row row_2 = (*origin)[2];
     LinkViewRef lv_0 = origin->get_linklist(ll_col, 0);
     LinkViewRef lv_1 = origin->get_linklist(ll_col, 1);
-    LinkViewRef lv_2 = origin->get_linklist(ll_col, 2);
     lv_0->add(0); // one link
     lv_1->add(1); // two links
     lv_1->add(2);
-    lv_2->add(3); // three links
-    lv_2->add(4);
-    lv_2->add(5);
 
     CHECK_EQUAL(origin->size(), 4);
     CHECK(row_0.is_attached());
@@ -1658,7 +1654,6 @@ TEST(Table_SetUniqueLoserAccessorUpdates)
     CHECK_EQUAL(row_2.get_linklist(ll_col)->size(), 1); // subsumed
     CHECK_EQUAL(lv_0->size(), 1);
     CHECK_EQUAL(lv_1->size(), 2);
-    CHECK_EQUAL(lv_2->size(), 0); // direct access, 0 links comes from move_last_over(2)
 
     CHECK(lv_0->is_attached());
     CHECK(lv_1->is_attached());
