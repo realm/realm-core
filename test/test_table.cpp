@@ -1662,6 +1662,38 @@ TEST(Table_SetUniqueLoserAccessorUpdates)
 }
 
 
+TEST(Table_AccessorsUpdateAfterChangeLinkTargets)
+{
+    Group g;
+    TableRef origin = g.add_table("origin");
+    TableRef target = g.add_table("target");
+
+    target->add_column(type_Int, "col");
+    target->add_empty_row(6);
+
+    origin->add_column_link(type_Link, "link_column", *target);
+    origin->add_empty_row(3);
+    origin->set_link(0, 0, 0);
+    origin->set_link(0, 1, 1);
+    origin->set_link(0, 2, 2);
+
+    Row row_0 = (*origin)[0];
+    Row row_1 = (*origin)[1];
+
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 0);
+    CHECK_EQUAL(row_1.get_index(), 1);
+
+    origin->change_link_targets(1, 2);
+
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 0);
+    CHECK_EQUAL(row_1.get_index(), 2);
+}
+
+
 TEST(Table_Distinct)
 {
     TestTableEnum table;
