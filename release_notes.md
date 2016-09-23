@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* TimestampColumn::is_nullable() mismatched its real nulability. Also, when adding a new
+* TimestampColumn::is_nullable() could return a wrong value. Also, when adding a new
   Float/Double column to a Table with rowcount > 0, the new entries would be non-null
   even though the column was created as nullable.
 
