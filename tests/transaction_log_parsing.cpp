@@ -461,39 +461,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(info.tables[2].empty());
         }
 
-        SECTION("moving a row via a PK conflict marks it as moved") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.add_empty_row(2);
-                table.set_int_unique(0, 10, 5);
-            });
-            REQUIRE(info.tables.size() == 3);
-            // 10 assumed identity of old 5, but 11 was moved over it, so 5
-            // is a new insert and 10 is a move.
-            REQUIRE_INDICES(info.tables[2].insertions, 5, 10);
-            REQUIRE_INDICES(info.tables[2].deletions, 5);
-            REQUIRE_MOVES(info.tables[2], {5, 10});
-        }
-
-        SECTION("modifying a row before a PK-conflict move marks it as modified") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.set_int(1, 5, 15);
-                table.add_empty_row(2);
-                table.set_int_unique(0, 10, 5);
-            });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_INDICES(info.tables[2].modifications, 10);
-        }
-
-        SECTION("modifying a row after a PK-conflict move marks it as modified") {
-            auto info = track_changes({false, false, true}, [&] {
-                table.add_empty_row(2);
-                table.set_int_unique(0, 10, 5);
-                table.set_int(1, 10, 15);
-            });
-            REQUIRE(info.tables.size() == 3);
-            REQUIRE_INDICES(info.tables[2].modifications, 10);
-        }
-
         SECTION("non-conflicting set_int_unique() does not mark a row as modified") {
             auto info = track_changes({false, false, true}, [&] {
                 table.set_int_unique(0, 0, 20);

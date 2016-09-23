@@ -393,19 +393,6 @@ TEST_CASE("list") {
             REQUIRE_INDICES(change.insertions, 13);
             REQUIRE(lst.size() == 14);
             REQUIRE(lst.get(13).get_index() == 4);
-
-#if REALM_VER_MAJOR >= 2
-            // add a new row with the same primary key
-            write([&] {
-                size_t row = origin->add_empty_row(2);
-                origin->set_int_unique(0, row, 1);
-                origin->get_linklist(1, row)->add(5);
-            });
-            REQUIRE(origin->size() == 4);
-            REQUIRE_INDICES(change.insertions, 14);
-            REQUIRE(lst.size() == 15);
-            REQUIRE(lst.get(14).get_index() == 5);
-#endif
         }
     }
 
