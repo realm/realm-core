@@ -207,6 +207,9 @@
 		3F838D421D35A1ED004625B7 /* test_version.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 80ADCCED18A23E2D0049D472 /* test_version.cpp */; };
 		3F967AFA1AA4C00800005C38 /* transact_log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F967AF81AA4C00800005C38 /* transact_log.cpp */; };
 		3F967AFB1AA4C00800005C38 /* transact_log.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 3F967AF91AA4C00800005C38 /* transact_log.hpp */; };
+		3F9BE2961D75DDE800A5BFBA /* logger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F9BE2951D75DDE800A5BFBA /* logger.cpp */; };
+		3F9BE2971D75DDEB00A5BFBA /* logger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F9BE2951D75DDE800A5BFBA /* logger.cpp */; };
+		3F9BE2981D75DDEC00A5BFBA /* logger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3F9BE2951D75DDE800A5BFBA /* logger.cpp */; };
 		3FB4D04B1D4FBA7E0005F96E /* interprocess_mutex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FB4D04A1D4FBA7E0005F96E /* interprocess_mutex.cpp */; };
 		3FB4D04C1D4FBA860005F96E /* interprocess_mutex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FB4D04A1D4FBA7E0005F96E /* interprocess_mutex.cpp */; };
 		3FB4D04D1D4FBA870005F96E /* interprocess_mutex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FB4D04A1D4FBA7E0005F96E /* interprocess_mutex.cpp */; };
@@ -279,8 +282,6 @@
 		4222F2FB19640A7A00EC86A5 /* jsmn.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4222F2F919640A7A00EC86A5 /* jsmn.hpp */; };
 		4222F2FE19640B8400EC86A5 /* replication.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4222F2FC19640B8400EC86A5 /* replication.cpp */; };
 		4222F2FF19640B8400EC86A5 /* replication.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4222F2FD19640B8400EC86A5 /* replication.hpp */; };
-		4222F30219640C6700EC86A5 /* commit_log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4222F30019640C6700EC86A5 /* commit_log.cpp */; };
-		4222F30319640C6700EC86A5 /* commit_log.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4222F30119640C6700EC86A5 /* commit_log.hpp */; };
 		425ED13319BDC371006C0DAE /* shared_ptr.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 425ED13219BDC371006C0DAE /* shared_ptr.hpp */; };
 		42F862D319BDE3460053C134 /* views.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 42F862D119BDE3460053C134 /* views.cpp */; };
 		42F862D419BDE3460053C134 /* views.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 42F862D219BDE3460053C134 /* views.hpp */; };
@@ -454,7 +455,6 @@
 		C008FF441B67F02F0042669E /* column_string.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 365CCE0A157CC37D00172BF8 /* column_string.cpp */; };
 		C008FF451B67F02F0042669E /* column_string_enum.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 365CCE08157CC37D00172BF8 /* column_string_enum.cpp */; };
 		C008FF461B67F02F0042669E /* column_table.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 365CCE0C157CC37D00172BF8 /* column_table.cpp */; };
-		C008FF471B67F02F0042669E /* commit_log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4222F30019640C6700EC86A5 /* commit_log.cpp */; };
 		C008FF481B67F02F0042669E /* descriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5267884A189AB4B8009CDE7D /* descriptor.cpp */; };
 		C008FF491B67F02F0042669E /* encrypted_file_mapping.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3FC68FD91A0AD3FE005F3103 /* encrypted_file_mapping.cpp */; };
 		C008FF4A1B67F02F0042669E /* exceptions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52C9B60D19B7406D00248011 /* exceptions.cpp */; };
@@ -595,7 +595,6 @@
 		F4D0FC841B00F62C0040956A /* column_backlink.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3658CE6F1921AC6F009A7085 /* column_backlink.cpp */; };
 		F4D0FC851B00F62C0040956A /* column_link_base.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5285BD09197D5A830031FD44 /* column_link_base.cpp */; };
 		F4D0FC861B00F62C0040956A /* column_linklist.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3658CE7819245BE5009A7085 /* column_linklist.cpp */; };
-		F4D0FC871B00F62C0040956A /* commit_log.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4222F30019640C6700EC86A5 /* commit_log.cpp */; };
 		F4D0FC881B00F62C0040956A /* descriptor.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5267884A189AB4B8009CDE7D /* descriptor.cpp */; };
 		F4D0FC891B00F62C0040956A /* exceptions.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52C9B60D19B7406D00248011 /* exceptions.cpp */; };
 		F4D0FC8A1B00F62C0040956A /* link_view.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 36AA59E61937552000D691E0 /* link_view.cpp */; };
@@ -824,6 +823,7 @@
 		3F5ED51319D9D4D1001FCFF4 /* test_link_query_view.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_link_query_view.cpp; sourceTree = "<group>"; };
 		3F967AF81AA4C00800005C38 /* transact_log.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = transact_log.cpp; sourceTree = "<group>"; };
 		3F967AF91AA4C00800005C38 /* transact_log.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = transact_log.hpp; sourceTree = "<group>"; };
+		3F9BE2951D75DDE800A5BFBA /* logger.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = logger.cpp; sourceTree = "<group>"; };
 		3FA0DBCA1A0BF28C003548DC /* test_encrypted_file_mapping.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_encrypted_file_mapping.cpp; sourceTree = "<group>"; };
 		3FB4D04A1D4FBA7E0005F96E /* interprocess_mutex.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = interprocess_mutex.cpp; sourceTree = "<group>"; };
 		3FC68FD81A0AD3BF005F3103 /* encrypted_file_mapping.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = encrypted_file_mapping.hpp; sourceTree = "<group>"; };
@@ -837,8 +837,6 @@
 		4222F2F919640A7A00EC86A5 /* jsmn.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = jsmn.hpp; sourceTree = "<group>"; };
 		4222F2FC19640B8400EC86A5 /* replication.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = replication.cpp; path = realm/replication.cpp; sourceTree = "<group>"; };
 		4222F2FD19640B8400EC86A5 /* replication.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = replication.hpp; path = realm/replication.hpp; sourceTree = "<group>"; };
-		4222F30019640C6700EC86A5 /* commit_log.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = commit_log.cpp; path = realm/commit_log.cpp; sourceTree = "<group>"; };
-		4222F30119640C6700EC86A5 /* commit_log.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = commit_log.hpp; path = realm/commit_log.hpp; sourceTree = "<group>"; };
 		425ED13219BDC371006C0DAE /* shared_ptr.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = shared_ptr.hpp; sourceTree = "<group>"; };
 		42F862D119BDE3460053C134 /* views.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = views.cpp; path = realm/views.cpp; sourceTree = "<group>"; };
 		42F862D219BDE3460053C134 /* views.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = views.hpp; path = realm/views.hpp; sourceTree = "<group>"; };
@@ -1217,8 +1215,6 @@
 				365CCE0E157CC37D00172BF8 /* column_tpl.hpp */,
 				365CCE0F157CC37D00172BF8 /* column_type.hpp */,
 				5DC597311B854C960020D712 /* column_type_traits.hpp */,
-				4222F30019640C6700EC86A5 /* commit_log.cpp */,
-				4222F30119640C6700EC86A5 /* commit_log.hpp */,
 				520588C916C1DA9D009DA6D8 /* data_type.hpp */,
 				5267884A189AB4B8009CDE7D /* descriptor.cpp */,
 				5267884D189AB4D7009CDE7D /* descriptor.hpp */,
@@ -1486,6 +1482,7 @@
 				3F1967AB1A9530AA0072FE29 /* interprocess_condvar.hpp */,
 				3FB4D04A1D4FBA7E0005F96E /* interprocess_mutex.cpp */,
 				5D86403A1CFE841400CA3CE4 /* interprocess_mutex.hpp */,
+				3F9BE2951D75DDE800A5BFBA /* logger.cpp */,
 				52D7C46F1852A01700633748 /* logger.hpp */,
 				3620DEFF18B6C93C003AD498 /* memory_stream.cpp */,
 				3620DF0018B6C93C003AD498 /* memory_stream.hpp */,
@@ -1655,7 +1652,6 @@
 				365CCE51157CC37D00172BF8 /* column_tpl.hpp in Headers */,
 				365CCE52157CC37D00172BF8 /* column_type.hpp in Headers */,
 				5DC597321B854C960020D712 /* column_type_traits.hpp in Headers */,
-				4222F30319640C6700EC86A5 /* commit_log.hpp in Headers */,
 				48A048311C7F7A55000FFD12 /* continuous_transactions_history.hpp in Headers */,
 				36A1DC9216C3F3470086A836 /* data_type.hpp in Headers */,
 				5267884E189AB4D7009CDE7D /* descriptor.hpp in Headers */,
@@ -1761,7 +1757,6 @@
 				4142C9701623478700B3B902 /* group_writer.hpp in Headers */,
 				4142C9881623478700B3B902 /* index_string.hpp in Headers */,
 				F44D4CE91B381D27009ADAB9 /* input_stream.hpp in Headers */,
-				D4AC5C2E1D5BAFD600E3D29D /* version_id.hpp in Headers */,
 				4142C9731623478700B3B902 /* lang_bind_helper.hpp in Headers */,
 				4142C9751623478700B3B902 /* mixed.hpp in Headers */,
 				4142C96F1623478700B3B902 /* olddatetime.hpp in Headers */,
@@ -1783,6 +1778,7 @@
 				B159814618CF55D400E3C5DF /* type_traits.hpp in Headers */,
 				4142C9851623478700B3B902 /* utilities.hpp in Headers */,
 				80ADCCEC18A23DD00049D472 /* version.hpp in Headers */,
+				D4AC5C2E1D5BAFD600E3D29D /* version_id.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1836,7 +1832,6 @@
 				5DC597341B854CBA0020D712 /* column_type_traits.hpp in Headers */,
 				48A048331C7F7A55000FFD12 /* continuous_transactions_history.hpp in Headers */,
 				C008FF7C1B67F02F0042669E /* data_type.hpp in Headers */,
-				D4AC5C2F1D5BAFD700E3D29D /* version_id.hpp in Headers */,
 				C008FF7E1B67F02F0042669E /* group.hpp in Headers */,
 				C008FF7F1B67F02F0042669E /* group_shared.hpp in Headers */,
 				C008FF801B67F02F0042669E /* group_writer.hpp in Headers */,
@@ -1862,6 +1857,7 @@
 				C008FF931B67F02F0042669E /* type_traits.hpp in Headers */,
 				C008FF941B67F02F0042669E /* utilities.hpp in Headers */,
 				C008FF951B67F02F0042669E /* version.hpp in Headers */,
+				D4AC5C2F1D5BAFD700E3D29D /* version_id.hpp in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2217,7 +2213,6 @@
 				365CCE4B157CC37D00172BF8 /* column_string_enum.cpp in Sources */,
 				365CCE4F157CC37D00172BF8 /* column_table.cpp in Sources */,
 				65033A761C7DD3B80019E9F2 /* column_timestamp.cpp in Sources */,
-				4222F30219640C6700EC86A5 /* commit_log.cpp in Sources */,
 				48A048351C7F7A6B000FFD12 /* continuous_transactions_history.cpp in Sources */,
 				5267884B189AB4B8009CDE7D /* descriptor.cpp in Sources */,
 				6579EEB91B4E89B6004DE3D8 /* disable_sync_to_disk.cpp in Sources */,
@@ -2234,6 +2229,7 @@
 				3FB4D04B1D4FBA7E0005F96E /* interprocess_mutex.cpp in Sources */,
 				36A1DC9316C3F34B0086A836 /* lang_bind_helper.cpp in Sources */,
 				36AA59E81937552000D691E0 /* link_view.cpp in Sources */,
+				3F9BE2961D75DDE800A5BFBA /* logger.cpp in Sources */,
 				3620DF0118B6C93C003AD498 /* memory_stream.cpp in Sources */,
 				485231161B2E914D003C72AF /* misc_errors.cpp in Sources */,
 				3620DF0E18B6CA7B003AD498 /* output_stream.cpp in Sources */,
@@ -2312,12 +2308,12 @@
 				3F838D361D35A1ED004625B7 /* test_upgrade_database.cpp in Sources */,
 				3F838D371D35A1ED004625B7 /* test_utf8.cpp in Sources */,
 				3F838D381D35A1ED004625B7 /* test_util_error.cpp in Sources */,
+				B6F92D3C1D46122700887B4E /* test_util_file.cpp in Sources */,
 				3F838D3A1D35A1ED004625B7 /* test_util_inspect.cpp in Sources */,
 				3F838D3B1D35A1ED004625B7 /* test_util_logger.cpp in Sources */,
 				3F838D3D1D35A1ED004625B7 /* test_util_scope_exit.cpp in Sources */,
 				3F838D3E1D35A1ED004625B7 /* test_util_stringbuffer.cpp in Sources */,
 				3F838D3F1D35A1ED004625B7 /* test_util_to_string.cpp in Sources */,
-				B6F92D3C1D46122700887B4E /* test_util_file.cpp in Sources */,
 				3F838D401D35A1ED004625B7 /* test_util_type_list.cpp in Sources */,
 				3F838D421D35A1ED004625B7 /* test_version.cpp in Sources */,
 			);
@@ -2357,7 +2353,6 @@
 				4142C9441623478700B3B902 /* column_string_enum.cpp in Sources */,
 				4142C9461623478700B3B902 /* column_table.cpp in Sources */,
 				65033A781C7DD3F30019E9F2 /* column_timestamp.cpp in Sources */,
-				F4D0FC871B00F62C0040956A /* commit_log.cpp in Sources */,
 				48A048361C7F7A6B000FFD12 /* continuous_transactions_history.cpp in Sources */,
 				F4D0FC881B00F62C0040956A /* descriptor.cpp in Sources */,
 				6579EEBA1B4E89B7004DE3D8 /* disable_sync_to_disk.cpp in Sources */,
@@ -2374,6 +2369,7 @@
 				3FB4D04C1D4FBA860005F96E /* interprocess_mutex.cpp in Sources */,
 				52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */,
 				F4D0FC8A1B00F62C0040956A /* link_view.cpp in Sources */,
+				3F9BE2971D75DDEB00A5BFBA /* logger.cpp in Sources */,
 				F4D0FC7F1B00F62C0040956A /* memory_stream.cpp in Sources */,
 				65F35E0B1B32F9E5006AE5A9 /* misc_errors.cpp in Sources */,
 				F4D0FC791B00F62C0040956A /* output_stream.cpp in Sources */,
@@ -2447,7 +2443,6 @@
 				C008FF451B67F02F0042669E /* column_string_enum.cpp in Sources */,
 				C008FF461B67F02F0042669E /* column_table.cpp in Sources */,
 				65033A7A1C7DD3F40019E9F2 /* column_timestamp.cpp in Sources */,
-				C008FF471B67F02F0042669E /* commit_log.cpp in Sources */,
 				48A048371C7F7A6B000FFD12 /* continuous_transactions_history.cpp in Sources */,
 				C008FF481B67F02F0042669E /* descriptor.cpp in Sources */,
 				C008FF4E1B67F02F0042669E /* disable_sync_to_disk.cpp in Sources */,
@@ -2464,6 +2459,7 @@
 				3FB4D04D1D4FBA870005F96E /* interprocess_mutex.cpp in Sources */,
 				C008FF531B67F02F0042669E /* lang_bind_helper.cpp in Sources */,
 				C008FF541B67F02F0042669E /* link_view.cpp in Sources */,
+				3F9BE2981D75DDEC00A5BFBA /* logger.cpp in Sources */,
 				C008FF551B67F02F0042669E /* memory_stream.cpp in Sources */,
 				C008FF391B67F02F0042669E /* misc_errors.cpp in Sources */,
 				C008FF561B67F02F0042669E /* output_stream.cpp in Sources */,
@@ -2511,7 +2507,6 @@
 				3F838CDD1D35A1EA004625B7 /* test_column_float.cpp in Sources */,
 				3F838CDE1D35A1EA004625B7 /* test_column_mixed.cpp in Sources */,
 				3F838CDF1D35A1EA004625B7 /* test_column_string.cpp in Sources */,
-				B6F92D3D1D46122C00887B4E /* test_util_file.cpp in Sources */,
 				3F838CE01D35A1EA004625B7 /* test_column_timestamp.cpp in Sources */,
 				3F838CE11D35A1EA004625B7 /* test_descriptor.cpp in Sources */,
 				3F838CE21D35A1EA004625B7 /* test_destroy_guard.cpp in Sources */,
@@ -2541,6 +2536,7 @@
 				3F838CFA1D35A1EA004625B7 /* test_upgrade_database.cpp in Sources */,
 				3F838CFB1D35A1EA004625B7 /* test_utf8.cpp in Sources */,
 				3F838CFC1D35A1EA004625B7 /* test_util_error.cpp in Sources */,
+				B6F92D3D1D46122C00887B4E /* test_util_file.cpp in Sources */,
 				3F838CFE1D35A1EA004625B7 /* test_util_inspect.cpp in Sources */,
 				3F838CFF1D35A1EA004625B7 /* test_util_logger.cpp in Sources */,
 				3F838D011D35A1EA004625B7 /* test_util_scope_exit.cpp in Sources */,

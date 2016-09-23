@@ -29,16 +29,15 @@ namespace _impl {
 
 void InRealmHistory::initialize(Group& group)
 {
-    REALM_ASSERT(!m_group);
     m_group = &group;
+    m_base_version = 0;
+    m_size = 0;
+    m_changesets = nullptr;
 }
 
 
 InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
 {
-    if (changeset.size() > Table::max_binary_size)
-        throw std::runtime_error("Changeset too large");
-
     if (!m_changesets) {
         using gf = _impl::GroupFriend;
         Allocator& alloc = gf::get_alloc(*m_group);
@@ -46,7 +45,7 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
         bool nullable = false;
         ref_type hist_ref = BinaryColumn::create(alloc, size, nullable); // Throws
         _impl::DeepArrayRefDestroyGuard dg(hist_ref, alloc);
-        m_changesets.reset(new BinaryColumn(alloc, hist_ref, nullable));                                  // Throws
+        m_changesets = std::make_unique<BinaryColumn>(alloc, hist_ref, nullable);                         // Throws
         gf::prepare_history_parent(*m_group, *m_changesets->get_root_array(), Replication::hist_InRealm); // Throws
         // Note: gf::prepare_history_parent() also ensures the the root array
         // has a slot for the history ref.
@@ -57,10 +56,10 @@ InRealmHistory::version_type InRealmHistory::add_changeset(BinaryData changeset)
     // null. It should probably be changed such that BinaryData{} is always
     // interpreted as the empty string. For the purpose of setting null values,
     // BinaryColumn::set() should accept values of type Optional<BinaryData>().
-    BinaryData changeset_2("", 0);
-    if (!changeset.is_null())
-        changeset_2 = changeset;
-    m_changesets->add(changeset_2); // Throws
+    if (changeset.is_null())
+        m_changesets->add(BinaryData("", 0)); // Throws
+    else
+        m_changesets->add(changeset); // Throws
     ++m_size;
     version_type new_version = m_base_version + m_size;
     return new_version;
@@ -85,8 +84,8 @@ void InRealmHistory::update_from_parent(version_type version)
 }
 
 
-void InRealmHistory::get_changesets(version_type begin_version, version_type end_version, BinaryData* buffer) const
-    noexcept
+void InRealmHistory::get_changesets(version_type begin_version, version_type end_version,
+                                    BinaryIterator* buffer) const noexcept
 {
     REALM_ASSERT(begin_version <= end_version);
     REALM_ASSERT(begin_version >= m_base_version);
@@ -98,7 +97,7 @@ void InRealmHistory::get_changesets(version_type begin_version, version_type end
     size_t n = size_t(n_version_type);
     size_t offset = size_t(offset_version_type);
     for (size_t i = 0; i < n; ++i)
-        buffer[i] = m_changesets->get(offset + i);
+        buffer[i] = BinaryIterator(m_changesets.get(), offset + i);
 }
 
 
@@ -136,20 +135,21 @@ void InRealmHistory::update_from_ref(ref_type ref, version_type version)
         // No history
         m_base_version = version;
         m_size = 0;
-        m_changesets.reset();
-        return;
-    }
-    if (REALM_LIKELY(m_changesets)) {
-        m_changesets->update_from_ref(ref); // Throws
+        m_changesets = nullptr;
     }
     else {
-        Allocator& alloc = gf::get_alloc(*m_group);
-        bool nullable = false;
-        m_changesets.reset(new BinaryColumn(alloc, ref, nullable)); // Throws
-        gf::set_history_parent(*m_group, *m_changesets->get_root_array());
+        if (REALM_LIKELY(m_changesets)) {
+            m_changesets->update_from_ref(ref); // Throws
+        }
+        else {
+            Allocator& alloc = gf::get_alloc(*m_group);
+            bool nullable = false;
+            m_changesets = std::make_unique<BinaryColumn>(alloc, ref, nullable); // Throws
+            gf::set_history_parent(*m_group, *m_changesets->get_root_array());
+        }
+        m_size = m_changesets->size();
+        m_base_version = version - m_size;
     }
-    m_size = m_changesets->size();
-    m_base_version = version - m_size;
 }
 
 } // namespace _impl

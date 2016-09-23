@@ -44,6 +44,13 @@ public:
     bool is_nullable() const noexcept override;
 
     BinaryData get(size_t ndx) const noexcept;
+
+    /// Return data from position 'pos' and onwards. If the blob is distributed
+    /// across multiple arrays (if bigger than ~ 16M), you will only get data
+    /// from one array. 'pos' will be updated to be an index to next available
+    /// data. It will be 0 if no more data.
+    BinaryData get_at(size_t ndx, size_t& pos) const noexcept;
+
     bool is_null(size_t ndx) const noexcept override;
     StringData get_index_data(size_t, StringIndex::StringConversionBuffer&) const noexcept final;
 
@@ -125,6 +132,47 @@ private:
 
     friend class Array;
     friend class ColumnBase;
+};
+
+class BinaryIterator {
+public:
+    BinaryIterator()
+    {
+    }
+    // TODO: When WriteLogCollector is removed, there is no need for this
+    BinaryIterator(BinaryData binary)
+        : m_binary(binary)
+    {
+    }
+
+    BinaryIterator(BinaryColumn* col, size_t ndx)
+        : m_binary_col(col)
+        , m_ndx(ndx)
+    {
+    }
+
+    BinaryData get_next() noexcept
+    {
+        if (!end_of_data) {
+            if (m_binary_col) {
+                BinaryData ret = m_binary_col->get_at(m_ndx, m_pos);
+                end_of_data = (m_pos == 0);
+                return ret;
+            }
+            else if (!m_binary.is_null()) {
+                end_of_data = true;
+                return m_binary;
+            }
+        }
+        return {};
+    }
+
+private:
+    bool end_of_data = false;
+    BinaryColumn* m_binary_col = nullptr;
+    size_t m_ndx = 0;
+    size_t m_pos = 0;
+    BinaryData m_binary;
 };
 
 

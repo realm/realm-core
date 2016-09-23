@@ -933,6 +933,15 @@ void StringColumn::find_all(IntegerColumn& result, StringData value, size_t begi
 }
 
 
+FindRes StringColumn::find_all_no_copy(StringData value, InternalFindResult& result) const
+{
+    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
+    REALM_ASSERT(m_search_index);
+
+    return m_search_index->find_all_no_copy(value, result);
+}
+
+
 namespace {
 
 struct BinToStrAdaptor {
@@ -1003,15 +1012,6 @@ size_t StringColumn::upper_bound_string(StringData value) const noexcept
     }
     // Non-leaf root
     return ColumnBase::upper_bound(*this, value);
-}
-
-
-FindRes StringColumn::find_all_indexref(StringData value, size_t& dst) const
-{
-    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
-    REALM_ASSERT(m_search_index);
-
-    return m_search_index->find_all(value, dst);
 }
 
 
