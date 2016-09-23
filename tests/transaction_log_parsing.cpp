@@ -425,6 +425,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_INDICES(info.tables[1].insertions, 10, 11, 12);
         }
 
+#if REALM_VER_MAJOR >= 2
         SECTION("swap_rows() reports a pair of moves") {
             auto info = track_changes({false, false, true}, [&] {
                 table.swap_rows(1, 5);
@@ -449,7 +450,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_INDICES(table.modifications, 8);
         }
 
-#if REALM_VER_MAJOR >= 2
         SECTION("PK conflict from last row produces no net change") {
             auto info = track_changes({false, false, true}, [&] {
                 table.add_empty_row();
@@ -1193,6 +1193,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_FALSE(changes.modified(0, 2));
         }
 
+#if REALM_MAJOR_VER >= 2
         SECTION("SetDefault does not mark as changed") {
             Row r = target->get(0);
             auto changes = observe({r}, [&] {
@@ -1201,8 +1202,8 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_FALSE(changes.modified(0, 0));
             REQUIRE_FALSE(changes.modified(0, 1));
             REQUIRE_FALSE(changes.modified(0, 2));
-
         }
+#endif
 
         SECTION("multiple properties on a single object are handled properly") {
             Row r = target->get(0);
@@ -1311,15 +1312,17 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         SECTION("moving the target of a link does not mark the link as modified") {
             Row r = origin->get(0);
+#if REALM_VER_MAJOR >= 2
             auto changes = observe({r}, [&] {
                 target->swap_rows(5, 9);
             });
             REQUIRE_FALSE(changes.modified(0, 1));
+#endif
 
-            changes = observe({r}, [&] {
+            auto changes2 = observe({r}, [&] {
                 target->move_last_over(0);
             });
-            REQUIRE_FALSE(changes.modified(0, 1));
+            REQUIRE_FALSE(changes2.modified(0, 1));
         }
 
         SECTION("clearing a table invalidates all observers for that table") {
@@ -1352,6 +1355,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.modified(0, 0));
         }
 
+#if REALM_VER_MAJOR >= 2
         SECTION("moving an observed object with swap() does not interfere with tracking") {
             Row r1 = target->get(1), r2 = target->get(3);
 
@@ -1429,6 +1433,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.modified(0, 1));
             REQUIRE(changes.modified(0, 2));
         }
+#endif
 
         SECTION("inserting a column into an observed table does not break tracking") {
             Row r = target->get(0);
@@ -1615,6 +1620,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {10, 11}));
         }
 
+#if REALM_VER_MAJOR >= 2
         SECTION("array: moving the observed object via swap() does not interrupt tracking") {
             Row r = origin->get(0);
             auto changes = observe({r}, [&] {
@@ -1659,6 +1665,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             });
             REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {12, 13}));
         }
+#endif
     }
 }
 
