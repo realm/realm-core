@@ -5,6 +5,9 @@
 * TimestampColumn::is_nullable() could return a wrong value. Also, when adding a new
   Float/Double column to a Table with rowcount > 0, the new entries would be non-null
   even though the column was created as nullable.
+* Update accessors after a change_link_target or set_unique operation, so that users
+  will have the latest data immediately. Previously this would require manually
+  refetching the data or looking for the unique key again.
 
 ----------------------------------------------
 
