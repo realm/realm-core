@@ -1,8 +1,20 @@
+# 2.0.0-rc8 Release notes
+
+### Bugfixes
+
+* TimestampColumn::is_nullable() mismatched its real nulability. Also, when adding a new
+  Float/Double column to a Table with rowcount > 0, the new entries would be non-null
+  even though the column was created as nullable.
+
+----------------------------------------------
+
 # 2.0.0-rc9 Release notes
 
 ### Internals
 
 * Use Xcode 7.3.1 to build core for Cocoa
+
+----------------------------------------------
 
 # 2.0.0-rc8 Release notes
 
@@ -11,9 +23,6 @@
 * Fixed a crash related to queries that was introduced in rc7. (#2186)
 * Fixed a bug triggered through set unique of primary keys through
   the ROS. (#2180)
-* TimestampColumn::is_nullable() mismatched its real nulability. Also, when adding a new
-  Float/Double column to a Table with rowcount > 0, the new entries would be non-null
-  even though the column was created as nullable.
   
 -----------
 
@@ -34,6 +43,8 @@
 * Reversed the decision process of resolving primary key conflicts. Instead of
   letting the newest row win, the oldest row will now always win in order to not
   lose subsequent changes.
+
+-----------
 
 ### Breaking changes
 
