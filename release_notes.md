@@ -11,7 +11,10 @@
 * Fixed a crash related to queries that was introduced in rc7. (#2186)
 * Fixed a bug triggered through set unique of primary keys through
   the ROS. (#2180)
-
+* TimestampColumn::is_nullable() mismatched its real nulability. Also, when adding a new
+  Float/Double column to a Table with rowcount > 0, the new entries would be non-null
+  even though the column was created as nullable.
+  
 -----------
 
 ### Internals
@@ -94,9 +97,6 @@
   or OldDateTime. Caused by bad static `get_size_from_ref()` methods of columns. (#2101)
 * Fixed a bug with link columns incorrectly updating on a `move_last_over`
   operation when the link points to the same table.
-* TimestampColumn::is_nullable() mismatched its real nulability. Also, when adding a new
-  Float/Double column to a Table with rowcount > 0, the new entries would be non-null
-  even though the column was created as nullable.
 
 ### Breaking changes
 
