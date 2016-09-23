@@ -17,7 +17,7 @@
 * TimestampColumn::is_nullable() mismatched its real nulability. Also, when adding a new
   Float/Double column to a Table with rowcount > 0, the new entries would be non-null
   even though the column was created as nullable.
-  
+
 ### Breaking changes
 
 * Refactored the `SharedGroup` constructors and open methods to use a new
