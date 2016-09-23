@@ -2394,6 +2394,7 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
         }
     }
 
+    adj_row_acc_subsume_row(row_ndx, new_row_ndx);
     bump_version();
 }
 
