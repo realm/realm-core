@@ -2396,6 +2396,7 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
         }
     }
 
+    adj_row_acc_subsume_row(row_ndx, new_row_ndx);
     bump_version();
 }
 
@@ -2840,6 +2841,8 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
             break;
         if (ndx == size() - 1)
             ndx = duplicate;
+
+        adj_row_acc_subsume_row(duplicate, winner);
         move_last_over(duplicate);
         // Re-check moved-last-over
         duplicate -= 1;
@@ -2848,6 +2851,8 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
     // Delete candidate.
     if (winner == size() - 1)
         winner = ndx;
+
+    adj_row_acc_subsume_row(ndx, winner);
     move_last_over(ndx);
 
     return winner;
