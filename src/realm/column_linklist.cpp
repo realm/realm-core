@@ -363,8 +363,10 @@ LinkViewRef LinkListColumn::get_ptr(size_t row_ndx) const
     if (it != m_list_accessors.end()) {
         if (it->m_row_ndx == row_ndx) {
             // If we have an existing LinkView, return it.
-            if (LinkViewRef list = it->m_list.lock())
+            if (LinkViewRef list = it->m_list.lock()) {
+                REALM_ASSERT_DEBUG(list->is_attached());
                 return list;
+            }
         }
         if (it->m_list.expired()) {
             // We found an expired entry at the appropriate position. Reuse it with a new LinkView.
@@ -468,6 +470,36 @@ void LinkListColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexc
 
     const bool fix_ndx_in_parent = false;
     adj_swap<fix_ndx_in_parent>(row_ndx_1, row_ndx_2);
+}
+
+
+void LinkListColumn::adj_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept
+{
+    prune_list_accessor_tombstones();
+
+    auto begin = m_list_accessors.begin(), end = m_list_accessors.end();
+    auto old_it = std::lower_bound(begin, end, list_entry{old_row_ndx, std::weak_ptr<LinkView>()});
+    if (old_it == end || old_it->m_row_ndx != old_row_ndx)
+        return;
+
+    // move the accessor to the correct position in the sorted list for the new value
+    if (old_row_ndx < new_row_ndx) {
+        auto new_it = std::lower_bound(old_it, end, list_entry{new_row_ndx, std::weak_ptr<LinkView>()});
+        std::rotate(old_it, old_it + 1, new_it);
+        old_it = new_it - 1;
+    }
+    else {
+        auto new_it = std::lower_bound(begin, old_it, list_entry{new_row_ndx, std::weak_ptr<LinkView>()});
+        std::rotate(new_it, old_it, old_it + 1);
+        old_it = new_it;
+    }
+
+    // update the accessor
+    old_it->m_row_ndx = new_row_ndx;
+    if (LinkViewRef list = old_it->m_list.lock())
+        list->set_origin_row_index(new_row_ndx);
+
+    validate_list_accessors();
 }
 
 

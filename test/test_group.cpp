@@ -2561,4 +2561,27 @@ TEST(Group_SharedMappingsForReadOnlyStreamingForm)
     }
 }
 
+
+// This test embodies a current limitation of our merge algorithm. If this
+// limitation is lifted, the code for the SET_UNIQUE instruction in
+// fuzz_group.cpp should be strengthened to reflect this.
+// (i.e. remove the try / catch for LogicError of kind illegal_combination)
+TEST(Group_SetNullUniqueLimitation)
+{
+    Group g;
+    TableRef t = g.add_table("t0");
+    t->add_column(type_Int, "", true);
+    t->add_search_index(0);
+    t->add_column_link(type_LinkList, "", *t);
+    t->add_empty_row();
+    t->get_linklist(1, 0)->add(0);
+    try {
+        t->set_null_unique(0, 0);
+    }
+    catch (const LogicError& le) {
+        CHECK(le.kind() == LogicError::illegal_combination);
+    }
+}
+
+
 #endif // TEST_GROUP

@@ -40,6 +40,25 @@ void ArrayBinary::init_from_mem(MemRef mem) noexcept
     }
 }
 
+size_t ArrayBinary::read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept
+{
+    REALM_ASSERT_3(ndx, <, m_offsets.size());
+
+    if (!legacy_array_type() && m_nulls.get(ndx)) {
+        return 0;
+    }
+    else {
+        size_t begin_idx = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
+        size_t end_idx = to_size_t(m_offsets.get(ndx));
+        size_t sz = end_idx - begin_idx;
+
+        size_t size_to_copy = (pos > sz) ? 0 : std::min(max_size, sz - pos);
+        const char* begin = m_blob.get(begin_idx) + pos;
+        const char* end = m_blob.get(begin_idx) + pos + size_to_copy;
+        std::copy(begin, end, buffer);
+        return size_to_copy;
+    }
+}
 
 void ArrayBinary::add(BinaryData value, bool add_zero_term)
 {

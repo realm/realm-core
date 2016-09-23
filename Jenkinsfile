@@ -35,6 +35,9 @@ try {
         }
       }
     }
+
+    rpmVersion = dependencies.VERSION.replaceAll("-", "_")
+    echo "rpm version: ${rpmVersion}"
   }
 
   stage('check') {
@@ -66,7 +69,7 @@ try {
     )
   }
 
-  if (['master', 'next-major'].contains(env.BRANCH_NAME)) {
+  if (['master', 'next-major'].contains(env.BRANCH_NAME) || gitTag != "") {
     stage('publish-packages') {
       parallel(
         generic: doPublishGeneric(),
@@ -74,14 +77,6 @@ try {
         centos6: doPublish('centos-6', 'rpm', 'el', 6),
         ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
       )
-    }
-
-    if (gitTag != "") {
-      stage('trigger release') {
-        build job: 'sync_release/realm-core-rpm-release',
-          wait: false,
-          parameters: [[$class: 'StringParameterValue', name: 'RPM_VERSION', value: "${dependencies.VERSION}-${env.BUILD_NUMBER}"]]
-      }
     }
   }
 } catch(Exception e) {
@@ -91,7 +86,7 @@ try {
 
 def doBuildCocoa() {
   return {
-    node('osx') {
+    node('osx_vegas') {
       getArchive()
 
       try {
@@ -146,7 +141,7 @@ def doBuildCocoa() {
 
 def doBuildDotNetOsx() {
   return {
-    node('osx') {
+    node('osx_vegas') {
       getArchive()
 
       try {
@@ -296,7 +291,7 @@ def doBuildNodeInDocker() {
 
 def doBuildNodeInOsx() {
   return {
-    node('osx') {
+    node('osx_vegas') {
       getArchive()
 
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
@@ -496,6 +491,7 @@ def get_version() {
   }
 }
 
+@NonCPS
 def getDeviceNames(String commandOutput) {
   def deviceNames = []
   def lines = commandOutput.split('\n')
@@ -550,7 +546,7 @@ def doPublishGeneric() {
         unstash "packages-generic"
       }
       dir("core/v${version}/linux") {
-        sh "mv ${topdir}/packaging/out/generic/realm-core-${version}.tgz realm-core-${version}.tgz"
+        sh "mv ${topdir}/packaging/out/generic/realm-core-*.tgz ./"
       }
 
       step([

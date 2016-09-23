@@ -23,9 +23,11 @@
 
 #include <realm/util/features.h>
 
-#define REALM_VER_MAJOR 1
-#define REALM_VER_MINOR 5
-#define REALM_VER_PATCH 1
+
+#define REALM_VER_MAJOR 2
+#define REALM_VER_MINOR 0
+#define REALM_VER_PATCH 0
+#define REALM_VER_EXTRA "rc8"
 #define REALM_PRODUCT_NAME "realm-core"
 
 #define REALM_VER_STRING                                                                                             \
@@ -38,6 +40,8 @@ enum Feature {
     feature_Debug,
     feature_Replication,
 };
+
+class StringData;
 
 class Version {
 public:
@@ -53,7 +57,9 @@ public:
     {
         return REALM_VER_PATCH;
     }
+    static StringData get_extra();
     static std::string get_version();
+    static bool is_at_least(int major, int minor, int patch, StringData extra);
     static bool is_at_least(int major, int minor, int patch);
     static bool has_feature(Feature feature);
 };

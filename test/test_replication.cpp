@@ -3465,7 +3465,11 @@ TEST(Replication_SetUnique)
         table1->add_empty_row(2);
         table1->set_int_unique(0, 0, 123);
         table1->set_string_unique(1, 0, "Hello, World!");
-        table1->set_int_unique(2, 0, 123);
+        // This will delete row 0! It is a bit counter intuative but this
+        // is because we expect that SetUnique is called before filling in
+        // other columns with data.
+        table1->set_null_unique(2, 0);
+        CHECK_EQUAL(table1->size(), 1);
         table1->set_string_unique(3, 0, "Hello, World!");
         wt.commit();
     }
@@ -3474,9 +3478,9 @@ TEST(Replication_SetUnique)
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
 
-        CHECK_EQUAL(table2->get_int(0, 0), 123);
-        CHECK_EQUAL(table2->get_string(1, 0), "Hello, World!");
-        CHECK_EQUAL(table2->get_int(2, 0), 123);
+        CHECK_EQUAL(table2->get_int(0, 0), 0);
+        CHECK_EQUAL(table2->get_string(1, 0), "");
+        CHECK(table2->is_null(2, 0));
         CHECK_EQUAL(table2->get_string(3, 0), "Hello, World!");
     }
 }
