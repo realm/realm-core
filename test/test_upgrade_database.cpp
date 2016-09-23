@@ -32,7 +32,6 @@
 #include <realm.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/file.hpp>
-#include <realm/commit_log.hpp>
 #include <realm/version.hpp>
 #include <realm/history.hpp>
 
@@ -235,7 +234,7 @@ TEST(Upgrade_Database_2_3)
     {
         CHECK_OR_RETURN(File::copy(path, temp_copy));
 
-        std::unique_ptr<Replication> hist = make_client_history(temp_copy);
+        std::unique_ptr<Replication> hist = make_in_realm_history(temp_copy);
         SharedGroup sg(*hist);
         ReadTransaction rt(sg);
         ConstTableRef t = rt.get_table("table");
@@ -297,7 +296,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
-    CHECK_EQUAL(5, sgf::get_file_format_version(g));
+    CHECK_EQUAL(6, sgf::get_file_format_version(g));
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -438,7 +437,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
-    CHECK_EQUAL(5, sgf::get_file_format_version(g));
+    CHECK_EQUAL(6, sgf::get_file_format_version(g));
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -785,7 +784,7 @@ TEST(Upgrade_InRealmHistory)
         CHECK_LESS_EQUAL(4, sgf::get_file_format_version(sg));
     }
 
-    // Try again, but do it in two steps (2->3, 3->5).
+    // Try again, but do it in two steps (2->3, 3->6).
     {
         File::remove(temp_path);
         CHECK_OR_RETURN(File::copy(path, temp_path));
@@ -793,7 +792,7 @@ TEST(Upgrade_InRealmHistory)
         {
             SharedGroup sg(temp_path, no_create);
             using sgf = _impl::SharedGroupFriend;
-            CHECK_EQUAL(5, sgf::get_file_format_version(sg));
+            CHECK_EQUAL(6, sgf::get_file_format_version(sg));
         }
         {
             std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
@@ -994,6 +993,121 @@ TEST(Upgrade_Database_4_5_DateTime1)
     t->set_olddatetime(1, 2, OldDateTime(0));
     t->set_null(2, 2);
     t->set_olddatetime(3, 2, OldDateTime(0));
+
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+}
+
+
+// Open an existing database-file-format-version 5 file and
+// check that it automatically upgrades to version 6.
+TEST(Upgrade_Database_5_6_StringIndex)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_5_to_6_stringindex.realm";
+
+    // use a common prefix which will not cause a stack overflow but is larger
+    // than StringIndex::s_max_offset
+    const int common_prefix_length = 500;
+    std::string std_base2(common_prefix_length, 'a');
+    std::string std_base2_b = std_base2 + "b";
+    std::string std_base2_c = std_base2 + "c";
+    StringData base2(std_base2);
+    StringData base2_b(std_base2_b);
+    StringData base2_c(std_base2_c);
+
+
+#if TEST_READ_UPGRADE_MODE
+
+    // Automatic upgrade from SharedGroup
+    {
+        CHECK_OR_RETURN(File::exists(path));
+        SHARED_GROUP_TEST_PATH(temp_copy);
+
+        // Make a copy of the version 4 database so that we keep the
+        // original file intact and unmodified
+        CHECK_OR_RETURN(File::copy(path, temp_copy));
+
+        // Constructing this SharedGroup will trigger an upgrade
+        // for all tables because the file is in version 4
+        SharedGroup sg(temp_copy);
+
+        WriteTransaction rt(sg);
+        TableRef t = rt.get_table("t1");
+        TableRef t2 = rt.get_table("t2");
+
+        size_t int_ndx = 0;
+        size_t str_ndx = 4;
+        size_t ts_ndx = 6;
+        size_t num_rows = 6;
+
+        CHECK_EQUAL(t->size(), num_rows);
+        CHECK(t->has_search_index(int_ndx));
+        CHECK(t->has_search_index(str_ndx));
+        CHECK(t->has_search_index(ts_ndx));
+
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2_b), 0);
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2_c), 1);
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2), 4);
+        CHECK_EQUAL(t->get_distinct_view(str_ndx).size(), 4);
+        CHECK_EQUAL(t->size(), 6);
+
+        // If the StringIndexes were not updated we couldn't do this
+        // on a format 5 file and find it again.
+        std::string std_base2_d = std_base2 + "d";
+        StringData base2_d(std_base2_d);
+        t->add_empty_row();
+        t->set_string(str_ndx, 6, base2_d);
+        CHECK_EQUAL(t->find_first_string(str_ndx, base2_d), 6);
+
+        // And if the indexes were using the old format, adding a long
+        // prefix string would cause a stack overflow.
+        std::string big_base(90000, 'a');
+        std::string big_base_b = big_base + "b";
+        std::string big_base_c = big_base + "c";
+        StringData b(big_base_b);
+        StringData c(big_base_c);
+        t->add_empty_row(2);
+        t->set_string(str_ndx, 7, b);
+        t->set_string(str_ndx, 8, c);
+
+        t->verify();
+        t2->verify();
+    }
+
+#else  // test write mode
+    // NOTE: This code must be executed from an old file-format-version 5
+    // core in order to create a file-format-version 5 test file!
+    char leafsize[20];
+    sprintf(leafsize, "%d", REALM_MAX_BPNODE_SIZE);
+    File::try_remove(path);
+
+    Group g;
+    TableRef t = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+
+    size_t int_ndx = t->add_column(type_Int, "int");
+    t->add_column(type_Bool, "bool");
+    t->add_column(type_Float, "float");
+    t->add_column(type_Double, "double");
+    size_t str_ndx = t->add_column(type_String, "string");
+    t->add_column(type_Binary, "binary");
+    size_t ts_ndx = t->add_column(type_Timestamp, "timestamp");
+    t->add_column(type_Table, "table");
+    t->add_column(type_Mixed, "mixed");
+    t->add_column_link(type_Link, "link", *t2);
+    t->add_column_link(type_LinkList, "linklist", *t2);
+    t->add_search_index(int_ndx);
+    t->add_search_index(str_ndx);
+    t->add_search_index(ts_ndx);
+
+    t->add_empty_row(6);
+    t->set_string(str_ndx, 0, base2_b);
+    t->set_string(str_ndx, 1, base2_c);
+    t->set_string(str_ndx, 2, "aaaaaaaaaa");
+    t->set_string(str_ndx, 3, "aaaaaaaaaa");
+    t->set_string(str_ndx, 4, base2);
+    t->set_string(str_ndx, 5, base2);
 
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE

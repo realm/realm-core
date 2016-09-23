@@ -1861,6 +1861,66 @@ TEST(Query_StrIndexCrash)
     }
 }
 
+TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    table->add_column(type_String, "first");
+    table->add_search_index(0);
+    if (TEST_TYPE::value == true) {
+        bool force = true;
+        table->optimize(force); // Make it a StringEnum column
+    }
+
+    auto test_prefix_find = [&](std::string prefix) {
+        std::string prefix_b = prefix + "b";
+        std::string prefix_c = prefix + "c";
+        std::string prefix_d = prefix + "d";
+        std::string prefix_e = prefix + "e";
+        StringData spb(prefix_b);
+        StringData spc(prefix_c);
+        StringData spd(prefix_d);
+        StringData spe(prefix_e);
+
+        size_t start_row = table->size();
+        size_t ins_pos = start_row;
+        table->add_empty_row(6);
+        table->set_string(0, ins_pos++, spb);
+        table->set_string(0, ins_pos++, spc);
+        table->set_string(0, ins_pos++, spc);
+        table->set_string(0, ins_pos++, spe);
+        table->set_string(0, ins_pos++, spe);
+        table->set_string(0, ins_pos++, spe);
+
+        TableView v = table->where().equal(0, spb).find_all();
+        CHECK_EQUAL(v.size(), 1);
+        CHECK_EQUAL(v.get(0).get_index(), start_row);
+
+        v = table->where().equal(0, spc).find_all();
+        CHECK_EQUAL(v.size(), 2);
+        CHECK_EQUAL(v.get(0).get_index(), start_row + 1);
+        CHECK_EQUAL(v.get(1).get_index(), start_row + 2);
+
+        v = table->where().equal(0, spd).find_all();
+        CHECK_EQUAL(v.size(), 0);
+
+        v = table->where().equal(0, spe).find_all();
+        CHECK_EQUAL(v.size(), 3);
+        CHECK_EQUAL(v.get(0).get_index(), start_row + 3);
+        CHECK_EQUAL(v.get(1).get_index(), start_row + 4);
+        CHECK_EQUAL(v.get(2).get_index(), start_row + 5);
+    };
+
+    std::string std_max(StringIndex::s_max_offset, 'a');
+    std::string std_over_max = std_max + "a";
+    std::string std_under_max(StringIndex::s_max_offset >> 1, 'a');
+
+    test_prefix_find(std_max);
+    test_prefix_find(std_over_max);
+    test_prefix_find(std_under_max);
+
+}
+
 
 TEST(Query_TwoColsEqualVaryWidthAndValues)
 {

@@ -699,7 +699,6 @@
     <ClCompile Include="..\..\src\realm\column_string_enum.cpp" />
     <ClCompile Include="..\..\src\realm\column_table.cpp" />
     <ClCompile Include="..\..\src\realm\history.cpp" />
-    <ClCompile Include="..\..\src\realm\commit_log.cpp" />
     <ClCompile Include="..\..\src\realm\descriptor.cpp" />
     <ClCompile Include="..\..\src\realm\disable_sync_to_disk.cpp" />
     <ClCompile Include="..\..\src\realm\impl\simulated_failure.cpp" />
@@ -736,6 +735,7 @@
     </ClCompile>
     <ClCompile Include="..\..\src\realm\util\file_mapper.cpp" />
     <ClCompile Include="..\..\src\realm\util\interprocess_condvar.cpp" />
+    <ClCompile Include="..\..\src\realm\util\logger.cpp" />
     <ClCompile Include="..\..\src\realm\util\memory_stream.cpp" />
     <ClCompile Include="..\..\src\realm\util\misc_errors.cpp" />
     <ClCompile Include="..\..\src\realm\util\thread.cpp" />

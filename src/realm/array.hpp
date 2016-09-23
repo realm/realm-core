@@ -504,8 +504,8 @@ public:
     typedef StringData (*StringGetter)(void*, size_t, char*); // Pre-declare getter function from string index
     size_t index_string_find_first(StringData value, ColumnBase* column) const;
     void index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const;
+    FindRes index_string_find_all_no_copy(StringData value, ColumnBase* column, InternalFindResult& result) const;
     size_t index_string_count(StringData value, ColumnBase* column) const;
-    FindRes index_string_find_all_no_copy(StringData value, size_t& res_ref, ColumnBase* column) const;
 
     /// This one may change the represenation of the array, so be carefull if
     /// you call it after ensure_minimum_width().
@@ -599,7 +599,7 @@ public:
     /// \param indirection an \c Array containing valid indices of values in
     ///        this \c Array, sorted in ascending order
     /// \return the index of the value if found, or realm::not_found otherwise
-    size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
+    size_t find_gte(const int64_t target, size_t start, size_t end = size_t(-1)) const;
     void preset(int64_t min, int64_t max, size_t num_items);
     void preset(size_t bitwidth, size_t num_items);
 
@@ -1080,12 +1080,15 @@ protected:
 
     bool do_erase_bptree_elem(size_t elem_ndx, EraseHandler&);
 
+    template <IndexMethod>
+    size_t from_list(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+                     const IntegerColumn& rows, ColumnBase* column) const;
+
     template <IndexMethod method, class T>
-    size_t index_string(StringData value, IntegerColumn& result, ref_type& result_ref, ColumnBase* column) const;
+    size_t index_string(StringData value, IntegerColumn& result,
+                        InternalFindResult& result_ref, ColumnBase* column) const;
 
 protected:
-    //    void add_positive_local(int64_t value);
-
     // Includes array header. Not necessarily 8-byte aligned.
     virtual size_t calc_byte_len(size_t num_items, size_t width) const;
 
@@ -1149,7 +1152,7 @@ private:
     bool minmax(int64_t& result, size_t start, size_t end, size_t* return_ndx) const;
 
     template <size_t w>
-    size_t find_gte(const int64_t target, size_t start, Array const* indirection) const;
+    size_t find_gte(const int64_t target, size_t start, size_t end) const;
 
     template <size_t w>
     size_t adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff);
