@@ -863,6 +863,8 @@ protected:
 
     void set_into_mixed(Table* parent, size_t col_ndx, size_t row_ndx) const;
 
+    void check_lists_are_empty(size_t row_ndx) const;
+
 private:
     class SliceWriter;
 

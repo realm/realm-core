@@ -2886,6 +2886,10 @@ size_t Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
         throw LogicError{LogicError::no_search_index};
     }
 
+    // FIXME: See the definition of check_lists_are_empty() for an explanation
+    // of why this is needed.
+    check_lists_are_empty(ndx); // Throws
+
     bump_version();
 
     if (is_nullable(col_ndx)) {
@@ -3130,6 +3134,10 @@ size_t Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
 
     if (!has_search_index(col_ndx))
         throw LogicError(LogicError::no_search_index);
+
+    // FIXME: See the definition of check_lists_are_empty() for an explanation
+    // of why this is needed
+    check_lists_are_empty(ndx); // Throws
 
     bump_version();
 
@@ -3485,6 +3493,10 @@ void Table::set_null_unique(size_t col_ndx, size_t row_ndx)
     if (!has_search_index(col_ndx)) {
         throw LogicError{LogicError::no_search_index};
     }
+
+    // FIXME: See the definition of check_lists_are_empty() for an explanation
+    // of why this is needed.
+    check_lists_are_empty(row_ndx); // Throws
 
     bump_version();
 
@@ -5361,6 +5373,27 @@ bool Table::compare_rows(const Table& t) const
         REALM_ASSERT(false);
     }
     return true;
+}
+
+
+void Table::check_lists_are_empty(size_t row_ndx) const
+{
+    // FIXME: Due to a limitation in Sync, it is not legal to change the primary
+    // key of a row that contains lists (including linklists) after those lists
+    // have been populated. This limitation may be lifted in the future, but for
+    // now it is necessary to ensure that all lists are empty before setting a
+    // primary key (by way of set_int_unique() or set_string_unique() or set_null_unique()).
+
+    for (size_t i = 0; i < get_column_count(); ++i) {
+        if (get_column_type(i) == type_LinkList) {
+            const LinkListColumn& col = get_column_link_list(i);
+            if (col.get_link_count(row_ndx) != 0) {
+                // Violation of the rule that an object receiving a primary key
+                // may not contain any non-empty lists.
+                throw LogicError{LogicError::illegal_combination};
+            }
+        }
+    }
 }
 
 
