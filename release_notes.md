@@ -1,3 +1,9 @@
+# 2.0.0-rc9 Release notes
+
+### Internals
+
+* Use Xcode 7.3.1 to build core for Cocoa
+
 # 2.0.0-rc8 Release notes
 
 ### Bugfixes
