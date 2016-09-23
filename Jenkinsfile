@@ -92,7 +92,6 @@ def doBuildCocoa() {
       try {
         withEnv([
           'PATH=$PATH:/usr/local/bin',
-          'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer',
           'REALM_ENABLE_ENCRYPTION=yes',
           'REALM_ENABLE_ASSERTIONS=yes',
           'MAKEFLAGS=\'CFLAGS_DEBUG=-Oz\'',
