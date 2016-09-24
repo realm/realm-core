@@ -67,7 +67,7 @@ using namespace realm::_impl::sync_session_states;
 /// owned by this session is destroyed, and the session is quiescent.
 /// From: WAITING_FOR_ACCESS_TOKEN, ACTIVE, DYING
 /// To:
-///    * WAITING_FOR_ACCESS_TOKEN: if the session is revived
+///    * WAITING_FOR_ACCESS_TOKEN: if the session is revived, either with or without an access token.
 ///    * ERROR: if a fatal error occurs
 ///
 /// ERROR: a non-recoverable error has occurred, and this session is semantically
@@ -240,6 +240,16 @@ struct sync_session_states::Inactive : public SyncSession::State {
         session.m_session = nullptr;
         session.m_server_url = util::none;
         session.unregister(lock);
+    }
+
+    void refresh_access_token(std::unique_lock<std::mutex>& lock, SyncSession& session,
+                              const std::string& access_token,
+                              const util::Optional<std::string>& server_url) const override
+    {
+        // Revive.
+        session.create_sync_session();
+        session.advance_state(lock, waiting_for_access_token);
+        waiting_for_access_token.refresh_access_token(lock, session, access_token, server_url);
     }
 
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
