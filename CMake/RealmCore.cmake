@@ -175,6 +175,7 @@ function(build_realm_sync sync_directory)
         find_library(SECURITY Security)
     endif()
     ExternalProject_Add(realm-sync-lib
+        DEPENDS realm-core
         URL ""
         PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
         SOURCE_DIR ${sync_directory}
