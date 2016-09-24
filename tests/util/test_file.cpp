@@ -23,6 +23,12 @@
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/string_data.hpp>
 
+#if REALM_VER_MAJOR >= 2
+#include <realm/history.hpp>
+#else
+#include <realm/commit_log.hpp>
+#endif
+
 #include <cstdlib>
 #include <unistd.h>
 
@@ -33,10 +39,12 @@
 #include <map>
 #endif
 
+using namespace realm;
+
 TestFile::TestFile()
 {
     static std::string tmpdir = [] {
-        realm::disable_sync_to_disk();
+        disable_sync_to_disk();
 
         const char* dir = getenv("TMPDIR");
         if (dir && *dir)
@@ -56,6 +64,15 @@ TestFile::~TestFile()
 InMemoryTestFile::InMemoryTestFile()
 {
     in_memory = true;
+}
+
+std::unique_ptr<Replication> TestFile::make_history() const
+{
+#if REALM_VER_MAJOR >= 2
+    return make_in_realm_history(path);
+#else
+    return make_client_history(path);
+#endif
 }
 
 #if defined(__has_feature) && __has_feature(thread_sanitizer)
@@ -85,7 +102,7 @@ public:
                 m_signal.load();
             }
 
-            auto c = reinterpret_cast<realm::_impl::RealmCoordinator *>(value);
+            auto c = reinterpret_cast<_impl::RealmCoordinator *>(value);
             c->on_change();
             m_signal.store(1, std::memory_order_relaxed);
         }
@@ -97,7 +114,7 @@ public:
         m_thread.join();
     }
 
-    void on_change(const std::shared_ptr<realm::_impl::RealmCoordinator>& c)
+    void on_change(const std::shared_ptr<_impl::RealmCoordinator>& c)
     {
         auto& it = m_published_coordinators[c.get()];
         if (it.lock()) {
@@ -114,20 +131,20 @@ public:
 private:
     std::atomic<uintptr_t> m_signal{0};
     std::thread m_thread;
-    std::map<realm::_impl::RealmCoordinator*, std::weak_ptr<realm::_impl::RealmCoordinator>> m_published_coordinators;
+    std::map<_impl::RealmCoordinator*, std::weak_ptr<_impl::RealmCoordinator>> m_published_coordinators;
 } s_worker;
 
-void advance_and_notify(realm::Realm& realm)
+void advance_and_notify(Realm& realm)
 {
-    s_worker.on_change(realm::_impl::RealmCoordinator::get_existing_coordinator(realm.config().path));
+    s_worker.on_change(_impl::RealmCoordinator::get_existing_coordinator(realm.config().path));
     realm.notify();
 }
 
 #else // __has_feature(thread_sanitizer)
 
-void advance_and_notify(realm::Realm& realm)
+void advance_and_notify(Realm& realm)
 {
-    realm::_impl::RealmCoordinator::get_existing_coordinator(realm.config().path)->on_change();
+    _impl::RealmCoordinator::get_existing_coordinator(realm.config().path)->on_change();
     realm.notify();
 }
 #endif

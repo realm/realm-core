@@ -367,29 +367,32 @@ TEST_CASE("list") {
             REQUIRE(lst.size() == 11);
             REQUIRE(lst.get(10).get_index() == 1);
 
-            // delete the row after it, then the row before it so that it
-            // is moved by the deletion
+            // swap the row containing it with another row
             write([&] {
-                origin->move_last_over(3);
-                origin->move_last_over(0);
+                origin->swap_rows(2, 3);
                 lv->add(2);
             });
             REQUIRE_INDICES(change.insertions, 11);
             REQUIRE(lst.size() == 12);
             REQUIRE(lst.get(11).get_index() == 2);
 
-#if REALM_VER_MAJOR >= 2
-            // add a new row with the same primary key
+            // swap it back to verify both of the rows in the swap are handled
             write([&] {
-                size_t row = origin->add_empty_row(2);
-                origin->set_int_unique(0, 2, 1);
-                origin->get_linklist(1, 2)->add(3);
+                origin->swap_rows(2, 3);
+                lv->add(3);
             });
-            REQUIRE(origin->size() == 3);
             REQUIRE_INDICES(change.insertions, 12);
             REQUIRE(lst.size() == 13);
             REQUIRE(lst.get(12).get_index() == 3);
-#endif
+
+            // delete a row so that it's moved (as it's at the end)
+            write([&] {
+                origin->move_last_over(0);
+                lv->add(4);
+            });
+            REQUIRE_INDICES(change.insertions, 13);
+            REQUIRE(lst.size() == 14);
+            REQUIRE(lst.get(13).get_index() == 4);
         }
     }
 
