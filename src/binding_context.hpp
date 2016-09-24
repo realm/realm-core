@@ -99,7 +99,7 @@ public:
 
     // Called immediately after the read transaction version is advanced. Unlike
     // will_change(), this is called even if detailed change information was not
-    // requested or if the Realm is not actually in a read transactuib, although
+    // requested or if the Realm is not actually in a read transaction, although
     // both vectors will be empty in that case.
     virtual void did_change(std::vector<ObserverState> const& observers,
                             std::vector<void*> const& invalidated);
