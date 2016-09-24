@@ -1,4 +1,4 @@
-![Realm](logo.png)
+![Realm](doc/logo.png)
 
 Realm is a mobile database that runs directly inside phones, tablets or wearables - checkout [realm.io](https://realm.io). 
 
