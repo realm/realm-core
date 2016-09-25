@@ -57,6 +57,10 @@ struct SyncSession : public std::enable_shared_from_this<SyncSession> {
     void wait_for_upload_completion(std::function<void()> callback);
     void wait_for_download_completion(std::function<void()> callback);
 
+    // If the sync session is currently `Dying`, ask it to stay alive instead.
+    // If the sync session is currently `Inactive`, recreate it. Otherwise, a no-op.
+    void revive_if_needed();
+
     void refresh_access_token(std::string access_token, util::Optional<std::string> server_url);
 
     // Inform the sync session that it should close.
@@ -101,10 +105,6 @@ private:
     friend class realm::SyncManager;
     // Called by SyncManager {
     SyncSession(std::shared_ptr<_impl::SyncClient>, std::string realm_path, SyncConfig);
-
-    // If the sync session is currently `Dying`, ask it to stay alive instead.
-    // If the sync session is currently `Inactive`, recreate it. Otherwise, a no-op.
-    void revive_if_needed();
 
     // Check if this sync session is actually inactive
     bool is_inactive() const;
