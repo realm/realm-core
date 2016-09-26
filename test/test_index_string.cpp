@@ -1674,10 +1674,10 @@ TEST(StringIndex_Fuzzy)
             t->set_string(0, t->size() - 1, str);
             t->set_string(1, t->size() - 1, str);
         }
-        
+
         for (size_t rounds = 0; rounds < 1 + 10 * TEST_DURATION; rounds++) {
             for (size_t r = 0; r < t->size(); r++) {
-                
+
                 TableView tv0 = (t->column<String>(0) == t->get_string(0, r)).find_all();
                 TableView tv1 = (t->column<String>(1) == t->get_string(1, r)).find_all();
 
