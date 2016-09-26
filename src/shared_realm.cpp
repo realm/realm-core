@@ -363,6 +363,7 @@ void Realm::add_schema_change_handler()
             auto required_changes = m_schema.compare(new_schema);
             ObjectStore::verify_valid_additive_changes(required_changes);
             m_schema.copy_table_columns_from(new_schema);
+            m_coordinator->update_schema(m_schema, m_schema_version);
         });
     }
 }
