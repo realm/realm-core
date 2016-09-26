@@ -51,7 +51,7 @@
 
 #include "test.hpp"
 
-extern unsigned long unit_test_random_seed;
+extern unsigned int unit_test_random_seed;
 
 using namespace realm;
 using namespace realm::util;

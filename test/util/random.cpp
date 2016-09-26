@@ -23,7 +23,7 @@ namespace realm {
 namespace test_util {
 
 
-unsigned long produce_nondeterministic_random_seed()
+unsigned int produce_nondeterministic_random_seed()
 {
     std::random_device rd;
     return rd();
