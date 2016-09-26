@@ -415,7 +415,7 @@ public:
 
         auto end = m_observers.end();
         auto from_it = lower_bound(begin(m_observers), end, ObserverState{current_table(), from, nullptr});
-        if (from_it == end || *from_it < ObserverState{current_table(), from, nullptr})
+        if (from_it == end || from_it->table_ndx != current_table() || from_it->row_ndx != from)
             return true;
 
         auto to_it = lower_bound(begin(m_observers), end, ObserverState{current_table(), to, nullptr});
