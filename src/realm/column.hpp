@@ -76,7 +76,7 @@ template <typename ColumnDataType>
 class ColumnRandIterator : public std::iterator<std::random_access_iterator_tag, ColumnDataType, ptrdiff_t, size_t> {
 public:
     ColumnRandIterator(const Column<ColumnDataType>* src_col, size_t ndx = 0);
-    operator bool() const;
+    explicit operator bool() const noexcept;
     bool operator==(const ColumnRandIterator<ColumnDataType>& other) const;
     bool operator!=(const ColumnRandIterator<ColumnDataType>& other) const;
     ColumnRandIterator<ColumnDataType>& operator+=(const ptrdiff_t& movement);
@@ -1702,7 +1702,7 @@ ColumnRandIterator<ColumnDataType>::ColumnRandIterator(const Column<ColumnDataTy
 }
 
 template <class ColumnDataType>
-ColumnRandIterator<ColumnDataType>::operator bool() const
+ColumnRandIterator<ColumnDataType>::operator bool() const noexcept
 {
     return col_ndx >= 0 && col_ndx < cached_column_size;
 }
