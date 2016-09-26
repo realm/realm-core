@@ -384,7 +384,7 @@ build_cocoa()
     cp tools/LICENSE "$tmpdir/$dir_basename" || exit 1
     if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
         command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
-        pandoc -f markdown -t plain -o "$tmpdir/$dir_basename/release_notes.txt" release_notes.md || exit 1
+        pandoc -f markdown -t plain -o "$tmpdir/$dir_basename/CHANGELOG.txt" CHANGELOG.md || exit 1
     fi
 
     echo "Create zip file: '$file_basename-$realm_version.zip'"
@@ -1112,7 +1112,7 @@ EOF
         cp tools/LICENSE "$node_directory" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
-            pandoc -f markdown -t plain -o "$node_directory/release_notes.txt" release_notes.md || exit 1
+            pandoc -f markdown -t plain -o "$node_directory/CHANGELOG.txt" CHANGELOG.md || exit 1
         fi
 
         realm_version="$(sh build.sh get-version)" || exit
@@ -1340,14 +1340,14 @@ EOF
 
     "release-notes-prerelease")
         RELEASE_HEADER="# $(sh build.sh get-version) Release notes" || exit 1
-        sed -i.bak "1s/.*/$RELEASE_HEADER/" release_notes.md || exit 1
-        rm release_notes.md.bak
+        sed -i.bak "1s/.*/$RELEASE_HEADER/" CHANGELOG.md || exit 1
+        rm CHANGELOG.md.bak
         exit 0
         ;;
 
     "release-notes-postrelease")
-        cat doc/release_notes_template.md release_notes.md > release_notes.md.new || exit 1
-        mv release_notes.md.new release_notes.md || exit 1
+        cat doc/CHANGELOG_template.md CHANGELOG.md > CHANGELOG.md.new || exit 1
+        mv CHANGELOG.md.new CHANGELOG.md || exit 1
         exit 0
         ;;
 
