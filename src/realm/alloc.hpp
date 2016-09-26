@@ -197,7 +197,10 @@ public:
     ///     When opening an older database file, all DateTime columns will be
     ///     automatically upgraded Timestamp columns.
     ///
-    ///   6 Introduced a new non-compatible structure for StringIndex
+    ///   6 Introduced a new structure for the StringIndex. Moved the commit
+    ///     logs into the Realm file. Changes to the transaction log format
+    ///     including reshuffling instructions. This is the format used in
+    ///     milestone 2.0.0.
     ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in AllocSlab::validate_buffer(), the file
