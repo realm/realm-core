@@ -516,7 +516,7 @@ void StringIndex::find_all(IntegerColumn& result, T value) const
     return m_array->index_string_find_all(result, to_str(value, buffer), m_target_column);
 }
 
-template<class T>
+template <class T>
 FindRes StringIndex::find_all_no_copy(T value, InternalFindResult& result) const
 {
     // Use direct access method

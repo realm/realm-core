@@ -384,7 +384,7 @@ public:
     /// therefore, if it throws, the application should not attempt to
     /// continue. If may not even be safe to destroy the SharedGroup object.
     ///
-    /// WARNING / FIXME: compact() should NOT be exposed publicly on Windows 
+    /// WARNING / FIXME: compact() should NOT be exposed publicly on Windows
     /// because it's not crash safe! It may corrupt your database if something fails
     bool compact();
 
