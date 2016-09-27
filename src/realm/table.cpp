@@ -1597,9 +1597,16 @@ void Table::upgrade_file_format(size_t target_file_format_version)
             case col_type_Int:
             case col_type_OldDateTime: {
                 // FIXME: Do upgrade of col_type_OldDateTime
-                IntegerColumn& col = get_column(col_ndx);
-                col.get_search_index()->clear();
-                col.populate_search_index();
+                if (is_nullable(col_ndx)) {
+                    IntNullColumn& col = get_column_int_null(col_ndx);
+                    col.get_search_index()->clear();
+                    col.populate_search_index();
+                }
+                else {
+                    IntegerColumn& col = get_column(col_ndx);
+                    col.get_search_index()->clear();
+                    col.populate_search_index();
+                }
                 continue;
             }
             case col_type_StringEnum: {
