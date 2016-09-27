@@ -1843,6 +1843,12 @@ size_t ColumnRandIterator<ColumnDataType>::get_col_ndx() const
     return col_ndx;
 }
 
+template <class ColumnDataType>
+std::ostream& operator<<(std::ostream& out, const ColumnRandIterator<ColumnDataType>& it)
+{
+    out << "ColumnRandIterator at index: " << it.get_col_ndx();
+    return out;
+}
 
 } // namespace realm
 
