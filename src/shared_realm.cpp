@@ -567,16 +567,15 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
 
 Realm::HandoverPackage::HandoverPackage(HandoverPackage&&) = default;
 Realm::HandoverPackage& Realm::HandoverPackage::operator=(HandoverPackage&&) = default;
-Realm::HandoverPackage::VersionID::VersionID() : VersionID(SharedGroup::VersionID()) { }
 
 // Precondition: `m_version` is not greater than `new_version`
 // Postcondition: `m_version` is equal to `new_version`
 void Realm::HandoverPackage::advance_to_version(VersionID new_version)
 {
-    if (SharedGroup::VersionID(new_version) == SharedGroup::VersionID(m_version_id)) {
+    if (new_version == m_version_id) {
         return;
     }
-    REALM_ASSERT_DEBUG((SharedGroup::VersionID(new_version) > SharedGroup::VersionID(m_version_id)));
+    REALM_ASSERT_DEBUG(new_version > m_version_id);
 
     // Open `Realm` at handover version
     _impl::RealmCoordinator& coordinator = get_coordinator();
@@ -650,7 +649,7 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
     else {
         auto current_version = m_shared_group->get_version_of_current_transaction();
 
-        if (SharedGroup::VersionID(handover.m_version_id) <= current_version) {
+        if (handover.m_version_id <= current_version) {
             // The handover is behind, so advance it to our version
             handover.advance_to_version(current_version);
         } else {

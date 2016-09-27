@@ -25,6 +25,7 @@
 
 #include <realm/group_shared.hpp>
 #include <realm/lang_bind_helper.hpp>
+
 #include <algorithm>
 
 using namespace realm;
@@ -792,7 +793,7 @@ public:
 namespace realm {
 namespace _impl {
 namespace transaction {
-void advance(SharedGroup& sg, BindingContext* context, SchemaMode schema_mode, SharedGroup::VersionID version)
+void advance(SharedGroup& sg, BindingContext* context, SchemaMode schema_mode, VersionID version)
 {
     TransactLogObserver(context, sg, [&](auto&&... args) {
         LangBindHelper::advance_read(sg, std::move(args)..., version);
@@ -829,7 +830,7 @@ void cancel(SharedGroup& sg, BindingContext* context)
 
 void advance(SharedGroup& sg,
              TransactionChangeInfo& info,
-             SharedGroup::VersionID version)
+             VersionID version)
 {
     if (info.table_modifications_needed.empty() && info.lists.empty()) {
         LangBindHelper::advance_read(sg, version);

@@ -22,6 +22,7 @@
 #include "schema.hpp"
 
 #include <realm/util/optional.hpp>
+#include <realm/version_id.hpp>
 
 #include <memory>
 #include <thread>
@@ -227,24 +228,6 @@ public:
     private:
         friend HandoverPackage Realm::package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over);
         friend std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage handover);
-
-        struct VersionID { // SharedGroup::VersionID without including header
-            uint_fast64_t version;
-            uint_fast32_t index;
-
-            VersionID();
-
-            template<typename T>
-            VersionID(T value) : version(value.version), index(value.index) { }
-
-            template<typename T>
-            operator T() const {
-                T version_id; // Don't use initializer list for better type safety
-                version_id.version = version;
-                version_id.index = index;
-                return version_id;
-            }
-        };
 
         VersionID m_version_id;
         std::vector<_impl::AnyHandover> m_objects;
