@@ -956,11 +956,11 @@ private:
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
     template <class ColType, class T>
-    size_t do_find_unique(ColType& col, size_t ndx, T&& value);
+    size_t do_find_unique(ColType& col, size_t ndx, T&& value, bool& conflict);
     template <class ColType>
-    size_t do_set_unique_null(ColType& col, size_t ndx);
+    size_t do_set_unique_null(ColType& col, size_t ndx, bool& conflict);
     template <class ColType, class T>
-    size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
+    size_t do_set_unique(ColType& column, size_t row_ndx, T&& value, bool& conflict);
 
     void upgrade_file_format(size_t target_file_format_version);
 
