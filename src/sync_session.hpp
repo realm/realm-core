@@ -25,6 +25,7 @@
 #include "sync_config.hpp"
 
 #include <mutex>
+#include <memory>
 
 namespace realm {
 
