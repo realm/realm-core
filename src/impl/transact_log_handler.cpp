@@ -156,7 +156,7 @@ public:
     bool link_list_clear(size_t) { return true; }
     bool link_list_move(size_t, size_t) { return true; }
     bool link_list_swap(size_t, size_t) { return true; }
-    bool change_link_targets(size_t, size_t) { return true; }
+    bool merge_rows(size_t, size_t) { return true; }
     bool optimize_table() { return true; }
 
 };
@@ -380,7 +380,7 @@ public:
         return true;
     }
 
-    bool change_link_targets(size_t from, size_t to)
+    bool merge_rows(size_t from, size_t to)
     {
         REALM_ASSERT(from != to);
 
@@ -722,7 +722,7 @@ public:
         return true;
     }
 
-    bool change_link_targets(size_t from, size_t to)
+    bool merge_rows(size_t from, size_t to)
     {
         for (auto& list : m_info.lists) {
             if (list.table_ndx == current_table() && list.row_ndx == from)
