@@ -1199,4 +1199,123 @@ TEST(ColumnIntNull_CompareInts)
     c2.destroy();
 }
 
+
+TEST_TYPES(Column_Iterators, std::true_type, std::false_type)
+{
+    std::vector<int64_t> list;
+    ref_type ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn c(Allocator::get_default(), ref);
+    if (TEST_TYPE::value) {
+        c.create_search_index();
+    }
+
+    Random random(random_int<long>());
+    const size_t num_elements = 1000;
+
+    for (size_t i = 0; i < num_elements; i++) {
+        long r = random.draw_int<long>();
+        list.emplace_back(r);
+        c.add(r);
+    }
+
+    auto std_begin = list.cbegin();
+    auto std_it = list.cbegin();
+    auto std_end = list.cend();
+    auto realm_begin = c.cbegin();
+    auto realm_it = c.cbegin();
+    auto realm_end = c.cend();
+
+    CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
+    CHECK(realm_it);
+    CHECK(!realm_end);
+
+    while(std_it != std_end) {
+        CHECK_EQUAL(*std_it, *realm_it);
+        auto std_found = std::find(std_begin, std_end, *std_it);
+        auto realm_found = std::find(realm_begin, realm_end, *realm_it);
+        CHECK_EQUAL(std_end - std_found, realm_end - realm_found);
+        CHECK_EQUAL(std_found - std_begin, realm_found - realm_begin);
+        size_t ndx = c.find_first(*realm_it);
+        if (ndx == npos) {
+            CHECK_EQUAL(realm_found, realm_end);
+        }
+        else {
+            CHECK_EQUAL(ndx, realm_found - realm_begin);
+            CHECK_EQUAL(ndx, realm_found.get_col_ndx());
+        }
+
+        ++std_it;
+        ++realm_it;
+    }
+
+    // operator +
+    std_it = std_begin + 5;
+    realm_it = realm_begin + 5;
+    CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
+    CHECK_EQUAL(std_it - std_begin, realm_it - realm_begin);
+    CHECK_EQUAL(realm_it.get_col_ndx(), 5);
+    // operator +=
+    std_it += 10;
+    realm_it += 10;
+    CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
+    CHECK_EQUAL(std_it - std_begin, realm_it - realm_begin);
+    CHECK_EQUAL(realm_it.get_col_ndx(), 15);
+    // operator -=
+    std_it -= 10;
+    realm_it -= 10;
+    CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
+    CHECK_EQUAL(std_it - std_begin, realm_it - realm_begin);
+    CHECK_EQUAL(realm_it.get_col_ndx(), 5);
+    // operator -
+    std_it = std_it - 5;
+    realm_it = realm_it - 5;
+    CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
+    CHECK_EQUAL(std_it - std_begin, realm_it - realm_begin);
+    CHECK_EQUAL(realm_it.get_col_ndx(), 0);
+    // operator ++
+    std_it++;
+    ++std_it;
+    realm_it++;
+    ++realm_it;
+    CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
+    CHECK_EQUAL(std_it - std_begin, realm_it - realm_begin);
+    CHECK_EQUAL(realm_it.get_col_ndx(), 2);
+    // operator --
+    std_it--;
+    --std_it;
+    realm_it--;
+    --realm_it;
+    CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
+    CHECK_EQUAL(std_it - std_begin, realm_it - realm_begin);
+    CHECK_EQUAL(realm_it.get_col_ndx(), 0);
+    // operator [] offset
+    int64_t std_value = (std_it + 10)[5];
+    int64_t realm_value = (realm_it + 10)[5];
+    CHECK_EQUAL(std_value, realm_value);
+    std_value = (std_it + 10)[-5];
+    realm_value = (realm_it + 10)[-5];
+    CHECK_EQUAL(std_value, realm_value);
+    // operator equality
+    auto realm_next = realm_it + 1;
+    CHECK(realm_next == realm_next);
+    CHECK(realm_it == realm_it);
+    CHECK(realm_it != realm_next);
+    CHECK(realm_next != realm_it);
+    CHECK_EQUAL(realm_next, realm_it + 1);
+    // operator <
+    CHECK(realm_it < realm_next);
+    CHECK(!(realm_it < realm_it));
+    CHECK(!(realm_next < realm_it));
+    CHECK(realm_it <= realm_next);
+    CHECK(realm_it <= realm_it);
+    CHECK(!(realm_next <= realm_it));
+    // operator >
+    CHECK(realm_next > realm_it);
+    CHECK(!(realm_next > realm_next));
+    CHECK(!(realm_it > realm_next));
+    CHECK(realm_next >= realm_it);
+    CHECK(realm_next >= realm_next);
+    CHECK(!(realm_it >= realm_next));
+}
+
 #endif // TEST_COLUMN
