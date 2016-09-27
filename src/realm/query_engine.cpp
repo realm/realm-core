@@ -22,24 +22,29 @@ using namespace realm;
 
 size_t ParentNode::find_first(size_t start, size_t end)
 {
-    size_t next_cond = 0;
-    size_t first_cond = 0;
+    size_t sz = m_children.size();
+    size_t current_cond = 0;
+    size_t nb_cond_to_test = sz;
 
-    while (start < end) {
-        size_t m = m_children[next_cond]->find_first_local(start, end);
+    while (REALM_LIKELY(start < end)) {
+        size_t m = m_children[current_cond]->find_first_local(start, end);
 
-        next_cond++;
-        if (next_cond == m_children.size())
-            next_cond = 0;
-
-        if (m == start) {
-            if (next_cond == first_cond)
-                return m;
-        }
-        else {
-            first_cond = next_cond;
+        if (m != start) {
+            // Pointer advanced - we will have to check all other conditions
+            nb_cond_to_test = sz;
             start = m;
         }
+
+        nb_cond_to_test--;
+
+        // Optimized for one condition where this will be true first time
+        if (REALM_LIKELY(nb_cond_to_test == 0))
+            return m;
+
+        current_cond++;
+
+        if (current_cond == sz)
+            current_cond = 0;
     }
     return not_found;
 }
