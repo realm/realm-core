@@ -27,8 +27,6 @@ struct TestFile : realm::Realm::Config {
     TestFile();
     ~TestFile();
 
-    std::unique_ptr<realm::Replication> make_history() const;
-
     auto options() const
     {
         realm::SharedGroupOptions options;

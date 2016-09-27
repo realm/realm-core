@@ -61,11 +61,6 @@ InMemoryTestFile::InMemoryTestFile()
     in_memory = true;
 }
 
-std::unique_ptr<Replication> TestFile::make_history() const
-{
-    return make_in_realm_history(path);
-}
-
 #if defined(__has_feature) && __has_feature(thread_sanitizer)
 // A helper which synchronously runs on_change() on a fixed background thread
 // so that ThreadSanitizer can potentially detect issues

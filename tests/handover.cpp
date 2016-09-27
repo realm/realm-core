@@ -84,7 +84,7 @@ TEST_CASE("handover") {
     }
 
     SECTION("cleanup properly unpins version") {
-        auto history = config.make_history();
+        auto history = make_in_realm_history(config.path);
         SharedGroup shared_group(*history, config.options());
 
         auto get_current_version = [&]() -> SharedGroup::VersionID {

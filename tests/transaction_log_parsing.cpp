@@ -29,6 +29,7 @@
 #include "schema.hpp"
 
 #include <realm/group_shared.hpp>
+#include <realm/history.hpp>
 #include <realm/link_view.hpp>
 
 using namespace realm;
@@ -36,7 +37,7 @@ using namespace realm;
 class CaptureHelper {
 public:
     CaptureHelper(TestFile const& config, SharedRealm const& r, LinkViewRef lv, size_t table_ndx)
-    : m_history(config.make_history())
+    : m_history(make_in_realm_history(config.path))
     , m_sg(*m_history, config.options())
     , m_realm(r)
     , m_group(m_sg.begin_read())
@@ -140,7 +141,7 @@ TEST_CASE("Transaction log parsing: schema change validation") {
         });
         r->read_group();
 
-        auto history = config.make_history();
+        auto history = make_in_realm_history(config.path);
         SharedGroup sg(*history, config.options());
 
         SECTION("adding a table is allowed") {
@@ -225,7 +226,7 @@ TEST_CASE("Transaction log parsing: schema change validation") {
         });
         r->read_group();
 
-        auto history = config.make_history();
+        auto history = make_in_realm_history(config.path);
         SharedGroup sg(*history, config.options());
 
         SECTION("adding a table is allowed") {
@@ -332,7 +333,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         r->commit_transaction();
 
         auto track_changes = [&](std::vector<bool> tables_needed, auto&& f) {
-            auto history = config.make_history();
+            auto history = make_in_realm_history(config.path);
             SharedGroup sg(*history, config.options());
             sg.begin_read();
 
@@ -1157,7 +1158,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         };
 
         auto observe = [&](std::initializer_list<Row> rows, auto&& fn) {
-            auto history = config.make_history();
+            auto history = make_in_realm_history(config.path);
             SharedGroup sg(*history, config.options());
             auto& group = sg.begin_read();
 
@@ -1681,7 +1682,7 @@ TEST_CASE("DeepChangeChecker") {
     r->commit_transaction();
 
     auto track_changes = [&](auto&& f) {
-        auto history = config.make_history();
+        auto history = make_in_realm_history(config.path);
         SharedGroup sg(*history, config.options());
         Group const& g = sg.begin_read();
 
