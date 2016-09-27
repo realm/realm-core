@@ -137,13 +137,9 @@ void copy_property_values(Property const& prop, Table& table)
 {
     auto copy_property_values = [&](auto getter, auto setter) {
         for (size_t i = 0, count = table.size(); i < count; i++) {
-#if REALM_VER_MAJOR >= 2
             bool is_default = false;
             (table.*setter)(prop.table_column, i, (table.*getter)(prop.table_column + 1, i),
                             is_default);
-#else
-            (table.*setter)(prop.table_column, i, (table.*getter)(prop.table_column + 1, i));
-#endif
         }
     };
 
@@ -235,11 +231,7 @@ void ObjectStore::set_primary_key_for_object(Group& group, StringData object_typ
     size_t row = table->find_first_string(c_primaryKeyObjectClassColumnIndex, object_type);
     if (row == not_found && primary_key.size()) {
         row = table->add_empty_row();
-#if REALM_VER_MAJOR >= 2
         row = table->set_string_unique(c_primaryKeyObjectClassColumnIndex, row, object_type);
-#else
-        table->set_string(c_primaryKeyObjectClassColumnIndex, row, object_type);
-#endif
     }
 
     // set if changing, or remove if setting to nil
