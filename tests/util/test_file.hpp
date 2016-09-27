@@ -31,14 +31,10 @@ struct TestFile : realm::Realm::Config {
 
     auto options() const
     {
-#ifdef REALM_GROUP_SHARED_OPTIONS_HPP
         realm::SharedGroupOptions options;
         options.durability = in_memory ? realm::SharedGroupOptions::Durability::MemOnly
                                        : realm::SharedGroupOptions::Durability::Full;
         return options;
-#else
-        return in_memory ? realm::SharedGroup::durability_MemOnly : realm::SharedGroup::durability_Full;
-#endif
     }
 };
 

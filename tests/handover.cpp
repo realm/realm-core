@@ -27,12 +27,7 @@
 #include "schema.hpp"
 #include "thread_confined.hpp"
 
-#if REALM_VER_MAJOR >= 2
 #include <realm/history.hpp>
-#else
-#include <realm/commit_log.hpp>
-#endif
-
 #include <realm/util/optional.hpp>
 
 #include <thread>

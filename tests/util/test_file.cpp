@@ -21,13 +21,8 @@
 #include "impl/realm_coordinator.hpp"
 
 #include <realm/disable_sync_to_disk.hpp>
-#include <realm/string_data.hpp>
-
-#if REALM_VER_MAJOR >= 2
 #include <realm/history.hpp>
-#else
-#include <realm/commit_log.hpp>
-#endif
+#include <realm/string_data.hpp>
 
 #include <cstdlib>
 #include <unistd.h>
@@ -68,11 +63,7 @@ InMemoryTestFile::InMemoryTestFile()
 
 std::unique_ptr<Replication> TestFile::make_history() const
 {
-#if REALM_VER_MAJOR >= 2
     return make_in_realm_history(path);
-#else
-    return make_client_history(path);
-#endif
 }
 
 #if defined(__has_feature) && __has_feature(thread_sanitizer)

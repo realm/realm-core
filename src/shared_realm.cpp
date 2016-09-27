@@ -30,12 +30,7 @@
 
 #include "util/format.hpp"
 
-#if REALM_VER_MAJOR >= 2
 #include <realm/history.hpp>
-#else
-#include <realm/commit_log.hpp>
-#endif
-
 #include <realm/util/scope_exit.hpp>
 
 using namespace realm;
@@ -149,13 +144,8 @@ void Realm::open_with_config(const Config& config,
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
         }
         else {
-#if REALM_VER_MAJOR >= 2
             history = realm::make_in_realm_history(config.path);
-#else
-            history = realm::make_client_history(config.path, config.encryption_key.data());
-#endif
 
-#ifdef REALM_GROUP_SHARED_OPTIONS_HPP
             SharedGroupOptions options;
             options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
                                                     SharedGroupOptions::Durability::Full;
@@ -168,17 +158,6 @@ void Realm::open_with_config(const Config& config,
                 }
             };
             shared_group = std::make_unique<SharedGroup>(*history, options);
-#else
-            SharedGroup::DurabilityLevel durability = config.in_memory ? SharedGroup::durability_MemOnly :
-                                                                           SharedGroup::durability_Full;
-            shared_group = std::make_unique<SharedGroup>(*history, durability, config.encryption_key.data(), !config.disable_format_upgrade,
-                                                         [&](int from_version, int to_version) {
-                if (realm) {
-                    realm->upgrade_initial_version = from_version;
-                    realm->upgrade_final_version = to_version;
-                }
-            });
-#endif
         }
     }
     catch (...) {
