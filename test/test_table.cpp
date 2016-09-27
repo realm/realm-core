@@ -1662,7 +1662,7 @@ TEST(Table_SetUniqueLoserAccessorUpdates)
 }
 
 
-TEST(Table_AccessorsUpdateAfterChangeLinkTargets)
+TEST(Table_AccessorsUpdateAfterMergeRows)
 {
     Group g;
     TableRef origin = g.add_table("origin");
@@ -1685,7 +1685,7 @@ TEST(Table_AccessorsUpdateAfterChangeLinkTargets)
     CHECK_EQUAL(row_0.get_index(), 0);
     CHECK_EQUAL(row_1.get_index(), 1);
 
-    origin->change_link_targets(1, 2);
+    origin->merge_rows(1, 2);
 
     CHECK(row_0.is_attached());
     CHECK(row_1.is_attached());
@@ -6876,7 +6876,7 @@ TEST(Table_MixedCrashValues)
 }
 
 
-TEST(Table_ChangeLinkTargets_Links)
+TEST(Table_MergeRows_Links)
 {
     Group g;
 
@@ -6893,14 +6893,14 @@ TEST(Table_ChangeLinkTargets_Links)
 
     Row replaced_row = t1->get(0);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 1);
-    t1->change_link_targets(0, 9);
+    t1->merge_rows(0, 9);
     CHECK(replaced_row.is_attached());
     CHECK_EQUAL(t0->get_link(0, 0), 9);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
 }
 
 
-TEST(Table_ChangeLinkTargets_LinkLists)
+TEST(Table_MergeRows_LinkLists)
 {
     Group g;
 
@@ -6919,7 +6919,7 @@ TEST(Table_ChangeLinkTargets_LinkLists)
 
     Row replaced_row = t1->get(0);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 2);
-    t1->change_link_targets(0, 9);
+    t1->merge_rows(0, 9);
     CHECK(replaced_row.is_attached());
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
     CHECK_EQUAL(t0->get_linklist(0, 0)->size(), 2);
@@ -7084,7 +7084,7 @@ TEST(Table_DetachedAccessor)
     CHECK_LOGIC_ERROR(table->clear(), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->add_search_index(0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->remove_search_index(0), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->change_link_targets(0, 1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->merge_rows(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->swap_rows(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_string(1, 0, ""), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_string_unique(1, 0, ""), LogicError::detached_accessor);

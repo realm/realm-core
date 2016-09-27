@@ -2206,7 +2206,7 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
     remove_backlink_broken_rows(state); // Throws
 }
 
-void Table::change_link_targets(size_t row_ndx, size_t new_row_ndx)
+void Table::merge_rows(size_t row_ndx, size_t new_row_ndx)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -2216,10 +2216,10 @@ void Table::change_link_targets(size_t row_ndx, size_t new_row_ndx)
         throw LogicError(LogicError::row_index_out_of_range);
 
     if (Replication* repl = get_repl()) {
-        repl->change_link_targets(this, row_ndx, new_row_ndx);
+        repl->merge_rows(this, row_ndx, new_row_ndx);
     }
 
-    do_change_link_targets(row_ndx, new_row_ndx);
+    do_merge_rows(row_ndx, new_row_ndx);
 }
 
 void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over)
@@ -2360,10 +2360,10 @@ void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 }
 
 
-void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
+void Table::do_merge_rows(size_t row_ndx, size_t new_row_ndx)
 {
     // This bypasses handling of cascading rows, and we have decided that this is OK, because
-    // ChangeLinkTargets is always followed by MoveLastOver, so breaking the last strong link
+    // MergeRows is always followed by MoveLastOver, so breaking the last strong link
     // to a row that is being subsumed will have no observable effect, while honoring the
     // cascading behavior would complicate the calling code somewhat (having to take
     // into account whether or not the row was removed as a consequence of cascade, leading
@@ -2386,7 +2386,7 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
         col.swap_rows(row_ndx_1, row_ndx_2);
     }
 
-    adj_row_acc_subsume_row(row_ndx, new_row_ndx);
+    adj_row_acc_merge_rows(row_ndx, new_row_ndx);
     bump_version();
 }
 
@@ -2834,7 +2834,7 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value, bool& conflict
         if (ndx == size() - 1)
             ndx = duplicate;
 
-        adj_row_acc_subsume_row(duplicate, winner);
+        adj_row_acc_merge_rows(duplicate, winner);
         move_last_over(duplicate);
         // Re-check moved-last-over
         duplicate -= 1;
@@ -2844,7 +2844,7 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value, bool& conflict
     if (winner == size() - 1)
         winner = ndx;
 
-    adj_row_acc_subsume_row(ndx, winner);
+    adj_row_acc_merge_rows(ndx, winner);
     move_last_over(ndx);
 
     return winner;
@@ -5470,18 +5470,18 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
-void Table::adj_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept
+void Table::adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-    adj_row_acc_subsume_row(old_row_ndx, new_row_ndx);
+    adj_row_acc_merge_rows(old_row_ndx, new_row_ndx);
 
     // Adjust LinkViews for new rows
     for (auto& col : m_cols) {
         if (col) {
-            col->adj_acc_subsume_row(old_row_ndx, new_row_ndx);
+            col->adj_acc_merge_rows(old_row_ndx, new_row_ndx);
         }
     }
 }
@@ -5607,7 +5607,7 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
-void Table::adj_row_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept
+void Table::adj_row_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the

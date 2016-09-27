@@ -3508,8 +3508,8 @@ TEST(LangBindHelper_AdvanceReadTransact_ChangeLinkTargets)
         WriteTransaction wt(sg_w);
         TableRef t0 = wt.get_table("t0");
         TableRef t1 = wt.get_table("t1");
-        t0->change_link_targets(0, 2);
-        t1->change_link_targets(0, 2);
+        t0->merge_rows(0, 2);
+        t1->merge_rows(0, 2);
         wt.commit();
     }
 
@@ -7743,7 +7743,7 @@ public:
     {
         return false;
     }
-    bool change_link_targets(size_t, size_t)
+    bool merge_rows(size_t, size_t)
     {
         return false;
     }
@@ -9533,7 +9533,7 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
 
     // Check that row accessors are detached.
     LangBindHelper::promote_to_write(sg);
-    t0->change_link_targets(0, 9);
+    t0->merge_rows(0, 9);
     LangBindHelper::commit_and_continue_as_read(sg);
 
     CHECK(r.is_attached());
@@ -9545,7 +9545,7 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
     TableRef mt0 = t1->get_subtable(3, 0);
     CHECK_EQUAL(l0->get_origin_row_index(), 0);
     LangBindHelper::promote_to_write(sg);
-    t1->change_link_targets(0, 9);
+    t1->merge_rows(0, 9);
     LangBindHelper::commit_and_continue_as_read(sg);
 
     CHECK(l0->is_attached());

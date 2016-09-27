@@ -473,7 +473,7 @@ void LinkListColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexc
 }
 
 
-void LinkListColumn::adj_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept
+void LinkListColumn::adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
 {
     prune_list_accessor_tombstones();
 
