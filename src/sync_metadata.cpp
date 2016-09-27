@@ -23,6 +23,9 @@
 #include "property.hpp"
 #include "results.hpp"
 #include "schema.hpp"
+#if REALM_PLATFORM_APPLE
+#include "impl/apple/keychain_helper.hpp"
+#endif
 
 #include <realm/descriptor.hpp>
 #include <realm/table.hpp>
@@ -35,7 +38,9 @@ static const char * const c_sync_identity = "identity";
 static const char * const c_sync_auth_server_url = "auth_server_url";
 static const char * const c_sync_user_token = "user_token";
 
-SyncMetadataManager::SyncMetadataManager(std::string path)
+SyncMetadataManager::SyncMetadataManager(std::string path,
+                                         bool should_encrypt,
+                                         util::Optional<std::vector<char>> encryption_key)
 {
     std::lock_guard<std::mutex> lock(m_metadata_lock);
 
@@ -50,7 +55,7 @@ SyncMetadataManager::SyncMetadataManager(std::string path)
     primary_key.is_primary = true;
 
     Realm::Config config;
-    config.path = path;
+    config.path = std::move(path);
     Schema schema = {
         { c_sync_userMetadata,
             {
@@ -63,6 +68,17 @@ SyncMetadataManager::SyncMetadataManager(std::string path)
     };
     config.schema = std::move(schema);
     config.schema_mode = SchemaMode::Additive;
+#if REALM_PLATFORM_APPLE
+    if (should_encrypt && !encryption_key) {
+        encryption_key = keychain::metadata_realm_encryption_key();
+    }
+#endif
+    if (should_encrypt) {
+        if (!encryption_key) {
+            throw std::invalid_argument("Metadata Realm encryption was specified, but no encryption key was provided.");
+        }
+        config.encryption_key = std::move(*encryption_key);
+    }
 
     // Open the Realm.
     SharedRealm realm = Realm::get_shared_realm(config);
@@ -109,10 +125,11 @@ SyncUserMetadataResults SyncMetadataManager::get_users(bool marked) const
 }
 
 SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, RowExpr row)
-: m_realm(realm)
-, m_schema(schema)
-, m_row(Row(row))
-, m_invalid(Row(row).get_bool(schema.idx_marked_for_removal)) { }
+: m_invalid(row.get_bool(schema.idx_marked_for_removal))
+, m_schema(std::move(schema))
+, m_realm(std::move(realm))
+, m_row(row)
+{ }
 
 SyncUserMetadata::SyncUserMetadata(SyncMetadataManager& manager, std::string identity, bool make_if_absent)
 : m_schema(manager.m_schema)

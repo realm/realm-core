@@ -69,11 +69,9 @@ public:
 private:
     bool m_invalid = false;
 
-    SyncUserMetadata() = delete;
     util::Optional<std::string> get_optional_string_field(size_t col_idx) const;
 
     Schema m_schema;
-
     SharedRealm m_realm;
     Row m_row;
 };
@@ -93,9 +91,10 @@ public:
     }
 
     SyncMetadataResults(Results results, SharedRealm realm, typename T::Schema schema)
-    : m_results(results)
-    , m_realm(realm)
-    , m_schema(schema) { }
+    : m_schema(std::move(schema))
+    , m_realm(std::move(realm))
+    , m_results(std::move(results))
+    { }
 private:
     typename T::Schema m_schema;
     SharedRealm m_realm;
@@ -117,7 +116,15 @@ public:
 
     Realm::Config get_configuration() const;
 
-    SyncMetadataManager(std::string path);
+
+    /// Construct the metadata manager.
+    ///
+    /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make
+    /// the object store handle generating and persisting an encryption key for the metadata database. Otherwise, an
+    /// exception will be thrown.
+    SyncMetadataManager(std::string path,
+                        bool should_encrypt,
+                        util::Optional<std::vector<char>> encryption_key=none);
 
 private:
     SyncUserMetadataResults get_users(bool marked) const;

@@ -379,6 +379,7 @@ void Realm::add_schema_change_handler()
             auto required_changes = m_schema.compare(new_schema);
             ObjectStore::verify_valid_additive_changes(required_changes);
             m_schema.copy_table_columns_from(new_schema);
+            m_coordinator->update_schema(m_schema, m_schema_version);
         });
     }
 }
@@ -600,19 +601,6 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
     }
     return util::none;
 }
-
-#ifdef REALM_SYNC
-bool Realm::refresh_sync_access_token(std::string access_token, StringData path, util::Optional<std::string> sync_url)
-{
-    auto coordinator = realm::_impl::RealmCoordinator::get_existing_coordinator(path);
-    if (coordinator) {
-        coordinator->refresh_sync_access_token(std::move(access_token), std::move(sync_url));
-        return true;
-    } else {
-        return false;
-    }
-}
-#endif
 
 Realm::HandoverPackage::HandoverPackage(HandoverPackage&&) = default;
 Realm::HandoverPackage& Realm::HandoverPackage::operator=(HandoverPackage&&) = default;

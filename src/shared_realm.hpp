@@ -304,12 +304,6 @@ public:
                                  std::unique_ptr<Group>& read_only_group,
                                  Realm* realm);
 
-#ifdef REALM_SYNC
-    static bool refresh_sync_access_token(std::string access_token,
-                                          StringData path,
-                                          util::Optional<std::string> sync_url);
-#endif
-
 private:
     // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
     Realm(Config config);

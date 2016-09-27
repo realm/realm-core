@@ -89,16 +89,8 @@ TEST_CASE("handover") {
     }
 
     SECTION("cleanup properly unpins version") {
-#if REALM_VER_MAJOR >= 2
-        auto history = realm::make_in_realm_history(config.path);
-#else
-        auto history = realm::make_client_history(config.path, config.encryption_key.data());   
-#endif
-#ifdef REALM_GROUP_SHARED_OPTIONS_HPP
-        SharedGroup shared_group(*history, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
-#else
-        SharedGroup shared_group(*history, SharedGroup::durability_MemOnly);
-#endif
+        auto history = config.make_history();
+        SharedGroup shared_group(*history, config.options());
 
         auto get_current_version = [&]() -> SharedGroup::VersionID {
             shared_group.begin_read();

@@ -16,32 +16,43 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_SYNC_CONFIG_HPP
-#define REALM_SYNC_CONFIG_HPP
+#ifndef REALM_OS_SYNC_CONFIG_HPP
+#define REALM_OS_SYNC_CONFIG_HPP
 
-#include <realm/sync/client.hpp>
+#include <functional>
+#include <string>
 
 namespace realm {
 
+enum class SyncSessionStopPolicy;
+
 enum class SyncSessionError {
     Debug,                  // An informational error, nothing to do. Only for debug purposes.
-    SessionTokenExpired,    // The session's token has expired.
     SessionFatal,           // The session is invalid and should be killed.
     AccessDenied,           // Permissions error with the session.
     UserFatal,              // The user associated with the session is invalid.
 };
 
-using SyncSessionErrorHandler = void(int error_code, std::string message, SyncSessionError error_type);
+using SyncSessionErrorHandler = void(int error_code, std::string message, SyncSessionError);
 
 struct SyncConfig {
-public:
+    SyncConfig(std::string user_tag, std::string realm_url, std::function<SyncSessionErrorHandler> error_handler,
+               SyncSessionStopPolicy stop_policy)
+    : user_tag(std::move(user_tag))
+    , realm_url(std::move(realm_url))
+    , error_handler(std::move(error_handler))
+    , stop_policy(stop_policy)
+    {
+    }
+
     std::string user_tag;
     std::string realm_url;
     std::function<SyncSessionErrorHandler> error_handler;
     // Some bindings may want to handle the session in binding level.
     bool create_session = true;
+    SyncSessionStopPolicy stop_policy;
 };
 
 } // realm
 
-#endif // REALM_SYNC_CONFIG_HPP
+#endif // REALM_OS_SYNC_CONFIG_HPP

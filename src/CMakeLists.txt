@@ -34,6 +34,7 @@ set(HEADERS
 
     impl/android/external_commit_helper.hpp
     impl/apple/external_commit_helper.hpp
+    impl/apple/keychain_helper.hpp
     impl/generic/external_commit_helper.hpp
 
     impl/collection_change_builder.hpp
@@ -60,7 +61,7 @@ set(HEADERS
     util/format.hpp)
 
 if(APPLE)
-    list(APPEND SOURCES impl/apple/external_commit_helper.cpp)
+    list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
 elseif(REALM_PLATFORM STREQUAL "Android")
     list(APPEND SOURCES impl/android/external_commit_helper.cpp)
 else()
@@ -74,8 +75,8 @@ set(INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Add the sync files separately to reduce merge conflicts.
-list(APPEND HEADERS sync_manager.cpp impl/sync_session.cpp sync_metadata.cpp)
-list(APPEND SOURCES sync_manager.cpp impl/sync_client.hpp impl/sync_session.hpp sync_metadata.hpp)
+list(APPEND HEADERS sync_config.hpp sync_manager.hpp sync_metadata.hpp sync_session.hpp impl/sync_client.hpp)
+list(APPEND SOURCES sync_manager.cpp sync_metadata.cpp sync_session.cpp)
 find_package(ZLIB REQUIRED)
 list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
 
