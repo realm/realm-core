@@ -2,6 +2,8 @@
 
 ### Bugfixes
 
+* Fix an assertion failure when upgrading indexed nullable int columns to the
+  new index format.
 * Extra SetUnique instructions are no longer generated in the transaction log
   when a conflict was resolved locally.
 
