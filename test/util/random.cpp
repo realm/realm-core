@@ -35,7 +35,7 @@ namespace test_util {
 unsigned long produce_nondeterministic_random_seed()
 {
     typedef unsigned long ulong;
-    ulong value = ulong(time(0));
+    ulong value = ulong(time(nullptr));
 
 #ifdef _WIN32
     value ^= ulong(GetCurrentProcessId());

@@ -107,7 +107,7 @@ private:
     /// If it is the last reference, underly resources will be freed as well.
     void free_lock_info();
 #else
-    SharedPart* m_shared_part = 0;
+    SharedPart* m_shared_part = nullptr;
 #endif
     friend class InterprocessCondVar;
 };
