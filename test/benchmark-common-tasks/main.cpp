@@ -556,6 +556,41 @@ struct BenchmarkGetLongString : BenchmarkWithLongStrings {
     }
 };
 
+struct BenchmarkQueryLongString : BenchmarkWithStrings {
+    static constexpr const char* long_string = "This is some other long string, that takes a lot of time to find";
+    bool ok;
+
+    const char* name() const
+    {
+        return "QueryLongString";
+    }
+
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkWithStrings::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("StringOnly");
+        t->set_string(0, 0, "Some random string");
+        t->set_string(0, 1, long_string);
+        tr.commit();
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        StringData str(long_string);
+        ok = true;
+        auto q = table->where().equal(0, str);
+        for (size_t ndx = 0; ndx < 1000; ndx++) {
+            auto res = q.find();
+            if (res != 1) {
+                ok = false;
+            }
+        }
+    }
+};
+
 struct BenchmarkSetLongString : BenchmarkWithLongStrings {
     const char* name() const
     {
@@ -805,6 +840,7 @@ TEST(benchmark_common_tasks_main)
     BENCH(BenchmarkSetString);
     BENCH(BenchmarkCreateIndex);
     BENCH(BenchmarkGetLongString);
+    BENCH(BenchmarkQueryLongString);
     BENCH(BenchmarkSetLongString);
     BENCH(BenchmarkGetLinkList);
 

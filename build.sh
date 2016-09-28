@@ -229,7 +229,7 @@ download_openssl()
     fi
 
     echo 'Downloading OpenSSL...'
-    openssl_ver='1.0.1t'
+    openssl_ver='1.0.1u'
     curl -L -s "http://www.openssl.org/source/openssl-${openssl_ver}.tar.gz" -o openssl.tar.gz || return 1
     tar -xzf openssl.tar.gz || return 1
     mv openssl-$openssl_ver openssl || return 1
@@ -976,6 +976,7 @@ EOF
                           -a ! -name cbc128.o \
                           -a ! -name sha256.o \
                           -a ! -name sha256-586.o \
+                          -a ! -name mem_clr.o \
                           -delete || exit 1
                         rm -f aes_wrap.o
                         $AR x "$repodir/src/realm/$lib_name" || exit 1

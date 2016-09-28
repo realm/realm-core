@@ -1,3 +1,25 @@
+# NEXT RELEASE
+
+### Bugfixes
+
+* Lorem ipsum.
+
+### Breaking changes
+
+* Lorem ipsum.
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Android builds: upgraded to OpenSSL 1.0.1u.
+
+----------------------------------------------
+
 # 2.0.0 Release notes
 
 ### Bugfixes
