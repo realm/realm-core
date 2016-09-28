@@ -1,23 +1,9 @@
-# NEXT RELEASE
+# 2.0.1 Release notes
 
 ### Bugfixes
 
 * Fix an assertion failure when upgrading indexed nullable int columns to the
   new index format.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
