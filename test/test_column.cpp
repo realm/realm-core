@@ -1314,6 +1314,8 @@ TEST_TYPES(Column_Iterators, std::true_type, std::false_type)
     CHECK(realm_next >= realm_it);
     CHECK(realm_next >= realm_next);
     CHECK(!(realm_it >= realm_next));
+
+    c.destroy();
 }
 
 #endif // TEST_COLUMN
