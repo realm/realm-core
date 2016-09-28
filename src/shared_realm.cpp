@@ -36,7 +36,9 @@
 #include <realm/commit_log.hpp>
 #endif
 
+#if REALM_ENABLE_SYNC
 #include <realm/sync/history.hpp>
+#endif
 #include <realm/util/scope_exit.hpp>
 
 using namespace realm;
@@ -156,7 +158,9 @@ void Realm::open_with_config(const Config& config,
             // probably has to be transmuted to an NSError.
             bool server_synchronization_mode = bool(config.sync_config);
             if (server_synchronization_mode) {
+                #if REALM_ENABLE_SYNC
                 history = realm::sync::make_sync_history(config.path);
+                #endif
             }
             else {
 #if REALM_VER_MAJOR >= 2

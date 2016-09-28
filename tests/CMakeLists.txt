@@ -26,7 +26,9 @@ set(SOURCES
 add_executable(tests ${SOURCES} ${HEADERS})
 target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
 target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
+if(REALM_ENABLE_SYNC)
 target_link_libraries(tests realm-sync)
+endif()
 
 create_coverage_target(generate-coverage tests)
 

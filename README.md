@@ -72,7 +72,7 @@ The given core tree will be built as part of the object store build.
 Specify the path to realm-core and realm-sync when invoking `cmake`:
 
 ```
-cmake -DREALM_CORE_VERSION=/path/to/realm-core -DREALM_SYNC_PREFIX=/path/to/realm-sync
+cmake -DREALM_CORE_VERSION=/path/to/realm-core -DREALM_SYNC_PREFIX=/path/to/realm-sync -DREALM_ENABLE_SYNC=ON
 ```
 
 Prebuilt sync binaries are currently not supported.
