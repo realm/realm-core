@@ -1,5 +1,7 @@
 # 2.0.1 Release notes
 
+-----------
+
 ### Internals
 
 * Android builds: upgraded to OpenSSL 1.0.1u.
