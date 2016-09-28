@@ -28,7 +28,6 @@
 #include <cstdlib>
 
 #ifdef _WIN32
-#define NOMINMAX
 #include <windows.h>
 #include <io.h>
 #include <direct.h>

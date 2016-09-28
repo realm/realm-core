@@ -41,7 +41,6 @@
 #include <sys/wait.h>
 #define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
-#define NOMINMAX
 #include <windows.h>
 #endif
 
