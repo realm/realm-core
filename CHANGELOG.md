@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.1.0 Release notes
 
 ### Bugfixes
 
@@ -11,10 +11,6 @@
 
 * The ChangeLinkTargets instruction was a misnomer and has been renamed to
   MergeRows.
-
-### Enhancements
-
-* Lorem ipsum.
 
 -----------
 
