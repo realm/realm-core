@@ -812,12 +812,11 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         set_unique_called = true;
                         break;
                     }
-                    
+
                     if (set_unique_called) {
                         break;
                     }
                 }
-
             }
             else if (instr == IS_NULL && g_r.size() > 0) {
                 size_t table_ndx = get_next(s) % g_r.size();

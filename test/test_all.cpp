@@ -516,8 +516,8 @@ int test_all(int argc, char* argv[], util::Logger* logger)
 
 #ifdef _MSC_VER
     // we're in /build/ on Windows if we're in the Visual Studio IDE
-    set_test_resource_path("../../test/");
-    set_test_path_prefix("../../test/");
+    set_test_resource_path("../test/");
+    set_test_path_prefix("../test/");
 #endif
 
     set_random_seed();

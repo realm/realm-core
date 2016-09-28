@@ -413,8 +413,8 @@ private:
     // These two delimit a contiguous region of free space in a
     // transaction log buffer following the last written data. It may
     // be empty.
-    char* m_transact_log_free_begin = 0;
-    char* m_transact_log_free_end = 0;
+    char* m_transact_log_free_begin = nullptr;
+    char* m_transact_log_free_end = nullptr;
 
     char* reserve(size_t size);
     /// \param ptr Must be in the range [m_transact_log_free_begin, m_transact_log_free_end]

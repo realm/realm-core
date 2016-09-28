@@ -1480,7 +1480,7 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
             break;
         case col_type_Timestamp:
             // Origin table will be set by group after entire table has been created
-            col = new TimestampColumn(alloc, ref, col_ndx); // Throws
+            col = new TimestampColumn(nullable, alloc, ref, col_ndx); // Throws
             break;
         case col_type_Reserved4:
             // These have no function yet and are therefore unexpected.
@@ -2048,9 +2048,11 @@ ref_type Table::create_column(ColumnType col_type, size_t size, bool nullable, A
         case col_type_Timestamp:
             return TimestampColumn::create(alloc, size, nullable); // Throws
         case col_type_Float:
-            return FloatColumn::create(alloc, Array::type_Normal, size); // Throws
+            return FloatColumn::create(alloc, Array::type_Normal, size,
+                                       nullable ? null::get_null_float<Float>() : 0.0); // Throws
         case col_type_Double:
-            return DoubleColumn::create(alloc, Array::type_Normal, size); // Throws
+            return DoubleColumn::create(alloc, Array::type_Normal, size,
+                                        nullable ? null::get_null_float<Double>() : 0.0); // Throws
         case col_type_String:
             return StringColumn::create(alloc, size); // Throws
         case col_type_Binary:
@@ -2394,6 +2396,7 @@ void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
         }
     }
 
+    adj_row_acc_subsume_row(row_ndx, new_row_ndx);
     bump_version();
 }
 
@@ -2838,6 +2841,8 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
             break;
         if (ndx == size() - 1)
             ndx = duplicate;
+
+        adj_row_acc_subsume_row(duplicate, winner);
         move_last_over(duplicate);
         // Re-check moved-last-over
         duplicate -= 1;
@@ -2846,6 +2851,8 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
     // Delete candidate.
     if (winner == size() - 1)
         winner = ndx;
+
+    adj_row_acc_subsume_row(ndx, winner);
     move_last_over(ndx);
 
     return winner;

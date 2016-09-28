@@ -1,3 +1,46 @@
+# NEXT RELEASE
+
+### Bugfixes
+
+* Lorem ipsum.
+
+### Breaking changes
+
+* Lorem ipsum.
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Android builds: upgraded to OpenSSL 1.0.1u.
+
+----------------------------------------------
+
+# 2.0.0 Release notes
+
+### Bugfixes
+
+* TimestampColumn::is_nullable() could return a wrong value. Also, when adding a new
+  Float/Double column to a Table with rowcount > 0, the new entries would be non-null
+  even though the column was created as nullable.
+* Update accessors after a change_link_target or set_unique operation, so that users
+  will have the latest data immediately. Previously this would require manually
+  refetching the data or looking for the unique key again.
+
+----------------------------------------------
+
+# 2.0.0-rc9 Release notes
+
+### Internals
+
+* Use Xcode 7.3.1 to build core for Cocoa
+
+----------------------------------------------
+
 # 2.0.0-rc8 Release notes
 
 ### Bugfixes
@@ -5,7 +48,7 @@
 * Fixed a crash related to queries that was introduced in rc7. (#2186)
 * Fixed a bug triggered through set unique of primary keys through
   the ROS. (#2180)
-
+  
 -----------
 
 ### Internals
@@ -25,6 +68,8 @@
 * Reversed the decision process of resolving primary key conflicts. Instead of
   letting the newest row win, the oldest row will now always win in order to not
   lose subsequent changes.
+
+-----------
 
 ### Breaking changes
 

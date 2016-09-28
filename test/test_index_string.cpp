@@ -1637,7 +1637,7 @@ TEST(StringIndex_Fuzzy)
     constexpr size_t chunkcount = 50;
     constexpr size_t rowcount = 100 + 1000 * TEST_DURATION;
 
-    for (size_t main_rounds = 0; main_rounds < 1 + 10 * TEST_DURATION; main_rounds++) {
+    for (size_t main_rounds = 0; main_rounds < 2 + 10 * TEST_DURATION; main_rounds++) {
 
         Group g;
 
@@ -1674,10 +1674,10 @@ TEST(StringIndex_Fuzzy)
             t->set_string(0, t->size() - 1, str);
             t->set_string(1, t->size() - 1, str);
         }
-        
+
         for (size_t rounds = 0; rounds < 1 + 10 * TEST_DURATION; rounds++) {
             for (size_t r = 0; r < t->size(); r++) {
-                
+
                 TableView tv0 = (t->column<String>(0) == t->get_string(0, r)).find_all();
                 TableView tv1 = (t->column<String>(1) == t->get_string(1, r)).find_all();
 
@@ -1688,14 +1688,40 @@ TEST(StringIndex_Fuzzy)
                 }
             }
 
+
+            for (size_t r = 0; r < 5 + 1000 * TEST_DURATION; r++) {
+                size_t chunks;
+                if (fastrand() % 2 == 0)
+                    chunks = fastrand() % 4;
+                else
+                    chunks = 2;
+
+                std::string str;
+
+                for (size_t c = 0; c < chunks; c++) {
+                    str += strings[fastrand() % chunkcount];
+                }
+
+                TableView tv0 = (t->column<String>(0) == str).find_all();
+                TableView tv1 = (t->column<String>(1) == str).find_all();
+
+                CHECK_EQUAL(tv0.size(), tv1.size());
+
+                for (size_t v = 0; v < tv0.size(); v++) {
+                    CHECK_EQUAL(tv0.get_source_ndx(v), tv1.get_source_ndx(v));
+                }
+            }
             if (t->size() > 10)
                 t->remove(0);
 
             size_t r1 = fastrand() % t->size();
             size_t r2 = fastrand() % t->size();
 
-            t->set_string(0, r1, t->get_string(0, r2));
-            t->set_string(1, r1, t->get_string(1, r2));
+            std::string str1 = t->get_string(0, r2);
+            std::string str2 = t->get_string(0, r2);
+
+            t->set_string(0, r1, StringData(str1));
+            t->set_string(1, r1, StringData(str2));
 
             r1 = fastrand() % t->size();
             r2 = fastrand() % t->size();

@@ -1597,6 +1597,103 @@ TEST(Table_SetUniqueAccessorUpdating)
 }
 
 
+TEST(Table_SetUniqueLoserAccessorUpdates)
+{
+    Group g;
+    TableRef origin = g.add_table("origin");
+    TableRef target = g.add_table("target");
+
+    target->add_column(type_Int, "col");
+    target->add_empty_row(6);
+    size_t int_col = origin->add_column(type_Int, "pk");
+    size_t ll_col = origin->add_column_link(type_LinkList, "list", *target);
+    size_t str_col = origin->add_column(type_String, "description");
+    origin->add_search_index(0);
+    origin->add_search_index(2);
+
+    origin->add_empty_row(4);
+    origin->set_int_unique(int_col, 0, 1);
+    origin->set_int_unique(int_col, 1, 2);
+    origin->set_string(str_col, 0, "zero");
+    origin->set_string(str_col, 1, "one");
+    origin->set_string(str_col, 2, "two");
+    origin->set_string(str_col, 3, "three");
+
+    Row row_0 = (*origin)[0];
+    Row row_1 = (*origin)[1];
+    Row row_2 = (*origin)[2];
+    LinkViewRef lv_0 = origin->get_linklist(ll_col, 0);
+    LinkViewRef lv_1 = origin->get_linklist(ll_col, 1);
+    lv_0->add(0); // one link
+    lv_1->add(1); // two links
+    lv_1->add(2);
+
+    CHECK_EQUAL(origin->size(), 4);
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(row_0.get_string(str_col), "zero");
+    CHECK_EQUAL(row_1.get_string(str_col), "one");
+    CHECK_EQUAL(row_2.get_string(str_col), "two");
+
+    // leaves row 0 as winner, move last over of 2
+    origin->set_int_unique(int_col, 2, 1);
+
+    CHECK_EQUAL(origin->size(), 3);
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 0);
+    CHECK_EQUAL(row_1.get_index(), 1);
+    CHECK_EQUAL(row_2.get_index(), 0);
+    CHECK_EQUAL(row_0.get_string(str_col), "zero");
+    CHECK_EQUAL(row_1.get_string(str_col), "one");
+    CHECK_EQUAL(row_2.get_string(str_col), "zero");
+    CHECK_EQUAL(row_0.get_linklist(ll_col)->size(), 1);
+    CHECK_EQUAL(row_1.get_linklist(ll_col)->size(), 2);
+    CHECK_EQUAL(row_2.get_linklist(ll_col)->size(), 1); // subsumed
+    CHECK_EQUAL(lv_0->size(), 1);
+    CHECK_EQUAL(lv_1->size(), 2);
+
+    CHECK(lv_0->is_attached());
+    CHECK(lv_1->is_attached());
+    CHECK(lv_0 == origin->get_linklist(1, 0));
+    CHECK(lv_1 == origin->get_linklist(1, 1));
+}
+
+
+TEST(Table_AccessorsUpdateAfterChangeLinkTargets)
+{
+    Group g;
+    TableRef origin = g.add_table("origin");
+    TableRef target = g.add_table("target");
+
+    target->add_column(type_Int, "col");
+    target->add_empty_row(6);
+
+    origin->add_column_link(type_Link, "link_column", *target);
+    origin->add_empty_row(3);
+    origin->set_link(0, 0, 0);
+    origin->set_link(0, 1, 1);
+    origin->set_link(0, 2, 2);
+
+    Row row_0 = (*origin)[0];
+    Row row_1 = (*origin)[1];
+
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 0);
+    CHECK_EQUAL(row_1.get_index(), 1);
+
+    origin->change_link_targets(1, 2);
+
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 0);
+    CHECK_EQUAL(row_1.get_index(), 2);
+}
+
+
 TEST(Table_Distinct)
 {
     TestTableEnum table;

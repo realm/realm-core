@@ -229,7 +229,7 @@ download_openssl()
     fi
 
     echo 'Downloading OpenSSL...'
-    openssl_ver='1.0.1t'
+    openssl_ver='1.0.1u'
     curl -L -s "http://www.openssl.org/source/openssl-${openssl_ver}.tar.gz" -o openssl.tar.gz || return 1
     tar -xzf openssl.tar.gz || return 1
     mv openssl-$openssl_ver openssl || return 1
@@ -384,7 +384,7 @@ build_cocoa()
     cp tools/LICENSE "$tmpdir/$dir_basename" || exit 1
     if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
         command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
-        pandoc -f markdown -t plain -o "$tmpdir/$dir_basename/release_notes.txt" release_notes.md || exit 1
+        pandoc -f markdown -t plain -o "$tmpdir/$dir_basename/CHANGELOG.txt" CHANGELOG.md || exit 1
     fi
 
     echo "Create zip file: '$file_basename-$realm_version.zip'"
@@ -976,6 +976,7 @@ EOF
                           -a ! -name cbc128.o \
                           -a ! -name sha256.o \
                           -a ! -name sha256-586.o \
+                          -a ! -name mem_clr.o \
                           -delete || exit 1
                         rm -f aes_wrap.o
                         $AR x "$repodir/src/realm/$lib_name" || exit 1
@@ -1112,7 +1113,7 @@ EOF
         cp tools/LICENSE "$node_directory" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
-            pandoc -f markdown -t plain -o "$node_directory/release_notes.txt" release_notes.md || exit 1
+            pandoc -f markdown -t plain -o "$node_directory/CHANGELOG.txt" CHANGELOG.md || exit 1
         fi
 
         realm_version="$(sh build.sh get-version)" || exit
@@ -1340,14 +1341,14 @@ EOF
 
     "release-notes-prerelease")
         RELEASE_HEADER="# $(sh build.sh get-version) Release notes" || exit 1
-        sed -i.bak "1s/.*/$RELEASE_HEADER/" release_notes.md || exit 1
-        rm release_notes.md.bak
+        sed -i.bak "1s/.*/$RELEASE_HEADER/" CHANGELOG.md || exit 1
+        rm CHANGELOG.md.bak
         exit 0
         ;;
 
     "release-notes-postrelease")
-        cat doc/release_notes_template.md release_notes.md > release_notes.md.new || exit 1
-        mv release_notes.md.new release_notes.md || exit 1
+        cat doc/CHANGELOG_template.md CHANGELOG.md > CHANGELOG.md.new || exit 1
+        mv CHANGELOG.md.new CHANGELOG.md || exit 1
         exit 0
         ;;
 
