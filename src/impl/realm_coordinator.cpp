@@ -103,7 +103,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
         }
     }
 
-    #if REALM_ENABLE_SYNC
+#if REALM_ENABLE_SYNC
     if (config.sync_config && !m_sync_session) {
         m_sync_session = SyncManager::shared().get_session(config.path, *config.sync_config);
         SyncSession::Internal::set_sync_transact_callback(*m_sync_session, [this](VersionID, VersionID) {
@@ -114,7 +114,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
             SyncSession::Internal::set_error_handler(*m_sync_session, config.sync_config->error_handler);
         }
     }
-    #endif
+#endif
 
     auto realm = Realm::make_shared_realm(std::move(config));
     if (!config.read_only() && !m_notifier && config.automatic_change_notifications) {
@@ -232,16 +232,16 @@ void RealmCoordinator::send_commit_notifications(Realm& source_realm)
     if (m_notifier) {
         m_notifier->notify_others();
     }
-    #if REALM_ENABLE_SYNC
+#if REALM_ENABLE_SYNC
     if (m_sync_session) {
         auto& sg = Realm::Internal::get_shared_group(source_realm);
         auto version = LangBindHelper::get_version_of_latest_snapshot(sg);
         SyncSession::Internal::nonsync_transact_notify(*m_sync_session, version);
     }
-    #else
+#else
     // Silence "unused parameter 'source_realm'" warning
     (void)source_realm;
-    #endif
+#endif
 }
 
 void RealmCoordinator::pin_version(uint_fast64_t version, uint_fast32_t index)
