@@ -385,6 +385,8 @@
 		651AEEA61B31945F0048C8EE /* test_upgrade_database_1000_1.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEEA01B31945F0048C8EE /* test_upgrade_database_1000_1.realm */; };
 		651AEEA71B31945F0048C8EE /* test_upgrade_database_1000_2.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEEA11B31945F0048C8EE /* test_upgrade_database_1000_2.realm */; };
 		651AEEA81B31945F0048C8EE /* test_upgrade_database_1000_3.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEEA21B31945F0048C8EE /* test_upgrade_database_1000_3.realm */; };
+		652A4A971D9C5C05004FAAA3 /* test_upgrade_database_4_5_to_6_stringindex.realm in Resources */ = {isa = PBXBuildFile; fileRef = 652A4A951D9C5BF5004FAAA3 /* test_upgrade_database_4_5_to_6_stringindex.realm */; };
+		652A4A981D9C5C0A004FAAA3 /* test_upgrade_database_1000_5_to_6_stringindex.realm in Resources */ = {isa = PBXBuildFile; fileRef = 652A4A961D9C5BF5004FAAA3 /* test_upgrade_database_1000_5_to_6_stringindex.realm */; };
 		656341F81C18C508006EE446 /* fuzz_group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 484814A51C172F390007CDD7 /* fuzz_group.cpp */; };
 		656341F91C18C50A006EE446 /* fuzz_group.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 484814A51C172F390007CDD7 /* fuzz_group.cpp */; };
 		6579EEB91B4E89B6004DE3D8 /* disable_sync_to_disk.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */; };
@@ -951,6 +953,8 @@
 		651AEEA21B31945F0048C8EE /* test_upgrade_database_1000_3.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_3.realm; sourceTree = "<group>"; };
 		651D389B1D25440A006DBCC5 /* test_util_logger.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_logger.cpp; sourceTree = "<group>"; };
 		651D389C1D25440A006DBCC5 /* test_util_scope_exit.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_scope_exit.cpp; sourceTree = "<group>"; };
+		652A4A951D9C5BF5004FAAA3 /* test_upgrade_database_4_5_to_6_stringindex.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_4_5_to_6_stringindex.realm; sourceTree = "<group>"; };
+		652A4A961D9C5BF5004FAAA3 /* test_upgrade_database_1000_5_to_6_stringindex.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_5_to_6_stringindex.realm; sourceTree = "<group>"; };
 		6546AB4A1BDE41E700F74CF1 /* query_expression.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = query_expression.hpp; path = realm/query_expression.hpp; sourceTree = "<group>"; };
 		6579EEB71B4E898B004DE3D8 /* disable_sync_to_disk.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = disable_sync_to_disk.cpp; path = realm/disable_sync_to_disk.cpp; sourceTree = "<group>"; };
 		6579EEB81B4E898B004DE3D8 /* disable_sync_to_disk.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = disable_sync_to_disk.hpp; path = realm/disable_sync_to_disk.hpp; sourceTree = "<group>"; };
@@ -1548,11 +1552,13 @@
 				651AEE9F1B31945F0048C8EE /* test_upgrade_database_4_3.realm */,
 				659A0F391CD3276B00A7E878 /* test_upgrade_database_4_4_to_5_datetime1.realm */,
 				65BC7FA01B4D63E70070E98D /* test_upgrade_database_4_4.realm */,
+				652A4A951D9C5BF5004FAAA3 /* test_upgrade_database_4_5_to_6_stringindex.realm */,
 				651AEEA01B31945F0048C8EE /* test_upgrade_database_1000_1.realm */,
 				651AEEA11B31945F0048C8EE /* test_upgrade_database_1000_2.realm */,
 				651AEEA21B31945F0048C8EE /* test_upgrade_database_1000_3.realm */,
 				659A0F3A1CD3276B00A7E878 /* test_upgrade_database_1000_4_to_5_datetime1.realm */,
 				65BC7FA11B4D63E70070E98D /* test_upgrade_database_1000_4.realm */,
+				652A4A961D9C5BF5004FAAA3 /* test_upgrade_database_1000_5_to_6_stringindex.realm */,
 			);
 			name = test_files;
 			path = test;
@@ -2149,11 +2155,13 @@
 				651AEEA51B31945F0048C8EE /* test_upgrade_database_4_3.realm in Resources */,
 				659A0F3B1CD327C100A7E878 /* test_upgrade_database_4_4_to_5_datetime1.realm in Resources */,
 				6589FF2D1B4D6806001B6239 /* test_upgrade_database_4_4.realm in Resources */,
+				652A4A971D9C5C05004FAAA3 /* test_upgrade_database_4_5_to_6_stringindex.realm in Resources */,
 				651AEEA61B31945F0048C8EE /* test_upgrade_database_1000_1.realm in Resources */,
 				651AEEA71B31945F0048C8EE /* test_upgrade_database_1000_2.realm in Resources */,
 				651AEEA81B31945F0048C8EE /* test_upgrade_database_1000_3.realm in Resources */,
 				659A0F3C1CD327C500A7E878 /* test_upgrade_database_1000_4_to_5_datetime1.realm in Resources */,
 				6589FF2E1B4D6806001B6239 /* test_upgrade_database_1000_4.realm in Resources */,
+				652A4A981D9C5C0A004FAAA3 /* test_upgrade_database_1000_5_to_6_stringindex.realm in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
