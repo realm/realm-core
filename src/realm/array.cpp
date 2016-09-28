@@ -2887,9 +2887,8 @@ size_t Array::from_list<index_FindAll>(StringData value, IntegerColumn& result, 
     return size_t(FindRes_column);
 }
 
-template<>
-size_t Array::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& result,
-                                              InternalFindResult& result_ref,
+template <>
+size_t Array::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
                                               const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result);
@@ -2941,8 +2940,8 @@ size_t Array::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& r
 } // namespace realm
 
 template <IndexMethod method, class T>
-size_t Array::index_string(StringData value, IntegerColumn& result,
-                           InternalFindResult& result_ref, ColumnBase* column) const
+size_t Array::index_string(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+                           ColumnBase* column) const
 {
     // Return`realm::not_found`, or an index to the (any) match
     bool first(method == index_FindFirst);

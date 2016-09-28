@@ -1019,7 +1019,7 @@ void StringIndex::verify() const
             }
         }
     }
-    // FIXME: Extend verification along the lines of IntegerColumn::verify().
+// FIXME: Extend verification along the lines of IntegerColumn::verify().
 #endif
 }
 

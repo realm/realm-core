@@ -1918,7 +1918,6 @@ TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
     test_prefix_find(std_max);
     test_prefix_find(std_over_max);
     test_prefix_find(std_under_max);
-
 }
 
 
