@@ -69,96 +69,43 @@ using namespace realm::test_util;
 
 namespace {
 
-REALM_TABLE_2(TwoIntTable,
-              first, Int,
-              second, Int)
+REALM_TABLE_2(TwoIntTable, first, Int, second, Int)
 
-REALM_TABLE_1(SingleStringTable,
-              first, String)
+REALM_TABLE_1(SingleStringTable, first, String)
 
-REALM_TABLE_3(TripleTable,
-              first, String,
-              second, String,
-              third, Int)
+REALM_TABLE_3(TripleTable, first, String, second, String, third, Int)
 
-REALM_TABLE_1(OneIntTable,
-              first, Int)
+REALM_TABLE_1(OneIntTable, first, Int)
 
-REALM_TABLE_2(TupleTableType,
-              first, Int,
-              second, String)
+REALM_TABLE_2(TupleTableType, first, Int, second, String)
 
-REALM_TABLE_5(DateIntStringFloatDouble,
-              first, Int,
-              second, String,
-              third, OldDateTime,
-              fourth, Float,
-              fifth, Double)
+REALM_TABLE_5(DateIntStringFloatDouble, first, Int, second, String, third, OldDateTime, fourth, Float, fifth, Double)
 
-REALM_TABLE_2(TupleTableTypeBin,
-              first, Int,
-              second, Binary)
+REALM_TABLE_2(TupleTableTypeBin, first, Int, second, Binary)
 
-REALM_TABLE_2(BoolTupleTable,
-              first, Int,
-              second, Bool)
+REALM_TABLE_2(BoolTupleTable, first, Int, second, Bool)
 
-REALM_TABLE_5(PeopleTable,
-              name, String,
-              age, Int,
-              male, Bool,
-              hired, OldDateTime,
-              photo, Binary)
+REALM_TABLE_5(PeopleTable, name, String, age, Int, male, Bool, hired, OldDateTime, photo, Binary)
 
-REALM_TABLE_2(FloatTable,
-              col_float, Float,
-              col_double, Double)
+REALM_TABLE_2(FloatTable, col_float, Float, col_double, Double)
 
-REALM_TABLE_3(FloatTable3,
-              col_float, Float,
-              col_double, Double,
-              col_int, Int)
+REALM_TABLE_3(FloatTable3, col_float, Float, col_double, Double, col_int, Int)
 
-REALM_TABLE_3(PHPMinimumCrash,
-              firstname, String,
-              lastname, String,
-              salary, Int)
+REALM_TABLE_3(PHPMinimumCrash, firstname, String, lastname, String, salary, Int)
 
-REALM_TABLE_3(TableViewSum,
-              col_float, Float,
-              col_double, Double,
-              col_int, Int)
+REALM_TABLE_3(TableViewSum, col_float, Float, col_double, Double, col_int, Int)
 
-REALM_TABLE_5(GATable,
-              user_id, String,
-              country, String,
-              build, String,
-              event_1, Int,
-              event_2, Int)
+REALM_TABLE_5(GATable, user_id, String, country, String, build, String, event_1, Int, event_2, Int)
 
-REALM_TABLE_2(PeopleTable2,
-              name, String,
-              age, Int)
+REALM_TABLE_2(PeopleTable2, name, String, age, Int)
 
-REALM_TABLE_5(ThreeColTable,
-              first, Int,
-              second, Float,
-              third, Double,
-              fourth, Bool,
-              fifth, String)
+REALM_TABLE_5(ThreeColTable, first, Int, second, Float, third, Double, fourth, Bool, fifth, String)
 
-REALM_TABLE_3(Books,
-              title, String,
-              author, String,
-              pages, Int)
+REALM_TABLE_3(Books, title, String, author, String, pages, Int)
 
-REALM_TABLE_3(Types,
-              ints, Int,
-              strings, String,
-              doubles, Double)
+REALM_TABLE_3(Types, ints, Int, strings, String, doubles, Double)
 
 } // anonymous namespace
-
 
 
 TEST(Query_NoConditions)
@@ -294,8 +241,6 @@ TEST(Query_NextGenSyntax)
     CHECK_EQUAL(match, 1);
 
 
-
-
     // This is a demonstration of fallback to old query_engine for the specific cases where it's possible
     // because old engine is faster. This will return a ->less(...) query
     match = (untyped.column<int64_t>(0) == untyped.column<int64_t>(0)).find();
@@ -365,7 +310,6 @@ TEST(Query_NextGenSyntax)
     CHECK_EQUAL(match, 1);
 
     Query q4 = untyped.column<float>(1) + untyped.column<int64_t>(0) > 40;
-
 
 
     Query q5 = 20 < untyped.column<float>(1);
@@ -438,7 +382,9 @@ TEST(Query_NextGenSyntax)
     match = (untyped.column<float>(1) <= untyped.column<int64_t>(0)).find();
     CHECK_EQUAL(match, 0);
 
-    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) >= untyped.column<int64_t>(0) + untyped.column<float>(1)).find();
+    match = (untyped.column<int64_t>(0) + untyped.column<float>(1) >=
+             untyped.column<int64_t>(0) + untyped.column<float>(1))
+                .find();
     CHECK_EQUAL(match, 0);
 
     // Untyped, column objects
@@ -502,7 +448,6 @@ TEST(Query_NextGenSyntax)
     delete second2;
     delete first2;
     */
-
 }
 
 
@@ -743,8 +688,7 @@ TEST(Query_NextGenSyntaxMonkey0)
     // table size to test out-of-bounds bugs.
 
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    for (int iter = 1; iter < 10 + TEST_DURATION * 1000; iter++)
-    {
+    for (int iter = 1; iter < 10 + TEST_DURATION * 1000; iter++) {
         const size_t rows = 1 + random.draw_int_mod(2 * REALM_MAX_BPNODE_SIZE);
         Table table;
 
@@ -786,14 +730,13 @@ TEST(Query_NextGenSyntaxMonkey0)
         tv = q.find_all(start, size_t(-1), limit);
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
-            if (r >= start && tvpos < limit && table.get_int(0, r) > table.get_float(1, r) && table.get_string(2, r) == "a") {
+            if (r >= start && tvpos < limit && table.get_int(0, r) > table.get_float(1, r) &&
+                table.get_string(2, r) == "a") {
                 tvpos++;
             }
         }
         CHECK_EQUAL(tvpos, tv.size());
-
     }
-
 }
 
 TEST(Query_NextGenSyntaxMonkey)
@@ -801,9 +744,9 @@ TEST(Query_NextGenSyntaxMonkey)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     for (int iter = 1; iter < 5 * (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1); iter++) {
         // Set 'rows' to at least '* 20' else some tests will give 0 matches and bad coverage
-        const size_t rows =
-            1 + random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
-            (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
+        const size_t rows = 1 +
+                            random.draw_int_mod<size_t>(REALM_MAX_BPNODE_SIZE * 20 *
+                                                        (TEST_DURATION * TEST_DURATION * TEST_DURATION + 1));
         Table table;
         table.add_column(type_Int, "first");
         table.add_column(type_Int, "second");
@@ -833,7 +776,8 @@ TEST(Query_NextGenSyntaxMonkey)
         CHECK_EQUAL(tvpos, tv_0.size());
 
         // (first == 0 || first == 1) && second == 1
-        realm::Query q2_1 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 1) && table.column<int64_t>(1) == 1;
+        realm::Query q2_1 =
+            (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 1) && table.column<int64_t>(1) == 1;
         realm::TableView tv_1 = q2_1.find_all();
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
@@ -846,7 +790,8 @@ TEST(Query_NextGenSyntaxMonkey)
 
 
         // first == 0 || (first == 1 && second == 1)
-        realm::Query q2_2 = table.column<int64_t>(0) == 0 || (table.column<int64_t>(0) == 1 && table.column<int64_t>(1) == 1);
+        realm::Query q2_2 =
+            table.column<int64_t>(0) == 0 || (table.column<int64_t>(0) == 1 && table.column<int64_t>(1) == 1);
         realm::TableView tv_2 = q2_2.find_all();
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
@@ -859,7 +804,8 @@ TEST(Query_NextGenSyntaxMonkey)
 
 
         // second == 0 && (first == 0 || first == 2)
-        realm::Query q4_8 = table.column<int64_t>(1) == 0 && (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2);
+        realm::Query q4_8 =
+            table.column<int64_t>(1) == 0 && (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2);
         realm::TableView tv_8 = q4_8.find_all();
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
@@ -872,11 +818,13 @@ TEST(Query_NextGenSyntaxMonkey)
 
 
         // (first == 0 || first == 2) && (first == 1 || second == 1)
-        realm::Query q3_7 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2) && (table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1);
+        realm::Query q3_7 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2) &&
+                            (table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1);
         realm::TableView tv_7 = q3_7.find_all();
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
-            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
+            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) &&
+                (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_7.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -885,11 +833,13 @@ TEST(Query_NextGenSyntaxMonkey)
 
 
         // (first == 0 || first == 2) || (first == 1 || second == 1)
-        realm::Query q4_7 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2) || (table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1);
+        realm::Query q4_7 = (table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2) ||
+                            (table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1);
         realm::TableView tv_10 = q4_7.find_all();
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
-            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) || (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
+            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) ||
+                (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_10.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -900,11 +850,13 @@ TEST(Query_NextGenSyntaxMonkey)
         TableView tv;
 
         // first == 0 || first == 2 || first == 1 || second == 1
-        realm::Query q20 = table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2 || table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1;
+        realm::Query q20 = table.column<int64_t>(0) == 0 || table.column<int64_t>(0) == 2 ||
+                           table.column<int64_t>(0) == 1 || table.column<int64_t>(1) == 1;
         tv = q20.find_all();
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
-            if (table.get_int(0, r) == 0 || table.get_int(0, r) == 2 || table.get_int(0, r) == 1 || table.get_int(1, r) == 1) {
+            if (table.get_int(0, r) == 0 || table.get_int(0, r) == 2 || table.get_int(0, r) == 1 ||
+                table.get_int(1, r) == 1) {
                 CHECK_EQUAL(r, tv.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -924,8 +876,13 @@ TEST(Query_NextGenSyntaxMonkey)
         }
         CHECK_EQUAL(tvpos, tv.size());
 
-        // first * 2 > second / 2 + third + 1 + third - third + third - third + third - third + third - third + third - third
-        realm::Query q22 = table.column<int64_t>(0) * 2 > table.column<int64_t>(1) / 2 + table.column<int64_t>(2) + 1 + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2);
+        // first * 2 > second / 2 + third + 1 + third - third + third - third + third - third + third - third + third
+        // - third
+        realm::Query q22 = table.column<int64_t>(0) * 2 >
+                           table.column<int64_t>(1) / 2 + table.column<int64_t>(2) + 1 + table.column<int64_t>(2) -
+                               table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2) +
+                               table.column<int64_t>(2) - table.column<int64_t>(2) + table.column<int64_t>(2) -
+                               table.column<int64_t>(2) + table.column<int64_t>(2) - table.column<int64_t>(2);
         tv = q22.find_all();
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
@@ -935,7 +892,6 @@ TEST(Query_NextGenSyntaxMonkey)
             }
         }
         CHECK_EQUAL(tvpos, tv.size());
-
     }
 }
 
@@ -962,7 +918,6 @@ TEST(Query_LimitUntyped)
 
     sum = q.sum_int(0, nullptr, 0, -1, 3);
     CHECK_EQUAL(50000, sum);
-
 }
 
 
@@ -984,7 +939,6 @@ TEST(Query_MergeQueriesOverloads)
     table.set_int(1, 2, 30);
 
     size_t c;
-
 
 
     // q1_0 && q2_0
@@ -1021,7 +975,6 @@ TEST(Query_MergeQueriesOverloads)
     realm::Query q3_2 = q2_2 || q1_2;
     c = q3_2.count();
     CHECK_EQUAL(2, c);
-
 }
 
 
@@ -1081,17 +1034,17 @@ TEST(Query_Not)
 
     // nested nots (implicit grouping)
     realm::Query q0d = table.where().Not().Not().equal(0, 10);
-    CHECK_EQUAL(1, q0d.count());  // FAILS
+    CHECK_EQUAL(1, q0d.count()); // FAILS
 
     realm::Query q0e = table.where().Not().Not().Not().equal(0, 10);
-    CHECK_EQUAL(2, q0e.count());  // FAILS
+    CHECK_EQUAL(2, q0e.count()); // FAILS
 
     // just checking the above
     realm::Query q0f = table.where().Not().not_equal(0, 10);
     CHECK_EQUAL(1, q0f.count());
 
     realm::Query q0g = table.where().Not().Not().not_equal(0, 10);
-    CHECK_EQUAL(2, q0g.count());   // FAILS
+    CHECK_EQUAL(2, q0g.count()); // FAILS
 
     realm::Query q0h = table.where().not_equal(0, 10);
     CHECK_EQUAL(2, q0h.count());
@@ -1124,13 +1077,12 @@ TEST(Query_Not)
 
     // should apply not to both terms, leading to query "not A and not A", which has 2 members
     realm::Query q3 = table.where().Not().equal(0, 10).Not().equal(0, 10);
-    CHECK_EQUAL(2, q3.count());  // FAILS
+    CHECK_EQUAL(2, q3.count()); // FAILS
 
     // applying not to an empty query is forbidden
     realm::Query q4 = table.where();
     CHECK_THROW(!q4, std::runtime_error);
 }
-
 
 
 TEST(Query_MergeQueriesMonkey)
@@ -1221,7 +1173,8 @@ TEST(Query_MergeQueriesMonkey)
         realm::TableView tv_5 = q3_5.find_all();
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
-            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) || (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
+            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) ||
+                (table.get_int(0, r) == 1 && table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_5.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -1248,7 +1201,8 @@ TEST(Query_MergeQueriesMonkey)
         realm::TableView tv_7 = q3_7.find_all();
         tvpos = 0;
         for (size_t r = 0; r < rows; r++) {
-            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) && (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
+            if ((table.get_int(0, r) == 0 || table.get_int(0, r) == 2) &&
+                (table.get_int(0, r) == 1 || table.get_int(1, r) == 1)) {
                 CHECK_EQUAL(r, tv_7.get_source_ndx(tvpos));
                 tvpos++;
             }
@@ -1302,13 +1256,8 @@ TEST(Query_MergeQueriesMonkey)
                 tvpos++;
             }
         }
-
     }
-
-
 }
-
-
 
 
 TEST(Query_MergeQueriesMonkeyOverloads)
@@ -1411,10 +1360,7 @@ TEST(Query_MergeQueriesMonkeyOverloads)
                 tvpos++;
             }
         }
-
     }
-
-
 }
 
 
@@ -1462,7 +1408,6 @@ TEST(Query_Expressions0)
     table.add_column(type_Int, "first1");
     table.add_column(type_Float, "second1");
     table.add_column(type_Double, "third");
-
 
 
     size_t match;
@@ -1675,7 +1620,6 @@ TEST(Query_Expressions0)
 
     match = (first > 1000000000.f).find();
     CHECK_EQUAL(match, not_found);
-
 }
 
 TEST(Query_LimitUntyped2)
@@ -1768,7 +1712,7 @@ TEST(Query_LimitUntyped2)
     CHECK_EQUAL(2, ndx);
 
     // Timestamp
-/*
+    /*
     ts = q.maximum_timestamp(3, nullptr, 0, -1, 1);
     CHECK_EQUAL(Timestamp(10000, 10000), ts);
     q.maximum_int(0, nullptr, 0, -1, 1, &ndx);
@@ -1783,7 +1727,7 @@ TEST(Query_LimitUntyped2)
     CHECK_EQUAL(Timestamp(40000, 40000), ts);
     q.maximum_int(0, nullptr, 0, -1, -1, &ndx);
     CHECK_EQUAL(2, ndx);
-*/
+    */
     // float
     sumf = q.maximum_float(1, nullptr, 0, -1, 1);
     CHECK_EQUAL(10000., sumf);
@@ -1917,6 +1861,66 @@ TEST(Query_StrIndexCrash)
     }
 }
 
+TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    table->add_column(type_String, "first");
+    table->add_search_index(0);
+    if (TEST_TYPE::value == true) {
+        bool force = true;
+        table->optimize(force); // Make it a StringEnum column
+    }
+
+    auto test_prefix_find = [&](std::string prefix) {
+        std::string prefix_b = prefix + "b";
+        std::string prefix_c = prefix + "c";
+        std::string prefix_d = prefix + "d";
+        std::string prefix_e = prefix + "e";
+        StringData spb(prefix_b);
+        StringData spc(prefix_c);
+        StringData spd(prefix_d);
+        StringData spe(prefix_e);
+
+        size_t start_row = table->size();
+        size_t ins_pos = start_row;
+        table->add_empty_row(6);
+        table->set_string(0, ins_pos++, spb);
+        table->set_string(0, ins_pos++, spc);
+        table->set_string(0, ins_pos++, spc);
+        table->set_string(0, ins_pos++, spe);
+        table->set_string(0, ins_pos++, spe);
+        table->set_string(0, ins_pos++, spe);
+
+        TableView v = table->where().equal(0, spb).find_all();
+        CHECK_EQUAL(v.size(), 1);
+        CHECK_EQUAL(v.get(0).get_index(), start_row);
+
+        v = table->where().equal(0, spc).find_all();
+        CHECK_EQUAL(v.size(), 2);
+        CHECK_EQUAL(v.get(0).get_index(), start_row + 1);
+        CHECK_EQUAL(v.get(1).get_index(), start_row + 2);
+
+        v = table->where().equal(0, spd).find_all();
+        CHECK_EQUAL(v.size(), 0);
+
+        v = table->where().equal(0, spe).find_all();
+        CHECK_EQUAL(v.size(), 3);
+        CHECK_EQUAL(v.get(0).get_index(), start_row + 3);
+        CHECK_EQUAL(v.get(1).get_index(), start_row + 4);
+        CHECK_EQUAL(v.get(2).get_index(), start_row + 5);
+    };
+
+    std::string std_max(StringIndex::s_max_offset, 'a');
+    std::string std_over_max = std_max + "a";
+    std::string std_under_max(StringIndex::s_max_offset >> 1, 'a');
+
+    test_prefix_find(std_max);
+    test_prefix_find(std_over_max);
+    test_prefix_find(std_under_max);
+
+}
+
 
 TEST(Query_TwoColsEqualVaryWidthAndValues)
 {
@@ -1985,7 +1989,6 @@ TEST(Query_TwoColsEqualVaryWidthAndValues)
 
         if (table.get_double(8, i) == table.get_double(9, i))
             doubles.push_back(i);
-
     }
 
     realm::TableView t1 = table.where().equal_int(size_t(0), size_t(1)).find_all();
@@ -2081,7 +2084,6 @@ TEST(Query_TwoColsVaryOperators)
     CHECK_EQUAL(1, table.where().greater_equal_double(size_t(4), size_t(5)).find());
     CHECK_EQUAL(0, table.where().less_equal_double(size_t(4), size_t(5)).find());
 }
-
 
 
 TEST(Query_TwoCols0)
@@ -2312,10 +2314,12 @@ TEST(Query_Huge)
             if ((row >= start && row < end && limit > res6) && (first != "A" && second == "A" && third == 1))
                 res6++;
 
-            if ((row >= start && row < end && limit > res7) && (first != "longlonglonglonglonglonglong A" && second == "A" && third == 1))
+            if ((row >= start && row < end && limit > res7) &&
+                (first != "longlonglonglonglonglonglong A" && second == "A" && third == 1))
                 res7++;
 
-            if ((row >= start && row < end && limit > res8) && (first != "longlonglonglonglonglonglong A" && second == "A" && third == 2))
+            if ((row >= start && row < end && limit > res8) &&
+                (first != "longlonglonglonglonglonglong A" && second == "A" && third == 2))
                 res8++;
         }
 
@@ -2329,7 +2333,6 @@ TEST(Query_Huge)
                 tt.column().second.add_search_index();
 
 
-
             v = tt.where().first.equal("A").second.equal("A").third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res1, v.size());
 
@@ -2339,17 +2342,21 @@ TEST(Query_Huge)
             v = tt.where().third.equal(1).second.equal("A").first.equal("A").find_all(start, end, limit);
             CHECK_EQUAL(res1, v.size());
 
-            v = tt.where().group().first.equal("A").Or().second.equal("A").end_group().third.equal(1).find_all(start, end, limit);
+            v = tt.where().group().first.equal("A").Or().second.equal("A").end_group().third.equal(1).find_all(
+                start, end, limit);
             CHECK_EQUAL(res2, v.size());
 
-            v = tt.where().first.equal("A").group().second.equal("A").Or().third.equal(1).end_group().find_all(start, end, limit);
+            v = tt.where().first.equal("A").group().second.equal("A").Or().third.equal(1).end_group().find_all(
+                start, end, limit);
             CHECK_EQUAL(res3, v.size());
 
-            TripleTable::Query q = tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A");
+            TripleTable::Query q =
+                tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A");
             v = q.find_all(start, end, limit);
             CHECK_EQUAL(res4, v.size());
 
-            v = tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A").find_all(start, end, limit);
+            v = tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A").find_all(
+                start, end, limit);
             CHECK_EQUAL(res4, v.size());
 
             v = tt.where().first.equal("A").Or().second.equal("A").Or().third.equal(1).find_all(start, end, limit);
@@ -2358,10 +2365,18 @@ TEST(Query_Huge)
             v = tt.where().first.not_equal("A").second.equal("A").third.equal(1).find_all(start, end, limit);
             CHECK_EQUAL(res6, v.size());
 
-            v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(1).find_all(start, end, limit);
+            v = tt.where()
+                    .first.not_equal("longlonglonglonglonglonglong A")
+                    .second.equal("A")
+                    .third.equal(1)
+                    .find_all(start, end, limit);
             CHECK_EQUAL(res7, v.size());
 
-            v = tt.where().first.not_equal("longlonglonglonglonglonglong A").second.equal("A").third.equal(2).find_all(start, end, limit);
+            v = tt.where()
+                    .first.not_equal("longlonglonglonglonglonglong A")
+                    .second.equal("A")
+                    .third.equal(2)
+                    .find_all(start, end, limit);
             CHECK_EQUAL(res8, v.size());
         }
     }
@@ -2402,7 +2417,6 @@ TEST(Query_OnTableView_where)
 }
 
 
-
 TEST(Query_StrIndex3)
 {
     // Create two columns where query match-density varies alot throughout the rows. This forces the query engine to
@@ -2427,13 +2441,15 @@ TEST(Query_StrIndex3)
 #else
         for (int i = 0; i < 20; i++) {
 #endif
-            // 1/500 match probability because we want possibility for a 1000 sized leaf to contain 0 matches (important
+            // 1/500 match probability because we want possibility for a 1000 sized leaf to contain 0 matches
+            // (important
             // edge case)
             int f1 = random.draw_int_mod(REALM_MAX_BPNODE_SIZE) / 2 + 1;
             int f2 = random.draw_int_mod(REALM_MAX_BPNODE_SIZE) / 2 + 1;
             bool longstrings = random.chance(1, 5);
 
-            // 2200 entries with that probability to fill out two concecutive 1000 sized leaves with above probability,
+            // 2200 entries with that probability to fill out two concecutive 1000 sized leaves with above
+            // probability,
             // plus a remainder (edge case)
             for (int j = 0; j < REALM_MAX_BPNODE_SIZE * 2 + REALM_MAX_BPNODE_SIZE / 5; j++) {
                 if (random.chance(1, f1)) {
@@ -2603,7 +2619,6 @@ TEST(Query_StrIndex)
         s = ttt.where().second.equal("AA").count();
         CHECK_EQUAL(aa, s);
     }
-
 }
 
 
@@ -2775,8 +2790,6 @@ TEST(Query_JavaMinimumCrash)
     int64_t m = q1.salary.minimum();
     CHECK_EQUAL(1, m);
 }
-
-
 
 
 TEST(Query_Float4)
@@ -2957,8 +2970,10 @@ TEST(Query_DateQuery)
     table.add("Bob", 24, true, realm::OldDateTime(2010, 12, 1), realm::BinaryData("bin \0\n data 3", 13));
 
     // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
-    PeopleTable::View view5 = table.where().hired.greater_equal(realm::OldDateTime(2012, 1, 1).get_olddatetime())
-        .hired.less(realm::OldDateTime(2013, 1, 1).get_olddatetime()).find_all();
+    PeopleTable::View view5 = table.where()
+                                  .hired.greater_equal(realm::OldDateTime(2012, 1, 1).get_olddatetime())
+                                  .hired.less(realm::OldDateTime(2013, 1, 1).get_olddatetime())
+                                  .find_all();
     CHECK_EQUAL(1, view5.size());
     CHECK_EQUAL("Mary", view5[0].name);
 }
@@ -2979,9 +2994,8 @@ TEST(Query_DoubleCoordinates)
         table->set_double(0, t, (t * 12345) % 1000);
         table->set_double(1, t, (t * 12345) % 1000);
 
-        if (table->get_double(0, t) >= 100. && table->get_double(0, t) <= 110. &&
-            table->get_double(1, t) >= 100. && table->get_double(1, t) <= 110.)
-        {
+        if (table->get_double(0, t) >= 100. && table->get_double(0, t) <= 110. && table->get_double(1, t) >= 100. &&
+            table->get_double(1, t) <= 110.) {
             expected++;
         }
     }
@@ -2989,7 +3003,7 @@ TEST(Query_DoubleCoordinates)
     // This unit test can be used as benchmark. Just enable this for loop
     //    for (size_t t = 0; t < 1000; t++) {
     Query q = table->column<double>(0) >= 100. && table->column<double>(0) <= 110. &&
-        table->column<double>(1) >= 100. && table->column<double>(1) <= 110.;
+              table->column<double>(1) >= 100. && table->column<double>(1) <= 110.;
 
     size_t c = q.count();
     REALM_ASSERT(c == expected);
@@ -3208,9 +3222,7 @@ TEST(Query_FindAllRangeOrMonkey2)
         }
         a.destroy();
     }
-
 }
-
 
 
 TEST(Query_FindAllRangeOr)
@@ -3284,73 +3296,6 @@ TEST(Query_Delete)
     CHECK_EQUAL(3, r);
     CHECK_EQUAL(0, ttt.size());
 }
-
-TEST(Query_DeleteRange)
-{
-    TupleTableType ttt;
-
-    ttt.add(0, "X");
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "X");
-    ttt.add(5, "X");
-
-    TupleTableType::Query q = ttt.where().second.equal("X");
-    size_t r = q.remove(1, 4);
-
-    CHECK_EQUAL(3, r);
-    CHECK_EQUAL(3, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(4, ttt[1].first);
-    CHECK_EQUAL(5, ttt[2].first);
-}
-
-TEST(Query_DeleteRange_where)
-{
-    TupleTableType ttt;
-
-    ttt.add(0, "X");
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "X");
-    ttt.add(5, "X");
-
-    TupleTableType::View tv = ttt.where().second.equal("X").find_all();
-    TupleTableType::Query q = ttt.where(&tv).second.equal("X");
-
-    size_t r = q.remove(1, 4);
-
-    CHECK_EQUAL(3, r);
-    CHECK_EQUAL(3, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(4, ttt[1].first);
-    CHECK_EQUAL(5, ttt[2].first);
-}
-
-TEST(Query_DeleteLimit)
-{
-    TupleTableType ttt;
-
-    ttt.add(0, "X");
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "X");
-    ttt.add(5, "X");
-
-    TupleTableType::Query q = ttt.where().second.equal("X");
-    size_t r = q.remove(1, 4, 2);
-
-    CHECK_EQUAL(2, r);
-    CHECK_EQUAL(4, ttt.size());
-    CHECK_EQUAL(0, ttt[0].first);
-    CHECK_EQUAL(3, ttt[1].first);
-    CHECK_EQUAL(4, ttt[2].first);
-    CHECK_EQUAL(5, ttt[3].first);
-}
-
 
 
 TEST(Query_Simple)
@@ -3523,7 +3468,7 @@ TEST(Query_SubtableBug)
     sub->add_column(type_Bool, "sub 2");
     CHECK_EQUAL(2, table->get_column_count());
 
-    for (int i = 0; i<5; i++) {
+    for (int i = 0; i < 5; i++) {
         table->insert_empty_row(i);
         table->set_int(0, i, 100);
     }
@@ -3574,7 +3519,6 @@ TEST(Query_Sort1)
     CHECK(tv[5].first == 8);
     CHECK(tv[6].first == 9);
 }
-
 
 
 TEST(Query_QuickSort)
@@ -3804,7 +3748,7 @@ TEST(Query_SortLinkChains)
     TableView tv = t1->where().less(t1_int_col, 6).find_all();
 
     // Test original funcionality through chain class
-    std::vector<size_t> results1 = { 0, 1, 2, 3, 4, 5 };
+    std::vector<size_t> results1 = {0, 1, 2, 3, 4, 5};
     tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
     CHECK_EQUAL(tv.size(), results1.size());
     for (size_t i = 0; i < tv.size(); ++i) {
@@ -3816,7 +3760,7 @@ TEST(Query_SortLinkChains)
     }
 
     // Test basic one link chain
-    std::vector<size_t> results2 = { 3, 4, 2, 1, 5, 0 };
+    std::vector<size_t> results2 = {3, 4, 2, 1, 5, 0};
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
     CHECK_EQUAL(tv.size(), results2.size());
     for (size_t i = 0; i < tv.size(); ++i) {
@@ -3828,7 +3772,7 @@ TEST(Query_SortLinkChains)
     }
 
     // Test link chain through two links with nulls
-    std::vector<size_t> results3 = { 1, 0, 2, 5 };
+    std::vector<size_t> results3 = {1, 0, 2, 5};
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {true}));
     // No guarantees about nullified links except they are at the end.
     CHECK(tv.size() >= results3.size());
@@ -3843,23 +3787,23 @@ TEST(Query_SortLinkChains)
     }
 
     // Test link chain with nulls and a single local column
-    std::vector<size_t> results4 = { 1, 0, 2, 5, 3, 4 };
+    std::vector<size_t> results4 = {1, 0, 2, 5, 3, 4};
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}));
     CHECK_EQUAL(tv.size(), results4.size());
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4[i]);
     }
-    std::vector<size_t> results4_rev = { 1, 0, 2, 5, 4, 3 };
+    std::vector<size_t> results4_rev = {1, 0, 2, 5, 4, 3};
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {true, false}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev[i]);
     }
-    std::vector<size_t> results4_rev2 = { 3, 4, 5, 2, 0, 1 };
+    std::vector<size_t> results4_rev2 = {3, 4, 5, 2, 0, 1};
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, true}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev2[i]);
     }
-    std::vector<size_t> results4_rev3 = { 4, 3, 5, 2, 0, 1 };
+    std::vector<size_t> results4_rev3 = {4, 3, 5, 2, 0, 1};
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, false}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev3[i]);
@@ -3951,8 +3895,8 @@ TEST(Query_DistinctThroughLinks)
         TableView tv = t1->where().less(t1_int_col, 6).find_all();
 
         // Test original funcionality through chain class
-        std::vector<size_t> results1 = { 0, 1, 2, 3, 4, 5 };
-        tv.distinct(SortDescriptor(*t1, {{t1_int_col}}, {true} ));
+        std::vector<size_t> results1 = {0, 1, 2, 3, 4, 5};
+        tv.distinct(SortDescriptor(*t1, {{t1_int_col}}, {true}));
         CHECK_EQUAL(tv.size(), results1.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
@@ -3975,7 +3919,7 @@ TEST(Query_DistinctThroughLinks)
         TableView tv = t1->where().less(t1_int_col, 6).find_all(); // fresh unsorted view
 
         // Test basic one link chain
-        std::vector<size_t> results2 = { 0, 1, 2, 4 };
+        std::vector<size_t> results2 = {0, 1, 2, 4};
         tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         CHECK_EQUAL(tv.size(), results2.size());
         for (size_t i = 0; i < tv.size(); ++i) {
@@ -3988,7 +3932,7 @@ TEST(Query_DistinctThroughLinks)
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
         }
 
-        std::vector<size_t> results2_sorted_link = { 0, 4, 2, 1 };
+        std::vector<size_t> results2_sorted_link = {0, 4, 2, 1};
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
         CHECK_EQUAL(tv.size(), results2_sorted_link.size());
         for (size_t i = 0; i < tv.size(); ++i) {
@@ -4004,7 +3948,7 @@ TEST(Query_DistinctThroughLinks)
         TableView tv = t1->where().less(t1_int_col, 6).find_all(); // fresh unsorted view
 
         // Test link chain through two links with nulls
-        std::vector<size_t> results3 = { 0, 1, 2, 5 };
+        std::vector<size_t> results3 = {0, 1, 2, 5};
         tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         // Nullified links are excluded from distinct.
         CHECK_EQUAL(tv.size(), results3.size());
@@ -4018,7 +3962,7 @@ TEST(Query_DistinctThroughLinks)
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
         }
 
-        results3 = { 1, 0, 2, 5 }; // sorted order on t3_col_int { null, 3, 4, 7 }
+        results3 = {1, 0, 2, 5}; // sorted order on t3_col_int { null, 3, 4, 7 }
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
@@ -4055,7 +3999,7 @@ TEST(Query_Sort_And_Requery_Typed1)
     TupleTableType::View tv = q.find_all();
 
     size_t match = ttt.where(&tv).first.equal(7).find();
-    CHECK_EQUAL(match, 6);
+    CHECK_EQUAL(match, 8);
 
     tv.column().first.sort();
 
@@ -4081,15 +4025,14 @@ TEST(Query_Sort_And_Requery_Typed1)
     CHECK_EQUAL(match, 0);
 
     match = ttt.where(&tv).second.not_equal("X").find(1);
-    CHECK_EQUAL(match, 1);
+    CHECK_EQUAL(match, 3);
 
     match = ttt.where(&tv).second.not_equal("X").find(2);
-    CHECK_EQUAL(match, 5);
+    CHECK_EQUAL(match, 3);
 
     match = ttt.where(&tv).second.not_equal("X").find(6);
-    CHECK_EQUAL(match, 6);
+    CHECK_EQUAL(match, 7);
 }
-
 
 
 TEST(Query_Sort_And_Requery_FindFirst)
@@ -4221,7 +4164,6 @@ TEST(Query_Sort_And_Requery_Untyped2)
     CHECK_EQUAL(8, tv4.get_int(0, 1)); // 8, 9 (sort order) instead of 9, 8 (table order)
     CHECK_EQUAL(9, tv4.get_int(0, 2));
 }
-
 
 
 TEST(Query_Sort_And_Requery_Untyped1)
@@ -4453,7 +4395,7 @@ TEST(Query_Threads)
     TupleTableType::Query q1 = ttt.where().first.equal(2).second.equal("b");
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
-    //q1.set_threads(5);
+    // q1.set_threads(5);
     TupleTableType::View tv = q1.find_all();
 
     CHECK_EQUAL(30, tv.size());
@@ -4485,7 +4427,7 @@ TEST(Query_LongString)
     TupleTableType::Query q1 = ttt.where().first.equal(2).second.equal("bbbbbbbbbbbbbbbbbb");
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
-    //q1.set_threads(5);
+    // q1.set_threads(5);
     TupleTableType::View tv = q1.find_all();
 
     CHECK_EQUAL(30, tv.size());
@@ -4518,7 +4460,7 @@ TEST(Query_LongEnum)
     TupleTableType::Query q1 = ttt.where().first.equal(2).second.not_equal("aaaaaaaaaaaaaaaaaa");
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
-    //q1.set_threads(5);
+    // q1.set_threads(5);
     TupleTableType::View tv = q1.find_all();
 
     CHECK_EQUAL(30, tv.size());
@@ -4541,7 +4483,8 @@ TEST(Query_BigString)
     CHECK_EQUAL(1, res2);
 
     ttt.add(1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
-    size_t res3 = ttt.where().second.equal("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ").find();
+    size_t res3 =
+        ttt.where().second.equal("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ").find();
     CHECK_EQUAL(2, res3);
 }
 
@@ -4704,7 +4647,6 @@ TEST(Query_FindRandom)
         // Compare .find() with manual for-loop-result
         CHECK_EQUAL(expected, res);
     }
-
 }
 
 TEST(Query_FindNext2)
@@ -4745,7 +4687,6 @@ TEST(Query_FindAll1)
     TupleTableType::View tv2 = q2.find_all();
     CHECK_EQUAL(5, tv2.get_source_ndx(0));
     CHECK_EQUAL(6, tv2.get_source_ndx(1));
-
 }
 
 TEST(Query_FindAll2)
@@ -4900,7 +4841,8 @@ TEST(Query_FindAllOrNested)
     ttt.add(8, "Y");
 
     // first > 3 && (first == 5 || second == X || second == Y)
-    TupleTableType::Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().second.equal("X").Or().second.equal("Y").end_group();
+    TupleTableType::Query q1 =
+        ttt.where().first.greater(3).group().first.equal(5).Or().second.equal("X").Or().second.equal("Y").end_group();
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(5, tv1.get_source_ndx(0));
     CHECK_EQUAL(6, tv1.get_source_ndx(1));
@@ -4921,7 +4863,17 @@ TEST(Query_FindAllOrNestedInnerGroup)
     ttt.add(8, "Y");
 
     // first > 3 && (first == 5 || (second == X || second == Y))
-    TupleTableType::Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().group().second.equal("X").Or().second.equal("Y").end_group().end_group();
+    TupleTableType::Query q1 = ttt.where()
+                                   .first.greater(3)
+                                   .group()
+                                   .first.equal(5)
+                                   .Or()
+                                   .group()
+                                   .second.equal("X")
+                                   .Or()
+                                   .second.equal("Y")
+                                   .end_group()
+                                   .end_group();
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(5, tv1.get_source_ndx(0));
     CHECK_EQUAL(6, tv1.get_source_ndx(1));
@@ -4937,7 +4889,8 @@ TEST(Query_FindAllOrPHP)
     ttt.add(3, "Jim");
 
     // (second == Jim || second == Joe) && first = 1
-    TupleTableType::Query q1 = ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(1);
+    TupleTableType::Query q1 =
+        ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(1);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
@@ -4951,13 +4904,11 @@ TEST(Query_FindAllOr2)
     ttt.add(3, "Jim");
 
     // (second == Jim || second == Joe) && first = 1
-    TupleTableType::Query q1 = ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(3);
+    TupleTableType::Query q1 =
+        ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(3);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.get_source_ndx(0));
 }
-
-
-
 
 
 TEST(Query_FindAllParens2)
@@ -4973,7 +4924,20 @@ TEST(Query_FindAllParens2)
     ttt.add(11, "X");
 
     // ()((first > 3()) && (()))
-    TupleTableType::Query q1 = ttt.where().group().end_group().group().group().first.greater(3).group().end_group().end_group().group().group().end_group().end_group().end_group();
+    TupleTableType::Query q1 = ttt.where()
+                                   .group()
+                                   .end_group()
+                                   .group()
+                                   .group()
+                                   .first.greater(3)
+                                   .group()
+                                   .end_group()
+                                   .end_group()
+                                   .group()
+                                   .group()
+                                   .end_group()
+                                   .end_group()
+                                   .end_group();
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(4, tv1.get_source_ndx(0));
@@ -5076,14 +5040,11 @@ TEST(Query_Binary)
 {
     TupleTableTypeBin t;
 
-    const char bin[64] = {
-        6, 3, 9, 5, 9, 7, 6, 3, 2, 6, 0, 0, 5, 4, 2, 4,
-        5, 7, 9, 5, 7, 1, 1, 2, 0, 8, 3, 8, 0, 9, 6, 8,
-        4, 7, 3, 4, 9, 5, 2, 3, 6, 2, 7, 4, 0, 3, 7, 6,
-        2, 3, 5, 9, 3, 1, 2, 1, 0, 5, 5, 2, 9, 4, 5, 9
-    };
+    const char bin[64] = {6, 3, 9, 5, 9, 7, 6, 3, 2, 6, 0, 0, 5, 4, 2, 4, 5, 7, 9, 5, 7, 1,
+                          1, 2, 0, 8, 3, 8, 0, 9, 6, 8, 4, 7, 3, 4, 9, 5, 2, 3, 6, 2, 7, 4,
+                          0, 3, 7, 6, 2, 3, 5, 9, 3, 1, 2, 1, 0, 5, 5, 2, 9, 4, 5, 9};
 
-    const char bin_2[4] = { 6, 6, 6, 6 }; // Not occuring above
+    const char bin_2[4] = {6, 6, 6, 6}; // Not occuring above
 
     t.add(0, BinaryData(bin + 0, 16));
     t.add(0, BinaryData(bin + 0, 32));
@@ -5093,7 +5054,7 @@ TEST(Query_Binary)
     t.add(0, BinaryData(bin + 32, 32));
     t.add(0, BinaryData(bin + 48, 16));
     t.add(0, BinaryData(bin + 24, 16)); // The "odd ball"
-    t.add(0, BinaryData(bin + 0, 32)); // Repeat an entry
+    t.add(0, BinaryData(bin + 0, 32));  // Repeat an entry
 
     CHECK_EQUAL(0, t.where().second.equal(BinaryData(bin + 16, 16)).count());
     CHECK_EQUAL(1, t.where().second.equal(BinaryData(bin + 0, 16)).count());
@@ -5130,7 +5091,8 @@ TEST(Query_Binary)
             CHECK_EQUAL(1, tv.get_source_ndx(0));
             CHECK_EQUAL(8, tv.get_source_ndx(1));
         }
-        else CHECK(false);
+        else
+            CHECK(false);
     }
 
     {
@@ -5141,7 +5103,8 @@ TEST(Query_Binary)
             CHECK_EQUAL(4, tv.get_source_ndx(2));
             CHECK_EQUAL(7, tv.get_source_ndx(3));
         }
-        else CHECK(false);
+        else
+            CHECK(false);
     }
 }
 
@@ -5172,15 +5135,15 @@ TEST(Query_Enums)
 }
 
 
-#define uY  "\x0CE\x0AB"              // greek capital letter upsilon with dialytika (U+03AB)
-#define uYd "\x0CE\x0A5\x0CC\x088"    // decomposed form (Y followed by two dots)
-#define uy  "\x0CF\x08B"              // greek small letter upsilon with dialytika (U+03AB)
-#define uyd "\x0cf\x085\x0CC\x088"    // decomposed form (Y followed by two dots)
+#define uY "\x0CE\x0AB"            // greek capital letter upsilon with dialytika (U+03AB)
+#define uYd "\x0CE\x0A5\x0CC\x088" // decomposed form (Y followed by two dots)
+#define uy "\x0CF\x08B"            // greek small letter upsilon with dialytika (U+03AB)
+#define uyd "\x0cf\x085\x0CC\x088" // decomposed form (Y followed by two dots)
 
-#define uA  "\x0c3\x085"         // danish capital A with ring above (as in BLAABAERGROED)
-#define uAd "\x041\x0cc\x08a"    // decomposed form (A (41) followed by ring)
-#define ua  "\x0c3\x0a5"         // danish lower case a with ring above (as in blaabaergroed)
-#define uad "\x061\x0cc\x08a"    // decomposed form (a (41) followed by ring)
+#define uA "\x0c3\x085"       // danish capital A with ring above (as in BLAABAERGROED)
+#define uAd "\x041\x0cc\x08a" // decomposed form (A (41) followed by ring)
+#define ua "\x0c3\x0a5"       // danish lower case a with ring above (as in blaabaergroed)
+#define uad "\x061\x0cc\x08a" // decomposed form (a (41) followed by ring)
 
 TEST(Query_CaseSensitivity)
 {
@@ -5364,10 +5327,10 @@ TEST(Query_SyntaxCheck)
     // when is becomes available.
     /*
     TupleTableType::Query q7 = ttt.where().second.equal("\xa0", false);
-    #ifdef REALM_DEBUG
+#ifdef REALM_DEBUG
     s = q7.verify();
     CHECK(s != "");
-    #endif
+#endif
     */
 }
 
@@ -5633,9 +5596,6 @@ TEST(Query_SumMinMaxAvg_where)
     CHECK_EQUAL(3, cnt);
     CHECK_EQUAL(9, t.where(&v).first.sum(&cnt, 0, size_t(-1)));
     CHECK_EQUAL(9, cnt);
-
-
-
 }
 
 TEST(Query_Avg)
@@ -5647,15 +5607,15 @@ TEST(Query_Avg)
     t.add(30, "b");
     CHECK_EQUAL(20, t.where().first.average());
 
-    CHECK_EQUAL(0, t.where().first.average(nullptr, 0, 0));     // none
-    CHECK_EQUAL(0, t.where().first.average(nullptr, 1, 1));     // none
-    CHECK_EQUAL(20, t.where().first.average(nullptr, 0, 2));     // both
-    CHECK_EQUAL(20, t.where().first.average(nullptr, 0, -1));     // both
+    CHECK_EQUAL(0, t.where().first.average(nullptr, 0, 0));   // none
+    CHECK_EQUAL(0, t.where().first.average(nullptr, 1, 1));   // none
+    CHECK_EQUAL(20, t.where().first.average(nullptr, 0, 2));  // both
+    CHECK_EQUAL(20, t.where().first.average(nullptr, 0, -1)); // both
 
-    CHECK_EQUAL(10, t.where().first.average(&cnt, 0, 1));     // first
+    CHECK_EQUAL(10, t.where().first.average(&cnt, 0, 1)); // first
 
     CHECK_EQUAL(30, t.where().first.sum(nullptr, 1, 2));     // second
-    CHECK_EQUAL(30, t.where().first.average(nullptr, 1, 2));     // second
+    CHECK_EQUAL(30, t.where().first.average(nullptr, 1, 2)); // second
 }
 
 TEST(Query_Avg2)
@@ -5742,21 +5702,15 @@ TEST(Query_Const)
     const size_t count = const_table.where().second.equal("a").count();
     CHECK_EQUAL(2, count);
 
-    //TODO: Should not be possible
+    // TODO: Should not be possible
     const_table.where().second.equal("a").remove();
 }
 
 namespace {
 
-REALM_TABLE_2(PhoneTable,
-              type, String,
-              number, String)
+REALM_TABLE_2(PhoneTable, type, String, number, String)
 
-REALM_TABLE_4(EmployeeTable,
-              name, String,
-              age, Int,
-              hired, Bool,
-              phones, Subtable<PhoneTable>)
+REALM_TABLE_4(EmployeeTable, name, String, age, Int, hired, Bool, phones, Subtable<PhoneTable>)
 
 } // anonymous namespace
 
@@ -5802,7 +5756,7 @@ TEST(Query_AllTypesDynamicallyTyped)
         sub1->add_column(type_Int, "sub_int");
         sub1.reset();
 
-        const char bin[4] = { 0, 1, 2, 3 };
+        const char bin[4] = {0, 1, 2, 3};
         BinaryData bin1(bin, sizeof bin / 2);
         BinaryData bin2(bin, sizeof bin);
         int_fast64_t time_now = time(0);
@@ -5902,19 +5856,10 @@ TEST(Query_AggregateSortedView)
 
 namespace {
 
-REALM_TABLE_1(TestQuerySub,
-              age, Int)
+REALM_TABLE_1(TestQuerySub, age, Int)
 
-REALM_TABLE_9(TestQueryAllTypes,
-              bool_col, Bool,
-              int_col, Int,
-              float_col, Float,
-              double_col, Double,
-              string_col, String,
-              binary_col, Binary,
-              date_col, OldDateTime,
-              table_col, Subtable<TestQuerySub>,
-              mixed_col, Mixed)
+REALM_TABLE_9(TestQueryAllTypes, bool_col, Bool, int_col, Int, float_col, Float, double_col, Double, string_col,
+              String, binary_col, Binary, date_col, OldDateTime, table_col, Subtable<TestQuerySub>, mixed_col, Mixed)
 
 } // unnamed namespace
 
@@ -5923,7 +5868,7 @@ TEST(Query_AllTypesStaticallyTyped)
 {
     TestQueryAllTypes table;
 
-    const char bin[4] = { 0, 1, 2, 3 };
+    const char bin[4] = {0, 1, 2, 3};
     BinaryData bin1(bin, sizeof bin / 2);
     BinaryData bin2(bin, sizeof bin);
     int_fast64_t time_now = time(0);
@@ -5944,7 +5889,8 @@ TEST(Query_AllTypesStaticallyTyped)
     CHECK_EQUAL(1, table.where().date_col.equal(0).count());
     //    CHECK_EQUAL(1, table.where().table_col.equal(subtab).count());
     //    CHECK_EQUAL(1, table.where().mixed_col.equal(mix_int).count());
-    // FIXME: It's not possible to construct a subtable query. .table_col.subtable() does not return an object with 'age':
+    // FIXME: It's not possible to construct a subtable query. .table_col.subtable() does not return an object with
+    // 'age':
     //    CHECK_EQUAL(1, table.where().table_col.subtable().age.end_subtable().count());
 
     TestQueryAllTypes::Query query = table.where().bool_col.equal(false);
@@ -6015,7 +5961,8 @@ TEST(Query_DeepCopy)
     t.add(3, "3", 3.3);
     t.add(4, "4", 4.4);
 
-    Query q = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine.
+    Query q = t.column().ints >
+              Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine.
 
 
     // Test if we can execute a copy
@@ -6045,13 +5992,15 @@ TEST(Query_DeepCopy)
     delete q4;
 
     // See if we can append a criteria to a query
-    Query q5 = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
+    Query q5 = t.column().ints >
+               Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
     q5.greater(2, 4.0);
     CHECK_EQUAL(3, q5.find());
 
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_expression integer node.
-    Query q6 = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
+    Query q6 = t.column().ints >
+               Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
     Query q7(q6);
 
     q7.greater(2, 4.0);
@@ -6097,7 +6046,8 @@ TEST(Query_TableViewMoveAssign1)
     t.add(4, "4", 4.4);
 
     // temporary query is created, then q makes and stores a deep copy and then temporary is destructed
-    Query q = t.column().ints > Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
+    Query q = t.column().ints >
+              Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
 
     // now deep copy should be destructed and replaced by new temporary
     TableView tv = q.find_all();
@@ -6162,7 +6112,6 @@ TEST(Query_TableViewMoveAssignLeak2)
 }
 
 
-
 TEST(Query_DeepCopyLeak1)
 {
     // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an
@@ -6176,7 +6125,8 @@ TEST(Query_DeepCopyLeak1)
     t.add(4, "4", 4.4);
 
     // See if copying of a mix of query_expression and query_engine nodes will leak
-    Query q = !(t.column().ints > Value<Int>(2) && t.column().ints > 2 && t.column().doubles > 2.2) || t.column().ints == 4 || t.column().ints == Value<Int>(4);
+    Query q = !(t.column().ints > Value<Int>(2) && t.column().ints > 2 && t.column().doubles > 2.2) ||
+              t.column().ints == 4 || t.column().ints == Value<Int>(4);
     Query q2(q);
     Query q3(q2);
 }
@@ -6219,9 +6169,9 @@ TEST(Query_NullStrings)
     TableView v;
 
     // Short strings
-    table.set_string(0, 0, "Albertslund");      // Normal non-empty string
-    table.set_string(0, 1, realm::null());    // NULL string
-    table.set_string(0, 2, "");                 // Empty string
+    table.set_string(0, 0, "Albertslund"); // Normal non-empty string
+    table.set_string(0, 1, realm::null()); // NULL string
+    table.set_string(0, 2, "");            // Empty string
 
     q = table.column<StringData>(0) == realm::null();
     v = q.find_all();
@@ -6270,7 +6220,6 @@ TEST(Query_NullStrings)
     v = q.find_all();
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(2, v.get_source_ndx(0));
-
 }
 
 TEST(Query_Nulls_Fuzzy)
@@ -6311,10 +6260,12 @@ TEST(Query_Nulls_Fuzzy)
                     // Generate string with equal probability of being empty, null, short, medium and long, and with
                     // their contents having equal proability of being either random or a duplicate of a previous
                     // string. When it's random, each char must have equal probability of being 0 or non-0
-                    char buf[] = "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
+                    char buf[] =
+                        "This string is around 90 bytes long, which falls in the long-string type of Realm strings";
                     char* buf1 = static_cast<char*>(malloc(sizeof(buf)));
                     memcpy(buf1, buf, sizeof(buf));
-                    char buf2[] = "                                                                                         ";
+                    char buf2[] =
+                        "                                                                                         ";
 
                     StringData sd;
                     std::string st;
@@ -6345,9 +6296,9 @@ TEST(Query_Nulls_Fuzzy)
                             // random string
                             for (size_t s = 0; s < len; s++) {
                                 if (fastrand(100) > 20)
-                                    buf2[s] = 0;                        // zero byte
+                                    buf2[s] = 0; // zero byte
                                 else
-                                    buf2[s] = static_cast<char>(fastrand(255));  // random byte
+                                    buf2[s] = static_cast<char>(fastrand(255)); // random byte
                             }
                             // no generated string can equal "null" (our vector magic value for null) because
                             // len == 4 is not possible
@@ -6362,7 +6313,6 @@ TEST(Query_Nulls_Fuzzy)
 
                     v.insert(v.begin() + pos, st);
                     free(buf1);
-
                 }
                 else if (table.size() > 0) {
                     // delete
@@ -6381,9 +6331,7 @@ TEST(Query_Nulls_Fuzzy)
                         CHECK(table.get_string(0, j) == v[j]);
                     }
                 }
-
             }
-
         }
     }
 }
@@ -6478,13 +6426,13 @@ TEST(Query_BinaryNull)
 
 TEST(Query_IntegerNullOldQueryEngine)
 {
-/*
-    first   second  third
-     null      100      1
-        0     null      2
-      123      200      3
-      null    null      4
-*/
+    /*
+        first   second  third
+         null      100      1
+            0     null      2
+          123      200      3
+          null    null      4
+    */
     Table table;
     table.add_column(type_Int, "first", true);
     table.add_column(type_Int, "second", true);
@@ -6544,8 +6492,8 @@ TEST(Query_IntegerNonNull)
     TableView t;
 
     // Fixme, should you be able to query a non-nullable column against null?
-//    t = table.where().equal(0, null{}).find_all();
-//    CHECK_EQUAL(0, t.size());
+    //    t = table.where().equal(0, null{}).find_all();
+    //    CHECK_EQUAL(0, t.size());
 }
 
 
@@ -6631,7 +6579,8 @@ bool equals(TableView& tv, std::vector<size_t> indexes)
     return true;
 }
 
-void fill_data(TableRef table) {
+void fill_data(TableRef table)
+{
     table->add_empty_row(3);
 
     table->set_int(0, 0, 1);
@@ -6682,11 +6631,13 @@ TEST(Query_NullShowcase)
 
     NOTE NOTE: For BinaryData, use BinaryData() instead of null().
 
-        Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<OldDateTime>   Photo<BinaryData>
+        Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>
+    Delivery<OldDateTime>   Photo<BinaryData>
         -------------------------------------------------------------------------------------------------------------------------------------
-    0   null            null                null                    1.1                 true          2016-2-2             "foo"
-    1   10              null                "foo"                   2.2                 null          null                 zero-lenght non-null
-    2   20              30.0                "bar"                   3.3                 false         2016-6-6             null
+    0   null            null                null                    1.1                 true          2016-2-2 "foo"
+    1   10              null                "foo"                   2.2                 null          null
+    zero-lenght non-null
+    2   20              30.0                "bar"                   3.3                 false         2016-6-6 null
     */
 
     Group g;
@@ -6729,7 +6680,8 @@ TEST(Query_NullShowcase)
     table->set_olddatetime(5, 2, OldDateTime(2016, 6, 6));
 
     table->set_binary(6, 0, BinaryData("foo"));
-    table->set_binary(6, 1, BinaryData("", 0)); // remember 0, else it will have length of 1 due to 0 termination of c++
+    table->set_binary(6, 1,
+                      BinaryData("", 0)); // remember 0, else it will have length of 1 due to 0 termination of c++
     table->set_null(6, 2);
 
     Columns<Int> price = table->column<Int>(0);
@@ -6745,28 +6697,28 @@ TEST(Query_NullShowcase)
     TableView tv;
 
     tv = (price == null()).find_all();
-    CHECK(equals(tv, { 0 }));
+    CHECK(equals(tv, {0}));
 
     tv = (price != null()).find_all();
-    CHECK(equals(tv, { 1, 2 }));
+    CHECK(equals(tv, {1, 2}));
 
     // Note that this returns rows with null, which differs from SQL!
     tv = (price == shipping).find_all();
-    CHECK(equals(tv, { 0 })); // null == null
+    CHECK(equals(tv, {0})); // null == null
 
     // If you add a != null criteria, you would probably get what most users intended, like in SQL
     tv = (price == shipping && price != null()).find_all();
     CHECK(equals(tv, {}));
 
     tv = (price != shipping).find_all();
-    CHECK(equals(tv, { 1, 2 })); // 10 != null
+    CHECK(equals(tv, {1, 2})); // 10 != null
 
     tv = (price < 0 || price > 0).find_all();
-    CHECK(equals(tv, { 1, 2 }));
+    CHECK(equals(tv, {1, 2}));
 
     // Shows that null + null == null, and 10 + null == null, and null < 100 == false
     tv = (price + shipping < 100).find_all();
-    CHECK(equals(tv, { 2 }));
+    CHECK(equals(tv, {2}));
 
     //  null < 0 == false
     tv = (price < 0).find_all();
@@ -6778,77 +6730,77 @@ TEST(Query_NullShowcase)
 
     // (null == 0) == false
     tv = (price > 0).find_all();
-    CHECK(equals(tv, { 1, 2 }));
+    CHECK(equals(tv, {1, 2}));
 
     // Show that power(null) == null
     tv = (power(price) == null()).find_all();
-    CHECK(equals(tv, { 0 }));
+    CHECK(equals(tv, {0}));
 
     // Doubles
     // (null > double) == false
     tv = (price > rating).find_all();
-    CHECK(equals(tv, { 1, 2 }));
+    CHECK(equals(tv, {1, 2}));
 
     tv = (price + rating == null()).find_all();
-    CHECK(equals(tv, { 0 }));
+    CHECK(equals(tv, {0}));
 
     tv = (price + rating != null()).find_all();
-    CHECK(equals(tv, { 1, 2 }));
+    CHECK(equals(tv, {1, 2}));
 
 
     // Booleans
     tv = (stock == true).find_all();
-    CHECK(equals(tv, { 0 }));
+    CHECK(equals(tv, {0}));
 
     tv = (stock == false).find_all();
-    CHECK(equals(tv, { 2 }));
+    CHECK(equals(tv, {2}));
 
     tv = (stock == null()).find_all();
-    CHECK(equals(tv, { 1 }));
+    CHECK(equals(tv, {1}));
 
     tv = (stock != null()).find_all();
-    CHECK(equals(tv, { 0, 2 }));
+    CHECK(equals(tv, {0, 2}));
 
     // Dates
     tv = (delivery == OldDateTime(2016, 6, 6)).find_all();
-    CHECK(equals(tv, { 2 }));
+    CHECK(equals(tv, {2}));
 
     tv = (delivery != OldDateTime(2016, 6, 6)).find_all();
-    CHECK(equals(tv, { 0, 1 }));
+    CHECK(equals(tv, {0, 1}));
 
     tv = (delivery == null()).find_all();
-    CHECK(equals(tv, { 1 }));
+    CHECK(equals(tv, {1}));
 
     tv = (delivery != null()).find_all();
-    CHECK(equals(tv, { 0, 2 }));
+    CHECK(equals(tv, {0, 2}));
 
     // BinaryData
     //
     // BinaryData only supports == and !=, and you cannot compare two columns - only a column and a constant
     tv = (photo == BinaryData("foo")).find_all();
-    CHECK(equals(tv, { 0 }));
+    CHECK(equals(tv, {0}));
 
     tv = (photo == BinaryData("", 0)).find_all();
-    CHECK(equals(tv, { 1 }));
+    CHECK(equals(tv, {1}));
 
     tv = (photo == BinaryData()).find_all();
-    CHECK(equals(tv, { 2 }));
+    CHECK(equals(tv, {2}));
 
     tv = (photo != BinaryData("foo")).find_all();
-    CHECK(equals(tv, { 1, 2 }));
+    CHECK(equals(tv, {1, 2}));
 
     // Old query syntax
     tv = table->where().equal(0, null()).find_all();
-    CHECK(equals(tv, { 0 }));
+    CHECK(equals(tv, {0}));
 
     tv = table->where().not_equal(0, null()).find_all();
-    CHECK(equals(tv, { 1, 2 }));
+    CHECK(equals(tv, {1, 2}));
 
     // You can also compare against user-given null with > and <, but only in the expression syntax!
     tv = (price > null()).find_all();
-    CHECK(equals(tv, { }));
+    CHECK(equals(tv, {}));
     tv = (price + rating > null()).find_all();
-    CHECK(equals(tv, { }));
+    CHECK(equals(tv, {}));
 
     // As stated above, if you want to use `> null()`, you cannot do it in the old syntax. This is for source
     // code simplicity (would need tons of new method overloads that also need unit test testing, etc). So
@@ -6857,16 +6809,16 @@ TEST(Query_NullShowcase)
 
     // Nullable floats in old syntax
     tv = table->where().equal(1, null()).find_all();
-    CHECK(equals(tv, { 0, 1 }));
+    CHECK(equals(tv, {0, 1}));
 
     tv = table->where().not_equal(1, null()).find_all();
-    CHECK(equals(tv, { 2 }));
+    CHECK(equals(tv, {2}));
 
     tv = table->where().greater(1, 0.0f).find_all();
-    CHECK(equals(tv, { 2 }));
+    CHECK(equals(tv, {2}));
 
     tv = table->where().less(1, 20.0f).find_all();
-    CHECK(equals(tv, { }));
+    CHECK(equals(tv, {}));
 
     // TableView
     size_t count;
@@ -6938,13 +6890,13 @@ TEST(Query_NullShowcase)
     CHECK(std::isnan(table->get_float(1, 1)));
 
 
-    // FIXME: std::numeric_limits<float>::signaling_NaN() seems broken in VS2015 in that it returns a non-
-    // signaling NaN. A bug report has been filed to Microsoft. Update: It turns out that on 32-bit Intel
-    // Architecture (at least on my Core i7 in 32 bit code), if you push a float-NaN (fld instruction) that
-    // has bit 22 clear (indicates it's signaling), and pop it back (fst instruction), the FPU will toggle
-    // that bit into being set. All this needs further investigation, so a P2 has been created. Note that
-    // IEEE just began specifying signaling vs. non-signaling NaNs in 2008. Also note that all this seems
-    // to work fine on ARM in both 32 and 64 bit mode.
+// FIXME: std::numeric_limits<float>::signaling_NaN() seems broken in VS2015 in that it returns a non-
+// signaling NaN. A bug report has been filed to Microsoft. Update: It turns out that on 32-bit Intel
+// Architecture (at least on my Core i7 in 32 bit code), if you push a float-NaN (fld instruction) that
+// has bit 22 clear (indicates it's signaling), and pop it back (fst instruction), the FPU will toggle
+// that bit into being set. All this needs further investigation, so a P2 has been created. Note that
+// IEEE just began specifying signaling vs. non-signaling NaNs in 2008. Also note that all this seems
+// to work fine on ARM in both 32 and 64 bit mode.
 
 #if !defined(_WIN32) && !REALM_ARCHITECTURE_X86_32
     CHECK(null::is_signaling(table->get_float(1, 0)));
@@ -7098,7 +7050,7 @@ TEST(Query_Null_Two_Columns)
     TableView tv;
 
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>   Delivery<OldDateTime>
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool> Delivery<OldDateTime>
     ----------------------------------------------------------------------------------------------------------------
     0   1           null                null                    1.1                 true          2016-2-2
     1   null        null                "foo"                   2.2                 null          null
@@ -7115,35 +7067,35 @@ TEST(Query_Null_Two_Columns)
     CHECK(equals(tv, {}));
 
     tv = (price != rating).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (shipping == rating).find_all();
     CHECK(equals(tv, {}));
 
     tv = (shipping != rating).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     // Comparison column with itself
     tv = (shipping == shipping).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (shipping > shipping).find_all();
-    CHECK(equals(tv, { }));
+    CHECK(equals(tv, {}));
 
     tv = (shipping < shipping).find_all();
     CHECK(equals(tv, {}));
 
     tv = (shipping <= shipping).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (shipping >= shipping).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (rating == rating).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (rating != rating).find_all();
-    CHECK(equals(tv, { }));
+    CHECK(equals(tv, {}));
 
     tv = (rating > rating).find_all();
     CHECK(equals(tv, {}));
@@ -7152,22 +7104,22 @@ TEST(Query_Null_Two_Columns)
     CHECK(equals(tv, {}));
 
     tv = (rating >= rating).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (rating <= rating).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (stock == stock).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (stock != stock).find_all();
-    CHECK(equals(tv, { }));
+    CHECK(equals(tv, {}));
 
     tv = (price == price).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (price != price).find_all();
-    CHECK(equals(tv, { }));
+    CHECK(equals(tv, {}));
 
     tv = (price > price).find_all();
     CHECK(equals(tv, {}));
@@ -7176,13 +7128,13 @@ TEST(Query_Null_Two_Columns)
     CHECK(equals(tv, {}));
 
     tv = (price >= price).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (price <= price).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (delivery == delivery).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (delivery != delivery).find_all();
     CHECK(equals(tv, {}));
@@ -7194,13 +7146,13 @@ TEST(Query_Null_Two_Columns)
     CHECK(equals(tv, {}));
 
     tv = (delivery >= delivery).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (delivery <= delivery).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (description == description).find_all();
-    CHECK(equals(tv, { 0, 1, 2 }));
+    CHECK(equals(tv, {0, 1, 2}));
 
     tv = (description != description).find_all();
     CHECK(equals(tv, {}));
@@ -7208,24 +7160,24 @@ TEST(Query_Null_Two_Columns)
     // integer + null == null
     // note: booleans can convert to 0 and 1 when compared agaist numeric values, like in c++
     tv = (price + shipping == stock).find_all();
-    CHECK(equals(tv, { 1 }));
+    CHECK(equals(tv, {1}));
 
     // Test a few untested things
     tv = table->where().equal(3, null()).find_all();
-    CHECK(equals(tv, { 2 }));
+    CHECK(equals(tv, {2}));
 
     tv = table->where().equal(0, null()).find_all();
-    CHECK(equals(tv, { 1 }));
+    CHECK(equals(tv, {1}));
 
     tv = table->where().not_equal(3, null()).find_all();
-    CHECK(equals(tv, { 0, 1 }));
+    CHECK(equals(tv, {0, 1}));
 
     tv = table->where().between(0, 2, 4).find_all();
-    CHECK(equals(tv, { 2 }));
+    CHECK(equals(tv, {2}));
 
     // between for floats
     tv = table->where().between(1, 10.f, 40.f).find_all();
-    CHECK(equals(tv, { 2 }));
+    CHECK(equals(tv, {2}));
 
     tv = table->where().between(1, 0.f, 20.f).find_all();
     CHECK(equals(tv, {}));
@@ -7235,17 +7187,16 @@ TEST(Query_Null_Two_Columns)
 
     // between for doubles
     tv = table->where().between(3, 0., 100.).find_all();
-    CHECK(equals(tv, { 0, 1 }));
+    CHECK(equals(tv, {0, 1}));
 
     tv = table->where().between(3, 1., 2.).find_all();
-    CHECK(equals(tv, { 0 }));
+    CHECK(equals(tv, {0}));
 
     tv = table->where().between(3, 2., 3.).find_all();
-    CHECK(equals(tv, { 1 }));
+    CHECK(equals(tv, {1}));
 
     tv = table->where().between(3, 3., 100.).find_all();
     CHECK(equals(tv, {}));
-
 }
 
 // Between, count, min and max
@@ -7257,9 +7208,10 @@ TEST(Query_Null_BetweenMinMax_Nullable)
     table->add_empty_row();
 
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<OldDateTime>     ts<Timestamp>
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>
+    Delivery<OldDateTime>     ts<Timestamp>
     --------------------------------------------------------------------------------------------------------------------------------------
-    null            null                null                    null                null            null                      null
+    null            null                null                    null                null            null null
     */
 
     TableView tv;
@@ -7341,7 +7293,7 @@ TEST(Query_Null_BetweenMinMax_Nullable)
 
     // Now we test that average does not include nulls in row count:
     /*
-    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool>     Delivery<OldDateTime>
+    Price<int>      Shipping<float>     Description<String>     Rating<double>      Stock<bool> Delivery<OldDateTime>
     ----------------------------------------------------------------------------------------------------------------
     null            null                null                    null                null            null
     10              10.f                null                    10.                 null            null
@@ -7393,8 +7345,8 @@ TEST(Query_Null_ManyRows)
     }
 
     // Reference lists used to verify query results
-    std::vector<size_t> nulls;          // List of rows that have all fields set to null
-    std::vector<size_t> non_nulls;      // List of non-null rows
+    std::vector<size_t> nulls;     // List of rows that have all fields set to null
+    std::vector<size_t> non_nulls; // List of non-null rows
 
     // Fill in nulls in random rows, at each 10'th row on average
     for (size_t t = 0; t < table->size() / 10; t++) {
@@ -7841,7 +7793,8 @@ TEST(Query_Link_MaximumSumAverage)
 
 
     // Sum.
-    // Floating point results below may be inexact for some combination of architectures, compilers, and compiler flags.
+    // Floating point results below may be inexact for some combination of architectures, compilers, and compiler
+    // flags.
 
     q = table2->column<LinkList>(col_linklist).column<Int>(0).sum() == 1245;
     match = q.find();
@@ -7901,7 +7854,8 @@ TEST(Query_Link_MaximumSumAverage)
 
 
     // Average.
-    // Floating point results below may be inexact for some combination of architectures, compilers, and compiler flags.
+    // Floating point results below may be inexact for some combination of architectures, compilers, and compiler
+    // flags.
 
     q = table2->column<LinkList>(col_linklist).column<Int>(0).average() == 622.5;
     match = q.find();
@@ -8255,14 +8209,14 @@ TEST(Query_DeepLink)
     size_t col_bool = table->add_column(type_Bool, "bool");
     size_t col_linklist = table->add_column_link(type_LinkList, "list", *table);
 
-    for(size_t j = 0; j < N; ++j) {
+    for (size_t j = 0; j < N; ++j) {
         table->add_empty_row();
         table->set_int(col_int, j, j);
         table->set_bool(col_bool, j, (j % 2) == 0);
 
         LinkViewRef links = table->get_linklist(col_linklist, j);
         TableView view = table->where().find_all();
-        for(size_t i = 0; i < view.size(); ++i) {
+        for (size_t i = 0; i < view.size(); ++i) {
             links->add(i);
         }
     }
@@ -8358,8 +8312,7 @@ TEST(Query_BrokenFindGT)
 TEST(Query_FuzzyFind)
 {
     // TEST_DURATION is normally 0.
-    for (size_t iter = 0; iter < 50 + TEST_DURATION * 2000; iter++)
-    {
+    for (size_t iter = 0; iter < 50 + TEST_DURATION * 2000; iter++) {
         Group group;
         TableRef table = group.add_table("test");
         size_t col = table->add_column(type_Int, "int");
@@ -8482,8 +8435,7 @@ TEST(Query_NegativeNumbers)
 // on Query. When performed on TableView or Table, it worked OK.
 TEST(Query_MaximumSumAverage)
 {
-    for (int nullable = 0; nullable < 2; nullable++)
-    {
+    for (int nullable = 0; nullable < 2; nullable++) {
         bool n = (nullable == 1);
         Group group;
         TableRef table1 = group.add_table("table1");
@@ -8756,7 +8708,6 @@ TEST(Query_MaximumSumAverage)
         }
 
 
-
         // Count
         {
             int64_t d;
@@ -8906,7 +8857,8 @@ TEST(Query_SubQueries)
     Query q;
 
     // The linked rows for rows 0 and 2 all match ("world", 500). Row 2 does by virtue of having no rows.
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500).count() == table1->column<LinkList>(col_link2).count();
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500)
+            .count() == table1->column<LinkList>(col_link2).count();
     match = q.find();
     CHECK_EQUAL(0, match);
     match = q.find(match + 1);
@@ -8915,12 +8867,14 @@ TEST(Query_SubQueries)
     CHECK_EQUAL(not_found, match);
 
     // No linked rows match ("world, 600).
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 600).count() >= 1;
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 600)
+            .count() >= 1;
     match = q.find();
     CHECK_EQUAL(not_found, match);
 
     // Rows 0 and 1 both have at least one linked row that matches ("world", 500).
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500).count() >= 1;
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" && table2->column<Int>(0) == 500)
+            .count() >= 1;
     match = q.find();
     CHECK_EQUAL(0, match);
     match = q.find(match + 1);
@@ -8929,21 +8883,25 @@ TEST(Query_SubQueries)
     CHECK_EQUAL(not_found, match);
 
     // Row 1 has at least one linked row that matches ("!", 600).
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "!" && table2->column<Int>(0) == 600).count() >= 1;
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "!" && table2->column<Int>(0) == 600)
+            .count() >= 1;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
     // Row 1 has two linked rows that contain either "world" or 600.
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600).count() == 2;
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600)
+            .count() == 2;
     match = q.find();
     CHECK_EQUAL(1, match);
     match = q.find(match + 1);
     CHECK_EQUAL(not_found, match);
 
-    // Rows 0 and 2 have at most one linked row that contains either "world" or 600. Row 2 does by virtue of having no rows.
-    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600).count() <= 1;
+    // Rows 0 and 2 have at most one linked row that contains either "world" or 600. Row 2 does by virtue of having no
+    // rows.
+    q = table1->column<LinkList>(col_link2, table2->column<String>(1) == "world" || table2->column<Int>(0) == 600)
+            .count() <= 1;
     match = q.find();
     CHECK_EQUAL(0, match);
     match = q.find(match + 1);
@@ -8983,7 +8941,7 @@ TEST(Query_Timestamp)
     table.set_timestamp(0, 0, Timestamp(111, 222));
     table.set_timestamp(0, 1, Timestamp(111, 333));
     table.set_timestamp(0, 2, Timestamp(333, 444));
-    table.set_timestamp(0, 3, Timestamp(null{}));
+    table.set_timestamp(0, 3, Timestamp{});
     table.set_timestamp(0, 4, Timestamp(0, 0));
     table.set_timestamp(0, 5, Timestamp(-1000, 0));
 
@@ -9016,7 +8974,7 @@ TEST(Query_Timestamp)
     match = (first < Timestamp(0, 0)).count();
     CHECK_EQUAL(match, 1);
 
-    match = (first != Timestamp(null{})).count();
+    match = (first != Timestamp{}).count();
     CHECK_EQUAL(match, 5);
 
     match = (first != null{}).count();
@@ -9032,7 +8990,7 @@ TEST(Query_Timestamp)
     match = (Timestamp(111, 222) == first).find();
     CHECK_EQUAL(match, 0);
 
-    match = (Timestamp(null{}) == first).find();
+    match = (Timestamp{} == first).find();
     CHECK_EQUAL(match, 3);
 
     match = (Timestamp(111, 222) > first).find();
@@ -9073,7 +9031,7 @@ TEST(Query_Timestamp)
     CHECK_EQUAL(match, 0);
 
     match = (first <= first).find();
-    CHECK_EQUAL(match, 0); 
+    CHECK_EQUAL(match, 0);
 
     // Two different columns
     match = (first == second).find();
@@ -9084,7 +9042,6 @@ TEST(Query_Timestamp)
 
     match = (first < second).find();
     CHECK_EQUAL(match, npos); // Note that (null < null) == false
-
 }
 
 TEST(Query_Timestamp_Null)
@@ -9101,10 +9058,10 @@ TEST(Query_Timestamp_Null)
     Columns<Timestamp> first = table.column<Timestamp>(0);
     Columns<Timestamp> second = table.column<Timestamp>(1);
 
-    match = (first == Timestamp(null{})).find();
+    match = (first == Timestamp{}).find();
     CHECK_EQUAL(match, npos);
 
-    match = (second == Timestamp(null{})).find();
+    match = (second == Timestamp{}).find();
     CHECK_EQUAL(match, 0);
 }
 
@@ -9146,7 +9103,7 @@ TEST(Query_SyncViewIfNeeded)
     size_t col_links = source->add_column_link(type_LinkList, "link", *target);
     size_t col_id = target->add_column(type_Int, "id");
 
-    auto reset_table_contents = [&]{
+    auto reset_table_contents = [&] {
         source->clear();
         target->clear();
 
@@ -9284,6 +9241,30 @@ TEST(Query_CombineWithEmptyQueryDoesntCrash)
     }
 }
 
+// Check that queries take into account restricting views, but still
+// return row index into the underlying table
+TEST(Query_AccountForRestrictingViews)
+{
+    Table table;
+    size_t col_id = table.add_column(type_Int, "id");
+    table.add_empty_row(3);
+    table.set_int(col_id, 0, 42);
+    table.set_int(col_id, 1, 43);
+    table.set_int(col_id, 2, 44);
+
+    {
+        // Create initial table view
+        TableView results = table.where().equal(col_id, 44).find_all();
+        CHECK_EQUAL(1, results.size());
+        CHECK_EQUAL(44, results.get(0).get_int(col_id));
+
+        // Create query based on restricting view
+        Query q = Query(results.get_parent().where(&results));
+        size_t table_index = q.find(0);
+        CHECK_EQUAL(2, table_index);
+    }
+}
+
 namespace {
 struct QueryInitHelper;
 
@@ -9291,21 +9272,30 @@ struct QueryInitHelper;
 // type. This is done in a somewhat ridiculous CPS style to ensure complete
 // control over when the Query instances are copied.
 struct PreRun {
-    template<typename Next>
-    auto operator()(Query& q, Next&& next) { q.count(); return next(q); }
+    template <typename Next>
+    auto operator()(Query& q, Next&& next)
+    {
+        q.count();
+        return next(q);
+    }
 };
 struct CopyQuery {
-    template<typename Next>
-    auto operator()(Query& q, Next&& next) {  Query copy(q); return next(copy); }
+    template <typename Next>
+    auto operator()(Query& q, Next&& next)
+    {
+        Query copy(q);
+        return next(copy);
+    }
 };
 struct AndQuery {
-    template<typename Next>
-    auto operator()(Query& q, Next&& next) {
+    template <typename Next>
+    auto operator()(Query& q, Next&& next)
+    {
         return next(q.get_table()->where().and_query(q));
     }
 };
 struct HandoverQuery {
-    template<typename Next>
+    template <typename Next>
     auto operator()(Query& q, Next&& next)
     {
         auto main_table = next.state.table;
@@ -9313,7 +9303,8 @@ struct HandoverQuery {
         // Hand over the query to the secondary SG and continue processing on that
         std::swap(next.state.sg, next.state.sg2);
         auto& group = next.state.sg->begin_read(next.state.sg2->get_version_of_current_transaction());
-        auto copy = next.state.sg->import_from_handover(next.state.sg2->export_for_handover(q, ConstSourcePayload::Copy));
+        auto copy =
+            next.state.sg->import_from_handover(next.state.sg2->export_for_handover(q, ConstSourcePayload::Copy));
         next.state.table = const_cast<Table*>(group.get_table(0).get());
 
         auto ret = next(*copy);
@@ -9326,7 +9317,7 @@ struct HandoverQuery {
     }
 };
 struct InsertColumn {
-    template<typename Next>
+    template <typename Next>
     auto operator()(Query& q, Next&& next)
     {
         LangBindHelper::advance_read(*next.state.sg);
@@ -9334,19 +9325,28 @@ struct InsertColumn {
     }
 };
 struct GetCount {
-    auto operator()(Query& q) {  return q.count(); }
+    auto operator()(Query& q)
+    {
+        return q.count();
+    }
 };
 
-template<typename Func, typename... Rest>
+template <typename Func, typename... Rest>
 struct Compose {
     QueryInitHelper& state;
-    auto operator()(Query& q) { return Func()(q, Compose<Rest...>{state}); }
+    auto operator()(Query& q)
+    {
+        return Func()(q, Compose<Rest...>{state});
+    }
 };
 
-template<typename Func>
+template <typename Func>
 struct Compose<Func> {
     QueryInitHelper& state;
-    auto operator()(Query& q) { return Func()(q); }
+    auto operator()(Query& q)
+    {
+        return Func()(q);
+    }
 };
 
 struct QueryInitHelper {
@@ -9356,14 +9356,14 @@ struct QueryInitHelper {
     SharedGroup::VersionID initial_version, extra_col_version;
     Table* table;
 
-    template<typename Func>
+    template <typename Func>
     REALM_NOINLINE void operator()(Func&& fn);
 
-    template<typename Func, typename... Mutations>
+    template <typename Func, typename... Mutations>
     REALM_NOINLINE size_t run(Func& fn);
 };
 
-template<typename Func>
+template <typename Func>
 void QueryInitHelper::operator()(Func&& fn)
 {
     // get baseline result with no copies
@@ -9402,16 +9402,14 @@ void QueryInitHelper::operator()(Func&& fn)
     CHECK_EQUAL(count, (run<Func, PreRun, InsertColumn, HandoverQuery>(fn)));
 }
 
-template<typename Func, typename... Mutations>
+template <typename Func, typename... Mutations>
 size_t QueryInitHelper::run(Func& fn)
 {
     auto& group = sg->begin_read(initial_version);
     table = const_cast<Table*>(group.get_table(0).get());
     size_t count;
     Query query = table->where();
-    fn(query, [&](auto&& q2) {
-        count = Compose<Mutations..., GetCount>{*this}(q2);
-    });
+    fn(query, [&](auto&& q2) { count = Compose<Mutations..., GetCount>{*this}(q2); });
     sg->end_read();
     return count;
 }
@@ -9426,8 +9424,8 @@ TEST(Query_TableInitialization)
 
     auto repl = make_in_realm_history(path);
     auto repl2 = make_in_realm_history(path);
-    SharedGroup sg(*repl, SharedGroup::durability_MemOnly);
-    SharedGroup sg2(*repl2, SharedGroup::durability_MemOnly);
+    SharedGroup sg(*repl, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
+    SharedGroup sg2(*repl2, SharedGroupOptions(SharedGroupOptions::Durability::MemOnly));
     Group& g = const_cast<Group&>(sg.begin_read());
     LangBindHelper::promote_to_write(sg);
 
@@ -9490,7 +9488,9 @@ TEST(Query_TableInitialization)
     helper([&](Query& q, auto&& test) { test(q.links_to(col_link, (*q.get_table())[0])); });
     helper([&](Query& q, auto&& test) { test(q.links_to(col_list, (*q.get_table())[0])); });
     helper([&](Query& q, auto&& test) { test(q.Not().links_to(col_link, (*q.get_table())[0])); });
-    helper([&](Query& q, auto&& test) { test(q.links_to(col_link, (*q.get_table())[0]).Or().links_to(col_link, (*q.get_table())[1])); });
+    helper([&](Query& q, auto&& test) {
+        test(q.links_to(col_link, (*q.get_table())[0]).Or().links_to(col_link, (*q.get_table())[1]));
+    });
 
     // subtable
     helper([&](Query& q, auto&& test) { test(q.subtable(col_table).equal(0, 0).end_subtable()); });
@@ -9689,23 +9689,31 @@ TEST(Query_TableInitialization)
     // Test all of the query expressions directly, over a link, over a backlink
     // over a linklist, and over two links
     test_query_expression([&]() -> Table& { return *helper.table; }, Mode::Direct);
-    test_query_expression([&]() -> Table& {
-        helper.table->link(col_link);
-        return *helper.table;
-    }, Mode::Link);
-    test_query_expression([&]() -> Table& {
-        helper.table->backlink(*helper.table, col_link);
-        return *helper.table;
-    }, Mode::LinkList);
-    test_query_expression([&]() -> Table& {
-        helper.table->link(col_list);
-        return *helper.table;
-    }, Mode::LinkList);
-    test_query_expression([&]() -> Table& {
-        helper.table->link(col_link);
-        helper.table->link(col_list);
-        return *helper.table;
-    }, Mode::LinkList);
+    test_query_expression(
+        [&]() -> Table& {
+            helper.table->link(col_link);
+            return *helper.table;
+        },
+        Mode::Link);
+    test_query_expression(
+        [&]() -> Table& {
+            helper.table->backlink(*helper.table, col_link);
+            return *helper.table;
+        },
+        Mode::LinkList);
+    test_query_expression(
+        [&]() -> Table& {
+            helper.table->link(col_list);
+            return *helper.table;
+        },
+        Mode::LinkList);
+    test_query_expression(
+        [&]() -> Table& {
+            helper.table->link(col_link);
+            helper.table->link(col_list);
+            return *helper.table;
+        },
+        Mode::LinkList);
 
     helper([&](Query& q, auto&& test) {
         test(helper.table->column<LinkList>(col_list, q.equal_int(col_int, 0)).count() > 0);

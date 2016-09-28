@@ -26,7 +26,7 @@
 #include <cstring>
 
 #include <cfloat>
-#include <math.h>
+#include <cmath>
 
 #include <realm/util/features.h>
 #include <realm/util/optional.hpp>
@@ -82,17 +82,17 @@ public:
     /// If \a external_data is 'null', \a data_size must be zero.
     StringData(const char* external_data, size_t data_size) noexcept;
 
-    template<class T, class A>
+    template <class T, class A>
     StringData(const std::basic_string<char, T, A>&);
 
-    template<class T, class A>
+    template <class T, class A>
     operator std::basic_string<char, T, A>() const;
 
     // StringData does not store data, callers must manage their own strings.
-    template<class T, class A>
+    template <class T, class A>
     StringData(std::basic_string<char, T, A>&&) = delete;
 
-    template<class T, class A>
+    template <class T, class A>
     StringData(const util::Optional<std::basic_string<char, T, A>>&);
 
     StringData(const null&) noexcept;
@@ -148,8 +148,8 @@ public:
     StringData substr(size_t i) const noexcept;
     //@}
 
-    template<class C, class T>
-    friend std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>&, const StringData&);
+    template <class C, class T>
+    friend std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>&, const StringData&);
 
     explicit operator bool() const noexcept;
 
@@ -161,49 +161,48 @@ private:
 
 // Implementation:
 
-inline StringData::StringData() noexcept:
-    m_data(nullptr),
-    m_size(0)
+inline StringData::StringData() noexcept
+    : m_data(nullptr)
+    , m_size(0)
 {
 }
 
-inline StringData::StringData(const char* external_data, size_t data_size) noexcept:
-    m_data(external_data),
-    m_size(data_size)
+inline StringData::StringData(const char* external_data, size_t data_size) noexcept
+    : m_data(external_data)
+    , m_size(data_size)
 {
     REALM_ASSERT_DEBUG(external_data || data_size == 0);
 }
 
-template<class T, class A>
-inline StringData::StringData(const std::basic_string<char, T, A>& s):
-    m_data(s.data()),
-    m_size(s.size())
+template <class T, class A>
+inline StringData::StringData(const std::basic_string<char, T, A>& s)
+    : m_data(s.data())
+    , m_size(s.size())
 {
 }
 
-template<class T, class A>
+template <class T, class A>
 inline StringData::operator std::basic_string<char, T, A>() const
 {
     return std::basic_string<char, T, A>(m_data, m_size);
 }
 
-template<class T, class A>
-inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s):
-    m_data(s ? s->data() : nullptr),
-    m_size(s ? s->size() : 0)
+template <class T, class A>
+inline StringData::StringData(const util::Optional<std::basic_string<char, T, A>>& s)
+    : m_data(s ? s->data() : nullptr)
+    , m_size(s ? s->size() : 0)
 {
 }
 
-inline StringData::StringData(const null&) noexcept:
-    m_data(nullptr),
-    m_size(0)
+inline StringData::StringData(const null&) noexcept
+    : m_data(nullptr)
+    , m_size(0)
 {
-
 }
 
-inline StringData::StringData(const char* c_str) noexcept:
-    m_data(c_str),
-    m_size(0)
+inline StringData::StringData(const char* c_str) noexcept
+    : m_data(c_str)
+    , m_size(0)
 {
     if (c_str)
         m_size = std::char_traits<char>::length(c_str);
@@ -246,8 +245,7 @@ inline bool operator<(const StringData& a, const StringData& b) noexcept
         // equal to empty strings.
         return true;
     }
-    return std::lexicographical_compare(a.m_data, a.m_data + a.m_size,
-                                        b.m_data, b.m_data + b.m_size);
+    return std::lexicographical_compare(a.m_data, a.m_data + a.m_size, b.m_data, b.m_data + b.m_size);
 }
 
 inline bool operator>(const StringData& a, const StringData& b) noexcept
@@ -284,13 +282,12 @@ inline bool StringData::contains(StringData d) const noexcept
     if (is_null() && !d.is_null())
         return false;
 
-    return d.m_size == 0 ||
-        std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
+    return d.m_size == 0 || std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
 inline StringData StringData::prefix(size_t n) const noexcept
 {
-    return substr(0,n);
+    return substr(0, n);
 }
 
 inline StringData StringData::suffix(size_t n) const noexcept
@@ -308,8 +305,8 @@ inline StringData StringData::substr(size_t i) const noexcept
     return substr(i, m_size - i);
 }
 
-template<class C, class T>
-inline std::basic_ostream<C,T>& operator<<(std::basic_ostream<C,T>& out, const StringData& d)
+template <class C, class T>
+inline std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, const StringData& d)
 {
     for (const char* i = d.m_data; i != d.m_data + d.m_size; ++i)
         out << *i;

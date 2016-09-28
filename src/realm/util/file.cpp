@@ -21,23 +21,23 @@
 #include <algorithm>
 #include <vector>
 
-#include <errno.h>
-#include <string.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cerrno>
+#include <cstring>
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
 
 #ifdef _WIN32
-#  define NOMINMAX
-#  include <windows.h>
-#  include <io.h>
-#  include <direct.h>
+#define NOMINMAX
+#include <windows.h>
+#include <io.h>
+#include <direct.h>
 #else
-#  include <unistd.h>
-#  include <fcntl.h>
-#  include <sys/stat.h>
-#  include <sys/mman.h>
-#  include <sys/file.h> // BSD / Linux flock()
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <sys/file.h> // BSD / Linux flock()
 #endif
 
 #include <realm/util/errno.hpp>
@@ -63,10 +63,9 @@ std::string get_last_error_msg(const char* prefix, DWORD err)
     DWORD flags = FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS;
     DWORD language_id = MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT);
     DWORD size =
-        FormatMessageA(flags, 0, err, language_id, buffer.data()+offset,
-                       static_cast<DWORD>(max_msg_size), 0);
+        FormatMessageA(flags, 0, err, language_id, buffer.data() + offset, static_cast<DWORD>(max_msg_size), 0);
     if (0 < size)
-        return std::string(buffer.data(), offset+size);
+        return std::string(buffer.data(), offset + size);
     buffer.resize(offset);
     buffer.append_c_str("Unknown error");
     return buffer.str();
@@ -79,7 +78,7 @@ size_t get_page_size()
 #ifdef _WIN32
     SYSTEM_INFO sysinfo;
     GetNativeSystemInfo(&sysinfo);
-    //DWORD size = sysinfo.dwPageSize;
+    // DWORD size = sysinfo.dwPageSize;
     // On windows we use the allocation granularity instead
     DWORD size = sysinfo.dwAllocationGranularity;
 #else
@@ -106,7 +105,7 @@ bool try_make_dir(const std::string& path)
     if (_mkdir(path.c_str()) == 0)
         return true;
 #else // POSIX
-    if (::mkdir(path.c_str(), S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH) == 0)
+    if (::mkdir(path.c_str(), S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == 0)
         return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
@@ -118,7 +117,7 @@ bool try_make_dir(const std::string& path)
         case EROFS:
             throw File::PermissionDenied(msg, path);
         default:
-            throw File::AccessError(msg, path);         // LCOV_EXCL_LINE
+            throw File::AccessError(msg, path); // LCOV_EXCL_LINE
     }
 }
 
@@ -154,7 +153,7 @@ void remove_dir(const std::string& path)
         case ENOENT:
             throw File::NotFound(msg, path);
         default:
-            throw File::AccessError(msg, path);   // LCOV_EXCL_LINE
+            throw File::AccessError(msg, path); // LCOV_EXCL_LINE
     }
 }
 
@@ -164,8 +163,8 @@ std::string make_temp_dir()
 #ifdef _WIN32 // Windows version
 
     StringBuffer buffer1;
-    buffer1.resize(MAX_PATH+1);
-    if (GetTempPathA(MAX_PATH+1, buffer1.data()) == 0)
+    buffer1.resize(MAX_PATH + 1);
+    if (GetTempPathA(MAX_PATH + 1, buffer1.data()) == 0)
         throw std::runtime_error("CreateDirectory() failed");
     StringBuffer buffer2;
     buffer2.resize(MAX_PATH);
@@ -186,7 +185,7 @@ std::string make_temp_dir()
     StringBuffer buffer;
     buffer.append_c_str(P_tmpdir "/realm_XXXXXX");
     if (mkdtemp(buffer.c_str()) == 0)
-        throw std::runtime_error("mkdtemp() failed");   // LCOV_EXCL_LINE
+        throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
     return buffer.str();
 
 #endif
@@ -214,7 +213,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
             break;
         case access_ReadWrite:
             if (flags & flag_Append) {
-                desired_access  = FILE_APPEND_DATA;
+                desired_access = FILE_APPEND_DATA;
             }
             else {
                 desired_access |= GENERIC_WRITE;
@@ -238,10 +237,10 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
             break;
     }
     DWORD flags_and_attributes = 0;
-    HANDLE handle = CreateFileA(path.c_str(), desired_access, share_mode, 0,
-                                creation_disposition, flags_and_attributes, 0);
+    HANDLE handle =
+        CreateFileA(path.c_str(), desired_access, share_mode, 0, creation_disposition, flags_and_attributes, 0);
     if (handle != INVALID_HANDLE_VALUE) {
-        m_handle    = handle;
+        m_handle = handle;
         m_have_lock = false;
         if (success)
             *success = true;
@@ -296,7 +295,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         flags2 |= O_TRUNC;
     if (flags & flag_Append)
         flags2 |= O_APPEND;
-    int fd = ::open(path.c_str(), flags2, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    int fd = ::open(path.c_str(), flags2, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (0 <= fd) {
         m_fd = fd;
         if (success)
@@ -325,7 +324,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
         case EEXIST:
             throw Exists(msg, path);
         default:
-            throw AccessError(msg, path);   // LCOV_EXCL_LINE
+            throw AccessError(msg, path); // LCOV_EXCL_LINE
     }
 
 #endif
@@ -405,7 +404,7 @@ error:
         if (r == 0)
             break;
         if (r < 0)
-            goto error;     // LCOV_EXCL_LINE
+            goto error; // LCOV_EXCL_LINE
         REALM_ASSERT_RELEASE(size_t(r) <= n);
         size -= size_t(r);
         data += size_t(r);
@@ -417,7 +416,7 @@ error:
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("read(): failed: ", err);
     throw std::runtime_error(msg);
-    // LCOV_EXCL_STOP
+// LCOV_EXCL_STOP
 #endif
 }
 
@@ -441,7 +440,7 @@ void File::write(const char* data, size_t size)
     }
     return;
 
-  error:
+error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     std::string msg = get_last_error_msg("WriteFile() failed: ", err);
     throw std::runtime_error(msg);
@@ -465,7 +464,7 @@ void File::write(const char* data, size_t size)
         size_t n = std::min(size, size_t(SSIZE_MAX));
         ssize_t r = ::write(m_fd, data, n);
         if (r < 0)
-            goto error;     // LCOV_EXCL_LINE
+            goto error; // LCOV_EXCL_LINE
         REALM_ASSERT_RELEASE(r != 0);
         REALM_ASSERT_RELEASE(size_t(r) <= n);
         size -= size_t(r);
@@ -473,12 +472,12 @@ void File::write(const char* data, size_t size)
     }
     return;
 
-  error:
-  // LCOV_EXCL_START
+error:
+    // LCOV_EXCL_START
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("write(): failed: ", err);
     throw std::runtime_error(msg);
-    // LCOV_EXCL_STOP
+// LCOV_EXCL_STOP
 
 #endif
 }
@@ -592,13 +591,13 @@ void File::prealloc_if_supported(SizeType offset, size_t size)
     std::string msg = get_errno_msg("posix_fallocate() failed: ", err);
     throw std::runtime_error(msg);
 
-    // FIXME: OS X does not have any version of fallocate, but see
-    // http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
+// FIXME: OS X does not have any version of fallocate, but see
+// http://stackoverflow.com/questions/11497567/fallocate-command-equivalent-in-os-x
 
-    // FIXME: On Windows one could use a call to CreateFileMapping()
-    // since it will grow the file if necessary, but never shrink it,
-    // just like posix_fallocate(). The advantage would be that it
-    // then becomes an atomic operation (probably).
+// FIXME: On Windows one could use a call to CreateFileMapping()
+// since it will grow the file if necessary, but never shrink it,
+// just like posix_fallocate(). The advantage would be that it
+// then becomes an atomic operation (probably).
 
 #else
 
@@ -655,9 +654,9 @@ File::SizeType File::get_file_position()
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-    LARGE_INTEGER liOfs = { 0 };
-    LARGE_INTEGER liNew = { 0 };
-    if(!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
+    LARGE_INTEGER liOfs = {0};
+    LARGE_INTEGER liNew = {0};
+    if (!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
         throw std::runtime_error("SetFilePointerEx() failed");
     return liNew.QuadPart;
 }
@@ -714,8 +713,8 @@ bool File::lock(bool exclusive, bool non_blocking)
         flags |= LOCKFILE_FAIL_IMMEDIATELY;
     OVERLAPPED overlapped;
     memset(&overlapped, 0, sizeof overlapped);
-    overlapped.Offset = 0;        // Just for clarity
-    overlapped.OffsetHigh = 0;    // Just for clarity
+    overlapped.Offset = 0;     // Just for clarity
+    overlapped.OffsetHigh = 0; // Just for clarity
     if (LockFileEx(m_handle, flags, 0, 1, 0, &overlapped)) {
         m_have_lock = true;
         return true;
@@ -748,7 +747,7 @@ bool File::lock(bool exclusive, bool non_blocking)
 
     int operation = exclusive ? LOCK_EX : LOCK_SH;
     if (non_blocking)
-        operation |=  LOCK_NB;
+        operation |= LOCK_NB;
     do {
         if (flock(m_fd, operation) == 0)
             return true;
@@ -796,21 +795,20 @@ void* File::map(AccessMode a, size_t size, int map_flags, size_t offset) const
     // FIXME: Is there anything that we must do on Windows to honor map_NoSync?
     static_cast<void>(map_flags);
 
-    DWORD protect        = PAGE_READONLY;
+    DWORD protect = PAGE_READONLY;
     DWORD desired_access = FILE_MAP_READ;
     switch (a) {
         case access_ReadOnly:
             break;
         case access_ReadWrite:
-            protect        = PAGE_READWRITE;
+            protect = PAGE_READWRITE;
             desired_access = FILE_MAP_WRITE;
             break;
     }
     LARGE_INTEGER large_int;
-    if (int_cast_with_overflow_detect(offset+size, large_int.QuadPart))
+    if (int_cast_with_overflow_detect(offset + size, large_int.QuadPart))
         throw std::runtime_error("Map size is too large");
-    HANDLE map_handle =
-        CreateFileMapping(m_handle, 0, protect, large_int.HighPart, large_int.LowPart, 0);
+    HANDLE map_handle = CreateFileMapping(m_handle, 0, protect, large_int.HighPart, large_int.LowPart, 0);
     if (REALM_UNLIKELY(!map_handle))
         throw std::runtime_error("CreateFileMapping() failed");
     if (int_cast_with_overflow_detect(offset, large_int.QuadPart))
@@ -843,8 +841,7 @@ void* File::map(AccessMode a, size_t size, int map_flags, size_t offset) const
 #ifdef _WIN32
 #error "Encryption is not supported on Windows"
 #else
-void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping,
-                int map_flags, size_t offset) const
+void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int map_flags, size_t offset) const
 {
     static_cast<void>(map_flags);
 
@@ -869,8 +866,8 @@ void File::unmap(void* addr, size_t size) noexcept
 }
 
 
-void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size,
-                  int map_flags, size_t file_offset) const
+void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size, int map_flags,
+                  size_t file_offset) const
 {
 #ifdef _WIN32
     void* new_addr = map(a, new_size, map_flags);
@@ -1038,17 +1035,17 @@ bool File::is_same_file(const File& f) const
     BY_HANDLE_FILE_INFORMATION file_info;
     if (GetFileInformationByHandle(m_handle, &file_info)) {
         DWORD vol_serial_num = file_info.dwVolumeSerialNumber;
-        DWORD file_ndx_high  = file_info.nFileIndexHigh;
-        DWORD file_ndx_low   = file_info.nFileIndexLow;
+        DWORD file_ndx_high = file_info.nFileIndexHigh;
+        DWORD file_ndx_low = file_info.nFileIndexLow;
         if (GetFileInformationByHandle(f.m_handle, &file_info)) {
-            return vol_serial_num == file_info.dwVolumeSerialNumber &&
-                file_ndx_high == file_info.nFileIndexHigh &&
-                file_ndx_low  == file_info.nFileIndexLow;
+            return vol_serial_num == file_info.dwVolumeSerialNumber && file_ndx_high == file_info.nFileIndexHigh &&
+                   file_ndx_low == file_info.nFileIndexLow;
         }
     }
 
-/* FIXME: Here is how to do it on Windows Server 2012 and onwards. This new
-   solution correctly handles file identification on ReFS.
+    /*
+    FIXME: Here is how to do it on Windows Server 2012 and onwards. This new
+    solution correctly handles file identification on ReFS.
 
     FILE_ID_INFO file_id_info;
     if (GetFileInformationByHandleEx(m_handle, FileIdInfo, &file_id_info, sizeof file_id_info)) {
@@ -1060,7 +1057,7 @@ bool File::is_same_file(const File& f) const
                 file_id == file_id_info.FileId;
         }
     }
-*/
+    */
 
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     std::string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
@@ -1082,7 +1079,8 @@ bool File::is_same_file(const File& f) const
 #endif
 }
 
-File::UniqueID File::get_unique_id() const {
+File::UniqueID File::get_unique_id() const
+{
     REALM_ASSERT_RELEASE(is_attached());
 #ifdef _WIN32 // Windows version
     throw std::runtime_error("Not yet supported");
@@ -1097,7 +1095,8 @@ File::UniqueID File::get_unique_id() const {
 #endif
 }
 
-bool File::get_unique_id(const std::string& path, File::UniqueID& uid) {
+bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
+{
 #ifdef _WIN32 // Windows version
     throw std::runtime_error("Not yet supported");
 #else // POSIX version
@@ -1109,7 +1108,8 @@ bool File::get_unique_id(const std::string& path, File::UniqueID& uid) {
     }
     int err = errno; // Eliminate any risk of clobbering
     // File doesn't exist
-    if (err == ENOENT ) return false;
+    if (err == ENOENT)
+        return false;
 
     std::string msg = get_errno_msg("fstat() failed: ", err);
     throw std::runtime_error(msg);
@@ -1148,7 +1148,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
         path_2 = ".";
     if (!base_dir_2.empty() && base_dir_2.back() != dir_sep)
         base_dir_2.push_back(dir_sep);
-/*
+    /*
     // Abbreviate
     for (;;) {
         if (base_dir_2.empty()) {
@@ -1170,7 +1170,7 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
             break;
         if (path_2.size())
     }
-*/
+    */
     return base_dir_2 + path_2;
 #else
     static_cast<void>(path);
@@ -1184,7 +1184,7 @@ void File::set_encryption_key(const char* key)
 {
 #if REALM_ENABLE_ENCRYPTION
     if (key) {
-        char *buffer = new char[64];
+        char* buffer = new char[64];
         memcpy(buffer, key, 64);
         m_encryption_key.reset(buffer);
     }

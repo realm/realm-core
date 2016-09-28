@@ -35,12 +35,11 @@ public:
     enum ChangeType {
         change_Percent,
         change_DropFactor,
-        change_RiseFactor
+        change_RiseFactor,
     };
 
     /// Use submit_single() when you know there is only going to be a single datapoint.
-    void submit_single(const char* ident, const char* lead_text, double seconds,
-                ChangeType = change_Percent);
+    void submit_single(const char* ident, const char* lead_text, double seconds, ChangeType = change_Percent);
 
     /// Use submit() when there are multiple data points, and call finish() when you are done.
     void submit(const char* ident, double seconds);
@@ -78,12 +77,11 @@ private:
 };
 
 
-
-
 // Implementation:
 
-inline BenchmarkResults::BenchmarkResults(int max_lead_text_width, const char* results_file_stem):
-    m_max_lead_text_width(max_lead_text_width), m_results_file_stem(results_file_stem)
+inline BenchmarkResults::BenchmarkResults(int max_lead_text_width, const char* results_file_stem)
+    : m_max_lead_text_width(max_lead_text_width)
+    , m_results_file_stem(results_file_stem)
 {
     try_load_baseline_results();
 }

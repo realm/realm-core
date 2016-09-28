@@ -30,49 +30,64 @@ using realm::util::Optional;
 
 namespace {
 
+#ifdef _WIN32
+int setenv(const char* name, const char* value, int overwrite)
+{
+    int errcode = 0;
+    if (!overwrite) {
+        size_t envsize = 0;
+        errcode = getenv_s(&envsize, NULL, 0, name);
+        if (errcode || envsize)
+            return errcode;
+    }
+    return _putenv_s(name, value);
+}
+#endif
+
 void show_help(const std::string& program_name)
 {
-    std::cerr <<
-        "Usage: " << program_name << " [options] FILE\n"
-        "\n"
-        "Arguments:\n"
-        "\n"
-        "  FILE    The Realm file that should have its schema dumped.\n"
-        "\n"
-        "Options:\n"
-        "\n"
-        "  -k,--key     Encryption key to decrypt the Realm\n"
-        "  -u,--upgrade Perform file format upgrade if required\n"
-        "  -h,--help    Print this message\n";
+    std::cerr << "Usage: " << program_name << " [options] FILE\n"
+                                              "\n"
+                                              "Arguments:\n"
+                                              "\n"
+                                              "  FILE    The Realm file that should have its schema dumped.\n"
+                                              "\n"
+                                              "Options:\n"
+                                              "\n"
+                                              "  -k,--key     Encryption key to decrypt the Realm\n"
+                                              "  -u,--upgrade Perform file format upgrade if required\n"
+                                              "  -h,--help    Print this message\n";
 }
 
 namespace Logging {
 
-struct Naught {};
+struct Naught {
+};
 
-template<typename T>
+template <typename T>
 struct LogData {
     T items;
 };
 
-template<typename Begin, typename Value>
+template <typename Begin, typename Value>
 constexpr LogData<std::pair<Begin&&, Value&&>> operator<<(LogData<Begin>&& begin, Value&& value) noexcept
 {
-    return {{ std::forward<Begin>(begin.items), std::forward<Value>(value) }};
+    return {{std::forward<Begin>(begin.items), std::forward<Value>(value)}};
 }
 
-template<typename Begin, size_t n>
+template <typename Begin, size_t n>
 constexpr LogData<std::pair<Begin&&, const char*>> operator<<(LogData<Begin>&& begin, const char (&value)[n]) noexcept
 {
-    return {{ std::forward<Begin>(begin.items), value }};
+    return {{std::forward<Begin>(begin.items), value}};
 }
 
 typedef std::ostream& (*PfnManipulator)(std::ostream&);
 
-template<typename Begin>
-constexpr LogData<std::pair<Begin&&, PfnManipulator>> operator<<(LogData<Begin>&& begin, PfnManipulator value) noexcept
+template <typename Begin>
+constexpr LogData<std::pair<Begin&&, PfnManipulator>> operator<<(LogData<Begin>&& begin,
+                                                                 PfnManipulator value) noexcept
 {
-    return {{ std::forward<Begin>(begin.items), value }};
+    return {{std::forward<Begin>(begin.items), value}};
 }
 
 template <typename Begin, typename Last>
@@ -86,7 +101,7 @@ inline void print(std::ostream&, Naught)
 {
 }
 
-template<typename List>
+template <typename List>
 void Log(const char* file, int line, LogData<List>&& data)
 {
     std::cout << '[' << file << ':' << line << "] ";
@@ -106,12 +121,10 @@ struct Configuration {
 
 void parse_arguments(int argc, char* argv[], Configuration& configuration)
 {
-    static struct option long_options[] = {
-        {"key",     required_argument, nullptr, 'k'},
-        {"upgrade", no_argument,       nullptr, 'u'},
-        {"help",    no_argument,       nullptr, 'h'},
-        {nullptr,   0,                 nullptr, 0}
-    };
+    static struct option long_options[] = {{"key", required_argument, nullptr, 'k'},
+                                           {"upgrade", no_argument, nullptr, 'u'},
+                                           {"help", no_argument, nullptr, 'h'},
+                                           {nullptr, 0, nullptr, 0}};
 
     static const char* opt_desc = "k:uh";
 
@@ -169,6 +182,7 @@ using realm::Group;
 using realm::LangBindHelper;
 using realm::ReadTransaction;
 using realm::SharedGroup;
+using realm::SharedGroupOptions;
 
 class SchemaDumper {
 public:
@@ -223,8 +237,7 @@ void SchemaDumper::list_columns(std::ostream& stream, const ConstTableRef& table
         realm::DataType column_type = table->get_column_type(idx);
         std::string column_type_name = LangBindHelper::get_data_type_name(column_type);
 
-        stream << "    " << column_type_name << " " << column_name
-            << " (type id: " << column_type << ")";
+        stream << "    " << column_type_name << " " << column_name << " (type id: " << column_type << ")";
 
         if (idx + 1 < column_count) {
             stream << ',';
@@ -245,9 +258,10 @@ void SchemaDumper::open()
         encryption_key = (*m_config.key).c_str();
         LOG("Using encryption key `" << *m_config.key << '\'');
     }
-
-    m_sg.open(m_config.path, dont_create, SharedGroup::durability_Full,
-              encryption_key, upgrade_file_format);
+    SharedGroupOptions options;
+    options.encryption_key = encryption_key;
+    options.allow_file_format_upgrade = upgrade_file_format;
+    m_sg.open(m_config.path, dont_create, options);
 }
 
 } // unnamed namespace

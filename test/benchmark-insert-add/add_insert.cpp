@@ -33,15 +33,10 @@ namespace {
 enum Mode {
     mode_UseShared,
     mode_UseGroup,
-    mode_UseTable
+    mode_UseTable,
 };
 
-REALM_TABLE_5(TestTable,
-                x,  Int,
-                s1, String,
-                b,  Bool,
-                s2, String,
-                s3, String)
+REALM_TABLE_5(TestTable, x, Int, s1, String, b, Bool, s2, String, s3, String)
 
 
 void usage()
@@ -60,7 +55,7 @@ void usage()
 } // anonymous namespace
 
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
     size_t N = 100000000;
     size_t n = 50000;
@@ -68,12 +63,12 @@ int main(int argc, char *argv[])
     TestTable t;
 
     int c;
-    extern char *optarg;
+    extern char* optarg;
 
-    bool use_shared    = false;
-    SharedGroup::DurabilityLevel dlevel = SharedGroup::durability_Full;
-    bool do_insert     = false;
-    bool use_group     = false;
+    bool use_shared = false;
+    SharedGroupOptions::Durability dlevel = SharedGroupOptions::Durability::Full;
+    bool do_insert = false;
+    bool use_group = false;
     bool random_insert = false;
 
     // FIXME: 'getopt' is POSIX/Linux specific. We should replace with
@@ -90,15 +85,15 @@ int main(int argc, char *argv[])
             case 's':
                 use_shared = true;
                 if (strcmp(optarg, "mem") == 0) {
-                    dlevel = SharedGroup::durability_MemOnly;
+                    dlevel = SharedGroupOptions::Durability::MemOnly;
                 }
                 else {
                     if (strcmp(optarg, "full") == 0) {
-                        dlevel = SharedGroup::durability_Full;
+                        dlevel = SharedGroupOptions::Durability::Full;
                     }
                     else {
                         if (strcmp(optarg, "async") == 0) {
-                            dlevel = SharedGroup::durability_Async;
+                            dlevel = SharedGroupOptions::Durability::Async;
                         }
                         else {
                             std::cout << "durability must be either mem or full" << std::endl;
@@ -158,7 +153,7 @@ int main(int argc, char *argv[])
         std::cout << "#  random insert     : " << random_insert << std::endl;
     }
 
-    if (random_insert) {  // initialize RNG
+    if (random_insert) { // initialize RNG
         srandom(0);
     }
 
@@ -171,7 +166,7 @@ int main(int argc, char *argv[])
     SharedGroup sg = SharedGroup("test.realm", false, dlevel);
     Group g("gtest.realm", nullptr, Group::mode_ReadWrite);
 
-    switch(m) {
+    switch (m) {
         case mode_UseShared: {
             WriteTransaction wt(sg);
             BasicTableRef<TestTable> t = wt.add_table<TestTable>("test");
@@ -194,22 +189,22 @@ int main(int argc, char *argv[])
     }
 
     test_util::Timer timer(test_util::Timer::type_RealTime);
-    for(size_t i=0; i<N/rows_per_commit; ++i) {
-        switch(m) {
+    for (size_t i = 0; i < N / rows_per_commit; ++i) {
+        switch (m) {
             case mode_UseShared: {
                 WriteTransaction wt(sg);
                 BasicTableRef<TestTable> t1 = wt.get_table<TestTable>("test");
                 {
-                    for(size_t j=0; j<rows_per_commit; ++j) {
+                    for (size_t j = 0; j < rows_per_commit; ++j) {
                         if (do_insert) {
                             size_t k = 0;
                             if (random_insert && t1->size() > 0) {
                                 k = size_t(random() % t1->size());
                             }
-                            t1->insert(k, N, "Hello", i%2, "World", "Smurf");
+                            t1->insert(k, N, "Hello", i % 2, "World", "Smurf");
                         }
                         else {
-                            t1->add(N, "Hello", i%2, "World", "Smurf");
+                            t1->add(N, "Hello", i % 2, "World", "Smurf");
                         }
                     }
                 }
@@ -218,16 +213,16 @@ int main(int argc, char *argv[])
             }
             case mode_UseGroup: {
                 BasicTableRef<TestTable> t1 = g.get_table<TestTable>("test");
-                for(size_t j=0; j<rows_per_commit; ++j) {
+                for (size_t j = 0; j < rows_per_commit; ++j) {
                     if (do_insert) {
                         size_t k = 0;
                         if (random_insert && t1->size() > 0) {
                             k = size_t(random() % t1->size());
                         }
-                        t1->insert(k, N, "Hello", i%2, "World", "Smurf");
+                        t1->insert(k, N, "Hello", i % 2, "World", "Smurf");
                     }
                     else {
-                        t1->add(N, "Hello", i%2, "World", "Smurf");
+                        t1->add(N, "Hello", i % 2, "World", "Smurf");
                     }
                 }
                 try {
@@ -244,26 +239,26 @@ int main(int argc, char *argv[])
                 break;
             }
             case mode_UseTable:
-                for(size_t j=0; j<rows_per_commit; ++j) {
+                for (size_t j = 0; j < rows_per_commit; ++j) {
                     if (do_insert) {
                         size_t k = 0;
                         if (random_insert && t.size() > 0) {
                             k = size_t(random() % t.size());
                         }
-                        t.insert(k, N, "Hello", i%2, "World", "Smurf");
+                        t.insert(k, N, "Hello", i % 2, "World", "Smurf");
                     }
                     else {
-                        t.add(N, "Hello", i%2, "World", "Smurf");
+                        t.add(N, "Hello", i % 2, "World", "Smurf");
                     }
                 }
                 break;
         }
 
-        if (((i*rows_per_commit) % n) == 0 && i > 0) {
+        if (((i * rows_per_commit) % n) == 0 && i > 0) {
             double dt = timer.get_elapsed_time();
-            std::cout << i*rows_per_commit << ";" << dt << ";" << double(i*rows_per_commit)/dt << ";" << dt/double(i*rows_per_commit) << std::endl;
+            std::cout << i * rows_per_commit << ";" << dt << ";" << double(i * rows_per_commit) / dt << ";"
+                      << dt / double(i * rows_per_commit) << std::endl;
         }
     }
     return 0;
 }
-

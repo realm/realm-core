@@ -16,15 +16,15 @@
  *
  **************************************************************************/
 
-#include <stdint.h> // unint8_t etc
+#include <cstdint> // unint8_t etc
 #include <cstdlib>
 #include <cstring>
 #include <climits>
 
 #ifdef REALM_DEBUG
-#   include <iostream>
-#   include <iomanip>
-#   include <sstream>
+#include <iostream>
+#include <iomanip>
+#include <sstream>
 #endif
 
 #include <realm/column.hpp>
@@ -116,16 +116,11 @@ void ColumnBaseWithIndex::destroy() noexcept
     }
 }
 
-
-#ifdef REALM_DEBUG
-
 void ColumnBase::verify(const Table&, size_t column_ndx) const
 {
     verify();
     REALM_ASSERT_EX(column_ndx == m_column_ndx, column_ndx, m_column_ndx);
 }
-
-#endif // REALM_DEBUG
 
 void ColumnBaseSimple::replace_root_array(std::unique_ptr<Array> leaf)
 {
@@ -144,26 +139,38 @@ struct GetSizeFromRef {
     const ref_type m_ref;
     Allocator& m_alloc;
     size_t m_size;
-    GetSizeFromRef(ref_type r, Allocator& a): m_ref(r), m_alloc(a), m_size(0) {}
-    template<class Col>
+    GetSizeFromRef(ref_type r, Allocator& a)
+        : m_ref(r)
+        , m_alloc(a)
+        , m_size(0)
+    {
+    }
+
+    template <class Col>
     void call() noexcept
     {
         m_size = Col::get_size_from_ref(m_ref, m_alloc);
     }
 };
 
-template<class Op>
-void col_type_deleg(Op& op, ColumnType type)
+template <class Op>
+void col_type_deleg(Op& op, ColumnType type, bool nullable)
 {
     switch (type) {
         case col_type_Int:
         case col_type_Bool:
         case col_type_OldDateTime:
+            if (nullable)
+                op.template call<IntNullColumn>();
+            else
+                op.template call<IntegerColumn>();
+            return;
         case col_type_Link:
             op.template call<IntegerColumn>();
             return;
         case col_type_Timestamp:
             op.template call<TimestampColumn>();
+            return;
         case col_type_String:
             op.template call<StringColumn>();
             return;
@@ -185,9 +192,13 @@ void col_type_deleg(Op& op, ColumnType type)
         case col_type_Double:
             op.template call<DoubleColumn>();
             return;
-        case col_type_Reserved4:
         case col_type_LinkList:
+            op.template call<LinkListColumn>();
+            return;
         case col_type_BackLink:
+            op.template call<BacklinkColumn>();
+            return;
+        case col_type_Reserved4:
             break;
     }
     REALM_ASSERT_DEBUG(false);
@@ -196,26 +207,22 @@ void col_type_deleg(Op& op, ColumnType type)
 } // anonymous namespace
 
 
-
-size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref,
-                                              Allocator& alloc) noexcept
+size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref, Allocator& alloc, bool nullable) noexcept
 {
     GetSizeFromRef op(ref, alloc);
-    col_type_deleg(op, type);
+    col_type_deleg(op, type, nullable);
     return op.m_size;
 }
 
 
-
-ref_type ColumnBaseSimple::write(const Array* root, size_t slice_offset, size_t slice_size,
-                           size_t table_size, SliceHandler& handler, _impl::OutputStream& out)
+ref_type ColumnBaseSimple::write(const Array* root, size_t slice_offset, size_t slice_size, size_t table_size,
+                                 SliceHandler& handler, _impl::OutputStream& out)
 {
     return BpTreeBase::write_subtree(*root, slice_offset, slice_size, table_size, handler, out);
 }
 
 
-void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state,
-                                    bool is_append)
+void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state, bool is_append)
 {
     // At this point the original root and its new sibling is either
     // both leaves, or both inner nodes on the same form, compact or
@@ -226,34 +233,32 @@ void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeI
     Array* orig_root = get_root_array();
     Allocator& alloc = get_alloc();
     std::unique_ptr<Array> new_root(new Array(alloc)); // Throws
-    new_root->create(Array::type_InnerBptreeNode); // Throws
+    new_root->create(Array::type_InnerBptreeNode);     // Throws
     new_root->set_parent(orig_root->get_parent(), orig_root->get_ndx_in_parent());
     new_root->update_parent(); // Throws
-    bool compact_form =
-        is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);
+    bool compact_form = is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);
     // Something is wrong if we were not appending and the original
     // root is still on the compact form.
     REALM_ASSERT(!compact_form || is_append);
     if (compact_form) {
         int_fast64_t v = to_int64(state.m_split_offset); // elems_per_child
-        new_root->add(1 + 2*v); // Throws
+        new_root->add(1 + 2 * v);                        // Throws
     }
     else {
         Array new_offsets(alloc);
-        new_offsets.create(Array::type_Normal); // Throws
+        new_offsets.create(Array::type_Normal);          // Throws
         new_offsets.add(to_int64(state.m_split_offset)); // Throws
-        new_root->add(from_ref(new_offsets.get_ref())); // Throws
+        new_root->add(from_ref(new_offsets.get_ref()));  // Throws
     }
     new_root->add(from_ref(orig_root->get_ref())); // Throws
-    new_root->add(from_ref(new_sibling_ref)); // Throws
+    new_root->add(from_ref(new_sibling_ref));      // Throws
     int_fast64_t v = to_int64(state.m_split_size); // total_elems_in_tree
-    new_root->add(1 + 2*v); // Throws
+    new_root->add(1 + 2 * v);                      // Throws
     replace_root_array(std::move(new_root));
 }
 
 
-ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
-                           Allocator& alloc, CreateHandler& handler)
+ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height, Allocator& alloc, CreateHandler& handler)
 {
     size_t rest_size = *rest_size_ptr;
     size_t orig_rest_size = rest_size;
@@ -272,7 +277,7 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
             new_inner_node.create(Array::type_InnerBptreeNode); // Throws
             try {
                 int_fast64_t v = elems_per_child;
-                new_inner_node.add(1 + 2*v); // Throws
+                new_inner_node.add(1 + 2 * v); // Throws
                 v = from_ref(node);
                 new_inner_node.add(v); // Throws
                 node = 0;
@@ -288,18 +293,18 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
                         Array::destroy_deep(child, alloc);
                         throw;
                     }
-                    // LCOV_EXCL_END
+                    // LCOV_EXCL_STOP
                     ++num_children;
                 }
                 v = orig_rest_size - rest_size; // total_elems_in_tree
-                new_inner_node.add(1 + 2*v); // Throws
+                new_inner_node.add(1 + 2 * v);  // Throws
             }
             // LCOV_EXCL_START
             catch (...) {
                 new_inner_node.destroy_deep();
                 throw;
             }
-            // LCOV_EXCL_END
+            // LCOV_EXCL_STOP
             node = new_inner_node.get_ref();
             ++height;
             // Overflow is impossible here is all nodes will have elems_per_child <= orig_rest_size
@@ -312,9 +317,8 @@ ref_type ColumnBase::build(size_t* rest_size_ptr, size_t fixed_height,
             Array::destroy_deep(node, alloc);
         throw;
     }
-    // LCOV_EXCL_END
+    // LCOV_EXCL_STOP
 }
-
 
 
 /*
@@ -355,23 +359,25 @@ void ColumnBaseWithIndex::destroy_search_index() noexcept
     m_search_index.reset();
 }
 
-void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent,
-    size_t ndx_in_parent, bool allow_duplicate_valaues)
+void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
+                                               bool allow_duplicate_valaues)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this,
-        !allow_duplicate_valaues, get_alloc())); // Throws
+    m_search_index.reset(
+        new StringIndex(ref, parent, ndx_in_parent, this, !allow_duplicate_valaues, get_alloc())); // Throws
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
-class ColumnBase::LeafToDot: public Array::ToDotHandler {
+class ColumnBase::LeafToDot : public Array::ToDotHandler {
 public:
     const ColumnBase& m_column;
-    LeafToDot(const ColumnBase& column): m_column(column) {}
-    void to_dot(MemRef mem, ArrayParent* parent, size_t ndx_in_parent,
-                std::ostream& out) override
+    LeafToDot(const ColumnBase& column)
+        : m_column(column)
+    {
+    }
+    void to_dot(MemRef mem, ArrayParent* parent, size_t ndx_in_parent, std::ostream& out) override
     {
         m_column.leaf_to_dot(mem, parent, ndx_in_parent, out);
     }
@@ -401,8 +407,8 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
     Array leaf(alloc);
     leaf.init_from_mem(mem);
     int indent = level * 2;
-    out << std::setw(indent) << "" << "Integer leaf (ref: "<<leaf.get_ref()<<", "
-        "size: "<<leaf.size()<<")\n";
+    out << std::setw(indent) << ""
+        << "Integer leaf (ref: " << leaf.get_ref() << ", size: " << leaf.size() << ")\n";
     std::ostringstream out_2;
     for (size_t i = 0; i != leaf.size(); ++i) {
         if (i != 0) {
@@ -414,7 +420,8 @@ void leaf_dumper(MemRef mem, Allocator& alloc, std::ostream& out, int level)
         }
         out_2 << leaf.get(i);
     }
-    out << std::setw(indent) << "" << "  Elems: "<<out_2.str()<<"\n";
+    out << std::setw(indent) << ""
+        << "  Elems: " << out_2.str() << "\n";
 }
 
 } // namespace _impl

@@ -26,7 +26,7 @@
 #include <iostream>
 #include <iomanip>
 
-#include <realm/commit_log.hpp>
+#include <realm/history.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/file.hpp>
 #include <realm/group_shared.hpp>
@@ -75,32 +75,20 @@ using realm::test_util::crypt_key;
 
 namespace {
 
-enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi,
-              kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
+enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi, kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
 
-REALM_TABLE_2(MySubsubtable,
-              value,  Int,
-              binary, Binary)
+REALM_TABLE_2(MySubsubtable, value, Int, binary, Binary)
 
-REALM_TABLE_2(MySubtable,
-              foo, Int,
-              bar, Subtable<MySubsubtable>)
+REALM_TABLE_2(MySubtable, foo, Int, bar, Subtable<MySubsubtable>)
 
-REALM_TABLE_8(MyTable,
-              alpha,   Int,
-              beta,    Bool,
-              gamma,   Enum<MyEnum>,
-              delta,   OldDateTime,
-              epsilon, String,
-              zeta,    Binary,
-              eta,     Subtable<MySubtable>,
-              theta,   Mixed)
+REALM_TABLE_8(MyTable, alpha, Int, beta, Bool, gamma, Enum<MyEnum>, delta, OldDateTime, epsilon, String, zeta, Binary,
+              eta, Subtable<MySubtable>, theta, Mixed)
 
 
 const int num_threads = 23;
-const int num_rounds  = 2;
+const int num_rounds = 2;
 
-const size_t max_blob_size   = 32*1024; // 32 KiB
+const size_t max_blob_size = 32 * 1024; // 32 KiB
 
 const BinaryData EmptyNonNul = BinaryData("", 0);
 
@@ -113,9 +101,8 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         if (table->is_empty()) {
             table->add();
             table->add(0, false, moja, 0, "", EmptyNonNul, 0, Mixed(int64_t()));
-            char binary_data[] = { 7, 6, 5, 7, 6, 5, 4, 3, 113 };
-            table->add(749321, true, kumi_na_tatu, 99992, "click",
-                       BinaryData(binary_data), 0, Mixed("fido"));
+            char binary_data[] = {7, 6, 5, 7, 6, 5, 4, 3, 113};
+            table->add(749321, true, kumi_na_tatu, 99992, "click", BinaryData(binary_data), 0, Mixed("fido"));
         }
         wt.commit();
     }
@@ -125,7 +112,7 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #2
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         if (table->size() < 100) {
-            for (int i=0; i<10; ++i)
+            for (int i = 0; i < 10; ++i)
                 table->add();
         }
         ++table[0].alpha;
@@ -160,7 +147,7 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         MySubtable::Ref subtable = table[0].eta;
         ++subtable[0].foo;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
-        for (int i=int(subsubtable->size()); i<=index; ++i)
+        for (int i = int(subsubtable->size()); i <= index; ++i)
             subsubtable->add();
         ++table[0].alpha;
         wt.commit();
@@ -224,10 +211,10 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MySubtable::Ref subtable = table[0].eta;
         MySubsubtable::Ref subsubtable = subtable[0].bar;
-        size_t size = ((512 + index%1024) * 1024) % max_blob_size;
+        size_t size = ((512 + index % 1024) * 1024) % max_blob_size;
         std::unique_ptr<char[]> data(new char[size]);
-        for (size_t i=0; i<size; ++i)
-            data[i] = static_cast<unsigned char>((i+index) * 677 % 256);
+        for (size_t i = 0; i < size; ++i)
+            data[i] = static_cast<unsigned char>((i + index) * 677 % 256);
         subsubtable[index].binary = BinaryData(data.get(), size);
         wt.commit();
     }
@@ -236,18 +223,18 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #10
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
         MySubtable::Ref subtable = table[0].eta;
-        subtable[2].foo = index*677;
+        subtable[2].foo = index * 677;
         wt.commit();
     }
 
     {
         WriteTransaction wt(db); // Write transaction #11
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        size_t size = ((512 + (333 + 677*index) % 1024) * 1024) % max_blob_size;
+        size_t size = ((512 + (333 + 677 * index) % 1024) * 1024) % max_blob_size;
         std::unique_ptr<char[]> data(new char[size]);
-        for (size_t i=0; i<size; ++i)
-            data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
-        table[index%2].zeta = BinaryData(data.get(), size);
+        for (size_t i = 0; i < size; ++i)
+            data[i] = static_cast<unsigned char>((i + index + 73) * 677 % 256);
+        table[index % 2].zeta = BinaryData(data.get(), size);
         wt.commit();
     }
 
@@ -267,11 +254,11 @@ void round(TestContext& test_context, SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #13
         MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        size_t size = (512 + (333 + 677*index) % 1024) * 327;
+        size_t size = (512 + (333 + 677 * index) % 1024) * 327;
         std::unique_ptr<char[]> data(new char[size]);
-        for (size_t i=0; i<size; ++i)
-            data[i] = static_cast<unsigned char>((i+index+73) * 677 % 256);
-        table[(index+1)%2].zeta = BinaryData(data.get(), size);
+        for (size_t i = 0; i < size; ++i)
+            data[i] = static_cast<unsigned char>((i + index + 73) * 677 % 256);
+        table[(index + 1) % 2].zeta = BinaryData(data.get(), size);
         wt.commit();
     }
 
@@ -288,18 +275,18 @@ void round(TestContext& test_context, SharedGroup& db, int index)
             subtable->add();
             subtable->add();
         }
-        int n = 1 + 13 / (1+index);
-        for (int i=0; i<n; ++i) {
+        int n = 1 + 13 / (1 + index);
+        for (int i = 0; i < n; ++i) {
             BinaryData bin("", 0);
             Mixed mix = int64_t(i);
-            subtable->add(0, false, moja,  0, "alpha",   bin, 0, mix);
-            subtable->add(1, false, mbili, 0, "beta",    bin, 0, mix);
-            subtable->add(2, false, tatu,  0, "gamma",   bin, 0, mix);
-            subtable->add(3, false, nne,   0, "delta",   bin, 0, mix);
-            subtable->add(4, false, tano,  0, "epsilon", bin, 0, mix);
-            subtable->add(5, false, sita,  0, "zeta",    bin, 0, mix);
-            subtable->add(6, false, saba,  0, "eta",     bin, 0, mix);
-            subtable->add(7, false, nane,  0, "theta",   bin, 0, mix);
+            subtable->add(0, false, moja, 0, "alpha", bin, 0, mix);
+            subtable->add(1, false, mbili, 0, "beta", bin, 0, mix);
+            subtable->add(2, false, tatu, 0, "gamma", bin, 0, mix);
+            subtable->add(3, false, nne, 0, "delta", bin, 0, mix);
+            subtable->add(4, false, tano, 0, "epsilon", bin, 0, mix);
+            subtable->add(5, false, sita, 0, "zeta", bin, 0, mix);
+            subtable->add(6, false, saba, 0, "eta", bin, 0, mix);
+            subtable->add(7, false, nane, 0, "theta", bin, 0, mix);
         }
         wt.commit();
     }
@@ -326,14 +313,14 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         else {
             subsubtable = subtable[0].theta.set_subtable<MyTable>();
         }
-        size_t size = (17 + 233*index) % 523;
+        size_t size = (17 + 233 * index) % 523;
         std::unique_ptr<char[]> data(new char[size]);
-        for (size_t i=0; i<size; ++i)
-            data[i] = static_cast<unsigned char>((i+index+79) * 677 % 256);
+        for (size_t i = 0; i < size; ++i)
+            data[i] = static_cast<unsigned char>((i + index + 79) * 677 % 256);
         BinaryData bin(data.get(), size);
-        subsubtable->add(0, false, nne,  0, "", bin, 0, Mixed(int64_t(index*13)));
-        subsubtable->add(1, false, tano, 0, "", bin, 0, Mixed(index%2==0?false:true));
-        subsubtable->add(2, false, sita, 0, "", bin, 0, Mixed(OldDateTime(index*13)));
+        subsubtable->add(0, false, nne, 0, "", bin, 0, Mixed(int64_t(index * 13)));
+        subsubtable->add(1, false, tano, 0, "", bin, 0, Mixed(index % 2 == 0 ? false : true));
+        subsubtable->add(2, false, sita, 0, "", bin, 0, Mixed(OldDateTime(index * 13)));
         subsubtable->add(3, false, saba, 0, "", bin, 0, Mixed("click"));
         subsubtable->add(4, false, nane, 0, "", bin, 0, Mixed(bin));
         wt.commit();
@@ -352,15 +339,15 @@ void round(TestContext& test_context, SharedGroup& db, int index)
             subsubtable = subtable[1].theta.set_subtable<MySubtable>();
         }
         int num = 8;
-        for (int i=0; i<num; ++i)
+        for (int i = 0; i < num; ++i)
             subsubtable->add(i, 0);
         std::vector<MySubsubtable::Ref> subsubsubtables;
-        for (int i=0; i<num; ++i)
+        for (int i = 0; i < num; ++i)
             subsubsubtables.push_back(subsubtable[i].bar);
-        for (int i=0; i<3; ++i) {
-            for (int j=0; j<num; j+=2) {
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < num; j += 2) {
                 BinaryData bin("", 0);
-                subsubsubtables[j]->add((i-j)*index-19, bin);
+                subsubsubtables[j]->add((i - j) * index - 19, bin);
             }
         }
         wt.commit();
@@ -388,7 +375,7 @@ void round(TestContext& test_context, SharedGroup& db, int index)
             subsubtable = subtable[2].theta.set_subtable<MySubsubtable>();
         }
         int num = 9;
-        for (int i=0; i<num; ++i)
+        for (int i = 0; i < num; ++i)
             subsubtable->add(i, BinaryData("", 0));
         wt.commit();
     }
@@ -405,10 +392,10 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         else {
             subsubtable = subtable[3].theta.set_subtable<MySubsubtable>();
             // FIXME: Reenable this when it works!!!
-//            subsubtable->column().value.set_index();
+            //            subsubtable->column().value.set_index();
         }
         int num = 9;
-        for (int i=0; i<num; ++i)
+        for (int i = 0; i < num; ++i)
             subsubtable->add(i, BinaryData("", 0));
         wt.commit();
     }
@@ -417,7 +404,7 @@ void round(TestContext& test_context, SharedGroup& db, int index)
 
 void thread(TestContext& test_context, int index, std::string path)
 {
-    for (int i=0; i<num_rounds; ++i) {
+    for (int i = 0; i < num_rounds; ++i) {
         SharedGroup db(path);
         round(test_context, db, index);
     }
@@ -443,7 +430,7 @@ TEST(Transactions_General)
             bool thread_has_thrown = false;
             std::string except_msg;
             if (threads[i].join(except_msg)) {
-                std::cerr << "Exception thrown in thread "<<i<<": "<<except_msg<<"\n";
+                std::cerr << "Exception thrown in thread " << i << ": " << except_msg << "\n";
                 thread_has_thrown = true;
             }
             CHECK(!thread_has_thrown);
@@ -453,7 +440,7 @@ TEST(Transactions_General)
     // Verify database contents
     size_t table1_theta_size = 0;
     for (int i = 0; i != num_threads; ++i)
-        table1_theta_size += (1 + 13 / (1+i)) * 8;
+        table1_theta_size += (1 + 13 / (1 + i)) * 8;
     table1_theta_size *= num_rounds;
     table1_theta_size += 2;
 
@@ -462,97 +449,94 @@ TEST(Transactions_General)
     MyTable::ConstRef table = rt.get_table<MyTable>("my_table");
     CHECK(2 <= table->size());
 
-    CHECK_EQUAL(num_threads*num_rounds*4, table[0].alpha);
-    CHECK_EQUAL(false,             table[0].beta);
-    CHECK_EQUAL(moja,              table[0].gamma);
-    CHECK_EQUAL(0,                 table[0].delta);
-    CHECK_EQUAL("",                table[0].epsilon);
-    CHECK_EQUAL(3u,                table[0].eta->size());
-    CHECK_EQUAL(0,                 table[0].theta);
+    CHECK_EQUAL(num_threads * num_rounds * 4, table[0].alpha);
+    CHECK_EQUAL(false, table[0].beta);
+    CHECK_EQUAL(moja, table[0].gamma);
+    CHECK_EQUAL(0, table[0].delta);
+    CHECK_EQUAL("", table[0].epsilon);
+    CHECK_EQUAL(3u, table[0].eta->size());
+    CHECK_EQUAL(0, table[0].theta);
 
-    CHECK_EQUAL(749321,            table[1].alpha);
-    CHECK_EQUAL(true,              table[1].beta);
-    CHECK_EQUAL(kumi_na_tatu,      table[1].gamma);
-    CHECK_EQUAL(99992,             table[1].delta);
-    CHECK_EQUAL("click",           table[1].epsilon);
-    CHECK_EQUAL(0u,                table[1].eta->size());
+    CHECK_EQUAL(749321, table[1].alpha);
+    CHECK_EQUAL(true, table[1].beta);
+    CHECK_EQUAL(kumi_na_tatu, table[1].gamma);
+    CHECK_EQUAL(99992, table[1].delta);
+    CHECK_EQUAL("click", table[1].epsilon);
+    CHECK_EQUAL(0u, table[1].eta->size());
     CHECK_EQUAL(table1_theta_size, table[1].theta.get_subtable_size());
     CHECK(table[1].theta.is_subtable<MyTable>());
 
     {
         MySubtable::ConstRef subtable = table[0].eta;
-        CHECK_EQUAL(num_threads*num_rounds*2, subtable[0].foo);
+        CHECK_EQUAL(num_threads * num_rounds * 2, subtable[0].foo);
         CHECK_EQUAL(size_t(num_threads), subtable[0].bar->size());
         CHECK_EQUAL(100, subtable[1].foo);
-        CHECK_EQUAL(0u,  subtable[1].bar->size());
-        CHECK_EQUAL(0u,  subtable[2].bar->size());
+        CHECK_EQUAL(0u, subtable[1].bar->size());
+        CHECK_EQUAL(0u, subtable[2].bar->size());
 
         MySubsubtable::ConstRef subsubtable = subtable[0].bar;
         for (int i = 0; i != num_threads; ++i) {
-            CHECK_EQUAL(1000+i, subsubtable[i].value);
-            size_t size = ((512 + i%1024) * 1024) % max_blob_size;
+            CHECK_EQUAL(1000 + i, subsubtable[i].value);
+            size_t size = ((512 + i % 1024) * 1024) % max_blob_size;
             std::unique_ptr<char[]> data(new char[size]);
             for (size_t j = 0; j != size; ++j)
-                data[j] = static_cast<unsigned char>((j+i) * 677 % 256);
+                data[j] = static_cast<unsigned char>((j + i) * 677 % 256);
             CHECK_EQUAL(BinaryData(data.get(), size), subsubtable[i].binary);
         }
     }
 
     {
         MyTable::ConstRef subtable = table[1].theta.get_subtable<MyTable>();
-        for (size_t i=0; i<table1_theta_size; ++i) {
-            CHECK_EQUAL(false,        subtable[i].beta);
-            CHECK_EQUAL(0,            subtable[i].delta);
+        for (size_t i = 0; i < table1_theta_size; ++i) {
+            CHECK_EQUAL(false, subtable[i].beta);
+            CHECK_EQUAL(0, subtable[i].delta);
             CHECK_EQUAL(BinaryData("", 0), subtable[i].zeta);
-            CHECK_EQUAL(0u,           subtable[i].eta->size());
+            CHECK_EQUAL(0u, subtable[i].eta->size());
             if (4 <= i)
                 CHECK_EQUAL(type_Int, subtable[i].theta.get_type());
         }
-        CHECK_EQUAL(size_t(num_threads*num_rounds*5),
-                    subtable[0].theta.get_subtable_size());
+        CHECK_EQUAL(size_t(num_threads * num_rounds * 5), subtable[0].theta.get_subtable_size());
         CHECK(subtable[0].theta.is_subtable<MyTable>());
         CHECK_EQUAL(0u, subtable[1].theta.get_subtable_size());
         CHECK(subtable[1].theta.is_subtable<MySubtable>());
-        CHECK_EQUAL(size_t(num_threads*num_rounds*9),
-                    subtable[2].theta.get_subtable_size());
+        CHECK_EQUAL(size_t(num_threads * num_rounds * 9), subtable[2].theta.get_subtable_size());
         CHECK(subtable[2].theta.is_subtable<MySubsubtable>());
-        CHECK_EQUAL(size_t(num_threads*num_rounds*9),
-                    subtable[3].theta.get_subtable_size());
+        CHECK_EQUAL(size_t(num_threads * num_rounds * 9), subtable[3].theta.get_subtable_size());
         CHECK(subtable[3].theta.is_subtable<MySubsubtable>());
 
         MyTable::ConstRef subsubtable = subtable[0].theta.get_subtable<MyTable>();
-        for (int i=0; i<num_threads*num_rounds; ++i) {
-            CHECK_EQUAL(0,       subsubtable[5*i+0].alpha);
-            CHECK_EQUAL(1,       subsubtable[5*i+1].alpha);
-            CHECK_EQUAL(2,       subsubtable[5*i+2].alpha);
-            CHECK_EQUAL(3,       subsubtable[5*i+3].alpha);
-            CHECK_EQUAL(4,       subsubtable[5*i+4].alpha);
-            CHECK_EQUAL(false,   subsubtable[5*i+0].beta);
-            CHECK_EQUAL(false,   subsubtable[5*i+1].beta);
-            CHECK_EQUAL(false,   subsubtable[5*i+2].beta);
-            CHECK_EQUAL(false,   subsubtable[5*i+3].beta);
-            CHECK_EQUAL(false,   subsubtable[5*i+4].beta);
-            CHECK_EQUAL(nne,     subsubtable[5*i+0].gamma);
-            CHECK_EQUAL(tano,    subsubtable[5*i+1].gamma);
-            CHECK_EQUAL(sita,    subsubtable[5*i+2].gamma);
-            CHECK_EQUAL(saba,    subsubtable[5*i+3].gamma);
-            CHECK_EQUAL(nane,    subsubtable[5*i+4].gamma);
-            CHECK_EQUAL(0,       subsubtable[5*i+0].delta);
-            CHECK_EQUAL(0,       subsubtable[5*i+1].delta);
-            CHECK_EQUAL(0,       subsubtable[5*i+2].delta);
-            CHECK_EQUAL(0,       subsubtable[5*i+3].delta);
-            CHECK_EQUAL(0,       subsubtable[5*i+4].delta);
-            CHECK_EQUAL("",      subsubtable[5*i+0].epsilon);
-            CHECK_EQUAL("",      subsubtable[5*i+1].epsilon);
-            CHECK_EQUAL("",      subsubtable[5*i+2].epsilon);
-            CHECK_EQUAL("",      subsubtable[5*i+3].epsilon);
-            CHECK_EQUAL("",      subsubtable[5*i+4].epsilon);
-            CHECK_EQUAL(0u,      subsubtable[5*i+0].eta->size());
-            CHECK_EQUAL(0u,      subsubtable[5*i+1].eta->size());
-            CHECK_EQUAL(0u,      subsubtable[5*i+2].eta->size());
-            CHECK_EQUAL(0u,      subsubtable[5*i+3].eta->size());
-            CHECK_EQUAL(0u,      subsubtable[5*i+4].eta->size());
-            CHECK_EQUAL("click", subsubtable[5*i+3].theta);
+        for (int i = 0; i < num_threads * num_rounds; ++i) {
+            CHECK_EQUAL(0, subsubtable[5 * i + 0].alpha);
+            CHECK_EQUAL(1, subsubtable[5 * i + 1].alpha);
+            CHECK_EQUAL(2, subsubtable[5 * i + 2].alpha);
+            CHECK_EQUAL(3, subsubtable[5 * i + 3].alpha);
+            CHECK_EQUAL(4, subsubtable[5 * i + 4].alpha);
+            CHECK_EQUAL(false, subsubtable[5 * i + 0].beta);
+            CHECK_EQUAL(false, subsubtable[5 * i + 1].beta);
+            CHECK_EQUAL(false, subsubtable[5 * i + 2].beta);
+            CHECK_EQUAL(false, subsubtable[5 * i + 3].beta);
+            CHECK_EQUAL(false, subsubtable[5 * i + 4].beta);
+            CHECK_EQUAL(nne, subsubtable[5 * i + 0].gamma);
+            CHECK_EQUAL(tano, subsubtable[5 * i + 1].gamma);
+            CHECK_EQUAL(sita, subsubtable[5 * i + 2].gamma);
+            CHECK_EQUAL(saba, subsubtable[5 * i + 3].gamma);
+            CHECK_EQUAL(nane, subsubtable[5 * i + 4].gamma);
+            CHECK_EQUAL(0, subsubtable[5 * i + 0].delta);
+            CHECK_EQUAL(0, subsubtable[5 * i + 1].delta);
+            CHECK_EQUAL(0, subsubtable[5 * i + 2].delta);
+            CHECK_EQUAL(0, subsubtable[5 * i + 3].delta);
+            CHECK_EQUAL(0, subsubtable[5 * i + 4].delta);
+            CHECK_EQUAL("", subsubtable[5 * i + 0].epsilon);
+            CHECK_EQUAL("", subsubtable[5 * i + 1].epsilon);
+            CHECK_EQUAL("", subsubtable[5 * i + 2].epsilon);
+            CHECK_EQUAL("", subsubtable[5 * i + 3].epsilon);
+            CHECK_EQUAL("", subsubtable[5 * i + 4].epsilon);
+            CHECK_EQUAL(0u, subsubtable[5 * i + 0].eta->size());
+            CHECK_EQUAL(0u, subsubtable[5 * i + 1].eta->size());
+            CHECK_EQUAL(0u, subsubtable[5 * i + 2].eta->size());
+            CHECK_EQUAL(0u, subsubtable[5 * i + 3].eta->size());
+            CHECK_EQUAL(0u, subsubtable[5 * i + 4].eta->size());
+            CHECK_EQUAL("click", subsubtable[5 * i + 3].theta);
         }
     }
     // End of read transaction
@@ -566,8 +550,8 @@ TEST(Transactions_General)
 TEST(Transactions_RollbackMoveTableColumns)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
@@ -583,7 +567,7 @@ TEST(Transactions_RollbackMoveTableColumns)
     g.insert_table(0, "inserted_at_index_zero");
     LangBindHelper::rollback_and_continue_as_read(sg_w);
 
-    g.verify(); //table.cpp:5249: [realm-core-0.97.0] Assertion failed: col_ndx <= m_cols.size() [2, 0]
+    g.verify(); // table.cpp:5249: [realm-core-0.97.0] Assertion failed: col_ndx <= m_cols.size() [2, 0]
 
     LangBindHelper::promote_to_write(sg_w);
 
@@ -597,8 +581,8 @@ TEST(Transactions_RollbackMoveTableColumns)
 TEST(Transactions_RollbackMoveTableReferences)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_client_history(path, crypt_key()));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, crypt_key());
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     WriteTransaction wt(sg_w);
     Group& g = wt.get_group();
 
@@ -611,7 +595,7 @@ TEST(Transactions_RollbackMoveTableReferences)
     g.move_table(1, 0);
     LangBindHelper::rollback_and_continue_as_read(sg_w);
 
-    g.verify(); //array.cpp:2111: [realm-core-0.97.0] Assertion failed: ref_in_parent == m_ref [112, 4864]
+    g.verify(); // array.cpp:2111: [realm-core-0.97.0] Assertion failed: ref_in_parent == m_ref [112, 4864]
 
     LangBindHelper::promote_to_write(sg_w);
 
@@ -625,10 +609,10 @@ TEST(Transactions_RollbackMoveTableReferences)
 TEST(LangBindHelper_RollbackStringEnumInsert)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_client_history(path, 0));
-    std::unique_ptr<Replication> hist_2(make_client_history(path, 0));
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
-    SharedGroup sg_2(*hist_2, SharedGroup::durability_Full, 0);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_2(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w);
+    SharedGroup sg_2(*hist_2);
     Group& g = const_cast<Group&>(sg_w.begin_read());
     Group& g2 = const_cast<Group&>(sg_2.begin_read());
     LangBindHelper::promote_to_write(sg_w);
@@ -640,7 +624,7 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
         t->set_string(0, 1, "duplicate");
         t->set_string(0, 2, "duplicate");
         bool force = true;
-        t->optimize(force);  // upgrade to internal string enum column type
+        t->optimize(force); // upgrade to internal string enum column type
     };
 
     g.add_table("t0");
@@ -674,9 +658,9 @@ TEST(LangBindHelper_RollbackStringEnumInsert)
 TEST(LangBindHelper_RollbackLinkInsert)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist_w(make_client_history(path, 0));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
 
-    SharedGroup sg_w(*hist_w, SharedGroup::durability_Full, 0);
+    SharedGroup sg_w(*hist_w);
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
 
@@ -688,7 +672,7 @@ TEST(LangBindHelper_RollbackLinkInsert)
 
     g.get_table(1)->add_column_link(type_LinkList, "t1_col0_link", *g.get_table(0));
     // or
-    //g.get_table(0)->add_column_link(type_Link, "t0_col0_link", *g.get_table(1));
+    // g.get_table(0)->add_column_link(type_Link, "t0_col0_link", *g.get_table(1));
 
     LangBindHelper::rollback_and_continue_as_read(sg_w);
     LangBindHelper::promote_to_write(sg_w);
@@ -696,7 +680,7 @@ TEST(LangBindHelper_RollbackLinkInsert)
     g.add_table("t2");
     g.get_table(1)->add_column_link(type_Link, "link", *g.get_table(0));
     // or
-    //g.get_table(0)->add_column_link(type_Link, "link", *g.get_table(1));
+    // g.get_table(0)->add_column_link(type_Link, "link", *g.get_table(1));
 
     g.add_table("t3");
 

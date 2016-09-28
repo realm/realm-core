@@ -88,7 +88,7 @@ TEST(ArrayBigBlobs_Basic)
 
     CHECK_EQUAL(6, c.size());
 
-    CHECK_EQUAL(BinaryData("hey"),       c.get(0));
+    CHECK_EQUAL(BinaryData("hey"), c.get(0));
     CHECK_EQUAL(4, c.get(0).size());
     CHECK_EQUAL(0, c.get(1).size());
     CHECK_EQUAL(0, c.get(2).size());
@@ -103,13 +103,13 @@ TEST(ArrayBigBlobs_Basic)
     CHECK_EQUAL(0, c.size());
 
     c.add(BinaryData("abc"));
-    CHECK_EQUAL(BinaryData("abc"),       c.get(0)); // single
+    CHECK_EQUAL(BinaryData("abc"), c.get(0)); // single
     CHECK_EQUAL(4, c.get(0).size());
     CHECK_EQUAL(1, c.size());
 
-    c.add(BinaryData("defg")); //non-empty
-    CHECK_EQUAL(BinaryData("abc"),       c.get(0));
-    CHECK_EQUAL(BinaryData("defg"),      c.get(1));
+    c.add(BinaryData("defg")); // non-empty
+    CHECK_EQUAL(BinaryData("abc"), c.get(0));
+    CHECK_EQUAL(BinaryData("defg"), c.get(1));
     CHECK_EQUAL(4, c.get(0).size());
     CHECK_EQUAL(5, c.get(1).size());
     CHECK_EQUAL(2, c.size());
@@ -122,51 +122,51 @@ TEST(ArrayBigBlobs_Basic)
 
     c.add(BinaryData("abc"));
     c.set(0, BinaryData("de")); // shrink single
-    CHECK_EQUAL(BinaryData("de"),        c.get(0));
+    CHECK_EQUAL(BinaryData("de"), c.get(0));
     CHECK_EQUAL(1, c.size());
 
     c.set(0, BinaryData("abcd")); // grow single
-    CHECK_EQUAL(BinaryData("abcd"),      c.get(0));
+    CHECK_EQUAL(BinaryData("abcd"), c.get(0));
     CHECK_EQUAL(1, c.size());
 
     c.add(BinaryData("efg"));
-    CHECK_EQUAL(BinaryData("abcd"),      c.get(0));
-    CHECK_EQUAL(BinaryData("efg"),       c.get(1));
+    CHECK_EQUAL(BinaryData("abcd"), c.get(0));
+    CHECK_EQUAL(BinaryData("efg"), c.get(1));
     CHECK_EQUAL(2, c.size());
 
     c.set(1, BinaryData("hi")); // shrink last
-    CHECK_EQUAL(BinaryData("abcd"),      c.get(0));
-    CHECK_EQUAL(BinaryData("hi"),        c.get(1));
+    CHECK_EQUAL(BinaryData("abcd"), c.get(0));
+    CHECK_EQUAL(BinaryData("hi"), c.get(1));
     CHECK_EQUAL(2, c.size());
 
     c.set(1, BinaryData("jklmno")); // grow last
-    CHECK_EQUAL(BinaryData("abcd"),      c.get(0));
-    CHECK_EQUAL(BinaryData("jklmno"),    c.get(1));
+    CHECK_EQUAL(BinaryData("abcd"), c.get(0));
+    CHECK_EQUAL(BinaryData("jklmno"), c.get(1));
     CHECK_EQUAL(2, c.size());
 
     c.add(BinaryData("pq", 3));
     c.set(1, BinaryData("efghijkl")); // grow middle
-    CHECK_EQUAL(BinaryData("abcd"),      c.get(0));
-    CHECK_EQUAL(BinaryData("efghijkl"),  c.get(1));
-    CHECK_EQUAL(BinaryData("pq"),        c.get(2));
+    CHECK_EQUAL(BinaryData("abcd"), c.get(0));
+    CHECK_EQUAL(BinaryData("efghijkl"), c.get(1));
+    CHECK_EQUAL(BinaryData("pq"), c.get(2));
     CHECK_EQUAL(3, c.size());
 
     c.set(1, BinaryData("x")); // shrink middle
-    CHECK_EQUAL(BinaryData("abcd"),      c.get(0));
-    CHECK_EQUAL(BinaryData("x"),         c.get(1));
-    CHECK_EQUAL(BinaryData("pq"),        c.get(2));
+    CHECK_EQUAL(BinaryData("abcd"), c.get(0));
+    CHECK_EQUAL(BinaryData("x"), c.get(1));
+    CHECK_EQUAL(BinaryData("pq"), c.get(2));
     CHECK_EQUAL(3, c.size());
 
     c.set(0, BinaryData("qwertyuio")); // grow first
     CHECK_EQUAL(BinaryData("qwertyuio"), c.get(0));
-    CHECK_EQUAL(BinaryData("x"),         c.get(1));
-    CHECK_EQUAL(BinaryData("pq"),        c.get(2));
+    CHECK_EQUAL(BinaryData("x"), c.get(1));
+    CHECK_EQUAL(BinaryData("pq"), c.get(2));
     CHECK_EQUAL(3, c.size());
 
     c.set(0, BinaryData("mno")); // shrink first
-    CHECK_EQUAL(BinaryData("mno"),       c.get(0));
-    CHECK_EQUAL(BinaryData("x"),         c.get(1));
-    CHECK_EQUAL(BinaryData("pq"),        c.get(2));
+    CHECK_EQUAL(BinaryData("mno"), c.get(0));
+    CHECK_EQUAL(BinaryData("x"), c.get(1));
+    CHECK_EQUAL(BinaryData("pq"), c.get(2));
     CHECK_EQUAL(3, c.size());
 
 
@@ -175,33 +175,33 @@ TEST(ArrayBigBlobs_Basic)
     c.clear();
 
     c.insert(0, BinaryData("abc")); // single
-    CHECK_EQUAL(BinaryData("abc"),       c.get(0));
+    CHECK_EQUAL(BinaryData("abc"), c.get(0));
     CHECK_EQUAL(1, c.size());
 
     c.insert(1, BinaryData("d")); // end
-    CHECK_EQUAL(BinaryData("abc"),       c.get(0));
-    CHECK_EQUAL(BinaryData("d"),         c.get(1));
+    CHECK_EQUAL(BinaryData("abc"), c.get(0));
+    CHECK_EQUAL(BinaryData("d"), c.get(1));
     CHECK_EQUAL(2, c.size());
 
     c.insert(2, BinaryData("ef")); // end
-    CHECK_EQUAL(BinaryData("abc"),       c.get(0));
-    CHECK_EQUAL(BinaryData("d"),         c.get(1));
-    CHECK_EQUAL(BinaryData("ef"),        c.get(2));
+    CHECK_EQUAL(BinaryData("abc"), c.get(0));
+    CHECK_EQUAL(BinaryData("d"), c.get(1));
+    CHECK_EQUAL(BinaryData("ef"), c.get(2));
     CHECK_EQUAL(3, c.size());
 
     c.insert(1, BinaryData("ghij")); // middle
-    CHECK_EQUAL(BinaryData("abc"),       c.get(0));
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(1));
-    CHECK_EQUAL(BinaryData("d"),         c.get(2));
-    CHECK_EQUAL(BinaryData("ef"),        c.get(3));
+    CHECK_EQUAL(BinaryData("abc"), c.get(0));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(1));
+    CHECK_EQUAL(BinaryData("d"), c.get(2));
+    CHECK_EQUAL(BinaryData("ef"), c.get(3));
     CHECK_EQUAL(4, c.size());
 
     c.insert(0, BinaryData("klmno")); // first
-    CHECK_EQUAL(BinaryData("klmno"),     c.get(0));
-    CHECK_EQUAL(BinaryData("abc"),       c.get(1));
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(2));
-    CHECK_EQUAL(BinaryData("d"),         c.get(3));
-    CHECK_EQUAL(BinaryData("ef"),        c.get(4));
+    CHECK_EQUAL(BinaryData("klmno"), c.get(0));
+    CHECK_EQUAL(BinaryData("abc"), c.get(1));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(2));
+    CHECK_EQUAL(BinaryData("d"), c.get(3));
+    CHECK_EQUAL(BinaryData("ef"), c.get(4));
     CHECK_EQUAL(5, c.size());
 
 
@@ -216,25 +216,25 @@ TEST(ArrayBigBlobs_Basic)
     c.add(BinaryData("klmno"));
 
     c.erase(0); // first
-    CHECK_EQUAL(BinaryData("bc"),        c.get(0));
-    CHECK_EQUAL(BinaryData("def"),       c.get(1));
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(2));
-    CHECK_EQUAL(BinaryData("klmno"),     c.get(3));
+    CHECK_EQUAL(BinaryData("bc"), c.get(0));
+    CHECK_EQUAL(BinaryData("def"), c.get(1));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(2));
+    CHECK_EQUAL(BinaryData("klmno"), c.get(3));
     CHECK_EQUAL(4, c.size());
 
     c.erase(3); // last
-    CHECK_EQUAL(BinaryData("bc"),        c.get(0));
-    CHECK_EQUAL(BinaryData("def"),       c.get(1));
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(2));
+    CHECK_EQUAL(BinaryData("bc"), c.get(0));
+    CHECK_EQUAL(BinaryData("def"), c.get(1));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(2));
     CHECK_EQUAL(3, c.size());
 
     c.erase(1); // middle
-    CHECK_EQUAL(BinaryData("bc"),        c.get(0));
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(1));
+    CHECK_EQUAL(BinaryData("bc"), c.get(0));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(1));
     CHECK_EQUAL(2, c.size());
 
     c.erase(0); // single
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(0));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(0));
     CHECK_EQUAL(1, c.size());
 
     c.erase(0); // all
@@ -279,6 +279,114 @@ TEST(ArrayBigBlobs_Basic)
 
 
     // TEST(ArrayBigBlobs_Destroy)
+
+    c.destroy();
+}
+
+TEST(ArrayBigBlobs_get_at)
+{
+    bool ok;
+    size_t get_pos;
+    size_t idx;
+    const char* data;
+    BinaryData read;
+
+    std::string lazy_fox = "The lazy fox jumped over the quick brown dog";
+    ArrayBigBlobs c(Allocator::get_default(), false);
+    c.create();
+
+    c.add(BinaryData(lazy_fox));
+
+    // read from beginning
+    get_pos = 0;
+    read = c.get_at(0, get_pos);
+    CHECK_EQUAL(get_pos, 0);
+    CHECK_EQUAL(std::string(read.data(), read.size()), lazy_fox);
+
+    // Read from an offset
+    get_pos = 4;
+    read = c.get_at(0, get_pos);
+    CHECK_EQUAL(get_pos, 0);
+    CHECK_EQUAL(std::string(read.data(), read.size()), lazy_fox.substr(4));
+
+    // Read from an offset larger than size of data
+    get_pos = 50;
+    read = c.get_at(0, get_pos);
+    CHECK(read.is_null());
+
+    // Construct a huge blob
+    std::vector<char> big_blob(0x2000000);
+    for (unsigned i = 0; i < big_blob.size(); i++) {
+        big_blob[i] = char(i & 0xFF);
+    }
+
+    // This will be store in 3 blobs
+    c.add(BinaryData(big_blob.data(), big_blob.size()));
+#ifdef REALM_DEBUG
+    c.verify();
+#endif
+    BinaryData binary;
+    char* header = c.get_mem().get_addr();
+
+    // Using the normal get results in a NULL object
+    binary = c.get(1);
+    CHECK(binary.is_null());
+    binary = ArrayBigBlobs::get(header, 1, Allocator::get_default());
+    CHECK(binary.is_null());
+
+    get_pos = 0;
+    idx = 0;
+    ok = true;
+    do {
+        read = c.get_at(1, get_pos);
+        data = read.data();
+        for (unsigned j = 0; j < read.size(); j++) {
+            if (data[j] != big_blob[idx++]) {
+                ok = false;
+            }
+        }
+    } while (get_pos);
+    CHECK_EQUAL(idx, 0x2000000);
+    CHECK(ok);
+
+
+    // Read from an offset (get data from 2nd blob)
+    get_pos = 0x1800000;
+    idx = 0x1800000;
+    read = c.get_at(1, get_pos);
+    data = read.data();
+    CHECK_EQUAL(get_pos, 0x1ffffe0);
+    CHECK_EQUAL(read.size(), 0x1ffffe0 - 0x1800000);
+    ok = true;
+    for (unsigned j = 0; j < read.size(); j++) {
+        if (data[j] != big_blob[idx++]) {
+            ok = false;
+        }
+    }
+    CHECK(ok);
+
+    // Request last
+    read = c.get_at(1, get_pos);
+    data = read.data();
+    CHECK_EQUAL(read.size(), 0x2000000 - 0x1ffffe0);
+    ok = true;
+    for (unsigned j = 0; j < read.size(); j++) {
+        if (data[j] != big_blob[idx++]) {
+            ok = false;
+        }
+    }
+    CHECK(ok);
+
+    // Read outside data
+    get_pos = 0x2000000;
+    read = c.get_at(1, get_pos);
+    CHECK(read.is_null());
+
+    // Read a NULL entry
+    c.set(1, BinaryData());
+    get_pos = 0;
+    read = c.get_at(1, get_pos);
+    CHECK(read.is_null());
 
     c.destroy();
 }

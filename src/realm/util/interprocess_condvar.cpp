@@ -62,10 +62,6 @@ InterprocessCondVar::InterprocessCondVar()
 }
 
 
-
-
-
-
 void InterprocessCondVar::close() noexcept
 {
     if (uses_emulation) { // true if emulating a process shared condvar
@@ -73,7 +69,7 @@ void InterprocessCondVar::close() noexcept
 #ifdef REALM_CONDVAR_EMULATION
         ::close(m_fd_read);
         ::close(m_fd_write);
-#endif        
+#endif
         return; // we don't need to clean up the SharedPart
     }
     // we don't do anything to the shared part, other CondVars may share it
@@ -87,15 +83,15 @@ InterprocessCondVar::~InterprocessCondVar() noexcept
 }
 
 
-
-void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path,
-                                          std::string condvar_name)
+void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, std::string condvar_name,
+                                          std::string tmp_path)
 {
     close();
     uses_emulation = true;
     m_shared_part = &shared_part;
     static_cast<void>(base_path);
     static_cast<void>(condvar_name);
+    static_cast<void>(tmp_path);
 #ifdef REALM_CONDVAR_EMULATION
 #if !REALM_TVOS
     m_resource_path = base_path + "." + condvar_name + ".cv";
@@ -104,13 +100,12 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     int ret = mkfifo(m_resource_path.c_str(), 0600);
     if (ret == -1) {
         int err = errno;
-        if (err == ENOTSUP) {
+        if (err == ENOTSUP || err == EACCES) {
             // Filesystem doesn't support named pipes, so try putting it in tmp instead
             // Hash collisions are okay here because they just result in doing
             // extra work, as opposed to correctness problems
             std::ostringstream ss;
-            // FIXME: getenv() is not classified as thread safe
-            ss << getenv("TMPDIR");
+            ss << tmp_path;
             ss << "realm_" << std::hash<std::string>()(m_resource_path) << ".cv";
             m_resource_path = ss.str();
             ret = mkfifo(m_resource_path.c_str(), 0600);
@@ -127,7 +122,8 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
                 if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
                     throw std::runtime_error(m_resource_path + " exists and it is not a fifo.");
                 }
-            } else {
+            }
+            else {
                 throw std::system_error(err, std::system_category());
             }
         }
@@ -175,7 +171,8 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
 }
 
 
-void InterprocessCondVar::init_shared_part(SharedPart& shared_part) {
+void InterprocessCondVar::init_shared_part(SharedPart& shared_part)
+{
 #ifdef REALM_CONDVAR_EMULATION
     shared_part.wait_counter = 0;
     shared_part.signal_counter = 0;
@@ -185,7 +182,8 @@ void InterprocessCondVar::init_shared_part(SharedPart& shared_part) {
 }
 
 
-void InterprocessCondVar::release_shared_part() {
+void InterprocessCondVar::release_shared_part()
+{
 #ifdef REALM_CONDVAR_EMULATION
     File::try_remove(m_resource_path);
 #else
@@ -238,7 +236,7 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
         int r;
         {
             if (tp) {
-                long miliseconds = tp->tv_sec*1000 + tp->tv_nsec/1000000;
+                long miliseconds = tp->tv_sec * 1000 + tp->tv_nsec / 1000000;
                 REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<int>(miliseconds));
                 int timeout = int(miliseconds);
                 r = poll(&poll_d, 1, timeout);
@@ -287,13 +285,13 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
         // potentially loop on it), but it will consume excess CPU/battery
         // and may also cause priority inversion
         char c;
-        ssize_t ret = read(m_fd_read,&c,1);
+        ssize_t ret = read(m_fd_read, &c, 1);
         if (ret == -1)
             continue; // FIXME: If the invariants hold, this is unreachable
         return;
     }
 #else
-    m_shared_part->wait(*m.m_shared_part, [](){}, tp);
+    m_shared_part->wait(*m.m_shared_part, []() {}, tp);
 #endif
 }
 
@@ -334,5 +332,3 @@ void InterprocessCondVar::notify_all() noexcept
     m_shared_part->notify_all();
 #endif
 }
-
-

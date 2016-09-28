@@ -34,8 +34,7 @@ using namespace realm::test_util;
 
 namespace {
 
-REALM_TABLE_1(IntTable,
-                i, Int)
+REALM_TABLE_1(IntTable, i, Int)
 
 
 inline int_fast64_t read(IntTable& table, const std::vector<size_t> order)
@@ -73,7 +72,7 @@ inline void erase(IntTable& table, const std::vector<size_t> order)
 
 int main()
 {
-    const size_t target_size = 1100*1000L;
+    const size_t target_size = 1100 * 1000L;
     const int num_tables = 50;
     std::cout << "Number of tables: " << num_tables << "\n";
     std::cout << "Elements per table: " << target_size << "\n";
@@ -85,10 +84,10 @@ int main()
     std::vector<size_t> random_erase_order;
     for (size_t i = 0; i != target_size; ++i) {
         rising_order.push_back(i);
-        falling_order.push_back(target_size-1-i);
+        falling_order.push_back(target_size - 1 - i);
         random_order.push_back(i);
-        random_insert_order.push_back(rand() % (i+1));
-        random_erase_order.push_back(rand() % (target_size-i));
+        random_insert_order.push_back(rand() % (i + 1));
+        random_erase_order.push_back(rand() % (target_size - i));
     }
     Random random;
     random.shuffle(random_order.begin(), random_order.end());
@@ -174,5 +173,5 @@ int main()
 
     results.submit_single("total_time", "Total time", timer_total);
 
-    std::cout << "dummy = "<<dummy<<" (to avoid over-optimization)\n";
+    std::cout << "dummy = " << dummy << " (to avoid over-optimization)\n";
 }

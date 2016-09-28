@@ -42,7 +42,10 @@ std::string sanitize_for_file_name(std::string str)
     return str;
 }
 #else
-std::string sanitize_for_file_name(const std::string& str) { return str; }
+std::string sanitize_for_file_name(const std::string& str)
+{
+    return str;
+}
 #endif
 
 std::locale locale_classic = std::locale::classic();
@@ -60,12 +63,11 @@ void keep_test_files()
 
 std::string get_test_path(const TestContext& context, const std::string& suffix)
 {
-    std::string  test_name = context.test_details.test_name;
+    std::string test_name = context.test_details.test_name;
     int recurrence_index = context.recurrence_index;
     std::ostringstream out;
     out.imbue(locale_classic);
-    out << path_prefix << sanitize_for_file_name(test_name) << '.' << (recurrence_index+1) <<
-        suffix;
+    out << path_prefix << sanitize_for_file_name(test_name) << '.' << (recurrence_index + 1) << suffix;
     return out.str();
 }
 
@@ -89,8 +91,8 @@ void set_test_resource_path(const std::string& path)
     resource_path = path;
 }
 
-TestPathGuard::TestPathGuard(const std::string& path):
-    m_path(path)
+TestPathGuard::TestPathGuard(const std::string& path)
+    : m_path(path)
 {
     File::try_remove(m_path);
 }
@@ -108,8 +110,8 @@ TestPathGuard::~TestPathGuard() noexcept
 }
 
 
-TestDirGuard::TestDirGuard(const std::string& path):
-    m_path(path)
+TestDirGuard::TestDirGuard(const std::string& path)
+    : m_path(path)
 {
     if (!try_make_dir(path)) {
         clean_dir(path);
@@ -157,8 +159,8 @@ void TestDirGuard::clean_dir(const std::string& path)
 }
 
 
-SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path):
-    TestPathGuard(path)
+SharedGroupTestPathGuard::SharedGroupTestPathGuard(const std::string& path)
+    : TestPathGuard(path)
 {
     cleanup();
 }
@@ -173,9 +175,9 @@ SharedGroupTestPathGuard::~SharedGroupTestPathGuard() noexcept
 void SharedGroupTestPathGuard::cleanup() const noexcept
 {
     try {
-        do_clean_dir(m_path+ ".management", ".management");
-        if (File::is_dir(m_path+".management"))
-            remove_dir(m_path+ ".management");
+        do_clean_dir(m_path + ".management", ".management");
+        if (File::is_dir(m_path + ".management"))
+            remove_dir(m_path + ".management");
         File::try_remove(get_lock_path());
     }
     catch (...) {

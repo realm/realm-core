@@ -21,28 +21,28 @@
 #include <iostream>
 #include <sstream>
 #include <realm/util/features.h>
+#include <realm/util/thread.hpp>
 
 #if REALM_PLATFORM_APPLE
-#  include <asl.h>
-#  include <dlfcn.h>
-#  include <execinfo.h>
-#  include <CoreFoundation/CoreFoundation.h>
+#include <asl.h>
+#include <dlfcn.h>
+#include <execinfo.h>
+#include <CoreFoundation/CoreFoundation.h>
 #endif
 
 #ifdef __ANDROID__
-#  include <android/log.h>
+#include <android/log.h>
 #endif
 
 
 // extern "C" and noinline so that a readable message shows up in the stack trace
 // of the crash
 // prototype here to silence warning
-extern "C" REALM_NORETURN REALM_NOINLINE
-void please_report_this_error_to_help_at_realm_dot_io();
+extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_error_to_help_at_realm_dot_io();
 
 // LCOV_EXCL_START
-extern "C" REALM_NORETURN REALM_NOINLINE
-void please_report_this_error_to_help_at_realm_dot_io() {
+extern "C" REALM_NORETURN REALM_NOINLINE void please_report_this_error_to_help_at_realm_dot_io()
+{
     std::abort();
 }
 // LCOV_EXCL_STOP
@@ -50,7 +50,7 @@ void please_report_this_error_to_help_at_realm_dot_io() {
 namespace {
 
 #if REALM_PLATFORM_APPLE
-void nslog(const char *message) noexcept
+void nslog(const char* message) noexcept
 {
     // Standard error goes nowhere for applications managed by launchd, so log to ASL as well.
     fputs(message, stderr);
@@ -59,14 +59,15 @@ void nslog(const char *message) noexcept
     // Log the message to Crashlytics if it's loaded into the process
     void* addr = dlsym(RTLD_DEFAULT, "CLSLog");
     if (addr) {
-        CFStringRef str = CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
+        CFStringRef str =
+            CFStringCreateWithCStringNoCopy(kCFAllocatorDefault, message, kCFStringEncodingUTF8, kCFAllocatorNull);
         auto fn = reinterpret_cast<void (*)(CFStringRef, ...)>(reinterpret_cast<size_t>(addr));
         fn(CFSTR("%@"), str);
         CFRelease(str);
     }
 }
 
-void(*termination_notification_callback)(const char*) noexcept = nslog;
+void (*termination_notification_callback)(const char*) noexcept = nslog;
 
 #elif REALM_ANDROID
 
@@ -75,11 +76,11 @@ void android_log(const char* message) noexcept
     __android_log_print(ANDROID_LOG_ERROR, "REALM", message);
 }
 
-void(*termination_notification_callback)(const char*) noexcept = android_log;
+void (*termination_notification_callback)(const char*) noexcept = android_log;
 
 #else
 
-void(*termination_notification_callback)(const char*) noexcept = nullptr;
+void (*termination_notification_callback)(const char*) noexcept = nullptr;
 
 #endif
 
@@ -88,7 +89,7 @@ void(*termination_notification_callback)(const char*) noexcept = nullptr;
 namespace realm {
 namespace util {
 
-void set_termination_notification_callback(void(*callback)(const char* ) noexcept) noexcept
+void set_termination_notification_callback(void (*callback)(const char*) noexcept) noexcept
 {
     termination_notification_callback = callback;
 }
@@ -110,6 +111,9 @@ REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
     ss << "IMPORTANT: if you see this error, please send this log to help@realm.io.";
 #ifdef REALM_DEBUG
     std::cerr << ss.rdbuf() << '\n';
+    std::string thread_name;
+    if (Thread::get_name(thread_name))
+        std::cerr << "Thread name: " << thread_name << "\n";
 #endif
 
     if (termination_notification_callback) {

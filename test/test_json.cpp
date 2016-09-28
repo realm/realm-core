@@ -86,18 +86,18 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     // Create table with all column types
     {
         DescriptorRef sub1;
-        table.add_column(type_Int, "int");              //  0
-        table.add_column(type_Bool, "bool");             //  1
-        table.add_column(type_OldDateTime, "date");             //  2
-        table.add_column(type_Float, "float");            //  3
+        table.add_column(type_Int, "int");                 //  0
+        table.add_column(type_Bool, "bool");               //  1
+        table.add_column(type_OldDateTime, "date");        //  2
+        table.add_column(type_Float, "float");             //  3
         table.add_column(type_Double, "double");           //  4
         table.add_column(type_String, "string");           //  5
         table.add_column(type_String, "string_long");      //  6
         table.add_column(type_String, "string_big_blobs"); //  7
         table.add_column(type_String, "string_enum");      //  8 - becomes StringEnumColumn
         table.add_column(type_Binary, "binary");           //  9
-        table.add_column(type_Table, "tables", &sub1);    // 10
-        table.add_column(type_Mixed, "mixed");            // 11
+        table.add_column(type_Table, "tables", &sub1);     // 10
+        table.add_column(type_Mixed, "mixed");             // 11
         sub1->add_column(type_Int, "sub_first");
         sub1->add_column(type_String, "sub_second");
     }
@@ -106,7 +106,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
 
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i % 2 == 0) ? 1 : -1;
-        table.set_int(0, i, int64_t(i*sign));
+        table.set_int(0, i, int64_t(i * sign));
     }
     for (size_t i = 0; i < rows; ++i)
         table.set_bool(1, i, (i % 2 ? true : false));
@@ -114,11 +114,11 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
         table.set_olddatetime(2, i, 12345);
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i % 2 == 0) ? 1 : -1;
-        table.set_float(3, i, 123.456f*sign);
+        table.set_float(3, i, 123.456f * sign);
     }
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i % 2 == 0) ? 1 : -1;
-        table.set_double(4, i, 9876.54321*sign);
+        table.set_double(4, i, 9876.54321 * sign);
     }
     std::vector<std::string> strings;
     for (size_t i = 0; i < rows; ++i) {
@@ -134,30 +134,30 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     }
     for (size_t i = 0; i < rows; ++i) {
         switch (i % 2) {
-        case 0: {
-                    std::string s = strings[i];
-                    s += " very long string.........";
-                    for (int j = 0; j != 4; ++j)
-                        s += " big blobs big blobs big blobs"; // +30
-                    table.set_string(7, i, s);
-                    break;
-        }
-        case 1:
-            table.set_string(7, i, "");
-            break;
+            case 0: {
+                std::string s = strings[i];
+                s += " very long string.........";
+                for (int j = 0; j != 4; ++j)
+                    s += " big blobs big blobs big blobs"; // +30
+                table.set_string(7, i, s);
+                break;
+            }
+            case 1:
+                table.set_string(7, i, "");
+                break;
         }
     }
     for (size_t i = 0; i < rows; ++i) {
         switch (i % 3) {
-        case 0:
-            table.set_string(8, i, "enum1");
-            break;
-        case 1:
-            table.set_string(8, i, "enum2");
-            break;
-        case 2:
-            table.set_string(8, i, "enum3");
-            break;
+            case 0:
+                table.set_string(8, i, "enum1");
+                break;
+            case 1:
+                table.set_string(8, i, "enum2");
+                break;
+            case 2:
+                table.set_string(8, i, "enum3");
+                break;
         }
     }
     for (size_t i = 0; i < rows; ++i)
@@ -169,7 +169,7 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
             n += i;
         for (size_t j = 0; j != n; ++j) {
             TableRef subtable = table.get_subtable(10, i);
-            int64_t val = -123 + i*j * 1234 * sign;
+            int64_t val = -123 + i * j * 1234 * sign;
             subtable->insert_empty_row(j);
             subtable->set_int(0, j, val);
             subtable->set_string(1, j, "sub");
@@ -178,42 +178,42 @@ void setup_multi_table(Table& table, size_t rows, size_t sub_rows, bool fixed_su
     for (size_t i = 0; i < rows; ++i) {
         int64_t sign = (i % 2 == 0) ? 1 : -1;
         switch (i % 8) {
-        case 0:
-            table.set_mixed(11, i, false);
-            break;
-        case 1:
-            table.set_mixed(11, i, int64_t(i*i*sign));
-            break;
-        case 2:
-            table.set_mixed(11, i, "string");
-            break;
-        case 3:
-            table.set_mixed(11, i, OldDateTime(123456789));
-            break;
-        case 4:
-            table.set_mixed(11, i, BinaryData("binary", 7));
-            break;
-        case 5: {
-                    // Add subtable to mixed column
-                    // We can first set schema and contents when the entire
-                    // row has been inserted
-                    table.set_mixed(11, i, Mixed::subtable_tag());
-                    TableRef subtable = table.get_subtable(11, i);
-                    subtable->add_column(type_Int, "first");
-                    subtable->add_column(type_String, "second");
-                    for (size_t j = 0; j != 2; ++j) {
-                        subtable->insert_empty_row(j);
-                        subtable->set_int(0, j, i*i*j*sign);
-                        subtable->set_string(1, j, "mixed sub");
-                    }
-                    break;
-        }
-        case 6:
-            table.set_mixed(11, i, float(123.1*i*sign));
-            break;
-        case 7:
-            table.set_mixed(11, i, double(987.65*i*sign));
-            break;
+            case 0:
+                table.set_mixed(11, i, false);
+                break;
+            case 1:
+                table.set_mixed(11, i, int64_t(i * i * sign));
+                break;
+            case 2:
+                table.set_mixed(11, i, "string");
+                break;
+            case 3:
+                table.set_mixed(11, i, OldDateTime(123456789));
+                break;
+            case 4:
+                table.set_mixed(11, i, BinaryData("binary", 7));
+                break;
+            case 5: {
+                // Add subtable to mixed column
+                // We can first set schema and contents when the entire
+                // row has been inserted
+                table.set_mixed(11, i, Mixed::subtable_tag());
+                TableRef subtable = table.get_subtable(11, i);
+                subtable->add_column(type_Int, "first");
+                subtable->add_column(type_String, "second");
+                for (size_t j = 0; j != 2; ++j) {
+                    subtable->insert_empty_row(j);
+                    subtable->set_int(0, j, i * i * j * sign);
+                    subtable->set_string(1, j, "mixed sub");
+                }
+                break;
+            }
+            case 6:
+                table.set_mixed(11, i, float(123.1 * i * sign));
+                break;
+            case 7:
+                table.set_mixed(11, i, double(987.65 * i * sign));
+                break;
         }
     }
 
@@ -227,7 +227,7 @@ bool json_test(std::string json, std::string expected_file, bool generate)
     file_name += expected_file + ".json";
 
     jsmn_parser p;
-    jsmntok_t *t = new jsmntok_t[10000];
+    jsmntok_t* t = new jsmntok_t[10000];
     jsmn_init(&p);
     int r = jsmn_parse(&p, json.c_str(), strlen(json.c_str()), t, 10000);
     delete[] t;
@@ -250,7 +250,7 @@ bool json_test(std::string json, std::string expected_file, bool generate)
         std::ifstream test_file(file_name.c_str(), std::ios::in | std::ios::binary);
 
         // fixme, find a way to use CHECK from a function
-        if(!test_file.good())
+        if (!test_file.good())
             return false;
         if (test_file.fail())
             return false;
@@ -446,7 +446,6 @@ TEST(Json_LinkListCycle)
     ss.str("");
     table1->to_json(ss, 3);
     CHECK(json_test(ss.str(), "expected_json_linklist_cycle6", generate_all));
-
 }
 
 TEST(Json_LinkCycles)

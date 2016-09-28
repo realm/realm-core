@@ -35,7 +35,9 @@ Query::Query()
 }
 
 Query::Query(Table& table, TableViewBase* tv)
-    : m_table(table.get_table_ref()), m_view(tv), m_source_table_view(tv)
+    : m_table(table.get_table_ref())
+    , m_view(tv)
+    , m_source_table_view(tv)
 {
 #ifdef REALM_DEBUG
     if (m_view)
@@ -44,10 +46,10 @@ Query::Query(Table& table, TableViewBase* tv)
     create();
 }
 
-Query::Query(const Table& table, const LinkViewRef& lv):
-    m_table((const_cast<Table&>(table)).get_table_ref()),
-    m_view(lv.get()),
-    m_source_link_view(lv)
+Query::Query(const Table& table, const LinkViewRef& lv)
+    : m_table((const_cast<Table&>(table)).get_table_ref())
+    , m_view(lv.get())
+    , m_source_link_view(lv)
 {
 #ifdef REALM_DEBUG
     if (m_view)
@@ -58,7 +60,9 @@ Query::Query(const Table& table, const LinkViewRef& lv):
 }
 
 Query::Query(const Table& table, TableViewBase* tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv), m_source_table_view(tv)
+    : m_table((const_cast<Table&>(table)).get_table_ref())
+    , m_view(tv)
+    , m_source_table_view(tv)
 {
 #ifdef REALM_DEBUG
     if (m_view)
@@ -68,8 +72,10 @@ Query::Query(const Table& table, TableViewBase* tv)
 }
 
 Query::Query(const Table& table, std::unique_ptr<TableViewBase> tv)
-    : m_table((const_cast<Table&>(table)).get_table_ref()), m_view(tv.get()), m_source_table_view(tv.get()),
-    m_owned_source_table_view(std::move(tv))
+    : m_table((const_cast<Table&>(table)).get_table_ref())
+    , m_view(tv.get())
+    , m_source_table_view(tv.get())
+    , m_owned_source_table_view(std::move(tv))
 {
 #ifdef REALM_DEBUG
     if (m_view)
@@ -85,8 +91,11 @@ void Query::create()
         fetch_descriptor();
 }
 
-Query::Query(const Query& source): error_code(source.error_code), m_groups(source.m_groups),
-    m_current_descriptor(source.m_current_descriptor), m_table(source.m_table)
+Query::Query(const Query& source)
+    : error_code(source.error_code)
+    , m_groups(source.m_groups)
+    , m_current_descriptor(source.m_current_descriptor)
+    , m_table(source.m_table)
 {
     if (source.m_owned_source_table_view) {
         m_owned_source_table_view = source.m_owned_source_table_view->clone();
@@ -103,7 +112,7 @@ Query::Query(const Query& source): error_code(source.error_code), m_groups(sourc
     }
 }
 
-Query& Query::operator = (const Query& source)
+Query& Query::operator=(const Query& source)
 {
     if (this != &source) {
         m_groups = source.m_groups;
@@ -138,12 +147,12 @@ Query& Query::operator=(Query&&) = default;
 Query::~Query() noexcept = default;
 
 Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
-    : m_table(TableRef()), m_source_link_view(LinkViewRef())
+    : m_table(TableRef())
+    , m_source_link_view(LinkViewRef())
 {
     Table::generate_patch(source.m_table.get(), patch.m_table);
     if (source.m_source_table_view) {
-        m_owned_source_table_view =
-            source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+        m_owned_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
         m_source_table_view = m_owned_source_table_view.get();
     }
     else {
@@ -152,18 +161,18 @@ Query::Query(Query& source, HandoverPatch& patch, MutableSourcePayload mode)
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
 
     m_groups.reserve(source.m_groups.size());
-    for (const auto& cur_group: source.m_groups) {
+    for (const auto& cur_group : source.m_groups) {
         m_groups.emplace_back(cur_group, patch.m_node_data);
     }
 }
 
 Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
-    : m_table(TableRef()), m_source_link_view(LinkViewRef())
+    : m_table(TableRef())
+    , m_source_link_view(LinkViewRef())
 {
     Table::generate_patch(source.m_table.get(), patch.m_table);
     if (source.m_source_table_view) {
-        m_owned_source_table_view =
-            source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
+        m_owned_source_table_view = source.m_source_table_view->clone_for_handover(patch.table_view_data, mode);
         m_source_table_view = m_owned_source_table_view.get();
     }
     else {
@@ -172,12 +181,13 @@ Query::Query(const Query& source, HandoverPatch& patch, ConstSourcePayload mode)
     LinkView::generate_patch(source.m_source_link_view, patch.link_view_data);
 
     m_groups.reserve(source.m_groups.size());
-    for (const auto& cur_group: source.m_groups) {
+    for (const auto& cur_group : source.m_groups) {
         m_groups.emplace_back(cur_group, patch.m_node_data);
     }
 }
 
-Query::Query(std::unique_ptr<Expression> expr) : Query()
+Query::Query(std::unique_ptr<Expression> expr)
+    : Query()
 {
     if (auto table = const_cast<Table*>(expr->get_base_table()))
         set_table(table->get_table_ref());
@@ -260,7 +270,7 @@ Query& Query::contains(size_t column_ndx, BinaryData b)
 
 namespace {
 
-template<class Node>
+template <class Node>
 struct MakeConditionNode {
     static std::unique_ptr<ParentNode> make(size_t col_ndx, typename Node::TConditionValue value)
     {
@@ -272,35 +282,36 @@ struct MakeConditionNode {
         return std::unique_ptr<ParentNode>{new Node(null{}, col_ndx)};
     }
 
-    template<class T = typename Node::TConditionValue>
-    static typename std::enable_if<!std::is_same<typename util::RemoveOptional<T>::type, T>::value, std::unique_ptr<ParentNode>>::type
+    template <class T = typename Node::TConditionValue>
+    static typename std::enable_if<!std::is_same<typename util::RemoveOptional<T>::type, T>::value,
+                                   std::unique_ptr<ParentNode>>::type
     make(size_t col_ndx, typename util::RemoveOptional<T>::type value)
     {
         return std::unique_ptr<ParentNode>{new Node(std::move(value), col_ndx)};
     }
 
-    template<class T>
+    template <class T>
     static std::unique_ptr<ParentNode> make(size_t, T)
     {
         throw LogicError{LogicError::type_mismatch};
     }
 };
 
-template<class Cond>
+template <class Cond>
 struct MakeConditionNode<IntegerNode<IntegerColumn, Cond>> {
     static std::unique_ptr<ParentNode> make(size_t col_ndx, int64_t value)
     {
         return std::unique_ptr<ParentNode>{new IntegerNode<IntegerColumn, Cond>(std::move(value), col_ndx)};
     }
 
-    template<class T>
+    template <class T>
     static std::unique_ptr<ParentNode> make(size_t, T)
     {
         throw LogicError{LogicError::type_mismatch};
     }
 };
 
-template<class Cond>
+template <class Cond>
 struct MakeConditionNode<StringNode<Cond>> {
     static std::unique_ptr<ParentNode> make(size_t col_ndx, StringData value)
     {
@@ -312,14 +323,14 @@ struct MakeConditionNode<StringNode<Cond>> {
         return std::unique_ptr<ParentNode>{new StringNode<Cond>(null{}, col_ndx)};
     }
 
-    template<class T>
+    template <class T>
     static std::unique_ptr<ParentNode> make(size_t, T)
     {
         throw LogicError{LogicError::type_mismatch};
     }
 };
 
-template<class Cond, class T>
+template <class Cond, class T>
 std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, size_t column_ndx, T value)
 {
     DataType type = descriptor.get_column_type(column_ndx);
@@ -368,7 +379,7 @@ void Query::fetch_descriptor()
 }
 
 
-template<typename TConditionFunction, class T>
+template <typename TConditionFunction, class T>
 Query& Query::add_condition(size_t column_ndx, T value)
 {
     REALM_ASSERT_DEBUG(m_current_descriptor);
@@ -378,7 +389,7 @@ Query& Query::add_condition(size_t column_ndx, T value)
 }
 
 
-template<class ColumnType>
+template <class ColumnType>
 Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Equal>(column_ndx1, column_ndx2));
@@ -387,35 +398,35 @@ Query& Query::equal(size_t column_ndx1, size_t column_ndx2)
 }
 
 // Two column methods, any type
-template<class ColumnType>
+template <class ColumnType>
 Query& Query::less(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Less>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template<class ColumnType>
+template <class ColumnType>
 Query& Query::less_equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, LessEqual>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template<class ColumnType>
+template <class ColumnType>
 Query& Query::greater(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, Greater>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template<class ColumnType>
+template <class ColumnType>
 Query& Query::greater_equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, GreaterEqual>(column_ndx1, column_ndx2));
     add_node(std::move(node));
     return *this;
 }
-template<class ColumnType>
+template <class ColumnType>
 Query& Query::not_equal(size_t column_ndx1, size_t column_ndx2)
 {
     auto node = std::unique_ptr<ParentNode>(new TwoColumnsNode<ColumnType, NotEqual>(column_ndx1, column_ndx2));
@@ -758,40 +769,34 @@ Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive
 
 // Aggregates =================================================================================
 
-size_t Query::peek_tableview(size_t tv_index) const
+size_t Query::peek_tablerow(size_t tablerow) const
 {
-    REALM_ASSERT(m_view);
 #ifdef REALM_DEBUG
     m_view->check_cookie();
 #endif
-    REALM_ASSERT_3(tv_index, <, m_view->size());
-
-    // Cannot use to_size_t() because the get() may return -1
-    size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(tv_index));
 
     if (has_conditions())
         return root_node()->find_first(tablerow, tablerow + 1);
 
+    // Query has no conditions, so all rows match, also the user given argument
     return tablerow;
 }
 
-template<Action action, typename T, typename R, class ColType>
-    R Query::aggregate(R(ColType::*aggregateMethod)(size_t start, size_t end, size_t limit,
-                                                    size_t* return_ndx) const,
-                       size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                       size_t* return_ndx) const
+template <Action action, typename T, typename R, class ColType>
+R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_t limit, size_t* return_ndx) const,
+                   size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+                   size_t* return_ndx) const
 {
-    if(limit == 0 || m_table->is_degenerate()) {
+    if (limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
             *resultcount = 0;
         return static_cast<R>(0);
     }
 
     if (end == size_t(-1))
-        end = m_view ? m_view->size() : m_table->size();
+        end = m_table->size();
 
-    const ColType& column =
-        m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
+    const ColType& column = m_table->get_column<ColType, ColumnType(ColumnTypeTraits<T>::id)>(column_ndx);
 
     if (!has_conditions() && !m_view) {
         // No criteria, so call aggregate METHODS directly on columns
@@ -813,15 +818,17 @@ template<Action action, typename T, typename R, class ColType>
         SequentialGetter<ColType> source_column(*m_table, column_ndx);
 
         if (!m_view) {
-            aggregate_internal(action, ColumnTypeTraits<T>::id, ColType::nullable, root_node(), &st, start, end, &source_column);
+            aggregate_internal(action, ColumnTypeTraits<T>::id, ColType::nullable, root_node(), &st, start, end,
+                               &source_column);
         }
         else {
-            for (size_t t = start; t < end && st.m_match_count < limit; t++) {
-                size_t r = peek_tableview(t);
-                if (r != not_found) {
-                    int64_t view_row_index = m_view->m_row_indexes.get(t);
-                    REALM_ASSERT(!util::int_cast_has_overflow<size_t>(view_row_index));
-                    st.template match<action, false>(r, 0, source_column.get_next(size_t(view_row_index))); //       m_view->m_row_indexes.get(t)));
+            for (size_t t = 0; t < m_view->size(); t++) {
+                size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
+                if (tablerow >= start && tablerow < end && peek_tablerow(tablerow) != not_found) {
+                    st.template match<action, false>(tablerow, 0, source_column.get_next(tablerow));
+                    if (st.m_match_count >= limit) {
+                        break;
+                    }
                 }
             }
         }
@@ -838,57 +845,56 @@ template<Action action, typename T, typename R, class ColType>
     }
 }
 
-    /**************************************************************************************************************
-    *                                                                                                             *
-    * Main entry point of a query. Schedules calls to aggregate_local                                             *
-    * Return value is the result of the query, or Array pointer for FindAll.                                      *
-    *                                                                                                             *
-    **************************************************************************************************************/
+/**************************************************************************************************************
+*                                                                                                             *
+* Main entry point of a query. Schedules calls to aggregate_local                                             *
+* Return value is the result of the query, or Array pointer for FindAll.                                      *
+*                                                                                                             *
+**************************************************************************************************************/
 
-    void Query::aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable,
-                                   ParentNode* pn, QueryStateBase* st,
-                                   size_t start, size_t end, SequentialGetterBase* source_column) const
-    {
-        if (end == not_found)
-            end = m_table->size();
+void Query::aggregate_internal(Action TAction, DataType TSourceColumn, bool nullable, ParentNode* pn,
+                               QueryStateBase* st, size_t start, size_t end,
+                               SequentialGetterBase* source_column) const
+{
+    if (end == not_found)
+        end = m_table->size();
 
-        for (size_t c = 0; c < pn->m_children.size(); c++)
-            pn->m_children[c]->aggregate_local_prepare(TAction, TSourceColumn, nullable);
+    for (size_t c = 0; c < pn->m_children.size(); c++)
+        pn->m_children[c]->aggregate_local_prepare(TAction, TSourceColumn, nullable);
 
-        size_t td;
+    size_t td;
 
-        while (start < end) {
-            auto score_compare = [](const ParentNode* a, const ParentNode* b) { return a->cost() < b->cost(); };
-            size_t best = std::distance(pn->m_children.begin(),
-                                        std::min_element(pn->m_children.begin(), pn->m_children.end(),
-                                                         score_compare));
+    while (start < end) {
+        auto score_compare = [](const ParentNode* a, const ParentNode* b) { return a->cost() < b->cost(); };
+        size_t best = std::distance(pn->m_children.begin(),
+                                    std::min_element(pn->m_children.begin(), pn->m_children.end(), score_compare));
 
-            // Find a large amount of local matches in best condition
-            td = pn->m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
+        // Find a large amount of local matches in best condition
+        td = pn->m_children[best]->m_dT == 0.0 ? end : (start + 1000 > end ? end : start + 1000);
 
-            // Executes start...end range of a query and will stay inside the condition loop of the node it was called
-            // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
-            // condition of called node has evaluated to true local_matches number of times.
-            // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
-            start = pn->m_children[best]->aggregate_local(st, start, td, findlocals, source_column);
+        // Executes start...end range of a query and will stay inside the condition loop of the node it was called
+        // on. Can be called on any node; yields same result, but different performance. Returns prematurely if
+        // condition of called node has evaluated to true local_matches number of times.
+        // Return value is the next row for resuming aggregating (next row that caller must call aggregate_local on)
+        start = pn->m_children[best]->aggregate_local(st, start, td, findlocals, source_column);
 
-            // Make remaining conditions compute their m_dD (statistics)
-            for (size_t c = 0; c < pn->m_children.size() && start < end; c++) {
-                if (c == best)
-                    continue;
+        // Make remaining conditions compute their m_dD (statistics)
+        for (size_t c = 0; c < pn->m_children.size() && start < end; c++) {
+            if (c == best)
+                continue;
 
-                // Skip test if there is no way its cost can ever be better than best node's
-                double cost = pn->m_children[c]->cost();
-                if (pn->m_children[c]->m_dT < cost) {
+            // Skip test if there is no way its cost can ever be better than best node's
+            double cost = pn->m_children[c]->cost();
+            if (pn->m_children[c]->m_dT < cost) {
 
-                    // Limit to bestdist in order not to skip too large parts of index nodes
-                    size_t maxD = pn->m_children[c]->m_dT == 0.0 ? end - start : bestdist;
-                    td = pn->m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
-                    start = pn->m_children[c]->aggregate_local(st, start, td, probe_matches, source_column);
-                }
+                // Limit to bestdist in order not to skip too large parts of index nodes
+                size_t maxD = pn->m_children[c]->m_dT == 0.0 ? end - start : bestdist;
+                td = pn->m_children[c]->m_dT == 0.0 ? end : (start + maxD > end ? end : start + maxD);
+                start = pn->m_children[c]->aggregate_local(st, start, td, probe_matches, source_column);
             }
         }
     }
+}
 
 
 // Sum
@@ -915,42 +921,47 @@ int64_t Query::maximum_int(size_t column_ndx, size_t* resultcount, size_t start,
                            size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
-        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
+        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit,
+                                           return_ndx);
     }
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit,
+                                       return_ndx);
 }
 
-OldDateTime Query::maximum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
-                                 size_t limit, size_t* return_ndx) const
+OldDateTime Query::maximum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+                                       size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
-        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
+        return aggregate<act_Max, int64_t>(&IntNullColumn::maximum, column_ndx, resultcount, start, end, limit,
+                                           return_ndx);
     }
-    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Max, int64_t>(&IntegerColumn::maximum, column_ndx, resultcount, start, end, limit,
+                                       return_ndx);
 }
 
-float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
-                           size_t limit, size_t* return_ndx) const
+float Query::maximum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+                           size_t* return_ndx) const
 {
     return aggregate<act_Max, float>(&FloatColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
-double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
-                             size_t limit, size_t* return_ndx) const
+double Query::maximum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+                             size_t* return_ndx) const
 {
-    return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, resultcount, start, end, limit,
-                                      return_ndx);
+    return aggregate<act_Max, double>(&DoubleColumn::maximum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
 
 // Minimum
 
-int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end,
-                           size_t limit, size_t* return_ndx) const
+int64_t Query::minimum_int(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
+                           size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
-        return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+        return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit,
+                                           return_ndx);
     }
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit,
+                                       return_ndx);
 }
 float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                            size_t* return_ndx) const
@@ -960,17 +971,18 @@ float Query::minimum_float(size_t column_ndx, size_t* resultcount, size_t start,
 double Query::minimum_double(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                              size_t* return_ndx) const
 {
-    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, resultcount, start, end, limit,
-                                      return_ndx);
+    return aggregate<act_Min, double>(&DoubleColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
 }
 
 OldDateTime Query::minimum_olddatetime(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
-                                 size_t* return_ndx) const
+                                       size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx)) {
-        return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+        return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, resultcount, start, end, limit,
+                                           return_ndx);
     }
-    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit, return_ndx);
+    return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, resultcount, start, end, limit,
+                                       return_ndx);
 }
 
 Timestamp Query::minimum_timestamp(size_t column_ndx, size_t* return_ndx, size_t start, size_t end, size_t limit)
@@ -991,10 +1003,10 @@ Timestamp Query::maximum_timestamp(size_t column_ndx, size_t* return_ndx, size_t
 
 // Average
 
-template<typename T, bool Nullable>
+template <typename T, bool Nullable>
 double Query::average(size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit) const
 {
-    if(limit == 0 || m_table->is_degenerate()) {
+    if (limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
             *resultcount = 0;
         return 0.;
@@ -1116,8 +1128,8 @@ Query& Query::end_subtable()
         return *this;
     }
 
-    auto subtable_node = std::unique_ptr<ParentNode>(new SubtableNode(current_group.m_subtable_column,
-                                                                      std::move(current_group.m_root_node)));
+    auto subtable_node = std::unique_ptr<ParentNode>(
+        new SubtableNode(current_group.m_subtable_column, std::move(current_group.m_root_node)));
     end_group();
     m_subtable_path.pop_back();
     add_node(std::move(subtable_node));
@@ -1138,18 +1150,23 @@ size_t Query::find(size_t begin)
 
     // User created query with no criteria; return first
     if (!has_conditions()) {
-        if (m_view)
-            return m_view->size() == 0 ? not_found : begin;
+        if (m_view) {
+            for (size_t t = 0; t < m_view->size(); t++) {
+                size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
+                if (tablerow >= begin)
+                    return tablerow;
+            }
+            return not_found;
+        }
         else
             return m_table->size() == 0 ? not_found : begin;
     }
 
     if (m_view) {
-        size_t end = m_view->size();
-        for (; begin < end; begin++) {
-            size_t res = peek_tableview(begin);
-            if (res != not_found)
-                return begin;
+        for (size_t t = 0; t < m_view->size(); t++) {
+            size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
+            if (tablerow >= begin && peek_tablerow(tablerow) != not_found)
+                return tablerow;
         }
         return not_found;
     }
@@ -1160,45 +1177,39 @@ size_t Query::find(size_t begin)
     }
 }
 
-void Query::find_all(TableViewBase& ret, size_t start, size_t end, size_t limit) const
+void Query::find_all(TableViewBase& ret, size_t begin, size_t end, size_t limit) const
 {
     if (limit == 0 || m_table->is_degenerate())
         return;
 
-    REALM_ASSERT_3(start, <=, m_table->size());
+    REALM_ASSERT_3(begin, <=, m_table->size());
 
     init();
 
     if (end == size_t(-1))
-        end = m_view ? m_view->size() : m_table->size();
-
-    // User created query with no criteria; return everything
-    if (!has_conditions()) {
-        IntegerColumn& refs = ret.m_row_indexes;
-        size_t end_pos = (limit != size_t(-1)) ? std::min(end, start + limit) : end;
-
-        if (m_view) {
-            for (size_t i = start; i < end_pos; ++i)
-                refs.add(m_view->m_row_indexes.get(i));
-        }
-        else {
-            for (size_t i = start; i < end_pos; ++i)
-                refs.add(i);
-        }
-        return;
-    }
+        end = m_table->size();
 
     if (m_view) {
-        for (size_t begin = start; begin < end && ret.size() < limit; begin++) {
-            size_t res = peek_tableview(begin);
-            if (res != not_found)
-                ret.m_row_indexes.add(res);
+        for (size_t t = 0; t < m_view->size() && ret.size() < limit; t++) {
+            size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
+            if (tablerow >= begin && tablerow < end && peek_tablerow(tablerow) != not_found) {
+                ret.m_row_indexes.add(tablerow);
+            }
         }
     }
     else {
-        QueryState<int64_t> st;
-        st.init(act_FindAll, &ret.m_row_indexes, limit);
-        aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, false, root_node(), &st, start, end, nullptr);
+        if (!has_conditions()) {
+            IntegerColumn& refs = ret.m_row_indexes;
+            for (size_t i = begin; i < end && refs.size() < limit; ++i) {
+                refs.add(i);
+            }
+        }
+        else {
+            QueryState<int64_t> st;
+            st.init(act_FindAll, &ret.m_row_indexes, limit);
+            aggregate_internal(act_FindAll, ColumnTypeTraits<int64_t>::id, false, root_node(), &st, begin, end,
+                               nullptr);
+        }
     }
 }
 
@@ -1212,25 +1223,31 @@ TableView Query::find_all(size_t start, size_t end, size_t limit)
 
 size_t Query::count(size_t start, size_t end, size_t limit) const
 {
-    if(limit == 0 || m_table->is_degenerate())
+    if (limit == 0 || m_table->is_degenerate())
         return 0;
 
     if (end == size_t(-1))
-        end = m_view ? m_view->size() : m_table->size();
+        end = m_table->size();
 
     if (!has_conditions()) {
         // User created query with no criteria; count all
-        return (limit < end - start ? limit : end - start);
+        if (m_view) {
+            return (limit < m_view->size() - start ? limit : m_view->size() - start);
+        }
+        else {
+            return (limit < end - start ? limit : end - start);
+        }
     }
 
     init();
     size_t cnt = 0;
 
     if (m_view) {
-        for (size_t begin = start; begin < end && cnt < limit; begin++) {
-            size_t res = peek_tableview(begin);
-            if (res != not_found)
+        for (size_t t = 0; t < m_view->size() && cnt < limit; t++) {
+            size_t tablerow = static_cast<size_t>(m_view->m_row_indexes.get(t));
+            if (tablerow >= start && tablerow < end && peek_tablerow(tablerow) != not_found) {
                 cnt++;
+            }
         }
     }
     else {
@@ -1245,47 +1262,15 @@ size_t Query::count(size_t start, size_t end, size_t limit) const
 
 
 // todo, not sure if start, end and limit could be useful for delete.
-size_t Query::remove(size_t start, size_t end, size_t limit)
+size_t Query::remove()
 {
-    if(limit == 0 || m_table->is_degenerate())
+    if (m_table->is_degenerate())
         return 0;
 
-    if (end == not_found)
-        end = m_view ? m_view->size() : m_table->size();
-
-    size_t results = 0;
-
-    if (m_view) {
-        for (;;) {
-            if (start + results == end || results == limit)
-                return results;
-
-            init();
-            size_t r = peek_tableview(start + results);
-            if (r != not_found) {
-                m_table->remove(r);
-                results++;
-            }
-            else {
-                return results;
-            }
-        }
-    }
-    else {
-        size_t r = start;
-        for (;;) {
-            // Every remove invalidates the array cache in the nodes
-            // so we have to re-initialize it before searching
-            init();
-
-            r = find_internal(r, end - results);
-            if (r == not_found || r == m_table->size() || results == limit)
-                break;
-            ++results;
-            m_table->remove(r);
-        }
-        return results;
-    }
+    TableView tv = find_all();
+    size_t rows = tv.size();
+    tv.clear();
+    return rows;
 }
 
 #if REALM_MULTITHREAD_QUERY
@@ -1335,7 +1320,7 @@ TableView Query::find_all_multi(size_t start, size_t end)
 int Query::set_threads(unsigned int threadcount)
 {
 #if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-    pthread_win32_process_attach_np ();
+    pthread_win32_process_attach_np();
 #endif
     pthread_mutex_init(&ts.result_mutex, nullptr);
     pthread_cond_init(&ts.completed_cond, nullptr);
@@ -1351,7 +1336,7 @@ int Query::set_threads(unsigned int threadcount)
     for (size_t i = 0; i < threadcount; ++i) {
         int r = pthread_create(&threads[i], nullptr, query_thread, (void*)&ts);
         if (r != 0)
-            REALM_ASSERT(false); //todo
+            REALM_ASSERT(false); // todo
     }
     m_threadcount = threadcount;
     return 0;
@@ -1492,7 +1477,8 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
         default: {
             if (!current_group.m_root_node) {
                 current_group.m_root_node = std::move(node);
-            } else {
+            }
+            else {
                 current_group.m_root_node->add_child(std::move(node));
             }
         }
@@ -1505,7 +1491,8 @@ void Query::add_node(std::unique_ptr<ParentNode> node)
 *
 *  Stuff related to next-generation query syntax
 *
-******************************************************************************************************************** */
+********************************************************************************************************************
+*/
 
 Query& Query::and_query(const Query& q)
 {
@@ -1575,9 +1562,11 @@ util::Optional<uint_fast64_t> Query::sync_view_if_needed() const
     return util::none;
 }
 
-QueryGroup::QueryGroup(const QueryGroup& other) :
-    m_root_node(other.m_root_node ? other.m_root_node->clone() : nullptr),
-    m_pending_not(other.m_pending_not), m_subtable_column(other.m_subtable_column), m_state(other.m_state)
+QueryGroup::QueryGroup(const QueryGroup& other)
+    : m_root_node(other.m_root_node ? other.m_root_node->clone() : nullptr)
+    , m_pending_not(other.m_pending_not)
+    , m_subtable_column(other.m_subtable_column)
+    , m_state(other.m_state)
 {
 }
 
@@ -1592,8 +1581,10 @@ QueryGroup& QueryGroup::operator=(const QueryGroup& other)
     return *this;
 }
 
-QueryGroup::QueryGroup(const QueryGroup& other, QueryNodeHandoverPatches& patches) :
-    m_root_node(other.m_root_node ? other.m_root_node->clone(&patches) : nullptr),
-    m_pending_not(other.m_pending_not), m_subtable_column(other.m_subtable_column), m_state(other.m_state)
+QueryGroup::QueryGroup(const QueryGroup& other, QueryNodeHandoverPatches& patches)
+    : m_root_node(other.m_root_node ? other.m_root_node->clone(&patches) : nullptr)
+    , m_pending_not(other.m_pending_not)
+    , m_subtable_column(other.m_subtable_column)
+    , m_state(other.m_state)
 {
 }

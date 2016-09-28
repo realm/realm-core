@@ -40,11 +40,11 @@ using namespace realm::util;
 namespace {
 
 void check_table_view(test_util::unit_test::TestContext& test_context, const char* file, size_t line,
-                      const TableView& tv, std::vector<size_t> expected,
-                      const std::string& tv_str, const std::string& expected_str)
+                      const TableView& tv, std::vector<size_t> expected, const std::string& tv_str,
+                      const std::string& expected_str)
 {
-    test_context.check_equal(tv.size(), expected.size(), file, line,
-                             (tv_str + ".size()").c_str(), (expected_str + ".size()").c_str());
+    test_context.check_equal(tv.size(), expected.size(), file, line, (tv_str + ".size()").c_str(),
+                             (expected_str + ".size()").c_str());
     if (tv.size() == expected.size()) {
         for (size_t i = 0; i < expected.size(); ++i) {
             test_context.check_equal(tv.get_source_ndx(i), expected[i], file, line,
@@ -53,12 +53,11 @@ void check_table_view(test_util::unit_test::TestContext& test_context, const cha
         }
     }
 }
-
 }
 
 // void CHECK_TABLE_VIEW(const TableView&, std::initializer_list<size_t>);
-#define CHECK_TABLE_VIEW(_tv, ...) \
-    check_table_view(test_context, __FILE__, __LINE__, _tv, __VA_ARGS__, # _tv, # __VA_ARGS__)
+#define CHECK_TABLE_VIEW(_tv, ...)                                                                                   \
+    check_table_view(test_context, __FILE__, __LINE__, _tv, __VA_ARGS__, #_tv, #__VA_ARGS__)
 
 
 TEST(LinkList_Basic1)
@@ -979,7 +978,7 @@ TEST(LinkList_SortLinkView)
     CHECK_EQUAL(tv.get(0).get_index(), 1);
     CHECK_EQUAL(tv.get(1).get_index(), 2);
     CHECK_EQUAL(tv.get(2).get_index(), 0);
-    
+
     lvr = table2->get_linklist(col_link2, 1);
     lvr->clear();
     lvr->add(2);
@@ -1444,8 +1443,8 @@ TEST(LinkList_QueryOnIndexedPropertyOfLinkListSingleMatch)
     lvr->add(1);
     lvr->add(0);
 
-    CHECK_EQUAL(1, data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find());
-    CHECK_EQUAL(0, data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find());
+    CHECK_EQUAL(0, data_table->where(lvr).and_query(data_table->column<String>(0) == "a").find());
+    CHECK_EQUAL(1, data_table->where(lvr).and_query(data_table->column<String>(0) == "b").find());
     CHECK_EQUAL(not_found, data_table->where(lvr).and_query(data_table->column<String>(0) == "c").find());
 }
 
@@ -1500,7 +1499,10 @@ TEST(LinkList_QueryLinkNull)
 
     CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<String>(0) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0) != realm::null()).count());
-    CHECK_EQUAL(0, data_table->where().and_query(data_table->link(1).column<String>(0) != realm::null()).find_all().get_source_ndx(0));
+    CHECK_EQUAL(0, data_table->where()
+                       .and_query(data_table->link(1).column<String>(0) != realm::null())
+                       .find_all()
+                       .get_source_ndx(0));
 
     CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<Int>(2) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Int>(2) != realm::null()).count());
@@ -1508,18 +1510,36 @@ TEST(LinkList_QueryLinkNull)
     CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<Double>(3) == realm::null()).count());
     CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<Double>(3) != realm::null()).count());
 
-    CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<OldDateTime>(4) == realm::null()).count());
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<OldDateTime>(4) != realm::null()).count());
+    CHECK_EQUAL(2,
+                data_table->where().and_query(data_table->link(1).column<OldDateTime>(4) == realm::null()).count());
+    CHECK_EQUAL(1,
+                data_table->where().and_query(data_table->link(1).column<OldDateTime>(4) != realm::null()).count());
 
     CHECK_EQUAL(2, data_table->where().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
-    CHECK_EQUAL(1, data_table->where().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).count());
+    CHECK_EQUAL(
+        1, data_table->where().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).count());
 
-    CHECK_EQUAL(2, data_table->where().Not().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).count());
-    CHECK_EQUAL(1, data_table->where().Not().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).find_all().get_source_ndx(0));
-    CHECK_EQUAL(2, data_table->where().Not().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).find_all().get_source_ndx(1));
+    CHECK_EQUAL(
+        2,
+        data_table->where().Not().and_query(data_table->link(1).column<String>(0).not_equal(realm::null())).count());
+    CHECK_EQUAL(1, data_table->where()
+                       .Not()
+                       .and_query(data_table->link(1).column<String>(0).not_equal(realm::null()))
+                       .find_all()
+                       .get_source_ndx(0));
+    CHECK_EQUAL(2, data_table->where()
+                       .Not()
+                       .and_query(data_table->link(1).column<String>(0).not_equal(realm::null()))
+                       .find_all()
+                       .get_source_ndx(1));
 
-    CHECK_EQUAL(1, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
-    CHECK_EQUAL(0, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).find_all().get_source_ndx(0));
+    CHECK_EQUAL(
+        1, data_table->where().Not().and_query(data_table->link(1).column<String>(0).equal(realm::null())).count());
+    CHECK_EQUAL(0, data_table->where()
+                       .Not()
+                       .and_query(data_table->link(1).column<String>(0).equal(realm::null()))
+                       .find_all()
+                       .get_source_ndx(0));
 
     CHECK_EQUAL(1, (data_table->column<Link>(1) == realm::null()).count());
     CHECK_EQUAL(2, (data_table->column<Link>(1) != realm::null()).count());
@@ -1820,7 +1840,7 @@ TEST(BackLink_Query_LinkList)
     auto add_row = [&](std::vector<size_t> link_targets, int64_t i, double d, const char* string) {
         size_t row = source->add_empty_row();
         auto link_view = source->get_linklist(col_linklist, row);
-        for (auto link_target: link_targets)
+        for (auto link_target : link_targets)
             link_view->add(link_target);
         source->set_int(col_int, row, i);
         source->set_double(col_double, row, d);
@@ -1863,7 +1883,8 @@ TEST(BackLink_Query_LinkList)
     Query q10 = target->column<BackLink>(*source, col_linklist).column<Double>(col_double).sum() == 70;
     CHECK_TABLE_VIEW(q10.find_all(), {1});
 
-    Query q11 = target->column<BackLink>(*source, col_linklist, source->column<Double>(col_double) == 20.0).count() == 2;
+    Query q11 =
+        target->column<BackLink>(*source, col_linklist, source->column<Double>(col_double) == 20.0).count() == 2;
     CHECK_TABLE_VIEW(q11.find_all(), {1});
 }
 
@@ -1881,26 +1902,26 @@ TEST(BackLink_Query_MultipleLevels)
     auto add_person = [&](std::string name, int age, std::vector<size_t> children) {
         size_t row = people->add_empty_row();
         auto children_link_view = people->get_linklist(col_children, row);
-        for (auto child: children)
+        for (auto child : children)
             children_link_view->add(child);
         people->set_string(col_name, row, name);
         people->set_int(col_age, row, age);
         return row;
     };
 
-    auto hannah   = add_person("Hannah",    0, {});
-    auto elijah   = add_person("Elijah",    3, {});
+    auto hannah = add_person("Hannah", 0, {});
+    auto elijah = add_person("Elijah", 3, {});
 
-    auto mark     = add_person("Mark",     30, {hannah});
-    auto jason    = add_person("Jason",    31, {elijah});
+    auto mark = add_person("Mark", 30, {hannah});
+    auto jason = add_person("Jason", 31, {elijah});
 
-    auto diane    = add_person("Diane",    29, {hannah});
-    auto carol    = add_person("Carol",    31, {});
+    auto diane = add_person("Diane", 29, {hannah});
+    auto carol = add_person("Carol", 31, {});
 
-    auto don      = add_person("Don",      64, {diane, carol});
-    auto diane_sr = add_person("Diane",    60, {diane, carol});
+    auto don = add_person("Don", 64, {diane, carol});
+    auto diane_sr = add_person("Diane", 60, {diane, carol});
 
-    auto michael  = add_person("Michael",  57, {jason, mark});
+    auto michael = add_person("Michael", 57, {jason, mark});
     auto raewynne = add_person("Raewynne", 56, {jason, mark});
 
     // People that have a parent with a name that starts with 'M'.
@@ -1908,7 +1929,10 @@ TEST(BackLink_Query_MultipleLevels)
     CHECK_TABLE_VIEW(q1.find_all(), {hannah, mark, jason});
 
     // People that have a grandparent with a name that starts with 'M'.
-    Query q2 = people->backlink(*people, col_children).backlink(*people, col_children).column<String>(col_name).begins_with("M");
+    Query q2 = people->backlink(*people, col_children)
+                   .backlink(*people, col_children)
+                   .column<String>(col_name)
+                   .begins_with("M");
     CHECK_TABLE_VIEW(q2.find_all(), {hannah, elijah});
 
     // People that have children that have a parent named Diane.
@@ -1916,7 +1940,10 @@ TEST(BackLink_Query_MultipleLevels)
     CHECK_TABLE_VIEW(q3.find_all(), {mark, diane, don, diane_sr});
 
     // People that have children that have a grandparent named Don.
-    Query q4 = people->link(col_children).backlink(*people, col_children).backlink(*people, col_children).column<String>(col_name) == "Don";
+    Query q4 = people->link(col_children)
+                   .backlink(*people, col_children)
+                   .backlink(*people, col_children)
+                   .column<String>(col_name) == "Don";
     CHECK_TABLE_VIEW(q4.find_all(), {mark, diane});
 
     // People whose parents have an average age of < 60.
@@ -1924,7 +1951,8 @@ TEST(BackLink_Query_MultipleLevels)
     CHECK_TABLE_VIEW(q5.find_all(), {hannah, elijah, mark, jason});
 
     // People that have at least one sibling.
-    Query q6 = people->column<BackLink>(*people, col_children, people->column<Link>(col_children).count() > 1).count() > 0;
+    Query q6 =
+        people->column<BackLink>(*people, col_children, people->column<Link>(col_children).count() > 1).count() > 0;
     CHECK_TABLE_VIEW(q6.find_all(), {mark, jason, diane, carol});
 
     // People that have Raewynne as a parent.
@@ -1936,7 +1964,8 @@ TEST(BackLink_Query_MultipleLevels)
     CHECK_TABLE_VIEW(q8.find_all(), {michael, raewynne});
 
     // People that have Michael as a grandparent.
-    Query q9 = people->backlink(*people, col_children).column<BackLink>(*people, col_children) == people->get(michael);
+    Query q9 =
+        people->backlink(*people, col_children).column<BackLink>(*people, col_children) == people->get(michael);
     CHECK_TABLE_VIEW(q9.find_all(), {hannah, elijah});
 
     // People that have Hannah as a grandchild.

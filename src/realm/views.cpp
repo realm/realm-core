@@ -30,12 +30,13 @@ struct IndexPair {
 };
 } // anonymous namespace
 
-SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices, std::vector<bool> ascending)
-: m_ascending(std::move(ascending))
+SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices,
+                               std::vector<bool> ascending)
+    : m_ascending(std::move(ascending))
 {
     REALM_ASSERT(!column_indices.empty());
-    REALM_ASSERT_EX(m_ascending.empty() || m_ascending.size() == column_indices.size(),
-                    m_ascending.size(), column_indices.size());
+    REALM_ASSERT_EX(m_ascending.empty() || m_ascending.size() == column_indices.size(), m_ascending.size(),
+                    column_indices.size());
     if (m_ascending.empty())
         m_ascending.resize(column_indices.size(), true);
     if (table.is_degenerate())
@@ -93,8 +94,8 @@ SortDescriptor SortDescriptor::create_from_and_consume_patch(HandoverPatch& patc
 
 class SortDescriptor::Sorter {
 public:
-    Sorter(std::vector<std::vector<const ColumnBase*>> const& columns,
-           std::vector<bool> const& ascending, IntegerColumn const& row_indexes);
+    Sorter(std::vector<std::vector<const ColumnBase*>> const& columns, std::vector<bool> const& ascending,
+           IntegerColumn const& row_indexes);
 
     bool operator()(IndexPair i, IndexPair j, bool total_ordering = true) const;
 
@@ -219,19 +220,21 @@ void RowIndexes::do_sort(const SortDescriptor& order, const SortDescriptor& dist
 
         // Remove all rows which have a null link along the way to the distinct columns
         if (sorting_predicate.has_links()) {
-            v.erase(std::remove_if(v.begin(), v.end(), [&](auto&& index) {
-                return sorting_predicate.any_is_null(index);
-            }), v.end());
+            v.erase(std::remove_if(v.begin(), v.end(),
+                                   [&](auto&& index) { return sorting_predicate.any_is_null(index); }),
+                    v.end());
         }
 
         // Sort by the columns to distinct on
         std::sort(v.begin(), v.end(), std::ref(sorting_predicate));
 
         // Remove all duplicates
-        v.erase(std::unique(v.begin(), v.end(), [&](auto&& a, auto&& b) {
-            // "not less than" is "equal" since they're sorted
-            return !sorting_predicate(a, b, false);
-        }), v.end());
+        v.erase(std::unique(v.begin(), v.end(),
+                            [&](auto&& a, auto&& b) {
+                                // "not less than" is "equal" since they're sorted
+                                return !sorting_predicate(a, b, false);
+                            }),
+                v.end());
 
         // Restore the original order unless we're just going to sort it again anyway
         if (!order) {
@@ -252,11 +255,28 @@ void RowIndexes::do_sort(const SortDescriptor& order, const SortDescriptor& dist
         m_row_indexes.add(-1);
 }
 
+RowIndexes::RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc)
+    : m_row_indexes(urt, alloc)
+#ifdef REALM_COOKIE_CHECK
+    , m_debug_cookie(cookie_expected)
+#endif
+{
+}
+
+RowIndexes::RowIndexes(IntegerColumn&& col)
+    : m_row_indexes(std::move(col))
+#ifdef REALM_COOKIE_CHECK
+    , m_debug_cookie(cookie_expected)
+#endif
+{
+}
+
+
 // FIXME: this only works (and is only used) for row indexes with memory
 // managed by the default allocator, e.q. for TableViews.
 RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
 #ifdef REALM_COOKIE_CHECK
-    : cookie(source.cookie)
+    : m_debug_cookie(source.m_debug_cookie)
 #endif
 {
     REALM_ASSERT(&source.m_row_indexes.get_alloc() == &Allocator::get_default());
@@ -269,7 +289,7 @@ RowIndexes::RowIndexes(const RowIndexes& source, ConstSourcePayload mode)
 
 RowIndexes::RowIndexes(RowIndexes& source, MutableSourcePayload)
 #ifdef REALM_COOKIE_CHECK
-    : cookie(source.cookie)
+    : m_debug_cookie(source.m_debug_cookie)
 #endif
 {
     REALM_ASSERT(&source.m_row_indexes.get_alloc() == &Allocator::get_default());

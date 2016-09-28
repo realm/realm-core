@@ -19,10 +19,11 @@
 #ifndef REALM_IMPL_CONTINUOUS_TRANSACTIONS_HISTORY_HPP
 #define REALM_IMPL_CONTINUOUS_TRANSACTIONS_HISTORY_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <memory>
 
 #include <realm/column_binary.hpp>
+#include <realm/version_id.hpp>
 
 namespace realm {
 
@@ -34,7 +35,7 @@ namespace _impl {
 /// transactions.
 class History {
 public:
-    using version_type = uint_fast64_t;
+    using version_type = VersionID::version_type;
 
     /// May be called during a read transaction to gain early access to the
     /// history as it appears in a new snapshot that succeeds the one bound in
@@ -61,8 +62,7 @@ public:
     /// implementations will want to also provide for ways to modify the
     /// history, but in those cases, modifications must occur only after the
     /// Group accessor has been fully updated to reflect the new snapshot.
-    virtual void update_early_from_top_ref(version_type new_version, size_t new_file_size,
-                                           ref_type new_top_ref) = 0;
+    virtual void update_early_from_top_ref(version_type new_version, size_t new_file_size, ref_type new_top_ref) = 0;
 
     virtual void update_from_parent(version_type current_version) = 0;
 
@@ -92,8 +92,8 @@ public:
     /// of update_early_from_top_ref(). In that case, the caller may assume that
     /// the memory references stay valid for the remainder of the transaction
     /// (up until initiation of the commit operation).
-    virtual void get_changesets(version_type begin_version, version_type end_version,
-                                BinaryData* buffer) const noexcept = 0;
+    virtual void get_changesets(version_type begin_version, version_type end_version, BinaryIterator* buffer) const
+        noexcept = 0;
 
     /// \brief Specify the version of the oldest bound snapshot.
     ///
@@ -140,11 +140,11 @@ public:
     /// until initiation of the commit operation).
     virtual BinaryData get_uncommitted_changes() noexcept = 0;
 
-#ifdef REALM_DEBUG
     virtual void verify() const = 0;
-#endif
 
-    virtual ~History() noexcept {}
+    virtual ~History() noexcept
+    {
+    }
 };
 
 
@@ -158,7 +158,7 @@ public:
 /// history as long as those modifications happen after the remainder of the
 /// Group accessor is updated to reflect the new snapshot (see
 /// History::update_early_from_top_ref()).
-class InRealmHistory: public History {
+class InRealmHistory : public History {
 public:
     void initialize(Group&);
 
@@ -168,12 +168,10 @@ public:
 
     void update_early_from_top_ref(version_type, size_t, ref_type) override;
     void update_from_parent(version_type) override;
-    void get_changesets(version_type, version_type, BinaryData*) const noexcept override;
+    void get_changesets(version_type, version_type, BinaryIterator*) const noexcept override;
     void set_oldest_bound_version(version_type) override;
 
-#ifdef REALM_DEBUG
     void verify() const override;
-#endif
 
 private:
     Group* m_group = 0;

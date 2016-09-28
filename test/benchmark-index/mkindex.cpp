@@ -16,30 +16,23 @@
  *
  **************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
 #include <realm.hpp>
 
 using namespace realm;
 
-REALM_TABLE_7(IndexTable,
-                s1, String,
-                n1, Int,
-                n2, Int,
-                n3, Int,
-                n4, Int,
-                n5, Int,
-                s2, String)
+REALM_TABLE_7(IndexTable, s1, String, n1, Int, n2, Int, n3, Int, n4, Int, n5, Int, s2, String)
 
 
-
-int main(int argc, char *argv[]) {
-    Group *g = new Group();
+int main()
+{
+    Group* g = new Group();
 
     BasicTableRef<IndexTable> t = g->add_table<IndexTable>("test");
     srandom(1);
     printf("Adding rows\n");
-    for(size_t i=0; i<10000000; ++i) {
+    for (size_t i = 0; i < 10000000; ++i) {
         long n1 = random() % 1000;
         long n2 = random() % 1000;
         long n3 = random() % 1000;
@@ -57,7 +50,7 @@ int main(int argc, char *argv[]) {
     printf("\nOptimizing\n");
     t->optimize();
     printf("Creating index\n");
-    t->column().s1.set_index();
+    t->column().s1.add_search_index();
     printf("Writing to disk\n");
     g->write("test.realm");
 }

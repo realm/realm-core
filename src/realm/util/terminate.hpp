@@ -39,16 +39,16 @@ namespace util {
 ///
 /// Furthermore, the provided callback must be `noexcept`, indicating that if an exception
 /// is thrown in the callback, the process is terminated with a call to `std::terminate`.
-void set_termination_notification_callback(void(*callback)(const char* message) noexcept) noexcept;
+void set_termination_notification_callback(void (*callback)(const char* message) noexcept) noexcept;
 
 REALM_NORETURN void terminate(const char* message, const char* file, long line,
-                              std::initializer_list<Printable>&&={}) noexcept;
+                              std::initializer_list<Printable>&& = {}) noexcept;
 REALM_NORETURN void terminate_with_info(const char* message, const char* file, long line,
                                         const char* interesting_names,
-                                        std::initializer_list<Printable>&&={}) noexcept;
+                                        std::initializer_list<Printable>&& = {}) noexcept;
 
 // LCOV_EXCL_START
-template<class... Ts>
+template <class... Ts>
 REALM_NORETURN void terminate(const char* message, const char* file, long line, Ts... infos) noexcept
 {
     static_assert(sizeof...(infos) == 2 || sizeof...(infos) == 4 || sizeof...(infos) == 6,
@@ -56,13 +56,11 @@ REALM_NORETURN void terminate(const char* message, const char* file, long line, 
     terminate(message, file, line, {Printable(infos)...});
 }
 
-template<class... Args>
+template <class... Args>
 REALM_NORETURN void terminate_with_info(const char* assert_message, int line, const char* file,
-                                        const char* interesting_names,
-                                        Args&&... interesting_values) noexcept
+                                        const char* interesting_names, Args&&... interesting_values) noexcept
 {
     terminate_with_info(assert_message, file, line, interesting_names, {Printable(interesting_values)...});
-
 }
 // LCOV_EXCL_STOP
 

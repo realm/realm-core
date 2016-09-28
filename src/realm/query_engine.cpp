@@ -122,11 +122,12 @@ void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool n
 
 size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end, size_t local_limit,
                                    SequentialGetterBase* source_column)
-    {
+{
     // aggregate called on non-integer column type. Speed of this function is not as critical as speed of the
     // integer version, because find_first_local() is relatively slower here (because it's non-integers).
     //
-    // Todo: Two speedups are possible. Simple: Initially test if there are no sub criterias and run find_first_local()
+    // Todo: Two speedups are possible. Simple: Initially test if there are no sub criterias and run
+    // find_first_local()
     // in a tight loop if so (instead of testing if there are sub criterias after each match). Harder: Specialize
     // data type array to make array call match() directly on each match, like for integers.
 
@@ -158,9 +159,10 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
             }
         }
 
-        // If index of first match in this node equals index of first match in all remaining nodes, we have a final match
+        // If index of first match in this node equals index of first match in all remaining nodes, we have a final
+        // match
         if (m == r) {
-            bool cont = (this->* m_column_action_specializer)(st, source_column, r);
+            bool cont = (this->*m_column_action_specializer)(st, source_column, r);
             if (!cont) {
                 return static_cast<size_t>(-1);
             }
@@ -189,7 +191,7 @@ size_t NotNode::find_first_local(size_t start, size_t end)
 
 bool NotNode::evaluate_at(size_t rowndx)
 {
-    return m_condition->find_first(rowndx, rowndx+1) == not_found;
+    return m_condition->find_first(rowndx, rowndx + 1) == not_found;
 }
 
 void NotNode::update_known(size_t start, size_t end, size_t first)
@@ -289,7 +291,8 @@ size_t NotNode::find_first_overlap_upper(size_t start, size_t end)
 
 size_t NotNode::find_first_no_overlap(size_t start, size_t end)
 {
-    REALM_ASSERT_DEBUG((start < m_known_range_start && end < m_known_range_start) || (start > m_known_range_end && end > m_known_range_end));
+    REALM_ASSERT_DEBUG((start < m_known_range_start && end < m_known_range_start) ||
+                       (start > m_known_range_end && end > m_known_range_end));
     // CASE: no overlap
     // ### [    ]   or    [    ] ####
     // if input is a larger range, discard and replace with results.

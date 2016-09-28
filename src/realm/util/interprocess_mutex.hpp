@@ -51,7 +51,8 @@ public:
     ~InterprocessMutex() noexcept;
 
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    struct SharedPart { };
+    struct SharedPart {
+    };
 #else
     using SharedPart = RobustMutex;
 #endif
@@ -78,11 +79,12 @@ public:
     static bool is_robust_on_this_platform()
     {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-        return true;  // we're faking it!
+        return true; // we're faking it!
 #else
         return RobustMutex::is_robust_on_this_platform();
 #endif
     }
+
 private:
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     struct LockInfo {
@@ -133,7 +135,8 @@ inline InterprocessMutex::LockInfo::~LockInfo() noexcept
 inline void InterprocessMutex::free_lock_info()
 {
     // It has not been inited yet.
-    if (!m_lock_info) return;
+    if (!m_lock_info)
+        return;
 
     std::lock_guard<Mutex> guard(s_mutex);
 
@@ -145,8 +148,7 @@ inline void InterprocessMutex::free_lock_info()
 }
 #endif
 
-inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
-                                               const std::string& path,
+inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, const std::string& path,
                                                const std::string& mutex_name)
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
@@ -183,8 +185,7 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
 #endif
 }
 
-inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
-                                               File&& lock_file)
+inline void InterprocessMutex::set_shared_part(SharedPart& shared_part, File&& lock_file)
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
     static_cast<void>(shared_part);
@@ -199,7 +200,8 @@ inline void InterprocessMutex::set_shared_part(SharedPart& shared_part,
         m_lock_info = std::make_shared<LockInfo>();
         m_lock_info->m_file = std::move(lock_file);
         s_info_map[m_fileuid] = m_lock_info;
-    } else {
+    }
+    else {
         // File exists and the lock info has been created in the map.
         m_lock_info = result->second.lock();
         lock_file.close();
@@ -230,7 +232,7 @@ inline void InterprocessMutex::lock()
     mutex_lock.release();
 #else
     REALM_ASSERT(m_shared_part);
-    m_shared_part->lock([](){});
+    m_shared_part->lock([]() {});
 #endif
 }
 

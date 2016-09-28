@@ -33,7 +33,7 @@ namespace test_util {
 /// available to the thread that calls ThreadWrapper::join().
 class ThreadWrapper {
 public:
-    template<class F>
+    template <class F>
     void start(const F& func)
     {
         m_except = false;
@@ -46,7 +46,7 @@ public:
     {
         std::string except_msg;
         if (join(except_msg)) {
-            std::cerr << "Exception thrown in thread: "<<except_msg<<"\n";
+            std::cerr << "Exception thrown in thread: " << except_msg << "\n";
             return true;
         }
         return false;
@@ -75,7 +75,7 @@ private:
     bool m_except;
     std::string m_except_msg;
 
-    template<class F>
+    template <class F>
     struct Runner {
         static void run(F func, ThreadWrapper* tw)
         {

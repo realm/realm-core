@@ -23,14 +23,22 @@ namespace realm {
 namespace util {
 
 
-template<class T, class A, class B>
-struct EitherTypeIs { static const bool value = false; };
-template<class T, class A>
-struct EitherTypeIs<T,T,A> { static const bool value = true; };
-template<class T, class A>
-struct EitherTypeIs<T,A,T> { static const bool value = true; };
-template<class T>
-struct EitherTypeIs<T,T,T> { static const bool value = true; };
+template <class T, class A, class B>
+struct EitherTypeIs {
+    static const bool value = false;
+};
+template <class T, class A>
+struct EitherTypeIs<T, T, A> {
+    static const bool value = true;
+};
+template <class T, class A>
+struct EitherTypeIs<T, A, T> {
+    static const bool value = true;
+};
+template <class T>
+struct EitherTypeIs<T, T, T> {
+    static const bool value = true;
+};
 
 
 } // namespace util

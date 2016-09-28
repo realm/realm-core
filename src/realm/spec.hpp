@@ -41,8 +41,7 @@ public:
 
     bool has_strong_link_columns() noexcept;
 
-    void insert_column(size_t column_ndx, ColumnType type, StringData name,
-                       ColumnAttr attr = col_attr_None);
+    void insert_column(size_t column_ndx, ColumnType type, StringData name, ColumnAttr attr = col_attr_None);
     void rename_column(size_t column_ndx, StringData new_name);
     void move_column(size_t from, size_t to);
 
@@ -83,8 +82,7 @@ public:
     ConstSubspecRef get_subspec_by_ndx(size_t subspec_ndx) const noexcept;
 
     // Auto Enumerated string columns
-    void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref,
-                                ArrayParent*& keys_parent, size_t& keys_ndx);
+    void upgrade_string_to_enum(size_t column_ndx, ref_type keys_ref, ArrayParent*& keys_parent, size_t& keys_ndx);
     size_t get_enumkeys_ndx(size_t column_ndx) const noexcept;
     ref_type get_enumkeys_ref(size_t column_ndx, ArrayParent** keys_parent = nullptr,
                               size_t* keys_ndx = nullptr) noexcept;
@@ -95,8 +93,7 @@ public:
     bool has_backlinks() const noexcept;
     void set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col_ndx);
     size_t get_origin_column_ndx(size_t backlink_col_ndx) const noexcept;
-    size_t find_backlink_column(size_t origin_table_ndx,
-                                size_t origin_col_ndx) const noexcept;
+    size_t find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx) const noexcept;
 
     /// Get position in `Table::m_columns` of the specified column. It may be
     /// different from the specified logical column index due to the presence of
@@ -132,11 +129,11 @@ private:
     // table, and the second entry is the index of the origin column in the
     // origin table.
     Array m_top;
-    ArrayInteger m_types;// 1st slot in m_top
-    ArrayString m_names; // 2nd slot in m_top
-    ArrayInteger m_attr; // 3rd slot in m_top
-    Array m_subspecs;    // 4th slot in m_top (optional)
-    Array m_enumkeys;    // 5th slot in m_top (optional)
+    ArrayInteger m_types; // 1st slot in m_top
+    ArrayString m_names;  // 2nd slot in m_top
+    ArrayInteger m_attr;  // 3rd slot in m_top
+    Array m_subspecs;     // 4th slot in m_top (optional)
+    Array m_enumkeys;     // 5th slot in m_top (optional)
     bool m_has_strong_link_columns;
 
     Spec(Allocator&) noexcept; // Unattached
@@ -175,12 +172,12 @@ private:
     ColumnInfo get_column_info(size_t column_ndx) const noexcept;
 
     size_t get_subspec_ndx_after(size_t column_ndx, size_t skip_column_ndx) const noexcept;
+    size_t get_subspec_entries_for_col_type(ColumnType type) const noexcept;
     bool has_subspec() const noexcept;
 
     // Returns false if the spec has no columns, otherwise it returns
     // true and sets `type` to the type of the first column.
-    static bool get_first_column_type_from_ref(ref_type, Allocator&,
-                                               ColumnType& type) noexcept;
+    static bool get_first_column_type_from_ref(ref_type, Allocator&, ColumnType& type) noexcept;
 
     friend class Replication;
     friend class Group;
@@ -188,13 +185,18 @@ private:
 };
 
 
-
 class SubspecRef {
 public:
-    struct const_cast_tag {};
+    struct const_cast_tag {
+    };
     SubspecRef(const_cast_tag, ConstSubspecRef r) noexcept;
-    ~SubspecRef() noexcept {}
-    Allocator& get_alloc() const noexcept { return m_parent->get_alloc(); }
+    ~SubspecRef() noexcept
+    {
+    }
+    Allocator& get_alloc() const noexcept
+    {
+        return m_parent->get_alloc();
+    }
 
 private:
     Array* const m_parent;
@@ -209,8 +211,13 @@ private:
 class ConstSubspecRef {
 public:
     ConstSubspecRef(SubspecRef r) noexcept;
-    ~ConstSubspecRef() noexcept {}
-    Allocator& get_alloc() const noexcept { return m_parent->get_alloc(); }
+    ~ConstSubspecRef() noexcept
+    {
+    }
+    Allocator& get_alloc() const noexcept
+    {
+        return m_parent->get_alloc();
+    }
 
 private:
     const Array* const m_parent;
@@ -221,9 +228,6 @@ private:
     friend class Spec;
     friend class SubspecRef;
 };
-
-
-
 
 
 // Implementation:
@@ -247,25 +251,25 @@ inline ref_type Spec::get_subspec_ref(size_t subspec_ndx) const noexcept
     return m_subspecs.get_as_ref(subspec_ndx);
 }
 
-inline Spec::Spec(SubspecRef r) noexcept:
-    m_top(r.m_parent->get_alloc()),
-    m_types(r.m_parent->get_alloc()),
-    m_names(r.m_parent->get_alloc()),
-    m_attr(r.m_parent->get_alloc()),
-    m_subspecs(r.m_parent->get_alloc()),
-    m_enumkeys(r.m_parent->get_alloc())
+inline Spec::Spec(SubspecRef r) noexcept
+    : m_top(r.m_parent->get_alloc())
+    , m_types(r.m_parent->get_alloc())
+    , m_names(r.m_parent->get_alloc())
+    , m_attr(r.m_parent->get_alloc())
+    , m_subspecs(r.m_parent->get_alloc())
+    , m_enumkeys(r.m_parent->get_alloc())
 {
     init(r);
 }
 
 // Uninitialized Spec (call init() to init)
-inline Spec::Spec(Allocator& alloc) noexcept:
-    m_top(alloc),
-    m_types(alloc),
-    m_names(alloc),
-    m_attr(alloc),
-    m_subspecs(alloc),
-    m_enumkeys(alloc)
+inline Spec::Spec(Allocator& alloc) noexcept
+    : m_top(alloc)
+    , m_types(alloc)
+    , m_names(alloc)
+    , m_attr(alloc)
+    , m_subspecs(alloc)
+    , m_enumkeys(alloc)
 {
 }
 
@@ -406,8 +410,7 @@ inline size_t Spec::get_column_index(StringData name) const noexcept
     return m_names.find_first(name);
 }
 
-inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& alloc,
-                                                 ColumnType& type) noexcept
+inline bool Spec::get_first_column_type_from_ref(ref_type top_ref, Allocator& alloc, ColumnType& type) noexcept
 {
     const char* top_header = alloc.translate(top_ref);
     ref_type types_ref = to_ref(Array::get(top_header, 0));
@@ -437,34 +440,33 @@ inline bool Spec::has_subspec() const noexcept
     return (m_top.size() >= 4) && (m_top.get_as_ref(3) != 0);
 }
 
-inline bool Spec::operator!=(const Spec &s) const noexcept
+inline bool Spec::operator!=(const Spec& s) const noexcept
 {
     return !(*this == s);
 }
 
 
-inline SubspecRef::SubspecRef(Array* parent, size_t ndx_in_parent) noexcept:
-    m_parent(parent),
-    m_ndx_in_parent(ndx_in_parent)
+inline SubspecRef::SubspecRef(Array* parent, size_t ndx_in_parent) noexcept
+    : m_parent(parent)
+    , m_ndx_in_parent(ndx_in_parent)
 {
 }
 
-inline SubspecRef::SubspecRef(const_cast_tag, ConstSubspecRef r) noexcept:
-    m_parent(const_cast<Array*>(r.m_parent)),
-    m_ndx_in_parent(r.m_ndx_in_parent)
+inline SubspecRef::SubspecRef(const_cast_tag, ConstSubspecRef r) noexcept
+    : m_parent(const_cast<Array*>(r.m_parent))
+    , m_ndx_in_parent(r.m_ndx_in_parent)
 {
 }
 
-inline ConstSubspecRef::ConstSubspecRef(const Array* parent,
-                                        size_t ndx_in_parent) noexcept:
-    m_parent(parent),
-    m_ndx_in_parent(ndx_in_parent)
+inline ConstSubspecRef::ConstSubspecRef(const Array* parent, size_t ndx_in_parent) noexcept
+    : m_parent(parent)
+    , m_ndx_in_parent(ndx_in_parent)
 {
 }
 
-inline ConstSubspecRef::ConstSubspecRef(SubspecRef r) noexcept:
-        m_parent(r.m_parent),
-    m_ndx_in_parent(r.m_ndx_in_parent)
+inline ConstSubspecRef::ConstSubspecRef(SubspecRef r) noexcept
+    : m_parent(r.m_parent)
+    , m_ndx_in_parent(r.m_ndx_in_parent)
 {
 }
 

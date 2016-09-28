@@ -170,7 +170,8 @@ TEST(ArrayIntNull_InitFromParent)
     inner_node.destroy();
 }
 
-TEST(ArrayIntNull_SetNull) {
+TEST(ArrayIntNull_SetNull)
+{
     ArrayIntNull a(Allocator::get_default());
     a.create(Array::type_Normal);
 
@@ -188,7 +189,8 @@ TEST(ArrayIntNull_SetNull) {
     a.destroy();
 }
 
-TEST(ArrayIntNull_SetIntegerToPreviousNullValueChoosesNewNull) {
+TEST(ArrayIntNull_SetIntegerToPreviousNullValueChoosesNewNull)
+{
     ArrayIntNull a(Allocator::get_default());
     a.create(Array::type_Normal);
 
@@ -210,7 +212,8 @@ TEST(ArrayIntNull_SetIntegerToPreviousNullValueChoosesNewNull) {
     a.destroy();
 }
 
-TEST(ArrayIntNull_Boundaries) {
+TEST(ArrayIntNull_Boundaries)
+{
     ArrayIntNull a(Allocator::get_default());
     a.create(Array::type_Normal);
     a.add(0);
@@ -285,7 +288,8 @@ TEST(ArrayIntNull_Boundaries) {
 }
 
 // Test if allocator relocation preserves null and non-null
-TEST(ArrayIntNull_Relocate) {
+TEST(ArrayIntNull_Relocate)
+{
     ArrayIntNull a(Allocator::get_default());
     a.create(Array::type_Normal);
 
@@ -351,7 +355,7 @@ TEST(ArrayIntNull_Find)
 
     int64_t t6;
     size_t i6;
-    bool found = a.maximum(t6, 0 , npos, &i6);
+    bool found = a.maximum(t6, 0, npos, &i6);
     CHECK_EQUAL(100, i6);
     CHECK_EQUAL(0x100, t6);
     CHECK_EQUAL(found, true);
@@ -367,7 +371,6 @@ TEST(ArrayIntNull_Find)
         CHECK_EQUAL(a[static_cast<size_t>(col.get(1))], 0x44);
 
         col.destroy();
-
     }
     a.destroy();
 }

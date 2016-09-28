@@ -25,19 +25,16 @@
 
 #include "unit_test.hpp"
 
-#define TEST_PATH_HELPER(class_name, var_name, suffix) \
+#define TEST_PATH_HELPER(class_name, var_name, suffix)                                                               \
     class_name var_name(realm::test_util::get_test_path(test_context, "." #var_name "." suffix))
 
-#define TEST_PATH(var_name) \
-    TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "test");
+#define TEST_PATH(var_name) TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "test");
 
-#define TEST_DIR(var_name) \
-    TEST_PATH_HELPER(realm::test_util::TestDirGuard, var_name, "test-dir");
+#define TEST_DIR(var_name) TEST_PATH_HELPER(realm::test_util::TestDirGuard, var_name, "test-dir");
 
-#define GROUP_TEST_PATH(var_name) \
-    TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "realm");
+#define GROUP_TEST_PATH(var_name) TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "realm");
 
-#define SHARED_GROUP_TEST_PATH(var_name) \
+#define SHARED_GROUP_TEST_PATH(var_name)                                                                             \
     TEST_PATH_HELPER(realm::test_util::SharedGroupTestPathGuard, var_name, "realm");
 
 namespace realm {
@@ -95,6 +92,7 @@ public:
     }
     TestPathGuard(const TestPathGuard&) = delete;
     TestPathGuard& operator=(const TestPathGuard&) = delete;
+
 protected:
     std::string m_path;
 };
@@ -114,12 +112,13 @@ public:
     {
         return m_path.c_str();
     }
+
 private:
     std::string m_path;
     void clean_dir(const std::string& path);
 };
 
-class SharedGroupTestPathGuard: public TestPathGuard {
+class SharedGroupTestPathGuard : public TestPathGuard {
 public:
     SharedGroupTestPathGuard(const std::string& path);
     std::string get_lock_path() const
@@ -127,6 +126,7 @@ public:
         return m_path + ".lock"; // ".management/access_control";
     }
     ~SharedGroupTestPathGuard() noexcept;
+
 private:
     void cleanup() const noexcept;
 };

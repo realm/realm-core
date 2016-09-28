@@ -442,8 +442,8 @@ TEST(Array_General)
     CHECK_EQUAL(10, c.find_first(4294967296LL));
 
 
-// Partial find is not fully implemented yet
-/*
+    // Partial find is not fully implemented yet
+    /*
     // TEST(Array_PartialFind1)
 
     c.clear();
@@ -455,7 +455,7 @@ TEST(Array_General)
     CHECK_EQUAL(-1, c.find_first(partial_count+1, 0, partial_count));
     CHECK_EQUAL(-1, c.find_first(0, 1, partial_count));
     CHECK_EQUAL(partial_count-1, c.find_first(partial_count-1, partial_count-1, partial_count));
-*/
+    */
 
     // TEST(Array_Destroy)
 
@@ -484,8 +484,6 @@ TEST(Array_AddNeg1_1)
 }
 
 
-
-
 // Oops, see Array_LowerUpperBound
 TEST(Array_UpperLowerBound)
 {
@@ -498,8 +496,8 @@ TEST(Array_UpperLowerBound)
 
     // we use 4 as constant in order to make border case sequences of
     // v, v, v and v, v+1, v+2, etc, probable
-    for (int i=0; i< (1000 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION *
-                              TEST_DURATION * TEST_DURATION)) ; i++) {
+    for (int i = 0; i < (1000 * (1 + TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION * TEST_DURATION));
+         i++) {
         int elements = random.draw_int_mod(64);
         int val = random.draw_int_mod(4); // random start value
 
@@ -541,6 +539,7 @@ TEST(Array_LowerUpperBound)
     a.add(70);
     a.add(80);
 
+    // clang-format off
     CHECK_EQUAL(0, a.lower_bound_int(0));  CHECK_EQUAL(0, a.upper_bound_int(0));
     CHECK_EQUAL(0, a.lower_bound_int(1));  CHECK_EQUAL(0, a.upper_bound_int(1));
     CHECK_EQUAL(0, a.lower_bound_int(9));  CHECK_EQUAL(0, a.upper_bound_int(9));
@@ -574,11 +573,10 @@ TEST(Array_LowerUpperBound)
     CHECK_EQUAL(7, a.lower_bound_int(80)); CHECK_EQUAL(8, a.upper_bound_int(80));
     CHECK_EQUAL(8, a.lower_bound_int(81)); CHECK_EQUAL(8, a.upper_bound_int(81));
     CHECK_EQUAL(8, a.lower_bound_int(82)); CHECK_EQUAL(8, a.upper_bound_int(82));
+    // clang-format on
 
     a.destroy();
 }
-
-
 
 
 /** find_all() int tests spread out over bitwidth
@@ -597,7 +595,7 @@ TEST(Array_FindAllInt0)
     const int value = 0;
     const int vReps = 5;
 
-    for (int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++) {
         a.add(0);
     }
 
@@ -615,7 +613,7 @@ TEST(Array_FindAllInt0)
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.size()){
+    while (i < a.size()) {
         if (a.get(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
@@ -637,7 +635,7 @@ TEST(Array_FindAllInt1)
     const int value = 1;
     const int vReps = 5;
 
-    for (int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++) {
         a.add(0);
         a.add(0);
         a.add(1);
@@ -649,7 +647,7 @@ TEST(Array_FindAllInt1)
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.size()){
+    while (i < a.size()) {
         if (a.get(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
@@ -671,7 +669,7 @@ TEST(Array_FindAllInt2)
     const int value = 3;
     const int vReps = 5;
 
-    for (int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++) {
         a.add(0);
         a.add(1);
         a.add(2);
@@ -683,7 +681,7 @@ TEST(Array_FindAllInt2)
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.size()){
+    while (i < a.size()) {
         if (a.get(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
@@ -705,7 +703,7 @@ TEST(Array_FindAllInt3)
     const int value = 10;
     const int vReps = 5;
     // 0, 4, 8
-    for (int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++) {
         a.add(10);
         a.add(11);
         a.add(12);
@@ -717,7 +715,7 @@ TEST(Array_FindAllInt3)
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.size()){
+    while (i < a.size()) {
         if (a.get(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
@@ -739,7 +737,7 @@ TEST(Array_FindAllInt4)
     const int value = 20;
     const int vReps = 5;
 
-    for (int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++) {
         // 8 bitwidth
         a.add(20);
         a.add(21);
@@ -752,7 +750,7 @@ TEST(Array_FindAllInt4)
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.size()){
+    while (i < a.size()) {
         if (a.get(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
@@ -774,7 +772,7 @@ TEST(Array_FindAllInt5)
     const int value = 303;
     const int vReps = 5;
 
-    for (int i = 0; i < vReps; i++){
+    for (int i = 0; i < vReps; i++) {
         // 16 bitwidth
         a.add(300);
         a.add(301);
@@ -787,7 +785,7 @@ TEST(Array_FindAllInt5)
 
     size_t i = 0;
     size_t j = 0;
-    while (i < a.size()){
+    while (i < a.size()) {
         if (a.get(i) == value)
             CHECK_EQUAL(int64_t(i), r.get(j++));
         i += 1;
@@ -868,17 +866,19 @@ TEST(Array_FindAllInt7)
     r.destroy();
 }
 
-// Tests the case where a value does *not* exist in one entire 64-bit chunk (triggers the 'if (has_zero_byte()) break;' condition)
+// Tests the case where a value does *not* exist in one entire 64-bit chunk (triggers the 'if (has_zero_byte())
+// break;' condition)
 TEST(Array_FindHasZeroByte)
 {
-    // we want at least 1 entire 64-bit chunk-test, and we also want a remainder-test, so we chose n to be a prime > 64
+    // we want at least 1 entire 64-bit chunk-test, and we also want a remainder-test, so we chose n to be a prime >
+    // 64
     size_t n = 73;
-    has_zero_byte(test_context, 1, n); // width = 1
-    has_zero_byte(test_context, 3, n); // width = 2
-    has_zero_byte(test_context, 13, n); // width = 4
-    has_zero_byte(test_context, 100, n); // 8
-    has_zero_byte(test_context, 10000, n); // 16
-    has_zero_byte(test_context, 100000, n); // 32
+    has_zero_byte(test_context, 1, n);            // width = 1
+    has_zero_byte(test_context, 3, n);            // width = 2
+    has_zero_byte(test_context, 13, n);           // width = 4
+    has_zero_byte(test_context, 100, n);          // 8
+    has_zero_byte(test_context, 10000, n);        // 16
+    has_zero_byte(test_context, 100000, n);       // 32
     has_zero_byte(test_context, 8000000000LL, n); // 64
 }
 
@@ -903,7 +903,6 @@ TEST(Array_find_sse)
 }
 
 
-
 TEST(Array_Greater)
 {
     Array a(Allocator::get_default());
@@ -911,8 +910,7 @@ TEST(Array_Greater)
 
     size_t items = 400;
 
-    for (items = 2; items < 200; items += 7)
-    {
+    for (items = 2; items < 200; items += 7) {
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
@@ -1016,20 +1014,17 @@ TEST(Array_Greater)
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1000ULL*1000ULL*1000ULL*1000ULL);
+            a.add(1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
-            size_t t = a.find_first<Greater>(1000ULL*1000ULL*1000ULL*1000ULL, 0, size_t(-1));
+            a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL + 1ULL);
+            size_t t = a.find_first<Greater>(1000ULL * 1000ULL * 1000ULL * 1000ULL, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
+            a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
-
     }
     a.destroy();
 }
-
-
 
 
 TEST(Array_Less)
@@ -1039,8 +1034,7 @@ TEST(Array_Less)
 
     size_t items = 400;
 
-    for (items = 2; items < 200; items += 7)
-    {
+    for (items = 2; items < 200; items += 7) {
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
@@ -1141,15 +1135,14 @@ TEST(Array_Less)
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1000ULL*1000ULL*1000ULL*1000ULL);
+            a.add(1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL - 1ULL);
-            size_t t = a.find_first<Less>(1000ULL*1000ULL*1000ULL*1000ULL, 0, size_t(-1));
+            a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL - 1ULL);
+            size_t t = a.find_first<Less>(1000ULL * 1000ULL * 1000ULL * 1000ULL, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
+            a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
-
     }
     a.destroy();
 }
@@ -1177,8 +1170,7 @@ TEST(Array_NotEqual)
 
     size_t items = 400;
 
-    for (items = 2; items < 200; items += 7)
-    {
+    for (items = 2; items < 200; items += 7) {
         a.clear();
         for (size_t i = 0; i < items; ++i) {
             a.add(0);
@@ -1278,22 +1270,17 @@ TEST(Array_NotEqual)
 
         a.clear();
         for (size_t i = 0; i < items; ++i) {
-            a.add(1000ULL*1000ULL*1000ULL*1000ULL);
+            a.add(1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
         for (size_t i = 0; i < items; ++i) {
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL + 1ULL);
-            size_t t = a.find_first<NotEqual>(1000ULL*1000ULL*1000ULL*1000ULL, 0, size_t(-1));
+            a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL + 1ULL);
+            size_t t = a.find_first<NotEqual>(1000ULL * 1000ULL * 1000ULL * 1000ULL, 0, size_t(-1));
             CHECK_EQUAL(i, t);
-            a.set(i, 1000ULL*1000ULL*1000ULL*1000ULL);
+            a.set(i, 1000ULL * 1000ULL * 1000ULL * 1000ULL);
         }
-
     }
     a.destroy();
 }
-
-
-
-
 
 
 TEST(Array_Copy)
@@ -1367,7 +1354,8 @@ TEST(Array_Count)
 
     // 1 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 1);
+        if (i % 2)
+            a.set(i, 1);
     }
     const size_t c3 = a.count(0);
     const size_t c4 = a.count(1);
@@ -1378,7 +1366,8 @@ TEST(Array_Count)
 
     // 2 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 2);
+        if (i % 2)
+            a.set(i, 2);
     }
     const size_t c5 = a.count(0);
     const size_t c6 = a.count(2);
@@ -1389,7 +1378,8 @@ TEST(Array_Count)
 
     // 4 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 7);
+        if (i % 2)
+            a.set(i, 7);
     }
     const size_t c7 = a.count(0);
     const size_t c8 = a.count(7);
@@ -1400,7 +1390,8 @@ TEST(Array_Count)
 
     // 8 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 100);
+        if (i % 2)
+            a.set(i, 100);
     }
     const size_t c9 = a.count(0);
     const size_t c10 = a.count(100);
@@ -1412,7 +1403,8 @@ TEST(Array_Count)
 
     // 16 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 500);
+        if (i % 2)
+            a.set(i, 500);
     }
     const size_t c11 = a.count(0);
     const size_t c12 = a.count(500);
@@ -1424,7 +1416,8 @@ TEST(Array_Count)
 
     // 32 bit width
     for (size_t i = 0; i < 100; ++i) {
-        if (i % 2) a.set(i, 0x1FFFF);
+        if (i % 2)
+            a.set(i, 0x1FFFF);
     }
     const size_t c13 = a.count(0);
     const size_t c14 = a.count(0x1FFFF);
@@ -1438,7 +1431,7 @@ TEST(Array_Count)
     a.destroy();
 }
 
-TEST(Array_FindGTE_NoIndirection)
+TEST(Array_FindGTE)
 {
     // Zeroes only
     {
@@ -1454,9 +1447,9 @@ TEST(Array_FindGTE_NoIndirection)
         c.add(0);
         c.add(0);
 
-        CHECK_EQUAL(c.find_gte(1, 0, nullptr), not_found);
-        CHECK_EQUAL(c.find_gte(0, 0, nullptr), 0);
-        CHECK_EQUAL(c.find_gte(0, 5, nullptr), 5);
+        CHECK_EQUAL(c.find_gte(1, 0), not_found);
+        CHECK_EQUAL(c.find_gte(0, 0), 0);
+        CHECK_EQUAL(c.find_gte(0, 5), 5);
 
         c.destroy();
     }
@@ -1471,11 +1464,11 @@ TEST(Array_FindGTE_NoIndirection)
         c.add(1);
         c.add(1);
 
-        CHECK_EQUAL(c.find_gte(2, 0, nullptr), not_found);
-        CHECK_EQUAL(c.find_gte(0, 0, nullptr), 0);
-        CHECK_EQUAL(c.find_gte(0, 2, nullptr), 2);
-        CHECK_EQUAL(c.find_gte(1, 0, nullptr), 2);
-        CHECK_EQUAL(c.find_gte(1, 3, nullptr), 3);
+        CHECK_EQUAL(c.find_gte(2, 0), not_found);
+        CHECK_EQUAL(c.find_gte(0, 0), 0);
+        CHECK_EQUAL(c.find_gte(0, 2), 2);
+        CHECK_EQUAL(c.find_gte(1, 0), 2);
+        CHECK_EQUAL(c.find_gte(1, 3), 3);
 
         c.destroy();
     }
@@ -1491,71 +1484,15 @@ TEST(Array_FindGTE_NoIndirection)
         c.add(11111);
         c.add(2819283);
 
-        CHECK_EQUAL(c.find_gte(3333333, 0, nullptr), not_found);
-        CHECK_EQUAL(c.find_gte(10, 1, nullptr), 3);
-        CHECK_EQUAL(c.find_gte(-20000, 0, nullptr), 0);
-        CHECK_EQUAL(c.find_gte(-20000, 3, nullptr), 3);
+        CHECK_EQUAL(c.find_gte(3333333, 0), not_found);
+        CHECK_EQUAL(c.find_gte(10, 1), 3);
+        CHECK_EQUAL(c.find_gte(-20000, 0), 0);
+        CHECK_EQUAL(c.find_gte(-20000, 3), 3);
+        CHECK_EQUAL(c.find_gte(100000, 0), 4);
+        CHECK_EQUAL(c.find_gte(100000, 0, 4), not_found);
 
         c.destroy();
     }
-}
-
-TEST(Array_FindGTE_WithIndirection)
-{
-    Array lut(Allocator::get_default());
-    lut.create(Array::type_Normal);
-
-    // This indirection needs to result in a sorted Array c (below).
-    lut.add(4);
-    lut.add(2);
-    lut.add(0);
-    lut.add(5);
-    lut.add(3);
-    lut.add(1);
-    lut.add(10000);
-
-    // Zeroes only
-    {
-        Array c(Allocator::get_default());
-        c.create(Array::type_Normal);
-
-        c.add(0);
-        c.add(0);
-        c.add(0);
-        c.add(0);
-        c.add(0);
-        c.add(0);
-
-        CHECK_EQUAL(c.find_gte(1, 0, &lut), not_found);
-        CHECK_EQUAL(c.find_gte(0, 6, &lut), not_found); // array only has 5 entries, lut has 6.
-        CHECK_EQUAL(c.find_gte(0, 4, &lut), 4);
-        CHECK_EQUAL(c.find_gte(-8000, 0, &lut), 0);
-
-        c.destroy();
-    }
-
-    // Booleans only
-    {
-        Array c(Allocator::get_default());
-        c.create(Array::type_Normal);
-
-        // No need to be sorted, the lookup table does the sorting for us
-        c.add(0);
-        c.add(1);
-        c.add(0);
-        c.add(1);
-        c.add(0);
-        c.add(1);
-
-        CHECK_EQUAL(c.find_gte(3, 0, &lut), not_found);
-        CHECK_EQUAL(c.find_gte(0, 6, &lut), not_found);
-        CHECK_EQUAL(c.find_gte(0, 4, &lut), 4);
-        CHECK_EQUAL(c.find_gte(-8000, 0, &lut), 0);
-
-        c.destroy();
-    }
-
-    lut.destroy();
 }
 
 #endif // TEST_ARRAY

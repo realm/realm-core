@@ -61,8 +61,8 @@ using test_util::unit_test::TestContext;
 
 namespace {
 
-template<class T, size_t N>
-inline size_t size_of_array(T(&)[N])
+template <class T, size_t N>
+inline size_t size_of_array(T (&)[N])
 {
     return N;
 }
@@ -70,28 +70,16 @@ inline size_t size_of_array(T(&)[N])
 // Article about comparing floats:
 // http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
 
-float float_values[] = {
-    0.0f,
-    1.0f,
-    2.12345f,
-    12345.12f,
-    -12345.12f
-};
+float float_values[] = {0.0f, 1.0f, 2.12345f, 12345.12f, -12345.12f};
 const size_t num_float_values = size_of_array(float_values);
 
-double double_values[] = {
-    0.0,
-    1.0,
-    2.12345,
-    12345.12,
-    -12345.12
-};
+double double_values[] = {0.0, 1.0, 2.12345, 12345.12, -12345.12};
 const size_t num_double_values = size_of_array(double_values);
 
 } // anonymous namespace
 
 
-template<class C>
+template <class C>
 void BasicColumn_IsEmpty(TestContext& test_context)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -111,7 +99,7 @@ TEST(DoubleColumn_IsEmpty)
 }
 
 
-template<class C, typename T>
+template <class C, typename T>
 void BasicColumn_AddGet(TestContext& test_context, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -120,7 +108,7 @@ void BasicColumn_AddGet(TestContext& test_context, T values[], size_t num_values
     for (size_t i = 0; i < num_values; ++i) {
         c.add(values[i]);
 
-        CHECK_EQUAL(i+1, c.size());
+        CHECK_EQUAL(i + 1, c.size());
 
         for (size_t j = 0; j < i; ++j)
             CHECK_EQUAL(values[j], c.get(j));
@@ -138,7 +126,7 @@ TEST(DoubleColumn_AddGet)
 }
 
 
-template<class C, typename T>
+template <class C, typename T>
 void BasicColumn_Clear(TestContext& test_context)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -165,7 +153,7 @@ TEST(DoubleColumn_Clear)
 }
 
 
-template<class C, typename T>
+template <class C, typename T>
 void BasicColumn_Set(TestContext& test_context, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -198,7 +186,7 @@ TEST(DoubleColumn_Set)
 }
 
 
-template<class C, typename T>
+template <class C, typename T>
 void BasicColumn_Insert(TestContext& test_context, T values[], size_t num_values)
 {
     static_cast<void>(num_values);
@@ -253,7 +241,7 @@ TEST(DoubleColumn_Insert)
 }
 
 
-template<class C, typename T>
+template <class C, typename T>
 void BasicColumn_Aggregates(TestContext& test_context, T values[], size_t num_values)
 {
     static_cast<void>(test_context);
@@ -263,13 +251,13 @@ void BasicColumn_Aggregates(TestContext& test_context, T values[], size_t num_va
     ref_type ref = C::create(Allocator::get_default());
     C c(Allocator::get_default(), ref);
 
-//    double sum = c.sum();
-//    CHECK_EQUAL(0, sum);
+    //    double sum = c.sum();
+    //    CHECK_EQUAL(0, sum);
 
     // todo: add tests for minimum, maximum,
     // todo !!!
 
-   c.destroy();
+    c.destroy();
 }
 TEST(FloatColumn_Aggregates)
 {
@@ -281,7 +269,7 @@ TEST(DoubleColumn_Aggregates)
 }
 
 
-template<class C, typename T>
+template <class C, typename T>
 void BasicColumn_Delete(TestContext& test_context, T values[], size_t num_values)
 {
     ref_type ref = C::create(Allocator::get_default());
@@ -507,12 +495,12 @@ TEST(DoubleColumn_InitOfEmptyColumn)
     t.add_column(type_Double, "works");
     t.add_column(type_Double, "works also");
     t.add_empty_row();
-    t.set_double(0,0,1.1);
-    t.set_double(1,0,2.2);
+    t.set_double(0, 0, 1.1);
+    t.set_double(1, 0, 2.2);
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Double, "doesn't work");
-    CHECK_EQUAL(0.0, t.get_double(1,0));
+    CHECK_EQUAL(0.0, t.get_double(1, 0));
 }
 
 TEST(FloatColumn_InitOfEmptyColumn)
@@ -521,12 +509,12 @@ TEST(FloatColumn_InitOfEmptyColumn)
     t.add_column(type_Float, "works");
     t.add_column(type_Float, "works also");
     t.add_empty_row();
-    t.set_float(0,0,1.1f);
-    t.set_float(1,0,2.2f);
+    t.set_float(0, 0, 1.1f);
+    t.set_float(1, 0, 2.2f);
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Float, "doesn't work");
-    CHECK_EQUAL(0.0, t.get_float(1,0));
+    CHECK_EQUAL(0.0, t.get_float(1, 0));
 }
 
 TEST(ColumnInt_InitOfEmptyColumn)
@@ -535,12 +523,12 @@ TEST(ColumnInt_InitOfEmptyColumn)
     t.add_column(type_Int, "works");
     t.add_column(type_Int, "works also");
     t.add_empty_row();
-    t.set_int(0,0,1);
-    t.set_int(1,0,2);
+    t.set_int(0, 0, 1);
+    t.set_int(1, 0, 2);
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Int, "doesn't work");
-    CHECK_EQUAL(0, t.get_int(1,0));
+    CHECK_EQUAL(0, t.get_int(1, 0));
 }
 
 TEST(ColumnString_InitOfEmptyColumn)
@@ -549,12 +537,12 @@ TEST(ColumnString_InitOfEmptyColumn)
     t.add_column(type_String, "works");
     t.add_column(type_String, "works also", false);
     t.add_empty_row();
-    t.set_string(0,0, "yellow");
-    t.set_string(1,0, "very bright");
+    t.set_string(0, 0, "yellow");
+    t.set_string(1, 0, "very bright");
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_String, "doesn't work");
-    CHECK_EQUAL("", t.get_string(1,0));
+    CHECK_EQUAL("", t.get_string(1, 0));
 }
 
 TEST(ColumnBinary_InitOfEmptyColumn)
@@ -563,12 +551,12 @@ TEST(ColumnBinary_InitOfEmptyColumn)
     t.add_column(type_Binary, "works");
     t.add_column(type_Binary, "works also");
     t.add_empty_row();
-    t.set_binary(0,0, BinaryData("yellow"));
-    t.set_binary(1,0, BinaryData("very bright"));
+    t.set_binary(0, 0, BinaryData("yellow"));
+    t.set_binary(1, 0, BinaryData("very bright"));
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Binary, "doesn't work");
-    CHECK_NOT_EQUAL(BinaryData(), t.get_binary(1,0));
+    CHECK_NOT_EQUAL(BinaryData(), t.get_binary(1, 0));
 }
 
 TEST(ColumnBool_InitOfEmptyColumn)
@@ -577,12 +565,12 @@ TEST(ColumnBool_InitOfEmptyColumn)
     t.add_column(type_Bool, "works");
     t.add_column(type_Bool, "works also");
     t.add_empty_row();
-    t.set_bool(0,0, true);
-    t.set_bool(1,0, true);
+    t.set_bool(0, 0, true);
+    t.set_bool(1, 0, true);
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Bool, "doesn't work");
-    CHECK_EQUAL(false, t.get_bool(1,0));
+    CHECK_EQUAL(false, t.get_bool(1, 0));
 }
 
 TEST(ColumnMixed_InitOfEmptyColumn)
@@ -591,12 +579,12 @@ TEST(ColumnMixed_InitOfEmptyColumn)
     t.add_column(type_Mixed, "works");
     t.add_column(type_Mixed, "works also");
     t.add_empty_row();
-    t.set_mixed(0,0, Mixed(1.1));
-    t.set_mixed(1,0, Mixed(2.2));
+    t.set_mixed(0, 0, Mixed(1.1));
+    t.set_mixed(1, 0, Mixed(2.2));
     t.remove_column(1);
     t.add_empty_row();
     t.add_column(type_Mixed, "doesn't work");
-    CHECK_EQUAL(0, t.get_mixed(1,0));
+    CHECK_EQUAL(0, t.get_mixed(1, 0));
 }
 
 

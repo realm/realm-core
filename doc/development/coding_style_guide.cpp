@@ -2,6 +2,36 @@
 // Realm C++ coding standard - by example
 //
 
+/*
+ * The layout of the code is enforced by the use of clang-format - currently in version 3.9. The layout is
+ * defined by the .clang-format configuration file in the project root. You can ensure that a code change
+ * complies with the formatting rules in the following ways:
+ *
+ * Before files are added to the staging area:
+ *
+ * $ git clang-format -f
+ *
+ * This will immediately modify the changes you have made to comply with the standard (if changes are needed).
+ *
+ * After you have added files to the staging area:
+ *
+ * $ git add -u
+ * $ git clang-format
+ *
+ * This will modify the work-area files to comply with the standard, and you can easily inspect the changes made
+ * by a 'git diff' command. If you are happy with the changes, add them by 'git add -u'.
+ *
+ * After you have made your commit:
+ *
+ * $ git commit
+ * $ git clang-format HEAD^
+ *
+ * This will modify the work-area files to comply with the standard, and you can easily inspect the changes made
+ * by a 'git diff' command. If you are happy with the changes, add them by 'git add -u' and amend the commit with
+ * 'git commit --amend'.
+ *
+ * 'git clang-format' can be used in other ways - use 'git clang-format -h' to get info.
+ */
 
 // Lines should never exceed 118 characters --------------------------------------------------------------------------
 
@@ -81,7 +111,6 @@ void my_func_2()
 }
 
 
-
 // A name space name uses lowercase and its parts are separated by
 // underscores.
 
@@ -92,17 +121,15 @@ namespace my_namespace {
 
 // A Class name uses CamelCase with uppercase initial.
 
-template<class T>
-class MyClass: public Base {
+template <class T>
+class MyClass : public Base {
 public:
-
     // Public member variables do not have a 'm_' prefix.
     int baz;
 
-    MyClass(...):
-        Base(...),
-        m_bar(7),
-        ...
+    MyClass(...)
+        : Base(...)
+        , m_bar(7)
     {
         // ...
     }
@@ -119,7 +146,6 @@ private:
 } // namespace my_namespace
 
 
-
 // Names of values of an enumeration are composed of two parts
 // separated by an underscore. The first part is a common lowercase
 // prefix. The second part identifies the value and uses CamelCase
@@ -127,9 +153,8 @@ private:
 
 enum mode {
     mode_Foo,
-    mode_FooBar
+    mode_FooBar,
 };
-
 
 
 // Order of class members (roughly):
@@ -154,7 +179,6 @@ private:
 };
 
 
-
 // Use literals when possible
 
 char* str = nullptr; // don't use 0, NULL
@@ -162,14 +186,11 @@ bool enable_feature = true;
 bool is_last = false;
 
 
-
 // Use of 'auto' keyword:
 //
-// 'auto' should *not* be used for trivial cases where the type declaration 
+// 'auto' should *not* be used for trivial cases where the type declaration
 // is short, non-templated, and non-derived (type_t, int64_t, std::string,
 // etc.
-
-
 
 
 // About FIXMEs:

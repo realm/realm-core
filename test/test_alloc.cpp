@@ -68,8 +68,8 @@ void set_capacity(char* header, size_t value)
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[0] = uchar((value >> 16) & 0x000000FF);
-    h[1] = uchar((value >>  8) & 0x000000FF);
-    h[2] = uchar( value        & 0x000000FF);
+    h[1] = uchar((value >> 8) & 0x000000FF);
+    h[2] = uchar(value & 0x000000FF);
 }
 
 size_t get_capacity(const char* header)
@@ -155,8 +155,8 @@ TEST(Alloc_BadFile)
     {
         SlabAlloc alloc;
         SlabAlloc::Config cfg;
-        cfg.read_only     = true;
-        cfg.no_create     = true;
+        cfg.read_only = true;
+        cfg.no_create = true;
         CHECK_THROW(alloc.attach_file(path_1, cfg), InvalidDatabase);
         CHECK(!alloc.is_attached());
         CHECK_THROW(alloc.attach_file(path_1, cfg), InvalidDatabase);
@@ -231,8 +231,8 @@ TEST(Alloc_BadBuffer)
 
     // Produce an invalid buffer
     char buffer[32];
-    for (size_t i=0; i<sizeof buffer; ++i)
-        buffer[i] = char((i+192)%128);
+    for (size_t i = 0; i < sizeof buffer; ++i)
+        buffer[i] = char((i + 192) % 128);
 
     {
         SlabAlloc alloc;
@@ -272,7 +272,7 @@ TEST(Alloc_Fuzzy)
             // write some data to the allcoated area so that we can verify it later
             memset(r.get_addr() + 3, static_cast<char>(reinterpret_cast<intptr_t>(r.get_addr())), siz - 3);
         }
-        else if(refs.size() > 0) {
+        else if (refs.size() > 0) {
             // free random entry
             size_t entry = rand() % refs.size();
             alloc.free_(refs[entry].get_ref(), refs[entry].get_addr());
@@ -281,7 +281,7 @@ TEST(Alloc_Fuzzy)
 
         if (iter + 1 == iterations || refs.size() > 10) {
             // free everything when we have 10 allocations, or when we exit, to not leak
-            while(refs.size() > 0) {
+            while (refs.size() > 0) {
                 MemRef r = refs[0];
                 size_t siz = get_capacity(r.get_addr());
 
@@ -296,7 +296,6 @@ TEST(Alloc_Fuzzy)
                 alloc.free_(r.get_ref(), r.get_addr());
                 refs.erase(refs.begin());
             }
-
         }
     }
 }

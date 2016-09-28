@@ -61,8 +61,7 @@ void LinkColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t p
         uint_fast64_t value = LinkColumnBase::get_uint(old_origin_row_ndx);
         if (value != 0) { // Zero means null
             size_t target_row_ndx = to_size_t(value - 1);
-            m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx,
-                                               new_origin_row_ndx); // Throws
+            m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx, new_origin_row_ndx); // Throws
         }
     }
 
@@ -80,7 +79,7 @@ void LinkColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t pri
     // Remove backlinks to the removed origin rows
     if (!broken_reciprocal_backlinks) {
         for (size_t i = 0; i < num_rows_to_erase; ++i)
-            remove_backlinks(row_ndx+i);
+            remove_backlinks(row_ndx + i);
     }
 
     // Update backlinks to the moved origin rows
@@ -91,18 +90,15 @@ void LinkColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t pri
         uint_fast64_t value = LinkColumnBase::get_uint(old_origin_row_ndx);
         if (value != 0) { // Zero means null
             size_t target_row_ndx = to_size_t(value - 1);
-            m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx,
-                                               new_origin_row_ndx); // Throws
+            m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx, new_origin_row_ndx); // Throws
         }
     }
 
-    LinkColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
-                               broken_reciprocal_backlinks); // Throws
+    LinkColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
 
-void LinkColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-                                    bool broken_reciprocal_backlinks)
+void LinkColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
@@ -121,8 +117,7 @@ void LinkColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
         }
     }
 
-    LinkColumnBase::move_last_row_over(row_ndx, prior_num_rows,
-                                       broken_reciprocal_backlinks); // Throws
+    LinkColumnBase::move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
 
@@ -139,6 +134,9 @@ void LinkColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
         size_t target_row_ndx = to_size_t(value_2 - 1);
         m_backlink_column->swap_backlinks(target_row_ndx, row_ndx_1, row_ndx_2);
     }
+
+    set(row_ndx_1, value_2);
+    set(row_ndx_2, value_1);
 }
 
 
@@ -196,10 +194,9 @@ void LinkColumn::do_nullify_link(size_t row_ndx, size_t)
 }
 
 
-#ifdef REALM_DEBUG
-
 void LinkColumn::verify(const Table& table, size_t col_ndx) const
 {
+#ifdef REALM_DEBUG
     LinkColumnBase::verify(table, col_ndx);
 
     std::vector<BacklinkColumn::VerifyPair> pairs;
@@ -215,7 +212,7 @@ void LinkColumn::verify(const Table& table, size_t col_ndx) const
         typedef std::vector<BacklinkColumn::VerifyPair>::const_iterator iter;
         BacklinkColumn::VerifyPair search_value;
         search_value.origin_row_ndx = i;
-        std::pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
+        std::pair<iter, iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
         // Exactly one corresponding backlink must exist
         REALM_ASSERT(range.second - range.first == 1);
         REALM_ASSERT_3(range.first->target_row_ndx, ==, target_row_ndx);
@@ -224,6 +221,8 @@ void LinkColumn::verify(const Table& table, size_t col_ndx) const
 
     // All backlinks must have been matched by a forward link
     REALM_ASSERT_3(backlinks_seen, ==, pairs.size());
+#else
+    static_cast<void>(table);
+    static_cast<void>(col_ndx);
+#endif
 }
-
-#endif // REALM_DEBUG

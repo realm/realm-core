@@ -35,21 +35,21 @@
 #include "aes_cryptor.hpp"
 
 #include <memory>
-#include <signal.h>
+#include <csignal>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <string.h>
+#include <cstring>
 #include <atomic>
 
 #include <realm/util/errno.hpp>
 #include <realm/util/shared_ptr.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/thread.hpp>
-#include <string.h> // for memset
+#include <cstring> // for memset
 
 #if REALM_PLATFORM_APPLE
-#   include <mach/mach.h>
-#   include <mach/exc.h>
+#include <mach/mach.h>
+#include <mach/exc.h>
 #endif
 
 #if REALM_ANDROID
@@ -119,8 +119,8 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
     return 0;
 }
 
-EncryptedFileMapping* add_mapping(void* addr, size_t size, int fd, size_t file_offset,
-                                  File::AccessMode access, const char* encryption_key)
+EncryptedFileMapping* add_mapping(void* addr, size_t size, int fd, size_t file_offset, File::AccessMode access,
+                                  const char* encryption_key)
 {
     struct stat st;
     if (fstat(fd, &st)) {
@@ -197,7 +197,7 @@ void remove_mapping(void* addr, size_t size)
     for (std::vector<mappings_for_file>::iterator it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->info->mappings.empty()) {
             if (::close(it->info->fd) != 0) {
-                int err = errno; // Eliminate any risk of clobbering
+                int err = errno;                // Eliminate any risk of clobbering
                 if (err == EBADF || err == EIO) // FIXME: how do we handle EINTR?
                     throw std::runtime_error(get_errno_msg("close() failed: ", err));
             }
@@ -213,12 +213,10 @@ void* mmap_anon(size_t size)
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
         if (is_mmap_memory_error(err)) {
-            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err)
-                + " size: " + util::to_string(size));
+            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err) + " size: " + util::to_string(size));
         }
-        throw std::runtime_error(get_errno_msg("mmap() failed: ", err)
-                                 + "size: " + util::to_string(size)
-                                 + "offset is 0");
+        throw std::runtime_error(get_errno_msg("mmap() failed: ", err) + "size: " + util::to_string(size) +
+                                 "offset is 0");
     }
     return addr;
 }
@@ -228,7 +226,9 @@ size_t round_up_to_page_size(size_t size) noexcept
     return (size + page_size() - 1) & ~(page_size() - 1);
 }
 
-void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key, EncryptedFileMapping*& mapping) {
+void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key,
+           EncryptedFileMapping*& mapping)
+{
     if (encryption_key) {
         size = round_up_to_page_size(size);
         void* addr = mmap_anon(size);
@@ -274,13 +274,11 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
 
     int err = errno; // Eliminate any risk of clobbering
     if (is_mmap_memory_error(err)) {
-        throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err)
-            + " size: " + util::to_string(size)
-            + " offset: " + util::to_string(offset));
+        throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err) + " size: " + util::to_string(size) +
+                                    " offset: " + util::to_string(offset));
     }
-    throw std::runtime_error(get_errno_msg("mmap() failed: ", err)
-                             + "size: " + util::to_string(size)
-                             + "offset: " + util::to_string(offset));
+    throw std::runtime_error(get_errno_msg("mmap() failed: ", err) + "size: " + util::to_string(size) + "offset: " +
+                             util::to_string(offset));
 }
 
 void munmap(void* addr, size_t size) noexcept
@@ -288,14 +286,13 @@ void munmap(void* addr, size_t size) noexcept
 #if REALM_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
 #endif
-    if(::munmap(addr, size) != 0) {
+    if (::munmap(addr, size) != 0) {
         int err = errno;
         throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
     }
 }
 
-void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
-             File::AccessMode a, size_t new_size)
+void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size)
 {
 #if REALM_ENABLE_ENCRYPTION
     {
@@ -331,13 +328,11 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
         // In this case fall through to no-mremap case below.
         if (err != ENOTSUP && err != ENOSYS) {
             if (is_mmap_memory_error(err)) {
-                throw AddressSpaceExhausted(get_errno_msg("mremap() failed: ", err)
-                    + " old size: " + util::to_string(old_size)
-                    + " new size: " + util::to_string(new_size));
+                throw AddressSpaceExhausted(get_errno_msg("mremap() failed: ", err) + " old size: " +
+                                            util::to_string(old_size) + " new size: " + util::to_string(new_size));
             }
-            throw std::runtime_error(get_errno_msg("_gnu_src mmap() failed: ", err)
-                                     + " old size: " + util::to_string(old_size)
-                                     + " new_size: " + util::to_string(new_size));
+            throw std::runtime_error(get_errno_msg("_gnu_src mmap() failed: ", err) + " old size: " +
+                                     util::to_string(old_size) + " new_size: " + util::to_string(new_size));
         }
     }
 #endif
@@ -353,7 +348,8 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size,
 void msync(void* addr, size_t size)
 {
 #if REALM_ENABLE_ENCRYPTION
-    { // first check the encrypted mappings
+    {
+        // first check the encrypted mappings
         LockGuard lock(mapping_mutex);
         if (mapping_and_addr* m = find_mapping_for_addr(addr, round_up_to_page_size(size))) {
             m->mapping->flush();
@@ -379,7 +375,6 @@ void msync(void* addr, size_t size)
         throw std::runtime_error(get_errno_msg("msync() failed: ", err));
     }
 }
-
 }
 }
 

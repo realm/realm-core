@@ -26,7 +26,8 @@ int main(int argc, const char* const argv[])
 {
     if (argc != 2) {
         std::cerr << "Wrong number of command line arguments\n"
-            "Synopsis: " << argv[0] << "  DATABASE-FILE" << std::endl;
+                     "Synopsis: "
+                  << argv[0] << "  DATABASE-FILE" << std::endl;
         return 1;
     }
     Group g(argv[1], GROUP_READONLY);

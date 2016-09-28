@@ -61,8 +61,8 @@ namespace {
 
 class Foo {
 public:
-    Foo(bool* destroyed_flag):
-        m_destroyed_flag(destroyed_flag)
+    Foo(bool* destroyed_flag)
+        : m_destroyed_flag(destroyed_flag)
     {
     }
 
@@ -75,10 +75,10 @@ private:
     bool* const m_destroyed_flag;
 };
 
-class FooAlloc: public Allocator {
+class FooAlloc : public Allocator {
 public:
-    FooAlloc():
-        m_offset(8)
+    FooAlloc()
+        : m_offset(8)
     {
         m_baseline = 8;
     }
@@ -141,11 +141,9 @@ public:
         m_map.clear();
     }
 
-#ifdef REALM_DEBUG
     void verify() const override
     {
     }
-#endif
 
 private:
     ref_type m_offset;
@@ -263,8 +261,7 @@ TEST(DestroyGuard_ArrayDeep)
             root.create(Array::type_HasRefs);
             {
                 bool context_flag = false;
-                MemRef child_mem =
-                    Array::create_empty_array(Array::type_Normal, context_flag, alloc);
+                MemRef child_mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
                 int_fast64_t v(child_mem.get_ref());
                 root.add(v);
             }
@@ -322,8 +319,7 @@ TEST(DestroyGuard_ArrayRefDeep)
                 Array root(alloc);
                 root.create(Array::type_HasRefs);
                 bool context_flag = false;
-                MemRef child_mem =
-                    Array::create_empty_array(Array::type_Normal, context_flag, alloc);
+                MemRef child_mem = Array::create_empty_array(Array::type_Normal, context_flag, alloc);
                 int_fast64_t v(child_mem.get_ref());
                 root.add(v);
                 root_ref = root.get_ref();

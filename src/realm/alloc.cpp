@@ -53,7 +53,7 @@ namespace {
 /// be used by multiple threads. Although it has m_replication, this
 /// is not a problem, as there is no way to modify it, so it will
 /// remain zero.
-class DefaultAllocator: public realm::Allocator {
+class DefaultAllocator : public realm::Allocator {
 public:
     DefaultAllocator()
     {
@@ -69,13 +69,12 @@ public:
             throw std::bad_alloc();
         }
 #if REALM_ENABLE_ALLOC_SET_ZERO
-        std::fill(addr, addr+size, 0);
+        std::fill(addr, addr + size, 0);
 #endif
         return MemRef(addr, reinterpret_cast<size_t>(addr), *this);
     }
 
-    MemRef do_realloc(ref_type, const char* addr, size_t old_size,
-                      size_t new_size) override
+    MemRef do_realloc(ref_type, const char* addr, size_t old_size, size_t new_size) override
     {
         char* new_addr = static_cast<char*>(::realloc(const_cast<char*>(addr), new_size));
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!new_addr))) {
@@ -83,7 +82,7 @@ public:
             throw std::bad_alloc();
         }
 #if REALM_ENABLE_ALLOC_SET_ZERO
-        std::fill(new_addr+old_size, new_addr+new_size, 0);
+        std::fill(new_addr + old_size, new_addr + new_size, 0);
 #else
         static_cast<void>(old_size);
 #endif
@@ -100,9 +99,9 @@ public:
         return reinterpret_cast<char*>(ref);
     }
 
-#ifdef REALM_DEBUG
-    void verify() const override {}
-#endif
+    void verify() const override
+    {
+    }
 };
 
 // This variable is declared such that get_default() can return it. It could be a static local variable, but
@@ -111,7 +110,6 @@ public:
 DefaultAllocator default_alloc;
 
 } // anonymous namespace
-
 
 
 Allocator& Allocator::get_default() noexcept

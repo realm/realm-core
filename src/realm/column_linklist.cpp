@@ -26,8 +26,7 @@
 using namespace realm;
 
 
-void LinkListColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
-                                 size_t prior_num_rows, bool insert_nulls)
+void LinkListColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool insert_nulls)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
@@ -44,8 +43,7 @@ void LinkListColumn::insert_rows(size_t row_ndx, size_t num_rows_to_insert,
             for (size_t j = 0; j < n; ++j) {
                 uint_fast64_t value = link_list.get_uint(j);
                 size_t target_row_ndx = to_size_t(value);
-                m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx,
-                                                   new_origin_row_ndx); // Throws
+                m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx, new_origin_row_ndx); // Throws
             }
         }
     }
@@ -68,13 +66,13 @@ void LinkListColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
 
     // Remove backlinks to the removed origin rows
     for (size_t i = 0; i < num_rows_to_erase; ++i) {
-        if (ref_type ref = get_as_ref(row_ndx+i)) {
+        if (ref_type ref = get_as_ref(row_ndx + i)) {
             if (!broken_reciprocal_backlinks) {
                 IntegerColumn link_list(get_alloc(), ref);
                 size_t n = link_list.size();
                 for (size_t j = 0; j < n; ++j) {
                     size_t target_row_ndx = to_size_t(link_list.get(j));
-                    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx+i);
+                    m_backlink_column->remove_one_backlink(target_row_ndx, row_ndx + i);
                 }
             }
             Array::destroy_deep(ref, get_alloc());
@@ -92,22 +90,19 @@ void LinkListColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
             for (size_t j = 0; j < n; ++j) {
                 uint_fast64_t value = link_list.get_uint(j);
                 size_t target_row_ndx = to_size_t(value);
-                m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx,
-                                                   new_origin_row_ndx); // Throws
+                m_backlink_column->update_backlink(target_row_ndx, old_origin_row_ndx, new_origin_row_ndx); // Throws
             }
         }
     }
 
-    LinkColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows,
-                               broken_reciprocal_backlinks); // Throws
+    LinkColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, broken_reciprocal_backlinks); // Throws
 
     const bool fix_ndx_in_parent = true;
     adj_erase_rows<fix_ndx_in_parent>(row_ndx, num_rows_to_erase);
 }
 
 
-void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
-                                        bool broken_reciprocal_backlinks)
+void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool broken_reciprocal_backlinks)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
@@ -139,8 +134,7 @@ void LinkListColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows,
     }
 
     // Do the actual delete and move
-    LinkColumnBase::move_last_row_over(row_ndx, prior_num_rows,
-                                       broken_reciprocal_backlinks); // Throws
+    LinkColumnBase::move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
 
     const bool fix_ndx_in_parent = true;
     adj_move_over<fix_ndx_in_parent>(last_row_ndx, row_ndx);
@@ -298,8 +292,7 @@ void LinkListColumn::cascade_break_backlinks_to_all_rows(size_t num_rows, Cascad
 }
 
 
-void LinkListColumn::cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf,
-                                                               CascadeState& state)
+void LinkListColumn::cascade_break_backlinks_to_all_rows__leaf(const Array& link_list_leaf, CascadeState& state)
 {
     size_t target_table_ndx = m_target_table->get_index_in_group();
 
@@ -370,8 +363,10 @@ LinkViewRef LinkListColumn::get_ptr(size_t row_ndx) const
     if (it != m_list_accessors.end()) {
         if (it->m_row_ndx == row_ndx) {
             // If we have an existing LinkView, return it.
-            if (LinkViewRef list = it->m_list.lock())
+            if (LinkViewRef list = it->m_list.lock()) {
+                REALM_ASSERT_DEBUG(list->is_attached());
                 return list;
+            }
         }
         if (it->m_list.expired()) {
             // We found an expired entry at the appropriate position. Reuse it with a new LinkView.
@@ -478,13 +473,43 @@ void LinkListColumn::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexc
 }
 
 
-template<bool fix_ndx_in_parent>
+void LinkListColumn::adj_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept
+{
+    prune_list_accessor_tombstones();
+
+    auto begin = m_list_accessors.begin(), end = m_list_accessors.end();
+    auto old_it = std::lower_bound(begin, end, list_entry{old_row_ndx, std::weak_ptr<LinkView>()});
+    if (old_it == end || old_it->m_row_ndx != old_row_ndx)
+        return;
+
+    // move the accessor to the correct position in the sorted list for the new value
+    if (old_row_ndx < new_row_ndx) {
+        auto new_it = std::lower_bound(old_it, end, list_entry{new_row_ndx, std::weak_ptr<LinkView>()});
+        std::rotate(old_it, old_it + 1, new_it);
+        old_it = new_it - 1;
+    }
+    else {
+        auto new_it = std::lower_bound(begin, old_it, list_entry{new_row_ndx, std::weak_ptr<LinkView>()});
+        std::rotate(new_it, old_it, old_it + 1);
+        old_it = new_it;
+    }
+
+    // update the accessor
+    old_it->m_row_ndx = new_row_ndx;
+    if (LinkViewRef list = old_it->m_list.lock())
+        list->set_origin_row_index(new_row_ndx);
+
+    validate_list_accessors();
+}
+
+
+template <bool fix_ndx_in_parent>
 void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) noexcept
 {
     prune_list_accessor_tombstones();
 
     auto end = m_list_accessors.end();
-    auto it = std::lower_bound(m_list_accessors.begin(), end, list_entry{ row_ndx, std::weak_ptr<LinkView>() });
+    auto it = std::lower_bound(m_list_accessors.begin(), end, list_entry{row_ndx, std::weak_ptr<LinkView>()});
     for (; it != end; ++it) {
         it->m_row_ndx += num_rows_inserted;
         if (fix_ndx_in_parent) {
@@ -497,14 +522,16 @@ void LinkListColumn::adj_insert_rows(size_t row_ndx, size_t num_rows_inserted) n
 }
 
 
-template<bool fix_ndx_in_parent>
+template <bool fix_ndx_in_parent>
 void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noexcept
 {
     prune_list_accessor_tombstones();
 
     auto end = m_list_accessors.end();
-    auto erased_begin = std::lower_bound(m_list_accessors.begin(), end, list_entry{ row_ndx, std::weak_ptr<LinkView>() });
-    auto erased_end = std::lower_bound(erased_begin, end, list_entry{ row_ndx + num_rows_erased, std::weak_ptr<LinkView>() });
+    auto erased_begin =
+        std::lower_bound(m_list_accessors.begin(), end, list_entry{row_ndx, std::weak_ptr<LinkView>()});
+    auto erased_end =
+        std::lower_bound(erased_begin, end, list_entry{row_ndx + num_rows_erased, std::weak_ptr<LinkView>()});
 
     for (auto it = erased_begin; it != erased_end; ++it) {
         if (LinkViewRef list = it->m_list.lock())
@@ -519,13 +546,13 @@ void LinkListColumn::adj_erase_rows(size_t row_ndx, size_t num_rows_erased) noex
         }
     }
 
-     m_list_accessors.erase(erased_begin, erased_end);
+    m_list_accessors.erase(erased_begin, erased_end);
 
     validate_list_accessors();
 }
 
 
-template<bool fix_ndx_in_parent>
+template <bool fix_ndx_in_parent>
 void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept
 {
     prune_list_accessor_tombstones();
@@ -534,7 +561,7 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexc
     auto end = m_list_accessors.end();
 
     bool to_is_valid = false;
-    auto to = std::lower_bound(begin, end, list_entry{ to_row_ndx, std::weak_ptr<LinkView>() });
+    auto to = std::lower_bound(begin, end, list_entry{to_row_ndx, std::weak_ptr<LinkView>()});
     if (to != end && to->m_row_ndx == to_row_ndx) {
         to_is_valid = true;
 
@@ -549,7 +576,7 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexc
         return;
     }
 
-    auto from = std::lower_bound(begin, end, list_entry{ from_row_ndx, std::weak_ptr<LinkView>() });
+    auto from = std::lower_bound(begin, end, list_entry{from_row_ndx, std::weak_ptr<LinkView>()});
     if (from != end && from->m_row_ndx == from_row_ndx) {
         from->m_row_ndx = to_row_ndx;
         if (fix_ndx_in_parent) {
@@ -573,7 +600,7 @@ void LinkListColumn::adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexc
 }
 
 
-template<bool fix_ndx_in_parent>
+template <bool fix_ndx_in_parent>
 void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
 {
     prune_list_accessor_tombstones();
@@ -581,7 +608,7 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
     auto begin = m_list_accessors.begin();
     auto end = m_list_accessors.end();
 
-    auto it_1 = std::lower_bound(begin, end, list_entry{ row_ndx_1, std::weak_ptr<LinkView>() });
+    auto it_1 = std::lower_bound(begin, end, list_entry{row_ndx_1, std::weak_ptr<LinkView>()});
     bool row_1_found = (it_1 != end && it_1->m_row_ndx == row_ndx_1);
     LinkViewRef ptr_1;
     if (row_1_found) {
@@ -589,7 +616,7 @@ void LinkListColumn::adj_swap(size_t row_ndx_1, size_t row_ndx_2) noexcept
         if (!bool(ptr_1))
             row_1_found = false;
     }
-    auto it_2 = std::lower_bound(begin, end, list_entry{ row_ndx_2, std::weak_ptr<LinkView>() });
+    auto it_2 = std::lower_bound(begin, end, list_entry{row_ndx_2, std::weak_ptr<LinkView>()});
     bool row_2_found = (it_2 != end && it_2->m_row_ndx == row_ndx_2);
     LinkViewRef ptr_2;
     if (row_2_found) {
@@ -663,8 +690,8 @@ void LinkListColumn::validate_list_accessors() const noexcept
     auto end = m_list_accessors.end();
     REALM_ASSERT_DEBUG(std::is_sorted(begin, end));
     REALM_ASSERT_DEBUG(end == std::adjacent_find(begin, end, [](const list_entry& a, const list_entry& b) {
-        return a.m_row_ndx == b.m_row_ndx;
-    }));
+                           return a.m_row_ndx == b.m_row_ndx;
+                       }));
 #endif
 }
 
@@ -681,14 +708,13 @@ void LinkListColumn::prune_list_accessor_tombstones() noexcept
     // to prune_list_accessor_tombstones() there is *no* guarantee that all tombstones
     // have been removed. It is merely a best effort at reducing the size of the
     // vector.
-    auto remove_from = std::remove_if(m_list_accessors.begin(), m_list_accessors.end(), [](const list_entry& e) {
-            return e.m_list.expired();
-    });
+    auto remove_from = std::remove_if(m_list_accessors.begin(), m_list_accessors.end(),
+                                      [](const list_entry& e) { return e.m_list.expired(); });
     m_list_accessors.erase(remove_from, m_list_accessors.end());
 }
 
-
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+// LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG
 
 namespace {
 
@@ -703,8 +729,11 @@ size_t verify_leaf(MemRef mem, Allocator& alloc)
 
 } // anonymous namespace
 
+#endif
+
 void LinkListColumn::verify() const
 {
+#ifdef REALM_DEBUG
     if (root_is_leaf()) {
         get_root_array()->verify();
         REALM_ASSERT(get_root_array()->has_refs());
@@ -712,11 +741,13 @@ void LinkListColumn::verify() const
     }
 
     get_root_array()->verify_bptree(&verify_leaf);
+#endif
 }
 
 
 void LinkListColumn::verify(const Table& table, size_t col_ndx) const
 {
+#ifdef REALM_DEBUG
     LinkColumnBase::verify(table, col_ndx);
 
     std::vector<BacklinkColumn::VerifyPair> pairs;
@@ -739,7 +770,7 @@ void LinkListColumn::verify(const Table& table, size_t col_ndx) const
         typedef std::vector<BacklinkColumn::VerifyPair>::const_iterator iter;
         BacklinkColumn::VerifyPair search_value;
         search_value.origin_row_ndx = i;
-        std::pair<iter,iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
+        std::pair<iter, iter> range = equal_range(pairs.begin(), pairs.end(), search_value);
         for (iter j = range.first; j != range.second; ++j)
             links_2.insert(j->target_row_ndx);
         REALM_ASSERT(links_1 == links_2);
@@ -748,6 +779,10 @@ void LinkListColumn::verify(const Table& table, size_t col_ndx) const
 
     // All backlinks must have been matched by a forward link
     REALM_ASSERT_3(backlinks_seen, ==, pairs.size());
+#else
+    static_cast<void>(table);
+    static_cast<void>(col_ndx);
+#endif
 }
 
 
@@ -757,4 +792,4 @@ std::pair<ref_type, size_t> LinkListColumn::get_to_dot_parent(size_t ndx_in_pare
     return std::make_pair(p.first.get_ref(), p.second);
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+// LCOV_EXCL_STOP ignore debug functions

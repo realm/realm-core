@@ -40,6 +40,25 @@ void ArrayBinary::init_from_mem(MemRef mem) noexcept
     }
 }
 
+size_t ArrayBinary::read(size_t ndx, size_t pos, char* buffer, size_t max_size) const noexcept
+{
+    REALM_ASSERT_3(ndx, <, m_offsets.size());
+
+    if (!legacy_array_type() && m_nulls.get(ndx)) {
+        return 0;
+    }
+    else {
+        size_t begin_idx = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
+        size_t end_idx = to_size_t(m_offsets.get(ndx));
+        size_t sz = end_idx - begin_idx;
+
+        size_t size_to_copy = (pos > sz) ? 0 : std::min(max_size, sz - pos);
+        const char* begin = m_blob.get(begin_idx) + pos;
+        const char* end = m_blob.get(begin_idx) + pos + size_to_copy;
+        std::copy(begin, end, buffer);
+        return size_to_copy;
+    }
+}
 
 void ArrayBinary::add(BinaryData value, bool add_zero_term)
 {
@@ -69,7 +88,7 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     if (value.is_null() && legacy_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
-    int_fast64_t start = ndx ? m_offsets.get(ndx-1) : 0;
+    int_fast64_t start = ndx ? m_offsets.get(ndx - 1) : 0;
     int_fast64_t current_end = m_offsets.get(ndx);
     size_t stored_size = value.size();
     if (add_zero_term)
@@ -90,14 +109,14 @@ void ArrayBinary::insert(size_t ndx, BinaryData value, bool add_zero_term)
     if (value.is_null() && legacy_array_type())
         throw LogicError(LogicError::column_not_nullable);
 
-    size_t pos = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t pos = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     m_blob.insert(pos, value.data(), value.size(), add_zero_term);
 
     size_t stored_size = value.size();
     if (add_zero_term)
         ++stored_size;
     m_offsets.insert(ndx, pos + stored_size);
-    m_offsets.adjust(ndx+1, m_offsets.size(), stored_size);
+    m_offsets.adjust(ndx + 1, m_offsets.size(), stored_size);
 
     if (!legacy_array_type())
         m_nulls.insert(ndx, value.is_null());
@@ -107,7 +126,7 @@ void ArrayBinary::erase(size_t ndx)
 {
     REALM_ASSERT_3(ndx, <, m_offsets.size());
 
-    size_t start = ndx ? to_size_t(m_offsets.get(ndx-1)) : 0;
+    size_t start = ndx ? to_size_t(m_offsets.get(ndx - 1)) : 0;
     size_t end = to_size_t(m_offsets.get(ndx));
 
     m_blob.erase(start, end);
@@ -133,7 +152,7 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) no
         REALM_ASSERT_3(n == 1, ||, n == 0);
         bool null = (n != 0);
         if (null)
-            return BinaryData(0, 0);
+            return BinaryData{};
     }
 
     std::pair<int64_t, int64_t> p = get_two(header, 0);
@@ -141,21 +160,20 @@ BinaryData ArrayBinary::get(const char* header, size_t ndx, Allocator& alloc) no
     const char* blob_header = alloc.translate(to_ref(p.second));
     size_t begin, end;
     if (ndx) {
-        p = get_two(offsets_header, ndx-1);
+        p = get_two(offsets_header, ndx - 1);
         begin = to_size_t(p.first);
-        end   = to_size_t(p.second);
+        end = to_size_t(p.second);
     }
     else {
         begin = 0;
-        end   = to_size_t(Array::get(offsets_header, ndx));
+        end = to_size_t(Array::get(offsets_header, ndx));
     }
     BinaryData bd = BinaryData(ArrayBlob::get(blob_header, begin), end - begin);
     return bd;
 }
 
 // FIXME: Not exception safe (leaks are possible).
-ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term,
-                                         TreeInsertBase& state)
+ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_zero_term, TreeInsertBase& state)
 {
     size_t leaf_size = size();
     REALM_ASSERT_3(leaf_size, <=, REALM_MAX_BPNODE_SIZE);
@@ -163,7 +181,7 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
         ndx = leaf_size;
     if (REALM_LIKELY(leaf_size < REALM_MAX_BPNODE_SIZE)) {
         insert(ndx, value, add_zero_term); // Throws
-        return 0; // Leaf was not split
+        return 0;                          // Leaf was not split
     }
 
     // Split leaf node
@@ -175,8 +193,8 @@ ref_type ArrayBinary::bptree_leaf_insert(size_t ndx, BinaryData value, bool add_
     }
     else {
         for (size_t i = ndx; i != leaf_size; ++i)
-            new_leaf.add(get(i)); // Throws
-        truncate(ndx); // Throws
+            new_leaf.add(get(i));  // Throws
+        truncate(ndx);             // Throws
         add(value, add_zero_term); // Throws
         state.m_split_offset = ndx + 1;
     }
@@ -213,9 +231,9 @@ MemRef ArrayBinary::create_array(size_t size, Allocator& alloc, BinaryData value
     }
     {
         // Always create a m_nulls array, regardless if its column is marked as nullable or not. NOTE: This is new
-        // - existing binary arrays from earier versions of core will not have this third array. All methods on ArrayBinary
-        // must thus check if this array exists before trying to access it. If it doesn't, it must be interpreted as if its
-        // column isn't nullable.
+        // - existing binary arrays from earier versions of core will not have this third array. All methods on
+        // ArrayBinary must thus check if this array exists before trying to access it. If it doesn't, it must be
+        // interpreted as if its column isn't nullable.
         bool context_flag = false;
         int64_t value = values.is_null() ? 1 : 0;
         MemRef mem = ArrayInteger::create_array(type_Normal, context_flag, size, value, alloc); // Throws
@@ -238,7 +256,7 @@ MemRef ArrayBinary::slice(size_t offset, size_t slice_size, Allocator& target_al
     _impl::ShallowArrayDestroyGuard dg(&array_slice);
     array_slice.create(); // Throws
     size_t begin = offset;
-    size_t end   = offset + slice_size;
+    size_t end = offset + slice_size;
     for (size_t i = begin; i != end; ++i) {
         BinaryData value = get(i);
         array_slice.add(value); // Throws
@@ -248,7 +266,7 @@ MemRef ArrayBinary::slice(size_t offset, size_t slice_size, Allocator& target_al
 }
 
 
-#ifdef REALM_DEBUG  // LCOV_EXCL_START ignore debug functions
+#ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 void ArrayBinary::to_dot(std::ostream& out, bool, StringData title) const
 {

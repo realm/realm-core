@@ -31,6 +31,13 @@
 
 #include <realm/table_basic.hpp>
 
+/*****************************************************************************
+ *                                                                           *
+ *      THIS INTERFACE IS DEPRECATED AND MAY BE REMOVED WITHOUT NOTICE       *
+ *                                                                           *
+ ****************************************************************************/
+
+// clang-format off
 
 #define REALM_TABLE_1(Table, name1, type1) \
 struct Table##Spec: ::realm::SpecBase { \
@@ -931,5 +938,7 @@ struct Table##Spec: ::realm::SpecBase { \
 }; \
 typedef ::realm::BasicTable<Table##Spec> Table;
 
+
+// clang-format on
 
 #endif // REALM_TABLE_MACROS_HPP

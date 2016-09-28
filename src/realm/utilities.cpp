@@ -18,15 +18,15 @@
 
 #include <cstdlib> // size_t
 #include <string>
-#include <stdint.h>
+#include <cstdint>
 #include <atomic>
 #include <fstream>
 
 #ifdef _WIN32
 #define NOMINMAX
-#  include "windows.h"
-#  include "psapi.h"
-#else 
+#include "windows.h"
+#include "psapi.h"
+#else
 #include <unistd.h>
 #endif
 
@@ -35,18 +35,18 @@
 #include <realm/util/thread.hpp>
 
 #ifdef REALM_COMPILER_SSE
-#  ifdef _MSC_VER
-#    include <intrin.h>
-#  endif
+#ifdef _MSC_VER
+#include <intrin.h>
+#endif
 #endif
 
 
 namespace {
 
 #ifdef REALM_COMPILER_SSE
-#  if !defined __clang__ && ((defined(_MSC_FULL_VER) && _MSC_FULL_VER >= 160040219) || defined __GNUC__)
-#    if defined REALM_COMPILER_AVX && defined __GNUC__
-#      define _XCR_XFEATURE_ENABLED_MASK 0
+#if !defined __clang__ && ((defined(_MSC_FULL_VER) && _MSC_FULL_VER >= 160040219) || defined __GNUC__)
+#if defined REALM_COMPILER_AVX && defined __GNUC__
+#define _XCR_XFEATURE_ENABLED_MASK 0
 
 inline unsigned long long _xgetbv(unsigned index)
 {
@@ -60,8 +60,8 @@ inline unsigned long long _xgetbv(unsigned index)
 #endif
 }
 
-#    endif
-#  endif
+#endif
+#endif
 #endif
 
 } // anonymous namespace
@@ -79,22 +79,22 @@ void cpuid_init()
 {
 #ifdef REALM_COMPILER_SSE
     int cret;
-#  ifdef _MSC_VER
+#ifdef _MSC_VER
     int CPUInfo[4];
     __cpuid(CPUInfo, 1);
     cret = CPUInfo[2];
-#  else
+#else
     int a = 1;
-    __asm ( "mov %1, %%eax; "            // a into eax
+    __asm("mov %1, %%eax; " // a into eax
           "cpuid;"
-          "mov %%ecx, %0;"             // ecx into b
-          :"=r"(cret)                     // output
-          :"r"(a)                      // input
-          :"%eax","%ebx","%ecx","%edx" // clobbered register
-         );
-#  endif
+          "mov %%ecx, %0;"                 // ecx into b
+          : "=r"(cret)                     // output
+          : "r"(a)                         // input
+          : "%eax", "%ebx", "%ecx", "%edx" // clobbered register
+          );
+#endif
 
-// Byte is atomic. Race can/will occur but that's fine
+    // Byte is atomic. Race can/will occur but that's fine
     if (cret & 0x100000) { // test for 4.2
         sse_support = 1;
     }
@@ -108,7 +108,7 @@ void cpuid_init()
     bool avxSupported = false;
 
 // seems like in jenkins builds, __GNUC__ is defined for clang?! todo fixme
-#  if !defined __clang__ && ((defined(_MSC_FULL_VER) && _MSC_FULL_VER >= 160040219) || defined __GNUC__)
+#if !defined __clang__ && ((defined(_MSC_FULL_VER) && _MSC_FULL_VER >= 160040219) || defined __GNUC__)
     bool osUsesXSAVE_XRSTORE = cret & (1 << 27) || false;
     bool cpuAVXSuport = cret & (1 << 28) || false;
 
@@ -117,7 +117,7 @@ void cpuid_init()
         unsigned long long xcrFeatureMask = _xgetbv(_XCR_XFEATURE_ENABLED_MASK);
         avxSupported = (xcrFeatureMask & 0x6) || false;
     }
-#  endif
+#endif
 
     if (avxSupported) {
         avx_support = 0; // AVX1 supported
@@ -126,7 +126,7 @@ void cpuid_init()
         avx_support = -1; // No AVX supported
     }
 
-    // 1 is reserved for AVX2
+// 1 is reserved for AVX2
 
 #endif
 }
@@ -137,13 +137,13 @@ void cpuid_init()
 void* round_up(void* p, size_t align)
 {
     size_t r = size_t(p) % align == 0 ? 0 : align - size_t(p) % align;
-    return static_cast<char *>(p) + r;
+    return static_cast<char*>(p) + r;
 }
 
 void* round_down(void* p, size_t align)
 {
     size_t r = size_t(p);
-    return reinterpret_cast<void *>(r & ~(align - 1));
+    return reinterpret_cast<void*>(r & ~(align - 1));
 }
 
 size_t round_up(size_t p, size_t align)
@@ -166,7 +166,7 @@ size_t round_down(size_t p, size_t align)
 // with SSE42 but not with SSE3, and we don't want separate builds for each architecture - hence a runtime check would
 // be required.
 #if 0 // defined(_MSC_VER) && _MSC_VER >= 1500
-#  include <intrin.h>
+#include <intrin.h>
 
 namespace realm {
 
@@ -174,36 +174,36 @@ int fast_popcount32(int32_t x)
 {
     return __popcnt(x);
 }
-#  if defined(_M_X64)
+#if defined(_M_X64)
 int fast_popcount64(int64_t x)
 {
     return int(__popcnt64(x));
 }
-#  else
+#else
 int fast_popcount64(int64_t x)
 {
     return __popcnt(unsigned(x)) + __popcnt(unsigned(x >> 32));
 }
-#  endif
+#endif
 
 } // namespace realm
 
 #elif 0 // defined(__GNUC__) && __GNUC__ >= 4 || defined(__INTEL_COMPILER) && __INTEL_COMPILER >= 900
-#  define fast_popcount32 __builtin_popcount
+#define fast_popcount32 __builtin_popcount
 
 namespace realm {
 
-#  if ULONG_MAX == 0xffffffff
+#if ULONG_MAX == 0xffffffff
 int fast_popcount64(int64_t x)
 {
     return __builtin_popcount(unsigned(x)) + __builtin_popcount(unsigned(x >> 32));
 }
-#  else
+#else
 int fast_popcount64(int64_t x)
 {
     return __builtin_popcountll(x);
 }
-#  endif
+#endif
 
 } // namespace realm
 
@@ -212,17 +212,25 @@ int fast_popcount64(int64_t x)
 namespace {
 
 const char a_popcount_bits[256] = {
-    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7,        4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
+    0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 1, 2, 2, 3, 2,
+    3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3,
+    3, 4, 3, 4, 4, 5, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5,
+    6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 3, 4,
+    3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4,
+    5, 5, 6, 5, 6, 6, 7, 2, 3, 3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6,
+    6, 7, 3, 4, 4, 5, 4, 5, 5, 6, 4, 5, 5, 6, 5, 6, 6, 7, 4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
 };
 
 } // anonymous namespace
 
 namespace realm {
 
-// Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this automatically. Todo, investigate.
+// Masking away bits might be faster than bit shifting (which can be slow). Note that the compiler may optimize this
+// automatically. Todo, investigate.
 int fast_popcount32(int32_t x)
 {
-    return a_popcount_bits[255 & x] + a_popcount_bits[255 & x>> 8] + a_popcount_bits[255 & x>>16] + a_popcount_bits[255 & x>>24];
+    return a_popcount_bits[255 & x] + a_popcount_bits[255 & x >> 8] + a_popcount_bits[255 & x >> 16] +
+           a_popcount_bits[255 & x >> 24];
 }
 int fast_popcount64(int64_t x)
 {
@@ -286,9 +294,9 @@ void process_mem_usage(double& vm_usage, double& resident_set)
     {
         std::string ignore;
         std::ifstream ifs("/proc/self/stat", std::ios_base::in);
-        ifs >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore
-            >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore
-            >> ignore >> ignore >> vsize >> rss;
+        ifs >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >>
+            ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >> ignore >>
+            ignore >> ignore >> vsize >> rss;
     }
 
     long page_size_kb = sysconf(_SC_PAGE_SIZE); // in case x86-64 is configured to use 2MB pages
@@ -299,7 +307,5 @@ void process_mem_usage(double& vm_usage, double& resident_set)
 #endif
 
 } // namespace realm
-
-
 
 #endif // select best popcount implementations

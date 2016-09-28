@@ -19,7 +19,7 @@
 #ifndef REALM_TEST_UTIL_TIMER_HPP
 #define REALM_TEST_UTIL_TIMER_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <ostream>
 #include <string>
 
@@ -34,7 +34,11 @@ public:
         type_RealTime
     };
 
-    Timer(Type type = type_RealTime): m_type(type) { reset(); }
+    Timer(Type type = type_RealTime)
+        : m_type(type)
+    {
+        reset();
+    }
 
     void reset();
 
@@ -49,7 +53,10 @@ public:
     }
 
     /// Same as get_elapsed_time().
-    operator double() const { return get_elapsed_time(); }
+    operator double() const
+    {
+        return get_elapsed_time();
+    }
 
     /// Format the elapsed time on the form 0h00m, 00m00s, 00.00s, or
     /// 000.0ms depending on magnitude.
@@ -70,16 +77,19 @@ private:
 // Implementation:
 
 
-inline void Timer::reset() {
+inline void Timer::reset()
+{
     m_start = get_timer_ticks();
     m_paused_at = 0;
 }
 
-inline void Timer::pause() {
+inline void Timer::pause()
+{
     m_paused_at = get_timer_ticks();
 }
 
-inline void Timer::unpause() {
+inline void Timer::unpause()
+{
     if (m_paused_at) {
         m_start += get_timer_ticks() - m_paused_at;
         m_paused_at = 0;

@@ -19,7 +19,7 @@
 #ifndef REALM_ALLOC_HPP
 #define REALM_ALLOC_HPP
 
-#include <stdint.h>
+#include <cstdint>
 #include <cstddef>
 #include <atomic>
 
@@ -43,7 +43,6 @@ int64_t to_int64(size_t value) noexcept;
 
 class MemRef {
 public:
-
     MemRef() noexcept;
     ~MemRef() noexcept;
 
@@ -59,7 +58,7 @@ private:
     char* m_addr;
     ref_type m_ref;
 #if REALM_ENABLE_MEMDEBUG
-    // Allocator that created m_ref. Used to verify that the ref is valid whenever you call 
+    // Allocator that created m_ref. Used to verify that the ref is valid whenever you call
     // get_ref()/get_addr and that it e.g. has not been free'ed
     const Allocator* m_alloc = nullptr;
 #endif
@@ -82,7 +81,7 @@ private:
 /// \sa SlabAlloc
 class Allocator {
 public:
-	static constexpr int CURRENT_FILE_FORMAT_VERSION = 5;
+    static constexpr int CURRENT_FILE_FORMAT_VERSION = 6;
 
     util::File get_file() const { return util::File(); }
 
@@ -96,8 +95,7 @@ public:
     ///
     /// Note: The underscore has been added because the name `realloc`
     /// would conflict with a macro on the Windows platform.
-    MemRef realloc_(ref_type, const char* addr, size_t old_size,
-                    size_t new_size);
+    MemRef realloc_(ref_type, const char* addr, size_t old_size, size_t new_size);
 
     /// Calls do_free().
     ///
@@ -126,15 +124,18 @@ public:
 
     virtual ~Allocator() noexcept;
 
-#ifdef REALM_DEBUG
     virtual void verify() const = 0;
 
+#ifdef REALM_DEBUG
     /// Terminate the program precisely when the specified 'ref' is
     /// freed (or reallocated). You can use this to detect whether the
     /// ref is freed (or reallocated), and even to get a stacktrace at
     /// the point where it happens. Call watch(0) to stop watching
     /// that ref.
-    void watch(ref_type);
+    void watch(ref_type ref)
+    {
+        m_debug_watch = ref;
+    }
 #endif
 
     Replication* get_replication() noexcept;
@@ -159,7 +160,7 @@ public:
     /// to the file format version specified by the attached file (or attached
     /// memory buffer) at the time of attachment. If no file (or buffer) is
     /// currently attached, the returned value has no meaning. If the Realm file
-    /// format is later upgraded, the file form,at version filed must be updated
+    /// format is later upgraded, the file format version filed must be updated
     /// to reflect that fact.
     ///
     /// In shared mode (when a Realm file is opened via a SharedGroup instance)
@@ -199,9 +200,11 @@ public:
     ///     When opening an older database file, all DateTime columns will be
     ///     automatically upgraded Timestamp columns.
     ///
+    ///   6 Introduced a new non-compatible structure for StringIndex
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in AllocSlab::validate_buffer(), the file
-    /// format selection loginc in
+    /// format selection logic in
     /// Group::get_target_file_format_version_for_session(), and the file format
     /// upgrade logic in Group::upgrade_file_format().
     int get_file_format_version() const noexcept;
@@ -209,16 +212,12 @@ public:
 protected:
     size_t m_baseline = 0; // Separation line between immutable and mutable refs.
 
-    Replication* m_replication;
+    Replication* m_replication = nullptr;
 
     /// See get_file_format_version().
     int m_file_format_version = 0;
 
-    std::string m_db_name;
-
-#ifdef REALM_DEBUG
-    ref_type m_watch;
-#endif
+    ref_type m_debug_watch = 0;
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -234,8 +233,7 @@ protected:
     /// the old chunk.
     ///
     /// \throw std::bad_alloc If insufficient memory was available.
-    virtual MemRef do_realloc(ref_type, const char* addr, size_t old_size,
-                              size_t new_size) = 0;
+    virtual MemRef do_realloc(ref_type, const char* addr, size_t old_size, size_t new_size) = 0;
 
     /// Release the specified chunk of memory.
     virtual void do_free(ref_type, const char* addr) noexcept = 0;
@@ -254,8 +252,8 @@ protected:
     // be more obvious to place it in Group, but that would add a runtime overhead,
     // and access is time critical.
     //
-    // This means that multiple threads that allocate Realm objects through the 
-    // default allocator will share this variable, which is a logical design flaw 
+    // This means that multiple threads that allocate Realm objects through the
+    // default allocator will share this variable, which is a logical design flaw
     // that can make sync_if_needed() re-run queries even though it is not required.
     // It must be atomic because it's shared.
     std::atomic<uint_fast64_t> m_table_versioning_counter;
@@ -293,7 +291,6 @@ inline bool Allocator::should_propagate_version(uint_fast64_t& local_version) no
 }
 
 
-
 // Implementation:
 
 inline int_fast64_t from_ref(ref_type v) noexcept
@@ -313,15 +310,15 @@ inline ref_type to_ref(int_fast64_t v) noexcept
 
 inline int64_t to_int64(size_t value) noexcept
 {
-//    FIXME: Enable once we get clang warning flags correct
-//    REALM_ASSERT_DEBUG(value <= std::numeric_limits<int64_t>::max());
+    //    FIXME: Enable once we get clang warning flags correct
+    //    REALM_ASSERT_DEBUG(value <= std::numeric_limits<int64_t>::max());
     return static_cast<int64_t>(value);
 }
 
 
-inline MemRef::MemRef() noexcept:
-    m_addr(nullptr),
-    m_ref(0)
+inline MemRef::MemRef() noexcept
+    : m_addr(nullptr)
+    , m_ref(0)
 {
 }
 
@@ -329,9 +326,9 @@ inline MemRef::~MemRef() noexcept
 {
 }
 
-inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept:
-    m_addr(addr),
-    m_ref(ref)
+inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept
+    : m_addr(addr)
+    , m_ref(ref)
 {
     static_cast<void>(alloc);
 #if REALM_ENABLE_MEMDEBUG
@@ -339,9 +336,9 @@ inline MemRef::MemRef(char* addr, ref_type ref, Allocator& alloc) noexcept:
 #endif
 }
 
-inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept:
-    m_addr(alloc.translate(ref)),
-    m_ref(ref)
+inline MemRef::MemRef(ref_type ref, Allocator& alloc) noexcept
+    : m_addr(alloc.translate(ref))
+    , m_ref(ref)
 {
     static_cast<void>(alloc);
 #if REALM_ENABLE_MEMDEBUG
@@ -386,11 +383,10 @@ inline MemRef Allocator::alloc(size_t size)
     return do_alloc(size);
 }
 
-inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_size,
-                                  size_t new_size)
+inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_size, size_t new_size)
 {
 #ifdef REALM_DEBUG
-    if (ref == m_watch)
+    if (ref == m_debug_watch)
         REALM_TERMINATE("Allocator watch: Ref was reallocated");
 #endif
     return do_realloc(ref, addr, old_size, new_size);
@@ -399,7 +395,7 @@ inline MemRef Allocator::realloc_(ref_type ref, const char* addr, size_t old_siz
 inline void Allocator::free_(ref_type ref, const char* addr) noexcept
 {
 #ifdef REALM_DEBUG
-    if (ref == m_watch)
+    if (ref == m_debug_watch)
         REALM_TERMINATE("Allocator watch: Ref was freed");
 #endif
     return do_free(ref, addr);
@@ -422,12 +418,8 @@ inline bool Allocator::is_read_only(ref_type ref) const noexcept
     return ref < m_baseline;
 }
 
-inline Allocator::Allocator() noexcept:
-    m_replication(nullptr)
+inline Allocator::Allocator() noexcept
 {
-#ifdef REALM_DEBUG
-    m_watch = 0;
-#endif
     m_table_versioning_counter = 0;
 }
 
@@ -439,13 +431,6 @@ inline Replication* Allocator::get_replication() noexcept
 {
     return m_replication;
 }
-
-#ifdef REALM_DEBUG
-inline void Allocator::watch(ref_type ref)
-{
-    m_watch = ref;
-}
-#endif
 
 inline int Allocator::get_file_format_version() const noexcept
 {

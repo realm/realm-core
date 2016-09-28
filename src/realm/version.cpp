@@ -47,9 +47,9 @@ bool Version::is_at_least(int major, int minor, int patch, StringData extra)
     if (get_minor() > minor)
         return true;
 
-    if(get_patch() > patch)
+    if (get_patch() > patch)
         return true;
-    if(get_patch() < patch)
+    if (get_patch() < patch)
         return false;
 
     return (get_extra() >= extra);
@@ -73,5 +73,5 @@ bool Version::has_feature(Feature feature)
         case feature_Replication:
             return true;
     }
-    return false;  // LCOV_EXCL_LINE
+    return false; // LCOV_EXCL_LINE
 }

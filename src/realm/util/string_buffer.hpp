@@ -36,7 +36,9 @@ namespace util {
 class StringBuffer {
 public:
     StringBuffer() noexcept;
-    ~StringBuffer() noexcept {}
+    ~StringBuffer() noexcept
+    {
+    }
 
     std::string str() const;
 
@@ -103,12 +105,10 @@ private:
 };
 
 
-
-
-
 // Implementation:
 
-inline StringBuffer::StringBuffer() noexcept: m_size(0)
+inline StringBuffer::StringBuffer() noexcept
+    : m_size(0)
 {
 }
 
@@ -157,7 +157,7 @@ inline void StringBuffer::append_c_str(const char* c_string)
 inline void StringBuffer::reserve(size_t min_capacity)
 {
     size_t capacity = m_buffer.size();
-    if (capacity == 0 || capacity-1 < min_capacity)
+    if (capacity == 0 || capacity - 1 < min_capacity)
         reallocate(min_capacity);
 }
 

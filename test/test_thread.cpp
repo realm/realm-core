@@ -29,6 +29,7 @@
 #include <unistd.h>
 #endif
 
+#include <realm/group_shared_options.hpp>
 #include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
@@ -88,7 +89,7 @@ struct Shared {
     // 10000 takes less than 0.1 sec
     void increment_10000_times()
     {
-        for (int i=0; i<10000; ++i) {
+        for (int i = 0; i < 10000; ++i) {
             LockGuard lock(m_mutex);
             ++m_value;
         }
@@ -96,7 +97,7 @@ struct Shared {
 
     void increment_10000_times2()
     {
-        for (int i=0; i<10000; ++i) {
+        for (int i = 0; i < 10000; ++i) {
             LockGuard lock(m_mutex);
             // Create a time window where thread interference can take place. Problem with ++m_value is that it
             // could assemble into 'inc [addr]' which has very tiny gap
@@ -105,7 +106,6 @@ struct Shared {
             m_value = int(f);
         }
     }
-
 };
 
 struct SharedWithEmulated {
@@ -113,13 +113,19 @@ struct SharedWithEmulated {
     InterprocessMutex::SharedPart m_shared_part;
     int m_value;
 
-    SharedWithEmulated(std::string name) { m_mutex.set_shared_part(m_shared_part, name, "0"); }
-    ~SharedWithEmulated() { m_mutex.release_shared_part(); }
+    SharedWithEmulated(std::string name)
+    {
+        m_mutex.set_shared_part(m_shared_part, name, "0");
+    }
+    ~SharedWithEmulated()
+    {
+        m_mutex.release_shared_part();
+    }
 
     // 10000 takes less than 0.1 sec
     void increment_10000_times()
     {
-        for (int i=0; i<10000; ++i) {
+        for (int i = 0; i < 10000; ++i) {
             std::lock_guard<InterprocessMutex> lock(m_mutex);
             ++m_value;
         }
@@ -127,7 +133,7 @@ struct SharedWithEmulated {
 
     void increment_10000_times2()
     {
-        for (int i=0; i<10000; ++i) {
+        for (int i = 0; i < 10000; ++i) {
             std::lock_guard<InterprocessMutex> lock(m_mutex);
             // Create a time window where thread interference can take place. Problem with ++m_value is that it
             // could assemble into 'inc [addr]' which has very tiny gap
@@ -136,7 +142,6 @@ struct SharedWithEmulated {
             m_value = int(f);
         }
     }
-
 };
 
 struct Robust {
@@ -172,7 +177,8 @@ struct Robust {
 
 class QueueMonitor {
 public:
-    QueueMonitor(): m_closed(false)
+    QueueMonitor()
+        : m_closed(false)
     {
     }
 
@@ -223,7 +229,7 @@ private:
 
 void producer_thread(QueueMonitor* queue, int value)
 {
-    for (int i=0; i<1000; ++i) {
+    for (int i = 0; i < 1000; ++i) {
         queue->put(value);
     }
 }
@@ -242,8 +248,8 @@ void consumer_thread(QueueMonitor* queue, int* consumed_counts)
 
 class bowl_of_stones_semaphore {
 public:
-    bowl_of_stones_semaphore(int initial_number_of_stones = 0):
-        m_num_stones(initial_number_of_stones)
+    bowl_of_stones_semaphore(int initial_number_of_stones = 0)
+        : m_num_stones(initial_number_of_stones)
     {
     }
     void get_stone(int num_to_get)
@@ -259,6 +265,7 @@ public:
         ++m_num_stones;
         m_cond_var.notify_all();
     }
+
 private:
     Mutex m_mutex;
     int m_num_stones;
@@ -266,9 +273,7 @@ private:
 };
 
 
-
 } // anonymous namespace
-
 
 
 TEST(Thread_Join)
@@ -411,18 +416,15 @@ TEST_IF(Thread_RobustMutex, TEST_THREAD_ROBUSTNESS)
     }
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover_throw, &robust)),
-                RobustMutex::NotRecoverable);
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover_throw, &robust)), RobustMutex::NotRecoverable);
     CHECK(robust.m_recover_called);
 
     // Check that successive attempts at locking will throw
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)),
-                RobustMutex::NotRecoverable);
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)), RobustMutex::NotRecoverable);
     CHECK(!robust.m_recover_called);
     robust.m_recover_called = false;
-    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)),
-                RobustMutex::NotRecoverable);
+    CHECK_THROW(robust.m_mutex.lock(std::bind(&Robust::recover, &robust)), RobustMutex::NotRecoverable);
     CHECK(!robust.m_recover_called);
 }
 
@@ -533,30 +535,33 @@ namespace {
 
 void signaller(int* signals, InterprocessMutex* mutex, InterprocessCondVar* cv)
 {
-    millisleep(1000);
-    *signals = 1;
+    millisleep(200);
     {
         std::lock_guard<InterprocessMutex> l(*mutex);
+        *signals = 1;
         // wakeup any waiters
         cv->notify_all();
     }
     // exit scope to allow waiters to get lock
-    millisleep(1000);
-    *signals = 2;
+    millisleep(200);
     {
         std::lock_guard<InterprocessMutex> l(*mutex);
+        *signals = 2;
         // wakeup any waiters, 2nd time
         cv->notify_all();
     }
-    millisleep(1000);
-    *signals = 3;
+    millisleep(200);
     {
         std::lock_guard<InterprocessMutex> l(*mutex);
+        *signals = 3;
         // wakeup any waiters, 2nd time
         cv->notify_all();
     }
-    millisleep(1000);
-    *signals = 4;
+    millisleep(200);
+    {
+        std::lock_guard<InterprocessMutex> l(*mutex);
+        *signals = 4;
+    }
 }
 
 void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessCondVar* cv)
@@ -568,17 +573,16 @@ void wakeup_signaller(int* signal_state, InterprocessMutex* mutex, InterprocessC
 }
 
 
-void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, 
-                       InterprocessMutex* mutex, InterprocessCondVar* cv)
+void waiter_with_count(bowl_of_stones_semaphore* feedback, int* wait_counter, InterprocessMutex* mutex,
+                       InterprocessCondVar* cv)
 {
     std::lock_guard<InterprocessMutex> l(*mutex);
-    ++ *wait_counter;
+    ++*wait_counter;
     feedback->add_stone();
     cv->wait(*mutex, nullptr);
-    -- *wait_counter;
+    --*wait_counter;
     feedback->add_stone();
 }
-
 
 
 void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
@@ -586,7 +590,6 @@ void waiter(InterprocessMutex* mutex, InterprocessCondVar* cv)
     std::lock_guard<InterprocessMutex> l(*mutex);
     cv->wait(*mutex, nullptr);
 }
-
 }
 
 // Verify, that a wait on a condition variable actually waits
@@ -600,8 +603,9 @@ NONCONCURRENT_TEST(Thread_CondvarWaits)
     InterprocessCondVar changed;
     InterprocessCondVar::SharedPart condvar_part;
     TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     changed.init_shared_part(condvar_part);
     Thread signal_thread;
     signals = 0;
@@ -631,14 +635,15 @@ NONCONCURRENT_TEST(Thread_CondvarIsStateless)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     Thread signal_thread;
     signal_state = 1;
     // send some signals:
     {
         std::lock_guard<InterprocessMutex> l(mutex);
-        for (int i=0; i<10; ++i)
+        for (int i = 0; i < 10; ++i)
             changed.notify_all();
     }
     // spawn a thread which will later do one more signal in order
@@ -648,7 +653,7 @@ NONCONCURRENT_TEST(Thread_CondvarIsStateless)
     // that this wait will actually wait for the thread to signal.
     {
         std::lock_guard<InterprocessMutex> l(mutex);
-        changed.wait(mutex,0);
+        changed.wait(mutex, 0);
         CHECK_EQUAL(signal_state, 2);
     }
     signal_thread.join();
@@ -666,14 +671,15 @@ NONCONCURRENT_TEST(Thread_CondvarTimeout)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     struct timespec time;
     time.tv_sec = 0;
     time.tv_nsec = 100000000; // 0.1 sec
     {
         std::lock_guard<InterprocessMutex> l(mutex);
-        for (int i=0; i<5; ++i)
+        for (int i = 0; i < 5; ++i)
             changed.wait(mutex, &time);
     }
     changed.release_shared_part();
@@ -691,16 +697,17 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyAllWakeup)
     InterprocessCondVar::SharedPart condvar_part;
     InterprocessCondVar::init_shared_part(condvar_part);
     TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     const int num_waiters = 10;
     Thread waiters[num_waiters];
-    for (int i=0; i<num_waiters; ++i) {
+    for (int i = 0; i < num_waiters; ++i) {
         waiters[i].start(std::bind(waiter, &mutex, &changed));
     }
     millisleep(1000); // allow time for all waiters to wait
     changed.notify_all();
-    for (int i=0; i<num_waiters; ++i) {
+    for (int i = 0; i < num_waiters; ++i) {
         waiters[i].join();
     }
     changed.release_shared_part();
@@ -723,23 +730,33 @@ NONCONCURRENT_TEST(Thread_CondvarNotifyWakeup)
     InterprocessCondVar::init_shared_part(condvar_part);
     bowl_of_stones_semaphore feedback(0);
     SHARED_GROUP_TEST_PATH(path);
+    SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
-    changed.set_shared_part(condvar_part, path, "");
+    changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
     const int num_waiters = 10;
     Thread waiters[num_waiters];
-    for (int i=0; i<num_waiters; ++i) {
+    for (int i = 0; i < num_waiters; ++i) {
         waiters[i].start(std::bind(waiter_with_count, &feedback, &wait_counter, &mutex, &changed));
     }
     feedback.get_stone(num_waiters);
-    CHECK_EQUAL(wait_counter, num_waiters);
-    changed.notify();
+    {
+        std::lock_guard<InterprocessMutex> l(mutex);
+        CHECK_EQUAL(wait_counter, num_waiters);
+        changed.notify();
+    }
     feedback.get_stone(1);
-    CHECK_EQUAL(wait_counter, num_waiters-1);
-    changed.notify();
+    {
+        std::lock_guard<InterprocessMutex> l(mutex);
+        CHECK_EQUAL(wait_counter, num_waiters - 1);
+        changed.notify();
+    }
     feedback.get_stone(1);
-    CHECK_EQUAL(wait_counter, num_waiters-2);
-    changed.notify_all();
-    for (int i=0; i<num_waiters; ++i) {
+    {
+        std::lock_guard<InterprocessMutex> l(mutex);
+        CHECK_EQUAL(wait_counter, num_waiters - 2);
+        changed.notify_all();
+    }
+    for (int i = 0; i < num_waiters; ++i) {
         waiters[i].join();
     }
     changed.release_shared_part();

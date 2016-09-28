@@ -21,17 +21,16 @@
 #include <realm/util/features.h>
 
 #if defined _WIN32
-#  include <windows.h>
-#  include <psapi.h>
+#include <windows.h>
+#include <psapi.h>
 #elif REALM_PLATFORM_APPLE
-#  include <mach/mach.h>
+#include <mach/mach.h>
 #elif defined REALM_HAVE_LIBPROCPS
 // Requires libprocps (formerly known as libproc)
-#  include <proc/readproc.h>
+#include <proc/readproc.h>
 #endif
 
 #include "mem.hpp"
-
 
 
 #ifdef _WIN32
@@ -58,15 +57,16 @@ DWORD calculate_ws_private(DWORD process_id)
 
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, process_id);
 
-    if (hProcess) throw std::runtime_error("Failed");
+    if (hProcess)
+        throw std::runtime_error("Failed");
 
     __try {
-        if (!QueryWorkingSet(hProcess, dWorkingSetPages, sizeof (dWorkingSetPages)))
+        if (!QueryWorkingSet(hProcess, dWorkingSetPages, sizeof(dWorkingSetPages)))
             __leave;
 
         DWORD dPages = dWorkingSetPages[0];
 
-        qsort(&dWorkingSetPages[1], dPages, sizeof (DWORD), compare);
+        qsort(&dWorkingSetPages[1], dPages, sizeof(DWORD), compare);
 
         for (DWORD i = 1; i <= dPages; ++i) {
             DWORD dCurrentPageStatus = 0;
@@ -79,29 +79,31 @@ DWORD calculate_ws_private(DWORD process_id)
             while (i <= dPages) { // iterate all pages
                 dCurrentPageStatus++;
 
-                if (i == dPages) break; //if last page
+                if (i == dPages)
+                    break; // if last page
 
                 dCurrentPageAddress = dWorkingSetPages[i] & 0xFFFFF000;
-                dNextPageAddress = dWorkingSetPages[i+1] & 0xFFFFF000;
-                dNextPageFlags = dWorkingSetPages[i+1] & 0x00000FFF;
+                dNextPageAddress = dWorkingSetPages[i + 1] & 0xFFFFF000;
+                dNextPageFlags = dWorkingSetPages[i + 1] & 0x00000FFF;
 
-                //decide whether iterate further or exit
+                // decide whether iterate further or exit
                 //(this is non-contiguous page or have different flags)
                 if ((dNextPageAddress == (dCurrentPageAddress + dPageSize)) && (dNextPageFlags == dPageFlags)) {
                     i++;
                 }
-                else break;
+                else
+                    break;
             }
 
             if ((dPageAddress < 0xC0000000) || (dPageAddress > 0xE0000000)) {
-                if ( dPageFlags & 0x100 ) // this is shared one
+                if (dPageFlags & 0x100) // this is shared one
                     dSharedPages += dCurrentPageStatus;
 
                 else // private one
                     dPrivatePages += dCurrentPageStatus;
             }
             else {
-                dPageTablePages += dCurrentPageStatus; //page table region
+                dPageTablePages += dCurrentPageStatus; // page table region
             }
         }
 
@@ -139,7 +141,9 @@ size_t get_mem_usage()
 
     struct task_basic_info t_info;
     mach_msg_type_number_t t_info_count = TASK_BASIC_INFO_COUNT;
-    if (KERN_SUCCESS != task_info(mach_task_self(), TASK_BASIC_INFO, reinterpret_cast<task_info_t>(&t_info), &t_info_count)) return -1;
+    if (KERN_SUCCESS !=
+        task_info(mach_task_self(), TASK_BASIC_INFO, reinterpret_cast<task_info_t>(&t_info), &t_info_count))
+        return -1;
     // resident size is in t_info.resident_size;
     // virtual size is in t_info.virtual_size;
     // FIXME: Virtual size does not seem to contain a usfull metric as

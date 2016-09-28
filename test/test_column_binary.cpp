@@ -104,13 +104,13 @@ TEST(BinaryColumn_Basic)
     CHECK_EQUAL(0, c.size());
 
     c.add(BinaryData("abc"));
-    CHECK_EQUAL(BinaryData("abc"),       c.get(0)); // single
+    CHECK_EQUAL(BinaryData("abc"), c.get(0)); // single
     CHECK_EQUAL(4, c.get(0).size());
     CHECK_EQUAL(1, c.size());
 
-    c.add(BinaryData("defg")); //non-empty
-    CHECK_EQUAL(BinaryData("abc"),       c.get(0));
-    CHECK_EQUAL(BinaryData("defg"),      c.get(1));
+    c.add(BinaryData("defg")); // non-empty
+    CHECK_EQUAL(BinaryData("abc"), c.get(0));
+    CHECK_EQUAL(BinaryData("defg"), c.get(1));
     CHECK_EQUAL(4, c.get(0).size());
     CHECK_EQUAL(5, c.get(1).size());
     CHECK_EQUAL(2, c.size());
@@ -123,51 +123,51 @@ TEST(BinaryColumn_Basic)
 
     c.add(BinaryData("abc"));
     c.set(0, BinaryData("de", 3)); // shrink single
-    CHECK_EQUAL(BinaryData("de"),        c.get(0));
+    CHECK_EQUAL(BinaryData("de"), c.get(0));
     CHECK_EQUAL(1, c.size());
 
     c.set(0, BinaryData("abcd")); // grow single
-    CHECK_EQUAL(BinaryData("abcd"),      c.get(0));
+    CHECK_EQUAL(BinaryData("abcd"), c.get(0));
     CHECK_EQUAL(1, c.size());
 
     c.add(BinaryData("efg"));
-    CHECK_EQUAL(BinaryData("abcd"),      c.get(0));
-    CHECK_EQUAL(BinaryData("efg"),       c.get(1));
+    CHECK_EQUAL(BinaryData("abcd"), c.get(0));
+    CHECK_EQUAL(BinaryData("efg"), c.get(1));
     CHECK_EQUAL(2, c.size());
 
     c.set(1, BinaryData("hi")); // shrink last
-    CHECK_EQUAL(BinaryData("abcd"),      c.get(0));
-    CHECK_EQUAL(BinaryData("hi"),        c.get(1));
+    CHECK_EQUAL(BinaryData("abcd"), c.get(0));
+    CHECK_EQUAL(BinaryData("hi"), c.get(1));
     CHECK_EQUAL(2, c.size());
 
     c.set(1, BinaryData("jklmno")); // grow last
-    CHECK_EQUAL(BinaryData("abcd"),      c.get(0));
-    CHECK_EQUAL(BinaryData("jklmno"),    c.get(1));
+    CHECK_EQUAL(BinaryData("abcd"), c.get(0));
+    CHECK_EQUAL(BinaryData("jklmno"), c.get(1));
     CHECK_EQUAL(2, c.size());
 
     c.add(BinaryData("pq"));
     c.set(1, BinaryData("efghijkl")); // grow middle
-    CHECK_EQUAL(BinaryData("abcd"),      c.get(0));
-    CHECK_EQUAL(BinaryData("efghijkl"),  c.get(1));
-    CHECK_EQUAL(BinaryData("pq"),        c.get(2));
+    CHECK_EQUAL(BinaryData("abcd"), c.get(0));
+    CHECK_EQUAL(BinaryData("efghijkl"), c.get(1));
+    CHECK_EQUAL(BinaryData("pq"), c.get(2));
     CHECK_EQUAL(3, c.size());
 
     c.set(1, BinaryData("x")); // shrink middle
-    CHECK_EQUAL(BinaryData("abcd"),      c.get(0));
-    CHECK_EQUAL(BinaryData("x"),         c.get(1));
-    CHECK_EQUAL(BinaryData("pq"),        c.get(2));
+    CHECK_EQUAL(BinaryData("abcd"), c.get(0));
+    CHECK_EQUAL(BinaryData("x"), c.get(1));
+    CHECK_EQUAL(BinaryData("pq"), c.get(2));
     CHECK_EQUAL(3, c.size());
 
     c.set(0, BinaryData("qwertyuio")); // grow first
     CHECK_EQUAL(BinaryData("qwertyuio"), c.get(0));
-    CHECK_EQUAL(BinaryData("x"),         c.get(1));
-    CHECK_EQUAL(BinaryData("pq"),        c.get(2));
+    CHECK_EQUAL(BinaryData("x"), c.get(1));
+    CHECK_EQUAL(BinaryData("pq"), c.get(2));
     CHECK_EQUAL(3, c.size());
 
     c.set(0, BinaryData("mno")); // shrink first
-    CHECK_EQUAL(BinaryData("mno"),       c.get(0));
-    CHECK_EQUAL(BinaryData("x"),         c.get(1));
-    CHECK_EQUAL(BinaryData("pq"),        c.get(2));
+    CHECK_EQUAL(BinaryData("mno"), c.get(0));
+    CHECK_EQUAL(BinaryData("x"), c.get(1));
+    CHECK_EQUAL(BinaryData("pq"), c.get(2));
     CHECK_EQUAL(3, c.size());
 
 
@@ -176,42 +176,42 @@ TEST(BinaryColumn_Basic)
     c.clear();
 
     c.insert(0, BinaryData("abc")); // single
-    CHECK_EQUAL(BinaryData("abc"),       c.get(0));
+    CHECK_EQUAL(BinaryData("abc"), c.get(0));
     CHECK_EQUAL(1, c.size());
 
     c.insert(1, BinaryData("d")); // end
-    CHECK_EQUAL(BinaryData("abc"),       c.get(0));
-    CHECK_EQUAL(BinaryData("d"),         c.get(1));
+    CHECK_EQUAL(BinaryData("abc"), c.get(0));
+    CHECK_EQUAL(BinaryData("d"), c.get(1));
     CHECK_EQUAL(2, c.size());
 
     c.insert(2, BinaryData("ef")); // end
-    CHECK_EQUAL(BinaryData("abc"),       c.get(0));
-    CHECK_EQUAL(BinaryData("d"),         c.get(1));
-    CHECK_EQUAL(BinaryData("ef"),        c.get(2));
+    CHECK_EQUAL(BinaryData("abc"), c.get(0));
+    CHECK_EQUAL(BinaryData("d"), c.get(1));
+    CHECK_EQUAL(BinaryData("ef"), c.get(2));
     CHECK_EQUAL(3, c.size());
 
     c.insert(1, BinaryData("ghij")); // middle
-    CHECK_EQUAL(BinaryData("abc"),       c.get(0));
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(1));
-    CHECK_EQUAL(BinaryData("d"),         c.get(2));
-    CHECK_EQUAL(BinaryData("ef"),        c.get(3));
+    CHECK_EQUAL(BinaryData("abc"), c.get(0));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(1));
+    CHECK_EQUAL(BinaryData("d"), c.get(2));
+    CHECK_EQUAL(BinaryData("ef"), c.get(3));
     CHECK_EQUAL(4, c.size());
 
     c.insert(0, BinaryData("klmno")); // first
-    CHECK_EQUAL(BinaryData("klmno"),     c.get(0));
-    CHECK_EQUAL(BinaryData("abc"),       c.get(1));
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(2));
-    CHECK_EQUAL(BinaryData("d"),         c.get(3));
-    CHECK_EQUAL(BinaryData("ef"),        c.get(4));
+    CHECK_EQUAL(BinaryData("klmno"), c.get(0));
+    CHECK_EQUAL(BinaryData("abc"), c.get(1));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(2));
+    CHECK_EQUAL(BinaryData("d"), c.get(3));
+    CHECK_EQUAL(BinaryData("ef"), c.get(4));
     CHECK_EQUAL(5, c.size());
 
     c.insert(2, BinaryData("as")); // middle again
-    CHECK_EQUAL(BinaryData("klmno"),     c.get(0));
-    CHECK_EQUAL(BinaryData("abc"),       c.get(1));
-    CHECK_EQUAL(BinaryData("as"),        c.get(2));
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(3));
-    CHECK_EQUAL(BinaryData("d"),         c.get(4));
-    CHECK_EQUAL(BinaryData("ef"),        c.get(5));
+    CHECK_EQUAL(BinaryData("klmno"), c.get(0));
+    CHECK_EQUAL(BinaryData("abc"), c.get(1));
+    CHECK_EQUAL(BinaryData("as"), c.get(2));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(3));
+    CHECK_EQUAL(BinaryData("d"), c.get(4));
+    CHECK_EQUAL(BinaryData("ef"), c.get(5));
     CHECK_EQUAL(6, c.size());
 
 
@@ -226,25 +226,25 @@ TEST(BinaryColumn_Basic)
     c.add(BinaryData("klmno"));
 
     c.erase(0); // first
-    CHECK_EQUAL(BinaryData("bc"),        c.get(0));
-    CHECK_EQUAL(BinaryData("def"),       c.get(1));
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(2));
-    CHECK_EQUAL(BinaryData("klmno"),     c.get(3));
+    CHECK_EQUAL(BinaryData("bc"), c.get(0));
+    CHECK_EQUAL(BinaryData("def"), c.get(1));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(2));
+    CHECK_EQUAL(BinaryData("klmno"), c.get(3));
     CHECK_EQUAL(4, c.size());
 
     c.erase(3); // last
-    CHECK_EQUAL(BinaryData("bc"),        c.get(0));
-    CHECK_EQUAL(BinaryData("def"),       c.get(1));
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(2));
+    CHECK_EQUAL(BinaryData("bc"), c.get(0));
+    CHECK_EQUAL(BinaryData("def"), c.get(1));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(2));
     CHECK_EQUAL(3, c.size());
 
     c.erase(1); // middle
-    CHECK_EQUAL(BinaryData("bc"),        c.get(0));
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(1));
+    CHECK_EQUAL(BinaryData("bc"), c.get(0));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(1));
     CHECK_EQUAL(2, c.size());
 
     c.erase(0); // single
-    CHECK_EQUAL(BinaryData("ghij"),      c.get(0));
+    CHECK_EQUAL(BinaryData("ghij"), c.get(0));
     CHECK_EQUAL(1, c.size());
 
     c.erase(0); // all
@@ -258,7 +258,8 @@ TEST(BinaryColumn_Basic)
 
     c.add(BinaryData("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  "));
     CHECK_EQUAL(BinaryData("70 chars  70 chars  70 chars  70 chars  "
-                           "70 chars  70 chars  70 chars  "), c.get(0));
+                           "70 chars  70 chars  70 chars  "),
+                c.get(0));
 
     c.clear();
     c.add(BinaryData("a"));
@@ -268,7 +269,8 @@ TEST(BinaryColumn_Basic)
     c.add(BinaryData("klmno"));
     c.add(BinaryData("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  "));
     CHECK_EQUAL(BinaryData("70 chars  70 chars  70 chars  70 chars  "
-                           "70 chars  70 chars  70 chars  "), c.get(5));
+                           "70 chars  70 chars  70 chars  "),
+                c.get(5));
 
     // Insert all sizes
     c.clear();
@@ -498,16 +500,16 @@ TEST(BinaryColumn_NonLeafRoot)
         ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
         BinaryColumn c(Allocator::get_default(), ref, true);
 
-        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
             std::string s = util::to_string(i);
             c.add(BinaryData(s));
         }
 
         c.erase(0);
         CHECK_EQUAL(std::string(c.get(0)), "1");
-        c.erase(c.size()-1);
-        c.erase(c.size()-1);
-        CHECK_EQUAL(std::string(c.get(c.size()-1)), util::to_string(REALM_MAX_BPNODE_SIZE-1));
+        c.erase(c.size() - 1);
+        c.erase(c.size() - 1);
+        CHECK_EQUAL(std::string(c.get(c.size() - 1)), util::to_string(REALM_MAX_BPNODE_SIZE - 1));
 
         c.destroy();
     }
@@ -518,16 +520,16 @@ TEST(BinaryColumn_NonLeafRoot)
         BinaryColumn c(Allocator::get_default(), ref, true);
 
         c.add(BinaryData(anotherBigString));
-        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
             std::string s = util::to_string(i);
             c.add(BinaryData(s));
         }
 
         c.erase(0);
         CHECK_EQUAL(std::string(c.get(0)), "1");
-        c.erase(c.size()-1);
-        c.erase(c.size()-1);
-        CHECK_EQUAL(std::string(c.get(c.size()-1)), util::to_string(REALM_MAX_BPNODE_SIZE-1));
+        c.erase(c.size() - 1);
+        c.erase(c.size() - 1);
+        CHECK_EQUAL(std::string(c.get(c.size() - 1)), util::to_string(REALM_MAX_BPNODE_SIZE - 1));
 
         c.destroy();
     }
@@ -537,21 +539,84 @@ TEST(BinaryColumn_NonLeafRoot)
         ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
         BinaryColumn c(Allocator::get_default(), ref, true);
 
-        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE+1); i++) {
+        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE + 1); i++) {
             std::string s = util::to_string(i);
             c.add(BinaryData(s));
         }
-        c.set(1, BinaryData(someBigString));    // Upgrade when setting
-        c.add(BinaryData(anotherBigString));    // Upgrade when adding
+        c.set(1, BinaryData(someBigString)); // Upgrade when setting
+        c.add(BinaryData(anotherBigString)); // Upgrade when adding
 
         c.erase(0);
         CHECK_EQUAL(std::string(c.get(0)), someBigString);
-        c.erase(c.size()-1);
-        c.erase(c.size()-1);
-        CHECK_EQUAL(std::string(c.get(c.size()-1)), util::to_string(REALM_MAX_BPNODE_SIZE-1));
+        c.erase(c.size() - 1);
+        c.erase(c.size() - 1);
+        CHECK_EQUAL(std::string(c.get(c.size() - 1)), util::to_string(REALM_MAX_BPNODE_SIZE - 1));
 
         c.destroy();
     }
+}
+
+TEST(BinaryColumn_get_at)
+{
+    BinaryData read;
+    size_t get_pos;
+
+    std::string hello = "Hello, world";
+    std::string very_lazy_fox =
+        "The lazy fox jumped over the quick brown dog. The quick fox jumped over the lazy brown dog. ";
+
+    ref_type ref = BinaryColumn::create(Allocator::get_default(), 0, false);
+    BinaryColumn c(Allocator::get_default(), ref, true);
+
+    c.add(BinaryData());
+    c.add(BinaryData(hello));
+
+    // First one should be NULL
+    CHECK(c.get(0).is_null());
+    get_pos = 0;
+    read = c.get_at(0, get_pos);
+    CHECK(read.is_null());
+
+    get_pos = 0;
+    read = c.get_at(1, get_pos);
+    CHECK_EQUAL(read.size(), hello.size());
+    CHECK_EQUAL(std::string(read.data(), read.size()), hello);
+
+    BinaryIterator it0;
+    read = it0.get_next();
+    CHECK(read.is_null());
+
+    BinaryIterator it1(&c, 1);
+    read = it1.get_next();
+    CHECK_EQUAL(std::string(read.data(), read.size()), hello);
+    read = it1.get_next();
+    CHECK(read.is_null());
+
+    BinaryIterator it2(c.get(1));
+    read = it2.get_next();
+    CHECK_EQUAL(std::string(read.data(), read.size()), hello);
+    read = it2.get_next();
+    CHECK(read.is_null());
+
+    // Check BigBlob
+    c.add(BinaryData(very_lazy_fox));
+
+    get_pos = 0;
+    read = c.get_at(2, get_pos);
+    CHECK_EQUAL(read.size(), very_lazy_fox.size());
+    CHECK_EQUAL(std::string(read.data(), read.size()), very_lazy_fox);
+
+    // Split root
+    for (unsigned i = 0; i < REALM_MAX_BPNODE_SIZE; i++) {
+        c.add(BinaryData());
+    }
+
+    get_pos = 0;
+    read = c.get_at(1, get_pos);
+    CHECK_EQUAL(read.size(), hello.size());
+    CHECK_EQUAL(std::string(read.data(), read.size()), hello);
+
+    c.destroy();
 }
 
 #endif // TEST_COLUMN_BINARY

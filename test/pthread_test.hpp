@@ -19,11 +19,14 @@
 /*
 Thread bug detector. Background:
 
-Existing thread bug detectors can only identify a non-exclusive access (r/w) in the moment it occurs at runtime. However
-a few data races only occur under certain rare conditions. This wrapper can force some of these conditions to reveal and
+Existing thread bug detectors can only identify a non-exclusive access (r/w) in the moment it occurs at runtime.
+However
+a few data races only occur under certain rare conditions. This wrapper can force some of these conditions to reveal
+and
 is perfect to use in combination with existing thread bug detectors but can also be used alone.
 
-Use by #including this file in the file(s) that call pthreads functions. If you #include pthread.h then include this file
+Use by #including this file in the file(s) that call pthreads functions. If you #include pthread.h then include this
+file
 *after* it because it works by wrapping pthread functions by macro-redefining their function names.
 */
 
@@ -42,8 +45,8 @@ inline unsigned int ptf_fastrand()
     // Must be fast because important edge case is 0 delay. Not thread safe, but that just adds randomnes.
     static unsigned int u = 1;
     static unsigned int v = 1;
-    v = 36969*(v & 65535) + (v >> 16);
-    u = 18000*(u & 65535) + (u >> 16);
+    v = 36969 * (v & 65535) + (v >> 16);
+    u = 18000 * (u & 65535) + (u >> 16);
     return (v << 16) + u;
 }
 
@@ -72,11 +75,11 @@ inline void ptf_randsleep(void)
         sched_yield();
     }
     else if (r < 999) {
-        // Wake up in time slice according to normal OS scheduling
+// Wake up in time slice according to normal OS scheduling
 #ifdef _WIN32
-    Sleep(0);
+        Sleep(0);
 #else
-    usleep(0);
+        usleep(0);
 #endif
     }
     else {
@@ -89,7 +92,7 @@ inline void ptf_randsleep(void)
     }
 }
 
-inline int ptf_pthread_mutex_trylock(pthread_mutex_t * mutex)
+inline int ptf_pthread_mutex_trylock(pthread_mutex_t* mutex)
 {
     ptf_randsleep();
     int i = pthread_mutex_trylock(mutex);
@@ -97,7 +100,7 @@ inline int ptf_pthread_mutex_trylock(pthread_mutex_t * mutex)
     return i;
 }
 
-inline int ptf_pthread_barrier_wait(pthread_barrier_t *barrier)
+inline int ptf_pthread_barrier_wait(pthread_barrier_t* barrier)
 {
     ptf_randsleep();
     int i = pthread_barrier_wait(barrier);
@@ -105,7 +108,7 @@ inline int ptf_pthread_barrier_wait(pthread_barrier_t *barrier)
     return i;
 }
 
-inline int ptf_pthread_mutex_lock(pthread_mutex_t * mutex)
+inline int ptf_pthread_mutex_lock(pthread_mutex_t* mutex)
 {
     ptf_randsleep();
     int i = pthread_mutex_lock(mutex);
@@ -113,7 +116,7 @@ inline int ptf_pthread_mutex_lock(pthread_mutex_t * mutex)
     return i;
 }
 
-inline int ptf_pthread_mutex_unlock(pthread_mutex_t * mutex)
+inline int ptf_pthread_mutex_unlock(pthread_mutex_t* mutex)
 {
     ptf_randsleep();
     int i = pthread_mutex_unlock(mutex);
@@ -142,9 +145,9 @@ inline int ptf_pthread_cond_broadcast(pthread_cond_t* cond)
     ptf_randsleep();
 }
 
-#define ptf_surround(arg) \
-    ptf_randsleep(); \
-    arg; \
+#define ptf_surround(arg)                                                                                            \
+    ptf_randsleep();                                                                                                 \
+    arg;                                                                                                             \
     ptf_randsleep();
 
 #define pthread_mutex_lock ptf_pthread_mutex_lock

@@ -46,12 +46,14 @@ public:
     // `column_indices` must be non-empty, and each vector within it must also
     // be non-empty. `ascending` must either be empty or have one entry for each
     // column index chain.
-    SortDescriptor(Table const& table,
-                   std::vector<std::vector<size_t>> column_indices,
-                   std::vector<bool> ascending={});
+    SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices,
+                   std::vector<bool> ascending = {});
 
     // returns whether this descriptor is valid and can be used to sort
-    explicit operator bool() const noexcept { return !m_columns.empty(); }
+    explicit operator bool() const noexcept
+    {
+        return !m_columns.empty();
+    }
 
     // handover support
     using HandoverPatch = std::unique_ptr<SortDescriptorHandoverPatch>;
@@ -60,6 +62,7 @@ public:
 
     class Sorter;
     Sorter sorter(IntegerColumn const& row_indexes) const;
+
 private:
     std::vector<std::vector<const ColumnBase*>> m_columns;
     std::vector<bool> m_ascending;
@@ -69,27 +72,15 @@ private:
 // supports sorting and distinct.
 class RowIndexes {
 public:
-    RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc) :
-        m_row_indexes(urt, alloc)
-#ifdef REALM_COOKIE_CHECK
-        , cookie(cookie_expected)
-#endif
-    {}
-
-    RowIndexes(IntegerColumn&& col) :
-        m_row_indexes(std::move(col))
-#ifdef REALM_COOKIE_CHECK
-        , cookie(cookie_expected)
-#endif
-    {}
-
+    RowIndexes(IntegerColumn::unattached_root_tag urt, realm::Allocator& alloc);
+    RowIndexes(IntegerColumn&& col);
     RowIndexes(const RowIndexes& source, ConstSourcePayload mode);
     RowIndexes(RowIndexes& source, MutableSourcePayload mode);
 
     virtual ~RowIndexes()
     {
 #ifdef REALM_COOKIE_CHECK
-        cookie = 0x7765697633333333; // 0x77656976 = 'view'; 0x33333333 = '3333' = destructed
+        m_debug_cookie = 0x7765697633333333; // 0x77656976 = 'view'; 0x33333333 = '3333' = destructed
 #endif
     }
 
@@ -101,12 +92,15 @@ public:
 
     // These two methods are overridden by TableView and LinkView.
     virtual uint_fast64_t sync_if_needed() const = 0;
-    virtual bool is_in_sync() const { return true; }
+    virtual bool is_in_sync() const
+    {
+        return true;
+    }
 
     void check_cookie() const
     {
 #ifdef REALM_COOKIE_CHECK
-        REALM_ASSERT_RELEASE(cookie == cookie_expected);
+        REALM_ASSERT_RELEASE(m_debug_cookie == cookie_expected);
 #endif
     }
 
@@ -115,10 +109,8 @@ public:
 protected:
     void do_sort(const SortDescriptor& sorting_predicate, const SortDescriptor& distinct_columns);
 
-#ifdef REALM_COOKIE_CHECK
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
-    uint64_t cookie;
-#endif
+    uint64_t m_debug_cookie;
 };
 
 } // namespace realm

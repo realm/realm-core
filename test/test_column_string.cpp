@@ -138,7 +138,7 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     // TEST(ColumnString_Add1)
 
     c.add("a");
-    CHECK_EQUAL(default_string_value,  c.get(0));
+    CHECK_EQUAL(default_string_value, c.get(0));
     CHECK_EQUAL("a", c.get(1));
     CHECK_EQUAL(2, c.size());
 
@@ -146,8 +146,8 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     // TEST(ColumnString_Add2)
 
     c.add("bb");
-    CHECK_EQUAL(default_string_value,   c.get(0));
-    CHECK_EQUAL("a",  c.get(1));
+    CHECK_EQUAL(default_string_value, c.get(0));
+    CHECK_EQUAL("a", c.get(1));
     CHECK_EQUAL("bb", c.get(2));
     CHECK_EQUAL(3, c.size());
 
@@ -155,9 +155,9 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     // TEST(ColumnString_Add3)
 
     c.add("ccc");
-    CHECK_EQUAL(default_string_value,    c.get(0));
-    CHECK_EQUAL("a",   c.get(1));
-    CHECK_EQUAL("bb",  c.get(2));
+    CHECK_EQUAL(default_string_value, c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("bb", c.get(2));
     CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL(4, c.size());
 
@@ -165,10 +165,10 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     // TEST(ColumnString_Add4)
 
     c.add("dddd");
-    CHECK_EQUAL(default_string_value,     c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("bb",   c.get(2));
-    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL(default_string_value, c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("bb", c.get(2));
+    CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL(5, c.size());
 
@@ -176,10 +176,10 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     // TEST(ColumnString_Add8)
 
     c.add("eeeeeeee");
-    CHECK_EQUAL(default_string_value,     c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("bb",   c.get(2));
-    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL(default_string_value, c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("bb", c.get(2));
+    CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL(6, c.size());
@@ -188,10 +188,10 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     // TEST(ColumnString_Add16)
 
     c.add("ffffffffffffffff");
-    CHECK_EQUAL(default_string_value,     c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("bb",   c.get(2));
-    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL(default_string_value, c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("bb", c.get(2));
+    CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
@@ -202,10 +202,10 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
 
     c.add("gggggggggggggggggggggggggggggggg");
 
-    CHECK_EQUAL(default_string_value,     c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("bb",   c.get(2));
-    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL(default_string_value, c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("bb", c.get(2));
+    CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
@@ -218,10 +218,10 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     // Add a string longer than 64 bytes to trigger long strings
     c.add("xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx");
 
-    CHECK_EQUAL(default_string_value,     c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("bb",   c.get(2));
-    CHECK_EQUAL("ccc",  c.get(3));
+    CHECK_EQUAL(default_string_value, c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("bb", c.get(2));
+    CHECK_EQUAL("ccc", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
@@ -239,10 +239,10 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
 
     CHECK_EQUAL(9, c.size());
 
-    CHECK_EQUAL("ccc",  c.get(0));
-    CHECK_EQUAL("bb",   c.get(1));
-    CHECK_EQUAL("a",    c.get(2));
-    CHECK_EQUAL("",     c.get(3));
+    CHECK_EQUAL("ccc", c.get(0));
+    CHECK_EQUAL("bb", c.get(1));
+    CHECK_EQUAL("a", c.get(2));
+    CHECK_EQUAL("", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
@@ -257,11 +257,11 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
 
     CHECK_EQUAL(10, c.size());
 
-    CHECK_EQUAL("ccc",  c.get(0));
-    CHECK_EQUAL("bb",   c.get(1));
-    CHECK_EQUAL("a",    c.get(2));
-    CHECK_EQUAL("",     c.get(3));
-    CHECK_EQUAL("xx",   c.get(4));
+    CHECK_EQUAL("ccc", c.get(0));
+    CHECK_EQUAL("bb", c.get(1));
+    CHECK_EQUAL("a", c.get(2));
+    CHECK_EQUAL("", c.get(3));
+    CHECK_EQUAL("xx", c.get(4));
     CHECK_EQUAL("dddd", c.get(5));
     CHECK_EQUAL("eeeeeeee", c.get(6));
     CHECK_EQUAL("ffffffffffffffff", c.get(7));
@@ -276,11 +276,11 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
 
     CHECK_EQUAL(9, c.size());
 
-    CHECK_EQUAL("ccc",  c.get(0));
-    CHECK_EQUAL("bb",   c.get(1));
-    CHECK_EQUAL("a",    c.get(2));
-    CHECK_EQUAL("",     c.get(3));
-    CHECK_EQUAL("xx",   c.get(4));
+    CHECK_EQUAL("ccc", c.get(0));
+    CHECK_EQUAL("bb", c.get(1));
+    CHECK_EQUAL("a", c.get(2));
+    CHECK_EQUAL("", c.get(3));
+    CHECK_EQUAL("xx", c.get(4));
     CHECK_EQUAL("dddd", c.get(5));
     CHECK_EQUAL("eeeeeeee", c.get(6));
     CHECK_EQUAL("ffffffffffffffff", c.get(7));
@@ -294,10 +294,10 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
 
     CHECK_EQUAL(8, c.size());
 
-    CHECK_EQUAL("bb",   c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("",     c.get(2));
-    CHECK_EQUAL("xx",   c.get(3));
+    CHECK_EQUAL("bb", c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("", c.get(2));
+    CHECK_EQUAL("xx", c.get(3));
     CHECK_EQUAL("dddd", c.get(4));
     CHECK_EQUAL("eeeeeeee", c.get(5));
     CHECK_EQUAL("ffffffffffffffff", c.get(6));
@@ -311,9 +311,9 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
 
     CHECK_EQUAL(7, c.size());
 
-    CHECK_EQUAL("bb",   c.get(0));
-    CHECK_EQUAL("a",    c.get(1));
-    CHECK_EQUAL("",     c.get(2));
+    CHECK_EQUAL("bb", c.get(0));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("", c.get(2));
     CHECK_EQUAL("dddd", c.get(3));
     CHECK_EQUAL("eeeeeeee", c.get(4));
     CHECK_EQUAL("ffffffffffffffff", c.get(5));
@@ -354,10 +354,10 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.insert(0, "xxxxx");
 
     CHECK_EQUAL("xxxxx", c.get(0));
-    CHECK_EQUAL("a",     c.get(1));
-    CHECK_EQUAL("b",     c.get(2));
-    CHECK_EQUAL("c",     c.get(3));
-    CHECK_EQUAL("d",     c.get(4));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("b", c.get(2));
+    CHECK_EQUAL("c", c.get(3));
+    CHECK_EQUAL("d", c.get(4));
     CHECK_EQUAL(5, c.size());
 
 
@@ -367,11 +367,11 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
     c.insert(3, "xxxxxxxxxx");
 
     CHECK_EQUAL("xxxxx", c.get(0));
-    CHECK_EQUAL("a",     c.get(1));
-    CHECK_EQUAL("b",     c.get(2));
+    CHECK_EQUAL("a", c.get(1));
+    CHECK_EQUAL("b", c.get(2));
     CHECK_EQUAL("xxxxxxxxxx", c.get(3));
-    CHECK_EQUAL("c",     c.get(4));
-    CHECK_EQUAL("d",     c.get(5));
+    CHECK_EQUAL("c", c.get(4));
+    CHECK_EQUAL("d", c.get(5));
     CHECK_EQUAL(6, c.size());
 
 
@@ -410,8 +410,7 @@ TEST_TYPES(ColumnString_Basic, non_nullable, nullable)
 
         CHECK_EQUAL(c.size(), c.size());
         CHECK_EQUAL("foobar", c.get(0));
-        CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ",
-                    c.get(1));
+        CHECK_EQUAL("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ", c.get(1));
         CHECK_EQUAL("baz", c.get(2));
     }
 
@@ -713,7 +712,7 @@ TEST_TYPES(ColumnString_AutoEnumerateIndex, non_nullable, nullable)
 
     // Append a value
     e.add("lastval");
-    auto last_val = e.get(e.size()-1);
+    auto last_val = e.get(e.size() - 1);
     CHECK_EQUAL("lastval", last_val);
 
     // Delete values
@@ -929,7 +928,8 @@ TEST(ColumnString_Null)
         // ArrayString capacity starts at 128 bytes, so we need lots of elements
         // to test if relocation works
         for (size_t i = 0; i < 100; i++) {
-            unsigned char rnd = static_cast<unsigned char>(random.draw_int<unsigned int>());  //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
+            unsigned char rnd = static_cast<unsigned char>(
+                random.draw_int<unsigned int>()); //    = 1234 * ((i + 123) * (t + 432) + 423) + 543;
 
             // Add more often than removing, so that we grow
             if (rnd < 80 && a.size() > 0) {
@@ -939,7 +939,8 @@ TEST(ColumnString_Null)
             }
             else {
                 // Generate string with good probability of being empty or realm::null()
-                static const char str[] = "This string must be longer than 64 bytes in order to test the BinaryBlob type of strings";
+                static const char str[] =
+                    "This string must be longer than 64 bytes in order to test the BinaryBlob type of strings";
                 size_t len;
 
                 if (random.draw_int<int>() > 100)
@@ -983,7 +984,6 @@ TEST(ColumnString_Null)
         }
         a.destroy();
     }
-
 }
 
 TEST(ColumnString_SetNullThrowsUnlessNullable)
@@ -1033,7 +1033,8 @@ TEST_TYPES(ColumnString_FindAllExpand, non_nullable, nullable)
     asc.add("HEJ");
     asc.add("dfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfs");
     asc.add("HEJ");
-    asc.add("dfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfgdfg djf gjkfdghkfds");
+    asc.add("dfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfsdfsdfsdkfjds gfgdfg djf "
+            "gjkfdghkfds");
 
     // Todo, should the API behaviour really require us to clear c manually?
     c.clear();
@@ -1049,7 +1050,6 @@ TEST_TYPES(ColumnString_FindAllExpand, non_nullable, nullable)
 
     asc.destroy();
     c.destroy();
-
 }
 
 // FindAll using ranges, when expanded ArrayStringLong
@@ -1360,7 +1360,7 @@ TEST(ColumnString_SwapRows)
 
         c.swap_rows(1, 2);
 
-        CHECK(c.get(1).is_null()); // fails
+        CHECK(c.get(1).is_null());  // fails
         CHECK_EQUAL(c.get(2), "b"); // passes
 
         c.destroy();
@@ -1485,7 +1485,7 @@ TEST(ColumnString_NonLeafRoot)
         ref_type ref = StringColumn::create(Allocator::get_default());
         StringColumn c(Allocator::get_default(), ref);
 
-        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
             std::string s = util::to_string(i);
             c.add(s);
         }
@@ -1493,8 +1493,8 @@ TEST(ColumnString_NonLeafRoot)
         CHECK_EQUAL(c.count("3"), 1);
         CHECK_EQUAL(c.find_first("3"), 3);
         CHECK_EQUAL(c.find_first("5000"), not_found);
-        auto mid_point = util::to_string(REALM_MAX_BPNODE_SIZE/2);
-        CHECK_EQUAL(c.upper_bound_string(mid_point), REALM_MAX_BPNODE_SIZE/2 + 1);
+        auto mid_point = util::to_string(REALM_MAX_BPNODE_SIZE / 2);
+        CHECK_EQUAL(c.upper_bound_string(mid_point), REALM_MAX_BPNODE_SIZE / 2 + 1);
 
         ref_type col_ref = IntegerColumn::create(Allocator::get_default());
         IntegerColumn col(Allocator::get_default(), col_ref);
@@ -1504,9 +1504,9 @@ TEST(ColumnString_NonLeafRoot)
         col.destroy();
 
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE));
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE+1), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
         c.erase(REALM_MAX_BPNODE_SIZE);
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
         c.erase(REALM_MAX_BPNODE_SIZE);
         CHECK_EQUAL(c.size(), REALM_MAX_BPNODE_SIZE);
 
@@ -1518,7 +1518,7 @@ TEST(ColumnString_NonLeafRoot)
         StringColumn c(Allocator::get_default(), ref);
 
         c.add("This is a medium long string");
-        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
             std::string s = util::to_string(i);
             c.add(s);
         }
@@ -1534,9 +1534,9 @@ TEST(ColumnString_NonLeafRoot)
         col.destroy();
 
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE));
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE+1), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
         c.erase(REALM_MAX_BPNODE_SIZE);
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
         c.erase(REALM_MAX_BPNODE_SIZE);
         CHECK_EQUAL(c.size(), REALM_MAX_BPNODE_SIZE);
 
@@ -1548,7 +1548,7 @@ TEST(ColumnString_NonLeafRoot)
         StringColumn c(Allocator::get_default(), ref);
 
         c.add("This is a rather long string, that should not be very much shorter");
-        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+        for (int i = 1; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
             std::string s = util::to_string(i);
             c.add(s);
         }
@@ -1564,9 +1564,9 @@ TEST(ColumnString_NonLeafRoot)
         col.destroy();
 
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE));
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE+1), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
         c.erase(REALM_MAX_BPNODE_SIZE);
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE+1));
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), util::to_string(REALM_MAX_BPNODE_SIZE + 1));
         c.erase(REALM_MAX_BPNODE_SIZE);
         CHECK_EQUAL(c.size(), REALM_MAX_BPNODE_SIZE);
 
@@ -1577,7 +1577,7 @@ TEST(ColumnString_NonLeafRoot)
         ref_type ref = StringColumn::create(Allocator::get_default());
         StringColumn c(Allocator::get_default(), ref);
 
-        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE+2); i++) {
+        for (int i = 0; i < (REALM_MAX_BPNODE_SIZE + 2); i++) {
             std::string s = util::to_string(i);
             c.add(s);
         }
@@ -1585,7 +1585,8 @@ TEST(ColumnString_NonLeafRoot)
         c.set(REALM_MAX_BPNODE_SIZE + 1, "This is a rather long string, that should not be very much shorter");
         CHECK_EQUAL(c.get(0), "0");
         CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE), "This is a medium long string");
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), "This is a rather long string, that should not be very much shorter");
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1),
+                    "This is a rather long string, that should not be very much shorter");
 
         c.destroy();
     }
@@ -1600,7 +1601,8 @@ TEST(ColumnString_NonLeafRoot)
         }
         c.add("This is a rather long string, that should not be very much shorter");
 
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), "This is a rather long string, that should not be very much shorter");
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1),
+                    "This is a rather long string, that should not be very much shorter");
 
         c.destroy();
     }
@@ -1616,7 +1618,8 @@ TEST(ColumnString_NonLeafRoot)
         }
         c.add("This is a rather long string, that should not be very much shorter");
 
-        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1), "This is a rather long string, that should not be very much shorter");
+        CHECK_EQUAL(c.get(REALM_MAX_BPNODE_SIZE + 1),
+                    "This is a rather long string, that should not be very much shorter");
 
         c.destroy();
     }
