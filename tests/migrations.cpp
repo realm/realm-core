@@ -1079,6 +1079,24 @@ TEST_CASE("migration: Additive") {
         REQUIRE(realm->schema().find("object")->persisted_properties[0].table_column == 1);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].table_column == 0);
     }
+
+    SECTION("opening new Realms uses the correct schema after an external change") {
+        auto realm2 = Realm::get_shared_realm(config);
+        auto& group = realm2->read_group();
+        realm2->begin_transaction();
+        auto table = ObjectStore::table_for_object_type(group, "object");
+        table->insert_column(0, type_Double, "newcol");
+        realm2->commit_transaction();
+
+        REQUIRE_NOTHROW(realm->refresh());
+        REQUIRE(realm->schema() == schema);
+        REQUIRE(realm->schema().find("object")->persisted_properties[0].table_column == 1);
+        REQUIRE(realm->schema().find("object")->persisted_properties[1].table_column == 2);
+
+        auto realm3 = Realm::get_shared_realm(config);
+        REQUIRE(realm3->schema().find("object")->persisted_properties[0].table_column == 1);
+        REQUIRE(realm3->schema().find("object")->persisted_properties[1].table_column == 2);
+    }
 }
 
 TEST_CASE("migration: Manual") {
