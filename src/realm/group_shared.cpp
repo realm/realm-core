@@ -1125,7 +1125,6 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, Durabili
     }
 }
 
-
 bool SharedGroup::compact()
 {
     // FIXME: ExcetionSafety: This function must be rewritten with exception
@@ -1139,9 +1138,9 @@ bool SharedGroup::compact()
     if (m_transact_stage != transact_Ready) {
         throw std::runtime_error(m_db_path + ": compact is not supported whithin a transaction");
     }
-    DurabilityLevel dura;
+    Durability dura;
+    std::string tmp_path = m_db_path + ".tmp_compaction_space";
     {
-        std::string tmp_path = m_db_path + ".tmp_compaction_space";
         SharedInfo* info = m_file_map.get_addr();
         std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
         if (info->num_participants > 1)
@@ -1157,8 +1156,8 @@ bool SharedGroup::compact()
         // This is also needed to attach the group (get the proper top pointer, etc)
         begin_read(); // Throws
 
-        // Compact by writing a new file holding only live data, then renaming the new file
-        // so it becomes the database file, replacing the old one in the process.
+                      // Compact by writing a new file holding only live data, then renaming the new file
+                      // so it becomes the database file, replacing the old one in the process.
         File file;
         file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
         m_group.write(file, m_key, info->latest_version_number);
@@ -1166,26 +1165,34 @@ bool SharedGroup::compact()
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
             file.sync(); // Throws
-        util::File::move(tmp_path.c_str(), m_db_path.c_str());
+#ifndef _WIN32
+        util::File::move(tmp_path, m_db_path);
+#endif
         {
             SharedInfo* r_info = m_reader_map.get_addr();
             Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
-            REALM_ASSERT_3(rc.version, ==, info->latest_version_number);
+            REALM_ASSERT_3(rc.version, == , info->latest_version_number);
             static_cast<void>(rc); // rc unused if ENABLE_ASSERTION is unset
         }
         end_read();
-        dura = DurabilityLevel(info->durability);
+        dura = Durability(info->durability);
         // We need to release any shared mapping *before* releasing the control mutex.
         // When someone attaches to the new database file, they *must* *not* see and
         // reuse any existing memory mapping of the stale file.
         m_group.m_alloc.detach();
     }
     close();
-    do_open(m_db_path, true, dura, false, m_key, false);
-    m_file.update_checksum();
+#ifdef _WIN32
+    util::File::copy(tmp_path, m_db_path);
+#endif
+
+    SharedGroupOptions new_options;
+    new_options.durability = dura;
+    new_options.encryption_key = m_key;
+    new_options.allow_file_format_upgrade = false;
+    do_open(m_db_path, true, false, new_options);
     return true;
 }
-
 uint_fast64_t SharedGroup::get_number_of_versions()
 {
     SharedInfo* info = m_file_map.get_addr();
@@ -1553,7 +1560,7 @@ const Group& SharedGroup::begin_read(VersionID version_id)
     bool writable = false;
     do_begin_read(version_id, writable); // Throws
 
-    m_group.m_alloc.get_file().verify_checksum();
+//    m_group.m_alloc.get_file().verify_checksum();
 
     m_transact_stage = transact_Reading;
     return m_group;

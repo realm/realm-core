@@ -24,15 +24,6 @@
 #include <realm/util/features.h>
 #include <realm/util/terminate.hpp>
 
-namespace realm {
-
-    inline void verify_checksum()
-    {
-    
-    }
-
-}
-
 #if REALM_ENABLE_ASSERTIONS || defined(REALM_DEBUG)
 #  define REALM_ASSERTIONS_ENABLED 1
 #else
@@ -58,24 +49,21 @@ namespace realm {
 #define REALM_STRINGIFY(X) #X
 
 #define REALM_ASSERT_RELEASE_EX(condition, ...) \
-    verify_checksum(); \
     (REALM_LIKELY(condition) ? static_cast<void>(0) : \
     realm::util::terminate_with_info("Assertion failed: " # condition, __LINE__, __FILE__, \
                                      REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
 
 
-#define REALM_ASSERT_RELEASE_EX2(condition, ...) \
+#define REALM_ASSERT_RELEASE_CRC(condition, ...) \
     get_alloc().get_file().verify_checksum(); \
     (REALM_LIKELY(condition) ? static_cast<void>(0) : \
     realm::util::terminate_with_info("Assertion failed: " # condition, __LINE__, __FILE__, \
                                      REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
 
 
-
-
-
 #ifdef REALM_DEBUG
 #  define REALM_ASSERT_DEBUG_EX REALM_ASSERT_RELEASE_EX
+#  define REALM_ASSERT_DEBUG_CRC REALM_ASSERT_RELEASE_CRC
 #else
 #  define REALM_ASSERT_DEBUG_EX(condition, ...) static_cast<void>(sizeof bool(condition))
 #endif
@@ -86,6 +74,7 @@ namespace realm {
 #if REALM_ENABLE_ASSERTIONS || defined(REALM_DEBUG)
 
 #  define REALM_ASSERT_EX REALM_ASSERT_RELEASE_EX
+#  define REALM_ASSERT_CRC REALM_ASSERT_RELEASE_CRC
 
 #  define REALM_ASSERT_3(left, cmp, right) \
     (REALM_LIKELY((left) cmp (right)) ? static_cast<void>(0) : \

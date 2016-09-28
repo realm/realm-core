@@ -72,7 +72,7 @@ void ArrayBigBlobs::set(size_t ndx, BinaryData value, bool add_zero_term)
         Array::set(ndx, 0);
         return;
     }
-    REALM_ASSERT(false);
+    REALM_ASSERT_RELEASE_CRC(false);
 }
 
 
