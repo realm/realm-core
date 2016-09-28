@@ -7,6 +7,7 @@ set -e
 # to delete them from our host.
 trap 'chown -R --reference /inside/test /test-logs/' EXIT
 
+apt-get update
 apt-get install -y /out/*.deb
 
 # include build test here to ensure that everything is properly installed
