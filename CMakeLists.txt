@@ -19,7 +19,6 @@ include(RealmCore)
 set(REALM_CORE_VERSION "1.5.0" CACHE STRING "")
 use_realm_core(${REALM_CORE_VERSION})
 
-option(REALM_ENABLE_SYNC "Build realm object store with sync extensions" OFF)
 if(REALM_SYNC_PREFIX)
   set(REALM_ENABLE_SYNC ON)
   build_realm_sync(${REALM_SYNC_PREFIX})
