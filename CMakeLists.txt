@@ -25,6 +25,10 @@ if(REALM_SYNC_PREFIX)
   build_realm_sync(${REALM_SYNC_PREFIX})
 endif()
 
+if(REALM_ENABLE_SYNC)
+  add_definitions(-DREALM_ENABLE_SYNC)
+endif()
+
 set(PEGTL_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pegtl)
 
 add_subdirectory(src)
