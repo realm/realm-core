@@ -76,31 +76,28 @@ template <typename ColumnDataType>
 class ColumnRandIterator : public std::iterator<std::random_access_iterator_tag, ColumnDataType, ptrdiff_t, size_t> {
 public:
     ColumnRandIterator(const Column<ColumnDataType>* src_col, size_t ndx = 0);
-    ColumnRandIterator();
-    explicit operator bool() const noexcept;
     bool operator==(const ColumnRandIterator<ColumnDataType>& other) const;
     bool operator!=(const ColumnRandIterator<ColumnDataType>& other) const;
     bool operator<(const ColumnRandIterator<ColumnDataType>& other) const;
     bool operator>(const ColumnRandIterator<ColumnDataType>& other) const;
     bool operator<=(const ColumnRandIterator<ColumnDataType>& other) const;
     bool operator>=(const ColumnRandIterator<ColumnDataType>& other) const;
-    ColumnRandIterator<ColumnDataType>& operator+=(const ptrdiff_t& movement);
-    ColumnRandIterator<ColumnDataType>& operator-=(const ptrdiff_t& movement);
+    ColumnRandIterator<ColumnDataType>& operator+=(ptrdiff_t movement);
+    ColumnRandIterator<ColumnDataType>& operator-=(ptrdiff_t movement);
     ColumnRandIterator<ColumnDataType>& operator++();
     ColumnRandIterator<ColumnDataType>& operator--();
     ColumnRandIterator<ColumnDataType> operator++(int);
     ColumnRandIterator<ColumnDataType> operator--(int);
-    ColumnRandIterator<ColumnDataType> operator+(const ptrdiff_t& movement);
-    ColumnRandIterator<ColumnDataType> operator-(const ptrdiff_t& movement);
+    ColumnRandIterator<ColumnDataType> operator+(ptrdiff_t movement);
+    ColumnRandIterator<ColumnDataType> operator-(ptrdiff_t movement);
     ptrdiff_t operator-(const ColumnRandIterator<ColumnDataType>& rawIterator);
     const ColumnDataType operator*() const;
     const ColumnDataType operator->() const;
-    const ColumnDataType operator[](const ptrdiff_t& offset) const;
+    const ColumnDataType operator[](ptrdiff_t offset) const;
     size_t get_col_ndx() const;
 protected:
-    size_t col_ndx;
-    size_t cached_column_size;
-    const Column<ColumnDataType>* col;
+    size_t m_col_ndx;
+    const Column<ColumnDataType>* m_col;
 };
 
 /// Base class for all column types.
@@ -1701,30 +1698,15 @@ void Column<T>::dump_node_structure(const Array& root, std::ostream& out, int le
 
 template <class ColumnDataType>
 ColumnRandIterator<ColumnDataType>::ColumnRandIterator(const Column<ColumnDataType>* src_col, size_t ndx)
-    : col_ndx(ndx)
-    , col(src_col)
+    : m_col_ndx(ndx)
+    , m_col(src_col)
 {
-    cached_column_size = col->size();
-}
-
-template <class ColumnDataType>
-ColumnRandIterator<ColumnDataType>::ColumnRandIterator()
-    : col_ndx(size_t(-1))
-    , cached_column_size(0)
-    , col(nullptr)
-{
-}
-
-template <class ColumnDataType>
-ColumnRandIterator<ColumnDataType>::operator bool() const noexcept
-{
-    return col_ndx >= 0 && col_ndx < cached_column_size;
 }
 
 template <class ColumnDataType>
 bool ColumnRandIterator<ColumnDataType>::operator==(const ColumnRandIterator<ColumnDataType>& other) const
 {
-    return (col_ndx == other.col_ndx);
+    return (m_col_ndx == other.m_col_ndx);
 }
 
 template <class ColumnDataType>
@@ -1736,52 +1718,52 @@ bool ColumnRandIterator<ColumnDataType>::operator!=(const ColumnRandIterator<Col
 template <class ColumnDataType>
 bool ColumnRandIterator<ColumnDataType>::operator<(const ColumnRandIterator<ColumnDataType>& other) const
 {
-    return col_ndx < other.col_ndx;
+    return m_col_ndx < other.m_col_ndx;
 }
 
 template <class ColumnDataType>
 bool ColumnRandIterator<ColumnDataType>::operator>(const ColumnRandIterator<ColumnDataType>& other) const
 {
-    return col_ndx > other.col_ndx;
+    return m_col_ndx > other.m_col_ndx;
 }
 
 template <class ColumnDataType>
 bool ColumnRandIterator<ColumnDataType>::operator<=(const ColumnRandIterator<ColumnDataType>& other) const
 {
-    return col_ndx <= other.col_ndx;
+    return m_col_ndx <= other.m_col_ndx;
 }
 
 template <class ColumnDataType>
 bool ColumnRandIterator<ColumnDataType>::operator>=(const ColumnRandIterator<ColumnDataType>& other) const
 {
-    return col_ndx >= other.col_ndx;
+    return m_col_ndx >= other.m_col_ndx;
 }
 
 template <class ColumnDataType>
-ColumnRandIterator<ColumnDataType>& ColumnRandIterator<ColumnDataType>::operator+=(const ptrdiff_t& movement)
+ColumnRandIterator<ColumnDataType>& ColumnRandIterator<ColumnDataType>::operator+=(ptrdiff_t movement)
 {
-    col_ndx += movement;
+    m_col_ndx += movement;
     return (*this);
 }
 
 template <class ColumnDataType>
-ColumnRandIterator<ColumnDataType>& ColumnRandIterator<ColumnDataType>::operator-=(const ptrdiff_t& movement)
+ColumnRandIterator<ColumnDataType>& ColumnRandIterator<ColumnDataType>::operator-=(ptrdiff_t movement)
 {
-    col_ndx -= movement;
+    m_col_ndx -= movement;
     return (*this);
 }
 
 template <class ColumnDataType>
 ColumnRandIterator<ColumnDataType>& ColumnRandIterator<ColumnDataType>::operator++()
 {
-    ++col_ndx;
+    ++m_col_ndx;
     return (*this);
 }
 
 template <class ColumnDataType>
 ColumnRandIterator<ColumnDataType>& ColumnRandIterator<ColumnDataType>::operator--()
 {
-    --col_ndx;
+    --m_col_ndx;
     return (*this);
 }
 
@@ -1789,7 +1771,7 @@ template <class ColumnDataType>
 ColumnRandIterator<ColumnDataType> ColumnRandIterator<ColumnDataType>::operator++(int)
 {
     auto temp(*this);
-    ++col_ndx;
+    ++m_col_ndx;
     return temp;
 }
 
@@ -1797,50 +1779,50 @@ template <class ColumnDataType>
 ColumnRandIterator<ColumnDataType> ColumnRandIterator<ColumnDataType>::operator--(int)
 {
     auto temp(*this);
-    --col_ndx;
+    --m_col_ndx;
     return temp;
 }
 
 template <class ColumnDataType>
-ColumnRandIterator<ColumnDataType> ColumnRandIterator<ColumnDataType>::operator+(const ptrdiff_t& movement)
+ColumnRandIterator<ColumnDataType> ColumnRandIterator<ColumnDataType>::operator+(ptrdiff_t movement)
 {
-    return ColumnRandIterator(col, col_ndx + movement);
+    return ColumnRandIterator(m_col, m_col_ndx + movement);
 }
 
 template <class ColumnDataType>
-ColumnRandIterator<ColumnDataType> ColumnRandIterator<ColumnDataType>::operator-(const ptrdiff_t& movement)
+ColumnRandIterator<ColumnDataType> ColumnRandIterator<ColumnDataType>::operator-(ptrdiff_t movement)
 {
-    return ColumnRandIterator(col, col_ndx - movement);
+    return ColumnRandIterator(m_col, m_col_ndx - movement);
 }
 
 template <class ColumnDataType>
 ptrdiff_t ColumnRandIterator<ColumnDataType>::operator-(const ColumnRandIterator<ColumnDataType>& other)
 {
-    return col_ndx - other.col_ndx;
+    return m_col_ndx - other.m_col_ndx;
 }
 
 template <class ColumnDataType>
 const ColumnDataType ColumnRandIterator<ColumnDataType>::operator*() const
 {
-    return col->get(col_ndx);
+    return m_col->get(m_col_ndx);
 }
 
 template <class ColumnDataType>
 const ColumnDataType ColumnRandIterator<ColumnDataType>::operator->() const
 {
-    return col->get(col_ndx);
+    return m_col->get(m_col_ndx);
 }
 
 template <class ColumnDataType>
-const ColumnDataType ColumnRandIterator<ColumnDataType>::operator[](const ptrdiff_t& offset) const
+const ColumnDataType ColumnRandIterator<ColumnDataType>::operator[](ptrdiff_t offset) const
 {
-    return col->get(col_ndx + offset);
+    return m_col->get(m_col_ndx + offset);
 }
 
 template <class ColumnDataType>
 size_t ColumnRandIterator<ColumnDataType>::get_col_ndx() const
 {
-    return col_ndx;
+    return m_col_ndx;
 }
 
 template <class ColumnDataType>

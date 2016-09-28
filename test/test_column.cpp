@@ -1226,8 +1226,6 @@ TEST_TYPES(Column_Iterators, std::true_type, std::false_type)
     auto realm_end = c.cend();
 
     CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
-    CHECK(realm_it);
-    CHECK(!realm_end);
 
     while(std_it != std_end) {
         CHECK_EQUAL(*std_it, *realm_it);
