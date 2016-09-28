@@ -16,9 +16,9 @@
  *
  **************************************************************************/
 
+#include <realm/array_direct.hpp>
 #include <realm/bptree.hpp>
 #include <realm/array_integer.hpp>
-#include <realm/array_packed.hpp>
 
 using namespace realm;
 

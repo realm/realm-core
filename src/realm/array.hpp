@@ -55,7 +55,7 @@ Searching: The main finding function is:
 #include <realm/string_data.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/column_fwd.hpp>
-#include "array_packed.hpp"
+#include "array_direct.hpp"
 
 /*
     MMX: mmintrin.h

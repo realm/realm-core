@@ -16,8 +16,8 @@
  *
  **************************************************************************/
 
-#ifndef REALM_ARRAY_PACKED_HPP
-#define REALM_ARRAY_PACKED_HPP
+#ifndef REALM_ARRAY_DIRECT_HPP
+#define REALM_ARRAY_DIRECT_HPP
 
 #include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
@@ -85,6 +85,69 @@ using namespace realm::util;
 namespace realm {
 
 // Direct access methods
+
+template <size_t width>
+void set_direct(char* data, size_t ndx, int_fast64_t value) noexcept
+{
+    if (width == 0) {
+        REALM_ASSERT_DEBUG(value == 0);
+        return;
+    }
+    else if (width == 1) {
+        REALM_ASSERT_DEBUG(0 <= value && value <= 0x01);
+        size_t byte_ndx = ndx / 8;
+        size_t bit_ndx = ndx % 8;
+        typedef unsigned char uchar;
+        uchar* p = reinterpret_cast<uchar*>(data) + byte_ndx;
+        *p = uchar((*p & ~(0x01 << bit_ndx)) | (int(value) & 0x01) << bit_ndx);
+    }
+    else if (width == 2) {
+        REALM_ASSERT_DEBUG(0 <= value && value <= 0x03);
+        size_t byte_ndx = ndx / 4;
+        size_t bit_ndx = ndx % 4 * 2;
+        typedef unsigned char uchar;
+        uchar* p = reinterpret_cast<uchar*>(data) + byte_ndx;
+        *p = uchar((*p & ~(0x03 << bit_ndx)) | (int(value) & 0x03) << bit_ndx);
+    }
+    else if (width == 4) {
+        REALM_ASSERT_DEBUG(0 <= value && value <= 0x0F);
+        size_t byte_ndx = ndx / 2;
+        size_t bit_ndx = ndx % 2 * 4;
+        typedef unsigned char uchar;
+        uchar* p = reinterpret_cast<uchar*>(data) + byte_ndx;
+        *p = uchar((*p & ~(0x0F << bit_ndx)) | (int(value) & 0x0F) << bit_ndx);
+    }
+    else if (width == 8) {
+        REALM_ASSERT_DEBUG(std::numeric_limits<int8_t>::min() <= value &&
+                           value <= std::numeric_limits<int8_t>::max());
+        *(reinterpret_cast<int8_t*>(data) + ndx) = int8_t(value);
+    }
+    else if (width == 16) {
+        REALM_ASSERT_DEBUG(std::numeric_limits<int16_t>::min() <= value &&
+                           value <= std::numeric_limits<int16_t>::max());
+        *(reinterpret_cast<int16_t*>(data) + ndx) = int16_t(value);
+    }
+    else if (width == 32) {
+        REALM_ASSERT_DEBUG(std::numeric_limits<int32_t>::min() <= value &&
+                           value <= std::numeric_limits<int32_t>::max());
+        *(reinterpret_cast<int32_t*>(data) + ndx) = int32_t(value);
+    }
+    else if (width == 64) {
+        REALM_ASSERT_DEBUG(std::numeric_limits<int64_t>::min() <= value &&
+                           value <= std::numeric_limits<int64_t>::max());
+        *(reinterpret_cast<int64_t*>(data) + ndx) = int64_t(value);
+    }
+    else {
+        REALM_ASSERT_DEBUG(false);
+    }
+}
+
+template <size_t width>
+void fill_direct(char* data, size_t begin, size_t end, int_fast64_t value) noexcept
+{
+    for (size_t i = begin; i != end; ++i)
+        set_direct<width>(data, i, value);
+}
 
 template <int w>
 int64_t get_direct(const char* data, size_t ndx) noexcept
