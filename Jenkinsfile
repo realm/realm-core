@@ -69,15 +69,13 @@ try {
     )
   }
 
-  if (['master', 'next-major'].contains(env.BRANCH_NAME) || gitTag != "") {
-    stage('publish-packages') {
-      parallel(
-        generic: doPublishGeneric(),
-        centos7: doPublish('centos-7', 'rpm', 'el', 7),
-        centos6: doPublish('centos-6', 'rpm', 'el', 6),
-        ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
-      )
-    }
+  stage('publish-packages') {
+    parallel(
+      generic: doPublishGeneric(),
+      centos7: doPublish('centos-7', 'rpm', 'el', 7),
+      centos6: doPublish('centos-6', 'rpm', 'el', 6),
+      ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
+    )
   }
 } catch(Exception e) {
   e.printStackTrace()
