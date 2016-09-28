@@ -514,6 +514,12 @@ TEST_TYPES(DoubleFloatColumn_InitOfEmptyColumnNullable, std::true_type, std::fal
     t.add_column(type_Float, "d", nullable_toggle);
     CHECK(t.is_null(1, 0) == nullable_toggle);
     CHECK(t.is_null(2, 0) == nullable_toggle);
+    if (nullable_toggle) {
+        t.set_null(1, 0);
+        t.set_null(2, 0);
+        CHECK(t.is_null(1, 0));
+        CHECK(t.is_null(2, 0));
+    }
 }
 
 TEST(FloatColumn_InitOfEmptyColumn)
