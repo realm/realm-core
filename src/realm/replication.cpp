@@ -309,15 +309,15 @@ public:
         return true;
     }
 
-    bool change_link_targets(size_t row_ndx, size_t new_row_ndx)
+    bool merge_rows(size_t row_ndx, size_t new_row_ndx)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(row_ndx >= m_table->size() || new_row_ndx >= m_table->size())))
             return false;
-        log("table->change_link_targets(%1, %2);", row_ndx, new_row_ndx); // Throws
+        log("table->merge_rows(%1, %2);", row_ndx, new_row_ndx); // Throws
         using tf = _impl::TableFriend;
-        tf::do_change_link_targets(*m_table, row_ndx, new_row_ndx); // Throws
+        tf::do_merge_rows(*m_table, row_ndx, new_row_ndx); // Throws
         return true;
     }
 

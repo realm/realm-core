@@ -2,11 +2,13 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Extra SetUnique instructions are no longer generated in the transaction log
+  when a conflict was resolved locally.
 
 ### Breaking changes
 
-* Lorem ipsum.
+* The ChangeLinkTargets instruction was a misnomer and has been renamed to
+  MergeRows.
 
 ### Enhancements
 
@@ -17,6 +19,8 @@
 ### Internals
 
 * Android builds: upgraded to OpenSSL 1.0.1u.
+* The behavior of MergeRows (formerly ChangeLinkTargets) has been simplified to
+  be semantically equivalent to a row swap.
 
 ----------------------------------------------
 
