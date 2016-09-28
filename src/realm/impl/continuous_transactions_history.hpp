@@ -174,7 +174,7 @@ public:
     void verify() const override;
 
 private:
-    Group* m_group = 0;
+    Group* m_group = nullptr;
 
     /// Version on which the first changeset in the history is based, or if the
     /// history is empty, the version associatede with currently bound

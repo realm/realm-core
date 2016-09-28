@@ -2213,7 +2213,7 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
     remove_backlink_broken_rows(state); // Throws
 }
 
-void Table::change_link_targets(size_t row_ndx, size_t new_row_ndx)
+void Table::merge_rows(size_t row_ndx, size_t new_row_ndx)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -2223,10 +2223,10 @@ void Table::change_link_targets(size_t row_ndx, size_t new_row_ndx)
         throw LogicError(LogicError::row_index_out_of_range);
 
     if (Replication* repl = get_repl()) {
-        repl->change_link_targets(this, row_ndx, new_row_ndx);
+        repl->merge_rows(this, row_ndx, new_row_ndx);
     }
 
-    do_change_link_targets(row_ndx, new_row_ndx);
+    do_merge_rows(row_ndx, new_row_ndx);
 }
 
 void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last_over)
@@ -2367,43 +2367,33 @@ void Table::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 }
 
 
-void Table::do_change_link_targets(size_t row_ndx, size_t new_row_ndx)
+void Table::do_merge_rows(size_t row_ndx, size_t new_row_ndx)
 {
-    // Replace links through backlink columns.
-    //
     // This bypasses handling of cascading rows, and we have decided that this is OK, because
-    // ChangeLinkTargets is always followed by MoveLastOver, so breaking the last strong link
+    // MergeRows is always followed by MoveLastOver, so breaking the last strong link
     // to a row that is being subsumed will have no observable effect, while honoring the
     // cascading behavior would complicate the calling code somewhat (having to take
     // into account whether or not the row was removed as a consequence of cascade, leading
     // to bugs in case this was forgotten).
-    size_t backlink_col_start = m_spec.get_public_column_count();
-    size_t backlink_col_end = m_spec.get_column_count();
-    for (size_t col_ndx = backlink_col_start; col_ndx < backlink_col_end; ++col_ndx) {
-        REALM_ASSERT(m_spec.get_column_type(col_ndx) == col_type_BackLink);
 
-        auto& col = get_column_backlink(col_ndx);
-        auto& origin_table = col.get_origin_table();
-        size_t origin_col_ndx = col.get_origin_column_index();
-        ColumnType origin_col_type = origin_table.get_real_column_type(origin_col_ndx);
-        while (col.get_backlink_count(row_ndx) > 0) {
-            size_t origin_row_ndx = col.get_backlink(row_ndx, 0);
 
-            if (origin_col_type == col_type_Link) {
-                origin_table.set_link(origin_col_ndx, origin_row_ndx, new_row_ndx);
-            }
-            else if (origin_col_type == col_type_LinkList) {
-                LinkViewRef links = origin_table.get_linklist(origin_col_ndx, origin_row_ndx);
-                for (size_t j = 0; j < links->size(); ++j) {
-                    if (links->get(j).get_index() == row_ndx) {
-                        links->set(j, new_row_ndx);
-                    }
-                }
-            }
+    // Since new_row_ndx is guaranteed to be empty at this point, simply swap
+    // the rows to get the desired behavior.
+
+    size_t row_ndx_1 = row_ndx, row_ndx_2 = new_row_ndx;
+    if (row_ndx_1 > row_ndx_2)
+        std::swap(row_ndx_1, row_ndx_2);
+    size_t num_cols = m_spec.get_column_count();
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        ColumnBase& col = get_column_base(col_ndx);
+        if (get_column_type(col_ndx) == type_LinkList) {
+            LinkListColumn& link_list_col = static_cast<LinkListColumn&>(col);
+            REALM_ASSERT(!link_list_col.has_links(new_row_ndx));
         }
+        col.swap_rows(row_ndx_1, row_ndx_2);
     }
 
-    adj_row_acc_subsume_row(row_ndx, new_row_ndx);
+    adj_row_acc_merge_rows(row_ndx, new_row_ndx);
     bump_version();
 }
 
@@ -2821,7 +2811,7 @@ Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 
 
 template <class ColType, class T>
-size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
+size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value, bool& conflict)
 {
     size_t winner = size_t(-1);
 
@@ -2834,6 +2824,8 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
         else
             break;
     }
+
+    conflict = true;
 
     REALM_ASSERT(winner != not_found);
     REALM_ASSERT(winner != ndx);
@@ -2849,7 +2841,7 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
         if (ndx == size() - 1)
             ndx = duplicate;
 
-        adj_row_acc_subsume_row(duplicate, winner);
+        adj_row_acc_merge_rows(duplicate, winner);
         move_last_over(duplicate);
         // Re-check moved-last-over
         duplicate -= 1;
@@ -2859,24 +2851,24 @@ size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value)
     if (winner == size() - 1)
         winner = ndx;
 
-    adj_row_acc_subsume_row(ndx, winner);
+    adj_row_acc_merge_rows(ndx, winner);
     move_last_over(ndx);
 
     return winner;
 }
 
 template <class ColType>
-size_t Table::do_set_unique_null(ColType& col, size_t ndx)
+size_t Table::do_set_unique_null(ColType& col, size_t ndx, bool& conflict)
 {
-    ndx = do_find_unique(col, ndx, null{});
+    ndx = do_find_unique(col, ndx, null{}, conflict);
     col.set_null(ndx);
     return ndx;
 }
 
 template <class ColType, class T>
-size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value)
+size_t Table::do_set_unique(ColType& col, size_t ndx, T&& value, bool& conflict)
 {
-    ndx = do_find_unique(col, ndx, value);
+    ndx = do_find_unique(col, ndx, value, conflict);
     col.set(ndx, value);
     return ndx;
 }
@@ -2901,17 +2893,21 @@ size_t Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 
     bump_version();
 
+    bool conflict = false;
+
     if (is_nullable(col_ndx)) {
         auto& col = get_column_int_null(col_ndx);
-        ndx = do_set_unique(col, ndx, value); // Throws
+        ndx = do_set_unique(col, ndx, value, conflict); // Throws
     }
     else {
         auto& col = get_column(col_ndx);
-        ndx = do_set_unique(col, ndx, value); // Throws
+        ndx = do_set_unique(col, ndx, value, conflict); // Throws
     }
 
-    if (Replication* repl = get_repl())
-        repl->set_int(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
+    if (!conflict) {
+        if (Replication* repl = get_repl())
+            repl->set_int(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
+    }
 
     return ndx;
 }
@@ -3153,18 +3149,21 @@ size_t Table::set_string_unique(size_t col_ndx, size_t ndx, StringData value)
     ColumnType actual_type = get_real_column_type(col_ndx);
     REALM_ASSERT(actual_type == ColumnType::col_type_String || actual_type == ColumnType::col_type_StringEnum);
 
+    bool conflict = false;
     // FIXME: String and StringEnum columns should have a common base class
     if (actual_type == ColumnType::col_type_String) {
         StringColumn& col = get_column_string(col_ndx);
-        ndx = do_set_unique(col, ndx, value); // Throws
+        ndx = do_set_unique(col, ndx, value, conflict); // Throws
     }
     else {
         StringEnumColumn& col = get_column_string_enum(col_ndx);
-        ndx = do_set_unique(col, ndx, value); // Throws
+        ndx = do_set_unique(col, ndx, value, conflict); // Throws
     }
 
-    if (Replication* repl = get_repl())
-        repl->set_string(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
+    if (!conflict) {
+        if (Replication* repl = get_repl())
+            repl->set_string(this, col_ndx, ndx, value, _impl::instr_SetUnique); // Throws
+    }
 
     return ndx;
 }
@@ -3509,12 +3508,16 @@ void Table::set_null_unique(size_t col_ndx, size_t row_ndx)
 
     bump_version();
 
+    bool conflict = false;
+
     // Only valid for int columns; use `set_string_unique` to set null strings
     auto& col = get_column_int_null(col_ndx);
-    row_ndx = do_set_unique_null(col, row_ndx); // Throws
+    row_ndx = do_set_unique_null(col, row_ndx, conflict); // Throws
 
-    if (Replication* repl = get_repl())
-        repl->set_null(this, col_ndx, row_ndx, _impl::instr_SetUnique); // Throws
+    if (!conflict) {
+        if (Replication* repl = get_repl())
+            repl->set_null(this, col_ndx, row_ndx, _impl::instr_SetUnique); // Throws
+    }
 }
 
 void Table::set_null(size_t col_ndx, size_t row_ndx, bool is_default)
@@ -5474,18 +5477,18 @@ void Table::adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
-void Table::adj_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept
+void Table::adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the
     // underlying node structure. See AccessorConsistencyLevels.
 
-    adj_row_acc_subsume_row(old_row_ndx, new_row_ndx);
+    adj_row_acc_merge_rows(old_row_ndx, new_row_ndx);
 
     // Adjust LinkViews for new rows
     for (auto& col : m_cols) {
         if (col) {
-            col->adj_acc_subsume_row(old_row_ndx, new_row_ndx);
+            col->adj_acc_merge_rows(old_row_ndx, new_row_ndx);
         }
     }
 }
@@ -5611,7 +5614,7 @@ void Table::adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept
 }
 
 
-void Table::adj_row_acc_subsume_row(size_t old_row_ndx, size_t new_row_ndx) noexcept
+void Table::adj_row_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept
 {
     // This function must assume no more than minimal consistency of the
     // accessor hierarchy. This means in particular that it cannot access the

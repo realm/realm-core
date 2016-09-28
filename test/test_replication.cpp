@@ -3527,9 +3527,9 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
 }
 
 
-TEST(Replication_ChangeLinkTargets)
+TEST(Replication_MergeRows)
 {
-    // Test that ChangeLinkTargets has the same effect whether called directly
+    // Test that MergeRows has the same effect whether called directly
     // or applied via TransactLogApplier.
 
     SHARED_GROUP_TEST_PATH(path_1);
@@ -3550,7 +3550,7 @@ TEST(Replication_ChangeLinkTargets)
         t0->add_empty_row(2);
         t1->add_empty_row(2);
         t1->set_link(0, 0, 0);
-        t0->change_link_targets(0, 1);
+        t0->merge_rows(0, 1);
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger);

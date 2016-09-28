@@ -330,7 +330,7 @@ void BenchmarkResults::try_load_baseline_results()
 
 void BenchmarkResults::save_results()
 {
-    time_t now = time(0);
+    time_t now = time(nullptr);
     localtime(&now);
     struct tm local;
     localtime_r(&now, &local);

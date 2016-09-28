@@ -1371,11 +1371,11 @@ public:
         return true;
     }
 
-    bool change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
+    bool merge_rows(size_t row_ndx, size_t new_row_ndx) noexcept
     {
         typedef _impl::TableFriend tf;
         if (m_table)
-            tf::adj_acc_subsume_row(*m_table, row_ndx, new_row_ndx);
+            tf::adj_acc_merge_rows(*m_table, row_ndx, new_row_ndx);
         return true;
     }
 
