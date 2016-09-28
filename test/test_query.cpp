@@ -5758,7 +5758,7 @@ TEST(Query_AllTypesDynamicallyTyped)
         const char bin[4] = {0, 1, 2, 3};
         BinaryData bin1(bin, sizeof bin / 2);
         BinaryData bin2(bin, sizeof bin);
-        int_fast64_t time_now = time(0);
+        int_fast64_t time_now = time(nullptr);
         Mixed mix_int(int64_t(1));
         Mixed mix_subtab((Mixed::subtable_tag()));
 
@@ -5870,7 +5870,7 @@ TEST(Query_AllTypesStaticallyTyped)
     const char bin[4] = {0, 1, 2, 3};
     BinaryData bin1(bin, sizeof bin / 2);
     BinaryData bin2(bin, sizeof bin);
-    int_fast64_t time_now = time(0);
+    int_fast64_t time_now = time(nullptr);
     TestQuerySub subtab;
     subtab.add(100);
     Mixed mix_int(int64_t(1));
