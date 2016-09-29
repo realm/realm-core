@@ -510,8 +510,8 @@ TEST_TYPES(DoubleFloatColumn_InitOfEmptyColumnNullable, std::true_type, std::fal
     Table t;
     t.add_column(type_Int, "unused");
     t.add_empty_row();
-    t.add_column(type_Double, "f", nullable_toggle);
-    t.add_column(type_Float, "d", nullable_toggle);
+    t.add_column(type_Double, "d", nullable_toggle);
+    t.add_column(type_Float, "f", nullable_toggle);
     CHECK(t.is_null(1, 0) == nullable_toggle);
     CHECK(t.is_null(2, 0) == nullable_toggle);
     if (nullable_toggle) {
