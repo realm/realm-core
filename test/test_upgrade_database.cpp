@@ -268,7 +268,7 @@ TEST(Upgrade_Database_2_3)
     t->add_search_index(0);
     t->add_search_index(1);
 
-    for (size_t i = 0; i < 1000; i++) {
+    for (int i = 0; i < 1000; i++) {
         t->add_empty_row();
         char tmp[20];
         sprintf(tmp, "%d", i);
@@ -1032,25 +1032,43 @@ TEST(Upgrade_Database_5_6_StringIndex)
         // for all tables because the file is in version 4
         SharedGroup sg(temp_copy);
 
-        WriteTransaction rt(sg);
-        TableRef t = rt.get_table("t1");
-        TableRef t2 = rt.get_table("t2");
+        WriteTransaction wt(sg);
+        TableRef t = wt.get_table("t1");
+        TableRef t2 = wt.get_table("t2");
 
         size_t int_ndx = 0;
+        size_t bool_ndx = 1;
         size_t str_ndx = 4;
         size_t ts_ndx = 6;
+
+        size_t null_int_ndx = 0;
+        size_t null_bool_ndx = 1;
+        size_t null_str_ndx = 4;
+        size_t null_ts_ndx = 6;
+
         size_t num_rows = 6;
 
         CHECK_EQUAL(t->size(), num_rows);
         CHECK(t->has_search_index(int_ndx));
+        CHECK(t->has_search_index(bool_ndx));
         CHECK(t->has_search_index(str_ndx));
         CHECK(t->has_search_index(ts_ndx));
+
+        CHECK(t->has_search_index(null_int_ndx));
+        CHECK(t->has_search_index(null_bool_ndx));
+        CHECK(t->has_search_index(null_str_ndx));
+        CHECK(t->has_search_index(null_ts_ndx));
 
         CHECK_EQUAL(t->find_first_string(str_ndx, base2_b), 0);
         CHECK_EQUAL(t->find_first_string(str_ndx, base2_c), 1);
         CHECK_EQUAL(t->find_first_string(str_ndx, base2), 4);
         CHECK_EQUAL(t->get_distinct_view(str_ndx).size(), 4);
         CHECK_EQUAL(t->size(), 6);
+
+        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_b), 0);
+        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_c), 1);
+        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2), 4);
+        CHECK_EQUAL(t->get_distinct_view(null_str_ndx).size(), 4);
 
         // If the StringIndexes were not updated we couldn't do this
         // on a format 5 file and find it again.
@@ -1059,6 +1077,8 @@ TEST(Upgrade_Database_5_6_StringIndex)
         t->add_empty_row();
         t->set_string(str_ndx, 6, base2_d);
         CHECK_EQUAL(t->find_first_string(str_ndx, base2_d), 6);
+        t->set_string(null_str_ndx, 6, base2_d);
+        CHECK_EQUAL(t->find_first_string(null_str_ndx, base2_d), 6);
 
         // And if the indexes were using the old format, adding a long
         // prefix string would cause a stack overflow.
@@ -1070,6 +1090,8 @@ TEST(Upgrade_Database_5_6_StringIndex)
         t->add_empty_row(2);
         t->set_string(str_ndx, 7, b);
         t->set_string(str_ndx, 8, c);
+        t->set_string(null_str_ndx, 7, b);
+        t->set_string(null_str_ndx, 8, c);
 
         t->verify();
         t2->verify();
@@ -1087,7 +1109,7 @@ TEST(Upgrade_Database_5_6_StringIndex)
     TableRef t2 = g.add_table("t2");
 
     size_t int_ndx = t->add_column(type_Int, "int");
-    t->add_column(type_Bool, "bool");
+    size_t bool_ndx = t->add_column(type_Bool, "bool");
     t->add_column(type_Float, "float");
     t->add_column(type_Double, "double");
     size_t str_ndx = t->add_column(type_String, "string");
@@ -1097,9 +1119,20 @@ TEST(Upgrade_Database_5_6_StringIndex)
     t->add_column(type_Mixed, "mixed");
     t->add_column_link(type_Link, "link", *t2);
     t->add_column_link(type_LinkList, "linklist", *t2);
+
+    size_t null_int_ndx = t->add_column(type_Int, "nullable int", true);
+    size_t null_bool_ndx = t->add_column(type_Bool, "nullable bool", true);
+    size_t null_str_ndx = t->add_column(type_String, "nullable string", true);
+    size_t null_ts_ndx = t->add_column(type_Timestamp, "nullable timestamp", true);
+
+    t->add_search_index(bool_ndx);
     t->add_search_index(int_ndx);
     t->add_search_index(str_ndx);
     t->add_search_index(ts_ndx);
+    t->add_search_index(null_bool_ndx);
+    t->add_search_index(null_int_ndx);
+    t->add_search_index(null_str_ndx);
+    t->add_search_index(null_ts_ndx);
 
     t->add_empty_row(6);
     t->set_string(str_ndx, 0, base2_b);
@@ -1108,6 +1141,13 @@ TEST(Upgrade_Database_5_6_StringIndex)
     t->set_string(str_ndx, 3, "aaaaaaaaaa");
     t->set_string(str_ndx, 4, base2);
     t->set_string(str_ndx, 5, base2);
+
+    t->set_string(null_str_ndx, 0, base2_b);
+    t->set_string(null_str_ndx, 1, base2_c);
+    t->set_string(null_str_ndx, 2, "aaaaaaaaaa");
+    t->set_string(null_str_ndx, 3, "aaaaaaaaaa");
+    t->set_string(null_str_ndx, 4, base2);
+    t->set_string(null_str_ndx, 5, base2);
 
     g.write(path);
 #endif // TEST_READ_UPGRADE_MODE
