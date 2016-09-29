@@ -1,10 +1,10 @@
 #!groovy
 
-try {
-  def gitTag
-  def gitSha
-  def dependencies
+def gitTag
+def gitSha
+def dependencies
 
+try {
   stage('gather-info') {
     node {
       checkout([
