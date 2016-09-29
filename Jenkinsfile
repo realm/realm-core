@@ -28,7 +28,9 @@ try {
         setBuildName(gitSha)
       } else {
         if (gitTag != "v${dependencies.VERSION}") {
-          echo "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
+          def message = "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
+          echo message
+          throw new IllegalStateException(message)
         } else {
           echo "Building release: '${gitTag}'"
           setBuildName("Tag ${gitTag}")
@@ -94,7 +96,7 @@ def doBuildCocoa() {
           'PATH=$PATH:/usr/local/bin',
           'REALM_ENABLE_ENCRYPTION=yes',
           'REALM_ENABLE_ASSERTIONS=yes',
-          'MAKEFLAGS=\'CFLAGS_DEBUG=-Oz\'',
+          "MAKEFLAGS='CFLAGS_DEBUG=-Oz'",
           'UNITTEST_SHUFFLE=1',
           'UNITTEST_REANDOM_SEED=random',
           'UNITTEST_XML=1',
@@ -107,7 +109,7 @@ def doBuildCocoa() {
               sh build.sh build-cocoa
               sh build.sh check-debug
 
-              # Repack the release with just what we need so that it's not a 1 GB download
+              # Repack the release with just what we need so that it is not a 1 GB download
               version=$(sh build.sh get-version)
               tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
               (
@@ -124,7 +126,10 @@ def doBuildCocoa() {
 
               cp core-*.tar.xz realm-core-latest.tar.xz
             '''
-            archive '*core-*.*.*.tar.xz'
+            if (gitTag) {
+              stash includes: '*core-*.*.*.tar.xz', name: 'cocoa-package'
+            }
+            archiveArtifacts artifacts: '*core-*.*.*.tar.xz'
 
             sh 'sh build.sh clean'
         }
@@ -150,7 +155,7 @@ def doBuildDotNetOsx() {
           'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer',
           'REALM_ENABLE_ENCRYPTION=yes',
           'REALM_ENABLE_ASSERTIONS=yes',
-          'MAKEFLAGS=\'CFLAGS_DEBUG=-Oz\'',
+          "MAKEFLAGS='CFLAGS_DEBUG=-Oz'",
           'UNITTEST_SHUFFLE=1',
           'UNITTEST_REANDOM_SEED=random',
           'UNITTEST_XML=1',
@@ -161,7 +166,7 @@ def doBuildDotNetOsx() {
               sh build.sh config $dir/install
               sh build.sh build-dotnet-cocoa
 
-              # Repack the release with just what we need so that it's not a 1 GB download
+              # Repack the release with just what we need so that it is not a 1 GB download
               version=$(sh build.sh get-version)
               tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
               (
@@ -178,7 +183,10 @@ def doBuildDotNetOsx() {
 
               cp realm-core-dotnet-cocoa-*.tar.bz2 realm-core-dotnet-cocoa-latest.tar.bz2
             '''
-            archive '*core-*.*.*.tar.bz2'
+            if (gitTag) {
+              stash includes: '*core-*.*.*.tar.bz2', name: 'dotnet-package'
+            }
+            archiveArtifacts artifacts: '*core-*.*.*.tar.bz2'
 
             sh 'sh build.sh clean'
         }
@@ -276,7 +284,10 @@ def doBuildNodeInDocker() {
           try {
               sh 'sh build.sh build-node-package'
               sh 'cp realm-core-node-*.tar.gz realm-core-node-linux-latest.tar.gz'
-              archive '*realm-core-node-linux-*.*.*.tar.gz'
+              if (gitTag) {
+                stash includes: '*realm-core-node-linux-*.*.*.tar.gz', name: 'node-linux-package'
+              }
+              archiveArtifacts artifacts: '*realm-core-node-linux-*.*.*.tar.gz'
               withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
                 sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core'
               }
@@ -300,7 +311,10 @@ def doBuildNodeInOsx() {
         try {
           sh 'sh build.sh build-node-package'
           sh 'cp realm-core-node-*.tar.gz realm-core-node-osx-latest.tar.gz'
-          archive '*realm-core-node-osx-*.*.*.tar.gz'
+          if (gitTag) {
+            stash includes: '*realm-core-node-osx-*.*.*.tar.gz', name: 'node-cocoa-package'
+          }
+          archiveArtifacts artifacts: '*realm-core-node-osx-*.*.*.tar.gz'
 
           sh 'sh build.sh clean'
 
@@ -333,7 +347,10 @@ def doBuildAndroid() {
               sh "sh build.sh config '${pwd()}/install'"
               sh "sh build.sh ${target}"
             }
-            archive 'realm-core-android-*.tar.gz'
+            if (gitTag) {
+              stash includes: 'realm-core-android-*.tar.gz', name: 'android-package'
+            }
+            archiveArtifacts artifacts: 'realm-core-android-*.tar.gz'
 
             dir('test/android') {
                 sh '$ANDROID_HOME/tools/android update project -p . --target android-9'
@@ -513,7 +530,7 @@ def doBuildPackage(distribution, fileType) {
       }
 
       dir('packaging/out') {
-        step([$class: 'ArtifactArchiver', artifacts: "${distribution}/*.${fileType}", fingerprint: true])
+        archiveArtifacts artifacts: "${distribution}/*.${fileType}"
         stash includes: "${distribution}/*.${fileType}", name: "packages-${distribution}"
       }
     }
@@ -568,6 +585,22 @@ def doPublishGeneric() {
         profileName: 'hub-jenkins-user',
         userMetadata: []
       ])
+    }
+  }
+}
+
+def publishLocalArtifacts() {
+  // TODO create a Dockerfile for an image only containing s3cmd
+  return {
+    node('dk01') {
+      unstash 'cocoa-package'
+      unstash 'dotnet-package'
+      unstash 'node-linux-package'
+      unstash 'node-cocoa-package'
+      unstash 'android-package'
+      withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+        sh 'find . -type f -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core \\;'
+      }
     }
   }
 }
