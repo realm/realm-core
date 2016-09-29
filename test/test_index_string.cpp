@@ -973,13 +973,13 @@ StringData create_string_with_nuls(const size_t bits, const size_t length, char*
 } // anonymous namespace
 
 
-  // Test for generated strings of length 1..16 with all combinations of embedded NUL bytes
+// Test for generated strings of length 1..16 with all combinations of embedded NUL bytes
 TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     // 4 seems to fail on Windows, 7 seems to fail on Linux
     for (int seed = 4; seed < 8; seed++) {
-
-        constexpr bool nullable = TEST_TYPE::value;
 
         // String index
         ref_type ref = StringColumn::create(Allocator::get_default());
