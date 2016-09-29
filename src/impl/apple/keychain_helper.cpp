@@ -33,7 +33,7 @@ using realm::util::adoptCF;
 namespace realm {
 namespace keychain {
 
-KeychainAccessException::KeychainAccessException(size_t error_code)
+KeychainAccessException::KeychainAccessException(int32_t error_code)
 : std::runtime_error(util::format("Keychain returned unexpected status code: %1", error_code)) { }
 
 CFPtr<CFStringRef> convert_string(const std::string& string);
