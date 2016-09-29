@@ -1435,15 +1435,7 @@ void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade, int target
 // a simple thread barrier that makes sure the threads meet here, to
 // increase the likelyhood of detecting any potential race problems.
 // See the unit test for details.
-#ifdef _WIN32
-        _sleep(200);
-#else
-        // sleep() takes seconds and usleep() is deprecated, so use nanosleep()
-        timespec ts;
-        ts.tv_sec = 0;
-        ts.tv_nsec = 200000000;
-        nanosleep(&ts, 0);
-#endif
+        millisleep(200);
 #endif
 
         WriteTransaction wt(*this);
