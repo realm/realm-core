@@ -314,7 +314,12 @@ void Array::preset(int64_t min, int64_t max, size_t num_items)
 }
 
 
-void Array::destroy_children(size_t offset) noexcept
+void Array::destroy_children() noexcept
+{
+    destroy_some_children(0);
+}
+
+void Array::destroy_some_children(size_t offset) noexcept
 {
     for (size_t i = offset; i != m_size; ++i) {
         int64_t value = get(i);
@@ -649,7 +654,7 @@ void Array::truncate_and_destroy_children(size_t new_size)
 
     if (m_has_refs) {
         size_t offset = new_size;
-        destroy_children(offset);
+        destroy_some_children(offset);
     }
 
     // Update size in accessor and in header. This leaves the capacity
@@ -1461,26 +1466,8 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
 MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 {
     const char* header = mem.get_addr();
-    if (!get_hasrefs_from_header(header)) {
-        // This array has no subarrays, so we can make a byte-for-byte
-        // copy, which is more efficient.
-
-        // Calculate size of new array in bytes
-        size_t size = get_byte_size_from_header(header);
-
-        // Create the new array
-        MemRef clone_mem = target_alloc.alloc(size); // Throws
-        char* clone_header = clone_mem.get_addr();
-
-        // Copy contents
-        const char* src_begin = header;
-        const char* src_end = header + size;
-        char* dst_begin = clone_header;
-        std::copy(src_begin, src_end, dst_begin);
-
-        // Update with correct capacity
-        set_header_capacity(size, clone_header);
-
+    MemRef clone_mem = DbElement::clone(header, target_alloc);
+    if (clone_mem) {
         return clone_mem;
     }
 

@@ -26,6 +26,19 @@ namespace realm {
 // Maximum number of bytes that the payload of an DbElement can be
 const size_t max_array_payload = 0x00ffffffL;
 
+/// Special index value. It has various meanings depending on
+/// context. It is returned by some search functions to indicate 'not
+/// found'. It is similar in function to std::string::npos.
+const size_t npos = size_t(-1);
+
+/// Alias for realm::npos.
+const size_t not_found = npos;
+
+struct TreeInsertBase {
+    size_t m_split_offset;
+    size_t m_split_size;
+};
+
 class ArrayParent {
 public:
     virtual ~ArrayParent() noexcept
@@ -91,6 +104,17 @@ public:
 
     virtual ~DbElement()
     {
+    }
+
+    /*************************** Public virtuals *****************************/
+
+    /// Construct a complete copy of this element (including its subelements)
+    /// using the specified target allocator and return just the reference to
+    /// the underlying memory.
+    virtual MemRef clone_deep(Allocator& target_alloc) const
+    {
+        char* header = get_header_from_data(m_data);
+        return clone(header, target_alloc);
     }
 
     /**************************** Initializers *******************************/
@@ -232,6 +256,8 @@ public:
 
     void destroy() noexcept;
 
+    void destroy_deep() noexcept;
+
     /// Setting a new parent affects ownership of the attached array node, if
     /// any. If a non-null parent is specified, and there was no parent
     /// originally, then the caller passes ownership to the parent, and vice
@@ -310,12 +336,17 @@ protected:
     static void init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
                             WidthType width_type, int width, size_t size, size_t capacity) noexcept;
 
+    static MemRef clone(const char* header, Allocator& target_alloc);
+
     void alloc(size_t init_size, size_t width);
     void copy_on_write();
 
     // Includes array header. Not necessarily 8-byte aligned.
     virtual size_t calc_byte_len(size_t num_items, size_t width) const;
     virtual size_t calc_item_count(size_t bytes, size_t width) const noexcept;
+    virtual void destroy_children() noexcept
+    {
+    }
 
     /********************** header modifier functions ************************/
 
@@ -395,6 +426,17 @@ inline void DbElement::destroy() noexcept
     char* header = get_header_from_data(m_data);
     get_alloc().free_(get_ref(), header);
     m_data = nullptr;
+}
+
+inline void DbElement::destroy_deep() noexcept
+{
+    if (!is_attached())
+        return;
+
+    if (has_refs())
+        destroy_children();
+
+    DbElement::destroy();
 }
 
 inline void DbElement::update_parent()

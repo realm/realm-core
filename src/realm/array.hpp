@@ -96,14 +96,6 @@ inline T no0(T v)
     return v == 0 ? 1 : v;
 }
 
-/// Special index value. It has various meanings depending on
-/// context. It is returned by some search functions to indicate 'not
-/// found'. It is similar in function to std::string::npos.
-const size_t npos = size_t(-1);
-
-/// Alias for realm::npos.
-const size_t not_found = npos;
-
 // Pre-definitions
 class Array;
 class StringColumn;
@@ -148,12 +140,6 @@ private:
     friend class Array;
 };
 
-
-
-struct TreeInsertBase {
-    size_t m_split_offset;
-    size_t m_split_size;
-};
 
 /// Provides access to individual array nodes of the database.
 ///
@@ -236,7 +222,7 @@ public:
     /// Construct a complete copy of this array (including its subarrays) using
     /// the specified target allocator and return just the reference to the
     /// underlying memory.
-    MemRef clone_deep(Allocator& target_alloc) const;
+    MemRef clone_deep(Allocator& target_alloc) const override;
 
     /// Construct an empty integer array of the specified type, and return just
     /// the reference to the underlying memory.
@@ -474,13 +460,12 @@ public:
     /// alternative. If this accessor is already in the detached state, this
     /// function has no effect (idempotency).
     using DbElement::destroy;
-
     /// Recursively destroy children (as if calling
     /// clear_and_destroy_children()), then put this accessor into the detached
     /// state (as if calling detach()), then free the allocated memory. If this
     /// accessor is already in the detached state, this function has no effect
     /// (idempotency).
-    void destroy_deep() noexcept;
+    using DbElement::destroy_deep;
 
     /// Shorthand for `destroy(MemRef(ref, alloc), alloc)`.
     static void destroy(ref_type ref, Allocator& alloc) noexcept;
@@ -789,7 +774,8 @@ protected:
     // Overriding method in ArrayParent
     ref_type get_child_ref(size_t) const noexcept override;
 
-    void destroy_children(size_t offset = 0) noexcept;
+    void destroy_children() noexcept override;
+    void destroy_some_children(size_t offset) noexcept;
 
     std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
 
@@ -1169,19 +1155,6 @@ inline void Array::ensure_minimum_width(RefOrTagged ref_or_tagged)
 {
     REALM_ASSERT(has_refs());
     ensure_minimum_width(ref_or_tagged.m_value); // Throws
-}
-
-inline void Array::destroy_deep() noexcept
-{
-    if (!is_attached())
-        return;
-
-    if (has_refs())
-        destroy_children();
-
-    char* header = get_header_from_data(m_data);
-    get_alloc().free_(get_ref(), header);
-    m_data = nullptr;
 }
 
 inline ref_type Array::write(_impl::ArrayWriterBase& out, bool deep, bool only_if_modified) const

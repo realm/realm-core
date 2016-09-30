@@ -36,6 +36,34 @@ MemRef DbElement::create_element(size_t size, Allocator& alloc, bool context_fla
     return mem;
 }
 
+MemRef DbElement::clone(const char* header, Allocator& target_alloc)
+{
+    MemRef clone_mem;
+
+    if (!get_hasrefs_from_header(header)) {
+        // This array has no subarrays, so we can make a byte-for-byte
+        // copy, which is more efficient.
+
+        // Calculate size of new array in bytes
+        size_t size = get_byte_size_from_header(header);
+
+        // Create the new array
+        clone_mem = target_alloc.alloc(size); // Throws
+        char* clone_header = clone_mem.get_addr();
+
+        // Copy contents
+        const char* src_begin = header;
+        const char* src_end = header + size;
+        char* dst_begin = clone_header;
+        std::copy(src_begin, src_end, dst_begin);
+
+        // Update with correct capacity
+        set_header_capacity(size, clone_header);
+    }
+
+    return clone_mem;
+}
+
 void DbElement::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.get_addr();
