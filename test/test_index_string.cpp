@@ -995,11 +995,6 @@ ONLY_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
 
             {
                 Random random(seed);
-
-                create_string_with_nuls(0, MAX_LENGTH, tmp, random);
-                std::cout << std::string(tmp, MAX_LENGTH) << '\n';
-
-
                 const size_t combinations = 1 << length;
                 for (size_t i = 0; i < combinations; ++i) {
                     StringData str = create_string_with_nuls(i, length, tmp, random);
