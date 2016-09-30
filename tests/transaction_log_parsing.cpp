@@ -29,6 +29,7 @@
 #include "schema.hpp"
 
 #include <realm/group_shared.hpp>
+#include <realm/history.hpp>
 #include <realm/link_view.hpp>
 
 using namespace realm;
@@ -36,7 +37,7 @@ using namespace realm;
 class CaptureHelper {
 public:
     CaptureHelper(TestFile const& config, SharedRealm const& r, LinkViewRef lv, size_t table_ndx)
-    : m_history(config.make_history())
+    : m_history(make_in_realm_history(config.path))
     , m_sg(*m_history, config.options())
     , m_realm(r)
     , m_group(m_sg.begin_read())
@@ -140,7 +141,7 @@ TEST_CASE("Transaction log parsing: schema change validation") {
         });
         r->read_group();
 
-        auto history = config.make_history();
+        auto history = make_in_realm_history(config.path);
         SharedGroup sg(*history, config.options());
 
         SECTION("adding a table is allowed") {
@@ -225,7 +226,7 @@ TEST_CASE("Transaction log parsing: schema change validation") {
         });
         r->read_group();
 
-        auto history = config.make_history();
+        auto history = make_in_realm_history(config.path);
         SharedGroup sg(*history, config.options());
 
         SECTION("adding a table is allowed") {
@@ -332,7 +333,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         r->commit_transaction();
 
         auto track_changes = [&](std::vector<bool> tables_needed, auto&& f) {
-            auto history = config.make_history();
+            auto history = make_in_realm_history(config.path);
             SharedGroup sg(*history, config.options());
             sg.begin_read();
 
@@ -425,7 +426,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_INDICES(info.tables[1].insertions, 10, 11, 12);
         }
 
-#if REALM_VER_MAJOR >= 2
         SECTION("swap_rows() reports a pair of moves") {
             auto info = track_changes({false, false, true}, [&] {
                 table.swap_rows(1, 5);
@@ -450,10 +450,58 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_INDICES(table.modifications, 8);
         }
 
-        SECTION("PK conflict from last row produces no net change") {
+        SECTION("merge_rows() marks the target row as modified if the source row was") {
+            size_t new_row;
             auto info = track_changes({false, false, true}, [&] {
-                table.add_empty_row();
-                table.set_int_unique(0, 10, 5);
+                new_row = table.add_empty_row(2);
+                table.set_int(1, 5, 15);
+                table.merge_rows(5, new_row);
+                table.move_last_over(5);
+            });
+            REQUIRE(info.tables.size() == 3);
+            REQUIRE_INDICES(info.tables[2].modifications, new_row);
+
+            info = track_changes({false, false, true}, [&] {
+                new_row = table.add_empty_row(2);
+                table.merge_rows(5, new_row);
+                table.move_last_over(5);
+            });
+            REQUIRE(info.tables.size() == 3);
+            REQUIRE(info.tables[2].modifications.empty());
+        }
+
+        SECTION("merge_rows() leaves the target modified if it already was") {
+            size_t new_row;
+            auto info = track_changes({false, false, true}, [&] {
+                new_row = table.add_empty_row(2);
+                table.set_int(1, new_row, 15);
+                table.merge_rows(5, new_row);
+                table.move_last_over(5);
+            });
+            REQUIRE(info.tables.size() == 3);
+            REQUIRE_INDICES(info.tables[2].modifications, new_row);
+        }
+
+        SECTION("merge_rows() reports a move from the old to new row") {
+            size_t new_row;
+            auto info = track_changes({false, false, true}, [&] {
+                new_row = table.add_empty_row(2);
+                table.set_int(1, new_row, 15);
+                table.merge_rows(5, new_row);
+                table.move_last_over(5);
+            });
+            REQUIRE(info.tables.size() == 3);
+            REQUIRE_MOVES(info.tables[2], {5, new_row});
+            REQUIRE_INDICES(info.tables[2].insertions, 5, new_row);
+            REQUIRE_INDICES(info.tables[2].deletions, 5);
+        }
+
+        SECTION("merge_rows() to a new row followed by move_last_over() produces no net change") {
+            size_t new_row;
+            auto info = track_changes({false, false, true}, [&] {
+                size_t new_row = table.add_empty_row();
+                table.merge_rows(5, new_row);
+                table.move_last_over(5);
             });
             REQUIRE(info.tables.size() == 3);
             // new row is inserted at 10, then moved over 5 and assumes the
@@ -461,7 +509,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(info.tables[2].empty());
         }
 
-        SECTION("non-conflicting set_int_unique() does not mark a row as modified") {
+        SECTION("set_int_unique() does not mark a row as modified") {
             auto info = track_changes({false, false, true}, [&] {
                 table.set_int_unique(0, 0, 20);
             });
@@ -475,7 +523,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             });
             REQUIRE(info.tables.empty());
         }
-#endif
     }
 
     SECTION("LinkView change information") {
@@ -986,6 +1033,48 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             }
         }
 
+        SECTION("moving the linkview") {
+            SECTION("via swap_rows()") {
+                VALIDATE_CHANGES(changes) {
+                    lv->add(0);
+                    size_t new_row = origin->add_empty_row();
+                    origin->swap_rows(0, new_row);
+                    lv->add(0);
+                }
+                REQUIRE_INDICES(changes.insertions, 10, 11);
+            }
+
+            SECTION("via insert_empty_row()") {
+                VALIDATE_CHANGES(changes) {
+                    lv->add(0);
+                    origin->insert_empty_row(0);
+                    lv->add(0);
+                }
+                REQUIRE_INDICES(changes.insertions, 10, 11);
+            }
+
+            SECTION("via move_last_over()") {
+                VALIDATE_CHANGES(changes) {
+                    lv->add(0);
+                    origin->insert_empty_row(0, 3);
+                    origin->move_last_over(1);
+                    lv->add(0);
+                }
+                REQUIRE_INDICES(changes.insertions, 10, 11);
+            }
+
+            SECTION("via merge_rows()") {
+                VALIDATE_CHANGES(changes) {
+                    lv->add(0);
+                    size_t row = origin->add_empty_row(2);
+                    origin->merge_rows(0, row);
+                    origin->move_last_over(0);
+                    lv->add(0);
+                }
+                REQUIRE_INDICES(changes.insertions, 10, 11);
+            }
+        }
+
         SECTION("modifying a different linkview should not produce notifications") {
             r->begin_transaction();
             origin->add_empty_row();
@@ -1159,7 +1248,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         };
 
         auto observe = [&](std::initializer_list<Row> rows, auto&& fn) {
-            auto history = config.make_history();
+            auto history = make_in_realm_history(config.path);
             SharedGroup sg(*history, config.options());
             auto& group = sg.begin_read();
 
@@ -1312,12 +1401,10 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         SECTION("moving the target of a link does not mark the link as modified") {
             Row r = origin->get(0);
-#if REALM_VER_MAJOR >= 2
             auto changes = observe({r}, [&] {
                 target->swap_rows(5, 9);
             });
             REQUIRE_FALSE(changes.modified(0, 1));
-#endif
 
             auto changes2 = observe({r}, [&] {
                 target->move_last_over(0);
@@ -1355,8 +1442,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.modified(0, 0));
         }
 
-#if REALM_VER_MAJOR >= 2
-        SECTION("moving an observed object with swap() does not interfere with tracking") {
+        SECTION("moving an observed object with swap_rows() does not interfere with tracking") {
             Row r1 = target->get(1), r2 = target->get(3);
 
             // swap two observed rows
@@ -1397,12 +1483,14 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_FALSE(changes.modified(1, 2));
         }
 
-        SECTION("subsuming an observed object updates tracking to the new object") {
+        SECTION("moving an observed object with merge_rows() does not interfere with tracking") {
             Row r = target->get(1);
             auto changes = observe({r}, [&] {
                 size_t row = target->add_empty_row();
                 r.set_int(1, 5);
-                target->set_int_unique(0, row, r.get_int(0));
+                size_t old = r.get_index();
+                target->merge_rows(old, row);
+                target->move_last_over(old);
                 r.set_int(2, 5);
             });
             REQUIRE_FALSE(changes.modified(0, 0));
@@ -1413,7 +1501,9 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             changes = observe({r}, [&] {
                 size_t row = target->add_empty_row(2);
                 r.set_int(1, 6);
-                target->set_int_unique(0, row, r.get_int(0));
+                size_t old = r.get_index();
+                target->merge_rows(old, row);
+                target->move_last_over(old);
                 r.set_int(2, 6);
             });
             REQUIRE_FALSE(changes.modified(0, 0));
@@ -1426,14 +1516,28 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             Row r3 = target->back();
             changes = observe({r}, [&] {
                 r.set_int(1, 6);
-                target->set_int_unique(0, 2, r.get_int(0));
+                size_t old = r.get_index();
+                target->merge_rows(old, 2);
+                target->move_last_over(old);
+                r.set_int(2, 6);
+            });
+            REQUIRE_FALSE(changes.modified(0, 0));
+            REQUIRE(changes.modified(0, 1));
+            REQUIRE(changes.modified(0, 2));
+
+            // subsume some unrelated rows
+            REQUIRE(r.get_index() > 0);
+            REQUIRE(r.get_index() < target->size() - 1);
+            changes = observe({r}, [&] {
+                r.set_int(1, 6);
+                target->merge_rows(0, 4);
+                target->move_last_over(0);
                 r.set_int(2, 6);
             });
             REQUIRE_FALSE(changes.modified(0, 0));
             REQUIRE(changes.modified(0, 1));
             REQUIRE(changes.modified(0, 2));
         }
-#endif
 
         SECTION("inserting a column into an observed table does not break tracking") {
             Row r = target->get(0);
@@ -1620,7 +1724,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {10, 11}));
         }
 
-#if REALM_VER_MAJOR >= 2
         SECTION("array: moving the observed object via swap() does not interrupt tracking") {
             Row r = origin->get(0);
             auto changes = observe({r}, [&] {
@@ -1646,26 +1749,30 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {10, 11}));
         }
 
-        SECTION("array: moving the observed object via primary key subsumption does not interrupt tracking") {
+        SECTION("array: moving the observed object via merge_rows() does not interrupt tracking") {
             Row r = origin->get(0);
             auto changes = observe({r}, [&] {
+                size_t old = r.get_index();
                 size_t row = origin->add_empty_row();
                 lv->add(0);
-                origin->set_int_unique(0, row, r.get_int(0));
+                origin->merge_rows(old, row);
+                origin->move_last_over(old);
                 lv->add(0);
             });
             REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {10, 11}));
+            REQUIRE(r.is_attached());
 
             // add two rows so that the new row doesn't just get moved over the old one
             changes = observe({r}, [&] {
+                size_t old = r.get_index();
                 size_t row = origin->add_empty_row(2);
                 lv->add(0);
-                origin->set_int_unique(0, row, r.get_int(0));
+                origin->merge_rows(old, row);
+                origin->move_last_over(old);
                 lv->add(0);
             });
             REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {12, 13}));
         }
-#endif
     }
 }
 
@@ -1689,7 +1796,7 @@ TEST_CASE("DeepChangeChecker") {
     r->commit_transaction();
 
     auto track_changes = [&](auto&& f) {
-        auto history = config.make_history();
+        auto history = make_in_realm_history(config.path);
         SharedGroup sg(*history, config.options());
         Group const& g = sg.begin_read();
 

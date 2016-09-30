@@ -27,18 +27,12 @@ struct TestFile : realm::Realm::Config {
     TestFile();
     ~TestFile();
 
-    std::unique_ptr<realm::Replication> make_history() const;
-
     auto options() const
     {
-#ifdef REALM_GROUP_SHARED_OPTIONS_HPP
         realm::SharedGroupOptions options;
         options.durability = in_memory ? realm::SharedGroupOptions::Durability::MemOnly
                                        : realm::SharedGroupOptions::Durability::Full;
         return options;
-#else
-        return in_memory ? realm::SharedGroup::durability_MemOnly : realm::SharedGroup::durability_Full;
-#endif
     }
 };
 
