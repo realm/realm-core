@@ -1,10 +1,10 @@
 #!groovy
 
-def gitTag
-def gitSha
-def dependencies
-
 try {
+  def gitTag
+  def gitSha
+  def dependencies
+
   stage('gather-info') {
     node {
       checkout([
@@ -46,11 +46,11 @@ try {
     parallelExecutors = [
       checkLinuxRelease: doBuildInDocker('check'),
       checkLinuxDebug: doBuildInDocker('check-debug'),
-      buildCocoa: doBuildCocoa(),
-      buildNodeLinux: doBuildNodeInDocker(),
-      buildNodeOsx: doBuildNodeInOsx(),
-      buildDotnetOsx: doBuildDotNetOsx(),
-      buildAndroid: doBuildAndroid(),
+      buildCocoa: doBuildCocoa(gitTag),
+      buildNodeLinux: doBuildNodeInDocker(gitTag),
+      buildNodeOsx: doBuildNodeInOsx(gitTag),
+      buildDotnetOsx: doBuildDotNetOsx(gitTag),
+      buildAndroid: doBuildAndroid(gitTag),
       addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
       //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
     ]
@@ -77,7 +77,8 @@ try {
         generic: doPublishGeneric(),
         centos7: doPublish('centos-7', 'rpm', 'el', 7),
         centos6: doPublish('centos-6', 'rpm', 'el', 6),
-        ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
+        ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
+        others: doPublishLocalArtifacts()
       )
     }
   }
@@ -86,7 +87,7 @@ try {
   throw e
 }
 
-def doBuildCocoa() {
+def doBuildCocoa(def gitTag) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -104,6 +105,7 @@ def doBuildCocoa() {
           'DEVELOPER_DIR=/Applications/Xcode-7.3.1.app/Contents/Developer/'
         ]) {
             sh '''
+              env
               dir=$(pwd)
               sh build.sh config $dir/install
               sh build.sh build-cocoa
@@ -144,7 +146,7 @@ def doBuildCocoa() {
   }
 }
 
-def doBuildDotNetOsx() {
+def doBuildDotNetOsx(def gitTag) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -271,7 +273,7 @@ def buildDiffCoverage() {
   }
 }
 
-def doBuildNodeInDocker() {
+def doBuildNodeInDocker(def gitTag) {
   return {
     node('docker') {
       getArchive()
@@ -300,7 +302,7 @@ def doBuildNodeInDocker() {
   }
 }
 
-def doBuildNodeInOsx() {
+def doBuildNodeInOsx(def gitTag) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -329,7 +331,7 @@ def doBuildNodeInOsx() {
   }
 }
 
-def doBuildAndroid() {
+def doBuildAndroid(def gitTag) {
     def target = 'build-android'
     def buildName = "android-${target}-with-encryption"
 
@@ -589,7 +591,7 @@ def doPublishGeneric() {
   }
 }
 
-def publishLocalArtifacts() {
+def doPublishLocalArtifacts() {
   // TODO create a Dockerfile for an image only containing s3cmd
   return {
     node('dk01') {
