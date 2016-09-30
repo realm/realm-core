@@ -1,19 +1,5 @@
 # 2.1.1 Release notes
 
-### Bugfixes
-
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
 ### Internals
 
 * Upgraded to OpenSSL 1.0.2j.
