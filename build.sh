@@ -234,11 +234,6 @@ download_openssl()
     tar -xzf openssl.tar.gz || return 1
     mv openssl-$openssl_ver openssl || return 1
     rm openssl.tar.gz || return 1
-
-    # A function we don't use calls OPENSSL_cleanse, which has all sorts of
-    # dependencies due to being written in asm
-    #sed '/OPENSSL_cleanse/d' 'openssl/crypto/sha/sha256.c' > sha_tmp
-    #smv sha_tmp 'openssl/crypto/sha/sha256.c'
 }
 
 # Setup OS specific stuff
