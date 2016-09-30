@@ -19,6 +19,11 @@
 #include "util/test_file.hpp"
 
 #include "impl/realm_coordinator.hpp"
+#include "util/format.hpp"
+
+#if REALM_ENABLE_SYNC
+#include "sync_manager.hpp"
+#endif
 
 #include <realm/disable_sync_to_disk.hpp>
 #include <realm/history.hpp>
@@ -60,6 +65,66 @@ InMemoryTestFile::InMemoryTestFile()
 {
     in_memory = true;
 }
+
+#if REALM_ENABLE_SYNC
+
+sync::Server::Config TestLogger::server_config() {
+    sync::Server::Config config;
+#if TEST_ENABLE_SYNC_LOGGING
+    auto logger = new util::StderrLogger;
+    logger->set_level_threshold(util::Logger::Level::all);
+    config.logger = logger;
+#else
+    config.logger = new TestLogger;
+#endif
+    return config;
+}
+
+sync::Client::Config TestLogger::client_config() {
+    sync::Client::Config config;
+#if TEST_ENABLE_SYNC_LOGGING
+    auto logger = new util::StderrLogger;
+    logger->set_level_threshold(util::Logger::Level::all);
+    config.logger = logger;
+#else
+    config.logger = new TestLogger;
+#endif
+    return config;
+}
+
+SyncServer::SyncServer()
+: m_server(util::make_temp_dir(), util::none, TestLogger::server_config())
+{
+    SyncManager::shared().set_log_level(util::Logger::Level::off);
+    uint64_t port;
+    while (true) {
+        // Try to pick a random available port, or loop forever if other
+        // problems occur because there's no specific error for "port in use"
+        try {
+            port = fastrand(65536 - 1000) + 1000;
+            m_server.start("127.0.0.1", util::to_string(port));
+            break;
+        }
+        catch (std::runtime_error) {
+            continue;
+        }
+    }
+    m_url = util::format("realm://127.0.0.1:%1", port);
+    m_thread = std::thread([this]{ m_server.run(); });
+}
+
+SyncServer::~SyncServer()
+{
+    m_server.stop();
+    m_thread.join();
+}
+
+std::string SyncServer::url_for_realm(StringData realm_name) const
+{
+    return util::format("%1/%2", m_url, realm_name);
+}
+
+#endif // REALM_ENABLE_SYNC
 
 #if defined(__has_feature) && __has_feature(thread_sanitizer)
 // A helper which synchronously runs on_change() on a fixed background thread
