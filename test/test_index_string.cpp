@@ -960,15 +960,13 @@ namespace {
 StringData create_string_with_nuls(const size_t bits, const size_t length, char* tmp, Random& random)
 {
     for (size_t i = 0; i < length; ++i) {
-        bool insert_nul_at_pos = (bits & (1 << i)) == 0;
+        bool insert_nul_at_pos = (bits & (1 << i)) != 0;
         if (insert_nul_at_pos) {
             tmp[i] = '\0';
         } else {
-            char random_char = static_cast<char>(random.draw_int<int>(CHAR_MIN, CHAR_MAX));
-            if (random_char == '\0') {
-                random_char = 'a';
-            }
-            tmp[i] = random_char;
+            // Avoid stray \0 chars, since we are already testing all combinations.
+            // All casts are necessary to preserve the bitpattern.
+            tmp[i] = static_cast<char>(static_cast<unsigned char>(random.draw_int<unsigned int>(1, UCHAR_MAX)));
         }
     }
     return StringData(tmp, length);
@@ -997,6 +995,11 @@ ONLY_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
 
             {
                 Random random(seed);
+
+                create_string_with_nuls(0, MAX_LENGTH, tmp, random);
+                std::cout << std::string(tmp, MAX_LENGTH) << '\n';
+
+
                 const size_t combinations = 1 << length;
                 for (size_t i = 0; i < combinations; ++i) {
                     StringData str = create_string_with_nuls(i, length, tmp, random);
