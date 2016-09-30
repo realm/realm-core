@@ -102,11 +102,9 @@ def doBuildCocoa(def gitTag) {
           'UNITTEST_REANDOM_SEED=random',
           'UNITTEST_XML=1',
           'UNITTEST_THREADS=1',
-          'DEVELOPER_DIR=/Applications/Xcode-7.3.1.app/Contents/Developer/',
-          'REALM_SCRIPT_DEBUG=1'
+          'DEVELOPER_DIR=/Applications/Xcode-7.3.1.app/Contents/Developer/'
         ]) {
             sh '''
-              env
               dir=$(pwd)
               sh build.sh config $dir/install
               sh build.sh build-cocoa
