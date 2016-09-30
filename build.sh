@@ -229,7 +229,7 @@ download_openssl()
     fi
 
     echo 'Downloading OpenSSL...'
-    openssl_ver='1.0.1u'
+    openssl_ver='1.0.2j'
     curl -L -s "http://www.openssl.org/source/openssl-${openssl_ver}.tar.gz" -o openssl.tar.gz || return 1
     tar -xzf openssl.tar.gz || return 1
     mv openssl-$openssl_ver openssl || return 1
@@ -237,8 +237,8 @@ download_openssl()
 
     # A function we don't use calls OPENSSL_cleanse, which has all sorts of
     # dependencies due to being written in asm
-    sed '/OPENSSL_cleanse/d' 'openssl/crypto/sha/sha256.c' > sha_tmp
-    mv sha_tmp 'openssl/crypto/sha/sha256.c'
+    #sed '/OPENSSL_cleanse/d' 'openssl/crypto/sha/sha256.c' > sha_tmp
+    #smv sha_tmp 'openssl/crypto/sha/sha256.c'
 }
 
 # Setup OS specific stuff
