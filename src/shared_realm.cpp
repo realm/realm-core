@@ -197,6 +197,13 @@ Group& Realm::read_group()
     return *m_group;
 }
 
+void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
+{
+    REALM_ASSERT(!realm.m_group);
+    realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version_id));
+    realm.add_schema_change_handler();
+}
+
 SharedRealm Realm::get_shared_realm(Config config)
 {
     auto coordinator = RealmCoordinator::get_coordinator(config.path);

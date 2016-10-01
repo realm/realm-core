@@ -46,6 +46,7 @@ struct TransactionChangeInfo {
     std::vector<bool> table_moves_needed;
     std::vector<ListChangeInfo> lists;
     std::vector<CollectionChangeBuilder> tables;
+    bool track_all = false;
 };
 
 class DeepChangeChecker {
