@@ -776,10 +776,6 @@ private:
     size_t adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff);
 
 protected:
-    /// The total size in bytes (including the header) of a new empty
-    /// array. Must be a multiple of 8 (i.e., 64-bit aligned).
-    static const size_t initial_capacity = 128;
-
     /// It is an error to specify a non-zero value unless the width
     /// type is wtype_Bits. It is also an error to specify a non-zero
     /// size if the width type is wtype_Ignore.

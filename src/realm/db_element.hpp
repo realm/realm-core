@@ -64,9 +64,9 @@ public:
     };
 
     enum WidthType {
-        wtype_Bits = 0,
-        wtype_Multiply = 1,
-        wtype_Ignore = 2,
+        wtype_Bits = 0,     // width indicates how many bits every element occupies
+        wtype_Multiply = 1, // width indicates how many bytes every element occupies
+        wtype_Ignore = 2,   // each element is 1 byte
     };
 
     static const int header_size = 8; // Number of bytes used by header
@@ -289,6 +289,10 @@ public:
 #endif
 
 protected:
+    /// The total size in bytes (including the header) of a new empty
+    /// db element. Must be a multiple of 8 (i.e., 64-bit aligned).
+    static constexpr size_t initial_capacity = 128;
+
     size_t m_ref;
     uint_least8_t m_width = 0;   // Size of an element (meaning depend on type of array).
     bool m_is_inner_bptree_node; // This array is an inner node of B+-tree.
@@ -299,6 +303,9 @@ protected:
     size_t m_size = 0;     // Number of elements currently stored.
 
     Allocator& m_alloc;
+
+    static MemRef create_element(size_t size, Allocator& alloc, bool context_flag = false, Type type = type_Normal,
+                                 WidthType width_type = wtype_Ignore, int width = 1);
 
     static void init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
                             WidthType width_type, int width, size_t size, size_t capacity) noexcept;

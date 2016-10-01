@@ -21,6 +21,21 @@
 
 using namespace realm;
 
+MemRef DbElement::create_element(size_t size, Allocator& alloc, bool context_flag, Type type, WidthType width_type,
+                                 int width)
+{
+    size_t byte_size_0 = calc_byte_size(width_type, size, width);
+    size_t byte_size = std::max(byte_size_0, size_t(initial_capacity));
+
+    MemRef mem = alloc.alloc(byte_size); // Throws
+    char* header = mem.get_addr();
+
+    init_header(header, type == type_InnerBptreeNode, type != type_Normal, context_flag, width_type, width, size,
+                byte_size);
+
+    return mem;
+}
+
 void DbElement::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.get_addr();
