@@ -451,7 +451,7 @@ protected:
 
     bool is_history_updated() const noexcept;
 
-    BinaryData get_uncommitted_changes() const noexcept;
+    BinaryData get_uncommitted_changes() const noexcept override;
 
     std::string get_database_path() override;
     void initialize(SharedGroup&) override;

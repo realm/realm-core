@@ -653,21 +653,21 @@ public:
 
 inline void TransactLogBufferStream::transact_log_reserve(size_t n, char** inout_new_begin, char** out_new_end)
 {
-    char* data = m_buffer.data();
-    REALM_ASSERT(*inout_new_begin >= data);
-    REALM_ASSERT(*inout_new_begin <= (data + m_buffer.size()));
-    size_t size = *inout_new_begin - data;
-    m_buffer.reserve_extra(size, n);
-    data = m_buffer.data(); // May have changed
-    *inout_new_begin = data + size;
-    *out_new_end = data + m_buffer.size();
+    char* buf = m_buffer.data();
+    REALM_ASSERT(*inout_new_begin >= buf);
+    REALM_ASSERT(*inout_new_begin <= (buf + m_buffer.size()));
+    size_t sz = *inout_new_begin - buf;
+    m_buffer.reserve_extra(sz, n);
+    buf = m_buffer.data(); // May have changed
+    *inout_new_begin = buf + sz;
+    *out_new_end = buf + m_buffer.size();
 }
 
-inline void TransactLogBufferStream::transact_log_append(const char* data, size_t size, char** out_new_begin,
+inline void TransactLogBufferStream::transact_log_append(const char* buf, size_t sz, char** out_new_begin,
                                                          char** out_new_end)
 {
-    transact_log_reserve(size, out_new_begin, out_new_end);
-    *out_new_begin = std::copy(data, data + size, *out_new_begin);
+    transact_log_reserve(sz, out_new_begin, out_new_end);
+    *out_new_begin = std::copy(buf, buf + sz, *out_new_begin);
 }
 
 inline TransactLogEncoder::TransactLogEncoder(TransactLogStream& stream)
