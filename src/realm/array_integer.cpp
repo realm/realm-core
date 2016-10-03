@@ -261,7 +261,7 @@ namespace {
 // FIXME: Move this logic to BpTree.
 struct ArrayIntNullLeafInserter {
     static ref_type leaf_insert(Allocator& alloc, ArrayIntNull& self, size_t ndx, util::Optional<int64_t> value,
-                                Array::TreeInsertBase& state)
+                                TreeInsertBase& state)
     {
         size_t leaf_size = self.size();
         REALM_ASSERT_DEBUG(leaf_size <= REALM_MAX_BPNODE_SIZE);
@@ -294,7 +294,7 @@ struct ArrayIntNullLeafInserter {
 
 } // anonymous namespace
 
-ref_type ArrayIntNull::bptree_leaf_insert(size_t ndx, value_type value, Array::TreeInsertBase& state)
+ref_type ArrayIntNull::bptree_leaf_insert(size_t ndx, value_type value, TreeInsertBase& state)
 {
     return ArrayIntNullLeafInserter::leaf_insert(get_alloc(), *this, ndx, value, state);
 }

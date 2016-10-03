@@ -464,7 +464,7 @@ protected:
 
     /// Introduce a new root node which increments the height of the
     /// tree by one.
-    void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state, bool is_append);
+    void introduce_new_root(ref_type new_sibling_ref, TreeInsertBase& state, bool is_append);
 
     static ref_type write(const Array* root, size_t slice_offset, size_t slice_size, size_t table_size, SliceHandler&,
                           _impl::OutputStream&);
@@ -744,6 +744,7 @@ protected:
 #ifdef REALM_DEBUG
     static void dump_node_structure(const Array& root, std::ostream&, int level);
 #endif
+    std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const;
 
 private:
     class EraseLeafElem;
@@ -1071,7 +1072,7 @@ inline size_t ColumnBase::get_size_from_ref(ref_type root_ref, Allocator& alloc)
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
     if (root_is_leaf)
         return Array::get_size_from_header(root_header);
-    return Array::get_bptree_size_from_header(root_header);
+    return BpTreeNode::get_bptree_size_from_header(root_header);
 }
 
 template <class L, class T>
@@ -1693,7 +1694,22 @@ void Column<T>::dump_node_structure(const Array& root, std::ostream& out, int le
     root.dump_bptree_structure(out, level, &_impl::leaf_dumper);
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+#endif
+
+template <class T>
+std::pair<ref_type, size_t> Column<T>::get_to_dot_parent(size_t ndx_in_parent) const
+{
+    auto root = get_root_array();
+    if (root->is_inner_bptree_node()) {
+        std::pair<MemRef, size_t> p = static_cast<const BpTreeNode*>(root)->get_bptree_leaf(ndx_in_parent);
+        return std::make_pair(p.first.get_ref(), p.second);
+    }
+    else {
+        return std::make_pair(root->get_ref(), ndx_in_parent);
+    }
+}
+
+// LCOV_EXCL_STOP ignore debug functions
 
 
 template <class ColumnDataType>
