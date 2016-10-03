@@ -289,8 +289,6 @@ TEST(File_SetEncryptionKey)
 }
 
 
-#ifndef _WIN32
-
 TEST(File_ReadWrite)
 {
     TEST_PATH(path);
@@ -307,8 +305,6 @@ TEST(File_ReadWrite)
         CHECK_EQUAL(i, read);
     }
 }
-
-#endif
 
 
 TEST(File_Resize)
