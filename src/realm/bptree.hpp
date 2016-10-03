@@ -249,6 +249,10 @@ public:
     BpTree();
     explicit BpTree(BpTreeBase::unattached_tag);
     explicit BpTree(Allocator& alloc);
+    explicit BpTree(std::unique_ptr<Array> init_root)
+        : BpTreeBase(std::move(init_root))
+    {
+    }
     BpTree(BpTree&&) = default;
     BpTree& operator=(BpTree&&) = default;
     void init_from_ref(Allocator& alloc, ref_type ref);
