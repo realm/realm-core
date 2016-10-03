@@ -91,13 +91,13 @@ public:
     char* m_data = nullptr; // Points to first byte after header
 
     // The object will not be fully initialized when using this constructor
-    explicit DbElement(Allocator& alloc) noexcept
-        : m_alloc(alloc)
+    explicit DbElement(Allocator& a) noexcept
+        : m_alloc(a)
     {
     }
 
-    explicit DbElement(ref_type ref, Allocator& alloc) noexcept
-        : m_alloc(alloc)
+    explicit DbElement(ref_type ref, Allocator& a) noexcept
+        : m_alloc(a)
     {
         init_from_ref(ref);
     }
@@ -186,7 +186,7 @@ public:
     }
     /// The meaning of 'width' depends on the context in which this
     /// array is used.
-    size_t get_width() const noexcept
+    uint_least8_t get_width() const noexcept
     {
         return m_width;
     }
@@ -331,7 +331,7 @@ protected:
     Allocator& m_alloc;
 
     static MemRef create_element(size_t size, Allocator& alloc, bool context_flag = false, Type type = type_Normal,
-                                 WidthType width_type = wtype_Ignore, int width = 1);
+                                 WidthType width_type = wtype_Ignore, uint_least8_t width = 1);
 
     static void init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
                             WidthType width_type, int width, size_t size, size_t capacity) noexcept;

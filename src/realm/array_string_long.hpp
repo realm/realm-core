@@ -45,7 +45,7 @@ public:
     //@{
     /// Overriding functions of Array
     void init_from_ref(ref_type) noexcept;
-    void init_from_mem(MemRef) noexcept;
+    void init_from_mem(MemRef) noexcept override;
     void init_from_parent() noexcept;
     //@}
 
@@ -130,7 +130,6 @@ inline void ArrayStringLong::init_from_ref(ref_type ref) noexcept
     REALM_ASSERT(ref);
     char* header = get_alloc().translate(ref);
     init_from_mem(MemRef(header, ref, m_alloc));
-    m_nullable = (Array::size() == 3);
 }
 
 inline void ArrayStringLong::init_from_parent() noexcept

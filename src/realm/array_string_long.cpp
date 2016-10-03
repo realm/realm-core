@@ -37,6 +37,7 @@ void ArrayStringLong::init_from_mem(MemRef mem) noexcept
         ref_type nulls_ref = get_as_ref(2);
         m_nulls.init_from_ref(nulls_ref);
     }
+    m_nullable = (Array::size() == 3);
 }
 
 

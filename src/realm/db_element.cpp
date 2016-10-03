@@ -22,7 +22,7 @@
 using namespace realm;
 
 MemRef DbElement::create_element(size_t size, Allocator& alloc, bool context_flag, Type type, WidthType width_type,
-                                 int width)
+                                 uint_least8_t width)
 {
     size_t byte_size_0 = calc_byte_size(width_type, size, width);
     size_t byte_size = std::max(byte_size_0, size_t(initial_capacity));

@@ -19,6 +19,7 @@
     <ClCompile Include="..\..\src\realm\column_string.cpp" />
     <ClCompile Include="..\..\src\realm\column_string_enum.cpp" />
     <ClCompile Include="..\..\src\realm\column_table.cpp" />
+    <ClCompile Include="..\..\src\realm\db_element.cpp" />
     <ClCompile Include="..\..\src\realm\history.cpp" />
     <ClCompile Include="..\..\src\realm\descriptor.cpp" />
     <ClCompile Include="..\..\src\realm\link_view.cpp" />
@@ -150,6 +151,7 @@
     <ClInclude Include="..\..\src\realm\column_linkbase.hpp" />
     <ClInclude Include="..\..\src\realm\column_linklist.hpp" />
     <ClInclude Include="..\..\src\realm\commit_log.hpp" />
+    <ClInclude Include="..\..\src\realm\db_element.hpp" />
     <ClInclude Include="..\..\src\realm\descriptor.hpp" />
     <ClInclude Include="..\..\src\realm\descriptor_fwd.hpp" />
     <ClInclude Include="..\..\src\realm\impl\output_stream.hpp" />
