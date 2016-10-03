@@ -966,14 +966,6 @@ EOF
                         AR="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ar")" || exit 1
                         RANLIB="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ranlib")" || exit 1
                         $AR x "$repodir/$ANDROID_DIR/$libcrypto_name" || exit 1
-                        find \
-                          . ! -name 'aes*' \
-                          -a ! -name cbc128.o \
-                          -a ! -name sha256.o \
-                          -a ! -name sha256-586.o \
-                          -a ! -name mem_clr.o \
-                          -delete || exit 1
-                        rm -f aes_wrap.o
                         $AR x "$repodir/src/realm/$lib_name" || exit 1
                         $AR r "$repodir/$ANDROID_DIR/$lib_name" *.o || exit 1
                         $RANLIB "$repodir/$ANDROID_DIR/$lib_name"
