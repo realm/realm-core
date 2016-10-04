@@ -9025,7 +9025,6 @@ TEST(LangBindHelper_RollbackAndContinueAsRead_TransactLog)
     }
 }
 
-#ifndef _WIN32
 
 TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
 {
@@ -9058,7 +9057,6 @@ TEST(LangBindHelper_ImplicitTransactions_OverSharedGroupDestruction)
     }
 }
 
-#endif
 
 TEST(LangBindHelper_ImplicitTransactions_LinkList)
 {
@@ -10283,7 +10281,7 @@ void attacher(std::string path)
 }
 } // anonymous namespace
 
-#ifndef _WIN32 // Fails in Windows very frequently
+
 TEST(LangBindHelper_RacingAttachers)
 {
     const int num_attachers = 10;
@@ -10304,7 +10302,7 @@ TEST(LangBindHelper_RacingAttachers)
         attachers[i].join();
     }
 }
-#endif
+
 
 TEST(LangBindHelper_HandoverBetweenThreads)
 {
@@ -11110,10 +11108,11 @@ TEST(LangBindHelper_HandoverQuerySubQuery)
 
 REALM_TABLE_1(MyTable, first, Int)
 
-#ifndef _WIN32
 
 TEST(LangBindHelper_VersionControl)
 {
+    Random random(random_int<unsigned long>());
+
     const int num_versions = 10;
     const int num_random_tests = 100;
     SharedGroup::VersionID versions[num_versions];
@@ -11205,7 +11204,7 @@ TEST(LangBindHelper_VersionControl)
         CHECK_EQUAL(old_version, t[old_version].first);
         for (int k = num_random_tests; k; --k) {
             int new_version =
-                random() % num_versions; // FIXME: Use of wrong random generator. See note at beginning of file.
+                random.draw_int_mod(num_versions);
             // std::cerr << "Random jump: version " << old_version << " -> " << new_version << std::endl;
             if (new_version < old_version) {
                 CHECK(versions[new_version] < versions[old_version]);
@@ -11248,8 +11247,6 @@ TEST(LangBindHelper_VersionControl)
             CHECK_THROW(sg.begin_read(versions[i]), SharedGroup::BadVersion);
     }
 }
-
-#endif // not defined _WIN32
 
 
 TEST(LangBindHelper_LinkListCrash)
