@@ -249,9 +249,15 @@ public:
     BpTree();
     explicit BpTree(BpTreeBase::unattached_tag);
     explicit BpTree(Allocator& alloc);
-    explicit BpTree(std::unique_ptr<Array> init_root)
+    [[deprecated("Initialize with ref instead")]] explicit BpTree(std::unique_ptr<Array> init_root)
         : BpTreeBase(std::move(init_root))
     {
+
+    }
+    explicit BpTree(Allocator& alloc, ref_type ref)
+        : BpTreeBase(std::unique_ptr<Array>(new LeafType(alloc)))
+    {
+        init_from_ref(alloc, ref);
     }
     BpTree(BpTree&&) = default;
     BpTree& operator=(BpTree&&) = default;
@@ -279,7 +285,7 @@ public:
     size_t find_first(T value, size_t begin = 0, size_t end = npos) const;
     void find_all(IntegerColumn& out_indices, T value, size_t begin = 0, size_t end = npos) const;
 
-    static MemRef create_leaf(Array::Type, size_t size, T value, Allocator&);
+    static ref_type create_leaf(Array::Type leaf_type, size_t size, T value, Allocator&);
 
     /// See LeafInfo for information about what to put in the inout_leaf
     /// parameter.
@@ -1133,10 +1139,11 @@ ref_type BpTree<T>::write(size_t slice_offset, size_t slice_size, size_t table_s
 }
 
 template <class T>
-MemRef BpTree<T>::create_leaf(Array::Type leaf_type, size_t size, T value, Allocator& alloc)
+ref_type BpTree<T>::create_leaf(Array::Type leaf_type, size_t size, T value, Allocator& alloc)
 {
     bool context_flag = false;
-    return LeafType::create_array(leaf_type, context_flag, size, std::move(value), alloc);
+    MemRef mem = LeafType::create_array(leaf_type, context_flag, size, std::move(value), alloc);
+    return mem.get_ref();
 }
 
 template <class T>
