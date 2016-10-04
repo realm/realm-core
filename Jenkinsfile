@@ -89,6 +89,15 @@ try {
   throw e
 }
 
+def buildDockerEnv(name) {
+  docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
+    env.DOCKER_REGISTRY = '012067661104.dkr.ecr.eu-west-1.amazonaws.com'
+    sh "./packaging/docker_build.sh $name ."
+  }
+
+  return docker.image(name)
+}
+
 def doBuildCocoa(def gitTag) {
   return {
     node('osx_vegas') {
@@ -209,7 +218,7 @@ def doBuildInDocker(String command) {
     node('docker') {
       getArchive()
 
-      def buildEnv = docker.build 'realm-core:snapshot'
+      def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       def environment = environment()
       withEnv(environment) {
         buildEnv.inside {
@@ -237,7 +246,7 @@ def buildDiffCoverage() {
         userRemoteConfigs: scm.userRemoteConfigs
       ])
 
-      def buildEnv = docker.build 'realm-core:snapshot'
+      def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       def environment = environment()
       withEnv(environment) {
         buildEnv.inside {
@@ -278,8 +287,8 @@ def doBuildNodeInDocker(def gitTag) {
   return {
     node('docker') {
       getArchive()
-
-      def buildEnv = docker.build 'realm-core:snapshot'
+      
+      def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
       withEnv(environment) {
         buildEnv.inside {
@@ -528,8 +537,11 @@ def doBuildPackage(distribution, fileType) {
     node('docker') {
       getSourceArchive()
 
-      withCredentials([[$class: 'StringBinding', credentialsId: 'packagecloud-sync-devel-master-token', variable: 'PACKAGECLOUD_MASTER_TOKEN']]) {
-        sh "sh packaging/package.sh ${distribution}"
+      docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
+        env.DOCKER_REGISTRY = '012067661104.dkr.ecr.eu-west-1.amazonaws.com'
+        withCredentials([[$class: 'StringBinding', credentialsId: 'packagecloud-sync-devel-master-token', variable: 'PACKAGECLOUD_MASTER_TOKEN']]) {
+          sh "sh packaging/package.sh ${distribution}"
+        }
       }
 
       dir('packaging/out') {
