@@ -202,6 +202,10 @@ public:
         return ref;
     }
 
+    /// The meaning of 'width' depends on the context in which this
+    /// array is used.
+    size_t get_width() const noexcept { return m_width; }
+
     /***************************** modifiers *********************************/
 
     /// Detach from the underlying array node. This method has no effect if the
@@ -301,8 +305,8 @@ protected:
         }
     }
 
-    static MemRef create_element(size_t size, Allocator& alloc, bool context_flag = false, Type type = type_Normal,
-                                 WidthType width_type = wtype_Ignore, int width = 1);
+    static MemRef create_node(size_t size, Allocator& alloc, bool context_flag = false, Type type = type_Normal,
+                              WidthType width_type = wtype_Ignore, int width = 1);
 
     void set_header_size(size_t value) noexcept { set_header_size(value, get_header()); }
 

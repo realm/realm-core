@@ -8,6 +8,7 @@ set(REALM_SOURCES
     array_blobs_small.cpp
     array_blobs_big.cpp
     array_integer.cpp
+    array_unsigned.cpp
     array_string.cpp
     array_string_short.cpp
     array_string_long.cpp
@@ -81,6 +82,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_direct.hpp
     array_integer.hpp
     array_bool.hpp
+    array_unsigned.hpp
     array_string.hpp
     array_string_short.hpp
     array_string_long.hpp

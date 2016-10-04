@@ -26,6 +26,7 @@
 #include <map>
 
 #include <realm/array.hpp>
+#include <realm/array_unsigned.hpp>
 #include <realm/column.hpp>
 #include <realm/query_conditions.hpp>
 
@@ -458,6 +459,109 @@ TEST(Array_General)
     */
 
     // TEST(Array_Destroy)
+
+    c.destroy();
+}
+
+
+TEST(Array_Unsigned)
+{
+    ArrayUnsigned c(Allocator::get_default());
+    c.create(0, 0);
+
+    // TEST(Array_Add0)
+
+    c.add(0);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.size(), 1);
+    CHECK_EQUAL(0, c.get_width());
+
+    // TEST(Array_Add1)
+
+    c.add(1);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.size(), 2);
+    CHECK_EQUAL(8, c.get_width());
+
+    // TEST(Array_Add2)
+
+    c.add(0xff);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 0xff);
+    CHECK_EQUAL(c.size(), 3);
+    CHECK_EQUAL(8, c.get_width());
+
+    // TEST(Array_Add3)
+
+    c.add(0x100);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 0xff);
+    CHECK_EQUAL(c.get(3), 0x100);
+    CHECK_EQUAL(c.size(), 4);
+    CHECK_EQUAL(16, c.get_width());
+
+    // TEST(Array_Add4)
+
+    c.add(0x10000);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 0xff);
+    CHECK_EQUAL(c.get(3), 0x100);
+    CHECK_EQUAL(c.get(4), 0x10000);
+    CHECK_EQUAL(c.size(), 5);
+    CHECK_EQUAL(32, c.get_width());
+
+    // TEST(Array_Insert3)
+
+    c.insert(3, 0x100000000);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 0xff);
+    CHECK_EQUAL(c.get(3), 0x100000000);
+    CHECK_EQUAL(c.get(4), 0x100);
+    CHECK_EQUAL(c.get(5), 0x10000);
+    CHECK_EQUAL(c.size(), 6);
+    CHECK_EQUAL(64, c.get_width());
+
+    // TEST(Array_Insert3)
+
+    c.insert(5, 7);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 0xff);
+    CHECK_EQUAL(c.get(3), 0x100000000);
+    CHECK_EQUAL(c.get(4), 0x100);
+    CHECK_EQUAL(c.get(5), 7);
+    CHECK_EQUAL(c.get(6), 0x10000);
+    CHECK_EQUAL(c.size(), 7);
+
+    c.erase(3);
+    CHECK_EQUAL(c.get(0), 0);
+    CHECK_EQUAL(c.get(1), 1);
+    CHECK_EQUAL(c.get(2), 0xff);
+    CHECK_EQUAL(c.get(3), 0x100);
+    CHECK_EQUAL(c.get(4), 7);
+    CHECK_EQUAL(c.get(5), 0x10000);
+    CHECK_EQUAL(c.size(), 6);
+
+    c.truncate(0);
+    CHECK_EQUAL(c.size(), 0);
+    CHECK_EQUAL(0, c.get_width());
+    c.add(1);
+    c.add(2);
+    c.add(2);
+    c.add(3);
+
+    CHECK_EQUAL(c.lower_bound(1), 0);
+    CHECK_EQUAL(c.lower_bound(2), 1);
+    CHECK_EQUAL(c.lower_bound(3), 3);
+
+    CHECK_EQUAL(c.upper_bound(1), 1);
+    CHECK_EQUAL(c.upper_bound(2), 3);
+    CHECK_EQUAL(c.upper_bound(3), 4);
 
     c.destroy();
 }

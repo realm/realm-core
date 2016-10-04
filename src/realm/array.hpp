@@ -651,13 +651,6 @@ public:
 
     static void get_three(const char* data, size_t ndx, ref_type& v0, ref_type& v1, ref_type& v2) noexcept;
 
-    /// The meaning of 'width' depends on the context in which this
-    /// array is used.
-    size_t get_width() const noexcept
-    {
-        return m_width;
-    }
-
     /// Get the number of bytes currently in use by this array. This
     /// includes the array header, but it does not include allocated
     /// bytes corresponding to excess capacity. The result is
