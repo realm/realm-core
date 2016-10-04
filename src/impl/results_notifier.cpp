@@ -159,6 +159,10 @@ void ResultsNotifier::run()
 void ResultsNotifier::do_prepare_handover(SharedGroup& sg)
 {
     if (!m_tv.is_attached()) {
+        // if the table version didn't change we can just reuse the same handover
+        // object and bump its version to the current SG version
+        if (m_tv_handover)
+            m_tv_handover->version = sg.get_version_of_current_transaction();
         return;
     }
 
@@ -188,7 +192,6 @@ void ResultsNotifier::deliver(SharedGroup& sg)
 
     REALM_ASSERT(!m_query_handover);
     if (m_tv_to_deliver) {
-        m_tv_to_deliver->version = version();
         Results::Internal::set_table_view(*m_target_results,
                                           std::move(*sg.import_from_handover(std::move(m_tv_to_deliver))));
     }
