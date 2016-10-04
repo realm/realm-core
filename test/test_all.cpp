@@ -415,7 +415,7 @@ bool run_tests(util::Logger* logger)
     std::ofstream xml_file;
     bool xml;
 #ifdef REALM_MOBILE
-    xml = true;
+    xml = !true;
 #else
     const char* xml_str = getenv("UNITTEST_XML");
     xml = (xml_str && strlen(xml_str) != 0);
