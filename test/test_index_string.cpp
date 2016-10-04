@@ -975,24 +975,29 @@ StringData create_string_with_nuls(const size_t bits, const size_t length, char*
 } // anonymous namespace
 
 
-// Test for generated strings of length 1..16 with all combinations of embedded NUL bytes
-ONLY_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
+// Test for generated strings of length 1..8/16 with all combinations of embedded NUL bytes
+TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    // 4 seems to fail on Windows, 7 seems to fail on Linux
-    for (int seed = 4; seed < 8; seed++) {
-
+#if TEST_DURATION == 0
+    for (int seed = 0; seed < 5; seed++) {
+#else 
+    for (int seed = 0; seed < 100; seed++) {
+#endif
         // String index
         ref_type ref = StringColumn::create(Allocator::get_default());
         StringColumn col(Allocator::get_default(), ref, nullable);
         const StringIndex& ndx = *col.create_search_index();
 
-        const size_t MAX_LENGTH = 16; // Test medium
-        char tmp[MAX_LENGTH];         // this is a bit of a hack, that relies on the string being copied in column.add()
+#if TEST_DURATION == 0
+        const size_t MAX_LENGTH = 8;
+#else
+        const size_t MAX_LENGTH = 16; // Test medium length strings
+#endif
+        char tmp[MAX_LENGTH];
 
         for (size_t length = 1; length <= MAX_LENGTH; ++length) {
-
             {
                 Random random(seed);
                 const size_t combinations = 1 << length;
@@ -1020,6 +1025,7 @@ ONLY_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
         col.destroy();
     }
 }
+
 
 // Tests for a bug with strings containing zeroes
 TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
