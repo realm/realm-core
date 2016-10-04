@@ -978,20 +978,16 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
 #if TEST_DURATION == 0
+    const size_t MAX_LENGTH = 8;
     for (int seed = 0; seed < 5; seed++) {
 #else 
+    const size_t MAX_LENGTH = 16; // Test medium length strings
     for (int seed = 0; seed < 100; seed++) {
 #endif
         // String index
         ref_type ref = StringColumn::create(Allocator::get_default());
         StringColumn col(Allocator::get_default(), ref, nullable);
         const StringIndex& ndx = *col.create_search_index();
-
-#if TEST_DURATION == 0
-        const size_t MAX_LENGTH = 8;
-#else
-        const size_t MAX_LENGTH = 16; // Test medium length strings
-#endif
         char tmp[MAX_LENGTH];
 
         for (size_t length = 1; length <= MAX_LENGTH; ++length) {
@@ -1012,8 +1008,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
                 for (size_t i = 0; i < combinations; ++i) {
                     StringData needle = create_string_with_nuls(i, l, tmp, random);
                     CHECK_EQUAL(ndx.find_first(needle), expected_index);
-                    CHECK(strncmp(col.get(expected_index).data(), needle.data(), l) == 0);
-                    CHECK_EQUAL(col.get(expected_index).size(), needle.size());
+                    CHECK_EQUAL(col.get(expected_index), needle);
                     expected_index++;
                 }
             }
