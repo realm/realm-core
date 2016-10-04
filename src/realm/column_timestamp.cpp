@@ -61,7 +61,8 @@ public:
 
     ref_type create_leaf(size_t size) override
     {
-        return BT::create_leaf(Array::type_Normal, size, m_value, m_alloc); // Throws
+        ref_type ref =  BT::create_leaf(Array::type_Normal, size, m_value, m_alloc); // Throws
+        return ref;
     }
 
 private:

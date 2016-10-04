@@ -532,7 +532,7 @@ public:
         , m_tree(Allocator::get_default())
     {
     }
-    [[deprecated]] explicit Column(std::unique_ptr<Array> root) noexcept;
+    REALM_DEPRECATED("Initialize with ref instead") explicit Column(std::unique_ptr<Array> root) noexcept;
     Column(Allocator&, ref_type, size_t column_ndx = npos);
     Column(unattached_root_tag, Allocator&);
     Column(Column&&) noexcept = default;
@@ -1564,7 +1564,8 @@ public:
     }
     ref_type create_leaf(size_t size) override
     {
-        return BpTree<T>::create_leaf(m_leaf_type, size, m_value, m_alloc); // Throws
+        ref_type ref = BpTree<T>::create_leaf(m_leaf_type, size, m_value, m_alloc); // Throws
+        return ref;
     }
 
 private:

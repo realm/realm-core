@@ -249,7 +249,7 @@ public:
     BpTree();
     explicit BpTree(BpTreeBase::unattached_tag);
     explicit BpTree(Allocator& alloc);
-    [[deprecated("Initialize with ref instead")]] explicit BpTree(std::unique_ptr<Array> init_root)
+    REALM_DEPRECATED("Initialize with ref instead") explicit BpTree(std::unique_ptr<Array> init_root)
         : BpTreeBase(std::move(init_root))
     {
 
