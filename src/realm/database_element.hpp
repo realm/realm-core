@@ -23,7 +23,7 @@
 
 namespace realm {
 
-// Maximum number of bytes that the payload of an DbElement can be
+// Maximum number of bytes that the payload of a DatabaseElement can be
 const size_t max_array_payload = 0x00ffffffL;
 
 /// Special index value. It has various meanings depending on
@@ -39,6 +39,17 @@ struct TreeInsertBase {
     size_t m_split_size;
 };
 
+/// All accessor classes that logically contains other objects must inherit
+/// this class.
+///
+/// A database node accessor contains information about the parent of the
+/// referenced node. This 'reverse' reference is not explicitly present in the
+/// underlying node hierarchy, but it is needed when modifying an array. A
+/// modification may lead to relocation of the underlying array node, and the
+/// parent must be updated accordingly. Since this applies recursivly all the
+/// way to the root node, it is essential that the entire chain of parent
+/// accessors is constructed and propperly maintained when a particular array is
+/// modified.
 class ArrayParent {
 public:
     virtual ~ArrayParent() noexcept
@@ -53,11 +64,50 @@ protected:
     // Used only by Array::to_dot().
     virtual std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const = 0;
 
-    friend class DbElement;
+    friend class DatabaseElement;
     friend class Array;
 };
 
-class DbElement {
+/// Provides access to individual nodes of the database.
+///
+/// This class serves purely as an accessor, it assumes no ownership of the
+/// referenced memory.
+///
+/// A database node accessor can be in one of two states: attached or unattached.
+/// It is in the attached state if, and only if is_attached() returns true. Most
+/// non-static member functions of this class have undefined behaviour if the
+/// accessor is in the unattached state. The exceptions are: is_attached(),
+/// detach(), init_from_ref(), init_from_mem(), init_from_parent(),
+/// has_parent(), get_parent(), set_parent(), get_ndx_in_parent(),
+/// set_ndx_in_parent(), adjust_ndx_in_parent(), and get_ref_from_parent().
+///
+/// The parent reference (`pointer to parent`, `index in parent`) is updated
+/// independently from the state of attachment to an underlying node. In
+/// particular, the parent reference remains valid and is unannfected by changes
+/// in attachment. These two aspects of the state of the accessor is updated
+/// independently, and it is entirely the responsibility of the caller to update
+/// them such that they are consistent with the underlying node hierarchy before
+/// calling any method that modifies the underlying array node.
+///
+/// FIXME: This class currently has fragments of ownership, in particular the
+/// constructors that allocate underlying memory. On the other hand, the
+/// destructor never frees the memory. This is a problematic situation, because
+/// it so easily becomes an obscure source of leaks. There are three options for
+/// a fix of which the third is most attractive but hardest to implement: (1)
+/// Remove all traces of ownership semantics, that is, remove the constructors
+/// that allocate memory, but keep the trivial copy constructor. For this to
+/// work, it is important that the constness of the accessor has nothing to do
+/// with the constness of the underlying memory, otherwise constness can be
+/// violated simply by copying the accessor. (2) Disallov copying but associate
+/// the constness of the accessor with the constness of the underlying
+/// memory. (3) Provide full ownership semantics like is done for Table
+/// accessors, and provide a proper copy constructor that really produces a copy
+/// of the array. For this to work, the class should assume ownership if, and
+/// only if there is no parent. A copy produced by a copy constructor will not
+/// have a parent. Even if the original was part of a database, the copy will be
+/// free-standing, that is, not be part of any database. For intra, or inter
+/// database copying, one would have to also specify the target allocator.
+class DatabaseElement {
 public:
     enum Type {
         type_Normal,
@@ -91,18 +141,18 @@ public:
     char* m_data = nullptr; // Points to first byte after header
 
     // The object will not be fully initialized when using this constructor
-    explicit DbElement(Allocator& a) noexcept
+    explicit DatabaseElement(Allocator& a) noexcept
         : m_alloc(a)
     {
     }
 
-    explicit DbElement(ref_type ref, Allocator& a) noexcept
+    explicit DatabaseElement(ref_type ref, Allocator& a) noexcept
         : m_alloc(a)
     {
         init_from_ref(ref);
     }
 
-    virtual ~DbElement()
+    virtual ~DatabaseElement()
     {
     }
 
@@ -117,27 +167,10 @@ public:
         return clone(header, target_alloc);
     }
 
-    /**************************** Initializers *******************************/
+    /**************************** initializers *******************************/
 
-    /// Reinitialize this array accessor to point to the specified new
-    /// underlying memory. This does not modify the parent reference information
-    /// of this accessor.
     void init_from_ref(ref_type) noexcept;
-
-    /// Same as init_from_ref(ref_type) but avoid the mapping of 'ref' to memory
-    /// pointer.
-    virtual void init_from_mem(MemRef) noexcept;
-
-    /// Same as `init_from_ref(get_ref_from_parent())`.
-    void init_from_parent() noexcept;
-
-    /// Called in the context of Group::commit() to ensure that attached
-    /// accessors stay valid across a commit. Please note that this works only
-    /// for non-transactional commits. Accessors obtained during a transaction
-    /// are always detached when the transaction ends.
-    ///
-    /// Returns true if, and only if the array has changed. If the array has not
-    /// changed, then its children are guaranteed to also not have changed.
+    void init_from_mem(MemRef) noexcept;
     bool update_from_parent(size_t old_baseline) noexcept;
 
     /************************** access functions *****************************/
@@ -344,6 +377,10 @@ protected:
     // Includes array header. Not necessarily 8-byte aligned.
     virtual size_t calc_byte_len(size_t num_items, size_t width) const;
     virtual size_t calc_item_count(size_t bytes, size_t width) const noexcept;
+    // Destroy all children. Will be called from destroy_deep. Must be implemented
+    // by all classes having children (inheriting ArrayParent)
+    // TODO: The above comment suggests that this operation should be defined on
+    // ArrayParent. Investigate feasibility.
     virtual void destroy_children() noexcept
     {
     }
@@ -373,22 +410,16 @@ private:
     static size_t calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept;
 };
 
-inline void DbElement::init_from_ref(ref_type ref) noexcept
+inline void DatabaseElement::init_from_ref(ref_type ref) noexcept
 {
     REALM_ASSERT_DEBUG(ref);
     char* header = m_alloc.translate(ref);
     init_from_mem(MemRef(header, ref, m_alloc));
 }
 
-inline void DbElement::init_from_parent() noexcept
-{
-    ref_type ref = get_ref_from_parent();
-    init_from_ref(ref);
-}
-
 /*****************************************************************************/
 
-inline DbElement::Type DbElement::get_type() const noexcept
+inline DatabaseElement::Type DatabaseElement::get_type() const noexcept
 {
     if (m_is_inner_bptree_node) {
         REALM_ASSERT_DEBUG(m_has_refs);
@@ -399,13 +430,13 @@ inline DbElement::Type DbElement::get_type() const noexcept
     return type_Normal;
 }
 
-inline size_t DbElement::size() const noexcept
+inline size_t DatabaseElement::size() const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     return m_size;
 }
 
-inline size_t DbElement::get_byte_size() const noexcept
+inline size_t DatabaseElement::get_byte_size() const noexcept
 {
     const char* header = get_header_from_data(m_data);
     WidthType wtype = get_wtype_from_header(header);
@@ -419,7 +450,7 @@ inline size_t DbElement::get_byte_size() const noexcept
 
 /*****************************************************************************/
 
-inline void DbElement::destroy() noexcept
+inline void DatabaseElement::destroy() noexcept
 {
     if (!is_attached())
         return;
@@ -428,7 +459,7 @@ inline void DbElement::destroy() noexcept
     m_data = nullptr;
 }
 
-inline void DbElement::destroy_deep() noexcept
+inline void DatabaseElement::destroy_deep() noexcept
 {
     if (!is_attached())
         return;
@@ -436,10 +467,10 @@ inline void DbElement::destroy_deep() noexcept
     if (has_refs())
         destroy_children();
 
-    DbElement::destroy();
+    DatabaseElement::destroy();
 }
 
-inline void DbElement::update_parent()
+inline void DatabaseElement::update_parent()
 {
     if (m_parent)
         m_parent->update_child_ref(m_ndx_in_parent, m_ref);
@@ -447,64 +478,64 @@ inline void DbElement::update_parent()
 
 /*****************************************************************************/
 
-inline char* DbElement::get_data_from_header(char* header) noexcept
+inline char* DatabaseElement::get_data_from_header(char* header) noexcept
 {
     return header + header_size;
 }
 
-inline char* DbElement::get_header_from_data(char* data) noexcept
+inline char* DatabaseElement::get_header_from_data(char* data) noexcept
 {
     return data - header_size;
 }
 
-inline const char* DbElement::get_data_from_header(const char* header) noexcept
+inline const char* DatabaseElement::get_data_from_header(const char* header) noexcept
 {
     return get_data_from_header(const_cast<char*>(header));
 }
 
-inline bool DbElement::get_is_inner_bptree_node_from_header(const char* header) noexcept
+inline bool DatabaseElement::get_is_inner_bptree_node_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x80) != 0;
 }
 
-inline bool DbElement::get_hasrefs_from_header(const char* header) noexcept
+inline bool DatabaseElement::get_hasrefs_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x40) != 0;
 }
 
-inline bool DbElement::get_context_flag_from_header(const char* header) noexcept
+inline bool DatabaseElement::get_context_flag_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (int(h[4]) & 0x20) != 0;
 }
 
-inline DbElement::WidthType DbElement::get_wtype_from_header(const char* header) noexcept
+inline DatabaseElement::WidthType DatabaseElement::get_wtype_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return WidthType((int(h[4]) & 0x18) >> 3);
 }
 
-inline uint_least8_t DbElement::get_width_from_header(const char* header) noexcept
+inline uint_least8_t DatabaseElement::get_width_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return uint_least8_t((1 << (int(h[4]) & 0x07)) >> 1);
 }
 
-inline size_t DbElement::get_size_from_header(const char* header) noexcept
+inline size_t DatabaseElement::get_size_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
     return (size_t(h[5]) << 16) + (size_t(h[6]) << 8) + h[7];
 }
 
-inline DbElement::Type DbElement::get_type_from_header(const char* header) noexcept
+inline DatabaseElement::Type DatabaseElement::get_type_from_header(const char* header) noexcept
 {
     if (get_is_inner_bptree_node_from_header(header))
         return type_InnerBptreeNode;
@@ -513,7 +544,7 @@ inline DbElement::Type DbElement::get_type_from_header(const char* header) noexc
     return type_Normal;
 }
 
-inline size_t DbElement::get_byte_size_from_header(const char* header) noexcept
+inline size_t DatabaseElement::get_byte_size_from_header(const char* header) noexcept
 {
     size_t size = get_size_from_header(header);
     uint_least8_t width = get_width_from_header(header);
@@ -523,7 +554,7 @@ inline size_t DbElement::get_byte_size_from_header(const char* header) noexcept
     return num_bytes;
 }
 
-inline size_t DbElement::get_capacity_from_header(const char* header) noexcept
+inline size_t DatabaseElement::get_capacity_from_header(const char* header) noexcept
 {
     typedef unsigned char uchar;
     const uchar* h = reinterpret_cast<const uchar*>(header);
@@ -532,63 +563,63 @@ inline size_t DbElement::get_capacity_from_header(const char* header) noexcept
 
 /*****************************************************************************/
 
-inline void DbElement::set_header_is_inner_bptree_node(bool value) noexcept
+inline void DatabaseElement::set_header_is_inner_bptree_node(bool value) noexcept
 {
     set_header_is_inner_bptree_node(value, get_header_from_data(m_data));
 }
 
-inline void DbElement::set_header_hasrefs(bool value) noexcept
+inline void DatabaseElement::set_header_hasrefs(bool value) noexcept
 {
     set_header_hasrefs(value, get_header_from_data(m_data));
 }
 
-inline void DbElement::set_header_context_flag(bool value) noexcept
+inline void DatabaseElement::set_header_context_flag(bool value) noexcept
 {
     set_header_context_flag(value, get_header_from_data(m_data));
 }
 
-inline void DbElement::set_header_wtype(WidthType value) noexcept
+inline void DatabaseElement::set_header_wtype(WidthType value) noexcept
 {
     set_header_wtype(value, get_header_from_data(m_data));
 }
 
-inline void DbElement::set_header_width(int value) noexcept
+inline void DatabaseElement::set_header_width(int value) noexcept
 {
     set_header_width(value, get_header_from_data(m_data));
 }
 
-inline void DbElement::set_header_size(size_t value) noexcept
+inline void DatabaseElement::set_header_size(size_t value) noexcept
 {
     set_header_size(value, get_header_from_data(m_data));
 }
 
-inline void DbElement::set_header_capacity(size_t value) noexcept
+inline void DatabaseElement::set_header_capacity(size_t value) noexcept
 {
     set_header_capacity(value, get_header_from_data(m_data));
 }
 
-inline void DbElement::set_header_is_inner_bptree_node(bool value, char* header) noexcept
+inline void DatabaseElement::set_header_is_inner_bptree_node(bool value, char* header) noexcept
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[4] = uchar((int(h[4]) & ~0x80) | int(value) << 7);
 }
 
-inline void DbElement::set_header_hasrefs(bool value, char* header) noexcept
+inline void DatabaseElement::set_header_hasrefs(bool value, char* header) noexcept
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[4] = uchar((int(h[4]) & ~0x40) | int(value) << 6);
 }
 
-inline void DbElement::set_header_context_flag(bool value, char* header) noexcept
+inline void DatabaseElement::set_header_context_flag(bool value, char* header) noexcept
 {
     typedef unsigned char uchar;
     uchar* h = reinterpret_cast<uchar*>(header);
     h[4] = uchar((int(h[4]) & ~0x20) | int(value) << 5);
 }
 
-inline void DbElement::set_header_wtype(WidthType value, char* header) noexcept
+inline void DatabaseElement::set_header_wtype(WidthType value, char* header) noexcept
 {
     // Indicates how to calculate size in bytes based on width
     // 0: bits      (width/8) * size
@@ -599,7 +630,7 @@ inline void DbElement::set_header_wtype(WidthType value, char* header) noexcept
     h[4] = uchar((int(h[4]) & ~0x18) | int(value) << 3);
 }
 
-inline void DbElement::set_header_width(int value, char* header) noexcept
+inline void DatabaseElement::set_header_width(int value, char* header) noexcept
 {
     // Pack width in 3 bits (log2)
     int w = 0;
@@ -614,7 +645,7 @@ inline void DbElement::set_header_width(int value, char* header) noexcept
     h[4] = uchar((int(h[4]) & ~0x7) | w);
 }
 
-inline void DbElement::set_header_size(size_t value, char* header) noexcept
+inline void DatabaseElement::set_header_size(size_t value, char* header) noexcept
 {
     REALM_ASSERT_3(value, <=, max_array_payload);
     typedef unsigned char uchar;
@@ -625,7 +656,7 @@ inline void DbElement::set_header_size(size_t value, char* header) noexcept
 }
 
 // Note: There is a copy of this function is test_alloc.cpp
-inline void DbElement::set_header_capacity(size_t value, char* header) noexcept
+inline void DatabaseElement::set_header_capacity(size_t value, char* header) noexcept
 {
     REALM_ASSERT_3(value, <=, max_array_payload);
     typedef unsigned char uchar;
@@ -637,7 +668,7 @@ inline void DbElement::set_header_capacity(size_t value, char* header) noexcept
 
 /*****************************************************************************/
 
-inline void DbElement::init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
+inline void DatabaseElement::init_header(char* header, bool is_inner_bptree_node, bool has_refs, bool context_flag,
                                    WidthType width_type, int width, size_t size, size_t capacity) noexcept
 {
     // Note: Since the header layout contains unallocated bit and/or
@@ -653,7 +684,7 @@ inline void DbElement::init_header(char* header, bool is_inner_bptree_node, bool
     set_header_capacity(capacity, header);
 }
 
-inline size_t DbElement::calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
+inline size_t DatabaseElement::calc_byte_size(WidthType wtype, size_t size, uint_least8_t width) noexcept
 {
     size_t num_bytes = 0;
     switch (wtype) {

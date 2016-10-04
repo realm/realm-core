@@ -85,7 +85,7 @@ public:
     void create(Type = type_Normal, bool context_flag = false);
 
     void init_from_ref(ref_type) noexcept;
-    void init_from_mem(MemRef) noexcept override;
+    void init_from_mem(MemRef) noexcept;
     void init_from_parent() noexcept;
 
     size_t size() const noexcept;

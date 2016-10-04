@@ -75,7 +75,7 @@ public:
     //@{
     /// Overriding functions of Array
     void init_from_ref(ref_type) noexcept;
-    void init_from_mem(MemRef) noexcept override;
+    void init_from_mem(MemRef) noexcept;
     void init_from_parent() noexcept;
     //@}
 

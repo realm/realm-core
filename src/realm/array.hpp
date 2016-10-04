@@ -47,7 +47,6 @@ Searching: The main finding function is:
 
 #include <cstdint> // unint8_t etc
 
-#include <realm/db_element.hpp>
 #include <realm/util/meta.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/file_mapper.hpp>
@@ -57,6 +56,7 @@ Searching: The main finding function is:
 #include <realm/query_conditions.hpp>
 #include <realm/column_fwd.hpp>
 #include "array_direct.hpp"
+#include "database_element.hpp"
 
 /*
     MMX: mmintrin.h
@@ -143,59 +143,16 @@ private:
 
 /// Provides access to individual array nodes of the database.
 ///
-/// This class serves purely as an accessor, it assumes no ownership of the
-/// referenced memory.
-///
-/// An array accessor can be in one of two states: attached or unattached. It is
-/// in the attached state if, and only if is_attached() returns true. Most
-/// non-static member functions of this class have undefined behaviour if the
-/// accessor is in the unattached state. The exceptions are: is_attached(),
-/// detach(), create(), init_from_ref(), init_from_mem(), init_from_parent(),
-/// has_parent(), get_parent(), set_parent(), get_ndx_in_parent(),
-/// set_ndx_in_parent(), adjust_ndx_in_parent(), and get_ref_from_parent().
-///
-/// An array accessor contains information about the parent of the referenced
-/// array node. This 'reverse' reference is not explicitely present in the
-/// underlying node hierarchy, but it is needed when modifying an array. A
-/// modification may lead to relocation of the underlying array node, and the
-/// parent must be updated accordingly. Since this applies recursivly all the
-/// way to the root node, it is essential that the entire chain of parent
-/// accessors is constructed and propperly maintained when a particular array is
-/// modified.
-///
-/// The parent reference (`pointer to parent`, `index in parent`) is updated
-/// independently from the state of attachment to an underlying node. In
-/// particular, the parent reference remains valid and is unannfected by changes
-/// in attachment. These two aspects of the state of the accessor is updated
-/// independently, and it is entirely the responsibility of the caller to update
-/// them such that they are consistent with the underlying node hierarchy before
-/// calling any method that modifies the underlying array node.
-///
-/// FIXME: This class currently has fragments of ownership, in particular the
-/// constructors that allocate underlying memory. On the other hand, the
-/// destructor never frees the memory. This is a problematic situation, because
-/// it so easily becomes an obscure source of leaks. There are three options for
-/// a fix of which the third is most attractive but hardest to implement: (1)
-/// Remove all traces of ownership semantics, that is, remove the constructors
-/// that allocate memory, but keep the trivial copy constructor. For this to
-/// work, it is important that the constness of the accessor has nothing to do
-/// with the constness of the underlying memory, otherwise constness can be
-/// violated simply by copying the accessor. (2) Disallov copying but associate
-/// the constness of the accessor with the constness of the underlying
-/// memory. (3) Provide full ownership semantics like is done for Table
-/// accessors, and provide a proper copy constructor that really produces a copy
-/// of the array. For this to work, the class should assume ownership if, and
-/// only if there is no parent. A copy produced by a copy constructor will not
-/// have a parent. Even if the original was part of a database, the copy will be
-/// free-standing, that is, not be part of any database. For intra, or inter
-/// database copying, one would have to also specify the target allocator.
-class Array : public DbElement, public ArrayParent {
+/// This class offers efficient storage of int64_t values and very efficient
+/// methods to search for those values. Intended to be a building block for
+/// integer like columns.
+class Array : public DatabaseElement, public ArrayParent {
 public:
     //    void state_init(int action, QueryState *state);
     //    bool match(int action, size_t index, int64_t value, QueryState *state);
 
     /// Create an array accessor in the unattached state.
-    using DbElement::DbElement;
+    using DatabaseElement::DatabaseElement;
 
     ~Array() noexcept override
     {
@@ -209,9 +166,24 @@ public:
     /// node. It is not owned by the accessor.
     void create(Type, bool context_flag = false, size_t size = 0, int_fast64_t value = 0);
 
+    /// Reinitialize this array accessor to point to the specified new
+    /// underlying memory. This does not modify the parent reference information
+    /// of this accessor.
+    void init_from_ref(ref_type) noexcept;
     /// Same as init_from_ref(ref_type) but avoid the mapping of 'ref' to memory
     /// pointer.
-    void init_from_mem(MemRef) noexcept override;
+    void init_from_mem(MemRef) noexcept;
+    /// Same as `init_from_ref(get_ref_from_parent())`.
+    void init_from_parent() noexcept;
+
+    /// Called in the context of Group::commit() to ensure that attached
+    /// accessors stay valid across a commit. Please note that this works only
+    /// for non-transactional commits. Accessors obtained during a transaction
+    /// are always detached when the transaction ends.
+    ///
+    /// Returns true if, and only if the array has changed. If the array has not
+    /// changed, then its children are guaranteed to also not have changed.
+    bool update_from_parent(size_t old_baseline) noexcept;
 
     /// Change the type of an already attached array node.
     ///
@@ -459,13 +431,13 @@ public:
     /// children of that array. See non-static destroy_deep() for an
     /// alternative. If this accessor is already in the detached state, this
     /// function has no effect (idempotency).
-    using DbElement::destroy;
+    using DatabaseElement::destroy;
     /// Recursively destroy children (as if calling
     /// clear_and_destroy_children()), then put this accessor into the detached
     /// state (as if calling detach()), then free the allocated memory. If this
     /// accessor is already in the detached state, this function has no effect
     /// (idempotency).
-    using DbElement::destroy_deep;
+    using DatabaseElement::destroy_deep;
 
     /// Shorthand for `destroy(MemRef(ref, alloc), alloc)`.
     static void destroy(ref_type ref, Allocator& alloc) noexcept;
@@ -775,7 +747,7 @@ protected:
     ref_type get_child_ref(size_t) const noexcept override;
 
     void destroy_children() noexcept override;
-    void destroy_some_children(size_t offset) noexcept;
+    void destroy_last_children(size_t offset) noexcept;
 
     std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
 
@@ -825,9 +797,10 @@ private:
     ref_type do_write_deep(_impl::ArrayWriterBase&, bool only_if_modified) const;
 
     // Undefined behavior if m_alloc.is_read_only(m_ref) returns true
-    size_t get_capacity_from_hdr() const noexcept
+    size_t get_zero_width_capacity() const noexcept
     {
-        return DbElement::get_capacity_from_header(get_header_from_data(m_data));
+        // When width is zero, the number of items does not matter
+        return DatabaseElement::calc_item_count(0, 0);
     }
 
 
@@ -1084,6 +1057,26 @@ inline void Array::create(Type type, bool context_flag, size_t length, int_fast6
     init_from_mem(mem);
 }
 
+
+inline void Array::init_from_ref(ref_type ref) noexcept
+{
+    REALM_ASSERT_DEBUG(ref);
+    char* header = m_alloc.translate(ref);
+    Array::init_from_mem(MemRef(header, ref, m_alloc));
+}
+
+
+inline void Array::init_from_mem(MemRef mem) noexcept
+{
+    DatabaseElement::init_from_mem(mem);
+    set_width(m_width);
+}
+
+inline void Array::init_from_parent() noexcept
+{
+    ref_type ref = get_ref_from_parent();
+    init_from_ref(ref);
+}
 
 inline void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 {

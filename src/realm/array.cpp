@@ -207,13 +207,6 @@ size_t Array::bit_width(int64_t v)
     return uint64_t(v) >> 31 ? 64 : uint64_t(v) >> 15 ? 32 : uint64_t(v) >> 7 ? 16 : 8;
 }
 
-
-void Array::init_from_mem(MemRef mem) noexcept
-{
-    DbElement::init_from_mem(mem);
-    set_width(m_width);
-}
-
 void Array::set_type(Type type)
 {
     REALM_ASSERT(is_attached());
@@ -236,6 +229,27 @@ void Array::set_type(Type type)
     m_has_refs = init_has_refs;
     set_header_is_inner_bptree_node(init_is_inner_bptree_node);
     set_header_hasrefs(init_has_refs);
+}
+
+bool Array::update_from_parent(size_t old_baseline) noexcept
+{
+    auto parent = get_parent();
+    REALM_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT_DEBUG(parent);
+
+    // Array nodes that are part of the previous version of the
+    // database will not be overwritten by Group::commit(). This is
+    // necessary for robustness in the face of abrupt termination of
+    // the process. It also means that we can be sure that an array
+    // remains unchanged across a commit if the new ref is equal to
+    // the old ref and the ref is below the previous baseline.
+
+    ref_type new_ref = parent->get_child_ref(get_ndx_in_parent());
+    if (new_ref == m_ref && new_ref < old_baseline)
+        return false; // Has not changed
+
+    init_from_ref(new_ref);
+    return true; // Might have changed
 }
 
 
@@ -316,10 +330,10 @@ void Array::preset(int64_t min, int64_t max, size_t num_items)
 
 void Array::destroy_children() noexcept
 {
-    destroy_some_children(0);
+    destroy_last_children(0);
 }
 
-void Array::destroy_some_children(size_t offset) noexcept
+void Array::destroy_last_children(size_t offset) noexcept
 {
     for (size_t i = offset; i != m_size; ++i) {
         int64_t value = get(i);
@@ -629,12 +643,12 @@ void Array::truncate(size_t new_size)
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
 
-    DbElement::truncate(new_size);
+    DatabaseElement::truncate(new_size);
 
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (new_size == 0) {
-        m_capacity = calc_item_count(get_capacity_from_hdr(), 0);
+        m_capacity = get_zero_width_capacity();
         set_width(0);
         set_header_width(0);
     }
@@ -654,7 +668,7 @@ void Array::truncate_and_destroy_children(size_t new_size)
 
     if (m_has_refs) {
         size_t offset = new_size;
-        destroy_some_children(offset);
+        destroy_last_children(offset);
     }
 
     // Update size in accessor and in header. This leaves the capacity
@@ -665,7 +679,7 @@ void Array::truncate_and_destroy_children(size_t new_size)
     // If the array is completely cleared, we take the opportunity to
     // drop the width back to zero.
     if (new_size == 0) {
-        m_capacity = calc_item_count(get_capacity_from_hdr(), 0);
+        m_capacity = get_zero_width_capacity();
         set_width(0);
         set_header_width(0);
     }
@@ -701,7 +715,7 @@ void Array::set_all_to_zero()
 {
     copy_on_write(); // Throws
 
-    m_capacity = calc_item_count(get_capacity_from_hdr(), 0);
+    m_capacity = get_zero_width_capacity();
     set_width(0);
 
     // Update header
@@ -1466,7 +1480,7 @@ size_t Array::calc_aligned_byte_size(size_t size, int width)
 MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 {
     const char* header = mem.get_addr();
-    MemRef clone_mem = DbElement::clone(header, target_alloc);
+    MemRef clone_mem = DatabaseElement::clone(header, target_alloc);
     if (clone_mem) {
         return clone_mem;
     }

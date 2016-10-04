@@ -16,12 +16,12 @@
  *
  **************************************************************************/
 
-#include <realm/db_element.hpp>
+#include <realm/database_element.hpp>
 #include <iomanip>
 
 using namespace realm;
 
-MemRef DbElement::create_element(size_t size, Allocator& alloc, bool context_flag, Type type, WidthType width_type,
+MemRef DatabaseElement::create_element(size_t size, Allocator& alloc, bool context_flag, Type type, WidthType width_type,
                                  uint_least8_t width)
 {
     size_t byte_size_0 = calc_byte_size(width_type, size, width);
@@ -36,7 +36,7 @@ MemRef DbElement::create_element(size_t size, Allocator& alloc, bool context_fla
     return mem;
 }
 
-MemRef DbElement::clone(const char* header, Allocator& target_alloc)
+MemRef DatabaseElement::clone(const char* header, Allocator& target_alloc)
 {
     MemRef clone_mem;
 
@@ -64,7 +64,7 @@ MemRef DbElement::clone(const char* header, Allocator& target_alloc)
     return clone_mem;
 }
 
-void DbElement::init_from_mem(MemRef mem) noexcept
+void DatabaseElement::init_from_mem(MemRef mem) noexcept
 {
     char* header = mem.get_addr();
     // Parse header
@@ -91,7 +91,7 @@ void DbElement::init_from_mem(MemRef mem) noexcept
     }
 }
 
-bool DbElement::update_from_parent(size_t old_baseline) noexcept
+bool DatabaseElement::update_from_parent(size_t old_baseline) noexcept
 {
     auto parent = get_parent();
     REALM_ASSERT_DEBUG(is_attached());
@@ -112,7 +112,7 @@ bool DbElement::update_from_parent(size_t old_baseline) noexcept
     return true; // Might have changed
 }
 
-void DbElement::truncate(size_t new_size)
+void DatabaseElement::truncate(size_t new_size)
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(new_size, <=, m_size);
@@ -127,7 +127,7 @@ void DbElement::truncate(size_t new_size)
 
 // FIXME: It may be worth trying to combine this with copy_on_write()
 // to avoid two copies.
-void DbElement::alloc(size_t init_size, size_t width)
+void DatabaseElement::alloc(size_t init_size, size_t width)
 {
     REALM_ASSERT(is_attached());
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
@@ -188,7 +188,7 @@ void DbElement::alloc(size_t init_size, size_t width)
     set_header_size(init_size);
 }
 
-void DbElement::copy_on_write()
+void DatabaseElement::copy_on_write()
 {
 #if REALM_ENABLE_MEMDEBUG
     // We want to relocate this array regardless if there is a need or not, in order to catch use-after-free bugs.
@@ -241,7 +241,7 @@ void DbElement::copy_on_write()
     }
 }
 
-size_t DbElement::calc_byte_len(size_t num_items, size_t width) const
+size_t DatabaseElement::calc_byte_len(size_t num_items, size_t width) const
 {
     REALM_ASSERT_3(get_wtype_from_header(get_header_from_data(m_data)), ==, wtype_Bits);
 
@@ -257,7 +257,7 @@ size_t DbElement::calc_byte_len(size_t num_items, size_t width) const
     return bytes + header_size;    // add room for 8 byte header
 }
 
-size_t DbElement::calc_item_count(size_t bytes, size_t width) const noexcept
+size_t DatabaseElement::calc_item_count(size_t bytes, size_t width) const noexcept
 {
     if (width == 0)
         return std::numeric_limits<size_t>::max(); // Zero width gives "infinite" space
@@ -271,7 +271,7 @@ size_t DbElement::calc_item_count(size_t bytes, size_t width) const noexcept
 
 #ifdef REALM_DEBUG
 
-void DbElement::to_dot_parent_edge(std::ostream& out) const
+void DatabaseElement::to_dot_parent_edge(std::ostream& out) const
 {
     if (ArrayParent* parent = get_parent()) {
         size_t ndx_in_parent = get_ndx_in_parent();
