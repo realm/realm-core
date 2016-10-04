@@ -81,13 +81,8 @@ const char s7[] = "Sam";
 const int64_t ints[] = {0x1111,     0x11112222, 0x11113333, 0x1111333, 0x111122223333ull, 0x1111222233334ull,
                         0x22223333, 0x11112227, 0x11112227, 0x78923};
 
-struct nullable {
-    static constexpr bool value = true;
-};
-
-struct non_nullable {
-    static constexpr bool value = false;
-};
+using nullable = std::true_type;
+using non_nullable = std::false_type;
 
 } // anonymous namespace
 
@@ -778,8 +773,8 @@ TEST(StringIndex_FindAllNoCopyCommonPrefixStrings)
         const IntegerColumn results_c(Allocator::get_default(), ref_type(results.payload));
         CHECK_EQUAL(results_c.get(results.start_ndx), start_row + 1);
         CHECK_EQUAL(results_c.get(results.start_ndx + 1), start_row + 2);
-        CHECK_EQUAL(col.get(results_c.get(results.start_ndx)), spc);
-        CHECK_EQUAL(col.get(results_c.get(results.start_ndx + 1)), spc);
+        CHECK_EQUAL(col.get(to_size_t(results_c.get(results.start_ndx))), spc);
+        CHECK_EQUAL(col.get(to_size_t(results_c.get(results.start_ndx + 1))), spc);
 
         res = ndx.find_all_no_copy(spd, results);
         CHECK_EQUAL(res, FindRes_not_found);
@@ -791,9 +786,9 @@ TEST(StringIndex_FindAllNoCopyCommonPrefixStrings)
         CHECK_EQUAL(results_e.get(results.start_ndx), start_row + 3);
         CHECK_EQUAL(results_e.get(results.start_ndx + 1), start_row + 4);
         CHECK_EQUAL(results_e.get(results.start_ndx + 2), start_row + 5);
-        CHECK_EQUAL(col.get(results_e.get(results.start_ndx)), spe);
-        CHECK_EQUAL(col.get(results_e.get(results.start_ndx + 1)), spe);
-        CHECK_EQUAL(col.get(results_e.get(results.start_ndx + 2)), spe);
+        CHECK_EQUAL(col.get(to_size_t(results_e.get(results.start_ndx))), spe);
+        CHECK_EQUAL(col.get(to_size_t(results_e.get(results.start_ndx + 1))), spe);
+        CHECK_EQUAL(col.get(to_size_t(results_e.get(results.start_ndx + 2))), spe);
     };
 
     std::string std_max(StringIndex::s_max_offset, 'a');
@@ -962,7 +957,14 @@ namespace {
 StringData create_string_with_nuls(const size_t bits, const size_t length, char* tmp, Random& random)
 {
     for (size_t i = 0; i < length; ++i) {
-        tmp[i] = (bits & (1 << i)) == 0 ? '\0' : static_cast<char>(random.draw_int<int>(CHAR_MIN, CHAR_MAX));
+        bool insert_nul_at_pos = (bits & (1 << i)) != 0;
+        if (insert_nul_at_pos) {
+            tmp[i] = '\0';
+        } else {
+            // Avoid stray \0 chars, since we are already testing all combinations.
+            // All casts are necessary to preserve the bitpattern.
+            tmp[i] = static_cast<char>(static_cast<unsigned char>(random.draw_int<unsigned int>(1, UCHAR_MAX)));
+        }
     }
     return StringData(tmp, length);
 }
@@ -970,47 +972,52 @@ StringData create_string_with_nuls(const size_t bits, const size_t length, char*
 } // anonymous namespace
 
 
-// Test for generated strings of length 1..16 with all combinations of embedded NUL bytes
+// Test for generated strings of length 1..8/16 with all combinations of embedded NUL bytes
 TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
 
-    // String index
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), ref, nullable);
-    const StringIndex& ndx = *col.create_search_index();
+#if TEST_DURATION == 0
+    const size_t MAX_LENGTH = 8;
+    for (int seed = 0; seed < 5; seed++) {
+#else 
+    const size_t MAX_LENGTH = 16; // Test medium length strings
+    for (int seed = 0; seed < 100; seed++) {
+#endif
+        // String index
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn col(Allocator::get_default(), ref, nullable);
+        const StringIndex& ndx = *col.create_search_index();
+        char tmp[MAX_LENGTH];
 
-    const size_t MAX_LENGTH = 16; // Test medium
-    char tmp[MAX_LENGTH];         // this is a bit of a hack, that relies on the string being copied in column.add()
+        for (size_t length = 1; length <= MAX_LENGTH; ++length) {
+            {
+                Random random(seed);
+                const size_t combinations = 1 << length;
+                for (size_t i = 0; i < combinations; ++i) {
+                    StringData str = create_string_with_nuls(i, length, tmp, random);
+                    col.add(str);
+                }
+            }
 
-    for (size_t length = 1; length <= MAX_LENGTH; ++length) {
-
-        {
-            Random random(42);
-            const size_t combinations = 1 << length;
-            for (size_t i = 0; i < combinations; ++i) {
-                StringData str = create_string_with_nuls(i, length, tmp, random);
-                col.add(str);
+            // check index up to this length
+            size_t expected_index = 0;
+            for (size_t l = 1; l <= length; ++l) {
+                Random random(seed);
+                const size_t combinations = 1 << l;
+                for (size_t i = 0; i < combinations; ++i) {
+                    StringData needle = create_string_with_nuls(i, l, tmp, random);
+                    CHECK_EQUAL(ndx.find_first(needle), expected_index);
+                    CHECK_EQUAL(col.get(expected_index), needle);
+                    expected_index++;
+                }
             }
         }
 
-        // check index up to this length
-        size_t expected_index = 0;
-        for (size_t l = 1; l <= length; ++l) {
-            Random random(42);
-            const size_t combinations = 1 << l;
-            for (size_t i = 0; i < combinations; ++i) {
-                StringData needle = create_string_with_nuls(i, l, tmp, random);
-                CHECK_EQUAL(ndx.find_first(needle), expected_index);
-                CHECK(strncmp(col.get(expected_index).data(), needle.data(), l) == 0);
-                CHECK_EQUAL(col.get(expected_index).size(), needle.size());
-                expected_index++;
-            }
-        }
+        col.destroy();
     }
-
-    col.destroy();
 }
+
 
 // Tests for a bug with strings containing zeroes
 TEST_TYPES(StringIndex_EmbeddedZeroes, non_nullable, nullable)
