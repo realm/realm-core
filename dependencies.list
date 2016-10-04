@@ -1,1 +1,2 @@
-VERSION=2.1.0
+PACKAGE_NAME=realm-core
+VERSION=2.1.1

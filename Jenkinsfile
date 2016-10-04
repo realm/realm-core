@@ -5,78 +5,83 @@ try {
   def gitSha
   def dependencies
 
-  stage('gather-info') {
-    node {
-      checkout([
-        $class: 'GitSCM',
-        branches: scm.branches,
-        gitTool: 'native git',
-        extensions: scm.extensions + [[$class: 'CleanCheckout']],
-        userRemoteConfigs: scm.userRemoteConfigs
-      ])
-      sh 'git archive -o core.zip HEAD'
-      stash includes: 'core.zip', name: 'core-source'
+  timeout(time: 1, unit: 'HOURS') {
+    stage('gather-info') {
+      node {
+        checkout([
+          $class: 'GitSCM',
+          branches: scm.branches,
+          gitTool: 'native git',
+          extensions: scm.extensions + [[$class: 'CleanCheckout']],
+          userRemoteConfigs: scm.userRemoteConfigs
+        ])
+        sh 'git archive -o core.zip HEAD'
+        stash includes: 'core.zip', name: 'core-source'
 
-      dependencies = readProperties file: 'dependencies.list'
-      echo "VERSION: ${dependencies.VERSION}"
+        dependencies = readProperties file: 'dependencies.list'
+        echo "VERSION: ${dependencies.VERSION}"
 
-      gitTag = readGitTag()
-      gitSha = readGitSha()
-      echo "tag: ${gitTag}"
-      if (gitTag == "") {
-        echo "No tag given for this build"
-        setBuildName(gitSha)
-      } else {
-        if (gitTag != "v${dependencies.VERSION}") {
-          echo "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
+        gitTag = readGitTag()
+        gitSha = readGitSha()
+        echo "tag: ${gitTag}"
+        if (gitTag == "") {
+          echo "No tag given for this build"
+          setBuildName(gitSha)
         } else {
-          echo "Building release: '${gitTag}'"
-          setBuildName("Tag ${gitTag}")
+          if (gitTag != "v${dependencies.VERSION}") {
+            def message = "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
+            echo message
+            throw new IllegalStateException(message)
+          } else {
+            echo "Building release: '${gitTag}'"
+            setBuildName("Tag ${gitTag}")
+          }
         }
       }
+
+      rpmVersion = dependencies.VERSION.replaceAll("-", "_")
+      echo "rpm version: ${rpmVersion}"
     }
 
-    rpmVersion = dependencies.VERSION.replaceAll("-", "_")
-    echo "rpm version: ${rpmVersion}"
-  }
+    stage('check') {
+      parallelExecutors = [
+        checkLinuxRelease: doBuildInDocker('check'),
+        checkLinuxDebug: doBuildInDocker('check-debug'),
+        buildCocoa: doBuildCocoa(gitTag),
+        buildNodeLinux: doBuildNodeInDocker(gitTag),
+        buildNodeOsx: doBuildNodeInOsx(gitTag),
+        buildDotnetOsx: doBuildDotNetOsx(gitTag),
+        buildAndroid: doBuildAndroid(gitTag),
+        addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
+        //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
+      ]
 
-  stage('check') {
-    parallelExecutors = [
-      checkLinuxRelease: doBuildInDocker('check'),
-      checkLinuxDebug: doBuildInDocker('check-debug'),
-      buildCocoa: doBuildCocoa(),
-      buildNodeLinux: doBuildNodeInDocker(),
-      buildNodeOsx: doBuildNodeInOsx(),
-      buildDotnetOsx: doBuildDotNetOsx(),
-      buildAndroid: doBuildAndroid(),
-      addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
-      //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
-    ]
+      if (env.CHANGE_TARGET) {
+        parallelExecutors['diffCoverage'] = buildDiffCoverage()
+      }
 
-    if (env.CHANGE_TARGET) {
-      parallelExecutors['diffCoverage'] = buildDiffCoverage()
+      parallel parallelExecutors
     }
 
-    parallel parallelExecutors
-  }
-
-  stage('build-packages') {
-    parallel(
-      generic: doBuildPackage('generic', 'tgz'),
-      centos7: doBuildPackage('centos-7', 'rpm'),
-      centos6: doBuildPackage('centos-6', 'rpm'),
-      ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
-    )
-  }
-
-  if (['master', 'next-major'].contains(env.BRANCH_NAME) || gitTag != "") {
-    stage('publish-packages') {
+    stage('build-packages') {
       parallel(
-        generic: doPublishGeneric(),
-        centos7: doPublish('centos-7', 'rpm', 'el', 7),
-        centos6: doPublish('centos-6', 'rpm', 'el', 6),
-        ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
+        generic: doBuildPackage('generic', 'tgz'),
+        centos7: doBuildPackage('centos-7', 'rpm'),
+        centos6: doBuildPackage('centos-6', 'rpm'),
+        ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
       )
+    }
+
+    if (['master', 'next-major'].contains(env.BRANCH_NAME) || gitTag != "") {
+      stage('publish-packages') {
+        parallel(
+          generic: doPublishGeneric(),
+          centos7: doPublish('centos-7', 'rpm', 'el', 7),
+          centos6: doPublish('centos-6', 'rpm', 'el', 6),
+          ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
+          others: doPublishLocalArtifacts()
+        )
+      }
     }
   }
 } catch(Exception e) {
@@ -84,7 +89,16 @@ try {
   throw e
 }
 
-def doBuildCocoa() {
+def buildDockerEnv(name) {
+  docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
+    env.DOCKER_REGISTRY = '012067661104.dkr.ecr.eu-west-1.amazonaws.com'
+    sh "./packaging/docker_build.sh $name ."
+  }
+
+  return docker.image(name)
+}
+
+def doBuildCocoa(def gitTag) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -94,7 +108,7 @@ def doBuildCocoa() {
           'PATH=$PATH:/usr/local/bin',
           'REALM_ENABLE_ENCRYPTION=yes',
           'REALM_ENABLE_ASSERTIONS=yes',
-          'MAKEFLAGS=\'CFLAGS_DEBUG=-Oz\'',
+          'MAKEFLAGS=CFLAGS_DEBUG\\=-Oz',
           'UNITTEST_SHUFFLE=1',
           'UNITTEST_REANDOM_SEED=random',
           'UNITTEST_XML=1',
@@ -107,7 +121,7 @@ def doBuildCocoa() {
               sh build.sh build-cocoa
               sh build.sh check-debug
 
-              # Repack the release with just what we need so that it's not a 1 GB download
+              # Repack the release with just what we need so that it is not a 1 GB download
               version=$(sh build.sh get-version)
               tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
               (
@@ -124,7 +138,10 @@ def doBuildCocoa() {
 
               cp core-*.tar.xz realm-core-latest.tar.xz
             '''
-            archive '*core-*.*.*.tar.xz'
+            if (gitTag) {
+              stash includes: '*core-*.*.*.tar.xz', name: 'cocoa-package'
+            }
+            archiveArtifacts artifacts: '*core-*.*.*.tar.xz'
 
             sh 'sh build.sh clean'
         }
@@ -139,7 +156,7 @@ def doBuildCocoa() {
   }
 }
 
-def doBuildDotNetOsx() {
+def doBuildDotNetOsx(def gitTag) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -150,7 +167,7 @@ def doBuildDotNetOsx() {
           'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer',
           'REALM_ENABLE_ENCRYPTION=yes',
           'REALM_ENABLE_ASSERTIONS=yes',
-          'MAKEFLAGS=\'CFLAGS_DEBUG=-Oz\'',
+          'MAKEFLAGS=CFLAGS_DEBUG\\=-Oz',
           'UNITTEST_SHUFFLE=1',
           'UNITTEST_REANDOM_SEED=random',
           'UNITTEST_XML=1',
@@ -161,7 +178,7 @@ def doBuildDotNetOsx() {
               sh build.sh config $dir/install
               sh build.sh build-dotnet-cocoa
 
-              # Repack the release with just what we need so that it's not a 1 GB download
+              # Repack the release with just what we need so that it is not a 1 GB download
               version=$(sh build.sh get-version)
               tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
               (
@@ -178,7 +195,10 @@ def doBuildDotNetOsx() {
 
               cp realm-core-dotnet-cocoa-*.tar.bz2 realm-core-dotnet-cocoa-latest.tar.bz2
             '''
-            archive '*core-*.*.*.tar.bz2'
+            if (gitTag) {
+              stash includes: '*core-*.*.*.tar.bz2', name: 'dotnet-package'
+            }
+            archiveArtifacts artifacts: '*core-*.*.*.tar.bz2'
 
             sh 'sh build.sh clean'
         }
@@ -198,7 +218,7 @@ def doBuildInDocker(String command) {
     node('docker') {
       getArchive()
 
-      def buildEnv = docker.build 'realm-core:snapshot'
+      def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       def environment = environment()
       withEnv(environment) {
         buildEnv.inside {
@@ -226,7 +246,7 @@ def buildDiffCoverage() {
         userRemoteConfigs: scm.userRemoteConfigs
       ])
 
-      def buildEnv = docker.build 'realm-core:snapshot'
+      def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       def environment = environment()
       withEnv(environment) {
         buildEnv.inside {
@@ -263,12 +283,12 @@ def buildDiffCoverage() {
   }
 }
 
-def doBuildNodeInDocker() {
+def doBuildNodeInDocker(def gitTag) {
   return {
     node('docker') {
       getArchive()
-
-      def buildEnv = docker.build 'realm-core:snapshot'
+      
+      def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
       withEnv(environment) {
         buildEnv.inside {
@@ -276,7 +296,10 @@ def doBuildNodeInDocker() {
           try {
               sh 'sh build.sh build-node-package'
               sh 'cp realm-core-node-*.tar.gz realm-core-node-linux-latest.tar.gz'
-              archive '*realm-core-node-linux-*.*.*.tar.gz'
+              if (gitTag) {
+                stash includes: '*realm-core-node-linux-*.*.*.tar.gz', name: 'node-linux-package'
+              }
+              archiveArtifacts artifacts: '*realm-core-node-linux-*.*.*.tar.gz'
               withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
                 sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core'
               }
@@ -289,7 +312,7 @@ def doBuildNodeInDocker() {
   }
 }
 
-def doBuildNodeInOsx() {
+def doBuildNodeInOsx(def gitTag) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -300,7 +323,10 @@ def doBuildNodeInOsx() {
         try {
           sh 'sh build.sh build-node-package'
           sh 'cp realm-core-node-*.tar.gz realm-core-node-osx-latest.tar.gz'
-          archive '*realm-core-node-osx-*.*.*.tar.gz'
+          if (gitTag) {
+            stash includes: '*realm-core-node-osx-*.*.*.tar.gz', name: 'node-cocoa-package'
+          }
+          archiveArtifacts artifacts: '*realm-core-node-osx-*.*.*.tar.gz'
 
           sh 'sh build.sh clean'
 
@@ -315,7 +341,7 @@ def doBuildNodeInOsx() {
   }
 }
 
-def doBuildAndroid() {
+def doBuildAndroid(def gitTag) {
     def target = 'build-android'
     def buildName = "android-${target}-with-encryption"
 
@@ -333,7 +359,10 @@ def doBuildAndroid() {
               sh "sh build.sh config '${pwd()}/install'"
               sh "sh build.sh ${target}"
             }
-            archive 'realm-core-android-*.tar.gz'
+            if (gitTag) {
+              stash includes: 'realm-core-android-*.tar.gz', name: 'android-package'
+            }
+            archiveArtifacts artifacts: 'realm-core-android-*.tar.gz'
 
             dir('test/android') {
                 sh '$ANDROID_HOME/tools/android update project -p . --target android-9'
@@ -508,12 +537,15 @@ def doBuildPackage(distribution, fileType) {
     node('docker') {
       getSourceArchive()
 
-      withCredentials([[$class: 'StringBinding', credentialsId: 'packagecloud-sync-devel-master-token', variable: 'PACKAGECLOUD_MASTER_TOKEN']]) {
-        sh "sh packaging/package.sh ${distribution}"
+      docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
+        env.DOCKER_REGISTRY = '012067661104.dkr.ecr.eu-west-1.amazonaws.com'
+        withCredentials([[$class: 'StringBinding', credentialsId: 'packagecloud-sync-devel-master-token', variable: 'PACKAGECLOUD_MASTER_TOKEN']]) {
+          sh "sh packaging/package.sh ${distribution}"
+        }
       }
 
       dir('packaging/out') {
-        step([$class: 'ArtifactArchiver', artifacts: "${distribution}/*.${fileType}", fingerprint: true])
+        archiveArtifacts artifacts: "${distribution}/*.${fileType}"
         stash includes: "${distribution}/*.${fileType}", name: "packages-${distribution}"
       }
     }
@@ -568,6 +600,22 @@ def doPublishGeneric() {
         profileName: 'hub-jenkins-user',
         userMetadata: []
       ])
+    }
+  }
+}
+
+def doPublishLocalArtifacts() {
+  // TODO create a Dockerfile for an image only containing s3cmd
+  return {
+    node('dk01') {
+      unstash 'cocoa-package'
+      unstash 'dotnet-package'
+      unstash 'node-linux-package'
+      unstash 'node-cocoa-package'
+      unstash 'android-package'
+      withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+        sh 'find . -type f -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core \\;'
+      }
     }
   }
 }

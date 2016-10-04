@@ -294,8 +294,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
         if (fr != FindRes_column)
             return;
 
-        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
-        matches.get_root_array()->init_from_ref(result.payload);
+        IntegerColumn matches(col.get_alloc(), result.payload);
 
         CHECK_EQUAL(3, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(3, matches.size());
@@ -314,8 +313,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
         if (fr != FindRes_column)
             return;
 
-        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
-        matches.get_root_array()->init_from_ref(result.payload);
+        IntegerColumn matches(col.get_alloc(), result.payload);
 
         CHECK_EQUAL(3, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(3, matches.size());
@@ -334,8 +332,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
         if (fr != FindRes_column)
             return;
 
-        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
-        matches.get_root_array()->init_from_ref(result.payload);
+        IntegerColumn matches(col.get_alloc(), result.payload);
 
         CHECK_EQUAL(2, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(2, matches.size());

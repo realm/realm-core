@@ -229,16 +229,11 @@ download_openssl()
     fi
 
     echo 'Downloading OpenSSL...'
-    openssl_ver='1.0.1u'
+    openssl_ver='1.0.2j'
     curl -L -s "http://www.openssl.org/source/openssl-${openssl_ver}.tar.gz" -o openssl.tar.gz || return 1
     tar -xzf openssl.tar.gz || return 1
     mv openssl-$openssl_ver openssl || return 1
     rm openssl.tar.gz || return 1
-
-    # A function we don't use calls OPENSSL_cleanse, which has all sorts of
-    # dependencies due to being written in asm
-    sed '/OPENSSL_cleanse/d' 'openssl/crypto/sha/sha256.c' > sha_tmp
-    mv sha_tmp 'openssl/crypto/sha/sha256.c'
 }
 
 # Setup OS specific stuff
@@ -971,14 +966,6 @@ EOF
                         AR="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ar")" || exit 1
                         RANLIB="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ranlib")" || exit 1
                         $AR x "$repodir/$ANDROID_DIR/$libcrypto_name" || exit 1
-                        find \
-                          . ! -name 'aes*' \
-                          -a ! -name cbc128.o \
-                          -a ! -name sha256.o \
-                          -a ! -name sha256-586.o \
-                          -a ! -name mem_clr.o \
-                          -delete || exit 1
-                        rm -f aes_wrap.o
                         $AR x "$repodir/src/realm/$lib_name" || exit 1
                         $AR r "$repodir/$ANDROID_DIR/$lib_name" *.o || exit 1
                         $RANLIB "$repodir/$ANDROID_DIR/$lib_name"
