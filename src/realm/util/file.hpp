@@ -500,6 +500,8 @@ public:
 
         tmp = checksum();
 
+        std::cerr << "u=" << (int)tmp << " ";
+
         seek(22);
         write(&tmp, 1);
     }
@@ -509,6 +511,9 @@ public:
         if (!is_attached())
             return;
 
+        std::cerr << "i";
+
+
         char tmp;
 
         tmp = 123;
@@ -517,15 +522,34 @@ public:
         write(&tmp, 1);
     }
 
+    char get_checksum()
+    {
+        if (!is_attached())
+            return 123;
+
+
+        char tmp2;
+
+        seek(22);
+        read(&tmp2, 1);
+
+        std::cerr << "g=" << (int)tmp2 << " ";
+
+        return tmp2;
+    }
+
     bool verify_checksum()
     {
         if (!is_attached())
             return true;
 
+
         char tmp;
         char tmp2;
 
         tmp = checksum();
+
+        std::cerr << "v=" << int(tmp) << " ";
 
         seek(22);
         read(&tmp2, 1);

@@ -95,7 +95,11 @@ SlabAlloc::SlabAlloc()
 
 util::File& SlabAlloc::get_file()
 {
-    return m_file_mappings->m_file;
+    static File f;
+    if (m_file_mappings)
+        return m_file_mappings->m_file;
+    else
+        return f;
 }
 
 

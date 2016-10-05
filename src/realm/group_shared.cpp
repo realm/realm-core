@@ -1144,10 +1144,14 @@ bool SharedGroup::compact()
         File file;
         file.open(tmp_path, File::access_ReadWrite, File::create_Must, 0);
         m_group.write(file, m_key, info->latest_version_number);
+        
         // Data needs to be flushed to the disk before renaming.
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
             file.sync(); // Throws
+
+        file.update_checksum();
+
 #ifndef _WIN32
         util::File::move(tmp_path, m_db_path);
 #endif
@@ -1599,6 +1603,11 @@ SharedGroup::version_type SharedGroup::commit()
 
     m_group.m_alloc.get_file().invalidate_checksum();
     version_type new_version = do_commit(); // Throws
+
+    char crc = m_group.m_alloc.get_file().get_checksum();
+    if (crc != 123)
+        crc = crc;
+
     m_group.m_alloc.get_file().update_checksum();
 
     do_end_write();

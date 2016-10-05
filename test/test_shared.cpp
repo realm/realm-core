@@ -1189,7 +1189,7 @@ TEST(Shared_WriterThreads)
         // Create a new shared db
         SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
 
-        const size_t thread_count = 10;
+        const size_t thread_count = 2;
         // Create first table in group
         {
             WriteTransaction wt(sg);
