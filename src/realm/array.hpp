@@ -1564,9 +1564,9 @@ inline void Array::destroy_deep(MemRef mem, Allocator& alloc) noexcept
 
 inline void Array::adjust(size_t ndx, int_fast64_t diff)
 {
+    REALM_ASSERT_3(ndx, <=, m_size);
     if (diff != 0) {
         // FIXME: Should be optimized
-        REALM_ASSERT_3(ndx, <=, m_size);
         int_fast64_t v = get(ndx);
         set(ndx, int64_t(v + diff)); // Throws
     }
