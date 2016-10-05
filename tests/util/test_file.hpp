@@ -27,6 +27,11 @@
 #if REALM_ENABLE_SYNC
 #include <realm/sync/client.hpp>
 #include <realm/sync/server.hpp>
+
+namespace realm {
+struct SyncConfig;
+}
+
 #endif
 
 struct TestFile : realm::Realm::Config {
@@ -50,6 +55,10 @@ void advance_and_notify(realm::Realm& realm);
 
 #if REALM_ENABLE_SYNC
 
+struct SyncTestFile : TestFile {
+    SyncTestFile(const realm::SyncConfig&);
+};
+
 #define TEST_ENABLE_SYNC_LOGGING 0 // change to 1 to enable logging
 
 struct TestLogger : realm::util::Logger::LevelThreshold, realm::util::Logger {
@@ -58,7 +67,6 @@ struct TestLogger : realm::util::Logger::LevelThreshold, realm::util::Logger {
     TestLogger() : Logger::LevelThreshold(), Logger(static_cast<Logger::LevelThreshold&>(*this)) { }
 
     static realm::sync::Server::Config server_config();
-    static realm::sync::Client::Config client_config();
 };
 
 class SyncServer {

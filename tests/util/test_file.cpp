@@ -22,6 +22,7 @@
 #include "util/format.hpp"
 
 #if REALM_ENABLE_SYNC
+#include "sync_config.hpp"
 #include "sync_manager.hpp"
 #endif
 
@@ -68,20 +69,14 @@ InMemoryTestFile::InMemoryTestFile()
 
 #if REALM_ENABLE_SYNC
 
-sync::Server::Config TestLogger::server_config() {
-    sync::Server::Config config;
-#if TEST_ENABLE_SYNC_LOGGING
-    auto logger = new util::StderrLogger;
-    logger->set_level_threshold(util::Logger::Level::all);
-    config.logger = logger;
-#else
-    config.logger = new TestLogger;
-#endif
-    return config;
+SyncTestFile::SyncTestFile(const SyncConfig& sync_config)
+{
+    this->sync_config = std::make_shared<SyncConfig>(sync_config);
+    schema_mode = SchemaMode::Additive;
 }
 
-sync::Client::Config TestLogger::client_config() {
-    sync::Client::Config config;
+sync::Server::Config TestLogger::server_config() {
+    sync::Server::Config config;
 #if TEST_ENABLE_SYNC_LOGGING
     auto logger = new util::StderrLogger;
     logger->set_level_threshold(util::Logger::Level::all);
@@ -95,7 +90,12 @@ sync::Client::Config TestLogger::client_config() {
 SyncServer::SyncServer()
 : m_server(util::make_temp_dir(), util::none, TestLogger::server_config())
 {
+#if TEST_ENABLE_SYNC_LOGGING
+    SyncManager::shared().set_log_level(util::Logger::Level::all);
+#else
     SyncManager::shared().set_log_level(util::Logger::Level::off);
+#endif
+
     uint64_t port;
     while (true) {
         // Try to pick a random available port, or loop forever if other

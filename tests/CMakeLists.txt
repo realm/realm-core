@@ -23,6 +23,10 @@ set(SOURCES
     util/test_file.cpp
 )
 
+if(REALM_ENABLE_SYNC)
+    list(APPEND SOURCES sync.cpp)
+endif()
+
 add_executable(tests ${SOURCES} ${HEADERS})
 target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
 target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
