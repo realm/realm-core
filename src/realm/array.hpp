@@ -1564,17 +1564,21 @@ inline void Array::destroy_deep(MemRef mem, Allocator& alloc) noexcept
 
 inline void Array::adjust(size_t ndx, int_fast64_t diff)
 {
-    // FIXME: Should be optimized
-    REALM_ASSERT_3(ndx, <=, m_size);
-    int_fast64_t v = get(ndx);
-    set(ndx, int64_t(v + diff)); // Throws
+    if (diff != 0) {
+        // FIXME: Should be optimized
+        REALM_ASSERT_3(ndx, <=, m_size);
+        int_fast64_t v = get(ndx);
+        set(ndx, int64_t(v + diff)); // Throws
+    }
 }
 
 inline void Array::adjust(size_t begin, size_t end, int_fast64_t diff)
 {
-    // FIXME: Should be optimized
-    for (size_t i = begin; i != end; ++i)
-        adjust(i, diff); // Throws
+    if (diff != 0) {
+        // FIXME: Should be optimized
+        for (size_t i = begin; i != end; ++i)
+            adjust(i, diff); // Throws
+    }
 }
 
 
