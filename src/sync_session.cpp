@@ -382,13 +382,15 @@ void SyncSession::nonsync_transact_notify(sync::Session::version_type version)
 
 void SyncSession::revive_if_needed()
 {
-    bool need_login;
+    util::Optional<std::function<SyncLogInHandler>&> log_in_handler;
     {
         std::unique_lock<std::mutex> lock(m_state_mutex);
-        need_login = m_state->revive_if_needed(lock, *this);
+        if (m_state->revive_if_needed(lock, *this)) {
+            log_in_handler = m_config.log_in_handler;
+        }
     }
-    if (need_login)
-        SyncManager::shared().get_sync_login_function()(m_realm_path, m_config);
+    if (log_in_handler)
+        log_in_handler.value()(m_realm_path, m_config);
 }
 
 void SyncSession::log_out()
