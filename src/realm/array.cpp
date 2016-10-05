@@ -757,16 +757,20 @@ void Array::set_all_to_zero()
 
 void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 {
-    for (size_t i = 0, n = size(); i != n;) {
-        REALM_TEMPEX(i = adjust_ge, m_width, (i, n, limit, diff))
+    if (diff != 0) {
+        // Check if we need to copy before modifying
+        copy_on_write(); // Throws
+
+        for (size_t i = 0, n = size(); i != n;) {
+            REALM_TEMPEX(i = adjust_ge, m_width, (i, n, limit, diff))
+        }
     }
 }
 
 template <size_t w>
 size_t Array::adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff)
 {
-    // Check if we need to copy before modifying
-    copy_on_write(); // Throws
+    REALM_ASSERT_DEBUG(diff != 0);
 
     for (size_t i = start; i != end; ++i) {
         int_fast64_t v = get<w>(i);
