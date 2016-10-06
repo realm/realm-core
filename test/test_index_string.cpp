@@ -81,13 +81,8 @@ const char s7[] = "Sam";
 const int64_t ints[] = {0x1111,     0x11112222, 0x11113333, 0x1111333, 0x111122223333ull, 0x1111222233334ull,
                         0x22223333, 0x11112227, 0x11112227, 0x78923};
 
-struct nullable {
-    static constexpr bool value = true;
-};
-
-struct non_nullable {
-    static constexpr bool value = false;
-};
+using nullable = std::true_type;
+using non_nullable = std::false_type;
 
 } // anonymous namespace
 
