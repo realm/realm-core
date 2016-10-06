@@ -101,9 +101,22 @@ public:
     Mutex();
     ~Mutex() noexcept;
 
-    struct process_shared_tag {
+    struct no_destruction_tag {
     };
 
+    // Configure this mutex to ignore destruction. This should be used
+    // ONLY for a mutex placed in a global variable. Global variables
+    // are destroyed on exit of the main thread, but some use cases
+    // indicate that background threads may still be alive and accessing
+    // the mutex after destruction. This leads to apps failing.
+    // For global variables, it is ok not to destroy the mutex properly.
+    // When the process terminates, the kernel will release the resources
+    // in any case. This facility should *never* be used for process
+    // shared mutexes.
+    Mutex(no_destruction_tag);
+
+    struct process_shared_tag {
+    };
     /// Initialize this mutex for use across multiple processes. When
     /// constructed this way, the instance may be placed in memory
     /// shared by multiple processes, as well as in a memory mapped
@@ -121,6 +134,7 @@ public:
 
 protected:
     pthread_mutex_t m_impl = PTHREAD_MUTEX_INITIALIZER;
+    bool do_not_destroy = false;
 
     struct no_init_tag {
     };
@@ -389,8 +403,16 @@ inline Mutex::Mutex(process_shared_tag)
     init_as_process_shared(robust_if_available);
 }
 
+inline Mutex::Mutex(no_destruction_tag)
+{
+    do_not_destroy = true;
+}
+
 inline Mutex::~Mutex() noexcept
 {
+    if (do_not_destroy)
+        return;
+
     int r = pthread_mutex_destroy(&m_impl);
     if (REALM_UNLIKELY(r != 0))
         destroy_failed(r);
