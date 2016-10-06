@@ -375,12 +375,14 @@ void NotifierPackage::package_and_wait(SharedGroup& sg)
     auto target_version = sgf::get_version_of_latest_snapshot(sg);
     m_lock->lock();
     m_cv->wait(*m_lock, [&] {
-        return std::all_of(begin(m_notifiers), end(m_notifiers),
-                           [&](auto const& n) { return n->version().version >= target_version; });
+        return std::all_of(begin(m_notifiers), end(m_notifiers), [&](auto const& n) {
+            return !n->have_callbacks() || n->version().version >= target_version;
+        });
     });
     for (auto& notifier : m_notifiers) {
-        notifier->package_for_delivery();
-        m_version = notifier->version();
+        auto ver = notifier->package_for_delivery();
+        if (ver != VersionID{})
+            m_version = ver;
     }
     m_lock->unlock();
     m_lock = nullptr;

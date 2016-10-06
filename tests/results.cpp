@@ -343,6 +343,19 @@ TEST_CASE("notifications: async delivery") {
             thread.join();
         }
 
+        SECTION("refresh() does not block for results without callbacks") {
+            token = {};
+            // this would deadlock if it waits for the notifier to be ready
+            r->refresh();
+        }
+
+        SECTION("begin_transaction() does not block for results without callbacks") {
+            token = {};
+            // this would deadlock if it waits for the notifier to be ready
+            r->begin_transaction();
+            r->cancel_transaction();
+        }
+
         SECTION("begin_transaction() does not block for Results for different Realms") {
             // this would deadlock if beginning the write on the secondary Realm
             // waited for the primary Realm to be ready

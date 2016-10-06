@@ -624,7 +624,7 @@ std::unique_lock<std::mutex> RealmCoordinator::wait_for_notifiers(Realm& realm, 
         if (m_async_error)
             return true;
         return std::all_of(begin(m_notifiers), end(m_notifiers), [&](auto const& n) {
-            return n->version().version >= min_version || !n->is_for_realm(realm);
+            return n->version().version >= min_version || !n->have_callbacks() || !n->is_for_realm(realm);
         });
     });
     return lock;
