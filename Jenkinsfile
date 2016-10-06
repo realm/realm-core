@@ -138,9 +138,8 @@ def doBuildCocoa(def gitTag) {
 
               cp core-*.tar.xz realm-core-latest.tar.xz
             '''
-            if (gitTag) {
-              stash includes: '*core-*.*.*.tar.xz', name: 'cocoa-package'
-            }
+
+            stash includes: '*core-*.*.*.tar.xz', name: 'cocoa-package'
             archiveArtifacts artifacts: '*core-*.*.*.tar.xz'
 
             sh 'sh build.sh clean'
