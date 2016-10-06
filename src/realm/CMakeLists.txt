@@ -256,14 +256,16 @@ install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
 install(FILES ${REALM_INSTALL_UTIL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util)
 
-add_executable(realm-config config_tool.cpp)
-add_executable(realm-importer importer_tool.cpp)
-target_link_libraries(realm-importer realm)
+if (NOT APPLE AND NOT ANDROID)
+    add_executable(realm-config config_tool.cpp)
+    add_executable(realm-importer importer_tool.cpp)
+    target_link_libraries(realm-importer realm)
 
-install(TARGETS realm-config realm-importer
-        DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(TARGETS realm-config realm-importer
+            DESTINATION ${CMAKE_INSTALL_BINDIR})
 
-add_executable(realmd realmd.cpp)
-target_link_libraries(realmd realm)
-install(TARGETS realmd
-        DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+    add_executable(realmd realmd.cpp)
+    target_link_libraries(realmd realm)
+    install(TARGETS realmd
+            DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
+endif()
