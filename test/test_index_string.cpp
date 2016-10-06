@@ -976,6 +976,7 @@ StringData create_string_with_nuls(const size_t bits, const size_t length, char*
 TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
+    constexpr unsigned int seed = 42;
 
     // String index
     ref_type ref = StringColumn::create(Allocator::get_default());
@@ -988,7 +989,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
     for (size_t length = 1; length <= MAX_LENGTH; ++length) {
 
         {
-            Random random(42);
+            Random random(seed);
             const size_t combinations = 1 << length;
             for (size_t i = 0; i < combinations; ++i) {
                 StringData str = create_string_with_nuls(i, length, tmp, random);
@@ -999,7 +1000,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
         // check index up to this length
         size_t expected_index = 0;
         for (size_t l = 1; l <= length; ++l) {
-            Random random(42);
+            Random random(seed);
             const size_t combinations = 1 << l;
             for (size_t i = 0; i < combinations; ++i) {
                 StringData needle = create_string_with_nuls(i, l, tmp, random);
