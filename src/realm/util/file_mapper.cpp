@@ -92,7 +92,7 @@ struct mapping_and_addr {
     size_t size;
 };
 
-util::Mutex mapping_mutex;
+util::Mutex mapping_mutex(Mutex::no_destruction_tag());
 std::vector<mapping_and_addr> mappings_by_addr;
 std::vector<mappings_for_file> mappings_by_file;
 

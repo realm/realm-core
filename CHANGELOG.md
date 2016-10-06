@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed a race between destruction of a global mutex as part of main thread exit
+  and attempt to lock it on a background thread. (issue #2238)
 
 ### Breaking changes
 
