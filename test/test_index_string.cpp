@@ -957,7 +957,14 @@ namespace {
 StringData create_string_with_nuls(const size_t bits, const size_t length, char* tmp, Random& random)
 {
     for (size_t i = 0; i < length; ++i) {
-        tmp[i] = (bits & (1 << i)) == 0 ? '\0' : static_cast<char>(random.draw_int<int>(CHAR_MIN, CHAR_MAX));
+        bool insert_nul_at_pos = (bits & (1 << i)) == 0;
+        if (insert_nul_at_pos) {
+            tmp[i] = '\0';
+        } else {
+            // Avoid stray \0 chars, since we are already testing all combinations.
+            // All casts are necessary to preserve the bitpattern.
+            tmp[i] = static_cast<char>(static_cast<unsigned char>(random.draw_int<unsigned int>(1, UCHAR_MAX)));
+        }
     }
     return StringData(tmp, length);
 }
