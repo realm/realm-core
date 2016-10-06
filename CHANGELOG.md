@@ -2,8 +2,7 @@
 
 ### Bugfixes
 
-* When adding a nullable column of type Float while other columns existed
-  already, the values of the new column would be non-null. This is now fixed.
+* Lorem ipsum.
 
 ### Breaking changes
 
