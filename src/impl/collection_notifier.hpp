@@ -138,6 +138,7 @@ public:
 
     // Get the SharedGroup version which this collection can attach to (if it's
     // in handover mode), or can deliver to (if it's been handed over to the BG worker alredad)
+    // precondition: RealmCoordinator::m_notifier_mutex is locked
     VersionID version() const noexcept { return m_sg_version; }
 
     // Release references to all core types
@@ -146,34 +147,46 @@ public:
     // CollectionNotifier is released on a different thread
     virtual void release_data() noexcept = 0;
 
-    // Prepare to deliver the new collection and call callbacks. Returns the
-    // transaction version which it can deliver to if applicable, and a
-    // default-constructed version if this notifier has nothing to deliver.
-    VersionID package_for_delivery();
+    // Prepare to deliver the new collection and call callbacks.
+    // Returns whether or not it has anything to deliver.
+    // precondition: RealmCoordinator::m_notifier_mutex is locked
+    bool package_for_delivery();
 
     // Deliver the new state to the target collection using the given SharedGroup
+    // precondition: RealmCoordinator::m_notifier_mutex is unlocked
     virtual void deliver(SharedGroup&) { }
 
     // Pass the given error to all registered callbacks, then remove them
+    // precondition: RealmCoordinator::m_notifier_mutex is unlocked
     void deliver_error(std::exception_ptr);
 
     // Call each of the given callbacks with the changesets prepared by package_for_delivery()
+    // precondition: RealmCoordinator::m_notifier_mutex is unlocked
     void before_advance();
     void after_advance();
 
     bool is_alive() const noexcept;
 
+    // precondition: RealmCoordinator::m_notifier_mutex is locked *or* is called on worker thread
+    bool has_run() const noexcept { return m_has_run; }
+
     // Attach the handed-over query to `sg`. Must not be already attached to a SharedGroup.
+    // precondition: RealmCoordinator::m_notifier_mutex is locked
     void attach_to(SharedGroup& sg);
     // Create a new query handover object and stop using the previously attached
     // SharedGroup
+    // precondition: RealmCoordinator::m_notifier_mutex is locked
     void detach();
 
     // Set `info` as the new ChangeInfo that will be populated by the next
     // transaction advance, and register all required information in it
+    // precondition: RealmCoordinator::m_notifier_mutex is locked
     void add_required_change_info(TransactionChangeInfo& info);
 
+    // precondition: RealmCoordinator::m_notifier_mutex is unlocked
     virtual void run() = 0;
+
+    // precondition: RealmCoordinator::m_notifier_mutex is locked
     void prepare_handover();
 
     template <typename T>
@@ -200,6 +213,7 @@ private:
     VersionID m_sg_version;
     SharedGroup* m_sg = nullptr;
 
+    bool m_has_run = false;
     bool m_error = false;
     CollectionChangeBuilder m_accumulated_changes;
     CollectionChangeSet m_changes_to_deliver;
@@ -272,17 +286,7 @@ public:
 class NotifierPackage {
 public:
     NotifierPackage() = default;
-
-    // Package the error if it's non-null, and otherwise the subset of the
-    // notifiers which are for the given realm and are ready to deliver without
-    // blocking
-    NotifierPackage(Realm& realm, std::exception_ptr error,
-                    std::vector<std::shared_ptr<CollectionNotifier>> notifiers);
-
-    // Package the error if it's non-null, and otherwise gather the subset of
-    // the given notifiers which are for the given realm, including ones which
-    // are not yet ready to deliver and will need to block
-    NotifierPackage(Realm& realm, std::exception_ptr error,
+    NotifierPackage(std::exception_ptr error,
                     std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
                     std::condition_variable& cv, std::unique_lock<std::mutex>& lock);
 
@@ -290,13 +294,12 @@ public:
 
     // Get the version which this package can deliver into, or VersionID{} if
     // it has not yet been packaged
-    VersionID version() { return m_version; }
+    util::Optional<VersionID> version() { return m_version; }
 
     // Package the notifiers for delivery, blocking if they aren't ready for
-    // delivery into the given sg.
-    // No-op if it has already been called or if this was created with the
-    // constructor that does not take a cv and lock.
-    void package_and_wait(SharedGroup& sg);
+    // the given version.
+    // No-op if called multiple times
+    void package_and_wait(util::Optional<VersionID::version_type> target_version);
 
     // Sent the before-change notifications
     void before_advance();
@@ -306,10 +309,11 @@ public:
     void after_advance();
 
 private:
-    VersionID m_version;
+    util::Optional<VersionID> m_version;
     std::vector<std::shared_ptr<CollectionNotifier>> m_notifiers;
+
     std::condition_variable* m_cv = nullptr;
-    std::unique_lock<std::mutex>* m_lock = nullptr;
+    std::unique_lock<std::mutex>* m_lock = nullptr; // RealmCoordinator::m_notifier_mutex
     std::exception_ptr m_error;
 };
 

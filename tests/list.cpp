@@ -80,10 +80,13 @@ TEST_CASE("list") {
     for (int i = 0; i < 10; ++i)
         lv2->add(i);
 
-    other_target->add_empty_row();
     other_origin->add_empty_row();
+    other_target->add_empty_row(10);
+    for (int i = 0; i < 10; ++i)
+        other_target->set_int(0, i, i);
     LinkViewRef other_lv = other_origin->get_linklist(0, 0);
-    other_lv->add(0);
+    for (int i = 0; i < 10; ++i)
+        other_lv->add(i);
 
     r->commit_transaction();
 
@@ -287,7 +290,7 @@ TEST_CASE("list") {
                 lv->add(1);
 
                 other_origin->insert_empty_row(0);
-                other_lv->add(0);
+                other_lv->insert(1, 0);
 
                 lv->add(2);
             });
@@ -300,7 +303,7 @@ TEST_CASE("list") {
                 lv->add(4);
             });
             REQUIRE_INDICES(change.insertions, 12, 13);
-            REQUIRE_INDICES(other_changes.deletions, 0, 1);
+            REQUIRE_INDICES(other_changes.deletions, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
 
             write([&] {
                 lv->add(5);
@@ -311,29 +314,35 @@ TEST_CASE("list") {
         }
 
         SECTION("tables-of-interest are tracked properly for multiple source versions") {
-            List lst2(r, other_lv);
-
-            // Add a callback for list1, advance the version, then add a
-            // callback for list2, so that the notifiers added at each source
-            // version have different tables watched for modifications
+            // Add notifiers for different tables at different versions to verify
+            // that the tables of interest are updated correct as we process new
+            // notifiers
             CollectionChangeSet changes1, changes2;
             auto token1 = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 changes1 = std::move(c);
             });
 
-            r->begin_transaction(); r->commit_transaction();
+            r2->begin_transaction();
+            r2->read_group().get_table("class_target")->set_int(0, 0, 10);
+            r2->read_group().get_table("class_other_target")->set_int(0, 1, 10);
+            r2->commit_transaction();
 
+            List lst2(r2, r2->read_group().get_table("class_other_origin")->get_linklist(0, 0));
             auto token2 = lst2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 changes2 = std::move(c);
             });
 
-            r->begin_transaction();
-            target->set_int(0, 0, 10);
-            r->commit_transaction();
-            advance_and_notify(*r);
+            auto r3 = coordinator.get_realm();
+            r3->begin_transaction();
+            r3->read_group().get_table("class_target")->set_int(0, 2, 10);
+            r3->read_group().get_table("class_other_target")->set_int(0, 3, 10);
+            r3->commit_transaction();
 
-            REQUIRE_INDICES(changes1.modifications, 0);
-            REQUIRE(changes2.empty());
+            advance_and_notify(*r);
+            advance_and_notify(*r2);
+
+            REQUIRE_INDICES(changes1.modifications, 0, 2);
+            REQUIRE_INDICES(changes2.modifications, 3);
         }
 
         SECTION("modifications are reported for rows that are moved and then moved back in a second transaction") {
@@ -397,6 +406,17 @@ TEST_CASE("list") {
             REQUIRE_INDICES(change.insertions, 13);
             REQUIRE(lst.size() == 14);
             REQUIRE(lst.get(13).get_index() == 4);
+        }
+
+        SECTION("changes are sent in initial notification") {
+            auto token = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+                change = c;
+            });
+            r2->begin_transaction();
+            r2_lv->remove(5);
+            r2->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE_INDICES(change.deletions, 5);
         }
     }
 

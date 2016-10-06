@@ -35,6 +35,17 @@
 
 using namespace realm;
 
+class joining_thread {
+public:
+    template<typename... Args>
+    joining_thread(Args&&... args) : m_thread(std::forward<Args>(args)...) { }
+    ~joining_thread() { if (m_thread.joinable()) m_thread.join(); }
+    void join() { m_thread.join(); }
+
+private:
+    std::thread m_thread;
+};
+
 TEST_CASE("notifications: async delivery") {
     InMemoryTestFile config;
     config.cache = false;
@@ -106,23 +117,31 @@ TEST_CASE("notifications: async delivery") {
             REQUIRE(notification_calls == 1);
         }
 
-        SECTION("refresh() does not block due to initial results not being ready") {
+        SECTION("refresh() blocks due to initial results not being ready") {
+            REQUIRE(notification_calls == 0);
+            joining_thread thread([&] {
+                usleep(5000);
+                coordinator->on_change();
+            });
             r->refresh();
-            REQUIRE(notification_calls == 0);
-
-            make_remote_change();
-            REQUIRE(notification_calls == 0);
+            REQUIRE(notification_calls == 1);
         }
 
-        SECTION("begin_transaction() does not block due to initial results not being ready") {
-            r->begin_transaction();
+        SECTION("begin_transaction() blocks due to initial results not being ready") {
             REQUIRE(notification_calls == 0);
+            joining_thread thread([&] {
+                usleep(5000);
+                coordinator->on_change();
+            });
+            r->begin_transaction();
+            REQUIRE(notification_calls == 1);
             r->cancel_transaction();
+        }
 
-            make_remote_change();
-            r->begin_transaction();
+        SECTION("notify() does not block due to initial results not being ready") {
             REQUIRE(notification_calls == 0);
-            r->cancel_transaction();
+            r->notify();
+            REQUIRE(notification_calls == 0);
         }
 
         SECTION("is delivered after invalidate()") {
@@ -301,17 +320,16 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("refresh() blocks") {
             REQUIRE(notification_calls == 1);
-            auto thread = std::thread([&] {
+            joining_thread thread([&] {
                 usleep(5000);
                 coordinator->on_change();
             });
             r->refresh();
             REQUIRE(notification_calls == 2);
-            thread.join();
         }
 
         SECTION("refresh() advances to the first version with notifiers ready that is at least a recent as the newest at the time it is called") {
-            auto thread = std::thread([&] {
+            joining_thread thread([&] {
                 usleep(5000);
                 make_remote_change();
                 coordinator->on_change();
@@ -333,14 +351,13 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("begin_transaction() blocks") {
             REQUIRE(notification_calls == 1);
-            auto thread = std::thread([&] {
+            joining_thread thread([&] {
                 usleep(5000);
                 coordinator->on_change();
             });
             r->begin_transaction();
             REQUIRE(notification_calls == 2);
             r->cancel_transaction();
-            thread.join();
         }
 
         SECTION("refresh() does not block for results without callbacks") {
@@ -384,25 +401,23 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("refresh() blocks") {
             REQUIRE(notification_calls == 1);
-            auto thread = std::thread([&] {
+            joining_thread thread([&] {
                 usleep(5000);
                 coordinator->on_change();
             });
             r->refresh();
             REQUIRE(notification_calls == 2);
-            thread.join();
         }
 
         SECTION("begin_transaction() blocks") {
             REQUIRE(notification_calls == 1);
-            auto thread = std::thread([&] {
+            joining_thread thread([&] {
                 usleep(5000);
                 coordinator->on_change();
             });
             r->begin_transaction();
             REQUIRE(notification_calls == 2);
             r->cancel_transaction();
-            thread.join();
         }
     }
 

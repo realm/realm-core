@@ -264,7 +264,11 @@ public:
         if (context) {
             m_observers = context->get_observed_rows();
         }
-        if (m_observers.empty() && (!m_notifiers || m_notifiers.version() != VersionID())) {
+
+        // If we have collection notifiers we have to use the transaction log
+        // observer to send will_change notifications once we know what the
+        // target version is, despite not otherwise needing to observe anything
+        if (m_observers.empty() && (!m_notifiers || m_notifiers.version())) {
             m_notifiers.before_advance();
             if (schema_mode) {
                 func(TransactLogValidator(*schema_mode));
@@ -284,7 +288,7 @@ public:
         func(*this);
         if (context)
             context->did_change(m_observers, invalidated);
-        m_notifiers.package_and_wait(sg); // is a no-op if parse_complete() was called
+        m_notifiers.package_and_wait(sg.get_version_of_current_transaction().version); // is a no-op if parse_complete() was called
         m_notifiers.deliver(sg); // only will ever deliver errors
         m_notifiers.after_advance();
     }
@@ -304,7 +308,8 @@ public:
     {
         if (m_context)
             m_context->will_change(m_observers, invalidated);
-        m_notifiers.package_and_wait(m_sg);
+        using sgf = _impl::SharedGroupFriend;
+        m_notifiers.package_and_wait(sgf::get_version_of_latest_snapshot(m_sg));
         m_notifiers.before_advance();
     }
 
@@ -822,7 +827,7 @@ void advance(SharedGroup& sg, BindingContext* context, SchemaMode schema_mode, V
 void advance(SharedGroup& sg, BindingContext* context, SchemaMode schema_mode, NotifierPackage& notifiers)
 {
     TransactLogObserver(context, sg, [&](auto&&... args) {
-        LangBindHelper::advance_read(sg, std::move(args)..., notifiers.version());
+        LangBindHelper::advance_read(sg, std::move(args)..., notifiers.version().value_or(VersionID{}));
     }, schema_mode, notifiers);
 }
 

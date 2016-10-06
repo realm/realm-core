@@ -150,6 +150,7 @@ private:
     // wait for all notifiers targeting the given realm to be ready for the
     // given version or any later version
     std::unique_lock<std::mutex> wait_for_notifiers(Realm& realm, uint64_t min_version);
+    std::vector<std::shared_ptr<_impl::CollectionNotifier>> notifiers_for_realm(Realm&);
 };
 
 } // namespace _impl

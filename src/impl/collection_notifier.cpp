@@ -261,6 +261,7 @@ void CollectionNotifier::prepare_handover()
     REALM_ASSERT(m_sg);
     m_sg_version = m_sg->get_version_of_current_transaction();
     do_prepare_handover(*m_sg);
+    m_has_run = true;
 }
 
 void CollectionNotifier::before_advance()
@@ -295,12 +296,12 @@ bool CollectionNotifier::is_for_realm(Realm& realm) const noexcept
     return m_realm.get() == &realm;
 }
 
-VersionID CollectionNotifier::package_for_delivery()
+bool CollectionNotifier::package_for_delivery()
 {
     if (!prepare_to_deliver())
-        return VersionID{};
+        return false;
     m_changes_to_deliver = std::move(m_accumulated_changes).finalize();
-    return version();
+    return true;
 }
 
 CollectionChangeCallback CollectionNotifier::next_callback(bool has_changes, bool pre)
@@ -336,54 +337,44 @@ void CollectionNotifier::detach()
     m_sg = nullptr;
 }
 
-NotifierPackage::NotifierPackage(Realm& realm, std::exception_ptr error,
-                                 std::vector<std::shared_ptr<CollectionNotifier>> notifiers)
-: m_error(error)
-{
-    for (auto& notifier : notifiers) {
-        if (!notifier->is_for_realm(realm))
-            continue;
-        if (error) {
-            m_notifiers.push_back(notifier);
-            continue;
-        }
-        auto ver = notifier->package_for_delivery();
-        if (ver != VersionID()) {
-            m_version = ver;
-            m_notifiers.push_back(notifier);
-        }
-    }
-}
-
-NotifierPackage::NotifierPackage(Realm& realm, std::exception_ptr error,
+NotifierPackage::NotifierPackage(std::exception_ptr error,
                                  std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
                                  std::condition_variable& cv, std::unique_lock<std::mutex>& lock)
-: m_cv(&cv), m_lock(&lock), m_error(error)
+: m_notifiers(std::move(notifiers))
+, m_cv(&cv)
+, m_lock(&lock)
+, m_error(std::move(error))
 {
-    for (auto& notifier : notifiers) {
-        if (notifier->is_for_realm(realm))
-            m_notifiers.push_back(notifier);
-    }
 }
 
-void NotifierPackage::package_and_wait(SharedGroup& sg)
+void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> target_version)
 {
     if (!m_lock || m_error || !*this)
         return;
 
-    using sgf = SharedGroupFriend;
-    auto target_version = sgf::get_version_of_latest_snapshot(sg);
     m_lock->lock();
-    m_cv->wait(*m_lock, [&] {
-        return std::all_of(begin(m_notifiers), end(m_notifiers), [&](auto const& n) {
-            return !n->have_callbacks() || n->version().version >= target_version;
+    // Wait for the notifiers to be ready if we're advancing to a specific version
+    if (target_version) {
+        m_cv->wait(*m_lock, [&] {
+            return std::all_of(begin(m_notifiers), end(m_notifiers), [&](auto const& n) {
+                return !n->have_callbacks() || (n->has_run() && n->version().version >= *target_version);
+            });
         });
-    });
-    for (auto& notifier : m_notifiers) {
-        auto ver = notifier->package_for_delivery();
-        if (ver != VersionID{})
-            m_version = ver;
     }
+
+    // Package the notifiers for delivery and remove any which don't have anything to deliver
+    auto package = [&](auto& notifier) {
+        if (notifier->has_run() && notifier->package_for_delivery()) {
+            m_version = notifier->version();
+            return false;
+        }
+        return true;
+    };
+    m_notifiers.erase(std::remove_if(begin(m_notifiers), end(m_notifiers), package), end(m_notifiers));
+    if (m_version && target_version && m_version->version < *target_version)
+        m_notifiers.clear();
+    REALM_ASSERT(m_version || m_notifiers.empty());
+
     m_lock->unlock();
     m_lock = nullptr;
     m_cv = nullptr;
