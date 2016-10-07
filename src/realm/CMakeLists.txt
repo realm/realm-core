@@ -238,7 +238,7 @@ if(REALM_ENABLE_ENCRYPTION)
             INSTALL_COMMAND ""
             BUILD_IN_SOURCE 1
         )
-        add_dependencies(realm openssl)
+        add_dependencies(realm-objects openssl)
         include_directories(${PROJECT_BINARY_DIR}/libcrypto/include)
     elseif(NOT APPLE)
         target_link_libraries(realm ${OPENSSL_LIBRARIES})
