@@ -20,8 +20,8 @@ show_help () {
 
 This script generates the benchmark results for the given version of core
 (branch, commit, or tag) and places the results in the directory specified
-by REALM_BENCH_DIR which is ${benchdir} by default. If the results of
-the benchmarks on this machine already exist there, the benchmarks are not
+by REALM_BENCH_DIR (defaults to "~/.realm/core/benchmarks/"). If the results
+of the benchmarks on this machine already exist there, the benchmarks are not
 run. If no version of core is specified, HEAD is assumed.
 
 Examples:
@@ -34,26 +34,13 @@ $ ./util/build-core.sh 32b3b79d2ab90e784ad5f14f201d682be9746781
 EOF
 }
 
-function sanitize_ref () {
-
-  # Check if given "ref" is a (remote) branch, and prepend origin/ if it is.
-  # Otherwise, git-checkout will complain about updating paths and switching
-  # branches at the same time.
-
-    if [ `git branch -r | grep "^\\s*origin/${ref}$"` ]; then
-        remoteref="origin/${ref}"
-    else
-        remoteref="${ref}"
-    fi
-}
-
 function get_machid () {
     if [ -f "/var/lib/dbus/machine-id" ]; then
-        machid=`cat /var/lib/dbus/machine-id`
+        machid=$(cat /var/lib/dbus/machine-id)
     elif [ -f "/etc/machine-id" ]; then
-        machid=`cat /etc/machine-id`
+        machid=$(cat /etc/machine-id)
     else
-        machid=`ifconfig en0 | awk '/ether/{print $2}'`
+        machid=$(ifconfig en0 | awk '/ether/{print $2}')
     fi
     echo "using machine id: ${machid}"
 }
@@ -74,39 +61,49 @@ if [ $# -gt 1 ]; then
     show_usage
     exit 1
 elif [ $# -eq 0 ]; then
-    ref=`git rev-parse HEAD`
+    ref=$(git rev-parse HEAD)
 else
     ref=$1
 fi
 
-sanitize_ref
+#get the hash from nice names like tags/v2.0.0
+remoteref=$(git rev-list -n 1 "${ref}")
 
 if [ -z "$REALM_BENCH_DIR" ]; then
-    REALM_BENCH_DIR=~/.realm/core/benchmarks/
+    REALM_BENCH_DIR=~/.realm/core/benchmarks
 fi
 
 get_machid
 basedir="${REALM_BENCH_DIR}/${machid}"
 mkdir -p "${basedir}"
-outputfile="${basedir}/${ref}.csv"
+outputfile="${basedir}/${remoteref}.csv"
 
 if [ -f "${outputfile}" ]; then
     echo "found results, skipping ${outputfile}"
 else
-    headref=`git rev-parse HEAD`
-    if [ "$headref"=="${ref}" ]; then
+    headref=$(git rev-parse HEAD)
+    if [ "${headref}" == "${remoteref}" ]; then
         cd ../..
     else
-        sh ./util/build-core.sh ${ref}
-        cd ./core-builds/${ref}/src/
+        sh ./util/build-core.sh "${remoteref}"
+        cd "./core-builds/${remoteref}/src/"
     fi
     sh build.sh benchmark-common-tasks
     sh build.sh benchmark-crud
     echo "writing results to ${outputfile}"
-# print common header
+    # print common header
     head -n 1 "test/benchmark-common-tasks/results.latest.csv" > "${outputfile}"
-# print contents, add _EncryptionOff tag to names without encryption (backwards compatibility)
-    tail -n +2 "test/benchmark-common-tasks/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> ${outputfile}
-    tail -n +2 "test/benchmark-crud/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> ${outputfile}
+    # print contents, add _EncryptionOff tag to names without encryption (backwards compatibility)
+    tail -n +2 "test/benchmark-common-tasks/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> "${outputfile}"
+    tail -n +2 "test/benchmark-crud/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> "${outputfile}"
+
+    if [ "${headref}" != "${remoteref}" ]; then
+        cd ../..
+        pwd
+        echo "cleaning up: ${remoteref}"
+        rm -rf "${remoteref}"
+    else
+        echo "done"
+    fi
 fi
 

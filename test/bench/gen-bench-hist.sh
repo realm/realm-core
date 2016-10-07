@@ -4,15 +4,15 @@
 
 set -euo pipefail
 
-showUsage () {
+show_usage () {
   cat <<EOF
 Usage: $0 [-h|--help]
 EOF
 }
 
-showHelp () {
+show_help () {
   echo ""
-  showUsage
+  show_usage
   echo ""
   cat <<EOF
 ./gen-bench-hist.sh
@@ -30,7 +30,7 @@ EOF
 while [ $# -gt 0 ]; do
   case "$1" in
     -h | --help )
-      showHelp
+      show_help
       exit 0
       ;;
     * )
@@ -40,31 +40,14 @@ while [ $# -gt 0 ]; do
 done
 
 if [ $# -gt 0 ]; then
-  showUsage
+  show_usage
   exit 1
-elif [ $# -eq 0 ]; then
-  ref=master
-else
-  ref=$1
 fi
 
-function checkout () {
+sh gen-bench.sh HEAD
 
-  # Check if given "ref" is a (remote) branch, and prepend origin/ if it is.
-  # Otherwise, git-checkout will complain about updating paths and switching
-  # branches at the same time.
-  if [ `git branch -r | grep "^\\s*origin/${ref}$"` ]; then
-    remoteref="origin/${ref}"
-  else
-    remoteref="${ref}"
-  fi
-
-  git checkout "${remoteref}"
-}
-
-
-while read p; do
-  echo $p
-  sh gen-bench.sh $p
+while read -r p; do
+  echo "$p"
+  sh gen-bench.sh "$p"
 done <revs_to_benchmark.txt
 

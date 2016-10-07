@@ -71,7 +71,7 @@ function checkout () {
   # Check if given "ref" is a (remote) branch, and prepend origin/ if it is.
   # Otherwise, git-checkout will complain about updating paths and switching
   # branches at the same time.
-  if [ `git branch -r | grep "^\\s*origin/${ref}$"` ]; then
+  if [ "$(git branch -r | grep -q "^\\s*origin/${ref}$")" ]; then
     remoteref="origin/${ref}"
   else
     remoteref="${ref}"

@@ -1,12 +1,6 @@
 tags/v0.90.0
 tags/v0.91.0
-tags/v0.91.1
-tags/v0.91.2
 tags/v0.92.0
-tags/v0.92.1
-tags/v0.92.2
-tags/v0.92.3
-tags/v0.92.4
 tags/v0.93.0
 tags/v0.94.0
 tags/v0.94.1
