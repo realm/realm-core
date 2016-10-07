@@ -119,7 +119,7 @@ void ColumnBaseWithIndex::destroy() noexcept
 void ColumnBase::verify(const Table&, size_t column_ndx) const
 {
     verify();
-    REALM_ASSERT_EX(column_ndx == m_column_ndx, column_ndx, m_column_ndx);
+    REALM_ASSERT_CRC(column_ndx == m_column_ndx, column_ndx, m_column_ndx);
 }
 
 void ColumnBaseSimple::replace_root_array(std::unique_ptr<Array> leaf)

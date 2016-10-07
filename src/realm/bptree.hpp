@@ -417,7 +417,7 @@ bool BpTree<T>::is_null(size_t ndx) const noexcept
 template <class T>
 T BpTree<T>::get(size_t ndx) const noexcept
 {
-    REALM_ASSERT_DEBUG_EX(ndx < size(), ndx, size());
+    REALM_ASSERT_DEBUG_CRC(ndx < size(), ndx, size());
     if (root_is_leaf()) {
         return root_as_leaf().get(ndx);
     }
@@ -610,7 +610,7 @@ struct BpTree<T>::EraseHandler : Array::EraseHandler {
 template <class T>
 void BpTree<T>::erase(size_t ndx, bool is_last)
 {
-    REALM_ASSERT_DEBUG_EX(ndx < size(), ndx, size());
+    REALM_ASSERT_DEBUG_CRC(ndx < size(), ndx, size());
     REALM_ASSERT_DEBUG(is_last == (ndx == size() - 1));
     if (root_is_leaf()) {
         root_as_leaf().erase(ndx);

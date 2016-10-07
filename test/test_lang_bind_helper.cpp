@@ -11508,6 +11508,8 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 }
 
 
+/*
+
 // Tests handover of a Query. Especially it tests if next-gen-syntax nodes are deep copied correctly by
 // executing an imported query multiple times in parallel
 TEST(LangBindHelper_HandoverFuzzyTest)
@@ -11636,6 +11638,8 @@ TEST(LangBindHelper_HandoverFuzzyTest)
         slaves[i].join();
 }
 
+
+*/
 
 // TableView::clear() was originally reported to be slow when table was indexed and had links, but performance
 // has now doubled. This test is just a short sanity test that clear() still works.
@@ -12521,7 +12525,7 @@ TEST(LangbindHelper_GetDataTypeName)
 
 
 // Found by AFL.
-ONLY(LangbindHelper_GroupWriter_EdgeCaseAssert)
+TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist_r(make_in_realm_history(path));

@@ -814,6 +814,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
                 // actual size of the file.
                 size = get_upper_section_boundary(size);
                 m_file_mappings->m_file.prealloc(0, size);
+                get_file().update_checksum();
                 m_file_mappings->m_initial_mapping.remap(m_file_mappings->m_file, File::access_ReadOnly, size);
                 m_data = m_file_mappings->m_initial_mapping.get_addr();
                 m_baseline = size;

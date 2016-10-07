@@ -1543,7 +1543,7 @@ const Group& SharedGroup::begin_read(VersionID version_id)
     bool writable = false;
     do_begin_read(version_id, writable); // Throws
 
-//    m_group.m_alloc.get_file().verify_checksum();
+    m_group.m_alloc.get_file().verify_checksum();
 
     m_transact_stage = transact_Reading;
     return m_group;
@@ -1601,10 +1601,18 @@ SharedGroup::version_type SharedGroup::commit()
 
     REALM_ASSERT(m_group.is_attached());
 
+    char crc;
+
     m_group.m_alloc.get_file().invalidate_checksum();
+    crc = m_group.m_alloc.get_file().get_checksum();
+    if (crc != 123) {
+        crc = crc;
+        std::cerr << "\n\nBUUUUUUUUUUUUUUUUUG\n\n";
+    }
+    
     version_type new_version = do_commit(); // Throws
 
-    char crc = m_group.m_alloc.get_file().get_checksum();
+    crc = m_group.m_alloc.get_file().get_checksum();
     if (crc != 123)
         crc = crc;
 

@@ -467,6 +467,22 @@ public:
         if (!is_attached())
             return 0;
 
+
+
+        char s = 0;
+        char* p = (char*)map(File::access_ReadOnly, 100);
+        for (size_t t = 0; t < 22; t++)
+            s += (p[t] * t);
+        unmap(p, 100);
+        return s;
+
+
+
+        sync();
+
+        if (get_size() < 23)
+            int i = 123;
+
         constexpr size_t block = 128;
         char buf[block];
         char sum = 0;
@@ -496,14 +512,32 @@ public:
         if (!is_attached())
             return;
 
+
+
+        char s = 0;
+        char* p = (char*)map(File::access_ReadWrite, 100);
+        p[22] = checksum();
+   //     std::cerr << "U=" << (int)p[22] << " ";
+        unmap(p, 100);
+        return;
+
+
+
+        sync();
+
+        if (get_size() < 23)
+            int i = 123;
+
         char tmp;
 
         tmp = checksum();
 
-        std::cerr << "u=" << (int)tmp << " ";
+  //      std::cerr << "u=" << (int)tmp << " ";
 
         seek(22);
         write(&tmp, 1);
+        sync();
+
     }
 
     void invalidate_checksum()
@@ -511,7 +545,24 @@ public:
         if (!is_attached())
             return;
 
-        std::cerr << "i";
+
+
+        char s = 0;
+        char* p = (char*)map(File::access_ReadWrite, 100);
+        p[22] = 123;
+        unmap(p, 100);
+      //  std::cerr << " i ";
+        return;
+
+
+
+
+        sync();
+
+        if (get_size() < 23)
+            int i = 123;
+
+ //       std::cerr << "i";
 
 
         char tmp;
@@ -520,6 +571,7 @@ public:
 
         seek(22);
         write(&tmp, 1);
+        sync();
     }
 
     char get_checksum()
@@ -528,12 +580,25 @@ public:
             return 123;
 
 
-        char tmp2;
 
+        char s = 0;
+        char* p = (char*)map(File::access_ReadOnly, 100);
+        s = p[22];
+  //      std::cerr << "g=" << (int)s << " ";
+        unmap(p, 100);
+        return s;
+
+
+
+//        if (get_size() < 23)
+//            int i = 123;
+
+        char tmp2;
+        sync();
         seek(22);
         read(&tmp2, 1);
 
-        std::cerr << "g=" << (int)tmp2 << " ";
+    //    std::cerr << "g=" << (int)tmp2 << " ";
 
         return tmp2;
     }
@@ -543,16 +608,19 @@ public:
         if (!is_attached())
             return true;
 
+ //       if (get_size() < 23)
+ //           int i = 123;
+
+ //       sync();
 
         char tmp;
         char tmp2;
 
         tmp = checksum();
 
-        std::cerr << "v=" << int(tmp) << " ";
+   //     std::cerr << "v=" << int(tmp) << " ";
 
-        seek(22);
-        read(&tmp2, 1);
+        tmp2 = get_checksum();
 
         if (tmp2 != 123 && tmp != tmp2) {
             std::cerr << "\nERRRRRR " << (int)tmp << " " << (int)tmp2 << " " << get_size() << "\n";

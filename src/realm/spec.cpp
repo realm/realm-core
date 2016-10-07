@@ -156,7 +156,7 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
     if (is_subspec_type) {
         Allocator& alloc = m_top.get_alloc();
         // `m_subspecs` array is only present when the spec contains a subtable column
-        REALM_ASSERT_EX(m_subspecs.is_attached() == has_subspec(), m_subspecs.is_attached(), m_top.size());
+        REALM_ASSERT_CRC(m_subspecs.is_attached() == has_subspec(), m_subspecs.is_attached(), m_top.size());
         if (!m_subspecs.is_attached()) {
             bool context_flag = false;
             MemRef subspecs_mem = Array::create_empty_array(Array::type_HasRefs, context_flag, alloc); // Throws
