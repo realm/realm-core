@@ -4,6 +4,7 @@ try {
   def gitTag
   def gitSha
   def dependencies
+  def isPublishingRun
 
   timeout(time: 1, unit: 'HOURS') {
     stage('gather-info') {
@@ -39,6 +40,9 @@ try {
         }
       }
 
+      isPublishingRun = ['master', 'next-major'].contains(env.BRANCH_NAME) || gitTag != ""
+      echo "Publishing Run: ${isPublishingRun}"
+
       rpmVersion = dependencies.VERSION.replaceAll("-", "_")
       echo "rpm version: ${rpmVersion}"
     }
@@ -47,11 +51,11 @@ try {
       parallelExecutors = [
         checkLinuxRelease: doBuildInDocker('check'),
         checkLinuxDebug: doBuildInDocker('check-debug'),
-        buildCocoa: doBuildCocoa(gitTag),
-        buildNodeLinux: doBuildNodeInDocker(gitTag),
-        buildNodeOsx: doBuildNodeInOsx(gitTag),
-        buildDotnetOsx: doBuildDotNetOsx(gitTag),
-        buildAndroid: doBuildAndroid(gitTag),
+        buildCocoa: doBuildCocoa(isPublishingRun),
+        buildNodeLinux: doBuildNodeInDocker(isPublishingRun),
+        buildNodeOsx: doBuildNodeInOsx(isPublishingRun),
+        buildDotnetOsx: doBuildDotNetOsx(isPublishingRun),
+        buildAndroid: doBuildAndroid(isPublishingRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
       ]
@@ -72,7 +76,7 @@ try {
       )
     }
 
-    if (['master', 'next-major'].contains(env.BRANCH_NAME) || gitTag != "") {
+    if (isPublishingRun) {
       stage('publish-packages') {
         parallel(
           generic: doPublishGeneric(),
@@ -98,7 +102,7 @@ def buildDockerEnv(name) {
   return docker.image(name)
 }
 
-def doBuildCocoa(def gitTag) {
+def doBuildCocoa(def isPublishingRun) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -139,8 +143,10 @@ def doBuildCocoa(def gitTag) {
               cp core-*.tar.xz realm-core-latest.tar.xz
             '''
 
-            stash includes: '*core-*.*.*.tar.xz', name: 'cocoa-package'
-            archiveArtifacts artifacts: '*core-*.*.*.tar.xz'
+            if (isPublishingRun) {
+              stash includes: '*core-*.*.*.tar.xz', name: 'cocoa-package'
+            }
+	    archiveArtifacts artifacts: '*core-*.*.*.tar.xz'
 
             sh 'sh build.sh clean'
         }
@@ -155,7 +161,7 @@ def doBuildCocoa(def gitTag) {
   }
 }
 
-def doBuildDotNetOsx(def gitTag) {
+def doBuildDotNetOsx(def isPublishingRun) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -194,7 +200,7 @@ def doBuildDotNetOsx(def gitTag) {
 
               cp realm-core-dotnet-cocoa-*.tar.bz2 realm-core-dotnet-cocoa-latest.tar.bz2
             '''
-            if (gitTag) {
+            if (isPublishingRun) {
               stash includes: '*core-*.*.*.tar.bz2', name: 'dotnet-package'
             }
             archiveArtifacts artifacts: '*core-*.*.*.tar.bz2'
@@ -282,7 +288,7 @@ def buildDiffCoverage() {
   }
 }
 
-def doBuildNodeInDocker(def gitTag) {
+def doBuildNodeInDocker(def isPublishingRun) {
   return {
     node('docker') {
       getArchive()
@@ -295,7 +301,7 @@ def doBuildNodeInDocker(def gitTag) {
           try {
               sh 'sh build.sh build-node-package'
               sh 'cp realm-core-node-*.tar.gz realm-core-node-linux-latest.tar.gz'
-              if (gitTag) {
+              if (isPublishingRun) {
                 stash includes: '*realm-core-node-linux-*.*.*.tar.gz', name: 'node-linux-package'
               }
               archiveArtifacts artifacts: '*realm-core-node-linux-*.*.*.tar.gz'
@@ -311,7 +317,7 @@ def doBuildNodeInDocker(def gitTag) {
   }
 }
 
-def doBuildNodeInOsx(def gitTag) {
+def doBuildNodeInOsx(def isPublishingRun) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -322,7 +328,7 @@ def doBuildNodeInOsx(def gitTag) {
         try {
           sh 'sh build.sh build-node-package'
           sh 'cp realm-core-node-*.tar.gz realm-core-node-osx-latest.tar.gz'
-          if (gitTag) {
+          if (isPublishingRun) {
             stash includes: '*realm-core-node-osx-*.*.*.tar.gz', name: 'node-cocoa-package'
           }
           archiveArtifacts artifacts: '*realm-core-node-osx-*.*.*.tar.gz'
@@ -340,7 +346,7 @@ def doBuildNodeInOsx(def gitTag) {
   }
 }
 
-def doBuildAndroid(def gitTag) {
+def doBuildAndroid(def isPublishingRun) {
     def target = 'build-android'
     def buildName = "android-${target}-with-encryption"
 
@@ -358,7 +364,7 @@ def doBuildAndroid(def gitTag) {
               sh "sh build.sh config '${pwd()}/install'"
               sh "sh build.sh ${target}"
             }
-            if (gitTag) {
+            if (isPublishingRun) {
               stash includes: 'realm-core-android-*.tar.gz', name: 'android-package'
             }
             archiveArtifacts artifacts: 'realm-core-android-*.tar.gz'
