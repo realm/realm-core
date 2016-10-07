@@ -214,7 +214,7 @@ public:
         // Release is triggered by explicitly storing into count whenever a
         // new entry has been initialized.
         mutable std::atomic<uint32_t> count;
-        uint32_t next;
+        uint_fast32_t next;
     };
 
     Ringbuffer() noexcept
@@ -360,9 +360,9 @@ public:
 
 private:
     // number of entries. Access synchronized through put_pos.
-    uint32_t entries;
-    std::atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
-    std::atomic<uint32_t> old_pos; // only changed during write transactions and under lock
+    uint_fast32_t entries;
+    std::atomic<uint_fast32_t> put_pos; // only changed under lock, but accessed outside lock
+    std::atomic<uint_fast32_t> old_pos; // only changed during write transactions and under lock
 
     const static int init_readers_size = 32;
 
