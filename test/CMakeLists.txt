@@ -31,6 +31,8 @@ target_link_libraries(
   ${PLATFORM_LIBRARIES}
 )
 
+include_directories(${PROJECT_BINARY_DIR}/libcrypto/include)
+
 target_include_directories(
   realm-tests
   PUBLIC ${EXTRA_TEST_CFLAGS}
@@ -44,6 +46,9 @@ add_test(
 set(BENCHMARKS benchmark-common-tasks/main.cpp)
 add_executable(realm-benchmark-common-tasks ${BENCHMARKS})
 target_link_libraries(realm-benchmark-common-tasks realm test-util)
+if(ANDROID)
+  target_link_libraries(realm-benchmark-common-tasks log android)
+endif()
 add_test(RealmBenchmarkCommonTasks realm-benchmark-common-tasks)
 
 # FIXME: Add other benchmarks
