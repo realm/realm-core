@@ -467,13 +467,30 @@ public:
         if (!is_attached())
             return 0;
 
+        size_t fsiz = get_size();
+//        sync();
+//        std::cerr << "fs=" << fsiz << " ";
+
 
 
         char s = 0;
-        char* p = (char*)map(File::access_ReadOnly, 100);
-        for (size_t t = 0; t < 22; t++)
+        char* p = (char*)map(File::access_ReadOnly, fsiz);
+
+      //  std::cerr << "\n\nBYTES: ";
+
+        for (size_t t = 0; t < 22; t++) {
             s += (p[t] * t);
-        unmap(p, 100);
+        }
+
+        for (size_t t = 23; t < fsiz; t++) {
+            s += (p[t] * t);
+        }
+
+//        std::cerr << "\n\n: ";
+
+
+        unmap(p, fsiz);
+
         return s;
 
 
@@ -515,10 +532,10 @@ public:
 
 
         char s = 0;
-        char* p = (char*)map(File::access_ReadWrite, 100);
+        char* p = (char*)map(File::access_ReadWrite, 23);
         p[22] = checksum();
-   //     std::cerr << "U=" << (int)p[22] << " ";
-        unmap(p, 100);
+  //      std::cerr << "U=" << (int)p[22] << " ";
+        unmap(p, 23);
         return;
 
 
@@ -545,12 +562,9 @@ public:
         if (!is_attached())
             return;
 
-
-
-        char s = 0;
-        char* p = (char*)map(File::access_ReadWrite, 100);
+        char* p = (char*)map(File::access_ReadWrite, 23);
         p[22] = 123;
-        unmap(p, 100);
+        unmap(p, 23);
       //  std::cerr << " i ";
         return;
 
@@ -580,12 +594,11 @@ public:
             return 123;
 
 
-
         char s = 0;
-        char* p = (char*)map(File::access_ReadOnly, 100);
+        char* p = (char*)map(File::access_ReadOnly, 23);
         s = p[22];
-  //      std::cerr << "g=" << (int)s << " ";
-        unmap(p, 100);
+     //   std::cerr << "g=" << (int)s << " ";
+        unmap(p, 23);
         return s;
 
 
@@ -618,12 +631,12 @@ public:
 
         tmp = checksum();
 
-   //     std::cerr << "v=" << int(tmp) << " ";
 
         tmp2 = get_checksum();
 
         if (tmp2 != 123 && tmp != tmp2) {
             std::cerr << "\nERRRRRR " << (int)tmp << " " << (int)tmp2 << " " << get_size() << "\n";
+            exit(0);
             return false;
         }
         

@@ -1864,6 +1864,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     m_alloc.invalidate_cache();
     m_top.detach();                                 // Soft detach
     bool create_group_when_missing = false;         // See Group::attach_shared().
+
     attach(new_top_ref, create_group_when_missing); // Throws
     refresh_dirty_accessors();                      // Throws
 

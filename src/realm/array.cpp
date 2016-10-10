@@ -239,7 +239,7 @@ void Array::init_from_mem(MemRef mem) noexcept
 
 void Array::set_type(Type type)
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_CRC(is_attached(), 0);
 
     copy_on_write(); // Throws
 
@@ -285,7 +285,7 @@ bool Array::update_from_parent(size_t old_baseline) noexcept
 
 MemRef Array::slice(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_CRC(is_attached(), 0);
 
     Array new_slice(target_alloc);
     _impl::DeepArrayDestroyGuard dg(&new_slice);
@@ -304,7 +304,7 @@ MemRef Array::slice(size_t offset, size_t slice_size, Allocator& target_alloc) c
 
 MemRef Array::slice_and_clone_children(size_t offset, size_t slice_size, Allocator& target_alloc) const
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_CRC(is_attached(), 0);
     if (!has_refs())
         return slice(offset, slice_size, target_alloc); // Throws
 
@@ -422,7 +422,7 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     REALM_ASSERT_3(end, <=, m_size);
     REALM_ASSERT_3(dest_begin, <=, m_size);
     REALM_ASSERT_3(end - begin, <=, m_size - dest_begin);
-    REALM_ASSERT(!(dest_begin >= begin && dest_begin < end)); // Required by std::copy
+    REALM_ASSERT_CRC(!(dest_begin >= begin && dest_begin < end), 0); // Required by std::copy
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -455,7 +455,7 @@ void Array::move_backward(size_t begin, size_t end, size_t dest_end)
     REALM_ASSERT_3(end, <=, m_size);
     REALM_ASSERT_3(dest_end, <=, m_size);
     REALM_ASSERT_3(end - begin, <=, dest_end);
-    REALM_ASSERT(!(dest_end > begin && dest_end <= end)); // Required by std::copy_backward
+    REALM_ASSERT_CRC(!(dest_end > begin && dest_end <= end), 0); // Required by std::copy_backward
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -581,8 +581,8 @@ void Array::set_as_ref(size_t ndx, ref_type ref)
 // (happens a lot when returning results to TableViews)
 void Array::add_positive_local(int64_t value)
 {
-    REALM_ASSERT(value >= 0);
-    REALM_ASSERT(&m_alloc == &Allocator::get_default());
+    REALM_ASSERT_CRC(value >= 0);
+    REALM_ASSERT_CRC(&m_alloc == &Allocator::get_default());
 
     if (value <= m_ubound) {
         if (m_size < m_capacity) {
@@ -657,7 +657,7 @@ void Array::insert(size_t ndx, int_fast64_t value)
 
 void Array::truncate(size_t new_size)
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_CRC(is_attached(), 0);
     REALM_ASSERT_3(new_size, <=, m_size);
 
     // FIXME: BasicArray<> currently does not work if the width is set
@@ -690,7 +690,7 @@ void Array::truncate(size_t new_size)
 
 void Array::truncate_and_destroy_children(size_t new_size)
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_CRC(is_attached(), 0);
     REALM_ASSERT_3(new_size, <=, m_size);
 
     // FIXME: See FIXME in truncate().
@@ -822,7 +822,7 @@ size_t Array::find_gte(const int64_t target, size_t start, size_t end) const
 template <size_t w>
 size_t Array::find_gte(const int64_t target, size_t start, size_t end) const
 {
-    REALM_ASSERT(start < size());
+    REALM_ASSERT_CRC(start < size(), 0);
 
     if (end > m_size) {
         end = m_size;
@@ -1769,8 +1769,8 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
 // to avoid two copies.
 void Array::alloc(size_t init_size, size_t width)
 {
-    REALM_ASSERT(is_attached());
-    REALM_ASSERT(!m_alloc.is_read_only(m_ref));
+    REALM_ASSERT_CRC(is_attached(), 0);
+    REALM_ASSERT_CRC(!m_alloc.is_read_only(m_ref), 0);
     REALM_ASSERT_3(m_capacity, >, 0);
     if (m_capacity < init_size || width != m_width) {
         size_t needed_bytes = calc_byte_len(init_size, width);
@@ -1991,8 +1991,9 @@ void Array::get_chunk(size_t ndx, int64_t res[8]) const noexcept
 #ifdef REALM_DEBUG
     for (int j = 0; j + ndx < m_size && j < 8; j++) {
         int64_t expected = get<w>(ndx + j);
-        if (res[j] != expected)
-            REALM_ASSERT(false);
+        if (res[j] != expected) {
+            REALM_ASSERT_CRC(false, false);
+        }
     }
 #endif
 }
@@ -2071,7 +2072,7 @@ ref_type Array::insert_bptree_child(Array& offsets, size_t orig_child_ndx, ref_t
         // parent to be split. Since this is not possible during
         // 'append', we can safely assume that the parent node is on
         // the general form.
-        REALM_ASSERT(new_offsets.is_attached());
+        REALM_ASSERT_CRC(new_offsets.is_attached(), new_offsets.is_attached());
         new_split_offset = elem_ndx_offset + state.m_split_size;
         new_split_size = to_size_t(back() / 2) + 1;
         REALM_ASSERT_3(size(), >=, 2);
@@ -2155,10 +2156,10 @@ void Array::print() const
 
 void Array::verify() const
 {
-    REALM_ASSERT(is_attached());
+    REALM_ASSERT_CRC(is_attached(), is_attached());
 
-    REALM_ASSERT(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
-                 m_width == 32 || m_width == 64);
+    REALM_ASSERT_CRC(m_width == 0 || m_width == 1 || m_width == 2 || m_width == 4 || m_width == 8 || m_width == 16 ||
+                 m_width == 32 || m_width == 64, 0);
 
     if (!m_parent)
         return;
@@ -2755,7 +2756,7 @@ size_t Array::upper_bound_int(int64_t value) const noexcept
 void Array::find_all(IntegerColumn* result, int64_t value, size_t col_offset, size_t begin, size_t end) const
 {
     REALM_ASSERT_3(begin, <=, size());
-    REALM_ASSERT(end == npos || (begin <= end && end <= size()));
+    REALM_ASSERT_CRC(end == npos || (begin <= end && end <= size()), 0);
 
     if (end == npos)
         end = m_size;
@@ -3398,7 +3399,7 @@ void elim_superfluous_bptree_root(Array* root, MemRef parent_mem, int_fast64_t p
 
 std::pair<MemRef, size_t> Array::get_bptree_leaf(size_t ndx) const noexcept
 {
-    REALM_ASSERT(is_inner_bptree_node());
+    REALM_ASSERT_CRC(is_inner_bptree_node(), 0);
 
     size_t ndx_2 = ndx;
     uint_least8_t width = m_width;
