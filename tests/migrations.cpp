@@ -897,6 +897,9 @@ TEST_CASE("migration: ResetFile") {
         {"object", {
             {"value", PropertyType::Int, "", "", false, false, false},
         }},
+        {"object 2", {
+            {"value", PropertyType::Int, "", "", false, false, false},
+        }},
     };
 
     {
@@ -920,10 +923,18 @@ TEST_CASE("migration: ResetFile") {
     }
 
     SECTION("file is not reset when adding a new table") {
-        realm->update_schema(add_table(schema, {"object 2", {
+        realm->update_schema(add_table(schema, {"object 3", {
             {"value", PropertyType::Int, "", "", false, false, false},
         }}));
         REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 1);
+        REQUIRE(realm->schema().size() == 3);
+    }
+
+    SECTION("file is not reset when removing a table") {
+        realm->update_schema(remove_table(schema, "object 2"));
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object")->size() == 1);
+        REQUIRE(ObjectStore::table_for_object_type(realm->read_group(), "object 2"));
+        REQUIRE(realm->schema().size() == 1);
     }
 
     SECTION("file is not reset when adding an index") {
