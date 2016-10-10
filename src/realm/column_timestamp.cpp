@@ -23,7 +23,7 @@ namespace realm {
 
 
 TimestampColumn::TimestampColumn(bool nullable, Allocator& alloc, ref_type ref, size_t col_ndx)
-    : ColumnBaseSimple(col_ndx)
+    : ColumnBaseSimple(col_ndx), m_alloc(alloc)
 {
     std::unique_ptr<Array> top;
     std::unique_ptr<BpTree<util::Optional<int64_t>>> seconds;
@@ -204,7 +204,7 @@ void TimestampColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, 
 
 void TimestampColumn::clear(size_t num_rows, bool /*broken_reciprocal_backlinks*/)
 {
-    REALM_ASSERT_EX(num_rows == m_seconds->size(), num_rows, m_seconds->size());
+    REALM_ASSERT_CRC(num_rows == m_seconds->size(), num_rows, m_seconds->size());
     static_cast<void>(num_rows);
     m_seconds->clear();     // Throws
     m_nanoseconds->clear(); // Throws

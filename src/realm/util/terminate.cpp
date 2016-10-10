@@ -149,6 +149,7 @@ REALM_NORETURN void terminate_with_info(const char* message, const char* file, l
     ss << '\n';
     terminate_internal(ss);
 }
+
 // LCOV_EXCL_STOP
 
 } // namespace util

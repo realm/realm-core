@@ -62,7 +62,7 @@ size_t ArrayBinary::read(size_t ndx, size_t pos, char* buffer, size_t max_size) 
 
 void ArrayBinary::add(BinaryData value, bool add_zero_term)
 {
-    REALM_ASSERT_7(value.size(), ==, 0, ||, value.data(), !=, 0);
+    REALM_ASSERT_RELEASE_CRC(value.size() == 0 || value.data() != 0, value.size());
 
     if (value.is_null() && legacy_array_type())
         throw LogicError(LogicError::column_not_nullable);

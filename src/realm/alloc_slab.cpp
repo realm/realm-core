@@ -95,16 +95,20 @@ SlabAlloc::SlabAlloc()
 
 util::File& SlabAlloc::get_file()
 {
-    return m_file_mappings->m_file;
+    static File f;
+    if (m_file_mappings)
+        return m_file_mappings->m_file;
+    else
+        return f;
 }
 
 
 const SlabAlloc::Header SlabAlloc::empty_file_header = {
-    {0, 0}, // top-refs
-    {'T', '-', 'D', 'B'},
-    {0, 0}, // undecided file format
-    0,      // reserved
-    0       // flags (lsb is select bit)
+    { 0, 0 }, // top-refs
+    { 'T', '-', 'D', 'B' },
+    { 0, 0 }, // undecided file format
+    123, // reserved
+    0  // flags (lsb is select bit)
 };
 
 
@@ -116,7 +120,7 @@ void SlabAlloc::init_streaming_header(Header* streaming_header, int file_format_
         {0xFFFFFFFFFFFFFFFFULL, 0}, // top-refs
         {'T', '-', 'D', 'B'},
         {storage_type(file_format_version), 0},
-        0, // reserved
+        123, // reserved
         0  // flags (lsb is select bit)
     };
 }
@@ -768,6 +772,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             m_file_on_streaming_form = false;
             writable_map.sync();
         }
+        get_file().update_checksum();
     }
 
     // We can only safely mmap the file, if its size matches a section. If not,
@@ -809,6 +814,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
                 // actual size of the file.
                 size = get_upper_section_boundary(size);
                 m_file_mappings->m_file.prealloc(0, size);
+                get_file().update_checksum();
                 m_file_mappings->m_initial_mapping.remap(m_file_mappings->m_file, File::access_ReadOnly, size);
                 m_data = m_file_mappings->m_initial_mapping.get_addr();
                 m_baseline = size;

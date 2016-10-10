@@ -125,7 +125,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file foprmat
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 6, target_file_format_version);
+    REALM_ASSERT_CRC(target_file_format_version == 6, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -133,7 +133,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     // SlabAlloc::validate_buffer() must ensure this. Be sure to revisit the
     // following upgrade logic when SlabAlloc::validate_buffer() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version == 2 || current_file_format_version == 3 ||
+    REALM_ASSERT_CRC(current_file_format_version == 2 || current_file_format_version == 3 ||
                         current_file_format_version == 4 || current_file_format_version == 5,
                     current_file_format_version);
 
@@ -314,7 +314,7 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
         // The 3rd slot in m_top is
         // `RefOrTagged::make_tagged(logical_file_size)`, and the logical file
         // size must never exceed actual file size.
-        REALM_ASSERT_3(m_top.get_as_ref_or_tagged(2).get_as_int(), <=, m_alloc.get_baseline());
+        REALM_ASSERT_CRC(m_top.get_as_ref_or_tagged(2).get_as_int() <= m_alloc.get_baseline(), m_top.get_as_ref_or_tagged(2).get_as_int(), m_alloc.get_baseline());
     }
     else if (create_group_when_missing) {
         create_empty_group(); // Throws
@@ -675,7 +675,7 @@ void Group::move_table(size_t from_table_ndx, size_t to_table_ndx)
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
     REALM_ASSERT_3(m_tables.size(), ==, m_table_names.size());
-    REALM_ASSERT_EX(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size(),
+    REALM_ASSERT_CRC(m_table_accessors.empty() || m_table_accessors.size() == m_tables.size(),
                     m_table_accessors.size(), m_tables.size());
     if (from_table_ndx >= m_tables.size())
         throw LogicError(LogicError::table_index_out_of_range);

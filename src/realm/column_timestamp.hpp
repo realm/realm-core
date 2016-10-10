@@ -119,6 +119,7 @@ private:
 
     std::unique_ptr<StringIndex> m_search_index;
     bool m_nullable;
+    Allocator& m_alloc;
 
     template <class BT>
     class CreateHandler;

@@ -24,6 +24,7 @@
 #include <atomic>
 
 #include <realm/util/features.h>
+#include <realm/util/file.hpp>
 #include <realm/util/terminate.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -81,6 +82,8 @@ private:
 class Allocator {
 public:
     static constexpr int CURRENT_FILE_FORMAT_VERSION = 6;
+
+    util::File get_file() const { return util::File(); }
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.

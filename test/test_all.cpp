@@ -392,7 +392,7 @@ bool run_tests(util::Logger* logger)
 
     // Set number of repetitions
     {
-        const char* str = getenv("UNITTEST_REPEAT");
+        const char* str = "1"; // getenv("UNITTEST_REPEAT");
         if (str && strlen(str) != 0) {
             std::istringstream in(str);
             in.imbue(std::locale::classic());
@@ -429,7 +429,7 @@ bool run_tests(util::Logger* logger)
     }
     else {
         const char* str = getenv("UNITTEST_PROGRESS");
-        bool report_progress = str && strlen(str) != 0;
+        bool report_progress = true; // str && strlen(str) != 0;
         reporter.reset(new CustomReporter(report_progress));
     }
     config.reporter = reporter.get();

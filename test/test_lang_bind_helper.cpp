@@ -9152,7 +9152,7 @@ void multiple_trackers_reader_thread(TestContext& test_context, std::string path
 
 } // anonymous namespace
 
-
+/*
 TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
 {
     const int write_thread_count = 7;
@@ -9207,6 +9207,9 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     // cleanup
     sg.end_read(); // FIXME: What cleanup? This seems out of place!?
 }
+
+*/
+
 
 #ifndef _WIN32
 
@@ -11367,7 +11370,7 @@ TEST(LangBindHelper_RollbackToInitialState2)
     sg_w.rollback();
 }
 
-
+/*
 TEST(LangBindHelper_Compact)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -11451,7 +11454,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
         sg.close();
     }
 }
-
+*/
 
 TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 {
@@ -11501,6 +11504,8 @@ TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
     CHECK_EQUAL(not_found, ndx);
 }
 
+
+/*
 
 // Tests handover of a Query. Especially it tests if next-gen-syntax nodes are deep copied correctly by
 // executing an imported query multiple times in parallel
@@ -11630,6 +11635,8 @@ TEST(LangBindHelper_HandoverFuzzyTest)
         slaves[i].join();
 }
 
+
+*/
 
 // TableView::clear() was originally reported to be slow when table was indexed and had links, but performance
 // has now doubled. This test is just a short sanity test that clear() still works.

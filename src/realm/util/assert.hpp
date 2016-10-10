@@ -19,6 +19,8 @@
 #ifndef REALM_UTIL_ASSERT_HPP
 #define REALM_UTIL_ASSERT_HPP
 
+#include <vector>
+
 #include <realm/util/features.h>
 #include <realm/util/terminate.hpp>
 
@@ -51,8 +53,17 @@
                              : realm::util::terminate_with_info("Assertion failed: " #condition, __LINE__, __FILE__, \
                                                                 REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
 
+
+#define REALM_ASSERT_RELEASE_CRC(condition, ...) \
+    get_alloc().get_file().verify_checksum(); \
+    (REALM_LIKELY(condition) ? static_cast<void>(0) : \
+    realm::util::terminate_with_info("Assertion failed: " # condition, __LINE__, __FILE__, \
+                                     REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
+
+
 #ifdef REALM_DEBUG
 #define REALM_ASSERT_DEBUG_EX REALM_ASSERT_RELEASE_EX
+#  define REALM_ASSERT_DEBUG_CRC REALM_ASSERT_RELEASE_CRC
 #else
 #define REALM_ASSERT_DEBUG_EX(condition, ...) static_cast<void>(sizeof bool(condition))
 #endif
@@ -63,6 +74,7 @@
 #if REALM_ENABLE_ASSERTIONS || defined(REALM_DEBUG)
 
 #define REALM_ASSERT_EX REALM_ASSERT_RELEASE_EX
+#  define REALM_ASSERT_CRC REALM_ASSERT_RELEASE_CRC
 
 #define REALM_ASSERT_3(left, cmp, right)                                                                             \
     (REALM_LIKELY((left)cmp(right)) ? static_cast<void>(0)                                                           \
