@@ -206,10 +206,8 @@ size_t page_size()
 char File::checksum()
 {
     if (!is_attached())
-        return 0;
+        return 123;
 
-
-#if 1
     size_t fsiz = get_size();
 
     char s = 0;
@@ -238,44 +236,12 @@ char File::checksum()
 
     sync();
 
-
-#else
-
-    //    if (get_size() < 23)
-    //        int i = 123;
-
-    constexpr size_t block = 128;
-    char buf[block];
-    char sum = 0;
-
-    size_t siz = get_size();
-
-    seek(0);
-    read(buf, block);
-
-    for (size_t t = 0; t < 22; t++)
-        sum += (buf[t] * t);
-    /*
-    for (size_t t = 23; t < block; t++)
-        sum += (buf[t] * t);
-
-    seek(siz - block);
-    read(buf, block);
-
-    for (size_t t = 0; t < block; t++)
-        sum += (buf[t] * (t + siz - block));
-        */
-    return sum;
-
-#endif
 }
 
 void File::update_checksum()
 {
     if (!is_attached())
         return;
-
-#if 1
 
     char* p = (char*)map(File::access_ReadWrite, 23);
     char c = checksum();
@@ -288,21 +254,6 @@ void File::update_checksum()
 
     return;
 
-#else
-
-    sync();
-
-
-    char tmp;
-
-    tmp = checksum();
-
-    //      std::cerr << "u=" << (int)tmp << " ";
-
-    seek(22);
-    write(&tmp, 1);
-    sync();
-#endif
 }
 
 void File::invalidate_checksum()
@@ -311,8 +262,6 @@ void File::invalidate_checksum()
     if (!is_attached())
         return;
 
-
-#if 1
     char* p = (char*)map(File::access_ReadWrite, 23);
     p[22] = 123;
     CRC = 123;
@@ -324,28 +273,8 @@ void File::invalidate_checksum()
         m.unlock();
     }
 
-
-    //  std::cerr << " i ";
     return;
-#else
 
-
-
-    sync();
-
-
-    //       std::cerr << "i";
-
-
-    char tmp;
-
-    tmp = 123;
-
-    seek(22);
-    write(&tmp, 1);
-    sync();
-
-#endif
 }
 
 
@@ -355,8 +284,6 @@ char File::get_checksum()
     if (!is_attached())
         return 123;
 
-
-#if 1
     char s = 0;
     char* p = (char*)map(File::access_ReadOnly, 23);
     s = p[22];
@@ -364,21 +291,7 @@ char File::get_checksum()
     unmap(p, 23);
 
     return s;
-#else
 
-
-    //        if (get_size() < 23)
-    //            int i = 123;
-
-    char tmp2;
-    sync();
-    seek(22);
-    read(&tmp2, 1);
-
-    //    std::cerr << "g=" << (int)tmp2 << " ";
-
-    return tmp2;
-#endif
 }
 
 bool File::verify_checksum()
@@ -389,8 +302,6 @@ bool File::verify_checksum()
 
     char tmp;
     char tmp2;
-
-
 
     tmp = checksum();
     tmp2 = get_checksum();

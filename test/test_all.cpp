@@ -392,7 +392,7 @@ bool run_tests(util::Logger* logger)
 
     // Set number of repetitions
     {
-        const char* str = getenv("UNITTEST_REPEAT");
+        const char* str = "100"; // getenv("UNITTEST_REPEAT");
         if (str && strlen(str) != 0) {
             std::istringstream in(str);
             in.imbue(std::locale::classic());
