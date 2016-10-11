@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <atomic>
 #include <fstream>
+#include <iostream>
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -162,7 +163,7 @@ bool verify_checksum(const File& f)
     if (tmp2 != 123 && tmp != tmp2) {
 
         if (compute_checksum(f) == tmp) {
-            std::cerr << "\nERRRRRR " << (int)tmp << " " << (int)tmp2 << " " << f.get_size() << "\n";
+       //     std::cerr << "\nERRRRRR " << (int)tmp << " " << (int)tmp2 << " " << f.get_size() << "\n";
             return false;
             REALM_ASSERT(false);
             exit(0);
