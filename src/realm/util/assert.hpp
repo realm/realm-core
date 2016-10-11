@@ -38,6 +38,7 @@
 #define REALM_ASSERT(condition) REALM_ASSERT_RELEASE(condition)
 #else
 #define REALM_ASSERT(condition) static_cast<void>(sizeof bool(condition))
+#define REALM_ASSERT_CRC(condition) static_cast<void>(sizeof bool(condition))
 #endif
 
 #ifdef REALM_DEBUG
