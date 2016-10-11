@@ -462,186 +462,15 @@ public:
     /// string is interpreted as a relative path.
     static std::string resolve(const std::string& path, const std::string& base_dir);
 
-    char checksum()
-    {
-        if (!is_attached())
-            return 0;
+    char checksum();
 
-        size_t fsiz = get_size();
-//        sync();
-//        std::cerr << "fs=" << fsiz << " ";
 
+    void update_checksum();
 
+    void invalidate_checksum();
+    char get_checksum();
 
-        char s = 0;
-        char* p = (char*)map(File::access_ReadOnly, fsiz);
-
-      //  std::cerr << "\n\nBYTES: ";
-
-        for (size_t t = 0; t < 22; t++) {
-            s += (p[t] * t);
-        }
-
-        for (size_t t = 23; t < fsiz; t++) {
-            s += (p[t] * t);
-        }
-
-//        std::cerr << "\n\n: ";
-
-
-        unmap(p, fsiz);
-
-        return s;
-
-
-
-        sync();
-
-        if (get_size() < 23)
-            int i = 123;
-
-        constexpr size_t block = 128;
-        char buf[block];
-        char sum = 0;
-
-        size_t siz = get_size();
-
-        seek(0);
-        read(buf, block);
-
-        for (size_t t = 0; t < 22; t++)
-            sum += (buf[t] * t);
-
-        for (size_t t = 23; t < block; t++)
-            sum += (buf[t] * t);
-
-        seek(siz - block);
-        read(buf, block);
-
-        for (size_t t = 0; t < block; t++)
-            sum += (buf[t] * (t + siz - block));
-
-        return sum;
-    }
-
-    void update_checksum()
-    {
-        if (!is_attached())
-            return;
-
-
-
-        char s = 0;
-        char* p = (char*)map(File::access_ReadWrite, 23);
-        p[22] = checksum();
-  //      std::cerr << "U=" << (int)p[22] << " ";
-        unmap(p, 23);
-        return;
-
-
-
-        sync();
-
-        if (get_size() < 23)
-            int i = 123;
-
-        char tmp;
-
-        tmp = checksum();
-
-  //      std::cerr << "u=" << (int)tmp << " ";
-
-        seek(22);
-        write(&tmp, 1);
-        sync();
-
-    }
-
-    void invalidate_checksum()
-    {
-        if (!is_attached())
-            return;
-
-        char* p = (char*)map(File::access_ReadWrite, 23);
-        p[22] = 123;
-        unmap(p, 23);
-      //  std::cerr << " i ";
-        return;
-
-
-
-
-        sync();
-
-        if (get_size() < 23)
-            int i = 123;
-
- //       std::cerr << "i";
-
-
-        char tmp;
-
-        tmp = 123;
-
-        seek(22);
-        write(&tmp, 1);
-        sync();
-    }
-
-    char get_checksum()
-    {
-        if (!is_attached())
-            return 123;
-
-
-        char s = 0;
-        char* p = (char*)map(File::access_ReadOnly, 23);
-        s = p[22];
-     //   std::cerr << "g=" << (int)s << " ";
-        unmap(p, 23);
-        return s;
-
-
-
-//        if (get_size() < 23)
-//            int i = 123;
-
-        char tmp2;
-        sync();
-        seek(22);
-        read(&tmp2, 1);
-
-    //    std::cerr << "g=" << (int)tmp2 << " ";
-
-        return tmp2;
-    }
-
-    bool verify_checksum()
-    {
-        if (!is_attached())
-            return true;
-
- //       if (get_size() < 23)
- //           int i = 123;
-
- //       sync();
-
-        char tmp;
-        char tmp2;
-
-        tmp = checksum();
-
-
-        tmp2 = get_checksum();
-
-        if (tmp2 != 123 && tmp != tmp2) {
-            std::cerr << "\nERRRRRR " << (int)tmp << " " << (int)tmp2 << " " << get_size() << "\n";
-            exit(0);
-            return false;
-        }
-        
-        return true;
-    }
+    bool verify_checksum();
 
     struct UniqueID {
 #ifdef _WIN32 // Windows version
@@ -687,6 +516,8 @@ private:
     int m_fd;
 #endif
 
+
+
     std::unique_ptr<const char[]> m_encryption_key;
 
     bool lock(bool exclusive, bool non_blocking);
@@ -716,6 +547,7 @@ private:
         }
 #endif
     };
+
 };
 
 

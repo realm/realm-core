@@ -50,6 +50,8 @@
 using namespace realm;
 using namespace realm::util;
 
+extern char CRC;
+
 namespace {
 #ifdef _WIN32 // Windows - GetLastError()
 
@@ -201,6 +203,214 @@ size_t page_size()
 } // namespace realm
 
 
+char File::checksum()
+{
+    if (!is_attached())
+        return 0;
+
+
+#if 1
+    size_t fsiz = get_size();
+
+    char s = 0;
+    char* p = (char*)map(File::access_ReadOnly, fsiz);
+
+
+    for (size_t t = 0; t < 22; t++) {
+        s += (p[t] * t);
+    }
+
+    for (size_t t = 23; t < fsiz; t++) {
+        s += (p[t] * t);
+    }
+
+    unmap(p, fsiz);
+
+    {
+        Mutex m;
+        m.lock();
+        m.unlock();
+    }
+
+    return s;
+
+
+
+    sync();
+
+
+#endif
+
+    //    if (get_size() < 23)
+    //        int i = 123;
+
+    constexpr size_t block = 128;
+    char buf[block];
+    char sum = 0;
+
+    size_t siz = get_size();
+
+    seek(0);
+    read(buf, block);
+
+    for (size_t t = 0; t < 22; t++)
+        sum += (buf[t] * t);
+    /*
+    for (size_t t = 23; t < block; t++)
+        sum += (buf[t] * t);
+
+    seek(siz - block);
+    read(buf, block);
+
+    for (size_t t = 0; t < block; t++)
+        sum += (buf[t] * (t + siz - block));
+        */
+    return sum;
+}
+
+void File::update_checksum()
+{
+    if (!is_attached())
+        return;
+
+#if 1
+    char s = 0;
+    char* p = (char*)map(File::access_ReadWrite, 23);
+    char c = checksum();
+    p[22] = c;
+
+    CRC = c;
+
+    //      std::cerr << "U=" << (int)p[22] << " ";
+    unmap(p, 23);
+
+    return;
+
+#endif
+
+    sync();
+
+
+    char tmp;
+
+    tmp = checksum();
+
+    //      std::cerr << "u=" << (int)tmp << " ";
+
+    seek(22);
+    write(&tmp, 1);
+    sync();
+
+}
+
+void File::invalidate_checksum()
+{
+
+    if (!is_attached())
+        return;
+
+
+#if 1
+    char* p = (char*)map(File::access_ReadWrite, 23);
+    p[22] = 123;
+    CRC = 123;
+    unmap(p, 23);
+
+    {
+        Mutex m;
+        m.lock();
+        m.unlock();
+    }
+
+
+    //  std::cerr << " i ";
+    return;
+#endif
+
+
+
+    sync();
+
+
+    //       std::cerr << "i";
+
+
+    char tmp;
+
+    tmp = 123;
+
+    seek(22);
+    write(&tmp, 1);
+    sync();
+}
+
+
+char File::get_checksum()
+{
+
+    if (!is_attached())
+        return 123;
+
+
+#if 1
+    char s = 0;
+    char* p = (char*)map(File::access_ReadOnly, 23);
+    s = p[22];
+    //   std::cerr << "g=" << (int)s << " ";
+    unmap(p, 23);
+
+    return s;
+#endif
+
+
+    //        if (get_size() < 23)
+    //            int i = 123;
+
+    char tmp2;
+    sync();
+    seek(22);
+    read(&tmp2, 1);
+
+    //    std::cerr << "g=" << (int)tmp2 << " ";
+
+    return tmp2;
+}
+
+bool File::verify_checksum()
+{
+
+    if (!is_attached())
+        return true;
+
+    char tmp;
+    char tmp2;
+
+
+
+    tmp = checksum();
+    tmp2 = get_checksum();
+
+
+    if (tmp2 != 123 && tmp != tmp2) {
+
+        if (checksum() == tmp) {
+            std::cerr << "\nERRRRRR " << (int)tmp << " " << (int)tmp2 << " " << get_size() << "\n";
+            return false;
+            REALM_ASSERT(false);
+            exit(0);
+            return false;
+
+        }
+        else
+        {
+//            std::cerr << "\modded " << (int)tmp << " " << (int)tmp2 << " " << get_size() << "\n";
+        }
+
+    }
+
+
+    return true;
+}
 void File::open_internal(const std::string& path, AccessMode a, CreateMode c, int flags, bool* success)
 {
     REALM_ASSERT_RELEASE(!is_attached());

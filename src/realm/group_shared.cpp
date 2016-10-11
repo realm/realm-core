@@ -1604,12 +1604,6 @@ SharedGroup::version_type SharedGroup::commit()
     char crc;
 
     m_group.m_alloc.get_file().invalidate_checksum();
-    crc = m_group.m_alloc.get_file().get_checksum();
-    if (crc != 123) {
-        crc = crc;
-        std::cerr << "\n\nBUUUUUUUUUUUUUUUUUG\n\n";
-    }
-    
     version_type new_version = do_commit(); // Throws
 
     crc = m_group.m_alloc.get_file().get_checksum();
