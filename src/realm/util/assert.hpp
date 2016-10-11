@@ -45,6 +45,7 @@
 #define REALM_ASSERT_DEBUG(condition) REALM_ASSERT_RELEASE(condition)
 #else
 #define REALM_ASSERT_DEBUG(condition) static_cast<void>(sizeof bool(condition))
+#define REALM_ASSERT_DEBUG_CRC(condition) static_cast<void>(sizeof bool(condition))
 #endif
 
 #define REALM_STRINGIFY(X) #X
