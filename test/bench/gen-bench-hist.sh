@@ -1,8 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/sh
 #
 # See ./util/gen-bench-hist.sh --help for documentation.
-
-set -euo pipefail
 
 show_usage () {
   cat <<EOF
@@ -44,10 +42,10 @@ if [ $# -gt 0 ]; then
   exit 1
 fi
 
-sh gen-bench.sh HEAD
-
 while read -r p; do
   echo "$p"
   sh gen-bench.sh "$p"
 done <revs_to_benchmark.txt
+
+sh gen-bench.sh HEAD
 

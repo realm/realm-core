@@ -1,8 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/sh
 #
 # See ./util/build-core.sh --help for documentation.
-
-set -euo pipefail
 
 builddir=./core-builds
 
@@ -66,7 +64,7 @@ basedir="$(cd "${basedir}" && pwd -P)"
 
 srcdir="${basedir}/src"
 
-function checkout () {
+checkout () {
 
   # Check if given "ref" is a (remote) branch, and prepend origin/ if it is.
   # Otherwise, git-checkout will complain about updating paths and switching

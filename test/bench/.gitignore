@@ -1,2 +1,6 @@
 # Various builds of core for cross-commit benchmarking
 /core-builds
+
+# default results directory from the parse-hist script
+/bench-hist-results
+

@@ -1,9 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/sh
 #
 # See ./util/gen-bench.sh --help for documentation.
-
-set -eo pipefail
-
 
 show_usage () {
   cat <<EOF
@@ -34,7 +31,7 @@ $ ./util/build-core.sh 32b3b79d2ab90e784ad5f14f201d682be9746781
 EOF
 }
 
-function get_machid () {
+get_machid () {
     if [ -f "/var/lib/dbus/machine-id" ]; then
         machid=$(cat /var/lib/dbus/machine-id)
     elif [ -f "/etc/machine-id" ]; then
@@ -68,6 +65,8 @@ fi
 
 #get the hash from nice names like tags/v2.0.0
 remoteref=$(git rev-list -n 1 "${ref}")
+unixtime=$(git show -s --format=%at ${remoteref})
+
 
 if [ -z "$REALM_BENCH_DIR" ]; then
     REALM_BENCH_DIR=~/.realm/core/benchmarks
@@ -76,7 +75,7 @@ fi
 get_machid
 basedir="${REALM_BENCH_DIR}/${machid}"
 mkdir -p "${basedir}"
-outputfile="${basedir}/${remoteref}.csv"
+outputfile="${basedir}/${unixtime}_${remoteref}.csv"
 
 if [ -f "${outputfile}" ]; then
     echo "found results, skipping ${outputfile}"
