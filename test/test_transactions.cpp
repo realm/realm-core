@@ -413,7 +413,7 @@ void thread(TestContext& test_context, int index, std::string path)
 } // anonymous namespace
 
 
-ONLY(Transactions_General)
+TEST(Transactions_General)
 {
     SHARED_GROUP_TEST_PATH(path);
 
