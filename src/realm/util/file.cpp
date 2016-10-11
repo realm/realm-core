@@ -239,7 +239,7 @@ char File::checksum()
     sync();
 
 
-#endif
+#else
 
     //    if (get_size() < 23)
     //        int i = 123;
@@ -266,6 +266,8 @@ char File::checksum()
         sum += (buf[t] * (t + siz - block));
         */
     return sum;
+
+#endif
 }
 
 void File::update_checksum()
@@ -286,7 +288,7 @@ void File::update_checksum()
 
     return;
 
-#endif
+#else
 
     sync();
 
@@ -300,7 +302,7 @@ void File::update_checksum()
     seek(22);
     write(&tmp, 1);
     sync();
-
+#endif
 }
 
 void File::invalidate_checksum()
@@ -325,7 +327,7 @@ void File::invalidate_checksum()
 
     //  std::cerr << " i ";
     return;
-#endif
+#else
 
 
 
@@ -342,6 +344,8 @@ void File::invalidate_checksum()
     seek(22);
     write(&tmp, 1);
     sync();
+
+#endif
 }
 
 
@@ -360,7 +364,7 @@ char File::get_checksum()
     unmap(p, 23);
 
     return s;
-#endif
+#else
 
 
     //        if (get_size() < 23)
@@ -374,6 +378,7 @@ char File::get_checksum()
     //    std::cerr << "g=" << (int)tmp2 << " ";
 
     return tmp2;
+#endif
 }
 
 bool File::verify_checksum()
