@@ -27,6 +27,8 @@
 #include <realm/util/terminate.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
+#include <realm/util/file.hpp>
+
 
 namespace realm {
 
@@ -208,6 +210,8 @@ public:
     /// Group::get_target_file_format_version_for_session(), and the file format
     /// upgrade logic in Group::upgrade_file_format().
     int get_file_format_version() const noexcept;
+
+    util::File get_file() const { return util::File(); }
 
 protected:
     size_t m_baseline = 0; // Separation line between immutable and mutable refs.

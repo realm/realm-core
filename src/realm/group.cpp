@@ -314,7 +314,7 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
         // The 3rd slot in m_top is
         // `RefOrTagged::make_tagged(logical_file_size)`, and the logical file
         // size must never exceed actual file size.
-        REALM_ASSERT_3(m_top.get_as_ref_or_tagged(2).get_as_int(), <=, m_alloc.get_baseline());
+        REALM_ASSERT_EX_CRC(m_top.get_as_ref_or_tagged(2).get_as_int() <= m_alloc.get_baseline(), m_top.get_as_ref_or_tagged(2).get_as_int(), m_alloc.get_baseline());
     }
     else if (create_group_when_missing) {
         create_empty_group(); // Throws

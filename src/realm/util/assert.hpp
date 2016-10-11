@@ -32,8 +32,13 @@
     (REALM_LIKELY(condition) ? static_cast<void>(0)                                                                  \
                              : realm::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
 
+#define REALM_ASSERT_RELEASE_CRC(condition)                                                                              \
+    (REALM_LIKELY(condition) ? static_cast<void>(0)                                                                  \
+                             : realm::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
+
 #if REALM_ASSERTIONS_ENABLED
 #define REALM_ASSERT(condition) REALM_ASSERT_RELEASE(condition)
+#define REALM_ASSERT_CRC(condition) REALM_ASSERT_RELEASE_CRC(condition)
 #else
 #define REALM_ASSERT(condition) static_cast<void>(sizeof bool(condition))
 #endif
@@ -51,10 +56,18 @@
                              : realm::util::terminate_with_info("Assertion failed: " #condition, __LINE__, __FILE__, \
                                                                 REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
 
+#define REALM_ASSERT_RELEASE_EX_CRC(condition, ...)                                                                      \
+    (REALM_LIKELY(condition) ? static_cast<void>(0)                                                                  \
+                             : realm::util::terminate_with_info("Assertion failed: " #condition, __LINE__, __FILE__, \
+                                                                REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
+
+
 #ifdef REALM_DEBUG
 #define REALM_ASSERT_DEBUG_EX REALM_ASSERT_RELEASE_EX
+#define REALM_ASSERT_DEBUG_EX_CRC REALM_ASSERT_RELEASE_EX_CRC
 #else
 #define REALM_ASSERT_DEBUG_EX(condition, ...) static_cast<void>(sizeof bool(condition))
+#define REALM_ASSERT_DEBUG_EX_CRC(condition, ...) static_cast<void>(sizeof bool(condition))
 #endif
 
 // Becase the assert is used in noexcept methods, it's a bad idea to allocate
@@ -63,6 +76,7 @@
 #if REALM_ENABLE_ASSERTIONS || defined(REALM_DEBUG)
 
 #define REALM_ASSERT_EX REALM_ASSERT_RELEASE_EX
+#define REALM_ASSERT_EX_CRC REALM_ASSERT_RELEASE_EX_CRC
 
 #define REALM_ASSERT_3(left, cmp, right)                                                                             \
     (REALM_LIKELY((left)cmp(right)) ? static_cast<void>(0)                                                           \

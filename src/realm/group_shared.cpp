@@ -1148,6 +1148,9 @@ bool SharedGroup::compact()
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
             file.sync(); // Throws
+
+        update_checksum(file);
+
 #ifndef _WIN32
         util::File::move(tmp_path, m_db_path);
 #endif
@@ -1573,6 +1576,8 @@ Group& SharedGroup::begin_write()
         bool writable = true;
         do_begin_read(version_id, writable); // Throws
 
+        verify_checksum(m_group.get_alloc().get_file());
+
         if (Replication* repl = m_group.get_replication()) {
             version_type current_version = m_read_lock.m_version;
             bool history_updated = false;
@@ -1596,7 +1601,13 @@ SharedGroup::version_type SharedGroup::commit()
 
     REALM_ASSERT(m_group.is_attached());
 
+
+    invalidate_checksum(m_group.get_alloc().get_file());
+
     version_type new_version = do_commit(); // Throws
+
+    update_checksum(m_group.get_alloc().get_file());
+
     do_end_write();
     do_end_read();
 

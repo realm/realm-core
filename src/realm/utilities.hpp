@@ -30,9 +30,14 @@
 #include <intrin.h>
 #endif
 
+#include <realm/util/file.hpp>
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
+
+
+using namespace realm::util;
+
 
 // GCC defines __i386__ and __x86_64__
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) ||               \
@@ -107,6 +112,14 @@ REALM_FORCEINLINE bool sseavx()
     return false;
 #endif
 }
+
+
+char compute_checksum(const File& f);
+void update_checksum(const File& f);
+void invalidate_checksum(const File& f);
+char read_checksum(const File& f);
+bool verify_checksum(const File& f);
+
 
 void cpuid_init();
 void* round_up(void* p, size_t align);

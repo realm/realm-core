@@ -95,7 +95,12 @@ SlabAlloc::SlabAlloc()
 
 util::File& SlabAlloc::get_file()
 {
-    return m_file_mappings->m_file;
+    static File f;
+
+    if (m_file_mappings)
+        return m_file_mappings->m_file;
+    else
+        return f;
 }
 
 
@@ -103,7 +108,7 @@ const SlabAlloc::Header SlabAlloc::empty_file_header = {
     {0, 0}, // top-refs
     {'T', '-', 'D', 'B'},
     {0, 0}, // undecided file format
-    0,      // reserved
+    123,      // reserved
     0       // flags (lsb is select bit)
 };
 
@@ -767,6 +772,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             realm::util::encryption_write_barrier(writable_map, 0);
             m_file_on_streaming_form = false;
             writable_map.sync();
+            update_checksum(get_file());
         }
     }
 

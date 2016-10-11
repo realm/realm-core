@@ -75,6 +75,115 @@ signed char avx_support = -1;
 StringCompareCallback string_compare_callback = nullptr;
 string_compare_method_t string_compare_method = STRING_COMPARE_CORE;
 
+
+
+
+char compute_checksum(const File& f)
+{
+    if (!f.is_attached())
+        return 123;
+
+    size_t fsiz = f.get_size();
+
+    char s = 0;
+    char* p = (char*)f.map(File::access_ReadOnly, fsiz);
+
+
+    for (size_t t = 0; t < 22; t++) {
+        s += (p[t] * t);
+    }
+
+    for (size_t t = 23; t < fsiz; t++) {
+        s += (p[t] * t);
+    }
+
+    f.unmap(p, fsiz);
+
+    return s;
+}
+
+void update_checksum(const File& f)
+{
+    if (!f.is_attached())
+        return;
+
+    char* p = (char*)f.map(File::access_ReadWrite, 23);
+    char c = compute_checksum(f);
+    p[22] = c;
+    f.unmap(p, 23);
+
+    return;
+
+}
+
+void invalidate_checksum(const File& f)
+{
+
+    if (!f.is_attached())
+        return;
+
+    char* p = (char*)f.map(File::access_ReadWrite, 23);
+    p[22] = 123;
+    f.unmap(p, 23);
+
+    return;
+
+}
+
+
+char read_checksum(const File& f)
+{
+
+    if (!f.is_attached())
+        return 123;
+
+    char s = 0;
+    char* p = (char*)f.map(File::access_ReadOnly, 23);
+    s = p[22];
+    f.unmap(p, 23);
+
+    return s;
+
+}
+
+bool verify_checksum(const File& f)
+{
+
+    if (!f.is_attached())
+        return true;
+
+    char tmp;
+    char tmp2;
+
+    tmp = read_checksum(f);
+    tmp2 = compute_checksum(f);
+
+
+    if (tmp2 != 123 && tmp != tmp2) {
+
+        if (compute_checksum(f) == tmp) {
+            std::cerr << "\nERRRRRR " << (int)tmp << " " << (int)tmp2 << " " << f.get_size() << "\n";
+            return false;
+            REALM_ASSERT(false);
+            exit(0);
+            return false;
+
+        }
+        else
+        {
+            //            std::cerr << "\modded " << (int)tmp << " " << (int)tmp2 << " " << get_size() << "\n";
+        }
+
+    }
+
+
+    return true;
+}
+
+
+
+
+
 void cpuid_init()
 {
 #ifdef REALM_COMPILER_SSE
@@ -305,6 +414,12 @@ void process_mem_usage(double& vm_usage, double& resident_set)
 #endif
 }
 #endif
+
+
+
+
+
+
 
 } // namespace realm
 
