@@ -276,7 +276,7 @@ void File::update_checksum()
         return;
 
 #if 1
-    char s = 0;
+
     char* p = (char*)map(File::access_ReadWrite, 23);
     char c = checksum();
     p[22] = c;
