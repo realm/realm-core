@@ -11,7 +11,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Added Array-type support
 
 -----------
 
