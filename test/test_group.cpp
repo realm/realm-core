@@ -2190,20 +2190,41 @@ TEST(Group_CascadeNotify_Simple)
     CHECK(called);
 }
 
-/*
-TEST(Group_CRC)
+ONLY(Group_CRC)
 {
     GROUP_TEST_PATH(path);
     
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
+    t->add_empty_row(100000);
+
+    realm::util::File file;
+    file.open(path, File::access_ReadWrite, File::create_Never, 0);
+
+    for (size_t i = 0; i < 100000; i++) {
+        // byte sized arrays so we get small arrays and high array "denisty" in the .realm file
+        t.get()->set_int(0, i, 100);
+    }
+
+    g.commit();
+
+
+    for (size_t i = 0; i < 100000; i++) {
+        // byte sized arrays so we get small arrays and high array "denisty" in the .realm file
+        file.seek(fastrand() % 128);
+        char c = fastrand();
+        file.write(&c, 1);
+        // Polute start which is contained in crc
+        file.seek(120);
+        file.write(&c, 1);
+        file.sync();
+        t.get()->sum_int(0);
+        std::cerr << ".";
+    }
 
 
 }
-
-*/
-
 
 TEST(Group_CascadeNotify_TableClear)
 {

@@ -1959,6 +1959,9 @@ int64_t Array::get(size_t ndx) const noexcept
 template <size_t w>
 int64_t Array::get_universal(const char* data, size_t ndx) const
 {
+    REALM_ASSERT_EX_CRC(ndx <= 1000);
+
+
     if (w == 0) {
         return 0;
     }

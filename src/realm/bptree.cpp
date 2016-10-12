@@ -402,6 +402,7 @@ std::pair<MemRef, size_t> BpTreeNode::get_bptree_leaf(size_t ndx) const noexcept
         bool child_is_leaf = !get_is_inner_bptree_node_from_header(child_header);
         if (child_is_leaf) {
             MemRef mem(child_header, child_ref, m_alloc);
+            REALM_ASSERT_EX_CRC(Array::get_size_from_header(mem.get_addr()) <= REALM_MAX_BPNODE_SIZE, Array::get_size_from_header(mem.get_addr()));
             return std::make_pair(mem, ndx_in_child);
         }
         ndx_2 = ndx_in_child;

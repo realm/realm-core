@@ -159,8 +159,14 @@ bool verify_checksum(const File& f)
     tmp2 = compute_checksum(f);
 
 
-    if (tmp2 != 123 && tmp != tmp2 && compute_checksum(f) == tmp) {
-        return false;
+    if (tmp2 != 123 && tmp != tmp2) {
+        if (compute_checksum(f) == tmp2 && read_checksum(f) != 123) {
+            return false;
+        }
+        else {
+            // Just to have a line number to set a debugging breakpoint on
+            static_cast<void>(0);
+        }
     }
 
     return true;

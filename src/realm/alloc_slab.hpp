@@ -28,6 +28,7 @@
 #include <realm/util/file.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
+#include <realm/utilities.hpp>
 
 namespace realm {
 
@@ -59,6 +60,12 @@ class SlabAlloc : public Allocator {
 public:
     ~SlabAlloc() noexcept override;
     SlabAlloc();
+
+    char compute_checksum2() override { return compute_checksum(get_file()); }
+    void update_checksum2() override { update_checksum(get_file()); }
+    void invalidate_checksum2() override { invalidate_checksum(get_file()); }
+    char read_checksum2() override { return read_checksum(get_file()) ; }
+    bool verify_checksum2() override { return verify_checksum(get_file()); }
 
     /// \struct Config
     /// \brief Storage for combining setup flags for initialization to

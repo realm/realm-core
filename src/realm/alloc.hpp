@@ -125,6 +125,13 @@ public:
 
     virtual void verify() const = 0;
 
+    virtual char compute_checksum2() { return 123; }
+    virtual void update_checksum2() { return; }
+    virtual void invalidate_checksum2() { return; }
+    virtual char read_checksum2() { return 123; }
+    virtual bool verify_checksum2() { return true; }
+
+
 #ifdef REALM_DEBUG
     /// Terminate the program precisely when the specified 'ref' is
     /// freed (or reallocated). You can use this to detect whether the

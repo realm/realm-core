@@ -1602,11 +1602,11 @@ SharedGroup::version_type SharedGroup::commit()
     REALM_ASSERT(m_group.is_attached());
 
 
-    invalidate_checksum(m_group.get_alloc().get_file());
+    m_group.get_alloc().invalidate_checksum2();
 
     version_type new_version = do_commit(); // Throws
 
-    update_checksum(m_group.get_alloc().get_file());
+    m_group.get_alloc().update_checksum2();
 
     do_end_write();
     do_end_read();
