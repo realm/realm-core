@@ -210,7 +210,7 @@ def doBuildDotNetOsx(def isPublishingRun) {
       } finally {
         collectCompilerWarnings('clang')
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          sh 's3cmd -c $s3cfg_config_file put realm-core-dotnet-cocoa-latest.tar.bz2 s3://static.realm.io/downloads/core'
+          sh 's3cmd -c $s3cfg_config_file put --multipart-chunk-size-mb 5 realm-core-dotnet-cocoa-latest.tar.bz2 s3://static.realm.io/downloads/core'
         }
       }
     }
@@ -292,7 +292,7 @@ def doBuildNodeInDocker(def isPublishingRun) {
   return {
     node('docker') {
       getArchive()
-      
+
       def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
       withEnv(environment) {
