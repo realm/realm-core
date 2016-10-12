@@ -51,6 +51,14 @@ def getMachId():
         machid = os.popen('ifconfig en0 | awk \'/ether/{print $2}\'').read().strip()
     return machid
 
+def find_ndx(inlist, item):
+    ndx = 0
+    try:
+        ndx = inlist.index(item)
+    except ValueError:
+        ndx = -1
+    return ndx
+
 def transform(inputdir, outputdir, filelist):
     for inputfile in filelist:
         sha = os.path.splitext(os.path.basename(inputfile))[0]
@@ -58,6 +66,11 @@ def transform(inputdir, outputdir, filelist):
         with open(inputfile) as fin:
             csvr = csv.reader(fin)
             header = csvr.next()
+            min_ndx = find_ndx(header, "min")
+            max_ndx = find_ndx(header, "max")
+            med_ndx = find_ndx(header, "median")
+            avg_ndx = find_ndx(header, "avg")
+            print "min at: " + str(min_ndx) + " max at: " + str(max_ndx) + " median at" + str(med_ndx) + " avg at: " + str(avg_ndx)
             for row in csvr:
                 if len(row) < 5:
                     break
@@ -73,11 +86,20 @@ def transform(inputdir, outputdir, filelist):
                     lines = [line.rstrip('\n') for line in fout]
                     if len(lines) < 5:
                         lines = ['','','','','']
+                endline = ",\n"
                 with open(outfilename, 'w+') as fout:
                     fout.seek(0)
-                    for i in range(0, 5):
-                        newrow = lines[i] + row[i] + ",\n"
-                        fout.write(newrow)
+                    newrow = lines[0] + sha + endline
+                    fout.write(newrow)
+                    newrow = lines[1] + row[min_ndx] + endline if min_ndx >= 0 else lines[1] + endline
+                    fout.write(newrow)
+                    newrow = lines[2] + row[max_ndx] + endline if max_ndx >= 0 else lines[2] + endline
+                    fout.write(newrow)
+                    newrow = lines[3] + row[med_ndx] + endline if med_ndx >= 0 else lines[3] + endline
+                    fout.write(newrow)
+                    newrow = lines[4] + row[avg_ndx] + endline if avg_ndx >= 0 else lines[4] + endline
+                    fout.write(newrow)
+
                     fout.truncate()
 
 if __name__ == "__main__":
@@ -97,7 +119,4 @@ if __name__ == "__main__":
     files = getFilesByName(inputdir)
     
     transform(inputdir, outputdir, files)
-    #for cdate, path in files:
-    #    print time.ctime(cdate), os.path.basename(path)
-
 
