@@ -308,6 +308,7 @@ public:
     void set_file_format_version(int) noexcept;
 
     void verify() const override;
+
 #ifdef REALM_DEBUG
     void enable_debug(bool enable)
     {
@@ -361,7 +362,7 @@ private:
         // Info-block 8-bytes
         uint8_t m_mnemonic[4];    // "T-DB"
         uint8_t m_file_format[2]; // See `library_file_format`
-        uint8_t m_reserved;
+        uint8_t m_checksum;
         // bit 0 of m_flags is used to select between the two top refs.
         uint8_t m_flags;
     };

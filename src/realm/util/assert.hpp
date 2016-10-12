@@ -57,9 +57,8 @@
                                                                 REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
 
 #define REALM_ASSERT_RELEASE_EX_CRC(condition, ...)         \
-    verify_checksum(get_alloc().get_file()); \
     (REALM_LIKELY(condition) ? static_cast<void>(0)                                                                  \
-                             : realm::util::terminate_with_info("Assertion failed: " #condition, __LINE__, __FILE__, \
+                             : realm::util::terminate_with_info((verify_checksum(get_alloc().get_file()) ? ("Assertion failed: " #condition) : ("Assertion failed with .realm file checksum error: " #condition)), __LINE__, __FILE__, \
                                                                 REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
 
 

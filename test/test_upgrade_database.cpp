@@ -74,8 +74,7 @@ using namespace realm::util;
 
 TEST(Upgrade_Database_2_3)
 {
-    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
-                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
+    std::string path = "c:\\d\\Objectif_crc.realm";
 
 // Test upgrading the database file format from version 2 to 3. When you open a version 2 file using SharedGroup
 // it gets converted automatically by Group::upgrade_file_format(). Files cannot be read or written (you cannot

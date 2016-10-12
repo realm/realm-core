@@ -1576,7 +1576,7 @@ Group& SharedGroup::begin_write()
         bool writable = true;
         do_begin_read(version_id, writable); // Throws
 
-        verify_checksum(m_group.get_alloc().get_file());
+//        verify_checksum(m_group.get_alloc().get_file());
 
         if (Replication* repl = m_group.get_replication()) {
             version_type current_version = m_read_lock.m_version;

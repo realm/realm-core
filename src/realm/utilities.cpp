@@ -76,25 +76,30 @@ signed char avx_support = -1;
 StringCompareCallback string_compare_callback = nullptr;
 string_compare_method_t string_compare_method = STRING_COMPARE_CORE;
 
-
-
-
 char compute_checksum(const File& f)
 {
     if (!f.is_attached())
         return 123;
 
     size_t fsiz = f.get_size();
-
+    REALM_ASSERT_RELEASE_EX(fsiz >= 23, fsiz);
+    
     char s = 0;
+
+    size_t head = fsiz >= 128 ? 128 - 22 : fsiz - 22;
     char* p = (char*)f.map(File::access_ReadOnly, fsiz);
 
-
-    for (size_t t = 0; t < 22; t++) {
+    for (size_t t = 0; t < 22 && t < fsiz; t++) {
         s += (p[t] * t);
     }
 
-    for (size_t t = 23; t < fsiz; t++) {
+    for (size_t t = 23; t < head; t++) {
+        s += (p[t] * t);
+    }
+
+    size_t tail = fsiz >= 256 ? 128 : fsiz - head;
+    
+    for (size_t t = fsiz - tail; t < fsiz; t++) {
         s += (p[t] * t);
     }
 
@@ -114,12 +119,10 @@ void update_checksum(const File& f)
     f.unmap(p, 23);
 
     return;
-
 }
 
 void invalidate_checksum(const File& f)
 {
-
     if (!f.is_attached())
         return;
 
@@ -128,13 +131,10 @@ void invalidate_checksum(const File& f)
     f.unmap(p, 23);
 
     return;
-
 }
-
 
 char read_checksum(const File& f)
 {
-
     if (!f.is_attached())
         return 123;
 
@@ -149,7 +149,6 @@ char read_checksum(const File& f)
 
 bool verify_checksum(const File& f)
 {
-
     if (!f.is_attached())
         return true;
 
@@ -160,23 +159,9 @@ bool verify_checksum(const File& f)
     tmp2 = compute_checksum(f);
 
 
-    if (tmp2 != 123 && tmp != tmp2) {
-
-        if (compute_checksum(f) == tmp) {
-       //     std::cerr << "\nERRRRRR " << (int)tmp << " " << (int)tmp2 << " " << f.get_size() << "\n";
-            return false;
-            REALM_ASSERT(false);
-            exit(0);
-            return false;
-
-        }
-        else
-        {
-            //            std::cerr << "\modded " << (int)tmp << " " << (int)tmp2 << " " << get_size() << "\n";
-        }
-
+    if (tmp2 != 123 && tmp != tmp2 && compute_checksum(f) == tmp) {
+        return false;
     }
-
 
     return true;
 }

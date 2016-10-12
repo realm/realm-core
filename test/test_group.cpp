@@ -2190,6 +2190,20 @@ TEST(Group_CascadeNotify_Simple)
     CHECK(called);
 }
 
+/*
+TEST(Group_CRC)
+{
+    GROUP_TEST_PATH(path);
+    
+    Group g(path, 0, Group::mode_ReadWrite);
+    TableRef t = g.add_table("target");
+    t->add_column(type_Int, "int");
+
+
+}
+
+*/
+
 
 TEST(Group_CascadeNotify_TableClear)
 {
