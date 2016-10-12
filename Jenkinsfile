@@ -618,7 +618,7 @@ def doPublishGeneric() {
 def doPublishLocalArtifacts() {
   // TODO create a Dockerfile for an image only containing s3cmd
   return {
-    node('dk01') {
+    node('aws') {
       unstash 'cocoa-package'
       unstash 'dotnet-package'
       unstash 'node-linux-package'
