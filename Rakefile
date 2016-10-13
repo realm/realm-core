@@ -416,7 +416,7 @@ android_abis.product(android_build_types) do |abi, build_type|
   dir = ENV['build_dir'] || "#{REALM_BUILD_DIR_ANDROID}.#{abi}.#{build_type}"
   directory dir
 
-  desc "Configure the Android build in #{abi} mode for #{abi}"
+  desc "Configure the Android build in #{build_type} mode for #{abi}"
   task "config-android-#{abi}-#{build_type}" => [dir] do
     ENV['CMAKE_TOOLCHAIN_FILE'] = 'tools/cmake/android.toolchain.cmake'
     ENV['REALM_PLATFORM'] = 'Android'
@@ -426,9 +426,17 @@ android_abis.product(android_build_types) do |abi, build_type|
     generate_makefiles(dir)
   end
 
+  desc "Build the core static library in #{build_type} mode for #{abi}"
   task "build-android-#{abi}-#{build_type}" => ["config-android-#{abi}-#{build_type}", 'guess_num_processors'] do
     Dir.chdir(dir) do
       sh "make realm -j#{@num_processors}"
+    end
+  end
+
+  desc "Build the core tests in #{build_type} mode for #{abi}"
+  task "build-tests-android-#{abi}-#{build_type}" => ["config-android-#{abi}-#{build_type}", 'guess_num_processors'] do
+    Dir.chdir(dir) do
+      sh "make all -j#{@num_processors}"
     end
   end
 
