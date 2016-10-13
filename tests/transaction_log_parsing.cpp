@@ -1240,7 +1240,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             }
 
             void did_change(std::vector<ObserverState> const& observers,
-                            std::vector<void*> const& invalidated) override
+                            std::vector<void*> const& invalidated, bool) override
             {
                 m_invalidated = invalidated;
                 m_result = observers;

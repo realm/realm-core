@@ -287,7 +287,7 @@ public:
         std::sort(begin(m_observers), end(m_observers));
         func(*this);
         if (context)
-            context->did_change(m_observers, invalidated);
+            context->did_change(m_observers, invalidated, old_version != sg.get_version_of_current_transaction());
         m_notifiers.package_and_wait(sg.get_version_of_current_transaction().version); // is a no-op if parse_complete() was called
         m_notifiers.deliver(sg); // only will ever deliver errors
         m_notifiers.after_advance();

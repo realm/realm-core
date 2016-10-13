@@ -191,7 +191,7 @@ TEST_CASE("SharedRealm: notifications") {
         size_t* change_count;
         Context(size_t* out) : change_count(out) { }
 
-        void did_change(std::vector<ObserverState> const&, std::vector<void*> const&) override
+        void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
         {
             ++*change_count;
         }
