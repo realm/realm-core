@@ -569,6 +569,7 @@ void RealmCoordinator::run_async_notifiers()
     // Make a copy of the notifiers vector and then release the lock to avoid
     // blocking other threads trying to register or unregister notifiers while we run them
     auto notifiers = m_notifiers;
+    m_notifiers.insert(m_notifiers.end(), new_notifiers.begin(), new_notifiers.end());
     lock.unlock();
 
     if (skip_version.version) {
@@ -598,8 +599,8 @@ void RealmCoordinator::run_async_notifiers()
     // Attach the new notifiers to the main SG and move them to the main list
     for (auto& notifier : new_notifiers) {
         notifier->attach_to(*m_notifier_sg);
+        notifier->run();
     }
-    std::move(new_notifiers.begin(), new_notifiers.end(), std::back_inserter(notifiers));
 
     // Change info is now all ready, so the notifiers can now perform their
     // background work
@@ -610,10 +611,12 @@ void RealmCoordinator::run_async_notifiers()
     // Reacquire the lock while updating the fields that are actually read on
     // other threads
     lock.lock();
+    for (auto& notifier : new_notifiers) {
+        notifier->prepare_handover();
+    }
     for (auto& notifier : notifiers) {
         notifier->prepare_handover();
     }
-    m_notifiers = std::move(notifiers);
     clean_up_dead_notifiers();
     m_notifier_cv.notify_all();
 }
