@@ -3,7 +3,8 @@
 ### Bugfixes
 
 * Fixed a race between destruction of a global mutex as part of main thread exit
-  and attempt to lock it on a background thread. (issue #2238)
+  and attempt to lock it on a background thread, or conversely attempt to lock a
+  mutex after it has been destroyed. (PR #2238, fixes issues #2238, #2137, #2009)
 
 ### Breaking changes
 
