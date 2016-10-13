@@ -1,11 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
 
-if(REALM_PLATFORM STREQUAL "Android")
-    # This must be before project()
-    set(CMAKE_TOOLCHAIN_FILE "${CMAKE_CURRENT_SOURCE_DIR}/tools/cmake/android.toolchain.cmake")
-    set(ANDROID_ABI "arm64-v8a" CACHE STRING "")
-endif()
-
 project(Realm)
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake" ${CMAKE_MODULE_PATH})
 
@@ -20,10 +14,11 @@ set(REALM_SOVERSION "9.0.0")
 if(ANDROID)
     set(ANDROID_OPENSSL_VERSION "1.0.1t")
     set(REALM_LIBTYPE "STATIC")
-    find_library(ANDROID_LIBRARY android)
-    find_library(ANDROID_LOG_LIBRARY log)
-    list(APPEND PLATFORM_LIBRARIES ${ANDROID_LIBRARY})
-    list(APPEND PLATFORM_LIBRARIES ${ANDROID_LOG_LIBRARY})
+    list(APPEND PLATFORM_LIBRARIES log)
+    list(APPEND PLATFORM_LIBRARIES android)
+    if (ANDROID_ABI STREQUAL mips)
+        list(APPEND PLATFORM_LIBRARIES atomic)
+    endif()
 endif()
 
 project(

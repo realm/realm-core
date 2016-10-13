@@ -10,6 +10,7 @@ end
 REALM_PROJECT_ROOT    = File.absolute_path(File.dirname(__FILE__))
 REALM_BUILD_DIR_APPLE = 'build.apple'.freeze
 REALM_BUILD_DIR_STEM  = 'build.make'.freeze
+REALM_BUILD_DIR_ANDROID = 'build.android'.freeze
 
 def generate_makefiles(build_dir)
   options = ENV.select { |k, _| k.start_with?('REALM_') || k.start_with?('CMAKE_') || k.start_with?('ANDROID_') }.map { |k, v| "-D#{k}=#{v}" }.join(' ')
@@ -412,11 +413,13 @@ android_build_types = %w(Release Debug)
 build_android_dependencies = []
 
 android_abis.product(android_build_types) do |abi, build_type|
-  dir = ENV['build_dir'] || "#{REALM_BUILD_DIR_STEM}.#{abi}.#{build_type}"
+  dir = ENV['build_dir'] || "#{REALM_BUILD_DIR_ANDROID}.#{abi}.#{build_type}"
   directory dir
 
   desc "Configure the Android build in #{abi} mode for #{abi}"
   task "config-android-#{abi}-#{build_type}" => [dir] do
+    ENV['CMAKE_TOOLCHAIN_FILE'] = 'tools/cmake/android.toolchain.cmake'
+    ENV['REALM_PLATFORM'] = 'Android'
     ENV['CMAKE_BUILD_TYPE'] = build_type
     ENV['ANDROID_ABI'] = abi
     ENV['REALM_ENABLE_ENCRYPTION'] = '1'
@@ -425,7 +428,7 @@ android_abis.product(android_build_types) do |abi, build_type|
 
   task "build-android-#{abi}-#{build_type}" => ["config-android-#{abi}-#{build_type}", 'guess_num_processors'] do
     Dir.chdir(dir) do
-      sh "cmake --build . -- -j#{@num_processors}"
+      sh "make realm -j#{@num_processors}"
     end
   end
 

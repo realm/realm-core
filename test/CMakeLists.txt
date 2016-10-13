@@ -45,10 +45,7 @@ add_test(
 
 set(BENCHMARKS benchmark-common-tasks/main.cpp)
 add_executable(realm-benchmark-common-tasks ${BENCHMARKS})
-target_link_libraries(realm-benchmark-common-tasks realm test-util)
-if(ANDROID)
-  target_link_libraries(realm-benchmark-common-tasks log android)
-endif()
+target_link_libraries(realm-benchmark-common-tasks ${PLATFORM_LIBRARIES} realm test-util)
 add_test(RealmBenchmarkCommonTasks realm-benchmark-common-tasks)
 
 # FIXME: Add other benchmarks
