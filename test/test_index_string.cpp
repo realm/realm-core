@@ -81,13 +81,8 @@ const char s7[] = "Sam";
 const int64_t ints[] = {0x1111,     0x11112222, 0x11113333, 0x1111333, 0x111122223333ull, 0x1111222233334ull,
                         0x22223333, 0x11112227, 0x11112227, 0x78923};
 
-struct nullable {
-    static constexpr bool value = true;
-};
-
-struct non_nullable {
-    static constexpr bool value = false;
-};
+using nullable = std::true_type;
+using non_nullable = std::false_type;
 
 } // anonymous namespace
 
@@ -962,7 +957,14 @@ namespace {
 StringData create_string_with_nuls(const size_t bits, const size_t length, char* tmp, Random& random)
 {
     for (size_t i = 0; i < length; ++i) {
-        tmp[i] = (bits & (1 << i)) == 0 ? '\0' : static_cast<char>(random.draw_int<int>(CHAR_MIN, CHAR_MAX));
+        bool insert_nul_at_pos = (bits & (1 << i)) == 0;
+        if (insert_nul_at_pos) {
+            tmp[i] = '\0';
+        } else {
+            // Avoid stray \0 chars, since we are already testing all combinations.
+            // All casts are necessary to preserve the bitpattern.
+            tmp[i] = static_cast<char>(static_cast<unsigned char>(random.draw_int<unsigned int>(1, UCHAR_MAX)));
+        }
     }
     return StringData(tmp, length);
 }
@@ -974,6 +976,7 @@ StringData create_string_with_nuls(const size_t bits, const size_t length, char*
 TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
+    constexpr unsigned int seed = 42;
 
     // String index
     ref_type ref = StringColumn::create(Allocator::get_default());
@@ -986,7 +989,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
     for (size_t length = 1; length <= MAX_LENGTH; ++length) {
 
         {
-            Random random(42);
+            Random random(seed);
             const size_t combinations = 1 << length;
             for (size_t i = 0; i < combinations; ++i) {
                 StringData str = create_string_with_nuls(i, length, tmp, random);
@@ -997,7 +1000,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
         // check index up to this length
         size_t expected_index = 0;
         for (size_t l = 1; l <= length; ++l) {
-            Random random(42);
+            Random random(seed);
             const size_t combinations = 1 << l;
             for (size_t i = 0; i < combinations; ++i) {
                 StringData needle = create_string_with_nuls(i, l, tmp, random);

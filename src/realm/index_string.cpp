@@ -32,7 +32,6 @@
 using namespace realm;
 using namespace realm::util;
 
-
 namespace {
 
 void get_child(Array& parent, size_t child_ref_ndx, Array& child) noexcept
@@ -61,13 +60,284 @@ StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIn
     std::copy(ns_buf, ns_buf + sizeof(ns), buffer.data() + sizeof(s));
     return StringData{buffer.data(), index_size};
 }
+
+template <>
+size_t IndexArray::from_list<index_FindFirst>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+                                              const IntegerColumn& rows, ColumnBase* column) const
+{
+    static_cast<void>(result);
+    static_cast<void>(result_ref);
+
+    SortedListComparator slc(*column);
+
+    IntegerColumn::const_iterator it_end = rows.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    if (lower == it_end)
+        return not_found;
+
+    const size_t first_row_ref = to_size_t(*lower);
+
+    // The buffer is needed when for when this is an integer index.
+    StringIndex::StringConversionBuffer buffer;
+    StringData str = column->get_index_data(first_row_ref, buffer);
+    if (str != value)
+        return not_found;
+
+    return first_row_ref;
+}
+
+template <>
+size_t IndexArray::from_list<index_Count>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+                                          const IntegerColumn& rows, ColumnBase* column) const
+{
+    static_cast<void>(result);
+    static_cast<void>(result_ref);
+
+    SortedListComparator slc(*column);
+
+    IntegerColumn::const_iterator it_end = rows.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    if (lower == it_end)
+        return 0;
+
+    const size_t first_row_ref = to_size_t(*lower);
+
+    // The buffer is needed when for when this is an integer index.
+    StringIndex::StringConversionBuffer buffer;
+    StringData str = column->get_index_data(first_row_ref, buffer);
+    if (str != value)
+        return 0;
+
+    IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value, slc);
+    size_t cnt = upper - lower;
+
+    return cnt;
+}
+
+template <>
+size_t IndexArray::from_list<index_FindAll>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+                                            const IntegerColumn& rows, ColumnBase* column) const
+{
+    static_cast<void>(result_ref);
+
+    SortedListComparator slc(*column);
+
+    IntegerColumn::const_iterator it_end = rows.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    if (lower == it_end)
+        return size_t(FindRes_not_found);
+
+    const size_t first_row_ref = to_size_t(*lower);
+
+    // The buffer is needed when for when this is an integer index.
+    StringIndex::StringConversionBuffer buffer;
+    StringData str = column->get_index_data(first_row_ref, buffer);
+    if (str != value)
+        return size_t(FindRes_not_found);
+
+    IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value, slc);
+
+    // Copy all matches into result column
+    for (IntegerColumn::const_iterator it = lower; it != upper; ++it) {
+        const size_t cur_row_ref = to_size_t(*it);
+        result.add(cur_row_ref);
+    }
+
+    return size_t(FindRes_column);
+}
+
+template <>
+size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& result,
+                                                   InternalFindResult& result_ref, const IntegerColumn& rows,
+                                                   ColumnBase* column) const
+{
+    static_cast<void>(result);
+
+    SortedListComparator slc(*column);
+    IntegerColumn::const_iterator it_end = rows.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    if (lower == it_end)
+        return size_t(FindRes_not_found);
+
+    const size_t first_row_ref = to_size_t(*lower);
+
+    // The buffer is needed when for when this is an integer index.
+    StringIndex::StringConversionBuffer buffer;
+    StringData str = column->get_index_data(first_row_ref, buffer);
+    if (str != value)
+        return size_t(FindRes_not_found);
+
+    // Optimization: check the last entry before trying upper bound.
+    IntegerColumn::const_iterator upper = it_end;
+    --upper;
+    // Single result if upper matches lower
+    if (upper == lower) {
+        result_ref.payload = *lower;
+        return size_t(FindRes_single);
+    }
+
+    // Check string value at upper, if equal return matches in (lower, upper]
+    const size_t last_row_ref = to_size_t(*upper);
+    str = column->get_index_data(last_row_ref, buffer);
+    if (str == value) {
+        result_ref.payload = rows.get_ref();
+        result_ref.start_ndx = lower.get_col_ndx();
+        result_ref.end_ndx = upper.get_col_ndx() + 1; // one past last match
+        return size_t(FindRes_column);
+    }
+
+    // Last result is not equal, find the upper bound of the range of results.
+    // Note that we are passing upper which is cend() - 1 here as we already
+    // checked the last item manually.
+    upper = std::upper_bound(lower, upper, value, slc);
+
+    result_ref.payload = to_ref(rows.get_ref());
+    result_ref.start_ndx = lower.get_col_ndx();
+    result_ref.end_ndx = upper.get_col_ndx();
+    return size_t(FindRes_column);
+}
+
+template <IndexMethod method, class T>
+size_t IndexArray::index_string(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+                                ColumnBase* column) const
+{
+    // Return`realm::not_found`, or an index to the (any) match
+    bool first(method == index_FindFirst);
+    // Return 0, or the number of items that match the specified `value`
+    bool get_count(method == index_Count);
+    // Place all row indexes containing `value` into `result`
+    // Returns one of FindRes_not_found[==0] if no matches found
+    // Returns FindRes_single, if one match found: the result row literal is
+    // both placed in `result_ref.payload` and added to `column`
+    // Returns FindRes_column, if more than one match found: the matching row
+    // literals are copied into `column`
+    bool all(method == index_FindAll);
+    // Same as `index_FindAll` but does not copy matching rows into `column`
+    // returns FindRes_not_found if there are no matches
+    // returns FindRes_single and the row index (literal) in result_ref.payload
+    // or returns FindRes_column and the reference to a column of duplicates in
+    // result_ref.result with the results in the bounds start_ndx, and end_ndx
+    bool allnocopy(method == index_FindAll_nocopy);
+
+    const char* data = m_data;
+    const char* header;
+    uint_least8_t width = m_width;
+    bool is_inner_node = m_is_inner_bptree_node;
+    typedef StringIndex::key_type key_type;
+    key_type key;
+    size_t stringoffset = 0;
+
+    // Create 4 byte index key
+    key = StringIndex::create_key(value, stringoffset);
+
+    for (;;) {
+        // Get subnode table
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+
+        // Find the position matching the key
+        const char* offsets_header = m_alloc.translate(offsets_ref);
+        const char* offsets_data = get_data_from_header(offsets_header);
+        size_t offsets_size = get_size_from_header(offsets_header);
+        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
+
+        // If key is outside range, we know there can be no match
+        if (pos == offsets_size)
+            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+
+        // Get entry under key
+        size_t pos_refs = pos + 1; // first entry in refs points to offsets
+        int64_t ref = get_direct(data, width, pos_refs);
+
+        if (is_inner_node) {
+            // Set vars for next iteration
+            header = m_alloc.translate(to_ref(ref));
+            data = get_data_from_header(header);
+            width = get_width_from_header(header);
+            is_inner_node = get_is_inner_bptree_node_from_header(header);
+            continue;
+        }
+
+        key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
+
+        if (stored_key != key) // keys don't match so return not found (0 implies FindRes_not_found if `all==true`)
+            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+
+        // Literal row index (tagged)
+        if (ref & 1) {
+            size_t row_ref = size_t(uint64_t(ref) >> 1);
+
+            // The buffer is needed when for when this is an integer index.
+            StringIndex::StringConversionBuffer buffer;
+            StringData str = column->get_index_data(row_ref, buffer);
+            if (str == value) {
+                result_ref.payload = row_ref;
+                if (all)
+                    result.add(row_ref);
+
+                return first ? row_ref : get_count ? 1 : FindRes_single;
+            }
+            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+        }
+
+        const char* sub_header = m_alloc.translate(to_ref(ref));
+        const bool sub_isindex = get_context_flag_from_header(sub_header);
+
+        // List of row indices with common prefix up to this point, in sorted order.
+        if (!sub_isindex) {
+            const IntegerColumn sub(m_alloc, to_ref(ref));
+            return from_list<method>(value, result, result_ref, sub, column);
+        }
+
+        // Recurse into sub-index;
+        header = sub_header;
+        data = get_data_from_header(header);
+        width = get_width_from_header(header);
+        is_inner_node = get_is_inner_bptree_node_from_header(header);
+
+        if (value.size() - stringoffset >= 4)
+            stringoffset += 4;
+        else
+            stringoffset += value.size() - stringoffset + 1;
+
+        // Update 4 byte index key
+        key = StringIndex::create_key(value, stringoffset);
+    }
+}
+
 } // namespace realm
 
+size_t IndexArray::index_string_find_first(StringData value, ColumnBase* column) const
+{
+    InternalFindResult dummy;
+    IntegerColumn dummycol;
+    return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column);
+}
 
-Array* StringIndex::create_node(Allocator& alloc, bool is_leaf)
+
+void IndexArray::index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const
+{
+    InternalFindResult dummy;
+    index_string<index_FindAll, StringData>(value, result, dummy, column);
+}
+
+FindRes IndexArray::index_string_find_all_no_copy(StringData value, ColumnBase* column,
+                                                  InternalFindResult& result) const
+{
+    IntegerColumn dummy;
+    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, result, column));
+}
+
+size_t IndexArray::index_string_count(StringData value, ColumnBase* column) const
+{
+    IntegerColumn dummy1;
+    InternalFindResult dummy2;
+    return index_string<index_Count, StringData>(value, dummy1, dummy2, column);
+}
+
+IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
     Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerBptreeNode;
-    std::unique_ptr<Array> top(new Array(alloc)); // Throws
+    std::unique_ptr<IndexArray> top(new IndexArray(alloc)); // Throws
     top->create(type);                            // Throws
 
     // Mark that this is part of index

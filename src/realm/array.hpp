@@ -447,12 +447,6 @@ public:
     /// specified value.
     void ensure_minimum_width(int_fast64_t value);
 
-    typedef StringData (*StringGetter)(void*, size_t, char*); // Pre-declare getter function from string index
-    size_t index_string_find_first(StringData value, ColumnBase* column) const;
-    void index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const;
-    FindRes index_string_find_all_no_copy(StringData value, ColumnBase* column, InternalFindResult& result) const;
-    size_t index_string_count(StringData value, ColumnBase* column) const;
-
     /// This one may change the represenation of the array, so be carefull if
     /// you call it after ensure_minimum_width().
     void set_all_to_zero();
@@ -883,14 +877,6 @@ private:
     Array& operator=(const Array&); // not allowed
 protected:
     typedef bool (*CallbackDummy)(int64_t);
-
-    template <IndexMethod>
-    size_t from_list(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                     const IntegerColumn& rows, ColumnBase* column) const;
-
-    template <IndexMethod method, class T>
-    size_t index_string(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                        ColumnBase* column) const;
 
 protected:
     // Includes array header. Not necessarily 8-byte aligned.
@@ -1564,17 +1550,21 @@ inline void Array::destroy_deep(MemRef mem, Allocator& alloc) noexcept
 
 inline void Array::adjust(size_t ndx, int_fast64_t diff)
 {
-    // FIXME: Should be optimized
     REALM_ASSERT_3(ndx, <=, m_size);
-    int_fast64_t v = get(ndx);
-    set(ndx, int64_t(v + diff)); // Throws
+    if (diff != 0) {
+        // FIXME: Should be optimized
+        int_fast64_t v = get(ndx);
+        set(ndx, int64_t(v + diff)); // Throws
+    }
 }
 
 inline void Array::adjust(size_t begin, size_t end, int_fast64_t diff)
 {
-    // FIXME: Should be optimized
-    for (size_t i = begin; i != end; ++i)
-        adjust(i, diff); // Throws
+    if (diff != 0) {
+        // FIXME: Should be optimized
+        for (size_t i = begin; i != end; ++i)
+            adjust(i, diff); // Throws
+    }
 }
 
 
