@@ -85,7 +85,13 @@ else
         cd ../..
     else
         sh ./util/build-core.sh "${remoteref}"
-        cd "./core-builds/${remoteref}/src/"
+        cd ../benchmark-common-tasks
+        cp main.cpp Makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
+        cd ../benchmark-crud
+        cp main.cpp Makefile "../bench/core-builds/${remoteref}/src/test/benchmark-crud/"
+        cd ../util
+        cp benchmark_results.hpp benchmark_results.cpp "../bench/core-builds/${remoteref}/src/test/util/"
+        cd "../bench/core-builds/${remoteref}/src/"
     fi
     sh build.sh benchmark-common-tasks
     sh build.sh benchmark-crud

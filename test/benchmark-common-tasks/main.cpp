@@ -57,6 +57,60 @@ const size_t max_repetitions = 1000;
 const double min_duration_s = 0.1;
 const double min_warmup_time_s = 0.05;
 
+/// This shadows SharedGroupOptions::Durability
+/// The indirection is necessary because old versions
+/// of core should still be able to compile with this
+/// benchmark test.
+enum class RealmDurability {
+    Full,
+    MemOnly,
+    Async
+};
+
+#ifdef BENCHMARK_LEGACY
+
+SharedGroup::DurabilityLevel durability(RealmDurability level)
+{
+    switch (level) {
+    case RealmDurability::Full:
+        return SharedGroup::durability_Full;
+    case RealmDurability::MemOnly:
+        return SharedGroup::durability_MemOnly;
+    case RealmDurability::Async:
+        return SharedGroup::durability_Async;
+    }
+    REALM_ASSERT(false); // unhandled case
+    return SharedGroup::durability_Full;
+}
+
+SharedGroup* create_new_shared_group(std::string path, RealmDurability level, const char* key)
+{
+    return new SharedGroup(path, false, durability(level));
+}
+
+#else
+
+SharedGroupOptions::Durability durability(RealmDurability level)
+{
+    switch (level) {
+    case RealmDurability::Full:
+        return SharedGroupOptions::Durability::Full;
+    case RealmDurability::MemOnly:
+        return SharedGroupOptions::Durability::MemOnly;
+    case RealmDurability::Async:
+        return SharedGroupOptions::Durability::Async;
+    }
+    REALM_ASSERT(false); // unhandled case
+    return SharedGroupOptions::Durability::Full;
+}
+
+SharedGroup* create_new_shared_group(std::string path, RealmDurability level, const char* key)
+{
+    return new SharedGroup(path, false, SharedGroupOptions(durability(level), key));
+}
+
+#endif // BENCHMARK_LEGACY
+
 struct Benchmark {
     virtual ~Benchmark()
     {
@@ -116,7 +170,7 @@ struct AddTable : Benchmark {
         TableRef t = tr.add_table(name());
         t->add_column(type_String, "first");
         t->add_column(type_Int, "second");
-        t->add_column(type_OldDateTime, "third");
+        t->add_column(type_Float, "third");
         tr.commit();
     }
 
@@ -428,6 +482,7 @@ struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             t->set_int(0, i, r.draw_int(0, BASE_SIZE * 2));
         }
+        t->add_search_index(0);
         tr.commit();
     }
 
@@ -435,8 +490,7 @@ struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
-        ConstTableView view = table->where().find_all();
-        view.distinct(0);
+        ConstTableView view = table->get_distinct_view(0);
     }
 };
 
@@ -456,6 +510,7 @@ struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             t->set_int(0, i, r.draw_int(0, 10));
         }
+        t->add_search_index(0);
         tr.commit();
     }
 
@@ -463,8 +518,7 @@ struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
-        ConstTableView view = table->where().find_all();
-        view.distinct(0);
+        ConstTableView view = table->get_distinct_view(0);
     }
 };
 
@@ -689,30 +743,30 @@ struct BenchmarkGetLinkList : Benchmark {
     }
 };
 
-const char* to_lead_cstr(SharedGroupOptions::Durability level)
+const char* to_lead_cstr(RealmDurability level)
 {
     switch (level) {
-        case SharedGroupOptions::Durability::Full:
+        case RealmDurability::Full:
             return "Full   ";
-        case SharedGroupOptions::Durability::MemOnly:
+        case RealmDurability::MemOnly:
             return "MemOnly";
 #ifndef _WIN32
-        case SharedGroupOptions::Durability::Async:
+        case RealmDurability::Async:
             return "Async  ";
 #endif
     }
     return nullptr;
 }
 
-const char* to_ident_cstr(SharedGroupOptions::Durability level)
+const char* to_ident_cstr(RealmDurability level)
 {
     switch (level) {
-        case SharedGroupOptions::Durability::Full:
+        case RealmDurability::Full:
             return "Full";
-        case SharedGroupOptions::Durability::MemOnly:
+        case RealmDurability::MemOnly:
             return "MemOnly";
 #ifndef _WIN32
-        case SharedGroupOptions::Durability::Async:
+        case RealmDurability::Async:
             return "Async";
 #endif
     }
@@ -737,24 +791,24 @@ void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
 template <typename B>
 void run_benchmark(TestContext& test_context, BenchmarkResults& results)
 {
-    typedef std::pair<SharedGroupOptions::Durability, const char*> config_pair;
+    typedef std::pair<RealmDurability, const char*> config_pair;
     std::vector<config_pair> configs;
 
-    configs.push_back(config_pair(SharedGroupOptions::Durability::MemOnly, nullptr));
+    configs.push_back(config_pair(RealmDurability::MemOnly, nullptr));
 #if REALM_ENABLE_ENCRYPTION
-    configs.push_back(config_pair(SharedGroupOptions::Durability::MemOnly, crypt_key(true)));
+    configs.push_back(config_pair(RealmDurability::MemOnly, crypt_key(true)));
 #endif
 
-    configs.push_back(config_pair(SharedGroupOptions::Durability::Full, nullptr));
+    configs.push_back(config_pair(RealmDurability::Full, nullptr));
 
 #if REALM_ENABLE_ENCRYPTION
-    configs.push_back(config_pair(SharedGroupOptions::Durability::Full, crypt_key(true)));
+    configs.push_back(config_pair(RealmDurability::Full, crypt_key(true)));
 #endif
 
     Timer timer(Timer::type_UserTime);
 
     for (auto it = configs.begin(); it != configs.end(); ++it) {
-        SharedGroupOptions::Durability level = it->first;
+        RealmDurability level = it->first;
         const char* key = it->second;
         B benchmark;
 
@@ -770,8 +824,7 @@ void run_benchmark(TestContext& test_context, BenchmarkResults& results)
         // Open a SharedGroup:
         SHARED_GROUP_TEST_PATH(realm_path);
         std::unique_ptr<SharedGroup> group;
-        group.reset(new SharedGroup(realm_path, false, SharedGroupOptions(level, key)));
-
+        group.reset(create_new_shared_group(realm_path, level, key));
         benchmark.before_all(*group);
 
         // Warm-up and initial measuring:
