@@ -18,6 +18,7 @@
 
 #include "impl/external_commit_helper.hpp"
 #include "impl/realm_coordinator.hpp"
+#include "util/format.hpp"
 
 #include <assert.h>
 #include <errno.h>
@@ -89,24 +90,32 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
     int ret = mkfifo(path.c_str(), 0600);
     if (ret == -1) {
         int err = errno;
-        if (err == ENOTSUP) {
+        if (err == ENOTSUP || err == EACCES) {
             // Filesystem doesn't support named pipes, so try putting it in tmp instead
             // Hash collisions are okay here because they just result in doing
             // extra work, as opposed to correctness problems
-            std::ostringstream ss;
 
-            std::string tmp_dir(getenv("TMPDIR"));
-            ss << tmp_dir;
-            if (tmp_dir.back() != '/')
-              ss << '/';
-            ss << "realm_" << std::hash<std::string>()(path) << ".note";
-            path = ss.str();
-            ret = mkfifo(path.c_str(), 0600);
-            err = errno;
+            std::string temporary_dir = realm::get_temporary_directory();
+            if (!temporary_dir.empty()) {
+                path = util::format("%1realm_%2.note", temporary_dir, std::hash<std::string>()(path));
+                ret = mkfifo(path.c_str(), 0600);
+                err = errno;
+            }
         }
         // the fifo already existing isn't an error
         if (ret == -1 && err != EEXIST) {
-            throw std::system_error(err, std::system_category());
+            // Workaround for a mkfifo bug on Blackberry devices:
+            // When the fifo already exists, mkfifo fails with error ENOSYS which is not correct.
+            // In this case, we use stat to check if the path exists and it is a fifo.
+            struct stat stat_buf;
+            if (err == ENOSYS && stat(path.c_str(), &stat_buf) == 0) {
+                if ((stat_buf.st_mode & S_IFMT) != S_IFIFO) {
+                    throw std::runtime_error(path + " exists and it is not a fifo.");
+                }
+            }
+            else {
+                throw std::system_error(err, std::system_category());
+            }
         }
     }
 
