@@ -159,6 +159,7 @@ column_string.cpp \
 column_string_enum.cpp \
 column_table.cpp \
 column_timestamp.cpp \
+database_element.cpp \
 descriptor.cpp \
 exceptions.cpp \
 group.cpp \

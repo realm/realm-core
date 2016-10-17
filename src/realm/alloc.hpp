@@ -52,6 +52,10 @@ public:
     ref_type get_ref();
     void set_ref(ref_type ref);
     void set_addr(char* addr);
+    explicit operator bool() const noexcept
+    {
+        return (m_addr != nullptr);
+    }
 
 private:
     char* m_addr;

@@ -301,8 +301,8 @@
 		48B1D2381C749D750066A961 /* crypt_key.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 48B1D2371C749D750066A961 /* crypt_key.hpp */; };
 		48B1D23A1C749D850066A961 /* crypt_key.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48B1D2391C749D850066A961 /* crypt_key.cpp */; };
 		48B1D23B1C749DF00066A961 /* crypt_key.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48B1D2391C749D850066A961 /* crypt_key.cpp */; };
-		4BE251771D6B0282009121FB /* group_shared_options.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4BE251761D6B0282009121FB /* group_shared_options.hpp */; };
 		4B07BA971D64860100A6D7E0 /* test_destructor_thread_safety.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4B07BA961D64860100A6D7E0 /* test_destructor_thread_safety.cpp */; };
+		4BE251771D6B0282009121FB /* group_shared_options.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4BE251761D6B0282009121FB /* group_shared_options.hpp */; };
 		520588CA16C1DA9D009DA6D8 /* data_type.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 520588C916C1DA9D009DA6D8 /* data_type.hpp */; };
 		52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */; };
 		5219EB6918FB026100FF9232 /* verified_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5219EB6718FB026100FF9232 /* verified_integer.cpp */; };
@@ -432,6 +432,12 @@
 		B159814A18CF560000E3C5DF /* demangle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B159814718CF560000E3C5DF /* demangle.cpp */; };
 		B159814B18CF560000E3C5DF /* demangle.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159814818CF560000E3C5DF /* demangle.hpp */; };
 		B159814C18CF560000E3C5DF /* super_int.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159814918CF560000E3C5DF /* super_int.hpp */; };
+		B6A35EEE1DA2940600C81814 /* database_element.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B6A35EED1DA2940600C81814 /* database_element.cpp */; };
+		B6A35EEF1DA2942E00C81814 /* database_element.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B6A35EED1DA2940600C81814 /* database_element.cpp */; };
+		B6A35EF01DA2942F00C81814 /* database_element.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B6A35EED1DA2940600C81814 /* database_element.cpp */; };
+		B6A35EF21DA2944F00C81814 /* database_element.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B6A35EF11DA2944F00C81814 /* database_element.hpp */; };
+		B6A35EF31DA2945800C81814 /* database_element.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B6A35EF11DA2944F00C81814 /* database_element.hpp */; };
+		B6A35EF41DA2945900C81814 /* database_element.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B6A35EF11DA2944F00C81814 /* database_element.hpp */; };
 		B6F92D3C1D46122700887B4E /* test_util_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B6F92D3A1D4611D900887B4E /* test_util_file.cpp */; };
 		B6F92D3D1D46122C00887B4E /* test_util_file.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B6F92D3A1D4611D900887B4E /* test_util_file.cpp */; };
 		C008FF321B67F02F0042669E /* alloc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52F6359316B43C79006117C4 /* alloc.cpp */; };
@@ -1010,6 +1016,8 @@
 		B159814D18CF562600E3C5DF /* test_safe_int_ops.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_safe_int_ops.cpp; sourceTree = "<group>"; };
 		B647249B1D225C87006AB240 /* test_util_type_list.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_type_list.cpp; sourceTree = "<group>"; };
 		B67A2D381D1D5C1F00F0A0E7 /* test_util_to_string.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_to_string.cpp; sourceTree = "<group>"; };
+		B6A35EED1DA2940600C81814 /* database_element.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = database_element.cpp; path = realm/database_element.cpp; sourceTree = "<group>"; };
+		B6A35EF11DA2944F00C81814 /* database_element.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = database_element.hpp; path = realm/database_element.hpp; sourceTree = "<group>"; };
 		B6F92D3A1D4611D900887B4E /* test_util_file.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_file.cpp; sourceTree = "<group>"; };
 		C008FF991B67F02F0042669E /* liblibrealm watchos.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblibrealm watchos.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C08FE2B61B45BD750037AFCE /* simulated_failure.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = simulated_failure.cpp; sourceTree = "<group>"; };
@@ -1163,6 +1171,8 @@
 		3647DEEA14209C1200D56FD7 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				B6A35EF11DA2944F00C81814 /* database_element.hpp */,
+				B6A35EED1DA2940600C81814 /* database_element.cpp */,
 				3620DF0318B6CA7B003AD498 /* impl */,
 				52D7C4661852A01700633748 /* util */,
 				52F6359316B43C79006117C4 /* alloc.cpp */,
@@ -1658,6 +1668,7 @@
 				52678850189AB4EA009CDE7D /* descriptor_fwd.hpp in Headers */,
 				3620DF0D18B6CA7B003AD498 /* destroy_guard.hpp in Headers */,
 				3FE557F81A150F2100A18CCB /* errno.hpp in Headers */,
+				B6A35EF21DA2944F00C81814 /* database_element.hpp in Headers */,
 				36EE6CC517F0F9CB00BA9635 /* exceptions.hpp in Headers */,
 				52D7C4811852A01700633748 /* features.h in Headers */,
 				52D7C4831852A01700633748 /* file.hpp in Headers */,
@@ -1773,6 +1784,7 @@
 				4142C97C1623478700B3B902 /* table_macros.hpp in Headers */,
 				4142C97D1623478700B3B902 /* table_ref.hpp in Headers */,
 				4142C97F1623478700B3B902 /* table_view.hpp in Headers */,
+				B6A35EF31DA2945800C81814 /* database_element.hpp in Headers */,
 				4142C97E1623478700B3B902 /* table_view_basic.hpp in Headers */,
 				6508530B1CC6C6150020F9BB /* timestamp.hpp in Headers */,
 				B159814618CF55D400E3C5DF /* type_traits.hpp in Headers */,
@@ -1825,6 +1837,7 @@
 				C008FF761B67F02F0042669E /* column_mixed.hpp in Headers */,
 				C008FF771B67F02F0042669E /* column_string.hpp in Headers */,
 				C008FF781B67F02F0042669E /* column_string_enum.hpp in Headers */,
+				B6A35EF41DA2945900C81814 /* database_element.hpp in Headers */,
 				C008FF791B67F02F0042669E /* column_table.hpp in Headers */,
 				65033A7B1C7DD3F40019E9F2 /* column_timestamp.hpp in Headers */,
 				C008FF7A1B67F02F0042669E /* column_tpl.hpp in Headers */,
@@ -2229,6 +2242,7 @@
 				3FB4D04B1D4FBA7E0005F96E /* interprocess_mutex.cpp in Sources */,
 				36A1DC9316C3F34B0086A836 /* lang_bind_helper.cpp in Sources */,
 				36AA59E81937552000D691E0 /* link_view.cpp in Sources */,
+				B6A35EEE1DA2940600C81814 /* database_element.cpp in Sources */,
 				3F9BE2961D75DDE800A5BFBA /* logger.cpp in Sources */,
 				3620DF0118B6C93C003AD498 /* memory_stream.cpp in Sources */,
 				485231161B2E914D003C72AF /* misc_errors.cpp in Sources */,
@@ -2377,6 +2391,7 @@
 				F4C28BBE1A696DBB00F8BB2A /* query_engine.cpp in Sources */,
 				F4D0FC8D1B00F62C0040956A /* realmd.cpp in Sources */,
 				F4D0FC8B1B00F62C0040956A /* replication.cpp in Sources */,
+				B6A35EEF1DA2942E00C81814 /* database_element.cpp in Sources */,
 				F4D0FC8C1B00F62C0040956A /* row.cpp in Sources */,
 				C0552C561B45CEA4007FF3AA /* simulated_failure.cpp in Sources */,
 				4142C94C1623478700B3B902 /* spec.cpp in Sources */,
@@ -2467,6 +2482,7 @@
 				C008FF591B67F02F0042669E /* query_engine.cpp in Sources */,
 				C008FF5A1B67F02F0042669E /* realmd.cpp in Sources */,
 				C008FF5B1B67F02F0042669E /* replication.cpp in Sources */,
+				B6A35EF01DA2942F00C81814 /* database_element.cpp in Sources */,
 				C008FF5C1B67F02F0042669E /* row.cpp in Sources */,
 				C008FF3B1B67F02F0042669E /* simulated_failure.cpp in Sources */,
 				C008FF5D1B67F02F0042669E /* spec.cpp in Sources */,
