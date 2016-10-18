@@ -125,11 +125,9 @@ public:
 
     virtual void verify() const = 0;
 
-    virtual char compute_checksum2() { return 123; }
-    virtual void update_checksum2() { return; }
-    virtual void invalidate_checksum2() { return; }
-    virtual char read_checksum2() { return 123; }
-    virtual bool verify_checksum2() { return true; }
+    virtual void update_checksum() { return; }
+    virtual void invalidate_checksum() { return; }
+    virtual bool verify_checksum() { return true; }
 
 
 #ifdef REALM_DEBUG

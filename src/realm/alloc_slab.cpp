@@ -108,7 +108,7 @@ const SlabAlloc::Header SlabAlloc::empty_file_header = {
     {0, 0}, // top-refs
     {'T', '-', 'D', 'B'},
     {0, 0}, // undecided file format
-    123,      // reserved
+    ignore_checksum,      // reserved
     0       // flags (lsb is select bit)
 };
 
@@ -772,7 +772,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             realm::util::encryption_write_barrier(writable_map, 0);
             m_file_on_streaming_form = false;
             writable_map.sync();
-            update_checksum(get_file());
+            update_checksum();
         }
     }
 
@@ -1155,6 +1155,79 @@ void SlabAlloc::reserve_disk_space(size_t size)
 void SlabAlloc::set_file_format_version(int file_format_version) noexcept
 {
     m_file_format_version = file_format_version;
+}
+
+char SlabAlloc::compute_checksum()
+{
+    const size_t block_size = 128;
+    char s = 0;
+
+    size_t fsiz = get_file().get_size();
+
+    size_t head_size = fsiz >= block_size ? block_size : block_size - fsiz;
+    size_t tail_size = fsiz >= 2 * block_size ? block_size : (fsiz > head_size ? fsiz - head_size : 0);
+    size_t aligned_tail_offset = round_down(fsiz - tail_size, page_size());
+    char* map = (char*)get_file().map(File::access_ReadWrite, fsiz - aligned_tail_offset, 0, aligned_tail_offset);
+    char* tail = map + ((fsiz - tail_size) - aligned_tail_offset);
+
+    for (size_t t = 0; t < tail_size; t++)
+        s += ((tail[t] + 1) * t);
+
+    get_file().unmap(map, fsiz - aligned_tail_offset);
+    map = (char*)get_file().map(File::access_ReadWrite, head_size);
+
+    for (size_t t = 0; t < checksum_offset; t++)
+        s += ((map[t] + 1) * t);
+
+    for (size_t t = checksum_offset + 1; t < head_size; t++)
+        s += ((map[t] + 1) * t);
+
+    s += (fsiz + (fsiz >> 8) + (fsiz >> 16) + (fsiz >> 24));
+
+    get_file().unmap(map, head_size);
+
+    return s;
+}
+
+void SlabAlloc::update_checksum()
+{
+    if (!get_file().is_attached())
+        return;
+
+    char* map = (char*)get_file().map(File::access_ReadWrite, checksum_offset + 1);
+    char c = compute_checksum();
+    reinterpret_cast<Header*>(map)->m_checksum = c;
+    get_file().unmap(map, checksum_offset + 1);
+}
+
+void SlabAlloc::invalidate_checksum()
+{
+    if (!get_file().is_attached())
+        return;
+
+    char* p = (char*)get_file().map(File::access_ReadWrite, checksum_offset + 1);
+    reinterpret_cast<Header*>(p)->m_checksum = ignore_checksum;
+    get_file().unmap(p, checksum_offset + 1);
+}
+
+bool SlabAlloc::verify_checksum()
+{
+    if (!get_file().is_attached())
+        return true;
+
+    char c2 = compute_checksum();
+
+    char* map = (char*)get_file().map(File::access_ReadWrite, checksum_offset + 1);
+    char c1 = reinterpret_cast<Header*>(map)->m_checksum;
+
+    if (c2 != ignore_checksum && c1 != c2) {
+        if (compute_checksum() == c2 && reinterpret_cast<Header*>(map)->m_checksum != ignore_checksum) {
+            get_file().unmap(map, checksum_offset + 1);
+            return false;
+        }
+    }
+    get_file().unmap(map, checksum_offset + 1);
+    return true;
 }
 
 

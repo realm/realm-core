@@ -113,14 +113,6 @@ REALM_FORCEINLINE bool sseavx()
 #endif
 }
 
-
-char compute_checksum(const File& f);
-void update_checksum(const File& f);
-void invalidate_checksum(const File& f);
-char read_checksum(const File& f);
-bool verify_checksum(const File& f);
-
-
 void cpuid_init();
 void* round_up(void* p, size_t align);
 void* round_down(void* p, size_t align);

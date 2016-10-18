@@ -2190,10 +2190,13 @@ TEST(Group_CascadeNotify_Simple)
     CHECK(called);
 }
 
-ONLY(Group_CRC)
+/*
+TEST(Group_CRC)
 {
     GROUP_TEST_PATH(path);
     
+    char c = 0;
+
     Group g(path, 0, Group::mode_ReadWrite);
     TableRef t = g.add_table("target");
     t->add_column(type_Int, "int");
@@ -2209,11 +2212,15 @@ ONLY(Group_CRC)
 
     g.commit();
 
+    file.seek(22);
+    file.write(&c, 1);
+    file.sync();
+
 
     for (size_t i = 0; i < 100000; i++) {
         // byte sized arrays so we get small arrays and high array "denisty" in the .realm file
         file.seek(fastrand() % 128);
-        char c = fastrand();
+        c = fastrand();
         file.write(&c, 1);
         // Polute start which is contained in crc
         file.seek(120);
@@ -2225,6 +2232,58 @@ ONLY(Group_CRC)
 
 
 }
+*/
+
+
+
+
+/*
+ONLY(Group_CRC1)
+{
+    GROUP_TEST_PATH(path);
+    std::string tmpfile = std::string(path.c_str()) + ".tmp";
+
+    {
+        Group g(path, 0, Group::mode_ReadWrite);
+        TableRef t = g.add_table("target");
+        t->add_column(type_Int, "int");
+        t->add_empty_row(1000000);
+
+        for (size_t i = 0; i < 1000000; i++) {
+            // byte sized arrays so we get small arrays and high array "denisty" in the .realm file
+            t.get()->set_int(0, i, 100);
+        }
+
+        g.commit();
+    }
+
+
+    auto async = [&]() {
+        for (;;) {
+            std::cerr << "c";
+            util::File::copy(path, tmpfile);
+            std::cerr << "d";
+        }
+    };
+
+    Thread copier;
+    copier.start([=] { async(); });
+
+    millisleep(rand() % 100);
+
+    for (;;) {
+        try {
+            std::cerr << "o";
+            Group g(tmpfile, 0, Group::mode_ReadWrite);
+            std::cerr << g.get_table(0).get()->get_name();
+        }
+        catch (...) {}
+
+    }
+
+}
+*/
+
 
 TEST(Group_CascadeNotify_TableClear)
 {

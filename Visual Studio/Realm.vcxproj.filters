@@ -127,7 +127,6 @@
     <ClCompile Include="..\test\util\timer.cpp" />
     <ClCompile Include="..\test\util\unit_test.cpp" />
     <ClCompile Include="..\test\util\wildcard.cpp" />
-    <ClCompile Include="..\src\realm\checksum.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\realm.hpp" />
@@ -246,7 +245,6 @@
     <ClInclude Include="..\test\util\verified_string.hpp" />
     <ClInclude Include="..\test\pthread_test.hpp" />
     <ClInclude Include="..\test\testsettings.hpp" />
-    <ClInclude Include="..\src\realm\checksum.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />

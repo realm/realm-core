@@ -61,12 +61,6 @@ public:
     ~SlabAlloc() noexcept override;
     SlabAlloc();
 
-    char compute_checksum2() override { return compute_checksum(get_file()); }
-    void update_checksum2() override { update_checksum(get_file()); }
-    void invalidate_checksum2() override { invalidate_checksum(get_file()); }
-    char read_checksum2() override { return read_checksum(get_file()) ; }
-    bool verify_checksum2() override { return verify_checksum(get_file()); }
-
     /// \struct Config
     /// \brief Storage for combining setup flags for initialization to
     /// the SlabAlloc.
@@ -314,6 +308,10 @@ public:
     /// \sa get_file_format_version()
     void set_file_format_version(int) noexcept;
 
+    void update_checksum();
+    void invalidate_checksum();
+    bool verify_checksum();
+
     void verify() const override;
 
 #ifdef REALM_DEBUG
@@ -325,6 +323,8 @@ public:
     void print() const;
 #endif
     struct MappedFile;
+
+    static const char ignore_checksum = '*';
 
 protected:
     MemRef do_alloc(const size_t size) override;
@@ -380,6 +380,8 @@ private:
         uint64_t m_magic_cookie;
     };
 
+    char compute_checksum();
+
     static_assert(sizeof(Header) == 24, "Bad header size");
     static_assert(sizeof(StreamingFooter) == 16, "Bad footer size");
 
@@ -387,6 +389,7 @@ private:
     static void init_streaming_header(Header*, int file_format_version);
 
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
+    static const size_t checksum_offset = offsetof(Header, m_checksum);
 
     // The mappings are shared, if they are from a file
     std::shared_ptr<MappedFile> m_file_mappings;
