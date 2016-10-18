@@ -84,7 +84,7 @@ SharedGroup::DurabilityLevel durability(RealmDurability level)
 
 SharedGroup* create_new_shared_group(std::string path, RealmDurability level, const char* key)
 {
-    return new SharedGroup(path, false, durability(level));
+    return new SharedGroup(path, false, durability(level), key);
 }
 
 #else
@@ -805,7 +805,6 @@ void run_benchmark(BenchmarkResults& results)
     configs.push_back(config_pair(RealmDurability::Full, crypt_key(true)));
 #endif
 
-    static long test_counter = 0;
     Timer timer(Timer::type_UserTime);
 
     for (auto it = configs.begin(); it != configs.end(); ++it) {
@@ -823,14 +822,13 @@ void run_benchmark(BenchmarkResults& results)
         std::string ident = ident_ss.str();
 
         realm::test_util::unit_test::TestDetails test_details;
-        test_details.test_index = test_counter++;
         test_details.suite_name = "BenchmarkCommonTasks";
         test_details.test_name = ident.c_str();
         test_details.file_name = __FILE__;
         test_details.line_number = __LINE__;
 
         // Open a SharedGroup:
-        SHARED_GROUP_TEST_PATH(realm_path);
+        SharedGroupTestPathGuard realm_path("benchmark_common_tasks" + ident);
         std::unique_ptr<SharedGroup> group;
         group.reset(create_new_shared_group(realm_path, level, key));
         benchmark.before_all(*group);
