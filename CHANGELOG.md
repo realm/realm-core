@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.1.3 Release notes
 
 ### Bugfixes
 
@@ -6,19 +6,11 @@
   `Table::batch_erase_rows()`, which would only be noticed after reapplying the
   transaction log to a separate Realm file or via synchronization.
 
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
 -----------
 
 ### Internals
 
-* Lorem ipsum.
+* `array_direct.hpp` added to installed headers.
 
 ----------------------------------------------
 
