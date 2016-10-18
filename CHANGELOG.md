@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Deleting rows through a `TableView` generated wrong instructions by way of
+  `Table::batch_erase_rows()`, which would only be noticed after reapplying the
+  transaction log to a separate Realm file or via synchronization.
 
 ### Breaking changes
 
