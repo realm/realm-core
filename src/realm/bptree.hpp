@@ -475,6 +475,8 @@ inline Array& BpTreeBase::root() noexcept
 inline size_t BpTreeNode::get_bptree_size() const noexcept
 {
     REALM_ASSERT_DEBUG(is_inner_bptree_node());
+    // FIXME: who knows anything about why bptree Arrays can be larger than REALM_MAX_BPNODE_SIZE?
+    REALM_ASSERT_EX_CRC(size() <= REALM_MAX_BPNODE_SIZE + 10, size(), REALM_MAX_BPNODE_SIZE);
     int_fast64_t v = back();
     return size_t(v / 2); // v = 1 + 2*total_elems_in_tree
 }
@@ -531,6 +533,8 @@ ref_type BpTreeNode::bptree_append(TreeInsert<TreeTraits>& state)
     // present. Consider this carefully.
 
     REALM_ASSERT_DEBUG(size() >= 1 + 1 + 1); // At least one child
+    // FIXME: who knows anything about why bptree Arrays can be larger than REALM_MAX_BPNODE_SIZE?
+    REALM_ASSERT_EX_CRC(size() <= REALM_MAX_BPNODE_SIZE + 10, size(), REALM_MAX_BPNODE_SIZE);
 
     ArrayParent& childs_parent = *this;
     size_t child_ref_ndx = size() - 2;
@@ -672,6 +676,8 @@ std::unique_ptr<Array> BpTree<T>::create_root_from_mem(Allocator& alloc, MemRef 
         leaf->init_from_mem(mem);
         new_root = std::move(leaf);
     }
+    // FIXME: who knows anything about why bptree Arrays can be larger than REALM_MAX_BPNODE_SIZE?
+    REALM_ASSERT_EX_CRC(new_root.get()->size() <= REALM_MAX_BPNODE_SIZE + 10, size(), REALM_MAX_BPNODE_SIZE);
     return new_root;
 }
 
@@ -1150,6 +1156,7 @@ void BpTree<T>::get_leaf(size_t ndx, size_t& ndx_in_leaf, LeafInfo& inout_leaf_i
     std::pair<MemRef, size_t> p = root_as_node().get_bptree_leaf(ndx);
     inout_leaf_info.fallback->init_from_mem(p.first);
     ndx_in_leaf = p.second;
+
     *inout_leaf_info.out_leaf = inout_leaf_info.fallback;
 }
 
