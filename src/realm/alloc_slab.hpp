@@ -308,8 +308,15 @@ public:
     /// \sa get_file_format_version()
     void set_file_format_version(int) noexcept;
 
+    // Compute checksum of .realm file and write it to its header
     void update_checksum();
+    
+    // Call while modifying the file during commit() when pages are written.
+    // This will make verify_checksum() a no-op.
     void invalidate_checksum();
+    
+    // Compute checksum of .realm file and compare with the value in its
+    // header
     bool verify_checksum();
 
     void verify() const override;

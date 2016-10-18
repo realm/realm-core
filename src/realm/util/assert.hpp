@@ -32,7 +32,7 @@
     (REALM_LIKELY(condition) ? static_cast<void>(0)                                                                  \
                              : realm::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
 
-#define REALM_ASSERT_RELEASE_CRC(condition)                                                                              \
+#define REALM_ASSERT_RELEASE_CRC(condition)                                                                          \
     (REALM_LIKELY(condition) ? static_cast<void>(0)                                                                  \
                              : realm::util::terminate("Assertion failed: " #condition, __FILE__, __LINE__))
 
@@ -56,11 +56,12 @@
                              : realm::util::terminate_with_info("Assertion failed: " #condition, __LINE__, __FILE__, \
                                                                 REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
 
-#define REALM_ASSERT_RELEASE_EX_CRC(condition, ...)         \
+#define REALM_ASSERT_RELEASE_EX_CRC(condition, ...)                                                                  \
     (REALM_LIKELY(condition) ? static_cast<void>(0)                                                                  \
-                             : realm::util::terminate_with_info((get_alloc().verify_checksum() ? ("Assertion failed: " #condition) : ("Realm file checksum error and failed assertion: " #condition)), __LINE__, __FILE__, \
-                                                                REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
-
+                             : realm::util::terminate_with_info((get_alloc().verify_checksum() ?                     \
+                                ("Assertion failed: " #condition) :                                                  \
+                                ("Realm file may be corrupted by non-Realm code/process: " #condition)),             \
+                            __LINE__, __FILE__, REALM_STRINGIFY((__VA_ARGS__)), __VA_ARGS__))
 
 #ifdef REALM_DEBUG
 #define REALM_ASSERT_DEBUG_EX REALM_ASSERT_RELEASE_EX
