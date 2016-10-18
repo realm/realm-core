@@ -502,6 +502,57 @@ size_t search_case_fold(StringData haystack, const char* needle_upper, const cha
     return haystack.size(); // Not found
 }
 
+// pre-declaration
+bool matchstar_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower, size_t p1, size_t p2) noexcept;
+
+bool matchhere_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower, size_t p1, size_t p2) noexcept
+{
+    if (p1 == text.size()) {
+        if (p2 == pattern_lower.size())
+            return true;
+        if (p2 == pattern_lower.size()-1 && pattern_lower[p2] == '*')
+            return true;
+        return false;
+    }
+    if (p2 == pattern_lower.size())
+        return false;
+    if (pattern_lower[p2] == '*')
+        return matchstar_ins(text, pattern_lower, pattern_upper, p1, p2+1);
+        if (pattern_lower[p2] == '?' || pattern_lower[p2] == text[p1] || pattern_upper[p2] == text[p1])
+            return matchhere_ins(text, pattern_lower, pattern_upper, p1+1, p2+1);
+            return false;
+}
+
+bool matchstar_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower, size_t p1, size_t p2) noexcept
+{
+    do {
+        if (matchhere_ins(text, pattern_lower, pattern_upper, p1, p2))
+            return true;
+    }
+    while (p1++ != text.size());
+    return false;
+}
+
+bool string_like_ins(StringData text, StringData upper, StringData lower) noexcept
+{
+    if (text.is_null() || lower.is_null()) {
+        return (text.is_null() && lower.is_null());
+    }
+    
+    return matchhere_ins(text, lower, upper, 0, 0);
+}
+
+bool string_like_ins(StringData text, StringData pattern) noexcept
+{
+    if (text.is_null() || pattern.is_null()) {
+        return (text.is_null() && pattern.is_null());
+    }
+    
+    std::string upper = case_map(pattern, true, IgnoreErrors);
+    std::string lower = case_map(pattern, false, IgnoreErrors);
+    
+    return matchhere_ins(text, lower.c_str(), upper.c_str(), 0, 0);
+}
 
 } // namespace realm
 

@@ -25,6 +25,7 @@
 
 #include <realm.hpp>
 #include <realm/string_data.hpp>
+#include <realm/unicode.hpp>
 
 #include "test.hpp"
 
@@ -254,6 +255,91 @@ TEST(StringData_LexicographicCompare)
     CHECK((sd_9_22 <= sd_9_22) && !(sd_9_22 > sd_9_22));
 }
 
+TEST(StringData_Like)
+{
+    StringData null = realm::null();
+    StringData empty("");
+    StringData f("f");
+    StringData foo("foo");
+    StringData bar("bar");
+    StringData foobar("foobar");
+    StringData foofoo("foofoo");
+    StringData foobarfoo("foobarfoo");
+    
+    CHECK(null.like(null));
+    CHECK(!null.like(""));
+    CHECK(!null.like("*"));
+    CHECK(!null.like("?"));
+    CHECK(!empty.like(null));
+    
+    CHECK(empty.like(""));
+    CHECK(empty.like("*"));
+    
+    CHECK(f.like("*"));
+    CHECK(foo.like("foo*"));
+    CHECK(foo.like("*foo"));
+    CHECK(foobar.like("foo*"));
+    CHECK(foofoo.like("foo*foo"));
+    CHECK(foobarfoo.like("foo*foo"));
+    CHECK(!foobarfoo.like("foo*bar"));
+    
+    CHECK(f.like("?"));
+    CHECK(foo.like("?oo"));
+    CHECK(foo.like("f?o"));
+    CHECK(foo.like("fo?"));
+    CHECK(!empty.like("?"));
+    CHECK(!foo.like("foo?"));
+    CHECK(!foo.like("?foo"));
+    
+    CHECK(foo.like("?oo*"));
+    CHECK(foo.like("*?o?"));
+    CHECK(foobar.like("???*"));
+    CHECK(foofoo.like("?oo*?oo"));
+    CHECK(foobarfoo.like("?oo*?oo"));
+}
+
+TEST(StringData_Like_CaseInsensitive)
+{
+    StringData null = realm::null();
+    StringData empty("");
+    StringData f("f");
+    StringData foo("FoO");
+    StringData bar("bAr");
+    StringData foobar("FOOBAR");
+    StringData foofoo("FOOfoo");
+    StringData foobarfoo("FoObArFoO");
+    
+    CHECK(string_like_ins(null, null));
+    CHECK(!string_like_ins(null, ""));
+    CHECK(!string_like_ins(null, "*"));
+    CHECK(!string_like_ins(null, "?"));
+    CHECK(!string_like_ins("", null));
+    
+    CHECK(string_like_ins(empty, ""));
+    CHECK(string_like_ins(empty, "*"));
+    
+    CHECK(string_like_ins(f, "*"));
+    CHECK(string_like_ins(foo, "foo*"));
+    CHECK(string_like_ins(foo, "*foo"));
+    CHECK(string_like_ins(foobar, "foo*"));
+    CHECK(string_like_ins(foofoo, "foo*foo"));
+    CHECK(string_like_ins(foobarfoo, "foo*foo"));
+    CHECK(!string_like_ins(foobarfoo, "foo*bar"));
+    
+    CHECK(string_like_ins(f,"?"));
+    CHECK(string_like_ins(foo, "?oo"));
+    CHECK(string_like_ins(foo, "f?o"));
+    CHECK(string_like_ins(foo, "fo?"));
+    CHECK(!string_like_ins(empty, "?"));
+    CHECK(!string_like_ins(foo, "foo?"));
+    CHECK(!string_like_ins(foo, "?foo"));
+    
+    CHECK(string_like_ins(foo, "?oo*"));
+    CHECK(string_like_ins(foo, "*?o?"));
+    CHECK(string_like_ins(foobar, "???*"));
+    CHECK(string_like_ins(foofoo, "?oo*?oo"));
+    CHECK(string_like_ins(foobarfoo, "?oo*?oo"));
+}
 
 TEST(StringData_Substrings)
 {

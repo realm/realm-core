@@ -150,6 +150,10 @@ bool equal_case_fold(StringData haystack, const char* needle_upper, const char* 
 /// needle was not found.
 size_t search_case_fold(StringData haystack, const char* needle_upper, const char* needle_lower, size_t needle_size);
 
+/// Case insensitive wildcard matching ('?' for single char, '*' for zero or more chars)
+bool string_like_ins(StringData text, StringData pattern) noexcept;
+bool string_like_ins(StringData text, StringData upper, StringData lower) noexcept;
+
 } // namespace realm
 
 #endif // REALM_UNICODE_HPP

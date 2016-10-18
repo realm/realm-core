@@ -1960,6 +1960,16 @@ public:
     {
         return string_compare<Contains, ContainsIns>(*this, col, case_sensitive);
     }
+    
+    Query like(StringData sd, bool case_sensitive = true)
+    {
+        return string_compare<StringData, Like, LikeIns>(*this, sd, case_sensitive);
+    }
+    
+    Query like(const Columns<StringData>& col, bool case_sensitive = true)
+    {
+        return string_compare<Like, LikeIns>(*this, col, case_sensitive);
+    }
 };
 
 

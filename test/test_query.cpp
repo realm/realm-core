@@ -5035,6 +5035,48 @@ TEST(Query_FindAllContains)
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
 }
 
+TEST(Query_FindAllLike)
+{
+    TupleTableType ttt;
+    
+    ttt.add(0, "foo");
+    ttt.add(0, "foobar");
+    ttt.add(0, "barfoo");
+    ttt.add(0, "barfoobaz");
+    ttt.add(0, "fo");
+    ttt.add(0, "fobar");
+    ttt.add(0, "barfo");
+    
+    TupleTableType::Query q1 = ttt.where().second.like("*foo*");
+    TupleTableType::View tv1 = q1.find_all();
+    CHECK_EQUAL(4, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_ndx(1));
+    CHECK_EQUAL(2, tv1.get_source_ndx(2));
+    CHECK_EQUAL(3, tv1.get_source_ndx(3));
+}
+
+TEST(Query_FindAllLikeCaseInsensitive)
+{
+    TupleTableType ttt;
+    
+    ttt.add(0, "Foo");
+    ttt.add(0, "FOOBAR");
+    ttt.add(0, "BaRfOo");
+    ttt.add(0, "barFOObaz");
+    ttt.add(0, "Fo");
+    ttt.add(0, "Fobar");
+    ttt.add(0, "baRFo");
+    
+    TupleTableType::Query q1 = ttt.where().second.like("*foo*", false);
+    TupleTableType::View tv1 = q1.find_all();
+    CHECK_EQUAL(4, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_ndx(1));
+    CHECK_EQUAL(2, tv1.get_source_ndx(2));
+    CHECK_EQUAL(3, tv1.get_source_ndx(3));
+}
+
 TEST(Query_Binary)
 {
     TupleTableTypeBin t;

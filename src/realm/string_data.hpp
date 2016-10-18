@@ -138,6 +138,10 @@ public:
     bool begins_with(StringData) const noexcept;
     bool ends_with(StringData) const noexcept;
     bool contains(StringData) const noexcept;
+    
+    // Wildcard matching ('?' for single char, '*' for zero or more chars)
+    // case insensitive version in unicode.hpp
+    bool like(StringData) const noexcept;
 
     //@{
     /// Undefined behavior if \a n, \a i, or <tt>i+n</tt> is greater than
@@ -156,6 +160,9 @@ public:
 private:
     const char* m_data;
     size_t m_size;
+    
+    static bool matchhere(const StringData& text, const StringData& pattern, size_t p1, size_t p2) noexcept;
+    static bool matchstar(const StringData& text, const StringData& pattern, size_t p1, size_t p2) noexcept;
 };
 
 
@@ -283,6 +290,43 @@ inline bool StringData::contains(StringData d) const noexcept
         return false;
 
     return d.m_size == 0 || std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
+}
+
+inline bool StringData::matchhere(const StringData& text, const StringData& pattern, size_t p1, size_t p2) noexcept
+{
+    if (p1 == text.size()) {
+        if (p2 == pattern.size())
+            return true;
+        if (p2 == pattern.size()-1 && pattern[p2] == '*')
+            return true;
+        return false;
+    }
+    if (p2 == pattern.size())
+        return false;
+    if (pattern[p2] == '*')
+        return matchstar(text, pattern, p1, p2+1);
+    if (pattern[p2] == '?' || pattern[p2] == text[p1])
+        return matchhere(text, pattern, p1+1, p2+1);
+    return false;
+}
+
+inline bool StringData::matchstar(const StringData& text, const StringData& pattern, size_t p1, size_t p2) noexcept
+{
+    do {
+        if (matchhere(text, pattern, p1, p2))
+            return true;
+    }
+    while (p1++ != text.size());
+    return false;
+}
+
+inline bool StringData::like(StringData d) const noexcept
+{
+    if (is_null() || d.is_null()) {
+        return (is_null() && d.is_null());
+    }
+    
+    return matchhere(*this, d, 0, 0);
 }
 
 inline StringData StringData::prefix(size_t n) const noexcept
