@@ -425,6 +425,8 @@ public:
     /// this is not the case when working with proper transactions.
     void commit();
 
+    SlabAlloc& get_alloc() { return m_alloc; }
+
     //@{
     /// Some operations on Tables in a Group can cause indirect changes to other
     /// fields, including in other Tables in the same Group. Specifically,

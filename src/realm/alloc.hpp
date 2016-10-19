@@ -27,6 +27,8 @@
 #include <realm/util/terminate.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
+#include <realm/util/file.hpp>
+
 
 namespace realm {
 
@@ -123,6 +125,11 @@ public:
 
     virtual void verify() const = 0;
 
+    virtual void update_checksum() { return; }
+    virtual void invalidate_checksum() { return; }
+    virtual bool verify_checksum() { return true; }
+
+
 #ifdef REALM_DEBUG
     /// Terminate the program precisely when the specified 'ref' is
     /// freed (or reallocated). You can use this to detect whether the
@@ -208,6 +215,8 @@ public:
     /// Group::get_target_file_format_version_for_session(), and the file format
     /// upgrade logic in Group::upgrade_file_format().
     int get_file_format_version() const noexcept;
+
+    util::File get_file() const { return util::File(); }
 
 protected:
     size_t m_baseline = 0; // Separation line between immutable and mutable refs.

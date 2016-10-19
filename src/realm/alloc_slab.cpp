@@ -95,7 +95,12 @@ SlabAlloc::SlabAlloc()
 
 util::File& SlabAlloc::get_file()
 {
-    return m_file_mappings->m_file;
+    static File f;
+
+    if (m_file_mappings)
+        return m_file_mappings->m_file;
+    else
+        return f;
 }
 
 
@@ -103,7 +108,7 @@ const SlabAlloc::Header SlabAlloc::empty_file_header = {
     {0, 0}, // top-refs
     {'T', '-', 'D', 'B'},
     {0, 0}, // undecided file format
-    0,      // reserved
+    ignore_checksum,      // reserved
     0       // flags (lsb is select bit)
 };
 
@@ -582,10 +587,8 @@ ref_type SlabAlloc::get_top_ref(const char* buffer, size_t len)
 
 namespace {
 
-// prevent destruction at exit (which can lead to races if other threads are still running)
-std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>>& all_files =
-    *new std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>>;
-util::Mutex& all_files_mutex = *new util::Mutex;
+std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>> all_files;
+util::Mutex all_files_mutex;
 }
 
 
@@ -769,6 +772,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
             realm::util::encryption_write_barrier(writable_map, 0);
             m_file_on_streaming_form = false;
             writable_map.sync();
+            update_checksum();
         }
     }
 
@@ -1151,6 +1155,119 @@ void SlabAlloc::reserve_disk_space(size_t size)
 void SlabAlloc::set_file_format_version(int file_format_version) noexcept
 {
     m_file_format_version = file_format_version;
+}
+
+// Meant to be noexcept (called inside our assert macro)
+char SlabAlloc::compute_checksum()
+{
+    // Compute checksum of first 128 bytes + last 128 bytes, such that summed areas will
+    // *not* overlap if file is too short
+
+    const size_t block_size = 128;
+    char s = 0;
+
+    size_t fsiz = get_file().get_size();
+    size_t head_size = fsiz >= block_size ? block_size : block_size - fsiz;
+    size_t tail_size = fsiz >= 2 * block_size ? block_size : (fsiz > head_size ? fsiz - head_size : 0);
+    size_t aligned_tail_offset = round_down(fsiz - tail_size, page_size());
+    char* map;
+
+    try {
+        // map() can fail if non-Realm process shortens the file size between get_size() and map()
+        map = (char*)get_file().map(File::access_ReadWrite, fsiz - aligned_tail_offset, 0, aligned_tail_offset);
+    }
+    catch (...) {
+        return ignore_checksum;
+    }
+
+    char* tail = map + ((fsiz - tail_size) - aligned_tail_offset);
+
+    // First sum the *last* 128 bytes because if a non-Realm process is overwriting the .realm file
+    // with another valid .realm file it probably does from from the beginning of the file. We want
+    // to catch the end of the original file and the beginning of the new .realm file to get a
+    // checksum mismatch
+
+    for (size_t t = 0; t < tail_size; t++)
+        s += ((tail[t] + 1) * t);
+
+    get_file().unmap(map, fsiz - aligned_tail_offset);
+
+    try {
+        // map() can fail if non-Realm process shortens the file size between get_size() and map()
+        map = (char*)get_file().map(File::access_ReadWrite, head_size);
+    }
+    catch (...) {
+        return ignore_checksum;
+    }
+
+    for (size_t t = 0; t < checksum_offset; t++)
+        s += ((map[t] + 1) * t);
+
+    // Skip the checksum field itself of the header when summing bytes
+    for (size_t t = checksum_offset + 1; t < head_size; t++)
+        s += ((map[t] + 1) * t);
+
+    // Include file size in the checksum. Even on 64-bit platforms it's sufficient to just use the lower
+    // 32 bits to get a good checksum variation that includes file size information.
+    s += (fsiz + (fsiz >> 8) + (fsiz >> 16) + (fsiz >> 24));
+
+    get_file().unmap(map, head_size);
+
+    return s;
+}
+
+void SlabAlloc::update_checksum()
+{
+    if (!get_file().is_attached())
+        return;
+
+    char* map = (char*)get_file().map(File::access_ReadWrite, checksum_offset + 1);
+    char c = compute_checksum();
+    reinterpret_cast<Header*>(map)->m_checksum = c;
+    get_file().unmap(map, checksum_offset + 1);
+}
+
+void SlabAlloc::invalidate_checksum()
+{
+    if (!get_file().is_attached())
+        return;
+
+    char* p = (char*)get_file().map(File::access_ReadWrite, checksum_offset + 1);
+    reinterpret_cast<Header*>(p)->m_checksum = ignore_checksum;
+    get_file().unmap(p, checksum_offset + 1);
+}
+
+// Meant to be noexcept (called from our assert macro). If another thread is inside commit(), we have a .realm 
+// file which may be inconsistent because it's only written partly to disk. We attempt to detect this by
+// making commit() write a flag that indicates that it's currently busy, so any checksum verification should
+// be skipped.
+bool SlabAlloc::verify_checksum()
+{
+    if (!get_file().is_attached())
+        return true;
+
+    char c2 = compute_checksum();
+    char* map;
+
+    try {
+        // map() can fail if non-Realm process shortens the file size between get_size() and map(). We then
+        // return false which means checksum error
+        map = (char*)get_file().map(File::access_ReadWrite, checksum_offset + 1);
+    }
+    catch (...) {
+        return false;
+    }
+
+    char c1 = reinterpret_cast<Header*>(map)->m_checksum;
+
+    if (c2 != ignore_checksum && c1 != c2) {
+        if (compute_checksum() == c2 && reinterpret_cast<Header*>(map)->m_checksum != ignore_checksum) {
+            get_file().unmap(map, checksum_offset + 1);
+            return false;
+        }
+    }
+    get_file().unmap(map, checksum_offset + 1);
+    return true;
 }
 
 

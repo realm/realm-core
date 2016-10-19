@@ -770,6 +770,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     REALM_ASSERT(!util::int_cast_has_overflow<type_1>(file_format_version));
     file_header.m_top_ref[slot_selector] = new_top_ref;
     file_header.m_file_format[slot_selector] = type_1(file_format_version);
+    file_header.m_checksum = SlabAlloc::ignore_checksum;
 
     // When running the test suite, device synchronization is disabled
     bool disable_sync = get_disable_sync_to_disk();
