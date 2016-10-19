@@ -352,6 +352,45 @@ def doBuildNodeInOsx(def isPublishingRun) {
   }
 }
 
+def doBuildOsxDylibs(def isPublishingRun) {
+  return {
+    node('osx_vegas') {
+      getArchive()
+
+      def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes', 'UNITTEST_SHUFFLE=1',
+        'UNITTEST_XML=1', 'UNITTEST_THREADS=1']
+      withEnv(environment) {
+        sh 'sh build.sh config'
+        try {
+          sh '''
+            sh build.sh build
+            sh build.sh check-debug
+          '''
+
+          dir('src/realm') {
+            'zip --symlink ../../realm-core-dylib-osx-$version.zip librealm*.dylib'
+          }
+
+          sh 'cp realm-core-dylib-osx-*.tar.gz realm-core-dylib-osx-latest.tar.gz'
+
+          if (isPublishingRun) {
+            stash includes: '*realm-core-dylib-osx-*.*.*.zip', name: 'dylib-osx-package'
+          }
+          archiveArtifacts artifacts: '*realm-core-dylib-osx-*.*.*.zip'
+
+          sh 'sh build.sh clean'
+
+          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+            sh 's3cmd -c $s3cfg_config_file put realm-core-dylib-osx-latest.tar.gz s3://static.realm.io/downloads/core/'
+          }
+        } finally {
+          collectCompilerWarnings('clang')
+        }
+      }
+    }
+  }
+}
+
 def doBuildAndroid(def isPublishingRun) {
     def target = 'build-android'
     def buildName = "android-${target}-with-encryption"
@@ -624,8 +663,11 @@ def doPublishLocalArtifacts() {
       unstash 'node-linux-package'
       unstash 'node-cocoa-package'
       unstash 'android-package'
+      unstash 'dylib-osx-package'
+
       withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
         sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
+        sh 'find . -type f -name "*.zip" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
       }
     }
   }
