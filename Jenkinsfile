@@ -160,7 +160,7 @@ def doBuildCocoa(def isPublishingRun) {
         collectCompilerWarnings('clang')
         recordTests('check-debug-cocoa')
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          sh 's3cmd -c $s3cfg_config_file put realm-core-latest.tar.xz s3://static.realm.io/downloads/core'
+          sh 's3cmd -c $s3cfg_config_file put realm-core-latest.tar.xz s3://static.realm.io/downloads/core/'
         }
       }
     }
@@ -216,7 +216,7 @@ def doBuildDotNetOsx(def isPublishingRun) {
       } finally {
         collectCompilerWarnings('clang')
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          sh 's3cmd -c $s3cfg_config_file put --multipart-chunk-size-mb 5 realm-core-dotnet-cocoa-latest.tar.bz2 s3://static.realm.io/downloads/core'
+          sh 's3cmd -c $s3cfg_config_file put --multipart-chunk-size-mb 5 realm-core-dotnet-cocoa-latest.tar.bz2 s3://static.realm.io/downloads/core/'
         }
       }
     }
@@ -312,7 +312,7 @@ def doBuildNodeInDocker(def isPublishingRun) {
               }
               archiveArtifacts artifacts: '*realm-core-node-linux-*.*.*.tar.gz'
               withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-                sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core'
+                sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core/'
               }
           } finally {
             collectCompilerWarnings('gcc')
@@ -342,7 +342,7 @@ def doBuildNodeInOsx(def isPublishingRun) {
           sh 'sh build.sh clean'
 
           withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-            sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core'
+            sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core/'
           }
         } finally {
           collectCompilerWarnings('clang')
@@ -625,7 +625,7 @@ def doPublishLocalArtifacts() {
       unstash 'node-cocoa-package'
       unstash 'android-package'
       withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-        sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core \\;'
+        sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
       }
     }
   }
