@@ -373,7 +373,7 @@ def doBuildOsxDylibs(def isPublishingRun) {
             "zip --symlink ../../realm-core-dylib-osx-${version}.zip librealm*.dylib"
           }
 
-          sh 'cp realm-core-dylib-osx-*.tar.gz realm-core-dylib-osx-latest.tar.gz'
+          sh 'cp realm-core-dylib-osx-*.zip realm-core-dylib-osx-latest.zip'
 
           if (isPublishingRun) {
             stash includes: '*realm-core-dylib-osx-*.*.*.zip', name: 'dylib-osx-package'
@@ -383,7 +383,7 @@ def doBuildOsxDylibs(def isPublishingRun) {
           sh 'sh build.sh clean'
 
           withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-            sh 's3cmd -c $s3cfg_config_file put realm-core-dylib-osx-latest.tar.gz s3://static.realm.io/downloads/core/'
+            sh 's3cmd -c $s3cfg_config_file put realm-core-dylib-osx-latest.zip s3://static.realm.io/downloads/core/'
           }
         } finally {
           collectCompilerWarnings('clang')
