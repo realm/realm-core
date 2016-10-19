@@ -45,6 +45,12 @@ try {
 
       rpmVersion = dependencies.VERSION.replaceAll("-", "_")
       echo "rpm version: ${rpmVersion}"
+
+      if (['master'].contains(env.BRANCH_NAME)) {
+        // If we're on master, instruct the docker image builds to push to the
+        // cache registry
+        env.DOCKER_PUSH = "1"
+      }
     }
 
     stage('check') {
