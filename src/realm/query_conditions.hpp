@@ -85,7 +85,7 @@ struct Contains : public HackClass {
     static const int condition = -1;
 };
 
-// Does v2 contain somethin like v1 (wildcard matching)?
+// Does v2 contain something like v1 (wildcard matching)?
 struct Like : public HackClass {
     bool operator()(StringData v1, const char*, const char*, StringData v2, bool = false, bool = false) const { return v2.like(v1); }
     bool operator()(StringData v1, StringData v2, bool = false, bool = false) const { return v2.like(v1); }
