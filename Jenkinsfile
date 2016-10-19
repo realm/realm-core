@@ -356,7 +356,7 @@ def doBuildNodeInOsx(def isPublishingRun) {
 def doBuildOsxDylibs(def isPublishingRun) {
   return {
     node('osx_vegas') {
-      getArchive()
+      getSourceArchive()
       def version = get_version()
 
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes', 'UNITTEST_SHUFFLE=1',
