@@ -370,7 +370,7 @@ def doBuildOsxDylibs(def isPublishingRun) {
           '''
 
           dir('src/realm') {
-            "zip --symlink ../../realm-core-dylib-osx-${version}.zip librealm*.dylib"
+            sh "zip --symlink ../../realm-core-dylib-osx-${version}.zip librealm*.dylib"
           }
 
           sh 'cp realm-core-dylib-osx-*.zip realm-core-dylib-osx-latest.zip'
