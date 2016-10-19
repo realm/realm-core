@@ -62,6 +62,7 @@ try {
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun),
         buildDotnetOsx: doBuildDotNetOsx(isPublishingRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
+        buildOsxDylibs: doBuildOsxDylibs(isPublishingRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
       ]
@@ -142,11 +143,11 @@ def doBuildCocoa(def isPublishingRun) {
                   # the debug build of core, so remove that slice
                   lipo -remove armv7s core/librealm-ios-dbg.a -o core/librealm-ios-dbg.a
 
-                  tar cf "$dir/core-$version.tar.xz" --xz core || exit 1
+                  tar cf "$dir/realm-core-$version.tar.xz" --xz core || exit 1
               )
               rm -rf "$tmpdir" || exit 1
 
-              cp core-*.tar.xz realm-core-latest.tar.xz
+              cp realm-core-*.tar.xz realm-core-latest.tar.xz
             '''
 
             if (isPublishingRun) {
@@ -160,7 +161,7 @@ def doBuildCocoa(def isPublishingRun) {
         collectCompilerWarnings('clang')
         recordTests('check-debug-cocoa')
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          sh 's3cmd -c $s3cfg_config_file put realm-core-latest.tar.xz s3://static.realm.io/downloads/core'
+          sh 's3cmd -c $s3cfg_config_file put realm-core-latest.tar.xz s3://static.realm.io/downloads/core/'
         }
       }
     }
@@ -216,7 +217,7 @@ def doBuildDotNetOsx(def isPublishingRun) {
       } finally {
         collectCompilerWarnings('clang')
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          sh 's3cmd -c $s3cfg_config_file put --multipart-chunk-size-mb 5 realm-core-dotnet-cocoa-latest.tar.bz2 s3://static.realm.io/downloads/core'
+          sh 's3cmd -c $s3cfg_config_file put --multipart-chunk-size-mb 5 realm-core-dotnet-cocoa-latest.tar.bz2 s3://static.realm.io/downloads/core/'
         }
       }
     }
@@ -312,7 +313,7 @@ def doBuildNodeInDocker(def isPublishingRun) {
               }
               archiveArtifacts artifacts: '*realm-core-node-linux-*.*.*.tar.gz'
               withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-                sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core'
+                sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core/'
               }
           } finally {
             collectCompilerWarnings('gcc')
@@ -342,7 +343,47 @@ def doBuildNodeInOsx(def isPublishingRun) {
           sh 'sh build.sh clean'
 
           withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-            sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core'
+            sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core/'
+          }
+        } finally {
+          collectCompilerWarnings('clang')
+        }
+      }
+    }
+  }
+}
+
+def doBuildOsxDylibs(def isPublishingRun) {
+  return {
+    node('osx_vegas') {
+      getSourceArchive()
+      def version = get_version()
+
+      def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes', 'UNITTEST_SHUFFLE=1',
+        'UNITTEST_XML=1', 'UNITTEST_THREADS=1']
+      withEnv(environment) {
+        sh 'sh build.sh config'
+        try {
+          sh '''
+            sh build.sh build
+            sh build.sh check-debug
+          '''
+
+          dir('src/realm') {
+            sh "zip --symlink ../../realm-core-dylib-osx-${version}.zip librealm*.dylib"
+          }
+
+          sh 'cp realm-core-dylib-osx-*.zip realm-core-dylib-osx-latest.zip'
+
+          if (isPublishingRun) {
+            stash includes: '*realm-core-dylib-osx-*.*.*.zip', name: 'dylib-osx-package'
+          }
+          archiveArtifacts artifacts: '*realm-core-dylib-osx-*.*.*.zip'
+
+          sh 'sh build.sh clean'
+
+          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+            sh 's3cmd -c $s3cfg_config_file put realm-core-dylib-osx-latest.zip s3://static.realm.io/downloads/core/'
           }
         } finally {
           collectCompilerWarnings('clang')
@@ -589,7 +630,7 @@ def doPublishGeneric() {
         unstash "packages-generic"
       }
       dir("core/v${version}/linux") {
-        sh "mv ${topdir}/packaging/out/generic/realm-core-*.tgz ./"
+        sh "mv ${topdir}/packaging/out/generic/realm-core-*.tgz ./realm-core-${version}.tgz"
       }
 
       step([
@@ -624,8 +665,11 @@ def doPublishLocalArtifacts() {
       unstash 'node-linux-package'
       unstash 'node-cocoa-package'
       unstash 'android-package'
+      unstash 'dylib-osx-package'
+
       withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-        sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core \\;'
+        sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
+        sh 'find . -type f -name "*.zip" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
       }
     }
   }
