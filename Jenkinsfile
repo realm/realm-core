@@ -589,7 +589,7 @@ def doPublishGeneric() {
         unstash "packages-generic"
       }
       dir("core/v${version}/linux") {
-        sh "mv ${topdir}/packaging/out/generic/realm-core-*.tgz ./"
+        sh "mv ${topdir}/packaging/out/generic/realm-core-*.tgz ./realm-core-${version}.tgz"
       }
 
       step([
