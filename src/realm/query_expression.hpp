@@ -478,6 +478,10 @@ Query create(L left, const Subexpr2<R>& right)
             q.contains(column->column_ndx(), only_string(left));
         else if (std::is_same<Cond, ContainsIns>::value)
             q.contains(column->column_ndx(), only_string(left), false);
+        else if (std::is_same<Cond, Like>::value)
+            q.like(column->column_ndx(), only_string(left));
+        else if (std::is_same<Cond, LikeIns>::value)
+            q.like(column->column_ndx(), only_string(left), false);
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
             // fallback to using use 'return new Compare<>' instead.

@@ -558,6 +558,19 @@ TEST(Query_NextGen_StringConditions)
 
     m = table1->column<String>(0).ends_with(table1->column<String>(1), true).find();
     CHECK_EQUAL(m, 2);
+    
+    // Like (wildcard matching)
+    m = table1->column<String>(0).like("b*", false).find();
+    CHECK_EQUAL(m, 2);
+    
+    m = table1->column<String>(0).like("*r", false).find();
+    CHECK_EQUAL(m, 2);
+    
+    m = table1->column<String>(0).like("f?o", false).find();
+    CHECK_EQUAL(m, 0);
+    
+    m = (table1->column<String>(0).like("f*", false) && table1->column<String>(0) == "foo").find();
+    CHECK_EQUAL(m, 0);
 
     // Test various compare operations with null
     TableRef table2 = group.add_table("table2");
