@@ -62,6 +62,7 @@ try {
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun),
         buildDotnetOsx: doBuildDotNetOsx(isPublishingRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
+        buildOsxDylibs: doBuildOsxDylibs(isPublishingRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
       ]
@@ -356,6 +357,7 @@ def doBuildOsxDylibs(def isPublishingRun) {
   return {
     node('osx_vegas') {
       getArchive()
+      def version = get_version()
 
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes', 'UNITTEST_SHUFFLE=1',
         'UNITTEST_XML=1', 'UNITTEST_THREADS=1']
@@ -368,7 +370,7 @@ def doBuildOsxDylibs(def isPublishingRun) {
           '''
 
           dir('src/realm') {
-            'zip --symlink ../../realm-core-dylib-osx-$version.zip librealm*.dylib'
+            "zip --symlink ../../realm-core-dylib-osx-${version}.zip librealm*.dylib"
           }
 
           sh 'cp realm-core-dylib-osx-*.tar.gz realm-core-dylib-osx-latest.tar.gz'
