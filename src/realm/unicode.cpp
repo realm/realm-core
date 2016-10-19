@@ -518,9 +518,9 @@ bool matchhere_ins(const StringData& text, const StringData& pattern_upper, cons
         return false;
     if (pattern_lower[p2] == '*')
         return matchstar_ins(text, pattern_lower, pattern_upper, p1, p2+1);
-        if (pattern_lower[p2] == '?' || pattern_lower[p2] == text[p1] || pattern_upper[p2] == text[p1])
-            return matchhere_ins(text, pattern_lower, pattern_upper, p1+1, p2+1);
-            return false;
+    if (pattern_lower[p2] == '?' || pattern_lower[p2] == text[p1] || pattern_upper[p2] == text[p1])
+        return matchhere_ins(text, pattern_lower, pattern_upper, p1+1, p2+1);
+    return false;
 }
 
 bool matchstar_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower, size_t p1, size_t p2) noexcept
