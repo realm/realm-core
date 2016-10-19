@@ -1174,7 +1174,7 @@ char SlabAlloc::compute_checksum()
 
     try {
         // map() can fail if non-Realm process shortens the file size between get_size() and map()
-        map = (char*)get_file().map(File::access_ReadWrite, fsiz - aligned_tail_offset, 0, aligned_tail_offset);
+        map = static_cast<char*>(get_file().map(File::access_ReadWrite, fsiz - aligned_tail_offset, 0, aligned_tail_offset));
     }
     catch (...) {
         return ignore_checksum;
@@ -1194,7 +1194,7 @@ char SlabAlloc::compute_checksum()
 
     try {
         // map() can fail if non-Realm process shortens the file size between get_size() and map()
-        map = (char*)get_file().map(File::access_ReadWrite, head_size);
+        map = static_cast<char*>(get_file().map(File::access_ReadWrite, head_size));
     }
     catch (...) {
         return ignore_checksum;
@@ -1221,7 +1221,7 @@ void SlabAlloc::update_checksum()
     if (!get_file().is_attached())
         return;
 
-    char* map = (char*)get_file().map(File::access_ReadWrite, checksum_offset + 1);
+    char* map = static_cast<char*>(get_file().map(File::access_ReadWrite, checksum_offset + 1));
     char c = compute_checksum();
     reinterpret_cast<Header*>(map)->m_checksum = c;
     get_file().unmap(map, checksum_offset + 1);
@@ -1232,7 +1232,7 @@ void SlabAlloc::invalidate_checksum()
     if (!get_file().is_attached())
         return;
 
-    char* p = (char*)get_file().map(File::access_ReadWrite, checksum_offset + 1);
+    char* p = static_cast<char*>(get_file().map(File::access_ReadWrite, checksum_offset + 1));
     reinterpret_cast<Header*>(p)->m_checksum = ignore_checksum;
     get_file().unmap(p, checksum_offset + 1);
 }
