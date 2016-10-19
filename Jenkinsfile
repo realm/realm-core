@@ -142,11 +142,11 @@ def doBuildCocoa(def isPublishingRun) {
                   # the debug build of core, so remove that slice
                   lipo -remove armv7s core/librealm-ios-dbg.a -o core/librealm-ios-dbg.a
 
-                  tar cf "$dir/core-$version.tar.xz" --xz core || exit 1
+                  tar cf "$dir/realm-core-$version.tar.xz" --xz core || exit 1
               )
               rm -rf "$tmpdir" || exit 1
 
-              cp core-*.tar.xz realm-core-latest.tar.xz
+              cp realm-core-*.tar.xz realm-core-latest.tar.xz
             '''
 
             if (isPublishingRun) {
