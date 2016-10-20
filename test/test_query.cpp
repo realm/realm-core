@@ -560,6 +560,9 @@ TEST(Query_NextGen_StringConditions)
     CHECK_EQUAL(m, 2);
     
     // Like (wildcard matching)
+    m = table1->column<String>(0).like("b*", true).find();
+    CHECK_EQUAL(m, 2);
+    
     m = table1->column<String>(0).like("b*", false).find();
     CHECK_EQUAL(m, 2);
     
@@ -571,6 +574,9 @@ TEST(Query_NextGen_StringConditions)
     
     m = (table1->column<String>(0).like("f*", false) && table1->column<String>(0) == "foo").find();
     CHECK_EQUAL(m, 0);
+    
+    m = table1->column<String>(0).like(table1->column<String>(1), true).find();
+    CHECK_EQUAL(m, not_found);
 
     // Test various compare operations with null
     TableRef table2 = group.add_table("table2");
@@ -611,6 +617,9 @@ TEST(Query_NextGen_StringConditions)
 
     m = table2->column<String>(0).contains(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
+    
+    m = table2->column<String>(0).like(StringData(""), false).count();
+    CHECK_EQUAL(m, 1);
 
     m = table2->column<String>(0).begins_with(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
@@ -632,6 +641,9 @@ TEST(Query_NextGen_StringConditions)
 
     m = table2->column<String>(0).contains(realm::null(), false).count();
     CHECK_EQUAL(m, 4);
+    
+    m = table2->column<String>(0).like(realm::null(), false).count();
+    CHECK_EQUAL(m, 1);
 
     TableRef table3 = group.add_table(StringData("table3"));
     table3->add_column_link(type_Link, "link1", *table2);
@@ -671,6 +683,9 @@ TEST(Query_NextGen_StringConditions)
 
     m = table3->link(0).column<String>(0).contains(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
+    
+    m = table3->link(0).column<String>(0).like(StringData(""), false).count();
+    CHECK_EQUAL(m, 1);
 
     m = table3->link(0).column<String>(0).begins_with(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
@@ -692,6 +707,9 @@ TEST(Query_NextGen_StringConditions)
 
     m = table3->link(0).column<String>(0).contains(realm::null(), false).count();
     CHECK_EQUAL(m, 4);
+    
+    m = table3->link(0).column<String>(0).like(realm::null(), false).count();
+    CHECK_EQUAL(m, 1);
 }
 
 

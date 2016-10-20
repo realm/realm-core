@@ -275,6 +275,7 @@ TEST(StringData_Like)
     CHECK(empty.like(""));
     CHECK(empty.like("*"));
     
+    CHECK(!f.like(""));
     CHECK(f.like("*"));
     CHECK(foo.like("foo*"));
     CHECK(foo.like("*foo"));
@@ -318,6 +319,7 @@ TEST(StringData_Like_CaseInsensitive)
     CHECK(string_like_ins(empty, ""));
     CHECK(string_like_ins(empty, "*"));
     
+    CHECK(!string_like_ins(f, ""));
     CHECK(string_like_ins(f, "*"));
     CHECK(string_like_ins(foo, "foo*"));
     CHECK(string_like_ins(foo, "*foo"));
