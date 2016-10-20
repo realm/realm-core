@@ -535,7 +535,7 @@ protected:
 
     /// Short hand for test_context.logger.info().
     template <class... Params>
-    void log(const char* message, Params...);
+    void log(const char* message, Params&&...);
 
     TestBase(TestContext&);
 };
@@ -845,9 +845,9 @@ inline TestBase::TestBase(TestContext& context)
 }
 
 template <class... Params>
-inline void TestBase::log(const char* message, Params... params)
+inline void TestBase::log(const char* message, Params&&... params)
 {
-    test_context.logger.info(message, params...); // Throws
+    test_context.logger.info(message, std::forward<Params>(params)...); // Throws
 }
 
 
