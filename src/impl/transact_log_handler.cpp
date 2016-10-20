@@ -844,13 +844,9 @@ void begin(SharedGroup& sg, BindingContext* context, SchemaMode schema_mode,
     }, schema_mode, notifiers);
 }
 
-void commit(SharedGroup& sg, BindingContext* context)
+void commit(SharedGroup& sg)
 {
     LangBindHelper::commit_and_continue_as_read(sg);
-
-    if (context) {
-        context->did_change({}, {});
-    }
 }
 
 void cancel(SharedGroup& sg, BindingContext* context)

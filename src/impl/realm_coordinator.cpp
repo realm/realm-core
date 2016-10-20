@@ -22,6 +22,7 @@
 #include "impl/external_commit_helper.hpp"
 #include "impl/transact_log_handler.hpp"
 #include "impl/weak_realm_notifier.hpp"
+#include "binding_context.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "schema.hpp"
@@ -36,8 +37,8 @@
 #include <realm/lang_bind_helper.hpp>
 #include <realm/string_data.hpp>
 
-#include <unordered_map>
 #include <algorithm>
+#include <unordered_map>
 
 using namespace realm;
 using namespace realm::_impl;
@@ -291,7 +292,7 @@ void RealmCoordinator::commit_write(Realm& realm)
         // skip version
         std::lock_guard<std::mutex> l(m_notifier_mutex);
 
-        transaction::commit(Realm::Internal::get_shared_group(realm), realm.m_binding_context.get());
+        transaction::commit(Realm::Internal::get_shared_group(realm));
 
         // Don't need to check m_new_notifiers because those don't skip versions
         bool have_notifiers = std::any_of(m_notifiers.begin(), m_notifiers.end(),
@@ -299,6 +300,10 @@ void RealmCoordinator::commit_write(Realm& realm)
         if (have_notifiers) {
             m_notifier_skip_version = Realm::Internal::get_shared_group(realm).get_version_of_current_transaction();
         }
+    }
+
+    if (realm.m_binding_context) {
+        realm.m_binding_context->did_change({}, {});
     }
 
     if (m_notifier) {
