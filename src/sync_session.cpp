@@ -292,6 +292,7 @@ void SyncSession::create_sync_session()
 
         switch (strong_code) {
             // Client errors; all ignored (for now)
+            case Error::invalid_error:
             case Error::connection_closed:
             case Error::other_error:
             case Error::unknown_message:
@@ -304,6 +305,7 @@ void SyncSession::create_sync_session()
             case Error::bad_message_order:
                 return;
             // Session errors
+            case Error::disabled_session:
             case Error::session_closed:
             case Error::other_session_error:
                 // The binding doesn't need to be aware of these because they are strictly informational, and do not

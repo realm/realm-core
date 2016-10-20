@@ -16,7 +16,7 @@ include(CompilerFlags)
 include(Sanitizers)
 
 include(RealmCore)
-set(REALM_CORE_VERSION "2.1.0" CACHE STRING "")
+set(REALM_CORE_VERSION "2.1.3" CACHE STRING "")
 use_realm_core(${REALM_CORE_VERSION})
 
 if(REALM_SYNC_PREFIX)
