@@ -111,7 +111,8 @@ private:
     void log_impl(State&);
     template <class Param, class... Params>
     void log_impl(State&, Param&&, Params&&...);
-    template <class Param> static void subst(State&, Param&&);
+    template <class Param>
+    static void subst(State&, Param&&);
 };
 
 template <class C, class T>
@@ -323,7 +324,8 @@ inline void Logger::log_impl(State& state, Param&& param, Params&&... params)
     log_impl(state, std::forward<Params>(params)...); // Throws
 }
 
-template <class Param> void Logger::subst(State& state, Param&& param)
+template <class Param>
+void Logger::subst(State& state, Param&& param)
 {
     state.m_formatter << "%" << state.m_param_num;
     std::string key = state.m_formatter.str();
