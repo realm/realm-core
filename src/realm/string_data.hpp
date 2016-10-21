@@ -305,8 +305,19 @@ inline bool StringData::matchhere(const StringData& text, const StringData& patt
         return false;
     if (pattern[p2] == '*')
         return matchstar(text, pattern, p1, p2+1);
-    if (pattern[p2] == '?' || pattern[p2] == text[p1])
+    if (pattern[p2] == text[p1])
         return matchhere(text, pattern, p1+1, p2+1);
+    if (pattern[p2] == '?') {
+        // utf-8 encoded characters may take up multiple bytes
+        if ((text[p1] & 0x80) == 0)
+            return matchhere(text, pattern, p1+1, p2+1);
+        else {
+            size_t p = 1;
+            while (p1+p != text.size() && (text[p1+p] & 0xc0) == 0x80)
+                ++p;
+            return matchhere(text, pattern, p1+p, p2+1);
+        }
+    }
     return false;
 }
 

@@ -518,8 +518,19 @@ bool matchhere_ins(const StringData& text, const StringData& pattern_upper, cons
         return false;
     if (pattern_lower[p2] == '*')
         return matchstar_ins(text, pattern_lower, pattern_upper, p1, p2+1);
-    if (pattern_lower[p2] == '?' || pattern_lower[p2] == text[p1] || pattern_upper[p2] == text[p1])
+    if (pattern_lower[p2] == text[p1] || pattern_upper[p2] == text[p1])
         return matchhere_ins(text, pattern_lower, pattern_upper, p1+1, p2+1);
+    if (pattern_lower[p2] == '?') {
+        // utf-8 encoded characters may take up multiple bytes
+        if ((text[p1] & 0x80) == 0)
+            return matchhere_ins(text, pattern_lower, pattern_upper, p1+1, p2+1);
+        else {
+            size_t p = 1;
+            while (p1+p != text.size() && (text[p1+p] & 0xc0) == 0x80)
+                ++p;
+            return matchhere_ins(text, pattern_lower, pattern_upper, p1+p, p2+1);
+        }
+    }
     return false;
 }
 

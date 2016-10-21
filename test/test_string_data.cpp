@@ -265,6 +265,7 @@ TEST(StringData_Like)
     StringData foobar("foobar");
     StringData foofoo("foofoo");
     StringData foobarfoo("foobarfoo");
+    StringData unicode("\xc3\xa6\xc3\xb8\xc3\xa5\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9etest"); // utf-8 "æøå日本語test"
     
     CHECK(null.like(null));
     CHECK(!null.like(""));
@@ -284,6 +285,11 @@ TEST(StringData_Like)
     CHECK(foobarfoo.like("foo*foo"));
     CHECK(!foobarfoo.like("foo*bar"));
     
+    CHECK(unicode.like("*test"));
+    CHECK(unicode.like("\xc3\xa6\xc3\xb8\xc3\xa5*")); // "æøå*"
+    CHECK(unicode.like("\xc3\xa6\xc3\xb8\xc3\xa5*test")); // "æøå*test"
+    CHECK(unicode.like("*\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e*")); // "*日本語*"
+    
     CHECK(f.like("?"));
     CHECK(foo.like("?oo"));
     CHECK(foo.like("f?o"));
@@ -291,6 +297,11 @@ TEST(StringData_Like)
     CHECK(!empty.like("?"));
     CHECK(!foo.like("foo?"));
     CHECK(!foo.like("?foo"));
+    
+    CHECK(unicode.like("?\xc3\xb8\xc3\xa5\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9etest")); // "?øå日本語test"
+    CHECK(unicode.like("\xc3\xa6?\xc3\xa5\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9etest")); // "æ?å日本語test"));
+    CHECK(unicode.like("\xc3\xa6\xc3\xb8\xc3\xa5?\xe6\x9c\xac\xe8\xaa\x9etest"));     // "æøå?本語test"));
+    CHECK(unicode.like("\xc3\xa6?\xc3\xa5?\xe6\x9c\xac?test"));                       // "æ?å?本?t?s?"));
     
     CHECK(foo.like("?oo*"));
     CHECK(foo.like("*?o?"));
@@ -309,6 +320,7 @@ TEST(StringData_Like_CaseInsensitive)
     StringData foobar("FOOBAR");
     StringData foofoo("FOOfoo");
     StringData foobarfoo("FoObArFoO");
+    StringData unicode("\xc3\xa6\xc3\xb8\xc3\xa5\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9etest"); // utf-8 "æøå日本語test"
     
     CHECK(string_like_ins(null, null));
     CHECK(!string_like_ins(null, ""));
@@ -328,6 +340,11 @@ TEST(StringData_Like_CaseInsensitive)
     CHECK(string_like_ins(foobarfoo, "foo*foo"));
     CHECK(!string_like_ins(foobarfoo, "foo*bar"));
     
+    CHECK(string_like_ins(unicode, "*test"));
+    CHECK(string_like_ins(unicode, "\xc3\xa6\xc3\xb8\xc3\xa5*")); // "æøå*"
+    CHECK(string_like_ins(unicode, "\xc3\xa6\xc3\xb8\xc3\xa5*test")); // "æøå*test"
+    CHECK(string_like_ins(unicode, "*\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e*")); // "*日本語*"
+    
     CHECK(string_like_ins(f,"?"));
     CHECK(string_like_ins(foo, "?oo"));
     CHECK(string_like_ins(foo, "f?o"));
@@ -335,6 +352,11 @@ TEST(StringData_Like_CaseInsensitive)
     CHECK(!string_like_ins(empty, "?"));
     CHECK(!string_like_ins(foo, "foo?"));
     CHECK(!string_like_ins(foo, "?foo"));
+    
+    CHECK(string_like_ins(unicode, "?\xc3\xb8\xc3\xa5\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9etest")); // "?øå日本語test"
+    CHECK(string_like_ins(unicode, "\xc3\xa6?\xc3\xa5\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9etest")); // "æ?å日本語test"));
+    CHECK(string_like_ins(unicode, "\xc3\xa6\xc3\xb8\xc3\xa5?\xe6\x9c\xac\xe8\xaa\x9etest"));     // "æøå?本語test"));
+    CHECK(string_like_ins(unicode, "\xc3\xa6?\xc3\xa5?\xe6\x9c\xac?test"));                       // "æ?å?本?t?s?"));
     
     CHECK(string_like_ins(foo, "?oo*"));
     CHECK(string_like_ins(foo, "*?o?"));
