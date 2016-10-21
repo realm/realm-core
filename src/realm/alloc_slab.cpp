@@ -1252,7 +1252,7 @@ bool SlabAlloc::verify_checksum()
     try {
         // map() can fail if non-Realm process shortens the file size between get_size() and map(). We then
         // return false which means checksum error
-        map = (char*)get_file().map(File::access_ReadWrite, checksum_offset + 1);
+        map = static_cast<char*>(get_file().map(File::access_ReadWrite, checksum_offset + 1));
     }
     catch (...) {
         return false;
