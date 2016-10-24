@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix storage of very large refs (MSB set) on 32-bit platforms.
 
 ### Breaking changes
 
