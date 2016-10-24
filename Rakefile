@@ -458,5 +458,12 @@ android_package_dependencies = android_abis.map { |abi| [ abi[:filename_release]
 
 desc 'Build the package for Android'
 task 'package-android' => android_package_dependencies do
-  # TODO Implement the creation of the package folder and its compression
+  Dir.mktmpdir { |dir|
+    android_abis.each { |abi|
+      FileUtils.cp(abi[:filename_release], "#{dir}/librealm-android-#{abi[:package_name]}.a")
+      FileUtils.cp(abi[:filename_debug], "#{dir}/librealm-android-#{abi[:package_name]}-dbg.a")
+    }
+    # TODO: include folder
+    # TODO: OpenSSL license file
+  }
 end
