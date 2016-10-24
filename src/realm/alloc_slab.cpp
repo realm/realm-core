@@ -1158,7 +1158,7 @@ void SlabAlloc::set_file_format_version(int file_format_version) noexcept
 }
 
 // Meant to be noexcept (called inside our assert macro)
-char SlabAlloc::compute_checksum()
+char SlabAlloc::compute_checksum() noexcept
 {
     // Compute checksum of first 128 bytes + last 128 bytes, such that summed areas will
     // *not* overlap if file is too short
@@ -1237,11 +1237,11 @@ void SlabAlloc::invalidate_checksum()
     get_file().unmap(p, checksum_offset + 1);
 }
 
-// Meant to be noexcept (called from our assert macro). If another thread is inside commit(), we have a .realm 
+// Must be noexcept because it's called inside our assert. If another thread is inside commit(), we have a .realm 
 // file which may be inconsistent because it's only written partly to disk. We attempt to detect this by
 // making commit() write a flag that indicates that it's currently busy, so any checksum verification should
 // be skipped.
-bool SlabAlloc::verify_checksum()
+bool SlabAlloc::verify_checksum() noexcept
 {
     if (!get_file().is_attached())
         return true;

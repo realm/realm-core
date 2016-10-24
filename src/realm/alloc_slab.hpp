@@ -317,7 +317,7 @@ public:
     
     // Compute checksum of .realm file and compare with the value in its
     // header
-    bool verify_checksum() override;
+    bool verify_checksum() noexcept override;
 
     void verify() const override;
 
@@ -387,7 +387,7 @@ private:
         uint64_t m_magic_cookie;
     };
 
-    char compute_checksum();
+    char compute_checksum() noexcept;
 
     static_assert(sizeof(Header) == 24, "Bad header size");
     static_assert(sizeof(StreamingFooter) == 16, "Bad footer size");

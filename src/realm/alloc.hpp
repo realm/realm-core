@@ -127,7 +127,7 @@ public:
 
     virtual void update_checksum() { return; }
     virtual void invalidate_checksum() { return; }
-    virtual bool verify_checksum() { return true; }
+    virtual bool verify_checksum() noexcept { return true; }
 
 
 #ifdef REALM_DEBUG
