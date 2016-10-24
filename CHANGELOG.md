@@ -15,6 +15,9 @@
 * Added .realm file checksum. This will attempt to detect if the realm file is being
   or overwritten by a non-Realm process/code. It results in an assert with a notice
   on this.
+* Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
+  are now perfectly forwarded (via perfect forwarding) to
+  `std::stream::operator<<()`.
 
 -----------
 
