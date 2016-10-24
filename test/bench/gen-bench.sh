@@ -87,7 +87,15 @@ else
     else
         sh ./util/build-core.sh "${remoteref}"
         cd ../benchmark-common-tasks
-        cp main.cpp Makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
+        cp main.cpp compatibility.hpp Makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
+        echo "unix timestamp of build is ${unixtime}"
+        if [ "${unixtime}" -lt "1473070980" ]; then
+            echo "Using legacy compatibility of SharedGroup"
+            cp compatibility_legacy.cpp "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/compatibility.cpp"
+        else
+            echo "Using normal compatibility of SharedGroup"
+            cp compatibility.cpp "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/"
+        fi
         cd ../benchmark-crud
         cp main.cpp Makefile "../bench/core-builds/${remoteref}/src/test/benchmark-crud/"
         cd ../util
