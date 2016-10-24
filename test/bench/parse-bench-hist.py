@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 #
-# useage:
-# $ ./parse-bench-hist.py [outputdir [inputdir]]
+# This script can produce csv files locally or send
+# results to a remote influx 1.0.2 database.
 #
-# this script will read any csv files from the
+# Local useage:
+# $ ./parse-bench-hist.py --local [outputdir [inputdir]]
+#
+# This script will read any csv files from the
 # input directory (default is the folder created by
 # the gen-bench-hist.sh script) and output combined
 # results organized by benchmark function in the
@@ -12,9 +15,31 @@
 # performance per function per build. The x axis of builds
 # is ordered by the "modified" timestamp of the csv files
 # from the input directory.
+#
+# remote useage:
+# $ ./parse-bench-hist.py --remote ip_address [inputdir [inputfile]]
+#
+# This script will read the csv benchmark results and send them
+# to a remote influx database at ip_address. If no inputdir is
+# specified then all csv files from the gen-bench-hist.sh script
+# are parsed. If only an input directory is specified then all
+# csv files from this directory are parsed. If both the input
+# directory and the inputfile are specified, then only this
+# single csv file is parsed.
+#
+# Results will be curled to the specified ip address in the format:
+# function,machine=${machid} min=x,max=y,median=z,avg=w,sha=${gitsha} unixtimestamp
 
 from stat import S_ISREG, ST_MTIME, ST_MODE
 import csv, errno, os, sys, time
+
+def printUseageAndQuit():
+    print ("This python script can produce local csv files or "
+          "send benchmark stats to a remote influx database.")
+    print "Useage:"
+    print "./parse-bench-hist.py --local [outputdir [inputdir]]"
+    print "./parse-bench-hist.py --remote ip_address [inputdir [inputfile]]"
+    exit()
 
 def getFilesByModDate(dirpath, suffix='.csv'):
     # get all entries in the directory w/ stats
@@ -102,21 +127,49 @@ def transform(inputdir, outputdir, filelist):
 
                     fout.truncate()
 
-if __name__ == "__main__":
+def transform_local():
     machid = getMachId()
     outputdir = "./bench-hist-results/"
-    if len(sys.argv) >= 2:
-        outputdir = sys.argv[1]
+    if len(sys.argv) >= 3:
+        outputdir = sys.argv[2]
     outputdir = os.path.expanduser(outputdir)
     mkdirs(outputdir)
     print "results will be written to " + outputdir
 
     inputdir = "~/.realm/core/benchmarks/" + str(machid)
-    if len(sys.argv) >= 3:
-        inputdir = sys.argv[2]
+    if len(sys.argv) >= 4:
+        inputdir = sys.argv[3]
     inputdir = os.path.expanduser(inputdir)
     print "looking for csv files in " + inputdir
     files = getFilesByName(inputdir)
-    
+
     transform(inputdir, outputdir, files)
+
+def transform_remote():
+    machid = getMachId()
+    if len(sys.argv) <= 2:
+        print "Must specify the remote ip address of the influx database."
+        printUseageAndQuit()
+    remoteip = sys.argv[2]
+    inputdir = "~/.realm/core/benchmarks/" + str(machid)
+    if len(sys.argv) > 3:
+        inputdir = sys.argv[3]
+    inputfile = ""
+    if len(sys.argv) > 4:
+        inputfile = sys.argv[4]
+
+#function,machine=${machid} min=x,max=y,median=z,avg=w,sha=${gitsha} unixtimestamp
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print "Missing arguments."
+        printUseageAndQuit()
+    locality = sys.argv[1]
+    if locality == "--local":
+        transform_local()
+    elif locality == "--remote":
+        transform_remote()
+    else:
+        print "Expecting either '--local' or '--remote' as the second argument."
+        printUseageAndQuit()
 
