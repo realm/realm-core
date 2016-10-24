@@ -407,41 +407,56 @@ end
 
 # Android
 
-android_abis = ['armeabi-v7a', 'x86', 'mips', 'arm64-v8a', 'x86_64']
 android_build_types = %w(Release Debug)
+
+android_abis = [
+  { :name => 'armeabi-v7a', :package_name => 'arm-v7a' },
+  { :name => 'x86', :package_name => 'x86' },
+  { :name => 'mips', :package_name => 'mips' },
+  { :name => 'arm64-v8a', :package_name => 'arm64' },
+  { :name => 'x86_64', :package_name => 'x86_64' }
+]
 
 build_android_dependencies = []
 
 android_abis.product(android_build_types) do |abi, build_type|
-  dir = ENV['build_dir'] || "#{REALM_BUILD_DIR_ANDROID}.#{abi}.#{build_type}"
+  dir = ENV['build_dir'] || "#{REALM_BUILD_DIR_ANDROID}.#{abi[:name]}.#{build_type}"
   directory dir
 
-  desc "Configure the Android build in #{build_type} mode for #{abi}"
-  task "config-android-#{abi}-#{build_type}" => [dir] do
+  desc "Configure the Android build in #{build_type} mode for #{abi[:name]}"
+  task "config-android-#{abi[:name]}-#{build_type}" => [dir] do
     ENV['CMAKE_TOOLCHAIN_FILE'] = 'tools/cmake/android.toolchain.cmake'
     ENV['REALM_PLATFORM'] = 'Android'
     ENV['CMAKE_BUILD_TYPE'] = build_type
-    ENV['ANDROID_ABI'] = abi
+    ENV['ANDROID_ABI'] = abi[:name]
     ENV['REALM_ENABLE_ENCRYPTION'] = '1'
     generate_makefiles(dir)
   end
 
-  desc "Build the core static library in #{build_type} mode for #{abi}"
-  task "build-android-#{abi}-#{build_type}" => ["config-android-#{abi}-#{build_type}", 'guess_num_processors'] do
+  desc "Build the core static library in #{build_type} mode for #{abi[:name]}"
+  task "build-android-#{abi[:name]}-#{build_type}" => ["config-android-#{abi[:name]}-#{build_type}", 'guess_num_processors'] do
     Dir.chdir(dir) do
       sh "make realm -j#{@num_processors}"
     end
   end
 
-  desc "Build the core tests in #{build_type} mode for #{abi}"
-  task "build-tests-android-#{abi}-#{build_type}" => ["config-android-#{abi}-#{build_type}", 'guess_num_processors'] do
+  desc "Build the core tests in #{build_type} mode for #{abi[:name]}"
+  task "build-tests-android-#{abi[:name]}-#{build_type}" => ["config-android-#{abi[:name]}-#{build_type}", 'guess_num_processors'] do
     Dir.chdir(dir) do
       sh "make all -j#{@num_processors}"
     end
   end
 
-  build_android_dependencies << "build-android-#{abi}-#{build_type}"
+  build_android_dependencies << "build-android-#{abi[:name]}-#{build_type}"
+  abi[:"filename_#{build_type.downcase}"] = "#{dir}/src/realm/librealm.a"
 end
 
 desc 'Build for Android'
 task 'build-android' => build_android_dependencies
+
+android_package_dependencies = android_abis.map { |abi| [ abi[:filename_release], abi[:filename_debug] ] }.flatten
+
+desc 'Build the package for Android'
+task 'package-android' => android_package_dependencies do
+  # TODO Implement the creation of the package folder and its compression
+end
