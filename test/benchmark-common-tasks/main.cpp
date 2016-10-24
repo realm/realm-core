@@ -22,6 +22,7 @@
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 
+#include "compatibility.hpp"
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
@@ -30,6 +31,7 @@
 #include "../util/crypt_key.hpp"
 #endif
 
+using namespace compatibility;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
@@ -55,60 +57,6 @@ const size_t min_repetitions = 10;
 const size_t max_repetitions = 1000;
 const double min_duration_s = 0.1;
 const double min_warmup_time_s = 0.05;
-
-/// This shadows SharedGroupOptions::Durability
-/// The indirection is necessary because old versions
-/// of core should still be able to compile with this
-/// benchmark test.
-enum class RealmDurability {
-    Full,
-    MemOnly,
-    Async
-};
-
-#ifdef BENCHMARK_LEGACY
-
-SharedGroup::DurabilityLevel durability(RealmDurability level)
-{
-    switch (level) {
-    case RealmDurability::Full:
-        return SharedGroup::durability_Full;
-    case RealmDurability::MemOnly:
-        return SharedGroup::durability_MemOnly;
-    case RealmDurability::Async:
-        return SharedGroup::durability_Async;
-    }
-    REALM_ASSERT(false); // unhandled case
-    return SharedGroup::durability_Full;
-}
-
-SharedGroup* create_new_shared_group(std::string path, RealmDurability level, const char* key)
-{
-    return new SharedGroup(path, false, durability(level), key);
-}
-
-#else
-
-SharedGroupOptions::Durability durability(RealmDurability level)
-{
-    switch (level) {
-    case RealmDurability::Full:
-        return SharedGroupOptions::Durability::Full;
-    case RealmDurability::MemOnly:
-        return SharedGroupOptions::Durability::MemOnly;
-    case RealmDurability::Async:
-        return SharedGroupOptions::Durability::Async;
-    }
-    REALM_ASSERT(false); // unhandled case
-    return SharedGroupOptions::Durability::Full;
-}
-
-SharedGroup* create_new_shared_group(std::string path, RealmDurability level, const char* key)
-{
-    return new SharedGroup(path, false, SharedGroupOptions(durability(level), key));
-}
-
-#endif // BENCHMARK_LEGACY
 
 struct Benchmark {
     virtual ~Benchmark()

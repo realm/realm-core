@@ -81,7 +81,8 @@ if [ -f "${outputfile}" ]; then
     echo "found results, skipping ${outputfile}"
 else
     headref=$(git rev-parse HEAD)
-    if [ "${headref}" == "${remoteref}" ]; then
+    if [ "${headref}" = "${remoteref}" ]; then
+        echo "building HEAD"
         cd ../..
     else
         sh ./util/build-core.sh "${remoteref}"
