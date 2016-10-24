@@ -76,8 +76,16 @@ set(INCLUDE_DIRS
 
 if(REALM_ENABLE_SYNC)
     # Add the sync files separately to reduce merge conflicts.
-    list(APPEND HEADERS sync_config.hpp sync_manager.hpp sync_metadata.hpp sync_session.hpp impl/sync_client.hpp)
-    list(APPEND SOURCES sync_manager.cpp sync_metadata.cpp sync_session.cpp)
+    list(APPEND HEADERS
+        sync/sync_config.hpp
+        sync/sync_manager.hpp
+        sync/sync_session.hpp
+        sync/impl/sync_client.hpp
+        sync/impl/sync_metadata.hpp)
+    list(APPEND SOURCES
+        sync/sync_manager.cpp
+        sync/sync_session.cpp
+        sync/impl/sync_metadata.cpp)
     find_package(ZLIB REQUIRED)
     list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
 endif()
