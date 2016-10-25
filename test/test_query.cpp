@@ -5087,6 +5087,19 @@ TEST(Query_FindAllLike)
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
 }
 
+TEST(Query_FindAllLikeStackOverflow)
+{
+    std::string str(100000, 'x');
+    StringData sd(str);
+
+    Table table;
+    table.add_column(type_String, "strings");
+    table.add_empty_row();
+    table.set_string(0, 0, sd);
+
+    table.where().like(0, sd).find();
+}
+
 TEST(Query_FindAllLikeCaseInsensitive)
 {
     TupleTableType ttt;
