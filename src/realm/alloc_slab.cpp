@@ -582,8 +582,10 @@ ref_type SlabAlloc::get_top_ref(const char* buffer, size_t len)
 
 namespace {
 
-std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>> all_files;
-util::Mutex all_files_mutex;
+// prevent destruction at exit (which can lead to races if other threads are still running)
+std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>>& all_files =
+    *new std::map<std::string, std::weak_ptr<SlabAlloc::MappedFile>>;
+util::Mutex& all_files_mutex = *new util::Mutex;
 }
 
 
