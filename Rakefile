@@ -427,6 +427,7 @@ android_abis.product(android_build_types) do |abi, build_type|
   task "config-android-#{abi[:name]}-#{build_type}" => [dir] do
     ENV['CMAKE_TOOLCHAIN_FILE'] = 'tools/cmake/android.toolchain.cmake'
     ENV['REALM_PLATFORM'] = 'Android'
+    ENV['CMAKE_INSTALL_PREFIX'] = 'install'
     ENV['CMAKE_BUILD_TYPE'] = build_type
     ENV['ANDROID_ABI'] = abi[:name]
     ENV['REALM_ENABLE_ENCRYPTION'] = '1'
@@ -437,6 +438,7 @@ android_abis.product(android_build_types) do |abi, build_type|
   task "build-android-#{abi[:name]}-#{build_type}" => ["config-android-#{abi[:name]}-#{build_type}", 'guess_num_processors'] do
     Dir.chdir(dir) do
       sh "make realm -j#{@num_processors}"
+      sh "make install/fast"
     end
   end
 
@@ -449,6 +451,7 @@ android_abis.product(android_build_types) do |abi, build_type|
 
   build_android_dependencies << "build-android-#{abi[:name]}-#{build_type}"
   abi[:"filename_#{build_type.downcase}"] = "#{dir}/src/realm/librealm.a"
+  abi[:"build_dir_#{build_type.downcase}"] = dir
 end
 
 desc 'Build for Android'
@@ -458,12 +461,19 @@ android_package_dependencies = android_abis.map { |abi| [ abi[:filename_release]
 
 desc 'Build the package for Android'
 task 'package-android' => android_package_dependencies do
-  Dir.mktmpdir { |dir|
-    android_abis.each { |abi|
+  Dir.mktmpdir do |dir|
+    android_abis.each do |abi|
       FileUtils.cp(abi[:filename_release], "#{dir}/librealm-android-#{abi[:package_name]}.a")
       FileUtils.cp(abi[:filename_debug], "#{dir}/librealm-android-#{abi[:package_name]}-dbg.a")
-    }
-    # TODO: include folder
-    # TODO: OpenSSL license file
-  }
+    end
+    FileUtils.copy_entry("#{android_abis.first[:build_dir_release]}/install/include", "#{dir}/include")
+    File.open("#{dir}/OpenSSL.txt", 'a') do |file|
+      file << "This product includes software developed by the OpenSSL Project for use in the OpenSSL toolkit. (http://www.openssl.org/).\n\n"
+      file << "The following license applies only to the portions of this product developed by the OpenSSL Project.\n\n"
+      file << File.open("#{android_abis.first[:build_dir_release]}/src/realm/openssl-prefix/src/openssl/LICENSE").read
+    end
+    Dir.chdir(dir) do
+      sh "cmake -E tar czf #{__dir__}/realm-core-android-latest.tar.gz *"
+    end
+  end
 end
