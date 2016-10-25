@@ -67,6 +67,41 @@ class DescriptorFriend;
 /// \sa Table::get_descriptor()
 class Descriptor : public std::enable_shared_from_this<Descriptor> {
 public:
+
+
+
+
+    void add_index(size_t col_ndx)  //, DescriptorRef* subdesc)
+    {
+        typedef _impl::TableFriend tf;
+
+        if (REALM_UNLIKELY(!is_attached()))
+            throw LogicError(LogicError::detached_accessor);
+        if (REALM_UNLIKELY(col_ndx > get_column_count()))
+            throw LogicError(LogicError::column_index_out_of_range);
+
+
+
+/*
+        LinkTargetInfo invalid_link;
+     //   tf::insert_column(*this, col_ndx, type, name, invalid_link, nullable); // Throws
+        adj_insert_column(col_ndx);
+        if (subdesc && type == type_Table)
+            *subdesc = get_subdescriptor(col_ndx);
+*/
+
+
+    }
+
+
+
+
+
+
+
+
+
+
     /// Get the number of columns in the associated tables.
     size_t get_column_count() const noexcept;
 

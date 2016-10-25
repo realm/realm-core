@@ -528,6 +528,8 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
 void Table::init(ConstSubspecRef shared_spec, ArrayParent* parent_column, size_t parent_row_ndx)
 {
+    
+
     m_mark = false;
 
     m_version = 0;
@@ -1692,13 +1694,59 @@ void Table::upgrade_olddatetime()
 }
 
 
-void Table::add_search_index(size_t col_ndx)
+void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc, size_t sub_col)
 {
+    typedef _impl::DescriptorFriend df;
+
+    if (subdesc) {
+        int attr;
+        TableRef sub;
+
+        for (size_t r = 0; r < size(); r++) {
+
+            sub = get_subtable(col_ndx, r);
+            ColumnBase& col = sub.get()->get_column_base(sub_col);
+            StringIndex* index = col.create_search_index(); // Throws
+
+            size_t index_pos = sub.get()->m_spec.get_column_info(sub_col).m_column_ref_ndx + 1;
+            index->set_parent(&(sub.get()->m_columns), index_pos);
+            sub.get()->m_columns.insert(index_pos, index->get_ref()); // Throws
+
+            /*
+            attr = sub.get()->m_spec.get_column_attr(sub_col);
+            attr |= col_attr_Indexed;
+            sub.get()->m_spec.set_column_attr(sub_col, ColumnAttr(attr)); // Throws
+
+            sub.get()->refresh_column_accessors(sub_col + 1); // Throws
+
+            attr = sub.get()->m_spec.get_column_attr(sub_col);
+            attr ^= col_attr_Indexed;
+            sub.get()->m_spec.set_column_attr(sub_col, ColumnAttr(attr)); // Throws
+            */
+        }
+
+
+        attr = sub.get()->m_spec.get_column_attr(sub_col);
+        attr ^= col_attr_Indexed;
+        sub.get()->m_spec.set_column_attr(sub_col, ColumnAttr(attr)); // Throws
+
+
+        return;
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
-    if (REALM_UNLIKELY(has_shared_type()))
-        throw LogicError(LogicError::wrong_kind_of_table);
+   // if (REALM_UNLIKELY(has_shared_type()))
+   //     throw LogicError(LogicError::wrong_kind_of_table);
 
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);

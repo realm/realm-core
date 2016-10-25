@@ -243,7 +243,7 @@ public:
     /// \param column_ndx The index of a column of this table.
 
     bool has_search_index(size_t column_ndx) const noexcept;
-    void add_search_index(size_t column_ndx);
+    void add_search_index(size_t column_ndx, DescriptorRef* subdesc = nullptr, size_t sub_col = 0);
     void remove_search_index(size_t column_ndx);
 
     //@}
@@ -1449,6 +1449,7 @@ private:
     friend class LinkMap;
     friend class LinkView;
     friend class Group;
+    friend class Descriptor;
 };
 
 
