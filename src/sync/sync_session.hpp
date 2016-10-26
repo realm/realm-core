@@ -52,8 +52,21 @@ using SyncSessionTransactCallback = void(VersionID old_version, VersionID new_ve
 
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
 public:
-    bool is_valid() const;
-    bool is_inactive() const;
+    enum class PublicState {
+        WaitingForAccessToken,
+        Active,
+        Dying,
+        Inactive,
+        Error,
+    };
+    PublicState state() const;
+    // FIXME: Sessions should be safely destroyable at any time; the fact that they aren't is a bug
+    // (https://github.com/realm/realm-sync/issues/986)
+    bool can_be_safely_destroyed() const;
+
+    bool is_in_error_state() const {
+        return state() == PublicState::Error;
+    }
 
     std::string const& path() const { return m_realm_path; }
 

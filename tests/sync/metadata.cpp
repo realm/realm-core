@@ -28,7 +28,7 @@ using File = realm::util::File;
 static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_metadata/";
 static const std::string metadata_path = base_path + "/metadata.realm";
 
-TEST_CASE("sync_metadata: user metadata") {
+TEST_CASE("sync_metadata: user metadata", "[sync]") {
     reset_test_directory(base_path);
     SyncMetadataManager manager(metadata_path, false);
 
@@ -127,7 +127,7 @@ TEST_CASE("sync_metadata: user metadata") {
     }
 }
 
-TEST_CASE("sync_metadata: user metadata APIs") {
+TEST_CASE("sync_metadata: user metadata APIs", "[sync]") {
     reset_test_directory(base_path);
     SyncMetadataManager manager(metadata_path, false);
 
@@ -158,7 +158,7 @@ TEST_CASE("sync_metadata: user metadata APIs") {
     }
 }
 
-TEST_CASE("sync_metadata: results") {
+TEST_CASE("sync_metadata: results", "[sync]") {
     reset_test_directory(base_path);
     SyncMetadataManager manager(metadata_path, false);
 
@@ -204,7 +204,7 @@ TEST_CASE("sync_metadata: results") {
     }
 }
 
-TEST_CASE("sync_metadata: persistence across metadata manager instances") {
+TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync]") {
     reset_test_directory(base_path);
 
     SECTION("works for the basic case") {
@@ -225,7 +225,7 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances") {
     }
 }
 
-TEST_CASE("sync_metadata: encryption") {
+TEST_CASE("sync_metadata: encryption", "[sync]") {
     reset_test_directory(base_path);
 
     SECTION("prohibits opening the metadata Realm with different keys") {

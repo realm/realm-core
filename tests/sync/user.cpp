@@ -29,7 +29,7 @@ using File = realm::util::File;
 
 static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_user/";
 
-TEST_CASE("sync_user: SyncManager `get_user()` API") {
+TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
@@ -96,7 +96,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API") {
     }
 }
 
-TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API") {
+TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
@@ -130,7 +130,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API") {
     }
 }
 
-TEST_CASE("sync_user: logout") {
+TEST_CASE("sync_user: logout", "[sync]") {
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
     const std::string identity = "sync_test_identity";
@@ -145,7 +145,7 @@ TEST_CASE("sync_user: logout") {
     }
 }
 
-TEST_CASE("sync_user: user persistence") {
+TEST_CASE("sync_user: user persistence", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);

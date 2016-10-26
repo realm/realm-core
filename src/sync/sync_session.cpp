@@ -507,13 +507,24 @@ void SyncSession::bind_with_admin_token(std::string admin_token, std::string ser
     m_state->bind_with_admin_token(lock, *this, admin_token, server_url);
 }
 
-bool SyncSession::is_valid() const
+SyncSession::PublicState SyncSession::state() const
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    return m_state != &State::error;
+    if (m_state == &State::waiting_for_access_token) {
+        return PublicState::WaitingForAccessToken;
+    } else if (m_state == &State::active) {
+        return PublicState::Active;
+    } else if (m_state == &State::dying) {
+        return PublicState::Dying;
+    } else if (m_state == &State::inactive) {
+        return PublicState::Inactive;
+    } else if (m_state == &State::error) {
+        return PublicState::Error;
+    }
+    REALM_UNREACHABLE();
 }
 
-bool SyncSession::is_inactive() const
+bool SyncSession::can_be_safely_destroyed() const
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     return m_state == &State::inactive && m_pending_upload_threads == 0;

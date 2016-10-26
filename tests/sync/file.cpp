@@ -35,7 +35,7 @@ static void prepare_sync_manager_test(void) {
     util::make_dir(manager_path);
 }
 
-TEST_CASE("sync_file: percent-encoding APIs") {
+TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
     SECTION("does not encode a string that has no restricted characters") {
         const std::string expected = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_-";
         auto actual = make_percent_encoded_string(expected);
@@ -57,7 +57,7 @@ TEST_CASE("sync_file: percent-encoding APIs") {
     }
 }
 
-TEST_CASE("sync_file: URL manipulation APIs") {
+TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
     SECTION("properly concatenates a path when the path has a trailing slash") {
         const std::string expected = "/foo/bar";
         const std::string path = "/foo/";
@@ -123,7 +123,7 @@ TEST_CASE("sync_file: URL manipulation APIs") {
     }
 }
 
-TEST_CASE("sync_file: SyncFileManager APIs") {
+TEST_CASE("sync_file: SyncFileManager APIs", "[sync]") {
     const std::string identity = "123456789";
     const std::string manager_path = base_path + "syncmanager/";
     prepare_sync_manager_test();
