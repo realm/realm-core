@@ -1715,20 +1715,37 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
             sub->m_columns.insert(index_pos, index->get_ref()); // Throws
         }
 
-        int attr = sub->m_spec.get_column_attr(col_ndx);
-        attr ^= col_attr_Indexed;
-        sub->m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
+       
+            /*
+                    int attr = sub->m_spec.get_column_attr(col_ndx);
+                    attr ^= col_attr_Indexed;
+                    sub->m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
+                    */
 
-        refresh_column_accessors(col_ndx); // Throws
+        int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
+        attr ^= col_attr_Indexed;
+        subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
+
+
+
+        refresh_column_accessors(parent_col); // Throws
 
         return;
     }
-        
+    
+    
+    
+    
+    
+    
+    
+    
+    
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
-    if (REALM_UNLIKELY(has_shared_type()))
-        throw LogicError(LogicError::wrong_kind_of_table);
+   // if (REALM_UNLIKELY(has_shared_type()))
+   //     throw LogicError(LogicError::wrong_kind_of_table);
 
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);

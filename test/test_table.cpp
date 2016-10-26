@@ -2207,7 +2207,74 @@ TEST(Table_SlabAlloc)
 }
 
 
-ONLY(Table_Spec)
+TEST(Table_Spec)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+
+    // Create specification with sub-table
+    {
+        DescriptorRef sub_1;
+        table->add_column(type_Int, "first");
+        table->add_column(type_String, "second");
+        table->add_column(type_Table, "third", &sub_1);
+        sub_1->add_column(type_Int, "sub_first");
+        sub_1->add_column(type_String, "sub_second");
+    }
+
+    CHECK_EQUAL(3, table->get_column_count());
+
+    // Add a row
+    table->insert_empty_row(0);
+    table->set_int(0, 0, 4);
+    table->set_string(1, 0, "Hello");
+
+    CHECK_EQUAL(0, table->get_subtable_size(2, 0));
+
+    // Get the sub-table
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+        CHECK(subtable->is_empty());
+
+        subtable->insert_empty_row(0);
+        subtable->set_int(0, 0, 42);
+        subtable->set_string(1, 0, "test");
+
+        CHECK_EQUAL(42, subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+
+    CHECK_EQUAL(1, table->get_subtable_size(2, 0));
+
+    // Get the sub-table again and see if the values
+    // still match.
+    {
+        TableRef subtable = table->get_subtable(2, 0);
+
+        CHECK_EQUAL(1, subtable->size());
+        CHECK_EQUAL(42, subtable->get_int(0, 0));
+        CHECK_EQUAL("test", subtable->get_string(1, 0));
+    }
+
+    // Write the group to disk
+    GROUP_TEST_PATH(path);
+    group.write(path);
+
+    // Read back tables
+    {
+        Group from_disk(path, 0, Group::mode_ReadOnly);
+        TableRef from_disk_table = from_disk.get_table("test");
+
+        TableRef subtable2 = from_disk_table->get_subtable(2, 0);
+
+        CHECK_EQUAL(1, subtable2->size());
+        CHECK_EQUAL(42, subtable2->get_int(0, 0));
+        CHECK_EQUAL("test", subtable2->get_string(1, 0));
+    }
+}
+
+
+ONLY(Table_SubtableIndex)
 {
     Group group;
     DescriptorRef sub_1;
@@ -2229,7 +2296,7 @@ ONLY(Table_Spec)
             sub_1->add_column(type_String, "sssss");
         }
 
-        CHECK_EQUAL(3, table->get_column_count());
+        CHECK_EQUAL(2, table->get_column_count());
 
         // Add a row
         table->insert_empty_row(0);
@@ -2265,11 +2332,17 @@ ONLY(Table_Spec)
 
 
 
-    table.get()->add_search_index(2, &sub_1);
+    table.get()->add_search_index(1, &sub_1);
 
     TableRef subtable = table->get_subtable(1, 0);
     subtable.get()->get_int(0, 0);
     subtable.get()->get_string(1, 0);
+
+
+   //    CHECK(table.get()->has_search_index)
+
+    size_t tt = subtable.get()->where().equal(1, "testsub2").find();
+    CHECK_EQUAL(tt, 1);
 
     group.verify();
 
