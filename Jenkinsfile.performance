@@ -1,0 +1,60 @@
+#!groovy
+
+def setBuildName(newBuildName) {
+  currentBuild.displayName = "${currentBuild.displayName} - ${newBuildName}"
+}
+
+def getSourceArchive() {
+  checkout scm
+  sh 'git clean -ffdx -e .????????'
+  sh 'git submodule update --init'
+}
+
+def buildDockerEnv(name) {
+  docker.withRegistry("https://${env.DOCKER_REGISTRY}", "ecr:eu-west-1:aws-ci-user") {
+    sh "./packaging/docker_build.sh $name ."
+  }
+
+  return docker.image(name)
+}
+
+def readGitTag() {
+  sh "git describe --exact-match --tags HEAD | tail -n 1 > tag.txt 2>&1 || true"
+  def tag = readFile('tag.txt').trim()
+  return tag
+}
+
+def readGitSha() {
+  sh "git rev-parse HEAD | cut -b1-8 > sha.txt"
+  def sha = readFile('sha.txt').readLines().last().trim()
+  return sha
+}
+
+stage('Test Performance') {
+  // Select docker-cph-X.  We want docker, metal (brix) and only one executor
+  // (exclusive)
+  node('docker && brix && exclusive') {
+    getSourceArchive()
+
+    def gitTag = readGitTag()
+    def gitSha = readGitSha()
+
+    if (gitTag == "") {
+      setBuildName(gitSha)
+    } else {
+      setBuildName("Tag ${gitTag}")
+    }
+
+    def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
+    buildEnv.inside {
+      sh 'cd test/bench && mkdir -p results && REALM_BENCH_DIR="$(pwd)/results" ./gen-bench.sh'
+      withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'influxdb-core-benchmarks', passwordVariable: 'INFLUXDB_PASSWORD', usernameVariable: 'INFLUXDB_USER']]) {
+        sh '''
+          cd test/bench && ./parse-bench-hist.py \
+            --remote "http://$INFLUXDB_USER:$INFLUXDB_PASSWORD@influxdb.hub.realm:8086/write?db=core_benchmarks" \
+            "$(pwd)/results"
+        '''
+      }
+    }
+  }
+}
