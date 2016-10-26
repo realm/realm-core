@@ -1694,59 +1694,41 @@ void Table::upgrade_olddatetime()
 }
 
 
-void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc, size_t sub_col)
+void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
 {
     typedef _impl::DescriptorFriend df;
 
     if (subdesc) {
-        int attr;
+        size_t stat_buf[8];
+        typedef _impl::DescriptorFriend df;
+        size_t parent_col = *(df::record_subdesc_path(*subdesc->get(), stat_buf, stat_buf + sizeof stat_buf / sizeof *stat_buf));
         TableRef sub;
 
         for (size_t r = 0; r < size(); r++) {
 
-            sub = get_subtable(col_ndx, r);
-            ColumnBase& col = sub.get()->get_column_base(sub_col);
+            sub = get_subtable(parent_col, r);
+            ColumnBase& col = sub->get_column_base(col_ndx);
             StringIndex* index = col.create_search_index(); // Throws
 
-            size_t index_pos = sub.get()->m_spec.get_column_info(sub_col).m_column_ref_ndx + 1;
-            index->set_parent(&(sub.get()->m_columns), index_pos);
-            sub.get()->m_columns.insert(index_pos, index->get_ref()); // Throws
-
-            /*
-            attr = sub.get()->m_spec.get_column_attr(sub_col);
-            attr |= col_attr_Indexed;
-            sub.get()->m_spec.set_column_attr(sub_col, ColumnAttr(attr)); // Throws
-
-            sub.get()->refresh_column_accessors(sub_col + 1); // Throws
-
-            attr = sub.get()->m_spec.get_column_attr(sub_col);
-            attr ^= col_attr_Indexed;
-            sub.get()->m_spec.set_column_attr(sub_col, ColumnAttr(attr)); // Throws
-            */
+            size_t index_pos = sub->m_spec.get_column_info(col_ndx).m_column_ref_ndx + 1;
+            index->set_parent(&(sub->m_columns), index_pos);
+            sub->m_columns.insert(index_pos, index->get_ref()); // Throws
         }
 
-
-        attr = sub.get()->m_spec.get_column_attr(sub_col);
+        int attr = sub->m_spec.get_column_attr(col_ndx);
         attr ^= col_attr_Indexed;
-        sub.get()->m_spec.set_column_attr(sub_col, ColumnAttr(attr)); // Throws
+        sub->m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
+        refresh_column_accessors(col_ndx); // Throws
 
         return;
     }
-    
-    
-    
-    
-    
-    
-    
-    
-    
+        
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
-   // if (REALM_UNLIKELY(has_shared_type()))
-   //     throw LogicError(LogicError::wrong_kind_of_table);
+    if (REALM_UNLIKELY(has_shared_type()))
+        throw LogicError(LogicError::wrong_kind_of_table);
 
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);

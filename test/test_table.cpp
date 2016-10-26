@@ -2263,11 +2263,15 @@ ONLY(Table_Spec)
         }
     }
 
+
+
+    table.get()->add_search_index(2, &sub_1);
+
     TableRef subtable = table->get_subtable(1, 0);
-    subtable.get()->get_column_type(0);
+    subtable.get()->get_int(0, 0);
+    subtable.get()->get_string(1, 0);
 
-
-    table.get()->add_search_index(1, &sub_1, 2);
+    group.verify();
 
     group.to_dot("c:\\d\\dot.dot");
 
