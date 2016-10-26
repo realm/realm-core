@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix a race involving destruction order of InterprocessMutex static variables.
 
 ### Breaking changes
 
