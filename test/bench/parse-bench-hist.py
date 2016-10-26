@@ -31,7 +31,7 @@
 # function,machine=${machid} min=x,max=y,median=z,avg=w,sha=${gitsha} unixtimestamp
 
 from stat import S_ISREG, ST_MTIME, ST_MODE
-import csv, errno, os, sys, time
+import csv, errno, os, subprocess, sys, time
 
 def printUseageAndQuit():
     print ("This python script can produce local csv files or "
@@ -84,48 +84,68 @@ def find_ndx(inlist, item):
         ndx = -1
     return ndx
 
-def transform(inputdir, outputdir, filelist):
+def transform(inputdir, destination, filelist, handler):
     for inputfile in filelist:
-        sha = os.path.splitext(os.path.basename(inputfile))[0]
+        file_name = os.path.splitext(os.path.basename(inputfile))[0].split("_")
+        if len(file_name) != 2:
+            print "Expecting input files of format 'timestamp_sha.csv'"
+            exit()
+        timestamp = file_name[0]
+        sha = file_name[1]
         print "column sha:" + sha
         with open(inputfile) as fin:
             csvr = csv.reader(fin)
-            header = csvr.next()
+            header = {}
+            try:
+                header = csvr.next()
+            except StopIteration:
+               print "skipping empty file: " + str(inputfile)
+               continue;
             min_ndx = find_ndx(header, "min")
             max_ndx = find_ndx(header, "max")
             med_ndx = find_ndx(header, "median")
             avg_ndx = find_ndx(header, "avg")
-            print "min at: " + str(min_ndx) + " max at: " + str(max_ndx) + " median at" + str(med_ndx) + " avg at: " + str(avg_ndx)
             for row in csvr:
                 if len(row) < 5:
                     break
                 benchmark = row[0]
-                outfilename = outputdir + benchmark + ".csv"
-                row[0] = sha
-                # make the file if not exist and read contents
-                lines = ['','','','','']
-                if not os.path.exists(outfilename):
-                    open(outfilename, 'w+').close()
-                with open(outfilename, 'r') as fout:
-                    fout.seek(0)
-                    lines = [line.rstrip('\n') for line in fout]
-                    if len(lines) < 5:
-                        lines = ['','','','','']
-                endline = ",\n"
-                with open(outfilename, 'w+') as fout:
-                    fout.seek(0)
-                    newrow = lines[0] + sha + endline
-                    fout.write(newrow)
-                    newrow = lines[1] + row[min_ndx] + endline if min_ndx >= 0 else lines[1] + endline
-                    fout.write(newrow)
-                    newrow = lines[2] + row[max_ndx] + endline if max_ndx >= 0 else lines[2] + endline
-                    fout.write(newrow)
-                    newrow = lines[3] + row[med_ndx] + endline if med_ndx >= 0 else lines[3] + endline
-                    fout.write(newrow)
-                    newrow = lines[4] + row[avg_ndx] + endline if avg_ndx >= 0 else lines[4] + endline
-                    fout.write(newrow)
+                row_min = row[min_ndx] if min_ndx >= 0 else ""
+                row_max = row[max_ndx] if max_ndx >= 0 else ""
+                row_med = row[med_ndx] if med_ndx >= 0 else ""
+                row_avg = row[avg_ndx] if avg_ndx >= 0 else ""
+                info = { 'min':row_min, 'max':row_max, 'med':row_med, 'avg':row_avg,
+                         'function':benchmark, 'sha':sha, 'time':timestamp, 'dest':destination }
+                handler(info)
 
-                    fout.truncate()
+def handle_local(info):
+    outfilename = info['dest'] + info['function'] + ".csv"
+    # make the file if not exist and read contents
+    lines = ['','','','','']
+    if not os.path.exists(outfilename):
+        open(outfilename, 'w+').close()
+    with open(outfilename, 'r') as fout:
+        fout.seek(0)
+        lines = [line.rstrip('\n') for line in fout]
+        if len(lines) < 5:
+            lines = ['','','','','']
+    endline = ",\n"
+    with open(outfilename, 'w+') as fout:
+        fout.seek(0)
+	keys = ['sha', 'min', 'max', 'med', 'avg']
+	for idx in xrange(len(keys)):
+		newrow = lines[idx] + info[keys[idx]] + endline
+		fout.write(newrow)
+
+        fout.truncate()
+
+def handle_remote(info):
+    info['mach'] = getMachId()
+    info['nanotime'] = str(info['time']) + "000000000"
+    #function,machine="${machid}" min=x,max=y,median=z,avg=w,sha="${gitsha}" unix_timestamp_in_nanoseconds
+    #note that string types must be quoted
+    payload = "%(function)s,machine=\"%(mach)s\" min=%(min)s,max=%(max)s,med=%(med)s,avg=%(avg)s,sha=\"%(sha)s\" %(nanotime)s" % info
+    #curl -i -XPOST 'remote_ip' --data-binary 'payload'
+    subprocess.call(['curl', '-i', '-XPOST', info['dest'], '--data-binary', payload])
 
 def transform_local():
     machid = getMachId()
@@ -139,11 +159,14 @@ def transform_local():
     inputdir = "~/.realm/core/benchmarks/" + str(machid)
     if len(sys.argv) >= 4:
         inputdir = sys.argv[3]
+    if len(sys.argv) > 4:
+        print "Unexpected extra arguments."
+        printUseageAndExit()
     inputdir = os.path.expanduser(inputdir)
     print "looking for csv files in " + inputdir
     files = getFilesByName(inputdir)
 
-    transform(inputdir, outputdir, files)
+    transform(inputdir, outputdir, files, handle_local)
 
 def transform_remote():
     machid = getMachId()
@@ -154,11 +177,16 @@ def transform_remote():
     inputdir = "~/.realm/core/benchmarks/" + str(machid)
     if len(sys.argv) > 3:
         inputdir = sys.argv[3]
-    inputfile = ""
+    inputdir = os.path.expanduser(inputdir)
+    files = []
     if len(sys.argv) > 4:
-        inputfile = sys.argv[4]
-
-#function,machine=${machid} min=x,max=y,median=z,avg=w,sha=${gitsha} unixtimestamp
+        files = [ sys.argv[4] ]
+    else:
+        files = getFilesByName(inputdir)
+    if len(sys.argv) > 5:
+        print "Unexpected extra arguments."
+        printUseageAndQuit()
+    transform(inputdir, remoteip, files, handle_remote)
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
