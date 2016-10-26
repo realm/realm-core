@@ -44,8 +44,7 @@ using namespace realm;
 using namespace realm::_impl;
 
 static std::mutex s_coordinator_mutex;
-static std::unordered_map<std::string, std::weak_ptr<RealmCoordinator>> s_coordinators_per_path;
-
+static auto& s_coordinators_per_path = *new std::unordered_map<std::string, std::weak_ptr<RealmCoordinator>>;
 std::shared_ptr<RealmCoordinator> RealmCoordinator::get_coordinator(StringData path)
 {
     std::lock_guard<std::mutex> lock(s_coordinator_mutex);
