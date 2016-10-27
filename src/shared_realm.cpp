@@ -33,6 +33,10 @@
 #include <realm/history.hpp>
 #include <realm/util/scope_exit.hpp>
 
+#if REALM_ENABLE_SYNC
+#include <realm/sync/history.hpp>
+#endif
+
 using namespace realm;
 using namespace realm::_impl;
 
@@ -138,12 +142,16 @@ REALM_NOINLINE static void translate_file_exception(StringData path, bool read_o
         // don't want two copies of the path in the error, so strip it out if it
         // appears, and then include it in our prefix.
         std::string underlying = ex.what();
+        RealmFileException::Kind error_kind = RealmFileException::Kind::AccessError;
+        // FIXME: Replace this with a proper specific exception type once Core adds support for it.
+        if (underlying == "Bad or incompatible history type")
+            error_kind = RealmFileException::Kind::BadHistoryError;
         auto pos = underlying.find(ex.get_path());
         if (pos != std::string::npos && pos > 0) {
             // One extra char at each end for the quotes
             underlying.replace(pos - 1, ex.get_path().size() + 2, "");
         }
-        throw RealmFileException(RealmFileException::Kind::AccessError, ex.get_path(),
+        throw RealmFileException(error_kind, ex.get_path(),
                                  util::format("Unable to open a realm at path '%1': %2.", ex.get_path(), underlying), ex.what());
     }
     catch (IncompatibleLockFile const& ex) {
@@ -175,7 +183,17 @@ void Realm::open_with_config(const Config& config,
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
         }
         else {
-            history = realm::make_in_realm_history(config.path);
+            bool server_synchronization_mode = bool(config.sync_config);
+            if (server_synchronization_mode) {
+#if REALM_ENABLE_SYNC
+                history = realm::sync::make_sync_history(config.path);
+#else
+                REALM_TERMINATE("Realm was not built with sync enabled");
+#endif
+            }
+            else {
+                history = realm::make_in_realm_history(config.path);
+            }
 
             SharedGroupOptions options;
             options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
@@ -211,6 +229,13 @@ Group& Realm::read_group()
         add_schema_change_handler();
     }
     return *m_group;
+}
+
+void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
+{
+    REALM_ASSERT(!realm.m_group);
+    realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version_id));
+    realm.add_schema_change_handler();
 }
 
 SharedRealm Realm::get_shared_realm(Config config)
@@ -439,7 +464,7 @@ void Realm::commit_transaction()
     }
 
     transaction::commit(*m_shared_group, m_binding_context.get());
-    m_coordinator->send_commit_notifications();
+    m_coordinator->send_commit_notifications(*this);
 }
 
 void Realm::cancel_transaction()

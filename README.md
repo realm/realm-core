@@ -67,6 +67,16 @@ cmake -DREALM_CORE_VERSION=/path/to/realm-core
 
 The given core tree will be built as part of the object store build.
 
+### Building with Sync
+
+Specify the path to realm-core and realm-sync when invoking `cmake`:
+
+```
+cmake -DREALM_CORE_VERSION=/path/to/realm-core -DREALM_SYNC_PREFIX=/path/to/realm-sync
+```
+
+Prebuilt sync binaries are currently not supported.
+
 ### Building with Sanitizers
 
 The object store can be built using ASan, TSan and/or UBSan by specifying `-DSANITIZE_ADDRESS=1`, `-DSANITIZE_THREAD=1`, or `-DSANITIZE_UNDEFINED=1` when invoking CMake.

@@ -167,3 +167,80 @@ function(build_existing_realm_core core_directory)
 
     define_built_realm_core_target(${core_directory})
 endfunction()
+
+function(build_realm_sync sync_directory)
+    get_filename_component(sync_directory ${sync_directory} ABSOLUTE)
+    if(APPLE)
+        find_library(FOUNDATION Foundation)
+        find_library(SECURITY Security)
+    endif()
+    ExternalProject_Add(realm-sync-lib
+        DEPENDS realm-core
+        URL ""
+        PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
+        SOURCE_DIR ${sync_directory}
+        BUILD_IN_SOURCE 1
+        BUILD_ALWAYS 1
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND make -C src/realm librealm-sync.a librealm-sync-dbg.a librealm-server.a librealm-server-dbg.a ${MAKE_FLAGS}
+        INSTALL_COMMAND ""
+        ${USES_TERMINAL_BUILD}
+        )
+    set(sync_library_debug ${sync_directory}/src/realm/librealm-sync-dbg.a)
+    set(sync_library_release ${sync_directory}/src/realm/librealm-sync.a)
+    set(sync_libraries ${sync_library_debug} ${sync_library_release})
+
+    ExternalProject_Add_Step(realm-sync-lib ensure-libraries
+        COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${sync_libraries}
+        OUTPUT ${sync_libraries}
+        DEPENDEES build
+        )
+
+    add_library(realm-sync STATIC IMPORTED)
+    add_dependencies(realm-sync realm-sync-lib)
+
+    set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_DEBUG ${sync_library_debug})
+    set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_COVERAGE ${sync_library_debug})
+    set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_RELEASE ${sync_library_release})
+    set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION ${sync_library_release})
+    if(APPLE)
+        set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES ${FOUNDATION} ${SECURITY})
+    else()
+        set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES -lcrypto -lssl)
+    endif()
+
+    # Sync server library is built as part of the sync library build
+    ExternalProject_Add(realm-server-lib
+        DEPENDS realm-core
+        DOWNLOAD_COMMAND ""
+        PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
+        SOURCE_DIR ${sync_directory}
+        CONFIGURE_COMMAND ""
+        BUILD_COMMAND ""
+        INSTALL_COMMAND ""
+        )
+    set(sync_server_library_debug ${sync_directory}/src/realm/librealm-server-dbg.a)
+    set(sync_server_library_release ${sync_directory}/src/realm/librealm-server.a)
+    set(sync_server_libraries ${sync_server_library_debug} ${sync_server_library_release})
+
+    ExternalProject_Add_Step(realm-server-lib ensure-server-libraries
+        COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${sync_server_libraries}
+        OUTPUT ${sync_server_libraries}
+        DEPENDEES build
+        )
+
+    add_library(realm-sync-server STATIC IMPORTED)
+    add_dependencies(realm-sync-server realm-server-lib)
+
+    set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_DEBUG ${sync_server_library_debug})
+    set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_COVERAGE ${sync_server_library_debug})
+    set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_RELEASE ${sync_server_library_release})
+    set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION ${sync_server_library_release})
+    if(APPLE)
+        set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES ${FOUNDATION} ${SECURITY} -lyaml-cpp)
+    else()
+        set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES -lcrypto -lssl -lyaml-cpp) 
+    endif()
+
+    set(REALM_SYNC_INCLUDE_DIR ${sync_directory}/src PARENT_SCOPE)
+endfunction()

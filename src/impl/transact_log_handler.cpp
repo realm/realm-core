@@ -574,7 +574,7 @@ class LinkViewObserver : public TransactLogValidationMixin, public MarkDirtyMixi
     _impl::CollectionChangeBuilder* get_change()
     {
         auto tbl_ndx = current_table();
-        if (tbl_ndx >= m_info.table_modifications_needed.size() || !m_info.table_modifications_needed[tbl_ndx])
+        if (!m_info.track_all && (tbl_ndx >= m_info.table_modifications_needed.size() || !m_info.table_modifications_needed[tbl_ndx]))
             return nullptr;
         if (m_info.tables.size() <= tbl_ndx) {
             m_info.tables.resize(std::max(m_info.tables.size() * 2, tbl_ndx + 1));
@@ -585,7 +585,7 @@ class LinkViewObserver : public TransactLogValidationMixin, public MarkDirtyMixi
     bool need_move_info() const
     {
         auto tbl_ndx = current_table();
-        return tbl_ndx < m_info.table_moves_needed.size() && m_info.table_moves_needed[tbl_ndx];
+        return m_info.track_all || (tbl_ndx < m_info.table_moves_needed.size() && m_info.table_moves_needed[tbl_ndx]);
     }
 
 public:
@@ -832,7 +832,7 @@ void advance(SharedGroup& sg,
              TransactionChangeInfo& info,
              VersionID version)
 {
-    if (info.table_modifications_needed.empty() && info.lists.empty()) {
+    if (!info.track_all && info.table_modifications_needed.empty() && info.lists.empty()) {
         LangBindHelper::advance_read(sg, version);
     }
     else {

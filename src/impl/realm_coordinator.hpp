@@ -28,6 +28,7 @@ class Replication;
 class Schema;
 class SharedGroup;
 class StringData;
+class SyncSession;
 
 namespace _impl {
 class CollectionNotifier;
@@ -40,6 +41,8 @@ class RealmCoordinator : public std::enable_shared_from_this<RealmCoordinator> {
 public:
     // Get the coordinator for the given path, creating it if neccesary
     static std::shared_ptr<RealmCoordinator> get_coordinator(StringData path);
+    // Get the coordinator for the given config, creating it if neccesary
+    static std::shared_ptr<RealmCoordinator> get_coordinator(const Realm::Config&);
     // Get the coordinator for the given path, or null if there is none
     static std::shared_ptr<RealmCoordinator> get_existing_coordinator(StringData path);
 
@@ -59,7 +62,7 @@ public:
 
     // Asynchronously call notify() on every Realm instance for this coordinator's
     // path, including those in other processes
-    void send_commit_notifications();
+    void send_commit_notifications(Realm&);
 
     // Clear the weak Realm cache for all paths
     // Should only be called in test code, as continuing to use the previously
@@ -90,6 +93,10 @@ public:
     void advance_to_ready(Realm& realm);
     void process_available_async(Realm& realm);
 
+    void notify_others();
+
+    void set_transaction_callback(std::function<void(VersionID, VersionID)>);
+
 private:
     Realm::Config m_config;
     Schema m_schema;
@@ -115,9 +122,15 @@ private:
     std::exception_ptr m_async_error;
 
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
+    std::function<void(VersionID, VersionID)> m_transaction_callback;
+
+    std::shared_ptr<SyncSession> m_sync_session;
 
     // must be called with m_notifier_mutex locked
     void pin_version(VersionID version);
+
+    void set_config(const Realm::Config&);
+    void create_sync_session();
 
     void run_async_notifiers();
     void open_helper_shared_group();

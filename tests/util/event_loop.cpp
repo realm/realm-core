@@ -20,12 +20,99 @@
 
 #include <realm/util/features.h>
 
+#include <mutex>
+#include <stdexcept>
+#include <vector>
+
 #if REALM_PLATFORM_NODE
 #include <uv.h>
+#elif REALM_PLATFORM_APPLE
+#include <realm/util/cf_ptr.hpp>
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
-namespace realm {
-namespace util {
-bool has_event_loop_implementation() { return true; }
+using namespace realm::util;
+
+struct EventLoop::Impl {
+    // Returns the main event loop.
+    static std::unique_ptr<Impl> main();
+
+    // Run the event loop until the given return predicate returns true
+    void run_until(std::function<bool()> predicate);
+
+    // Schedule execution of the given function on the event loop.
+    void perform(std::function<void()>);
+
+    ~Impl();
+
+private:
+#if REALM_PLATFORM_NODE
+    Impl(uv_loop_t* loop);
+
+    std::vector<std::function<void()>> m_pending_work;
+    std::mutex m_mutex;
+    uv_loop_t* m_loop;
+    uv_async_t m_perform_work;
+#elif REALM_PLATFORM_APPLE
+    Impl(util::CFPtr<CFRunLoopRef> loop) : m_loop(std::move(loop)) { }
+
+    util::CFPtr<CFRunLoopRef> m_loop;
+#endif
+};
+
+EventLoop& EventLoop::main()
+{
+    static EventLoop main(Impl::main());
+    return main;
+}
+
+EventLoop::EventLoop(std::unique_ptr<Impl> impl) : m_impl(std::move(impl))
+{
+}
+
+EventLoop::~EventLoop() = default;
+
+void EventLoop::run_until(std::function<bool()> predicate)
+{
+    return m_impl->run_until(std::move(predicate));
+}
+
+void EventLoop::perform(std::function<void()> function)
+{
+    return m_impl->perform(std::move(function));
+}
+
+#if REALM_PLATFORM_NODE
+
+bool EventLoop::has_implementation() { return true; }
+
+std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main()
+{
+    return std::unique_ptr<Impl>(new Impl(uv_default_loop()));
+}
+
+EventLoop::Impl::Impl(uv_loop_t* loop)
+    : m_loop(loop)
+{
+    m_perform_work.data = this;
+    uv_async_init(uv_default_loop(), &m_perform_work, [](uv_async_t* handle) {
+        std::vector<std::function<void()>> pending_work;
+        {
+            Impl& self = *static_cast<Impl*>(handle->data);
+            std::lock_guard<std::mutex> lock(self.m_mutex);
+            std::swap(pending_work, self.m_pending_work);
+        }
+
+        for (auto& f : pending_work)
+            f();
+    });
+}
+
+EventLoop::Impl::~Impl()
+{
+    uv_close((uv_handle_t*)&m_perform_work, [](uv_handle_t*){});
+    uv_loop_close(m_loop);
+}
 
 struct IdleHandler {
     uv_idle_t* idle = new uv_idle_t;
@@ -42,14 +129,12 @@ struct IdleHandler {
     }
 };
 
-void run_event_loop_until(std::function<bool()> predicate)
+void EventLoop::Impl::run_until(std::function<bool()> predicate)
 {
     if (predicate())
         return;
 
-    auto loop = uv_default_loop();
-
-    IdleHandler observer(loop);
+    IdleHandler observer(m_loop);
     observer.idle->data = &predicate;
 
     uv_idle_start(observer.idle, [](uv_idle_t* handle) {
@@ -59,21 +144,34 @@ void run_event_loop_until(std::function<bool()> predicate)
         }
     });
 
-    uv_run(loop, UV_RUN_DEFAULT);
+    uv_run(m_loop, UV_RUN_DEFAULT);
     uv_idle_stop(observer.idle);
 }
-} // namespace util
-} // namespace realm
+
+void EventLoop::Impl::perform(std::function<void()> f)
+{
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_pending_work.push_back(std::move(f));
+    }
+    uv_async_send(&m_perform_work);
+}
 
 #elif REALM_PLATFORM_APPLE
-#include <CoreFoundation/CoreFoundation.h>
 
-namespace realm {
-namespace util {
-bool has_event_loop_implementation() { return true; }
+bool EventLoop::has_implementation() { return true; }
 
-void run_event_loop_until(std::function<bool()> predicate)
+std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main()
 {
+    return std::unique_ptr<Impl>(new Impl(retainCF(CFRunLoopGetMain())));
+}
+
+EventLoop::Impl::~Impl() = default;
+
+void EventLoop::Impl::run_until(std::function<bool()> predicate)
+{
+    REALM_ASSERT(m_loop.get() == CFRunLoopGetCurrent());
+
     if (predicate())
         return;
 
@@ -84,21 +182,32 @@ void run_event_loop_until(std::function<bool()> predicate)
     };
     CFRunLoopObserverContext ctx{};
     ctx.info = &predicate;
-    auto observer = CFRunLoopObserverCreate(kCFAllocatorDefault, kCFRunLoopAllActivities,
-                                            true, 0, callback, &ctx);
-    CFRunLoopAddObserver(CFRunLoopGetCurrent(), observer, kCFRunLoopCommonModes);
+    auto observer = adoptCF(CFRunLoopObserverCreate(kCFAllocatorDefault, kCFRunLoopAllActivities,
+                                                    true, 0, callback, &ctx));
+    auto timer = adoptCF(CFRunLoopTimerCreateWithHandler(kCFAllocatorDefault, CFAbsoluteTimeGetCurrent(), 0.05, 0, 0,
+                                                         ^(CFRunLoopTimerRef){
+        // Do nothing. The timer firing is sufficient to cause our runloop observer to run.
+    }));
+    CFRunLoopAddObserver(CFRunLoopGetCurrent(), observer.get(), kCFRunLoopCommonModes);
+    CFRunLoopAddTimer(CFRunLoopGetCurrent(), timer.get(), kCFRunLoopCommonModes);
     CFRunLoopRun();
-    CFRunLoopRemoveObserver(CFRunLoopGetCurrent(), observer, kCFRunLoopCommonModes);
+    CFRunLoopRemoveTimer(CFRunLoopGetCurrent(), timer.get(), kCFRunLoopCommonModes);
+    CFRunLoopRemoveObserver(CFRunLoopGetCurrent(), observer.get(), kCFRunLoopCommonModes);
 }
-} // namespace util
-} // namespace realm
+
+void EventLoop::Impl::perform(std::function<void()> f)
+{
+    CFRunLoopPerformBlock(m_loop.get(), kCFRunLoopDefaultMode, ^{ f(); });
+    CFRunLoopWakeUp(m_loop.get());
+}
 
 #else
 
-namespace realm {
-namespace util {
-bool has_event_loop_implementation() { return false; }
-void run_event_loop_until(std::function<bool()>) { }
-} // namespace util
-} // namespace realm
+bool EventLoop::has_implementation() { return false; }
+std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main() { return nullptr; }
+EventLoop::Impl::~Impl() = default;
+void EventLoop::Impl::run_until(std::function<bool()>) { }
+void EventLoop::Impl::run_for(std::chrono::nanoseconds) { }
+void EventLoop::Impl::perform(std::function<void()>) { }
+
 #endif
