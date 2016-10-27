@@ -97,16 +97,16 @@ private:
     /// Operations on the map need to be protected by s_mutex
     static std::map<File::UniqueID, std::weak_ptr<LockInfo>>* s_info_map;
     static Mutex* s_mutex;
-    /// We control the order of initialization of these static variables,
+    /// We manually initialize these static variables when first needed,
     /// creating them on the heap so that they last for the enitre lifetime
-    /// of the process. The destructor on these is never called, but the
-    /// process will clean up the memory when exiting. It would not be enough
+    /// of the process. The destructor of these is never called; the
+    /// process will clean up their memory when exiting. It is not enough
     /// to count instances of InterprocessMutex and clean up these statics when
-    /// the count reaches zero because the process could create more
-    /// InterprocessMutexes before the process ends, so we really need these
-    /// variables for the entire lifetime of the proces.
-    static std::once_flag static_flag;
-    static void static_initialisation();
+    /// the count reaches zero because the program can create more
+    /// InterprocessMutex instances before the process ends, so we really need
+    /// these variables for the entire lifetime of the process.
+    static std::once_flag s_init_flag;
+    static void initiailize_statics();
 
     /// Only used for release_shared_part
     std::string m_filename;
@@ -125,7 +125,7 @@ private:
 inline InterprocessMutex::InterprocessMutex()
 {
 #ifdef REALM_ROBUST_MUTEX_EMULATION
-    std::call_once(static_flag, static_initialisation);
+    std::call_once(s_init_flag, initiailize_statics);
 #endif
 }
 
@@ -159,7 +159,7 @@ inline void InterprocessMutex::free_lock_info()
     m_filename.clear();
 }
 
-inline void InterprocessMutex::static_initialisation() {
+inline void InterprocessMutex::initiailize_statics() {
     s_mutex = new Mutex();
     s_info_map = new std::map<File::UniqueID, std::weak_ptr<LockInfo>>();
 }
