@@ -2281,19 +2281,21 @@ ONLY(Table_SubtableIndex)
     TableRef table = group.add_table("test");
 
     {
-
-
-
         // Create specification with sub-table
         {
             table->add_column(type_String, "second");
 
             table->add_column(type_Table, "third", &sub_1);
 
+
             sub_1->add_column(type_Int, "sub_first");
             sub_1->add_column(type_String, "sub_second");
             sub_1->add_column(type_String, "dfsd");
             sub_1->add_column(type_String, "sssss");
+
+            table.get()->add_search_index(1, &sub_1);
+
+
         }
 
         CHECK_EQUAL(2, table->get_column_count());
@@ -2332,7 +2334,7 @@ ONLY(Table_SubtableIndex)
 
 
 
-    table.get()->add_search_index(1, &sub_1);
+   // table.get()->add_search_index(1, &sub_1);
 
     TableRef subtable = table->get_subtable(1, 0);
     subtable.get()->get_int(0, 0);

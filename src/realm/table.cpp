@@ -1302,12 +1302,19 @@ void Table::create_degen_subtab_columns()
         ColumnType type = m_spec.get_column_type(i);
         bool nullable = (m_spec.get_column_attr(i) & col_attr_Nullable) != 0;
         size_t init_size = 0;
-        ref_type ref = create_column(type, init_size, nullable, alloc); // Throws
-        m_columns.add(int_fast64_t(ref));                               // Throws
 
-        // So far, only root tables can have search indexes, and this is not a
-        // root table.
-        REALM_ASSERT_3(m_spec.get_column_attr(i) & ~col_attr_Nullable, ==, col_attr_None);
+        ref_type ref = create_column(type, init_size, nullable, alloc); // Throws
+        
+
+        m_columns.add(int_fast64_t(ref));                               // Throws
+     
+       
+        int attr = m_spec.get_column_attr(i);
+        m_spec.set_column_attr(i, ColumnAttr( attr & col_attr_Indexed));
+        if (attr & col_attr_Indexed) {
+            StringIndex index(nullptr, get_alloc()); // Throws
+            m_columns.add(from_ref(index.get_ref()));
+        }
     }
 
     m_cols.resize(num_cols);
@@ -1699,9 +1706,8 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
     typedef _impl::DescriptorFriend df;
 
     if (subdesc) {
-        size_t stat_buf[8];
-        typedef _impl::DescriptorFriend df;
-        size_t parent_col = *(df::record_subdesc_path(*subdesc->get(), stat_buf, stat_buf + sizeof stat_buf / sizeof *stat_buf));
+        size_t tmp[8];
+        size_t parent_col = *(df::record_subdesc_path(*subdesc->get(), tmp, tmp + sizeof tmp / sizeof *tmp));
         TableRef sub;
 
         for (size_t r = 0; r < size(); r++) {
@@ -1715,37 +1721,21 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
             sub->m_columns.insert(index_pos, index->get_ref()); // Throws
         }
 
-       
-            /*
-                    int attr = sub->m_spec.get_column_attr(col_ndx);
-                    attr ^= col_attr_Indexed;
-                    sub->m_spec.set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
-                    */
-
         int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
         attr ^= col_attr_Indexed;
         subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
-
-
 
         refresh_column_accessors(parent_col); // Throws
 
         return;
     }
     
-    
-    
-    
-    
-    
-    
-    
-    
+
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
-   // if (REALM_UNLIKELY(has_shared_type()))
-   //     throw LogicError(LogicError::wrong_kind_of_table);
+    if (REALM_UNLIKELY(has_shared_type()))
+        throw LogicError(LogicError::wrong_kind_of_table);
 
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
