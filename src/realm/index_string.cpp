@@ -334,7 +334,7 @@ size_t IndexArray::index_string_count(StringData value, ColumnBase* column) cons
     return index_string<index_Count, StringData>(value, dummy1, dummy2, column);
 }
 
-static ref_type create_empty(Allocator& alloc)
+ref_type StringIndex::create_empty(Allocator& alloc)
 {
     return StringIndex(nullptr, alloc).get_ref(); // Throws
 }
