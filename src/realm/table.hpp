@@ -244,7 +244,7 @@ public:
 
     bool has_search_index(size_t column_ndx) const noexcept;
     void add_search_index(size_t column_ndx, DescriptorRef* subdesc = nullptr);
-    void remove_search_index(size_t column_ndx);
+    void remove_search_index(size_t column_ndx, DescriptorRef* subdesc = nullptr);
 
     //@}
 

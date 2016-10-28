@@ -1701,15 +1701,16 @@ void Table::upgrade_olddatetime()
 
 void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
 {
-    typedef _impl::DescriptorFriend df;
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
 
     if (subdesc) {
+        typedef _impl::DescriptorFriend df;
         size_t tmp[8];
         size_t parent_col = *(df::record_subdesc_path(*subdesc->get(), tmp, tmp + sizeof tmp / sizeof *tmp));
         TableRef sub;
 
         for (size_t r = 0; r < size(); r++) {
-
             sub = get_subtable(parent_col, r);
             ColumnBase& col = sub->get_column_base(col_ndx);
             StringIndex* index = col.create_search_index(); // Throws
@@ -1727,10 +1728,6 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
 
         return;
     }
-    
-
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
 
     if (REALM_UNLIKELY(has_shared_type()))
         throw LogicError(LogicError::wrong_kind_of_table);
@@ -1771,13 +1768,26 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
 }
 
 
-void Table::remove_search_index(size_t col_ndx)
+void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
 
-    if (REALM_UNLIKELY(has_shared_type()))
-        throw LogicError(LogicError::wrong_kind_of_table);
+    if (subdesc) {
+        typedef _impl::DescriptorFriend df;
+        size_t tmp[8];
+        size_t parent_col = *(df::record_subdesc_path(*subdesc->get(), tmp, tmp + sizeof tmp / sizeof *tmp));
+        TableRef sub;
+
+        for (size_t r = 0; r < size(); r++) {
+            sub = get_subtable(parent_col, r);
+            sub.get()->remove_search_index(col_ndx);
+        }
+        return;
+    }
+
+//    if (REALM_UNLIKELY(has_shared_type()))
+//        throw LogicError(LogicError::wrong_kind_of_table);
 
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);

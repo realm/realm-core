@@ -2284,18 +2284,18 @@ ONLY(Table_SubtableIndex)
         // Create specification with sub-table
         {
             table->add_column(type_String, "second");
-
             table->add_column(type_Table, "third", &sub_1);
-
 
             sub_1->add_column(type_Int, "sub_first");
             sub_1->add_column(type_String, "sub_second");
             sub_1->add_column(type_String, "dfsd");
             sub_1->add_column(type_String, "sssss");
 
-            table.get()->add_search_index(1, &sub_1);
-
-
+            // Add search index to `degenerate` subtable (subtable which does not yet exist because it has
+            // no rows yet, so it's just a 0-ref in the ColumnTable object)
+            table.get()->add_search_index(0, &sub_1);
+            table.get()->remove_search_index(0, &sub_1);
+            table.get()->add_search_index(0, &sub_1);
         }
 
         CHECK_EQUAL(2, table->get_column_count());
@@ -2332,24 +2332,42 @@ ONLY(Table_SubtableIndex)
         }
     }
 
-
-
-   // table.get()->add_search_index(1, &sub_1);
+    table.get()->add_search_index(1, &sub_1);
 
     TableRef subtable = table->get_subtable(1, 0);
-    subtable.get()->get_int(0, 0);
-    subtable.get()->get_string(1, 0);
-
 
    //    CHECK(table.get()->has_search_index)
 
-    size_t tt = subtable.get()->where().equal(1, "testsub2").find();
-    CHECK_EQUAL(tt, 1);
+    size_t match;
+    
+    match = subtable.get()->where().equal(0, 43).find();
+    CHECK_EQUAL(match, 1);
+    match = subtable.get()->where().equal(1, "testsub2").find();
+    CHECK_EQUAL(match, 1);
 
     group.verify();
-
     group.to_dot("c:\\d\\dot.dot");
 
+    subtable = table->get_subtable(1, 1);
+
+    match = subtable.get()->where().equal(0, 77).find();
+    CHECK_EQUAL(match, 1);
+    match = subtable.get()->where().equal(1, "testsub4").find();
+    CHECK_EQUAL(match, 1);
+
+    table.get()->remove_search_index(1, &sub_1);
+    
+    match = subtable.get()->where().equal(0, 77).find();
+    CHECK_EQUAL(match, 1);
+    match = subtable.get()->where().equal(1, "testsub4").find();
+    CHECK_EQUAL(match, 1);
+
+    table.get()->add_search_index(1, &sub_1);
+
+    match = subtable.get()->where().equal(0, 77).find();
+    CHECK_EQUAL(match, 1);
+    match = subtable.get()->where().equal(1, "testsub4").find();
+    CHECK_EQUAL(match, 1);
 }
 
 TEST(Table_SpecColumnPath)
