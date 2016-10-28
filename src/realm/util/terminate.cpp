@@ -30,7 +30,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 
-#ifdef __ANDROID__
+#if REALM_ANDROID
 #include <android/log.h>
 #endif
 
