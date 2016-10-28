@@ -1308,10 +1308,10 @@ void Table::create_degen_subtab_columns()
         REALM_ASSERT(init_size == 0);
         ref_type ref = create_column(type, init_size, nullable, alloc); // Throws      
         m_columns.add(int_fast64_t(ref));                               // Throws     
-        m_spec.set_column_attr(i, ColumnAttr(attr & col_attr_Indexed));
 
         if (attr & col_attr_Indexed) {
             m_columns.add(StringIndex::create_empty(get_alloc()));
+            m_spec.set_column_attr(i, ColumnAttr(attr & col_attr_Indexed));
         }
     }
 
@@ -1821,9 +1821,6 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
 
         return;
     }
-
-//    if (REALM_UNLIKELY(has_shared_type()))
-//        throw LogicError(LogicError::wrong_kind_of_table);
 
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);

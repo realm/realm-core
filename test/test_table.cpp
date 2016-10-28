@@ -2274,7 +2274,7 @@ TEST(Table_Spec)
 }
 
 
-ONLY(Table_SubtableIndex)
+TEST(Table_SubtableIndex)
 {
     Group group;
     DescriptorRef sub_1;

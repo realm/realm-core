@@ -2,8 +2,9 @@
 
 ### Bugfixes
 
-* When adding a nullable column of type Float while other columns existed
-  already, the values of the new column would be non-null. This is now fixed.
+* Fixed a race between destruction of a global mutex as part of main thread exit
+  and attempt to lock it on a background thread, or conversely attempt to lock a
+  mutex after it has been destroyed. (PR #2238, fixes issues #2238, #2137, #2009)
 
 ### Breaking changes
 
@@ -12,12 +13,24 @@
 ### Enhancements
 
 * Added Array-type support
+* Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
+  are now perfectly forwarded (via perfect forwarding) to
+  `std::stream::operator<<()`.
 
 -----------
 
 ### Internals
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 2.1.2 Release notes
+
+### Bugfixes
+
+* When adding a nullable column of type Float while other columns existed
+  already, the values of the new column would be non-null. This is now fixed.
 
 ----------------------------------------------
 
