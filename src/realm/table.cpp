@@ -1300,20 +1300,18 @@ void Table::create_degen_subtab_columns()
     size_t num_cols = m_spec.get_column_count();
     for (size_t i = 0; i < num_cols; ++i) {
         ColumnType type = m_spec.get_column_type(i);
-        bool nullable = (m_spec.get_column_attr(i) & col_attr_Nullable) != 0;
-        size_t init_size = 0;
-
-        ref_type ref = create_column(type, init_size, nullable, alloc); // Throws
-        
-
-        m_columns.add(int_fast64_t(ref));                               // Throws
-     
-       
         int attr = m_spec.get_column_attr(i);
-        m_spec.set_column_attr(i, ColumnAttr( attr & col_attr_Indexed));
+        bool nullable = (attr & col_attr_Nullable) != 0;
+        
+        // Must be 0, else there's no way to create search index for it statically
+        size_t init_size = 0;
+        REALM_ASSERT(init_size == 0);
+        ref_type ref = create_column(type, init_size, nullable, alloc); // Throws      
+        m_columns.add(int_fast64_t(ref));                               // Throws     
+        m_spec.set_column_attr(i, ColumnAttr(attr & col_attr_Indexed));
+
         if (attr & col_attr_Indexed) {
-            StringIndex index(nullptr, get_alloc()); // Throws
-            m_columns.add(from_ref(index.get_ref()));
+            m_columns.add(StringIndex::create_empty(get_alloc()));
         }
     }
 

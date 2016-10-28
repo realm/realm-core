@@ -95,9 +95,11 @@ public:
     StringIndex(ColumnBase* target_column, Allocator&);
     StringIndex(ref_type, ArrayParent*, size_t ndx_in_parent, ColumnBase* target_column, bool allow_duplicate_values,
                 Allocator&);
-    ~StringIndex() noexcept
-    {
+    ~StringIndex() noexcept  {
     }
+
+    static ref_type create_empty(Allocator& alloc);
+
     void set_target(ColumnBase* target_column) noexcept;
 
     // Accessor concept:
