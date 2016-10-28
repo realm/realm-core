@@ -1730,6 +1730,9 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
             return;
 
         for (size_t r = 0; r < size(); r++) {
+            attr &= ~col_attr_Indexed;
+            subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
+
             sub = get_subtable(parent_col, r);
             ColumnBase& col = sub->get_column_base(col_ndx);
             StringIndex* index = col.create_search_index(); // Throws
@@ -1803,8 +1806,14 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
         TableRef sub;
 
         for (size_t r = 0; r < size(); r++) {
+  
+            attr &= col_attr_Indexed;
+            subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
+
             sub = get_subtable(parent_col, r);
             sub.get()->remove_search_index(col_ndx);
+            refresh_column_accessors(col_ndx + 1); // Throws
+
         }
 
         attr &= ~ col_attr_Indexed;
@@ -1819,8 +1828,8 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-  //  if (!has_search_index(col_ndx))
-  //      return;
+    if (!has_search_index(col_ndx))
+        return;
 
     // Destroy and remove the index column
     ColumnBase& col = get_column_base(col_ndx);
