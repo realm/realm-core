@@ -2294,8 +2294,11 @@ ONLY(Table_SubtableIndex)
             // Add search index to `degenerate` subtable (subtable which does not yet exist because it has
             // no rows yet, so it's just a 0-ref in the ColumnTable object)
             table.get()->add_search_index(0, &sub_1);
+            CHECK(table.get()->has_search_index(0, &sub_1));
             table.get()->remove_search_index(0, &sub_1);
+            CHECK(!table.get()->has_search_index(0, &sub_1));
             table.get()->add_search_index(0, &sub_1);
+            CHECK(table.get()->has_search_index(0, &sub_1));
         }
 
         CHECK_EQUAL(2, table->get_column_count());
@@ -2309,8 +2312,12 @@ ONLY(Table_SubtableIndex)
         {
             TableRef subtable = table->get_subtable(1, 0);
             CHECK(subtable->is_empty());
+            CHECK(subtable->has_search_index(0));
 
             subtable->insert_empty_row(0);
+
+            CHECK(subtable->has_search_index(0));
+
             subtable->set_int(0, 0, 42);
             subtable->set_string(1, 0, "testsub1");
             subtable->insert_empty_row(0);
@@ -2335,8 +2342,7 @@ ONLY(Table_SubtableIndex)
     table.get()->add_search_index(1, &sub_1);
 
     TableRef subtable = table->get_subtable(1, 0);
-
-   //    CHECK(table.get()->has_search_index)
+    CHECK(subtable.get()->has_search_index(0));
 
     size_t match;
     

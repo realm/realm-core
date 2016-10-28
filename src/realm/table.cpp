@@ -1576,14 +1576,29 @@ Table::~Table() noexcept
 }
 
 
-bool Table::has_search_index(size_t col_ndx) const noexcept
+bool Table::has_search_index(size_t col_ndx, DescriptorRef* subdesc) const noexcept
 {
+
+    if (subdesc) {
+        typedef _impl::DescriptorFriend df;
+        TableRef sub;
+        int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
+        return (attr & col_attr_Indexed);
+    }
+    else if (has_shared_type()) {
+        int attr = get_descriptor()->get_spec()->get_column_attr(col_ndx);
+        return attr & col_attr_Indexed;
+    }
+
     // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         return false;
     const ColumnBase& col = get_column_base(col_ndx);
     return col.has_search_index();
 }
+
+
+
 
 
 void Table::upgrade_file_format(size_t target_file_format_version)
@@ -1709,6 +1724,10 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
         size_t tmp[8];
         size_t parent_col = *(df::record_subdesc_path(*subdesc->get(), tmp, tmp + sizeof tmp / sizeof *tmp));
         TableRef sub;
+        int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
+
+        if (attr & col_attr_Indexed)
+            return;
 
         for (size_t r = 0; r < size(); r++) {
             sub = get_subtable(parent_col, r);
@@ -1718,10 +1737,10 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
             size_t index_pos = sub->m_spec.get_column_info(col_ndx).m_column_ref_ndx + 1;
             index->set_parent(&(sub->m_columns), index_pos);
             sub->m_columns.insert(index_pos, index->get_ref()); // Throws
+            refresh_column_accessors(col_ndx + 1); // Throws
         }
-
-        int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
-        attr ^= col_attr_Indexed;
+       
+        attr |= col_attr_Indexed;
         subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
         refresh_column_accessors(parent_col); // Throws
@@ -1775,6 +1794,10 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
 
     if (subdesc) {
         typedef _impl::DescriptorFriend df;
+        int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
+        if (!(attr & col_attr_Indexed))
+            return;
+
         size_t tmp[8];
         size_t parent_col = *(df::record_subdesc_path(*subdesc->get(), tmp, tmp + sizeof tmp / sizeof *tmp));
         TableRef sub;
@@ -1783,6 +1806,10 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
             sub = get_subtable(parent_col, r);
             sub.get()->remove_search_index(col_ndx);
         }
+
+        attr &= ~ col_attr_Indexed;
+        subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
+
         return;
     }
 
@@ -1792,8 +1819,8 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
-    if (!has_search_index(col_ndx))
-        return;
+  //  if (!has_search_index(col_ndx))
+  //      return;
 
     // Destroy and remove the index column
     ColumnBase& col = get_column_base(col_ndx);

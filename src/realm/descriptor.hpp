@@ -328,7 +328,7 @@ public:
     /// \param link_type The type of links the column should store.
     void set_link_type(size_t col_ndx, LinkType link_type);
 
-    Spec* get_spec() { return m_spec; };
+    Spec* get_spec() const { return m_spec; };
 
     //@{
     /// Get the descriptor for the specified subtable column.
