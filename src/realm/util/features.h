@@ -234,6 +234,8 @@
 
 #if REALM_ANDROID || REALM_IOS || REALM_WATCHOS
 #define REALM_MOBILE 1
+#else
+#define REALM_MOBILE 0
 #endif
 
 

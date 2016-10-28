@@ -414,7 +414,7 @@ bool run_tests(util::Logger* logger)
     // Set up reporter
     std::ofstream xml_file;
     bool xml;
-#ifdef REALM_MOBILE
+#if REALM_MOBILE
     xml = true;
 #else
     const char* xml_str = getenv("UNITTEST_XML");
