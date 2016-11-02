@@ -265,6 +265,7 @@ TEST(StringData_Like)
     StringData foobar("foobar");
     StringData foofoo("foofoo");
     StringData foobarfoo("foobarfoo");
+    StringData star_in_string("*bar");
     StringData unicode("\xc3\xa6\xc3\xb8\xc3\xa5\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9etest"); // utf-8 "æøå日本語test"
     
     CHECK(null.like(null));
@@ -284,6 +285,7 @@ TEST(StringData_Like)
     CHECK(foofoo.like("foo*foo"));
     CHECK(foobarfoo.like("foo*foo"));
     CHECK(!foobarfoo.like("foo*bar"));
+    CHECK(star_in_string.like("*ar"));
     
     CHECK(unicode.like("*test"));
     CHECK(unicode.like("\xc3\xa6\xc3\xb8\xc3\xa5*")); // "æøå*"
@@ -320,6 +322,7 @@ TEST(StringData_Like_CaseInsensitive)
     StringData foobar("FOOBAR");
     StringData foofoo("FOOfoo");
     StringData foobarfoo("FoObArFoO");
+    StringData star_in_string("*bar");
     StringData unicode("\xc3\xa6\xc3\xb8\xc3\xa5\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9etest"); // utf-8 "æøå日本語test"
     
     CHECK(string_like_ins(null, null));
@@ -339,6 +342,7 @@ TEST(StringData_Like_CaseInsensitive)
     CHECK(string_like_ins(foofoo, "foo*foo"));
     CHECK(string_like_ins(foobarfoo, "foo*foo"));
     CHECK(!string_like_ins(foobarfoo, "foo*bar"));
+    CHECK(string_like_ins(star_in_string, "*ar"));
     
     CHECK(string_like_ins(unicode, "*test"));
     CHECK(string_like_ins(unicode, "\xc3\xa6\xc3\xb8\xc3\xa5*")); // "æøå*"

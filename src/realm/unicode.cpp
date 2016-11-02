@@ -503,45 +503,71 @@ size_t search_case_fold(StringData haystack, const char* needle_upper, const cha
 }
 
 // pre-declaration
-bool matchstar_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower, size_t p1, size_t p2) noexcept;
+bool matchlike_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower) noexcept;
 
-bool matchhere_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower, size_t p1, size_t p2) noexcept
+bool matchlike_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower) noexcept
 {
-    if (p1 == text.size()) {
+    std::vector<size_t> textpos;
+    std::vector<size_t> patternpos;
+    size_t p1 = 0;
+    size_t p2 = 0;
+    
+    while (true) {
+        if (p1 == text.size()) {
+            if (p2 == pattern_lower.size())
+                return true;
+            if (p2 == pattern_lower.size()-1 && pattern_lower[p2] == '*')
+                return true;
+            goto no_match;
+        }
         if (p2 == pattern_lower.size())
-            return true;
-        if (p2 == pattern_lower.size()-1 && pattern_lower[p2] == '*')
-            return true;
-        return false;
-    }
-    if (p2 == pattern_lower.size())
-        return false;
-    if (pattern_lower[p2] == '*')
-        return matchstar_ins(text, pattern_lower, pattern_upper, p1, p2+1);
-    if (pattern_lower[p2] == text[p1] || pattern_upper[p2] == text[p1])
-        return matchhere_ins(text, pattern_lower, pattern_upper, p1+1, p2+1);
-    if (pattern_lower[p2] == '?') {
-        // utf-8 encoded characters may take up multiple bytes
-        if ((text[p1] & 0x80) == 0)
-            return matchhere_ins(text, pattern_lower, pattern_upper, p1+1, p2+1);
+            goto no_match;
+        
+        if (pattern_lower[p2] == '*') {
+            textpos.push_back(p1);
+            patternpos.push_back(++p2);
+            continue;
+        }
+        if (pattern_lower[p2] == '?') {
+            // utf-8 encoded characters may take up multiple bytes
+            if ((text[p1] & 0x80) == 0) {
+                ++p1; ++p2;
+                continue;
+            }
+            else {
+                size_t p = 1;
+                while (p1+p != text.size() && (text[p1+p] & 0xc0) == 0x80)
+                    ++p;
+                p1 += p; ++p2;
+                continue;
+            }
+        }
+        
+        if (pattern_lower[p2] == text[p1] || pattern_upper[p2] == text[p1]) {
+            ++p1; ++p2;
+            continue;
+        }
+        
+    no_match:
+        if (textpos.empty())
+            return false;
         else {
-            size_t p = 1;
-            while (p1+p != text.size() && (text[p1+p] & 0xc0) == 0x80)
-                ++p;
-            return matchhere_ins(text, pattern_lower, pattern_upper, p1+p, p2+1);
+            if (p1 == text.size()) {
+                textpos.pop_back();
+                patternpos.pop_back();
+                
+                if (textpos.empty())
+                    return false;
+                
+                p1 = textpos.back();
+            }
+            else {
+                p1 = textpos.back();
+                textpos.back() = ++p1;
+            }
+            p2 = patternpos.back();
         }
     }
-    return false;
-}
-
-bool matchstar_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower, size_t p1, size_t p2) noexcept
-{
-    do {
-        if (matchhere_ins(text, pattern_lower, pattern_upper, p1, p2))
-            return true;
-    }
-    while (p1++ != text.size());
-    return false;
 }
 
 bool string_like_ins(StringData text, StringData upper, StringData lower) noexcept
@@ -550,7 +576,7 @@ bool string_like_ins(StringData text, StringData upper, StringData lower) noexce
         return (text.is_null() && lower.is_null());
     }
     
-    return matchhere_ins(text, lower, upper, 0, 0);
+    return matchlike_ins(text, lower, upper);
 }
 
 bool string_like_ins(StringData text, StringData pattern) noexcept
@@ -562,7 +588,7 @@ bool string_like_ins(StringData text, StringData pattern) noexcept
     std::string upper = case_map(pattern, true, IgnoreErrors);
     std::string lower = case_map(pattern, false, IgnoreErrors);
     
-    return matchhere_ins(text, lower.c_str(), upper.c_str(), 0, 0);
+    return matchlike_ins(text, lower.c_str(), upper.c_str());
 }
 
 } // namespace realm
