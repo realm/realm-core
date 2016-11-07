@@ -2338,8 +2338,8 @@ TEST(Table_SubtableIndex)
         match = subtable.get()->where().equal(1, "testsub2").find();
         CHECK_EQUAL(match, 1);
 
-        group.verify();
-        group.to_dot("c:\\d\\dot.dot");
+     //   group.verify();
+     //   group.to_dot("c:\\d\\dot.dot");
 
         subtable = table->get_subtable(1, 1);
 
