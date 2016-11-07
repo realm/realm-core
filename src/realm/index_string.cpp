@@ -1419,7 +1419,7 @@ void StringIndex::to_dot_2(std::ostream& out, StringData title) const
     ref_type ref = get_ref();
 
     out << "subgraph cluster_string_index" << ref << " {" << std::endl;
-    out << " label = \"String index";
+    out << " label = \"Search index";
     if (title.size() != 0)
         out << "\\n'" << title << "'";
     out << "\";" << std::endl;

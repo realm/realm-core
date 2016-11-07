@@ -1721,8 +1721,12 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
 
     if (subdesc) {
         typedef _impl::DescriptorFriend df;
-        size_t tmp[8];
-        size_t parent_col = *(df::record_subdesc_path(*subdesc->get(), tmp, tmp + sizeof tmp / sizeof *tmp));
+        size_t tmp;
+        size_t* parent_col = df::record_subdesc_path(*subdesc->get(), &tmp, &tmp + 1);
+        if (!parent_col) {
+            throw LogicError(LogicError::subtable_of_subtable_index);
+        }
+
         TableRef sub;
         int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
 
@@ -1733,7 +1737,7 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
             attr &= ~col_attr_Indexed;
             subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
-            sub = get_subtable(parent_col, r);
+            sub = get_subtable(*parent_col, r);
             ColumnBase& col = sub->get_column_base(col_ndx);
             StringIndex* index = col.create_search_index(); // Throws
 
@@ -1746,7 +1750,7 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
         attr |= col_attr_Indexed;
         subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
-        refresh_column_accessors(parent_col); // Throws
+        refresh_column_accessors(*parent_col); // Throws
 
         return;
     }
@@ -6140,6 +6144,12 @@ void Table::to_dot_internal(std::ostream& out) const
         const ColumnBase& col = get_column_base(i);
         StringData name = get_column_name(i);
         col.to_dot(out, name);
+        
+        if (has_search_index(i)) {
+            col.get_search_index()->to_dot_2(out, "");
+        }
+        
+
     }
 }
 

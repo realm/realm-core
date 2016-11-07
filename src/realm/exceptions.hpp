@@ -190,7 +190,10 @@ public:
         mixed_history_type,
 
         /// Adding rows to a table with no columns is not supported.
-        table_has_no_columns
+        table_has_no_columns,
+
+        /// You can not add index on a subtable of a subtable
+        subtable_of_subtable_index
     };
 
     LogicError(ErrorKind message);
