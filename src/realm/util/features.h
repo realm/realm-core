@@ -155,6 +155,14 @@
 #define REALM_UNUSED
 #endif
 
+/* The way to specify that a function is deprecated
+ * not be used. Use it to suppress a warning from the compiler. */
+#if __GNUC__
+#define REALM_DEPRECATED(x) [[deprecated(x)]]
+#else
+#define REALM_DEPRECATED(x) __declspec(deprecated(x))
+#endif
+
 
 #if __GNUC__ || defined __INTEL_COMPILER
 #define REALM_UNLIKELY(expr) __builtin_expect(!!(expr), 0)
