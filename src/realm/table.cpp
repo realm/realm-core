@@ -1578,9 +1578,7 @@ Table::~Table() noexcept
 
 bool Table::has_search_index(size_t col_ndx, DescriptorRef* subdesc) const noexcept
 {
-
     if (subdesc) {
-        typedef _impl::DescriptorFriend df;
         TableRef sub;
         int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
         return (attr & col_attr_Indexed);
@@ -1596,9 +1594,6 @@ bool Table::has_search_index(size_t col_ndx, DescriptorRef* subdesc) const noexc
     const ColumnBase& col = get_column_base(col_ndx);
     return col.has_search_index();
 }
-
-
-
 
 
 void Table::upgrade_file_format(size_t target_file_format_version)
