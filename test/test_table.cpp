@@ -2286,8 +2286,8 @@ ONLY(Table_SubtableIndex)
         TableRef table = group.add_table("test");
    
         // Create specification with sub-table
-        table->add_column(type_String, "second");
-        table->add_column(type_Table, "third", &sub_1);
+        table->add_column(type_String, "first");
+        table->add_column(type_Table, "second", &sub_1);
 
         sub_1->add_column(type_Int, "sub_first");
         sub_1->add_column(type_String, "sub_second");
@@ -2346,15 +2346,21 @@ ONLY(Table_SubtableIndex)
 
         match = subtable.get()->where().equal(0, 77).find();
         CHECK_EQUAL(match, 1);
+
+        // Query column that follows indexed column to test if refresh_column_accessors()
+        // has worked
         match = subtable.get()->where().equal(1, "testsub4").find();
         CHECK_EQUAL(match, 1);
 
         table.get()->remove_search_index(1, &sub_1);
         CHECK(!subtable.get()->has_search_index(1));
 
-        match = subtable.get()->where().equal(0, 77).find();
-        CHECK_EQUAL(match, 1);
+        // Query column that follows indexed column to test if refresh_column_accessors()
+        // has worked
         match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        match = subtable.get()->where().equal(0, 77).find();
         CHECK_EQUAL(match, 1);
 
         // Tests non-degenerate construction of index
