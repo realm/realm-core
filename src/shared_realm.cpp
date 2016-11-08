@@ -183,7 +183,10 @@ void Realm::open_with_config(const Config& config,
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
         }
         else {
-            bool server_synchronization_mode = bool(config.sync_config);
+            bool server_synchronization_mode = false;
+#if REALM_ENABLE_SYNC
+            server_synchronization_mode = bool(config.sync_config);
+#endif
             if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
                 history = realm::sync::make_sync_history(config.path);
@@ -193,7 +196,6 @@ void Realm::open_with_config(const Config& config,
             }
             else {
                 history = realm::make_in_realm_history(config.path);
-#ifdef REALM_SYNC
             }
 
             SharedGroupOptions options;
