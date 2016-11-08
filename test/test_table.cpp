@@ -2276,7 +2276,7 @@ TEST(Table_Spec)
 // Test search index on subtables. Adding or removing a search index of a subtable will
 // add or remove it from *all* subtables in the entire subtable column. This may take a
 // while if there are many subtables with many rows each.
-ONLY(Table_SubtableIndex)
+TEST(Table_SubtableIndex)
 {
     GROUP_TEST_PATH(path);
 
@@ -2305,29 +2305,31 @@ ONLY(Table_SubtableIndex)
         CHECK_EQUAL(2, table->get_column_count());
 
         // Add two rows to parent table
-        table->insert_empty_row(0);
-        table->insert_empty_row(0);
+        table->add_empty_row();
+        table->add_empty_row();
         table->set_string(0, 0, "Hello");
 
         // Add rows to first subtable
         TableRef subtable = table->get_subtable(1, 0);
         CHECK(subtable->is_empty());
-        subtable->insert_empty_row(0);
+        subtable->add_empty_row();
         subtable->set_int(0, 0, 42);
         subtable->set_string(1, 0, "testsub1");
-        subtable->insert_empty_row(0);
+        subtable->add_empty_row();
         subtable->set_int(0, 1, 43);
         subtable->set_string(1, 1, "testsub2");
 
         // Add rows to second subtable
         subtable = table->get_subtable(1, 1);
         CHECK(subtable->is_empty());
-        subtable->insert_empty_row(0);
+        subtable->add_empty_row();
         subtable->set_int(0, 0, 66);
         subtable->set_string(1, 0, "testsub3");
-        subtable->insert_empty_row(0);
+        subtable->add_empty_row();
         subtable->set_int(0, 1, 77);
         subtable->set_string(1, 1, "testsub4");
+
+        int64_t tt = subtable.get()->get_int(0, 0);
 
         subtable = table->get_subtable(1, 0);
         CHECK(subtable.get()->has_search_index(0));
@@ -2342,7 +2344,7 @@ ONLY(Table_SubtableIndex)
      //   group.verify();
      //   group.to_dot("c:\\d\\dot.dot");
 
-        subtable = table->get_subtable(1, 1);
+       subtable = table->get_subtable(1, 1);
 
         match = subtable.get()->where().equal(0, 77).find();
         CHECK_EQUAL(match, 1);
@@ -2360,6 +2362,7 @@ ONLY(Table_SubtableIndex)
         match = subtable.get()->where().equal(1, "testsub4").find();
         CHECK_EQUAL(match, 1);
 
+
         match = subtable.get()->where().equal(0, 77).find();
         CHECK_EQUAL(match, 1);
 
@@ -2370,6 +2373,11 @@ ONLY(Table_SubtableIndex)
         CHECK_EQUAL(match, 1);
         match = subtable.get()->where().equal(1, "testsub4").find();
         CHECK_EQUAL(match, 1);
+
+        // Add more data and see if that works
+        subtable.get()->add_empty_row();
+        match = subtable.get()->where().equal(0, 0).find();
+        CHECK_EQUAL(match, 2);
 
         group.write(path);
     }
@@ -2396,7 +2404,6 @@ ONLY(Table_SubtableIndex)
         CHECK_EQUAL(match, 1);
         match = subtable.get()->where().equal(1, "testsub4").find();
         CHECK_EQUAL(match, 1);
-
         
         DescriptorRef subsub;
         DescriptorRef sub = table.get()->get_subdescriptor(1);
