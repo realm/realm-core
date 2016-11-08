@@ -13,7 +13,10 @@
   index in a subtable of a subtable (will throw exception). The feature
   is required for upcoming support for Array and Map types. NOTE: Core
   versions prior to this version will not be able to open .realm files of
-  this Core version if this Core version has added such indexes.
+  this Core version if this Core version has added such indexes. Adding or
+  removing an index will take place for *all* subtables in a subtable 
+  column. There is no way to add or remove it form single individual
+  subtables.
 
 ### Enhancements
 
