@@ -1729,7 +1729,7 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
         typedef _impl::DescriptorFriend df;
         size_t tmp;
 
-        // Find the root table column index that contains the subtables
+        // Find the root table column index that contains the search index
         size_t* parent_col = df::record_subdesc_path(*subdesc->get(), &tmp, &tmp + 1);
         if (!parent_col) {
             throw LogicError(LogicError::subtable_of_subtable_index);
@@ -1747,9 +1747,9 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
 
         // Iterate through all rows of the root table and create an instance of each subtable
         for (size_t r = 0; r < size(); r++) {
-            // Set spec attributes to indexed. Even though all accessors share the same spec, it is
-            // not sufficient to just set it after the for-loop. We need to do it here too because
-            // the call to refresh_column_accessors() depends on its attributes to be correct already now
+            // Clear index bit from shared spec because we're now going to operate on the next subtable
+            // object which has no index yet (because various method calls may crash if attributes are 
+            // wrong)
             attr &= ~col_attr_Indexed;
             subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
@@ -1761,6 +1761,11 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
             size_t index_pos = sub->m_spec.get_column_info(col_ndx).m_column_ref_ndx + 1;
             index->set_parent(&(sub->m_columns), index_pos);
             sub->m_columns.insert(index_pos, index->get_ref()); // Throws
+
+            // Set index bit in shared spec before calling refresh_column_accessors() which might expect
+            // attributes to be correct
+            attr |= col_attr_Indexed;
+            subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
             refresh_column_accessors(col_ndx + 1); // Throws
         }
@@ -1829,7 +1834,6 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
         if (!(attr & col_attr_Indexed))
             return;
 
-        // Find the root table column index that contains the subtables
         size_t tmp;
         size_t* parent_col = df::record_subdesc_path(*subdesc->get(), &tmp, &tmp + 1);
 
@@ -1842,21 +1846,23 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
 
         // Iterate through all rows of the root table and create an instance of each subtable
         for (size_t r = 0; r < size(); r++) {
-            // Set spec attributes to non-indexed. Even though all accessors share the same spec, it is
-            // not sufficient to just set it after the for-loop. We need to do it here too because
-            // the call to refresh_column_accessors() depends on its attributes to be correct already now
+            // Set index bit from shared spec because we're now going to operate on the next subtable
+            // object which still has an index (because various method calls may crash if attributes are 
+            // wrong)
             attr &= col_attr_Indexed;
             subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
-            // Destroy search index
+            // Destroy search index. This will update shared attributes in case refresh_column_accessors() 
+            // should depend on them being correct
             sub = get_subtable(*parent_col, r);
-            sub->remove_search_index(col_ndx);
+            sub.get()->remove_search_index(col_ndx);
+
             refresh_column_accessors(col_ndx + 1); // Throws
         }
 
         // Set shared attributes here also, in case there was no rows to iterate through in the for-loop
         // above
-        attr &= ~ col_attr_Indexed;
+        attr &= ~col_attr_Indexed;
         subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
         return;
