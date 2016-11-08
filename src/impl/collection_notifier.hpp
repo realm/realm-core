@@ -49,6 +49,16 @@ struct TransactionChangeInfo {
     std::vector<ListChangeInfo> lists;
     std::vector<CollectionChangeBuilder> tables;
     bool track_all = false;
+
+    // Required by GCC 4.9
+    TransactionChangeInfo() {}
+    TransactionChangeInfo(std::vector<bool> table_mods,
+                          std::vector<bool> table_moves,
+                          std::vector<ListChangeInfo> ls)
+            : table_modifications_needed(table_mods),
+              table_moves_needed(table_moves),
+              lists(ls)
+    {}
 };
 
 class DeepChangeChecker {
