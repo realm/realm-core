@@ -8,11 +8,12 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Added support for search index on subtable columns. NOTE: Core versions prior
+  to this version will not be able to open .realm files of this Core version
+  if this Core version has added such indexes.
 
 ### Enhancements
 
-* Added Array-type support
 * Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
   are now perfectly forwarded (via perfect forwarding) to
   `std::stream::operator<<()`.
