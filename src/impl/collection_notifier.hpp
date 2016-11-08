@@ -55,9 +55,9 @@ struct TransactionChangeInfo {
     TransactionChangeInfo(std::vector<bool> table_mods,
                           std::vector<bool> table_moves,
                           std::vector<ListChangeInfo> ls)
-            : table_modifications_needed(table_mods),
-              table_moves_needed(table_moves),
-              lists(ls)
+            : table_modifications_needed(std::move(table_mods)),
+              table_moves_needed(std::move(table_moves)),
+              lists(std::move(ls))
     {}
 };
 
