@@ -2273,8 +2273,8 @@ TEST(Table_Spec)
     }
 }
 
-
-TEST(Table_SubtableIndex)
+// Test search index on subtables
+ONLY(Table_SubtableIndex)
 {
     GROUP_TEST_PATH(path);
 
@@ -2282,7 +2282,6 @@ TEST(Table_SubtableIndex)
         Group group;
         DescriptorRef sub_1;
         TableRef table = group.add_table("test");
-
    
         // Create specification with sub-table
         table->add_column(type_String, "second");
@@ -2367,7 +2366,6 @@ TEST(Table_SubtableIndex)
         group.write(path);
     }
 
-
     {
         // Check persistence
         Group g2(path);
@@ -2394,9 +2392,8 @@ TEST(Table_SubtableIndex)
         
         DescriptorRef subsub;
         DescriptorRef sub = table.get()->get_subdescriptor(1);
-        sub->add_column(type_Table, "bbfgf", &subsub);
+        sub->add_column(type_Table, "foobar", &subsub);
         CHECK_THROW_ANY(table.get()->add_search_index(0, &subsub));
-
     }
 
     {
@@ -2406,10 +2403,9 @@ TEST(Table_SubtableIndex)
         TableRef table = g2.get_table("test");
         DescriptorRef subsub;
         DescriptorRef sub = table.get()->get_subdescriptor(1);
-        sub->add_column(type_Table, "bbfgf", &subsub);
+        sub->add_column(type_Table, "baz", &subsub);
         CHECK_THROW_ANY(table.get()->add_search_index(0, &subsub));
     }
-
 
     {
         // Check correct updating of other subtable accessors than the one you called add_search_index() on
@@ -2433,7 +2429,6 @@ TEST(Table_SubtableIndex)
         match = sub2.get()->where().equal(1, "testsub4").find();
         CHECK_EQUAL(match, 1);
 
-
         table.get()->add_search_index(0, &des);
 
         CHECK(sub1.get()->has_search_index(0));
@@ -2443,6 +2438,11 @@ TEST(Table_SubtableIndex)
         CHECK(sub2.get()->has_search_index(0));
         match = sub2.get()->where().equal(1, "testsub4").find();
         CHECK_EQUAL(match, 1);
+
+        // Check what happens if user given column index is out of range
+        CHECK_THROW(table.get()->add_search_index(100, &des), LogicError);
+        CHECK_THROW(table.get()->remove_search_index(100, &des), LogicError);
+        CHECK(!table.get()->has_search_index(100, &des));
     }
 }
 

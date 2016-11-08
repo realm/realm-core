@@ -528,8 +528,6 @@ void Table::init(ref_type top_ref, ArrayParent* parent, size_t ndx_in_parent, bo
 
 void Table::init(ConstSubspecRef shared_spec, ArrayParent* parent_column, size_t parent_row_ndx)
 {
-    
-
     m_mark = false;
 
     m_version = 0;
@@ -1309,6 +1307,7 @@ void Table::create_degen_subtab_columns()
         ref_type ref = create_column(type, init_size, nullable, alloc); // Throws      
         m_columns.add(int_fast64_t(ref));                               // Throws     
 
+        // Create empty search index if required and add it to m_columns
         if (attr & col_attr_Indexed) {
             m_columns.add(StringIndex::create_empty(get_alloc()));
             m_spec.set_column_attr(i, ColumnAttr(attr & col_attr_Indexed));
@@ -1579,15 +1578,25 @@ Table::~Table() noexcept
 bool Table::has_search_index(size_t col_ndx, DescriptorRef* subdesc) const noexcept
 {
     if (subdesc) {
+        // Check column of subtable
+        if (REALM_UNLIKELY(col_ndx >= subdesc->get()->get_spec()->get_column_count()))
+            return false;
+
         TableRef sub;
+
         int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
         return (attr & col_attr_Indexed);
     }
     else if (has_shared_type()) {
+        if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
+            return false;
+
+        // Method called directly on Table object which is a subtable
         int attr = get_descriptor()->get_spec()->get_column_attr(col_ndx);
         return attr & col_attr_Indexed;
     }
 
+    // Check column of root table
     // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         return false;
@@ -1701,6 +1710,7 @@ void Table::upgrade_olddatetime()
 
     REALM_ASSERT_3(old_column_count, ==, get_column_count());
     static_cast<void>(old_column_count);
+
     for (size_t col = 0; col < get_column_count(); col++) {
         ColumnType col_type = get_real_column_type(col);
         static_cast<void>(col_type);
@@ -1715,6 +1725,7 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
         throw LogicError(LogicError::detached_accessor);
 
     if (subdesc) {
+        // Add search index on subtable
         typedef _impl::DescriptorFriend df;
         size_t tmp;
         size_t* parent_col = df::record_subdesc_path(*subdesc->get(), &tmp, &tmp + 1);
@@ -1723,6 +1734,10 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
         }
 
         TableRef sub;
+        
+        if (REALM_UNLIKELY(col_ndx >= subdesc->get()->get_spec()->get_column_count()))
+            throw LogicError(LogicError::column_index_out_of_range);
+
         int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
 
         if (attr & col_attr_Indexed)
@@ -1750,9 +1765,7 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
         return;
     }
 
-    if (REALM_UNLIKELY(has_shared_type()))
-        throw LogicError(LogicError::wrong_kind_of_table);
-
+    // Add search index on root table
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
@@ -1795,7 +1808,12 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
         throw LogicError(LogicError::detached_accessor);
 
     if (subdesc) {
+        // Remove search index from subtable
         typedef _impl::DescriptorFriend df;
+
+        if (REALM_UNLIKELY(col_ndx >= subdesc->get()->get_spec()->get_column_count()))
+            throw LogicError(LogicError::column_index_out_of_range);
+
         int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
         if (!(attr & col_attr_Indexed))
             return;
@@ -1821,6 +1839,8 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
         return;
     }
 
+
+    // Remove search index from root table
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         throw LogicError(LogicError::column_index_out_of_range);
 
@@ -6143,8 +6163,6 @@ void Table::to_dot_internal(std::ostream& out) const
         if (has_search_index(i)) {
             col.get_search_index()->to_dot_2(out, "");
         }
-        
-
     }
 }
 

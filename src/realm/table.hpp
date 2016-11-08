@@ -222,25 +222,25 @@ public:
 
     //@{
 
+    /// Following three search index methods take an optional `subdesc` argument.
+    /// If it is omitted, then the methods operate on `this` table. If a subtable
+    /// descriptor is passed, the methods operate on the subtable. NOTE: Subtables
+    /// of the deprecated Mixed column are not supported.
+    ///
     /// has_search_index() returns true if, and only if a search index has been
     /// added to the specified column. Rather than throwing, it returns false if
     /// the table accessor is detached or the specified index is out of range.
     ///
-    /// add_search_index() adds a search index to the specified column of this
+    /// add_search_index() adds a search index to the specified column of the
     /// table. It has no effect if a search index has already been added to the
     /// specified column (idempotency).
     ///
     /// remove_search_index() removes the search index from the specified column
-    /// of this table. It has no effect if the specified column has no search
+    /// of the table. It has no effect if the specified column has no search
     /// index. The search index cannot be removed from the primary key of a
     /// table.
     ///
-    /// This table must be a root table; that is, it must have an independent
-    /// descriptor. Freestanding tables, group-level tables, and subtables in a
-    /// column of type 'mixed' are all examples of root tables. See add_column()
-    /// for more on this.
-    ///
-    /// \param column_ndx The index of a column of this table.
+    /// \param column_ndx The index of a column of the table.
 
     bool has_search_index(size_t column_ndx, DescriptorRef* subdesc = nullptr) const noexcept;
     void add_search_index(size_t column_ndx, DescriptorRef* subdesc = nullptr);
@@ -1449,7 +1449,6 @@ private:
     friend class LinkMap;
     friend class LinkView;
     friend class Group;
-    friend class Descriptor;
 };
 
 
