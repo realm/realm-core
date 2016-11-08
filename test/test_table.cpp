@@ -2273,7 +2273,9 @@ TEST(Table_Spec)
     }
 }
 
-// Test search index on subtables
+// Test search index on subtables. Adding or removing a search index of a subtable will
+// add or remove it from *all* subtables in the entire subtable column. This may take a
+// while if there are many subtables with many rows each.
 ONLY(Table_SubtableIndex)
 {
     GROUP_TEST_PATH(path);
