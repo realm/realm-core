@@ -1850,7 +1850,7 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
 
             // Destroy search index
             sub = get_subtable(*parent_col, r);
-            sub.get()->remove_search_index(col_ndx);
+            sub->remove_search_index(col_ndx);
             refresh_column_accessors(col_ndx + 1); // Throws
         }
 

@@ -2414,37 +2414,37 @@ ONLY(Table_SubtableIndex)
         Group g2(path);
         DescriptorRef des;
         TableRef table = g2.get_table("test");
-        TableRef sub1 = table.get()->get_subtable(1, 0);
-        TableRef sub2 = table.get()->get_subtable(1, 1);
+        TableRef sub1 = table->get_subtable(1, 0);
+        TableRef sub2 = table->get_subtable(1, 1);
 
         size_t match;
        
-        des = table.get()->get_subdescriptor(1);
+        des = table->get_subdescriptor(1);
 
-        table.get()->remove_search_index(0, &des);
+        table->remove_search_index(0, &des);
 
-        CHECK(!sub1.get()->has_search_index(0));
-        match = sub1.get()->where().equal(1, "testsub2").find();
+        CHECK(!sub1->has_search_index(0));
+        match = sub1->where().equal(1, "testsub2").find();
         CHECK_EQUAL(match, 1);
 
-        CHECK(!sub2.get()->has_search_index(0));
-        match = sub2.get()->where().equal(1, "testsub4").find();
+        CHECK(!sub2->has_search_index(0));
+        match = sub2->where().equal(1, "testsub4").find();
         CHECK_EQUAL(match, 1);
 
-        table.get()->add_search_index(0, &des);
+        table->add_search_index(0, &des);
 
-        CHECK(sub1.get()->has_search_index(0));
-        match = sub1.get()->where().equal(1, "testsub2").find();
+        CHECK(sub1->has_search_index(0));
+        match = sub1->where().equal(1, "testsub2").find();
         CHECK_EQUAL(match, 1);
 
-        CHECK(sub2.get()->has_search_index(0));
-        match = sub2.get()->where().equal(1, "testsub4").find();
+        CHECK(sub2->has_search_index(0));
+        match = sub2->where().equal(1, "testsub4").find();
         CHECK_EQUAL(match, 1);
 
         // Check what happens if user given column index is out of range
-        CHECK_THROW(table.get()->add_search_index(100, &des), LogicError);
-        CHECK_THROW(table.get()->remove_search_index(100, &des), LogicError);
-        CHECK(!table.get()->has_search_index(100, &des));
+        CHECK_THROW(table->add_search_index(100, &des), LogicError);
+        CHECK_THROW(table->remove_search_index(100, &des), LogicError);
+        CHECK(!table->has_search_index(100, &des));
     }
 }
 
