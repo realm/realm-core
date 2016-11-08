@@ -40,7 +40,7 @@ try {
         }
       }
 
-      isPublishingRun = ['master', 'next-major'].contains(env.BRANCH_NAME) || gitTag != ""
+      isPublishingRun = gitTag != ""
       echo "Publishing Run: ${isPublishingRun}"
 
       rpmVersion = dependencies.VERSION.replaceAll("-", "_")
