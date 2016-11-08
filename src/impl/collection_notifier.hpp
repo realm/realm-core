@@ -21,7 +21,7 @@
 
 #include "impl/collection_change_builder.hpp"
 
-#include <realm/group_shared.hpp>
+#include <realm/version_id.hpp>
 
 #include <array>
 #include <atomic>
@@ -32,6 +32,8 @@
 
 namespace realm {
 class Realm;
+class SharedGroup;
+class Table;
 
 namespace _impl {
 struct ListChangeInfo {
@@ -46,6 +48,7 @@ struct TransactionChangeInfo {
     std::vector<bool> table_moves_needed;
     std::vector<ListChangeInfo> lists;
     std::vector<CollectionChangeBuilder> tables;
+    bool track_all = false;
 };
 
 class DeepChangeChecker {
@@ -122,7 +125,7 @@ public:
 
     // Get the SharedGroup version which this collection can attach to (if it's
     // in handover mode), or can deliver to (if it's been handed over to the BG worker alredad)
-    SharedGroup::VersionID version() const noexcept { return m_sg_version; }
+    VersionID version() const noexcept { return m_sg_version; }
 
     // Release references to all core types
     // This is called on the worker thread to ensure that non-thread-safe things
@@ -135,7 +138,7 @@ public:
     // default-constructed version if this notifier has nothing to deliver to
     // this Realm (either due to being for a different Realm, or just because
     // nothing has changed since it last delivered).
-    SharedGroup::VersionID package_for_delivery(Realm&);
+    VersionID package_for_delivery(Realm&);
 
     // Deliver the new state to the target collection using the given SharedGroup
     virtual void deliver(SharedGroup&) { }
@@ -183,7 +186,7 @@ private:
     mutable std::mutex m_realm_mutex;
     std::shared_ptr<Realm> m_realm;
 
-    SharedGroup::VersionID m_sg_version;
+    VersionID m_sg_version;
     SharedGroup* m_sg = nullptr;
 
     bool m_error = false;
@@ -211,7 +214,7 @@ private:
 
     // Iteration variable for looping over callbacks
     // remove_callback() updates this when needed
-    size_t m_callback_index = npos;
+    size_t m_callback_index = -1;
 
     CollectionChangeCallback next_callback(bool has_changes, bool pre);
 };

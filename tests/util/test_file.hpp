@@ -22,23 +22,28 @@
 #include "shared_realm.hpp"
 
 #include <realm/group_shared.hpp>
+#include <realm/util/logger.hpp>
+
+#if REALM_ENABLE_SYNC
+#include <realm/sync/client.hpp>
+#include <realm/sync/server.hpp>
+
+namespace realm {
+struct SyncConfig;
+}
+
+#endif
 
 struct TestFile : realm::Realm::Config {
     TestFile();
     ~TestFile();
 
-    std::unique_ptr<realm::Replication> make_history() const;
-
     auto options() const
     {
-#ifdef REALM_GROUP_SHARED_OPTIONS_HPP
         realm::SharedGroupOptions options;
         options.durability = in_memory ? realm::SharedGroupOptions::Durability::MemOnly
                                        : realm::SharedGroupOptions::Durability::Full;
         return options;
-#else
-        return in_memory ? realm::SharedGroup::durability_MemOnly : realm::SharedGroup::durability_Full;
-#endif
     }
 };
 
@@ -47,5 +52,37 @@ struct InMemoryTestFile : TestFile {
 };
 
 void advance_and_notify(realm::Realm& realm);
+
+#if REALM_ENABLE_SYNC
+
+struct SyncTestFile : TestFile {
+    SyncTestFile(const realm::SyncConfig&);
+};
+
+#define TEST_ENABLE_SYNC_LOGGING 0 // change to 1 to enable logging
+
+struct TestLogger : realm::util::Logger::LevelThreshold, realm::util::Logger {
+    void do_log(realm::util::Logger::Level, std::string) override {}
+    Level get() const noexcept override { return Level::off; }
+    TestLogger() : Logger::LevelThreshold(), Logger(static_cast<Logger::LevelThreshold&>(*this)) { }
+
+    static realm::sync::Server::Config server_config();
+};
+
+class SyncServer {
+public:
+    SyncServer();
+    ~SyncServer();
+
+    std::string url_for_realm(realm::StringData realm_name) const;
+    std::string base_url() const { return m_url; }
+
+private:
+    realm::sync::Server m_server;
+    std::thread m_thread;
+    std::string m_url;
+};
+
+#endif // REALM_ENABLE_SYNC
 
 #endif

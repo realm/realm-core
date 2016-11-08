@@ -21,8 +21,12 @@
 
 #include <functional>
 #include <string>
+#include <memory>
 
 namespace realm {
+
+class SyncUser;
+class SyncSession;
 
 enum class SyncSessionStopPolicy;
 
@@ -33,20 +37,31 @@ enum class SyncSessionError {
     UserFatal,              // The user associated with the session is invalid.
 };
 
+struct SyncConfig;
+using SyncBindSessionHandler = void(const std::string&,                       // path on disk of the Realm file.
+                                    const SyncConfig&,                        // the sync configuration object.
+                                    std::shared_ptr<SyncSession>              // the session which should be bound.
+                                    );
+
 using SyncSessionErrorHandler = void(int error_code, std::string message, SyncSessionError);
 
 struct SyncConfig {
-    SyncConfig(std::string user_tag, std::string realm_url, std::function<SyncSessionErrorHandler> error_handler,
-               SyncSessionStopPolicy stop_policy)
-    : user_tag(std::move(user_tag))
+    SyncConfig(std::shared_ptr<SyncUser> user,
+               std::string realm_url,
+               SyncSessionStopPolicy stop_policy,
+               std::function<SyncBindSessionHandler> bind_session_handler,
+               std::function<SyncSessionErrorHandler> error_handler={})
+    : user(std::move(user))
     , realm_url(std::move(realm_url))
+    , bind_session_handler(std::move(bind_session_handler))
     , error_handler(std::move(error_handler))
     , stop_policy(stop_policy)
     {
     }
 
-    std::string user_tag;
+    std::shared_ptr<SyncUser> user;
     std::string realm_url;
+    std::function<SyncBindSessionHandler> bind_session_handler;
     std::function<SyncSessionErrorHandler> error_handler;
     // Some bindings may want to handle the session in binding level.
     bool create_session = true;

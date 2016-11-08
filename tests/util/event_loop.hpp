@@ -21,11 +21,30 @@
 namespace realm {
 namespace util {
 
-// Returns if the current platform has an event loop implementation
-bool has_event_loop_implementation();
+struct EventLoop {
+    // Returns if the current platform has an event loop implementation
+    static bool has_implementation();
 
-// Run the event loop until the given return predicate returns true
-void run_event_loop_until(std::function<bool()> predicate);
+    // Returns the main event loop.
+    static EventLoop& main();
+
+    // Run the event loop until the given return predicate returns true
+    void run_until(std::function<bool()> predicate);
+
+    // Schedule execution of the given function on the event loop.
+    void perform(std::function<void()>);
+
+    EventLoop(EventLoop&&) = default;
+    EventLoop& operator=(EventLoop&&) = default;
+    ~EventLoop();
+
+private:
+    struct Impl;
+
+    EventLoop(std::unique_ptr<Impl>);
+
+    std::unique_ptr<Impl> m_impl;
+};
 
 } // namespace util
 } // namespace realm

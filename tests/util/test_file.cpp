@@ -19,15 +19,16 @@
 #include "util/test_file.hpp"
 
 #include "impl/realm_coordinator.hpp"
+#include "util/format.hpp"
+
+#if REALM_ENABLE_SYNC
+#include "sync/sync_config.hpp"
+#include "sync/sync_manager.hpp"
+#endif
 
 #include <realm/disable_sync_to_disk.hpp>
-#include <realm/string_data.hpp>
-
-#if REALM_VER_MAJOR >= 2
 #include <realm/history.hpp>
-#else
-#include <realm/commit_log.hpp>
-#endif
+#include <realm/string_data.hpp>
 
 #include <cstdlib>
 #include <unistd.h>
@@ -66,14 +67,64 @@ InMemoryTestFile::InMemoryTestFile()
     in_memory = true;
 }
 
-std::unique_ptr<Replication> TestFile::make_history() const
+#if REALM_ENABLE_SYNC
+
+SyncTestFile::SyncTestFile(const SyncConfig& sync_config)
 {
-#if REALM_VER_MAJOR >= 2
-    return make_in_realm_history(path);
-#else
-    return make_client_history(path);
-#endif
+    this->sync_config = std::make_shared<SyncConfig>(sync_config);
+    schema_mode = SchemaMode::Additive;
 }
+
+sync::Server::Config TestLogger::server_config() {
+    sync::Server::Config config;
+#if TEST_ENABLE_SYNC_LOGGING
+    auto logger = new util::StderrLogger;
+    logger->set_level_threshold(util::Logger::Level::all);
+    config.logger = logger;
+#else
+    config.logger = new TestLogger;
+#endif
+    return config;
+}
+
+SyncServer::SyncServer()
+: m_server(util::make_temp_dir(), util::none, TestLogger::server_config())
+{
+#if TEST_ENABLE_SYNC_LOGGING
+    SyncManager::shared().set_log_level(util::Logger::Level::all);
+#else
+    SyncManager::shared().set_log_level(util::Logger::Level::off);
+#endif
+
+    uint64_t port;
+    while (true) {
+        // Try to pick a random available port, or loop forever if other
+        // problems occur because there's no specific error for "port in use"
+        try {
+            port = fastrand(65536 - 1000) + 1000;
+            m_server.start("127.0.0.1", util::to_string(port));
+            break;
+        }
+        catch (std::runtime_error) {
+            continue;
+        }
+    }
+    m_url = util::format("realm://127.0.0.1:%1", port);
+    m_thread = std::thread([this]{ m_server.run(); });
+}
+
+SyncServer::~SyncServer()
+{
+    m_server.stop();
+    m_thread.join();
+}
+
+std::string SyncServer::url_for_realm(StringData realm_name) const
+{
+    return util::format("%1/%2", m_url, realm_name);
+}
+
+#endif // REALM_ENABLE_SYNC
 
 #if defined(__has_feature) && __has_feature(thread_sanitizer)
 // A helper which synchronously runs on_change() on a fixed background thread

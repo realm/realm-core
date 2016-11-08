@@ -74,11 +74,25 @@ set(INCLUDE_DIRS
     ${UV_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR})
 
-# Add the sync files separately to reduce merge conflicts.
-list(APPEND HEADERS sync_config.hpp sync_manager.hpp sync_metadata.hpp sync_session.hpp impl/sync_client.hpp)
-list(APPEND SOURCES sync_manager.cpp sync_metadata.cpp sync_session.cpp)
-find_package(ZLIB REQUIRED)
-list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
+if(REALM_ENABLE_SYNC)
+    # Add the sync files separately to reduce merge conflicts.
+    list(APPEND HEADERS
+        sync/sync_config.hpp
+        sync/sync_manager.hpp
+        sync/sync_session.hpp
+        sync/sync_user.hpp
+        sync/impl/sync_client.hpp
+        sync/impl/sync_file.hpp
+        sync/impl/sync_metadata.hpp)
+    list(APPEND SOURCES
+        sync/sync_manager.cpp
+        sync/sync_session.cpp
+        sync/sync_user.cpp
+        sync/impl/sync_file.cpp
+        sync/impl/sync_metadata.cpp)
+    find_package(ZLIB REQUIRED)
+    list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
+endif()
 
 add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
 set_target_properties(realm-object-store PROPERTIES POSITION_INDEPENDENT_CODE 1)
@@ -86,5 +100,7 @@ target_compile_definitions(realm-object-store PRIVATE ${PLATFORM_DEFINES})
 target_include_directories(realm-object-store PUBLIC ${INCLUDE_DIRS})
 target_link_libraries(realm-object-store PUBLIC realm ${PLATFORM_LIBRARIES})
 
-# Add the sync libraries separately to reduce merge conflicts.
-target_link_libraries(realm-object-store PUBLIC realm-sync ${ZLIB_LIBRARIES})
+if(REALM_ENABLE_SYNC)
+    # Add the sync libraries separately to reduce merge conflicts.
+    target_link_libraries(realm-object-store PUBLIC realm-sync ${ZLIB_LIBRARIES})
+endif()

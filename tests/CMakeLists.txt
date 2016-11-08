@@ -23,10 +23,27 @@ set(SOURCES
     util/test_file.cpp
 )
 
+if(REALM_ENABLE_SYNC)
+    list(APPEND HEADERS
+        sync/sync_test_utils.hpp
+    )
+    list(APPEND SOURCES 
+        sync/file.cpp
+        sync/metadata.cpp
+        sync/session.cpp
+        sync/sync_manager.cpp
+        sync/sync_test_utils.cpp
+        sync/user.cpp
+    )
+endif()
+
 add_executable(tests ${SOURCES} ${HEADERS})
 target_compile_definitions(tests PRIVATE ${PLATFORM_DEFINES})
 target_link_libraries(tests realm-object-store ${PLATFORM_LIBRARIES})
-target_link_libraries(tests realm-sync)
+
+if(REALM_ENABLE_SYNC)
+    target_link_libraries(tests realm-sync-server)
+endif()
 
 create_coverage_target(generate-coverage tests)
 
