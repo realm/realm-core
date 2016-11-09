@@ -52,12 +52,12 @@ struct TransactionChangeInfo {
 
     // Required by GCC 4.9
     TransactionChangeInfo() {}
-    TransactionChangeInfo(std::vector<bool> table_mods,
-                          std::vector<bool> table_moves,
-                          std::vector<ListChangeInfo> ls)
-            : table_modifications_needed(std::move(table_mods)),
-              table_moves_needed(std::move(table_moves)),
-              lists(std::move(ls))
+    TransactionChangeInfo(std::vector<bool> table_modifications_needed,
+                          std::vector<bool> table_moves_needed,
+                          std::vector<ListChangeInfo> lists)
+    : table_modifications_needed(std::move(table_modifications_needed)),
+      table_moves_needed(std::move(table_moves_needed)),
+      lists(std::move(lists))
     {}
 };
 
