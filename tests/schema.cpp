@@ -129,7 +129,7 @@ TEST_CASE("ObjectSchema") {
 #define REQUIRE_PROPERTY(name, type, ...) do { \
     auto prop = os.property_for_name(name); \
     REQUIRE(prop); \
-    REQUIRE(*prop == Property(name, PropertyType::type, __VA_ARGS__)); \
+    REQUIRE((*prop == Property{name, PropertyType::type, __VA_ARGS__})); \
     REQUIRE(prop->table_column == expected_col++); \
 } while (0)
 
