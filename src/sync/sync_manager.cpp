@@ -29,12 +29,6 @@
 using namespace realm;
 using namespace realm::_impl;
 
-struct SyncManager::UserCreationData {
-    std::string identity;
-    std::string user_token;
-    util::Optional<std::string> server_url;
-};
-
 SyncManager& SyncManager::shared()
 {
     // The singleton is heap-allocated in order to fix an issue when running unit tests where tests would crash after
@@ -47,6 +41,12 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
                                         MetadataMode metadata_mode,
                                         util::Optional<std::vector<char>> custom_encryption_key)
 {
+    struct UserCreationData {
+        std::string identity;
+        std::string user_token;
+        util::Optional<std::string> server_url;
+    };
+
     std::vector<UserCreationData> users_to_add;
     {
         std::lock_guard<std::mutex> lock(m_file_system_mutex);

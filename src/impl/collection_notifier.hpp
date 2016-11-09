@@ -36,6 +36,8 @@ class SharedGroup;
 class Table;
 
 namespace _impl {
+class RealmCoordinator;
+
 struct ListChangeInfo {
     size_t table_ndx;
     size_t row_ndx;
@@ -293,7 +295,7 @@ public:
     NotifierPackage() = default;
     NotifierPackage(std::exception_ptr error,
                     std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
-                    std::condition_variable& cv, std::unique_lock<std::mutex>& lock);
+                    RealmCoordinator* coordinator);
 
     explicit operator bool() { return !m_notifiers.empty(); }
 
@@ -317,8 +319,7 @@ private:
     util::Optional<VersionID> m_version;
     std::vector<std::shared_ptr<CollectionNotifier>> m_notifiers;
 
-    std::condition_variable* m_cv = nullptr;
-    std::unique_lock<std::mutex>* m_lock = nullptr; // RealmCoordinator::m_notifier_mutex
+    RealmCoordinator* m_coordinator = nullptr;
     std::exception_ptr m_error;
 };
 

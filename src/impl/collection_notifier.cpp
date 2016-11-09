@@ -400,28 +400,25 @@ void CollectionNotifier::add_changes(CollectionChangeBuilder change)
 
 NotifierPackage::NotifierPackage(std::exception_ptr error,
                                  std::vector<std::shared_ptr<CollectionNotifier>> notifiers,
-                                 std::condition_variable& cv, std::unique_lock<std::mutex>& lock)
+                                 RealmCoordinator* coordinator)
 : m_notifiers(std::move(notifiers))
-, m_cv(&cv)
-, m_lock(&lock)
+, m_coordinator(coordinator)
 , m_error(std::move(error))
 {
 }
 
 void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> target_version)
 {
-    if (!m_lock || m_error || !*this)
+    if (!m_coordinator || m_error || !*this)
         return;
 
-    m_lock->lock();
-    // Wait for the notifiers to be ready if we're advancing to a specific version
-    if (target_version) {
-        m_cv->wait(*m_lock, [&] {
-            return std::all_of(begin(m_notifiers), end(m_notifiers), [&](auto const& n) {
-                return !n->have_callbacks() || (n->has_run() && n->version().version >= *target_version);
-            });
+    auto lock = m_coordinator->wait_for_notifiers([&] {
+        if (!target_version)
+            return true;
+        return std::all_of(begin(m_notifiers), end(m_notifiers), [&](auto const& n) {
+            return !n->have_callbacks() || (n->has_run() && n->version().version >= *target_version);
         });
-    }
+    });
 
     // Package the notifiers for delivery and remove any which don't have anything to deliver
     auto package = [&](auto& notifier) {
@@ -436,9 +433,7 @@ void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> t
         m_notifiers.clear();
     REALM_ASSERT(m_version || m_notifiers.empty());
 
-    m_lock->unlock();
-    m_lock = nullptr;
-    m_cv = nullptr;
+    m_coordinator = nullptr;
 }
 
 void NotifierPackage::before_advance()

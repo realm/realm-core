@@ -650,7 +650,7 @@ void RealmCoordinator::open_helper_shared_group()
 void RealmCoordinator::advance_to_ready(Realm& realm)
 {
     std::unique_lock<std::mutex> lock(m_notifier_mutex);
-    _impl::NotifierPackage notifiers(m_async_error, notifiers_for_realm(realm), m_notifier_cv, lock);
+    _impl::NotifierPackage notifiers(m_async_error, notifiers_for_realm(realm), this);
     lock.unlock();
     notifiers.package_and_wait(util::none);
 
@@ -687,7 +687,7 @@ bool RealmCoordinator::advance_to_latest(Realm& realm)
 
     auto& sg = Realm::Internal::get_shared_group(realm);
     std::unique_lock<std::mutex> lock(m_notifier_mutex);
-    _impl::NotifierPackage notifiers(m_async_error, notifiers_for_realm(realm), m_notifier_cv, lock);
+    _impl::NotifierPackage notifiers(m_async_error, notifiers_for_realm(realm), this);
     lock.unlock();
     notifiers.package_and_wait(sgf::get_version_of_latest_snapshot(sg));
 
@@ -701,7 +701,7 @@ void RealmCoordinator::promote_to_write(Realm& realm)
     REALM_ASSERT(!realm.is_in_transaction());
 
     std::unique_lock<std::mutex> lock(m_notifier_mutex);
-    _impl::NotifierPackage notifiers(m_async_error, notifiers_for_realm(realm), m_notifier_cv, lock);
+    _impl::NotifierPackage notifiers(m_async_error, notifiers_for_realm(realm), this);
     lock.unlock();
 
     auto& sg = Realm::Internal::get_shared_group(realm);

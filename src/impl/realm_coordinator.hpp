@@ -112,6 +112,9 @@ public:
     // other Realm instances for that path, including in other processes
     void commit_write(Realm& realm);
 
+    template<typename Pred>
+    std::unique_lock<std::mutex> wait_for_notifiers(Pred&& wait_predicate);
+
 private:
     Realm::Config m_config;
     Schema m_schema;
@@ -154,11 +157,26 @@ private:
     void advance_helper_shared_group_to_latest();
     void clean_up_dead_notifiers();
 
-    // wait for all notifiers targeting the given realm to be ready for the
-    // given version or any later version
-    std::unique_lock<std::mutex> wait_for_notifiers(Realm& realm, uint64_t min_version);
     std::vector<std::shared_ptr<_impl::CollectionNotifier>> notifiers_for_realm(Realm&);
 };
+
+
+template<typename Pred>
+std::unique_lock<std::mutex> RealmCoordinator::wait_for_notifiers(Pred&& wait_predicate)
+{
+    std::unique_lock<std::mutex> lock(m_notifier_mutex);
+    bool first = true;
+    m_notifier_cv.wait(lock, [&] {
+        if (wait_predicate())
+            return true;
+        if (first) {
+            wake_up_notifier_worker();
+            first = false;
+        }
+        return false;
+    });
+    return lock;
+}
 
 } // namespace _impl
 } // namespace realm

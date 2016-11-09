@@ -57,6 +57,9 @@ public:
 
     std::string const& path() const { return m_realm_path; }
 
+    void wait_for_upload_completion();
+    void wait_for_download_completion();
+
     void wait_for_upload_completion(std::function<void()> callback);
     void wait_for_download_completion(std::function<void()> callback);
 

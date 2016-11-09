@@ -32,9 +32,6 @@
 using namespace realm;
 using namespace realm::util;
 
-// {"identity":"test", "access": ["download", "upload"]}
-static const std::string s_test_token = "eyJpZGVudGl0eSI6InRlc3QiLCAiYWNjZXNzIjogWyJkb3dubG9hZCIsICJ1cGxvYWQiXX0=";
-
 template <typename FetchAccessToken, typename ErrorHandler>
 std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<SyncUser> user, const std::string& path,
                                           FetchAccessToken&& fetch_access_token, ErrorHandler&& error_handler)

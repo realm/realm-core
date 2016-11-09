@@ -33,6 +33,11 @@
 
 #include <unistd.h>
 
+#if REALM_ENABLE_SYNC
+#include "sync/sync_manager.hpp"
+#include "sync/sync_session.hpp"
+#endif
+
 using namespace realm;
 
 class joining_thread {
@@ -889,6 +894,50 @@ TEST_CASE("notifications: async error handling") {
 
             REQUIRE(called2);
         }
+    }
+}
+#endif
+
+#if REALM_ENABLE_SYNC
+TEST_CASE("notifications: sync") {
+    SyncServer server(false);
+    SyncTestFile config(server);
+    config.cache = false;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+    };
+
+    SECTION("sync progress commits do not distrupt notifications") {
+        auto r = Realm::get_shared_realm(config);
+        auto wait_realm = Realm::get_shared_realm(config);
+
+        Results results(r, *r->read_group().get_table("class_object"));
+        Results wait_results(wait_realm, *wait_realm->read_group().get_table("class_object"));
+        auto token1 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { });
+        auto token2 = wait_results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { });
+
+        // Add an object to the Realm so that notifications are needed
+        {
+            auto write_realm = Realm::get_shared_realm(config);
+            write_realm->begin_transaction();
+            write_realm->read_group().get_table("class_object")->add_empty_row();
+            write_realm->commit_transaction();
+        }
+
+        // Wait for the notifications to become ready for the new version
+        wait_realm->refresh();
+
+        // Start the server and wait for the Realm to be uploaded so that sync
+        // makes some writes to the Realm and bumps the version
+        server.start();
+        SyncManager::shared().get_session(config.path, *config.sync_config)->wait_for_upload_completion();
+
+        // Make sure that the notifications still get delivered rather than
+        // waiting forever due to that we don't get a commit notification from
+        // the commits sync makes to store the upload progress
+        r->refresh();
     }
 }
 #endif
