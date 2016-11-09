@@ -8,15 +8,7 @@
 
 ### Breaking changes
 
-* Added support for search index on subtable columns. Only one level of
-  subtables are currently supported, that is, you cannot create a search
-  index in a subtable of a subtable (will throw exception). The feature
-  is required for upcoming support for Array and Map types. NOTE: Core
-  versions prior to this version will not be able to open .realm files of
-  this Core version if this Core version has added such indexes. Adding or
-  removing an index will take place for *all* subtables in a subtable 
-  column. There is no way to add or remove it form single individual
-  subtables.
+* Lorem ipsum.
 
 ### Enhancements
 
@@ -28,7 +20,17 @@
 
 ### Internals
 
-* Lorem ipsum.
+* [NOTE: Do not use following feature because Replication still needs 
+  support; the feature has been added to keep pull-request-merges small]
+  Added support for search index on subtable columns. Only one level of
+  subtables are currently supported, that is, you cannot create a search
+  index in a subtable of a subtable (will throw exception). The feature
+  is required for upcoming support for Array and Map types. NOTE: Core
+  versions prior to this version will not be able to open .realm files of
+  this Core version if this Core version has added such indexes. Adding or
+  removing an index will take place for *all* subtables in a subtable 
+  column. There is no way to add or remove it form single individual
+  subtables.
 
 ----------------------------------------------
 
