@@ -1741,8 +1741,6 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
         if (!parent_col) {
             throw LogicError(LogicError::subtable_of_subtable_index);
         }
-
-        TableRef sub;
         
         if (REALM_UNLIKELY(col_ndx >= subdesc->get()->get_spec()->get_column_count()))
             throw LogicError(LogicError::column_index_out_of_range);
@@ -1765,7 +1763,7 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
             attr &= ~col_attr_Indexed;
             subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
-            sub = get_subtable(*parent_col, r);
+            TableRef sub = get_subtable(*parent_col, r);
             ColumnBase& col = sub->get_column_base(col_ndx);
 
             // Create an empty search index for the column and add its ref to m_columns
@@ -1857,7 +1855,6 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
             throw LogicError(LogicError::subtable_of_subtable_index);
         }
 
-        TableRef sub;
 
         // Iterate through all rows of the root table and create an instance of each subtable. We have a special
         // problem though: All subtables share the same common instance of attributes, however while we successively
@@ -1873,7 +1870,7 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
 
             // Destroy search index. This will update shared attributes in case refresh_column_accessors() 
             // should depend on them being correct
-            sub = get_subtable(*parent_col, r);
+            TableRef sub = get_subtable(*parent_col, r);
             sub.get()->remove_search_index(col_ndx);
 
             refresh_column_accessors(col_ndx + 1); // Throws
