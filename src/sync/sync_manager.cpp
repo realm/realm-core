@@ -101,7 +101,7 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
             try {
                 m_file_manager->remove_user_directory(user.identity());
                 dead_users.emplace_back(std::move(user));
-            } catch (util::File::AccessError) {
+            } catch (util::File::AccessError const&) {
                 continue;
             }
         }

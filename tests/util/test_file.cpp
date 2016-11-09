@@ -105,7 +105,7 @@ SyncServer::SyncServer()
             m_server.start("127.0.0.1", util::to_string(port));
             break;
         }
-        catch (std::runtime_error) {
+        catch (std::runtime_error const&) {
             continue;
         }
     }

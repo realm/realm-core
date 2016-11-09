@@ -178,10 +178,10 @@ static std::vector<T> read_int_list(std::istream& input_stream)
             ret.push_back(std::stoll(line));
             log("%lld\n", (long long)ret.back());
         }
-        catch (std::invalid_argument) {
+        catch (std::invalid_argument const&) {
             // not an error
         }
-        catch (std::out_of_range) {
+        catch (std::out_of_range const&) {
             // not an error
         }
     }
