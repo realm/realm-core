@@ -207,7 +207,6 @@ bool EventLoop::has_implementation() { return false; }
 std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main() { return nullptr; }
 EventLoop::Impl::~Impl() = default;
 void EventLoop::Impl::run_until(std::function<bool()>) { }
-void EventLoop::Impl::run_for(std::chrono::nanoseconds) { }
 void EventLoop::Impl::perform(std::function<void()>) { }
 
 #endif

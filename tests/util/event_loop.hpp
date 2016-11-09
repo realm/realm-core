@@ -17,6 +17,8 @@
  **************************************************************************/
 
 #include <functional>
+#include <memory>
+#include <chrono>
 
 namespace realm {
 namespace util {
