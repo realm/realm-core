@@ -33,7 +33,7 @@
 #include <cstdlib>
 #include <unistd.h>
 
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#if REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
 #include <condition_variable>
 #include <functional>
 #include <thread>
@@ -126,7 +126,7 @@ std::string SyncServer::url_for_realm(StringData realm_name) const
 
 #endif // REALM_ENABLE_SYNC
 
-#if defined(__has_feature) && __has_feature(thread_sanitizer)
+#if REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
 // A helper which synchronously runs on_change() on a fixed background thread
 // so that ThreadSanitizer can potentially detect issues
 // This deliberately uses an unsafe spinlock for synchronization to ensure that
@@ -191,7 +191,7 @@ void advance_and_notify(Realm& realm)
     realm.notify();
 }
 
-#else // __has_feature(thread_sanitizer)
+#else // REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
 
 void advance_and_notify(Realm& realm)
 {
