@@ -17,6 +17,7 @@
  **************************************************************************/
 
 #include <functional>
+#include <memory>
 
 namespace realm {
 namespace util {
