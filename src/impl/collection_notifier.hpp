@@ -50,7 +50,8 @@ struct TransactionChangeInfo {
     std::vector<CollectionChangeBuilder> tables;
     bool track_all = false;
 
-    // Required by GCC 4.9
+#if __GNUC__ < 5
+    // GCC 4.9 does not support C++14 braced-init with NSDMIs
     TransactionChangeInfo() {}
     TransactionChangeInfo(std::vector<bool> table_modifications_needed,
                           std::vector<bool> table_moves_needed,
@@ -59,6 +60,7 @@ struct TransactionChangeInfo {
       table_moves_needed(std::move(table_moves_needed)),
       lists(std::move(lists))
     {}
+#endif
 };
 
 class DeepChangeChecker {
