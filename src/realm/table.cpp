@@ -1578,25 +1578,29 @@ Table::~Table() noexcept
 bool Table::has_search_index(size_t col_ndx, DescriptorRef* subdesc) const noexcept
 {
     if (subdesc) {
-        // Check column of subtable
+        // Check column of subtable given in subdesc. `this` table must be its root table
+        if (!get_descriptor()->is_root())
+            throw(LogicError::wrong_kind_of_table);
+
+        // If column does not exist, we have so far just returned false, so do this for subtables too
         if (REALM_UNLIKELY(col_ndx >= subdesc->get()->get_spec()->get_column_count()))
             return false;
-
-        TableRef sub;
 
         int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
         return (attr & col_attr_Indexed);
     }
     else if (has_shared_type()) {
+        // Check column of `this` which is the subtable itself. In this case, subdesc must be nullptr
+        REALM_ASSERT(!subdesc);
+
         if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
             return false;
 
-        // Method called directly on Table object which is a subtable
         int attr = get_descriptor()->get_spec()->get_column_attr(col_ndx);
         return attr & col_attr_Indexed;
     }
 
-    // Check column of root table
+    // Check column of `this` which is a root table
     // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         return false;
@@ -1725,7 +1729,10 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
         throw LogicError(LogicError::detached_accessor);
 
     if (subdesc) {
-        // Add search index on subtable
+        // Add index to column of subtable given in subdesc. `this` table must be its root table
+        if (!get_descriptor()->is_root())
+            throw(LogicError::wrong_kind_of_table);
+
         typedef _impl::DescriptorFriend df;
         size_t tmp;
 
@@ -1745,7 +1752,12 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
         if (attr & col_attr_Indexed)
             return;
 
-        // Iterate through all rows of the root table and create an instance of each subtable
+        // Iterate through all rows of the root table and create an instance of each subtable. We have a special
+        // problem though: All subtables share the same common instance of attributes, however while we successively
+        // create indexes, we have some subtables that will match the index flag and some that will not, which
+        // is an inchoherent state of the database. We rely on the fact that all method calls and operations in the 
+        // for-loop are safe to call despite of this.
+
         for (size_t r = 0; r < size(); r++) {
             // Clear index bit from shared spec because we're now going to operate on the next subtable
             // object which has no index yet (because various method calls may crash if attributes are 
@@ -1823,7 +1835,10 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
         throw LogicError(LogicError::detached_accessor);
 
     if (subdesc) {
-        // Remove search index from subtable
+        // Remove index from column of subtable given in subdesc. `this` table must be its root table
+        if (!get_descriptor()->is_root())
+            throw(LogicError::wrong_kind_of_table);
+
         typedef _impl::DescriptorFriend df;
 
         if (REALM_UNLIKELY(col_ndx >= subdesc->get()->get_spec()->get_column_count()))
@@ -1844,7 +1859,11 @@ void Table::remove_search_index(size_t col_ndx, DescriptorRef* subdesc)
 
         TableRef sub;
 
-        // Iterate through all rows of the root table and create an instance of each subtable
+        // Iterate through all rows of the root table and create an instance of each subtable. We have a special
+        // problem though: All subtables share the same common instance of attributes, however while we successively
+        // remove indexes, we have some subtables that will match the index flag and some that will not, which
+        // is an inchoherent state of the database. We rely on the fact that all method calls and operations in the 
+        // for-loop are safe to call despite of this.
         for (size_t r = 0; r < size(); r++) {
             // Set index bit from shared spec because we're now going to operate on the next subtable
             // object which still has an index (because various method calls may crash if attributes are 
