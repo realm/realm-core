@@ -67,8 +67,8 @@ TEST_CASE("sync: log-in", "[sync]") {
     SECTION("Can log in") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, SyncManager::shared().get_user("user", "not_a_real_token"), "/test",
-                                    [&](auto...) { return s_test_token; },
-                                    [&](auto...) { ++error_count; });
+                                    [&](const std::string&, const std::string&) { return s_test_token; },
+                                    [&](int, std::string, SyncSessionError) { ++error_count; });
 
         std::atomic<bool> download_did_complete(false);
         // FIXME: Should it be necessary to kick this wait off asynchronously?
@@ -87,8 +87,8 @@ TEST_CASE("sync: log-in", "[sync]") {
     SECTION("Session is invalid after invalid token") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, SyncManager::shared().get_user("user", "not_a_real_token"), "/test",
-                                    [&](auto...) { return "this is not a valid access token"; },
-                                    [&](auto...) { ++error_count; });
+                                    [&](const std::string&, const std::string&) { return "this is not a valid access token"; },
+                                    [&](int, std::string, SyncSessionError) { ++error_count; });
 
         EventLoop::main().run_until([&] { return error_count > 0; });
         CHECK(!session->is_valid());
@@ -101,8 +101,8 @@ TEST_CASE("sync: log-in", "[sync]") {
     SECTION("Session is invalid after invalid token while waiting on download to complete") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, nullptr, "/test",
-                                    [&](auto...) { return "this is not a valid access token"; },
-                                    [&](auto...) { ++error_count; });
+                                    [&](const std::string&, const std::string&) { return "this is not a valid access token"; },
+                                    [&](int, std::string, SyncSessionError) { ++error_count; });
 
         EventLoop::main().perform([&] {
             session->wait_for_download_completion([] {
