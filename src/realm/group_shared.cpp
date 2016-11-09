@@ -947,18 +947,22 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                     case Replication::hist_None:
                     case Replication::hist_OutOfRealm:
                         good_history_type = (stored_history_type == Replication::hist_None);
+                        if (!good_history_type)
+                            throw IncompatibleHistories("Expected a Realm without history", path);
                         break;
                     case Replication::hist_InRealm:
                         good_history_type = (stored_history_type == Replication::hist_InRealm ||
                                              stored_history_type == Replication::hist_None);
+                        if (!good_history_type)
+                            throw IncompatibleHistories("Expected a Realm with no or in-realm history", path);
                         break;
                     case Replication::hist_Sync:
                         good_history_type = ((stored_history_type == Replication::hist_Sync) ||
                                              (stored_history_type == Replication::hist_None && top_ref == 0));
+                        if (!good_history_type)
+                            throw IncompatibleHistories(
+                                "Expected an empty Realm or a Realm written by Realm Mobile Platform", path);
                 }
-                if (!good_history_type)
-                    throw InvalidDatabase("Bad or incompatible history type", path);
-
                 if (Replication* repl = gf::get_replication(m_group))
                     repl->initiate_session(version); // Throws
 

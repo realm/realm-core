@@ -54,6 +54,15 @@ struct IncompatibleLockFile : std::runtime_error {
     }
 };
 
+/// Thrown by SharedGroup::open() if the realm database was generated with
+/// a format for Realm Mobile Platform but is being opened as a Realm
+/// Mobile Database or vice versa.
+struct IncompatibleHistories : util::File::AccessError {
+    IncompatibleHistories(const std::string& msg, const std::string& path)
+        : util::File::AccessError("Incompatible histories. " + msg, path)
+    {
+    }
+};
 
 /// A SharedGroup facilitates transactions.
 ///
