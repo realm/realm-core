@@ -18,7 +18,9 @@
 
 include(ExternalProject)
 include(ProcessorCount)
+
 find_package(PkgConfig)
+find_package(Threads)
 
 if(${CMAKE_GENERATOR} STREQUAL "Unix Makefiles")
     set(MAKE_EQUAL_MAKE "MAKE=$(MAKE)")
@@ -110,6 +112,8 @@ function(download_realm_core core_version)
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION_RELEASE ${core_library_release})
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION ${core_library_release})
 
+    set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES Threads::Threads)
+
     set(REALM_CORE_INCLUDE_DIR ${core_directory}/include PARENT_SCOPE)
 endfunction()
 
@@ -131,6 +135,8 @@ macro(define_built_realm_core_target core_directory)
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION_COVERAGE ${core_library_debug})
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION_RELEASE ${core_library_release})
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION ${core_library_release})
+
+    set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES Threads::Threads)
 
     set(REALM_CORE_INCLUDE_DIR ${core_directory}/src PARENT_SCOPE)
 endmacro()
