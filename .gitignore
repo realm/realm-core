@@ -18,3 +18,5 @@ Debug/
 Release/
 RelWithDebInfo/
 MinSizeRel/
+coverage.xml
+coverage/
