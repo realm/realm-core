@@ -157,11 +157,11 @@ endmacro()
 function(clone_and_build_realm_core branch)
     set(core_prefix_directory "${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
     ExternalProject_Add(realm-core
-        GIT_REPOSITORY "git@github.com:realm/realm-core.git"
+        GIT_REPOSITORY "https://github.com/realm/realm-core.git"
         GIT_TAG ${branch}
         PREFIX ${core_prefix_directory}
         BUILD_IN_SOURCE 1
-        CONFIGURE_COMMAND ""
+        CONFIGURE_COMMAND sh build.sh config
         BUILD_COMMAND make -C src/realm librealm.a librealm-dbg.a ${MAKE_FLAGS}
         INSTALL_COMMAND ""
         ${USES_TERMINAL_BUILD}
