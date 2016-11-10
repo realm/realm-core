@@ -53,7 +53,7 @@ def doBuildLinux() {
         $class: 'CoberturaPublisher',
         autoUpdateHealth: false,
         autoUpdateStability: false,
-        coberturaReportFile: 'coverage.xml',
+        coberturaReportFile: 'coverage.build/coverage.xml',
         failNoReports: true,
         failUnhealthy: false,
         failUnstable: false,
