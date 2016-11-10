@@ -12,6 +12,8 @@ docker build -t ci/realm-object-server:build .
 
 docker run --rm \
   -u $(id -u) \
+  -v "${HOME}:${HOME}" \
+  -e HOME="${HOME}" \
   -v /etc/passwd:/etc/passwd:ro \
   -v $(pwd):/source \
   -w /source \
