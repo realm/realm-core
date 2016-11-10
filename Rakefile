@@ -410,11 +410,11 @@ end
 android_build_types = %w(Release Debug)
 
 android_abis = [
-  { :name => 'armeabi-v7a', :package_name => 'arm-v7a' },
-  { :name => 'x86', :package_name => 'x86' },
-  { :name => 'mips', :package_name => 'mips' },
-  { :name => 'arm64-v8a', :package_name => 'arm64' },
-  { :name => 'x86_64', :package_name => 'x86_64' }
+  { name => 'armeabi-v7a', package_name => 'arm-v7a' },
+  { name => 'x86', package_name => 'x86' },
+  { name => 'mips', package_name => 'mips' },
+  { name => 'arm64-v8a', package_name => 'arm64' },
+  { name => 'x86_64', package_name => 'x86_64' }
 ]
 
 build_android_dependencies = []
@@ -438,7 +438,7 @@ android_abis.product(android_build_types) do |abi, build_type|
   task "build-android-#{abi[:name]}-#{build_type}" => ["config-android-#{abi[:name]}-#{build_type}", 'guess_num_processors'] do
     Dir.chdir(dir) do
       sh "make realm -j#{@num_processors}"
-      sh "make install/fast"
+      sh 'make install/fast'
     end
   end
 

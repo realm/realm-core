@@ -325,6 +325,7 @@ def doBuildAndroid() {
     environment << "REALM_ENABLE_ENCRYPTION=yes"
     environment << "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin:/usr/local/bin:/opt/android-sdk-linux/tools:/opt/android-sdk-linux/platform-tools:/opt/android-ndk-r10e"
     environment << "ANDROID_NDK_HOME=/opt/android-ndk-r10e"
+    environment << "ANDROID_NDK=/opt/android-ndk-r10e"
 
     return {
         node('fastlinux') {
