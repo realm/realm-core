@@ -509,8 +509,8 @@ bool matchlike_ins(const StringData& text, const StringData& pattern_upper, cons
 {
     std::vector<size_t> textpos;
     std::vector<size_t> patternpos;
-    size_t p1 = 0;
-    size_t p2 = 0;
+    size_t p1 = 0; // position in text (haystack)
+    size_t p2 = 0; // position in pattern (needle)
     
     while (true) {
         if (p1 == text.size()) {
@@ -531,20 +531,23 @@ bool matchlike_ins(const StringData& text, const StringData& pattern_upper, cons
         if (pattern_lower[p2] == '?') {
             // utf-8 encoded characters may take up multiple bytes
             if ((text[p1] & 0x80) == 0) {
-                ++p1; ++p2;
+                ++p1;
+                ++p2;
                 continue;
             }
             else {
                 size_t p = 1;
                 while (p1+p != text.size() && (text[p1+p] & 0xc0) == 0x80)
                     ++p;
-                p1 += p; ++p2;
+                p1 += p;
+                ++p2;
                 continue;
             }
         }
         
         if (pattern_lower[p2] == text[p1] || pattern_upper[p2] == text[p1]) {
-            ++p1; ++p2;
+            ++p1;
+            ++p2;
             continue;
         }
         

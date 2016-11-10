@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Added support for LIKE queries (wildcard with ? and *)
 
 -----------
 
