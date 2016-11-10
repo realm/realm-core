@@ -80,7 +80,6 @@ if(APPLE)
         set(CMAKE_XCODE_EFFECTIVE_PLATFORMS
             "-macosx;-iphoneos;-iphonesimulator;-appletvos;-appletvsimulator;-watchos;-watchsimulator"
         )
-        set(CMAKE_OSX_SYSROOT $(PLATFORM_NAME))
         set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
 
         # Deployment targets
