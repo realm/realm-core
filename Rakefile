@@ -410,11 +410,11 @@ end
 android_build_types = %w(Release Debug)
 
 android_abis = [
-  { name => 'armeabi-v7a', package_name => 'arm-v7a' },
-  { name => 'x86', package_name => 'x86' },
-  { name => 'mips', package_name => 'mips' },
-  { name => 'arm64-v8a', package_name => 'arm64' },
-  { name => 'x86_64', package_name => 'x86_64' }
+  { :name => 'armeabi-v7a', :package_name => 'arm-v7a' },
+  { :name => 'x86', :package_name => 'x86' },
+  { :name => 'mips', :package_name => 'mips' },
+  { :name => 'arm64-v8a', :package_name => 'arm64' },
+  { :name => 'x86_64', :package_name => 'x86_64' }
 ]
 
 build_android_dependencies = []
