@@ -18,10 +18,25 @@
 
 include(ExternalProject)
 include(ProcessorCount)
-find_package(PkgConfig)
 
-if(${CMAKE_GENERATOR} STREQUAL "Unix Makefiles")
-    set(MAKE_EQUAL_MAKE "MAKE=$(MAKE)")
+find_package(PkgConfig)
+find_package(Threads)
+
+if(APPLE)
+    find_library(Foundation Foundation)
+    find_library(Foundation Security)
+
+    set(CRYPTO_LIBRARIES "")
+    set(SSL_LIBRARIES Foundation Security)
+elseif(REALM_PLATFORM STREQUAL "Android")
+    # The Android core and sync libraries include the necessary portions of OpenSSL.
+    set(CRYPTO_LIBRARIES "")
+    set(SSL_LIBRARIES "")
+else()
+    find_package(OpenSSL REQUIRED)
+
+    set(CRYPTO_LIBRARIES OpenSSL::Crypto)
+    set(SSL_LIBRARIES OpenSSL::SSL)
 endif()
 
 set(MAKE_FLAGS "REALM_HAVE_CONFIG=1")
@@ -110,6 +125,8 @@ function(download_realm_core core_version)
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION_RELEASE ${core_library_release})
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION ${core_library_release})
 
+    set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES Threads::Threads ${CRYPTO_LIBRARIES})
+
     set(REALM_CORE_INCLUDE_DIR ${core_directory}/include PARENT_SCOPE)
 endfunction()
 
@@ -132,17 +149,19 @@ macro(define_built_realm_core_target core_directory)
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION_RELEASE ${core_library_release})
     set_property(TARGET realm PROPERTY IMPORTED_LOCATION ${core_library_release})
 
+    set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES Threads::Threads ${CRYPTO_LIBRARIES})
+
     set(REALM_CORE_INCLUDE_DIR ${core_directory}/src PARENT_SCOPE)
 endmacro()
 
 function(clone_and_build_realm_core branch)
     set(core_prefix_directory "${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
     ExternalProject_Add(realm-core
-        GIT_REPOSITORY "git@github.com:realm/realm-core.git"
+        GIT_REPOSITORY "https://github.com/realm/realm-core.git"
         GIT_TAG ${branch}
         PREFIX ${core_prefix_directory}
         BUILD_IN_SOURCE 1
-        CONFIGURE_COMMAND ""
+        CONFIGURE_COMMAND sh build.sh config
         BUILD_COMMAND make -C src/realm librealm.a librealm-dbg.a ${MAKE_FLAGS}
         INSTALL_COMMAND ""
         ${USES_TERMINAL_BUILD}
@@ -171,10 +190,6 @@ endfunction()
 
 function(build_realm_sync sync_directory)
     get_filename_component(sync_directory ${sync_directory} ABSOLUTE)
-    if(APPLE)
-        find_library(FOUNDATION Foundation)
-        find_library(SECURITY Security)
-    endif()
     ExternalProject_Add(realm-sync-lib
         DEPENDS realm-core
         URL ""
@@ -204,11 +219,8 @@ function(build_realm_sync sync_directory)
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_COVERAGE ${sync_library_debug})
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_RELEASE ${sync_library_release})
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION ${sync_library_release})
-    if(APPLE)
-        set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES ${FOUNDATION} ${SECURITY})
-    else()
-        set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES -lcrypto -lssl)
-    endif()
+
+    set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES})
 
     # Sync server library is built as part of the sync library build
     ExternalProject_Add(realm-server-lib
@@ -239,11 +251,7 @@ function(build_realm_sync sync_directory)
     set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION ${sync_server_library_release})
 
     pkg_check_modules(YAML QUIET yaml-cpp)
-    if(APPLE)
-        set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES ${FOUNDATION} ${SECURITY} ${YAML_LDFLAGS})
-    else()
-        set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES -lcrypto -lssl  ${YAML_LDFLAGS})
-    endif()
+    set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES} ${YAML_LDFLAGS})
 
     set(REALM_SYNC_INCLUDE_DIR ${sync_directory}/src PARENT_SCOPE)
 endfunction()
