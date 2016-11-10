@@ -39,10 +39,6 @@ else()
     set(SSL_LIBRARIES OpenSSL::SSL)
 endif()
 
-if(${CMAKE_GENERATOR} STREQUAL "Unix Makefiles")
-    set(MAKE_EQUAL_MAKE "MAKE=$(MAKE)")
-endif()
-
 set(MAKE_FLAGS "REALM_HAVE_CONFIG=1")
 
 if(SANITIZER_FLAGS)
