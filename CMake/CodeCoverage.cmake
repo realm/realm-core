@@ -16,9 +16,9 @@
 #
 ###########################################################################
 
-find_program(LCOV_PATH lcov)
-find_program(GENHTML_PATH genhtml)
-find_program(GCOVR_PATH gcovr PATHS ${CMAKE_SOURCE_DIR}/tests)
+find_host_program(LCOV_PATH lcov)
+find_host_program(GENHTML_PATH genhtml)
+find_host_program(GCOVR_PATH gcovr PATHS ${CMAKE_SOURCE_DIR}/tests)
 
 set(CMAKE_CXX_FLAGS_COVERAGE "-g -O0 -fprofile-arcs -ftest-coverage"
     CACHE STRING "Flags used by the C++ compiler during coverage builds.")

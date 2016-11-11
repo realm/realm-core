@@ -9,6 +9,19 @@ endif()
 set(CMAKE_BUILD_TYPE Debug CACHE STRING "")
 project(realm-object-store)
 
+# Search packages for host system instead of packages for target system
+# in case of cross compilation these macro should be defined by toolchain file
+if(NOT COMMAND find_host_package)
+  macro(find_host_package)
+    find_package(${ARGN})
+  endmacro()
+endif()
+if(NOT COMMAND find_host_program)
+  macro(find_host_program)
+    find_program(${ARGN})
+  endmacro()
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
 include(CodeCoverage)
