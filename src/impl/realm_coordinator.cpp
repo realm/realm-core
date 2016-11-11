@@ -138,7 +138,7 @@ void RealmCoordinator::set_config(const Realm::Config& config)
     }
 
 #if REALM_ENABLE_SYNC
-    if (config.sync_config) {
+    if (config.sync_config && config.sync_config->create_session) {
         create_sync_session();
     }
 #endif
