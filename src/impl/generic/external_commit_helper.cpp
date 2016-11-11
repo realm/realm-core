@@ -20,7 +20,7 @@
 
 #include "impl/realm_coordinator.hpp"
 
-#include <realm/commit_log.hpp>
+#include <realm/history.hpp>
 #include <realm/replication.hpp>
 
 using namespace realm;
@@ -28,9 +28,10 @@ using namespace realm::_impl;
 
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
-, m_history(realm::make_client_history(parent.get_path(), parent.get_encryption_key().data()))
-, m_sg(*m_history, parent.is_in_memory() ? SharedGroup::durability_MemOnly : SharedGroup::durability_Full,
-       parent.get_encryption_key().data())
+, m_history(realm::make_in_realm_history(parent.get_path()))
+, m_sg(*m_history, SharedGroupOptions(parent.is_in_memory() ? SharedGroupOptions::Durability::MemOnly
+                                                            : SharedGroupOptions::Durability::Full,
+                                      parent.get_encryption_key().data()))
 , m_thread(std::async(std::launch::async, [=] {
     m_sg.begin_read();
     while (m_sg.wait_for_change()) {
