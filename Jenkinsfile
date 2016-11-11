@@ -73,7 +73,10 @@ def doDockerBuild(String flavor) {
         currentBuild.result = 'FAILURE'
       }
 
-      publishReports(flavor)
+      if(flavor != 'android') {
+        // we're not yet able to run unit tests for android
+        publishReports(flavor)
+      }
     }
   }
 }
