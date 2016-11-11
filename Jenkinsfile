@@ -78,20 +78,20 @@ def doDockerBuild(String flavor) {
   }
 }
 
-def doBuild(String node) {
+def doBuild(String nodeSpec, String flavor) {
   return {
-    node(node) {
+    node(nodeSpec) {
       try {
         getSourceArchive()
         sshagent(['realm-ci-ssh']) {
-          sh "./workflow/test_coverage.sh"
+          sh "./workflow/test_coverage.sh ${flavor}"
         }
         currentBuild.result = 'SUCCESS'
       } catch (Exception err) {
         currentBuild.result = 'FAILURE'
       }
 
-      publishReports('macOS')
+      publishReports(flavor)
     }
   }
 }
@@ -121,6 +121,6 @@ stage('unit-tests') {
   parallel(
     linux: doDockerBuild('linux'),
     android: doDockerBuild('android'),
-    macos: doBuild('osx')
+    macos: doBuild('osx', 'macOS')
   )
 }
