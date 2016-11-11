@@ -172,3 +172,21 @@ TEST_CASE("sync_manager: persistent user state management") {
         }
     }
 }
+
+TEST_CASE("sync_manager: metadata") {
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    reset_test_directory(base_path);
+
+    SECTION("should be reset in case of decryption error") {
+        const size_t key_size = 64;
+        std::vector<char> encryption_key(key_size);
+
+        arc4random_buf(encryption_key.data(), key_size);
+        SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::Encryption, encryption_key);
+
+        SyncManager::shared().reset_for_testing();
+
+        arc4random_buf(encryption_key.data(), key_size);
+        SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::Encryption, encryption_key, true);
+    }
+}
