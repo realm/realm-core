@@ -1,12 +1,9 @@
 #!/bin/sh
 # This script can be used to locally check and debug
 # the linux build process outside of CI.
-# This should be run from the root directory `packaging/local_docker_build.sh`
+# This should be run from the root directory: `./workflow/local_docker_build.sh`
 
 set -e
-
-rm -rf CMakeCache.txt
-find . -name CMakeFiles -print0 | xargs -0 rm -rf
 
 docker build -t ci/realm-object-server:build .
 

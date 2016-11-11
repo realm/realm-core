@@ -7,6 +7,7 @@ fi
 
 set -e
 
+rm -rf coverage.build
 mkdir -p coverage.build
 cd coverage.build
 
