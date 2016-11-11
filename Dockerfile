@@ -13,4 +13,3 @@ RUN mkdir -p /tmp/android-ndk && \
     chmod -R a+rX /opt/android-ndk && \
     rm -rf /tmp/android-ndk
 
-RUN apt-get install -y 

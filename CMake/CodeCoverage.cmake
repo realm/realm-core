@@ -16,9 +16,9 @@
 #
 ###########################################################################
 
-find_host_program(LCOV_PATH lcov)
-find_host_program(GENHTML_PATH genhtml)
-find_host_program(GCOVR_PATH gcovr PATHS ${CMAKE_SOURCE_DIR}/tests)
+find_program(LCOV_PATH lcov)
+find_program(GENHTML_PATH genhtml)
+find_program(GCOVR_PATH gcovr PATHS ${CMAKE_SOURCE_DIR}/tests)
 
 set(CMAKE_CXX_FLAGS_COVERAGE "-g -O0 -fprofile-arcs -ftest-coverage"
     CACHE STRING "Flags used by the C++ compiler during coverage builds.")
@@ -44,6 +44,9 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
       COMMAND ${CMAKE_COMMAND} -E remove coverage.info coverage.info.cleaned
 
       COMMAND echo Open coverage/index.html in your browser to view the coverage report.
+
+      COMMAND ${GCOVR_PATH} -x -r ${CMAKE_SOURCE_DIR}/src ./src -o coverage.xml
+      COMMAND echo Code coverage report written to coverage.xml
 
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )

@@ -56,7 +56,7 @@ if (env.BRANCH_NAME == 'master') {
   env.DOCKER_PUSH = "1"
 }
 
-def doDockerBuild(String flavor) {
+def doDockerBuild(String flavor, Boolean withCoverage) {
   return {
     node('docker') {
       try {
@@ -64,7 +64,11 @@ def doDockerBuild(String flavor) {
         def image = buildDockerEnv("ci/realm-object-store:${flavor}")
         sshagent(['realm-ci-ssh']) {
           image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -e HOME=${env.HOME}") {
-            sh "./workflow/test_coverage.sh ${flavor}"
+            if(withCoverage) {
+              sh "./workflow/test_coverage.sh ${flavor}"
+            } else {
+              sh "./workflow/build.sh ${flavor}"
+            }
           }
         }
 
@@ -73,8 +77,7 @@ def doDockerBuild(String flavor) {
         currentBuild.result = 'FAILURE'
       }
 
-      if(flavor != 'android') {
-        // we're not yet able to run unit tests for android
+      if(withCoverage) {
         publishReports(flavor)
       }
     }
@@ -122,8 +125,8 @@ stage('prepare') {
 
 stage('unit-tests') {
   parallel(
-    linux: doDockerBuild('linux'),
-    android: doDockerBuild('android'),
+    linux: doDockerBuild('linux', true),
+    android: doDockerBuild('android', false),
     macos: doBuild('osx', 'macOS')
   )
 }
