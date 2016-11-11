@@ -50,7 +50,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
 
     add_custom_target(${targetname}-cobertura
       COMMAND ${testrunner}
-      COMMAND ${GCOVR_PATH} -x -r ${CMAKE_SOURCE_DIR}/src -o coverage.xml
+      COMMAND ${GCOVR_PATH} -x -r ${CMAKE_SOURCE_DIR}/src ./src -o coverage.xml
       COMMAND echo Code coverage report written to coverage.xml
 
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}

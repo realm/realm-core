@@ -44,6 +44,39 @@ def doBuildLinux() {
             """
           }
         }
+
+        currentBuild.result = 'SUCCESS'
+      } catch (Exception err) {
+        currentBuild.result = 'FAILURE'
+      }
+
+      step([
+        $class: 'CoberturaPublisher',
+        autoUpdateHealth: false,
+        autoUpdateStability: false,
+        coberturaReportFile: 'coverage.build/coverage.xml',
+        failNoReports: true,
+        failUnhealthy: false,
+        failUnstable: false,
+        maxNumberOfBuilds: 0,
+        onlyStable: false,
+        sourceEncoding: 'ASCII',
+        zoomCoverageChart: false
+      ])
+    }
+  }
+}
+
+def doBuildMacOS() {
+  return {
+    node('osx') {
+      try {
+        getSourceArchive()
+        sshagent(['realm-ci-ssh']) {
+          sh """
+            sh ./workflow/test_coverage.sh
+          """
+        }
         currentBuild.result = 'SUCCESS'
       } catch (Exception err) {
         currentBuild.result = 'FAILURE'
@@ -89,6 +122,7 @@ stage('prepare') {
 
 stage('unit-tests') {
   parallel(
-    linux: doBuildLinux()
+    linux: doBuildLinux(),
+    macos: doBuildMacOS()
   )
 }
