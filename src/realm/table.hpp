@@ -246,7 +246,8 @@ public:
     ///
     /// \param column_ndx The index of a column of the table.
 
-    bool has_search_index(size_t column_ndx, DescriptorRef* subdesc = nullptr) const noexcept;
+   // bool has_search_index(size_t column_ndx, DescriptorRef* subdesc = nullptr) const;
+    bool has_search_index(size_t column_ndx, ConstDescriptorRef subdesc = nullptr) const;
     void add_search_index(size_t column_ndx, DescriptorRef* subdesc = nullptr);
     void remove_search_index(size_t column_ndx, DescriptorRef* subdesc = nullptr);
 

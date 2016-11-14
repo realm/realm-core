@@ -81,6 +81,8 @@ enum Instruction {
     instr_LinkListNullify = 36, // Remove an entry from a link list due to linked row being erased
     instr_LinkListClear = 37,   // Ramove all entries from a link list
     instr_LinkListSetAll = 38,  // Assign to link list entry
+    instr_AddSubtableSearchIndex = 39,  // Add search index to subtable
+    instr_RemoveSubtableSearchIndex = 40   // Remove search index from subtable
 };
 
 
@@ -312,6 +314,16 @@ public:
         return true;
     }
 
+    bool add_subtable_search_index(size_t, size_t, size_t)
+    {
+        return true;
+    }
+
+    bool remove_subtable_search_index(size_t, size_t, size_t)
+    {
+        return true;
+    }
+
     void parse_complete()
     {
     }
@@ -369,7 +381,9 @@ public:
     bool rename_column(size_t col_ndx, StringData new_name);
     bool move_column(size_t col_ndx_1, size_t col_ndx_2);
     bool add_search_index(size_t col_ndx);
+    bool add_subtable_search_index(size_t table_ndx, size_t subtable_col, size_t index_col);
     bool remove_search_index(size_t col_ndx);
+    bool remove_subtable_search_index(size_t table_ndx, size_t subtable_col, size_t index_col);
     bool set_link_type(size_t col_ndx, LinkType);
 
     // Must have linklist selected:
@@ -485,6 +499,8 @@ public:
     void merge_rows(const Table*, size_t row_ndx, size_t new_row_ndx);
     void add_search_index(const Table*, size_t col_ndx);
     void remove_search_index(const Table*, size_t col_ndx);
+    void add_subtable_search_index(size_t table_ndx, size_t subtable_col, size_t index_col);
+    void remove_subtable_search_index(size_t table_ndx, size_t subtable_col, size_t index_col);
     void set_link_type(const Table*, size_t col_ndx, LinkType);
     void clear_table(const Table*);
     void optimize_table(const Table*);
@@ -1460,6 +1476,18 @@ inline bool TransactLogEncoder::add_search_index(size_t col_ndx)
     return true;
 }
 
+inline bool TransactLogEncoder::add_subtable_search_index(size_t table_ndx, size_t subtable_col, size_t index_col)
+{   
+    append_simple_instr(instr_AddSubtableSearchIndex, util::tuple(table_ndx, subtable_col, index_col)); // Throws
+    return true;
+}
+
+
+inline void TransactLogConvenientEncoder::add_subtable_search_index(size_t table_ndx, size_t subtable_col, size_t index_col)
+{
+    m_encoder.add_subtable_search_index(table_ndx, subtable_col, index_col);
+}
+
 inline void TransactLogConvenientEncoder::add_search_index(const Table* t, size_t col_ndx)
 {
     select_table(t);                     // Throws
@@ -1484,6 +1512,19 @@ inline bool TransactLogEncoder::set_link_type(size_t col_ndx, LinkType link_type
     append_simple_instr(instr_SetLinkType, util::tuple(col_ndx, int(link_type))); // Throws
     return true;
 }
+
+
+inline void TransactLogConvenientEncoder::remove_subtable_search_index(size_t table_ndx, size_t subtable_col, size_t index_col)
+{
+    m_encoder.remove_subtable_search_index(table_ndx, subtable_col, index_col);
+}
+
+inline bool TransactLogEncoder::remove_subtable_search_index(size_t table_ndx, size_t subtable_col, size_t index_col)
+{
+    append_simple_instr(instr_RemoveSubtableSearchIndex, util::tuple(table_ndx, subtable_col, index_col)); // Throws
+    return true;
+}
+
 
 inline void TransactLogConvenientEncoder::set_link_type(const Table* t, size_t col_ndx, LinkType link_type)
 {
@@ -1975,9 +2016,25 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_AddSubtableSearchIndex: {
+            size_t table_ndx = read_int<size_t>();    // Throws
+            size_t subtable_col = read_int<size_t>();    // Throws
+            size_t index_col = read_int<size_t>();    // Throws
+            if (!handler.add_subtable_search_index(table_ndx, subtable_col, index_col)) // Throws
+                parser_error();
+            return;
+        }
         case instr_RemoveSearchIndex: {
             size_t col_ndx = read_int<size_t>();       // Throws
             if (!handler.remove_search_index(col_ndx)) // Throws
+                parser_error();
+            return;
+        }
+        case instr_RemoveSubtableSearchIndex: {
+            size_t table_ndx = read_int<size_t>();    // Throws
+            size_t subtable_col = read_int<size_t>();    // Throws
+            size_t index_col = read_int<size_t>();    // Throws
+            if (!handler.remove_subtable_search_index(table_ndx, subtable_col, index_col)) // Throws
                 parser_error();
             return;
         }
@@ -2545,9 +2602,19 @@ public:
         return true; // No-op
     }
 
+    bool add_subtable_search_index(size_t, size_t, size_t)
+    {
+        return true;
+    }
+                
     bool remove_search_index(size_t)
     {
         return true; // No-op
+    }
+
+    bool remove_subtable_search_index(size_t, size_t, size_t)
+    {
+        return true;
     }
 
     bool set_link_type(size_t, LinkType)

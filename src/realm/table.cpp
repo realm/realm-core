@@ -1574,8 +1574,7 @@ Table::~Table() noexcept
     m_top.destroy_deep();
 }
 
-
-bool Table::has_search_index(size_t col_ndx, DescriptorRef* subdesc) const noexcept
+bool Table::has_search_index(size_t col_ndx, ConstDescriptorRef subdesc) const
 {
     if (subdesc) {
         // Check column of subtable given in subdesc. `this` table must be its root table
@@ -1583,10 +1582,10 @@ bool Table::has_search_index(size_t col_ndx, DescriptorRef* subdesc) const noexc
             throw(LogicError::wrong_kind_of_table);
 
         // If column does not exist, we have so far just returned false, so do this for subtables too
-        if (REALM_UNLIKELY(col_ndx >= subdesc->get()->get_spec()->get_column_count()))
+        if (REALM_UNLIKELY(col_ndx >= subdesc->get_spec()->get_column_count()))
             return false;
 
-        int attr = subdesc->get()->get_spec()->get_column_attr(col_ndx);
+        int attr = subdesc->get_spec()->get_column_attr(col_ndx);
         return (attr & col_attr_Indexed);
     }
     else if (has_shared_type()) {
@@ -1786,6 +1785,10 @@ void Table::add_search_index(size_t col_ndx, DescriptorRef* subdesc)
         subdesc->get()->get_spec()->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
         refresh_column_accessors(*parent_col); // Throws
+
+        if (Replication* repl = get_repl()) {
+            repl->add_subtable_search_index(get_index_in_group(), *parent_col, col_ndx); // Throws
+        }
 
         return;
     }

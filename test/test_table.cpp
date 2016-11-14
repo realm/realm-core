@@ -2296,11 +2296,11 @@ TEST(Table_SubtableIndex)
         // no rows yet, so it's just a 0-ref in the ColumnTable object). Important to test because the
         // search index is then constructed in a different place in the source code
         table.get()->add_search_index(0, &sub_1);
-        CHECK(table.get()->has_search_index(0, &sub_1));
+        CHECK(table.get()->has_search_index(0, sub_1));
         table.get()->remove_search_index(0, &sub_1);
-        CHECK(!table.get()->has_search_index(0, &sub_1));
+        CHECK(!table.get()->has_search_index(0, sub_1));
         table.get()->add_search_index(0, &sub_1);
-        CHECK(table.get()->has_search_index(0, &sub_1));
+        CHECK(table.get()->has_search_index(0, sub_1));
 
         CHECK_EQUAL(2, table->get_column_count());
 
@@ -2328,8 +2328,6 @@ TEST(Table_SubtableIndex)
         subtable->add_empty_row();
         subtable->set_int(0, 1, 77);
         subtable->set_string(1, 1, "testsub4");
-
-        int64_t tt = subtable.get()->get_int(0, 0);
 
         subtable = table->get_subtable(1, 0);
         CHECK(subtable.get()->has_search_index(0));
@@ -2457,7 +2455,7 @@ TEST(Table_SubtableIndex)
         // Check what happens if user given column index is out of range
         CHECK_THROW(table->add_search_index(100, &des), LogicError);
         CHECK_THROW(table->remove_search_index(100, &des), LogicError);
-        CHECK(!table->has_search_index(100, &des));
+        CHECK(!table->has_search_index(100, des));
     }
 }
 

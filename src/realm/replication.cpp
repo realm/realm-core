@@ -393,6 +393,46 @@ public:
         return false;
     }
 
+
+    bool add_subtable_search_index(size_t table_ndx, size_t subtable_col, size_t index_col)
+    {
+        if (table_ndx >= m_group.size())
+            return false;
+
+        TableRef root = m_group.get_table(table_ndx);
+        
+        if (subtable_col >= root->get_column_count())
+            return false;
+        
+        DescriptorRef desc = root->get_subdescriptor(subtable_col);
+
+        if (index_col >= desc->get_column_count())
+            return false;
+
+        root->add_search_index(index_col, &desc);
+        return true;
+    }
+
+    bool remove_subtable_search_index(size_t table_ndx, size_t subtable_col, size_t index_col)
+    {
+        if (table_ndx >= m_group.size())
+            return false;
+
+        TableRef root = m_group.get_table(table_ndx);
+
+        if (subtable_col >= root->get_column_count())
+            return false;
+
+        DescriptorRef desc = root->get_subdescriptor(subtable_col);
+        root->remove_search_index(index_col, &desc);
+
+        if (index_col >= desc->get_column_count())
+            return false;
+
+        return true;
+    }
+
+
     bool set_link_type(size_t col_ndx, LinkType link_type)
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_desc))) {

@@ -1644,12 +1644,22 @@ public:
         return true;
     }
 
+    bool add_subtable_search_index(size_t, size_t, size_t) noexcept
+    {
+        return true; // No-op
+    }
+
     bool add_search_index(size_t) noexcept
     {
         return true; // No-op
     }
 
     bool remove_search_index(size_t) noexcept
+    {
+        return true; // No-op
+    }
+
+    bool remove_subtable_search_index(size_t, size_t, size_t) noexcept
     {
         return true; // No-op
     }
