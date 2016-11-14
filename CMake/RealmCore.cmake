@@ -23,11 +23,11 @@ find_package(PkgConfig)
 find_package(Threads)
 
 if(APPLE)
-    find_library(Foundation Foundation)
-    find_library(Foundation Security)
+    find_library(FOUNDATION_FRAMEWORK Foundation)
+    find_library(SECURITY_FRAMEWORK Security)
 
     set(CRYPTO_LIBRARIES "")
-    set(SSL_LIBRARIES Foundation Security)
+    set(SSL_LIBRARIES ${FOUNDATION_FRAMEWORK} ${SECURITY_FRAMEWORK})
 elseif(REALM_PLATFORM STREQUAL "Android")
     # The Android core and sync libraries include the necessary portions of OpenSSL.
     set(CRYPTO_LIBRARIES "")
