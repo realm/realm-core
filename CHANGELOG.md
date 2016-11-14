@@ -20,9 +20,7 @@
 
 ### Internals
 
-* [NOTE: Do not use following feature because Replication still needs 
-  support; the feature has been added to keep pull-request-merges small]
-  Added support for search index on subtable columns. Only one level of
+* Added support for search index on subtable columns. Only one level of
   subtables are currently supported, that is, you cannot create a search
   index in a subtable of a subtable (will throw exception). The feature
   is required for upcoming support for Array and Map types. NOTE: Core
