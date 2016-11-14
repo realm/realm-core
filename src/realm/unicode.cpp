@@ -502,6 +502,43 @@ size_t search_case_fold(StringData haystack, const char* needle_upper, const cha
     return haystack.size(); // Not found
 }
 
+/// This method takes an array that maps chars (both upper- and lowercase) to distance that can be moved
+/// (and zero for chars not in needle), allowing the method to apply Boyer-Moore for quick substring search
+/// The map is calculated in the StringNode<ContainsIns> class (so it can be reused across searches)
+bool contains_ins(StringData haystack, const char* needle_upper, const char* needle_lower, size_t needle_size, const uint8_t (&charmap)[256])
+{
+    if (needle_size == 0)
+        return haystack.size() != 0;
+    
+    // Prepare vars to avoid lookups in loop
+    size_t last_char_pos = needle_size-1;
+    char lastCharU = needle_upper[last_char_pos];
+    char lastCharL = needle_lower[last_char_pos];
+    
+    // Do Boyer-Moore search
+    size_t p = last_char_pos;
+    while (p < haystack.size()) {
+        unsigned char c = haystack.data()[p]; // Get candidate for last char
+        
+        if (c == lastCharU || c == lastCharL) {
+            if (haystack.size() < 70) {
+                p = p;
+            }
+            StringData candidate = haystack.substr(p-needle_size+1, needle_size);
+            if (equal_case_fold(candidate, needle_upper, needle_lower))
+                return true; // text found!
+        }
+        
+        // If we don't have a match, see how far we can move char_pos
+        if (charmap[c] == 0)
+            p += needle_size; // char was not present in search string
+        else
+            p += charmap[c];
+    }
+    
+    return false;
+}
+
 
 } // namespace realm
 

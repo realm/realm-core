@@ -12,6 +12,7 @@
 
 ### Enhancements
 
+* Optimized Contains queries to use Boyer-Moore algorithm
 * Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
   are now perfectly forwarded (via perfect forwarding) to
   `std::stream::operator<<()`.

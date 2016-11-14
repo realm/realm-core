@@ -138,6 +138,7 @@ public:
     bool begins_with(StringData) const noexcept;
     bool ends_with(StringData) const noexcept;
     bool contains(StringData) const noexcept;
+    bool contains(StringData d, const uint8_t (&charmap)[256]) const noexcept;
 
     //@{
     /// Undefined behavior if \a n, \a i, or <tt>i+n</tt> is greater than
@@ -285,6 +286,42 @@ inline bool StringData::contains(StringData d) const noexcept
     return d.m_size == 0 || std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
 }
 
+/// This method takes an array that maps chars to distance that can be moved (and zero for chars not in needle),
+/// allowing the method to apply Boyer-Moore for quick substring search
+/// The map is calculated in the StringNode<Contains> class (so it can be reused across searches)
+inline bool StringData::contains(StringData d, const uint8_t (&charmap)[256]) const noexcept
+{
+    if (is_null() && !d.is_null())
+        return false;
+    
+    if (d.size() == 0)
+        return true;
+    
+    // Prepare vars to avoid lookups in loop
+    size_t last_char_pos = d.size()-1;
+    char lastChar = d[last_char_pos];
+    
+    // Do Boyer-Moore search
+    size_t p = last_char_pos;
+    while (p < m_size) {
+        unsigned char c = m_data[p]; // Get candidate for last char
+        
+        if (c == lastChar) {
+            StringData candidate = substr(p-d.size()+1, d.size());
+            if (candidate == d)
+                return true; // text found!
+        }
+        
+        // If we don't have a match, see how far we can move char_pos
+        if (charmap[c] == 0)
+            p += d.size(); // char was not present in search string
+        else
+            p += charmap[c];
+    }
+    
+    return false;
+}
+    
 inline StringData StringData::prefix(size_t n) const noexcept
 {
     return substr(0, n);

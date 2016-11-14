@@ -679,6 +679,16 @@ TEST(Query_NextGen_StringConditions)
 
     m = table3->link(0).column<String>(0).contains(realm::null(), false).count();
     CHECK_EQUAL(m, 4);
+    
+    // Test long string contains search (where needle is longer than 255 chars)
+    table2->add_empty_row();
+    table2->set_string(0, 0, "This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, needle, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!");
+    
+    m = table2->column<String>(0).contains("This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, needle", false).count();
+    CHECK_EQUAL(m, 1);
+    
+    m = table2->column<String>(0).contains("This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, needle", true).count();
+    CHECK_EQUAL(m, 1);
 }
 
 
