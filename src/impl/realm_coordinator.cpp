@@ -277,6 +277,8 @@ void RealmCoordinator::clear_all_caches()
 void RealmCoordinator::wake_up_notifier_worker()
 {
     if (m_notifier) {
+        // FIXME: this wakes up the notification workers for all processes and
+        // not just us. This might be worth optimizing in the future.
         m_notifier->notify_others();
     }
 }
