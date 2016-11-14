@@ -11,17 +11,6 @@
 * Attempts to open a Realm file with a different history type (Mobile Platform vs
   Mobile Database) now throws an IncompatibleHistories exception instead of a
   InvalidDatabase (as requested in issue #2275).
-
-### Enhancements
-
-* Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
-  are now perfectly forwarded (via perfect forwarding) to
-  `std::stream::operator<<()`.
-
------------
-
-### Internals
-
 * Added support for search index on subtable columns. Only one level of
   subtables are currently supported, that is, you cannot create a search
   index in a subtable of a subtable (will throw exception). The feature
@@ -31,6 +20,18 @@
   removing an index will take place for *all* subtables in a subtable 
   column. There is no way to add or remove it form single individual
   subtables.
+
+### Enhancements
+  
+* Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
+  are now perfectly forwarded (via perfect forwarding) to
+  `std::stream::operator<<()`.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
 
 ----------------------------------------------
 
