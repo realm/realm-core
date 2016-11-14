@@ -12145,7 +12145,7 @@ TEST(LangBindHelper_InRealmHistory_Downgrade)
     }
     {
         // No history
-        CHECK_THROW(SharedGroup(path), InvalidDatabase);
+        CHECK_THROW(SharedGroup(path), IncompatibleHistories);
     }
 }
 

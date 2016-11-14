@@ -8,7 +8,9 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Attempts to open a Realm file with a different history type (Mobile Platform vs
+  Mobile Database) now throws an IncompatibleHistories exception instead of a
+  InvalidDatabase (as requested in issue #2275).
 
 ### Enhancements
 
