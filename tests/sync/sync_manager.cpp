@@ -178,15 +178,15 @@ TEST_CASE("sync_manager: metadata") {
     reset_test_directory(base_path);
 
     SECTION("should be reset in case of decryption error") {
-        const size_t key_size = 64;
-        std::vector<char> encryption_key(key_size);
+		SyncManager::shared().configure_file_system(base_path,
+                                                    SyncManager::MetadataMode::Encryption,
+                                                    make_test_encryption_key());
 
-        arc4random_buf(encryption_key.data(), key_size);
-        SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::Encryption, encryption_key);
+		SyncManager::shared().reset_for_testing();
 
-        SyncManager::shared().reset_for_testing();
-
-        arc4random_buf(encryption_key.data(), key_size);
-        SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::Encryption, encryption_key, true);
+		SyncManager::shared().configure_file_system(base_path,
+                                                    SyncManager::MetadataMode::Encryption,
+                                                    make_test_encryption_key(),
+                                                    true);
     }
 }
