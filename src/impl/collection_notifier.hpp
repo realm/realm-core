@@ -308,11 +308,11 @@ public:
     // No-op if called multiple times
     void package_and_wait(util::Optional<VersionID::version_type> target_version);
 
-    // Sent the before-change notifications
+    // Send the before-change notifications
     void before_advance();
     // Deliver the payload associated with the contained notifiers and/or the error
     void deliver(SharedGroup& sg);
-    // Sent the after-change notifications
+    // Send the after-change notifications
     void after_advance();
 
 private:

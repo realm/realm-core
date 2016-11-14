@@ -346,8 +346,8 @@ TEST_CASE("list") {
 
         SECTION("tables-of-interest are tracked properly for multiple source versions") {
             // Add notifiers for different tables at different versions to verify
-            // that the tables of interest are updated correct as we process new
-            // notifiers
+            // that the tables of interest are updated correctly as we process
+            // new notifiers
             CollectionChangeSet changes1, changes2;
             auto token1 = lst.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 changes1 = std::move(c);
