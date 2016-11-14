@@ -178,13 +178,13 @@ TEST_CASE("sync_manager: metadata") {
     reset_test_directory(base_path);
 
     SECTION("should be reset in case of decryption error") {
-		SyncManager::shared().configure_file_system(base_path,
+        SyncManager::shared().configure_file_system(base_path,
                                                     SyncManager::MetadataMode::Encryption,
                                                     make_test_encryption_key());
 
-		SyncManager::shared().reset_for_testing();
+        SyncManager::shared().reset_for_testing();
 
-		SyncManager::shared().configure_file_system(base_path,
+        SyncManager::shared().configure_file_system(base_path,
                                                     SyncManager::MetadataMode::Encryption,
                                                     make_test_encryption_key(),
                                                     true);
