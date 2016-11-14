@@ -63,7 +63,7 @@ struct Contains : public HackClass {
     {
         return v2.contains(v1);
     }
-    bool operator()(StringData v1, const uint8_t (&charmap)[256], StringData v2) const
+    bool operator()(StringData v1, const std::array<uint8_t, 256> &charmap, StringData v2) const
     {
         return v2.contains(v1, charmap);
     }
@@ -247,7 +247,7 @@ struct ContainsIns : public HackClass {
     }
     
     // Case insensitive Boyer-Moore version
-    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, const uint8_t (&charmap)[256], StringData v2) const
+    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, const std::array<uint8_t, 256> &charmap, StringData v2) const
     {
         if (v2.is_null() && !v1.is_null())
             return false;

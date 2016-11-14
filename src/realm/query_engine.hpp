@@ -87,6 +87,7 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <algorithm>
 #include <functional>
 #include <string>
+#include <array>
 
 #include <realm/util/meta.hpp>
 #include <realm/util/miscellaneous.hpp>
@@ -1060,7 +1061,7 @@ protected:
     size_t m_leaf_start = 0;
     size_t m_leaf_end = 0;
     
-    inline StringData getString(size_t s)
+    inline StringData get_string(size_t s)
     {
         StringData t;
         
@@ -1134,7 +1135,7 @@ public:
         TConditionFunction cond;
 
         for (size_t s = start; s < end; ++s) {
-            StringData t = getString(s);
+            StringData t = get_string(s);
             
             if (cond(StringData(m_value), m_ucase.data(), m_lcase.data(), t))
                 return s;
@@ -1164,7 +1165,7 @@ template <>
 class StringNode<Contains> : public StringNodeBase {
 public:
     StringNode(StringData v, size_t column)
-    : StringNodeBase(v, column)
+    : StringNodeBase(v, column), m_charmap{}
     {
         if (v.size() == 0)
             return;
@@ -1199,7 +1200,7 @@ public:
         Contains cond;
         
         for (size_t s = start; s < end; ++s) {
-            StringData t = getString(s);
+            StringData t = get_string(s);
             
             if (cond(StringData(m_value), m_charmap, t))
                 return s;
@@ -1214,12 +1215,12 @@ public:
     
     StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
     : StringNodeBase(from, patches)
+    , m_charmap(from.m_charmap)
     {
-        std::copy(std::begin(from.m_charmap), std::end(from.m_charmap), std::begin(m_charmap));
     }
     
 protected:
-    uint8_t m_charmap[256] = {0};
+    std::array<uint8_t, 256> m_charmap;
 };
 
 // Specialization for ContainsIns condition on Strings - we specialize because we can utilize Boyer-Moore
@@ -1227,7 +1228,7 @@ template <>
 class StringNode<ContainsIns> : public StringNodeBase {
 public:
     StringNode(StringData v, size_t column)
-    : StringNodeBase(v, column)
+    : StringNodeBase(v, column), m_charmap{}
     {
         auto upper = case_map(v, true);
         auto lower = case_map(v, false);
@@ -1275,7 +1276,7 @@ public:
         ContainsIns cond;
         
         for (size_t s = start; s < end; ++s) {
-            StringData t = getString(s);
+            StringData t = get_string(s);
             
             if (cond(StringData(m_value), m_ucase.data(), m_lcase.data(), m_charmap, t))
                 return s;
@@ -1290,14 +1291,14 @@ public:
     
     StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
     : StringNodeBase(from, patches)
+    , m_charmap(from.m_charmap)
     , m_ucase(from.m_ucase)
     , m_lcase(from.m_lcase)
     {
-        std::copy(std::begin(from.m_charmap), std::end(from.m_charmap), std::begin(m_charmap));
     }
     
 protected:
-    uint8_t m_charmap[256] = {0};
+    std::array<uint8_t, 256> m_charmap;
     std::string m_ucase;
     std::string m_lcase;
 };

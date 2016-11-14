@@ -505,7 +505,7 @@ size_t search_case_fold(StringData haystack, const char* needle_upper, const cha
 /// This method takes an array that maps chars (both upper- and lowercase) to distance that can be moved
 /// (and zero for chars not in needle), allowing the method to apply Boyer-Moore for quick substring search
 /// The map is calculated in the StringNode<ContainsIns> class (so it can be reused across searches)
-bool contains_ins(StringData haystack, const char* needle_upper, const char* needle_lower, size_t needle_size, const uint8_t (&charmap)[256])
+bool contains_ins(StringData haystack, const char* needle_upper, const char* needle_lower, size_t needle_size, const std::array<uint8_t, 256> &charmap)
 {
     if (needle_size == 0)
         return haystack.size() != 0;

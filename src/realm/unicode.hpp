@@ -153,7 +153,7 @@ size_t search_case_fold(StringData haystack, const char* needle_upper, const cha
 /// Assumes that the sizes of \a needle_upper and \a needle_lower are
 /// both equal to \a needle_size. Returns false if the
 /// needle was not found.
-bool contains_ins(StringData haystack, const char* needle_upper, const char* needle_lower, size_t needle_size, const uint8_t (&charmap)[256]);
+bool contains_ins(StringData haystack, const char* needle_upper, const char* needle_lower, size_t needle_size, const std::array<uint8_t, 256> &charmap);
 
 } // namespace realm
 

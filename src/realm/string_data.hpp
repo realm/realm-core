@@ -24,6 +24,7 @@
 #include <string>
 #include <ostream>
 #include <cstring>
+#include <array>
 
 #include <cfloat>
 #include <cmath>
@@ -138,7 +139,7 @@ public:
     bool begins_with(StringData) const noexcept;
     bool ends_with(StringData) const noexcept;
     bool contains(StringData) const noexcept;
-    bool contains(StringData d, const uint8_t (&charmap)[256]) const noexcept;
+    bool contains(StringData d, const std::array<uint8_t, 256> &charmap) const noexcept;
 
     //@{
     /// Undefined behavior if \a n, \a i, or <tt>i+n</tt> is greater than
@@ -289,7 +290,7 @@ inline bool StringData::contains(StringData d) const noexcept
 /// This method takes an array that maps chars to distance that can be moved (and zero for chars not in needle),
 /// allowing the method to apply Boyer-Moore for quick substring search
 /// The map is calculated in the StringNode<Contains> class (so it can be reused across searches)
-inline bool StringData::contains(StringData d, const uint8_t (&charmap)[256]) const noexcept
+inline bool StringData::contains(StringData d, const std::array<uint8_t, 256> &charmap) const noexcept
 {
     if (is_null() && !d.is_null())
         return false;
