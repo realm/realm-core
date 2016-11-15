@@ -33,20 +33,18 @@ bool results_contains_user(SyncUserMetadataResults& results, const std::string& 
 std::string tmp_dir();
 std::vector<char> make_test_encryption_key(const char start = 0);
 
-} // realm
+} // namespace realm
 
-#define REQUIRE_DIR_EXISTS(macro_path) \
-{ \
+#define REQUIRE_DIR_EXISTS(macro_path) do { \
     DIR *dir_listing = opendir((macro_path).c_str()); \
     CHECK(dir_listing); \
     if (dir_listing) closedir(dir_listing); \
-}
+} while (0)
 
-#define REQUIRE_DIR_DOES_NOT_EXIST(macro_path) \
-{ \
+#define REQUIRE_DIR_DOES_NOT_EXIST(macro_path) do { \
     DIR *dir_listing = opendir((macro_path).c_str()); \
     CHECK(dir_listing == NULL); \
     if (dir_listing) closedir(dir_listing); \
-}
+} while (0)
 
 #endif // REALM_SYNC_TEST_UTILS_HPP

@@ -27,29 +27,21 @@
 
 #include <atomic>
 #include <chrono>
-#include <iostream>
 #include <unistd.h>
 
 using namespace realm;
 using namespace realm::util;
-
-// {"identity":"test", "access": ["download", "upload"]}
-static const std::string s_test_token = "eyJpZGVudGl0eSI6InRlc3QiLCAiYWNjZXNzIjogWyJkb3dubG9hZCIsICJ1cGxvYWQiXX0=";
 
 template <typename FetchAccessToken, typename ErrorHandler>
 std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<SyncUser> user, const std::string& path,
                                           FetchAccessToken&& fetch_access_token, ErrorHandler&& error_handler)
 {
     std::string url = server.base_url() + path;
-    SyncTestFile config(SyncConfig(user, url, SyncSessionStopPolicy::AfterChangesUploaded,
-                                   [&](const std::string& path,
-                                       const SyncConfig& config,
-                                       std::shared_ptr<SyncSession> session) {
-        EventLoop::main().perform([&, session=std::move(session)] {
+    SyncTestFile config({user, url, SyncSessionStopPolicy::AfterChangesUploaded,
+        [&](const std::string& path, const SyncConfig& config, std::shared_ptr<SyncSession> session) {
             auto token = fetch_access_token(path, config.realm_url);
             session->refresh_access_token(std::move(token), config.realm_url);
-        });
-    }, std::forward<ErrorHandler>(error_handler)));
+        }, std::forward<ErrorHandler>(error_handler)});
 
     std::shared_ptr<SyncSession> session;
     {
@@ -71,16 +63,10 @@ TEST_CASE("sync: log-in", "[sync]") {
                                     [&](int, std::string, SyncSessionError) { ++error_count; });
 
         std::atomic<bool> download_did_complete(false);
-        // FIXME: Should it be necessary to kick this wait off asynchronously?
-        // Failing to do so hits an assertion failure in sync::Session.
-        EventLoop::main().perform([&] {
-            session->wait_for_download_completion([&] {
-                download_did_complete = true;
-            });
-        });
-
+        session->wait_for_download_completion([&] { download_did_complete = true; });
         EventLoop::main().run_until([&] { return download_did_complete.load() || error_count > 0; });
         CHECK(session->is_valid());
+        CHECK(download_did_complete.load());
         CHECK(error_count == 0);
     }
 

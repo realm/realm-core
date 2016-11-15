@@ -104,8 +104,8 @@ public:
 
     // Reset part of the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
     void reset_for_testing();
+
 private:
-    struct UserCreationData;
     void dropped_last_reference_to_session(SyncSession*);
 
     // Stop tracking the session for the given path if it is inactive.

@@ -26,7 +26,7 @@ bool create_dummy_realm(std::string path) {
     try {
         Realm::make_shared_realm(config);
         return true;
-    } catch(std::exception) {
+    } catch (std::exception&) {
         return false;
     }
 }

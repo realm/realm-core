@@ -448,10 +448,23 @@ void Realm::begin_transaction()
         throw InvalidTransactionException("The Realm is already in a write transaction");
     }
 
+    // If we're already in the middle of sending notifications, just begin the
+    // write transaction without sending more notifications. If this actually
+    // advances the read version this could leave the user in an inconsistent
+    // state, but that's unavoidable.
+    if (m_is_sending_notifications) {
+        _impl::NotifierPackage notifiers;
+        transaction::begin(*m_shared_group, m_binding_context.get(), m_config.schema_mode, notifiers);
+        return;
+    }
+
     // make sure we have a read transaction
     read_group();
 
-    transaction::begin(*m_shared_group, m_binding_context.get(), m_config.schema_mode);
+    m_is_sending_notifications = true;
+    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
+
+    m_coordinator->promote_to_write(*this);
 }
 
 void Realm::commit_transaction()
@@ -463,8 +476,7 @@ void Realm::commit_transaction()
         throw InvalidTransactionException("Can't commit a non-existing write transaction");
     }
 
-    transaction::commit(*m_shared_group, m_binding_context.get());
-    m_coordinator->send_commit_notifications(*this);
+    m_coordinator->commit_write(*this);
 }
 
 void Realm::cancel_transaction()
@@ -532,11 +544,14 @@ void Realm::write_copy(StringData path, BinaryData key)
 
 void Realm::notify()
 {
-    if (is_closed()) {
+    if (is_closed() || is_in_transaction()) {
         return;
     }
 
     verify_thread();
+
+    m_is_sending_notifications = true;
+    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
 
     if (m_shared_group->has_changed()) { // Throws
         if (m_binding_context) {
@@ -546,8 +561,11 @@ void Realm::notify()
             if (m_group) {
                 m_coordinator->advance_to_ready(*this);
             }
-            else if (m_binding_context) {
-                m_binding_context->did_change({}, {});
+            else  {
+                if (m_binding_context) {
+                    m_binding_context->did_change({}, {});
+                }
+                m_coordinator->process_available_async(*this);
             }
         }
     }
@@ -565,21 +583,22 @@ bool Realm::refresh()
     if (is_in_transaction()) {
         return false;
     }
-
-    // advance transaction if database has changed
-    if (!m_shared_group->has_changed()) { // Throws
+    // don't advance if we're already in the process of advancing as that just
+    // makes things needlessly complicated
+    if (m_is_sending_notifications) {
         return false;
     }
 
+    m_is_sending_notifications = true;
+    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
+
     if (m_group) {
-        transaction::advance(*m_shared_group, m_binding_context.get(), m_config.schema_mode);
-        m_coordinator->process_available_async(*this);
-    }
-    else {
-        // Create the read transaction
-        read_group();
+        return m_coordinator->advance_to_latest(*this);
     }
 
+    // No current read transaction, so just create a new one
+    read_group();
+    m_coordinator->process_available_async(*this);
     return true;
 }
 

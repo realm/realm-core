@@ -91,7 +91,7 @@ void remove_nonempty_dir(const std::string& path)
     try {
         util::remove_dir(path);    
     }
-    catch (File::NotFound) {
+    catch (File::NotFound const&) {
     }
 }
 
@@ -250,9 +250,9 @@ bool SyncFileManager::remove_realm(const std::string& user_identity, const std::
     try {
         util::remove_nonempty_dir(management_path);
     }
-    catch (File::NotFound) {
+    catch (File::NotFound const&) {
     }
-    catch (File::AccessError) {
+    catch (File::AccessError const&) {
         success = false;
     }
     return success;
@@ -288,7 +288,7 @@ bool SyncFileManager::remove_metadata_realm() const
         util::remove_nonempty_dir(dir_path);
         return true;
     }
-    catch (File::AccessError) {
+    catch (File::AccessError const&) {
         return false;
     }
 }
