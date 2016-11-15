@@ -56,7 +56,7 @@ def doDockerBuild(String flavor, Boolean withCoverage) {
         sshagent(['realm-ci-ssh']) {
           image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -e HOME=${env.HOME}") {
             if(withCoverage) {
-              sh "./workflow/test_coverage.sh ${flavor}"
+              sh "./workflow/test_coverage.sh"
             } else {
               sh "./workflow/build.sh ${flavor}"
             }
@@ -81,7 +81,7 @@ def doBuild(String nodeSpec, String flavor) {
       try {
         getSourceArchive()
         sshagent(['realm-ci-ssh']) {
-          sh "./workflow/test_coverage.sh ${flavor}"
+          sh "./workflow/test_coverage.sh"
         }
         currentBuild.result = 'SUCCESS'
       } catch (Exception err) {

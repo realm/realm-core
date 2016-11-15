@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# This script is used by CI to build for a specific flavor.  It can be used
+# locally: `./workspace/build.sh [linux|android]`
+
 flavor=${1:-linux}
 
 nprocs=4
@@ -15,7 +18,6 @@ cd ci.build
 
 cmake_flags=""
 if [ ${flavor} = "android" ]; then
-  # we're not yet able to run unit tests for android
   cmake_flags="-DREALM_PLATFORM=Android -DANDROID_NDK=/opt/android-ndk"
 fi
 

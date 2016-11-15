@@ -1,6 +1,7 @@
 #!/bin/sh
 
-flavor=${1:-linux}
+# This script is used by CI to test coverage for a specific flavor.  It can be
+# used locally: `./workspace/test_coverage.sh`
 
 nprocs=4
 if [ "$(uname)" = "Linux" ]; then
