@@ -521,9 +521,6 @@ bool contains_ins(StringData haystack, const char* needle_upper, const char* nee
         unsigned char c = haystack.data()[p]; // Get candidate for last char
         
         if (c == lastCharU || c == lastCharL) {
-            if (haystack.size() < 70) {
-                p = p;
-            }
             StringData candidate = haystack.substr(p-needle_size+1, needle_size);
             if (equal_case_fold(candidate, needle_upper, needle_lower))
                 return true; // text found!

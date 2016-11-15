@@ -295,7 +295,8 @@ inline bool StringData::contains(StringData d, const std::array<uint8_t, 256> &c
     if (is_null() && !d.is_null())
         return false;
     
-    if (d.size() == 0)
+    size_t needle_size = d.size();
+    if (needle_size == 0)
         return true;
     
     // Prepare vars to avoid lookups in loop
@@ -308,14 +309,14 @@ inline bool StringData::contains(StringData d, const std::array<uint8_t, 256> &c
         unsigned char c = m_data[p]; // Get candidate for last char
         
         if (c == lastChar) {
-            StringData candidate = substr(p-d.size()+1, d.size());
+            StringData candidate = substr(p-needle_size+1, needle_size);
             if (candidate == d)
                 return true; // text found!
         }
         
         // If we don't have a match, see how far we can move char_pos
         if (charmap[c] == 0)
-            p += d.size(); // char was not present in search string
+            p += needle_size; // char was not present in search string
         else
             p += charmap[c];
     }
