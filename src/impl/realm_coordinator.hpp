@@ -21,6 +21,7 @@
 
 #include "shared_realm.hpp"
 
+#include <condition_variable>
 #include <mutex>
 
 namespace realm {
