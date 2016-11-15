@@ -13,3 +13,4 @@ RUN mkdir -p /tmp/android-ndk && \
     chmod -R a+rX /opt/android-ndk && \
     rm -rf /tmp/android-ndk
 
+ENV ANDROID_NDK_PATH /opt/android-ndk
