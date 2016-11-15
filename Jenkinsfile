@@ -41,15 +41,6 @@ def publishReports(String flavor) {
     sourceEncoding: 'ASCII',
     zoomCoverageChart: false
   ])
-
-  publishHTML([
-    allowMissing: false,
-    alwaysLinkToLastBuild: false,
-    keepAll: false,
-    reportDir: 'coverage.build/coverage',
-    reportFiles: 'index.html',
-    reportName: "${flavor} Coverage Report"
-  ])
 }
 
 if (env.BRANCH_NAME == 'master') {

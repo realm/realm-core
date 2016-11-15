@@ -14,4 +14,4 @@ mkdir -p coverage.build
 cd coverage.build
 
 cmake -DCMAKE_BUILD_TYPE=Coverage ..
-make VERBOSE=1 -j${nprocs} generate-coverage
+make VERBOSE=1 -j${nprocs} generate-coverage-cobertura

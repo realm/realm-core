@@ -45,9 +45,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
 
       COMMAND echo Open coverage/index.html in your browser to view the coverage report.
 
-      COMMAND ${GCOVR_PATH} -x -r ${CMAKE_SOURCE_DIR}/src ./src -o coverage.xml
-      COMMAND echo Code coverage report written to coverage.xml
-
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
 
