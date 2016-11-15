@@ -26,22 +26,40 @@ def buildDockerEnv(name, dockerfile='Dockerfile', extra_args='') {
   return docker.image(name)
 }
 
+def publishReports(String flavor) {
+  // Unfortunately, we cannot add a title or tag to individual coverage reports.
+  step([
+    $class: 'CoberturaPublisher',
+    autoUpdateHealth: false,
+    autoUpdateStability: false,
+    coberturaReportFile: 'coverage.build/coverage.xml',
+    failNoReports: true,
+    failUnhealthy: false,
+    failUnstable: false,
+    maxNumberOfBuilds: 0,
+    onlyStable: false,
+    sourceEncoding: 'ASCII',
+    zoomCoverageChart: false
+  ])
+}
+
 if (env.BRANCH_NAME == 'master') {
   env.DOCKER_PUSH = "1"
 }
 
-def doBuildLinux() {
+def doDockerBuild(String flavor, Boolean withCoverage) {
   return {
     node('docker') {
       try {
         getSourceArchive()
-        def image = buildDockerEnv("ci/realm-object-store:build")
+        def image = buildDockerEnv("ci/realm-object-store:${flavor}")
         sshagent(['realm-ci-ssh']) {
           image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -e HOME=${env.HOME}") {
-            sh """
-              . /opt/rh/devtoolset-3/enable
-              sh ./workflow/test_coverage.sh
-            """
+            if(withCoverage) {
+              sh "./workflow/test_coverage.sh"
+            } else {
+              sh "./workflow/build.sh ${flavor}"
+            }
           }
         }
 
@@ -50,51 +68,27 @@ def doBuildLinux() {
         currentBuild.result = 'FAILURE'
       }
 
-      step([
-        $class: 'CoberturaPublisher',
-        autoUpdateHealth: false,
-        autoUpdateStability: false,
-        coberturaReportFile: 'coverage.build/coverage.xml',
-        failNoReports: true,
-        failUnhealthy: false,
-        failUnstable: false,
-        maxNumberOfBuilds: 0,
-        onlyStable: false,
-        sourceEncoding: 'ASCII',
-        zoomCoverageChart: false
-      ])
+      if(withCoverage) {
+        publishReports(flavor)
+      }
     }
   }
 }
 
-def doBuildMacOS() {
+def doBuild(String nodeSpec, String flavor) {
   return {
-    node('osx') {
+    node(nodeSpec) {
       try {
         getSourceArchive()
         sshagent(['realm-ci-ssh']) {
-          sh """
-            sh ./workflow/test_coverage.sh
-          """
+          sh "./workflow/test_coverage.sh"
         }
         currentBuild.result = 'SUCCESS'
       } catch (Exception err) {
         currentBuild.result = 'FAILURE'
       }
 
-      step([
-        $class: 'CoberturaPublisher',
-        autoUpdateHealth: false,
-        autoUpdateStability: false,
-        coberturaReportFile: 'coverage.build/coverage.xml',
-        failNoReports: true,
-        failUnhealthy: false,
-        failUnstable: false,
-        maxNumberOfBuilds: 0,
-        onlyStable: false,
-        sourceEncoding: 'ASCII',
-        zoomCoverageChart: false
-      ])
+      publishReports(flavor)
     }
   }
 }
@@ -122,7 +116,8 @@ stage('prepare') {
 
 stage('unit-tests') {
   parallel(
-    linux: doBuildLinux(),
-    macos: doBuildMacOS()
+    linux: doDockerBuild('linux', true),
+    android: doDockerBuild('android', false),
+    macos: doBuild('osx', 'macOS')
   )
 }

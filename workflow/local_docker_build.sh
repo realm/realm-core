@@ -5,9 +5,11 @@
 
 set -e
 
+flavor=${1:-linux}
+
 docker build -t ci/realm-object-server:build .
 
-docker run --rm \
+docker run -it --rm \
   -u $(id -u) \
   -v "${HOME}:${HOME}" \
   -e HOME="${HOME}" \
@@ -15,4 +17,4 @@ docker run --rm \
   -v $(pwd):/source \
   -w /source \
   ci/realm-object-server:build \
-  ./workflow/test_coverage.sh
+  ./workflow/test_coverage.sh ${flavor}
