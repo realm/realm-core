@@ -53,8 +53,8 @@ try {
 
   for (def i = 0; i < androidAbis.size(); i++) {
       def abi = androidAbis[i]
-      for (def j=0; j < androidBuildtypes.size(); j++) {
-          def buildType = androidbuildtypes[j]
+      for (def j=0; j < androidBuildTypes.size(); j++) {
+          def buildType = androidBuildTypes[j]
           parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType)
       }
   }
