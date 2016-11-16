@@ -44,10 +44,20 @@ try {
     buildCocoa: doBuildCocoa(),
     buildNodeLinux: doBuildNodeInDocker(),
     buildNodeOsx: doBuildNodeInOsx(),
-    buildAndroid: doBuildAndroid(),
     addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
     //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
   ]
+
+  androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
+  androidBuildTypes = ['Debug', 'Release']
+
+  for (def i = 0; i < androidAbis.length(); i++) {
+      def abi = androidAbis[i]
+      for (def j=0; j < androidBuildtypes.length(); j++) {
+          def buildType = androidbuildtypes[j]
+          parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType)
+      }
+  }
 
   if (env.CHANGE_TARGET) {
     parallelExecutors['diffCoverage'] = buildDiffCoverage()
@@ -155,6 +165,26 @@ def doBuildInDocker(String command) {
           } finally {
             collectCompilerWarnings('gcc')
             recordTests(command)
+          }
+        }
+      }
+    }
+  }
+}
+
+def doAndroidBuildInDocker(String abi, String buildType) {
+  return {
+    node('docker') {
+      getArchive()
+
+      def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile')
+      def environment = environment()
+      withEnv(environment) {
+        buildEnv.inside {
+            try {
+            sh "rake build-android-${abi}-${buildType}"
+          } finally {
+            collectCompilerWarnings('gcc')
           }
         }
       }
