@@ -51,9 +51,9 @@ try {
   androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
   androidBuildTypes = ['Debug', 'Release']
 
-  for (def i = 0; i < androidAbis.length(); i++) {
+  for (def i = 0; i < androidAbis.size(); i++) {
       def abi = androidAbis[i]
-      for (def j=0; j < androidBuildtypes.length(); j++) {
+      for (def j=0; j < androidBuildtypes.size(); j++) {
           def buildType = androidbuildtypes[j]
           parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType)
       }
