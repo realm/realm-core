@@ -283,19 +283,19 @@ def doBuildAndroid() {
             }
             archive 'realm-core-android-*.tar.gz'
 
-            // dir('test/android') {
-            //     sh '$ANDROID_HOME/tools/android update project -p . --target android-9'
-            //     environment << "NDK_PROJECT_PATH=${pwd()}"
-            //     withEnv(environment) {
-            //         dir('jni') {
-            //             sh "${env.ANDROID_NDK_HOME}/ndk-build V=1"
-            //         }
-            //         sh 'ant debug'
-            //         dir('bin') {
-            //             stash includes: 'NativeActivity-debug.apk', name: 'android'
-            //         }
-            //     }
-            // }
+            dir('test/android') {
+                sh '$ANDROID_HOME/tools/android update project -p . --target android-9'
+                environment << "NDK_PROJECT_PATH=${pwd()}"
+                withEnv(environment) {
+                    dir('jni') {
+                        sh "${env.ANDROID_NDK_HOME}/ndk-build V=1"
+                    }
+                    sh 'ant debug'
+                    dir('bin') {
+                        stash includes: 'NativeActivity-debug.apk', name: 'android'
+                    }
+                }
+            }
             collectCompilerWarnings('gcc')
           }
         }
