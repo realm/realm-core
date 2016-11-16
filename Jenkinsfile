@@ -283,6 +283,7 @@ def doBuildAndroid() {
             }
             archive 'realm-core-android-*.tar.gz'
 
+            sh 'tar zxvf realm-core-android-latest.tar.gz'
             dir('test/android') {
                 sh '$ANDROID_HOME/tools/android update project -p . --target android-9'
                 environment << "NDK_PROJECT_PATH=${pwd()}"
