@@ -104,5 +104,5 @@ build.apple
 
 # Ignore python compiled files
 *.pyc
-/build.android.arm64-v8a.Debug/android-build-openssl.sh
-/build.cocoa/src/realm/util/config.h
+/build.android.*
+/build.cocoa
