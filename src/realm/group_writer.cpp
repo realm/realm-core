@@ -744,7 +744,7 @@ void GroupWriter::write_array_at(MapWindow* window, ref_type ref, const char* da
     // REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
     char* dest_addr = window->translate(pos);
 
-    uint32_t dummy_checksum = 41414141UL; // "AAAA" in ASCII
+    uint32_t dummy_checksum = 0x41414141UL; // "AAAA" in ASCII
     memcpy(dest_addr, &dummy_checksum, 4);
     memcpy(dest_addr + 4, data + 4, size - 4);
 }
