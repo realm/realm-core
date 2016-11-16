@@ -274,13 +274,12 @@ def doBuildAndroid() {
 
     return {
         node('fastlinux') {
-          ws('/tmp/core-android') {
             getArchive()
 
             withEnv(environment) {
-              sh "sh build.sh config '${pwd()}/install'"
-              sh "sh build.sh ${target}"
-              sh "sh build.sh package-android"
+                sh "sh build.sh config '${pwd()}/install'"
+                sh "sh build.sh ${target}"
+                sh "sh build.sh package-android"
             }
             archive 'realm-core-android-*.tar.gz'
 
@@ -298,7 +297,6 @@ def doBuildAndroid() {
                 }
             }
             collectCompilerWarnings('gcc')
-          }
         }
 
         // node('android-hub') {
