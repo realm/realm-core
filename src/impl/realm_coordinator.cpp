@@ -397,9 +397,9 @@ void RealmCoordinator::clean_up_dead_notifiers()
             m_notifier_sg->end_read();
         }
     }
-    if (swap_remove(m_new_notifiers)) {
+    if (swap_remove(m_new_notifiers) && m_advancer_sg) {
         REALM_ASSERT_3(m_advancer_sg->get_transact_stage(), ==, SharedGroup::transact_Reading);
-        if (m_new_notifiers.empty() && m_advancer_sg) {
+        if (m_new_notifiers.empty()) {
             m_advancer_sg->end_read();
         }
     }
