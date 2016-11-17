@@ -26,13 +26,14 @@ def buildDockerEnv(name, dockerfile='Dockerfile', extra_args='') {
   return docker.image(name)
 }
 
-def publishReports(String flavor) {
+def publishReport(String label) {
   // Unfortunately, we cannot add a title or tag to individual coverage reports.
+  unstash("coverage-${label}")
   step([
     $class: 'CoberturaPublisher',
     autoUpdateHealth: false,
     autoUpdateStability: false,
-    coberturaReportFile: 'coverage.build/coverage.xml',
+    coberturaReportFile: "${label}.build/coverage.xml",
     failNoReports: true,
     failUnhealthy: false,
     failUnstable: false,
@@ -49,28 +50,23 @@ if (env.BRANCH_NAME == 'master') {
 
 def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
   def sync = enableSync ? "sync" : ""
+  def label = "coverage-${flavor}${enableSync ? '-sync' : ''}"
+  
   return {
     node('docker') {
-      try {
-        getSourceArchive()
-        def image = buildDockerEnv("ci/realm-object-store:${flavor}")
-        sshagent(['realm-ci-ssh']) {
-          image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME}") {
-            if(withCoverage) {
-              sh "./workflow/test_coverage.sh ${sync}"
-            } else {
-              sh "./workflow/build.sh ${flavor} ${sync}"
-            }
+      getSourceArchive()
+      def image = buildDockerEnv("ci/realm-object-store:${flavor}")
+      sshagent(['realm-ci-ssh']) {
+        image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME}") {
+          if(withCoverage) {
+            sh "./workflow/test_coverage.sh ${sync} && mv coverage.build ${label}.build"
+          } else {
+            sh "./workflow/build.sh ${flavor} ${sync}"
           }
         }
-
-        currentBuild.result = 'SUCCESS'
-      } catch (Exception err) {
-        currentBuild.result = 'FAILURE'
       }
-
       if(withCoverage) {
-        publishReports(flavor)
+        stash includes: "${label}.build/coverage.xml", name: label
       }
     }
   }
@@ -78,19 +74,14 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
 
 def doBuild(String nodeSpec, String flavor, Boolean enableSync) {
   def sync = enableSync ? "sync" : ""
+  def label = "coverage-${flavor}${enableSync ? '-sync' : ''}"
   return {
     node(nodeSpec) {
-      try {
-        getSourceArchive()
-        sshagent(['realm-ci-ssh']) {
-          sh "./workflow/test_coverage.sh ${sync}"
-        }
-        currentBuild.result = 'SUCCESS'
-      } catch (Exception err) {
-        currentBuild.result = 'FAILURE'
+      getSourceArchive()
+      sshagent(['realm-ci-ssh']) {
+        sh "./workflow/test_coverage.sh ${sync} && mv coverage.build ${label}.build"
       }
-
-      publishReports(flavor)
+      stash includes: "${label}.build/coverage.xml", name: label
     }
   }
 }
@@ -124,4 +115,9 @@ stage('unit-tests') {
     macos: doBuild('osx', 'macOS', false),
     macos_sync: doBuild('osx', 'macOS', true)
   )
+  
+  publishReport('linux')
+  publishReport('linux-sync')
+  publishReport('macOS')
+  publishReport('macOS-sync')
 }
