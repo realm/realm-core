@@ -22,8 +22,7 @@ Please report bugs against the Realm product that you're using:
 
 ## Supported Platforms
 
-The object store's CMake build system currently only suports building for OS X, Linux, and Android. Building for Linux requires
-[building against a local version of core](#building-against-a-local-version-of-core).
+The object store's CMake build system currently only suports building for OS X, Linux, and Android.
 
 The object store code supports being built for all Apple platforms, Linux and Android when used along with the relevant Realm product's build system.
 
@@ -57,22 +56,30 @@ The object store code supports being built for all Apple platforms, Linux and An
     make
     ```
 
+## Building With Sync Support
+
+If you wish to build with sync enabled, invoke `cmake` like so:
+
+```
+cmake -DREALM_ENABLE_SYNC=1
+```
+
 ### Building Against a Local Version of Core
 
 If you wish to build against a local version of core you can invoke `cmake` like so:
 
 ```
-cmake -DREALM_CORE_VERSION=/path/to/realm-core
+cmake -DREALM_CORE_PREFIX=/path/to/realm-core
 ```
 
 The given core tree will be built as part of the object store build.
 
-### Building with Sync
+### Building Against a Local Version of Sync
 
 Specify the path to realm-core and realm-sync when invoking `cmake`:
 
 ```
-cmake -DREALM_CORE_VERSION=/path/to/realm-core -DREALM_SYNC_PREFIX=/path/to/realm-sync
+cmake -DREALM_ENABLE_SYNC=1 -DREALM_CORE_PREFIX=/path/to/realm-core -DREALM_SYNC_PREFIX=/path/to/realm-sync
 ```
 
 Prebuilt sync binaries are currently not supported.
@@ -80,7 +87,7 @@ Prebuilt sync binaries are currently not supported.
 ### Building with Sanitizers
 
 The object store can be built using ASan, TSan and/or UBSan by specifying `-DSANITIZE_ADDRESS=1`, `-DSANITIZE_THREAD=1`, or `-DSANITIZE_UNDEFINED=1` when invoking CMake.
-Building with ASan requires specifying a path to core with `-DREALM_CORE_VERSION` as core needs to also be built with ASan enabled.
+Building with ASan requires specifying a path to core with `-DREALM_CORE_PREFIX` as core needs to also be built with ASan enabled.
 
 On OS X, the Xcode-provided copy of Clang only comes with ASan, and using TSan or UBSan requires a custom build of Clang.
 If you have installed Clang as an external Xcode toolchain (using the `install-xcode-toolchain` when building LLVM), note that you'll have to specify `-DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++` when running `cmake` to stop cmake from being too clever.
