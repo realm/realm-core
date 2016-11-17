@@ -78,6 +78,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     SyncServer server;
     SyncManager::shared().configure_file_system("/tmp/", SyncManager::MetadataMode::NoMetadata);
     const std::string realm_base_url = server.base_url();
+    REQUIRE(EventLoop::has_implementation());
 
     SECTION("a SyncUser can properly retrieve its owned sessions") {
         auto user = SyncManager::shared().get_user("user1a", "not_a_real_token");
@@ -200,10 +201,12 @@ TEST_CASE("sync: log-in", "[sync]") {
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system("/tmp/", SyncManager::MetadataMode::NoMetadata);
+    auto user = SyncManager::shared().get_user("user", "not_a_real_token");
+    REQUIRE(EventLoop::has_implementation());
 
     SECTION("Can log in") {
         std::atomic<int> error_count(0);
-        auto session = sync_session(server, SyncManager::shared().get_user("user", "not_a_real_token"), "/test",
+        auto session = sync_session(server, user, "/test",
                                     [&](const std::string&, const std::string&) { return s_test_token; },
                                     [&](int, std::string, SyncSessionError) { ++error_count; });
 
@@ -216,7 +219,7 @@ TEST_CASE("sync: log-in", "[sync]") {
 
     SECTION("Session is invalid after invalid token") {
         std::atomic<int> error_count(0);
-        auto session = sync_session(server, SyncManager::shared().get_user("user", "not_a_real_token"), "/test",
+        auto session = sync_session(server, user, "/test",
                                     [&](const std::string&, const std::string&) { return "this is not a valid access token"; },
                                     [&](int, std::string, SyncSessionError) { ++error_count; });
 
@@ -230,7 +233,7 @@ TEST_CASE("sync: log-in", "[sync]") {
 
     SECTION("Session is invalid after invalid token while waiting on download to complete") {
         std::atomic<int> error_count(0);
-        auto session = sync_session(server, nullptr, "/test",
+        auto session = sync_session(server, user, "/test",
                                     [&](const std::string&, const std::string&) { return "this is not a valid access token"; },
                                     [&](int, std::string, SyncSessionError) { ++error_count; });
 
