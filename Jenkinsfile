@@ -65,6 +65,27 @@ try {
 
   parallel parallelExecutors
 
+  stage('aggregate') {
+      node('docker') {
+          getArchive()
+          for (def i = 0; i < androidAbis.size(); i++) {
+              def abi = androidAbis[i]
+              for (def j=0; j < androidBuildTypes.size(); j++) {
+                  def buildType = androidBuildTypes[j]
+                  unstash "install-${abi}-${buildType}"
+              }
+          }
+
+          def buildEnv = docker.build 'realm-core:snapshot'
+          def environment = environment()
+          withEnv(environment) {
+              buildEnv.inside {
+                  sh 'rake package-android'
+              }
+          }
+      }
+  }
+
   stage 'build-packages'
   parallel(
     generic: doBuildPackage('generic', 'tgz'),
@@ -177,12 +198,13 @@ def doAndroidBuildInDocker(String abi, String buildType) {
     node('docker') {
       getArchive()
 
-      def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
+      Def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
       def environment = environment()
       withEnv(environment) {
         buildEnv.inside {
             try {
             sh "rake build-android-${abi}-${buildType}"
+            stash includes: 'build.*/install', name: "install-${abi}-${buildType}"
           } finally {
             collectCompilerWarnings('gcc')
           }
