@@ -20,7 +20,6 @@ set(REALM_SOURCES
     column_string_enum.cpp
     column_table.cpp
     column_timestamp.cpp
-    commit_log.cpp
     descriptor.cpp
     disable_sync_to_disk.cpp
     exceptions.cpp
