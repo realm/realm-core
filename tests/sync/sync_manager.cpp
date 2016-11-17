@@ -186,7 +186,7 @@ TEST_CASE("sync_manager: metadata") {
 
         SyncManager::shared().configure_file_system(base_path,
                                                     SyncManager::MetadataMode::Encryption,
-                                                    make_test_encryption_key(),
+                                                    make_test_encryption_key(1),
                                                     true);
     }
 }
