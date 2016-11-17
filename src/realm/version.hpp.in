@@ -26,6 +26,7 @@
 #define REALM_VERSION_MAJOR @REALM_VERSION_MAJOR@
 #define REALM_VERSION_MINOR @REALM_VERSION_MINOR@
 #define REALM_VERSION_PATCH @REALM_VERSION_PATCH@
+#define REALM_VERSION_EXTRA @REALM_VERSION_EXTRA@
 #define REALM_VERSION_STRING "@PROJECT_VERSION@"
 
 #define REALM_PRODUCT_NAME "realm-core"
@@ -45,6 +46,7 @@ public:
     static int get_major() { return REALM_VERSION_MAJOR; }
     static int get_minor() { return REALM_VERSION_MINOR; }
     static int get_patch() { return REALM_VERSION_PATCH; }
+    static int get_extra() { return REALM_VERSION_EXTRA; }
     static std::string get_version();
     static bool is_at_least(int major, int minor, int patch, StringData extra);
     static bool is_at_least(int major, int minor, int patch);
