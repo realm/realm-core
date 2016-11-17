@@ -177,7 +177,7 @@ def doAndroidBuildInDocker(String abi, String buildType) {
     node('docker') {
       getArchive()
 
-      def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile')
+      def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
       def environment = environment()
       withEnv(environment) {
         buildEnv.inside {
