@@ -17,7 +17,7 @@ mkdir -p coverage.build
 cd coverage.build
 
 cmake_flags=""
-if [ ${sync} = "sync" ]; then
+if [ "${sync}" = "sync" ]; then
     cmake_flags="${cmake_flags} -DREALM_ENABLE_SYNC=1"
 fi
 
