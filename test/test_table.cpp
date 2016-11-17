@@ -26,7 +26,7 @@
 #include <ostream>
 
 #include <realm.hpp>
-#include <realm/commit_log.hpp>
+#include <realm/history.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/buffer.hpp>
 #include <realm/util/to_string.hpp>
@@ -1433,23 +1433,57 @@ TEST(Table_SetIntUnique)
     Table table;
     table.add_column(type_Int, "ints");
     table.add_column(type_Int, "ints_null", true);
+    table.add_column(type_Int, "ints_null", true);
     table.add_empty_row(10);
 
     CHECK_LOGIC_ERROR(table.set_int_unique(0, 0, 123), LogicError::no_search_index);
     CHECK_LOGIC_ERROR(table.set_int_unique(1, 0, 123), LogicError::no_search_index);
+    CHECK_LOGIC_ERROR(table.set_null_unique(2, 0), LogicError::no_search_index);
     table.add_search_index(0);
     table.add_search_index(1);
+    table.add_search_index(2);
 
     table.set_int_unique(0, 0, 123);
-    table.set_int_unique(1, 0, 123);
+    CHECK_EQUAL(table.size(), 10);
 
-    // Check that conflicting SetIntUniques result in rows being deleted.
-    table.set_int_unique(0, 1, 123);
+    table.set_int_unique(1, 0, 123);
+    CHECK_EQUAL(table.size(), 10);
+
+    table.set_int_unique(2, 0, 123);
+    CHECK_EQUAL(table.size(), 10);
+
+    // Check that conflicting SetIntUniques result in rows being deleted. First a collision in column 0:
+    table.set_int_unique(0, 1, 123); // This will delete row 1
     CHECK_EQUAL(table.size(), 9);
-    table.set_int_unique(1, 1, 123);
-    CHECK_EQUAL(table.size(), 9);
-    table.set_int_unique(1, 2, 123);
+
+    table.set_int_unique(1, 1, 123); // This will delete row 1
     CHECK_EQUAL(table.size(), 8);
+
+    table.set_int_unique(1, 2, 123); // This will delete row 1
+    CHECK_EQUAL(table.size(), 7);
+
+    // Collision in column 1:
+    table.set_int_unique(1, 0, 123); // no-op
+    CHECK_EQUAL(table.size(), 7);
+    table.set_int_unique(0, 0, 123); // no-op
+    CHECK_EQUAL(table.size(), 7);
+    table.set_int_unique(2, 0, 123); // no-op
+    CHECK_EQUAL(table.size(), 7);
+
+    // Collision in column 2:
+    table.set_int_unique(2, 1, 123); // This will delete a row
+    CHECK_EQUAL(table.size(), 6);
+    table.set_int_unique(0, 1, 123); // This will delete a row
+    CHECK_EQUAL(table.size(), 5);
+    table.set_int_unique(1, 1, 123); // This will delete a row
+    CHECK_EQUAL(table.size(), 4);
+
+    // Since table.add_empty_row(10); filled the column with all nulls, only two rows should now remain
+    table.set_null_unique(2, 1);
+    CHECK_EQUAL(table.size(), 2);
+
+    table.set_null_unique(2, 0);
+    CHECK_EQUAL(table.size(), 1);
 }
 
 
@@ -1480,6 +1514,183 @@ TEST_TYPES(Table_SetStringUnique, std::true_type, std::false_type)
 
     table.set_string_unique(2, 0, realm::null());
     CHECK_EQUAL(table.size(), 1);
+}
+
+
+TEST(Table_AddInt)
+{
+    Table t;
+    t.add_column(type_Int, "i");
+    t.add_column(type_Int, "ni", /*nullable*/ true);
+    t.add_empty_row(1);
+
+    t.add_int(0, 0, 1);
+    CHECK_EQUAL(t.get_int(0, 0), 1);
+
+    // Check that signed integers wrap around. This invariant is necessary for
+    // full commutativity.
+    t.add_int(0, 0, Table::max_integer);
+    CHECK_EQUAL(t.get_int(0, 0), Table::min_integer);
+    t.add_int(0, 0, -1);
+    CHECK_EQUAL(t.get_int(0, 0), Table::max_integer);
+
+    // add_int() has no effect on a NULL
+    CHECK(t.is_null(1, 0));
+    CHECK_LOGIC_ERROR(t.add_int(1, 0, 123), LogicError::illegal_combination);
+}
+
+
+TEST(Table_SetUniqueAccessorUpdating)
+{
+    Group g;
+    TableRef origin = g.add_table("origin");
+    TableRef target = g.add_table("target");
+
+    target->add_column(type_Int, "col");
+    origin->add_column(type_Int, "pk");
+    origin->add_column_link(type_LinkList, "list", *target);
+    origin->add_search_index(0);
+
+    origin->add_empty_row(2);
+    origin->set_int_unique(0, 0, 1);
+    origin->set_int_unique(0, 1, 2);
+
+    Row row_0 = (*origin)[0];
+    Row row_1 = (*origin)[1];
+    LinkViewRef lv_0 = origin->get_linklist(1, 0);
+    LinkViewRef lv_1 = origin->get_linklist(1, 1);
+
+    // check new row number > old row number
+
+    origin->add_empty_row(2);
+    // leaves row 0 as winner, move last over of 2
+    origin->set_int_unique(0, 2, 1);
+
+    CHECK_EQUAL(origin->size(), 3);
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 0);
+    CHECK_EQUAL(row_1.get_index(), 1);
+
+    CHECK(lv_0->is_attached());
+    CHECK(lv_1->is_attached());
+    CHECK(lv_0 == origin->get_linklist(1, 0));
+    CHECK(lv_1 == origin->get_linklist(1, 1));
+
+    // check new row number < old row number
+
+    origin->insert_empty_row(0, 2);
+    CHECK_EQUAL(origin->size(), 5);
+    // winner is row 3, row 0 is deleted via move_last_over(0)
+    origin->set_int_unique(0, 0, 2);
+    CHECK_EQUAL(origin->size(), 4);
+
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 2); // unchanged
+    CHECK_EQUAL(row_1.get_index(), 3); // unchanged
+
+    CHECK(lv_0->is_attached());
+    CHECK(lv_1->is_attached());
+    CHECK(lv_0 == origin->get_linklist(1, 2));
+    CHECK(lv_1 == origin->get_linklist(1, 3));
+}
+
+
+TEST(Table_SetUniqueLoserAccessorUpdates)
+{
+    Group g;
+    TableRef origin = g.add_table("origin");
+    TableRef target = g.add_table("target");
+
+    target->add_column(type_Int, "col");
+    target->add_empty_row(6);
+    size_t int_col = origin->add_column(type_Int, "pk");
+    size_t ll_col = origin->add_column_link(type_LinkList, "list", *target);
+    size_t str_col = origin->add_column(type_String, "description");
+    origin->add_search_index(0);
+    origin->add_search_index(2);
+
+    origin->add_empty_row(4);
+    origin->set_int_unique(int_col, 0, 1);
+    origin->set_int_unique(int_col, 1, 2);
+    origin->set_string(str_col, 0, "zero");
+    origin->set_string(str_col, 1, "one");
+    origin->set_string(str_col, 2, "two");
+    origin->set_string(str_col, 3, "three");
+
+    Row row_0 = (*origin)[0];
+    Row row_1 = (*origin)[1];
+    Row row_2 = (*origin)[2];
+    LinkViewRef lv_0 = origin->get_linklist(ll_col, 0);
+    LinkViewRef lv_1 = origin->get_linklist(ll_col, 1);
+    lv_0->add(0); // one link
+    lv_1->add(1); // two links
+    lv_1->add(2);
+
+    CHECK_EQUAL(origin->size(), 4);
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(row_0.get_string(str_col), "zero");
+    CHECK_EQUAL(row_1.get_string(str_col), "one");
+    CHECK_EQUAL(row_2.get_string(str_col), "two");
+
+    // leaves row 0 as winner, move last over of 2
+    origin->set_int_unique(int_col, 2, 1);
+
+    CHECK_EQUAL(origin->size(), 3);
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 0);
+    CHECK_EQUAL(row_1.get_index(), 1);
+    CHECK_EQUAL(row_2.get_index(), 0);
+    CHECK_EQUAL(row_0.get_string(str_col), "zero");
+    CHECK_EQUAL(row_1.get_string(str_col), "one");
+    CHECK_EQUAL(row_2.get_string(str_col), "zero");
+    CHECK_EQUAL(row_0.get_linklist(ll_col)->size(), 1);
+    CHECK_EQUAL(row_1.get_linklist(ll_col)->size(), 2);
+    CHECK_EQUAL(row_2.get_linklist(ll_col)->size(), 1); // subsumed
+    CHECK_EQUAL(lv_0->size(), 1);
+    CHECK_EQUAL(lv_1->size(), 2);
+
+    CHECK(lv_0->is_attached());
+    CHECK(lv_1->is_attached());
+    CHECK(lv_0 == origin->get_linklist(1, 0));
+    CHECK(lv_1 == origin->get_linklist(1, 1));
+}
+
+
+TEST(Table_AccessorsUpdateAfterMergeRows)
+{
+    Group g;
+    TableRef origin = g.add_table("origin");
+    TableRef target = g.add_table("target");
+
+    target->add_column(type_Int, "col");
+    target->add_empty_row(6);
+
+    origin->add_column_link(type_Link, "link_column", *target);
+    origin->add_empty_row(3);
+    origin->set_link(0, 0, 0);
+    origin->set_link(0, 1, 1);
+    origin->set_link(0, 2, 2);
+
+    Row row_0 = (*origin)[0];
+    Row row_1 = (*origin)[1];
+
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 0);
+    CHECK_EQUAL(row_1.get_index(), 1);
+
+    origin->merge_rows(1, 2);
+
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 0);
+    CHECK_EQUAL(row_1.get_index(), 2);
 }
 
 
@@ -6665,7 +6876,7 @@ TEST(Table_MixedCrashValues)
 }
 
 
-TEST(Table_ChangeLinkTargets_Links)
+TEST(Table_MergeRows_Links)
 {
     Group g;
 
@@ -6673,23 +6884,24 @@ TEST(Table_ChangeLinkTargets_Links)
     TableRef t1 = g.add_table("t1");
     t0->add_column_link(type_Link, "link", *t1);
     t1->add_column(type_Int, "int");
-    t0->add_empty_row(10);
-    t1->add_empty_row(10);
-    for (int i = 0; i < 10; ++i) {
+    t0->add_empty_row(2);
+    t1->add_empty_row(2);
+    for (int i = 0; i < 2; ++i) {
         t0->set_link(0, i, i);
         t1->set_int(0, i, i);
     }
+    t1->add_empty_row();
 
     Row replaced_row = t1->get(0);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 1);
-    t1->change_link_targets(0, 9);
+    t1->merge_rows(0, 2);
     CHECK(replaced_row.is_attached());
-    CHECK_EQUAL(t0->get_link(0, 0), 9);
+    CHECK_EQUAL(t0->get_link(0, 0), 2);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
 }
 
 
-TEST(Table_ChangeLinkTargets_LinkLists)
+TEST(Table_MergeRows_LinkLists)
 {
     Group g;
 
@@ -6705,18 +6917,19 @@ TEST(Table_ChangeLinkTargets_LinkLists)
         links->add((i + 1) % 10);
         t1->set_int(0, i, i);
     }
+    t1->add_empty_row();
 
     Row replaced_row = t1->get(0);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 2);
-    t1->change_link_targets(0, 9);
+    t1->merge_rows(0, 10);
     CHECK(replaced_row.is_attached());
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
     CHECK_EQUAL(t0->get_linklist(0, 0)->size(), 2);
-    CHECK_EQUAL(t0->get_linklist(0, 0)->get(0).get_index(), 9);
+    CHECK_EQUAL(t0->get_linklist(0, 0)->get(0).get_index(), 10);
     CHECK_EQUAL(t0->get_linklist(0, 0)->get(1).get_index(), 1);
     CHECK_EQUAL(t0->get_linklist(0, 9)->size(), 2);
     CHECK_EQUAL(t0->get_linklist(0, 9)->get(0).get_index(), 9);
-    CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 9);
+    CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 10);
 }
 
 // Minimal test case causing an assertion error because
@@ -6746,8 +6959,8 @@ TEST(Table_MinimalStaleLinkColumnIndex)
 
 // This test case is a simplified version of a bug revealed by fuzz testing
 // set_int_unique triggers backlinks to update if the element to insert is
-// not unique. The expected behaviour is that the old row containing the
-// unique int will be removed and the new row will remain; this ensures
+// not unique. The expected behaviour is that the new row containing the
+// unique int will be removed and the old row will remain; this ensures
 // uniques without throwing errors. This test was crashing (assert failed)
 // when inserting a unique duplicate because backlink indices hadn't been
 // updated after a column had been removed from the table containing the link.
@@ -6777,8 +6990,8 @@ TEST(Table_FuzzTestRevealed_SetUniqueAssert)
     g.get_table(0)->set_int_unique(0, 97, 'l');
     g.get_table(0)->add_empty_row(85);
     g.get_table(0)->set_int_unique(0, 100, 'l'); // duplicate
-    CHECK_EQUAL(g.get_table(0)->get_int(0, 100), 'l');
-    CHECK_EQUAL(g.get_table(0)->get_int(0, 97), 0);
+    CHECK_EQUAL(g.get_table(0)->get_int(0, 97), 'l');
+    CHECK_EQUAL(g.get_table(0)->get_int(0, 100), 0);
 }
 
 TEST(Table_InsertUniqueDuplicate_LinkedColumns)
@@ -6800,7 +7013,7 @@ TEST(Table_InsertUniqueDuplicate_LinkedColumns)
     t->set_string_unique(0, 1, "fourty-two");
     CHECK_EQUAL(t->size(), 1);
     CHECK_EQUAL(t->get_string(0, 0), "fourty-two");
-    CHECK_EQUAL(t->get_int(1, 0), 0);
+    CHECK_EQUAL(t->get_int(1, 0), 42);
 
     TableRef t2 = g.add_table("table2");
     t2->add_column(type_Int, "int_col");
@@ -6812,19 +7025,19 @@ TEST(Table_InsertUniqueDuplicate_LinkedColumns)
     t2->set_int_unique(0, 0, 43);
     t2->set_string_unique(1, 0, "fourty-three");
     t2->set_string_unique(1, 1, "FOURTY_THREE");
-    t2->set_link(2, 1, 0);
-    t2->set_int_unique(0, 1, 43);
+    t2->set_link(2, 0, 0);
+    t2->set_int_unique(0, 1, 43); // deletes row 1, row 0 is winner
 
     CHECK_EQUAL(t2->size(), 1);
     CHECK_EQUAL(t2->get_int(0, 0), 43);
-    CHECK_EQUAL(t2->get_string(1, 0), "FOURTY_THREE");
+    CHECK_EQUAL(t2->get_string(1, 0), "fourty-three");
     CHECK_EQUAL(t2->get_link(2, 0), 0);
 
     t2->remove_column(0);
     t->insert_empty_row(0); // update t2 link through backlinks
     t->set_int(1, 0, 333);
     CHECK_EQUAL(t->get_int(1, 0), 333);
-    CHECK_EQUAL(t->get_int(1, 1), 0);
+    CHECK_EQUAL(t->get_int(1, 1), 42);
     CHECK_EQUAL(t2->get_link(1, 0), 1); // bumped forward by insert at t(0), updated through backlinks
 
     using df = _impl::DescriptorFriend;
@@ -6840,22 +7053,22 @@ TEST(Table_InsertUniqueDuplicate_LinkedColumns)
     t->set_int(1, 0, 55555);
     CHECK_EQUAL(t2->get_link(0, 0), 3);
 
-    t->set_int_unique(1, 0, 4444);      // duplicate
-    CHECK_EQUAL(t2->get_link(0, 0), 1); // changed by duplicate overwrite in linked table via backlinks
+    t->set_int_unique(1, 0, 4444);      // duplicate, row 1 wins, move_last_over(0)
+    CHECK_EQUAL(t2->get_link(0, 0), 0); // changed by duplicate overwrite in linked table via backlinks
 
     t2->insert_column(0, type_Int, "type_Int col");
-    CHECK_EQUAL(t2->get_link(1, 0), 1); // no change after insert col
+    CHECK_EQUAL(t2->get_link(1, 0), 0); // no change after insert col
     t->insert_empty_row(0);
     t->set_int(1, 0, 666666);
-    CHECK_EQUAL(t2->get_link(1, 0), 2); // bumped forward via backlinks
+    CHECK_EQUAL(t2->get_link(1, 0), 1); // bumped forward via backlinks
 
     df::move_column(*t2_descriptor, 1, 0); // move backwards
-    CHECK_EQUAL(t2->get_link(0, 0), 2);    // no change
+    CHECK_EQUAL(t2->get_link(0, 0), 1);    // no change
     t->insert_empty_row(0);
     t->set_int(1, 0, 7777777);
-    CHECK_EQUAL(t2->get_link(0, 0), 3); // bumped forward via backlinks
+    CHECK_EQUAL(t2->get_link(0, 0), 2); // bumped forward via backlinks
     t->remove(0);
-    CHECK_EQUAL(t2->get_link(0, 0), 2); // bumped back via backlinks
+    CHECK_EQUAL(t2->get_link(0, 0), 1); // bumped back via backlinks
 }
 
 
@@ -6873,7 +7086,7 @@ TEST(Table_DetachedAccessor)
     CHECK_LOGIC_ERROR(table->clear(), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->add_search_index(0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->remove_search_index(0), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->change_link_targets(0, 1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->merge_rows(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->swap_rows(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_string(1, 0, ""), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_string_unique(1, 0, ""), LogicError::detached_accessor);
@@ -6889,7 +7102,7 @@ TEST(Table_DetachedAccessor)
 TEST(Table_StaleLinkIndexOnTableRemove)
 {
     SHARED_GROUP_TEST_PATH(path);
-    std::unique_ptr<Replication> hist(realm::make_client_history(path, crypt_key()));
+    std::unique_ptr<Replication> hist(realm::make_in_realm_history(path));
     SharedGroup sg_w(*hist, SharedGroupOptions(crypt_key()));
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
 

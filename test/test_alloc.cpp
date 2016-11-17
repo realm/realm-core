@@ -300,4 +300,27 @@ TEST(Alloc_Fuzzy)
     }
 }
 
+
+// This test reproduces the sporadic issue that was seen for large refs (addresses)
+// on 32-bit iPhone 5 Simulator runs on certain host machines.
+TEST(Alloc_ToAndFromRef)
+{
+    constexpr size_t ref_type_width = sizeof(ref_type) * 8;
+    constexpr ref_type interesting_refs[] = {
+        0,
+        8,
+        ref_type(1ULL << (ref_type_width - 1)), // 32-bit: 0x80000000, 64-bit: 0x8000000000000000
+        ref_type(3ULL << (ref_type_width - 2)), // 32-bit: 0xC0000000, 64-bit: 0xC000000000000000
+    };
+
+    constexpr size_t num_interesting_refs = sizeof(interesting_refs) / sizeof(interesting_refs[0]);
+    for (size_t i = 0; i < num_interesting_refs; ++i) {
+        ref_type ref = interesting_refs[i];
+        int_fast64_t ref_as_int = from_ref(ref);
+        ref_type back_to_ref = to_ref(ref_as_int);
+        CHECK_EQUAL(ref, back_to_ref);
+    }
+
+}
+
 #endif // TEST_ALLOC

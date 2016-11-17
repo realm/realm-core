@@ -28,7 +28,7 @@ namespace realm {
 // column type
 class TimestampColumn : public ColumnBaseSimple {
 public:
-    TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx = npos);
+    TimestampColumn(bool nullable, Allocator& alloc, ref_type ref, size_t col_ndx = npos);
 
     static ref_type create(Allocator& alloc, size_t size, bool nullable);
     static size_t get_size_from_ref(ref_type root_ref, Allocator& alloc) noexcept;
@@ -118,6 +118,7 @@ private:
     std::unique_ptr<BpTree<int64_t>> m_nanoseconds;
 
     std::unique_ptr<StringIndex> m_search_index;
+    bool m_nullable;
 
     template <class BT>
     class CreateHandler;

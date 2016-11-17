@@ -80,7 +80,7 @@ private:
 /// \sa SlabAlloc
 class Allocator {
 public:
-    static constexpr int CURRENT_FILE_FORMAT_VERSION = 5;
+    static constexpr int CURRENT_FILE_FORMAT_VERSION = 6;
 
     /// The specified size must be divisible by 8, and must not be
     /// zero.
@@ -157,7 +157,7 @@ public:
     /// to the file format version specified by the attached file (or attached
     /// memory buffer) at the time of attachment. If no file (or buffer) is
     /// currently attached, the returned value has no meaning. If the Realm file
-    /// format is later upgraded, the file form,at version filed must be updated
+    /// format is later upgraded, the file format version filed must be updated
     /// to reflect that fact.
     ///
     /// In shared mode (when a Realm file is opened via a SharedGroup instance)
@@ -197,9 +197,14 @@ public:
     ///     When opening an older database file, all DateTime columns will be
     ///     automatically upgraded Timestamp columns.
     ///
+    ///   6 Introduced a new structure for the StringIndex. Moved the commit
+    ///     logs into the Realm file. Changes to the transaction log format
+    ///     including reshuffling instructions. This is the format used in
+    ///     milestone 2.0.0.
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in AllocSlab::validate_buffer(), the file
-    /// format selection loginc in
+    /// format selection logic in
     /// Group::get_target_file_format_version_for_session(), and the file format
     /// upgrade logic in Group::upgrade_file_format().
     int get_file_format_version() const noexcept;
@@ -292,14 +297,26 @@ inline int_fast64_t from_ref(ref_type v) noexcept
 {
     // Check that v is divisible by 8 (64-bit aligned).
     REALM_ASSERT_DEBUG(v % 8 == 0);
-    return util::from_twos_compl<int_fast64_t>(v);
+
+    static_assert(std::is_same<ref_type, size_t>::value,
+                  "If ref_type changes, from_ref and to_ref should probably be updated");
+
+    // Make sure that we preserve the bit pattern of the ref_type (without sign extension).
+    return util::from_twos_compl<int_fast64_t>(uint_fast64_t(v));
 }
 
 inline ref_type to_ref(int_fast64_t v) noexcept
 {
-    REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<ref_type>(v));
     // Check that v is divisible by 8 (64-bit aligned).
     REALM_ASSERT_DEBUG(v % 8 == 0);
+
+    // C++11 standard, paragraph 4.7.2 [conv.integral]:
+    // If the destination type is unsigned, the resulting value is the least unsigned integer congruent to the source
+    // integer (modulo 2n where n is the number of bits used to represent the unsigned type). [ Note: In a two’s
+    // complement representation, this conversion is conceptual and there is no change in the bit pattern (if there is
+    // no truncation). — end note ]
+    static_assert(std::is_unsigned<ref_type>::value,
+                  "If ref_type changes, from_ref and to_ref should probably be updated");
     return ref_type(v);
 }
 

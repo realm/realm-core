@@ -54,13 +54,41 @@ bit set, then the remaining upper bits specify the row index at which the string
 it must be interpreted as a reference to a Column that stores the row indexes at which the string is stored.
 
 If a Column is used, then all row indexes are guaranteed to be sorted increasingly, which means you an search in it
-using our binary search functions such as upper_bound() and lower_bound().
+using our binary search functions such as upper_bound() and lower_bound(). Each duplicate value will be stored in
+the same Column, but Columns may contain more than just duplicates if the depth of the tree exceeds the value
+`s_max_offset` This is to avoid stack overflow problems with many of our recursive functions if we have two very
+long strings that have a long common prefix but differ in the last couple bytes. If a Column stores more than just
+duplicates, then the list is kept sorted in ascending order by string value and within the groups of common
+strings, the rows are sorted in ascending order.
 */
 
 namespace realm {
 
 class Spec;
 class Timestamp;
+
+class IndexArray : public Array {
+public:
+    IndexArray(Allocator& allocator)
+        : Array(allocator)
+    {
+    }
+
+    size_t index_string_find_first(StringData value, ColumnBase* column) const;
+    void index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const;
+    FindRes index_string_find_all_no_copy(StringData value, ColumnBase* column, InternalFindResult& result) const;
+    size_t index_string_count(StringData value, ColumnBase* column) const;
+
+private:
+    template <IndexMethod>
+    size_t from_list(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+                     const IntegerColumn& rows, ColumnBase* column) const;
+
+    template <IndexMethod method, class T>
+    size_t index_string(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+                        ColumnBase* column) const;
+};
+
 
 class StringIndex {
 public:
@@ -110,7 +138,7 @@ public:
     template <class T>
     void find_all(IntegerColumn& result, T value) const;
     template <class T>
-    FindRes find_all(T value, ref_type& ref) const;
+    FindRes find_all_no_copy(T value, InternalFindResult& result) const;
     template <class T>
     size_t count(T value) const;
     template <class T>
@@ -124,8 +152,8 @@ public:
     /// By default, duplicate values are allowed.
     void set_allow_duplicate_values(bool) noexcept;
 
-#ifdef REALM_DEBUG
     void verify() const;
+#ifdef REALM_DEBUG
     void verify_entries(const StringColumn& column) const;
     void do_dump_node_structure(std::ostream&, int) const;
     void to_dot() const;
@@ -134,6 +162,14 @@ public:
 
     typedef int32_t key_type;
 
+    // s_max_offset specifies the number of levels of recursive string indexes
+    // allowed before storing everything in lists. This is to avoid nesting
+    // to too deep of a level. Since every SubStringIndex stores 4 bytes, this
+    // means that a StringIndex is helpful for strings of a common prefix up to
+    // 4 times this limit (200 bytes shared). Lists are stored in sorted order,
+    // so strings sharing a common prefix of more than this limit will use a
+    // binary search of approximate complexity log2(n) from `std::lower_bound`.
+    static const size_t s_max_offset = 200; // max depth * s_index_key_length
     static const size_t s_index_key_length = 4;
     static key_type create_key(StringData) noexcept;
     static key_type create_key(StringData, size_t) noexcept;
@@ -158,7 +194,7 @@ private:
     // type 2, or type 3 (no shifting in either case).
     // References point to a list if the context header flag is NOT set.
     // If the header flag is set, references point to a sub-StringIndex (nesting).
-    std::unique_ptr<Array> m_array;
+    std::unique_ptr<IndexArray> m_array;
     ColumnBase* m_target_column;
     bool m_deny_duplicate_values;
 
@@ -166,10 +202,13 @@ private:
     };
     StringIndex(inner_node_tag, Allocator&);
 
-    static Array* create_node(Allocator&, bool is_leaf);
+    static IndexArray* create_node(Allocator&, bool is_leaf);
 
     void insert_with_offset(size_t row_ndx, StringData value, size_t offset);
     void insert_row_list(size_t ref, size_t offset, StringData value);
+    void insert_to_existing_list(size_t row, StringData value, IntegerColumn& list);
+    void insert_to_existing_list_at_lower(size_t row, StringData value, IntegerColumn& list,
+                                          const IntegerColumnIterator& lower);
     key_type get_last_key() const;
 
     /// Add small signed \a diff to all elements that are greater than, or equal
@@ -214,6 +253,17 @@ private:
     static void array_to_dot(std::ostream&, const Array&);
     static void keys_to_dot(std::ostream&, const Array&, StringData title = StringData());
 #endif
+};
+
+
+class SortedListComparator {
+public:
+    SortedListComparator(ColumnBase& column_values);
+    bool operator()(int64_t ndx, StringData needle);
+    bool operator()(StringData needle, int64_t ndx);
+
+private:
+    ColumnBase& values;
 };
 
 
@@ -302,7 +352,7 @@ inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc)
 
 inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, ColumnBase* target_column,
                                 bool deny_duplicate_values, Allocator& alloc)
-    : m_array(new Array(alloc))
+    : m_array(new IndexArray(alloc))
     , m_target_column(target_column)
     , m_deny_duplicate_values(deny_duplicate_values)
 {
@@ -426,11 +476,13 @@ void StringIndex::set(size_t row_ndx, T new_value)
     // Note that insert_with_offset() throws UniqueConstraintViolation.
 
     if (REALM_LIKELY(new_value2 != old_value)) {
-        size_t offset = 0;                               // First key from beginning of string
-        insert_with_offset(row_ndx, new_value2, offset); // Throws
-
+        // We must erase this row first because erase uses find_first which
+        // might find the duplicate if we insert before erasing.
         bool is_last = true;        // To avoid updating refs
         erase<T>(row_ndx, is_last); // Throws
+
+        size_t offset = 0;                               // First key from beginning of string
+        insert_with_offset(row_ndx, new_value2, offset); // Throws
     }
 }
 
@@ -488,11 +540,11 @@ void StringIndex::find_all(IntegerColumn& result, T value) const
 }
 
 template <class T>
-FindRes StringIndex::find_all(T value, ref_type& ref) const
+FindRes StringIndex::find_all_no_copy(T value, InternalFindResult& result) const
 {
     // Use direct access method
     StringConversionBuffer buffer;
-    return m_array->index_string_find_all_no_copy(to_str(value, buffer), ref, m_target_column);
+    return m_array->index_string_find_all_no_copy(to_str(value, buffer), m_target_column, result);
 }
 
 template <class T>

@@ -38,12 +38,15 @@ enum Feature {
     feature_Replication,
 };
 
+class StringData;
+
 class Version {
 public:
     static int get_major() { return REALM_VERSION_MAJOR; }
     static int get_minor() { return REALM_VERSION_MINOR; }
     static int get_patch() { return REALM_VERSION_PATCH; }
     static std::string get_version();
+    static bool is_at_least(int major, int minor, int patch, StringData extra);
     static bool is_at_least(int major, int minor, int patch);
     static bool has_feature(Feature feature);
 };

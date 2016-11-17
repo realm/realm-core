@@ -65,7 +65,7 @@ using namespace realm::test_util;
 using namespace realm::test_util::unit_test;
 
 // Random seed for various random number generators used by fuzzying unit tests.
-unsigned long unit_test_random_seed;
+unsigned int unit_test_random_seed;
 
 namespace {
 
@@ -515,9 +515,11 @@ int test_all(int argc, char* argv[], util::Logger* logger)
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
 #ifdef _MSC_VER
-    // we're in /build/ on Windows if we're in the Visual Studio IDE
-    set_test_resource_path("../../test/");
-    set_test_path_prefix("../../test/");
+    // we're in /build/ on Windows if we're in the Visual Studio IDE. Some Github clients on Windows will interfere with 
+    // the .realm files created by unit tests, so we need to make a special directory for them and add it to .gitignore
+    util::try_make_dir("../test/tmp");
+    set_test_resource_path("../test/");
+    set_test_path_prefix("../test/tmp/");
 #endif
 
     set_random_seed();

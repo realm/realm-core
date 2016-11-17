@@ -935,7 +935,7 @@ public:
     template <class T>
     BasicTableRef<T> get_subtable() const
     {
-        REALM_ASSERT(!Base::is_subtable() || Base::template is_subtable<T>());
+        REALM_ASSERT(!Base::is_subtable() || this->Base::template is_subtable<T>());
         return unchecked_cast<T>(get_subtable());
     }
 
@@ -987,7 +987,7 @@ public:
     template <class T>
     BasicTableRef<const T> get_subtable() const
     {
-        REALM_ASSERT(!Base::is_subtable() || Base::template is_subtable<T>());
+        REALM_ASSERT(!Base::is_subtable() || this->Base::template is_subtable<T>());
         return unchecked_cast<const T>(get_subtable());
     }
 
@@ -1885,6 +1885,12 @@ public:
     Query& contains(StringData value, bool case_sensitive = true) const
     {
         Base::m_query->m_impl.contains(col_idx, value, case_sensitive);
+        return *Base::m_query;
+    }
+
+    Query& like(StringData value, bool case_sensitive=true) const
+    {
+        Base::m_query->m_impl.like(col_idx, value, case_sensitive);
         return *Base::m_query;
     }
 };

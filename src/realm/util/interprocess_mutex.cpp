@@ -22,7 +22,8 @@
 
 using namespace realm::util;
 
-std::map<File::UniqueID, std::weak_ptr<InterprocessMutex::LockInfo>> InterprocessMutex::s_info_map;
-Mutex InterprocessMutex::s_mutex;
+std::once_flag InterprocessMutex::s_init_flag;
+std::map<File::UniqueID, std::weak_ptr<InterprocessMutex::LockInfo>>* InterprocessMutex::s_info_map;
+Mutex* InterprocessMutex::s_mutex;
 
 #endif

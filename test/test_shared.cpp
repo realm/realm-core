@@ -51,7 +51,7 @@
 
 #include "test.hpp"
 
-extern unsigned long unit_test_random_seed;
+extern unsigned int unit_test_random_seed;
 
 using namespace realm;
 using namespace realm::util;
@@ -1052,8 +1052,6 @@ TEST(Shared_ManyReaders)
     }
 }
 
-#ifndef _WIN32 // FIXME: Some times crashes on Windows
-
 // This test is a minimal repro. of core issue #842.
 TEST(Many_ConcurrentReaders)
 {
@@ -1093,7 +1091,6 @@ TEST(Many_ConcurrentReaders)
     }
 }
 
-#endif // #ifndef _WIN32
 
 namespace {
 
@@ -2289,8 +2286,6 @@ TEST(Shared_MixedWithNonShared)
 #endif
 }
 
-// @Finn, fixme, find out why it fails on Windows
-#if !defined(_WIN32)
 TEST(Shared_VersionCount)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2314,7 +2309,6 @@ TEST(Shared_VersionCount)
     // just a single version.
     CHECK_EQUAL(2, sg_r.get_number_of_versions());
 }
-#endif
 
 TEST(Shared_MultipleRollbacks)
 {

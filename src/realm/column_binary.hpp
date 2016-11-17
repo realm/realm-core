@@ -44,6 +44,13 @@ public:
     bool is_nullable() const noexcept override;
 
     BinaryData get(size_t ndx) const noexcept;
+
+    /// Return data from position 'pos' and onwards. If the blob is distributed
+    /// across multiple arrays (if bigger than ~ 16M), you will only get data
+    /// from one array. 'pos' will be updated to be an index to next available
+    /// data. It will be 0 if no more data.
+    BinaryData get_at(size_t ndx, size_t& pos) const noexcept;
+
     bool is_null(size_t ndx) const noexcept override;
     StringData get_index_data(size_t, StringIndex::StringConversionBuffer&) const noexcept final;
 
@@ -101,9 +108,9 @@ private:
 
     // Called by Array::bptree_insert().
     static ref_type leaf_insert(MemRef leaf_mem, ArrayParent&, size_t ndx_in_parent, Allocator&, size_t insert_ndx,
-                                Array::TreeInsert<BinaryColumn>& state);
+                                BpTreeNode::TreeInsert<BinaryColumn>& state);
 
-    struct InsertState : Array::TreeInsert<BinaryColumn> {
+    struct InsertState : BpTreeNode::TreeInsert<BinaryColumn> {
         bool m_add_zero_term;
     };
 
@@ -123,8 +130,49 @@ private:
 
     void leaf_to_dot(MemRef, ArrayParent*, size_t ndx_in_parent, std::ostream&) const override;
 
-    friend class Array;
+    friend class BpTreeNode;
     friend class ColumnBase;
+};
+
+class BinaryIterator {
+public:
+    BinaryIterator()
+    {
+    }
+    // TODO: When WriteLogCollector is removed, there is no need for this
+    BinaryIterator(BinaryData binary)
+        : m_binary(binary)
+    {
+    }
+
+    BinaryIterator(BinaryColumn* col, size_t ndx)
+        : m_binary_col(col)
+        , m_ndx(ndx)
+    {
+    }
+
+    BinaryData get_next() noexcept
+    {
+        if (!end_of_data) {
+            if (m_binary_col) {
+                BinaryData ret = m_binary_col->get_at(m_ndx, m_pos);
+                end_of_data = (m_pos == 0);
+                return ret;
+            }
+            else if (!m_binary.is_null()) {
+                end_of_data = true;
+                return m_binary;
+            }
+        }
+        return {};
+    }
+
+private:
+    bool end_of_data = false;
+    BinaryColumn* m_binary_col = nullptr;
+    size_t m_ndx = 0;
+    size_t m_pos = 0;
+    BinaryData m_binary;
 };
 
 
@@ -152,7 +200,7 @@ inline size_t BinaryColumn::size() const noexcept
         return leaf->size();
     }
     // Non-leaf root
-    return m_array->get_bptree_size();
+    return static_cast<BpTreeNode*>(m_array.get())->get_bptree_size();
 }
 
 inline bool BinaryColumn::is_nullable() const noexcept
@@ -203,7 +251,7 @@ inline BinaryData BinaryColumn::get(size_t ndx) const noexcept
     }
 
     // Non-leaf root
-    std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
+    std::pair<MemRef, size_t> p = static_cast<BpTreeNode*>(m_array.get())->get_bptree_leaf(ndx);
     const char* leaf_header = p.first.get_addr();
     size_t ndx_in_leaf = p.second;
     Allocator& alloc = m_array->get_alloc();
@@ -372,7 +420,7 @@ inline size_t BinaryColumn::get_size_from_ref(ref_type root_ref, Allocator& allo
         // Big blobs leaf
         return ArrayBigBlobs::get_size_from_header(root_header);
     }
-    return Array::get_bptree_size_from_header(root_header);
+    return BpTreeNode::get_bptree_size_from_header(root_header);
 }
 
 

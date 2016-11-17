@@ -503,6 +503,25 @@ TEST(DoubleColumn_InitOfEmptyColumn)
     CHECK_EQUAL(0.0, t.get_double(1, 0));
 }
 
+// Test for a bug where default values of newly added float/double columns did not obey their nullability
+TEST_TYPES(DoubleFloatColumn_InitOfEmptyColumnNullable, std::true_type, std::false_type)
+{
+    constexpr bool nullable_toggle = TEST_TYPE::value;
+    Table t;
+    t.add_column(type_Int, "unused");
+    t.add_empty_row();
+    t.add_column(type_Double, "d", nullable_toggle);
+    t.add_column(type_Float, "f", nullable_toggle);
+    CHECK(t.is_null(1, 0) == nullable_toggle);
+    CHECK(t.is_null(2, 0) == nullable_toggle);
+    if (nullable_toggle) {
+        t.set_null(1, 0);
+        t.set_null(2, 0);
+        CHECK(t.is_null(1, 0));
+        CHECK(t.is_null(2, 0));
+    }
+}
+
 TEST(FloatColumn_InitOfEmptyColumn)
 {
     Table t;

@@ -2430,17 +2430,18 @@ TEST(Group_ToDot)
     // Create table with all column types
     TableRef table = mygroup.add_table("test");
     DescriptorRef subdesc;
-    s.add_column(type_Int, "int");
-    s.add_column(type_Bool, "bool");
-    s.add_column(type_OldDateTime, "date");
-    s.add_column(type_String, "string");
-    s.add_column(type_String, "string_long");
-    s.add_column(type_String, "string_enum"); // becomes StringEnumColumn
-    s.add_column(type_Binary, "binary");
-    s.add_column(type_Mixed, "mixed");
-    s.add_column(type_Table, "tables", &subdesc);
+    table->add_column(type_Int, "int");
+    table->add_column(type_Bool, "bool");
+    table->add_column(type_OldDateTime, "date");
+    table->add_column(type_String, "string");
+    table->add_column(type_String, "string_long");
+    table->add_column(type_String, "string_enum"); // becomes StringEnumColumn
+    table->add_column(type_Binary, "binary");
+    table->add_column(type_Mixed, "mixed");
+    table->add_column(type_Table, "tables", &subdesc);
     subdesc->add_column(type_Int, "sub_first");
     subdesc->add_column(type_String, "sub_second");
+    subdesc.reset();
 
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
@@ -2468,7 +2469,7 @@ TEST(Group_ToDot)
                 break;
         }
 
-        table->set_binary(6, i, "binary", 7);
+        table->set_binary(6, i, BinaryData("binary", 7));
 
         switch (i % 3) {
             case 0:
@@ -2482,26 +2483,22 @@ TEST(Group_ToDot)
                 break;
         }
 
-        table->set_subtable(8, i);
-
         // Add sub-tables
         if (i == 2) {
             // To mixed column
-            table->set_mixed(7, i, Mixed(type_Table));
-            Table subtable = table->GetMixedTable(7, i);
+            table->set_mixed(7, i, Mixed::subtable_tag());
+            TableRef st = table->get_subtable(7, i);
 
-            Spec s = subtable->get_spec();
-            s.add_column(type_Int, "first");
-            s.add_column(type_String, "second");
-            subtable->UpdateFromSpec(s.get_ref());
+            st->add_column(type_Int, "first");
+            st->add_column(type_String, "second");
 
-            subtable->insert_empty_row(0);
-            subtable->set_int(0, 0, 42);
-            subtable->set_string(1, 0, "meaning");
+            st->insert_empty_row(0);
+            st->set_int(0, 0, 42);
+            st->set_string(1, 0, "meaning");
 
             // To table column
-            Table subtable2 = table->get_subtable(8, i);
-            subtable2->set_empty_row(0);
+            TableRef subtable2 = table->get_subtable(8, i);
+            subtable2->add_empty_row();
             subtable2->set_int(0, 0, 42);
             subtable2->set_string(1, 0, "meaning");
         }
@@ -2513,14 +2510,14 @@ TEST(Group_ToDot)
 #if 1
     // Write array graph to std::cout
     std::stringstream ss;
-    mygroup.ToDot(ss);
+    mygroup.to_dot(ss);
     std::cout << ss.str() << std::endl;
 #endif
 
     // Write array graph to file in dot format
-    std::ofstream fs("realm_graph.dot", ios::out | ios::binary);
+    std::ofstream fs("realm_graph.dot", std::ios::out | std::ios::binary);
     if (!fs.is_open())
-        std::cout << "file open error " << strerror << std::endl;
+        std::cout << "file open error " << strerror(errno) << std::endl;
     mygroup.to_dot(fs);
     fs.close();
 }
@@ -2560,5 +2557,28 @@ TEST(Group_SharedMappingsForReadOnlyStreamingForm)
         CHECK(table2 && table2->size() == 1);
     }
 }
+
+
+// This test embodies a current limitation of our merge algorithm. If this
+// limitation is lifted, the code for the SET_UNIQUE instruction in
+// fuzz_group.cpp should be strengthened to reflect this.
+// (i.e. remove the try / catch for LogicError of kind illegal_combination)
+TEST(Group_SetNullUniqueLimitation)
+{
+    Group g;
+    TableRef t = g.add_table("t0");
+    t->add_column(type_Int, "", true);
+    t->add_search_index(0);
+    t->add_column_link(type_LinkList, "", *t);
+    t->add_empty_row();
+    t->get_linklist(1, 0)->add(0);
+    try {
+        t->set_null_unique(0, 0);
+    }
+    catch (const LogicError& le) {
+        CHECK(le.kind() == LogicError::illegal_combination);
+    }
+}
+
 
 #endif // TEST_GROUP

@@ -73,7 +73,7 @@ BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable, size_t
 
 namespace {
 
-struct SetLeafElem : Array::UpdateHandler {
+struct SetLeafElem : BpTreeNode::UpdateHandler {
     Allocator& m_alloc;
     const BinaryData m_value;
     const bool m_add_zero_term;
@@ -113,6 +113,46 @@ struct SetLeafElem : Array::UpdateHandler {
 
 } // anonymous namespace
 
+BinaryData BinaryColumn::get_at(size_t ndx, size_t& pos) const noexcept
+{
+    REALM_ASSERT_3(ndx, <, size());
+
+    if (root_is_leaf()) {
+        Array* arr = m_array.get();
+        bool is_big = arr->get_context_flag();
+        if (!is_big) {
+            // Small blobs
+            pos = 0;
+            REALM_ASSERT_DEBUG(dynamic_cast<ArrayBinary*>(arr) != nullptr);
+            return static_cast<ArrayBinary*>(arr)->get(ndx);
+        }
+        else {
+            // Big blobs
+            REALM_ASSERT_DEBUG(dynamic_cast<ArrayBigBlobs*>(arr) != nullptr);
+            return static_cast<ArrayBigBlobs*>(arr)->get_at(ndx, pos);
+        }
+    }
+    else {
+        // Non-leaf root
+        std::pair<MemRef, size_t> p = static_cast<BpTreeNode*>(m_array.get())->get_bptree_leaf(ndx);
+        const char* leaf_header = p.first.get_addr();
+        bool is_big = Array::get_context_flag_from_header(leaf_header);
+        if (!is_big) {
+            // Small blobs
+            pos = 0;
+            ArrayBinary leaf(m_array->get_alloc());
+            leaf.init_from_mem(p.first);
+            return leaf.get(p.second);
+        }
+        else {
+            // Big blobs
+            ArrayBigBlobs leaf(m_array->get_alloc(), m_nullable);
+            leaf.init_from_mem(p.first);
+            return leaf.get_at(p.second, pos);
+        }
+    }
+}
+
 void BinaryColumn::set(size_t ndx, BinaryData value, bool add_zero_term)
 {
     REALM_ASSERT_3(ndx, <, size());
@@ -134,7 +174,7 @@ void BinaryColumn::set(size_t ndx, BinaryData value, bool add_zero_term)
 
     // Non-leaf root
     SetLeafElem set_leaf_elem(m_array->get_alloc(), value, add_zero_term);
-    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
+    static_cast<BpTreeNode*>(m_array.get())->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
 
@@ -180,13 +220,14 @@ void BinaryColumn::do_insert(size_t row_ndx, BinaryData value, bool add_zero_ter
         }
         else {
             // Non-leaf root
+            BpTreeNode* node = static_cast<BpTreeNode*>(m_array.get());
             state.m_value = value;
             state.m_add_zero_term = add_zero_term;
             if (row_ndx_2 == realm::npos) {
-                new_sibling_ref = m_array->bptree_append(state);
+                new_sibling_ref = node->bptree_append(state);
             }
             else {
-                new_sibling_ref = m_array->bptree_insert(row_ndx_2, state);
+                new_sibling_ref = node->bptree_insert(row_ndx_2, state);
             }
         }
         if (REALM_UNLIKELY(new_sibling_ref)) {
@@ -198,7 +239,7 @@ void BinaryColumn::do_insert(size_t row_ndx, BinaryData value, bool add_zero_ter
 
 
 ref_type BinaryColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t ndx_in_parent, Allocator& alloc,
-                                   size_t insert_ndx, Array::TreeInsert<BinaryColumn>& state)
+                                   size_t insert_ndx, BpTreeNode::TreeInsert<BinaryColumn>& state)
 {
     InsertState& state_2 = static_cast<InsertState&>(state);
     bool is_big = Array::get_context_flag_from_header(leaf_mem.get_addr());
@@ -224,7 +265,7 @@ ref_type BinaryColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t 
 }
 
 
-class BinaryColumn::EraseLeafElem : public Array::EraseHandler {
+class BinaryColumn::EraseLeafElem : public BpTreeNode::EraseHandler {
 public:
     BinaryColumn& m_column;
     EraseLeafElem(BinaryColumn& column) noexcept
@@ -319,7 +360,7 @@ void BinaryColumn::erase(size_t ndx, bool is_last)
     // Non-leaf root
     size_t ndx_2 = is_last ? npos : ndx;
     EraseLeafElem erase_leaf_elem(*this);
-    Array::erase_bptree_elem(m_array.get(), ndx_2, erase_leaf_elem); // Throws
+    BpTreeNode::erase_bptree_elem(static_cast<BpTreeNode*>(m_array.get()), ndx_2, erase_leaf_elem); // Throws
 }
 
 

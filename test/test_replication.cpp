@@ -3465,7 +3465,11 @@ TEST(Replication_SetUnique)
         table1->add_empty_row(2);
         table1->set_int_unique(0, 0, 123);
         table1->set_string_unique(1, 0, "Hello, World!");
-        table1->set_int_unique(2, 0, 123);
+        // This will delete row 0! It is a bit counter intuative but this
+        // is because we expect that SetUnique is called before filling in
+        // other columns with data.
+        table1->set_null_unique(2, 0);
+        CHECK_EQUAL(table1->size(), 1);
         table1->set_string_unique(3, 0, "Hello, World!");
         wt.commit();
     }
@@ -3474,9 +3478,9 @@ TEST(Replication_SetUnique)
         ReadTransaction rt(sg_2);
         ConstTableRef table2 = rt.get_table("table");
 
-        CHECK_EQUAL(table2->get_int(0, 0), 123);
-        CHECK_EQUAL(table2->get_string(1, 0), "Hello, World!");
-        CHECK_EQUAL(table2->get_int(2, 0), 123);
+        CHECK_EQUAL(table2->get_int(0, 0), 0);
+        CHECK_EQUAL(table2->get_string(1, 0), "");
+        CHECK(table2->is_null(2, 0));
         CHECK_EQUAL(table2->get_string(3, 0), "Hello, World!");
     }
 }
@@ -3523,9 +3527,9 @@ TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColu
 }
 
 
-TEST(Replication_ChangeLinkTargets)
+TEST(Replication_MergeRows)
 {
-    // Test that ChangeLinkTargets has the same effect whether called directly
+    // Test that MergeRows has the same effect whether called directly
     // or applied via TransactLogApplier.
 
     SHARED_GROUP_TEST_PATH(path_1);
@@ -3546,7 +3550,7 @@ TEST(Replication_ChangeLinkTargets)
         t0->add_empty_row(2);
         t1->add_empty_row(2);
         t1->set_link(0, 0, 0);
-        t0->change_link_targets(0, 1);
+        t0->merge_rows(0, 1);
         wt.commit();
     }
     repl.replay_transacts(sg_2, replay_logger);
@@ -3561,6 +3565,46 @@ TEST(Replication_ChangeLinkTargets)
 
         CHECK_EQUAL(t1_1->get_link(0, 0), 1);
         CHECK_EQUAL(t1_2->get_link(0, 0), 1);
+    }
+}
+
+
+TEST(Replication_LinkListNullifyThroughTableView)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    util::Logger& replay_logger = test_context.logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef t0 = wt.add_table("t0");
+        TableRef t1 = wt.add_table("t1");
+        t0->add_column_link(type_LinkList, "l", *t1);
+        t1->add_column(type_Int, "i");
+        t1->add_empty_row();
+        t0->add_empty_row();
+        t0->get_linklist(0, 0)->add(0);
+
+        // Create a TableView for the table and remove the rows through that.
+        auto tv = t1->where().find_all();
+        tv.clear(RemoveMode::unordered);
+
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt1(sg_1);
+        ReadTransaction rt2(sg_2);
+
+        CHECK(rt1.get_group() == rt2.get_group());
+        CHECK_EQUAL(rt1.get_table(0)->size(), 1);
+        CHECK_EQUAL(rt1.get_table(1)->size(), 0);
+        CHECK_EQUAL(rt1.get_table(0)->get_linklist(0, 0)->size(), 0);
     }
 }
 

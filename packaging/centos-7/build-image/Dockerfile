@@ -1,4 +1,4 @@
-FROM realm-core-centos-7-base
+FROM ci/realm-core:centos-7-base
 
 # whatever is required for building should be installed in this image; just
 # like BuildRequires: for RPM specs

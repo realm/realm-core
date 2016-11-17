@@ -70,6 +70,36 @@ struct ImplicitNull<double> {
 template <class T, class R, Action action, class Condition, class ColType>
 R aggregate(const ColType& column, T target, size_t start, size_t end, size_t limit, size_t* return_ndx);
 
+
+// Iterator with random access for Columns
+template <typename ColumnDataType>
+class ColumnRandIterator : public std::iterator<std::random_access_iterator_tag, ColumnDataType, ptrdiff_t, size_t> {
+public:
+    ColumnRandIterator(const Column<ColumnDataType>* src_col, size_t ndx = 0);
+    bool operator==(const ColumnRandIterator<ColumnDataType>& rhs) const;
+    bool operator!=(const ColumnRandIterator<ColumnDataType>& rhs) const;
+    bool operator<(const ColumnRandIterator<ColumnDataType>& rhs) const;
+    bool operator>(const ColumnRandIterator<ColumnDataType>& rhs) const;
+    bool operator<=(const ColumnRandIterator<ColumnDataType>& rhs) const;
+    bool operator>=(const ColumnRandIterator<ColumnDataType>& rhs) const;
+    ColumnRandIterator<ColumnDataType>& operator+=(ptrdiff_t movement);
+    ColumnRandIterator<ColumnDataType>& operator-=(ptrdiff_t movement);
+    ColumnRandIterator<ColumnDataType>& operator++();
+    ColumnRandIterator<ColumnDataType>& operator--();
+    ColumnRandIterator<ColumnDataType> operator++(int);
+    ColumnRandIterator<ColumnDataType> operator--(int);
+    ColumnRandIterator<ColumnDataType> operator+(ptrdiff_t movement);
+    ColumnRandIterator<ColumnDataType> operator-(ptrdiff_t movement);
+    ptrdiff_t operator-(const ColumnRandIterator<ColumnDataType>& rawIterator);
+    const ColumnDataType operator*() const;
+    const ColumnDataType operator->() const;
+    const ColumnDataType operator[](ptrdiff_t offset) const;
+    size_t get_col_ndx() const;
+protected:
+    size_t m_col_ndx;
+    const Column<ColumnDataType>* m_col;
+};
+
 /// Base class for all column types.
 class ColumnBase {
 public:
@@ -254,6 +284,7 @@ public:
     /// See Table::adj_acc_move_over()
     virtual void adj_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
     virtual void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+    virtual void adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
     virtual void adj_acc_clear_root_table() noexcept;
 
     enum {
@@ -433,7 +464,7 @@ protected:
 
     /// Introduce a new root node which increments the height of the
     /// tree by one.
-    void introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state, bool is_append);
+    void introduce_new_root(ref_type new_sibling_ref, TreeInsertBase& state, bool is_append);
 
     static ref_type write(const Array* root, size_t slice_offset, size_t slice_size, size_t table_size, SliceHandler&,
                           _impl::OutputStream&);
@@ -501,7 +532,7 @@ public:
         , m_tree(Allocator::get_default())
     {
     }
-    explicit Column(std::unique_ptr<Array> root) noexcept;
+    REALM_DEPRECATED("Initialize with ref instead") explicit Column(std::unique_ptr<Array> root) noexcept;
     Column(Allocator&, ref_type, size_t column_ndx = npos);
     Column(unattached_root_tag, Allocator&);
     Column(Column&&) noexcept = default;
@@ -620,6 +651,17 @@ public:
     size_t upper_bound(T value) const noexcept;
     //@}
 
+    using const_iterator = ColumnRandIterator<T>;
+
+    const_iterator cbegin() const
+    {
+        return const_iterator(this, 0); // `this` is const in a const method
+    }
+    const_iterator cend() const
+    {
+        return const_iterator(this, size());
+    }
+
     size_t find_gte(T target, size_t start) const;
 
     bool compare(const Column&) const noexcept;
@@ -702,6 +744,7 @@ protected:
 #ifdef REALM_DEBUG
     static void dump_node_structure(const Array& root, std::ostream&, int level);
 #endif
+    std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const;
 
 private:
     class EraseLeafElem;
@@ -800,6 +843,11 @@ inline void ColumnBase::adj_acc_move_over(size_t, size_t) noexcept
 }
 
 inline void ColumnBase::adj_acc_swap_rows(size_t, size_t) noexcept
+{
+    // Noop
+}
+
+inline void ColumnBase::adj_acc_merge_rows(size_t, size_t) noexcept
 {
     // Noop
 }
@@ -1024,7 +1072,7 @@ inline size_t ColumnBase::get_size_from_ref(ref_type root_ref, Allocator& alloc)
     bool root_is_leaf = !Array::get_is_inner_bptree_node_from_header(root_header);
     if (root_is_leaf)
         return Array::get_size_from_header(root_header);
-    return Array::get_bptree_size_from_header(root_header);
+    return BpTreeNode::get_bptree_size_from_header(root_header);
 }
 
 template <class L, class T>
@@ -1088,12 +1136,6 @@ template <class T>
 Column<T>::Column(unattached_root_tag, Allocator& alloc)
     : ColumnBaseWithIndex(npos)
     , m_tree(alloc)
-{
-}
-
-template <class T>
-Column<T>::Column(std::unique_ptr<Array> root) noexcept
-    : m_tree(std::move(root))
 {
 }
 
@@ -1522,8 +1564,8 @@ public:
     }
     ref_type create_leaf(size_t size) override
     {
-        MemRef mem = BpTree<T>::create_leaf(m_leaf_type, size, m_value, m_alloc); // Throws
-        return mem.get_ref();
+        ref_type ref = BpTree<T>::create_leaf(m_leaf_type, size, m_value, m_alloc); // Throws
+        return ref;
     }
 
 private:
@@ -1646,7 +1688,159 @@ void Column<T>::dump_node_structure(const Array& root, std::ostream& out, int le
     root.dump_bptree_structure(out, level, &_impl::leaf_dumper);
 }
 
-#endif // LCOV_EXCL_STOP ignore debug functions
+#endif
+
+template <class T>
+std::pair<ref_type, size_t> Column<T>::get_to_dot_parent(size_t ndx_in_parent) const
+{
+    auto root = get_root_array();
+    if (root->is_inner_bptree_node()) {
+        std::pair<MemRef, size_t> p = static_cast<const BpTreeNode*>(root)->get_bptree_leaf(ndx_in_parent);
+        return std::make_pair(p.first.get_ref(), p.second);
+    }
+    else {
+        return std::make_pair(root->get_ref(), ndx_in_parent);
+    }
+}
+
+// LCOV_EXCL_STOP ignore debug functions
+
+
+template <class ColumnDataType>
+ColumnRandIterator<ColumnDataType>::ColumnRandIterator(const Column<ColumnDataType>* src_col, size_t ndx)
+    : m_col_ndx(ndx)
+    , m_col(src_col)
+{
+}
+
+template <class ColumnDataType>
+bool ColumnRandIterator<ColumnDataType>::operator==(const ColumnRandIterator<ColumnDataType>& rhs) const
+{
+    return (m_col_ndx == rhs.m_col_ndx);
+}
+
+template <class ColumnDataType>
+bool ColumnRandIterator<ColumnDataType>::operator!=(const ColumnRandIterator<ColumnDataType>& rhs) const
+{
+    return !(*this == rhs);
+}
+
+template <class ColumnDataType>
+bool ColumnRandIterator<ColumnDataType>::operator<(const ColumnRandIterator<ColumnDataType>& rhs) const
+{
+    return m_col_ndx < rhs.m_col_ndx;
+}
+
+template <class ColumnDataType>
+bool ColumnRandIterator<ColumnDataType>::operator>(const ColumnRandIterator<ColumnDataType>& rhs) const
+{
+    return rhs < *this;
+}
+
+template <class ColumnDataType>
+bool ColumnRandIterator<ColumnDataType>::operator<=(const ColumnRandIterator<ColumnDataType>& rhs) const
+{
+    return !(rhs < *this);
+}
+
+template <class ColumnDataType>
+bool ColumnRandIterator<ColumnDataType>::operator>=(const ColumnRandIterator<ColumnDataType>& rhs) const
+{
+    return !(*this < rhs);
+}
+
+template <class ColumnDataType>
+ColumnRandIterator<ColumnDataType>& ColumnRandIterator<ColumnDataType>::operator+=(ptrdiff_t movement)
+{
+    m_col_ndx += movement;
+    return (*this);
+}
+
+template <class ColumnDataType>
+ColumnRandIterator<ColumnDataType>& ColumnRandIterator<ColumnDataType>::operator-=(ptrdiff_t movement)
+{
+    m_col_ndx -= movement;
+    return (*this);
+}
+
+template <class ColumnDataType>
+ColumnRandIterator<ColumnDataType>& ColumnRandIterator<ColumnDataType>::operator++()
+{
+    ++m_col_ndx;
+    return (*this);
+}
+
+template <class ColumnDataType>
+ColumnRandIterator<ColumnDataType>& ColumnRandIterator<ColumnDataType>::operator--()
+{
+    --m_col_ndx;
+    return (*this);
+}
+
+template <class ColumnDataType>
+ColumnRandIterator<ColumnDataType> ColumnRandIterator<ColumnDataType>::operator++(int)
+{
+    auto temp(*this);
+    ++m_col_ndx;
+    return temp;
+}
+
+template <class ColumnDataType>
+ColumnRandIterator<ColumnDataType> ColumnRandIterator<ColumnDataType>::operator--(int)
+{
+    auto temp(*this);
+    --m_col_ndx;
+    return temp;
+}
+
+template <class ColumnDataType>
+ColumnRandIterator<ColumnDataType> ColumnRandIterator<ColumnDataType>::operator+(ptrdiff_t movement)
+{
+    return ColumnRandIterator(m_col, m_col_ndx + movement);
+}
+
+template <class ColumnDataType>
+ColumnRandIterator<ColumnDataType> ColumnRandIterator<ColumnDataType>::operator-(ptrdiff_t movement)
+{
+    return ColumnRandIterator(m_col, m_col_ndx - movement);
+}
+
+template <class ColumnDataType>
+ptrdiff_t ColumnRandIterator<ColumnDataType>::operator-(const ColumnRandIterator<ColumnDataType>& other)
+{
+    return m_col_ndx - other.m_col_ndx;
+}
+
+template <class ColumnDataType>
+const ColumnDataType ColumnRandIterator<ColumnDataType>::operator*() const
+{
+    return m_col->get(m_col_ndx);
+}
+
+template <class ColumnDataType>
+const ColumnDataType ColumnRandIterator<ColumnDataType>::operator->() const
+{
+    return m_col->get(m_col_ndx);
+}
+
+template <class ColumnDataType>
+const ColumnDataType ColumnRandIterator<ColumnDataType>::operator[](ptrdiff_t offset) const
+{
+    return m_col->get(m_col_ndx + offset);
+}
+
+template <class ColumnDataType>
+size_t ColumnRandIterator<ColumnDataType>::get_col_ndx() const
+{
+    return m_col_ndx;
+}
+
+template <class ColumnDataType>
+std::ostream& operator<<(std::ostream& out, const ColumnRandIterator<ColumnDataType>& it)
+{
+    out << "ColumnRandIterator at index: " << it.get_col_ndx();
+    return out;
+}
 
 } // namespace realm
 

@@ -130,6 +130,7 @@ private:
     void detach();
     void set_origin_row_index(size_t row_ndx) noexcept;
 
+    void do_insert(size_t link_ndx, size_t target_row_ndx);
     size_t do_set(size_t link_ndx, size_t target_row_ndx);
     size_t do_remove(size_t link_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
@@ -176,7 +177,7 @@ inline LinkView::LinkView(const ctor_cookie&, Table* origin_table, LinkListColum
     Array& root = *m_row_indexes.get_root_array();
     root.set_parent(&column, row_ndx);
     if (ref_type ref = root.get_ref_from_parent())
-        root.init_from_ref(ref);
+        m_row_indexes.init_from_ref(column.get_alloc(), ref);
 }
 
 inline std::shared_ptr<LinkView> LinkView::create(Table* origin_table, LinkListColumn& column, size_t row_ndx)
@@ -369,6 +370,11 @@ public:
     {
         bool broken_reciprocal_backlinks = false;
         list.do_clear(broken_reciprocal_backlinks);
+    }
+
+    static void do_insert(LinkView& list, size_t link_ndx, size_t target_row_ndx)
+    {
+        list.do_insert(link_ndx, target_row_ndx);
     }
 };
 

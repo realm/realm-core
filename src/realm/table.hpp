@@ -392,12 +392,13 @@ public:
     ///
     /// This operation is usually followed by Table::move_last_over()
     /// as part of Table::set_int_unique() or Table::set_string_unique()
-    /// detecting a collision.
+    /// or Table::set_null_unique() detecting a collision.
     ///
     /// \sa Table::move_last_over()
     /// \sa Table::set_int_unique()
     /// \sa Table::set_string_unique()
-    void change_link_targets(size_t row_ndx, size_t new_row_ndx);
+    /// \sa Table::set_null_unique()
+    void merge_rows(size_t row_ndx, size_t new_row_ndx);
 
     // Get cell values. Will assert if the requested type does not match the column type
     int64_t get_int(size_t column_ndx, size_t row_ndx) const noexcept;
@@ -443,14 +444,32 @@ public:
     /// producing an oversized string or binary data value will cause an
     /// exception to be thrown.
     ///
-    /// The "unique" variants (set_int_unique(), set_string_unique()) are
-    /// intended to be used in the implementation of primary key support. They
+    /// The "unique" variants (set_int_unique(), set_string_unique(), set_null_unique())
+    /// are intended to be used in the implementation of primary key support. They
     /// check if the given column already contains one or more values that are
     /// equal to \a value, and if there are conflicts, it calls
-    /// Table::change_link_targets() for the conflicting row to be replaced by
-    /// \a row_ndx, followed by a Table::move_last_over() of the offending row.
-    /// Users intending to implement primary keys must therefore manually check
-    /// for duplicates if they want to raise an error instead.
+    /// Table::merge_rows() for the row_ndx to be replaced by the
+    /// existing row, followed by a Table::move_last_over() of row_ndx. The
+    /// return value is always a row index of a row that contains \a value in
+    /// the specified column, possibly different from \a row_ndx if a conflict
+    /// occurred.  Users intending to implement primary keys must therefore
+    /// manually check for duplicates if they want to raise an error instead.
+    ///
+    /// NOTE:  It is an error to call either function after adding elements to a
+    /// linklist in the object. In general, calling set_int_unique() or
+    /// set_string_unique() or set_null_unique() should be the first thing that
+    /// happens after creating a row. These limitations are imposed by limitations
+    /// in the Realm Object Server and may be relaxed in the future. A violation of
+    /// these rules results in a LogicError being thrown.
+    ///
+    /// add_int() adds a 64-bit signed integer to the current value of the
+    /// cell.  If the addition would cause signed integer overflow or
+    /// underflow, the addition "wraps around" with semantics similar to
+    /// unsigned integer arithmetic, such that Table::max_integer + 1 ==
+    /// Table::min_integer and Table::min_integer - 1 == Table::max_integer.
+    /// Note that the wrapping is platform-independent (all platforms wrap in
+    /// the same way regardless of integer representation). If the existing
+    /// value in the cell is null, a LogicError exception is thrown.
     ///
     /// insert_substring() inserts the specified string into the currently
     /// stored string at the specified position. The position must be less than
@@ -470,22 +489,32 @@ public:
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
     static const size_t max_binary_size = 0xFFFFF8 - Array::header_size;
 
-    void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
-    void set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
-    void set_bool(size_t column_ndx, size_t row_ndx, bool value);
-    void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value);
-    void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value);
+    // FIXME: These limits should be chosen independently of the underlying
+    // platform's choice to define int64_t and independent of the integer
+    // representation. The current values only work for 2's complement, which is
+    // not guaranteed by the standard.
+    static constexpr int_fast64_t max_integer = std::numeric_limits<int64_t>::max();
+    static constexpr int_fast64_t min_integer = std::numeric_limits<int64_t>::min();
+
+    void set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value, bool is_default = false);
+    size_t set_int_unique(size_t column_ndx, size_t row_ndx, int_fast64_t value);
+    void set_bool(size_t column_ndx, size_t row_ndx, bool value, bool is_default = false);
+    void set_olddatetime(size_t column_ndx, size_t row_ndx, OldDateTime value, bool is_default = false);
+    void set_timestamp(size_t column_ndx, size_t row_ndx, Timestamp value, bool is_default = false);
     template <class E>
     void set_enum(size_t column_ndx, size_t row_ndx, E value);
-    void set_float(size_t column_ndx, size_t row_ndx, float value);
-    void set_double(size_t column_ndx, size_t row_ndx, double value);
-    void set_string(size_t column_ndx, size_t row_ndx, StringData value);
-    void set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
-    void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value);
-    void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value);
-    void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx);
+    void set_float(size_t column_ndx, size_t row_ndx, float value, bool is_default = false);
+    void set_double(size_t column_ndx, size_t row_ndx, double value, bool is_default = false);
+    void set_string(size_t column_ndx, size_t row_ndx, StringData value, bool is_default = false);
+    size_t set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
+    void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default = false);
+    void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value, bool is_default = false);
+    void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default = false);
     void nullify_link(size_t column_ndx, size_t row_ndx);
-    void set_null(size_t column_ndx, size_t row_ndx);
+    void set_null(size_t column_ndx, size_t row_ndx, bool is_default = false);
+    void set_null_unique(size_t col_ndx, size_t row_ndx);
+
+    void add_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
 
     void insert_substring(size_t col_ndx, size_t row_ndx, size_t pos, StringData);
     void remove_substring(size_t col_ndx, size_t row_ndx, size_t pos, size_t substring_size = realm::npos);
@@ -834,6 +863,8 @@ protected:
 
     void set_into_mixed(Table* parent, size_t col_ndx, size_t row_ndx) const;
 
+    void check_lists_are_empty(size_t row_ndx) const;
+
 private:
     class SliceWriter;
 
@@ -921,13 +952,17 @@ private:
     void do_remove(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks);
     void do_swap_rows(size_t row_ndx_1, size_t row_ndx_2);
-    void do_change_link_targets(size_t row_ndx, size_t new_row_ndx);
+    void do_merge_rows(size_t row_ndx, size_t new_row_ndx);
     void do_clear(bool broken_reciprocal_backlinks);
     size_t do_set_link(size_t col_ndx, size_t row_ndx, size_t target_row_ndx);
     template <class ColType, class T>
-    size_t do_set_unique(ColType& column, size_t row_ndx, T&& value);
+    size_t do_find_unique(ColType& col, size_t ndx, T&& value, bool& conflict);
+    template <class ColType>
+    size_t do_set_unique_null(ColType& col, size_t ndx, bool& conflict);
+    template <class ColType, class T>
+    size_t do_set_unique(ColType& column, size_t row_ndx, T&& value, bool& conflict);
 
-    void upgrade_file_format();
+    void upgrade_file_format(size_t target_file_format_version);
 
     // Upgrades OldDateTime columns to Timestamp columns
     void upgrade_olddatetime();
@@ -1098,6 +1133,9 @@ private:
 
     const ColumnBase& get_column_base(size_t column_ndx) const noexcept;
     ColumnBase& get_column_base(size_t column_ndx);
+
+    const ColumnBaseWithIndex& get_column_base_indexed(size_t ndx) const noexcept;
+    ColumnBaseWithIndex& get_column_base_indexed(size_t ndx);
 
     template <class T, ColumnType col_type>
     T& get_column(size_t ndx);
@@ -1283,6 +1321,7 @@ private:
     void adj_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_acc_erase_row(size_t row_ndx) noexcept;
     void adj_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+    void adj_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
 
     /// Adjust this table accessor and its subordinates after move_last_over()
     /// (or its inverse).
@@ -1322,6 +1361,7 @@ private:
     void adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_row_acc_erase_row(size_t row_ndx) noexcept;
     void adj_row_acc_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+    void adj_row_acc_merge_rows(size_t old_row_ndx, size_t new_row_ndx) noexcept;
 
     /// Called by adj_acc_move_over() to adjust row accessors.
     void adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
@@ -2151,9 +2191,9 @@ public:
         table.do_swap_rows(row_ndx_1, row_ndx_2); // Throws
     }
 
-    static void do_change_link_targets(Table& table, size_t row_ndx, size_t new_row_ndx)
+    static void do_merge_rows(Table& table, size_t row_ndx, size_t new_row_ndx)
     {
-        table.do_change_link_targets(row_ndx, new_row_ndx); // Throws
+        table.do_merge_rows(row_ndx, new_row_ndx); // Throws
     }
 
     static void do_clear(Table& table)
@@ -2257,6 +2297,11 @@ public:
     static void adj_acc_swap_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
     {
         table.adj_acc_swap_rows(row_ndx_1, row_ndx_2);
+    }
+
+    static void adj_acc_merge_rows(Table& table, size_t row_ndx_1, size_t row_ndx_2) noexcept
+    {
+        table.adj_acc_merge_rows(row_ndx_1, row_ndx_2);
     }
 
     static void adj_acc_move_over(Table& table, size_t from_row_ndx, size_t to_row_ndx) noexcept

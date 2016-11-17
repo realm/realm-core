@@ -125,7 +125,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file foprmat
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 5, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 6, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -134,14 +134,14 @@ void Group::upgrade_file_format(int target_file_format_version)
     // following upgrade logic when SlabAlloc::validate_buffer() is changed (or
     // vice versa).
     REALM_ASSERT_EX(current_file_format_version == 2 || current_file_format_version == 3 ||
-                        current_file_format_version == 4,
+                        current_file_format_version == 4 || current_file_format_version == 5,
                     current_file_format_version);
 
     // Upgrade from 2 to 3
     if (current_file_format_version <= 2 && target_file_format_version >= 3) {
         for (size_t t = 0; t < m_tables.size(); t++) {
             TableRef table = get_table(t);
-            table->upgrade_file_format();
+            table->upgrade_file_format(target_file_format_version);
         }
     }
 
@@ -155,6 +155,14 @@ void Group::upgrade_file_format(int target_file_format_version)
         for (size_t t = 0; t < m_tables.size(); t++) {
             TableRef table = get_table(t);
             table->upgrade_olddatetime();
+        }
+    }
+
+    // Upgrade from 5 to 6 (new StringIndex format)
+    if (current_file_format_version <= 5 && target_file_format_version >= 6) {
+        for (size_t t = 0; t < m_tables.size(); t++) {
+            TableRef table = get_table(t);
+            table->upgrade_file_format(target_file_format_version);
         }
     }
 
@@ -1363,11 +1371,12 @@ public:
         return true;
     }
 
-    bool change_link_targets(size_t row_ndx, size_t new_row_ndx) noexcept
+    bool merge_rows(size_t row_ndx, size_t new_row_ndx) noexcept
     {
-        static_cast<void>(row_ndx);
-        static_cast<void>(new_row_ndx);
-        return true; // No-op
+        typedef _impl::TableFriend tf;
+        if (m_table)
+            tf::adj_acc_merge_rows(*m_table, row_ndx, new_row_ndx);
+        return true;
     }
 
     bool clear_table() noexcept
@@ -1378,57 +1387,52 @@ public:
         return true;
     }
 
-    bool set_int(size_t, size_t, int_fast64_t) noexcept
+    bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_int_unique(size_t, size_t, size_t, int_fast64_t) noexcept
+    bool add_int(size_t, size_t, int_fast64_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_bool(size_t, size_t, bool) noexcept
+    bool set_bool(size_t, size_t, bool, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_float(size_t, size_t, float) noexcept
+    bool set_float(size_t, size_t, float, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_double(size_t, size_t, double) noexcept
+    bool set_double(size_t, size_t, double, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_string(size_t, size_t, StringData) noexcept
+    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_string_unique(size_t, size_t, size_t, StringData) noexcept
+    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_binary(size_t, size_t, BinaryData) noexcept
+    bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_olddatetime(size_t, size_t, OldDateTime) noexcept
+    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction) noexcept
     {
         return true; // No-op
     }
 
-    bool set_timestamp(size_t, size_t, Timestamp) noexcept
-    {
-        return true; // No-op
-    }
-
-    bool set_table(size_t col_ndx, size_t row_ndx) noexcept
+    bool set_table(size_t col_ndx, size_t row_ndx, _impl::Instruction) noexcept
     {
         if (m_table) {
             typedef _impl::TableFriend tf;
@@ -1440,7 +1444,7 @@ public:
         return true;
     }
 
-    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&) noexcept
+    bool set_mixed(size_t col_ndx, size_t row_ndx, const Mixed&, _impl::Instruction) noexcept
     {
         typedef _impl::TableFriend tf;
         if (m_table)
@@ -1448,12 +1452,12 @@ public:
         return true;
     }
 
-    bool set_null(size_t, size_t) noexcept
+    bool set_null(size_t, size_t, _impl::Instruction, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool set_link(size_t col_ndx, size_t, size_t, size_t) noexcept
+    bool set_link(size_t col_ndx, size_t, size_t, size_t, _impl::Instruction) noexcept
     {
         // When links are changed, the link-target table is also affected and
         // its accessor must therefore be marked dirty too. Indeed, when it
@@ -1676,12 +1680,12 @@ public:
         return true; // No-op
     }
 
-    bool link_list_set(size_t, size_t) noexcept
+    bool link_list_set(size_t, size_t, size_t) noexcept
     {
         return true; // No-op
     }
 
-    bool link_list_insert(size_t, size_t) noexcept
+    bool link_list_insert(size_t, size_t, size_t) noexcept
     {
         return true; // No-op
     }
@@ -1696,7 +1700,7 @@ public:
         return true; // No-op
     }
 
-    bool link_list_erase(size_t) noexcept
+    bool link_list_erase(size_t, size_t) noexcept
     {
         return true; // No-op
     }
@@ -1711,7 +1715,7 @@ public:
         return true; // No-op
     }
 
-    bool link_list_nullify(size_t)
+    bool link_list_nullify(size_t, size_t)
     {
         return true; // No-op
     }

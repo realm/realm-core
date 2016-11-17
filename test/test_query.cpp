@@ -558,6 +558,25 @@ TEST(Query_NextGen_StringConditions)
 
     m = table1->column<String>(0).ends_with(table1->column<String>(1), true).find();
     CHECK_EQUAL(m, 2);
+    
+    // Like (wildcard matching)
+    m = table1->column<String>(0).like("b*", true).find();
+    CHECK_EQUAL(m, 2);
+    
+    m = table1->column<String>(0).like("b*", false).find();
+    CHECK_EQUAL(m, 2);
+    
+    m = table1->column<String>(0).like("*r", false).find();
+    CHECK_EQUAL(m, 2);
+    
+    m = table1->column<String>(0).like("f?o", false).find();
+    CHECK_EQUAL(m, 0);
+    
+    m = (table1->column<String>(0).like("f*", false) && table1->column<String>(0) == "foo").find();
+    CHECK_EQUAL(m, 0);
+    
+    m = table1->column<String>(0).like(table1->column<String>(1), true).find();
+    CHECK_EQUAL(m, not_found);
 
     // Test various compare operations with null
     TableRef table2 = group.add_table("table2");
@@ -598,6 +617,9 @@ TEST(Query_NextGen_StringConditions)
 
     m = table2->column<String>(0).contains(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
+    
+    m = table2->column<String>(0).like(StringData(""), false).count();
+    CHECK_EQUAL(m, 1);
 
     m = table2->column<String>(0).begins_with(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
@@ -619,6 +641,9 @@ TEST(Query_NextGen_StringConditions)
 
     m = table2->column<String>(0).contains(realm::null(), false).count();
     CHECK_EQUAL(m, 4);
+    
+    m = table2->column<String>(0).like(realm::null(), false).count();
+    CHECK_EQUAL(m, 1);
 
     TableRef table3 = group.add_table(StringData("table3"));
     table3->add_column_link(type_Link, "link1", *table2);
@@ -658,6 +683,9 @@ TEST(Query_NextGen_StringConditions)
 
     m = table3->link(0).column<String>(0).contains(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
+    
+    m = table3->link(0).column<String>(0).like(StringData(""), false).count();
+    CHECK_EQUAL(m, 1);
 
     m = table3->link(0).column<String>(0).begins_with(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
@@ -679,6 +707,9 @@ TEST(Query_NextGen_StringConditions)
 
     m = table3->link(0).column<String>(0).contains(realm::null(), false).count();
     CHECK_EQUAL(m, 4);
+    
+    m = table3->link(0).column<String>(0).like(realm::null(), false).count();
+    CHECK_EQUAL(m, 1);
 }
 
 
@@ -1859,6 +1890,65 @@ TEST(Query_StrIndexCrash)
         v = table->where().equal(0, StringData("8")).find_all();
         CHECK_EQUAL(eights, v.size());
     }
+}
+
+TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
+{
+    Group group;
+    TableRef table = group.add_table("test");
+    table->add_column(type_String, "first");
+    table->add_search_index(0);
+    if (TEST_TYPE::value == true) {
+        bool force = true;
+        table->optimize(force); // Make it a StringEnum column
+    }
+
+    auto test_prefix_find = [&](std::string prefix) {
+        std::string prefix_b = prefix + "b";
+        std::string prefix_c = prefix + "c";
+        std::string prefix_d = prefix + "d";
+        std::string prefix_e = prefix + "e";
+        StringData spb(prefix_b);
+        StringData spc(prefix_c);
+        StringData spd(prefix_d);
+        StringData spe(prefix_e);
+
+        size_t start_row = table->size();
+        size_t ins_pos = start_row;
+        table->add_empty_row(6);
+        table->set_string(0, ins_pos++, spb);
+        table->set_string(0, ins_pos++, spc);
+        table->set_string(0, ins_pos++, spc);
+        table->set_string(0, ins_pos++, spe);
+        table->set_string(0, ins_pos++, spe);
+        table->set_string(0, ins_pos++, spe);
+
+        TableView v = table->where().equal(0, spb).find_all();
+        CHECK_EQUAL(v.size(), 1);
+        CHECK_EQUAL(v.get(0).get_index(), start_row);
+
+        v = table->where().equal(0, spc).find_all();
+        CHECK_EQUAL(v.size(), 2);
+        CHECK_EQUAL(v.get(0).get_index(), start_row + 1);
+        CHECK_EQUAL(v.get(1).get_index(), start_row + 2);
+
+        v = table->where().equal(0, spd).find_all();
+        CHECK_EQUAL(v.size(), 0);
+
+        v = table->where().equal(0, spe).find_all();
+        CHECK_EQUAL(v.size(), 3);
+        CHECK_EQUAL(v.get(0).get_index(), start_row + 3);
+        CHECK_EQUAL(v.get(1).get_index(), start_row + 4);
+        CHECK_EQUAL(v.get(2).get_index(), start_row + 5);
+    };
+
+    std::string std_max(StringIndex::s_max_offset, 'a');
+    std::string std_over_max = std_max + "a";
+    std::string std_under_max(StringIndex::s_max_offset >> 1, 'a');
+
+    test_prefix_find(std_max);
+    test_prefix_find(std_over_max);
+    test_prefix_find(std_under_max);
 }
 
 
@@ -4976,6 +5066,61 @@ TEST(Query_FindAllContains)
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
 }
 
+TEST(Query_FindAllLike)
+{
+    TupleTableType ttt;
+    
+    ttt.add(0, "foo");
+    ttt.add(0, "foobar");
+    ttt.add(0, "barfoo");
+    ttt.add(0, "barfoobaz");
+    ttt.add(0, "fo");
+    ttt.add(0, "fobar");
+    ttt.add(0, "barfo");
+    
+    TupleTableType::Query q1 = ttt.where().second.like("*foo*");
+    TupleTableType::View tv1 = q1.find_all();
+    CHECK_EQUAL(4, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_ndx(1));
+    CHECK_EQUAL(2, tv1.get_source_ndx(2));
+    CHECK_EQUAL(3, tv1.get_source_ndx(3));
+}
+
+TEST(Query_FindAllLikeStackOverflow)
+{
+    std::string str(100000, 'x');
+    StringData sd(str);
+
+    Table table;
+    table.add_column(type_String, "strings");
+    table.add_empty_row();
+    table.set_string(0, 0, sd);
+
+    table.where().like(0, sd).find();
+}
+
+TEST(Query_FindAllLikeCaseInsensitive)
+{
+    TupleTableType ttt;
+    
+    ttt.add(0, "Foo");
+    ttt.add(0, "FOOBAR");
+    ttt.add(0, "BaRfOo");
+    ttt.add(0, "barFOObaz");
+    ttt.add(0, "Fo");
+    ttt.add(0, "Fobar");
+    ttt.add(0, "baRFo");
+    
+    TupleTableType::Query q1 = ttt.where().second.like("*foo*", false);
+    TupleTableType::View tv1 = q1.find_all();
+    CHECK_EQUAL(4, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_ndx(1));
+    CHECK_EQUAL(2, tv1.get_source_ndx(2));
+    CHECK_EQUAL(3, tv1.get_source_ndx(3));
+}
+
 TEST(Query_Binary)
 {
     TupleTableTypeBin t;
@@ -5699,7 +5844,7 @@ TEST(Query_AllTypesDynamicallyTyped)
         const char bin[4] = {0, 1, 2, 3};
         BinaryData bin1(bin, sizeof bin / 2);
         BinaryData bin2(bin, sizeof bin);
-        int_fast64_t time_now = time(0);
+        int_fast64_t time_now = time(nullptr);
         Mixed mix_int(int64_t(1));
         Mixed mix_subtab((Mixed::subtable_tag()));
 
@@ -5811,7 +5956,7 @@ TEST(Query_AllTypesStaticallyTyped)
     const char bin[4] = {0, 1, 2, 3};
     BinaryData bin1(bin, sizeof bin / 2);
     BinaryData bin2(bin, sizeof bin);
-    int_fast64_t time_now = time(0);
+    int_fast64_t time_now = time(nullptr);
     TestQuerySub subtab;
     subtab.add(100);
     Mixed mix_int(int64_t(1));

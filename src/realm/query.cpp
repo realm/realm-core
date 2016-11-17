@@ -765,6 +765,14 @@ Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive
         add_condition<NotEqualIns>(column_ndx, value);
     return *this;
 }
+Query& Query::like(size_t column_ndx, StringData value, bool case_sensitive)
+{
+    if (case_sensitive)
+        add_condition<Like>(column_ndx, value);
+    else
+        add_condition<LikeIns>(column_ndx, value);
+    return *this;
+}
 
 
 // Aggregates =================================================================================

@@ -70,7 +70,8 @@ const uint16_t relaxed_sync_threshold = 50;
 // 7       Introducing `commit_in_critical_phase` and `sync_client_present`, and
 //         changing `daemon_started` and `daemon_ready` from 1-bit to 8-bit
 //         fields.
-const uint_fast16_t g_shared_info_version = 7;
+// 8       Placing the commitlog history inside the Realm file.
+const uint_fast16_t g_shared_info_version = 8;
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -213,7 +214,7 @@ public:
         // Release is triggered by explicitly storing into count whenever a
         // new entry has been initialized.
         mutable std::atomic<uint32_t> count;
-        uint32_t next;
+        uint_fast32_t next;
     };
 
     Ringbuffer() noexcept
@@ -359,9 +360,9 @@ public:
 
 private:
     // number of entries. Access synchronized through put_pos.
-    uint32_t entries;
-    std::atomic<uint32_t> put_pos; // only changed under lock, but accessed outside lock
-    std::atomic<uint32_t> old_pos; // only changed during write transactions and under lock
+    uint_fast32_t entries;
+    std::atomic<uint_fast32_t> put_pos; // only changed under lock, but accessed outside lock
+    std::atomic<uint_fast32_t> old_pos; // only changed during write transactions and under lock
 
     const static int init_readers_size = 32;
 
@@ -725,7 +726,6 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 
     Replication::HistoryType history_type = Replication::hist_None;
     if (Replication* repl = m_group.get_replication()) {
-        repl->commit_log_close();
         history_type = repl->get_history_type();
     }
 
@@ -1106,7 +1106,8 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     }
 }
 
-
+// WARNING / FIXME: compact() should NOT be exposed publicly on Windows because it's not crash safe! It may
+// corrupt your database if something fails
 bool SharedGroup::compact()
 {
     // FIXME: ExcetionSafety: This function must be rewritten with exception
@@ -1121,8 +1122,8 @@ bool SharedGroup::compact()
         throw std::runtime_error(m_db_path + ": compact is not supported whithin a transaction");
     }
     Durability dura;
+    std::string tmp_path = m_db_path + ".tmp_compaction_space";
     {
-        std::string tmp_path = m_db_path + ".tmp_compaction_space";
         SharedInfo* info = m_file_map.get_addr();
         std::lock_guard<InterprocessMutex> lock(m_controlmutex); // Throws
         if (info->num_participants > 1)
@@ -1147,7 +1148,9 @@ bool SharedGroup::compact()
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
             file.sync(); // Throws
-        util::File::move(tmp_path.c_str(), m_db_path.c_str());
+#ifndef _WIN32
+        util::File::move(tmp_path, m_db_path);
+#endif
         {
             SharedInfo* r_info = m_reader_map.get_addr();
             Ringbuffer::ReadCount& rc = const_cast<Ringbuffer::ReadCount&>(r_info->readers.get_last());
@@ -1162,6 +1165,9 @@ bool SharedGroup::compact()
         m_group.m_alloc.detach();
     }
     close();
+#ifdef _WIN32
+    util::File::copy(tmp_path, m_db_path);
+#endif
 
     SharedGroupOptions new_options;
     new_options.durability = dura;
@@ -1199,10 +1205,6 @@ void SharedGroup::close() noexcept
             break;
     }
     m_group.detach();
-    using gf = _impl::GroupFriend;
-    if (Replication* repl = gf::get_replication(m_group))
-        repl->commit_log_close();
-
     m_transact_stage = transact_Ready;
     SharedInfo* info = m_file_map.get_addr();
     {
@@ -1225,6 +1227,7 @@ void SharedGroup::close() noexcept
                 catch (...) {
                 } // ignored on purpose.
             }
+            using gf = _impl::GroupFriend;
             if (Replication* repl = gf::get_replication(m_group))
                 repl->terminate_session();
         }
@@ -1714,7 +1717,6 @@ Replication::version_type SharedGroup::do_commit()
 
     version_type current_version = r_info->get_current_version_unchecked();
     version_type new_version = current_version + 1;
-    r_info->commit_in_critical_phase = 1;
     if (Replication* repl = m_group.get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the
@@ -1726,8 +1728,6 @@ Replication::version_type SharedGroup::do_commit()
         }
         catch (...) {
             repl->abort_transact();
-            r_info = m_reader_map.get_addr();
-            r_info->commit_in_critical_phase = 0;
             throw;
         }
         repl->finalize_commit();
@@ -1735,8 +1735,6 @@ Replication::version_type SharedGroup::do_commit()
     else {
         low_level_commit(new_version); // Throws
     }
-    r_info = m_reader_map.get_addr();
-    r_info->commit_in_critical_phase = 0;
     return new_version;
 }
 
@@ -1873,7 +1871,11 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
             break;
     }
     size_t new_file_size = out.get_file_size();
-    // Update reader info
+    // Update reader info. If this fails in any way, the ringbuffer may be corrupted.
+    // This can lead to other readers seing invalid data which is likely to cause them
+    // to crash. Other writers *must* be prevented from writing any further updates
+    // to the database. The flag "commit_in_critical_phase" is used to prevent such updates.
+    info->commit_in_critical_phase = 1;
     {
         SharedInfo* r_info = m_reader_map.get_addr();
         if (r_info->readers.is_full()) {
@@ -1894,6 +1896,9 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
         r.version = new_version;
         r_info->readers.use_next();
     }
+    // At this point, the ringbuffer has been succesfully updated, and the next writer
+    // can safely proceed once the writemutex has been lifted.
+    info->commit_in_critical_phase = 0;
     {
         std::lock_guard<InterprocessMutex> lock(m_controlmutex);
         info->number_of_versions = new_version - oldest_version + 1;
