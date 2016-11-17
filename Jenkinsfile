@@ -55,7 +55,7 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
         getSourceArchive()
         def image = buildDockerEnv("ci/realm-object-store:${flavor}")
         sshagent(['realm-ci-ssh']) {
-          image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -e HOME=${env.HOME}") {
+          image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME}") {
             if(withCoverage) {
               sh "./workflow/test_coverage.sh ${sync}"
             } else {
