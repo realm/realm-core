@@ -80,7 +80,7 @@ function(download_realm_core core_version)
     set(core_tarball_name "${core_basename}-${core_version}.tar.${core_compression}")
     set(core_url "https://static.realm.io/downloads/core/${core_tarball_name}")
     set(core_temp_tarball "/tmp/${core_tarball_name}")
-    set(core_directory_parent "${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}")
+    set(core_directory_parent "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}")
     set(core_directory "${core_directory_parent}/${core_basename}-${core_version}")
     set(core_tarball "${core_directory_parent}/${core_tarball_name}")
 
@@ -155,7 +155,7 @@ macro(define_built_realm_core_target core_directory)
 endmacro()
 
 function(clone_and_build_realm_core branch)
-    set(core_prefix_directory "${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
+    set(core_prefix_directory "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
     ExternalProject_Add(realm-core
         GIT_REPOSITORY "https://github.com/realm/realm-core.git"
         GIT_TAG ${branch}
@@ -175,7 +175,7 @@ function(build_existing_realm_core core_directory)
     get_filename_component(core_directory ${core_directory} ABSOLUTE)
     ExternalProject_Add(realm-core
         URL ""
-        PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-core
+        PREFIX ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-core
         SOURCE_DIR ${core_directory}
         BUILD_IN_SOURCE 1
         BUILD_ALWAYS 1
@@ -193,7 +193,7 @@ function(build_realm_sync sync_directory)
     ExternalProject_Add(realm-sync-lib
         DEPENDS realm-core
         URL ""
-        PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
+        PREFIX ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
         SOURCE_DIR ${sync_directory}
         BUILD_IN_SOURCE 1
         BUILD_ALWAYS 1
@@ -226,7 +226,7 @@ function(build_realm_sync sync_directory)
     ExternalProject_Add(realm-server-lib
         DEPENDS realm-core
         DOWNLOAD_COMMAND ""
-        PREFIX ${CMAKE_CURRENT_SOURCE_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
+        PREFIX ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-sync
         SOURCE_DIR ${sync_directory}
         CONFIGURE_COMMAND ""
         BUILD_COMMAND ""
