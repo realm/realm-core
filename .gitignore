@@ -106,3 +106,4 @@ build.apple
 *.pyc
 /build.android.*
 /build.cocoa
+/test/android/jni/#Android.mk#
