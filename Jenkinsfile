@@ -196,6 +196,7 @@ def doBuildInDocker(String command) {
 def doAndroidBuildInDocker(String abi, String buildType) {
   return {
     node('docker') {
+        sh 'rm -rf *'
       getArchive()
 
       def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
@@ -204,7 +205,7 @@ def doAndroidBuildInDocker(String abi, String buildType) {
         buildEnv.inside {
             try {
             sh "rake build-android-${abi}-${buildType}"
-            stash includes: 'build.*/install', name: "install-${abi}-${buildType}"
+            stash includes: 'build.*/install/**', name: "install-${abi}-${buildType}"
           } finally {
             collectCompilerWarnings('gcc')
           }
