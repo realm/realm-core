@@ -47,7 +47,8 @@ if (env.BRANCH_NAME == 'master') {
   env.DOCKER_PUSH = "1"
 }
 
-def doDockerBuild(String flavor, Boolean withCoverage) {
+def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
+  def sync = enableSync ? "sync" : ""
   return {
     node('docker') {
       try {
@@ -56,9 +57,9 @@ def doDockerBuild(String flavor, Boolean withCoverage) {
         sshagent(['realm-ci-ssh']) {
           image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -e HOME=${env.HOME}") {
             if(withCoverage) {
-              sh "./workflow/test_coverage.sh"
+              sh "./workflow/test_coverage.sh ${sync}"
             } else {
-              sh "./workflow/build.sh ${flavor}"
+              sh "./workflow/build.sh ${flavor} ${sync}"
             }
           }
         }
@@ -75,13 +76,14 @@ def doDockerBuild(String flavor, Boolean withCoverage) {
   }
 }
 
-def doBuild(String nodeSpec, String flavor) {
+def doBuild(String nodeSpec, String flavor, Boolean enableSync) {
+  def sync = enableSync ? "sync" : ""
   return {
     node(nodeSpec) {
       try {
         getSourceArchive()
         sshagent(['realm-ci-ssh']) {
-          sh "./workflow/test_coverage.sh"
+          sh "./workflow/test_coverage.sh ${sync}"
         }
         currentBuild.result = 'SUCCESS'
       } catch (Exception err) {
@@ -116,8 +118,10 @@ stage('prepare') {
 
 stage('unit-tests') {
   parallel(
-    linux: doDockerBuild('linux', true),
-    android: doDockerBuild('android', false),
-    macos: doBuild('osx', 'macOS')
+    linux: doDockerBuild('linux', true, false),
+    linux_sync: doDockerBuild('linux', true, true),
+    android: doDockerBuild('android', false, false),
+    macos: doBuild('osx', 'macOS', false),
+    macos_sync: doBuild('osx', 'macOS', true)
   )
 }
