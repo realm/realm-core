@@ -5,7 +5,7 @@
 
 sync=${1}
 
-nprocs=4
+nprocs=1
 if [ "$(uname)" = "Linux" ]; then
   nprocs=$(grep -c ^processor /proc/cpuinfo)
 fi
