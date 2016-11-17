@@ -91,7 +91,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     column_tpl.hpp
     column_type.hpp
     column_type_traits.hpp
-    commit_log.hpp
     data_type.hpp
     descriptor.hpp
     descriptor_fwd.hpp
