@@ -23,7 +23,7 @@
 
 #if REALM_PLATFORM_APPLE
 #include "impl/apple/external_commit_helper.hpp"
-#elif REALM_HAVE_EPOLL
+#elif REALM_HAVE_EPOLL || REALM_ANDROID
 #include "impl/epoll/external_commit_helper.hpp"
 #else
 #include "impl/generic/external_commit_helper.hpp"
