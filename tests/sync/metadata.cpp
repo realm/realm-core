@@ -24,6 +24,7 @@
 using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
+using SyncAction = SyncFileActionMetadata::Action;
 
 static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_metadata/";
 static const std::string metadata_path = base_path + "/metadata.realm";
@@ -155,6 +156,70 @@ TEST_CASE("sync_metadata: user metadata APIs", "[sync]") {
         REQUIRE(marked_users.size() == 2);
         REQUIRE(results_contains_user(marked_users, identity1));
         REQUIRE(results_contains_user(marked_users, identity3));
+    }
+}
+
+TEST_CASE("sync_metadata: file action metadata", "[sync]") {
+    reset_test_directory(base_path);
+    SyncMetadataManager manager(metadata_path, false);
+
+    const std::string identity_1 = "asdfg";
+    const std::string identity_2 = "qwerty";
+    const std::string url_1 = "realm://realm.example.com/1";
+    const std::string url_2 = "realm://realm.example.com/2";
+
+    SECTION("can be properly constructed") {
+        const auto original_name = "/tmp/foobar/test1";
+        auto user_metadata = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, original_name, url_1, identity_1);
+        REQUIRE(user_metadata.original_name() == original_name);
+        REQUIRE(user_metadata.new_name() == none);
+        REQUIRE(user_metadata.action() == SyncAction::HandleRealmForClientReset);
+        REQUIRE(user_metadata.url() == url_1);
+        REQUIRE(user_metadata.user_identity() == identity_1);
+    }
+
+    SECTION("properly reflects updating state, across multiple instances") {
+        const auto original_name = "/tmp/foobar/test2a";
+        const std::string new_name_1 = "/tmp/foobar/test2b";
+        const std::string new_name_2 = "/tmp/foobar/test2c";
+        auto user_metadata_1 = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, original_name, url_1, identity_1, new_name_1);
+        REQUIRE(user_metadata_1.original_name() == original_name);
+        REQUIRE(user_metadata_1.new_name() == new_name_1);
+        REQUIRE(user_metadata_1.action() == SyncAction::HandleRealmForClientReset);
+        REQUIRE(user_metadata_1.url() == url_1);
+        REQUIRE(user_metadata_1.user_identity() == identity_1);
+
+        auto user_metadata_2 = SyncFileActionMetadata(manager, SyncAction::DeleteRealm, original_name, url_2, identity_2, new_name_2);
+        REQUIRE(user_metadata_1.original_name() == original_name);
+        REQUIRE(user_metadata_1.new_name() == new_name_2);
+        REQUIRE(user_metadata_1.action() == SyncAction::DeleteRealm);
+        REQUIRE(user_metadata_2.original_name() == original_name);
+        REQUIRE(user_metadata_2.new_name() == new_name_2);
+        REQUIRE(user_metadata_2.action() == SyncAction::DeleteRealm);
+        REQUIRE(user_metadata_1.url() == url_2);
+        REQUIRE(user_metadata_1.user_identity() == identity_2);
+    }
+}
+
+TEST_CASE("sync_metadata: file action metadata APIs", "[sync]") {
+    reset_test_directory(base_path);
+    SyncMetadataManager manager(metadata_path, false);
+    SECTION("properly list all pending actions, reflecting their deletion") {
+        const auto filename1 = "/tmp/foobar/file1";
+        const auto filename2 = "/tmp/foobar/file2";
+        const auto filename3 = "/tmp/foobar/file3";
+        auto first = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, filename1, "asdf", "realm://realm.example.com/1");
+        auto second = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, filename2, "asdf", "realm://realm.example.com/2");
+        auto third = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, filename3, "asdf", "realm://realm.example.com/3");
+        auto actions = manager.all_pending_actions();
+        REQUIRE(actions.size() == 3);
+        REQUIRE(results_contains_original_name(actions, filename1));
+        REQUIRE(results_contains_original_name(actions, filename2));
+        REQUIRE(results_contains_original_name(actions, filename3));
+        first.remove();
+        second.remove();
+        third.remove();
+        REQUIRE(actions.size() == 0);
     }
 }
 

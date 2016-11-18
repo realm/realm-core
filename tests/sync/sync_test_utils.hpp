@@ -30,6 +30,7 @@ namespace realm {
 bool create_dummy_realm(std::string path);
 void reset_test_directory(const std::string& base_path);
 bool results_contains_user(SyncUserMetadataResults& results, const std::string& identity);
+bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name);
 std::string tmp_dir();
 std::vector<char> make_test_encryption_key(const char start = 0);
 

@@ -45,6 +45,15 @@ bool results_contains_user(SyncUserMetadataResults& results, const std::string& 
     return false;
 }
 
+bool results_contains_original_name(SyncFileActionMetadataResults& results, const std::string& original_name) {
+    for (size_t i = 0; i < results.size(); i++) {
+        if (results.get(i).original_name() == original_name) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::string tmp_dir() {
     const char* dir = getenv("TMPDIR");
     if (dir && *dir)
