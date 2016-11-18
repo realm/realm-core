@@ -1165,7 +1165,7 @@ template <>
 class StringNode<Contains> : public StringNodeBase {
 public:
     StringNode(StringData v, size_t column)
-    : StringNodeBase(v, column), m_charmap{}
+    : StringNodeBase(v, column), m_charmap()
     {
         if (v.size() == 0)
             return;
@@ -1228,7 +1228,7 @@ template <>
 class StringNode<ContainsIns> : public StringNodeBase {
 public:
     StringNode(StringData v, size_t column)
-    : StringNodeBase(v, column), m_charmap{}
+    : StringNodeBase(v, column), m_charmap()
     {
         auto upper = case_map(v, true);
         auto lower = case_map(v, false);
