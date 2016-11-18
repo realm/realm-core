@@ -39,7 +39,8 @@ SyncManager& SyncManager::shared()
 
 void SyncManager::configure_file_system(const std::string& base_file_path,
                                         MetadataMode metadata_mode,
-                                        util::Optional<std::vector<char>> custom_encryption_key)
+                                        util::Optional<std::vector<char>> custom_encryption_key,
+                                        bool reset_metadata_on_error)
 {
     struct UserCreationData {
         std::string identity;
@@ -68,9 +69,19 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
                                                                            false);
                 break;
             case MetadataMode::Encryption:
-                m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
-                                                                           true,
-                                                                           std::move(custom_encryption_key));
+                try {
+                    m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
+                                                                               true,
+                                                                               std::move(custom_encryption_key));
+                } catch (RealmFileException const& ex) {
+                    if (reset_metadata_on_error && m_file_manager->remove_metadata_realm()) {
+                        m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
+                                                                                   true,
+                                                                                   std::move(custom_encryption_key));
+                    } else {
+                        throw;
+                    }
+                }
                 break;
             case MetadataMode::NoMetadata:
                 return;

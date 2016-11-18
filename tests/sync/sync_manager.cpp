@@ -172,3 +172,21 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         }
     }
 }
+
+TEST_CASE("sync_manager: metadata") {
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    reset_test_directory(base_path);
+
+    SECTION("should be reset in case of decryption error") {
+        SyncManager::shared().configure_file_system(base_path,
+                                                    SyncManager::MetadataMode::Encryption,
+                                                    make_test_encryption_key());
+
+        SyncManager::shared().reset_for_testing();
+
+        SyncManager::shared().configure_file_system(base_path,
+                                                    SyncManager::MetadataMode::Encryption,
+                                                    make_test_encryption_key(1),
+                                                    true);
+    }
+}

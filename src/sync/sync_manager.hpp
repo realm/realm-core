@@ -66,7 +66,8 @@ public:
     // Configure the metadata and file management subsystems. This MUST be called upon startup.
     void configure_file_system(const std::string& base_file_path,
                                MetadataMode metadata_mode=MetadataMode::Encryption,
-                               util::Optional<std::vector<char>> custom_encryption_key=none);
+                               util::Optional<std::vector<char>> custom_encryption_key=none,
+                               bool reset_metadata_on_error=false);
 
     void set_log_level(util::Logger::Level) noexcept;
     void set_logger_factory(SyncLoggerFactory&) noexcept;
