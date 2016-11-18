@@ -415,7 +415,7 @@ void SyncSession::revive_if_needed(std::shared_ptr<SyncSession> session)
         }
     }
     if (handler) {
-        handler.value()(session->m_realm_path, session->m_config, std::move(session));
+        handler.value()(session->m_realm_path, session->m_config, session);
     }
 }
 
