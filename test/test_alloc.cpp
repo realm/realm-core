@@ -93,25 +93,30 @@ TEST(Alloc_1)
     MemRef mr1 = alloc.alloc(8);
     MemRef mr2 = alloc.alloc(16);
     MemRef mr3 = alloc.alloc(256);
+    MemRef mr4 = alloc.alloc(96);
 
     // Set size in headers (needed for Alloc::free())
     set_capacity(mr1.get_addr(), 8);
     set_capacity(mr2.get_addr(), 16);
     set_capacity(mr3.get_addr(), 256);
+    set_capacity(mr4.get_addr(), 96);
 
     // Are pointers 64bit aligned
     CHECK_EQUAL(0, intptr_t(mr1.get_addr()) & 0x7);
     CHECK_EQUAL(0, intptr_t(mr2.get_addr()) & 0x7);
     CHECK_EQUAL(0, intptr_t(mr3.get_addr()) & 0x7);
+    CHECK_EQUAL(0, intptr_t(mr4.get_addr()) & 0x7);
 
     // Do refs translate correctly
     CHECK_EQUAL(static_cast<void*>(mr1.get_addr()), alloc.translate(mr1.get_ref()));
     CHECK_EQUAL(static_cast<void*>(mr2.get_addr()), alloc.translate(mr2.get_ref()));
     CHECK_EQUAL(static_cast<void*>(mr3.get_addr()), alloc.translate(mr3.get_ref()));
+    CHECK_EQUAL(static_cast<void*>(mr4.get_addr()), alloc.translate(mr4.get_ref()));
 
     alloc.free_(mr3.get_ref(), mr3.get_addr());
-    alloc.free_(mr2.get_ref(), mr2.get_addr());
+    alloc.free_(mr4.get_ref(), mr4.get_addr());
     alloc.free_(mr1.get_ref(), mr1.get_addr());
+    alloc.free_(mr2.get_ref(), mr2.get_addr());
 
     // SlabAlloc destructor will verify that all is free'd
 }
