@@ -75,7 +75,7 @@ if(REALM_PLATFORM STREQUAL "Node")
     list(APPEND PLATFORM_LIBRARIES ${UV_LIBRARY})
 endif()
 
-if(REALM_SYNC_PREFIX AND ${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     find_library(UV_LIBRARY NAMES uv libuv)
     find_path(UV_INCLUDE_DIR uv.h)
 
