@@ -28,6 +28,7 @@ def buildDockerEnv(name, dockerfile='Dockerfile', extra_args='') {
 
 def publishReport(String label) {
   // Unfortunately, we cannot add a title or tag to individual coverage reports.
+  echo "Unstashing coverage-${label}"
   unstash("coverage-${label}")
   step([
     $class: 'CoberturaPublisher',
@@ -50,7 +51,7 @@ if (env.BRANCH_NAME == 'master') {
 
 def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
   def sync = enableSync ? "sync" : ""
-  def label = "coverage-${flavor}${enableSync ? '-sync' : ''}"
+  def label = "${flavor}${enableSync ? '-sync' : ''}"
   
   return {
     node('docker') {
@@ -66,7 +67,8 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
         }
       }
       if(withCoverage) {
-        stash includes: "${label}.build/coverage.xml", name: label
+        echo "Stashing coverage-${label}"
+        stash includes: "${label}.build/coverage.xml", name: "coverage-${label}"
       }
     }
   }
@@ -74,14 +76,15 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
 
 def doBuild(String nodeSpec, String flavor, Boolean enableSync) {
   def sync = enableSync ? "sync" : ""
-  def label = "coverage-${flavor}${enableSync ? '-sync' : ''}"
+  def label = "${flavor}${enableSync ? '-sync' : ''}"
   return {
     node(nodeSpec) {
       getSourceArchive()
       sshagent(['realm-ci-ssh']) {
         sh "./workflow/test_coverage.sh ${sync} && mv coverage.build ${label}.build"
       }
-      stash includes: "${label}.build/coverage.xml", name: label
+      echo "Stashing coverage-${label}"
+      stash includes: "${label}.build/coverage.xml", name: "coverage-${label}"
     }
   }
 }
