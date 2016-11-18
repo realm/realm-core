@@ -115,9 +115,13 @@ stage('unit-tests') {
     macos: doBuild('osx', 'macOS', false),
     macos_sync: doBuild('osx', 'macOS', true)
   )
-  
-  publishReport('linux')
-  publishReport('linux-sync')
-  publishReport('macOS')
-  publishReport('macOS-sync')
+}
+
+stage('publish') {
+  node('docker') {
+    publishReport('linux')
+    publishReport('linux-sync')
+    publishReport('macOS')
+    publishReport('macOS-sync')
+  }
 }
