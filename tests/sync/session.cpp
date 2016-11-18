@@ -74,11 +74,13 @@ bool session_is_inactive(const SyncSession& session)
 }
 
 TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     SyncManager::shared().configure_file_system("/tmp/", SyncManager::MetadataMode::NoMetadata);
     const std::string realm_base_url = server.base_url();
-    REQUIRE(EventLoop::has_implementation());
 
     SECTION("a SyncUser can properly retrieve its owned sessions") {
         auto user = SyncManager::shared().get_user("user1a", "not_a_real_token");
@@ -197,12 +199,14 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
 }
 
 TEST_CASE("sync: log-in", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system("/tmp/", SyncManager::MetadataMode::NoMetadata);
     auto user = SyncManager::shared().get_user("user", "not_a_real_token");
-    REQUIRE(EventLoop::has_implementation());
 
     SECTION("Can log in") {
         std::atomic<int> error_count(0);

@@ -16,6 +16,8 @@
 #
 ###########################################################################
 
+include(CheckSymbolExists)
+
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 set(CMAKE_CXX_EXTENSIONS off)
@@ -68,17 +70,20 @@ elseif(REALM_PLATFORM STREQUAL "Android")
 endif()
 
 if(REALM_PLATFORM STREQUAL "Node")
-    find_library(UV_LIBRARY NAMES uv libuv)
-    find_path(UV_INCLUDE_DIR uv.h)
-
     set(PLATFORM_DEFINES "REALM_PLATFORM_NODE=1")
-    list(APPEND PLATFORM_LIBRARIES ${UV_LIBRARY})
 endif()
 
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-    find_library(UV_LIBRARY NAMES uv libuv)
+find_library(UV_LIBRARY NAMES uv libuv)
+if(UV_LIBRARY)
     find_path(UV_INCLUDE_DIR uv.h)
 
-    set(PLATFORM_DEFINES "REALM_PLATFORM_LINUX=1")
     list(APPEND PLATFORM_LIBRARIES ${UV_LIBRARY})
+    add_definitions(-DREALM_HAVE_UV)
+elseif(REALM_PLATFORM STREQUAL "Node")
+    message(FATAL_ERROR "Platform set to Node but libuv was not found!")
+endif()
+
+check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
+if(REALM_HAVE_EPOLL)
+    add_definitions(-DREALM_HAVE_EPOLL)
 endif()

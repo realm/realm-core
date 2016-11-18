@@ -24,19 +24,11 @@
 #include <stdexcept>
 #include <vector>
 
-#if REALM_PLATFORM_NODE
-#define REALM_USE_UV 1
-#elif REALM_PLATFORM_LINUX
-#define REALM_USE_UV 1
-#else
-#define REALM_USE_UV 0
-#endif
-
-#if REALM_USE_UV
-#include <uv.h>
-#elif REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE
 #include <realm/util/cf_ptr.hpp>
 #include <CoreFoundation/CoreFoundation.h>
+#elif REALM_HAVE_UV
+#include <uv.h>
 #endif
 
 using namespace realm::util;
@@ -54,7 +46,7 @@ struct EventLoop::Impl {
     ~Impl();
 
 private:
-#if REALM_USE_UV
+#if REALM_HAVE_UV
     Impl(uv_loop_t* loop);
 
     std::vector<std::function<void()>> m_pending_work;
@@ -90,7 +82,7 @@ void EventLoop::perform(std::function<void()> function)
     return m_impl->perform(std::move(function));
 }
 
-#if REALM_USE_UV
+#if REALM_HAVE_UV
 
 bool EventLoop::has_implementation() { return true; }
 

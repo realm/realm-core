@@ -2,7 +2,7 @@ FROM ubuntu:xenial
 
 RUN apt-get update && \
     apt-get install -y wget build-essential lcov curl cmake gcovr libssl-dev \
-      git python-cheetah
+      git python-cheetah libuv1-dev
 
 # Install the Android NDK
 RUN mkdir -p /tmp/android-ndk && \

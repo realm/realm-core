@@ -14,7 +14,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 include(CodeCoverage)
 include(CompilerFlags)
 include(Sanitizers)
-include(CheckSymbolExists)
 
 include(RealmCore)
 set(REALM_CORE_VERSION "2.1.3" CACHE STRING "")
@@ -27,11 +26,6 @@ endif()
 
 if(REALM_ENABLE_SYNC)
   add_definitions(-DREALM_ENABLE_SYNC)
-endif()
-
-check_symbol_exists(epoll_create sys/epoll.h REALM_HAVE_EPOLL)
-if(REALM_HAVE_EPOLL)
-  add_definitions(-DREALM_HAVE_EPOLL)
 endif()
 
 set(PEGTL_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pegtl)
