@@ -9401,6 +9401,15 @@ struct HandoverQuery {
         return ret;
     }
 };
+struct SelfHandoverQuery {
+    template <typename Next>
+    auto operator()(Query& q, Next&& next)
+    {
+        // Export the query and then re-import it to the same SG
+        auto handover = next.state.sg->export_for_handover(q, ConstSourcePayload::Copy);
+        return next(*next.state.sg->import_from_handover(std::move(handover)));
+    }
+};
 struct InsertColumn {
     template <typename Next>
     auto operator()(Query& q, Next&& next)
@@ -9460,11 +9469,13 @@ void QueryInitHelper::operator()(Func&& fn)
     CHECK_EQUAL(count, (run<Func, CopyQuery>(fn)));
     CHECK_EQUAL(count, (run<Func, AndQuery>(fn)));
     CHECK_EQUAL(count, (run<Func, HandoverQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, SelfHandoverQuery>(fn)));
 
     // run, copy the query, rerun
     CHECK_EQUAL(count, (run<Func, PreRun, CopyQuery>(fn)));
     CHECK_EQUAL(count, (run<Func, PreRun, AndQuery>(fn)));
     CHECK_EQUAL(count, (run<Func, PreRun, HandoverQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, PreRun, SelfHandoverQuery>(fn)));
 
     // copy the query, insert column, then run
     CHECK_EQUAL(count, (run<Func, CopyQuery, InsertColumn>(fn)));
