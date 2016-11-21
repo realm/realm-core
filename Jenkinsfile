@@ -253,7 +253,7 @@ def doBuildWindows() {
         node('windows') {
             getArchive()
 
-            bat "\"${tool 'MSBuild'}\" \"Visual Studio\Realm.sln\""
+            bat "\"${tool 'MSBuild'}\" \"Visual Studio\\Realm.sln\""
         }
     }
 }
