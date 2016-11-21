@@ -64,7 +64,8 @@ public:
     // Asynchronously call notify() on every Realm instance for this coordinator's
     // path, including those in other processes
     void send_commit_notifications(Realm&);
-    
+
+    // Notify all threads that a change has happened
     void wake_up_notifier_worker();
 
     // Clear the weak Realm cache for all paths

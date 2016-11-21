@@ -53,6 +53,22 @@ struct SyncConfig {
     std::function<SyncSessionErrorHandler> error_handler;
     // Some bindings may want to handle the session in binding level.
     bool create_session = true;
+
+#if __GNUC__ < 5
+// GCC 4.9 does not support C++14 braced-init with NSDMIs
+    SyncConfig(std::shared_ptr<SyncUser> user,
+               std::string realm_url,
+               SyncSessionStopPolicy stop_policy,
+               std::function<SyncBindSessionHandler> bind_session_handler,
+               std::function<SyncSessionErrorHandler> error_handler={})
+            : user(std::move(user))
+            , realm_url(std::move(realm_url))
+            , stop_policy(stop_policy)
+            , bind_session_handler(std::move(bind_session_handler))
+            , error_handler(std::move(error_handler))
+    {
+    }
+#endif
 };
 
 } // namespace realm
