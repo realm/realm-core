@@ -1630,11 +1630,12 @@ public:
     LinkMap(LinkMap const& other, QueryNodeHandoverPatches* patches)
         : LinkMap(other)
     {
-        if (!patches || m_link_column_indexes.empty())
+        if (!patches)
             return;
 
         m_link_column_indexes.clear();
         const Table* table = m_base_table;
+        m_base_table = nullptr;
         for (auto column : m_link_columns) {
             m_link_column_indexes.push_back(column->get_column_index());
             if (table->get_real_column_type(m_link_column_indexes.back()) == col_type_BackLink)
@@ -1964,12 +1965,12 @@ public:
     {
         return string_compare<Contains, ContainsIns>(*this, col, case_sensitive);
     }
-    
+
     Query like(StringData sd, bool case_sensitive = true)
     {
         return string_compare<StringData, Like, LikeIns>(*this, sd, case_sensitive);
     }
-    
+
     Query like(const Columns<StringData>& col, bool case_sensitive = true)
     {
         return string_compare<Like, LikeIns>(*this, col, case_sensitive);
@@ -2459,9 +2460,11 @@ public:
     template <class ColType2 = ColType>
     void evaluate_internal(size_t index, ValueBase& destination)
     {
+        REALM_ASSERT_DEBUG(m_sg.get());
+        REALM_ASSERT_DEBUG(dynamic_cast<SequentialGetter<ColType2>*>(m_sg.get()));
+
         using U = typename ColType2::value_type;
         auto sgc = static_cast<SequentialGetter<ColType2>*>(m_sg.get());
-        REALM_ASSERT_DEBUG(dynamic_cast<SequentialGetter<ColType2>*>(m_sg.get()));
         REALM_ASSERT_DEBUG(sgc->m_column);
 
         if (links_exist()) {
