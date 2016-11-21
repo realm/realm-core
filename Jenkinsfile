@@ -55,16 +55,16 @@ try {
 
     stage('check') {
       parallelExecutors = [
-        checkLinuxRelease: doBuildInDocker('check'),
+        /*checkLinuxRelease: doBuildInDocker('check'),
         checkLinuxDebug: doBuildInDocker('check-debug'),
         buildCocoa: doBuildCocoa(isPublishingRun),
         buildNodeLinux: doBuildNodeInDocker(isPublishingRun),
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun),
         buildDotnetOsx: doBuildDotNetOsx(isPublishingRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
-        buildOsxDylibs: doBuildOsxDylibs(isPublishingRun),
-        buildWindows: doBuildWindows(),
-        addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
+        buildOsxDylibs: doBuildOsxDylibs(isPublishingRun),*/
+        buildWindows: doBuildWindows()
+        //addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
       ]
 
