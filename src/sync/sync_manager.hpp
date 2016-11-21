@@ -68,7 +68,10 @@ public:
                                MetadataMode metadata_mode=MetadataMode::Encryption,
                                util::Optional<std::vector<char>> custom_encryption_key=none);
 
+    // Configure the log level for the sync client. This can only be configured before the client is started.
     void set_log_level(util::Logger::Level) noexcept;
+
+    // Configure a custom logger factory. If not provided, a realm::util::StderrLogger will be used.
     void set_logger_factory(SyncLoggerFactory&) noexcept;
     void set_error_handler(std::function<sync::Client::ErrorHandler>);
 
@@ -101,6 +104,10 @@ public:
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     std::string path_for_realm(const std::string& user_identity, const std::string& raw_realm_url) const;
+
+    // Explicitly control when the Sync Client is started. Otherwise it will be started automatically
+    // when the first session is created.
+    void start_sync_client() const;
 
     // Reset part of the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
     void reset_for_testing();

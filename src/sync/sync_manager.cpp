@@ -380,3 +380,9 @@ std::shared_ptr<SyncClient> SyncManager::create_sync_client() const
                                         m_client_reconnect_mode,
                                         m_client_validate_ssl);
 }
+
+void SyncManager::start_sync_client() const
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    get_sync_client();
+}
