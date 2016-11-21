@@ -66,7 +66,8 @@ public:
     // Configure the metadata and file management subsystems. This MUST be called upon startup.
     void configure_file_system(const std::string& base_file_path,
                                MetadataMode metadata_mode=MetadataMode::Encryption,
-                               util::Optional<std::vector<char>> custom_encryption_key=none);
+                               util::Optional<std::vector<char>> custom_encryption_key=none,
+                               bool reset_metadata_on_error=false);
 
     // Configure the log level for the sync client. This can only be configured before the client is started.
     void set_log_level(util::Logger::Level) noexcept;
@@ -111,8 +112,8 @@ public:
 
     // Reset part of the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
     void reset_for_testing();
+
 private:
-    struct UserCreationData;
     void dropped_last_reference_to_session(SyncSession*);
 
     // Stop tracking the session for the given path if it is inactive.

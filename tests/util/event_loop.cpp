@@ -24,7 +24,11 @@
 #include <stdexcept>
 #include <vector>
 
-#if REALM_PLATFORM_NODE
+#if (REALM_HAVE_UV && !REALM_PLATFORM_APPLE) || REALM_PLATFORM_NODE
+#define REALM_USE_UV 1
+#endif
+
+#if REALM_USE_UV
 #include <uv.h>
 #elif REALM_PLATFORM_APPLE
 #include <realm/util/cf_ptr.hpp>
@@ -46,7 +50,7 @@ struct EventLoop::Impl {
     ~Impl();
 
 private:
-#if REALM_PLATFORM_NODE
+#if REALM_USE_UV
     Impl(uv_loop_t* loop);
 
     std::vector<std::function<void()>> m_pending_work;
@@ -82,7 +86,7 @@ void EventLoop::perform(std::function<void()> function)
     return m_impl->perform(std::move(function));
 }
 
-#if REALM_PLATFORM_NODE
+#if REALM_USE_UV
 
 bool EventLoop::has_implementation() { return true; }
 
@@ -206,7 +210,7 @@ void EventLoop::Impl::perform(std::function<void()> f)
 bool EventLoop::has_implementation() { return false; }
 std::unique_ptr<EventLoop::Impl> EventLoop::Impl::main() { return nullptr; }
 EventLoop::Impl::~Impl() = default;
-void EventLoop::Impl::run_until(std::function<bool()>) { }
-void EventLoop::Impl::perform(std::function<void()>) { }
+void EventLoop::Impl::run_until(std::function<bool()>) { printf("WARNING: there is no event loop implementation and nothing is happening.\n"); }
+void EventLoop::Impl::perform(std::function<void()>) { printf("WARNING: there is no event loop implementation and nothing is happening.\n"); }
 
 #endif

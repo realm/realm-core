@@ -53,7 +53,7 @@ set(HEADERS
     util/android/event_loop_signal.hpp
     util/apple/event_loop_signal.hpp
     util/generic/event_loop_signal.hpp
-    util/node/event_loop_signal.hpp
+    util/uv/event_loop_signal.hpp
 
     util/atomic_shared_ptr.hpp
     util/compiler.hpp

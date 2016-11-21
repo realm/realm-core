@@ -415,7 +415,7 @@ void SyncSession::revive_if_needed(std::shared_ptr<SyncSession> session)
         }
     }
     if (handler) {
-        handler.value()(session->m_realm_path, session->m_config, std::move(session));
+        handler.value()(session->m_realm_path, session->m_config, session);
     }
 }
 
@@ -451,23 +451,33 @@ bool SyncSession::can_wait_for_network_completion() const
     return m_state == &State::active || m_state == &State::dying;
 }
 
+void SyncSession::wait_for_upload_completion()
+{
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    if (can_wait_for_network_completion()) {
+        REALM_ASSERT(m_session);
+        m_session->wait_for_upload_complete_or_client_stopped();
+    }
+}
+
+void SyncSession::wait_for_download_completion()
+{
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    if (can_wait_for_network_completion()) {
+        REALM_ASSERT(m_session);
+        m_session->wait_for_download_complete_or_client_stopped();
+    }
+}
+
 void SyncSession::wait_for_upload_completion(std::function<void()> callback)
 {
     // FIXME: If the session is waiting for a token, the `wait_for_upload` should be deferred until the `bind()`
     // instead of just calling the callback immediately.
     REALM_ASSERT(shared_from_this());
-    auto thread = std::thread([this, callback=std::move(callback), self=shared_from_this()]() {
-        {
-            std::unique_lock<std::mutex> lock(m_state_mutex);
-            if (can_wait_for_network_completion()) {
-                REALM_ASSERT(m_session);
-                m_session->wait_for_upload_complete_or_client_stopped();
-            }
-        }
-
+    std::thread([callback=std::move(callback), self=shared_from_this()]() {
+        self->wait_for_upload_completion();
         callback();
-    });
-    thread.detach();
+    }).detach();
 }
 
 void SyncSession::wait_for_download_completion(std::function<void()> callback)
@@ -475,18 +485,10 @@ void SyncSession::wait_for_download_completion(std::function<void()> callback)
     // FIXME: If the session is waiting for a token, the `wait_for_upload` should be deferred until the `bind()`
     // instead of just calling the callback immediately.
     REALM_ASSERT(shared_from_this());
-    auto thread = std::thread([this, callback=std::move(callback), self=shared_from_this()]() {
-        {
-            std::unique_lock<std::mutex> lock(m_state_mutex);
-            if (can_wait_for_network_completion()) {
-                REALM_ASSERT(m_session);
-                m_session->wait_for_download_complete_or_client_stopped();
-            }
-        }
-
+    std::thread([callback=std::move(callback), self=shared_from_this()]() {
+        self->wait_for_download_completion();
         callback();
-    });
-    thread.detach();
+    }).detach();
 }
 
 void SyncSession::refresh_access_token(std::string access_token, util::Optional<std::string> server_url)
@@ -505,13 +507,24 @@ void SyncSession::bind_with_admin_token(std::string admin_token, std::string ser
     m_state->bind_with_admin_token(lock, *this, admin_token, server_url);
 }
 
-bool SyncSession::is_valid() const
+SyncSession::PublicState SyncSession::state() const
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
-    return m_state != &State::error;
+    if (m_state == &State::waiting_for_access_token) {
+        return PublicState::WaitingForAccessToken;
+    } else if (m_state == &State::active) {
+        return PublicState::Active;
+    } else if (m_state == &State::dying) {
+        return PublicState::Dying;
+    } else if (m_state == &State::inactive) {
+        return PublicState::Inactive;
+    } else if (m_state == &State::error) {
+        return PublicState::Error;
+    }
+    REALM_UNREACHABLE();
 }
 
-bool SyncSession::is_inactive() const
+bool SyncSession::can_be_safely_destroyed() const
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     return m_state == &State::inactive && m_pending_upload_threads == 0;

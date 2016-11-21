@@ -29,7 +29,7 @@ using File = realm::util::File;
 
 static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_user/";
 
-TEST_CASE("sync_user: SyncManager `get_user()` API") {
+TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
@@ -39,7 +39,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API") {
 
     SECTION("properly creates a new normal user") {
         auto user = SyncManager::shared().get_user(identity, token, server_url);
-        REQUIRE(user != nullptr);
+        REQUIRE(user);
         // The expected state for a newly created user:
         REQUIRE(!user->is_admin());
         REQUIRE(user->identity() == identity);
@@ -50,7 +50,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API") {
 
     SECTION("properly creates a new admin user") {
         auto user = SyncManager::shared().get_user(identity, token, server_url, true);
-        REQUIRE(user != nullptr);
+        REQUIRE(user);
         // The expected state for a newly created user:
         REQUIRE(user->is_admin());
         REQUIRE(user->identity() == identity);
@@ -62,7 +62,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API") {
     SECTION("properly retrieves a previously created user, updating fields as necessary") {
         const std::string second_token = "0987654321-fake-token";
         auto first = SyncManager::shared().get_user(identity, token, server_url);
-        REQUIRE(first != nullptr);
+        REQUIRE(first);
         REQUIRE(first->identity() == identity);
         REQUIRE(first->refresh_token() == token);
         // Get the user again, but with a different token.
@@ -96,7 +96,7 @@ TEST_CASE("sync_user: SyncManager `get_user()` API") {
     }
 }
 
-TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API") {
+TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
@@ -106,7 +106,7 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API") {
 
     SECTION("properly returns a null pointer when called for a non-existent user") {
         std::shared_ptr<SyncUser> user = SyncManager::shared().get_existing_logged_in_user(identity);
-        REQUIRE(user == nullptr);
+        REQUIRE(!user);
     }
 
     SECTION("properly returns an existing logged-in user") {
@@ -126,11 +126,11 @@ TEST_CASE("sync_user: SyncManager `get_existing_logged_in_user()` API") {
         REQUIRE(first->state() == SyncUser::State::LoggedOut);
         // Get that user using the 'existing user' API.
         auto second = SyncManager::shared().get_existing_logged_in_user(identity);
-        REQUIRE(second == nullptr);
+        REQUIRE(!second);
     }
 }
 
-TEST_CASE("sync_user: logout") {
+TEST_CASE("sync_user: logout", "[sync]") {
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
     const std::string identity = "sync_test_identity";
@@ -145,7 +145,7 @@ TEST_CASE("sync_user: logout") {
     }
 }
 
-TEST_CASE("sync_user: user persistence") {
+TEST_CASE("sync_user: user persistence", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);

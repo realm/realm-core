@@ -33,9 +33,916 @@
 
 #include <unistd.h>
 
+#if REALM_ENABLE_SYNC
+#include "sync/sync_manager.hpp"
+#include "sync/sync_session.hpp"
+#endif
+
 using namespace realm;
 
-TEST_CASE("results: notifications") {
+class joining_thread {
+public:
+    template<typename... Args>
+    joining_thread(Args&&... args) : m_thread(std::forward<Args>(args)...) { }
+    ~joining_thread() { if (m_thread.joinable()) m_thread.join(); }
+    void join() { m_thread.join(); }
+
+private:
+    std::thread m_thread;
+};
+
+TEST_CASE("notifications: async delivery") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {
+            {"value", PropertyType::Int}
+        }},
+    });
+
+    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    auto table = r->read_group().get_table("class_object");
+
+    r->begin_transaction();
+    table->add_empty_row(10);
+    for (int i = 0; i < 10; ++i)
+        table->set_int(0, i, i * 2);
+    r->commit_transaction();
+
+    Results results(r, table->where().greater(0, 0).less(0, 10));
+
+    int notification_calls = 0;
+    auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+        REQUIRE_FALSE(err);
+        ++notification_calls;
+    });
+
+    auto make_local_change = [&] {
+        r->begin_transaction();
+        table->set_int(0, 0, 4);
+        r->commit_transaction();
+    };
+
+    auto make_remote_change = [&] {
+        auto r2 = coordinator->get_realm();
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->set_int(0, 0, 5);
+        r2->commit_transaction();
+    };
+
+    SECTION("initial notification") {
+        SECTION("is delivered on notify()") {
+            REQUIRE(notification_calls == 0);
+            advance_and_notify(*r);
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("is delivered on refresh()") {
+            coordinator->on_change();
+            REQUIRE(notification_calls == 0);
+            r->refresh();
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("is delivered on begin_transaction()") {
+            coordinator->on_change();
+            REQUIRE(notification_calls == 0);
+            r->begin_transaction();
+            REQUIRE(notification_calls == 1);
+            r->cancel_transaction();
+        }
+
+        SECTION("is delivered on notify() even with autorefresh disabled") {
+            r->set_auto_refresh(false);
+            REQUIRE(notification_calls == 0);
+            advance_and_notify(*r);
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("refresh() blocks due to initial results not being ready") {
+            REQUIRE(notification_calls == 0);
+            joining_thread thread([&] {
+                usleep(5000);
+                coordinator->on_change();
+            });
+            r->refresh();
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("begin_transaction() blocks due to initial results not being ready") {
+            REQUIRE(notification_calls == 0);
+            joining_thread thread([&] {
+                usleep(5000);
+                coordinator->on_change();
+            });
+            r->begin_transaction();
+            REQUIRE(notification_calls == 1);
+            r->cancel_transaction();
+        }
+
+        SECTION("notify() does not block due to initial results not being ready") {
+            REQUIRE(notification_calls == 0);
+            r->notify();
+            REQUIRE(notification_calls == 0);
+        }
+
+        SECTION("is delivered after invalidate()") {
+            r->invalidate();
+
+            SECTION("notify()") {
+                coordinator->on_change();
+                REQUIRE_FALSE(r->is_in_read_transaction());
+                r->notify();
+                REQUIRE(notification_calls == 1);
+            }
+
+            SECTION("notify() without autorefresh") {
+                r->set_auto_refresh(false);
+                coordinator->on_change();
+                REQUIRE_FALSE(r->is_in_read_transaction());
+                r->notify();
+                REQUIRE(notification_calls == 1);
+            }
+
+            SECTION("refresh()") {
+                coordinator->on_change();
+                REQUIRE_FALSE(r->is_in_read_transaction());
+                r->refresh();
+                REQUIRE(notification_calls == 1);
+            }
+
+            SECTION("begin_transaction()") {
+                coordinator->on_change();
+                REQUIRE_FALSE(r->is_in_read_transaction());
+                r->begin_transaction();
+                REQUIRE(notification_calls == 1);
+                r->cancel_transaction();
+            }
+        }
+    }
+
+    advance_and_notify(*r);
+
+    SECTION("notifications for local changes") {
+        make_local_change();
+        coordinator->on_change();
+        REQUIRE(notification_calls == 1);
+
+        SECTION("notify()") {
+            r->notify();
+            REQUIRE(notification_calls == 2);
+        }
+
+        SECTION("notify() without autorefresh") {
+            r->set_auto_refresh(false);
+            r->notify();
+            REQUIRE(notification_calls == 2);
+        }
+
+        SECTION("refresh()") {
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+        }
+
+        SECTION("begin_transaction()") {
+            r->begin_transaction();
+            REQUIRE(notification_calls == 2);
+            r->cancel_transaction();
+        }
+    }
+
+    SECTION("notifications for remote changes") {
+        make_remote_change();
+        coordinator->on_change();
+        REQUIRE(notification_calls == 1);
+
+        SECTION("notify()") {
+            r->notify();
+            REQUIRE(notification_calls == 2);
+        }
+
+        SECTION("notify() without autorefresh") {
+            r->set_auto_refresh(false);
+            r->notify();
+            REQUIRE(notification_calls == 1);
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+        }
+
+        SECTION("refresh()") {
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+        }
+
+        SECTION("begin_transaction()") {
+            r->begin_transaction();
+            REQUIRE(notification_calls == 2);
+            r->cancel_transaction();
+        }
+    }
+
+    SECTION("notifications are not delivered when the token is destroyed before they are calculated") {
+        make_remote_change();
+        REQUIRE(notification_calls == 1);
+        token = {};
+        advance_and_notify(*r);
+        REQUIRE(notification_calls == 1);
+    }
+
+    SECTION("notifications are not delivered when the token is destroyed before they are delivered") {
+        make_remote_change();
+        REQUIRE(notification_calls == 1);
+        coordinator->on_change();
+        token = {};
+        r->notify();
+        REQUIRE(notification_calls == 1);
+    }
+
+    SECTION("notifications are delivered when a new callback is added from within a callback") {
+        NotificationToken token2, token3;
+        bool called = false;
+        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                called = true;
+            });
+        });
+
+        advance_and_notify(*r);
+        REQUIRE(called);
+    }
+
+    SECTION("notifications are not delivered when a callback is removed from within a callback") {
+        NotificationToken token2, token3;
+        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token3 = {};
+        });
+        token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            REQUIRE(false);
+        });
+
+        advance_and_notify(*r);
+    }
+
+    SECTION("removing the current callback does not stop later ones from being called") {
+        NotificationToken token2, token3;
+        bool called = false;
+        token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            token2 = {};
+        });
+        token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            called = true;
+        });
+
+        advance_and_notify(*r);
+
+        REQUIRE(called);
+    }
+
+    SECTION("the first call of a notification can include changes if it previously ran for a different callback") {
+        r->begin_transaction();
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            REQUIRE(!c.empty());
+        });
+
+        table->set_int(0, table->add_empty_row(), 5);
+        r->commit_transaction();
+        advance_and_notify(*r);
+    }
+
+    SECTION("handling of results not ready") {
+        make_remote_change();
+
+        SECTION("notify() does nothing") {
+            r->notify();
+            REQUIRE(notification_calls == 1);
+            coordinator->on_change();
+            r->notify();
+            REQUIRE(notification_calls == 2);
+        }
+
+        SECTION("refresh() blocks") {
+            REQUIRE(notification_calls == 1);
+            joining_thread thread([&] {
+                usleep(5000);
+                coordinator->on_change();
+            });
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+        }
+
+        SECTION("refresh() advances to the first version with notifiers ready that is at least a recent as the newest at the time it is called") {
+            joining_thread thread([&] {
+                usleep(5000);
+                make_remote_change();
+                coordinator->on_change();
+                make_remote_change();
+            });
+            // advances to the version after the one it was waiting for, but still
+            // not the latest
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+
+            thread.join();
+            REQUIRE(notification_calls == 2);
+
+            // now advances to the latest
+            coordinator->on_change();
+            r->refresh();
+            REQUIRE(notification_calls == 3);
+        }
+
+        SECTION("begin_transaction() blocks") {
+            REQUIRE(notification_calls == 1);
+            joining_thread thread([&] {
+                usleep(5000);
+                coordinator->on_change();
+            });
+            r->begin_transaction();
+            REQUIRE(notification_calls == 2);
+            r->cancel_transaction();
+        }
+
+        SECTION("refresh() does not block for results without callbacks") {
+            token = {};
+            // this would deadlock if it waits for the notifier to be ready
+            r->refresh();
+        }
+
+        SECTION("begin_transaction() does not block for results without callbacks") {
+            token = {};
+            // this would deadlock if it waits for the notifier to be ready
+            r->begin_transaction();
+            r->cancel_transaction();
+        }
+
+        SECTION("begin_transaction() does not block for Results for different Realms") {
+            // this would deadlock if beginning the write on the secondary Realm
+            // waited for the primary Realm to be ready
+            make_remote_change();
+
+            // sanity check that the notifications never did run
+            r->notify();
+            REQUIRE(notification_calls == 1);
+        }
+    }
+
+    SECTION("handling of stale results") {
+        make_remote_change();
+        coordinator->on_change();
+        make_remote_change();
+
+        SECTION("notify() uses the older version") {
+            r->notify();
+            REQUIRE(notification_calls == 2);
+            coordinator->on_change();
+            r->notify();
+            REQUIRE(notification_calls == 3);
+            r->notify();
+            REQUIRE(notification_calls == 3);
+        }
+
+        SECTION("refresh() blocks") {
+            REQUIRE(notification_calls == 1);
+            joining_thread thread([&] {
+                usleep(5000);
+                coordinator->on_change();
+            });
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+        }
+
+        SECTION("begin_transaction() blocks") {
+            REQUIRE(notification_calls == 1);
+            joining_thread thread([&] {
+                usleep(5000);
+                coordinator->on_change();
+            });
+            r->begin_transaction();
+            REQUIRE(notification_calls == 2);
+            r->cancel_transaction();
+        }
+    }
+
+    SECTION("updates are delivered after invalidate()") {
+        r->invalidate();
+        make_remote_change();
+
+        SECTION("notify()") {
+            coordinator->on_change();
+            REQUIRE_FALSE(r->is_in_read_transaction());
+            r->notify();
+            REQUIRE(notification_calls == 2);
+        }
+
+        SECTION("notify() without autorefresh") {
+            r->set_auto_refresh(false);
+            coordinator->on_change();
+            REQUIRE_FALSE(r->is_in_read_transaction());
+            r->notify();
+            REQUIRE(notification_calls == 1);
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+        }
+
+        SECTION("refresh()") {
+            coordinator->on_change();
+            REQUIRE_FALSE(r->is_in_read_transaction());
+            r->refresh();
+            REQUIRE(notification_calls == 2);
+        }
+
+        SECTION("begin_transaction()") {
+            coordinator->on_change();
+            REQUIRE_FALSE(r->is_in_read_transaction());
+            r->begin_transaction();
+            REQUIRE(notification_calls == 2);
+            r->cancel_transaction();
+        }
+    }
+
+    SECTION("refresh() from within a notification is a no-op") {
+        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            REQUIRE_FALSE(r->refresh()); // would deadlock if it actually tried to refresh
+        });
+        advance_and_notify(*r);
+        make_remote_change(); // 1
+        coordinator->on_change();
+        make_remote_change(); // 2
+        r->notify(); // advances to version from 1
+        coordinator->on_change();
+        REQUIRE(r->refresh()); // advances to version from 2
+        REQUIRE_FALSE(r->refresh()); // does not advance since it's now up-to-date
+    }
+
+    SECTION("begin_transaction() from within a notification does not send notifications immediately") {
+        bool first = true;
+        auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            if (first)
+                first = false;
+            else {
+                // would deadlock if it tried to send notifications as they aren't ready yet
+                r->begin_transaction();
+                r->cancel_transaction();
+            }
+        });
+        advance_and_notify(*r);
+
+        make_remote_change(); // 1
+        coordinator->on_change();
+        make_remote_change(); // 2
+        r->notify(); // advances to version from 1
+        REQUIRE(notification_calls == 2);
+        coordinator->on_change();
+        REQUIRE_FALSE(r->refresh()); // we made the commit locally, so no advancing here
+        REQUIRE(notification_calls == 3);
+    }
+
+    SECTION("is_in_transaction() is reported correctly within a notification from begin_transaction() and changes can be made") {
+        bool first = true;
+        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            if (first) {
+                REQUIRE_FALSE(r->is_in_transaction());
+                first = false;
+            }
+            else {
+                REQUIRE(r->is_in_transaction());
+                table->set_int(0, 0, 100);
+            }
+        });
+        advance_and_notify(*r);
+        make_remote_change();
+        coordinator->on_change();
+        r->begin_transaction();
+        REQUIRE(table->get_int(0, 0) == 100);
+        r->cancel_transaction();
+        REQUIRE(table->get_int(0, 0) != 100);
+    }
+
+    SECTION("invalidate() from within notification ends the write transaction started by begin_transaction()") {
+        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            r->invalidate();
+        });
+        advance_and_notify(*r);
+        REQUIRE_FALSE(r->is_in_read_transaction());
+        make_remote_change();
+        coordinator->on_change();
+        r->begin_transaction();
+        REQUIRE_FALSE(r->is_in_transaction());
+    }
+
+    SECTION("cancel_transaction() from within notification ends the write transaction started by begin_transaction()") {
+        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            if (r->is_in_transaction())
+                r->cancel_transaction();
+        });
+        advance_and_notify(*r);
+        make_remote_change();
+        coordinator->on_change();
+        r->begin_transaction();
+        REQUIRE_FALSE(r->is_in_transaction());
+    }
+}
+
+TEST_CASE("notifications: skip") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {
+            {"value", PropertyType::Int}
+        }},
+    });
+
+    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    auto table = r->read_group().get_table("class_object");
+
+    r->begin_transaction();
+    table->add_empty_row(10);
+    for (int i = 0; i < 10; ++i)
+        table->set_int(0, i, i * 2);
+    r->commit_transaction();
+
+    Results results(r, table->where());
+
+    auto add_callback = [](Results& results, int& calls, CollectionChangeSet& changes) {
+        return results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            ++calls;
+            changes = std::move(c);
+        });
+    };
+
+    auto make_local_change = [&](auto& token) {
+        r->begin_transaction();
+        table->add_empty_row();
+        token.suppress_next();
+        r->commit_transaction();
+    };
+
+    auto make_remote_change = [&] {
+        auto r2 = coordinator->get_realm();
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->add_empty_row();
+        r2->commit_transaction();
+    };
+
+    int calls1 = 0;
+    CollectionChangeSet changes1;
+    auto token1 = add_callback(results, calls1, changes1);
+
+    SECTION("no notification is sent when only callback is skipped") {
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        make_local_change(token1);
+        advance_and_notify(*r);
+
+        REQUIRE(calls1 == 1);
+        REQUIRE(changes1.empty());
+    }
+
+    SECTION("unskipped tokens for the same Results are still delivered") {
+        int calls2 = 0;
+        CollectionChangeSet changes2;
+        auto token2 = add_callback(results, calls2, changes2);
+
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls2 == 1);
+
+        make_local_change(token1);
+        advance_and_notify(*r);
+
+        REQUIRE(calls1 == 1);
+        REQUIRE(changes1.empty());
+        REQUIRE(calls2 == 2);
+        REQUIRE_INDICES(changes2.insertions, 10);
+    }
+
+    SECTION("unskipped tokens for different Results are still delivered") {
+        Results results2(r, table->where());
+        int calls2 = 0;
+        CollectionChangeSet changes2;
+        auto token2 = add_callback(results2, calls2, changes2);
+
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls2 == 1);
+
+        make_local_change(token1);
+        advance_and_notify(*r);
+
+        REQUIRE(calls1 == 1);
+        REQUIRE(changes1.empty());
+        REQUIRE(calls2 == 2);
+        REQUIRE_INDICES(changes2.insertions, 10);
+    }
+
+    SECTION("additional commits which occur before calculation are merged in") {
+        int calls2 = 0;
+        CollectionChangeSet changes2;
+        auto token2 = add_callback(results, calls2, changes2);
+
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls2 == 1);
+
+        make_local_change(token1);
+        make_remote_change();
+        advance_and_notify(*r);
+
+        REQUIRE(calls1 == 2);
+        REQUIRE_INDICES(changes1.insertions, 11);
+        REQUIRE(calls2 == 2);
+        REQUIRE_INDICES(changes2.insertions, 10, 11);
+    }
+
+    SECTION("additional commits which occur before delivery are merged in") {
+        int calls2 = 0;
+        CollectionChangeSet changes2;
+        auto token2 = add_callback(results, calls2, changes2);
+
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+        REQUIRE(calls2 == 1);
+
+        make_local_change(token1);
+        coordinator->on_change();
+        make_remote_change();
+        advance_and_notify(*r);
+
+        REQUIRE(calls1 == 2);
+        REQUIRE_INDICES(changes1.insertions, 11);
+        REQUIRE(calls2 == 2);
+        REQUIRE_INDICES(changes2.insertions, 10, 11);
+    }
+
+    SECTION("skipping must be done from within a write transaction") {
+        REQUIRE_THROWS(token1.suppress_next());
+    }
+
+    SECTION("skipping must be done from the Realm's thread") {
+        advance_and_notify(*r);
+        r->begin_transaction();
+        std::thread([&] {
+            REQUIRE_THROWS(token1.suppress_next());
+        }).join();
+        r->cancel_transaction();
+    }
+
+    SECTION("new notifiers do not interfere with skipping") {
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        CollectionChangeSet changes;
+
+        // new notifier at a version before the skipped one
+        auto r2 = coordinator->get_realm();
+        Results results2(r2, r2->read_group().get_table("class_object")->where());
+        int calls2 = 0;
+        auto token2 = add_callback(results2, calls2, changes);
+
+        make_local_change(token1);
+
+        // new notifier at the skipped version
+        auto r3 = coordinator->get_realm();
+        Results results3(r3, r3->read_group().get_table("class_object")->where());
+        int calls3 = 0;
+        auto token3 = add_callback(results3, calls3, changes);
+
+        make_remote_change();
+
+        // new notifier at version after the skipped one
+        auto r4 = coordinator->get_realm();
+        Results results4(r4, r4->read_group().get_table("class_object")->where());
+        int calls4 = 0;
+        auto token4 = add_callback(results4, calls4, changes);
+
+        coordinator->on_change();
+        r->notify();
+        r2->notify();
+        r3->notify();
+        r4->notify();
+
+        REQUIRE(calls1 == 2);
+        REQUIRE(calls2 == 1);
+        REQUIRE(calls3 == 1);
+        REQUIRE(calls4 == 1);
+    }
+}
+
+#if REALM_PLATFORM_APPLE
+TEST_CASE("notifications: async error handling") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+    });
+
+    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    Results results(r, *r->read_group().get_table("class_object"));
+
+    auto r2 = Realm::get_shared_realm(config);
+
+    class OpenFileLimiter {
+    public:
+        OpenFileLimiter()
+        {
+            // Set the max open files to zero so that opening new files will fail
+            getrlimit(RLIMIT_NOFILE, &m_old);
+            rlimit rl = m_old;
+            rl.rlim_cur = 0;
+            setrlimit(RLIMIT_NOFILE, &rl);
+        }
+
+        ~OpenFileLimiter()
+        {
+            setrlimit(RLIMIT_NOFILE, &m_old);
+        }
+
+    private:
+        rlimit m_old;
+    };
+
+    SECTION("error when opening the advancer SG") {
+        OpenFileLimiter limiter;
+
+        bool called = false;
+        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+            REQUIRE(err);
+            REQUIRE_FALSE(called);
+            called = true;
+        });
+        REQUIRE(!called);
+
+        SECTION("error is delivered on notify() without changes") {
+            coordinator->on_change();
+            REQUIRE(!called);
+            r->notify();
+            REQUIRE(called);
+        }
+
+        SECTION("error is delivered on notify() with changes") {
+            r2->begin_transaction(); r2->commit_transaction();
+            REQUIRE(!called);
+            coordinator->on_change();
+            REQUIRE(!called);
+            r->notify();
+            REQUIRE(called);
+        }
+
+        SECTION("error is delivered on refresh() without changes") {
+            coordinator->on_change();
+            REQUIRE(!called);
+            r->refresh();
+            REQUIRE(called);
+        }
+
+        SECTION("error is delivered on refresh() with changes") {
+            r2->begin_transaction(); r2->commit_transaction();
+            REQUIRE(!called);
+            coordinator->on_change();
+            REQUIRE(!called);
+            r->refresh();
+            REQUIRE(called);
+        }
+
+        SECTION("error is delivered on begin_transaction() without changes") {
+            coordinator->on_change();
+            REQUIRE(!called);
+            r->begin_transaction();
+            REQUIRE(called);
+            r->cancel_transaction();
+        }
+
+        SECTION("error is delivered on begin_transaction() with changes") {
+            r2->begin_transaction(); r2->commit_transaction();
+            REQUIRE(!called);
+            coordinator->on_change();
+            REQUIRE(!called);
+            r->begin_transaction();
+            REQUIRE(called);
+            r->cancel_transaction();
+        }
+
+        SECTION("adding another callback does not send the error again") {
+            advance_and_notify(*r);
+            REQUIRE(called);
+
+            bool called2 = false;
+            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+                REQUIRE(err);
+                REQUIRE_FALSE(called2);
+                called2 = true;
+            });
+
+            advance_and_notify(*r);
+            REQUIRE(called2);
+        }
+    }
+
+    SECTION("error when opening the executor SG") {
+        SECTION("error is delivered asynchronously") {
+            bool called = false;
+            auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+                REQUIRE(err);
+                called = true;
+            });
+            OpenFileLimiter limiter;
+
+            REQUIRE(!called);
+            coordinator->on_change();
+            REQUIRE(!called);
+            r->notify();
+            REQUIRE(called);
+        }
+
+        SECTION("adding another callback does not send the error again") {
+            bool called = false;
+            auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+                REQUIRE(err);
+                REQUIRE_FALSE(called);
+                called = true;
+            });
+            OpenFileLimiter limiter;
+
+            advance_and_notify(*r);
+
+            bool called2 = false;
+            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+                REQUIRE(err);
+                REQUIRE_FALSE(called2);
+                called2 = true;
+            });
+
+            advance_and_notify(*r);
+
+            REQUIRE(called2);
+        }
+    }
+}
+#endif
+
+#if REALM_ENABLE_SYNC
+TEST_CASE("notifications: sync") {
+    SyncServer server(false);
+    SyncTestFile config(server);
+    config.cache = false;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+    };
+
+    SECTION("sync progress commits do not distrupt notifications") {
+        auto r = Realm::get_shared_realm(config);
+        auto wait_realm = Realm::get_shared_realm(config);
+
+        Results results(r, *r->read_group().get_table("class_object"));
+        Results wait_results(wait_realm, *wait_realm->read_group().get_table("class_object"));
+        auto token1 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { });
+        auto token2 = wait_results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) { });
+
+        // Add an object to the Realm so that notifications are needed
+        {
+            auto write_realm = Realm::get_shared_realm(config);
+            write_realm->begin_transaction();
+            write_realm->read_group().get_table("class_object")->add_empty_row();
+            write_realm->commit_transaction();
+        }
+
+        // Wait for the notifications to become ready for the new version
+        wait_realm->refresh();
+
+        // Start the server and wait for the Realm to be uploaded so that sync
+        // makes some writes to the Realm and bumps the version
+        server.start();
+        SyncManager::shared().get_session(config.path, *config.sync_config)->wait_for_upload_completion();
+
+        // Make sure that the notifications still get delivered rather than
+        // waiting forever due to that we don't get a commit notification from
+        // the commits sync makes to store the upload progress
+        r->refresh();
+    }
+}
+#endif
+
+TEST_CASE("notifications: results") {
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -66,6 +973,9 @@ TEST_CASE("results: notifications") {
         table->set_int(0, i, i * 2);
     r->commit_transaction();
 
+    auto r2 = coordinator->get_realm();
+    auto r2_table = r2->read_group().get_table("class_object");
+
     Results results(r, table->where().greater(0, 0).less(0, 10));
 
     SECTION("unsorted notifications") {
@@ -85,83 +995,6 @@ TEST_CASE("results: notifications") {
             r->commit_transaction();
             advance_and_notify(*r);
         };
-
-        SECTION("initial results are delivered") {
-            REQUIRE(notification_calls == 1);
-        }
-
-        SECTION("notifications are sent asynchronously") {
-            r->begin_transaction();
-            table->set_int(0, 0, 4);
-            r->commit_transaction();
-
-            REQUIRE(notification_calls == 1);
-            advance_and_notify(*r);
-            REQUIRE(notification_calls == 2);
-        }
-
-        SECTION("notifications are not delivered when the token is destroyed before they are calculated") {
-            r->begin_transaction();
-            table->set_int(0, 0, 4);
-            r->commit_transaction();
-
-            REQUIRE(notification_calls == 1);
-            token = {};
-            advance_and_notify(*r);
-            REQUIRE(notification_calls == 1);
-        }
-
-        SECTION("notifications are not delivered when the token is destroyed before they are delivered") {
-            r->begin_transaction();
-            table->set_int(0, 0, 4);
-            r->commit_transaction();
-
-            REQUIRE(notification_calls == 1);
-            coordinator->on_change();
-            token = {};
-            r->notify();
-            REQUIRE(notification_calls == 1);
-        }
-
-        SECTION("notifications are delivered when a new callback is added from within a callback") {
-            NotificationToken token2, token3;
-            bool called = false;
-            token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                    called = true;
-                });
-            });
-
-            advance_and_notify(*r);
-            REQUIRE(called);
-        }
-
-        SECTION("notifications are not delivered when a callback is removed from within a callback") {
-            NotificationToken token2, token3;
-            token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                token3 = {};
-            });
-            token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                REQUIRE(false);
-            });
-
-            advance_and_notify(*r);
-        }
-
-        SECTION("removing the current callback does not stop later ones from being called") {
-            NotificationToken token2, token3;
-            bool called = false;
-            token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                token2 = {};
-            });
-            token3 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
-                called = true;
-            });
-
-            advance_and_notify(*r);
-
-            REQUIRE(called);
-        }
 
         SECTION("modifications to unrelated tables do not send notifications") {
             write([&] {
@@ -297,15 +1130,15 @@ TEST_CASE("results: notifications") {
         }
 
         SECTION("modifications from multiple transactions are collapsed") {
-            r->begin_transaction();
-            table->set_int(0, 0, 6);
-            r->commit_transaction();
+            r2->begin_transaction();
+            r2_table->set_int(0, 0, 6);
+            r2->commit_transaction();
 
             coordinator->on_change();
 
-            r->begin_transaction();
-            table->set_int(0, 1, 0);
-            r->commit_transaction();
+            r2->begin_transaction();
+            r2_table->set_int(0, 1, 0);
+            r2->commit_transaction();
 
             REQUIRE(notification_calls == 1);
             coordinator->on_change();
@@ -314,16 +1147,16 @@ TEST_CASE("results: notifications") {
         }
 
         SECTION("inserting a row then modifying it in a second transaction does not report it as modified") {
-            r->begin_transaction();
-            size_t ndx = table->add_empty_row();
-            table->set_int(0, ndx, 6);
-            r->commit_transaction();
+            r2->begin_transaction();
+            size_t ndx = r2_table->add_empty_row();
+            r2_table->set_int(0, ndx, 6);
+            r2->commit_transaction();
 
             coordinator->on_change();
 
-            r->begin_transaction();
-            table->set_int(0, ndx, 7);
-            r->commit_transaction();
+            r2->begin_transaction();
+            r2_table->set_int(0, ndx, 7);
+            r2->commit_transaction();
 
             advance_and_notify(*r);
 
@@ -347,31 +1180,21 @@ TEST_CASE("results: notifications") {
         }
 
         SECTION("notifications are not delivered when collapsing transactions results in no net change") {
-            r->begin_transaction();
-            size_t ndx = table->add_empty_row();
-            table->set_int(0, ndx, 5);
-            r->commit_transaction();
+            r2->begin_transaction();
+            size_t ndx = r2_table->add_empty_row();
+            r2_table->set_int(0, ndx, 5);
+            r2->commit_transaction();
 
             coordinator->on_change();
 
-            r->begin_transaction();
-            table->move_last_over(ndx);
-            r->commit_transaction();
+            r2->begin_transaction();
+            r2_table->move_last_over(ndx);
+            r2->commit_transaction();
 
             REQUIRE(notification_calls == 1);
             coordinator->on_change();
             r->notify();
             REQUIRE(notification_calls == 1);
-        }
-
-        SECTION("the first call of a notification can include changes if it previously ran for a different callback") {
-            auto token2 = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
-                REQUIRE(!c.empty());
-            });
-
-            write([&] {
-                table->set_int(0, table->add_empty_row(), 5);
-            });
         }
     }
 
@@ -408,9 +1231,8 @@ TEST_CASE("results: notifications") {
         }
 
         auto write = [&](auto&& func) {
-            auto r2 = Realm::get_shared_realm(config);
             r2->begin_transaction();
-            func(*r2->read_group().get_table("class_object"));
+            func(*r2_table);
             r2->commit_transaction();
             advance_and_notify(*r);
         };
@@ -565,13 +1387,13 @@ TEST_CASE("results: notifications") {
         }
 
         SECTION("modifications from multiple transactions are collapsed") {
-            r->begin_transaction();
-            table->set_int(0, 0, 5);
-            r->commit_transaction();
+            r2->begin_transaction();
+            r2_table->set_int(0, 0, 5);
+            r2->commit_transaction();
 
-            r->begin_transaction();
-            table->set_int(0, 1, 0);
-            r->commit_transaction();
+            r2->begin_transaction();
+            r2_table->set_int(0, 1, 0);
+            r2->commit_transaction();
 
             REQUIRE(notification_calls == 1);
             advance_and_notify(*r);
@@ -599,123 +1421,6 @@ TEST_CASE("results: notifications") {
         }
     }
 }
-
-#if REALM_PLATFORM_APPLE
-TEST_CASE("results: async error handling") {
-    InMemoryTestFile config;
-    config.cache = false;
-    config.automatic_change_notifications = false;
-
-    auto r = Realm::get_shared_realm(config);
-    r->update_schema({
-        {"object", {
-            {"value", PropertyType::Int},
-        }},
-    });
-
-    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
-    Results results(r, *r->read_group().get_table("class_object"));
-
-    class OpenFileLimiter {
-    public:
-        OpenFileLimiter()
-        {
-            // Set the max open files to zero so that opening new files will fail
-            getrlimit(RLIMIT_NOFILE, &m_old);
-            rlimit rl = m_old;
-            rl.rlim_cur = 0;
-            setrlimit(RLIMIT_NOFILE, &rl);
-        }
-
-        ~OpenFileLimiter()
-        {
-            setrlimit(RLIMIT_NOFILE, &m_old);
-        }
-
-    private:
-        rlimit m_old;
-    };
-
-    SECTION("error when opening the advancer SG") {
-        OpenFileLimiter limiter;
-
-        SECTION("error is delivered asynchronously") {
-            bool called = false;
-            auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
-                called = true;
-            });
-
-            REQUIRE(!called);
-            coordinator->on_change();
-            REQUIRE(!called);
-            r->notify();
-            REQUIRE(called);
-        }
-
-        SECTION("adding another callback does not send the error again") {
-            bool called = false;
-            auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
-                REQUIRE_FALSE(called);
-                called = true;
-            });
-
-            advance_and_notify(*r);
-
-            bool called2 = false;
-            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
-                REQUIRE_FALSE(called2);
-                called2 = true;
-            });
-
-            advance_and_notify(*r);
-            REQUIRE(called2);
-        }
-    }
-
-    SECTION("error when opening the executor SG") {
-        SECTION("error is delivered asynchronously") {
-            bool called = false;
-            auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
-                called = true;
-            });
-            OpenFileLimiter limiter;
-
-            REQUIRE(!called);
-            coordinator->on_change();
-            REQUIRE(!called);
-            r->notify();
-            REQUIRE(called);
-        }
-
-        SECTION("adding another callback does not send the error again") {
-            bool called = false;
-            auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
-                REQUIRE_FALSE(called);
-                called = true;
-            });
-            OpenFileLimiter limiter;
-
-            advance_and_notify(*r);
-
-            bool called2 = false;
-            auto token2 = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
-                REQUIRE(err);
-                REQUIRE_FALSE(called2);
-                called2 = true;
-            });
-
-            advance_and_notify(*r);
-
-            REQUIRE(called2);
-        }
-    }
-}
-#endif
 
 TEST_CASE("results: notifications after move") {
     InMemoryTestFile config;
