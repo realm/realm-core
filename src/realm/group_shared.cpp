@@ -67,7 +67,7 @@ const uint16_t relaxed_sync_threshold = 50;
 // 5       Introduction of SharedInfo::file_format_version and
 //         SharedInfo::history_type.
 // 6       Using new robust mutex emulation where applicable
-// 7       Introducing `commit_in_critical_phase` and `sync_client_present`, and
+// 7       Introducing `commit_in_critical_phase` and `sync_agent_present`, and
 //         changing `daemon_started` and `daemon_ready` from 1-bit to 8-bit
 //         fields.
 // 8       Placing the commitlog history inside the Realm file.
@@ -463,11 +463,13 @@ struct alignas(8) SharedGroup::SharedInfo {
 
     uint64_t number_of_versions; // Offset 32
 
-    /// True (1) if there is a sync client present. It is an error to start a
-    /// sync client if another one is present. If the sync client crashes and
-    /// leaves the flag set, the session will need to be restarted (lock file
-    /// reinitialized) before a new sync client can be started.
-    uint8_t sync_client_present = 0; // Offset 40
+    /// True (1) if there is a sync agent present (a session participant acting
+    /// as sync client). It is an error to have a session with more than one
+    /// sync agent. The purpose of this flag is to prevent that from ever
+    /// happening. If the sync agent crashes and leaves the flag set, the
+    /// session will need to be restarted (lock file reinitialized) before a new
+    /// sync agent can be started.
+    uint8_t sync_agent_present = 0; // Offset 40
 
     /// Set when a participant decides to start the daemon, cleared by the
     /// daemon when it decides to exit. Participants check during open() and
@@ -519,7 +521,7 @@ struct alignas(8) SharedGroup::SharedInfo {
 };
 
 
-SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType hist_type)
+SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht)
     : size_of_mutex(sizeof(shared_writemutex))
 #ifndef _WIN32
     , size_of_condvar(sizeof(room_to_write))
@@ -531,8 +533,8 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType hi
     , shared_controlmutex() // Throws
 {
     durability = static_cast<uint16_t>(dura); // durability level is fixed from creation
-    REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_type)>(hist_type + 0));
-    history_type = hist_type;
+    REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_type)>(ht + 0));
+    history_type = ht;
 #ifndef _WIN32
     InterprocessCondVar::init_shared_part(new_commit_available); // Throws
 #ifdef REALM_ASYNC_DAEMON
@@ -573,8 +575,8 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType hi
             std::is_same<decltype(session_initiator_pid), uint64_t>::value &&
             offsetof(SharedInfo, number_of_versions) == 32 &&
             std::is_same<decltype(number_of_versions), uint64_t>::value &&
-            offsetof(SharedInfo, sync_client_present) == 40 &&
-            std::is_same<decltype(sync_client_present), uint8_t>::value &&
+            offsetof(SharedInfo, sync_agent_present) == 40 &&
+            std::is_same<decltype(sync_agent_present), uint8_t>::value &&
             offsetof(SharedInfo, daemon_started) == 41 && std::is_same<decltype(daemon_started), uint8_t>::value &&
             offsetof(SharedInfo, daemon_ready) == 42 && std::is_same<decltype(daemon_ready), uint8_t>::value &&
             offsetof(SharedInfo, filler_1) == 43 && std::is_same<decltype(filler_1), uint8_t>::value &&
@@ -725,8 +727,10 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     SlabAlloc& alloc = m_group.m_alloc;
 
     Replication::HistoryType history_type = Replication::hist_None;
+    bool is_sync_agent = false;
     if (Replication* repl = m_group.get_replication()) {
         history_type = repl->get_history_type();
+        is_sync_agent = repl->is_sync_agent();
     }
 
     int target_file_format_version;
@@ -752,8 +756,8 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             // due to the bit field members. Otherwise we would write
             // uninitialized bits to the file.
             alignas(SharedInfo) char buffer[sizeof(SharedInfo)] = {0};
-            new (buffer) SharedInfo(options.durability, history_type); // Throws
-            m_file.write(buffer, sizeof buffer);                       // Throws
+            new (buffer) SharedInfo{options.durability, history_type}; // Throws
+            m_file.write(buffer, sizeof buffer); // Throws
 
             // Mark the file as completely initialized via a memory
             // mapping. Since this is done as a separate final step (involving
@@ -907,12 +911,12 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 
             // only the session initiator is allowed to create the database, all other
             // must assume that it already exists.
-            cfg.no_create = begin_new_session ? no_create_file : true;
+            cfg.no_create = (begin_new_session ? no_create_file : true);
 
             // if we're opening a MemOnly file that isn't already opened by
             // someone else then it's a file which should have been deleted on
             // close previously, but wasn't (perhaps due to the process crashing)
-            cfg.clear_file = options.durability == Durability::MemOnly && begin_new_session;
+            cfg.clear_file = (options.durability == Durability::MemOnly && begin_new_session);
 
             cfg.encryption_key = options.encryption_key;
             ref_type top_ref;
@@ -1023,6 +1027,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                        << target_file_format_version << ".";
                     throw IncompatibleLockFile(ss.str());
                 }
+
+                // We need to ensure that at most one sync agent can join a
+                // session
+                if (info->sync_agent_present && is_sync_agent)
+                    throw MultipleSyncAgents{};
             }
 
 #ifndef _WIN32
@@ -1056,6 +1065,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 
             // make our presence noted:
             ++info->num_participants;
+
+            if (is_sync_agent) {
+                REALM_ASSERT(!info->sync_agent_present);
+                info->sync_agent_present = 1; // Set to true
+            }
 
             // Initially wait_for_change is enabled
             m_wait_for_change_enabled = true;
@@ -1208,10 +1222,19 @@ void SharedGroup::close() noexcept
     m_transact_stage = transact_Ready;
     SharedInfo* info = m_file_map.get_addr();
     {
+        bool is_sync_agent = false;
+        if (Replication* repl = m_group.get_replication())
+            is_sync_agent = repl->is_sync_agent();
+
         std::lock_guard<InterprocessMutex> lock(m_controlmutex);
 
         if (m_group.m_alloc.is_attached())
             m_group.m_alloc.detach();
+
+        if (is_sync_agent) {
+            REALM_ASSERT(info->sync_agent_present);
+            info->sync_agent_present = 0; // Set to false
+        }
 
         --info->num_participants;
         bool end_of_session = info->num_participants == 0;

@@ -13,6 +13,11 @@
 ### Enhancements
 
 * Added support for LIKE queries (wildcard with ? and *)
+* Offer facilities to prevent multiple sync agents per Realm file access session
+  (`Replication::is_sync_agent()` to be overridden by sync-specific
+  implementation). The utilized lock-file flag
+  (`SharedInfo::sync_agent_present`) was added a long time ago, but the
+  completion of detection mechanism got postoponed until now.
 
 -----------
 
