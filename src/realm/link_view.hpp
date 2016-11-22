@@ -105,6 +105,8 @@ public:
     Table& get_origin_table() noexcept;
 
     size_t get_origin_row_index() const noexcept;
+    
+    size_t get_origin_column_index() const noexcept;
 
     const Table& get_target_table() const noexcept;
     Table& get_target_table() noexcept;
@@ -309,6 +311,11 @@ inline size_t LinkView::get_origin_row_index() const noexcept
 {
     REALM_ASSERT(is_attached());
     return m_row_indexes.get_root_array()->get_ndx_in_parent();
+}
+    
+inline size_t LinkView::get_origin_column_index() const noexcept
+{
+    return m_origin_column.get_column_index();
 }
 
 inline void LinkView::set_origin_row_index(size_t row_ndx) noexcept
