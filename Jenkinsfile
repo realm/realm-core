@@ -54,16 +54,16 @@ try {
 
     stage('check') {
       parallelExecutors = [
-        /*checkLinuxRelease: doBuildInDocker('check'),
+        checkLinuxRelease: doBuildInDocker('check'),
         checkLinuxDebug: doBuildInDocker('check-debug'),
         buildCocoa: doBuildCocoa(isPublishingRun),
         buildNodeLinux: doBuildNodeInDocker(isPublishingRun),
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun),
         buildDotnetOsx: doBuildDotNetOsx(isPublishingRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
-        buildOsxDylibs: doBuildOsxDylibs(isPublishingRun),*/
+        buildOsxDylibs: doBuildOsxDylibs(isPublishingRun),
         buildWindows: doBuildWindows()
-        //addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
+        addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
       ]
 
@@ -251,7 +251,11 @@ def doBuildWindows() {
     return {
         node('windows') {
             getArchive()
-            bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.vcxproj\" /p:Configuration=Debug /p:Platform=\"Win32\" /p:VisualStudioVersion=14.0"
+            try {
+              bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.vcxproj\" /p:Configuration=Debug /p:Platform=\"Win32\" /p:VisualStudioVersion=14.0"
+            } finally {
+              collectCompilerWarnings('msbuild')
+            }
         }
     }
 }
@@ -528,6 +532,8 @@ def collectCompilerWarnings(compiler) {
         parserName = 'GNU Make + GNU C Compiler (gcc)'
     } else if ( compiler == 'clang' ) {
         parserName = 'Clang (LLVM based)'
+    } else if ( compiler == 'msbuild' ) {
+        parserName = 'MSBuild'
     }
     step([
         $class: 'WarningsPublisher',
