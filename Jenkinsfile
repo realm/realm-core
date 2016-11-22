@@ -158,7 +158,7 @@ def doBuildCocoa(def isPublishingRun) {
             sh 'sh build.sh clean'
         }
       } finally {
-        collectCompilerWarnings('clang')
+        collectCompilerWarnings('clang', true)
         recordTests('check-debug-cocoa')
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
           sh 's3cmd -c $s3cfg_config_file put realm-core-latest.tar.xz s3://static.realm.io/downloads/core/'
@@ -215,7 +215,7 @@ def doBuildDotNetOsx(def isPublishingRun) {
             sh 'sh build.sh clean'
         }
       } finally {
-        collectCompilerWarnings('clang')
+        collectCompilerWarnings('clang', true)
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
           sh 's3cmd -c $s3cfg_config_file put --multipart-chunk-size-mb 5 realm-core-dotnet-cocoa-latest.tar.bz2 s3://static.realm.io/downloads/core/'
         }
@@ -238,7 +238,7 @@ def doBuildInDocker(String command) {
           try {
               sh "sh build.sh ${command}"
           } finally {
-            collectCompilerWarnings('gcc')
+            collectCompilerWarnings('gcc', true)
             recordTests(command)
           }
         }
@@ -254,7 +254,7 @@ def doBuildWindows() {
             try {
               bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.vcxproj\" /p:Configuration=Debug /p:Platform=\"Win32\" /p:VisualStudioVersion=14.0"
             } finally {
-              collectCompilerWarnings('msbuild')
+              collectCompilerWarnings('msbuild', false)
             }
         }
     }
@@ -329,7 +329,7 @@ def doBuildNodeInDocker(def isPublishingRun) {
                 sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core/'
               }
           } finally {
-            collectCompilerWarnings('gcc')
+            collectCompilerWarnings('gcc', true)
           }
         }
       }
@@ -359,7 +359,7 @@ def doBuildNodeInOsx(def isPublishingRun) {
             sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core/'
           }
         } finally {
-          collectCompilerWarnings('clang')
+          collectCompilerWarnings('clang', true)
         }
       }
     }
@@ -399,7 +399,7 @@ def doBuildOsxDylibs(def isPublishingRun) {
             sh 's3cmd -c $s3cfg_config_file put realm-core-dylib-osx-latest.zip s3://static.realm.io/downloads/core/'
           }
         } finally {
-          collectCompilerWarnings('clang')
+          collectCompilerWarnings('clang', true)
         }
       }
     }
@@ -442,7 +442,7 @@ def doBuildAndroid(def isPublishingRun) {
                     }
                 }
             }
-            collectCompilerWarnings('gcc')
+            collectCompilerWarnings('gcc', true)
           }
         }
 
@@ -526,7 +526,7 @@ def recordTests(tag) {
     ])
 }
 
-def collectCompilerWarnings(compiler) {
+def collectCompilerWarnings(compiler, fail) {
     def parserName
     if (compiler == 'gcc') {
         parserName = 'GNU Make + GNU C Compiler (gcc)'
@@ -542,10 +542,10 @@ def collectCompilerWarnings(compiler) {
         consoleParsers: [[parserName: parserName]],
         defaultEncoding: '',
         excludePattern: '',
-        failedTotalAll: '0',
-        failedTotalHigh: '0',
-        failedTotalLow: '0',
-        failedTotalNormal: '0',
+        failedTotalAll: fail?'0':'',
+        failedTotalHigh: fail?'0':'',
+        failedTotalLow: fail?'0':'',
+        failedTotalNormal: fail?'0':'',
         healthy: '',
         includePattern: '',
         messagesPattern: '',
