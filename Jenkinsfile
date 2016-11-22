@@ -62,7 +62,7 @@ try {
         buildDotnetOsx: doBuildDotNetOsx(isPublishingRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
         buildOsxDylibs: doBuildOsxDylibs(isPublishingRun),
-        buildWindows: doBuildWindows()
+        buildWindows: doBuildWindows(),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
       ]
