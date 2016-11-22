@@ -16,8 +16,7 @@ try {
           extensions: scm.extensions + [[$class: 'CleanCheckout']],
           userRemoteConfigs: scm.userRemoteConfigs
         ])
-        sh 'git archive -o core.zip HEAD'
-        stash includes: 'core.zip', name: 'core-source'
+        stash includes: '**', name: 'core-source'
 
         dependencies = readProperties file: 'dependencies.list'
         echo "VERSION: ${dependencies.VERSION}"
@@ -252,8 +251,7 @@ def doBuildWindows() {
     return {
         node('windows') {
             getArchive()
-
-            bat "\"${tool 'MSBuild'}\" \"Visual Studio\\Realm.sln\""
+            bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.vcxproj\" /p:Configuration=Debug /p:Platform=\"Win32\" /p:VisualStudioVersion=14.0"
         }
     }
 }
@@ -691,9 +689,8 @@ def setBuildName(newBuildName) {
 }
 
 def getArchive() {
-    sh 'rm -rf *'
+    deleteDir()
     unstash 'core-source'
-    sh 'unzip -o -q core.zip'
 }
 
 def getSourceArchive() {
