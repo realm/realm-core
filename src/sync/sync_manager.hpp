@@ -93,12 +93,14 @@ public:
     bool perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const;
 
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
-    // If a logged-out user exists, it will marked as logged back in.
+    // If a logged-out user exists, it will be marked as logged back in.
     std::shared_ptr<SyncUser> get_user(const std::string& identity,
                                        std::string refresh_token,
                                        util::Optional<std::string> auth_server_url=none,
                                        bool is_admin=false);
     // Get an existing user for a given identity, if one exists and is logged in.
+    // A user is considered logged in until explicitly logged out, even if
+    // the users refresh_token has expired.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& identity) const;
     // Get all the users.
     std::vector<std::shared_ptr<SyncUser>> all_users() const;
