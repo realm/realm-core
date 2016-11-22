@@ -93,6 +93,9 @@ void add_index(Table& table, size_t col)
 
 void insert_column(Group& group, Table& table, Property const& property, size_t col_ndx)
 {
+    if (property.type == PropertyType::LinkingObjects) {
+        throw std::logic_error("Cannot directly insert a LinkingObject column, it must be an artifact of an existing link column.");
+    }
     if (property.type == PropertyType::Object || property.type == PropertyType::Array) {
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_or_add_table(target_name);
@@ -112,8 +115,12 @@ void add_column(Group& group, Table& table, Property const& property)
 
 void replace_column(Group& group, Table& table, Property const& old_property, Property const& new_property)
 {
-    insert_column(group, table, new_property, old_property.table_column);
-    table.remove_column(old_property.table_column + 1);
+    size_t col_offset = 0;
+    if (new_property.type != PropertyType::LinkingObjects) {
+        insert_column(group, table, new_property, old_property.table_column);
+        col_offset = 1;
+    }
+    table.remove_column(old_property.table_column + col_offset);
 }
 
 TableRef create_table(Group& group, ObjectSchema const& object_schema)
