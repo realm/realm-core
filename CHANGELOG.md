@@ -10,7 +10,7 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Lorem ipsum. 
 
 ### Enhancements
 
