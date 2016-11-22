@@ -5,6 +5,8 @@
 * Fix a race involving destruction order of InterprocessMutex static variables.
 * Fix a crash when a Query is reimported into the SharedGroup it was exported
   for handover from.
+* Fix a crash when calling mkfifo on Android 4.x external storage. On 4.x devices,
+  errno is EPERM instead of EACCES.
 
 ### Breaking changes
 
