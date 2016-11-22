@@ -254,7 +254,7 @@ def doBuildWindows() {
             try {
               bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.vcxproj\" /p:Configuration=Debug /p:Platform=\"Win32\" /p:VisualStudioVersion=14.0"
               withEnv(['UNITTEST_XML=1']) {
-                bat 'Visual Studio\\Debug\\Realm.exe'
+                bat '\"Visual Studio\\Debug\\Realm.exe\"'
               }
             } finally {
               collectCompilerWarnings('msbuild', false)
