@@ -106,6 +106,15 @@ const Property *ObjectSchema::property_for_name(StringData name) const {
     return const_cast<ObjectSchema *>(this)->property_for_name(name);
 }
 
+bool ObjectSchema::property_is_computed(Property const& property) const {
+    for (auto& prop : computed_properties) {
+        if (prop == property) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void ObjectSchema::set_primary_key_property()
 {
     if (primary_key.length()) {
