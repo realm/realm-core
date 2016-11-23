@@ -101,16 +101,6 @@ Schema remove_property(Schema schema, StringData object_name, StringData propert
     return schema;
 }
 
-Schema replace_property(Schema schema, StringData object_name, StringData old_property_name, Property new_property)
-{
-    auto& properties = schema.find(object_name)->persisted_properties;
-    auto pos = find_if(begin(properties), end(properties),
-                        [&](auto&& prop) { return prop.name == old_property_name; });
-    properties.erase(pos);
-    properties.insert(pos, new_property);
-    return schema;
-}
-
 Schema set_indexed(Schema schema, StringData object_name, StringData property_name, bool value)
 {
     schema.find(object_name)->property_for_name(property_name)->is_indexed = value;
@@ -251,7 +241,7 @@ TEST_CASE("migration: Automatic") {
             REQUIRE_MIGRATION_NEEDED(*realm, schema, remove_property(schema, "object", "col2"));
         }
 
-        SECTION("replace property from existing object schema") {
+        SECTION("migratation which replaces a persisted property with a computed one") {
             auto realm = Realm::get_shared_realm(config);
             Schema schema1 = {
                 {"object", {
@@ -263,15 +253,16 @@ TEST_CASE("migration: Automatic") {
                     {"inverse", PropertyType::Object, "object", "", false, false, true},
                 }},
             };
+            Schema schema2 = remove_property(schema1, "object", "link");
             Property new_property{"link", PropertyType::LinkingObjects, "object2", "inverse", false, false, false};
-            Schema schema2 = replace_property(schema1, "object", "link", new_property);
+            schema2.find("object")->computed_properties.emplace_back(new_property);
 
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
             REQUIRE_THROWS((*realm).update_schema(schema2));
             REQUIRE((*realm).schema() == schema1);
             REQUIRE_NOTHROW((*realm).update_schema(schema2, 1,
                             [](SharedRealm, SharedRealm, Schema&) { /* empty but present migration handler */ }));
-            //VERIFY_SCHEMA(*realm); //FIXME: why is the column index of object.link now npos?
+            VERIFY_SCHEMA(*realm);
             REQUIRE((*realm).schema() == schema2);
         }
 
