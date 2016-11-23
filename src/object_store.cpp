@@ -115,12 +115,8 @@ void add_column(Group& group, Table& table, Property const& property)
 
 void replace_column(Group& group, Table& table, Property const& old_property, Property const& new_property)
 {
-    size_t col_offset = 0;
-    if (new_property.type != PropertyType::LinkingObjects) {
-        insert_column(group, table, new_property, old_property.table_column);
-        col_offset = 1;
-    }
-    table.remove_column(old_property.table_column + col_offset);
+    insert_column(group, table, new_property, old_property.table_column);
+    table.remove_column(old_property.table_column + 1);
 }
 
 TableRef create_table(Group& group, ObjectSchema const& object_schema)
