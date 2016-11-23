@@ -37,7 +37,7 @@ public:
     {
         uv_close((uv_handle_t*)m_handle, [](uv_handle_t* handle) {
             delete static_cast<Callback*>(handle->data);
-            delete handle;
+            delete reinterpret_cast<uv_async_t*>(handle);
         });
     }
 
