@@ -299,7 +299,15 @@ void SyncSession::create_sync_session()
     m_session = std::make_unique<sync::Session>(m_client->client, m_realm_path);
 
     // Set up the wrapped handler
-    auto wrapped_handler = [this](int error_code, std::string message) {
+    std::weak_ptr<SyncSession> weak_self = shared_from_this();
+    auto wrapped_handler = [this, weak_self](int error_code, std::string message) {
+        auto self = weak_self.lock();
+        if (!self) {
+            // An error was delivered after the session it relates to was destroyed. There's nothing useful
+            // we can do with it.
+            return;
+        }
+
         using Error = realm::sync::Error;
 
         SyncSessionError error_type = SyncSessionError::Debug;
@@ -372,9 +380,11 @@ void SyncSession::create_sync_session()
     m_session->set_error_handler(std::move(wrapped_handler));
 
     // Set up the wrapped sync transact callback
-    auto wrapped_callback = [this](VersionID old_version, VersionID new_version) {
-        if (m_sync_transact_callback) {
-            m_sync_transact_callback(old_version, new_version);
+    auto wrapped_callback = [this, weak_self](VersionID old_version, VersionID new_version) {
+        if (auto self = weak_self.lock()) {
+            if (m_sync_transact_callback) {
+                m_sync_transact_callback(old_version, new_version);
+            }
         }
     };
     m_session->set_sync_transact_callback(std::move(wrapped_callback));
