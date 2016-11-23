@@ -467,8 +467,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
 
         void operator()(ChangePropertyType op)
         {
-            insert_column(group, table(op.object), *op.new_property, op.old_property->table_column);
-            table(op.object).remove_column(op.old_property->table_column + 1);
+            replace_column(group, table(op.object), *op.old_property, *op.new_property);
         }
     } applier{group};
 
