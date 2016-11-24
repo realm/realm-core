@@ -305,6 +305,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 #ifdef REALM_SLAB_ALLOC_DEBUG
                 malloc_debug_map[ref] = malloc(1);
 #endif
+                REALM_ASSERT_DEBUG(ref >= m_baseline);
                 return MemRef(addr, ref, *this);
             }
         }
@@ -380,7 +381,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 #ifdef REALM_SLAB_ALLOC_DEBUG
     malloc_debug_map[ref] = malloc(1);
 #endif
-
+    REALM_ASSERT_DEBUG(ref >= m_baseline);
     return MemRef(slab.addr, ref, *this);
 }
 
