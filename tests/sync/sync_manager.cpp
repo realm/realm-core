@@ -248,6 +248,175 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
     }
 }
 
+TEST_CASE("sync_manager: file actions", "[sync]") {
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    reset_test_directory(base_path);
+    auto file_manager = SyncFileManager(base_path);
+    // Open the metadata separately, so we can investigate it ourselves.
+    SyncMetadataManager manager(file_manager.metadata_path(), false);
+
+    const std::string realm_url = "https://example.realm.com/~/1";
+    const std::string identity_1 = "foo-1";
+    const std::string identity_2 = "bar-1";
+    const std::string identity_3 = "baz-1";
+    const std::string identity_4 = "baz-2";
+
+    // Realm paths
+    const std::string realm_path_1 = file_manager.path(identity_1, realm_url);
+    const std::string realm_path_2 = file_manager.path(identity_2, realm_url);
+    const std::string realm_path_3 = file_manager.path(identity_3, realm_url);
+    const std::string realm_path_4 = file_manager.path(identity_4, realm_url);
+
+    SECTION("Action::DeleteRealm") {
+        // Create some file actions
+        auto a1 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::DeleteRealm, realm_path_1, "user1", realm_url);
+        auto a2 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::DeleteRealm, realm_path_2, "user2", realm_url);
+        auto a3 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::DeleteRealm, realm_path_3, "user3", realm_url);
+
+        SECTION("should properly delete the Realm") {
+            // Create some Realms
+            create_dummy_realm(realm_path_1);
+            create_dummy_realm(realm_path_2);
+            create_dummy_realm(realm_path_3);
+            SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+            // File actions should be cleared.
+            auto pending_actions = manager.all_pending_actions();
+            CHECK(pending_actions.size() == 0);
+            // All Realms should be deleted.
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_1);
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_2);
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_3);
+        }
+
+        SECTION("should fail gracefully if the Realm is missing") {
+            // Don't actually create the Realm files
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_1);
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_2);
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_3);
+            SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+            auto pending_actions = manager.all_pending_actions();
+            CHECK(pending_actions.size() == 0);
+        }
+
+        SECTION("should do nothing if metadata is disabled") {
+            // Create some Realms
+            create_dummy_realm(realm_path_1);
+            create_dummy_realm(realm_path_2);
+            create_dummy_realm(realm_path_3);
+            SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoMetadata);
+            // All file actions should still be present.
+            auto pending_actions = manager.all_pending_actions();
+            CHECK(pending_actions.size() == 3);
+            // All Realms should still be present.
+            REQUIRE_REALM_EXISTS(realm_path_1);
+            REQUIRE_REALM_EXISTS(realm_path_2);
+            REQUIRE_REALM_EXISTS(realm_path_3);
+        }
+    }
+
+    SECTION("Action::HandleRealmForClientReset") {
+        // Create some file actions
+        const std::string recovery_1 = "recovery-1";
+        const std::string recovery_2 = "recovery-2";
+        const std::string recovery_3 = "recovery-3";
+        auto a1 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::HandleRealmForClientReset, realm_path_1, "user1", realm_url, recovery_1);
+        auto a2 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::HandleRealmForClientReset, realm_path_2, "user2", realm_url, recovery_2);
+        auto a3 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::HandleRealmForClientReset, realm_path_3, "user3", realm_url, recovery_3);
+        const std::string recovery_dir = file_manager.recovery_directory_path();
+
+        SECTION("should properly copy the Realm file and delete the Realm") {
+            // Create some Realms
+            create_dummy_realm(realm_path_1);
+            create_dummy_realm(realm_path_2);
+            create_dummy_realm(realm_path_3);
+            SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+            // File actions should be cleared.
+            auto pending_actions = manager.all_pending_actions();
+            CHECK(pending_actions.size() == 0);
+            // All Realms should be deleted.
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_1);
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_2);
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_3);
+            // There should be recovery files.
+            CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_1)));
+            CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_2)));
+            CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_3)));
+        }
+
+        SECTION("should fail gracefully if the Realm is missing") {
+            // Don't actually create the Realm files
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_1);
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_2);
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_3);
+            SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+            // File actions should be cleared.
+            auto pending_actions = manager.all_pending_actions();
+            CHECK(pending_actions.size() == 0);
+            // There should not be recovery files.
+            CHECK(!File::exists(util::file_path_by_appending_component(recovery_dir, recovery_1)));
+            CHECK(!File::exists(util::file_path_by_appending_component(recovery_dir, recovery_2)));
+            CHECK(!File::exists(util::file_path_by_appending_component(recovery_dir, recovery_3)));
+        }
+
+        SECTION("should work properly when manually driven") {
+            // Create a Realm file
+            create_dummy_realm(realm_path_4);
+            // Configure the system
+            SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+            // Add a file action after the system is configured.
+            REQUIRE_REALM_EXISTS(realm_path_4);
+            auto a4 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::HandleRealmForClientReset, realm_path_4, "user4", realm_url, recovery_1);
+            auto pending_actions = manager.all_pending_actions();
+            CHECK(pending_actions.size() == 1);
+            // Force the recovery. (In a real application, the user would have closed the files by now.)
+            REQUIRE(SyncManager::shared().immediately_run_file_actions(realm_path_4));
+            // There should be recovery files.
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_4);
+            CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_1)));
+            pending_actions = manager.all_pending_actions();
+            CHECK(pending_actions.size() == 0);
+        }
+
+        SECTION("should fail gracefully if there is already a file at the destination") {
+            // Create some Realms
+            create_dummy_realm(realm_path_1);
+            create_dummy_realm(realm_path_2);
+            create_dummy_realm(realm_path_3);
+            create_dummy_realm(util::file_path_by_appending_component(recovery_dir, recovery_1));
+            SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+            // Most file actions should be cleared.
+            auto pending_actions = manager.all_pending_actions();
+            CHECK(pending_actions.size() == 1);
+            // Realms should be deleted.
+            REQUIRE_REALM_EXISTS(realm_path_1);
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_2);
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_path_3);
+            // There should be recovery files.
+            CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_2)));
+            CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_3)));
+        }
+
+        SECTION("should do nothing if metadata is disabled") {
+            // Create some Realms
+            create_dummy_realm(realm_path_1);
+            create_dummy_realm(realm_path_2);
+            create_dummy_realm(realm_path_3);
+            SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoMetadata);
+            // All file actions should still be present.
+            auto pending_actions = manager.all_pending_actions();
+            CHECK(pending_actions.size() == 3);
+            // All Realms should still be present.
+            REQUIRE_REALM_EXISTS(realm_path_1);
+            REQUIRE_REALM_EXISTS(realm_path_2);
+            REQUIRE_REALM_EXISTS(realm_path_3);
+            // There should not be recovery files.
+            CHECK(!File::exists(util::file_path_by_appending_component(recovery_dir, recovery_1)));
+            CHECK(!File::exists(util::file_path_by_appending_component(recovery_dir, recovery_2)));
+            CHECK(!File::exists(util::file_path_by_appending_component(recovery_dir, recovery_3)));
+        }
+    }
+}
+
 TEST_CASE("sync_manager: metadata") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);

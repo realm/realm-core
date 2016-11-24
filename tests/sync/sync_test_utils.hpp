@@ -48,4 +48,16 @@ std::vector<char> make_test_encryption_key(const char start = 0);
     if (dir_listing) closedir(dir_listing); \
 } while (0)
 
+#define REQUIRE_REALM_EXISTS(macro_path) do { \
+	REQUIRE(realm::util::File::exists(macro_path)); \
+	REQUIRE(realm::util::File::exists((macro_path) + ".lock")); \
+	REQUIRE_DIR_EXISTS((macro_path) + ".management"); \
+} while (0)
+
+#define REQUIRE_REALM_DOES_NOT_EXIST(macro_path) do { \
+	REQUIRE(!realm::util::File::exists(macro_path)); \
+	REQUIRE(!realm::util::File::exists((macro_path) + ".lock")); \
+	REQUIRE_DIR_DOES_NOT_EXIST((macro_path) + ".management"); \
+} while (0)
+
 #endif // REALM_SYNC_TEST_UTILS_HPP

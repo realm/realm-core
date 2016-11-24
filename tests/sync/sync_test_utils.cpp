@@ -22,9 +22,10 @@ namespace realm {
 
 bool create_dummy_realm(std::string path) {
     Realm::Config config;
-    config.path = std::move(path);
+    config.path = path;
     try {
         Realm::make_shared_realm(config);
+        REQUIRE_REALM_EXISTS(path);
         return true;
     } catch (std::exception&) {
         return false;

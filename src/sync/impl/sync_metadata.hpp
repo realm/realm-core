@@ -93,6 +93,8 @@ public:
         HandleRealmForClientReset
     };
 
+    static util::Optional<SyncFileActionMetadata> metadata_for_path(const std::string&, const SyncMetadataManager&);
+
     // The absolute path to the Realm file in question.
     std::string original_name() const;
 

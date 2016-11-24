@@ -264,6 +264,17 @@ void SyncUserMetadata::remove()
     m_realm = nullptr;
 }
 
+util::Optional<SyncFileActionMetadata> SyncFileActionMetadata::metadata_for_path(const std::string& original_name, const SyncMetadataManager& manager)
+{
+    auto realm = Realm::get_shared_realm(manager.get_configuration());
+    auto schema = manager.m_file_action_schema;
+    TableRef table = ObjectStore::table_for_object_type(realm->read_group(), c_sync_fileActionMetadata);
+    size_t row_idx = table->find_first_string(schema.idx_original_name, original_name);
+    if (row_idx == not_found) {
+        return none;
+    }
+    return SyncFileActionMetadata(std::move(schema), std::move(realm), table->get(row_idx));
+}                   
 
 SyncFileActionMetadata::SyncFileActionMetadata(const SyncMetadataManager& manager,
                                                Action action,

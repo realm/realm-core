@@ -128,6 +128,14 @@ public:
         }
     };
 
+    // Expose some internal functionality to testing code.
+    struct OnlyForTesting {
+        static void handle_error(SyncSession& session, SyncError error)
+        {
+            session.handle_error(std::move(error));
+        }
+    };
+
 private:
     struct State;
     friend struct _impl::sync_session_states::WaitingForAccessToken;
@@ -142,6 +150,9 @@ private:
     // }
 
     bool can_wait_for_network_completion() const;
+
+    void handle_error(SyncError);
+    static std::string get_recovery_file_path();
 
     void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);
     void set_error_handler(std::function<SyncSessionErrorHandler>);

@@ -27,6 +27,7 @@
 #include <memory>
 #include <string>
 #include <system_error>
+#include <unordered_map>
 
 namespace realm {
 
@@ -50,6 +51,10 @@ struct SyncError {
     std::error_code error_code;
     std::string message;
     bool is_fatal;
+    std::unordered_map<std::string, std::string> user_info;
+
+    static constexpr const char c_original_file_path_key[] = "ORIGINAL_FILE_PATH";
+    static constexpr const char c_recovery_file_path_key[] = "RECOVERY_FILE_PATH";
 
     /// The error is a client error, which applies to the client and all its sessions.
     bool is_client_error() const
@@ -73,6 +78,19 @@ struct SyncError {
             return false;
         }
         return realm::sync::is_session_level_error(static_cast<ProtocolError>(error_code.value()));
+    }
+
+    /// The error indicates a client reset situation.
+    bool is_client_reset_requested() const
+    {
+        if (error_code.category() != realm::sync::protocol_error_category()) {
+            return false;
+        }
+        // Documented here: https://realm.io/docs/realm-object-server/#client-recovery-from-a-backup
+        return (error_code == ProtocolError::bad_server_file_ident
+                || error_code == ProtocolError::bad_client_file_ident
+                || error_code == ProtocolError::bad_server_version
+                || error_code == ProtocolError::diverging_histories);
     }
 };
 

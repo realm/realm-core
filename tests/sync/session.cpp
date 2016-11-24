@@ -18,6 +18,8 @@
 
 #include "catch.hpp"
 
+#include "sync_test_utils.hpp"
+
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 
@@ -79,7 +81,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
 
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
-    SyncManager::shared().configure_file_system("/tmp/", SyncManager::MetadataMode::NoMetadata);
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
     const std::string realm_base_url = server.base_url();
 
     SECTION("a SyncUser can properly retrieve its owned sessions") {
@@ -224,7 +226,7 @@ TEST_CASE("sync: log-in", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
-    SyncManager::shared().configure_file_system("/tmp/", SyncManager::MetadataMode::NoMetadata);
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
     auto user = SyncManager::shared().get_user("user", "not_a_real_token");
 
     SECTION("Can log in") {
@@ -250,9 +252,6 @@ TEST_CASE("sync: log-in", "[sync]") {
         CHECK(session->is_in_error_state());
     }
 
-    // FIXME: This test currently deadlocks when SyncSession's error handler attempts to change the
-    // session's state. Should be fixed by https://github.com/realm/realm-object-store/pull/181.
-
     SECTION("Session is invalid after invalid token while waiting on download to complete") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
@@ -270,4 +269,87 @@ TEST_CASE("sync: log-in", "[sync]") {
     }
 
     // TODO: write a test that logs out a Realm with multiple sessions, then logs it back in?
+    // TODO: write tests that check that a Session properly handles various types of errors reported via its callback.
+}
+
+TEST_CASE("sync: error handling", "[sync]") {
+    using ProtocolError = realm::sync::ProtocolError;
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    SyncServer server;
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+
+    // Create a valid session.
+    std::function<void(std::shared_ptr<SyncSession>, SyncError)> error_handler = [](auto, auto) { };
+    const std::string user_id = "user1d";
+    std::string on_disk_path;
+    auto user = SyncManager::shared().get_user(user_id, "not_a_real_token");
+    auto session = sync_session(server, user, "/test1e",
+                                 [](auto&, auto&) { return s_test_token; },
+                                 [&](auto session, SyncError error) { 
+                                    error_handler(std::move(session), std::move(error));
+                                 },
+                                 SyncSessionStopPolicy::AfterChangesUploaded,
+                                 &on_disk_path);
+    // Make sure the sessions are bound.
+    EventLoop::main().run_until([&] { return session_is_active(*session); });
+    REQUIRE(!session->is_in_error_state());
+
+    SECTION("Properly handles a client reset error") {
+        int code = 0;
+        SyncError final_error;
+        error_handler = [&](auto, SyncError error) {
+            final_error = std::move(error);
+        };
+
+        SECTION("for bad_server_file_ident") {
+            code = static_cast<int>(ProtocolError::bad_server_file_ident);
+        }
+
+        SECTION("for bad_client_file_ident") {
+            code = static_cast<int>(ProtocolError::bad_client_file_ident);
+        }
+
+        SECTION("for bad_server_version") {
+            code = static_cast<int>(ProtocolError::bad_server_version);
+        }
+
+        SECTION("for diverging_histories") {
+            code = static_cast<int>(ProtocolError::diverging_histories);
+        }
+
+        SyncError initial_error{std::error_code{code, realm::sync::protocol_error_category()}, "Something bad happened", false};
+        std::time_t just_before_raw = std::time(nullptr);
+        SyncSession::OnlyForTesting::handle_error(*session, std::move(initial_error));
+        std::time_t just_after_raw = std::time(nullptr);
+        auto just_before = std::localtime(&just_before_raw);
+        auto just_after = std::localtime(&just_after_raw);
+        // At this point final_error should be populated.
+        CHECK(final_error.is_client_reset_requested());
+        // The original file path should be present.
+        CHECK(final_error.user_info[SyncError::c_original_file_path_key] == on_disk_path);
+        // The path to the recovery file should be present, and should contain all necessary components.
+        std::string recovery_path = final_error.user_info[SyncError::c_recovery_file_path_key];
+        auto idx = recovery_path.find("recovered_realm");
+        CHECK(idx != std::string::npos);
+        idx = recovery_path.find(SyncManager::shared().recovery_directory_path());
+        CHECK(idx != std::string::npos);
+        if (just_before->tm_year == just_after->tm_year) {
+            std::stringstream stream;
+            stream << std::put_time(just_after, "%Y");
+            idx = recovery_path.find(stream.str());
+            CHECK(idx != std::string::npos);
+        }
+        if (just_before->tm_mon == just_after->tm_mon) {
+            std::stringstream stream;
+            stream << std::put_time(just_after, "%m");
+            idx = recovery_path.find(stream.str());
+            CHECK(idx != std::string::npos);
+        }
+        if (just_before->tm_yday == just_after->tm_yday) {
+            std::stringstream stream;
+            stream << std::put_time(just_after, "%d");
+            idx = recovery_path.find(stream.str());
+            CHECK(idx != std::string::npos);
+        }
+    }
 }

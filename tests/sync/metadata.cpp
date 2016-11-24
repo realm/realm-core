@@ -169,7 +169,7 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]") {
     const std::string url_2 = "realm://realm.example.com/2";
 
     SECTION("can be properly constructed") {
-        const auto original_name = "/tmp/foobar/test1";
+        const auto original_name = tmp_dir() + "foobar/test1";
         auto user_metadata = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, original_name, url_1, identity_1);
         REQUIRE(user_metadata.original_name() == original_name);
         REQUIRE(user_metadata.new_name() == none);
@@ -179,9 +179,9 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]") {
     }
 
     SECTION("properly reflects updating state, across multiple instances") {
-        const auto original_name = "/tmp/foobar/test2a";
-        const std::string new_name_1 = "/tmp/foobar/test2b";
-        const std::string new_name_2 = "/tmp/foobar/test2c";
+        const auto original_name = tmp_dir() + "foobar/test2a";
+        const std::string new_name_1 = tmp_dir() + "foobar/test2b";
+        const std::string new_name_2 = tmp_dir() + "foobar/test2c";
         auto user_metadata_1 = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, original_name, url_1, identity_1, new_name_1);
         REQUIRE(user_metadata_1.original_name() == original_name);
         REQUIRE(user_metadata_1.new_name() == new_name_1);
@@ -205,9 +205,9 @@ TEST_CASE("sync_metadata: file action metadata APIs", "[sync]") {
     reset_test_directory(base_path);
     SyncMetadataManager manager(metadata_path, false);
     SECTION("properly list all pending actions, reflecting their deletion") {
-        const auto filename1 = "/tmp/foobar/file1";
-        const auto filename2 = "/tmp/foobar/file2";
-        const auto filename3 = "/tmp/foobar/file3";
+        const auto filename1 = tmp_dir() + "foobar/file1";
+        const auto filename2 = tmp_dir() + "foobar/file2";
+        const auto filename3 = tmp_dir() + "foobar/file3";
         auto first = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, filename1, "asdf", "realm://realm.example.com/1");
         auto second = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, filename2, "asdf", "realm://realm.example.com/2");
         auto third = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, filename3, "asdf", "realm://realm.example.com/3");
