@@ -252,7 +252,7 @@ def doBuildWindows() {
         node('windows') {
             getArchive()
             try {
-              bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.vcxproj\" /p:Configuration=Debug /p:Platform=\"Win32\" /p:VisualStudioVersion=14.0"
+              bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=Debug /p:Platform=\"Win32\""
             } finally {
               collectCompilerWarnings('msbuild', false)
             }
