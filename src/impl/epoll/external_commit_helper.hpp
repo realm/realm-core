@@ -16,7 +16,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include <memory>
+#include <mutex>
 #include <thread>
+#include <vector>
 
 namespace realm {
 
@@ -53,22 +56,13 @@ private:
         FdHolder(FdHolder const&) = delete;
     };
 
-    void listen();
+    class DaemonThread;
 
     RealmCoordinator& m_parent;
-
-    // The listener thread
-    std::thread m_thread;
 
     // Read-write file descriptor for the named pipe which is waited on for
     // changes and written to when a commit is made
     FdHolder m_notify_fd;
-    // File descriptor for epoll
-    FdHolder m_epfd;
-    // The two ends of an anonymous pipe used to notify the kqueue() thread that
-    // it should be shut down.
-    FdHolder m_shutdown_read_fd;
-    FdHolder m_shutdown_write_fd;
 };
 
 } // namespace _impl

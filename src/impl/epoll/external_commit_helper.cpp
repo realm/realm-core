@@ -20,7 +20,9 @@
 #include "impl/realm_coordinator.hpp"
 #include "util/format.hpp"
 
-#include <assert.h>
+#include <realm/util/assert.hpp>
+
+#include <algorithm>
 #include <errno.h>
 #include <fcntl.h>
 #include <sstream>
@@ -61,12 +63,43 @@ void notify_fd(int fd)
         // it to make space. We don't just read in the code waiting for
         // notifications so that we can notify multiple waiters with a single
         // write.
-        assert(ret == -1 && errno == EAGAIN);
-        char buff[1024];
-        read(fd, buff, sizeof buff);
+        if (ret != 0) {
+            int err = errno;
+            throw std::system_error(err, std::system_category());
+        }
+        std::vector<uint8_t> buff(1024);
+        read(fd, buff.data(), buff.size());
     }
 }
 } // anonymous namespace
+
+class ExternalCommitHelper::DaemonThread {
+public:
+    DaemonThread();
+    ~DaemonThread();
+
+    void add_commit_helper(ExternalCommitHelper* helper);
+    // Return true if the m_helper_list is empty after removal.
+    void remove_commit_helper(ExternalCommitHelper* helper);
+
+    static DaemonThread& shared();
+private:
+    void listen();
+
+    // To protect the accessing m_helpers on the daemon thread.
+    std::mutex m_mutex;
+    std::vector<ExternalCommitHelper*> m_helpers;
+    // The listener thread
+    std::thread m_thread;
+    // File descriptor for epoll
+    FdHolder m_epoll_fd;
+    // The two ends of an anonymous pipe used to notify the kqueue() thread that it should be shut down.
+    FdHolder m_shutdown_read_fd;
+    FdHolder m_shutdown_write_fd;
+    // Daemon thread id. For checking unexpected dead locks.
+    std::thread::id m_thread_id;
+};
+
 
 void ExternalCommitHelper::FdHolder::close()
 {
@@ -79,31 +112,24 @@ void ExternalCommitHelper::FdHolder::close()
 ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
 {
-    m_epfd = epoll_create(1);
-    if (m_epfd == -1) {
-        throw std::system_error(errno, std::system_category());
+    std::string path;
+    std::string temporary_dir = realm::get_temporary_directory();
+    if (temporary_dir.empty()) {
+        path = parent.get_path() + ".note";
+    } else {
+        // The fifo is always created in the temporary directory if it is provided.
+        // See https://github.com/realm/realm-java/issues/3140
+        // We create .note file on the temp directory always for simplicity no matter where the Realm file is.
+        // Hash collisions are okay here because they just result in doing extra work.
+        path = util::format("%1%2_realm.note", temporary_dir, std::hash<std::string>()(parent.get_path()));
     }
-
-    auto path = parent.get_path() + ".note";
 
     // Create and open the named pipe
     int ret = mkfifo(path.c_str(), 0600);
     if (ret == -1) {
         int err = errno;
-        if (err == ENOTSUP || err == EACCES) {
-            // Filesystem doesn't support named pipes, so try putting it in tmp instead
-            // Hash collisions are okay here because they just result in doing
-            // extra work, as opposed to correctness problems
-
-            std::string temporary_dir = realm::get_temporary_directory();
-            if (!temporary_dir.empty()) {
-                path = util::format("%1realm_%2.note", temporary_dir, std::hash<std::string>()(path));
-                ret = mkfifo(path.c_str(), 0600);
-                err = errno;
-            }
-        }
         // the fifo already existing isn't an error
-        if (ret == -1 && err != EEXIST) {
+        if (err != EEXIST) {
             // Workaround for a mkfifo bug on Blackberry devices:
             // When the fifo already exists, mkfifo fails with error ENOSYS which is not correct.
             // In this case, we use stat to check if the path exists and it is a fifo.
@@ -131,15 +157,41 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
         throw std::system_error(errno, std::system_category());
     }
 
+    // Lock is inside add_commit_helper.
+    DaemonThread::shared().add_commit_helper(this);
+}
+
+ExternalCommitHelper::~ExternalCommitHelper()
+{
+    DaemonThread::shared().remove_commit_helper(this);
+}
+
+ExternalCommitHelper::DaemonThread::DaemonThread()
+{
+    m_epoll_fd = epoll_create(1);
+    if (m_epoll_fd == -1) {
+        throw std::system_error(errno, std::system_category());
+    }
+
     // Create the anonymous pipe
     int pipe_fd[2];
-    ret = pipe(pipe_fd);
+    int ret = pipe(pipe_fd);
     if (ret == -1) {
         throw std::system_error(errno, std::system_category());
     }
 
     m_shutdown_read_fd = pipe_fd[0];
     m_shutdown_write_fd = pipe_fd[1];
+
+    struct epoll_event event;
+
+    event.events = EPOLLIN;
+    event.data.fd = m_shutdown_read_fd;
+    ret = epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, m_shutdown_read_fd, &event);
+    if (ret != 0) {
+        int err = errno;
+        throw std::system_error(err, std::system_category());
+    }
 
     m_thread = std::thread([=] {
         try {
@@ -154,42 +206,75 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
             throw;
         }
     });
+    m_thread_id = m_thread.get_id();
 }
 
-ExternalCommitHelper::~ExternalCommitHelper()
+ExternalCommitHelper::DaemonThread::~DaemonThread()
 {
     notify_fd(m_shutdown_write_fd);
     m_thread.join(); // Wait for the thread to exit
 }
 
-void ExternalCommitHelper::listen()
+ExternalCommitHelper::DaemonThread& ExternalCommitHelper::DaemonThread::shared()
+{
+    static DaemonThread daemon_thread;
+    return daemon_thread;
+}
+
+void ExternalCommitHelper::DaemonThread::add_commit_helper(ExternalCommitHelper* helper)
+{
+    // Called in the deamon thread loop, dead lock will happen.
+    REALM_ASSERT(std::this_thread::get_id() != m_thread_id);
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+    struct epoll_event event;
+
+    m_helpers.push_back(helper);
+
+    event.events = EPOLLIN | EPOLLET;
+    event.data.fd = helper->m_notify_fd;
+    int ret = epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, helper->m_notify_fd, &event);
+    if (ret != 0) {
+        int err = errno;
+        throw std::system_error(err, std::system_category());
+    }
+}
+
+void ExternalCommitHelper::DaemonThread::remove_commit_helper(ExternalCommitHelper* helper)
+{
+    // Called in the deamon thread loop, dead lock will happen.
+    REALM_ASSERT(std::this_thread::get_id() != m_thread_id);
+
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    m_helpers.erase(std::remove(m_helpers.begin(), m_helpers.end(), helper), m_helpers.end());
+
+    struct epoll_event event;
+
+    // In kernel versions before 2.6.9, the EPOLL_CTL_DEL operation required a non-NULL pointer in event, even
+    // though this argument is ignored. See man page of epoll_ctl.
+    epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, helper->m_notify_fd, &event);
+}
+
+void ExternalCommitHelper::DaemonThread::listen()
 {
     pthread_setname_np(pthread_self(), "Realm notification listener");
 
     int ret;
 
-    struct epoll_event event[2];
-
-    event[0].events = EPOLLIN | EPOLLET;
-    event[0].data.fd = m_notify_fd;
-    ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, m_notify_fd, &event[0]);
-    assert(ret == 0);
-
-    event[1].events = EPOLLIN;
-    event[1].data.fd = m_shutdown_read_fd;
-    ret = epoll_ctl(m_epfd, EPOLL_CTL_ADD, m_shutdown_read_fd, &event[1]);
-    assert(ret == 0);
-
     while (true) {
         struct epoll_event ev;
-        ret = epoll_wait(m_epfd, &ev, 1, -1);
+        ret = epoll_wait(m_epoll_fd, &ev, 1, -1);
 
         if (ret == -1 && errno == EINTR) {
             // Interrupted system call, try again.
             continue;
         }
 
-        assert(ret >= 0);
+        if (ret == -1) {
+            int err = errno;
+            throw std::system_error(err, std::system_category());
+        }
         if (ret == 0) {
             // Spurious wakeup; just wait again
             continue;
@@ -198,12 +283,17 @@ void ExternalCommitHelper::listen()
         if (ev.data.u32 == (uint32_t)m_shutdown_read_fd) {
             return;
         }
-        assert(ev.data.u32 == (uint32_t)m_notify_fd);
 
-        m_parent.on_change();
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            for (auto helper : m_helpers) {
+                if (ev.data.u32 == (uint32_t)helper->m_notify_fd) {
+                    helper->m_parent.on_change();
+                }
+            }
+        }
     }
 }
-
 
 void ExternalCommitHelper::notify_others()
 {
