@@ -103,7 +103,9 @@ public:
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     std::string path_for_realm(const std::string& user_identity, const std::string& raw_realm_url) const;
 
-    // Reset part of the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
+    // Reset the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
+    // Precondition: any synced Realms or `SyncSession`s must be closed or rendered inactive prior to
+    // calling this method.
     void reset_for_testing();
 
 private:

@@ -228,7 +228,7 @@ TEST_CASE("sync: log-in", "[sync]") {
                                     [&](auto, int, std::string, SyncSessionError) { ++error_count; });
 
         std::atomic<bool> download_did_complete(false);
-        session->wait_for_download_completion([&] { download_did_complete = true; });
+        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
         EventLoop::main().run_until([&] { return download_did_complete.load() || error_count > 0; });
         CHECK(!session->is_in_error_state());
         CHECK(error_count == 0);
@@ -244,7 +244,6 @@ TEST_CASE("sync: log-in", "[sync]") {
         CHECK(session->is_in_error_state());
     }
 
-#if 0
     // FIXME: This test currently deadlocks when SyncSession's error handler attempts to change the
     // session's state. Should be fixed by https://github.com/realm/realm-object-store/pull/181.
 
@@ -255,7 +254,7 @@ TEST_CASE("sync: log-in", "[sync]") {
                                     [&](auto, int, std::string, SyncSessionError) { ++error_count; });
 
         EventLoop::main().perform([&] {
-            session->wait_for_download_completion([] {
+            session->wait_for_download_completion([](auto) {
                 fprintf(stderr, "Download completed.\n");
             });
         });
@@ -263,7 +262,6 @@ TEST_CASE("sync: log-in", "[sync]") {
         EventLoop::main().run_until([&] { return error_count > 0; });
         CHECK(session->is_in_error_state());
     }
-#endif
 
     // TODO: write a test that logs out a Realm with multiple sessions, then logs it back in?
 }
