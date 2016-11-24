@@ -12,7 +12,7 @@
 
 ### Enhancements
 
-* Added support for LIKE queries (wildcard with ? and *)
+* Added support for LIKE queries (wildcard with `?` and `*`)
 * Offer facilities to prevent multiple sync agents per Realm file access session
   (`Replication::is_sync_agent()` to be overridden by sync-specific
   implementation). The utilized lock-file flag
