@@ -49,6 +49,7 @@ set(REALM_SOURCES
     util/file_mapper.cpp
     util/interprocess_condvar.cpp
     util/interprocess_mutex.cpp
+    util/logger.cpp
     util/memory_stream.cpp
     util/misc_errors.cpp
     util/string_buffer.cpp

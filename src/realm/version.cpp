@@ -32,7 +32,7 @@ std::string Version::get_version()
 
 StringData Version::get_extra()
 {
-    return REALM_VER_EXTRA;
+    return REALM_VERSION_EXTRA;
 }
 
 bool Version::is_at_least(int major, int minor, int patch, StringData extra)
