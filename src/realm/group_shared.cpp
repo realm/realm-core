@@ -217,6 +217,9 @@ public:
         uint32_t next;
     };
 
+    // Experiment. Must not be shipped.
+    static_assert(sizeof(std::atomic<uint_fast32_t>) == 32, "Hurray, we found a bug");
+
     Ringbuffer() noexcept
     {
         entries = init_readers_size;
