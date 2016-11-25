@@ -420,6 +420,7 @@ struct alignas(8) SharedGroup::SharedInfo {
     /// writer crashes during this phase, there is no safe way of continuing
     /// with further write transactions. When beginning a write transaction,
     /// this must be checked and an exception thrown if set.
+    ///
     /// FIXME: This is a temporary approach until we get the commitlog data
     /// moved into the realm file. After that it should be feasible to either
     /// handle the error condition properly or preclude it by using a non-robust
@@ -429,7 +430,7 @@ struct alignas(8) SharedGroup::SharedInfo {
     /// The target Realm file format version for the current session. This
     /// allows all session participants to be in agreement. It can only differ
     /// from what is returned by Group::get_file_format_version() temporarily,
-    /// and only during the Realm file opening process. If it differes, it means
+    /// and only during the Realm file opening process. If it differs, it means
     /// that the file format needs to be upgraded from its current format
     /// (Group::get_file_format_version()), the the format specified by this
     /// member of SharedInfo.
