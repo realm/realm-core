@@ -1140,6 +1140,12 @@ Column<T>::Column(unattached_root_tag, Allocator& alloc)
 }
 
 template <class T>
+Column<T>::Column(std::unique_ptr<Array> root) noexcept
+    : m_tree(std::move(root))
+{
+}
+
+template <class T>
 Column<T>::~Column() noexcept
 {
 }
@@ -1564,8 +1570,8 @@ public:
     }
     ref_type create_leaf(size_t size) override
     {
-        ref_type ref = BpTree<T>::create_leaf(m_leaf_type, size, m_value, m_alloc); // Throws
-        return ref;
+        MemRef mem = BpTree<T>::create_leaf(m_leaf_type, size, m_value, m_alloc); // Throws
+        return mem.get_ref();
     }
 
 private:
