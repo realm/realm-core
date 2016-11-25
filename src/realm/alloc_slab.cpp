@@ -249,9 +249,9 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     }
 #endif
 
-    REALM_ASSERT_DEBUG(0 < size);
-    REALM_ASSERT_DEBUG((size & 0x7) == 0); // only allow sizes that are multiples of 8
-    REALM_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT(0 < size);
+    REALM_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
+    REALM_ASSERT(is_attached());
 
     // If we failed to correctly record free space, new allocations cannot be
     // carried out until the free space record is reset.
@@ -305,6 +305,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 #ifdef REALM_SLAB_ALLOC_DEBUG
                 malloc_debug_map[ref] = malloc(1);
 #endif
+                REALM_ASSERT_EX(ref >= m_baseline, ref, m_baseline);
                 return MemRef(addr, ref, *this);
             }
         }
@@ -349,7 +350,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     }
 #endif
 
-    REALM_ASSERT_DEBUG(0 < new_size);
+    REALM_ASSERT(0 < new_size);
     std::unique_ptr<char[]> mem(new char[new_size]); // Throws
     std::fill(mem.get(), mem.get() + new_size, 0);
 
@@ -380,7 +381,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 #ifdef REALM_SLAB_ALLOC_DEBUG
     malloc_debug_map[ref] = malloc(1);
 #endif
-
+    REALM_ASSERT_EX(ref >= m_baseline, ref, m_baseline);
     return MemRef(slab.addr, ref, *this);
 }
 
@@ -419,7 +420,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     // Check for double free
     for (auto& c : free_space) {
         if ((ref >= c.ref && ref < (c.ref + c.size)) || (ref < c.ref && ref_end > c.ref)) {
-            REALM_ASSERT_DEBUG(!"Double Free");
+            REALM_ASSERT(!"Double Free");
         }
     }
 #endif
@@ -475,8 +476,8 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size_t new_size)
 {
     REALM_ASSERT_DEBUG(translate(ref) == addr);
-    REALM_ASSERT_DEBUG(0 < new_size);
-    REALM_ASSERT_DEBUG((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
+    REALM_ASSERT(0 < new_size);
+    REALM_ASSERT((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
 
     // FIXME: Check if we can extend current space. In that case, remember to
     // check whether m_free_space_state == free_state_Invalid. Also remember to
@@ -995,10 +996,10 @@ void SlabAlloc::reset_free_space_tracking()
 
 void SlabAlloc::remap(size_t file_size)
 {
-    REALM_ASSERT_DEBUG(file_size % 8 == 0); // 8-byte alignment required
-    REALM_ASSERT_DEBUG(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
+    REALM_ASSERT(file_size % 8 == 0); // 8-byte alignment required
+    REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     REALM_ASSERT_DEBUG(is_free_space_clean());
-    REALM_ASSERT_DEBUG(m_baseline <= file_size);
+    REALM_ASSERT(m_baseline <= file_size);
 
     // Extend mapping by adding sections
     REALM_ASSERT_DEBUG(matches_section_boundary(file_size));
@@ -1053,7 +1054,7 @@ void SlabAlloc::remap(size_t file_size)
     // each entire slab in m_slabs)
     size_t slab_ref = file_size;
     size_t n = m_free_space.size();
-    REALM_ASSERT_DEBUG(m_slabs.size() == n);
+    REALM_ASSERT(m_slabs.size() == n);
     for (size_t i = 0; i < n; ++i) {
         Chunk& free_chunk = m_free_space[i];
         free_chunk.ref = slab_ref;
