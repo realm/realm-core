@@ -380,7 +380,7 @@ task :check_pandoc do
 end
 
 task apple_release_notes: [:tmpdir_core, :check_pandoc] do
-  sh "#{@pandoc} -f markdown -t plain -o \"#{@tmpdir}/core/release_notes.txt\" #{REALM_PROJECT_ROOT}/release_notes.md"
+  sh "#{@pandoc} -f markdown -t plain -o \"#{@tmpdir}/core/release_notes.txt\" #{REALM_PROJECT_ROOT}/CHANGELOG.md"
 end
 
 APPLE_BINDINGS.map do |name, info|
