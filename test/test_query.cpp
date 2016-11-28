@@ -9816,4 +9816,56 @@ TEST(Query_TableInitialization)
     });
 }
 
+TEST(foo) 
+{
+    for (size_t iter = 0; iter < 10; iter++) {
+        // Tests crash where a query node would have an old column pointer to a column that was relocated
+        Group group;
+
+        TableRef contact = group.add_table("contact");
+        TableRef contact_type = group.add_table("contact_type");
+
+        size_t col_int = contact_type->add_column(type_Int, "id");
+        contact_type->add_column(type_String, "str");
+        size_t col_link = contact->add_column_link(type_LinkList, "link", *contact_type);
+
+        contact_type.get()->add_empty_row(10);
+        contact.get()->add_empty_row(10);
+
+        Query q1 = (contact.get()->link(0).column<Int>(0) == 0);
+        Query q2 = contact_type.get()->where().equal(0, 0);
+        Query q3 = (contact_type.get()->column<Int>(0) + contact_type.get()->column<Int>(0) == 0);
+        Query q4 = (contact_type.get()->column<Int>(0) == 0);
+        Query q5 = (contact_type.get()->column<String>(1) == "hejsa");
+
+        TableView tv = q1.find_all();
+        TableView tv2 = q2.find_all();
+        TableView tv3 = q3.find_all();
+        TableView tv4 = q4.find_all();
+        TableView tv5 = q5.find_all();
+
+        contact.get()->insert_column(0, type_Float, "extra");
+        contact_type.get()->insert_column(0, type_Float, "extra");
+
+        for (size_t t = 0; t < REALM_MAX_BPNODE_SIZE + 1; t++) {
+            contact.get()->add_empty_row();
+            contact_type.get()->add_empty_row();
+            //  contact_type.get()->set_string(1, t, "hejsa");
+
+            LinkViewRef lv = contact.get()->get_linklist(1, contact.get()->size() - 1);
+            lv->add(contact_type.get()->size() - 1);
+
+            if (t == 0 || t == REALM_MAX_BPNODE_SIZE)
+            {
+                tv.sync_if_needed();
+                tv2.sync_if_needed();
+                tv3.sync_if_needed();
+                tv4.sync_if_needed();
+                tv5.sync_if_needed();
+            }
+        }
+    }
+}
+
+
 #endif // TEST_QUERY
