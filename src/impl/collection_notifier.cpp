@@ -429,8 +429,10 @@ void NotifierPackage::package_and_wait(util::Optional<VersionID::version_type> t
         return true;
     };
     m_notifiers.erase(std::remove_if(begin(m_notifiers), end(m_notifiers), package), end(m_notifiers));
-    if (m_version && target_version && m_version->version < *target_version)
+    if (m_version && target_version && m_version->version < *target_version) {
         m_notifiers.clear();
+        m_version = util::none;
+    }
     REALM_ASSERT(m_version || m_notifiers.empty());
 
     m_coordinator = nullptr;

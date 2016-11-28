@@ -1474,6 +1474,51 @@ TEST_CASE("results: notifications after move") {
     }
 }
 
+TEST_CASE("results: implicit background notifier") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+    auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
+    auto r = coordinator->get_realm(std::move(config));
+    r->update_schema({
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+    });
+
+    auto table = r->read_group().get_table("class_object");
+    Results results(r, table->where());
+    results.last(); // force evaluation and creation of TableView
+
+    SECTION("refresh() does not block due to implicit notifier") {
+        auto r2 = coordinator->get_realm();
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->add_empty_row();
+        r2->commit_transaction();
+
+        r->refresh(); // would deadlock if there was a callback
+    }
+
+    SECTION("refresh() does not attempt to deliver stale results") {
+        // Create version 1
+        r->begin_transaction();
+        table->add_empty_row();
+        r->commit_transaction();
+
+        r->begin_transaction();
+        // Run async query for version 1
+        coordinator->on_change();
+        // Create version 2 without ever letting 1 be delivered
+        table->add_empty_row();
+        r->commit_transaction();
+
+        // Give it a chance to deliver the async query results (and fail, becuse
+        // they're for version 1 and the realm is at 2)
+        r->refresh();
+    }
+}
+
 TEST_CASE("results: error messages") {
     InMemoryTestFile config;
     config.schema = Schema{
