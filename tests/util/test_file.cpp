@@ -56,6 +56,8 @@ TestFile::TestFile()
     path = tmpdir + "/realm.XXXXXX";
     mktemp(&path[0]);
     unlink(path.c_str());
+
+    schema_version = 0;
 }
 
 TestFile::~TestFile()
