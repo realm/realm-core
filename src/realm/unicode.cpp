@@ -512,8 +512,8 @@ bool contains_ins(StringData haystack, const char* needle_upper, const char* nee
     
     // Prepare vars to avoid lookups in loop
     size_t last_char_pos = needle_size-1;
-    char lastCharU = needle_upper[last_char_pos];
-    char lastCharL = needle_lower[last_char_pos];
+    unsigned char lastCharU = needle_upper[last_char_pos];
+    unsigned char lastCharL = needle_lower[last_char_pos];
     
     // Do Boyer-Moore search
     size_t p = last_char_pos;

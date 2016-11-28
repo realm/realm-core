@@ -9736,8 +9736,9 @@ ONLY(Query_UTF8_Contains)
     TableRef table1 = group.add_table("table1");
     table1->add_column(type_String, "str1");
     table1->add_empty_row();
-    table1->set_string(0, 0, "\x0ff\x000");
-    size_t m = table1->column<String>(0).contains("\x0ff\x000", false).count();
+    table1->set_string(0, 0, StringData("\x0ff\x000", 2));
+    size_t m = table1->column<String>(0).contains(StringData("\x0ff\x000", 2), false).count();
+    CHECK_EQUAL(1, m);
 }
 
 #endif // TEST_QUERY

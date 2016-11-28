@@ -301,7 +301,7 @@ inline bool StringData::contains(StringData d, const std::array<uint8_t, 256> &c
     
     // Prepare vars to avoid lookups in loop
     size_t last_char_pos = d.size()-1;
-    char lastChar = d[last_char_pos];
+    unsigned char lastChar = d[last_char_pos];
     
     // Do Boyer-Moore search
     size_t p = last_char_pos;
