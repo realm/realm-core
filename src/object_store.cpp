@@ -93,6 +93,10 @@ void add_index(Table& table, size_t col)
 
 void insert_column(Group& group, Table& table, Property const& property, size_t col_ndx)
 {
+    // Cannot directly insert a LinkingObjects column (a computed property).
+    // LinkingObjects must be an artifact of an existing link column.
+    REALM_ASSERT(property.type != PropertyType::LinkingObjects);
+
     if (property.type == PropertyType::Object || property.type == PropertyType::Array) {
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_or_add_table(target_name);
@@ -460,8 +464,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
 
         void operator()(ChangePropertyType op)
         {
-            insert_column(group, table(op.object), *op.new_property, op.old_property->table_column);
-            table(op.object).remove_column(op.old_property->table_column + 1);
+            replace_column(group, table(op.object), *op.old_property, *op.new_property);
         }
     } applier{group};
 
