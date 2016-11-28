@@ -9816,7 +9816,7 @@ TEST(Query_TableInitialization)
     });
 }
 
-TEST(foo) 
+TEST(Query_ArrayLeafRelocate) 
 {
     for (size_t iter = 0; iter < 10; iter++) {
         // Tests crash where a query node would have an old column pointer to a column that was relocated
