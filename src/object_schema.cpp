@@ -107,12 +107,8 @@ const Property *ObjectSchema::property_for_name(StringData name) const {
 }
 
 bool ObjectSchema::property_is_computed(Property const& property) const {
-    for (auto& prop : computed_properties) {
-        if (prop == property) {
-            return true;
-        }
-    }
-    return false;
+    auto end = computed_properties.end();
+    return std::find(computed_properties.begin(), end, property) != end;
 }
 
 void ObjectSchema::set_primary_key_property()
