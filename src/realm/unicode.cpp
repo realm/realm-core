@@ -20,7 +20,6 @@
 #include <vector>
 
 #ifdef _WIN32
-#define NOMINMAX
 #include <windows.h>
 #else
 #include <ctype.h>

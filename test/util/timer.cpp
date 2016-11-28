@@ -24,7 +24,6 @@
 #include <realm/util/features.h>
 
 #if defined _WIN32
-#define NOMINMAX
 #include <windows.h>
 #elif REALM_PLATFORM_APPLE
 #include <sys/resource.h>
