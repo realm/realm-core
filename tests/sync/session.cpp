@@ -196,6 +196,19 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         session = user->session_for_url(server.base_url() + path);
         CHECK(session);
     }
+
+    SECTION("a user cannot create multiple sessions for the same URL") {
+        auto user = SyncManager::shared().get_user("user", "not_a_real_token");
+        auto create_session = [&]() {
+            return sync_session(server, user, "/test",
+                                [&](auto&, auto&) { return s_test_token; },
+                                [&](auto, auto, auto) { },
+                                SyncSessionStopPolicy::Immediately);
+        };
+
+        auto session = create_session();
+        CHECK_THROWS(create_session());
+    }
 }
 
 TEST_CASE("sync: log-in", "[sync]") {

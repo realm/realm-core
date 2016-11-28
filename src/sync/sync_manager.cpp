@@ -319,6 +319,11 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
 {
     auto client = get_sync_client(); // Throws
 
+    // The session is declared outside the scope of the lock so that if an exception is thrown
+    // it'll be destroyed after the lock has been dropped. This avoids deadlocking when
+    // dropped_last_reference_to_session attempts to lock the mutex.
+    std::shared_ptr<SyncSession> shared_session;
+
     std::lock_guard<std::mutex> lock(m_session_mutex);
     if (auto session = get_existing_active_session_locked(path)) {
         return session;
@@ -332,7 +337,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
     }
 
     auto session_deleter = [this](SyncSession *session) { dropped_last_reference_to_session(session); };
-    auto shared_session = std::shared_ptr<SyncSession>(session.release(), std::move(session_deleter));
+    shared_session = std::shared_ptr<SyncSession>(session.release(), std::move(session_deleter));
     m_active_sessions[path] = shared_session;
     if (session_is_new) {
         sync_config.user->register_session(shared_session);
