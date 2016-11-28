@@ -1,7 +1,8 @@
 # NEXT RELEASE
 
 ### Bugfixes
-
+* Fixed crash in query if a table had been modified so much that payload array
+  leafs had relocated (https://github.com/realm/realm-core/issues/2269)
 * Fix a race involving destruction order of InterprocessMutex static variables.
 * Fix a crash when a Query is reimported into the SharedGroup it was exported
   for handover from.
