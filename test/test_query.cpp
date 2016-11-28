@@ -9819,7 +9819,8 @@ TEST(Query_TableInitialization)
 TEST(Query_ArrayLeafRelocate) 
 {
     for (size_t iter = 0; iter < 10; iter++) {
-        // Tests crash where a query node would have an old column pointer to a column that was relocated
+        // Tests crash where a query node would have a SequentialGetter that pointed to an old array leaf
+        // that was relocated
         Group group;
 
         TableRef contact = group.add_table("contact");
