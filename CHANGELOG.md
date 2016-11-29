@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.1.5 Release notes
 
 ### Bugfixes
 
@@ -7,10 +7,8 @@
   for handover from.
 * Fix a crash when calling mkfifo on Android 4.x external storage. On 4.x devices,
   errno is EPERM instead of EACCES.
-
-### Breaking changes
-
-* Lorem ipsum. 
+* Fix a crash when updating a LinkView accessor from a leaf to an inner node. Occurs
+  only in debug mode. (#2321)
 
 ### Enhancements
 
@@ -25,7 +23,8 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Added extra check for double frees in slab allocator.
+* Deprecated Array type parameters in Column<T> and BpTree<T> constructors
 
 ----------------------------------------------
 
