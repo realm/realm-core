@@ -606,7 +606,7 @@ TEST_TYPES(Column_FindAllIntMax, IntegerColumn, IntNullColumn)
 
 TEST_TYPES(Column_LowerUpperBound, IntegerColumn, FloatColumn)
 {
-    using T = std::conditional<std::is_same<TEST_TYPE, IntegerColumn>::value, int64_t, float>::type;
+    using T = TEST_TYPE::value_type;
 
     // Create column with sorted members
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
