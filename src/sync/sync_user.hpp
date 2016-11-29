@@ -33,7 +33,7 @@ class SyncSession;
 
 // A `SyncUser` represents a single user account. Each user manages the sessions that
 // are associated with it.
-class SyncUser {
+class SyncUser : public std::enable_shared_from_this<SyncUser> {
 friend class SyncSession;
 public:
     enum class State {

@@ -18,7 +18,10 @@
 
 #include "sync_test_utils.hpp"
 
+#include "util/event_loop.hpp"
+
 #include "sync/sync_manager.hpp"
+#include "sync/sync_notifier.hpp"
 #include "sync/sync_user.hpp"
 #include <realm/util/logger.hpp>
 #include <realm/util/scope_exit.hpp>
@@ -28,6 +31,36 @@ using namespace realm::util;
 using File = realm::util::File;
 
 static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_manager/";
+
+namespace realm {
+
+class TestNotifier : public SyncNotifier {
+public:
+    enum class LastCalled {
+        None, UserLoggedIn, UserLoggedOut, SessionBoundToServer, SessionDestroyed, MetadataReset, UserDeleted
+    };
+    mutable LastCalled last_called = LastCalled::None;
+
+    void user_logged_in(std::shared_ptr<SyncUser>) const override { last_called = LastCalled::UserLoggedIn; }
+    void user_logged_out(std::shared_ptr<SyncUser>) const override { last_called = LastCalled::UserLoggedOut; }
+    void session_bound_to_server(std::shared_ptr<SyncSession>) const override { last_called = LastCalled::SessionBoundToServer; }
+    void session_destroyed(SyncConfig, const std::string&) const override { last_called = LastCalled::SessionDestroyed; }
+    void metadata_realm_reset() const override { last_called = LastCalled::MetadataReset; }
+    void user_deleted(const std::string&) const override { last_called = LastCalled::UserDeleted; }
+};
+
+class TestNotifierFactory : public SyncNotifierFactory {
+public:
+    TestNotifier* captured_notifier;
+
+    std::unique_ptr<SyncNotifier> make_notifier() override {
+        std::unique_ptr<SyncNotifier> notifier = std::make_unique<TestNotifier>();
+        captured_notifier = static_cast<TestNotifier*>(&*notifier);
+        return notifier;
+    }
+};
+
+}
 
 namespace {
 
@@ -84,6 +117,82 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
         REQUIRE(SyncManager::shared().path_for_realm(identity, raw_url) == expected);
         // This API should also generate the directory if it doesn't already exist.
         REQUIRE_DIR_EXISTS(base_path + "realm-object-server/foobarbaz/");
+    }
+}
+
+TEST_CASE("sync_manager: event notifier system", "[sync]") {
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    reset_test_directory(base_path);
+    TestNotifierFactory factory;
+    SyncManager::shared().set_notifier_factory(factory);
+
+    const std::string identity = "jpsimard";
+    const std::string url = "https://realm.example.com/foo";
+
+    SECTION("no metadata") {
+        SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoMetadata);
+
+        SECTION("works for user logging in and out") {
+            REQUIRE(factory.captured_notifier->last_called == TestNotifier::LastCalled::None);
+            // Log in a new user
+            auto u1 = SyncManager::shared().get_user(identity, "not-a-real-token", url);
+            REQUIRE(factory.captured_notifier->last_called == TestNotifier::LastCalled::UserLoggedIn);
+            // Log the user out
+            u1->log_out();
+            REQUIRE(factory.captured_notifier->last_called == TestNotifier::LastCalled::UserLoggedOut);
+            // Log the user back in (existing user)
+            u1 = SyncManager::shared().get_user(identity, "still-a-fake-token", url);
+            REQUIRE(factory.captured_notifier->last_called == TestNotifier::LastCalled::UserLoggedIn);
+        }
+
+        SECTION("works for session binding to sync server and destruction") {
+            SyncServer server;
+            REQUIRE(factory.captured_notifier->last_called == TestNotifier::LastCalled::None);
+            std::weak_ptr<SyncSession> weak_session;
+            {
+                // Create a session.
+                auto user = SyncManager::shared().get_user("user1a", "not_a_real_token");
+                auto session = sync_session(server, user, "/test1a-1",
+                                            [&](auto&, auto&) { return s_test_token; },
+                                            [&](auto, auto, auto, auto) { }, SyncSessionStopPolicy::Immediately);
+                weak_session = session;
+                EventLoop::main().run_until([&] { return session_is_active(*session); });
+                REQUIRE(factory.captured_notifier->last_called == TestNotifier::LastCalled::SessionBoundToServer);
+            }
+            // Session lifetime should be over.
+            REQUIRE(weak_session.expired());
+            REQUIRE(factory.captured_notifier->last_called == TestNotifier::LastCalled::SessionDestroyed);
+        }
+    }
+
+    SECTION("with metadata") {
+        SECTION("works for metadata Realm being reset") {
+            SyncManager::shared().configure_file_system(base_path,
+                                                    SyncManager::MetadataMode::Encryption,
+                                                    make_test_encryption_key());
+            SyncManager::shared().reset_for_testing();
+            SyncManager::shared().set_notifier_factory(factory);
+            SyncManager::shared().configure_file_system(base_path,
+                                                        SyncManager::MetadataMode::Encryption,
+                                                        make_test_encryption_key(1),
+                                                        true);
+            REQUIRE(factory.captured_notifier->last_called == TestNotifier::LastCalled::MetadataReset);
+        }
+
+        SECTION("works for user being deleted") {
+            // Create an entry in the metadata database for a user to be deleted.
+            auto file_manager = SyncFileManager(base_path);
+            SyncMetadataManager manager(file_manager.metadata_path(), false);
+            auto user = SyncUserMetadata(manager, identity);
+            user.mark_for_removal();
+            // Prepopulate the user directory with a dummy Realm.
+            const auto user_dir = file_manager.user_directory(identity);
+            create_dummy_realm(user_dir + "123456789");
+            // Delete the user and look for a notification.
+            SyncManager::shared().set_notifier_factory(factory);
+            SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+            REQUIRE(factory.captured_notifier->last_called == TestNotifier::LastCalled::UserDeleted);
+        }
     }
 }
 

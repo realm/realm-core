@@ -103,6 +103,7 @@ void SyncUser::update_refresh_token(std::string token)
                     }
                 }
                 m_waiting_sessions.clear();
+                SyncManager::shared().fire_notification([this](const SyncNotifier& n) { n.user_logged_in(this->shared_from_this()); });
                 break;
             }
         }
@@ -149,6 +150,7 @@ void SyncUser::log_out()
             metadata.mark_for_removal();
         });
     }
+    SyncManager::shared().fire_notification([this](const SyncNotifier& n) { n.user_logged_out(this->shared_from_this()); });
 }
 
 void SyncUser::invalidate()

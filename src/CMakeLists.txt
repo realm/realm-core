@@ -79,6 +79,7 @@ if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/sync_config.hpp
         sync/sync_manager.hpp
+        sync/sync_notifier.hpp
         sync/sync_session.hpp
         sync/sync_user.hpp
         sync/impl/sync_client.hpp

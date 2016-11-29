@@ -16,14 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "catch.hpp"
+#include "sync_test_utils.hpp"
 
 #include "util/event_loop.hpp"
-#include "util/test_file.hpp"
 
 #include "sync/sync_config.hpp"
-#include "sync/sync_manager.hpp"
-#include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
 
 #include <realm/util/scope_exit.hpp>
@@ -34,44 +31,6 @@
 
 using namespace realm;
 using namespace realm::util;
-
-template <typename FetchAccessToken, typename ErrorHandler>
-std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<SyncUser> user, const std::string& path,
-                                          FetchAccessToken&& fetch_access_token, ErrorHandler&& error_handler,
-                                          SyncSessionStopPolicy stop_policy=SyncSessionStopPolicy::AfterChangesUploaded,
-                                          std::string* on_disk_path=nullptr)
-{
-    std::string url = server.base_url() + path;
-    SyncTestFile config({user, url, std::move(stop_policy),
-        [&](const std::string& path, const SyncConfig& config, std::shared_ptr<SyncSession> session) {
-            auto token = fetch_access_token(path, config.realm_url);
-            session->refresh_access_token(std::move(token), config.realm_url);
-        }, std::forward<ErrorHandler>(error_handler)});
-    if (on_disk_path) {
-        *on_disk_path = config.path;
-    }
-
-    std::shared_ptr<SyncSession> session;
-    {
-        auto realm = Realm::get_shared_realm(config);
-        session = SyncManager::shared().get_session(config.path, *config.sync_config);
-    }
-    return session;
-}
-
-namespace {
-
-bool session_is_active(const SyncSession& session)
-{
-    return session.state() == SyncSession::PublicState::Active;
-}
-
-bool session_is_inactive(const SyncSession& session)
-{
-    return session.state() == SyncSession::PublicState::Inactive;
-}
-
-}
 
 TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     if (!EventLoop::has_implementation())

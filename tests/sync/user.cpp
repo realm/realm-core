@@ -18,7 +18,6 @@
 
 #include "sync_test_utils.hpp"
 
-#include "sync/sync_manager.hpp"
 #include "sync/sync_user.hpp"
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>

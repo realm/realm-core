@@ -47,6 +47,14 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
         std::string user_token;
         util::Optional<std::string> server_url;
     };
+    {
+        // Create the notifier, if applicable.
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_notifier_factory) {
+            m_notifier = m_notifier_factory->make_notifier();
+        }
+        m_notifier_factory = nullptr;
+    }
 
     std::vector<UserCreationData> users_to_add;
     {
@@ -75,6 +83,7 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
                                                                                std::move(custom_encryption_key));
                 } catch (RealmFileException const& ex) {
                     if (reset_metadata_on_error && m_file_manager->remove_metadata_realm()) {
+                        fire_notification([](const SyncNotifier& n) { n.metadata_realm_reset(); });
                         m_metadata_manager = std::make_unique<SyncMetadataManager>(m_file_manager->metadata_path(),
                                                                                    true,
                                                                                    std::move(custom_encryption_key));
@@ -110,8 +119,10 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
             // FIXME: delete user data in a different way? (This deletes a logged-out user's data as soon as the app
             // launches again, which might not be how some apps want to treat their data.)
             try {
-                m_file_manager->remove_user_directory(user.identity());
+                auto identity = user.identity();
+                m_file_manager->remove_user_directory(identity);
                 dead_users.emplace_back(std::move(user));
+                fire_notification([identity=std::move(identity)](const SyncNotifier& n) { n.user_deleted(identity); });
             } catch (util::File::AccessError const&) {
                 continue;
             }
@@ -174,9 +185,20 @@ void SyncManager::reset_for_testing()
         // NOTE: these should always match the defaults.
         m_log_level = util::Logger::Level::info;
         m_logger_factory = nullptr;
+        m_notifier = nullptr;
+        m_notifier_factory = nullptr;
         m_client_reconnect_mode = sync::Client::Reconnect::normal;
         m_client_validate_ssl = true;
     }
+}
+
+bool SyncManager::fire_notification(std::function<void(const SyncNotifier&)> action)
+{
+    if (m_notifier) {
+        action(*m_notifier);
+        return true;
+    }
+    return false;
 }
 
 void SyncManager::set_log_level(util::Logger::Level level) noexcept
@@ -189,6 +211,12 @@ void SyncManager::set_logger_factory(SyncLoggerFactory& factory) noexcept
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_logger_factory = &factory;
+}
+
+void SyncManager::set_notifier_factory(SyncNotifierFactory& factory) noexcept
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    m_notifier_factory = &factory;
 }
 
 void SyncManager::set_error_handler(std::function<sync::Client::ErrorHandler> handler)
@@ -261,6 +289,7 @@ std::shared_ptr<SyncUser> SyncManager::get_user(const std::string& identity,
         // No existing user.
         auto new_user = std::make_shared<SyncUser>(std::move(refresh_token), identity, auth_server_url, is_admin);
         m_users.insert({ identity, new_user });
+        SyncManager::shared().fire_notification([=](const SyncNotifier& n) { n.user_logged_in(new_user); });
         return new_user;
     } else {
         auto user = it->second;
@@ -385,7 +414,7 @@ void SyncManager::dropped_last_reference_to_session(SyncSession* session)
     session->close();
 }
 
-void SyncManager::unregister_session(const std::string& path)
+void SyncManager::unregister_session(std::string path, SyncConfig config)
 {
     std::lock_guard<std::mutex> lock(m_session_mutex);
     if (m_active_sessions.count(path))
@@ -393,6 +422,7 @@ void SyncManager::unregister_session(const std::string& path)
     auto it = m_inactive_sessions.find(path);
     REALM_ASSERT(it != m_inactive_sessions.end());
     m_inactive_sessions.erase(path);
+    fire_notification([config=std::move(config), path=std::move(path)](const SyncNotifier& n) { n.session_destroyed(std::move(config), path); });
 }
 
 SyncClient& SyncManager::get_sync_client() const

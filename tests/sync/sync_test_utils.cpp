@@ -20,6 +20,16 @@
 
 namespace realm {
 
+bool session_is_active(const SyncSession& session)
+{
+    return session.state() == SyncSession::PublicState::Active;
+}
+
+bool session_is_inactive(const SyncSession& session)
+{
+    return session.state() == SyncSession::PublicState::Inactive;
+}
+
 bool create_dummy_realm(std::string path) {
     Realm::Config config;
     config.path = std::move(path);
