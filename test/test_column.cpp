@@ -606,12 +606,14 @@ TEST_TYPES(Column_FindAllIntMax, IntegerColumn, IntNullColumn)
 
 TEST_TYPES(Column_LowerUpperBound, IntegerColumn, FloatColumn)
 {
+    using T = std::conditional<std::is_same<TEST_TYPE, IntegerColumn>::value, int64_t, float>::type;
+
     // Create column with sorted members
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE col(Allocator::get_default(), ref);
     col.add(5);
     for (size_t i = 5; i < 100; i += 5)
-        col.add(i);
+        col.add(static_cast<T>(i));
 
     // before first entry
     CHECK_EQUAL(0, col.lower_bound(0));

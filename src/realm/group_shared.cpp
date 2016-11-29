@@ -1543,7 +1543,9 @@ const Group& SharedGroup::begin_read(VersionID version_id)
     return m_group;
 }
 
-
+#ifdef _MSC_VER
+#pragma warning (disable: 4297) // throw in noexcept
+#endif
 void SharedGroup::end_read() noexcept
 {
     if (m_transact_stage == transact_Ready)
@@ -1556,6 +1558,9 @@ void SharedGroup::end_read() noexcept
 
     m_transact_stage = transact_Ready;
 }
+#ifdef _MSC_VER
+#pragma warning (default: 4297)
+#endif
 
 
 Group& SharedGroup::begin_write()
@@ -1603,12 +1608,16 @@ SharedGroup::version_type SharedGroup::commit()
     return new_version;
 }
 
-
+#ifdef _MSC_VER
+#pragma warning (disable: 4297) // throw in noexcept
+#endif
 void SharedGroup::rollback() noexcept
 {
     if (m_transact_stage == transact_Ready)
         return; // Idempotency
 
+    // FIXME: Find common/better method for error handling (throw from noexcept, and 
+    // pin_version() asserts instead).
     if (m_transact_stage != transact_Writing)
         throw LogicError(LogicError::wrong_transact_state);
 
@@ -1620,6 +1629,9 @@ void SharedGroup::rollback() noexcept
 
     m_transact_stage = transact_Ready;
 }
+#ifdef _MSC_VER
+#pragma warning (default: 4297)
+#endif
 
 SharedGroup::VersionID SharedGroup::pin_version()
 {

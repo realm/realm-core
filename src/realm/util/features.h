@@ -111,6 +111,10 @@
 #define REALM_DIAG_PUSH() REALM_DIAG(push)
 #define REALM_DIAG_POP() REALM_DIAG(pop)
 
+#ifdef _MSC_VER
+#define REALM_VS_WARNING_DISABLE #pragma warning (default: 4297)
+#endif
+
 #if REALM_HAVE_CLANG_WARNING("-Wtautological-compare") || REALM_HAVE_AT_LEAST_GCC(6, 0)
 #define REALM_DIAG_IGNORE_TAUTOLOGICAL_COMPARE() REALM_DIAG(ignored "-Wtautological-compare")
 #else

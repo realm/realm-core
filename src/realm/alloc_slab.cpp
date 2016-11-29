@@ -655,7 +655,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         }
         ref_type top_ref = 0;
         if (cfg.read_only)
-            top_ref = get_top_ref(m_data, m_file_mappings->m_file.get_size());
+            top_ref = get_top_ref(m_data, to_size_t(m_file_mappings->m_file.get_size()));
         return top_ref;
     }
     // Even though we're the first to map the file, we cannot assume that we're
