@@ -438,9 +438,10 @@ inline BpTreeNode& BpTreeBase::root_as_node()
 
 inline const BpTreeNode& BpTreeBase::root_as_node() const
 {
+    Array* arr = m_root.get();
     REALM_ASSERT_DEBUG(!root_is_leaf());
-    REALM_ASSERT_DEBUG(dynamic_cast<const BpTreeNode*>(m_root.get()) != nullptr);
-    return static_cast<const BpTreeNode&>(root());
+    REALM_ASSERT_DEBUG(dynamic_cast<const BpTreeNode*>(arr) != nullptr);
+    return static_cast<const BpTreeNode&>(*arr);
 }
 
 inline void BpTreeBase::set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
@@ -706,11 +707,16 @@ template <class T>
 void BpTree<T>::init_from_parent()
 {
     ref_type ref = root().get_ref_from_parent();
-    ArrayParent* parent = m_root->get_parent();
-    size_t ndx_in_parent = m_root->get_ndx_in_parent();
-    auto new_root = create_root_from_ref(get_alloc(), ref);
-    new_root->set_parent(parent, ndx_in_parent);
-    m_root = std::move(new_root);
+    if (ref) {
+        ArrayParent* parent = m_root->get_parent();
+        size_t ndx_in_parent = m_root->get_ndx_in_parent();
+        auto new_root = create_root_from_ref(get_alloc(), ref);
+        new_root->set_parent(parent, ndx_in_parent);
+        m_root = std::move(new_root);
+    }
+    else {
+        m_root->detach();
+    }
 }
 
 template <class T>
