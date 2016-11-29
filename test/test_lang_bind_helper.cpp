@@ -12659,5 +12659,57 @@ TEST(LangBindHelper_ColumnMoveUpdatesLinkedTables)
     g_r.verify();
 }
 
+TEST(LangBindHelper_Bug2321)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_r(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.add_table("target");
+        target->add_column(type_Int, "data");
+        target->add_empty_row(10);
+        TableRef origin = group.add_table("origin");
+        origin->add_column_link(type_LinkList, "_link", *target);
+        origin->add_empty_row(2);
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef origin = group.get_table("origin");
+        LinkViewRef lv0 = origin->get_linklist(0, 0);
+        lv0->add(0);
+        lv0->add(1);
+        lv0->add(2);
+        wt.commit();
+    }
+
+    ReadTransaction rt(sg_r);
+    ConstTableRef origin_read = rt.get_group().get_table("origin");
+    ConstLinkViewRef lv1 = origin_read->get_linklist(0, 0);
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef origin = group.get_table("origin");
+        LinkViewRef lv0 = origin->get_linklist(0, 0);
+        lv0->add(3);
+        lv0->add(4);
+        wt.commit();
+    }
+
+    // If MAX_BPNODE_SIZE is 4 and we run in debug mode, then the LinkView
+    // accessor was not refreshed correctly. It would still be a leaf class,
+    // but the header flags would tell it is a node.
+    LangBindHelper::advance_read(sg_r);
+    CHECK_EQUAL(lv1->size(), 5);
+}
+
+
 
 #endif
