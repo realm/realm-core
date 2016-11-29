@@ -33,11 +33,11 @@ namespace {
 
 bool validate_user_in_vector(std::vector<std::shared_ptr<SyncUser>> vector,
                              const std::string& identity,
-                             const std::string& url,
+                             util::Optional<std::string> url,
                              const std::string& token) {
     for (auto& user : vector) {
-        if (user->identity() == identity && user->server_url() == url && user->refresh_token() == token) {
-            return true;
+        if (user->identity() == identity && user->refresh_token() == token && url.value_or("") == user->server_url()) {
+           return true;
         }
     }
     return false;
@@ -87,6 +87,69 @@ TEST_CASE("sync_manager: `path_for_realm` API", "[sync]") {
     }
 }
 
+TEST_CASE("sync_manager: user state management", "[sync]") {
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    reset_test_directory(base_path);
+    SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoMetadata);
+
+    const std::string url_1 = "https://example.realm.com/1/";
+    const std::string url_2 = "https://example.realm.com/2/";
+    const std::string url_3 = "https://example.realm.com/3/";
+    const std::string token_1 = "foo_token";
+    const std::string token_2 = "bar_token";
+    const std::string token_3 = "baz_token";
+    const std::string identity_1 = "user-foo";
+    const std::string identity_2 = "user-bar";
+    const std::string identity_3 = "user-baz";
+
+    SECTION("should get all users that are created during run time") {
+        SyncManager::shared().get_user(identity_1, token_1, url_1);
+        SyncManager::shared().get_user(identity_2, token_2, url_2);
+        auto users = SyncManager::shared().all_logged_in_users();
+        REQUIRE(users.size() == 2);
+        CHECK(validate_user_in_vector(users, identity_1, url_1, token_1));
+        CHECK(validate_user_in_vector(users, identity_2, url_2, token_2));
+    }
+
+    SECTION("should properly update state in response to users logging in and out") {
+        auto token_3a = "qwerty";
+        auto u1 = SyncManager::shared().get_user(identity_1, token_1, url_1);
+        auto u2 = SyncManager::shared().get_user(identity_2, token_2, url_2);
+        auto u3 = SyncManager::shared().get_user(identity_3, token_3, url_3);
+        auto users = SyncManager::shared().all_logged_in_users();
+        REQUIRE(users.size() == 3);
+        CHECK(validate_user_in_vector(users, identity_1, url_1, token_1));
+        CHECK(validate_user_in_vector(users, identity_2, url_2, token_2));
+        CHECK(validate_user_in_vector(users, identity_3, url_3, token_3));
+        // Log out users 1 and 3
+        u1->log_out();
+        u3->log_out();
+        users = SyncManager::shared().all_logged_in_users();
+        REQUIRE(users.size() == 1);
+        CHECK(validate_user_in_vector(users, identity_2, url_2, token_2));
+        // Log user 3 back in
+        u3 = SyncManager::shared().get_user(identity_3, token_3a, url_3);
+        users = SyncManager::shared().all_logged_in_users();
+        REQUIRE(users.size() == 2);
+        CHECK(validate_user_in_vector(users, identity_2, url_2, token_2));
+        CHECK(validate_user_in_vector(users, identity_3, url_3, token_3a));
+        // Log user 2 out
+        u2->log_out();
+        users = SyncManager::shared().all_logged_in_users();
+        REQUIRE(users.size() == 1);
+        CHECK(validate_user_in_vector(users, identity_3, url_3, token_3a));
+    }
+
+    SECTION("should contain admin-token users if such users are created.") {
+        SyncManager::shared().get_user(identity_2, token_2, url_2);
+        SyncManager::shared().get_user(identity_3, token_3, none, true);
+        auto users = SyncManager::shared().all_logged_in_users();
+        REQUIRE(users.size() == 2);
+        CHECK(validate_user_in_vector(users, identity_2, url_2, token_2));
+        CHECK(validate_user_in_vector(users, identity_3, none, token_3));
+    }
+}
+
 TEST_CASE("sync_manager: persistent user state management", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
@@ -118,7 +181,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
 
         SECTION("they should be added to the active users list when metadata is enabled") {
             SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
-            auto users = SyncManager::shared().all_users();
+            auto users = SyncManager::shared().all_logged_in_users();
             REQUIRE(users.size() == 3);
             REQUIRE(validate_user_in_vector(users, identity_1, url_1, token_1));
             REQUIRE(validate_user_in_vector(users, identity_2, url_2, token_2));
@@ -126,7 +189,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         }
         SECTION("they should not be added to the active users list when metadata is disabled") {
             SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoMetadata);
-            auto users = SyncManager::shared().all_users();
+            auto users = SyncManager::shared().all_logged_in_users();
             REQUIRE(users.size() == 0);
         }
     }
@@ -156,7 +219,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
 
         SECTION("they should be cleaned up if metadata is enabled") {
             SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
-            auto users = SyncManager::shared().all_users();
+            auto users = SyncManager::shared().all_logged_in_users();
             REQUIRE(users.size() == 1);
             REQUIRE(validate_user_in_vector(users, identity_3, url_3, token_3));
             REQUIRE_DIR_DOES_NOT_EXIST(user_dir_1);
@@ -165,7 +228,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
         }
         SECTION("they should be left alone if metadata is disabled") {
             SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoMetadata);
-            auto users = SyncManager::shared().all_users();
+            auto users = SyncManager::shared().all_logged_in_users();
             REQUIRE_DIR_EXISTS(user_dir_1);
             REQUIRE_DIR_EXISTS(user_dir_2);
             REQUIRE_DIR_EXISTS(user_dir_3);

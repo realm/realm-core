@@ -263,14 +263,14 @@ std::shared_ptr<SyncUser> SyncManager::get_existing_logged_in_user(const std::st
     return (ptr->state() == SyncUser::State::Active ? ptr : nullptr);
 }
 
-std::vector<std::shared_ptr<SyncUser>> SyncManager::all_users() const
+std::vector<std::shared_ptr<SyncUser>> SyncManager::all_logged_in_users() const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
     std::vector<std::shared_ptr<SyncUser>> users;
     users.reserve(m_users.size());
     for (auto& it : m_users) {
         auto user = it.second;
-        if (user->state() != SyncUser::State::Error) {
+        if (user->state() == SyncUser::State::Active) {
             users.emplace_back(std::move(user));
         }
     }
