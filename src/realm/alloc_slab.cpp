@@ -416,12 +416,14 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 
     m_free_space_state = free_space_Dirty;
 
+#ifdef REALM_DEBUG
     // Check for double free
     for (auto& c : free_space) {
         if ((ref >= c.ref && ref < (c.ref + c.size)) || (ref < c.ref && ref_end > c.ref)) {
-            REALM_ASSERT_RELEASE(!"Double Free");
+            REALM_ASSERT(!"Double Free");
         }
     }
+#endif
 
     // Check if we can merge with adjacent succeeding free block
     typedef chunks::iterator iter;
