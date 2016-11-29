@@ -540,6 +540,16 @@ public:
     ///        this \c Array, sorted in ascending order
     /// \return the index of the value if found, or realm::not_found otherwise
     size_t find_gte(const int64_t target, size_t start, size_t end = size_t(-1)) const;
+
+    /// \brief Search the \c Array for a value greater or equal than \a target,
+    /// starting the search at the \a start index.
+    ///
+    /// \param target the smallest value to search for
+    /// \param start the offset at which to start searching in the array
+    /// \param end the offset at which to stop searching in the array
+    /// \return the index of the value if found, or realm::not_found otherwise
+    size_t find_gte_unsorted(const int64_t target, size_t start, size_t end = size_t(-1)) const;
+
     void preset(int64_t min, int64_t max, size_t num_items);
     void preset(size_t bitwidth, size_t num_items);
 
@@ -943,6 +953,9 @@ private:
 
     template <size_t w>
     size_t find_gte(const int64_t target, size_t start, size_t end) const;
+
+    template <size_t w>
+    size_t find_gte_unsorted(const int64_t target, size_t start, size_t end) const;
 
     template <size_t w>
     size_t adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64_t diff);
