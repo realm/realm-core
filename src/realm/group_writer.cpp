@@ -379,6 +379,15 @@ ref_type GroupWriter::write_group()
         // ascending position) to facilitate merge of adjacent segments. We
         // can find the correct insert postion by binary search
         size_t ndx = m_free_positions.lower_bound_int(ref);
+        if (ndx > 0) {
+            ref_type prev_ref = to_ref(m_free_positions.get(ndx - 1));
+            size_t prev_size = to_size_t(m_free_lengths.get(ndx - 1));
+            REALM_ASSERT_RELEASE(prev_ref + prev_size <= ref);
+        }
+        {
+            ref_type after_ref = to_ref(m_free_positions.get(ndx));
+            REALM_ASSERT_RELEASE(ref + size <= after_ref);
+        }
         m_free_positions.insert(ndx, ref); // Throws
         m_free_lengths.insert(ndx, size);  // Throws
         if (is_shared)
