@@ -9730,7 +9730,7 @@ TEST(Query_TableInitialization)
 }
 
 
-ONLY(Query_UTF8_Contains)
+TEST(Query_UTF8_Contains)
 {
     Group group;
     TableRef table1 = group.add_table("table1");
@@ -9739,6 +9739,30 @@ ONLY(Query_UTF8_Contains)
     table1->set_string(0, 0, StringData("\x0ff\x000", 2));
     size_t m = table1->column<String>(0).contains(StringData("\x0ff\x000", 2), false).count();
     CHECK_EQUAL(1, m);
+}
+
+
+ONLY(Query_UTF8_Contains_Fuzzy)
+{
+    Table table;
+    table.add_column(type_String, "str1");
+    table.add_empty_row();
+
+    for (size_t t = 0; t < 10000; t++) {
+        char haystack[10];
+        char needle[7];
+
+        for (size_t c = 0; c < 10; c++)
+            haystack[c] = char(fastrand());
+
+        for (size_t c = 0; c < 7; c++)
+            needle[c] = char(fastrand());
+
+        table.set_string(0, 0, StringData(haystack, 10));
+
+        table.column<String>(0).contains(StringData(needle, fastrand(7)), false).count();
+        table.column<String>(0).contains(StringData(needle, fastrand(7)), true).count();
+    }
 }
 
 #endif // TEST_QUERY
