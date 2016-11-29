@@ -167,12 +167,7 @@ def doBuildCocoa(def isPublishingRun) {
               (
                   cd $tmpdir || exit 1
                   unzip -qq "$dir/core-$version.zip" || exit 1
-
-                  # We only need an armv7s slice for CocoaPods, and the podspec never uses
-                  # the debug build of core, so remove that slice
-                  lipo -remove armv7s core/librealm-iphone-dbg.a -o core/librealm-ios-dbg.a
                   mv core/librealm-iphone.a core/librealm-ios.a
-
                   tar cf "$dir/realm-core-$version.tar.xz" --xz core || exit 1
               )
               rm -rf "$tmpdir" || exit 1
