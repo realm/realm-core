@@ -332,6 +332,7 @@ ref_type GroupWriter::write_group()
     m_free_lengths.copy_on_write();   // Throws
     if (is_shared)
         m_free_versions.copy_on_write();                                            // Throws
+    m_group.m_alloc.consolidate_free_read_only();                                   // Throws
     const SlabAlloc::chunks& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
     max_free_list_size += new_free_space.size();
 
@@ -370,7 +371,7 @@ ref_type GroupWriter::write_group()
     // the free-lists any free space created during the current transaction (or
     // since last commit). Had we added it earlier, we would have risked
     // clobering the previous database version. Note, however, that this risk
-    // would only have been present in the non-transactionl case where there is
+    // would only have been present in the non-transactional case where there is
     // no version tracking on the free-space chunks.
     for (const auto& free_space : new_free_space) {
         ref_type ref = free_space.ref;
