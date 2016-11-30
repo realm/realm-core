@@ -2,6 +2,8 @@
 
 require 'tmpdir'
 require 'fileutils'
+require 'uri'
+require 'open-uri'
 
 task :default do
   system('rake -sT') # s for silent
