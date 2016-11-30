@@ -9826,9 +9826,9 @@ TEST(Query_ArrayLeafRelocate)
         TableRef contact = group.add_table("contact");
         TableRef contact_type = group.add_table("contact_type");
 
-        size_t col_int = contact_type->add_column(type_Int, "id");
+        contact_type->add_column(type_Int, "id");
         contact_type->add_column(type_String, "str");
-        size_t col_link = contact->add_column_link(type_LinkList, "link", *contact_type);
+        contact->add_column_link(type_LinkList, "link", *contact_type);
 
         contact_type.get()->add_empty_row(10);
         contact.get()->add_empty_row(10);
