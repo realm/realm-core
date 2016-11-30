@@ -7,8 +7,15 @@
   for handover from.
 * Fix a crash when calling mkfifo on Android 4.x external storage. On 4.x devices,
   errno is EPERM instead of EACCES.
-* Fix a crash when updating a LinkView accessor from a leaf to an inner node. Occurs
-  only in debug mode. (#2321)
+* Fix a crash when updating a LinkView accessor from a leaf to an inner node. (#2321)
+
+### Breaking changes
+
+* The return type of `util::File::copy()` has been changed from `bool` to
+  `void`. Errors are now reported via `File::AccessError` exceptions. This
+  greatly increases the utility and robustness of `util::File::copy()`, as it
+  now catches all errors, and reports them in the same style as the other
+  functions in `util::File`.
 
 ### Enhancements
 
@@ -18,6 +25,9 @@
   implementation). The utilized lock-file flag
   (`SharedInfo::sync_agent_present`) was added a long time ago, but the
   completion of detection mechanism got postponed until now.
+* Improve performance of write transactions which free a large amount of
+  existing data.
+* Added `util::File::compare()` for comparing two files for equality.
 
 -----------
 
