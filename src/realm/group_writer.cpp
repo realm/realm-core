@@ -283,7 +283,6 @@ ref_type GroupWriter::write_group()
 
     Array& top = m_group.m_top;
     bool is_shared = m_group.m_is_shared;
-
     REALM_ASSERT_3(m_free_positions.size(), ==, m_free_lengths.size());
     REALM_ASSERT(!is_shared || m_free_versions.size() == m_free_lengths.size());
 
@@ -385,7 +384,7 @@ ref_type GroupWriter::write_group()
             size_t prev_size = to_size_t(m_free_lengths.get(ndx - 1));
             REALM_ASSERT_RELEASE(prev_ref + prev_size <= ref);
         }
-        {
+        if (ndx < m_free_positions.size()) {
             ref_type after_ref = to_ref(m_free_positions.get(ndx));
             REALM_ASSERT_RELEASE(ref + size <= after_ref);
         }
