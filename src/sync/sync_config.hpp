@@ -43,7 +43,7 @@ using SyncBindSessionHandler = void(const std::string&,          // path on disk
                                     std::shared_ptr<SyncSession> // the session which should be bound.
                                     );
 
-using SyncSessionErrorHandler = void(int error_code, std::string message, SyncSessionError);
+using SyncSessionErrorHandler = void(std::shared_ptr<SyncSession>, int error_code, std::string message, SyncSessionError);
 
 struct SyncConfig {
     std::shared_ptr<SyncUser> user;

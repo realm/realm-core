@@ -374,7 +374,7 @@ void SyncSession::create_sync_session()
                 break;
         }
         if (m_error_handler) {
-            m_error_handler(error_code, message, error_type);
+            m_error_handler(std::move(self), error_code, message, error_type);
         }
     };
     m_session->set_error_handler(std::move(wrapped_handler));
