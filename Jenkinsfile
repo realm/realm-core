@@ -61,8 +61,10 @@ try {
     buildCocoa: doBuildCocoa(isPublishingRun),
     buildNodeLinuxDebug: doBuildNodeInDocker('Debug', isPublishingRun),
     buildNodeLinuxRelease: doBuildNodeInDocker('Release', isPublishingRun),
-    buildNodeOsx: doBuildNodeInOsx(isPublishingRun),
-    buildOsxDylibs: doBuildOsxDylibs(isPublishingRun),
+    buildNodeOsxStaticRelease: doBuildNodeInOsx('STATIC', 'Release', isPublishingRun),
+    buildNodeOsxStaticDebug: doBuildNodeInOsx('STATIC', 'Debug', isPublishingRun),
+    buildNodeOsxSharedRelease: doBuildNodeInOsx('SHARED', 'Release', isPublishingRun),
+    buildNodeOsxSharedDebug: doBuildNodeInOsx('SHARED', 'Debug', isPublishingRun),
     addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
     //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
   ]
@@ -321,30 +323,33 @@ def doBuildNodeInDocker(String buildType, boolean isPublishingRun) {
   }
 }
 
-def doBuildNodeInOsx(def isPublishingRun) {
+def doBuildNodeInOsx(String buildType, String libType, boolean isPublishingRun) {
   return {
     node('osx_vegas') {
       getArchive()
 
-      def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
-      withEnv(environment) {
-        sh 'sh build.sh config'
-        try {
-          sh 'sh build.sh build-node-package'
-          sh 'cp realm-core-node-*.tar.gz realm-core-node-osx-latest.tar.gz'
-          if (isPublishingRun) {
-            stash includes: '*realm-core-node-osx-*.*.*.tar.gz', name: 'node-cocoa-package'
+      try {
+          sh """
+                mkdir -p build_dir
+                cd build_dir
+                rm -rf *
+                cmake -DREALM_ENABLE_ENCRYPTION=yes \\
+                      -DREALM_ENABLE_ASSERTIONS=yes \\
+                      -DREALM_BUILD_LIB_ONLY=1 \\
+                      -DREALM_LIBTYPE=${libType} \\
+                      -DCMAKE_BUILD_TYPE=${buildType} \\
+                      -GNinja ..
+                ninja
+                cpack
+              """
+          dir('build-dir') {
+              if (isPublishingRun) {
+                  stash includes: 'realm-core-*.tar.gz', name: 'node'
+              }
+              archiveArtifacts artifacts: 'realm-core-*.tar.gz'
           }
-          archiveArtifacts artifacts: '*realm-core-node-osx-*.*.*.tar.gz'
-
-          sh 'sh build.sh clean'
-
-          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-            sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core/'
-          }
-        } finally {
+      } finally {
           collectCompilerWarnings('clang')
-        }
       }
     }
   }
