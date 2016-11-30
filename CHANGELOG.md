@@ -10,7 +10,11 @@
 
 ### Breaking changes
 
-* Lorem ipsum. 
+* The return type of `util::File::copy()` has been changed from `bool` to
+  `void`. Errors are now reported via `File::AccessError` exceptions. This
+  greatly increases the utility and robustness of `util::File::copy()`, as it
+  now catches all errors, and reports them in the same style as the other
+  functions in `util::File`.
 
 ### Enhancements
 
@@ -22,6 +26,7 @@
   completion of detection mechanism got postponed until now.
 * Improve performance of write transactions which free a large amount of
   existing data.
+* Added `util::File::compare()` for comparing two files for equality.
 
 -----------
 
