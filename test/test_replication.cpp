@@ -3569,6 +3569,46 @@ TEST(Replication_MergeRows)
 }
 
 
+TEST(Replication_LinkListNullifyThroughTableView)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    util::Logger& replay_logger = test_context.logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef t0 = wt.add_table("t0");
+        TableRef t1 = wt.add_table("t1");
+        t0->add_column_link(type_LinkList, "l", *t1);
+        t1->add_column(type_Int, "i");
+        t1->add_empty_row();
+        t0->add_empty_row();
+        t0->get_linklist(0, 0)->add(0);
+
+        // Create a TableView for the table and remove the rows through that.
+        auto tv = t1->where().find_all();
+        tv.clear(RemoveMode::unordered);
+
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt1(sg_1);
+        ReadTransaction rt2(sg_2);
+
+        CHECK(rt1.get_group() == rt2.get_group());
+        CHECK_EQUAL(rt1.get_table(0)->size(), 1);
+        CHECK_EQUAL(rt1.get_table(1)->size(), 0);
+        CHECK_EQUAL(rt1.get_table(0)->get_linklist(0, 0)->size(), 0);
+    }
+}
+
+
 TEST(Replication_Substrings)
 {
     SHARED_GROUP_TEST_PATH(path_1);

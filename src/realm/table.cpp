@@ -2266,17 +2266,17 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
         auto rend = rows.rend();
         for (auto i = rows.rbegin(); i != rend; ++i) {
             size_t row_ndx = *i;
-            if (repl) {
-                size_t num_rows_to_erase = 1;
-                size_t prior_num_rows = m_size;
-                repl->erase_rows(this, row_ndx, num_rows_to_erase, prior_num_rows, is_move_last_over); // Throws
-            }
             bool broken_reciprocal_backlinks = false;
+            size_t prior_num_rows = m_size;
             if (is_move_last_over) {
                 do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
             }
             else {
                 do_remove(row_ndx, broken_reciprocal_backlinks); // Throws
+            }
+            if (repl) {
+                size_t num_rows_to_erase = 1;
+                repl->erase_rows(this, row_ndx, num_rows_to_erase, prior_num_rows, is_move_last_over); // Throws
             }
         }
         return;

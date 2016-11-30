@@ -43,7 +43,7 @@ docker_build() {
     docker history "$new_id"
   fi
 
-  if [ "${NOPUSH}" != "1" ] && [ "${DOCKER_REGISTRY}" != "" ]; then
+  if [ "${DOCKER_PUSH:-0}" != "0" ] && [ "${DOCKER_REGISTRY}" != "" ]; then
     docker tag "${name}" "${remote_name}"
     docker_push "${remote_name}"
   fi

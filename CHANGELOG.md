@@ -26,6 +26,22 @@
 
 ----------------------------------------------
 
+# 2.1.3 Release notes
+
+### Bugfixes
+
+* Deleting rows through a `TableView` generated wrong instructions by way of
+  `Table::batch_erase_rows()`, which would only be noticed after reapplying the
+  transaction log to a separate Realm file or via synchronization.
+
+-----------
+
+### Internals
+
+* `array_direct.hpp` added to installed headers.
+
+----------------------------------------------
+
 # 2.1.2 Release notes
 
 ### Bugfixes
