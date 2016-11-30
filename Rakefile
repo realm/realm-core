@@ -450,7 +450,7 @@ android_abis.product(android_build_types) do |abi, build_type|
   end
 
   build_android_dependencies << "build-android-#{abi[:name]}-#{build_type}"
-  abi[:"filename_#{build_type.downcase}"] = "#{dir}/src/realm/librealm.a"
+  abi[:"filename_#{build_type.downcase}"] = "#{dir}/install/lib/librealm.a"
   abi[:"build_dir_#{build_type.downcase}"] = dir
 end
 
