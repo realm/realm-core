@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     g++-4.9 \
     libprocps4-dev \
     libssl-dev \
+    ninja-build \
     pandoc \
     python-cheetah \
     python-pip \
