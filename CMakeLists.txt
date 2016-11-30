@@ -143,5 +143,18 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like
 add_subdirectory(src)
 
 # Enable CTest and include unit tests
-enable_testing()
-add_subdirectory(test)
+if(NOT REALM_BUILD_LIB_ONLY)
+    enable_testing()
+    add_subdirectory(test)
+endif()
+
+# Enable CPack
+set(CPACK_GENERATOR "TGZ")
+string(TOLOWER "realm-core-${REALM_LIBTYPE}-${CMAKE_BUILD_TYPE}" REALM_PACKAGE_NAME)
+set(CPACK_PACKAGE_NAME ${REALM_PACKAGE_NAME})
+set(CPACK_PACKAGE_VERSION_MAJOR ${REALM_VERSION_MAJOR})
+set(CPACK_PACKAGE_VERSION_MINOR ${REALM_VERSION_MINOR})
+set(CPACK_PACKAGE_VERSION_PATCH ${REALM_VERSION_PATCH})
+set(CPACK_PACKAGE_VENDOR "Realm Inc.")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+include(CPack)

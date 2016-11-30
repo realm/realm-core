@@ -178,17 +178,18 @@ set(REALM_OTHER_UTIL_HEADERS
     util/errno.hpp
 ) # REALM_OTHER_UTIL_HEADERS
 
-# An object library to group together the compilation of the source files.
-add_library(realm-objects OBJECT
-    ${REALM_SOURCES} ${REALM_INSTALL_GENERAL_HEADERS}
-    ${REALM_INSTALL_UTIL_HEADERS} ${REALM_OTHER_UTIL_HEADERS}
+add_library(realm ${REALM_LIBTYPE} ${REALM_SOURCES})
+
+set_target_properties(
+    realm PROPERTIES
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${REALM_SOVERSION}
 )
 
-set_target_properties(realm-objects PROPERTIES
-    POSITION_INDEPENDENT_CODE true
-
-    # Configure the optimization level explicitly because CMake doesn't recognize -Oz
-    # in CMAKE_CXX_CFLAGS.
+set_target_properties(
+    realm PROPERTIES
+    XCODE_ATTRIBUTE_INSTALL_PATH "/"
+    XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
     XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL "\$(GCC_OPTIMIZATION_LEVEL_\$(CONFIGURATION))"
     XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_Debug "0"
     XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_MinSizeDebug "z"
@@ -197,23 +198,12 @@ set_target_properties(realm-objects PROPERTIES
     XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelMinSize "3"
 )
 
-add_library(realm ${REALM_LIBTYPE} $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
-
-set_target_properties(
-    realm PROPERTIES
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${REALM_SOVERSION}
-)
-
 if(REALM_LIBTYPE STREQUAL "STATIC")
     set_target_properties(
         realm PROPERTIES
         # The static library may get included in a dynamic library
         # (the bindings), so build as position independent code.
         POSITION_INDEPENDENT_CODE true
-
-        XCODE_ATTRIBUTE_INSTALL_PATH "/"
-        XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
     )
 endif()
 
@@ -250,13 +240,15 @@ if(APPLE)
 endif(APPLE)
 
 install(TARGETS realm
-        DESTINATION ${CMAKE_INSTALL_LIBDIR})
+        COMPONENT core
+        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm)
 install(FILES ${REALM_INSTALL_UTIL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util)
 
-if (NOT APPLE AND NOT ANDROID)
+if (NOT APPLE AND NOT ANDROID AND NOT REALM_BUILD_LIB_ONLY)
     add_executable(realm-config config_tool.cpp)
     add_executable(realm-importer importer_tool.cpp)
     target_link_libraries(realm-importer realm)

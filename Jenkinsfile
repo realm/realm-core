@@ -59,7 +59,8 @@ try {
     checkLinuxRelease: doBuildInDocker('check'),
     checkLinuxDebug: doBuildInDocker('check-debug'),
     buildCocoa: doBuildCocoa(isPublishingRun),
-    buildNodeLinux: doBuildNodeInDocker(isPublishingRun),
+    buildNodeLinux: doBuildNodeInDocker('Debug', isPublishingRun),
+    buildNodeLinux: doBuildNodeInDocker('Release', isPublishingRun),
     buildNodeOsx: doBuildNodeInOsx(isPublishingRun),
     buildOsxDylibs: doBuildOsxDylibs(isPublishingRun),
     addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
@@ -285,30 +286,36 @@ def buildDiffCoverage() {
   }
 }
 
-def doBuildNodeInDocker(def isPublishingRun) {
+def doBuildNodeInDocker(String buildType, boolean isPublishingRun) {
   return {
     node('docker') {
       getArchive()
 
       def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
-      def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
-      withEnv(environment) {
-        buildEnv.inside {
-          sh 'sh build.sh config'
+      buildEnv.inside {
           try {
-              sh 'sh build.sh build-node-package'
-              sh 'cp realm-core-node-*.tar.gz realm-core-node-linux-latest.tar.gz'
-              if (isPublishingRun) {
-                stash includes: '*realm-core-node-linux-*.*.*.tar.gz', name: 'node-linux-package'
-              }
-              archiveArtifacts artifacts: '*realm-core-node-linux-*.*.*.tar.gz'
-              withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-                sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core/'
+              sh """
+                mkdir -p build_dir
+                cd build_dir
+                rm -rf *
+                cmake -DREALM_ENABLE_ENCRYPTION=yes \\
+                      -DREALM_ENABLE_ASSERTIONS=yes \\
+                      -DREALM_BUILD_LIB_ONLY=1 \\
+                      -DREALM_LIBTYPE=STATIC \\
+                      -DCMAKE_BUILD_TYPE=${buildType} \\
+                      -Gninja ..
+                ninja
+                cpack
+              """
+              dir('build-dir') {
+                  if (isPublishingRun) {
+                      stash includes: 'realm-core-*.tar.gz', name: 'node'
+                  }
+                  archiveArtifacts artifacts: 'realm-core-*.tar.gz'
               }
           } finally {
             collectCompilerWarnings('gcc')
           }
-        }
       }
     }
   }
