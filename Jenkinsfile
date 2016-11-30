@@ -303,7 +303,7 @@ def doBuildNodeInDocker(String buildType, boolean isPublishingRun) {
                       -DREALM_BUILD_LIB_ONLY=1 \\
                       -DREALM_LIBTYPE=STATIC \\
                       -DCMAKE_BUILD_TYPE=${buildType} \\
-                      -Gninja ..
+                      -GNinja ..
                 ninja
                 cpack
               """
