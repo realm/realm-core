@@ -323,7 +323,7 @@ def doBuildNodeInDocker(String buildType, boolean isPublishingRun) {
   }
 }
 
-def doBuildNodeInOsx(String buildType, String libType, boolean isPublishingRun) {
+def doBuildNodeInOsx(String libType, String buildType, boolean isPublishingRun) {
   return {
     node('osx_vegas') {
       getArchive()
