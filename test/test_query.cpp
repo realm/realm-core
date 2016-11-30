@@ -9820,7 +9820,7 @@ TEST(Query_ArrayLeafRelocate)
 {
     for (size_t iter = 0; iter < 10; iter++) {
         // Tests crash where a query node would have a SequentialGetter that pointed to an old array leaf
-        // that was relocated
+        // that was relocated. https://github.com/realm/realm-core/issues/2269
         Group group;
 
         TableRef contact = group.add_table("contact");
