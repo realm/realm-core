@@ -470,7 +470,7 @@ task 'package-android' => android_package_dependencies do
     File.open("#{dir}/OpenSSL.txt", 'a') do |file|
       file << "This product includes software developed by the OpenSSL Project for use in the OpenSSL toolkit. (http://www.openssl.org/).\n\n"
       file << "The following license applies only to the portions of this product developed by the OpenSSL Project.\n\n"
-      file << File.open("#{android_abis.first[:build_dir_release]}/src/realm/openssl-prefix/src/openssl/LICENSE").read
+      file << open('https://raw.githubusercontent.com/openssl/openssl/master/LICENSE').read
     end
     Dir.chdir(dir) do
       sh "cmake -E tar czf #{__dir__}/realm-core-android-latest.tar.gz *"
