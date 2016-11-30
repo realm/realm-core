@@ -59,8 +59,8 @@ try {
     checkLinuxRelease: doBuildInDocker('check'),
     checkLinuxDebug: doBuildInDocker('check-debug'),
     buildCocoa: doBuildCocoa(isPublishingRun),
-    buildNodeLinux: doBuildNodeInDocker('Debug', isPublishingRun),
-    buildNodeLinux: doBuildNodeInDocker('Release', isPublishingRun),
+    buildNodeLinuxDebug: doBuildNodeInDocker('Debug', isPublishingRun),
+    buildNodeLinuxRelease: doBuildNodeInDocker('Release', isPublishingRun),
     buildNodeOsx: doBuildNodeInOsx(isPublishingRun),
     buildOsxDylibs: doBuildOsxDylibs(isPublishingRun),
     addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
