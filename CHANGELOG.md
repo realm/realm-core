@@ -20,6 +20,8 @@
   implementation). The utilized lock-file flag
   (`SharedInfo::sync_agent_present`) was added a long time ago, but the
   completion of detection mechanism got postponed until now.
+* Improve performance of write transactions which free a large amount of
+  existing data.
 
 -----------
 

@@ -416,43 +416,47 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 
     m_free_space_state = free_space_Dirty;
 
+#ifdef REALM_DEBUG
     // Check for double free
     for (auto& c : free_space) {
         if ((ref >= c.ref && ref < (c.ref + c.size)) || (ref < c.ref && ref_end > c.ref)) {
-            REALM_ASSERT_RELEASE(!"Double Free");
+            REALM_ASSERT(!"Double Free");
         }
     }
+#endif
 
     // Check if we can merge with adjacent succeeding free block
     typedef chunks::iterator iter;
     iter merged_with = free_space.end();
-    {
-        iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEq(ref_end));
-        if (i != free_space.end()) {
-            // No consolidation over slab borders
-            if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref_end)) == m_slabs.end()) {
-                i->ref = ref;
-                i->size += size;
-                merged_with = i;
+    if (!read_only) {
+        {
+            iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEq(ref_end));
+            if (i != free_space.end()) {
+                // No consolidation over slab borders
+                if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref_end)) == m_slabs.end()) {
+                    i->ref = ref;
+                    i->size += size;
+                    merged_with = i;
+                }
             }
         }
-    }
 
-    // Check if we can merge with adjacent preceeding free block (not if that
-    // would cross slab boundary)
-    if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref)) == m_slabs.end()) {
-        iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEndEq(ref));
-        if (i != free_space.end()) {
-            if (merged_with != free_space.end()) {
-                i->size += merged_with->size;
-                // Erase by "move last over"
-                *merged_with = free_space.back();
-                free_space.pop_back();
+        // Check if we can merge with adjacent preceeding free block (not if that
+        // would cross slab boundary)
+        if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref)) == m_slabs.end()) {
+            iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEndEq(ref));
+            if (i != free_space.end()) {
+                if (merged_with != free_space.end()) {
+                    i->size += merged_with->size;
+                    // Erase by "move last over"
+                    *merged_with = free_space.back();
+                    free_space.pop_back();
+                }
+                else {
+                    i->size += size;
+                }
+                return;
             }
-            else {
-                i->size += size;
-            }
-            return;
         }
     }
 
@@ -468,6 +472,37 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
             m_free_space_state = free_space_Invalid;
         }
     }
+}
+
+
+void SlabAlloc::consolidate_free_read_only()
+{
+    if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
+        throw InvalidFreeSpace();
+    if (m_free_read_only.empty())
+        return;
+
+    std::sort(begin(m_free_read_only), end(m_free_read_only), [](auto& a, auto& b) {
+        return a.ref < b.ref;
+    });
+
+    // Combine any adjacent chunks in the freelist, except for when the chunks
+    // are on the edge of an allocation slab
+    auto prev = m_free_read_only.begin();
+    for (auto it = m_free_read_only.begin() + 1; it != m_free_read_only.end(); ++it) {
+        if (prev->ref + prev->size != it->ref) {
+            prev = it;
+            continue;
+        }
+
+        prev->size += it->size;
+        it->size = 0;
+    }
+
+    // Remove all of the now zero-size chunks from the free list
+    m_free_read_only.erase(std::remove_if(begin(m_free_read_only), end(m_free_read_only),
+                                          [](auto& chunk) { return chunk.size == 0; }),
+                           end(m_free_read_only));
 }
 
 
