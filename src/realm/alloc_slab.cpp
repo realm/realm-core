@@ -494,10 +494,6 @@ void SlabAlloc::consolidate_free_read_only()
             prev = it;
             continue;
         }
-        if (std::any_of(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(prev->ref + prev->size))) {
-            prev = it;
-            continue;
-        }
 
         prev->size += it->size;
         it->size = 0;

@@ -920,25 +920,6 @@ exit:
     return ret;
 }
 
-size_t Array::find_gte_unsorted(const int64_t target, size_t start, size_t end) const
-{
-    REALM_ASSERT(start < size());
-    if (end > m_size)
-        end = m_size;
-
-    REALM_TEMPEX(return find_gte_unsorted, m_width, (target, start, end));
-}
-
-template <size_t w>
-size_t Array::find_gte_unsorted(const int64_t target, size_t start, size_t end) const
-{
-    for (size_t idx = start; idx < end; ++idx) {
-        if (get<w>(idx) >= target)
-            return idx;
-    }
-    return not_found;
-}
-
 size_t Array::first_set_bit(unsigned int v) const
 {
 #if 0 && defined(USE_SSE42) && defined(_MSC_VER) && defined(REALM_PTR_64)

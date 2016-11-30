@@ -587,7 +587,7 @@ std::pair<size_t, size_t> GroupWriter::search_free_space_in_part_of_freelist(siz
     bool is_shared = m_group.m_is_shared;
     SlabAlloc& alloc = m_group.m_alloc;
     for (size_t next_start = begin; next_start < end; ) {
-        size_t i = m_free_lengths.find_gte_unsorted(size, next_start);
+        size_t i = m_free_lengths.find_first<Greater>(size - 1, next_start);
         if (i == not_found) {
             break;
         }
