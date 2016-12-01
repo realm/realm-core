@@ -301,8 +301,8 @@
 		48B1D2381C749D750066A961 /* crypt_key.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 48B1D2371C749D750066A961 /* crypt_key.hpp */; };
 		48B1D23A1C749D850066A961 /* crypt_key.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48B1D2391C749D850066A961 /* crypt_key.cpp */; };
 		48B1D23B1C749DF00066A961 /* crypt_key.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48B1D2391C749D850066A961 /* crypt_key.cpp */; };
-		4BE251771D6B0282009121FB /* group_shared_options.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4BE251761D6B0282009121FB /* group_shared_options.hpp */; };
 		4B07BA971D64860100A6D7E0 /* test_destructor_thread_safety.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 4B07BA961D64860100A6D7E0 /* test_destructor_thread_safety.cpp */; };
+		4BE251771D6B0282009121FB /* group_shared_options.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 4BE251761D6B0282009121FB /* group_shared_options.hpp */; };
 		520588CA16C1DA9D009DA6D8 /* data_type.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 520588C916C1DA9D009DA6D8 /* data_type.hpp */; };
 		52113CDE16C27EF800C301FB /* lang_bind_helper.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52113CDD16C27EF800C301FB /* lang_bind_helper.cpp */; };
 		5219EB6918FB026100FF9232 /* verified_integer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5219EB6718FB026100FF9232 /* verified_integer.cpp */; };
@@ -378,6 +378,8 @@
 		6508530A1CC6C4DC0020F9BB /* timestamp.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 650853091CC6C4DC0020F9BB /* timestamp.hpp */; };
 		6508530B1CC6C6150020F9BB /* timestamp.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 650853091CC6C4DC0020F9BB /* timestamp.hpp */; };
 		6508530C1CC6C6150020F9BB /* timestamp.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 650853091CC6C4DC0020F9BB /* timestamp.hpp */; };
+		650957E71DBF8DA100D5C9A2 /* test_upgrade_database_1000_5_to_6_stringindex.realm in Resources */ = {isa = PBXBuildFile; fileRef = 650957E61DBF8D8E00D5C9A2 /* test_upgrade_database_1000_5_to_6_stringindex.realm */; };
+		650957E81DBF8DA400D5C9A2 /* test_upgrade_database_4_5_to_6_stringindex.realm in Resources */ = {isa = PBXBuildFile; fileRef = 650957E51DBF8D8E00D5C9A2 /* test_upgrade_database_4_5_to_6_stringindex.realm */; };
 		650FBA3D1C84954C00F8771B /* null.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 650FBA3C1C84954C00F8771B /* null.hpp */; };
 		651AEEA31B31945F0048C8EE /* test_upgrade_database_4_1.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEE9D1B31945F0048C8EE /* test_upgrade_database_4_1.realm */; };
 		651AEEA41B31945F0048C8EE /* test_upgrade_database_4_2.realm in Resources */ = {isa = PBXBuildFile; fileRef = 651AEE9E1B31945F0048C8EE /* test_upgrade_database_4_2.realm */; };
@@ -942,6 +944,8 @@
 		65033A751C7DD3B80019E9F2 /* column_timestamp.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = column_timestamp.hpp; path = realm/column_timestamp.hpp; sourceTree = "<group>"; };
 		65033A7C1C7DD5180019E9F2 /* test_column_timestamp.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_column_timestamp.cpp; sourceTree = "<group>"; };
 		650853091CC6C4DC0020F9BB /* timestamp.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = timestamp.hpp; path = realm/timestamp.hpp; sourceTree = "<group>"; };
+		650957E51DBF8D8E00D5C9A2 /* test_upgrade_database_4_5_to_6_stringindex.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_4_5_to_6_stringindex.realm; sourceTree = "<group>"; };
+		650957E61DBF8D8E00D5C9A2 /* test_upgrade_database_1000_5_to_6_stringindex.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_5_to_6_stringindex.realm; sourceTree = "<group>"; };
 		650FBA3C1C84954C00F8771B /* null.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = null.hpp; path = realm/null.hpp; sourceTree = "<group>"; };
 		651AEE9D1B31945F0048C8EE /* test_upgrade_database_4_1.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_4_1.realm; sourceTree = "<group>"; };
 		651AEE9E1B31945F0048C8EE /* test_upgrade_database_4_2.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_4_2.realm; sourceTree = "<group>"; };
@@ -1531,28 +1535,30 @@
 				65ED1B6E1B31AEFC0041EBD1 /* expected_json_link_cycles3.json */,
 				65ED1B6F1B31AEFC0041EBD1 /* expected_json_link_cycles4.json */,
 				65ED1B701B31AEFC0041EBD1 /* expected_json_link_cycles5.json */,
-				65ED1B541B31AE3C0041EBD1 /* expected_json_linklist1_1.json */,
-				65ED1B551B31AE3C0041EBD1 /* expected_json_linklist1_2.json */,
-				65ED1B561B31AE3C0041EBD1 /* expected_json_linklist1_3.json */,
-				65ED1B571B31AE3C0041EBD1 /* expected_json_linklist1_4.json */,
-				65ED1B581B31AE3C0041EBD1 /* expected_json_linklist1_5.json */,
-				65ED1B591B31AE3C0041EBD1 /* expected_json_linklist1_6.json */,
 				65ED1B601B31AE9D0041EBD1 /* expected_json_linklist_cycle1.json */,
 				65ED1B611B31AE9D0041EBD1 /* expected_json_linklist_cycle2.json */,
 				65ED1B621B31AE9D0041EBD1 /* expected_json_linklist_cycle3.json */,
 				65ED1B631B31AE9D0041EBD1 /* expected_json_linklist_cycle4.json */,
 				65ED1B641B31AE9D0041EBD1 /* expected_json_linklist_cycle5.json */,
 				65ED1B651B31AE9D0041EBD1 /* expected_json_linklist_cycle6.json */,
-				651AEEA01B31945F0048C8EE /* test_upgrade_database_1000_1.realm */,
-				651AEEA11B31945F0048C8EE /* test_upgrade_database_1000_2.realm */,
-				651AEEA21B31945F0048C8EE /* test_upgrade_database_1000_3.realm */,
-				65BC7FA11B4D63E70070E98D /* test_upgrade_database_1000_4.realm */,
-				659A0F3A1CD3276B00A7E878 /* test_upgrade_database_1000_4_to_5_datetime1.realm */,
+				65ED1B541B31AE3C0041EBD1 /* expected_json_linklist1_1.json */,
+				65ED1B551B31AE3C0041EBD1 /* expected_json_linklist1_2.json */,
+				65ED1B561B31AE3C0041EBD1 /* expected_json_linklist1_3.json */,
+				65ED1B571B31AE3C0041EBD1 /* expected_json_linklist1_4.json */,
+				65ED1B581B31AE3C0041EBD1 /* expected_json_linklist1_5.json */,
+				65ED1B591B31AE3C0041EBD1 /* expected_json_linklist1_6.json */,
 				651AEE9D1B31945F0048C8EE /* test_upgrade_database_4_1.realm */,
 				651AEE9E1B31945F0048C8EE /* test_upgrade_database_4_2.realm */,
 				651AEE9F1B31945F0048C8EE /* test_upgrade_database_4_3.realm */,
-				65BC7FA01B4D63E70070E98D /* test_upgrade_database_4_4.realm */,
 				659A0F391CD3276B00A7E878 /* test_upgrade_database_4_4_to_5_datetime1.realm */,
+				65BC7FA01B4D63E70070E98D /* test_upgrade_database_4_4.realm */,
+				650957E51DBF8D8E00D5C9A2 /* test_upgrade_database_4_5_to_6_stringindex.realm */,
+				651AEEA01B31945F0048C8EE /* test_upgrade_database_1000_1.realm */,
+				651AEEA11B31945F0048C8EE /* test_upgrade_database_1000_2.realm */,
+				651AEEA21B31945F0048C8EE /* test_upgrade_database_1000_3.realm */,
+				659A0F3A1CD3276B00A7E878 /* test_upgrade_database_1000_4_to_5_datetime1.realm */,
+				65BC7FA11B4D63E70070E98D /* test_upgrade_database_1000_4.realm */,
+				650957E61DBF8D8E00D5C9A2 /* test_upgrade_database_1000_5_to_6_stringindex.realm */,
 			);
 			name = test_files;
 			path = test;
@@ -2122,6 +2128,9 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F45013BF1B01022800CD4A7E /* Images.xcassets in Resources */,
+				F45013C21B01022800CD4A7E /* LaunchScreen.xib in Resources */,
+				F45013BD1B01022800CD4A7E /* Main.storyboard in Resources */,
 				65ED1B531B31AD480041EBD1 /* expect_json.json in Resources */,
 				65ED1B771B31B17C0041EBD1 /* expect_string.txt in Resources */,
 				65ED1B711B31AF090041EBD1 /* expected_json_link_cycles1.json in Resources */,
@@ -2129,31 +2138,30 @@
 				65ED1B731B31AF090041EBD1 /* expected_json_link_cycles3.json in Resources */,
 				65ED1B741B31AF090041EBD1 /* expected_json_link_cycles4.json in Resources */,
 				65ED1B751B31AF090041EBD1 /* expected_json_link_cycles5.json in Resources */,
-				65ED1B5A1B31AE590041EBD1 /* expected_json_linklist1_1.json in Resources */,
-				65ED1B5B1B31AE590041EBD1 /* expected_json_linklist1_2.json in Resources */,
-				65ED1B5C1B31AE590041EBD1 /* expected_json_linklist1_3.json in Resources */,
-				65ED1B5D1B31AE590041EBD1 /* expected_json_linklist1_4.json in Resources */,
-				65ED1B5E1B31AE590041EBD1 /* expected_json_linklist1_5.json in Resources */,
-				65ED1B5F1B31AE590041EBD1 /* expected_json_linklist1_6.json in Resources */,
 				65ED1B661B31AEBA0041EBD1 /* expected_json_linklist_cycle1.json in Resources */,
 				65ED1B671B31AEBA0041EBD1 /* expected_json_linklist_cycle2.json in Resources */,
 				65ED1B681B31AEBA0041EBD1 /* expected_json_linklist_cycle3.json in Resources */,
 				65ED1B691B31AEBA0041EBD1 /* expected_json_linklist_cycle4.json in Resources */,
 				65ED1B6A1B31AEBA0041EBD1 /* expected_json_linklist_cycle5.json in Resources */,
 				65ED1B6B1B31AEBA0041EBD1 /* expected_json_linklist_cycle6.json in Resources */,
-				F45013BF1B01022800CD4A7E /* Images.xcassets in Resources */,
-				F45013C21B01022800CD4A7E /* LaunchScreen.xib in Resources */,
-				F45013BD1B01022800CD4A7E /* Main.storyboard in Resources */,
-				651AEEA61B31945F0048C8EE /* test_upgrade_database_1000_1.realm in Resources */,
-				651AEEA71B31945F0048C8EE /* test_upgrade_database_1000_2.realm in Resources */,
-				651AEEA81B31945F0048C8EE /* test_upgrade_database_1000_3.realm in Resources */,
-				6589FF2E1B4D6806001B6239 /* test_upgrade_database_1000_4.realm in Resources */,
-				659A0F3C1CD327C500A7E878 /* test_upgrade_database_1000_4_to_5_datetime1.realm in Resources */,
+				65ED1B5A1B31AE590041EBD1 /* expected_json_linklist1_1.json in Resources */,
+				65ED1B5B1B31AE590041EBD1 /* expected_json_linklist1_2.json in Resources */,
+				65ED1B5C1B31AE590041EBD1 /* expected_json_linklist1_3.json in Resources */,
+				65ED1B5D1B31AE590041EBD1 /* expected_json_linklist1_4.json in Resources */,
+				65ED1B5E1B31AE590041EBD1 /* expected_json_linklist1_5.json in Resources */,
+				65ED1B5F1B31AE590041EBD1 /* expected_json_linklist1_6.json in Resources */,
 				651AEEA31B31945F0048C8EE /* test_upgrade_database_4_1.realm in Resources */,
 				651AEEA41B31945F0048C8EE /* test_upgrade_database_4_2.realm in Resources */,
 				651AEEA51B31945F0048C8EE /* test_upgrade_database_4_3.realm in Resources */,
-				6589FF2D1B4D6806001B6239 /* test_upgrade_database_4_4.realm in Resources */,
 				659A0F3B1CD327C100A7E878 /* test_upgrade_database_4_4_to_5_datetime1.realm in Resources */,
+				6589FF2D1B4D6806001B6239 /* test_upgrade_database_4_4.realm in Resources */,
+				650957E81DBF8DA400D5C9A2 /* test_upgrade_database_4_5_to_6_stringindex.realm in Resources */,
+				651AEEA61B31945F0048C8EE /* test_upgrade_database_1000_1.realm in Resources */,
+				651AEEA71B31945F0048C8EE /* test_upgrade_database_1000_2.realm in Resources */,
+				651AEEA81B31945F0048C8EE /* test_upgrade_database_1000_3.realm in Resources */,
+				659A0F3C1CD327C500A7E878 /* test_upgrade_database_1000_4_to_5_datetime1.realm in Resources */,
+				6589FF2E1B4D6806001B6239 /* test_upgrade_database_1000_4.realm in Resources */,
+				650957E71DBF8DA100D5C9A2 /* test_upgrade_database_1000_5_to_6_stringindex.realm in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

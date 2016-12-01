@@ -240,7 +240,7 @@ public:
         , m_dT(from.m_dT)
         , m_probes(from.m_probes)
         , m_matches(from.m_matches)
-        , m_table(from.m_table)
+        , m_table(patches ? ConstTableRef{} : from.m_table)
     {
     }
 
@@ -300,10 +300,8 @@ protected:
                      const QueryNodeHandoverPatches* patches)
     {
         if (src.m_column) {
-            if (patches) {
+            if (patches)
                 dst_idx = src.m_column->get_column_index();
-                REALM_ASSERT_DEBUG(dst_idx < m_table->get_column_count());
-            }
             else
                 dst.init(src.m_column);
         }

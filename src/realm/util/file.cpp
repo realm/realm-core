@@ -998,27 +998,38 @@ void File::move(const std::string& old_path, const std::string& new_path)
 }
 
 
-bool File::copy(std::string source, std::string destination)
+void File::copy(const std::string& origin_path, const std::string& target_path)
 {
-    // Quick and dirty file copy, only used for unit tests. Todo, make more robust if used by Core.
-    char buf[1024];
-    size_t read;
-    File::try_remove(destination);
-    FILE* src = fopen(source.c_str(), "rb");
-    if (!src)
-        return false;
-
-    FILE* dst = fopen(destination.c_str(), "wb");
-    if (!dst) {
-        fclose(src);
-        return false;
+    File origin_file{origin_path, mode_Read};  // Throws
+    File target_file{target_path, mode_Write}; // Throws
+    size_t buffer_size = 4096;
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(buffer_size); // Throws
+    for (;;) {
+        size_t n = origin_file.read(buffer.get(), buffer_size); // Throws
+        target_file.write(buffer.get(), n); // Throws
+        if (n < buffer_size)
+            break;
     }
+}
 
-    while ((read = fread(buf, 1, 1024, src))) {
-        fwrite(buf, 1, read, dst);
+
+bool File::compare(const std::string& path_1, const std::string& path_2)
+{
+    File file_1{path_1}; // Throws
+    File file_2{path_2}; // Throws
+    size_t buffer_size = 4096;
+    std::unique_ptr<char[]> buffer_1 = std::make_unique<char[]>(buffer_size); // Throws
+    std::unique_ptr<char[]> buffer_2 = std::make_unique<char[]>(buffer_size); // Throws
+    for (;;) {
+        size_t n_1 = file_1.read(buffer_1.get(), buffer_size); // Throws
+        size_t n_2 = file_2.read(buffer_2.get(), buffer_size); // Throws
+        if (n_1 != n_2)
+            return false;
+        if (!std::equal(buffer_1.get(), buffer_1.get() + n_1, buffer_2.get()))
+            return false;
+        if (n_1 < buffer_size)
+            break;
     }
-    fclose(src);
-    fclose(dst);
     return true;
 }
 
