@@ -248,7 +248,7 @@ def doBuildWindows() {
             dir('build-dir') {
                 bat '''
                     cmake ..
-                    cmake --build
+                    cmake --build .
                 '''
             }
         }
