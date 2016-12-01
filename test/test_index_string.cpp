@@ -960,7 +960,8 @@ StringData create_string_with_nuls(const size_t bits, const size_t length, char*
         bool insert_nul_at_pos = (bits & (size_t(1) << i)) == 0;
         if (insert_nul_at_pos) {
             tmp[i] = '\0';
-        } else {
+        }
+        else {
             // Avoid stray \0 chars, since we are already testing all combinations.
             // All casts are necessary to preserve the bitpattern.
             tmp[i] = static_cast<char>(static_cast<unsigned char>(random.draw_int<unsigned int>(1, UCHAR_MAX)));

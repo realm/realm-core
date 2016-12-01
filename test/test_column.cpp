@@ -1229,7 +1229,7 @@ TEST_TYPES(Column_Iterators, std::true_type, std::false_type)
 
     CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
 
-    while(std_it != std_end) {
+    while (std_it != std_end) {
         CHECK_EQUAL(*std_it, *realm_it);
         auto std_found = std::find(std_begin, std_end, *std_it);
         auto realm_found = std::find(realm_begin, realm_end, *realm_it);
