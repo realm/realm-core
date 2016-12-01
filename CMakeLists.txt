@@ -44,7 +44,15 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 set(CMAKE_CXX_EXTENSIONS off)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic $ENV{EXTRA_CFLAGS}")
+# Set global warnings settings
+if(MSVC)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Wall")
+else()
+  set(CMAKE_CXX_FLAGS, "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic")
+endif()
+
+# Import some flags for the environment variables (for compatibility with build.sh)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} $ENV{EXTRA_CFLAGS}")
 set(CMAKE_LINKER_FLAGS $ENV{EXTRA_LDFLAGS})
 
 if(CMAKE_CONFIGURATION_TYPES)

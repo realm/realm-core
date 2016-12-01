@@ -65,7 +65,8 @@ try {
     buildNodeOsxStaticDebug: doBuildNodeInOsx('STATIC', 'Debug', isPublishingRun),
     buildNodeOsxSharedRelease: doBuildNodeInOsx('SHARED', 'Release', isPublishingRun),
     buildNodeOsxSharedDebug: doBuildNodeInOsx('SHARED', 'Debug', isPublishingRun),
-    addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
+    addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
+    buildWindows: doBuildWindows()
     //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
   ]
 
@@ -238,6 +239,22 @@ def doAndroidBuildInDocker(String abi, String buildType) {
       }
     }
   }
+}
+
+def doBuildWindows() {
+    return {
+        node('windows') {
+            deleteDir()
+            getArchive()
+
+            dir('build-dir') {
+                bat '''
+                    cmake ..
+                    cmake --build
+                '''
+            }
+        }
+    }
 }
 
 def buildDiffCoverage() {
