@@ -1,13 +1,16 @@
-# NEXT RELEASE
+# 2.2.0 Release notes
 
 ### Bugfixes
+* Fix possible corruption of realm file in case of more than 1000 entries in a
+  link list (#2289, #2292, #2293, #2295, #2301)
 * Fixed crash in query if a table had been modified so much that payload array
-  leafs had relocated (https://github.com/realm/realm-core/issues/2269)
+  leafs had relocated (#2269)
 * Fix a race involving destruction order of InterprocessMutex static variables.
 * Fix a crash when a Query is reimported into the SharedGroup it was exported
   for handover from.
 * Fix a crash when calling mkfifo on Android 4.x external storage. On 4.x devices,
   errno is EPERM instead of EACCES.
+* Fix a crash when updating a LinkView accessor from a leaf to an inner node. (#2321)
 
 ### Breaking changes
 
@@ -33,7 +36,8 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Added extra check for double frees in slab allocator.
+* Deprecated Array type parameters in Column<T> and BpTree<T> constructors
 
 ----------------------------------------------
 
