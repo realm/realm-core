@@ -62,7 +62,11 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
 
 # Coverage-specific build flags
 if(REALM_COVERAGE)
+  if(MSVC)
+    message( FATAL_ERROR "Code coverage is not yet supported on Visual Studio builds" )
+  else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs -ftest-coverage -fno-inline -fno-elide-constructors")
+  endif()
 endif()
 
 # Platform-specific build configuration
