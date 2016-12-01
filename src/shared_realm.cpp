@@ -300,7 +300,7 @@ bool Realm::reset_file_if_needed(Schema& schema, uint64_t version, std::vector<S
     return false;
 }
 
-void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function)
+void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function, bool in_transaction)
 {
     schema.validate();
     read_schema_from_group_if_needed();
@@ -357,10 +357,13 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     // Either the schema version has changed or we need to do non-migration changes
 
     m_group->set_schema_change_notification_handler(nullptr);
-    transaction::begin_without_validation(*m_shared_group);
+    if (!in_transaction) {
+        transaction::begin_without_validation(*m_shared_group);
+    }
     add_schema_change_handler();
 
     // Cancel the write transaction if we exit this function before committing it
+    // FIXME: don't cancel if in_transaction == true
     struct WriteTransactionGuard {
         Realm& realm;
         ~WriteTransactionGuard() { if (realm.is_in_transaction()) realm.cancel_transaction(); }
@@ -396,7 +399,9 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
     }
 
-    commit_transaction();
+    if (!in_transaction) {
+        commit_transaction();
+    }
     m_coordinator->update_schema(m_schema, version);
 }
 

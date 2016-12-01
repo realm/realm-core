@@ -184,7 +184,8 @@ public:
 
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.
     void update_schema(Schema schema, uint64_t version=0,
-                       MigrationFunction migration_function=nullptr);
+                       MigrationFunction migration_function=nullptr,
+                       bool in_transaction=false);
 
     // Read the schema version from the file specified by the given config, or
     // ObjectStore::NotVersioned if it does not exist
