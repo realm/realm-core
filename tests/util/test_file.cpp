@@ -51,11 +51,17 @@ TestFile::TestFile()
         const char* dir = getenv("TMPDIR");
         if (dir && *dir)
             return dir;
+#if REALM_ANDROID
+        return "/data/local/tmp";
+#else
         return "/tmp";
+#endif
     }();
     path = tmpdir + "/realm.XXXXXX";
-    mktemp(&path[0]);
+    mkstemp(&path[0]);
     unlink(path.c_str());
+
+    schema_version = 0;
 }
 
 TestFile::~TestFile()

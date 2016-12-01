@@ -175,9 +175,19 @@ void Realm::open_with_config(const Config& config,
                              std::unique_ptr<Group>& read_only_group,
                              Realm* realm)
 {
-    if (config.encryption_key.data() && config.encryption_key.size() != 64) {
+    if (config.encryption_key.data() && config.encryption_key.size() != 64)
         throw InvalidEncryptionKeyException();
-    }
+    if (config.schema && config.schema_version == ObjectStore::NotVersioned)
+        throw std::logic_error("A schema version must be specified when the schema is specified");
+    if (config.schema_mode == SchemaMode::ReadOnly && config.sync_config)
+        throw std::logic_error("Synchronized Realms cannot be opened in read-only mode");
+    if (config.schema_mode == SchemaMode::Additive && config.migration_function)
+        throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
+    if (config.schema_mode == SchemaMode::ReadOnly && config.migration_function)
+        throw std::logic_error("Realms opened in read-only mode do not use a migration function");
+    // ResetFile also won't use the migration function, but specifying one is
+    // allowed to simplify temporarily switching modes during development
+
     try {
         if (config.read_only()) {
             read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);

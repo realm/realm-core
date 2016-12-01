@@ -91,6 +91,16 @@ If you have installed Clang as an external Xcode toolchain (using the `install-x
 make run-tests
 ```
 
+### Android
+
+It requires a root device or an emulator:
+
+```
+make
+adb push tests/tests /data
+adb shell /data/tests
+```
+
 ## License
 
 Realm Object Store is published under the Apache 2.0 license. The underlying core is available under the

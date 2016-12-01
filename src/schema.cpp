@@ -112,6 +112,10 @@ static void compare(ObjectSchema const& existing_schema,
             changes.emplace_back(schema_change::RemoveProperty{&existing_schema, &current_prop});
             continue;
         }
+        if (target_schema.property_is_computed(*target_prop)) {
+            changes.emplace_back(schema_change::RemoveProperty{&existing_schema, &current_prop});
+            continue;
+        }
         if (current_prop.type != target_prop->type || current_prop.object_type != target_prop->object_type) {
             changes.emplace_back(schema_change::ChangePropertyType{&existing_schema, &current_prop, target_prop});
             continue;

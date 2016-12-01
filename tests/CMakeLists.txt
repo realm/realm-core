@@ -23,6 +23,7 @@ set(SOURCES
     util/test_file.cpp
 )
 
+
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/sync_test_utils.hpp

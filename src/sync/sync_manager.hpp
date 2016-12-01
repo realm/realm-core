@@ -102,8 +102,8 @@ public:
     // A user is considered logged in until explicitly logged out, even if
     // the users refresh_token has expired.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& identity) const;
-    // Get all the users.
-    std::vector<std::shared_ptr<SyncUser>> all_users() const;
+    // Get all the users that are logged in and not errored out.
+    std::vector<std::shared_ptr<SyncUser>> all_logged_in_users() const;
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     std::string path_for_realm(const std::string& user_identity, const std::string& raw_realm_url) const;

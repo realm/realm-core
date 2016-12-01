@@ -241,6 +241,31 @@ TEST_CASE("migration: Automatic") {
             REQUIRE_MIGRATION_NEEDED(*realm, schema, remove_property(schema, "object", "col2"));
         }
 
+        SECTION("migratation which replaces a persisted property with a computed one") {
+            auto realm = Realm::get_shared_realm(config);
+            Schema schema1 = {
+                {"object", {
+                    {"value", PropertyType::Int, "", "", false, false, false},
+                    {"link", PropertyType::Object, "object2", "", false, false, true},
+                }},
+                {"object2", {
+                    {"value", PropertyType::Int, "", "", false, false, false},
+                    {"inverse", PropertyType::Object, "object", "", false, false, true},
+                }},
+            };
+            Schema schema2 = remove_property(schema1, "object", "link");
+            Property new_property{"link", PropertyType::LinkingObjects, "object2", "inverse", false, false, false};
+            schema2.find("object")->computed_properties.emplace_back(new_property);
+
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
+            REQUIRE_THROWS((*realm).update_schema(schema2));
+            REQUIRE((*realm).schema() == schema1);
+            REQUIRE_NOTHROW((*realm).update_schema(schema2, 1,
+                            [](SharedRealm, SharedRealm, Schema&) { /* empty but present migration handler */ }));
+            VERIFY_SCHEMA(*realm);
+            REQUIRE((*realm).schema() == schema2);
+        }
+
         SECTION("change property type") {
             auto realm = Realm::get_shared_realm(config);
             Schema schema = {
