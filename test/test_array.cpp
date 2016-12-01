@@ -1497,8 +1497,7 @@ TEST(Array_FindGTE)
 
 TEST(Array_AdjustGEFuzzy)
 {
-    for (int iter = 0; iter < 100 + 100000 * TEST_DURATION; iter++)
-    {
+    for (int iter = 0; iter < 100 + 100000 * TEST_DURATION; iter++) {
         Array c(Allocator::get_default());
         c.create(Array::type_Normal);
         std::vector<int64_t> v;
@@ -1523,7 +1522,6 @@ TEST(Array_AdjustGEFuzzy)
         }
 
         c.destroy();
-
     }
 }
 #endif // TEST_ARRAY

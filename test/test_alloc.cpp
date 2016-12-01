@@ -312,8 +312,7 @@ TEST(Alloc_ToAndFromRef)
 {
     constexpr size_t ref_type_width = sizeof(ref_type) * 8;
     constexpr ref_type interesting_refs[] = {
-        0,
-        8,
+        0, 8,
         ref_type(1ULL << (ref_type_width - 1)), // 32-bit: 0x80000000, 64-bit: 0x8000000000000000
         ref_type(3ULL << (ref_type_width - 2)), // 32-bit: 0xC0000000, 64-bit: 0xC000000000000000
     };
@@ -325,7 +324,6 @@ TEST(Alloc_ToAndFromRef)
         ref_type back_to_ref = to_ref(ref_as_int);
         CHECK_EQUAL(ref, back_to_ref);
     }
-
 }
 
 #endif // TEST_ALLOC

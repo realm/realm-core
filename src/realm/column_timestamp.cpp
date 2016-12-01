@@ -61,7 +61,7 @@ public:
 
     ref_type create_leaf(size_t size) override
     {
-        MemRef mem =  BT::create_leaf(Array::type_Normal, size, m_value, m_alloc); // Throws
+        MemRef mem = BT::create_leaf(Array::type_Normal, size, m_value, m_alloc); // Throws
         return mem.get_ref();
     }
 

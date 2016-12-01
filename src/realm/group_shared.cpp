@@ -757,7 +757,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             // uninitialized bits to the file.
             alignas(SharedInfo) char buffer[sizeof(SharedInfo)] = {0};
             new (buffer) SharedInfo{options.durability, history_type}; // Throws
-            m_file.write(buffer, sizeof buffer); // Throws
+            m_file.write(buffer, sizeof buffer);                       // Throws
 
             // Mark the file as completely initialized via a memory
             // mapping. Since this is done as a separate final step (involving

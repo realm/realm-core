@@ -67,9 +67,9 @@ public:
         // Set m_leaf_ptr to point at the leaf that contains the value at column row `index`. Return whether or not
         // the leaf has changed (could be useful to know for caller).
 
-        // FIXME: Below line has been commented away because array leafs might relocate during the lifetime of the 
+        // FIXME: Below line has been commented away because array leafs might relocate during the lifetime of the
         // object that owns this SequentialGetter. Enable again when we have proper support for that.
-//        if (index >= m_leaf_end || index < m_leaf_start) 
+        //        if (index >= m_leaf_end || index < m_leaf_start)
         {
             typename ColType::LeafInfo leaf{&m_leaf_ptr, m_array_ptr.get()};
             size_t ndx_in_leaf;
@@ -91,7 +91,7 @@ public:
 #endif
         return m_column->get(index);
 
-        // FIXME: Below optimization is skipped because array leafs might relocate during the lifetime of the 
+        // FIXME: Below optimization is skipped because array leafs might relocate during the lifetime of the
         // object that owns this SequentialGetter. Enable again when we have proper support for that.
         cache_next(index);
         T av = m_leaf_ptr->get(index - m_leaf_start);

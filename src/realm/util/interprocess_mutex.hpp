@@ -159,7 +159,8 @@ inline void InterprocessMutex::free_lock_info()
     m_filename.clear();
 }
 
-inline void InterprocessMutex::initialize_statics() {
+inline void InterprocessMutex::initialize_statics()
+{
     s_mutex = new Mutex();
     s_info_map = new std::map<File::UniqueID, std::weak_ptr<LockInfo>>();
 }

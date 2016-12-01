@@ -104,24 +104,27 @@ struct Like : public HackClass {
         REALM_ASSERT(false);
         return false;
     }
-    
-    template<class A, class B> bool operator()(A, B) const
+
+    template <class A, class B>
+    bool operator()(A, B) const
     {
         REALM_ASSERT(false);
         return false;
     }
-    
-    template<class A, class B, class C, class D> bool operator()(A, B, C, D) const
+
+    template <class A, class B, class C, class D>
+    bool operator()(A, B, C, D) const
     {
         REALM_ASSERT(false);
         return false;
     }
-    
-    bool operator()(int64_t, int64_t, bool, bool) const {
+
+    bool operator()(int64_t, int64_t, bool, bool) const
+    {
         REALM_ASSERT(false);
         return false;
     }
-    
+
     static const int condition = -1;
 };
 
@@ -318,31 +321,46 @@ struct ContainsIns : public HackClass {
 
 // Does v2 contain something like v1 (wildcard matching)?
 struct LikeIns : public HackClass {
-    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false, bool = false) const
+    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, StringData v2, bool = false,
+                    bool = false) const
     {
         if (v2.is_null() || v1.is_null()) {
             return (v2.is_null() && v1.is_null());
         }
-        
+
         return string_like_ins(v2, v1_lower, v1_upper);
     }
-    
+
     // Slow version, used if caller hasn't stored an upper and lower case version
     bool operator()(StringData v1, StringData v2, bool = false, bool = false) const
     {
         if (v2.is_null() || v1.is_null()) {
             return (v2.is_null() && v1.is_null());
         }
-        
+
         std::string v1_upper = case_map(v1, true, IgnoreErrors);
         std::string v1_lower = case_map(v1, false, IgnoreErrors);
         return string_like_ins(v2, v1_lower, v1_upper);
     }
-    
-    template<class A, class B> bool operator()(A, B) const { REALM_ASSERT(false); return false; }
-    template<class A, class B, class C, class D> bool operator()(A, B, C, D) const { REALM_ASSERT(false); return false; }
-    bool operator()(int64_t, int64_t, bool, bool) const { REALM_ASSERT(false); return false; }
-    
+
+    template <class A, class B>
+    bool operator()(A, B) const
+    {
+        REALM_ASSERT(false);
+        return false;
+    }
+    template <class A, class B, class C, class D>
+    bool operator()(A, B, C, D) const
+    {
+        REALM_ASSERT(false);
+        return false;
+    }
+    bool operator()(int64_t, int64_t, bool, bool) const
+    {
+        REALM_ASSERT(false);
+        return false;
+    }
+
     static const int condition = -1;
 };
 

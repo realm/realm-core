@@ -482,9 +482,7 @@ void SlabAlloc::consolidate_free_read_only()
     if (m_free_read_only.empty())
         return;
 
-    std::sort(begin(m_free_read_only), end(m_free_read_only), [](auto& a, auto& b) {
-        return a.ref < b.ref;
-    });
+    std::sort(begin(m_free_read_only), end(m_free_read_only), [](auto& a, auto& b) { return a.ref < b.ref; });
 
     // Combine any adjacent chunks in the freelist, except for when the chunks
     // are on the edge of an allocation slab
@@ -500,9 +498,9 @@ void SlabAlloc::consolidate_free_read_only()
     }
 
     // Remove all of the now zero-size chunks from the free list
-    m_free_read_only.erase(std::remove_if(begin(m_free_read_only), end(m_free_read_only),
-                                          [](auto& chunk) { return chunk.size == 0; }),
-                           end(m_free_read_only));
+    m_free_read_only.erase(
+        std::remove_if(begin(m_free_read_only), end(m_free_read_only), [](auto& chunk) { return chunk.size == 0; }),
+        end(m_free_read_only));
 }
 
 

@@ -545,18 +545,18 @@ bool matchlike_ins(const StringData& text, const StringData& pattern_upper, cons
     std::vector<size_t> patternpos;
     size_t p1 = 0; // position in text (haystack)
     size_t p2 = 0; // position in pattern (needle)
-    
+
     while (true) {
         if (p1 == text.size()) {
             if (p2 == pattern_lower.size())
                 return true;
-            if (p2 == pattern_lower.size()-1 && pattern_lower[p2] == '*')
+            if (p2 == pattern_lower.size() - 1 && pattern_lower[p2] == '*')
                 return true;
             goto no_match;
         }
         if (p2 == pattern_lower.size())
             goto no_match;
-        
+
         if (pattern_lower[p2] == '*') {
             textpos.push_back(p1);
             patternpos.push_back(++p2);
@@ -571,20 +571,20 @@ bool matchlike_ins(const StringData& text, const StringData& pattern_upper, cons
             }
             else {
                 size_t p = 1;
-                while (p1+p != text.size() && (text[p1+p] & 0xc0) == 0x80)
+                while (p1 + p != text.size() && (text[p1 + p] & 0xc0) == 0x80)
                     ++p;
                 p1 += p;
                 ++p2;
                 continue;
             }
         }
-        
+
         if (pattern_lower[p2] == text[p1] || pattern_upper[p2] == text[p1]) {
             ++p1;
             ++p2;
             continue;
         }
-        
+
     no_match:
         if (textpos.empty())
             return false;
@@ -592,10 +592,10 @@ bool matchlike_ins(const StringData& text, const StringData& pattern_upper, cons
             if (p1 == text.size()) {
                 textpos.pop_back();
                 patternpos.pop_back();
-                
+
                 if (textpos.empty())
                     return false;
-                
+
                 p1 = textpos.back();
             }
             else {
@@ -612,7 +612,7 @@ bool string_like_ins(StringData text, StringData upper, StringData lower) noexce
     if (text.is_null() || lower.is_null()) {
         return (text.is_null() && lower.is_null());
     }
-    
+
     return matchlike_ins(text, lower, upper);
 }
 
@@ -621,10 +621,10 @@ bool string_like_ins(StringData text, StringData pattern) noexcept
     if (text.is_null() || pattern.is_null()) {
         return (text.is_null() && pattern.is_null());
     }
-    
+
     std::string upper = case_map(pattern, true, IgnoreErrors);
     std::string lower = case_map(pattern, false, IgnoreErrors);
-    
+
     return matchlike_ins(text, lower.c_str(), upper.c_str());
 }
 
