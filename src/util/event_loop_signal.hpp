@@ -21,12 +21,16 @@
 
 #include <realm/util/features.h>
 
-#if REALM_PLATFORM_APPLE
+#if (defined(REALM_HAVE_UV) && REALM_HAVE_UV && !REALM_PLATFORM_APPLE) || REALM_PLATFORM_NODE
+#define REALM_USE_UV 1
+#endif
+
+#if REALM_USE_UV
+#include "util/uv/event_loop_signal.hpp"
+#elif REALM_PLATFORM_APPLE
 #include "util/apple/event_loop_signal.hpp"
 #elif REALM_ANDROID
 #include "util/android/event_loop_signal.hpp"
-#elif REALM_HAVE_UV || REALM_PLATFORM_NODE
-#include "util/uv/event_loop_signal.hpp"
 #else
 #include "util/generic/event_loop_signal.hpp"
 #endif
