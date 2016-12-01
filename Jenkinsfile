@@ -16,8 +16,7 @@ try {
           extensions: scm.extensions + [[$class: 'CleanCheckout']],
           userRemoteConfigs: scm.userRemoteConfigs
         ])
-        sh 'git archive -o core.zip HEAD'
-        stash includes: 'core.zip', name: 'core-source'
+        stash includes: '**', name: 'core-source'
 
         dependencies = readProperties file: 'dependencies.list'
         echo "VERSION: ${dependencies.VERSION}"
@@ -244,7 +243,6 @@ def doAndroidBuildInDocker(String abi, String buildType) {
 def doBuildWindows() {
     return {
         node('windows') {
-            deleteDir()
             getArchive()
 
             dir('build-dir') {
@@ -700,9 +698,8 @@ def setBuildName(newBuildName) {
 }
 
 def getArchive() {
-    sh 'rm -rf *'
+    deleteDir()
     unstash 'core-source'
-    sh 'unzip -o -q core.zip'
 }
 
 def getSourceArchive() {
