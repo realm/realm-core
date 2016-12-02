@@ -138,7 +138,7 @@ private:
 
     friend class realm::SyncManager;
     // Called by SyncManager {
-    SyncSession(std::shared_ptr<_impl::SyncClient>, std::string realm_path, SyncConfig);
+    SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig);
     // }
 
     bool can_wait_for_network_completion() const;
@@ -163,7 +163,7 @@ private:
     SyncConfig m_config;
 
     std::string m_realm_path;
-    std::shared_ptr<_impl::SyncClient> m_client;
+    _impl::SyncClient& m_client;
     std::unique_ptr<sync::Session> m_session;
     util::Optional<int_fast64_t> m_deferred_commit_notification;
     bool m_deferred_close = false;

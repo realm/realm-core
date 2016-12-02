@@ -120,8 +120,8 @@ private:
     SyncManager(const SyncManager&) = delete;
     SyncManager& operator=(const SyncManager&) = delete;
 
-    std::shared_ptr<_impl::SyncClient> get_sync_client() const;
-    std::shared_ptr<_impl::SyncClient> create_sync_client() const;
+    _impl::SyncClient& get_sync_client() const;
+    std::unique_ptr<_impl::SyncClient> create_sync_client() const;
 
     std::shared_ptr<SyncSession> get_existing_active_session_locked(const std::string& path) const;
     std::unique_ptr<SyncSession> get_existing_inactive_session_locked(const std::string& path);
@@ -141,7 +141,7 @@ private:
     // A map of user identities to (shared pointers to) SyncUser objects.
     std::unordered_map<std::string, std::shared_ptr<SyncUser>> m_users;
 
-    mutable std::shared_ptr<_impl::SyncClient> m_sync_client;
+    mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
 
     // Protects m_active_sessions and m_inactive_sessions
     mutable std::mutex m_session_mutex;
