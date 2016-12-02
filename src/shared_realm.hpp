@@ -66,11 +66,11 @@ enum class SchemaMode : uint8_t {
     // changes, then call the migration function.
     //
     // If the schema version has not changed, verify that the only
-    // changes are to add new tables and add or remvoe indexes, and then
+    // changes are to add new tables and add or remove indexes, and then
     // apply them if so. Does not call the migration function.
     //
     // This mode does not automatically remove tables which are not
-    // present in the schea; that must be manually done in the migration
+    // present in the schema that must be manually done in the migration
     // function, to support sharing a Realm file between processes using
     // different class subsets.
     //
@@ -221,7 +221,7 @@ public:
     Realm(Realm&&) = delete;
     Realm& operator=(Realm&&) = delete;
     ~Realm();
-    
+
     // Pins the current version and exports each object for handover.
     HandoverPackage package_for_handover(std::vector<AnyThreadConfined> objects_to_hand_over);
 
