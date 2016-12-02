@@ -92,7 +92,7 @@ SyncTestFile::SyncTestFile(SyncServer& server)
         url,
         SyncSessionStopPolicy::Immediately,
         [=](auto&, auto&, auto session) { session->refresh_access_token(s_test_token, url); },
-        [](auto, auto, auto) { abort(); }
+        [](auto, auto, auto, auto) { abort(); }
     });
     schema_mode = SchemaMode::Additive;
 }

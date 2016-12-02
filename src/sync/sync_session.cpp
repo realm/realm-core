@@ -210,24 +210,21 @@ struct sync_session_states::Active : public SyncSession::State {
 struct sync_session_states::Dying : public SyncSession::State {
     void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
-        ++session.m_pending_upload_threads;
-        std::thread([session=&session] {
+        size_t current_death_count = ++session.m_death_count;
+        session.m_session->async_wait_for_upload_completion([session=&session, current_death_count](std::error_code error_code) {
+            if (error_code == util::error::operation_aborted) {
+                // Session was killed beneath us. Don't do anything.
+                return;
+            }
+            // FIXME: It's possible for the session to be destroyed while the callback is running,
+            // which is something we should address in the future. It is only possible when 
+            // SyncManager::reset_for_testing() is called.
+            // c.f. https://github.com/realm/realm-object-store/issues/269
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
-            if (session->m_pending_upload_threads != 1) {
-                --session->m_pending_upload_threads;
-                return;
+            if (session->m_state == &State::dying && session->m_death_count == current_death_count) {
+                session->advance_state(lock, inactive);
             }
-
-            if (session->m_state != &State::dying) {
-                // The session was revived. Don't kill it.
-                --session->m_pending_upload_threads;
-                return;
-            }
-
-            session->m_session->wait_for_upload_complete_or_client_stopped();
-            --session->m_pending_upload_threads;
-            session->advance_state(lock, inactive);
-        }).detach();
+        });
     }
 
     bool revive_if_needed(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
@@ -308,41 +305,41 @@ void SyncSession::create_sync_session()
             return;
         }
 
-        using Error = realm::sync::Error;
+        using ProtocolError = realm::sync::ProtocolError;
 
         SyncSessionError error_type = SyncSessionError::Debug;
         // Precondition: error_code is a valid realm::sync::Error raw value.
-        Error strong_code = static_cast<Error>(error_code);
+        ProtocolError strong_code = static_cast<ProtocolError>(error_code);
 
         switch (strong_code) {
             // Client errors; all ignored (for now)
-            case Error::invalid_error:
-            case Error::connection_closed:
-            case Error::other_error:
-            case Error::unknown_message:
-            case Error::bad_syntax:
-            case Error::limits_exceeded:
-            case Error::wrong_protocol_version:
-            case Error::bad_session_ident:
-            case Error::reuse_of_session_ident:
-            case Error::bound_in_other_session:
-            case Error::bad_message_order:
+            case ProtocolError::invalid_error:
+            case ProtocolError::connection_closed:
+            case ProtocolError::other_error:
+            case ProtocolError::unknown_message:
+            case ProtocolError::bad_syntax:
+            case ProtocolError::limits_exceeded:
+            case ProtocolError::wrong_protocol_version:
+            case ProtocolError::bad_session_ident:
+            case ProtocolError::reuse_of_session_ident:
+            case ProtocolError::bound_in_other_session:
+            case ProtocolError::bad_message_order:
                 return;
             // Session errors
-            case Error::disabled_session:
-            case Error::session_closed:
-            case Error::other_session_error:
+            case ProtocolError::disabled_session:
+            case ProtocolError::session_closed:
+            case ProtocolError::other_session_error:
                 // The binding doesn't need to be aware of these because they are strictly informational, and do not
                 // represent actual errors.
                 return;
-            case Error::token_expired: {
+            case ProtocolError::token_expired: {
                 std::unique_lock<std::mutex> lock(m_state_mutex);
                 // This isn't an error from the binding's point of view. If we're connected we'll
                 // simply ask the binding to log in again.
                 m_state->access_token_expired(lock, *this);
                 return;
             }
-            case Error::bad_authentication: {
+            case ProtocolError::bad_authentication: {
                 std::shared_ptr<SyncUser> user_to_invalidate;
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
@@ -354,22 +351,22 @@ void SyncSession::create_sync_session()
                     user_to_invalidate->invalidate();
                 break;
             }
-            case Error::illegal_realm_path:
-            case Error::no_such_realm:
-            case Error::bad_server_file_ident:
-            case Error::diverging_histories:
-            case Error::bad_changeset: {
+            case ProtocolError::illegal_realm_path:
+            case ProtocolError::no_such_realm:
+            case ProtocolError::bad_server_file_ident:
+            case ProtocolError::diverging_histories:
+            case ProtocolError::bad_changeset: {
                 std::unique_lock<std::mutex> lock(m_state_mutex);
                 error_type = SyncSessionError::SessionFatal;
                 advance_state(lock, State::error);
                 break;
             }
-            case Error::permission_denied:
+            case ProtocolError::permission_denied:
                 error_type = SyncSessionError::AccessDenied;
                 break;
-            case Error::bad_client_file_ident:
-            case Error::bad_server_version:
-            case Error::bad_client_version:
+            case ProtocolError::bad_client_file_ident:
+            case ProtocolError::bad_server_version:
+            case ProtocolError::bad_client_version:
                 error_type = SyncSessionError::Debug;
                 break;
         }
@@ -461,44 +458,41 @@ bool SyncSession::can_wait_for_network_completion() const
     return m_state == &State::active || m_state == &State::dying;
 }
 
-void SyncSession::wait_for_upload_completion()
+bool SyncSession::wait_for_upload_completion(std::function<void(std::error_code)> callback)
+{
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    // FIXME: instead of dropping the callback if we haven't yet `bind()`ed,
+    // save it and register it when the session `bind()`s.
+    if (can_wait_for_network_completion()) {
+        REALM_ASSERT(m_session);
+        m_session->async_wait_for_upload_completion(std::move(callback));
+        return true;
+    }
+    return false;
+}
+
+bool SyncSession::wait_for_download_completion(std::function<void(std::error_code)> callback)
+{
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+    // FIXME: instead of dropping the callback if we haven't yet `bind()`ed,
+    // save it and register it when the session `bind()`s.
+    if (can_wait_for_network_completion()) {
+        REALM_ASSERT(m_session);
+        m_session->async_wait_for_download_completion(std::move(callback));
+        return true;
+    }
+    return false;
+}
+
+bool SyncSession::wait_for_upload_completion_blocking()
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     if (can_wait_for_network_completion()) {
         REALM_ASSERT(m_session);
         m_session->wait_for_upload_complete_or_client_stopped();
+        return true;
     }
-}
-
-void SyncSession::wait_for_download_completion()
-{
-    std::unique_lock<std::mutex> lock(m_state_mutex);
-    if (can_wait_for_network_completion()) {
-        REALM_ASSERT(m_session);
-        m_session->wait_for_download_complete_or_client_stopped();
-    }
-}
-
-void SyncSession::wait_for_upload_completion(std::function<void()> callback)
-{
-    // FIXME: If the session is waiting for a token, the `wait_for_upload` should be deferred until the `bind()`
-    // instead of just calling the callback immediately.
-    REALM_ASSERT(shared_from_this());
-    std::thread([callback=std::move(callback), self=shared_from_this()]() {
-        self->wait_for_upload_completion();
-        callback();
-    }).detach();
-}
-
-void SyncSession::wait_for_download_completion(std::function<void()> callback)
-{
-    // FIXME: If the session is waiting for a token, the `wait_for_upload` should be deferred until the `bind()`
-    // instead of just calling the callback immediately.
-    REALM_ASSERT(shared_from_this());
-    std::thread([callback=std::move(callback), self=shared_from_this()]() {
-        self->wait_for_download_completion();
-        callback();
-    }).detach();
+    return false;
 }
 
 void SyncSession::refresh_access_token(std::string access_token, util::Optional<std::string> server_url)
@@ -532,10 +526,4 @@ SyncSession::PublicState SyncSession::state() const
         return PublicState::Error;
     }
     REALM_UNREACHABLE();
-}
-
-bool SyncSession::can_be_safely_destroyed() const
-{
-    std::unique_lock<std::mutex> lock(m_state_mutex);
-    return m_state == &State::inactive && m_pending_upload_threads == 0;
 }
