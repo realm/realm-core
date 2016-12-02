@@ -146,7 +146,7 @@ private:
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
     std::function<void(VersionID, VersionID)> m_transaction_callback;
 
-#ifdef REALM_ENABLE_SYNC
+#if REALM_ENABLE_SYNC
     std::shared_ptr<SyncSession> m_sync_session;
 #endif
 
