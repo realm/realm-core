@@ -16,7 +16,10 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Make `_impl::make_error_code(_impl::SimulatedFailure::FailureType)`
+  participate in overload resolution in unqualified ADL contexts like
+  `make_error_code(_impl::SimulatedFailure::sync_client__read_head)` and `ec ==
+  _impl::SimulatedFailure::sync_client__read_head`.
 
 ----------------------------------------------
 
