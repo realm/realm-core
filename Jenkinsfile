@@ -5,7 +5,7 @@ try {
   def gitSha
   def dependencies
   def isPublishingRun
-  def isLatestPublishingRun
+  def isPublishingLatestRun
 
   timeout(time: 1, unit: 'HOURS') {
     stage('gather-info') {
@@ -43,7 +43,7 @@ try {
       isPublishingRun = gitTag != ""
       echo "Publishing Run: ${isPublishingRun}"
 
-      isLatestPublishingRun = ['master'].contains(env.BRANCH_NAME)
+      isPublishingLatestRun = ['master'].contains(env.BRANCH_NAME)
 
       rpmVersion = dependencies.VERSION.replaceAll("-", "_")
       echo "rpm version: ${rpmVersion}"
@@ -59,13 +59,13 @@ try {
       parallelExecutors = [
         checkLinuxRelease: doBuildInDocker('check'),
         checkLinuxDebug: doBuildInDocker('check-debug'),
-        buildCocoa: doBuildCocoa(isPublishingRun, isLatestPublishingRun),
-        buildNodeLinux: doBuildNodeInDocker(isPublishingRun, isLatestPublishingRun),
-        buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isLatestPublishingRun),
-        buildDotnetOsx: doBuildDotNetOsx(isPublishingRun, isLatestPublishingRun),
-        buildAndroid: doBuildAndroid(isPublishingRun, isLatestPublishingRun),
+        buildCocoa: doBuildCocoa(isPublishingRun, isPublishingLatestRun),
+        buildNodeLinux: doBuildNodeInDocker(isPublishingRun, isPublishingLatestRun),
+        buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
+        buildDotnetOsx: doBuildDotNetOsx(isPublishingRun, isPublishingLatestRun),
+        buildAndroid: doBuildAndroid(isPublishingRun),
         buildWindows: doBuildWindows(),
-        buildOsxDylibs: doBuildOsxDylibs(isPublishingRun, isLatestPublishingRun),
+        buildOsxDylibs: doBuildOsxDylibs(isPublishingRun, isPublishingLatestRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
       ]
@@ -112,7 +112,7 @@ def buildDockerEnv(name) {
   return docker.image(name)
 }
 
-def doBuildCocoa(def isPublishingRun, def isLatestPublishingRun) {
+def doBuildCocoa(def isPublishingRun, def isPublishingLatestRun) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -164,7 +164,7 @@ def doBuildCocoa(def isPublishingRun, def isLatestPublishingRun) {
         collectCompilerWarnings('clang', true)
         recordTests('check-debug-cocoa')
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          if (isLatestPublishingRun) {
+          if (isPublishingLatestRun) {
             sh 's3cmd -c $s3cfg_config_file put realm-core-latest.tar.xz s3://static.realm.io/downloads/core/'
           }
         }
@@ -173,7 +173,7 @@ def doBuildCocoa(def isPublishingRun, def isLatestPublishingRun) {
   }
 }
 
-def doBuildDotNetOsx(def isPublishingRun, def isLatestPublishingRun) {
+def doBuildDotNetOsx(def isPublishingRun, def isPublishingLatestRun) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -222,7 +222,7 @@ def doBuildDotNetOsx(def isPublishingRun, def isLatestPublishingRun) {
       } finally {
         collectCompilerWarnings('clang', true)
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          if (isLatestPublishingRun) {
+          if (isPublishingLatestRun) {
             sh 's3cmd -c $s3cfg_config_file put --multipart-chunk-size-mb 5 realm-core-dotnet-cocoa-latest.tar.bz2 s3://static.realm.io/downloads/core/'
           }
         }
@@ -315,7 +315,7 @@ def buildDiffCoverage() {
   }
 }
 
-def doBuildNodeInDocker(def isPublishingRun, def isLatestPublishingRun) {
+def doBuildNodeInDocker(def isPublishingRun, def isPublishingLatestRun) {
   return {
     node('docker') {
       getArchive()
@@ -333,7 +333,7 @@ def doBuildNodeInDocker(def isPublishingRun, def isLatestPublishingRun) {
               }
               archiveArtifacts artifacts: '*realm-core-node-linux-*.*.*.tar.gz'
               withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-                if (isLatestPublishingRun) {
+                if (isPublishingLatestRun) {
                   sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core/'
                 }
               }
@@ -346,7 +346,7 @@ def doBuildNodeInDocker(def isPublishingRun, def isLatestPublishingRun) {
   }
 }
 
-def doBuildNodeInOsx(def isPublishingRun, def isLatestPublishingRun) {
+def doBuildNodeInOsx(def isPublishingRun, def isPublishingLatestRun) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -365,7 +365,7 @@ def doBuildNodeInOsx(def isPublishingRun, def isLatestPublishingRun) {
           sh 'sh build.sh clean'
 
           withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-            if (isLatestPublishingRun) {
+            if (isPublishingLatestRun) {
               sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core/'
             }
           }
@@ -377,7 +377,7 @@ def doBuildNodeInOsx(def isPublishingRun, def isLatestPublishingRun) {
   }
 }
 
-def doBuildOsxDylibs(def isPublishingRun, def isLatestPublishingRun) {
+def doBuildOsxDylibs(def isPublishingRun, def isPublishingLatestRun) {
   return {
     node('osx_vegas') {
       getSourceArchive()
@@ -407,7 +407,7 @@ def doBuildOsxDylibs(def isPublishingRun, def isLatestPublishingRun) {
           sh 'sh build.sh clean'
 
           withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-            if (isLatestPublishingRun) {
+            if (isPublishingLatestRun) {
               sh 's3cmd -c $s3cfg_config_file put realm-core-dylib-osx-latest.zip s3://static.realm.io/downloads/core/'
             }
           }
