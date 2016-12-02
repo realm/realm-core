@@ -51,8 +51,6 @@ struct SyncConfig {
     SyncSessionStopPolicy stop_policy;
     std::function<SyncBindSessionHandler> bind_session_handler;
     std::function<SyncSessionErrorHandler> error_handler;
-    // Some bindings may want to handle the session in binding level.
-    bool create_session = true;
 
 #if __GNUC__ < 5
 // GCC 4.9 does not support C++14 braced-init with NSDMIs
