@@ -43,10 +43,8 @@ public:
     // the tableview as needed
     Results();
     Results(SharedRealm r, Table& table);
-    Results(SharedRealm r, Query q, SortDescriptor s = {});
-    Results(SharedRealm r, Query q, SortDescriptor s, SortDescriptor d);
-    Results(SharedRealm r, TableView tv, SortDescriptor s = {});
-    Results(SharedRealm r, TableView tv, SortDescriptor s, SortDescriptor d);
+    Results(SharedRealm r, Query q, SortDescriptor s = {}, SortDescriptor d = {});
+    Results(SharedRealm r, TableView tv, SortDescriptor s = {}, SortDescriptor d = {});
     Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q = {}, SortDescriptor s = {});
     ~Results();
 
