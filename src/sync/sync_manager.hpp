@@ -28,6 +28,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
+#include <object-store/src/sync/impl/sync_client.hpp>
 
 namespace realm {
 
@@ -75,6 +76,9 @@ public:
     // Configure a custom logger factory. If not provided, a realm::util::StderrLogger will be used.
     void set_logger_factory(SyncLoggerFactory&) noexcept;
     void set_error_handler(std::function<sync::Client::ErrorHandler>);
+    // Option callback invoked when the thread responsible for running the Sync Client is started
+    // and the client has been created (but not started).
+    void set_client_thread_ready_callback(std::function<realm::_impl::ClientThreadReadyCallback>);
 
     /// Control whether the sync client attempts to reconnect immediately. Only set this to `true` for testing purposes.
     void set_client_should_reconnect_immediately(bool reconnect_immediately);
@@ -86,6 +90,8 @@ public:
 
     util::Logger::Level log_level() const noexcept;
 
+    // Return the session associated with the given path. The session start as INACTIVE, and must
+    // be started using 'revive_if_needed()'.
     std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 
@@ -107,10 +113,6 @@ public:
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     std::string path_for_realm(const std::string& user_identity, const std::string& raw_realm_url) const;
-
-    // Explicitly control when the Sync Client is started. Otherwise it will be started automatically
-    // when the first session is created.
-    void start_sync_client() const;
 
     // Reset part of the singleton state for testing purposes. DO NOT CALL OUTSIDE OF TESTING CODE.
     void reset_for_testing();
@@ -139,6 +141,7 @@ private:
     util::Logger::Level m_log_level = util::Logger::Level::info;
     SyncLoggerFactory* m_logger_factory = nullptr;
     std::function<sync::Client::ErrorHandler> m_error_handler;
+    std::function<realm::_impl::ClientThreadReadyCallback> m_client_thread_ready_callback;
     sync::Client::Reconnect m_client_reconnect_mode = sync::Client::Reconnect::normal;
     bool m_client_validate_ssl = true;
 
