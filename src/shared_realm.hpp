@@ -171,8 +171,8 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
-#ifdef REALM_ENABLE_SYNC
         /// A data structure storing data used to configure the Realm for sync support.
+#if REALM_ENABLE_SYNC
         std::shared_ptr<SyncConfig> sync_config;
 #endif
     };

@@ -179,8 +179,10 @@ void Realm::open_with_config(const Config& config,
         throw InvalidEncryptionKeyException();
     if (config.schema && config.schema_version == ObjectStore::NotVersioned)
         throw std::logic_error("A schema version must be specified when the schema is specified");
+#if REALM_ENABLE_SYNC
     if (config.schema_mode == SchemaMode::ReadOnly && config.sync_config)
         throw std::logic_error("Synchronized Realms cannot be opened in read-only mode");
+#endif
     if (config.schema_mode == SchemaMode::Additive && config.migration_function)
         throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
     if (config.schema_mode == SchemaMode::ReadOnly && config.migration_function)
