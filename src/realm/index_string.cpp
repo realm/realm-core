@@ -393,7 +393,7 @@ void StringIndex::insert_to_existing_list_at_lower(size_t row, StringData value,
         list.insert(upper.get_col_ndx(), row);
     }
     else {
-        IntegerColumn::const_iterator inner_lower = std::lower_bound(lower, upper, row);
+        IntegerColumn::const_iterator inner_lower = std::lower_bound(lower, upper, int64_t(row));
         list.insert(inner_lower.get_col_ndx(), row);
     }
 }

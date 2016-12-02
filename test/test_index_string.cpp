@@ -957,7 +957,7 @@ namespace {
 StringData create_string_with_nuls(const size_t bits, const size_t length, char* tmp, Random& random)
 {
     for (size_t i = 0; i < length; ++i) {
-        bool insert_nul_at_pos = (bits & (1 << i)) == 0;
+        bool insert_nul_at_pos = (bits & (size_t(1) << i)) == 0;
         if (insert_nul_at_pos) {
             tmp[i] = '\0';
         } else {
@@ -990,7 +990,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
 
         {
             Random random(seed);
-            const size_t combinations = 1 << length;
+            const size_t combinations = size_t(1) << length;
             for (size_t i = 0; i < combinations; ++i) {
                 StringData str = create_string_with_nuls(i, length, tmp, random);
                 col.add(str);
@@ -1001,7 +1001,7 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
         size_t expected_index = 0;
         for (size_t l = 1; l <= length; ++l) {
             Random random(seed);
-            const size_t combinations = 1 << l;
+            const size_t combinations = size_t(1) << l;
             for (size_t i = 0; i < combinations; ++i) {
                 StringData needle = create_string_with_nuls(i, l, tmp, random);
                 CHECK_EQUAL(ndx.find_first(needle), expected_index);

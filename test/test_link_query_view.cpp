@@ -43,11 +43,11 @@ void check_table_view(test_util::unit_test::TestContext& test_context, const cha
                       const TableView& tv, std::vector<size_t> expected, const std::string& tv_str,
                       const std::string& expected_str)
 {
-    test_context.check_equal(tv.size(), expected.size(), file, line, (tv_str + ".size()").c_str(),
+    test_context.check_equal(tv.size(), expected.size(), file, long(line), (tv_str + ".size()").c_str(),
                              (expected_str + ".size()").c_str());
     if (tv.size() == expected.size()) {
         for (size_t i = 0; i < expected.size(); ++i) {
-            test_context.check_equal(tv.get_source_ndx(i), expected[i], file, line,
+            test_context.check_equal(tv.get_source_ndx(i), expected[i], file, long(line),
                                      (tv_str + ".get_source_ndx(" + util::to_string(i) + ")").c_str(),
                                      (expected_str + "[" + util::to_string(i) + "]").c_str());
         }
