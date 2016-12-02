@@ -58,7 +58,12 @@ TestFile::TestFile()
 #endif
     }();
     path = tmpdir + "/realm.XXXXXX";
-    mkstemp(&path[0]);
+    int fd = mkstemp(&path[0]);
+    if (fd < 0) {
+        int err = errno;
+        throw std::system_error(err, std::system_category());
+    }
+    close(fd);
     unlink(path.c_str());
 
     schema_version = 0;
