@@ -253,6 +253,8 @@ def doBuildWindows() {
             getArchive()
             try {
               bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=Debug /p:Platform=\"Win32\""
+              bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, release\" /p:Platform=\"Win32\""
+              bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, debug\" /p:Platform=\"Win32\""
             } finally {
               collectCompilerWarnings('msbuild', false)
             }
