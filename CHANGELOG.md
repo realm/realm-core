@@ -14,6 +14,8 @@
 
 ### Enhancements
 
+* Added 'void SharedGroup::get_stats(size_t& free_space, size_t& used_space)'
+  allowing access to the size of free and used space (Requested in issue #2281).
 * Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
   are now perfectly forwarded (via perfect forwarding) to
   `std::stream::operator<<()`.
