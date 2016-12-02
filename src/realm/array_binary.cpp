@@ -94,7 +94,7 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     if (add_zero_term)
         ++stored_size;
     int_fast64_t diff = (start + stored_size) - current_end;
-    m_blob.replace(start, current_end, value.data(), value.size(), add_zero_term);
+    m_blob.replace(to_size_t(start), to_size_t(current_end), value.data(), value.size(), add_zero_term);
     m_offsets.adjust(ndx, m_offsets.size(), diff);
 
     if (!legacy_array_type())

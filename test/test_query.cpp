@@ -8750,10 +8750,10 @@ TEST(Query_MaximumSumAverage)
 
             // Average of double, criteria on integer
             dbl = table1->where().not_equal(0, 1234).sum_double(2);
-            CHECK_EQUAL(d, 7.);
+            CHECK_EQUAL(dbl, 7.);
 
             dbl = table1->where().not_equal(2, 1234.).sum_double(2);
-            CHECK_APPROXIMATELY_EQUAL(d, 7., 0.001);
+            CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
 
 
             // Those with criteria now only include some rows, whereof none are null

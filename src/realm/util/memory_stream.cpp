@@ -78,7 +78,7 @@ pos_type MemoryInputStreambuf::seekpos(pos_type pos, std::ios_base::openmode whi
 {
     REALM_ASSERT(which == std::ios_base::in);
 
-    m_curr = m_begin + pos;
+    m_curr = m_begin + static_cast<int64_t>(pos);
 
     if (m_curr < m_begin || m_curr > m_end)
         return traits_type::eof();

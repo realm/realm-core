@@ -90,7 +90,7 @@ size_t GroupWriter::MapWindow::get_window_size(util::File& f, ref_type start_ref
     if (window_size < intended_alignment)
         window_size = intended_alignment;
     // but never map beyond end of file
-    size_t file_size = f.get_size();
+    size_t file_size = to_size_t(f.get_size());
     REALM_ASSERT_DEBUG_EX(start_ref + size <= file_size, start_ref + size, file_size);
     if (window_size > file_size - base_ref)
         window_size = file_size - base_ref;
@@ -237,7 +237,7 @@ GroupWriter::~GroupWriter()
 
 size_t GroupWriter::get_file_size() const noexcept
 {
-    return m_alloc.get_file().get_size();
+    return to_size_t(m_alloc.get_file().get_size());
 }
 
 void GroupWriter::sync_all_mappings()
