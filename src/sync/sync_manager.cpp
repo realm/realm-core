@@ -141,12 +141,35 @@ void SyncManager::reset_for_testing()
         m_users.clear();
     }
     {
-        // Assert there are no active sessions remaining.
-        REALM_ASSERT(std::all_of(m_active_sessions.begin(), m_active_sessions.end(), [](auto& element){ return element.second.expired(); }));
-        // Destroy the client.
         std::lock_guard<std::mutex> lock(m_mutex);
+
+        // Stop the client. This will abort any uploads that inactive sessions are waiting for.
+        if (m_sync_client)
+            m_sync_client->stop();
+
+        {
+            std::lock_guard<std::mutex> lock(m_session_mutex);
+
+#if REALM_ASSERTIONS_ENABLED
+            // Callers of `SyncManager::reset_for_testing` should ensure there are no active sessions
+            // prior to calling `reset_for_testing`.
+            auto no_active_sessions = std::all_of(m_active_sessions.begin(), m_active_sessions.end(), [](auto& element){
+                return element.second.expired();
+            });
+            REALM_ASSERT(no_active_sessions);
+#endif
+
+            // Destroy any remaining inactive sessions.
+            // FIXME: We shouldn't have any inactive sessions at this point! Sessions are expected to
+            // remain inactive until their final upload completes, at which point they are unregistered
+            // and destroyed. Our call to `sync::Client::stop` above aborts all uploads, so all sessions
+            // should have already been destroyed.
+            m_inactive_sessions.clear();
+        }
+
+        // Destroy the client now that we have no remaining sessions.
         m_sync_client = nullptr;
-        m_inactive_sessions.clear();
+
         // Reset even more state.
         // NOTE: these should always match the defaults.
         m_log_level = util::Logger::Level::info;
@@ -320,7 +343,7 @@ std::unique_ptr<SyncSession> SyncManager::get_existing_inactive_session_locked(c
 
 std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config)
 {
-    auto client = get_sync_client(); // Throws
+    auto& client = get_sync_client(); // Throws
 
     // The session is declared outside the scope of the lock so that if an exception is thrown
     // it'll be destroyed after the lock has been dropped. This avoids deadlocking when
@@ -336,7 +359,7 @@ std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, c
     bool session_is_new = false;
     if (!session) {
         session_is_new = true;
-        session.reset(new SyncSession(std::move(client), path, sync_config));
+        session.reset(new SyncSession(client, path, sync_config));
     }
 
     auto session_deleter = [this](SyncSession *session) { dropped_last_reference_to_session(session); };
@@ -372,15 +395,15 @@ void SyncManager::unregister_session(const std::string& path)
     m_inactive_sessions.erase(path);
 }
 
-std::shared_ptr<SyncClient> SyncManager::get_sync_client() const
+SyncClient& SyncManager::get_sync_client() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     if (!m_sync_client)
         m_sync_client = create_sync_client(); // Throws
-    return m_sync_client;
+    return *m_sync_client;
 }
 
-std::shared_ptr<SyncClient> SyncManager::create_sync_client() const
+std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
 {
     REALM_ASSERT(!m_mutex.try_lock());
 
@@ -393,7 +416,7 @@ std::shared_ptr<SyncClient> SyncManager::create_sync_client() const
         stderr_logger->set_level_threshold(m_log_level);
         logger = std::move(stderr_logger);
     }
-    return std::make_shared<SyncClient>(std::move(logger),
+    return std::make_unique<SyncClient>(std::move(logger),
                                         std::move(m_error_handler),
                                         m_client_reconnect_mode,
                                         m_client_validate_ssl);
