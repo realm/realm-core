@@ -22,7 +22,7 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Unit tests now support JUnit output format.
 
 ----------------------------------------------
 
