@@ -359,7 +359,7 @@ def doBuildNodeInOsx(def isPublishingRun) {
             sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core/'
           }
         } finally {
-          collectCompilerWarnings('clang')
+          collectCompilerWarnings('clang', true)
         }
       }
     }
