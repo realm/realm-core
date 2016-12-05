@@ -370,7 +370,7 @@ def doBuildNodeInOsx(def isPublishingRun, def isPublishingLatestRun) {
             }
           }
         } finally {
-          collectCompilerWarnings('clang')
+          collectCompilerWarnings('clang', true)
         }
       }
     }

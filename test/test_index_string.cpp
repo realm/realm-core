@@ -773,8 +773,8 @@ TEST(StringIndex_FindAllNoCopyCommonPrefixStrings)
         const IntegerColumn results_c(Allocator::get_default(), ref_type(results.payload));
         CHECK_EQUAL(results_c.get(results.start_ndx), start_row + 1);
         CHECK_EQUAL(results_c.get(results.start_ndx + 1), start_row + 2);
-        CHECK_EQUAL(col.get(results_c.get(results.start_ndx)), spc);
-        CHECK_EQUAL(col.get(results_c.get(results.start_ndx + 1)), spc);
+        CHECK_EQUAL(col.get(size_t(results_c.get(results.start_ndx))), spc);
+        CHECK_EQUAL(col.get(size_t(results_c.get(results.start_ndx + 1))), spc);
 
         res = ndx.find_all_no_copy(spd, results);
         CHECK_EQUAL(res, FindRes_not_found);
@@ -786,9 +786,9 @@ TEST(StringIndex_FindAllNoCopyCommonPrefixStrings)
         CHECK_EQUAL(results_e.get(results.start_ndx), start_row + 3);
         CHECK_EQUAL(results_e.get(results.start_ndx + 1), start_row + 4);
         CHECK_EQUAL(results_e.get(results.start_ndx + 2), start_row + 5);
-        CHECK_EQUAL(col.get(results_e.get(results.start_ndx)), spe);
-        CHECK_EQUAL(col.get(results_e.get(results.start_ndx + 1)), spe);
-        CHECK_EQUAL(col.get(results_e.get(results.start_ndx + 2)), spe);
+        CHECK_EQUAL(col.get(size_t(results_e.get(results.start_ndx))), spe);
+        CHECK_EQUAL(col.get(size_t(results_e.get(results.start_ndx + 1))), spe);
+        CHECK_EQUAL(col.get(size_t(results_e.get(results.start_ndx + 2))), spe);
     };
 
     std::string std_max(StringIndex::s_max_offset, 'a');
