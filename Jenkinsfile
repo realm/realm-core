@@ -507,7 +507,7 @@ def collectCompilerWarnings(compiler, fail) {
     } else if ( compiler == 'msbuild' ) {
         parserName = 'MSBuild'
     }
-    step([
+/*    step([
         $class: 'WarningsPublisher',
         canComputeNew: false,
         canResolveRelativePaths: false,
@@ -522,7 +522,7 @@ def collectCompilerWarnings(compiler, fail) {
         includePattern: '',
         messagesPattern: '',
         unHealthy: ''
-    ])
+    ])*/
 }
 
 def environment() {
