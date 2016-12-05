@@ -33,11 +33,12 @@ using namespace realm;
 Results::Results() = default;
 Results::~Results() = default;
 
-Results::Results(SharedRealm r, Query q, SortDescriptor s)
+Results::Results(SharedRealm r, Query q, SortDescriptor s, SortDescriptor d)
 : m_realm(std::move(r))
 , m_query(std::move(q))
 , m_table(m_query.get_table().get())
 , m_sort(std::move(s))
+, m_distinct(std::move(d))
 , m_mode(Mode::Query)
 {
 }
@@ -62,24 +63,6 @@ Results::Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q, SortDes
     }
 }
 
-Results::Results(SharedRealm r, Query q, SortDescriptor s, SortDescriptor d)
-: m_realm(std::move(r))
-, m_query(std::move(q))
-, m_sort(std::move(s))
-, m_distinct(std::move(d))
-, m_mode(Mode::Query)
-{
-}
-
-Results::Results(SharedRealm r, TableView tv, SortDescriptor s)
-: m_realm(std::move(r))
-, m_table_view(std::move(tv))
-, m_table(&m_table_view.get_parent())
-, m_sort(std::move(s))
-, m_mode(Mode::TableView)
-{
-}
-
 Results::Results(SharedRealm r, TableView tv, SortDescriptor s, SortDescriptor d)
 : m_realm(std::move(r))
 , m_table_view(std::move(tv))
@@ -89,7 +72,6 @@ Results::Results(SharedRealm r, TableView tv, SortDescriptor s, SortDescriptor d
 , m_mode(Mode::TableView)
 {
 }
-
 
 Results::Results(const Results&) = default;
 Results& Results::operator=(const Results&) = default;

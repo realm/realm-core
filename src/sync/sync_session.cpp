@@ -211,15 +211,7 @@ struct sync_session_states::Dying : public SyncSession::State {
     void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
         size_t current_death_count = ++session.m_death_count;
-        session.m_session->async_wait_for_upload_completion([session=&session, current_death_count](std::error_code error_code) {
-            if (error_code == util::error::operation_aborted) {
-                // Session was killed beneath us. Don't do anything.
-                return;
-            }
-            // FIXME: It's possible for the session to be destroyed while the callback is running,
-            // which is something we should address in the future. It is only possible when 
-            // SyncManager::reset_for_testing() is called.
-            // c.f. https://github.com/realm/realm-object-store/issues/269
+        session.m_session->async_wait_for_upload_completion([session=&session, current_death_count](std::error_code) {
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
             if (session->m_state == &State::dying && session->m_death_count == current_death_count) {
                 session->advance_state(lock, inactive);
@@ -284,16 +276,16 @@ const SyncSession::State& SyncSession::State::inactive = Inactive();
 const SyncSession::State& SyncSession::State::error = Error();
 
 
-SyncSession::SyncSession(std::shared_ptr<SyncClient> client, std::string realm_path, SyncConfig config)
+SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config)
 : m_state(&State::inactive)
 , m_config(std::move(config))
 , m_realm_path(std::move(realm_path))
-, m_client(std::move(client)) { }
+, m_client(client) { }
 
 void SyncSession::create_sync_session()
 {
     REALM_ASSERT(!m_session);
-    m_session = std::make_unique<sync::Session>(m_client->client, m_realm_path);
+    m_session = std::make_unique<sync::Session>(m_client.client, m_realm_path);
 
     // Set up the wrapped handler
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
