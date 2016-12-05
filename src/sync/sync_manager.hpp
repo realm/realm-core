@@ -28,7 +28,7 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
-#include <object-store/src/sync/impl/sync_client.hpp>
+#include "impl/sync_client.hpp"
 
 namespace realm {
 
