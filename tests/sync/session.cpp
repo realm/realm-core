@@ -83,21 +83,27 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     const std::string realm_base_url = server.base_url();
 
     SECTION("a SyncUser can properly retrieve its owned sessions") {
+        std::string path_1;
+        std::string path_2;
         auto user = SyncManager::shared().get_user("user1a", "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1a-1",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     &path_1);
         auto session2 = sync_session(server, user, "/test1a-2",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto, auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded,
+                                     &path_2);
         EventLoop::main().run_until([&] { return session_is_active(*session1) && session_is_active(*session2); });
 
         // Check the sessions on the SyncUser.
         REQUIRE(user->all_sessions().size() == 2);
-        auto s1 = user->session_for_url(realm_base_url + "/test1a-1");
+        auto s1 = user->session_for_on_disk_path(path_1);
         REQUIRE(s1);
         CHECK(s1->config().realm_url == realm_base_url + "/test1a-1");
-        auto s2 = user->session_for_url(realm_base_url + "/test1a-2");
+        auto s2 = user->session_for_on_disk_path(path_2);
         REQUIRE(s2);
         CHECK(s2->config().realm_url == realm_base_url + "/test1a-2");
     }
@@ -193,21 +199,21 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         // The call to `get_session()` should result in `SyncUser::register_session()` being called.
         auto session = SyncManager::shared().get_session(on_disk_path, config);
         CHECK(session);
-        session = user->session_for_url(server.base_url() + path);
+        session = user->session_for_on_disk_path(on_disk_path);
         CHECK(session);
     }
 
-    SECTION("a user cannot create multiple sessions for the same URL") {
+    SECTION("a user can create multiple sessions for the same URL") {
         auto user = SyncManager::shared().get_user("user", "not_a_real_token");
         auto create_session = [&]() {
+            // Note that this should put the sessions at different paths.
             return sync_session(server, user, "/test",
                                 [](auto&, auto&) { return s_test_token; },
                                 [](auto, auto, auto, auto) { },
                                 SyncSessionStopPolicy::Immediately);
         };
-
-        auto session = create_session();
-        CHECK_THROWS(create_session());
+        REQUIRE(create_session());
+        REQUIRE(create_session());
     }
 }
 
