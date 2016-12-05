@@ -208,13 +208,14 @@ public:
 
     void verify_thread() const;
     void verify_in_write() const;
+    void verify_open() const;
 
     bool can_deliver_notifications() const noexcept;
 
     // Close this Realm and remove it from the cache. Continuing to use a
-    // Realm after closing it will produce undefined behavior.
+    // Realm after closing it will throw ClosedRealmException
     void close();
-    bool is_closed() { return !m_read_only_group && !m_shared_group; }
+    bool is_closed() const { return !m_read_only_group && !m_shared_group; }
 
     // returns the file format version upgraded from if an upgrade took place
     util::Optional<int> file_format_upgraded_from_version() const;
@@ -381,6 +382,11 @@ public:
 class IncorrectThreadException : public std::logic_error {
 public:
     IncorrectThreadException() : std::logic_error("Realm accessed from incorrect thread.") {}
+};
+
+class ClosedRealmException : public std::runtime_error {
+public:
+    ClosedRealmException(std::string message) : std::runtime_error(message) {}
 };
 
 class UninitializedRealmException : public std::runtime_error {
