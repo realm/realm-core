@@ -7714,7 +7714,15 @@ public:
     {
         return false;
     }
+    bool add_subtable_search_index(size_t, size_t, size_t)
+    {
+        return false;
+    }
     bool remove_search_index(size_t)
+    {
+        return false;
+    }
+    bool remove_subtable_search_index(size_t, size_t, size_t)
     {
         return false;
     }

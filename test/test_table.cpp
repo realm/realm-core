@@ -2273,6 +2273,192 @@ TEST(Table_Spec)
     }
 }
 
+// Test search index on subtables. Adding or removing a search index of a subtable will
+// add or remove it from *all* subtables in the entire subtable column. This may take a
+// while if there are many subtables with many rows each.
+TEST(Table_SubtableIndex)
+{
+    GROUP_TEST_PATH(path);
+
+    {
+        Group group;
+        DescriptorRef sub_1;
+        TableRef table = group.add_table("test");
+   
+        // Create specification with sub-table
+        table->add_column(type_String, "first");
+        table->add_column(type_Table, "second", &sub_1);
+
+        sub_1->add_column(type_Int, "sub_first");
+        sub_1->add_column(type_String, "sub_second");
+
+        // Add search index to `degenerate` subtable (subtable which does not yet exist because it has
+        // no rows yet, so it's just a 0-ref in the ColumnTable object). Important to test because the
+        // search index is then constructed in a different place in the source code
+        table.get()->add_search_index(0, &sub_1);
+        CHECK(table.get()->has_search_index(0, sub_1));
+        table.get()->remove_search_index(0, &sub_1);
+        CHECK(!table.get()->has_search_index(0, sub_1));
+        table.get()->add_search_index(0, &sub_1);
+        CHECK(table.get()->has_search_index(0, sub_1));
+
+        CHECK_EQUAL(2, table->get_column_count());
+
+        // Add two rows to parent table
+        table->add_empty_row();
+        table->add_empty_row();
+        table->set_string(0, 0, "Hello");
+
+        // Add rows to first subtable
+        TableRef subtable = table->get_subtable(1, 0);
+        CHECK(subtable->is_empty());
+        subtable->add_empty_row();
+        subtable->set_int(0, 0, 42);
+        subtable->set_string(1, 0, "testsub1");
+        subtable->add_empty_row();
+        subtable->set_int(0, 1, 43);
+        subtable->set_string(1, 1, "testsub2");
+
+        // Add rows to second subtable
+        subtable = table->get_subtable(1, 1);
+        CHECK(subtable->is_empty());
+        subtable->add_empty_row();
+        subtable->set_int(0, 0, 66);
+        subtable->set_string(1, 0, "testsub3");
+        subtable->add_empty_row();
+        subtable->set_int(0, 1, 77);
+        subtable->set_string(1, 1, "testsub4");
+
+        subtable = table->get_subtable(1, 0);
+        CHECK(subtable.get()->has_search_index(0));
+
+        size_t match;
+
+        match = subtable.get()->where().equal(0, 43).find();
+        CHECK_EQUAL(match, 1);
+        match = subtable.get()->where().equal(1, "testsub2").find();
+        CHECK_EQUAL(match, 1);
+
+     //   group.verify();
+     //   group.to_dot("c:\\d\\dot.dot");
+
+       subtable = table->get_subtable(1, 1);
+
+        match = subtable.get()->where().equal(0, 77).find();
+        CHECK_EQUAL(match, 1);
+
+        // Query column that follows indexed column to test if refresh_column_accessors()
+        // has worked
+        match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        table.get()->remove_search_index(1, &sub_1);
+        CHECK(!subtable.get()->has_search_index(1));
+
+        // Query column that follows indexed column to test if refresh_column_accessors()
+        // has worked
+        match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+
+        match = subtable.get()->where().equal(0, 77).find();
+        CHECK_EQUAL(match, 1);
+
+        // Tests non-degenerate construction of index
+        table.get()->add_search_index(1, &sub_1);
+
+        match = subtable.get()->where().equal(0, 77).find();
+        CHECK_EQUAL(match, 1);
+        match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        // Add more data and see if that works
+        subtable.get()->add_empty_row();
+        match = subtable.get()->where().equal(0, 0).find();
+        CHECK_EQUAL(match, 2);
+
+        group.write(path);
+    }
+
+    {
+        // Check persistence
+        Group g2(path);
+        DescriptorRef sub_1;
+        TableRef table = g2.get_table("test");
+
+        TableRef subtable = table->get_subtable(1, 0);
+        CHECK(subtable.get()->has_search_index(0));
+
+        size_t match;
+
+        match = subtable.get()->where().equal(0, 43).find();
+        CHECK_EQUAL(match, 1);
+        match = subtable.get()->where().equal(1, "testsub2").find();
+        CHECK_EQUAL(match, 1);
+
+        subtable = table->get_subtable(1, 1);
+
+        match = subtable.get()->where().equal(0, 77).find();
+        CHECK_EQUAL(match, 1);
+        match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+        
+        DescriptorRef subsub;
+        DescriptorRef sub = table.get()->get_subdescriptor(1);
+        sub->add_column(type_Table, "foobar", &subsub);
+        CHECK_THROW_ANY(table.get()->add_search_index(0, &subsub));
+    }
+
+    {
+        // Check that you are not allowed to add index to subtable of subtable
+        Group g2(path);
+        DescriptorRef sub_1;
+        TableRef table = g2.get_table("test");
+        DescriptorRef subsub;
+        DescriptorRef sub = table.get()->get_subdescriptor(1);
+        sub->add_column(type_Table, "baz", &subsub);
+        CHECK_THROW_ANY(table.get()->add_search_index(0, &subsub));
+    }
+
+    {
+        // Check correct updating of other subtable accessors than the one you called add_search_index() on
+        Group g2(path);
+        DescriptorRef des;
+        TableRef table = g2.get_table("test");
+        TableRef sub1 = table->get_subtable(1, 0);
+        TableRef sub2 = table->get_subtable(1, 1);
+
+        size_t match;
+       
+        des = table->get_subdescriptor(1);
+
+        table->remove_search_index(0, &des);
+
+        CHECK(!sub1->has_search_index(0));
+        match = sub1->where().equal(1, "testsub2").find();
+        CHECK_EQUAL(match, 1);
+
+        CHECK(!sub2->has_search_index(0));
+        match = sub2->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        table->add_search_index(0, &des);
+
+        CHECK(sub1->has_search_index(0));
+        match = sub1->where().equal(1, "testsub2").find();
+        CHECK_EQUAL(match, 1);
+
+        CHECK(sub2->has_search_index(0));
+        match = sub2->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        // Check what happens if user given column index is out of range
+        CHECK_THROW(table->add_search_index(100, &des), LogicError);
+        CHECK_THROW(table->remove_search_index(100, &des), LogicError);
+        CHECK(!table->has_search_index(100, des));
+    }
+}
+
 TEST(Table_SpecColumnPath)
 {
     Group group;

@@ -11,9 +11,18 @@
 * Attempts to open a Realm file with a different history type (Mobile Platform vs
   Mobile Database) now throws an IncompatibleHistories exception instead of a
   InvalidDatabase (as requested in issue #2275).
+* Added support for search index on subtable columns. Only one level of
+  subtables are currently supported, that is, you cannot create a search
+  index in a subtable of a subtable (will throw exception). The feature
+  is required for upcoming support for Array and Map types. NOTE: Core
+  versions prior to this version will not be able to open .realm files of
+  this Core version if this Core version has added such indexes. Adding or
+  removing an index will take place for *all* subtables in a subtable 
+  column. There is no way to add or remove it from single individual
+  subtables.
 
 ### Enhancements
-
+  
 * Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
   are now perfectly forwarded (via perfect forwarding) to
   `std::stream::operator<<()`.

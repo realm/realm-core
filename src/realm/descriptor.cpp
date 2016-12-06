@@ -208,3 +208,9 @@ void Descriptor::adj_move_column(size_t from, size_t to) noexcept
         }
     }
 }
+
+Spec* Descriptor::get_spec() const
+{
+    return m_spec; 
+}
+

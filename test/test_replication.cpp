@@ -219,6 +219,53 @@ TEST(Replication_General)
 }
 
 
+TEST(Replication_SubtableIndex)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    CHECK(Version::has_feature(Feature::feature_Replication));
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    {
+        WriteTransaction wt(sg_1);
+
+        DescriptorRef sub_1;
+        TableRef table = wt.add_table("test");
+
+        // Create specification with sub-table
+        table->add_column(type_String, "first");
+        table->add_column(type_Table, "second", &sub_1);
+
+        sub_1->add_column(type_Int, "sub_first");
+        sub_1->add_column(type_String, "sub_second");
+
+        table.get()->add_empty_row();
+
+        TableRef sub = table.get()->get_subtable(1, 0);
+        sub.get()->add_empty_row();
+
+        table.get()->add_search_index(0, &sub_1);
+        wt.commit();
+    }
+
+    util::Logger& replay_logger = test_context.logger;
+    SharedGroup sg_2(path_2);
+    repl.replay_transacts(sg_2, replay_logger);
+
+    {
+        WriteTransaction rt(sg_2);
+        rt.get_group().verify();
+        TableRef table = rt.get_table("test");
+        DescriptorRef sub_desc = table.get()->get_subdescriptor(1);
+        TableRef sub_table = table.get()->get_subtable(1, 0);
+        CHECK_EQUAL(sub_table.get()->get_int(0, 0), 0);
+        CHECK(table.get()->has_search_index(0, sub_desc));
+    }
+}
+
+
 void check(TestContext& test_context, SharedGroup& sg_1, const ReadTransaction& rt_2)
 {
     ReadTransaction rt_1(sg_1);
