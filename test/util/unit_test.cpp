@@ -181,17 +181,17 @@ public:
     }
     void summary(const SharedContext& context, const Summary& results_summary) override
     {
-        m_out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+        m_out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 
-        "<testsuites>\n"
-        "<testsuite "
-        "name=\"realm-core-tests\" "
-        "tests=\"" << results_summary.num_executed_tests << "\" "
-        "diabled=\"" << results_summary.num_excluded_tests << "\" "
-        "failures=\"" << results_summary.num_failed_tests << "\" "
-        "id=\"0\" "
-        "time=\"" << results_summary.elapsed_seconds << "\""
-        ">\n";
+        m_out << "<testsuites>\n"
+              << "  <testsuite "
+              << "name=\"realm-core-tests\" "
+              << "tests=\"" << results_summary.num_executed_tests << "\" "
+              << "disabled=\"" << results_summary.num_excluded_tests << "\" "
+              << "failures=\"" << results_summary.num_failed_tests << "\" "
+              << "id=\"0\" "
+              << "time=\"" << results_summary.elapsed_seconds << "\""
+              << ">\n";
 
         std::ostringstream out;
         out.imbue(std::locale::classic());
@@ -207,30 +207,26 @@ public:
                 out << '#' << (recurrence_index + 1);
             std::string test_name = out.str();
 
-            m_out << "  <testcase "
-            "name=\"" << xml_escape(test_name) << "\" "
-            "status=\"" << (t.failures.size() > 0 ? "failed" : "passed") << "\" "
-            "classname=\"" << xml_escape(test_name) << "\" "
-            "time=\"" << t.elapsed_seconds << "\"";
+            m_out << "    <testcase name=\"" << xml_escape(test_name) << "\" "
+                  << "status=\"" << (t.failures.size() > 0 ? "failed" : "passed") << "\" "
+                  << "classname=\"" << xml_escape(test_name) << "\" "
+                  << "time=\"" << t.elapsed_seconds << "\"";
 
             if (t.failures.empty()) {
                 m_out << "/>\n";
-                continue;
             }
-            m_out << ">\n";
+            else {
+                m_out << ">\n";
 
-            typedef std::vector<failure>::const_iterator fail_iter;
-            fail_iter fails_end = t.failures.end();
-            for (fail_iter i_2 = t.failures.begin(); i_2 != fails_end; ++i_2) {
-                std::string msg = xml_escape(i_2->message);
-                m_out << "    <failure type=\"assertion failed\" "
-                "message=\"" << i_2->file_name
-                << "(" << i_2->line_number << ") : "
-                << msg << "\"/>\n";
+                for (auto& i_2 : t.failures) {
+                    std::string msg = xml_escape(i_2.message);
+                    m_out << "      <failure type=\"assertion failed\" "
+                          << "message=\"" << i_2.file_name << "(" << i_2.line_number << ") : " << msg << "\"/>\n";
+                }
+                m_out << "    </testcase>\n";
             }
-            m_out << "  </testcase>\n";
         }
-        m_out << "</testsuite>\n</testsuites>\n";
+        m_out << "  </testsuite>\n</testsuites>\n";
     }
 };
 
