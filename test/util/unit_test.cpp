@@ -123,7 +123,7 @@ public:
             const TestDetails details = context.test_list.get_test_details(test_index);
             std::string test_name{details.test_name};
             if (context.num_recurrences > 1) {
-                test_name = test_name + "#" + std::to_string(recurrence_index + 1);
+                test_name = test_name + "#" + util::to_string(recurrence_index + 1);
             }
 
             m_out << "  <test suite=\"" << xml_escape(details.suite_name) << "\" "
@@ -198,7 +198,7 @@ public:
             const TestDetails details = context.test_list.get_test_details(test_index);
             std::string test_name{details.test_name};
             if (context.num_recurrences > 1) {
-                test_name = test_name + "#" + std::to_string(recurrence_index + 1);
+                test_name = test_name + "#" + util::to_string(recurrence_index + 1);
             }
 
             m_out << "    <testcase name=\"" << xml_escape(test_name) << "\" "
