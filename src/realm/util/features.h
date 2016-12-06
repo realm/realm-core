@@ -65,6 +65,11 @@
 #define REALM_MAX_BPNODE_SIZE 1000
 #endif
 
+// Maximum size of the basic Array objects which are part of a bptree. The number 
+// includes all "hidden" entries such as the magic value for nullable arrays, meta
+// entries for nodes that are on "compact form", etc. Note that an Array that is
+// *not* part of a bptree can be much larger.
+#define REALM_BPARRAY_SIZE (REALM_MAX_BPNODE_SIZE + 2)
 
 #define REALM_QUOTE_2(x) #x
 #define REALM_QUOTE(x) REALM_QUOTE_2(x)

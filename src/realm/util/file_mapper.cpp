@@ -92,11 +92,21 @@ struct mapping_and_addr {
     size_t size;
 };
 
-// prevent destruction at exit (which can lead to races if other threads are still running)
-util::Mutex& mapping_mutex = *new Mutex;
-std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
-std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
+util::Mutex mapping_mutex;
+std::vector<mapping_and_addr> mappings_by_addr;
+std::vector<mappings_for_file> mappings_by_file;
 
+// If there's any active mappings when the program exits, deliberately leak them
+// to avoid flushing things that were in the middle of being modified on a different thrad
+struct AtExit {
+    ~AtExit()
+    {
+        if (!mappings_by_addr.empty())
+            (new std::vector<mapping_and_addr>)->swap(mappings_by_addr);
+        if (!mappings_by_file.empty())
+            (new std::vector<mappings_for_file>)->swap(mappings_by_file);
+    }
+} at_exit;
 
 mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
 {

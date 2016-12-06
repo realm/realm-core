@@ -28,6 +28,7 @@
 #include <realm/util/file.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
+#include <realm/utilities.hpp>
 
 namespace realm {
 
@@ -307,7 +308,19 @@ public:
     /// \sa get_file_format_version()
     void set_file_format_version(int) noexcept;
 
+    // Compute checksum of .realm file and write it to its header
+    void update_checksum() override;
+    
+    // Call while modifying the file during commit() when pages are written.
+    // This will make verify_checksum() a no-op.
+    void invalidate_checksum() override;
+    
+    // Compute checksum of .realm file and compare with the value in its
+    // header
+    bool verify_checksum() noexcept override;
+
     void verify() const override;
+
 #ifdef REALM_DEBUG
     void enable_debug(bool enable)
     {
@@ -317,6 +330,8 @@ public:
     void print() const;
 #endif
     struct MappedFile;
+
+    static const char ignore_checksum = '*';
 
 protected:
     MemRef do_alloc(const size_t size) override;
@@ -361,7 +376,7 @@ private:
         // Info-block 8-bytes
         uint8_t m_mnemonic[4];    // "T-DB"
         uint8_t m_file_format[2]; // See `library_file_format`
-        uint8_t m_reserved;
+        uint8_t m_checksum;
         // bit 0 of m_flags is used to select between the two top refs.
         uint8_t m_flags;
     };
@@ -372,6 +387,8 @@ private:
         uint64_t m_magic_cookie;
     };
 
+    char compute_checksum() noexcept;
+
     static_assert(sizeof(Header) == 24, "Bad header size");
     static_assert(sizeof(StreamingFooter) == 16, "Bad footer size");
 
@@ -379,6 +396,7 @@ private:
     static void init_streaming_header(Header*, int file_format_version);
 
     static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
+    static const size_t checksum_offset = offsetof(Header, m_checksum);
 
     // The mappings are shared, if they are from a file
     std::shared_ptr<MappedFile> m_file_mappings;

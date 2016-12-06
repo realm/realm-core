@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <atomic>
 #include <fstream>
+#include <iostream>
 
 #ifdef _WIN32
 #include "windows.h"
@@ -73,6 +74,11 @@ signed char avx_support = -1;
 
 StringCompareCallback string_compare_callback = nullptr;
 string_compare_method_t string_compare_method = STRING_COMPARE_CORE;
+
+
+
+
+
 
 void cpuid_init()
 {
@@ -304,6 +310,12 @@ void process_mem_usage(double& vm_usage, double& resident_set)
 #endif
 }
 #endif
+
+
+
+
+
+
 
 } // namespace realm
 

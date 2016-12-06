@@ -1150,7 +1150,7 @@ int64_t Array::sum(size_t start, size_t end) const
 {
     if (end == size_t(-1))
         end = m_size;
-    REALM_ASSERT_11(start, <, m_size, &&, end, <=, m_size, &&, start, <, end);
+    REALM_ASSERT_EX_CRC(start < m_size && end <= m_size && start < end, start, m_size, end);
 
     if (w == 0)
         return 0;

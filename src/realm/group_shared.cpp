@@ -1166,6 +1166,9 @@ bool SharedGroup::compact()
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
             file.sync(); // Throws
+
+        m_group.get_alloc().update_checksum();
+
 #ifndef _WIN32
         util::File::move(tmp_path, m_db_path);
 #endif
@@ -1621,6 +1624,7 @@ SharedGroup::version_type SharedGroup::commit()
     REALM_ASSERT(m_group.is_attached());
 
     version_type new_version = do_commit(); // Throws
+
     do_end_write();
     do_end_read();
 
@@ -1748,6 +1752,9 @@ Replication::version_type SharedGroup::do_commit()
 
     version_type current_version = r_info->get_current_version_unchecked();
     version_type new_version = current_version + 1;
+
+    m_group.get_alloc().invalidate_checksum();
+
     if (Replication* repl = m_group.get_replication()) {
         // If Replication::prepare_commit() fails, then the entire transaction
         // fails. The application then has the option of terminating the
@@ -1766,6 +1773,9 @@ Replication::version_type SharedGroup::do_commit()
     else {
         low_level_commit(new_version); // Throws
     }
+
+    m_group.get_alloc().update_checksum();
+
     return new_version;
 }
 

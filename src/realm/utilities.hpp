@@ -30,9 +30,14 @@
 #include <intrin.h>
 #endif
 
+#include <realm/util/file.hpp>
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
+
+
+using namespace realm::util;
+
 
 // GCC defines __i386__ and __x86_64__
 #if (defined(__X86__) || defined(__i386__) || defined(i386) || defined(_M_IX86) || defined(__386__) ||               \
