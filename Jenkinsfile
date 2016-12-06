@@ -262,6 +262,8 @@ def doBuildWindows() {
               bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=Debug /p:Platform=\"Win32\""
               bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, release\" /p:Platform=\"Win32\""
               bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, debug\" /p:Platform=\"Win32\""
+              zip zipfile:'realm-core-windows.zip', dir:'Visual Studio', glob:'lib/*.lib'
+              zip zipfile:'realm-core-windows.zip', dir:'src', glob:'**/*.hpp', archive:True
             } finally {
               collectCompilerWarnings('msbuild', false)
             }
