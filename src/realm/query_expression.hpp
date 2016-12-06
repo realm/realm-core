@@ -2735,11 +2735,11 @@ public:
         std::vector<size_t> links = m_link_map.get_links(index);
         std::sort(links.begin(), links.end());
 
-        size_t count = std::accumulate(links.begin(), links.end(), 0, [this](size_t running_count, size_t link) {
+        size_t count = std::accumulate(links.begin(), links.end(), size_t(0), [this](size_t running_count, size_t link) {
             return running_count + m_query.count(link, link + 1, 1);
         });
 
-        destination.import(Value<Int>(false, 1, count));
+        destination.import(Value<Int>(false, 1, size_t(count)));
     }
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override

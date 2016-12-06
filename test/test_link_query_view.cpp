@@ -39,7 +39,7 @@ using namespace realm::util;
 
 namespace {
 
-void check_table_view(test_util::unit_test::TestContext& test_context, const char* file, size_t line,
+void check_table_view(test_util::unit_test::TestContext& test_context, const char* file, long line,
                       const TableView& tv, std::vector<size_t> expected, const std::string& tv_str,
                       const std::string& expected_str)
 {
