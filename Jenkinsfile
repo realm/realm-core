@@ -264,7 +264,7 @@ def doBuildWindows() {
               bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, debug\" /p:Platform=\"Win32\""
               zip zipfile:'realm-core-windows.zip', dir:'Visual Studio', glob:'lib/*.lib'
               zip zipfile:'realm-core-windows.zip', dir:'src', glob:'**/*.hpp', archive:True
-            catch(Exception e) {
+            } catch(Exception e) {
               e.printStackTrace()
               throw e
             } finally {
