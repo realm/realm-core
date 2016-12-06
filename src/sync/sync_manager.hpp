@@ -20,7 +20,6 @@
 #define REALM_OS_SYNC_MANAGER_HPP
 
 #include "shared_realm.hpp"
-#include "sync_notifier.hpp"
 
 #include <realm/sync/client.hpp>
 #include <realm/util/logger.hpp>
@@ -74,9 +73,6 @@ public:
     void set_logger_factory(SyncLoggerFactory&) noexcept;
     void set_error_handler(std::function<sync::Client::ErrorHandler>);
 
-    /// Optionally, set a notifier. Call this before calling `configure_file_system`, or no notifier will be created.
-    void set_notifier_factory(SyncNotifierFactory&) noexcept;
-
     /// Control whether the sync client attempts to reconnect immediately. Only set this to `true` for testing purposes.
     void set_client_should_reconnect_immediately(bool reconnect_immediately);
     bool client_should_reconnect_immediately() const noexcept;
@@ -112,16 +108,13 @@ public:
     // calling this method.
     void reset_for_testing();
 
-    // Only for use by sync code.
-    bool fire_notification(std::function<void(const SyncNotifier&)>);
-
 private:
     void dropped_last_reference_to_session(SyncSession*);
 
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list
     // due to someone holding a strong reference to it.
-    void unregister_session(std::string path, SyncConfig config);
+    void unregister_session(const std::string& path);
 
     SyncManager() = default;
     SyncManager(const SyncManager&) = delete;
@@ -141,8 +134,6 @@ private:
     std::function<sync::Client::ErrorHandler> m_error_handler;
     sync::Client::Reconnect m_client_reconnect_mode = sync::Client::Reconnect::normal;
     bool m_client_validate_ssl = true;
-    SyncNotifierFactory* m_notifier_factory = nullptr;
-    std::unique_ptr<SyncNotifier> m_notifier;
 
     // Protects m_users
     mutable std::mutex m_user_mutex;

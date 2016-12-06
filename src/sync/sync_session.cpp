@@ -133,8 +133,6 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
         if (session.m_deferred_close) {
             session.m_deferred_close = false;
             session.m_state->close(lock, session);
-        } else {
-            SyncManager::shared().fire_notification([&](const SyncNotifier& n) { n.session_bound_to_server(session.shared_from_this()); });
         }
     }
 
@@ -444,7 +442,7 @@ void SyncSession::unregister(std::unique_lock<std::mutex>& lock)
     REALM_ASSERT(m_state == &State::inactive); // Must stop an active session before unregistering.
 
     lock.unlock();
-    SyncManager::shared().unregister_session(m_realm_path, m_config);
+    SyncManager::shared().unregister_session(m_realm_path);
 }
 
 bool SyncSession::can_wait_for_network_completion() const
