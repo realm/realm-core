@@ -26,6 +26,8 @@
 
 #if (REALM_HAVE_UV && !REALM_PLATFORM_APPLE) || REALM_PLATFORM_NODE
 #define REALM_USE_UV 1
+#else
+#define REALM_USE_UV 0
 #endif
 
 #if REALM_USE_UV
