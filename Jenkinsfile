@@ -506,37 +506,9 @@ def doBuildAndroid(def isPublishingRun) {
 
 def recordTests(tag) {
     def tests = readFile('test/unit-test-report.xml')
-    def modifiedTests = tests.replaceAll('DefaultSuite', tag)
+    def modifiedTests = tests.replaceAll('realm-core-tests', tag)
     writeFile file: 'test/modified-test-report.xml', text: modifiedTests
-
-    step([
-        $class: 'XUnitBuilder',
-        testTimeMargin: '3000',
-        thresholdMode: 1,
-        thresholds: [
-        [
-        $class: 'FailedThreshold',
-        failureNewThreshold: '0',
-        failureThreshold: '0',
-        unstableNewThreshold: '0',
-        unstableThreshold: '0'
-        ], [
-        $class: 'SkippedThreshold',
-        failureNewThreshold: '0',
-        failureThreshold: '0',
-        unstableNewThreshold: '0',
-        unstableThreshold: '0'
-        ]
-        ],
-        tools: [[
-        $class: 'UnitTestJunitHudsonTestType',
-        deleteOutputFiles: true,
-        failIfNotNew: true,
-        pattern: 'test/modified-test-report.xml',
-        skipNoTestFiles: false,
-        stopProcessingIfError: true
-        ]]
-    ])
+    junit 'test/modified-test-report.xml'
 }
 
 def collectCompilerWarnings(compiler, fail) {
@@ -555,10 +527,7 @@ def collectCompilerWarnings(compiler, fail) {
         consoleParsers: [[parserName: parserName]],
         defaultEncoding: '',
         excludePattern: '',
-        failedTotalAll: fail?'0':'',
-        failedTotalHigh: fail?'0':'',
-        failedTotalLow: fail?'0':'',
-        failedTotalNormal: fail?'0':'',
+        unstableTotalAll: fail?'0':'',
         healthy: '',
         includePattern: '',
         messagesPattern: '',

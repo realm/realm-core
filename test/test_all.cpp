@@ -425,7 +425,7 @@ bool run_tests(util::Logger* logger)
         std::string path = get_test_path_prefix();
         std::string xml_path = path + "unit-test-report.xml";
         xml_file.open(xml_path.c_str());
-        reporter.reset(create_xml_reporter(xml_file));
+        reporter.reset(create_junit_reporter(xml_file));
     }
     else {
         const char* str = getenv("UNITTEST_PROGRESS");
