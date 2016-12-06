@@ -63,6 +63,10 @@ struct Contains : public HackClass {
     {
         return v2.contains(v1);
     }
+    bool operator()(StringData v1, const std::array<uint8_t, 256> &charmap, StringData v2) const
+    {
+        return v2.contains(v1, charmap);
+    }
 
     template <class A, class B>
     bool operator()(A, B) const
@@ -277,6 +281,19 @@ struct ContainsIns : public HackClass {
         std::string v1_lower = case_map(v1, false, IgnoreErrors);
         return search_case_fold(v2, v1_upper.c_str(), v1_lower.c_str(), v1.size()) != v2.size();
     }
+    
+    // Case insensitive Boyer-Moore version
+    bool operator()(StringData v1, const char* v1_upper, const char* v1_lower, const std::array<uint8_t, 256> &charmap, StringData v2) const
+    {
+        if (v2.is_null() && !v1.is_null())
+            return false;
+        
+        if (v1.size() == 0 && !v2.is_null())
+            return true;
+        
+        return contains_ins(v2, v1_upper, v1_lower, v1.size(), charmap);
+    }
+
 
     template <class A, class B>
     bool operator()(A, B) const
