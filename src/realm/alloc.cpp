@@ -61,7 +61,7 @@ public:
         m_file_format_version = CURRENT_FILE_FORMAT_VERSION;
     }
 
-    MemRef do_alloc(size_t size) override
+    MemRef do_alloc(const size_t size) override
     {
         char* addr = static_cast<char*>(::malloc(size));
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!addr))) {

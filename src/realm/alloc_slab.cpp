@@ -249,9 +249,9 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     }
 #endif
 
-    REALM_ASSERT_DEBUG(0 < size);
-    REALM_ASSERT_DEBUG((size & 0x7) == 0); // only allow sizes that are multiples of 8
-    REALM_ASSERT_DEBUG(is_attached());
+    REALM_ASSERT(0 < size);
+    REALM_ASSERT((size & 0x7) == 0); // only allow sizes that are multiples of 8
+    REALM_ASSERT(is_attached());
 
     // If we failed to correctly record free space, new allocations cannot be
     // carried out until the free space record is reset.
@@ -305,6 +305,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 #ifdef REALM_SLAB_ALLOC_DEBUG
                 malloc_debug_map[ref] = malloc(1);
 #endif
+                REALM_ASSERT_EX(ref >= m_baseline, ref, m_baseline);
                 return MemRef(addr, ref, *this);
             }
         }
@@ -349,7 +350,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     }
 #endif
 
-    REALM_ASSERT_DEBUG(0 < new_size);
+    REALM_ASSERT(0 < new_size);
     std::unique_ptr<char[]> mem(new char[new_size]); // Throws
     std::fill(mem.get(), mem.get() + new_size, 0);
 
@@ -380,7 +381,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 #ifdef REALM_SLAB_ALLOC_DEBUG
     malloc_debug_map[ref] = malloc(1);
 #endif
-
+    REALM_ASSERT_EX(ref >= m_baseline, ref, m_baseline);
     return MemRef(slab.addr, ref, *this);
 }
 
@@ -415,36 +416,47 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 
     m_free_space_state = free_space_Dirty;
 
+#ifdef REALM_DEBUG
+    // Check for double free
+    for (auto& c : free_space) {
+        if ((ref >= c.ref && ref < (c.ref + c.size)) || (ref < c.ref && ref_end > c.ref)) {
+            REALM_ASSERT(!"Double Free");
+        }
+    }
+#endif
+
     // Check if we can merge with adjacent succeeding free block
     typedef chunks::iterator iter;
     iter merged_with = free_space.end();
-    {
-        iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEq(ref_end));
-        if (i != free_space.end()) {
-            // No consolidation over slab borders
-            if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref_end)) == m_slabs.end()) {
-                i->ref = ref;
-                i->size += size;
-                merged_with = i;
+    if (!read_only) {
+        {
+            iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEq(ref_end));
+            if (i != free_space.end()) {
+                // No consolidation over slab borders
+                if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref_end)) == m_slabs.end()) {
+                    i->ref = ref;
+                    i->size += size;
+                    merged_with = i;
+                }
             }
         }
-    }
 
-    // Check if we can merge with adjacent preceeding free block (not if that
-    // would cross slab boundary)
-    if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref)) == m_slabs.end()) {
-        iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEndEq(ref));
-        if (i != free_space.end()) {
-            if (merged_with != free_space.end()) {
-                i->size += merged_with->size;
-                // Erase by "move last over"
-                *merged_with = free_space.back();
-                free_space.pop_back();
+        // Check if we can merge with adjacent preceeding free block (not if that
+        // would cross slab boundary)
+        if (find_if(m_slabs.begin(), m_slabs.end(), SlabRefEndEq(ref)) == m_slabs.end()) {
+            iter i = find_if(free_space.begin(), free_space.end(), ChunkRefEndEq(ref));
+            if (i != free_space.end()) {
+                if (merged_with != free_space.end()) {
+                    i->size += merged_with->size;
+                    // Erase by "move last over"
+                    *merged_with = free_space.back();
+                    free_space.pop_back();
+                }
+                else {
+                    i->size += size;
+                }
+                return;
             }
-            else {
-                i->size += size;
-            }
-            return;
         }
     }
 
@@ -463,11 +475,42 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 }
 
 
+void SlabAlloc::consolidate_free_read_only()
+{
+    if (REALM_COVER_NEVER(m_free_space_state == free_space_Invalid))
+        throw InvalidFreeSpace();
+    if (m_free_read_only.empty())
+        return;
+
+    std::sort(begin(m_free_read_only), end(m_free_read_only), [](auto& a, auto& b) {
+        return a.ref < b.ref;
+    });
+
+    // Combine any adjacent chunks in the freelist, except for when the chunks
+    // are on the edge of an allocation slab
+    auto prev = m_free_read_only.begin();
+    for (auto it = m_free_read_only.begin() + 1; it != m_free_read_only.end(); ++it) {
+        if (prev->ref + prev->size != it->ref) {
+            prev = it;
+            continue;
+        }
+
+        prev->size += it->size;
+        it->size = 0;
+    }
+
+    // Remove all of the now zero-size chunks from the free list
+    m_free_read_only.erase(std::remove_if(begin(m_free_read_only), end(m_free_read_only),
+                                          [](auto& chunk) { return chunk.size == 0; }),
+                           end(m_free_read_only));
+}
+
+
 MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size_t new_size)
 {
     REALM_ASSERT_DEBUG(translate(ref) == addr);
-    REALM_ASSERT_DEBUG(0 < new_size);
-    REALM_ASSERT_DEBUG((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
+    REALM_ASSERT(0 < new_size);
+    REALM_ASSERT((new_size & 0x7) == 0); // only allow sizes that are multiples of 8
 
     // FIXME: Check if we can extend current space. In that case, remember to
     // check whether m_free_space_state == free_state_Invalid. Also remember to
@@ -655,7 +698,7 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
         }
         ref_type top_ref = 0;
         if (cfg.read_only)
-            top_ref = get_top_ref(m_data, m_file_mappings->m_file.get_size());
+            top_ref = get_top_ref(m_data, to_size_t(m_file_mappings->m_file.get_size()));
         return top_ref;
     }
     // Even though we're the first to map the file, we cannot assume that we're
@@ -986,10 +1029,10 @@ void SlabAlloc::reset_free_space_tracking()
 
 void SlabAlloc::remap(size_t file_size)
 {
-    REALM_ASSERT_DEBUG(file_size % 8 == 0); // 8-byte alignment required
-    REALM_ASSERT_DEBUG(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
+    REALM_ASSERT(file_size % 8 == 0); // 8-byte alignment required
+    REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     REALM_ASSERT_DEBUG(is_free_space_clean());
-    REALM_ASSERT_DEBUG(m_baseline <= file_size);
+    REALM_ASSERT(m_baseline <= file_size);
 
     // Extend mapping by adding sections
     REALM_ASSERT_DEBUG(matches_section_boundary(file_size));
@@ -1044,7 +1087,7 @@ void SlabAlloc::remap(size_t file_size)
     // each entire slab in m_slabs)
     size_t slab_ref = file_size;
     size_t n = m_free_space.size();
-    REALM_ASSERT_DEBUG(m_slabs.size() == n);
+    REALM_ASSERT(m_slabs.size() == n);
     for (size_t i = 0; i < n; ++i) {
         Chunk& free_chunk = m_free_space[i];
         free_chunk.ref = slab_ref;

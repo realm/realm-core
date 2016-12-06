@@ -90,7 +90,7 @@ size_t GroupWriter::MapWindow::get_window_size(util::File& f, ref_type start_ref
     if (window_size < intended_alignment)
         window_size = intended_alignment;
     // but never map beyond end of file
-    size_t file_size = f.get_size();
+    size_t file_size = to_size_t(f.get_size());
     REALM_ASSERT_DEBUG_EX(start_ref + size <= file_size, start_ref + size, file_size);
     if (window_size > file_size - base_ref)
         window_size = file_size - base_ref;
@@ -237,7 +237,7 @@ GroupWriter::~GroupWriter()
 
 size_t GroupWriter::get_file_size() const noexcept
 {
-    return m_alloc.get_file().get_size();
+    return to_size_t(m_alloc.get_file().get_size());
 }
 
 void GroupWriter::sync_all_mappings()
@@ -283,7 +283,6 @@ ref_type GroupWriter::write_group()
 
     Array& top = m_group.m_top;
     bool is_shared = m_group.m_is_shared;
-
     REALM_ASSERT_3(m_free_positions.size(), ==, m_free_lengths.size());
     REALM_ASSERT(!is_shared || m_free_versions.size() == m_free_lengths.size());
 
@@ -332,6 +331,7 @@ ref_type GroupWriter::write_group()
     m_free_lengths.copy_on_write();   // Throws
     if (is_shared)
         m_free_versions.copy_on_write();                                            // Throws
+    m_group.m_alloc.consolidate_free_read_only();                                   // Throws
     const SlabAlloc::chunks& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
     max_free_list_size += new_free_space.size();
 
@@ -370,7 +370,7 @@ ref_type GroupWriter::write_group()
     // the free-lists any free space created during the current transaction (or
     // since last commit). Had we added it earlier, we would have risked
     // clobering the previous database version. Note, however, that this risk
-    // would only have been present in the non-transactionl case where there is
+    // would only have been present in the non-transactional case where there is
     // no version tracking on the free-space chunks.
     for (const auto& free_space : new_free_space) {
         ref_type ref = free_space.ref;
@@ -379,6 +379,15 @@ ref_type GroupWriter::write_group()
         // ascending position) to facilitate merge of adjacent segments. We
         // can find the correct insert postion by binary search
         size_t ndx = m_free_positions.lower_bound_int(ref);
+        if (ndx > 0) {
+            ref_type prev_ref = to_ref(m_free_positions.get(ndx - 1));
+            size_t prev_size = to_size_t(m_free_lengths.get(ndx - 1));
+            REALM_ASSERT_RELEASE(prev_ref + prev_size <= ref);
+        }
+        if (ndx < m_free_positions.size()) {
+            ref_type after_ref = to_ref(m_free_positions.get(ndx));
+            REALM_ASSERT_RELEASE(ref + size <= after_ref);
+        }
         m_free_positions.insert(ndx, ref); // Throws
         m_free_lengths.insert(ndx, size);  // Throws
         if (is_shared)
@@ -576,11 +585,13 @@ std::pair<size_t, size_t> GroupWriter::search_free_space_in_part_of_freelist(siz
 {
     bool is_shared = m_group.m_is_shared;
     SlabAlloc& alloc = m_group.m_alloc;
-    for (size_t i = begin; i != end; ++i) {
-        size_t chunk_size = to_size_t(m_free_lengths.get(i));
-        if (chunk_size < size) {
-            continue;
+    for (size_t next_start = begin; next_start < end; ) {
+        size_t i = m_free_lengths.find_first<Greater>(size - 1, next_start);
+        if (i == not_found) {
+            break;
         }
+
+        next_start = i + 1;
 
         // Only chunks that are not occupied by current readers
         // are allowed to be used.
@@ -590,6 +601,8 @@ std::pair<size_t, size_t> GroupWriter::search_free_space_in_part_of_freelist(siz
                 continue;
             }
         }
+
+        size_t chunk_size = to_size_t(m_free_lengths.get(i));
 
         // search through the chunk, finding a place within it,
         // where an allocation will not cross a mmap boundary
@@ -744,7 +757,7 @@ void GroupWriter::write_array_at(MapWindow* window, ref_type ref, const char* da
     // REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
     char* dest_addr = window->translate(pos);
 
-    uint32_t dummy_checksum = 41414141UL; // "AAAA" in ASCII
+    uint32_t dummy_checksum = 0x41414141UL; // "AAAA" in ASCII
     memcpy(dest_addr, &dummy_checksum, 4);
     memcpy(dest_addr + 4, data + 4, size - 4);
 }

@@ -155,6 +155,10 @@ size_t search_case_fold(StringData haystack, const char* needle_upper, const cha
 /// needle was not found.
 bool contains_ins(StringData haystack, const char* needle_upper, const char* needle_lower, size_t needle_size, const std::array<uint8_t, 256> &charmap);
 
+/// Case insensitive wildcard matching ('?' for single char, '*' for zero or more chars)
+bool string_like_ins(StringData text, StringData pattern) noexcept;
+bool string_like_ins(StringData text, StringData upper, StringData lower) noexcept;
+
 } // namespace realm
 
 #endif // REALM_UNICODE_HPP

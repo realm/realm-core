@@ -55,7 +55,7 @@ Searching: The main finding function is:
 #include <realm/string_data.hpp>
 #include <realm/query_conditions.hpp>
 #include <realm/column_fwd.hpp>
-#include "array_direct.hpp"
+#include <realm/array_direct.hpp>
 
 /*
     MMX: mmintrin.h
@@ -540,6 +540,7 @@ public:
     ///        this \c Array, sorted in ascending order
     /// \return the index of the value if found, or realm::not_found otherwise
     size_t find_gte(const int64_t target, size_t start, size_t end = size_t(-1)) const;
+
     void preset(int64_t min, int64_t max, size_t num_items);
     void preset(size_t bitwidth, size_t num_items);
 

@@ -532,7 +532,7 @@ public:
         , m_tree(Allocator::get_default())
     {
     }
-    explicit Column(std::unique_ptr<Array> root) noexcept;
+    REALM_DEPRECATED("Initialize with ref instead") explicit Column(std::unique_ptr<Array> root) noexcept;
     Column(Allocator&, ref_type, size_t column_ndx = npos);
     Column(unattached_root_tag, Allocator&);
     Column(Column&&) noexcept = default;

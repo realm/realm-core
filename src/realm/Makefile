@@ -36,6 +36,7 @@ utilities.hpp \
 alloc.hpp \
 alloc_slab.hpp \
 array.hpp \
+array_direct.hpp \
 array_integer.hpp \
 array_string.hpp \
 bptree.hpp \

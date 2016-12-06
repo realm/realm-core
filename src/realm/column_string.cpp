@@ -939,8 +939,12 @@ void StringColumn::find_all(IntegerColumn& result, StringData value, size_t begi
 
 FindRes StringColumn::find_all_no_copy(StringData value, InternalFindResult& result) const
 {
-    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     REALM_ASSERT(m_search_index);
+
+    if (value.is_null() && !m_nullable) {
+        // Early out if looking for null but we aren't nullable.
+        return FindRes::FindRes_not_found;
+    }
 
     return m_search_index->find_all_no_copy(value, result);
 }
