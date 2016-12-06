@@ -104,16 +104,11 @@ public:
     {
         m_out << "<?xml version=\"1.0\"?>\n"
                  "<unittest-results "
-                 "tests=\""
-              << results_summary.num_executed_tests << "\" "
-                                                       "failedtests=\""
-              << results_summary.num_failed_tests << "\" "
-                                                     "checks=\""
-              << results_summary.num_executed_checks << "\" "
-                                                        "failures=\""
-              << results_summary.num_failed_checks << "\" "
-                                                      "time=\""
-              << results_summary.elapsed_seconds << "\">\n";
+                 "tests=\"" << results_summary.num_executed_tests << "\" "
+                 "failedtests=\"" << results_summary.num_failed_tests << "\" "
+                 "checks=\"" << results_summary.num_executed_checks << "\" "
+                 "failures=\"" << results_summary.num_failed_checks << "\" "
+                 "time=\"" << results_summary.elapsed_seconds << "\">\n";
 
         for (const auto& p : m_tests) {
             auto key = p.first;
@@ -127,10 +122,8 @@ public:
             }
 
             m_out << "  <test suite=\"" << xml_escape(details.suite_name) << "\" "
-                                                                             "name=\""
-                  << xml_escape(test_name) << "\" "
-                                              "time=\""
-                  << t.elapsed_seconds << "\"";
+                     "name=\"" << xml_escape(test_name) << "\" "
+                     "time=\"" << t.elapsed_seconds << "\"";
             if (t.failures.empty()) {
                 m_out << "/>\n";
                 continue;
@@ -139,8 +132,8 @@ public:
 
             for (auto& i_2 : t.failures) {
                 std::string msg = xml_escape(i_2.message);
-                m_out << "    <failure message=\"" << i_2.file_name << "(" << i_2.line_number << ") : " << msg
-                      << "\"/>\n";
+                m_out << "    <failure message=\"" << i_2.file_name
+                      << "(" << i_2.line_number << ") : " << msg << "\"/>\n";
             }
             m_out << "  </test>\n";
         }
