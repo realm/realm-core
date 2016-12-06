@@ -100,7 +100,7 @@ public:
         i->second.elapsed_seconds = elapsed_seconds;
     }
 
-    virtual void summary(const SharedContext& context, const Summary& results_summary) override
+    void summary(const SharedContext& context, const Summary& results_summary) override
     {
         m_out << "<?xml version=\"1.0\"?>\n"
                  "<unittest-results "
@@ -114,19 +114,18 @@ public:
               << results_summary.num_failed_checks << "\" "
                                                       "time=\""
               << results_summary.elapsed_seconds << "\">\n";
-        std::ostringstream out;
-        out.imbue(std::locale::classic());
+
         for (const auto& p : m_tests) {
             auto key = p.first;
             const test& t = p.second;
             size_t test_index = key.first;
             int recurrence_index = key.second;
             const TestDetails details = context.test_list.get_test_details(test_index);
-            out.str(std::string());
-            out << details.test_name;
-            if (context.num_recurrences > 1)
-                out << '#' << (recurrence_index + 1);
-            std::string test_name = out.str();
+            std::string test_name{details.test_name};
+            if (context.num_recurrences > 1) {
+                test_name = test_name + "#" + std::to_string(recurrence_index + 1);
+            }
+
             m_out << "  <test suite=\"" << xml_escape(details.suite_name) << "\" "
                                                                              "name=\""
                   << xml_escape(test_name) << "\" "
@@ -137,13 +136,11 @@ public:
                 continue;
             }
             m_out << ">\n";
-            typedef std::vector<failure>::const_iterator fail_iter;
-            fail_iter fails_end = t.failures.end();
-            for (fail_iter i_2 = t.failures.begin(); i_2 != fails_end; ++i_2) {
-                std::string msg = xml_escape(i_2->message);
-                m_out << "    <failure message=\"" << i_2->file_name << ""
-                                                                        "("
-                      << i_2->line_number << ") : " << msg << "\"/>\n";
+
+            for (auto& i_2 : t.failures) {
+                std::string msg = xml_escape(i_2.message);
+                m_out << "    <failure message=\"" << i_2.file_name << "(" << i_2.line_number << ") : " << msg
+                      << "\"/>\n";
             }
             m_out << "  </test>\n";
         }
@@ -193,19 +190,16 @@ public:
               << "time=\"" << results_summary.elapsed_seconds << "\""
               << ">\n";
 
-        std::ostringstream out;
-        out.imbue(std::locale::classic());
         for (const auto& p : m_tests) {
             auto key = p.first;
             const test& t = p.second;
             size_t test_index = key.first;
             int recurrence_index = key.second;
             const TestDetails details = context.test_list.get_test_details(test_index);
-            out.str(std::string());
-            out << details.test_name;
-            if (context.num_recurrences > 1)
-                out << '#' << (recurrence_index + 1);
-            std::string test_name = out.str();
+            std::string test_name{details.test_name};
+            if (context.num_recurrences > 1) {
+                test_name = test_name + "#" + std::to_string(recurrence_index + 1);
+            }
 
             m_out << "    <testcase name=\"" << xml_escape(test_name) << "\" "
                   << "status=\"" << (t.failures.size() > 0 ? "failed" : "passed") << "\" "
