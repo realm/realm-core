@@ -10,7 +10,9 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
+  are now perfectly forwarded (via perfect forwarding) to
+  `std::stream::operator<<()`.
 
 -----------
 
