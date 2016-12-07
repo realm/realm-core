@@ -5,6 +5,7 @@ try {
   def gitSha
   def dependencies
   def isPublishingRun
+  def isPublishingLatestRun
 
   timeout(time: 1, unit: 'HOURS') {
     stage('gather-info') {
@@ -16,8 +17,7 @@ try {
           extensions: scm.extensions + [[$class: 'CleanCheckout']],
           userRemoteConfigs: scm.userRemoteConfigs
         ])
-        sh 'git archive -o core.zip HEAD'
-        stash includes: 'core.zip', name: 'core-source'
+        stash includes: '**', name: 'core-source'
 
         dependencies = readProperties file: 'dependencies.list'
         echo "VERSION: ${dependencies.VERSION}"
@@ -40,22 +40,32 @@ try {
         }
       }
 
-      isPublishingRun = ['master', 'next-major'].contains(env.BRANCH_NAME) || gitTag != ""
+      isPublishingRun = gitTag != ""
       echo "Publishing Run: ${isPublishingRun}"
+
+      isPublishingLatestRun = ['master'].contains(env.BRANCH_NAME)
 
       rpmVersion = dependencies.VERSION.replaceAll("-", "_")
       echo "rpm version: ${rpmVersion}"
+
+      if (['master'].contains(env.BRANCH_NAME)) {
+        // If we're on master, instruct the docker image builds to push to the
+        // cache registry
+        env.DOCKER_PUSH = "1"
+      }
     }
 
     stage('check') {
       parallelExecutors = [
         checkLinuxRelease: doBuildInDocker('check'),
         checkLinuxDebug: doBuildInDocker('check-debug'),
-        buildCocoa: doBuildCocoa(isPublishingRun),
-        buildNodeLinux: doBuildNodeInDocker(isPublishingRun),
-        buildNodeOsx: doBuildNodeInOsx(isPublishingRun),
-        buildDotnetOsx: doBuildDotNetOsx(isPublishingRun),
+        buildCocoa: doBuildCocoa(isPublishingRun, isPublishingLatestRun),
+        buildNodeLinux: doBuildNodeInDocker(isPublishingRun, isPublishingLatestRun),
+        buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
+        buildDotnetOsx: doBuildDotNetOsx(isPublishingRun, isPublishingLatestRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
+        buildWindows: doBuildWindows(),
+        buildOsxDylibs: doBuildOsxDylibs(isPublishingRun, isPublishingLatestRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
       ]
@@ -102,7 +112,7 @@ def buildDockerEnv(name) {
   return docker.image(name)
 }
 
-def doBuildCocoa(def isPublishingRun) {
+def doBuildCocoa(def isPublishingRun, def isPublishingLatestRun) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -136,11 +146,11 @@ def doBuildCocoa(def isPublishingRun) {
                   # the debug build of core, so remove that slice
                   lipo -remove armv7s core/librealm-ios-dbg.a -o core/librealm-ios-dbg.a
 
-                  tar cf "$dir/core-$version.tar.xz" --xz core || exit 1
+                  tar cf "$dir/realm-core-$version.tar.xz" --xz core || exit 1
               )
               rm -rf "$tmpdir" || exit 1
 
-              cp core-*.tar.xz realm-core-latest.tar.xz
+              cp realm-core-*.tar.xz realm-core-latest.tar.xz
             '''
 
             if (isPublishingRun) {
@@ -151,17 +161,19 @@ def doBuildCocoa(def isPublishingRun) {
             sh 'sh build.sh clean'
         }
       } finally {
-        collectCompilerWarnings('clang')
+        collectCompilerWarnings('clang', true)
         recordTests('check-debug-cocoa')
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          sh 's3cmd -c $s3cfg_config_file put realm-core-latest.tar.xz s3://static.realm.io/downloads/core'
+          if (isPublishingLatestRun) {
+            sh 's3cmd -c $s3cfg_config_file put realm-core-latest.tar.xz s3://static.realm.io/downloads/core/'
+          }
         }
       }
     }
   }
 }
 
-def doBuildDotNetOsx(def isPublishingRun) {
+def doBuildDotNetOsx(def isPublishingRun, def isPublishingLatestRun) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -208,9 +220,11 @@ def doBuildDotNetOsx(def isPublishingRun) {
             sh 'sh build.sh clean'
         }
       } finally {
-        collectCompilerWarnings('clang')
+        collectCompilerWarnings('clang', true)
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          sh 's3cmd -c $s3cfg_config_file put --multipart-chunk-size-mb 5 realm-core-dotnet-cocoa-latest.tar.bz2 s3://static.realm.io/downloads/core'
+          if (isPublishingLatestRun) {
+            sh 's3cmd -c $s3cfg_config_file put --multipart-chunk-size-mb 5 realm-core-dotnet-cocoa-latest.tar.bz2 s3://static.realm.io/downloads/core/'
+          }
         }
       }
     }
@@ -231,13 +245,26 @@ def doBuildInDocker(String command) {
           try {
               sh "sh build.sh ${command}"
           } finally {
-            collectCompilerWarnings('gcc')
+            collectCompilerWarnings('gcc', true)
             recordTests(command)
           }
         }
       }
     }
   }
+}
+
+def doBuildWindows() {
+    return {
+        node('windows') {
+            getArchive()
+            try {
+              bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=Debug /p:Platform=\"Win32\""
+            } finally {
+              collectCompilerWarnings('msbuild', false)
+            }
+        }
+    }
 }
 
 def buildDiffCoverage() {
@@ -288,7 +315,7 @@ def buildDiffCoverage() {
   }
 }
 
-def doBuildNodeInDocker(def isPublishingRun) {
+def doBuildNodeInDocker(def isPublishingRun, def isPublishingLatestRun) {
   return {
     node('docker') {
       getArchive()
@@ -306,10 +333,12 @@ def doBuildNodeInDocker(def isPublishingRun) {
               }
               archiveArtifacts artifacts: '*realm-core-node-linux-*.*.*.tar.gz'
               withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-                sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core'
+                if (isPublishingLatestRun) {
+                  sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core/'
+                }
               }
           } finally {
-            collectCompilerWarnings('gcc')
+            collectCompilerWarnings('gcc', true)
           }
         }
       }
@@ -317,7 +346,7 @@ def doBuildNodeInDocker(def isPublishingRun) {
   }
 }
 
-def doBuildNodeInOsx(def isPublishingRun) {
+def doBuildNodeInOsx(def isPublishingRun, def isPublishingLatestRun) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -336,10 +365,54 @@ def doBuildNodeInOsx(def isPublishingRun) {
           sh 'sh build.sh clean'
 
           withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-            sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core'
+            if (isPublishingLatestRun) {
+              sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core/'
+            }
           }
         } finally {
-          collectCompilerWarnings('clang')
+          collectCompilerWarnings('clang', true)
+        }
+      }
+    }
+  }
+}
+
+def doBuildOsxDylibs(def isPublishingRun, def isPublishingLatestRun) {
+  return {
+    node('osx_vegas') {
+      getSourceArchive()
+      def version = get_version()
+
+      def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes', 'UNITTEST_SHUFFLE=1',
+        'UNITTEST_XML=1', 'UNITTEST_THREADS=1']
+      withEnv(environment) {
+        sh 'sh build.sh config'
+        try {
+          sh '''
+            sh build.sh build
+            sh build.sh check-debug
+          '''
+
+          dir('src/realm') {
+            sh "zip --symlink ../../realm-core-dylib-osx-${version}.zip librealm*.dylib"
+          }
+
+          sh 'cp realm-core-dylib-osx-*.zip realm-core-dylib-osx-latest.zip'
+
+          if (isPublishingRun) {
+            stash includes: '*realm-core-dylib-osx-*.*.*.zip', name: 'dylib-osx-package'
+          }
+          archiveArtifacts artifacts: '*realm-core-dylib-osx-*.*.*.zip'
+
+          sh 'sh build.sh clean'
+
+          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+            if (isPublishingLatestRun) {
+              sh 's3cmd -c $s3cfg_config_file put realm-core-dylib-osx-latest.zip s3://static.realm.io/downloads/core/'
+            }
+          }
+        } finally {
+          collectCompilerWarnings('clang', true)
         }
       }
     }
@@ -382,7 +455,7 @@ def doBuildAndroid(def isPublishingRun) {
                     }
                 }
             }
-            collectCompilerWarnings('gcc')
+            collectCompilerWarnings('gcc', true)
           }
         }
 
@@ -433,45 +506,19 @@ def doBuildAndroid(def isPublishingRun) {
 
 def recordTests(tag) {
     def tests = readFile('test/unit-test-report.xml')
-    def modifiedTests = tests.replaceAll('DefaultSuite', tag)
+    def modifiedTests = tests.replaceAll('realm-core-tests', tag)
     writeFile file: 'test/modified-test-report.xml', text: modifiedTests
-
-    step([
-        $class: 'XUnitBuilder',
-        testTimeMargin: '3000',
-        thresholdMode: 1,
-        thresholds: [
-        [
-        $class: 'FailedThreshold',
-        failureNewThreshold: '0',
-        failureThreshold: '0',
-        unstableNewThreshold: '0',
-        unstableThreshold: '0'
-        ], [
-        $class: 'SkippedThreshold',
-        failureNewThreshold: '0',
-        failureThreshold: '0',
-        unstableNewThreshold: '0',
-        unstableThreshold: '0'
-        ]
-        ],
-        tools: [[
-        $class: 'UnitTestJunitHudsonTestType',
-        deleteOutputFiles: true,
-        failIfNotNew: true,
-        pattern: 'test/modified-test-report.xml',
-        skipNoTestFiles: false,
-        stopProcessingIfError: true
-        ]]
-    ])
+    junit 'test/modified-test-report.xml'
 }
 
-def collectCompilerWarnings(compiler) {
+def collectCompilerWarnings(compiler, fail) {
     def parserName
     if (compiler == 'gcc') {
         parserName = 'GNU Make + GNU C Compiler (gcc)'
     } else if ( compiler == 'clang' ) {
         parserName = 'Clang (LLVM based)'
+    } else if ( compiler == 'msbuild' ) {
+        parserName = 'MSBuild'
     }
     step([
         $class: 'WarningsPublisher',
@@ -480,10 +527,7 @@ def collectCompilerWarnings(compiler) {
         consoleParsers: [[parserName: parserName]],
         defaultEncoding: '',
         excludePattern: '',
-        failedTotalAll: '0',
-        failedTotalHigh: '0',
-        failedTotalLow: '0',
-        failedTotalNormal: '0',
+        unstableTotalAll: fail?'0':'',
         healthy: '',
         includePattern: '',
         messagesPattern: '',
@@ -583,7 +627,7 @@ def doPublishGeneric() {
         unstash "packages-generic"
       }
       dir("core/v${version}/linux") {
-        sh "mv ${topdir}/packaging/out/generic/realm-core-*.tgz ./"
+        sh "mv ${topdir}/packaging/out/generic/realm-core-*.tgz ./realm-core-${version}.tgz"
       }
 
       step([
@@ -618,8 +662,11 @@ def doPublishLocalArtifacts() {
       unstash 'node-linux-package'
       unstash 'node-cocoa-package'
       unstash 'android-package'
+      unstash 'dylib-osx-package'
+
       withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-        sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core \\;'
+        sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
+        sh 'find . -type f -name "*.zip" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
       }
     }
   }
@@ -630,9 +677,8 @@ def setBuildName(newBuildName) {
 }
 
 def getArchive() {
-    sh 'rm -rf *'
+    deleteDir()
     unstash 'core-source'
-    sh 'unzip -o -q core.zip'
 }
 
 def getSourceArchive() {

@@ -141,7 +141,7 @@ SortDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> const
         is_null.resize(num_rows);
 
         for (size_t row_ndx = 0; row_ndx < num_rows; row_ndx++) {
-            size_t translated_index = row_indexes.get(row_ndx);
+            size_t translated_index = to_size_t(row_indexes.get(row_ndx));
             for (size_t j = 0; j + 1 < columns[i].size(); ++j) {
                 // type was checked when creating the SortDescriptor
                 auto link_col = static_cast<const LinkColumn*>(columns[i][j]);

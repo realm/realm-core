@@ -174,10 +174,8 @@ inline LinkView::LinkView(const ctor_cookie&, Table* origin_table, LinkListColum
     , m_origin_table(origin_table->get_table_ref())
     , m_origin_column(column)
 {
-    Array& root = *m_row_indexes.get_root_array();
-    root.set_parent(&column, row_ndx);
-    if (ref_type ref = root.get_ref_from_parent())
-        m_row_indexes.init_from_ref(column.get_alloc(), ref);
+    m_row_indexes.set_parent(&m_origin_column, row_ndx);
+    m_row_indexes.init_from_parent();
 }
 
 inline std::shared_ptr<LinkView> LinkView::create(Table* origin_table, LinkListColumn& column, size_t row_ndx)
@@ -329,14 +327,8 @@ inline Table& LinkView::get_target_table() noexcept
 
 inline void LinkView::refresh_accessor_tree(size_t new_row_ndx) noexcept
 {
-    Array& root = *m_row_indexes.get_root_array();
-    root.set_ndx_in_parent(new_row_ndx);
-    if (ref_type ref = root.get_ref_from_parent()) {
-        root.init_from_ref(ref);
-    }
-    else {
-        root.detach();
-    }
+    set_origin_row_index(new_row_ndx);
+    m_row_indexes.init_from_parent();
 }
 
 inline void LinkView::update_from_parent(size_t old_baseline) noexcept

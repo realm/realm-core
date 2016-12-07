@@ -36,6 +36,7 @@ utilities.hpp \
 alloc.hpp \
 alloc_slab.hpp \
 array.hpp \
+array_direct.hpp \
 array_integer.hpp \
 array_string.hpp \
 bptree.hpp \
@@ -225,13 +226,6 @@ nobase_subinclude_HEADERS += $(CONFIG_H)
 GENERATED_SOURCES += $(CONFIG_H)
 $(CONFIG_H): ../config.mk $(CONFIG_SH)
 	$(SHELL) $(CONFIG_SH) $< $@
-endif
-
-
-ifeq ($(DISABLE_CHEETAH_CODE_GEN),)
-GENERATED_SOURCES += table_macros.hpp
-table_macros.hpp: table_macros.hpp.cheetah cheetah.sh
-	$(SHELL) cheetah.sh $< $@
 endif
 
 

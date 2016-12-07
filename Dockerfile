@@ -11,7 +11,6 @@ RUN apt-get update && apt-get install -y \
     libprocps4-dev \
     libssl-dev \
     pandoc \
-    python-cheetah \
     python-pip \
     pkg-config \
     ruby \

@@ -294,7 +294,7 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <AdditionalOptions>/DNOMINMAX /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION  /bigobj %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
@@ -363,7 +363,8 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DNOMINMAX /D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -483,7 +484,8 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DNOMINMAX /D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -565,7 +567,8 @@
       </PrecompiledHeader>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/DNOMINMAX /D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION </AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <Link>
       <AdditionalDependencies>
@@ -661,7 +664,8 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/DNOMINMAX /D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION </AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <Link>
       <AdditionalDependencies>x64\Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>

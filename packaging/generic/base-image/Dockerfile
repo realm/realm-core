@@ -4,5 +4,5 @@ ARG PACKAGECLOUD_URL
 
 RUN apt-get update && apt-get install -y \
   build-essential g++-4.9 git \
-  python-cheetah libssl-dev
+  libssl-dev
 

@@ -1941,7 +1941,6 @@ void Array::set(size_t ndx, int64_t value)
 }
 
 
-
 // FIXME: Not exception safe (leaks are possible).
 ref_type Array::bptree_leaf_insert(size_t ndx, int64_t value, TreeInsertBase& state)
 {

@@ -432,7 +432,7 @@ void TableViewBase::to_json(std::ostream& out) const
         if (real_row_index != detached_ref) {
             if (r > 0)
                 out << ",";
-            m_table->to_json_row(real_row_index, out);
+            m_table->to_json_row(to_size_t(real_row_index), out);
         }
     }
 
@@ -457,7 +457,7 @@ void TableViewBase::to_string(std::ostream& out, size_t limit) const
     while (count) {
         const int64_t real_row_index = get_source_ndx(i);
         if (real_row_index != detached_ref) {
-            m_table->to_string_row(real_row_index, out, widths);
+            m_table->to_string_row(to_size_t(real_row_index), out, widths);
             --count;
         }
         ++i;
@@ -482,7 +482,7 @@ void TableViewBase::row_to_string(size_t row_ndx, std::ostream& out) const
     // Print row contents
     int64_t real_ndx = get_source_ndx(row_ndx);
     REALM_ASSERT(real_ndx != detached_ref);
-    m_table->to_string_row(real_ndx, out, widths);
+    m_table->to_string_row(to_size_t(real_ndx), out, widths);
 }
 
 

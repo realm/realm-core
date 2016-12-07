@@ -172,7 +172,7 @@ size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, IntegerColu
     --upper;
     // Single result if upper matches lower
     if (upper == lower) {
-        result_ref.payload = *lower;
+        result_ref.payload = to_size_t(*lower);
         return size_t(FindRes_single);
     }
 
@@ -338,7 +338,7 @@ IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
     Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerBptreeNode;
     std::unique_ptr<IndexArray> top(new IndexArray(alloc)); // Throws
-    top->create(type);                            // Throws
+    top->create(type);                                      // Throws
 
     // Mark that this is part of index
     // (as opposed to columns under leaves)
@@ -393,7 +393,7 @@ void StringIndex::insert_to_existing_list_at_lower(size_t row, StringData value,
         list.insert(upper.get_col_ndx(), row);
     }
     else {
-        IntegerColumn::const_iterator inner_lower = std::lower_bound(lower, upper, row);
+        IntegerColumn::const_iterator inner_lower = std::lower_bound(lower, upper, int64_t(row));
         list.insert(inner_lower.get_col_ndx(), row);
     }
 }
@@ -774,7 +774,7 @@ bool StringIndex::leaf_insert(size_t row_ndx, key_type key, size_t offset, Strin
         bool value_exists_in_list = false;
         if (lower != it_end) {
             StringConversionBuffer buffer;
-            StringData lower_value = get(*lower, buffer);
+            StringData lower_value = get(to_size_t(*lower), buffer);
             if (lower_value == value) {
                 value_exists_in_list = true;
             }
@@ -878,7 +878,7 @@ void StringIndex::distinct(IntegerColumn& result) const
                         StringConversionBuffer buffer;
                         while (it != it_end) {
                             result.add(to_size_t(*it));
-                            StringData it_data = get(*it, buffer);
+                            StringData it_data = get(to_size_t(*it), buffer);
                             it = std::upper_bound(it, it_end, it_data, slc);
                         }
                     }
@@ -1134,7 +1134,7 @@ bool has_duplicate_values(const Array& node, ColumnBase* target_col) noexcept
             SortedListComparator slc(*target_col);
             StringIndex::StringConversionBuffer buffer;
             while (it != it_end) {
-                StringData it_data = target_col->get_index_data(*it, buffer);
+                StringData it_data = target_col->get_index_data(to_size_t(*it), buffer);
                 IntegerColumn::const_iterator next = std::upper_bound(it, it_end, it_data, slc);
                 size_t count_of_value = next - it; // row index subtraction in `sub`
                 if (count_of_value > 1) {
@@ -1196,7 +1196,7 @@ bool SortedListComparator::operator()(int64_t ndx, StringData needle) // used in
 {
     // The buffer is needed when for when this is an integer index.
     StringIndex::StringConversionBuffer buffer;
-    StringData a = values.get_index_data(ndx, buffer);
+    StringData a = values.get_index_data(to_size_t(ndx), buffer);
     if (a.is_null() && !needle.is_null())
         return true;
     else if (needle.is_null() && !a.is_null())
@@ -1219,7 +1219,7 @@ bool SortedListComparator::operator()(int64_t ndx, StringData needle) // used in
 bool SortedListComparator::operator()(StringData needle, int64_t ndx) // used in upper_bound
 {
     StringIndex::StringConversionBuffer buffer;
-    StringData a = values.get_index_data(ndx, buffer);
+    StringData a = values.get_index_data(to_size_t(ndx), buffer);
     if (needle == a) {
         return false;
     }
@@ -1268,21 +1268,21 @@ void StringIndex::verify() const
                     IntegerColumn::const_iterator it_end = sub.cend();
                     SortedListComparator slc(*m_target_column);
                     StringConversionBuffer buffer, buffer_prev;
-                    StringData previous_string = get(*it, buffer_prev);
-                    size_t last_row = *it;
+                    StringData previous_string = get(to_size_t(*it), buffer_prev);
+                    size_t last_row = to_size_t(*it);
 
                     // Check that strings listed in sub are in sorted order
                     // and if there are duplicates, that the row numbers are
                     // sorted in the group of duplicates.
                     while (it != it_end) {
-                        StringData it_data = get(*it, buffer);
-                        size_t it_row = *it;
+                        StringData it_data = get(to_size_t(*it), buffer);
+                        size_t it_row = to_size_t(*it);
                         REALM_ASSERT_EX(previous_string <= it_data, previous_string.data(), it_data.data());
                         if (it != sub.cbegin() && previous_string == it_data) {
                             REALM_ASSERT_EX(it_row > last_row, it_row, last_row);
                         }
                         last_row = it_row;
-                        previous_string = get(*it, buffer_prev);
+                        previous_string = get(to_size_t(*it), buffer_prev);
                         ++it;
                     }
                 }

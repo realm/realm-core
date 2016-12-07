@@ -30,6 +30,7 @@ rm -rf "${src_path}/packaging/out"; mkdir -p "${src_path}/packaging/out"
 cp "${src_path}/dependencies.list" "${src_path}/packaging/out/packaging.list"
 cat <<-EOD >> "${src_path}/packaging/out/packaging.list"
 ITERATION=$ITERATION
+GIT_TAG=$git_tag
 EOD
 
 env_file="${src_path}/packaging/out/packaging.list"

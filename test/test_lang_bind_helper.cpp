@@ -41,7 +41,6 @@
 #include <sys/wait.h>
 #define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
-#define NOMINMAX
 #include <windows.h>
 #endif
 
@@ -11203,8 +11202,7 @@ TEST(LangBindHelper_VersionControl)
         MyTable::ConstRef t = g.get_table<MyTable>("test");
         CHECK_EQUAL(old_version, t[old_version].first);
         for (int k = num_random_tests; k; --k) {
-            int new_version =
-                random.draw_int_mod(num_versions);
+            int new_version = random.draw_int_mod(num_versions);
             // std::cerr << "Random jump: version " << old_version << " -> " << new_version << std::endl;
             if (new_version < old_version) {
                 CHECK(versions[new_version] < versions[old_version]);
@@ -12659,5 +12657,112 @@ TEST(LangBindHelper_ColumnMoveUpdatesLinkedTables)
     g_r.verify();
 }
 
+TEST(LangBindHelper_Bug2321)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_r(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
+    int i;
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.add_table("target");
+        target->add_column(type_Int, "data");
+        target->add_empty_row(REALM_MAX_BPNODE_SIZE + 2);
+        TableRef origin = group.add_table("origin");
+        origin->add_column_link(type_LinkList, "_link", *target);
+        origin->add_empty_row(2);
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef origin = group.get_table("origin");
+        LinkViewRef lv0 = origin->get_linklist(0, 0);
+        for (i = 0; i < (REALM_MAX_BPNODE_SIZE - 1); i++) {
+            lv0->add(i);
+        }
+        wt.commit();
+    }
+
+    ReadTransaction rt(sg_r);
+    ConstTableRef origin_read = rt.get_group().get_table("origin");
+    ConstLinkViewRef lv1 = origin_read->get_linklist(0, 0);
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef origin = group.get_table("origin");
+        LinkViewRef lv0 = origin->get_linklist(0, 0);
+        lv0->add(i++);
+        lv0->add(i++);
+        wt.commit();
+    }
+
+    // If MAX_BPNODE_SIZE is 4 and we run in debug mode, then the LinkView
+    // accessor was not refreshed correctly. It would still be a leaf class,
+    // but the header flags would tell it is a node.
+    LangBindHelper::advance_read(sg_r);
+    CHECK_EQUAL(lv1->size(), i);
+}
+
+TEST(LangBindHelper_Bug2295)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_w(hist);
+    SharedGroup sg_r(hist);
+    int i;
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.add_table("target");
+        target->add_column(type_Int, "data");
+        target->add_empty_row(REALM_MAX_BPNODE_SIZE + 2);
+        TableRef origin = group.add_table("origin");
+        origin->add_column_link(type_LinkList, "_link", *target);
+        origin->add_empty_row(2);
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef origin = group.get_table("origin");
+        LinkViewRef lv0 = origin->get_linklist(0, 0);
+        for (i = 0; i < (REALM_MAX_BPNODE_SIZE + 1); i++) {
+            lv0->add(i);
+        }
+        wt.commit();
+    }
+
+    ReadTransaction rt(sg_r);
+    ConstTableRef origin_read = rt.get_group().get_table("origin");
+    ConstLinkViewRef lv1 = origin_read->get_linklist(0, 0);
+
+    CHECK_EQUAL(lv1->size(), i);
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef origin = group.get_table("origin");
+        // With the error present, this will cause some areas to be freed
+        // that has already been freed in the above transaction
+        LinkViewRef lv0 = origin->get_linklist(0, 0);
+        lv0->add(i++);
+        wt.commit();
+    }
+
+    LangBindHelper::promote_to_write(sg_r);
+    // Here we write the duplicates to the free list
+    LangBindHelper::commit_and_continue_as_read(sg_r);
+    rt.get_group().verify();
+
+    CHECK_EQUAL(lv1->size(), i);
+}
 
 #endif

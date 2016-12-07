@@ -2266,17 +2266,17 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
         auto rend = rows.rend();
         for (auto i = rows.rbegin(); i != rend; ++i) {
             size_t row_ndx = *i;
-            if (repl) {
-                size_t num_rows_to_erase = 1;
-                size_t prior_num_rows = m_size;
-                repl->erase_rows(this, row_ndx, num_rows_to_erase, prior_num_rows, is_move_last_over); // Throws
-            }
             bool broken_reciprocal_backlinks = false;
+            size_t prior_num_rows = m_size;
             if (is_move_last_over) {
                 do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
             }
             else {
                 do_remove(row_ndx, broken_reciprocal_backlinks); // Throws
+            }
+            if (repl) {
+                size_t num_rows_to_erase = 1;
+                repl->erase_rows(this, row_ndx, num_rows_to_erase, prior_num_rows, is_move_last_over); // Throws
             }
         }
         return;
@@ -3782,7 +3782,7 @@ double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
 OldDateTime Table::maximum_olddatetime(size_t col_ndx, size_t* return_ndx) const
 {
     if (!m_columns.is_attached())
-        return 0.;
+        return 0;
 
     if (is_nullable(col_ndx)) {
         const IntNullColumn& col = get_column<IntNullColumn, col_type_OldDateTime>(col_ndx);
@@ -6159,7 +6159,7 @@ void Table::print() const
             }
             switch (type) {
                 case col_type_Int: {
-                    size_t value = get_int(n, i);
+                    size_t value = to_size_t(get_int(n, i));
                     std::cout << std::setw(10) << value << " ";
                     break;
                 }

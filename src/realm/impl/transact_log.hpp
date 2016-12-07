@@ -57,8 +57,8 @@ enum Instruction {
     instr_InsertEmptyRows = 13,
     instr_EraseRows = 14, // Remove (multiple) rows
     instr_SwapRows = 15,
-    instr_MergeRows = 16, // Replace links pointing to row A with links to row B
-    instr_ClearTable = 17,        // Remove all rows in selected table
+    instr_MergeRows = 16,  // Replace links pointing to row A with links to row B
+    instr_ClearTable = 17, // Remove all rows in selected table
     instr_OptimizeTable = 18,
     instr_SelectDescriptor = 19, // Select descriptor from currently selected root table
     instr_InsertColumn =
@@ -1873,8 +1873,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_MergeRows: {
-            size_t row_ndx = read_int<size_t>();                    // Throws
-            size_t new_row_ndx = read_int<size_t>();                // Throws
+            size_t row_ndx = read_int<size_t>();           // Throws
+            size_t new_row_ndx = read_int<size_t>();       // Throws
             if (!handler.merge_rows(row_ndx, new_row_ndx)) // Throws
                 parser_error();
             return;

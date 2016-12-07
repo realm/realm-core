@@ -16,6 +16,7 @@
 
 * Added 'void SharedGroup::get_stats(size_t& free_space, size_t& used_space)'
   allowing access to the size of free and used space (Requested in issue #2281).
+* Optimized Contains queries to use Boyer-Moore algorithm (around 10x speedup on large datasets)
 * Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
   are now perfectly forwarded (via perfect forwarding) to
   `std::stream::operator<<()`.
@@ -24,7 +25,77 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Unit tests now support JUnit output format.
+
+----------------------------------------------
+
+# 2.2.0 Release notes
+
+### Bugfixes
+* Fix possible corruption of realm file in case of more than 1000 entries in a
+  link list (#2289, #2292, #2293, #2295, #2301)
+* Fixed crash in query if a table had been modified so much that payload array
+  leafs had relocated (#2269)
+* Fix a race involving destruction order of InterprocessMutex static variables.
+* Fix a crash when a Query is reimported into the SharedGroup it was exported
+  for handover from.
+* Fix a crash when calling mkfifo on Android 4.x external storage. On 4.x devices,
+  errno is EPERM instead of EACCES.
+* Fix a crash when updating a LinkView accessor from a leaf to an inner node. (#2321)
+
+### Breaking changes
+
+* The return type of `util::File::copy()` has been changed from `bool` to
+  `void`. Errors are now reported via `File::AccessError` exceptions. This
+  greatly increases the utility and robustness of `util::File::copy()`, as it
+  now catches all errors, and reports them in the same style as the other
+  functions in `util::File`.
+
+### Enhancements
+
+* Added support for LIKE queries (wildcard with `?` and `*`)
+* Offer facilities to prevent multiple sync agents per Realm file access session
+  (`Replication::is_sync_agent()` to be overridden by sync-specific
+  implementation). The utilized lock-file flag
+  (`SharedInfo::sync_agent_present`) was added a long time ago, but the
+  completion of detection mechanism got postponed until now.
+* Improve performance of write transactions which free a large amount of
+  existing data.
+* Added `util::File::compare()` for comparing two files for equality.
+
+-----------
+
+### Internals
+
+* Added extra check for double frees in slab allocator.
+* Deprecated Array type parameters in Column<T> and BpTree<T> constructors
+
+----------------------------------------------
+
+# 2.1.4 Release notes
+
+### Bugfixes
+
+* Fix storage of very large refs (MSB set) on 32-bit platforms.
+* Fixed a race between destruction of a global mutex as part of main thread exit
+  and attempt to lock it on a background thread, or conversely attempt to lock a
+  mutex after it has been destroyed. (PR #2238, fixes issues #2238, #2137, #2009)
+
+----------------------------------------------
+
+# 2.1.3 Release notes
+
+### Bugfixes
+
+* Deleting rows through a `TableView` generated wrong instructions by way of
+  `Table::batch_erase_rows()`, which would only be noticed after reapplying the
+  transaction log to a separate Realm file or via synchronization.
+
+-----------
+
+### Internals
+
+* `array_direct.hpp` added to installed headers.
 
 ----------------------------------------------
 
