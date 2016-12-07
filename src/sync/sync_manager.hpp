@@ -99,6 +99,8 @@ public:
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& identity) const;
     // Get all the users that are logged in and not errored out.
     std::vector<std::shared_ptr<SyncUser>> all_logged_in_users() const;
+    // Gets the currently logged in user. If there are more than 1 users logged in, an exception is thrown.
+    std::shared_ptr<SyncUser> get_current_user() const;
 
     // Get the default path for a Realm for the given user and absolute unresolved URL.
     std::string path_for_realm(const std::string& user_identity, const std::string& raw_realm_url) const;
