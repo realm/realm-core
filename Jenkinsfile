@@ -262,8 +262,19 @@ def doBuildWindows() {
               bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=Debug /p:Platform=\"Win32\""
               bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, release\" /p:Platform=\"Win32\""
               bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, debug\" /p:Platform=\"Win32\""
-              zip zipFile:'realm-core-windows.zip', dir:'Visual Studio', glob:'lib/*.lib'
-              zip zipFile:'realm-core-windows.zip', dir:'src', glob:'**/*.hpp', archive:true
+              dir('Visual Studio') {
+                stash includes: 'lib/*.lib', name: 'windows-libs'
+              }
+              dir('src') {
+                stash includes: '**/*.hpp', name: 'windows-includes'
+              }
+              dir('packaging-tmp') {
+                unstash 'windows-libs'
+                dir('include') {
+                  unstash 'windows-includes'
+                }
+                zip zipFile:'realm-core-windows.zip', archive:true
+              }
             } catch(Exception e) {
               e.printStackTrace()
               throw e
