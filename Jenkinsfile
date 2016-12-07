@@ -273,8 +273,8 @@ def doBuildWindows() {
                 dir('include') {
                   unstash 'windows-includes'
                 }
-                zip zipFile:'realm-core-windows.zip', archive:true
               }
+              zip dir:'packaging-tmp', zipFile:'realm-core-windows.zip', archive:true
             } catch(Exception e) {
               e.printStackTrace()
               throw e
