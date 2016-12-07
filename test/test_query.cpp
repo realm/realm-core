@@ -558,23 +558,23 @@ TEST(Query_NextGen_StringConditions)
 
     m = table1->column<String>(0).ends_with(table1->column<String>(1), true).find();
     CHECK_EQUAL(m, 2);
-    
+
     // Like (wildcard matching)
     m = table1->column<String>(0).like("b*", true).find();
     CHECK_EQUAL(m, 2);
-    
+
     m = table1->column<String>(0).like("b*", false).find();
     CHECK_EQUAL(m, 2);
-    
+
     m = table1->column<String>(0).like("*r", false).find();
     CHECK_EQUAL(m, 2);
-    
+
     m = table1->column<String>(0).like("f?o", false).find();
     CHECK_EQUAL(m, 0);
-    
+
     m = (table1->column<String>(0).like("f*", false) && table1->column<String>(0) == "foo").find();
     CHECK_EQUAL(m, 0);
-    
+
     m = table1->column<String>(0).like(table1->column<String>(1), true).find();
     CHECK_EQUAL(m, not_found);
 
@@ -617,7 +617,7 @@ TEST(Query_NextGen_StringConditions)
 
     m = table2->column<String>(0).contains(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
-    
+
     m = table2->column<String>(0).like(StringData(""), false).count();
     CHECK_EQUAL(m, 1);
 
@@ -641,7 +641,7 @@ TEST(Query_NextGen_StringConditions)
 
     m = table2->column<String>(0).contains(realm::null(), false).count();
     CHECK_EQUAL(m, 4);
-    
+
     m = table2->column<String>(0).like(realm::null(), false).count();
     CHECK_EQUAL(m, 1);
 
@@ -683,7 +683,7 @@ TEST(Query_NextGen_StringConditions)
 
     m = table3->link(0).column<String>(0).contains(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
-    
+
     m = table3->link(0).column<String>(0).like(StringData(""), false).count();
     CHECK_EQUAL(m, 1);
 
@@ -5079,7 +5079,7 @@ TEST(Query_FindAllContains)
 TEST(Query_FindAllLike)
 {
     TupleTableType ttt;
-    
+
     ttt.add(0, "foo");
     ttt.add(0, "foobar");
     ttt.add(0, "barfoo");
@@ -5087,7 +5087,7 @@ TEST(Query_FindAllLike)
     ttt.add(0, "fo");
     ttt.add(0, "fobar");
     ttt.add(0, "barfo");
-    
+
     TupleTableType::Query q1 = ttt.where().second.like("*foo*");
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
@@ -5113,7 +5113,7 @@ TEST(Query_FindAllLikeStackOverflow)
 TEST(Query_FindAllLikeCaseInsensitive)
 {
     TupleTableType ttt;
-    
+
     ttt.add(0, "Foo");
     ttt.add(0, "FOOBAR");
     ttt.add(0, "BaRfOo");
@@ -5121,7 +5121,7 @@ TEST(Query_FindAllLikeCaseInsensitive)
     ttt.add(0, "Fo");
     ttt.add(0, "Fobar");
     ttt.add(0, "baRFo");
-    
+
     TupleTableType::Query q1 = ttt.where().second.like("*foo*", false);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
@@ -9905,8 +9905,7 @@ TEST(Query_ArrayLeafRelocate)
             LinkViewRef lv = contact.get()->get_linklist(1, contact.get()->size() - 1);
             lv->add(contact_type.get()->size() - 1);
 
-            if (t == 0 || t == REALM_MAX_BPNODE_SIZE)
-            {
+            if (t == 0 || t == REALM_MAX_BPNODE_SIZE) {
                 tv.sync_if_needed();
                 tv2.sync_if_needed();
                 tv3.sync_if_needed();

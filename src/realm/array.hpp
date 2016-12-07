@@ -1051,8 +1051,6 @@ private:
 };
 
 
-
-
 // Implementation:
 
 class QueryStateBase {

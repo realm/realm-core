@@ -95,6 +95,7 @@ public:
     const ColumnDataType operator->() const;
     const ColumnDataType operator[](ptrdiff_t offset) const;
     size_t get_col_ndx() const;
+
 protected:
     size_t m_col_ndx;
     const Column<ColumnDataType>* m_col;

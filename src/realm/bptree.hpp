@@ -249,10 +249,10 @@ public:
     BpTree();
     explicit BpTree(BpTreeBase::unattached_tag);
     explicit BpTree(Allocator& alloc);
-    REALM_DEPRECATED("Initialize with MemRef instead") explicit BpTree(std::unique_ptr<Array> init_root)
+    REALM_DEPRECATED("Initialize with MemRef instead")
+    explicit BpTree(std::unique_ptr<Array> init_root)
         : BpTreeBase(std::move(init_root))
     {
-
     }
     explicit BpTree(Allocator& alloc, MemRef mem)
         : BpTreeBase(std::unique_ptr<Array>(new LeafType(alloc)))

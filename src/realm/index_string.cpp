@@ -338,7 +338,7 @@ IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
     Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerBptreeNode;
     std::unique_ptr<IndexArray> top(new IndexArray(alloc)); // Throws
-    top->create(type);                            // Throws
+    top->create(type);                                      // Throws
 
     // Mark that this is part of index
     // (as opposed to columns under leaves)
