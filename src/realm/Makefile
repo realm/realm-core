@@ -229,13 +229,6 @@ $(CONFIG_H): ../config.mk $(CONFIG_SH)
 endif
 
 
-ifeq ($(DISABLE_CHEETAH_CODE_GEN),)
-GENERATED_SOURCES += table_macros.hpp
-table_macros.hpp: table_macros.hpp.cheetah cheetah.sh
-	$(SHELL) cheetah.sh $< $@
-endif
-
-
 # Used by ../../build.sh
 .PHONY: get-inst-headers get-inst-libraries get-inst-programs
 get-inst-headers:
