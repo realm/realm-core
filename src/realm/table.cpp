@@ -5890,13 +5890,11 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         }
 
         if (column_has_search_index) {
-            bool allow_duplicate_values = true;
             if (col->has_search_index()) {
-                col->set_search_index_allow_duplicate_values(allow_duplicate_values);
             }
             else {
                 ref_type ref = m_columns.get_as_ref(ndx_in_parent + 1);
-                col->set_search_index_ref(ref, &m_columns, ndx_in_parent + 1, allow_duplicate_values); // Throws
+                col->set_search_index_ref(ref, &m_columns, ndx_in_parent + 1); // Throws
             }
         }
 
