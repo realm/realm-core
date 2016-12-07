@@ -1197,7 +1197,7 @@ void File::set_encryption_key(const char* key)
     if (key) {
         char* buffer = new char[64];
         memcpy(buffer, key, 64);
-        m_encryption_key.reset(buffer);
+        m_encryption_key.reset(static_cast<const char*>(buffer));
     }
     else {
         m_encryption_key.reset();
