@@ -352,7 +352,13 @@ public:
     Group& begin_write();
     version_type commit();
     void rollback() noexcept;
-
+    // report statistics of last commit done on THIS shared group.
+    // The free space reported is what can be expected to be freed
+    // by compact(). This may not correspond to the space which is free
+    // at the point where get_stats() is called, since that will include
+    // memory required to hold older versions of data, which still
+    // needs to be available.
+    void get_stats(size_t& free_space, size_t& used_space);
     //@}
 
     enum TransactStage {
@@ -522,6 +528,8 @@ private:
     class ReadLockUnlockGuard;
 
     // Member variables
+    size_t m_free_space = 0;
+    size_t m_used_space = 0;
     Group m_group;
     ReadLockInfo m_read_lock;
     uint_fast32_t m_local_max_entry;
@@ -634,6 +642,12 @@ private:
 
     friend class _impl::SharedGroupFriend;
 };
+
+
+inline void SharedGroup::get_stats(size_t& free_space, size_t& used_space) {
+    free_space = m_free_space;
+    used_space = m_used_space;
+}
 
 
 class ReadTransaction {

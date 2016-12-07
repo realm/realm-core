@@ -14,6 +14,8 @@
 
 ### Enhancements
 
+* Added 'void SharedGroup::get_stats(size_t& free_space, size_t& used_space)'
+  allowing access to the size of free and used space (Requested in issue #2281).
 * Optimized Contains queries to use Boyer-Moore algorithm (around 10x speedup on large datasets)
 * Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
   are now perfectly forwarded (via perfect forwarding) to

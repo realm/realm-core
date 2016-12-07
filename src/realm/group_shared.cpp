@@ -1370,7 +1370,6 @@ void SharedGroup::do_async_commits()
 #endif
             GroupWriter writer(m_group);
             writer.commit(next_read_lock.m_top_ref);
-
 #ifdef REALM_ENABLE_LOGFILE
             std::cerr << "..and Done" << std::endl;
 #endif
@@ -1887,6 +1886,8 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     out.set_versions(new_version, oldest_version);
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
+    m_free_space = out.get_free_space();
+    m_used_space = out.get_file_size() - m_free_space;
     // std::cout << "Writing version " << new_version << ", Topptr " << new_top_ref
     //     << " Read lock at version " << oldest_version << std::endl;
     switch (Durability(info->durability)) {

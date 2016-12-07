@@ -77,6 +77,7 @@ public:
     void dump();
 #endif
 
+    size_t get_free_space();
 private:
     class MapWindow;
     Group& m_group;

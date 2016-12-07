@@ -482,6 +482,16 @@ ref_type GroupWriter::write_group()
     return top_ref;
 }
 
+size_t GroupWriter::get_free_space() {
+    if (m_free_lengths.is_attached()) {
+        size_t sum = 0;
+        for (size_t j=0; j<m_free_lengths.size(); ++j)
+            sum += m_free_lengths.get(j);
+        return sum;
+    } else {
+        return 0;
+    }
+}
 
 void GroupWriter::merge_free_space()
 {
