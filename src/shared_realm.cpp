@@ -450,7 +450,7 @@ void Realm::verify_in_write() const
 void Realm::verify_open() const
 {
     if (is_closed()) {
-        throw ClosedRealmException("Cannot access realm that has been closed.");
+        throw ClosedRealmException();
     }
 }
 

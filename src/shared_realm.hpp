@@ -384,9 +384,9 @@ public:
     IncorrectThreadException() : std::logic_error("Realm accessed from incorrect thread.") {}
 };
 
-class ClosedRealmException : public std::runtime_error {
+class ClosedRealmException : public std::logic_error {
 public:
-    ClosedRealmException(std::string message) : std::runtime_error(message) {}
+    ClosedRealmException() : std::logic_error("Cannot access realm that has been closed.") {}
 };
 
 class UninitializedRealmException : public std::runtime_error {
