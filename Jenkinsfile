@@ -66,7 +66,7 @@ try {
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
         buildDotnetOsx: doBuildDotNetOsx(isPublishingRun, isPublishingLatestRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
-        buildWindows: doBuildWindows(version),
+        buildWindows: doBuildWindows(version, isPublishingRun),
         buildOsxDylibs: doBuildOsxDylibs(isPublishingRun, isPublishingLatestRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
@@ -256,7 +256,7 @@ def doBuildInDocker(String command) {
   }
 }
 
-def doBuildWindows(String version) {
+def doBuildWindows(boolean isPublishingRun, String version) {
     return {
         node('windows') {
             getArchive()
@@ -277,6 +277,9 @@ def doBuildWindows(String version) {
                 }
               }
               zip dir:'packaging-tmp', zipFile:"realm-core-windows-${version}.zip", archive:true
+              if (isPublishingRun) {
+                stash includes:"realm-core-windows-${version}.zip", name:'windows-package'
+              }
             } finally {
               collectCompilerWarnings('msbuild', false)
             }
@@ -705,12 +708,14 @@ def doPublishLocalArtifacts() {
   // TODO create a Dockerfile for an image only containing s3cmd
   return {
     node('aws') {
+      deleteDir()
       unstash 'cocoa-package'
       unstash 'dotnet-package'
       unstash 'node-linux-package'
       unstash 'node-cocoa-package'
       unstash 'android-package'
       unstash 'dylib-osx-package'
+      unstash 'windows-package'
 
       withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
         sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
