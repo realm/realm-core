@@ -66,7 +66,7 @@ try {
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
         buildDotnetOsx: doBuildDotNetOsx(isPublishingRun, isPublishingLatestRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
-        buildWindows: doBuildWindows(),
+        buildWindows: doBuildWindows(version),
         buildOsxDylibs: doBuildOsxDylibs(isPublishingRun, isPublishingLatestRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
@@ -256,7 +256,7 @@ def doBuildInDocker(String command) {
   }
 }
 
-def doBuildWindows() {
+def doBuildWindows(String version) {
     return {
         node('windows') {
             getArchive()
