@@ -63,8 +63,8 @@ private:
     bool m_cache = false;
 
     struct Callback {
-        std::weak_ptr<Realm> weak_realm;
-        void operator()();
+        const std::weak_ptr<Realm> weak_realm;
+        void operator()() const;
     };
     std::shared_ptr<util::EventLoopSignal<Callback>> m_signal;
 };
