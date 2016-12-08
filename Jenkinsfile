@@ -256,7 +256,7 @@ def doBuildInDocker(String command) {
   }
 }
 
-def doBuildWindows(boolean isPublishingRun, String version) {
+def doBuildWindows(String version, boolean isPublishingRun) {
     return {
         node('windows') {
             getArchive()
