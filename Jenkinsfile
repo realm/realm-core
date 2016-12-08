@@ -274,7 +274,7 @@ def doBuildWindows() {
                   unstash 'windows-includes'
                 }
               }
-              zip dir:'packaging-tmp', zipFile:'realm-core-windows.zip', archive:true
+              zip dir:'packaging-tmp', zipFile:"realm-core-windows-${get_version()}.zip", archive:true
             } finally {
               collectCompilerWarnings('msbuild', false)
             }
