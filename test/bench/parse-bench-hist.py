@@ -117,7 +117,27 @@ def transform(inputdir, destination, filelist, handler):
                          'function':benchmark, 'sha':sha, 'time':timestamp, 'dest':destination }
                 handler(info)
 
-def handle_local(info):
+# format is: sha, min, max, med, avg,
+#            sha1, ...
+#            ..., ...
+def handle_local_vertical(info):
+    outfilename = info['dest'] + info['function'] + ".csv"
+    endline = ',\n'
+    header = ''
+    keys = ['sha', 'min', 'max', 'med', 'avg']
+    if not os.path.exists(outfilename):
+        header = ','.join(map(str, keys)) + endline
+    with open(outfilename, 'a') as fout:
+        fout.write(header)
+        data = ','.join([info[e] for e in keys]) + endline
+        fout.write(data)
+
+# format is sha, sha1,sha2,sha3...
+#           min, ...
+#           max, ...
+#           med, ...
+#           avg, ...
+def handle_local_horizontal(info):
     outfilename = info['dest'] + info['function'] + ".csv"
     # make the file if not exist and read contents
     lines = ['','','','','']
@@ -166,7 +186,7 @@ def transform_local():
     print "looking for csv files in " + inputdir
     files = getFilesByName(inputdir)
 
-    transform(inputdir, outputdir, files, handle_local)
+    transform(inputdir, outputdir, files, handle_local_vertical)
 
 def transform_remote():
     machid = getMachId()
