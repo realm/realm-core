@@ -630,7 +630,7 @@ util::Mutex& all_files_mutex = *new util::Mutex;
 }
 
 
-ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
+ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 {
     // ExceptionSafety: If this function throws, it must leave the allocator in
     // the detached state.
@@ -647,6 +647,13 @@ ref_type SlabAlloc::attach_file(const std::string& path, Config& cfg)
     REALM_ASSERT(cfg.is_shared || !cfg.session_initiator);
     // clear_file can be set *only* if we're the first session.
     REALM_ASSERT(cfg.session_initiator || !cfg.clear_file);
+
+    // Create a deep copy of the file_path string, otherwise it can appear that
+    // users are leaking paths because string assignment operator implementations might
+    // actually be reference counting with copy-on-write. If our all_files map
+    // holds onto these references (since it is still reachable memory) it can appear
+    // as a leak in the user application, but it is actually us (and that's ok).
+    const std::string path = file_path.c_str();
 
     using namespace realm::util;
     File::AccessMode access = cfg.read_only ? File::access_ReadOnly : File::access_ReadWrite;

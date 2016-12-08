@@ -130,7 +130,7 @@ public:
     /// before the Realm opening process completes, and the decided file format
     /// must be set in the allocator by calling set_file_format_version().
     ///
-    /// Except for \a path, the parameters are passed in through a
+    /// Except for \a file_path, the parameters are passed in through a
     /// configuration object.
     ///
     /// \return The `ref` of the root node, or zero if there is none.
@@ -145,7 +145,7 @@ public:
     ///
     /// \throw util::File::AccessError
     /// \throw SlabAlloc::Retry
-    ref_type attach_file(const std::string& path, Config& cfg);
+    ref_type attach_file(const std::string& file_path, Config& cfg);
 
     /// Get the attached file. Only valid when called on an allocator with
     /// an attached file.
