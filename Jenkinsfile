@@ -275,9 +275,6 @@ def doBuildWindows() {
                 }
               }
               zip dir:'packaging-tmp', zipFile:'realm-core-windows.zip', archive:true
-            } catch(Exception e) {
-              e.printStackTrace()
-              throw e
             } finally {
               collectCompilerWarnings('msbuild', false)
             }
