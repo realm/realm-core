@@ -3,6 +3,7 @@
 try {
   def gitTag
   def gitSha
+  def version
   def dependencies
   def isPublishingRun
   def isPublishingLatestRun
@@ -24,6 +25,7 @@ try {
 
         gitTag = readGitTag()
         gitSha = readGitSha()
+        version = get_version()
         echo "tag: ${gitTag}"
         if (gitTag == "") {
           echo "No tag given for this build"
@@ -274,7 +276,7 @@ def doBuildWindows() {
                   unstash 'windows-includes'
                 }
               }
-              zip dir:'packaging-tmp', zipFile:"realm-core-windows-${get_version()}.zip", archive:true
+              zip dir:'packaging-tmp', zipFile:"realm-core-windows-${version}.zip", archive:true
             } finally {
               collectCompilerWarnings('msbuild', false)
             }
