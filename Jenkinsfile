@@ -3,6 +3,7 @@
 try {
   def gitTag
   def gitSha
+  def version
   def dependencies
   def isPublishingRun
   def isPublishingLatestRun
@@ -24,6 +25,7 @@ try {
 
         gitTag = readGitTag()
         gitSha = readGitSha()
+        version = get_version()
         echo "tag: ${gitTag}"
         if (gitTag == "") {
           echo "No tag given for this build"
@@ -64,7 +66,7 @@ try {
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
         buildDotnetOsx: doBuildDotNetOsx(isPublishingRun, isPublishingLatestRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
-        buildWindows: doBuildWindows(),
+        buildWindows: doBuildWindows(version, isPublishingRun),
         buildOsxDylibs: doBuildOsxDylibs(isPublishingRun, isPublishingLatestRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
@@ -254,12 +256,30 @@ def doBuildInDocker(String command) {
   }
 }
 
-def doBuildWindows() {
+def doBuildWindows(String version, boolean isPublishingRun) {
     return {
         node('windows') {
             getArchive()
             try {
               bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=Debug /p:Platform=\"Win32\""
+              bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, release\" /p:Platform=\"Win32\""
+              bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, debug\" /p:Platform=\"Win32\""
+              dir('Visual Studio') {
+                stash includes: 'lib/*.lib', name: 'windows-libs'
+              }
+              dir('src') {
+                stash includes: '**/*.hpp', name: 'windows-includes'
+              }
+              dir('packaging-tmp') {
+                unstash 'windows-libs'
+                dir('include') {
+                  unstash 'windows-includes'
+                }
+              }
+              zip dir:'packaging-tmp', zipFile:"realm-core-windows-${version}.zip", archive:true
+              if (isPublishingRun) {
+                stash includes:"realm-core-windows-${version}.zip", name:'windows-package'
+              }
             } finally {
               collectCompilerWarnings('msbuild', false)
             }
@@ -657,12 +677,14 @@ def doPublishLocalArtifacts() {
   // TODO create a Dockerfile for an image only containing s3cmd
   return {
     node('aws') {
+      deleteDir()
       unstash 'cocoa-package'
       unstash 'dotnet-package'
       unstash 'node-linux-package'
       unstash 'node-cocoa-package'
       unstash 'android-package'
       unstash 'dylib-osx-package'
+      unstash 'windows-package'
 
       withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
         sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
