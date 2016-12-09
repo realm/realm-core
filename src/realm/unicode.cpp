@@ -37,6 +37,9 @@
 #include <locale>
 #endif
 
+#if REALM_PLATFORM_APPLE
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
 using namespace realm;
 
