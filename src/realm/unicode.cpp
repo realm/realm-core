@@ -380,6 +380,8 @@ return true;
 util::Optional<std::string> case_map(StringData source, bool upper)
 {
 #if REALM_PLATFORM_APPLE == 1
+    std::string result;
+    result.resize(source.size());
 
     if (source.is_null())
         return util::none;
