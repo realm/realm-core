@@ -39,16 +39,12 @@
    ...
 }
 {
-   <Static test list holds on to unit test strings>
+   <SlabAlloc makes a deep copy of the realm file_path string which is still reachable as the keys of the all_files map>
    Memcheck:Leak
-   match-leak-kinds: reachable
    fun:_Znwm
    fun:_ZNSs4_Rep9_S_createEmmRKSaIcE
-   fun:_ZN5realm9test_util13get_test_pathERKNS0_9unit_test11TestContextERKSs
    ...
-   fun:_ZN5realm9test_util9unit_test8TestList17ThreadContextImpl3runENS2_17SharedContextImpl5EntryERNS_4util10UniqueLockE
-   fun:_ZN5realm9test_util9unit_test8TestList17ThreadContextImpl3runEv
-   fun:_ZZN5realm9test_util9unit_test8TestList3runENS2_6ConfigEENKUliE_clEi
+   fun:_ZN5realm9SlabAlloc11attach_fileERKSsRNS0_6ConfigE
    ...
 }
 {
