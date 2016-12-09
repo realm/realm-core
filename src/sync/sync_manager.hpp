@@ -81,6 +81,9 @@ public:
     void set_client_should_validate_ssl(bool validate_ssl);
     bool client_should_validate_ssl() const noexcept;
 
+    /// Force sync client to reconnect immediately if the connection was lost.
+    void reconnect();
+
     util::Logger::Level log_level() const noexcept;
 
     std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
