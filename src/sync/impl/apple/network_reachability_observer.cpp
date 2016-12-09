@@ -43,7 +43,7 @@ NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFla
         }
     }
 
-#if	TARGET_OS_IPHONE
+#if TARGET_OS_IPHONE
     if (flags & kSCNetworkReachabilityFlagsIsWWAN) {
         status = ReachableViaWWAN;
     }

@@ -37,22 +37,22 @@ endforeach()
 if(APPLE)
     find_library(FOUNDATION_FRAMEWORK Foundation)
     find_library(SECURITY_FRAMEWORK Security)
-	find_library(SYSTEM_CONFIGURATION_FRAMEWORK SystemConfiguration)
+    find_library(SYSTEM_CONFIGURATION_FRAMEWORK SystemConfiguration)
 
     set(CRYPTO_LIBRARIES "")
     set(SSL_LIBRARIES ${FOUNDATION_FRAMEWORK} ${SECURITY_FRAMEWORK})
-	set(REACHABILITY_LIBRARIES ${SYSTEM_CONFIGURATION_FRAMEWORK})
+    set(REACHABILITY_LIBRARIES ${SYSTEM_CONFIGURATION_FRAMEWORK})
 elseif(REALM_PLATFORM STREQUAL "Android")
     # The Android core and sync libraries include the necessary portions of OpenSSL.
     set(CRYPTO_LIBRARIES "")
     set(SSL_LIBRARIES "")
-	set(REACHABILITY_LIBRARIES "")
+    set(REACHABILITY_LIBRARIES "")
 else()
     find_package(OpenSSL REQUIRED)
 
     set(CRYPTO_LIBRARIES OpenSSL::Crypto)
     set(SSL_LIBRARIES OpenSSL::SSL)
-	set(REACHABILITY_LIBRARIES "")
+    set(REACHABILITY_LIBRARIES "")
 endif()
 
 
