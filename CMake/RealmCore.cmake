@@ -325,8 +325,13 @@ macro(build_realm_sync)
     ExternalProject_Get_Property(realm-sync-lib SOURCE_DIR)
     set(sync_directory ${SOURCE_DIR})
 
-    set(sync_library_debug ${sync_directory}/src/realm/librealm-sync${platform}-dbg.a)
-    set(sync_library_release ${sync_directory}/src/realm/librealm-sync${platform}.a)
+    if(REALM_PLATFORM STREQUAL "Android")
+        set(sync_library_debug ${sync_directory}/android-lib/librealm-sync${platform}-dbg.a)
+        set(sync_library_release ${sync_directory}/android-lib/librealm-sync${platform}.a)
+    else()
+        set(sync_library_debug ${sync_directory}/src/realm/librealm-sync${platform}-dbg.a)
+        set(sync_library_release ${sync_directory}/src/realm/librealm-sync${platform}.a)
+    endif()
     set(sync_libraries ${sync_library_debug} ${sync_library_release})
 
     ExternalProject_Add_Step(realm-sync-lib ensure-libraries
@@ -346,8 +351,13 @@ macro(build_realm_sync)
     set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES})
 
     # Sync server library is built as part of the sync library build
-    set(sync_server_library_debug ${sync_directory}/src/realm/librealm-server${platform}-dbg.a)
-    set(sync_server_library_release ${sync_directory}/src/realm/librealm$-server${platform}.a)
+    if(REALM_PLATFORM STREQUAL "Android")
+        set(sync_server_library_debug ${sync_directory}/android-lib/librealm-server${platform}-dbg.a)
+        set(sync_server_library_release ${sync_directory}/android-lib/librealm$-server${platform}.a)
+    else()
+        set(sync_server_library_debug ${sync_directory}/src/realm/librealm-server${platform}-dbg.a)
+        set(sync_server_library_release ${sync_directory}/src/realm/librealm$-server${platform}.a)
+    endif()
     set(sync_server_libraries ${sync_server_library_debug} ${sync_server_library_release})
 
     ExternalProject_Add_Step(realm-sync-lib ensure-server-libraries
