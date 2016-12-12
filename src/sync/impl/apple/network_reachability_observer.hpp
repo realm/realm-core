@@ -23,6 +23,7 @@
 #include <string>
 
 #include <realm/util/cf_ptr.hpp>
+#include <realm/util/optional.hpp>
 
 #include <SystemConfiguration/SystemConfiguration.h>
 
@@ -36,26 +37,24 @@ enum NetworkReachabilityStatus {
 
 class NetworkReachabilityObserver {
 public:
-    // An instanse to check if the default route is available.
-    NetworkReachabilityObserver();
-
-    // An instanse to check if the specific host is available.
-    NetworkReachabilityObserver(const std::string hostname);
+    NetworkReachabilityObserver(util::Optional<std::string> hostname,
+                                std::function<void (const NetworkReachabilityStatus)> handler);
 
     ~NetworkReachabilityObserver();
 
     NetworkReachabilityStatus reachability_status() const;
 
-    bool set_reachability_change_handler(std::function<void (const NetworkReachabilityStatus)>);
-
-private:
     bool start_observing();
     void stop_observing();
-    static void reachability_callback(SCNetworkReachabilityRef, SCNetworkReachabilityFlags, void*);
+
+private:
     void reachability_changed();
 
     util::CFPtr<SCNetworkReachabilityRef> m_reachability_ref;
-    std::function<void (const NetworkReachabilityStatus)> m_reachability_change_handler;
+    NetworkReachabilityStatus m_previous_status;
+    dispatch_queue_t m_callback_queue;
+    std::function<void ()> m_reachability_callback;
+    std::function<void (const NetworkReachabilityStatus)> m_change_handler;
 };
 
 }

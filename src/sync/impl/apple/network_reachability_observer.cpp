@@ -22,10 +22,8 @@ using namespace realm;
 
 namespace {
 
-NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFlags flags)
+static NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFlags flags)
 {
-    // This function uses the same method to detect connection type as Apple's Reachability sample:
-    // https://developer.apple.com/library/content/samplecode/Reachability
     if (!(flags & kSCNetworkReachabilityFlagsReachable)) {
         return NotReachable;
     }
@@ -36,11 +34,9 @@ NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFla
         status = ReachableViaWiFi;
     }
 
-    if ((flags & kSCNetworkReachabilityFlagsConnectionOnDemand) ||
-        (flags & kSCNetworkReachabilityFlagsConnectionOnTraffic)) {
-        if (!(flags & kSCNetworkReachabilityFlagsInterventionRequired)) {
-            status = ReachableViaWiFi;
-        }
+    if ((flags & kSCNetworkReachabilityFlagsConnectionOnTraffic) &&
+        !(flags & kSCNetworkReachabilityFlagsInterventionRequired)) {
+        status = ReachableViaWiFi;
     }
 
 #if TARGET_OS_IPHONE
@@ -51,25 +47,36 @@ NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFla
 
     return status;
 }
-    
-} // (anonymous namespace)
 
-NetworkReachabilityObserver::NetworkReachabilityObserver() {
-    struct sockaddr zeroAddress = {};
-    zeroAddress.sa_len = sizeof(zeroAddress);
-    zeroAddress.sa_family = AF_INET;
-
-    m_reachability_ref = util::adoptCF(SCNetworkReachabilityCreateWithAddress(nullptr, &zeroAddress));
+static void reachability_callback(SCNetworkReachabilityRef, SCNetworkReachabilityFlags, void* info)
+{
+    auto callback = reinterpret_cast<std::function<void ()> *>(info);
+    (*callback)();
 }
 
-NetworkReachabilityObserver::NetworkReachabilityObserver(const std::string hostname)
+} // (anonymous namespace)
+
+NetworkReachabilityObserver::NetworkReachabilityObserver(util::Optional<std::string> hostname,
+                                                         std::function<void (const NetworkReachabilityStatus)> handler)
+: m_callback_queue(dispatch_queue_create("io.realm.sync.reachability", nullptr))
+, m_reachability_callback([=]() { reachability_changed(); })
+, m_change_handler(std::move(handler))
 {
-    m_reachability_ref = util::adoptCF(SCNetworkReachabilityCreateWithName(nullptr, hostname.c_str()));
+    if (hostname) {
+        m_reachability_ref = util::adoptCF(SCNetworkReachabilityCreateWithName(nullptr, hostname->c_str()));
+    } else {
+        struct sockaddr zeroAddress = {};
+        zeroAddress.sa_len = sizeof(zeroAddress);
+        zeroAddress.sa_family = AF_INET;
+
+        m_reachability_ref = util::adoptCF(SCNetworkReachabilityCreateWithAddress(nullptr, &zeroAddress));
+    }
 }
 
 NetworkReachabilityObserver::~NetworkReachabilityObserver()
 {
     stop_observing();
+    dispatch_release(m_callback_queue);
 }
 
 NetworkReachabilityStatus NetworkReachabilityObserver::reachability_status() const
@@ -83,24 +90,17 @@ NetworkReachabilityStatus NetworkReachabilityObserver::reachability_status() con
     return NotReachable;
 }
 
-bool NetworkReachabilityObserver::set_reachability_change_handler(std::function<void (const NetworkReachabilityStatus)> handler)
-{
-    stop_observing();
-
-    m_reachability_change_handler = std::move(handler);
-
-    return m_reachability_change_handler ? start_observing() : true;
-}
-
 bool NetworkReachabilityObserver::start_observing()
 {
-    SCNetworkReachabilityContext context = {0, this, nullptr, nullptr, nullptr};
+    m_previous_status = reachability_status();
+
+    SCNetworkReachabilityContext context = {0, &m_reachability_callback, nullptr, nullptr, nullptr};
 
     if (!SCNetworkReachabilitySetCallback(m_reachability_ref.get(), reachability_callback, &context)) {
         return false;
     }
 
-    if (!SCNetworkReachabilityScheduleWithRunLoop(m_reachability_ref.get(), CFRunLoopGetCurrent(), kCFRunLoopDefaultMode)) {
+    if (!SCNetworkReachabilitySetDispatchQueue(m_reachability_ref.get(), m_callback_queue)) {
         return false;
     }
 
@@ -109,17 +109,19 @@ bool NetworkReachabilityObserver::start_observing()
 
 void NetworkReachabilityObserver::stop_observing()
 {
-    SCNetworkReachabilityUnscheduleFromRunLoop(m_reachability_ref.get(), CFRunLoopGetCurrent(), kCFRunLoopDefaultMode);
+    SCNetworkReachabilitySetDispatchQueue(m_reachability_ref.get(), nullptr);
     SCNetworkReachabilitySetCallback(m_reachability_ref.get(), nullptr, nullptr);
-}
-
-void NetworkReachabilityObserver::reachability_callback(SCNetworkReachabilityRef, SCNetworkReachabilityFlags, void* info)
-{
-    auto helper = reinterpret_cast<realm::NetworkReachabilityObserver *>(info);
-    helper->reachability_changed();
 }
 
 void NetworkReachabilityObserver::reachability_changed()
 {
-    m_reachability_change_handler(reachability_status());
+    auto current_status = reachability_status();
+
+    // When observing reachability of the specific host the callback might be called
+    // several times (because of DNS queries) with the same reachability flags while
+    // the caller should be notified only when the reachability status is really changed.
+    if (current_status != m_previous_status) {
+        m_change_handler(current_status);
+        m_previous_status = current_status;
+    }
 }

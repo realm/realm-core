@@ -47,15 +47,16 @@ struct SyncClient {
     }) // Throws
     {
 #if REALM_PLATFORM_APPLE
-        m_reachability_observer = std::make_unique<NetworkReachabilityObserver>();
-
         auto reachability_change_handler = [=](const NetworkReachabilityStatus status) {
             if (status != NotReachable) {
                 cancel_reconnect_delay();
             }
         };
 
-        if (!m_reachability_observer->set_reachability_change_handler(reachability_change_handler)) {
+        m_reachability_observer = std::make_unique<NetworkReachabilityObserver>(none,
+                                                                                reachability_change_handler);
+
+        if (!m_reachability_observer->start_observing()) {
             m_logger->error("Failed to set network reachability change handler");
         }
 #endif
