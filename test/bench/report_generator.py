@@ -1,3 +1,4 @@
+import math
 import matplotlib.pyplot as plt
 from matplotlib.mlab import csv2rec
 from matplotlib.cbook import get_sample_data
@@ -38,6 +39,18 @@ def reportPostStep():
 def reportMidStep(name):
     return "<h1>" + name + "</h1>" + "<p>Details generated</p><img align=\"middle\" src=\"" + name + "\"/>"
 
+def getThreshold(points):
+    # assumes that data has 2 or more points
+    # remove the last value from computation since we are testing it
+    data = points[:-1]
+    mean = float(sum(data)) / max(len(data), 1)
+    variance = 0
+    deviations = [ math.pow(x - mean, 2) for x in data ]
+    variance = sum(deviations) / max(len(deviations), 1)
+    std = math.sqrt(variance)
+    threshold = mean + (2 * std)
+    return threshold
+
 def generateReport(outputDirectory, csvFiles):
     metrics = ['min', 'max', 'med', 'avg']
 
@@ -65,6 +78,9 @@ def generateReport(outputDirectory, csvFiles):
 
         # rotate x axis labels for readability
         fig.autofmt_xdate()
+
+        threshold = getThreshold(bench_data['avg'])
+        plt.axhline(y=threshold, color='r')
 
         title = splitext(basename(fname))[0]
         plt.title(title, fontsize=18, ha='center')
