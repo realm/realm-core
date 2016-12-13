@@ -4,15 +4,15 @@
 # results to a remote influx 1.0.2 database.
 #
 # Local useage:
-# $ ./parse-bench-hist.py --local [outputdir [inputdir]]
-# $ ./parse-bench-hist.py --local-html [outputdir [inputdir]]
+# $ ./parse_bench_hist.py --local [outputdir [inputdir]]
+# $ ./parse_bench_hist.py --local-html [outputdir [inputdir]]
 #
 # --local-html is the same as --local but it also produces a
-# benchmarks-results.html page with graphs of the output.
+# results.html page with graphs of the output.
 #
 # This script will read any csv files from the
 # input directory (default is the folder created by
-# the gen-bench-hist.sh script) and output combined
+# the gen_bench_hist.sh script) and output combined
 # results organized by benchmark function in the
 # outputdir (default is ./bench-hist-results)
 # the generated csv files will show graphs of benchmark
@@ -21,11 +21,11 @@
 # from the input directory.
 #
 # remote useage:
-# $ ./parse-bench-hist.py --remote ip_address [inputdir [inputfile]]
+# $ ./parse_bench_hist.py --remote ip_address [inputdir [inputfile]]
 #
 # This script will read the csv benchmark results and send them
 # to a remote influx database at ip_address. If no inputdir is
-# specified then all csv files from the gen-bench-hist.sh script
+# specified then all csv files from the gen_bench_hist.sh script
 # are parsed. If only an input directory is specified then all
 # csv files from this directory are parsed. If both the input
 # directory and the inputfile are specified, then only this
@@ -42,8 +42,9 @@ def printUseageAndQuit():
     print ("This python script can produce local csv files or "
           "send benchmark stats to a remote influx database.")
     print "Useage:"
-    print "./parse-bench-hist.py --local [outputdir [inputdir]]"
-    print "./parse-bench-hist.py --remote ip_address [inputdir [inputfile]]"
+    print "./parse_bench_hist.py --local [outputdir [inputdir]]"
+    print "./parse_bench_hist.py --local-html [outputdir [inputdir]]"
+    print "./parse_bench_hist.py --remote ip_address [inputdir [inputfile]]"
     exit()
 
 def getFilesByModDate(dirpath, suffix='.csv'):

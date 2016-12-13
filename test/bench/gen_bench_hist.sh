@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# See ./util/gen-bench-hist.sh --help for documentation.
+# See ./util/gen_bench_hist.sh --help for documentation.
 
 show_usage () {
   cat <<EOF
@@ -13,7 +13,7 @@ show_help () {
   show_usage
   echo ""
   cat <<EOF
-./gen-bench-hist.sh
+./gen_bench_hist.sh
 
 This script runs the benchmarks on each version of core specified in the
 file revs_to_benchmark.txt plus the current branch. The benchmarks of a
@@ -44,8 +44,8 @@ fi
 
 while read -r p; do
   echo "$p"
-  sh gen-bench.sh "$p"
+  sh gen_bench.sh "$p"
 done <revs_to_benchmark.txt
 
-sh gen-bench.sh HEAD
+sh gen_bench.sh HEAD
 

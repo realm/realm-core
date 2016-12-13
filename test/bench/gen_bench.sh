@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# See ./util/gen-bench.sh --help for documentation.
+# See ./util/gen_bench.sh --help for documentation.
 
 show_usage () {
   cat <<EOF
