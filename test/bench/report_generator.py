@@ -16,12 +16,6 @@ class TagFormatter(Formatter):
             return ''
         return str(self.tags[ind])
 
-# These are the colors that will be used in the plot
-color_sequence = ['#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
-                  '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
-                  '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
-                  '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5']
-
 def reportPreStep():
     return """
     <html>
@@ -53,6 +47,7 @@ def getThreshold(points):
 
 def generateReport(outputDirectory, csvFiles):
     metrics = ['min', 'max', 'med', 'avg']
+    colors = {'min': '#1f77b4', 'max': '#aec7e8', 'med': '#ff7f0e', 'avg': '#ffbb78', 'threshold': '#ff1111'}
 
     report = reportPreStep()
 
@@ -69,7 +64,7 @@ def generateReport(outputDirectory, csvFiles):
 
         plt.grid(True)
         for rank, column in enumerate(metrics):
-            line, = plt.plot(bench_data[column], lw=2.5, color=color_sequence[rank])
+            line, = plt.plot(bench_data[column], lw=2.5, color=colors[column])
             line.set_label(column)
 
         plt.legend()
@@ -80,7 +75,7 @@ def generateReport(outputDirectory, csvFiles):
         fig.autofmt_xdate()
 
         threshold = getThreshold(bench_data['avg'])
-        plt.axhline(y=threshold, color='r')
+        plt.axhline(y=threshold, color=colors['threshold'])
 
         title = splitext(basename(fname))[0]
         plt.title(title, fontsize=18, ha='center')
