@@ -464,7 +464,7 @@ void Realm::begin_transaction()
     // state, but that's unavoidable.
     if (m_is_sending_notifications) {
         _impl::NotifierPackage notifiers;
-        transaction::begin(*m_shared_group, m_binding_context.get(), m_config.schema_mode, notifiers);
+        transaction::begin(*m_shared_group, m_binding_context.get(), notifiers);
         return;
     }
 
@@ -680,7 +680,7 @@ void Realm::HandoverPackage::advance_to_version(VersionID new_version)
     // Import handover, advance version, and then repackage for handover
     auto objects = realm->accept_handover(std::move(*this));
     transaction::advance(*realm->m_shared_group, realm->m_binding_context.get(),
-                         realm->m_config.schema_mode, new_version);
+                         new_version);
     *this = realm->package_for_handover(std::move(objects));
 }
 
@@ -747,7 +747,7 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
         } else {
             // We're behind, so advance to the handover's version
             transaction::advance(*m_shared_group, m_binding_context.get(),
-                                 m_config.schema_mode, handover.m_version_id);
+                                 handover.m_version_id);
             m_coordinator->process_available_async(*this);
         }
     }
