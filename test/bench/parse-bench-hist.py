@@ -5,6 +5,10 @@
 #
 # Local useage:
 # $ ./parse-bench-hist.py --local [outputdir [inputdir]]
+# $ ./parse-bench-hist.py --local-html [outputdir [inputdir]]
+#
+# --local-html is the same as --local but it also produces a
+# benchmarks-results.html page with graphs of the output.
 #
 # This script will read any csv files from the
 # input directory (default is the folder created by
@@ -31,6 +35,7 @@
 # function,machine=${machid} min=x,max=y,median=z,avg=w,sha=${gitsha} unixtimestamp
 
 from stat import S_ISREG, ST_MTIME, ST_MODE
+from report_generator import generateReport
 import csv, errno, os, subprocess, sys, time
 
 def printUseageAndQuit():
@@ -84,6 +89,14 @@ def find_ndx(inlist, item):
         ndx = -1
     return ndx
 
+def getReadableSha(verboseSha):
+    process = subprocess.Popen(["git", "describe", verboseSha], stdout=subprocess.PIPE)
+    output = process.communicate()[0]
+    output = output.replace('\n', '')
+    if not output:
+        return verboseSha
+    return output
+
 def transform(inputdir, destination, filelist, handler):
     for inputfile in filelist:
         file_name = os.path.splitext(os.path.basename(inputfile))[0].split("_")
@@ -92,6 +105,7 @@ def transform(inputdir, destination, filelist, handler):
             exit()
         timestamp = file_name[0]
         sha = file_name[1]
+        tag = getReadableSha(sha)
         print "column sha:" + sha
         with open(inputfile) as fin:
             csvr = csv.reader(fin)
@@ -114,17 +128,18 @@ def transform(inputdir, destination, filelist, handler):
                 row_med = row[med_ndx] if med_ndx >= 0 else ""
                 row_avg = row[avg_ndx] if avg_ndx >= 0 else ""
                 info = { 'min':row_min, 'max':row_max, 'med':row_med, 'avg':row_avg,
-                         'function':benchmark, 'sha':sha, 'time':timestamp, 'dest':destination }
+                         'function':benchmark, 'sha':sha, 'time':timestamp, 'dest':destination,
+                         'tag': tag}
                 handler(info)
 
-# format is: sha, min, max, med, avg,
+# format is: sha, tag, min, max, med, avg,
 #            sha1, ...
 #            ..., ...
 def handle_local_vertical(info):
     outfilename = info['dest'] + info['function'] + ".csv"
     endline = ',\n'
     header = ''
-    keys = ['sha', 'min', 'max', 'med', 'avg']
+    keys = ['sha', 'tag', 'min', 'max', 'med', 'avg']
     if not os.path.exists(outfilename):
         header = ','.join(map(str, keys)) + endline
     with open(outfilename, 'a') as fout:
@@ -167,7 +182,7 @@ def handle_remote(info):
     #curl -i -XPOST 'remote_ip' --data-binary 'payload'
     subprocess.call(['curl', '-i', '-XPOST', info['dest'], '--data-binary', payload])
 
-def transform_local():
+def transform_local(html=False):
     machid = getMachId()
     outputdir = "./bench-hist-results/"
     if len(sys.argv) >= 3:
@@ -187,6 +202,9 @@ def transform_local():
     files = getFilesByName(inputdir)
 
     transform(inputdir, outputdir, files, handle_local_vertical)
+
+    if html is True:
+        generateReport(outputdir, getFilesByName(outputdir))
 
 def transform_remote():
     machid = getMachId()
@@ -215,9 +233,11 @@ if __name__ == "__main__":
     locality = sys.argv[1]
     if locality == "--local":
         transform_local()
+    elif locality == "--local-html":
+        transform_local(html=True)
     elif locality == "--remote":
         transform_remote()
     else:
-        print "Expecting either '--local' or '--remote' as the second argument."
+        print "Expecting either '--local', '--local-html', or '--remote' as the second argument."
         printUseageAndQuit()
 
