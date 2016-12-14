@@ -139,7 +139,7 @@ private:
 
         for (size_t i = 1; i < size(); ++i) {
             Timestamp candidate = get(i);
-            if (best.is_null() && !candidate.is_null() || Condition()(candidate, best, candidate.is_null(), best.is_null())) {
+            if ((best.is_null() && !candidate.is_null()) || Condition()(candidate, best, candidate.is_null(), best.is_null())) {
                 best = candidate;
                 best_index = i;
             }
