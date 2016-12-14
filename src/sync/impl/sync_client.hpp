@@ -45,22 +45,21 @@ struct SyncClient {
         client.set_error_handler(std::move(handler));
         client.run();
     }) // Throws
-    {
 #if REALM_PLATFORM_APPLE
-        auto reachability_change_handler = [=](const NetworkReachabilityStatus status) {
-            if (status != NotReachable) {
-                cancel_reconnect_delay();
-            }
-        };
-
-        m_reachability_observer = std::make_unique<NetworkReachabilityObserver>(none,
-                                                                                reachability_change_handler);
-
-        if (!m_reachability_observer->start_observing()) {
-            m_logger->error("Failed to set network reachability change handler");
+    , m_reachability_observer(none, [=](const NetworkReachabilityStatus status) {
+        if (status != NotReachable) {
+            cancel_reconnect_delay();
         }
-#endif
+    })
+    {
+        if (!m_reachability_observer.start_observing()) {
+            m_logger->error("Failed to setup network reachability observer");
+        }
     }
+#else
+    {
+    }
+#endif
 
     void cancel_reconnect_delay() {
         // FIXME: Implement after https://github.com/realm/realm-sync/issues/794
@@ -92,7 +91,7 @@ private:
     const std::unique_ptr<util::Logger> m_logger;
     std::thread m_thread;
 #if REALM_PLATFORM_APPLE
-    std::unique_ptr<NetworkReachabilityObserver> m_reachability_observer;
+    NetworkReachabilityObserver m_reachability_observer;
 #endif
 };
 
