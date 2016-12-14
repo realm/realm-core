@@ -169,6 +169,9 @@ public:
 
         /// A data structure storing data used to configure the Realm for sync support.
         std::shared_ptr<SyncConfig> sync_config;
+
+        // FIXME: realm java is manage sync in the java level, but needs Realm created sync history.
+        bool force_sync_history = false;
     };
 
     // Get a cached Realm or create a new one if no cached copies exists
