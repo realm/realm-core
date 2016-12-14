@@ -237,41 +237,35 @@ endfunction()
 
 macro(build_realm_core)
     set(core_prefix_directory "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
+    
     if(REALM_PLATFORM STREQUAL "Android")
-      ExternalProject_Add(realm-core
-            PREFIX ${core_prefix_directory}
-            BUILD_IN_SOURCE 1
-            BUILD_COMMAND sh build.sh build-android
-            INSTALL_COMMAND ""
-            CONFIGURE_COMMAND REALM_ENABLE_ENCRYPTION=YES REALM_ENABLE_ASSERTIONS= sh build.sh config
-            ${USES_TERMINAL_BUILD}
-            ${ARGV}
-            )
+        set(build_cmd sh build.sh build-android)
     else()
-        ExternalProject_Add(realm-core
-            PREFIX ${core_prefix_directory}
-            BUILD_IN_SOURCE 1
-            BUILD_COMMAND make -C src/realm librealm.a librealm-dbg.a ${MAKE_FLAGS}
-            INSTALL_COMMAND ""
-            CONFIGURE_COMMAND ""
-            ${USES_TERMINAL_BUILD}
-            ${ARGV}
-            )
+        set(build_cmd make -C src/realm librealm.a librealm-dbg.a ${MAKE_FLAGS})
     endif()
 
+    ExternalProject_Add(realm-core
+        PREFIX ${core_prefix_directory}
+        BUILD_IN_SOURCE 1
+        BUILD_COMMAND ${build_cmd}
+        INSTALL_COMMAND ""
+        CONFIGURE_COMMAND ""
+        ${USES_TERMINAL_BUILD}
+        ${ARGV}
+        )
     ExternalProject_Get_Property(realm-core SOURCE_DIR)
     define_realm_core_target(NO ${SOURCE_DIR})
 endmacro()
 
 function(clone_and_build_realm_core branch)
     if(REALM_PLATFORM STREQUAL "Android")
-        set(CONFIG_CMD REALM_ENABLE_ENCRYPTION=YES REALM_ENABLE_ASSERTIONS= sh build.sh config)
+        set(config_cmd REALM_ENABLE_ENCRYPTION=YES REALM_ENABLE_ASSERTIONS= sh build.sh config)
     else()
-        set(CONFIG_CMD REALM_ENABLE_ENCRYPTION=YES REALM_ENABLE_ASSERTIONS=YES sh build.sh config)
+        set(config_cmd REALM_ENABLE_ENCRYPTION=YES REALM_ENABLE_ASSERTIONS=YES sh build.sh config)
     endif()
     build_realm_core(GIT_REPOSITORY "https://github.com/realm/realm-core.git"
                      GIT_TAG ${branch}
-                     CONFIGURE_COMMAND test -f src/config.mk || CONFIG_CMD
+                     CONFIGURE_COMMAND test -f src/config.mk || ${config_cmd}
                      )
 endfunction()
 
@@ -288,28 +282,21 @@ endfunction()
 macro(build_realm_sync)
     set(cmake_files ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY})
     if(REALM_PLATFORM STREQUAL "Android")
-        ExternalProject_Add(realm-sync-lib
-            DEPENDS realm-core
-            PREFIX ${cmake_files}/realm-sync
-            BUILD_IN_SOURCE 1
-            BUILD_COMMAND sh build.sh build-android
-            CONFIGURE_COMMAND rm -f src/config.mk && REALM_FORCE_OPENSSL=YES REALM_ENABLE_ENCRYPTION=YES REALM_ENABLE_ASSERTIONS= sh build.sh config && echo "ENABLE_ENCRYPTION    = yes" >> src/config.mk
-            INSTALL_COMMAND ""
-            ${USES_TERMINAL_BUILD}
-            ${ARGV}
-            )
+        set(build_cmd sh build.sh build-android)
     else()
-        ExternalProject_Add(realm-sync-lib
-            DEPENDS realm-core
-            PREFIX ${cmake_files}/realm-sync
-            BUILD_IN_SOURCE 1
-            BUILD_COMMAND make -C src/realm librealm-sync.a librealm-sync-dbg.a librealm-server.a librealm-server-dbg.a ${MAKE_FLAGS}
-            CONFIGURE_COMMAND ""
-            INSTALL_COMMAND ""
-            ${USES_TERMINAL_BUILD}
-            ${ARGV}
-            )
+        set(build_cmd make -C src/realm librealm-sync.a librealm-sync-dbg.a librealm-server.a librealm-server-dbg.a ${MAKE_FLAGS})
     endif()
+
+    ExternalProject_Add(realm-sync-lib
+        DEPENDS realm-core
+        PREFIX ${cmake_files}/realm-sync
+        BUILD_IN_SOURCE 1
+        BUILD_COMMAND ${build_cmd}
+        CONFIGURE_COMMAND ""
+        INSTALL_COMMAND ""
+        ${USES_TERMINAL_BUILD}
+        ${ARGV}
+        )
 
     if(APPLE)
         set(platform "")
@@ -392,14 +379,14 @@ endfunction()
 function(clone_and_build_realm_sync branch)
     set(cmake_files ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY})
     if(REALM_PLATFORM STREQUAL "Android")
-        set(CONFIG_CMD, rm -f src/config.mk && REALM_CORE_PREFIX=${cmake_files}/realm-core/src/realm-core REALM_FORCE_OPENSSL=YES REALM_ENABLE_ENCRYPTION=YES REALM_ENABLE_ASSERTIONS= sh build.sh config && echo "ENABLE_ENCRYPTION    = yes" >> src/config.mk)
+        set(config_cmd test -f src/config.mk || REALM_CORE_PREFIX=${cmake_files}/realm-core/src/realm-core REALM_FORCE_OPENSSL=YES REALM_ENABLE_ENCRYPTION=YES REALM_ENABLE_ASSERTIONS= sh build.sh config && echo "ENABLE_ENCRYPTION    = yes" >> src/config.mk)
     else()
-        set(CONFIG_CMD, test -f src/config.mk || REALM_CORE_PREFIX=${cmake_files}/realm-core/src/realm-core sh build.sh config)
+        set(config_cmd test -f src/config.mk || REALM_CORE_PREFIX=${cmake_files}/realm-core/src/realm-core sh build.sh config)
     endif()
 
     build_realm_sync(GIT_REPOSITORY "git@github.com:realm/realm-sync.git"
                      GIT_TAG ${branch}
-                     CONFIGURE_COMMAND CONFIG_CMD
+                     CONFIGURE_COMMAND ${config_cmd}
                      )
 
 endfunction()
