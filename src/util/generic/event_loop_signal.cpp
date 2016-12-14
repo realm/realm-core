@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2015 Realm Inc.
+// Copyright 2016 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,32 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include "impl/weak_realm_notifier.hpp"
+#include "event_loop_signal.hpp"
 
-#include "shared_realm.hpp"
-#include "util/event_loop_signal.hpp"
+using namespace realm::util;
 
-using namespace realm;
-using namespace realm::_impl;
+GenericEventLoop (*realm::util::s_get_eventloop)() = [] { return GenericEventLoop(); };
 
-WeakRealmNotifier::WeakRealmNotifier(const std::shared_ptr<Realm>& realm, bool cache)
-: m_realm(realm)
-, m_realm_key(realm.get())
-, m_cache(cache)
-, m_signal(std::make_shared<util::EventLoopSignal<Callback>>(Callback{realm}))
-{
-}
+void (*realm::util::s_post_on_eventloop)(GenericEventLoop, EventLoopPostHandler*, void* user_data) = [](auto, auto, auto) { };
 
-WeakRealmNotifier::~WeakRealmNotifier() = default;
-
-void WeakRealmNotifier::Callback::operator()() const
-{
-    if (auto realm = weak_realm.lock()) {
-        realm->notify();
-    }
-}
-
-void WeakRealmNotifier::notify()
-{
-    m_signal->notify();
-}
+void (*realm::util::s_release_eventloop)(GenericEventLoop) = [](auto) { };

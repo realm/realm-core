@@ -68,6 +68,10 @@ else()
     list(APPEND SOURCES impl/generic/external_commit_helper.cpp)
 endif()
 
+if(NOT APPLE AND NOT REALM_PLATFORM STREQUAL "Android")
+    list(APPEND SOURCES util/generic/event_loop_signal.cpp)
+endif()
+
 set(INCLUDE_DIRS
     ${REALM_CORE_INCLUDE_DIR}
     ${PEGTL_INCLUDE_DIR}

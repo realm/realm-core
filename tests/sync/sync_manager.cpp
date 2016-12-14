@@ -148,6 +148,18 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
         CHECK(validate_user_in_vector(users, identity_2, url_2, token_2));
         CHECK(validate_user_in_vector(users, identity_3, none, token_3));
     }
+
+    SECTION("should return current user that was created during run time") {
+        auto u_null = SyncManager::shared().get_current_user();
+        REQUIRE(u_null == nullptr);
+
+        auto u1 = SyncManager::shared().get_user(identity_1, token_1, url_1);
+        auto u_current = SyncManager::shared().get_current_user();
+        REQUIRE(u_current == u1);
+
+        auto u2 = SyncManager::shared().get_user(identity_2, token_2, url_2);
+        REQUIRE_THROWS_AS(SyncManager::shared().get_current_user(), std::logic_error);
+    }
 }
 
 TEST_CASE("sync_manager: persistent user state management", "[sync]") {
