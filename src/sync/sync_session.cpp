@@ -28,8 +28,8 @@ using namespace realm;
 using namespace realm::_impl;
 using namespace realm::_impl::sync_session_states;
 
-/// A state which a `SyncSession` can currently be within. State classes handle
-/// various actions and state transitions.
+/// A state which a `SyncSession` can currently be within. State classes handle various actions
+/// and state transitions.
 ///
 /// STATES:
 ///

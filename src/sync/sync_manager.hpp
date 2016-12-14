@@ -28,7 +28,6 @@
 #include <memory>
 #include <mutex>
 #include <unordered_map>
-#include "impl/sync_client.hpp"
 
 namespace realm {
 
@@ -70,15 +69,9 @@ public:
                                util::Optional<std::vector<char>> custom_encryption_key=none,
                                bool reset_metadata_on_error=false);
 
-    // Configure the log level for the sync client. This can only be configured before the client is started.
     void set_log_level(util::Logger::Level) noexcept;
-
-    // Configure a custom logger factory. If not provided, a realm::util::StderrLogger will be used.
     void set_logger_factory(SyncLoggerFactory&) noexcept;
     void set_error_handler(std::function<sync::Client::ErrorHandler>);
-    // Option callback invoked when the thread responsible for running the Sync Client is started
-    // and the client has been created (but not started).
-    void set_client_thread_ready_callback(std::function<realm::_impl::ClientThreadReadyCallback>);
 
     /// Control whether the sync client attempts to reconnect immediately. Only set this to `true` for testing purposes.
     void set_client_should_reconnect_immediately(bool reconnect_immediately);
@@ -90,8 +83,6 @@ public:
 
     util::Logger::Level log_level() const noexcept;
 
-    // Return the session associated with the given path. The session start as INACTIVE, and must
-    // be started using 'revive_if_needed()'.
     std::shared_ptr<SyncSession> get_session(const std::string& path, const SyncConfig& config);
     std::shared_ptr<SyncSession> get_existing_active_session(const std::string& path) const;
 
@@ -99,14 +90,12 @@ public:
     bool perform_metadata_update(std::function<void(const SyncMetadataManager&)> update_function) const;
 
     // Get a sync user for a given identity, or create one if none exists yet, and set its token.
-    // If a logged-out user exists, it will be marked as logged back in.
+    // If a logged-out user exists, it will marked as logged back in.
     std::shared_ptr<SyncUser> get_user(const std::string& identity,
                                        std::string refresh_token,
                                        util::Optional<std::string> auth_server_url=none,
                                        bool is_admin=false);
     // Get an existing user for a given identity, if one exists and is logged in.
-    // A user is considered logged in until explicitly logged out, even if
-    // the users refresh_token has expired.
     std::shared_ptr<SyncUser> get_existing_logged_in_user(const std::string& identity) const;
     // Get all the users that are logged in and not errored out.
     std::vector<std::shared_ptr<SyncUser>> all_logged_in_users() const;
@@ -145,7 +134,6 @@ private:
     util::Logger::Level m_log_level = util::Logger::Level::info;
     SyncLoggerFactory* m_logger_factory = nullptr;
     std::function<sync::Client::ErrorHandler> m_error_handler;
-    std::function<realm::_impl::ClientThreadReadyCallback> m_client_thread_ready_callback;
     sync::Client::Reconnect m_client_reconnect_mode = sync::Client::Reconnect::normal;
     bool m_client_validate_ssl = true;
 

@@ -27,21 +27,17 @@ namespace realm {
 namespace _impl {
 
 using Reconnect = sync::Client::Reconnect;
-using ClientThreadReadyCallback = void(sync::Client*);
 
 struct SyncClient {
-
     sync::Client client;
+
     SyncClient(std::unique_ptr<util::Logger> logger,
                std::function<sync::Client::ErrorHandler> handler,
                Reconnect reconnect_mode = Reconnect::normal,
-               bool verify_ssl = true,
-               std::function<ClientThreadReadyCallback> client_thread_ready = {})
+               bool verify_ssl = true)
     : client(make_client(*logger, reconnect_mode, verify_ssl)) // Throws
     , m_logger(std::move(logger))
-    , m_thread([this, handler=std::move(handler), client_thread_ready=std::move(client_thread_ready)] {
-        if (client_thread_ready)
-            client_thread_ready(&client);
+    , m_thread([this, handler=std::move(handler)] {
         client.set_error_handler(std::move(handler));
         client.run();
     }) // Throws

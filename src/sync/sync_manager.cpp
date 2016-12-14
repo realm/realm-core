@@ -208,12 +208,6 @@ void SyncManager::set_error_handler(std::function<sync::Client::ErrorHandler> ha
     m_error_handler = std::move(wrapped_handler);
 }
 
-void SyncManager::set_client_thread_ready_callback(std::function<realm::_impl::ClientThreadReadyCallback> callback)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_client_thread_ready_callback = callback;
-}
-
 void SyncManager::set_client_should_reconnect_immediately(bool reconnect_immediately)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -440,7 +434,5 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
     return std::make_unique<SyncClient>(std::move(logger),
                                         std::move(m_error_handler),
                                         m_client_reconnect_mode,
-                                        m_client_validate_ssl,
-                                        std::move(m_client_thread_ready_callback)
-        );
+                                        m_client_validate_ssl);
 }

@@ -64,8 +64,7 @@ public:
     // Asynchronously call notify() on every Realm instance for this coordinator's
     // path, including those in other processes
     void send_commit_notifications(Realm&);
-
-    // Notify all threads that a change has happened
+    
     void wake_up_notifier_worker();
 
     // Clear the weak Realm cache for all paths
@@ -146,9 +145,7 @@ private:
     std::unique_ptr<_impl::ExternalCommitHelper> m_notifier;
     std::function<void(VersionID, VersionID)> m_transaction_callback;
 
-#if REALM_ENABLE_SYNC
     std::shared_ptr<SyncSession> m_sync_session;
-#endif
 
     // must be called with m_notifier_mutex locked
     void pin_version(VersionID version);
