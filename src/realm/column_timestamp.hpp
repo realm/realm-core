@@ -127,7 +127,7 @@ private:
     Timestamp minmax(size_t* result_index) const noexcept
     {
         // Condition is realm::Greater for maximum and realm::Less for minimum. Any non-null value is both larger
-        // and smaller than a non-null value.
+        // and smaller than a null value.
         if (size() == 0) {
             if (result_index)
                 *result_index = npos;
