@@ -37,6 +37,7 @@
 #include <realm/sync/history.hpp>
 #endif
 
+
 using namespace realm;
 using namespace realm::_impl;
 
@@ -776,3 +777,23 @@ std::vector<AnyThreadConfined> Realm::accept_handover(Realm::HandoverPackage han
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
 : std::logic_error(util::format(message.data(), path)) { }
+
+// FIXME Those are exposed for Java async queries, mainly because of handover related methods.
+SharedGroup& RealmFriend::get_shared_group(Realm& realm)
+{
+    return *realm.m_shared_group;
+}
+
+Group& RealmFriend::read_group_to(Realm& realm, VersionID& version)
+{
+    if (!realm.m_group) {
+        realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version));
+        realm.add_schema_change_handler();
+    }
+    else if (version != realm.m_shared_group->get_version_of_current_transaction()) {
+        realm.m_shared_group->end_read();
+        realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version));
+    }
+    return *realm.m_group;
+}
+
