@@ -258,6 +258,55 @@ TEST(Table_OptimizeCrash)
     ttt.add(1, "AA");
 }
 
+TEST(Table_DateTimeMinMax)
+{
+    Group g;
+    TableRef table = g.add_table("test_table");
+
+    table->insert_column(0, type_Timestamp, "time", true);
+
+    // We test different code paths of the internal Core minmax method. First a null value as initial "best candidate",
+    // then non-null first. For each case we then try both a substitution of best candidate, then non-substitution. 4
+    // permutations in total.
+    
+    table->add_empty_row(3);
+    table->set_null(0, 0);
+    table->set_timestamp(0, 1, {0, 0});
+    table->set_timestamp(0, 2, {2, 2});
+
+    CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
+    CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
+
+    table->clear();
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->add_empty_row(3);
+    table->set_null(1, 0);
+    table->set_timestamp(0, 0, {0, 0});
+    table->set_timestamp(0, 2, {2, 2});
+
+    CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
+    CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
+
+    table->clear();
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->add_empty_row(3);
+    table->set_null(1, 0);
+    table->set_timestamp(0, 2, {0, 0});
+    table->set_timestamp(0, 0, {2, 2});
+
+    CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
+    CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
+
+    table->clear();
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->add_empty_row(3);
+    table->set_null(0, 0);
+    table->set_timestamp(0, 2, {0, 0});
+    table->set_timestamp(0, 0, {2, 2});
+
+    CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
+    CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
+}
 
 TEST(Table_1)
 {

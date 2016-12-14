@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed bug where Table::maximum_timestamp() could return a wrong result if the
+  column was nullable. https://github.com/realm/realm-core/issues/2357
 
 ### Breaking changes
 
