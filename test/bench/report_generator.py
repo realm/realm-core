@@ -20,9 +20,12 @@ def reportPreStep():
     return """
     <html>
     <body>
-        <title>Realm Core Performance Metrics</title>
-        <h1>Notes</h1>
-        <div style="width:100%; text-align:center">"""
+        <title>Realm Core Performance</title>
+        <div style="width:100%; text-align:center">
+        <h1>Realm Core Performance</h1>
+        <p>These graphs show the relative performance of certain operations between versions. The purpose of this report is to allow reviewers to see if there have been any unintentional performace regressions in the code being reviewed. It would be meaningless and misleading to use the numbers shown here to compare to other databases.</p>
+        <br>
+        """
 
 def reportPostStep():
     return """
@@ -30,8 +33,45 @@ def reportPostStep():
     </body>
 </html>"""
 
-def reportMidStep(name):
-    return "<h1>" + name + "</h1>" + "<p>Details generated</p><img align=\"middle\" src=\"" + name + "\"/>"
+def reportMidStep(imgSrc, title):
+    return "<h1>" + title + "</h1>" + "<p>Details generated</p><img align=\"middle\" src=\"" + imgSrc + "\"/>"
+
+def writeReport(outputDirectory, summary):
+    html = """
+        <html>
+        <head>
+            <style type=\"text/css\">
+                h1.pass { background-color: lightgreen; }
+                h1.fail { background-color: darksalmon; }
+                a.pass { color: green; }
+                a.fail { color: red; }
+            </style>
+        </head>
+        <body>
+            <title>Realm Core Performance Metrics</title>
+            <div style="width:100%; text-align:center">
+            <h1>Realm Core Performance Metrics</h1>
+            <p>These graphs show the relative performance of certain operations between versions. The purpose of this report is to allow reviewers to see if there have been any unintentional performace regressions in the code being reviewed. It would be meaningless and misleading to use the numbers shown here to compare to other databases.</p>
+            <br> """
+
+    html += "<ol>"
+    for title, values in summary.iteritems():
+        html += "<li><a class=\"" + values['status'] + "\" href=#" + title + ">" + title + "</a></li>"
+    html += "</ol><br>"
+
+    for title, values in summary.iteritems():
+        html += "<h1 class=\"" + values['status'] + "\" id=\"" + title +"\">" + title + "</h1>"
+        html += "<p>Threshold:  " + str(values['threshold']) + "</p>"
+        html += "<p>Last Value: " + str(values['last_value']) + " (" + str(values['last_std']) + " standard deviations)</p>"
+        html += "<img align=\"middle\" src=\"" + values['src'] + "\"/>"
+
+    html += """
+            </div>
+        </body>
+        </html>"""
+
+    with open(outputDirectory + str('report.html'), 'w+') as reportFile:
+        reportFile.write(html)
 
 def getThreshold(points):
     # assumes that data has 2 or more points
@@ -42,14 +82,20 @@ def getThreshold(points):
     deviations = [ math.pow(x - mean, 2) for x in data ]
     variance = sum(deviations) / max(len(deviations), 1)
     std = math.sqrt(variance)
+    # we define the warninng threshold as 2 standard deviations from the mean
     threshold = mean + (2 * std)
-    return threshold
+    last_value = points[-1]
+    # last_std is the distance of the last value (the one under test)
+    # from the mean, in units of standard deviations
+    last_std = (last_value - mean) / std
+    return [threshold, last_value, last_std]
 
 def generateReport(outputDirectory, csvFiles):
     metrics = ['min', 'max', 'med', 'avg']
     colors = {'min': '#1f77b4', 'max': '#aec7e8', 'med': '#ff7f0e', 'avg': '#ffbb78', 'threshold': '#ff1111'}
 
     report = reportPreStep()
+    summary = {}
 
     for index, fname in enumerate(csvFiles):
         bench_data = csv2rec(fname)
@@ -70,11 +116,10 @@ def generateReport(outputDirectory, csvFiles):
         plt.legend()
         plt.xlabel('Build')
         plt.ylabel('Seconds')
-
         # rotate x axis labels for readability
         fig.autofmt_xdate()
 
-        threshold = getThreshold(bench_data['avg'])
+        threshold, last_value, last_std = getThreshold(bench_data['avg'])
         plt.axhline(y=threshold, color=colors['threshold'])
 
         title = splitext(basename(fname))[0]
@@ -83,11 +128,9 @@ def generateReport(outputDirectory, csvFiles):
         plt.savefig(outputDirectory + imgName)
         # refresh axis and don't store these in memory
         plt.close(fig)
+        status = "fail" if last_value > threshold else "pass"
+        summary[title] = {'title': title, 'src': imgName, 'threshold': threshold,
+                          'last_value': last_value, 'last_std': last_std, 'status': status}
 
-        report += reportMidStep(imgName)
-
-    report += reportPostStep()
-
-    with open(outputDirectory + str('report.html'), 'w+') as reportFile:
-        reportFile.write(report)
+    writeReport(outputDirectory, summary)
 
