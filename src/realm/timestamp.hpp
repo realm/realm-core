@@ -104,7 +104,13 @@ public:
     // because it has usability drawbacks
     bool operator==(const Timestamp& rhs) const
     {
-        return is_null() == rhs.is_null() && m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds;
+        if (is_null() && rhs.is_null())
+            return true;
+
+        if (is_null() != rhs.is_null())
+            return false;
+
+        return m_seconds == rhs.m_seconds && m_nanoseconds == rhs.m_nanoseconds;
     }
     bool operator!=(const Timestamp& rhs) const
     {
