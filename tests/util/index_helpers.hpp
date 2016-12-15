@@ -28,6 +28,11 @@
     } \
 } while (0)
 
+#define REQUIRE_COLUMN_INDICES(columns, col, ...) do { \
+    REQUIRE((columns).size() > col); \
+    REQUIRE_INDICES((columns)[col], __VA_ARGS__); \
+} while (0)
+
 #define REQUIRE_MOVES(c, ...) do { \
     auto actual = (c); \
     std::initializer_list<CollectionChangeSet::Move> expected = {__VA_ARGS__}; \

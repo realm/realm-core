@@ -266,7 +266,7 @@ void CollectionNotifier::set_table(Table const& table)
 
 void CollectionNotifier::add_required_change_info(TransactionChangeInfo& info)
 {
-    if (!do_add_required_change_info(info)) {
+    if (!do_add_required_change_info(info) || m_related_tables.empty()) {
         return;
     }
 
@@ -466,4 +466,10 @@ void NotifierPackage::after_advance()
         return;
     for (auto& notifier : m_notifiers)
         notifier->after_advance();
+}
+
+void NotifierPackage::add_notifier(std::shared_ptr<CollectionNotifier> notifier)
+{
+    m_notifiers.push_back(notifier);
+    m_coordinator->register_notifier(notifier);
 }

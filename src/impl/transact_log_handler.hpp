@@ -50,9 +50,7 @@ void commit(SharedGroup& sg);
 void cancel(SharedGroup& sg, BindingContext* binding_context);
 
 // Advance the read transaction version, with change information gathered in info
-void advance(SharedGroup& sg,
-             TransactionChangeInfo& info,
-             VersionID version=VersionID{});
+void advance(SharedGroup& sg, TransactionChangeInfo& info, VersionID version=VersionID{});
 } // namespace transaction
 } // namespace _impl
 } // namespace realm

@@ -683,9 +683,10 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
     notifiers.package_and_wait(util::none);
 
     auto& sg = Realm::Internal::get_shared_group(realm);
-    if (!notifiers) {
-        transaction::advance(sg, realm.m_binding_context.get(), VersionID{});
-        return;
+    if (notifiers) {
+        auto version = notifiers.version();
+        if (version && *version <= sg.get_version_of_current_transaction())
+            return;
     }
 
     transaction::advance(sg, realm.m_binding_context.get(), notifiers);

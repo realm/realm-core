@@ -85,6 +85,9 @@ struct CollectionChangeSet {
     // unreported moves which show up only as a delete/insert pair.
     std::vector<Move> moves;
 
+    // Per-column version of `modifications`
+    std::vector<IndexSet> columns;
+
     bool empty() const
     {
         return deletions.empty() && insertions.empty() && modifications.empty()

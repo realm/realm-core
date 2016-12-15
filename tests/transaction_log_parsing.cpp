@@ -222,6 +222,160 @@ TEST_CASE("Transaction log parsing: schema change validation") {
     }
 }
 
+TEST_CASE("Transaction log parsing: schema change reporting") {
+    InMemoryTestFile config;
+    config.automatic_change_notifications = false;
+    config.schema_mode = SchemaMode::Additive;
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"table", {
+            {"col 1", PropertyType::Int},
+            {"col 2", PropertyType::Int},
+            {"col 3", PropertyType::Int},
+            {"col 4", PropertyType::Int},
+        }},
+        {"table 2", {
+            {"value", PropertyType::Int},
+        }},
+        {"table 3", {
+            {"value", PropertyType::Int},
+        }},
+        {"table 4", {
+            {"value", PropertyType::Int},
+        }},
+    });
+    auto& group = r->read_group();
+
+    auto history = make_in_realm_history(config.path);
+    SharedGroup sg(*history, config.options());
+
+    auto track_changes = [&](auto&& f) {
+        sg.begin_read();
+
+        r->begin_transaction();
+        f();
+        r->commit_transaction();
+
+        _impl::TransactionChangeInfo info;
+        info.table_modifications_needed.resize(10, true);
+        _impl::transaction::advance(sg, info);
+
+        sg.end_read();
+        return info;
+    };
+
+    SECTION("inserting a table") {
+        auto info = track_changes([&] {
+            group.insert_table(0, "1");
+        });
+        REQUIRE(info.table_indices.size() == 10);
+        REQUIRE(info.table_indices[0] == 1);
+
+        info = track_changes([&] {
+            group.insert_table(3, "2");
+            group.insert_table(1, "3");
+        });
+        REQUIRE(info.table_indices.size() == 10);
+        REQUIRE(info.table_indices[0] == 0);
+        REQUIRE(info.table_indices[1] == 2);
+        REQUIRE(info.table_indices[2] == 3);
+        REQUIRE(info.table_indices[3] == 5);
+        REQUIRE(info.table_indices[4] == 6);
+
+        info = track_changes([&] {
+            group.insert_table(1, "4");
+            group.insert_table(3, "5");
+        });
+        REQUIRE(info.table_indices.size() == 10);
+        REQUIRE(info.table_indices[0] == 0);
+        REQUIRE(info.table_indices[1] == 2);
+        REQUIRE(info.table_indices[2] == 4);
+        REQUIRE(info.table_indices[3] == 5);
+        REQUIRE(info.table_indices[4] == 6);
+    }
+
+    SECTION("moving tables") {
+        auto info = track_changes([&] {
+            group.move_table(1, 4);
+        });
+        REQUIRE(info.table_indices.size() == 10);
+        REQUIRE(info.table_indices[0] == 0);
+        REQUIRE(info.table_indices[1] == 4);
+        REQUIRE(info.table_indices[2] == 1);
+        REQUIRE(info.table_indices[3] == 2);
+        REQUIRE(info.table_indices[4] == 3);
+        REQUIRE(info.table_indices[5] == 5);
+
+        info = track_changes([&] {
+            group.move_table(4, 1);
+        });
+        REQUIRE(info.table_indices.size() == 10);
+        REQUIRE(info.table_indices[0] == 0);
+        REQUIRE(info.table_indices[1] == 2);
+        REQUIRE(info.table_indices[2] == 3);
+        REQUIRE(info.table_indices[3] == 4);
+        REQUIRE(info.table_indices[4] == 1);
+        REQUIRE(info.table_indices[5] == 5);
+
+        info = track_changes([&] {
+            group.move_table(0, 1);
+            group.move_table(1, 2);
+            group.move_table(2, 3);
+        });
+        REQUIRE(info.table_indices.size() == 10);
+        REQUIRE(info.table_indices[0] == 3);
+        REQUIRE(info.table_indices[1] == 0);
+        REQUIRE(info.table_indices[2] == 1);
+        REQUIRE(info.table_indices[3] == 2);
+        REQUIRE(info.table_indices[4] == 4);
+    }
+
+    SECTION("inserting columns") {
+        auto info = track_changes([&] {
+            group.get_table(2)->insert_column(1, type_Int, "1");
+        });
+        REQUIRE(info.column_indices.size() == 3);
+        REQUIRE(info.column_indices[0].empty());
+        REQUIRE(info.column_indices[1].empty());
+        REQUIRE(info.column_indices[2] == (std::vector<size_t>{0, npos, 1}));
+
+        info = track_changes([&] {
+            group.get_table(2)->insert_column(0, type_Int, "1");
+            group.get_table(2)->insert_column(2, type_Int, "1");
+        });
+        REQUIRE(info.column_indices[2] == (std::vector<size_t>{npos, 0, npos, 1, 2}));
+
+        info = track_changes([&] {
+            group.get_table(2)->insert_column(2, type_Int, "1");
+            group.get_table(2)->insert_column(0, type_Int, "1");
+        });
+        REQUIRE(info.column_indices[2] == (std::vector<size_t>{npos, 0, 1, npos, 2}));
+    }
+
+    SECTION("moving columns") {
+        auto info = track_changes([&] {
+            _impl::TableFriend::move_column(*group.get_table(2)->get_descriptor(), 1, 3);
+        });
+        REQUIRE(info.column_indices.size() == 3);
+        REQUIRE(info.column_indices[0].empty());
+        REQUIRE(info.column_indices[1].empty());
+        REQUIRE(info.column_indices[2] == (std::vector<size_t>{0, 2, 3, 1, 4}));
+
+        info = track_changes([&] {
+            _impl::TableFriend::move_column(*group.get_table(2)->get_descriptor(), 3, 1);
+        });
+        REQUIRE(info.column_indices.size() == 3);
+        REQUIRE(info.column_indices[2] == (std::vector<size_t>{0, 3, 1, 2, 4}));
+
+        info = track_changes([&] {
+            _impl::TableFriend::move_column(*group.get_table(2)->get_descriptor(), 3, 0);
+            _impl::TableFriend::move_column(*group.get_table(2)->get_descriptor(), 0, 3);
+        });
+        REQUIRE(info.column_indices.size() == 3);
+        REQUIRE(info.column_indices[2] == (std::vector<size_t>{0, 1, 2, 3, 4}));
+    }
+}
+
 TEST_CASE("Transaction log parsing: changeset calcuation") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
@@ -1175,6 +1329,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             auto& group = sg.begin_read();
 
             Context observer(rows);
+            observer.realm = realm;
 
             realm->begin_transaction();
             fn();
@@ -1567,15 +1722,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             changes = observe({r}, [&] {
                 r.set_int(0, 5);
                 realm->read_group().move_table(realm->read_group().size() - 1, 0);
-                r.set_int(1, 5);
-            });
-            REQUIRE(changes.modified(0, 0));
-            REQUIRE(changes.modified(0, 1));
-
-            // moving a table directly to the position of the observed table
-            changes = observe({r}, [&] {
-                r.set_int(0, 5);
-                realm->read_group().move_table(0, r.get_table()->get_index_in_group());
                 r.set_int(1, 5);
             });
             REQUIRE(changes.modified(0, 0));
