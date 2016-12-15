@@ -370,10 +370,10 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     add_schema_change_handler();
 
     // Cancel the write transaction if we exit this function before committing it
-    // FIXME: don't cancel if in_transaction == true
     struct WriteTransactionGuard {
         Realm& realm;
-        ~WriteTransactionGuard() { if (realm.is_in_transaction()) realm.cancel_transaction(); }
+        // When in_transaction is true, caller is responsible to cancel the transaction.
+        ~WriteTransactionGuard() { if (!in_transaction && realm.is_in_transaction()) realm.cancel_transaction(); }
     } write_transaction_guard{*this};
 
     // If beginning the write transaction advanced the version, then someone else
