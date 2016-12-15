@@ -311,14 +311,14 @@ macro(build_realm_sync)
     
     ExternalProject_Get_Property(realm-sync-lib SOURCE_DIR)
     set(sync_directory ${SOURCE_DIR})
-
     if(REALM_PLATFORM STREQUAL "Android")
-        set(sync_library_debug ${sync_directory}/android-lib/librealm-sync${platform}-dbg.a)
-        set(sync_library_release ${sync_directory}/android-lib/librealm-sync${platform}.a)
+        set(sync_library_directory ${sync_directory}/android-lib)
     else()
-        set(sync_library_debug ${sync_directory}/src/realm/librealm-sync${platform}-dbg.a)
-        set(sync_library_release ${sync_directory}/src/realm/librealm-sync${platform}.a)
+        set(sync_library_directory ${sync_directory}/src/realm)
     endif()
+    
+    set(sync_library_debug ${sync_library_directory}/librealm-sync${platform}-dbg.a)
+    set(sync_library_release ${sync_library_directory}/librealm-sync${platform}.a)
     set(sync_libraries ${sync_library_debug} ${sync_library_release})
 
     ExternalProject_Add_Step(realm-sync-lib ensure-libraries
@@ -338,13 +338,8 @@ macro(build_realm_sync)
     set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES})
 
     # Sync server library is built as part of the sync library build
-    if(REALM_PLATFORM STREQUAL "Android")
-        set(sync_server_library_debug ${sync_directory}/android-lib/librealm-server${platform}-dbg.a)
-        set(sync_server_library_release ${sync_directory}/android-lib/librealm$-server${platform}.a)
-    else()
-        set(sync_server_library_debug ${sync_directory}/src/realm/librealm-server${platform}-dbg.a)
-        set(sync_server_library_release ${sync_directory}/src/realm/librealm$-server${platform}.a)
-    endif()
+    set(sync_server_library_debug ${sync_library_directory}/librealm-server${platform}-dbg.a)
+    set(sync_server_library_release ${sync_library_directory}/librealm$-server${platform}.a)
     set(sync_server_libraries ${sync_server_library_debug} ${sync_server_library_release})
 
     ExternalProject_Add_Step(realm-sync-lib ensure-server-libraries
@@ -379,7 +374,7 @@ endfunction()
 function(clone_and_build_realm_sync branch)
     set(cmake_files ${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY})
     if(REALM_PLATFORM STREQUAL "Android")
-        set(config_cmd test -f src/config.mk || REALM_CORE_PREFIX=${cmake_files}/realm-core/src/realm-core REALM_FORCE_OPENSSL=YES REALM_ENABLE_ENCRYPTION=YES REALM_ENABLE_ASSERTIONS= sh build.sh config && echo "ENABLE_ENCRYPTION    = yes" >> src/config.mk)
+        set(config_cmd test -f src/config.mk || REALM_CORE_PREFIX=${cmake_files}/realm-core/src/realm-core REALM_FORCE_OPENSSL=YES REALM_ENABLE_ASSERTIONS= sh build.sh config && echo "ENABLE_ENCRYPTION    = yes" >> src/config.mk)
     else()
         set(config_cmd test -f src/config.mk || REALM_CORE_PREFIX=${cmake_files}/realm-core/src/realm-core sh build.sh config)
     endif()
