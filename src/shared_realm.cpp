@@ -624,7 +624,7 @@ bool Realm::can_deliver_notifications() const noexcept
     return true;
 }
 
-uint64_t Realm::get_schema_version(const realm::Realm::Config &config)
+uint64_t Realm::get_schema_version(const Realm::Config &config)
 {
     auto coordinator = RealmCoordinator::get_existing_coordinator(config.path);
     if (coordinator) {
@@ -657,7 +657,7 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
 }
 
 template <typename T>
-realm::ThreadSafeReference<T> realm::Realm::obtain_thread_safe_reference(T value)
+realm::ThreadSafeReference<T> Realm::obtain_thread_safe_reference(T value)
 {
     verify_thread();
     if (is_in_transaction()) {
@@ -666,12 +666,12 @@ realm::ThreadSafeReference<T> realm::Realm::obtain_thread_safe_reference(T value
     return ThreadSafeReference<T>(value);
 }
 
-template realm::ThreadSafeReference<Object> realm::Realm::obtain_thread_safe_reference(Object value);
-template realm::ThreadSafeReference<List> realm::Realm::obtain_thread_safe_reference(List value);
-template realm::ThreadSafeReference<Results> realm::Realm::obtain_thread_safe_reference(Results value);
+template ThreadSafeReference<Object> Realm::obtain_thread_safe_reference(Object value);
+template ThreadSafeReference<List> Realm::obtain_thread_safe_reference(List value);
+template ThreadSafeReference<Results> Realm::obtain_thread_safe_reference(Results value);
 
 template <typename T>
-T realm::Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
+T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
 {
     verify_thread();
     if (is_in_transaction()) {
@@ -731,9 +731,9 @@ T realm::Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
     return value;
 }
 
-template Object realm::Realm::resolve_thread_safe_reference(ThreadSafeReference<Object> reference);
-template List realm::Realm::resolve_thread_safe_reference(ThreadSafeReference<List> reference);
-template Results realm::Realm::resolve_thread_safe_reference(ThreadSafeReference<Results> reference);
+template Object Realm::resolve_thread_safe_reference(ThreadSafeReference<Object> reference);
+template List Realm::resolve_thread_safe_reference(ThreadSafeReference<List> reference);
+template Results Realm::resolve_thread_safe_reference(ThreadSafeReference<Results> reference);
 
 MismatchedConfigException::MismatchedConfigException(StringData message, StringData path)
 : std::logic_error(util::format(message.data(), path)) { }

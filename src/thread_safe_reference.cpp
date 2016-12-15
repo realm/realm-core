@@ -81,7 +81,7 @@ ThreadSafeReference<List>::ThreadSafeReference(List list)
 List ThreadSafeReference<List>::import_into_realm(SharedRealm realm) && {
     return invalidate_after_import<List>(*realm, [&](SharedGroup& shared_group) {
         LinkViewRef link_view = shared_group.import_linkview_from_handover(std::move(m_link_view));
-        return List(std::move(realm), link_view);
+        return List(std::move(realm), std::move(link_view));
     });
 }
 
