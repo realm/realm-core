@@ -114,7 +114,7 @@ public:
     }
     bool operator!=(const Timestamp& rhs) const
     {
-        return is_null() != rhs.is_null() || m_seconds != rhs.m_seconds || m_nanoseconds != rhs.m_nanoseconds;
+        return !(*this == rhs);
     }
     bool operator>(const Timestamp& rhs) const
     {

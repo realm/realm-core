@@ -308,6 +308,137 @@ TEST(Table_DateTimeMinMax)
     CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
 }
 
+TEST(Table_MinMaxSingleNullRow)
+{
+    // To illustrate/document behaviour
+    Group g;
+    TableRef table = g.add_table("test_table");
+
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->insert_column(1, type_Int, "int", true);
+    table->insert_column(2, type_Float, "float", true);
+    table->add_empty_row();
+
+    size_t ret;
+
+    // NOTE: Result-values of method calls are undefined; they're not necessarily a null-object. Alwats test the
+    // return_ndx argument!
+   
+    table->maximum_timestamp(0, &ret); // max on table
+    CHECK(ret == npos);
+    table.get()->where().find_all().maximum_timestamp(0, &ret); // max on tableview
+    CHECK(ret == npos);
+    table.get()->where().maximum_timestamp(0, &ret); // max on query
+    CHECK(ret == npos);
+
+    table->maximum_int(1, &ret); // max on table
+    CHECK(ret == npos);
+    table.get()->where().find_all().maximum_int(1, &ret); // max on tableview
+    CHECK(ret == npos);
+    table.get()->where().maximum_int(1, nullptr, 0, npos, npos, &ret); // max on query
+    CHECK(ret == npos);
+
+    table->maximum_float(2, &ret); // max on table
+    CHECK(ret == npos);
+    table.get()->where().find_all().maximum_float(2, &ret); // max on tableview
+    CHECK(ret == npos);
+    table.get()->where().maximum_float(2, nullptr, 0, npos, npos, &ret); // max on query
+    CHECK(ret == npos);
+
+    table->add_empty_row();
+
+    CHECK(table->maximum_timestamp(0).is_null()); // max on table
+    table.get()->where().find_all().maximum_timestamp(0, &ret); // max on tableview
+    CHECK(ret == npos);
+    table.get()->where().maximum_timestamp(0, &ret); // max on query
+    CHECK(ret == npos);
+
+}
+
+TEST(TableView_AggregateBugs)
+{
+    // Tests against various aggregate bugs on TableViews: https://github.com/realm/realm-core/pull/2360
+    {
+        Table table;
+        table.add_column(type_Int, "ints", true);
+        table.add_empty_row(4);
+
+        table.set_int(0, 0, 1);
+        table.set_int(0, 1, 2);
+        table.set_null(0, 2);
+        table.set_int(0, 3, 42);
+
+        table.add_column(type_Double, "doubles", true);
+        table.set_double(1, 0, 1.);
+        table.set_double(1, 1, 2.);
+        table.set_null(1, 2);
+        table.set_double(1, 3, 42.);
+
+        auto tv = table.where().not_equal(0, 42).find_all();
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(tv.maximum_int(0), 2);
+
+        // average == sum / rows, where rows does *not* include values with null.
+        CHECK_APPROXIMATELY_EQUAL(table.average_int(0), double(1 + 2 + 42) / 3, 0.001);
+
+        // There are currently 3 ways of doing average: on tableview, table and query:
+        CHECK_EQUAL(table.average_int(0), table.where().average_int(0));
+        CHECK_EQUAL(table.average_int(0), table.where().find_all().average_int(0));
+
+        // Core has an optimization where it executes average directly on the column if there
+        // are no query conditions. Bypass that here.
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(0, 1).find_all().average_int(0), double(2 + 42) / 2, 0.001);
+
+        // Add Double column and do same tests on that
+        table.add_column(type_Double, "doubles", true);
+        table.set_double(1, 0, 1.);
+        table.set_double(1, 1, 2.);
+        table.set_null(1, 2);
+        table.set_double(1, 3, 42.);
+
+        tv = table.where().not_equal(1, 42.).find_all();
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(tv.maximum_double(1), 2.);
+
+        // average == sum / rows, where rows does *not* include values with null.
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(1), double(1. + 2. + 42.) / 3, 0.001);
+
+        // There are currently 3 ways of doing average: on tableview, table and query:
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(1), table.where().average_double(1), 0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(1), table.where().find_all().average_double(1), 0.001);
+
+        // Core has an optimization where it executes average directly on the column if there
+        // are no query conditions. Bypass that here.
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(1, 1.).find_all().average_double(1), (2. + 42.) / 2, 0.001);
+    }
+
+    // Same as above, with null entry first
+    {
+        Table table;
+        table.add_column(type_Int, "value", true);
+        table.add_empty_row(4);
+        table.set_null(0, 0);
+        table.set_int(0, 1, 1);
+        table.set_int(0, 2, 2);
+        table.set_int(0, 3, 42);
+
+        auto tv = table.where().not_equal(0, 42).find_all();
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(tv.maximum_int(0), 2);
+
+        // average == sum / rows, where rows does *not* include values with null.
+        CHECK_APPROXIMATELY_EQUAL(table.average_int(0), double(1 + 2 + 42) / 3, 0.001);
+
+        // There are currently 3 ways of doing average: on tableview, table and query:
+        CHECK_EQUAL(table.average_int(0), table.where().average_int(0));
+        CHECK_EQUAL(table.average_int(0), table.where().find_all().average_int(0));
+
+        // Core has an optimization where it executes average directly on the column if there
+        // are no query conditions. Bypass that here.
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(0, 1).find_all().average_int(0), double(2 + 42) / 2, 0.001);
+    }
+}
+
 TEST(Table_1)
 {
     Table table;
