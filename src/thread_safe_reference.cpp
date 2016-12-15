@@ -24,8 +24,6 @@
 
 using namespace realm;
 
-ThreadSafeReferenceBase::VersionID::VersionID() : VersionID(SharedGroup::VersionID()) { }
-
 ThreadSafeReferenceBase::ThreadSafeReferenceBase(SharedRealm source_realm) : m_source_realm(source_realm)
 {
     m_source_realm->verify_thread();

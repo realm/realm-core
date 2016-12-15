@@ -44,24 +44,6 @@ public:
     bool is_invalidated() const { return m_source_realm == nullptr; };
 
 protected:
-    struct VersionID { // SharedGroup::VersionID without including header
-        uint_fast64_t version;
-        uint_fast32_t index;
-
-        VersionID();
-
-        template<typename T>
-        VersionID(T value) : version(value.version), index(value.index) { }
-
-        template<typename T>
-        operator T() const {
-            T version_id; // Don't use initializer list for better type safety
-            version_id.version = version;
-            version_id.index = index;
-            return version_id;
-        }
-    };
-
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
     ThreadSafeReferenceBase(SharedRealm source_realm);
 
