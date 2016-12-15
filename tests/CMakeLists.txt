@@ -13,6 +13,7 @@ set(SOURCES
     list.cpp
     main.cpp
     migrations.cpp
+    object.cpp
     object_store.cpp
     parser.cpp
     realm.cpp

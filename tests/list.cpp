@@ -23,6 +23,7 @@
 
 #include "binding_context.hpp"
 #include "list.hpp"
+#include "object.hpp"
 #include "object_schema.hpp"
 #include "property.hpp"
 #include "results.hpp"

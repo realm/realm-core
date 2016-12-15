@@ -23,7 +23,6 @@
 #include "schema.hpp"
 
 #include <realm/util/optional.hpp>
-#include <realm/version_id.hpp>
 #include <realm/binary_data.hpp>
 
 #if REALM_ENABLE_SYNC
@@ -33,17 +32,19 @@
 #include <memory>
 
 namespace realm {
-class BinaryData;
 class BindingContext;
 class Group;
 class Realm;
 class Replication;
 class SharedGroup;
 class StringData;
+class Table;
 struct SyncConfig;
 class ThreadSafeReferenceBase;
 template <typename T> class ThreadSafeReference;
 struct VersionID;
+template<typename Table> class BasicRow;
+typedef BasicRow<Table> Row;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 

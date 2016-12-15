@@ -21,6 +21,8 @@
 
 #include "shared_realm.hpp"
 
+#include <realm/version_id.hpp>
+
 #include <condition_variable>
 #include <mutex>
 

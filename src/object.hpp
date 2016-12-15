@@ -24,7 +24,9 @@
 #include <realm/row.hpp>
 
 namespace realm {
+class CollectionChangeCallback;
 class ObjectSchema;
+struct NotificationToken;
 
 namespace _impl {
     class ObjectNotifier;
@@ -37,6 +39,8 @@ public:
 
     Object(SharedRealm r, ObjectSchema const& s, Row const& o)
     : m_realm(std::move(r)), m_object_schema(&s), m_row(o) { }
+
+    ~Object();
 
     // property getter/setter
     template<typename ValueType, typename ContextType>
@@ -62,6 +66,8 @@ public:
     Row row() const { return m_row; }
 
     bool is_valid() const { return m_row.is_attached(); }
+
+    NotificationToken add_notification_block(CollectionChangeCallback callback);
 
 private:
     SharedRealm m_realm;
