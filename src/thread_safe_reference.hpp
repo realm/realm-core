@@ -86,9 +86,6 @@ private:
 
     // Precondition: Realm and handover are on same version.
     List import_into_realm(SharedRealm realm) &&;
-
-    template <typename F>
-    void execute_as_imported(SharedRealm intermediate_realm, F block);
 };
 
 template<>
@@ -104,9 +101,6 @@ private:
 
     // Precondition: Realm and handover are on same version.
     Object import_into_realm(SharedRealm realm) &&;
-
-    template <typename F>
-    void execute_as_imported(SharedRealm intermediate_realm, F block);
 };
 
 template<>
@@ -122,9 +116,6 @@ private:
 
     // Precondition: Realm and handover are on same version.
     Results import_into_realm(SharedRealm realm) &&;
-
-    template <typename F>
-    void execute_as_imported(Realm& intermediate_realm, F block);
 };
 }
 
