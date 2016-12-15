@@ -153,8 +153,9 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
     set_config(config);
 
     if (config.cache) {
+        AnyExecutionContextID execution_context(config.execution_context);
         for (auto& cached_realm : m_weak_realm_notifiers) {
-            if (cached_realm.is_cached_for_current_thread()) {
+            if (cached_realm.is_cached_for_execution_context(execution_context)) {
                 // can be null if we jumped in between ref count hitting zero and
                 // unregister_realm() getting the lock
                 if (auto realm = cached_realm.realm()) {

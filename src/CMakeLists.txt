@@ -22,6 +22,7 @@ set(SOURCES
 
 set(HEADERS
     collection_notifications.hpp
+    execution_context_id.hpp
     index_set.hpp
     list.hpp
     object_schema.hpp
