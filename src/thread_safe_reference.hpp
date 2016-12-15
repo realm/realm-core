@@ -82,7 +82,7 @@ private:
     std::unique_ptr<SharedGroup::Handover<LinkView>> m_link_view;
 
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
-    ThreadSafeReference(List value);
+    ThreadSafeReference(List const& value);
 
     // Precondition: Realm and handover are on same version.
     List import_into_realm(SharedRealm realm) &&;
@@ -97,7 +97,7 @@ private:
     std::string m_object_schema_name;
 
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
-    ThreadSafeReference(Object value);
+    ThreadSafeReference(Object const& value);
 
     // Precondition: Realm and handover are on same version.
     Object import_into_realm(SharedRealm realm) &&;
@@ -112,7 +112,7 @@ private:
     SortDescriptor::HandoverPatch m_sort_order;
 
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
-    ThreadSafeReference(Results value);
+    ThreadSafeReference(Results const& value);
 
     // Precondition: Realm and handover are on same version.
     Results import_into_realm(SharedRealm realm) &&;

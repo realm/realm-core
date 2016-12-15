@@ -657,7 +657,7 @@ util::Optional<int> Realm::file_format_upgraded_from_version() const
 }
 
 template <typename T>
-realm::ThreadSafeReference<T> Realm::obtain_thread_safe_reference(T value)
+realm::ThreadSafeReference<T> Realm::obtain_thread_safe_reference(T const& value)
 {
     verify_thread();
     if (is_in_transaction()) {
@@ -666,9 +666,9 @@ realm::ThreadSafeReference<T> Realm::obtain_thread_safe_reference(T value)
     return ThreadSafeReference<T>(value);
 }
 
-template ThreadSafeReference<Object> Realm::obtain_thread_safe_reference(Object value);
-template ThreadSafeReference<List> Realm::obtain_thread_safe_reference(List value);
-template ThreadSafeReference<Results> Realm::obtain_thread_safe_reference(Results value);
+template ThreadSafeReference<Object> Realm::obtain_thread_safe_reference(Object const& value);
+template ThreadSafeReference<List> Realm::obtain_thread_safe_reference(List const& value);
+template ThreadSafeReference<Results> Realm::obtain_thread_safe_reference(Results const& value);
 
 template <typename T>
 T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)

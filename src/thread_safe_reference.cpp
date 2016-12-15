@@ -24,7 +24,7 @@
 
 using namespace realm;
 
-ThreadSafeReferenceBase::ThreadSafeReferenceBase(SharedRealm source_realm) : m_source_realm(source_realm)
+ThreadSafeReferenceBase::ThreadSafeReferenceBase(SharedRealm source_realm) : m_source_realm(std::move(source_realm))
 {
     m_source_realm->verify_thread();
     if (m_source_realm->is_in_transaction()) {
@@ -72,7 +72,7 @@ void ThreadSafeReferenceBase::invalidate() {
     m_source_realm = nullptr;
 }
 
-ThreadSafeReference<List>::ThreadSafeReference(List list)
+ThreadSafeReference<List>::ThreadSafeReference(List const& list)
 : ThreadSafeReferenceBase(list.get_realm())
 , m_link_view(get_source_shared_group().export_linkview_for_handover(list.m_link_view)) { }
 
@@ -83,7 +83,7 @@ List ThreadSafeReference<List>::import_into_realm(SharedRealm realm) && {
     });
 }
 
-ThreadSafeReference<Object>::ThreadSafeReference(Object object)
+ThreadSafeReference<Object>::ThreadSafeReference(Object const& object)
 : ThreadSafeReferenceBase(object.realm())
 , m_row(get_source_shared_group().export_for_handover(object.row()))
 , m_object_schema_name(object.get_object_schema().name) { }
@@ -97,14 +97,14 @@ Object ThreadSafeReference<Object>::import_into_realm(SharedRealm realm) && {
     });
 }
 
-ThreadSafeReference<Results>::ThreadSafeReference(Results results)
+ThreadSafeReference<Results>::ThreadSafeReference(Results const& results)
 : ThreadSafeReferenceBase(results.get_realm())
 , m_query(get_source_shared_group().export_for_handover(results.get_query(), ConstSourcePayload::Copy))
 , m_sort_order([&]() {
     SortDescriptor::HandoverPatch sort_order;
     SortDescriptor::generate_patch(results.get_sort(), sort_order);
-        return sort_order;
-    }()) { }
+    return sort_order;
+}()) { }
 
 Results ThreadSafeReference<Results>::import_into_realm(SharedRealm realm) && {
     return invalidate_after_import<Results>(*realm, [&](SharedGroup& shared_group) {

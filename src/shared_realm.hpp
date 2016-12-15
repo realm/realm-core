@@ -220,10 +220,10 @@ public:
     Realm(Realm&&) = delete;
     Realm& operator=(Realm&&) = delete;
     ~Realm();
-    
+
     // Construct a thread safe reference, pinning the version in the process.
     template <typename T>
-    ThreadSafeReference<T> obtain_thread_safe_reference(T value);
+    ThreadSafeReference<T> obtain_thread_safe_reference(T const& value);
 
     // Advances the read transaction to the latest version, resolving the thread safe reference and unpinning the
     // version in the process.
