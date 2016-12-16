@@ -83,8 +83,6 @@ def makeSummaryGraph(outputDirectory, summary):
 
     # the y locations for the groups
     indices = range(len(ratios))
-    #reversed to follow order of summary links
-    indices.reverse()
     width = 1
     widths = [width/2.0] * len(ratios)
 
@@ -130,7 +128,7 @@ def generateReport(outputDirectory, csvFiles):
             line, = plt.plot(bench_data[column], lw=2.5, color=colors[column])
             line.set_label(column)
 
-        plt.legend()
+        plt.legend(loc='upper left', fancybox=True, framealpha=0.7)
         plt.xlabel('Build')
         plt.ylabel('Seconds')
         # rotate x axis labels for readability
@@ -142,6 +140,7 @@ def generateReport(outputDirectory, csvFiles):
         title = splitext(basename(fname))[0]
         plt.title(title, fontsize=18, ha='center')
         imgName = str(title) + '.png'
+        fig.set_size_inches(12, 6)
         plt.tight_layout()
         plt.savefig(outputDirectory + imgName)
         # refresh axis and don't store these in memory
