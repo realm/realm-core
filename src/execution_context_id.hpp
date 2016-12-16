@@ -19,6 +19,8 @@
 #ifndef REALM_OS_EXECUTION_CONTEXT_ID_HPP
 #define REALM_OS_EXECUTION_CONTEXT_ID_HPP
 
+#include "util/aligned_union.hpp"
+
 #include <cstring>
 #include <thread>
 
@@ -93,7 +95,7 @@ private:
 
     template <typename> struct TypeForStorageType;
 
-    std::aligned_union_t<2, std::thread::id, AbstractExecutionContextID> m_storage;
+    util::AlignedUnion<1, std::thread::id, AbstractExecutionContextID>::type m_storage;
     Type m_type;
 };
 

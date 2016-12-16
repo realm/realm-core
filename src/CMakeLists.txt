@@ -56,6 +56,7 @@ set(HEADERS
     util/generic/event_loop_signal.hpp
     util/uv/event_loop_signal.hpp
 
+    util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
     util/compiler.hpp
     util/event_loop_signal.hpp
