@@ -16,26 +16,6 @@ class TagFormatter(Formatter):
             return ''
         return str(self.tags[ind])
 
-def reportPreStep():
-    return """
-    <html>
-    <body>
-        <title>Realm Core Performance</title>
-        <div style="width:100%; text-align:center">
-        <h1>Realm Core Performance</h1>
-        <p>These graphs show the relative performance of certain operations between versions. The purpose of this report is to allow reviewers to see if there have been any unintentional performace regressions in the code being reviewed. It would be meaningless and misleading to use the numbers shown here to compare to other databases.</p>
-        <br>
-        """
-
-def reportPostStep():
-    return """
-        </div>
-    </body>
-</html>"""
-
-def reportMidStep(imgSrc, title):
-    return "<h1>" + title + "</h1>" + "<p>Details generated</p><img align=\"middle\" src=\"" + imgSrc + "\"/>"
-
 def writeReport(outputDirectory, summary):
     html = """
         <html>
@@ -48,17 +28,23 @@ def writeReport(outputDirectory, summary):
             </style>
         </head>
         <body>
-            <title>Realm Core Performance Metrics</title>
+            <title>Realm Core Performance</title>
             <div style="width:100%; text-align:center">
-            <h1>Realm Core Performance Metrics</h1>
+            <h1>Realm Core Performance</h1>
             <p>These graphs show the relative performance of certain operations between versions. The purpose of this report is to allow reviewers to see if there have been any unintentional performace regressions in the code being reviewed. It would be meaningless and misleading to use the numbers shown here to compare to other databases.</p>
             <br> """
 
+    # standard deviation summary graph
+    summaryGraphName = makeSummaryGraph(outputDirectory, summary)
+    html += "<img align=\"middle\" id=\"summary\" src=\"" + summaryGraphName + "\"/>"
+
+    # generate color coded link summary
     html += "<ol>"
     for title, values in summary.iteritems():
         html += "<li><a class=\"" + values['status'] + "\" href=#" + title + ">" + title + "</a></li>"
     html += "</ol><br>"
 
+    # generate each graph section
     for title, values in summary.iteritems():
         html += "<h1 class=\"" + values['status'] + "\" id=\"" + title +"\">" + title + "</h1>"
         html += "<p>Threshold:  " + str(values['threshold']) + "</p>"
@@ -90,11 +76,42 @@ def getThreshold(points):
     last_std = (last_value - mean) / std
     return [threshold, last_value, last_std]
 
+def makeSummaryGraph(outputDirectory, summary):
+    summaryGraphName = "summary.png"
+
+    ratios = {title:summary[title]['last_std'] for title in summary}
+
+    # the y locations for the groups
+    indices = range(len(ratios))
+    #reversed to follow order of summary links
+    indices.reverse()
+    width = 1
+    widths = [width/2.0] * len(ratios)
+
+    fig, ax = plt.subplots()
+    rects1 = ax.barh(indices, ratios.values(), width, color='b')
+
+    # add some text for labels, title and axes ticks
+    ax.set_xlabel('Standard Deviation')
+    ax.set_title('Standard Deviations')
+    ax.set_yticks(indices + widths)
+    ax.set_yticklabels(ratios.keys())
+    ax.set_ylim([0, len(ratios)])
+    ax.set_xlim([-4, 4])
+    # 2 std threshold line
+    plt.axvline(x=2, color='r')
+
+    fig.set_size_inches(10, 16)
+    plt.tight_layout()
+    plt.savefig(outputDirectory + summaryGraphName)
+    plt.close(fig)
+
+    return summaryGraphName
+
 def generateReport(outputDirectory, csvFiles):
     metrics = ['min', 'max', 'med', 'avg']
     colors = {'min': '#1f77b4', 'max': '#aec7e8', 'med': '#ff7f0e', 'avg': '#ffbb78', 'threshold': '#ff1111'}
 
-    report = reportPreStep()
     summary = {}
 
     for index, fname in enumerate(csvFiles):
@@ -125,6 +142,7 @@ def generateReport(outputDirectory, csvFiles):
         title = splitext(basename(fname))[0]
         plt.title(title, fontsize=18, ha='center')
         imgName = str(title) + '.png'
+        plt.tight_layout()
         plt.savefig(outputDirectory + imgName)
         # refresh axis and don't store these in memory
         plt.close(fig)
