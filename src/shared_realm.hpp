@@ -19,6 +19,7 @@
 #ifndef REALM_REALM_HPP
 #define REALM_REALM_HPP
 
+#include "execution_context_id.hpp"
 #include "schema.hpp"
 
 #include <realm/util/optional.hpp>
@@ -29,7 +30,6 @@
 #endif
 
 #include <memory>
-#include <thread>
 
 namespace realm {
 class AnyThreadConfined;
@@ -166,6 +166,10 @@ public:
         // speeds up tests that don't need notifications.
         bool automatic_change_notifications = true;
 
+        // The identifier of the abstract execution context in which this Realm will be used.
+        // If unset, the current thread's identifier will be used to identify the execution context.
+        util::Optional<AbstractExecutionContextID> execution_context;
+
         /// A data structure storing data used to configure the Realm for sync support.
         std::shared_ptr<SyncConfig> sync_config;
     };
@@ -202,7 +206,6 @@ public:
     bool compact();
     void write_copy(StringData path, BinaryData encryption_key);
 
-    std::thread::id thread_id() const { return m_thread_id; }
     void verify_thread() const;
     void verify_in_write() const;
 
@@ -296,7 +299,7 @@ private:
     Realm(Config config);
 
     Config m_config;
-    std::thread::id m_thread_id = std::this_thread::get_id();
+    AnyExecutionContextID m_execution_context;
     bool m_auto_refresh = true;
 
     std::unique_ptr<Replication> m_history;
