@@ -2,8 +2,9 @@
 
 ### Bugfixes
 
-* Fixed bug where Table::maximum_timestamp() could return a wrong result if the
-  column was nullable. https://github.com/realm/realm-core/issues/2357
+* Fixed various bugs in aggregate methods of Table, TableView and Query for nullable columns.
+  Non-nullable columns might not have been affected. One of the bugs are described here
+  https://github.com/realm/realm-core/issues/2357
 
 ### Breaking changes
 
