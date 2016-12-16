@@ -266,7 +266,6 @@ def doBuildWindows(String version, boolean isPublishingRun) {
               bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, debug\" /p:Platform=\"Win32\""
               dir('Visual Studio') {
                 stash includes: 'lib/*.lib', name: 'windows-libs'
-                stash included: 'lib/*.pdb', name: 'windows-pdbs'
               }
               dir('src') {
                 stash includes: '**/*.h', name: 'windows-c-includes'
@@ -274,7 +273,6 @@ def doBuildWindows(String version, boolean isPublishingRun) {
               }
               dir('packaging-tmp') {
                 unstash 'windows-libs'
-                unstash 'windows-pdbs'
                 dir('include') {
                   unstash 'windows-c-includes'
                   unstash 'windows-cxx-includes'
