@@ -19,8 +19,8 @@
 #ifndef REALM_REALM_HPP
 #define REALM_REALM_HPP
 
-#include "schema.hpp"
 #include "execution_context_id.hpp"
+#include "schema.hpp"
 
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>

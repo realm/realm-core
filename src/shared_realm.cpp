@@ -22,8 +22,6 @@
 #include "impl/realm_coordinator.hpp"
 #include "impl/transact_log_handler.hpp"
 
-#include "execution_context_id.hpp"
-
 #include "binding_context.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
@@ -432,10 +430,10 @@ static void check_read_write(Realm *realm)
 
 void Realm::verify_thread() const
 {
-    if (!m_execution_context.template contains<std::thread::id>())
+    if (!m_execution_context.contains<std::thread::id>())
         return;
 
-    auto thread_id = m_execution_context.template get<std::thread::id>();
+    auto thread_id = m_execution_context.get<std::thread::id>();
     if (thread_id != std::this_thread::get_id())
         throw IncorrectThreadException();
 }

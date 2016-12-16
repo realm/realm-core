@@ -19,10 +19,10 @@
 #ifndef REALM_WEAK_REALM_NOTIFIER_HPP
 #define REALM_WEAK_REALM_NOTIFIER_HPP
 
+#include "execution_context_id.hpp"
+
 #include <memory>
 #include <thread>
-
-#include "execution_context_id.hpp"
 
 namespace realm {
 class Realm;
