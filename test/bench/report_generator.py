@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.mlab import csv2rec
 from matplotlib.cbook import get_sample_data
 from matplotlib.ticker import Formatter, MultipleLocator
+import numpy as np
 from os.path import basename, splitext
 
 class TagFormatter(Formatter):
@@ -47,7 +48,7 @@ def writeReport(outputDirectory, summary):
     # generate each graph section
     for title, values in summary.iteritems():
         html += "<h1 class=\"" + values['status'] + "\" id=\"" + title +"\">" + title + "</h1>"
-        html += "<p>Threshold:  " + str(values['threshold']) + "</p>"
+        html += "<p>Threshold:  " + str(values['threshold']) + " (2 standard deviations)</p>"
         html += "<p>Last Value: " + str(values['last_value']) + " (" + str(values['last_std']) + " standard deviations)</p>"
         html += "<img align=\"middle\" src=\"" + values['src'] + "\"/>"
 
@@ -114,6 +115,8 @@ def generateReport(outputDirectory, csvFiles):
 
     for index, fname in enumerate(csvFiles):
         bench_data = csv2rec(fname)
+        # do not assume that the csv files are ordered correctly (they are not)
+        bench_data = np.sort(bench_data, order='tag')
 
         print "generating graph: " + str(index) + "/" + str(len(csvFiles)) + " (" + fname + ")"
         formatter = TagFormatter(bench_data['tag'])
