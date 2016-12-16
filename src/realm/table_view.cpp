@@ -164,6 +164,7 @@ template <int function, typename T, typename R, class ColType>
 R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx,
                            T count_target, size_t* return_ndx) const
 {
+    static_cast<void>(aggregateMethod);
     check_cookie();
     size_t non_nulls = 0;
             
@@ -205,11 +206,15 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
     // with 'new' because it will lead to mem leak. The column keeps ownership
     // of the payload in array and will free it itself later, so we must not call destroy() on array.
     ArrType arr(column->get_alloc());
+    
+    // FIXME: Speed optimization disabled because we need is_null() which is not available on all leaf types.
+
+/*
     const ArrType* arrp = nullptr;
     size_t leaf_start = 0;
     size_t leaf_end = 0;
     size_t row_ndx;
-
+*/
     R res = R{};
     size_t row = to_size_t(m_row_indexes.get(0));
     auto first = column->get(row);
@@ -255,12 +260,12 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
             if (function == act_Sum || function == act_Average) {
                 res += unpacked;
             }
-            else if (function == act_Max && unpacked > res || non_nulls == 1) {
+            else if ((function == act_Max && unpacked > res) || non_nulls == 1) {
                 res = unpacked;
                 if (return_ndx)
                     *return_ndx = tv_index;
             }
-            else if (function == act_Min && unpacked < res || non_nulls == 1) {
+            else if ((function == act_Min && unpacked < res) || non_nulls == 1) {
                 res = unpacked;
                 if (return_ndx)
                     *return_ndx = tv_index;
