@@ -133,11 +133,22 @@ def transform(inputdir, destination, filelist, handler):
                          'tag': tag}
                 handler(info)
 
+# remove existing files (old results) but only the
+# first time since we need to open and append to files
+# this allows us to run the script multiple times in the
+# same output directory
+existing = []
+def refresh_file_once(filename):
+    if filename not in existing:
+        os.remove(filename)
+    existing.append(filename)
+
 # format is: sha, tag, min, max, med, avg,
 #            sha1, ...
 #            ..., ...
 def handle_local_vertical(info):
     outfilename = info['dest'] + info['function'] + ".csv"
+    refresh_file_once(outfilename)
     endline = ',\n'
     header = ''
     keys = ['sha', 'tag', 'min', 'max', 'med', 'avg']
@@ -155,6 +166,7 @@ def handle_local_vertical(info):
 #           avg, ...
 def handle_local_horizontal(info):
     outfilename = info['dest'] + info['function'] + ".csv"
+    refresh_file_once(outfilename)
     # make the file if not exist and read contents
     lines = ['','','','','']
     if not os.path.exists(outfilename):
