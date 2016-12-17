@@ -82,6 +82,14 @@ def getMachId():
         machid = os.popen('ifconfig en0 | awk \'/ether/{print $2}\'').read().strip()
     return machid
 
+# The version of these benchmark scripts is set in the file
+# "benchmark_version" see that file for more details.
+def getBenchmarkVersion():
+    benchmark_version = "unknown"
+    with open('benchmark_version', 'r') as f:
+        benchmark_version = f.readline().strip()
+    return benchmark_version
+
 def find_ndx(inlist, item):
     ndx = 0
     try:
@@ -197,6 +205,7 @@ def handle_remote(info):
 
 def transform_local(html=False):
     machid = getMachId()
+    version = getBenchmarkVersion()
     outputdir = "./bench-hist-results/"
     if len(sys.argv) >= 3:
         outputdir = sys.argv[2]
@@ -204,7 +213,7 @@ def transform_local(html=False):
     mkdirs(outputdir)
     print "results will be written to " + outputdir
 
-    inputdir = "~/.realm/core/benchmarks/" + str(machid)
+    inputdir = "~/.realm/core/benchmarks/" + str(version) + "/" + str(machid)
     if len(sys.argv) >= 4:
         inputdir = sys.argv[3]
     if len(sys.argv) > 4:
@@ -221,11 +230,12 @@ def transform_local(html=False):
 
 def transform_remote():
     machid = getMachId()
+    version = getBenchmarkVersion()
     if len(sys.argv) <= 2:
         print "Must specify the remote ip address of the influx database."
         printUseageAndQuit()
     remoteip = sys.argv[2]
-    inputdir = "~/.realm/core/benchmarks/" + str(machid)
+    inputdir = "~/.realm/core/benchmarks/" + str(version) + "/" + str(machid)
     if len(sys.argv) > 3:
         inputdir = sys.argv[3]
     inputdir = os.path.expanduser(inputdir)

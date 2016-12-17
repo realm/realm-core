@@ -2,6 +2,11 @@
 #
 # See ./util/gen_bench.sh --help for documentation.
 
+
+#The first line of the file "benchmark_version" holds the
+#version number, see docs in that file.
+BENCH_VERSION=$(head -n 1 benchmark_version)
+
 show_usage () {
   cat <<EOF
 Usage: $0 [-h|--help] [<branch>|<commit>|<tag>]
@@ -13,7 +18,7 @@ show_help () {
   show_usage
   echo ""
   cat <<EOF
-./util/build-core.sh
+./util/build_core.sh
 
 This script generates the benchmark results for the given version of core
 (branch, commit, or tag) and places the results in the directory specified
@@ -23,10 +28,10 @@ run. If no version of core is specified, HEAD is assumed.
 
 Examples:
 
-$ ./util/build-core.sh # HEAD is assumed by default.
-$ ./util/build-core.sh tags/v0.97.3 # Tags must be prefixed with "tags/".
-$ ./util/build-core.sh ea310804 # Can be a short commit ID.
-$ ./util/build-core.sh 32b3b79d2ab90e784ad5f14f201d682be9746781
+$ ./util/build_core.sh # HEAD is assumed by default.
+$ ./util/build_core.sh tags/v0.97.3 # Tags must be prefixed with "tags/".
+$ ./util/build_core.sh ea310804 # Can be a short commit ID.
+$ ./util/build_core.sh 32b3b79d2ab90e784ad5f14f201d682be9746781
 
 EOF
 }
@@ -73,7 +78,7 @@ if [ -z "$REALM_BENCH_DIR" ]; then
 fi
 
 get_machid
-basedir="${REALM_BENCH_DIR}/${machid}"
+basedir="${REALM_BENCH_DIR}/${BENCH_VERSION}/${machid}"
 mkdir -p "${basedir}"
 outputfile="${basedir}/${unixtime}_${remoteref}.csv"
 
@@ -85,7 +90,7 @@ else
         echo "building HEAD"
         cd ../..
     else
-        sh ./util/build-core.sh "${remoteref}"
+        sh ./util/build_core.sh "${remoteref}"
         cd ../benchmark-common-tasks
         cp main.cpp compatibility.hpp Makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
         echo "unix timestamp of build is ${unixtime}"
