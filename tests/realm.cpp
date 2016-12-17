@@ -288,3 +288,28 @@ TEST_CASE("SharedRealm: notifications") {
         REQUIRE(change_count == 1);
     }
 }
+
+TEST_CASE("SharedRealm: closed realm") {
+    TestFile config;
+    config.schema_version = 1;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int, "", "", false, false, false}
+        }},
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    realm->close();
+
+    REQUIRE(realm->is_closed());
+
+    REQUIRE_THROWS_AS(realm->read_group(), ClosedRealmException);
+    REQUIRE_THROWS_AS(realm->begin_transaction(), ClosedRealmException);
+    REQUIRE(!realm->is_in_transaction());
+    REQUIRE_THROWS_AS(realm->commit_transaction(), InvalidTransactionException);
+    REQUIRE_THROWS_AS(realm->cancel_transaction(), InvalidTransactionException);
+
+    REQUIRE_THROWS_AS(realm->refresh(), ClosedRealmException);
+    REQUIRE_THROWS_AS(realm->invalidate(), ClosedRealmException);
+    REQUIRE_THROWS_AS(realm->compact(), ClosedRealmException);
+}
