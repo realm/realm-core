@@ -329,35 +329,71 @@ TEST(Table_MinMaxSingleNullRow)
 
     // NOTE: Return-values of method calls are undefined if you have only null-entries in the table.
     // The return-value is not necessarily a null-object. Always test the return_ndx argument!
-   
-    table->maximum_timestamp(0, &ret); // max on table
-    CHECK(ret == npos);
-    table.get()->where().find_all().maximum_timestamp(0, &ret); // max on tableview
-    CHECK(ret == npos);
-    table.get()->where().maximum_timestamp(0, &ret); // max on query
-    CHECK(ret == npos);
 
-    table->maximum_int(1, &ret); // max on table
-    CHECK(ret == npos);
-    table.get()->where().find_all().maximum_int(1, &ret); // max on tableview
-    CHECK(ret == npos);
-    table.get()->where().maximum_int(1, nullptr, 0, npos, npos, &ret); // max on query
-    CHECK(ret == npos);
+    // Maximum
+    {
+        table->maximum_timestamp(0, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().maximum_timestamp(0, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().maximum_timestamp(0, &ret); // max on query
+        CHECK(ret == npos);
 
-    table->maximum_float(2, &ret); // max on table
-    CHECK(ret == npos);
-    table.get()->where().find_all().maximum_float(2, &ret); // max on tableview
-    CHECK(ret == npos);
-    table.get()->where().maximum_float(2, nullptr, 0, npos, npos, &ret); // max on query
-    CHECK(ret == npos);
+        table->maximum_int(1, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().maximum_int(1, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().maximum_int(1, nullptr, 0, npos, npos, &ret); // max on query
+        CHECK(ret == npos);
 
-    table->add_empty_row();
+        table->maximum_float(2, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().maximum_float(2, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().maximum_float(2, nullptr, 0, npos, npos, &ret); // max on query
+        CHECK(ret == npos);
 
-    CHECK(table->maximum_timestamp(0).is_null()); // max on table
-    table.get()->where().find_all().maximum_timestamp(0, &ret); // max on tableview
-    CHECK(ret == npos);
-    table.get()->where().maximum_timestamp(0, &ret); // max on query
-    CHECK(ret == npos);
+        table->add_empty_row();
+
+        CHECK(table->maximum_timestamp(0).is_null()); // max on table
+        table.get()->where().find_all().maximum_timestamp(0, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().maximum_timestamp(0, &ret); // max on query
+        CHECK(ret == npos);
+    }
+
+    // Minimum
+    {
+        table->minimum_timestamp(0, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().minimum_timestamp(0, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().minimum_timestamp(0, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->minimum_int(1, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().minimum_int(1, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().minimum_int(1, nullptr, 0, npos, npos, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->minimum_float(2, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().minimum_float(2, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().minimum_float(2, nullptr, 0, npos, npos, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->add_empty_row();
+
+        CHECK(table->minimum_timestamp(0).is_null()); // max on table
+        table.get()->where().find_all().minimum_timestamp(0, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().minimum_timestamp(0, &ret); // max on query
+        CHECK(ret == npos);
+    }
+
 
 }
 
