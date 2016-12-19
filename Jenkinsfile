@@ -268,12 +268,14 @@ def doBuildWindows(String version, boolean isPublishingRun) {
                 stash includes: 'lib/*.lib', name: 'windows-libs'
               }
               dir('src') {
-                stash includes: '**/*.hpp', name: 'windows-includes'
+                stash includes: '**/*.h', name: 'windows-c-includes'
+                stash includes: '**/*.hpp', name: 'windows-cxx-includes'
               }
               dir('packaging-tmp') {
                 unstash 'windows-libs'
                 dir('include') {
-                  unstash 'windows-includes'
+                  unstash 'windows-c-includes'
+                  unstash 'windows-cxx-includes'
                 }
               }
               zip dir:'packaging-tmp', zipFile:"realm-core-windows-${version}.zip", archive:true
