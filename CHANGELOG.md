@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.2.1 Release notes
 
 ### Bugfixes
 
@@ -24,6 +24,8 @@
   participate in overload resolution in unqualified ADL contexts like
   `make_error_code(_impl::SimulatedFailure::sync_client__read_head)` and `ec ==
   _impl::SimulatedFailure::sync_client__read_head`.
+* `P_tmpdir` should not be used on Android. A better default name for temporary
+  folders has been introduced.
 
 ----------------------------------------------
 
