@@ -60,7 +60,6 @@ try {
         buildCocoa: doBuildCocoa(isPublishingRun),
         buildNodeLinux: doBuildNodeInDocker(isPublishingRun),
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun),
-        buildDotnetOsx: doBuildDotNetOsx(isPublishingRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
         buildOsxDylibs: doBuildOsxDylibs(isPublishingRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
@@ -167,63 +166,6 @@ def doBuildCocoa(def isPublishingRun) {
     }
   }
 }
-
-def doBuildDotNetOsx(def isPublishingRun) {
-  return {
-    node('osx_vegas') {
-      getArchive()
-
-      try {
-        withEnv([
-          'PATH=$PATH:/usr/local/bin',
-          'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer',
-          'REALM_ENABLE_ENCRYPTION=yes',
-          'REALM_ENABLE_ASSERTIONS=yes',
-          'MAKEFLAGS=CFLAGS_DEBUG\\=-Oz',
-          'UNITTEST_SHUFFLE=1',
-          'UNITTEST_REANDOM_SEED=random',
-          'UNITTEST_XML=1',
-          'UNITTEST_THREADS=1'
-        ]) {
-            sh '''
-              dir=$(pwd)
-              sh build.sh config $dir/install
-              sh build.sh build-dotnet-cocoa
-
-              # Repack the release with just what we need so that it is not a 1 GB download
-              version=$(sh build.sh get-version)
-              tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
-              (
-                  cd $tmpdir || exit 1
-                  unzip -qq "$dir/realm-core-dotnet-cocoa-$version.zip" || exit 1
-
-                  # We only need an armv7s slice for CocoaPods, and the podspec never uses
-                  # the debug build of core, so remove that slice
-                  lipo -remove armv7s core/librealm-ios-no-bitcode-dbg.a -o core/librealm-ios-no-bitcode-dbg.a
-
-                  tar cjf "$dir/realm-core-dotnet-cocoa-$version.tar.bz2" core || exit 1
-              )
-              rm -rf "$tmpdir" || exit 1
-
-              cp realm-core-dotnet-cocoa-*.tar.bz2 realm-core-dotnet-cocoa-latest.tar.bz2
-            '''
-            if (isPublishingRun) {
-              stash includes: '*core-*.*.*.tar.bz2', name: 'dotnet-package'
-            }
-            archiveArtifacts artifacts: '*core-*.*.*.tar.bz2'
-
-            sh 'sh build.sh clean'
-        }
-      } finally {
-        collectCompilerWarnings('clang')
-        withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          sh 's3cmd -c $s3cfg_config_file put --multipart-chunk-size-mb 5 realm-core-dotnet-cocoa-latest.tar.bz2 s3://static.realm.io/downloads/core/'
-        }
-      }
-    }
-  }
-}
-
 
 def doBuildInDocker(String command) {
   return {
@@ -661,7 +603,6 @@ def doPublishLocalArtifacts() {
   return {
     node('aws') {
       unstash 'cocoa-package'
-      unstash 'dotnet-package'
       unstash 'node-linux-package'
       unstash 'node-cocoa-package'
       unstash 'android-package'
