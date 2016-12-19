@@ -321,8 +321,8 @@ TEST(Table_MinMaxSingleNullRow)
 
     size_t ret;
 
-    // NOTE: Result-values of method calls are undefined; they're not necessarily a null-object. Alwats test the
-    // return_ndx argument!
+    // NOTE: Return-values of method calls are undefined if you have only null-entries in the table.
+    // The return-value is not necessarily a null-object. Always test the return_ndx argument!
    
     table->maximum_timestamp(0, &ret); // max on table
     CHECK(ret == npos);
