@@ -235,6 +235,8 @@ Realm::~Realm()
 
 Group& Realm::read_group()
 {
+    verify_open();
+
     if (!m_group) {
         m_group = &const_cast<Group&>(m_shared_group->begin_read());
         add_schema_change_handler();
@@ -445,6 +447,13 @@ void Realm::verify_in_write() const
     }
 }
 
+void Realm::verify_open() const
+{
+    if (is_closed()) {
+        throw ClosedRealmException();
+    }
+}
+
 bool Realm::is_in_transaction() const noexcept
 {
     if (!m_shared_group) {
@@ -507,6 +516,7 @@ void Realm::cancel_transaction()
 
 void Realm::invalidate()
 {
+    verify_open();
     verify_thread();
     check_read_write(this);
 
