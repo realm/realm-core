@@ -9685,24 +9685,28 @@ TEST(Query_TableInitialization)
     helper([&](Query& q, auto&& test) { test(q.begins_with(col_string, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.ends_with(col_string, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.contains(col_string, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.like(col_string, StringData{})); });
 
     helper([&](Query& q, auto&& test) { test(q.equal(col_string, StringData{}, false)); });
     helper([&](Query& q, auto&& test) { test(q.not_equal(col_string, StringData{}, false)); });
     helper([&](Query& q, auto&& test) { test(q.begins_with(col_string, StringData{}, false)); });
     helper([&](Query& q, auto&& test) { test(q.ends_with(col_string, StringData{}, false)); });
     helper([&](Query& q, auto&& test) { test(q.contains(col_string, StringData{}, false)); });
+    helper([&](Query& q, auto&& test) { test(q.like(col_string, StringData{}, false)); });
 
     helper([&](Query& q, auto&& test) { test(q.equal(col_string_enum, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.not_equal(col_string_enum, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.begins_with(col_string_enum, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.ends_with(col_string_enum, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.contains(col_string_enum, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.like(col_string_enum, StringData{})); });
 
     helper([&](Query& q, auto&& test) { test(q.equal(col_string_indexed, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.not_equal(col_string_indexed, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.begins_with(col_string_indexed, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.ends_with(col_string_indexed, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.contains(col_string_indexed, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.like(col_string_indexed, StringData{})); });
 
     // Conditions: binary data
     helper([&](Query& q, auto&& test) { test(q.equal(col_binary, BinaryData{})); });
@@ -9747,12 +9751,14 @@ TEST(Query_TableInitialization)
         test_operator([](auto&& a, auto&& b) { return a.begins_with(b); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.ends_with(b); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.contains(b); }, string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.like(b); }, string_col, StringData());
 
         test_operator([](auto&& a, auto&& b) { return a.equal(b, false); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.not_equal(b, false); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.begins_with(b, false); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.ends_with(b, false); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.contains(b, false); }, string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.like(b, false); }, string_col, StringData());
 
         auto null_string_col = [&] { return get_table().template column<String>(col_string_null); };
         test_operator(std::equal_to<>(), null_string_col, null());
