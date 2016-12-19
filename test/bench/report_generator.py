@@ -37,6 +37,7 @@ def writeReport(outputDirectory, summary):
 
     # standard deviation summary graph
     summaryGraphName = makeSummaryGraph(outputDirectory, summary)
+    html += "<h1>Summary</h1><p>This summary graph shows the performance of each benchmark as compared to the mean of all other runs on previous versions. The red line indicates the threshold of 2 standard deviations from the mean. A benchmark is marked for further inspection if the PR under test takes longer than this threshold. The same line is shown on each of the individual graphs in the rest of this report.</p>"
     html += "<img align=\"middle\" id=\"summary\" src=\"" + summaryGraphName + "\"/>"
 
     # generate color coded link summary
@@ -92,7 +93,7 @@ def makeSummaryGraph(outputDirectory, summary):
 
     # add some text for labels, title and axes ticks
     ax.set_xlabel('Standard Deviation')
-    ax.set_title('Standard Deviations')
+    ax.set_title('Standard Deviations From Mean')
     ax.set_yticks(indices + widths)
     ax.set_yticklabels(ratios.keys())
     ax.set_ylim([0, len(ratios)])
