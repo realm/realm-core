@@ -261,10 +261,10 @@ def doBuildWindows(String version, boolean isPublishingRun) {
         node('windows') {
             getArchive()
             try {
-              ['Win32', 'x64'].each { platform ->
-                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=Debug /p:Platform=\"${platform}\""
-                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, release\" /p:Platform=\"${platform}\""
-                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, debug\" /p:Platform=\"${platform}\""
+	      for (platform in ['Win32', 'x64']) {
+                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=Debug /p:Platform=${platform}"
+                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, release\" /p:Platform=${platform}"
+                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, debug\" /p:Platform=${platform}"
               }
               dir('Visual Studio') {
                 stash includes: 'lib/*.lib', name: 'windows-libs'
