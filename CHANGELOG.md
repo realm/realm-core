@@ -1,12 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
+# 2.2.1 Release notes
 
 ### Enhancements
 
