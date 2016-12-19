@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Prevent `stdin` from being accidentally closed during `~InterProcessCondVar()`.
 
 ### Breaking changes
 
