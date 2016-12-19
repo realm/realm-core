@@ -18,4 +18,5 @@ tags/v2.0.0-rc7
 tags/v2.0.0
 tags/v2.0.1
 tags/v2.1.0
-tags/v2.1.1
+tags/v2.2.0
+HEAD

@@ -82,6 +82,12 @@ basedir="${REALM_BENCH_DIR}/${BENCH_VERSION}/${machid}"
 mkdir -p "${basedir}"
 outputfile="${basedir}/${unixtime}_${remoteref}.csv"
 
+# if the file doesn't exist, create it and write the output dir as the first line
+if [ ! -e "recent_results.txt" ] ; then
+    echo "${basedir}" > recent_results.txt
+fi
+echo "${outputfile}" >> recent_results.txt
+
 if [ -f "${outputfile}" ]; then
     echo "found results, skipping ${outputfile}"
 else
