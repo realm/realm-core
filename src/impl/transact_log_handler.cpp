@@ -147,7 +147,7 @@ void rotate(Container& container, size_t from, size_t to)
     if (from >= container.size() || to >= container.size())
         container.resize(std::max(from, to) + 1);
     if (from < to)
-        std::rotate(begin(container) + from, begin(container) + to, begin(container) + to + 1);
+        std::rotate(begin(container) + from, begin(container) + from + 1, begin(container) + to + 1);
     else
         std::rotate(begin(container) + to, begin(container) + from, begin(container) + from + 1);
 }
@@ -165,7 +165,7 @@ void adjust_for_move(size_t& value, size_t from, size_t to)
 {
     if (value == from)
         value = to;
-    else if (value > from && value < to)
+    else if (value > from && value <= to)
         --value;
     else if (value < from && value >= to)
         ++value;
