@@ -187,7 +187,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
         }
         return 0;
     }
- 
+
     typedef typename ColTypeTraits::leaf_type ArrType;
     const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
 
