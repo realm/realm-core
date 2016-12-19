@@ -271,6 +271,7 @@ public:
     // without making it public to everyone
     class Internal {
         friend class AnyThreadConfined;
+        friend class GlobalNotifier;
         friend class _impl::CollectionNotifier;
         friend class _impl::ListNotifier;
         friend class _impl::RealmCoordinator;
