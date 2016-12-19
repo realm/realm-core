@@ -47,14 +47,11 @@ stage('Test Performance') {
 
     def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
     buildEnv.inside {
-      sh 'cd test/bench && mkdir -p results && REALM_BENCH_DIR="$(pwd)/results" ./gen_bench.sh'
-      withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: 'influxdb-core-benchmarks', passwordVariable: 'INFLUXDB_PASSWORD', usernameVariable: 'INFLUXDB_USER']]) {
-        sh '''
-          cd test/bench && ./parse_bench_hist.py \
-            --remote "http://$INFLUXDB_USER:$INFLUXDB_PASSWORD@influxdb.hub.realm:8086/write?db=core_benchmarks" \
-            "$(pwd)/results"
-        '''
-      }
+      // FIXME: get cache of persisted (as in forever) results "core-benchmarks.zip" and unzip to $(pwd)/core-benchmarks
+      sh 'cd test/bench && mkdir -p core-benchmarks && REALM_BENCH_DIR="$(pwd)/core-benchmarks" ./gen_bench-hist.sh'
+      sh 'cd test/bench && mkdir -p results && ./parse_bench_hist.py --local-html results/ core-benchmarks/' // requires matplotlib 1.3.1
+      // FIXME: zip core-benchmarks to core-benchmarks.zip and overwrite persisted version for next time
+      // FIXME: save "results" directory (for the lifetime of this build) and link to "results/report.html" from github
     }
   }
 }
