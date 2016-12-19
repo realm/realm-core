@@ -216,13 +216,13 @@ def transform_local(html=False):
     mkdirs(outputdir)
     print "results will be written to " + outputdir
 
-    inputdir = "~/.realm/core/benchmarks/" + str(version) + "/" + str(machid)
+    inputdir = "~/.realm/core/benchmarks/"
     if len(sys.argv) >= 4:
         inputdir = sys.argv[3]
     if len(sys.argv) > 4:
         print "Unexpected extra arguments."
         printUseageAndExit()
-    inputdir = os.path.expanduser(inputdir)
+    inputdir = os.path.expanduser(inputdir) + str(version) + "/" + str(machid)
     print "looking for csv files in " + inputdir
     files = getFilesByName(inputdir)
 
