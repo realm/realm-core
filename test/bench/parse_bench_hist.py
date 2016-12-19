@@ -148,7 +148,10 @@ def transform(inputdir, destination, filelist, handler):
 existing = []
 def refresh_file_once(filename):
     if filename not in existing:
-        os.remove(filename)
+        try:
+            os.remove(filename)
+        except:
+            pass
     existing.append(filename)
 
 # format is: sha, tag, min, max, med, avg,
