@@ -280,8 +280,22 @@ TEST(Table_DateTimeMinMax)
     table->clear();
     table->insert_column(0, type_Timestamp, "time", true);
     table->add_empty_row(3);
-    table->set_null(1, 0);
-    table->set_timestamp(0, 0, {0, 0});
+    table->set_null(0, 0);
+    table->set_timestamp(0, 1, {0, 0});
+    table->set_timestamp(0, 2, {2, 2});
+
+    size_t idx; // tableview entry that points at the max/min value
+
+    CHECK_EQUAL(table->maximum_timestamp(0, &idx), Timestamp(2, 2));
+    CHECK_EQUAL(idx, 2);
+    CHECK_EQUAL(table->minimum_timestamp(0, &idx), Timestamp(0, 0));
+    CHECK_EQUAL(idx, 1);
+
+    table->clear();
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->add_empty_row(3);
+    table->set_null(0, 0);
+    table->set_timestamp(0, 1, {0, 0});
     table->set_timestamp(0, 2, {2, 2});
 
     CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
@@ -290,22 +304,14 @@ TEST(Table_DateTimeMinMax)
     table->clear();
     table->insert_column(0, type_Timestamp, "time", true);
     table->add_empty_row(3);
-    table->set_null(1, 0);
-    table->set_timestamp(0, 2, {0, 0});
-    table->set_timestamp(0, 0, {2, 2});
-
-    CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
-    CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
-
-    table->clear();
-    table->insert_column(0, type_Timestamp, "time", true);
-    table->add_empty_row(3);
     table->set_null(0, 0);
-    table->set_timestamp(0, 2, {0, 0});
-    table->set_timestamp(0, 0, {2, 2});
+    table->set_timestamp(0, 1, {0, 0});
+    table->set_timestamp(0, 2, {2, 2});
 
-    CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
-    CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
+    CHECK_EQUAL(table->maximum_timestamp(0, &idx), Timestamp(2, 2));
+    CHECK_EQUAL(idx, 2);
+    CHECK_EQUAL(table->minimum_timestamp(0, &idx), Timestamp(0, 0));
+    CHECK_EQUAL(idx, 1);
 }
 
 TEST(Table_MinMaxSingleNullRow)
@@ -379,15 +385,20 @@ TEST(TableView_AggregateBugs)
         CHECK_EQUAL(tv.maximum_int(0), 2);
 
         // average == sum / rows, where rows does *not* include values with null.
-        CHECK_APPROXIMATELY_EQUAL(table.average_int(0), double(1 + 2 + 42) / 3, 0.001);
+        size_t vc; // number of non-null values that the average was computed from
+        CHECK_APPROXIMATELY_EQUAL(table.average_int(0, &vc), double(1 + 2 + 42) / 3, 0.001);
+        CHECK_EQUAL(vc, 3);
 
         // There are currently 3 ways of doing average: on tableview, table and query:
-        CHECK_EQUAL(table.average_int(0), table.where().average_int(0));
-        CHECK_EQUAL(table.average_int(0), table.where().find_all().average_int(0));
+        CHECK_EQUAL(table.average_int(0), table.where().average_int(0, &vc));
+        CHECK_EQUAL(vc, 3);
+        CHECK_EQUAL(table.average_int(0), table.where().find_all().average_int(0, &vc));
+        CHECK_EQUAL(vc, 3);
 
         // Core has an optimization where it executes average directly on the column if there
         // are no query conditions. Bypass that here.
-        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(0, 1).find_all().average_int(0), double(2 + 42) / 2, 0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(0, 1).find_all().average_int(0, &vc), double(2 + 42) / 2, 0.001);
+        CHECK_EQUAL(vc, 2);
 
         // Add Double column and do same tests on that
         table.add_column(type_Double, "doubles", true);
@@ -401,15 +412,20 @@ TEST(TableView_AggregateBugs)
         CHECK_EQUAL(tv.maximum_double(1), 2.);
 
         // average == sum / rows, where rows does *not* include values with null.
-        CHECK_APPROXIMATELY_EQUAL(table.average_double(1), double(1. + 2. + 42.) / 3, 0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(1, &vc), double(1. + 2. + 42.) / 3, 0.001);
+        CHECK_EQUAL(vc, 3);
 
         // There are currently 3 ways of doing average: on tableview, table and query:
-        CHECK_APPROXIMATELY_EQUAL(table.average_double(1), table.where().average_double(1), 0.001);
-        CHECK_APPROXIMATELY_EQUAL(table.average_double(1), table.where().find_all().average_double(1), 0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(1), table.where().average_double(1, &vc), 0.001);
+        CHECK_EQUAL(vc, 3);
+
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(1), table.where().find_all().average_double(1, &vc), 0.001);
+        CHECK_EQUAL(vc, 3);
 
         // Core has an optimization where it executes average directly on the column if there
         // are no query conditions. Bypass that here.
-        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(1, 1.).find_all().average_double(1), (2. + 42.) / 2, 0.001);
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(1, 1.).find_all().average_double(1, &vc), (2. + 42.) / 2, 0.001);
+        CHECK_EQUAL(vc, 2);
     }
 
     // Same as above, with null entry first
