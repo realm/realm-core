@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.2.0 Release notes
 
 ### Bugfixes
 
