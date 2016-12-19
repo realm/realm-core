@@ -186,12 +186,14 @@ DbEntry::DbEntry(std::ifstream& is, unsigned ref, std::set<Entry>& refs) {
 
     if (memcmp(header, &signature, 4) && memcmp(header, &alt_signature, 4)) {
         auto it = free_list.lower_bound(Entry(ref, 0));
-        it--;
-        if (ref > it->start && ref < it->start + it->length) {
-            std::cerr << err_txt << "Invalid ref in free space: 0x" << std::hex << ref << std::dec << std::endl;
-        }
-        else {
-            std::cerr << err_txt << "Invalid ref: 0x" << std::hex << ref << std::dec << std::endl;
+        if (it != free_list.begin()) {
+            it--;
+            if (ref > it->start && ref < it->start + it->length) {
+                std::cerr << err_txt << "Invalid ref in free space: 0x" << std::hex << ref << std::dec << std::endl;
+            }
+            else {
+                std::cerr << err_txt << "Invalid ref: 0x" << std::hex << ref << std::dec << std::endl;
+            }
         }
         if (!is) {
             is.clear();
