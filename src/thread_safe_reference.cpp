@@ -47,7 +47,7 @@ ThreadSafeReferenceBase::~ThreadSafeReferenceBase()
 
 template <typename V, typename T>
 V ThreadSafeReferenceBase::invalidate_after_import(Realm& destination_realm, T construct_with_shared_group) {
-    REALM_ASSERT_DEBUG(destination_realm.thread_id() == std::this_thread::get_id());
+    destination_realm.verify_thread();
     REALM_ASSERT_DEBUG(!m_source_realm->is_in_transaction());
     REALM_ASSERT_DEBUG(!is_invalidated());
 
