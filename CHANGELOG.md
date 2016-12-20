@@ -3,8 +3,9 @@
 ### Bugfixes
 
 * Fixed various bugs in aggregate methods of Table, TableView and Query for nullable columns
-  (max, min, avg, sum). Non-nullable columns might not have been affected. One of the bugs are
-  described here https://github.com/realm/realm-core/issues/2357
+  (max, min, avg, sum). The results of avg and sum could be wrong and the returned index of
+  the min and max rows could be wrong. Non-nullable columns might not have been affected.
+  One of the bugs are described here https://github.com/realm/realm-core/issues/2357
   
 ### Breaking changes
 
