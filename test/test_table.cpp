@@ -495,7 +495,7 @@ TEST(TableView_AggregateBugs)
 TEST(Table_AggregateFuzz)
 {
     // Tests sum, avg, min, max on Table, TableView, Query, for types float, Timestamp, int
-    for(int iter = 0; iter < 50; iter++)
+    for(int iter = 0; iter < 50 + 1000 * TEST_DURATION; iter++)
     {
         Group g;
         TableRef table = g.add_table("test_table");
@@ -503,10 +503,14 @@ TEST(Table_AggregateFuzz)
         table->insert_column(0, type_Timestamp, "time", true);
         table->insert_column(1, type_Int, "int", true);
         table->insert_column(2, type_Float, "float", true);
+
         size_t rows = fastrand(10);
         table->add_empty_row(rows);
-        size_t largest = npos;
-        size_t smallest = npos;
+        size_t largest = 0;
+        size_t smallest = 0;
+        size_t largest_pos = npos;
+        size_t smallest_pos = npos;
+
         double avg = 0;
         int64_t sum = 0;
         size_t nulls = 0;
@@ -515,13 +519,19 @@ TEST(Table_AggregateFuzz)
         for (size_t t = 0; t < rows; t++) {
             bool null = (fastrand(1) == 0);
             if (!null) {
-                sum += t;
-                largest = t;
-                if (smallest == npos)
-                    smallest = t;
-                table.get()->set_timestamp(0, t, Timestamp(t, 0));
-                table.get()->set_int(1, t, t);
-                table.get()->set_float(2, t, float(t));
+                int64_t value = fastrand(10);
+                sum += value;
+                if (largest_pos == npos || value > largest) {
+                    largest = value;
+                    largest_pos = t;
+                }
+                if (smallest_pos == npos || value < smallest) {
+                    smallest = value;
+                    smallest_pos = t;
+                }
+                table.get()->set_timestamp(0, t, Timestamp(value, 0));
+                table.get()->set_int(1, t, value);
+                table.get()->set_float(2, t, float(value));
             }
             else {
                 nulls++;
@@ -540,40 +550,40 @@ TEST(Table_AggregateFuzz)
             // Table::max
             ret = 123;
             f = table.get()->maximum_float(2, &ret);
-            CHECK_EQUAL(ret, largest);
-            if (largest != npos)
-                CHECK_EQUAL(f, table.get()->get_float(2, largest));
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, largest_pos));
 
             ret = 123;
             i = table.get()->maximum_int(1, &ret);
-            CHECK_EQUAL(ret, largest);
-            if (largest != npos)
-                CHECK_EQUAL(i, table.get()->get_int(1, largest));
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, largest_pos));
 
             ret = 123;
             ts = table.get()->maximum_timestamp(0, &ret);
-            CHECK_EQUAL(ret, largest);
-            if (largest != npos)
-                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest));
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest_pos));
 
             // Table::min
             ret = 123;
             f = table.get()->minimum_float(2, &ret);
-            CHECK_EQUAL(ret, smallest);
-            if (smallest != npos)
-                CHECK_EQUAL(f, table.get()->get_float(2, smallest));
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, smallest_pos));
 
             ret = 123;
             i = table.get()->minimum_int(1, &ret);
-            CHECK_EQUAL(ret, smallest);
-            if (smallest != npos)
-                CHECK_EQUAL(i, table.get()->get_int(1, smallest));
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, smallest_pos));
 
             ret = 123;
             ts = table.get()->minimum_timestamp(0, &ret);
-            CHECK_EQUAL(ret, smallest);
-            if (smallest != npos)
-                CHECK_EQUAL(ts, table.get()->get_timestamp(0, smallest));
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, smallest_pos));
 
             // Table::avg
             double d;
@@ -606,40 +616,40 @@ TEST(Table_AggregateFuzz)
             // TableView::max
             ret = 123;
             f = table.get()->where().find_all().maximum_float(2, &ret);
-            CHECK_EQUAL(ret, largest);
-            if (largest != npos)
-                CHECK_EQUAL(f, table.get()->get_float(2, largest));
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, largest_pos));
 
             ret = 123;
             i = table.get()->where().find_all().maximum_int(1, &ret);
-            CHECK_EQUAL(ret, largest);
-            if (largest != npos)
-                CHECK_EQUAL(i, table.get()->get_int(1, largest));
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, largest_pos));
 
             ret = 123;
             ts = table.get()->where().find_all().maximum_timestamp(0, &ret);
-            CHECK_EQUAL(ret, largest);
-            if (largest != npos)
-                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest));
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest_pos));
 
             // TableView::min
             ret = 123;
             f = table.get()->where().find_all().minimum_float(2, &ret);
-            CHECK_EQUAL(ret, smallest);
-            if (smallest != npos)
-                CHECK_EQUAL(f, table.get()->get_float(2, smallest));
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, smallest_pos));
 
             ret = 123;
             i = table.get()->where().find_all().minimum_int(1, &ret);
-            CHECK_EQUAL(ret, smallest);
-            if (smallest != npos)
-                CHECK_EQUAL(i, table.get()->get_int(1, smallest));
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, smallest_pos));
 
             ret = 123;
             ts = table.get()->where().find_all().minimum_timestamp(0, &ret);
-            CHECK_EQUAL(ret, smallest);
-            if (smallest != npos)
-                CHECK_EQUAL(ts, table.get()->get_timestamp(0, smallest));
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, smallest_pos));
 
             // TableView::avg
             double d;
@@ -674,42 +684,42 @@ TEST(Table_AggregateFuzz)
             // TableView::max
             ret = 123;
             f = table.get()->where().maximum_float(2, nullptr, 0, npos, npos, &ret);
-            CHECK_EQUAL(ret, largest);
-            if (largest != npos)
-                CHECK_EQUAL(f, table.get()->get_float(2, largest));
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, largest_pos));
 
             ret = 123;
             i = table.get()->where().maximum_int(1, nullptr, 0, npos, npos, &ret);
-            CHECK_EQUAL(ret, largest);
-            if (largest != npos)
-                CHECK_EQUAL(i, table.get()->get_int(1, largest));
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, largest_pos));
 
             ret = 123;
             // Note: Method arguments different from metholds on other column types
             ts = table.get()->where().maximum_timestamp(0, &ret);
-            CHECK_EQUAL(ret, largest);
-            if (largest != npos)
-                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest)); 
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest_pos)); 
 
             // TableView::min
             ret = 123;
             f = table.get()->where().minimum_float(2, nullptr, 0, npos, npos, &ret);
-            CHECK_EQUAL(ret, smallest);
-            if (smallest != npos)
-                CHECK_EQUAL(f, table.get()->get_float(2, smallest));
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, smallest_pos));
 
             ret = 123;
             i = table.get()->where().minimum_int(1, nullptr, 0, npos, npos, &ret);
-            CHECK_EQUAL(ret, smallest);
-            if (smallest != npos)
-                CHECK_EQUAL(i, table.get()->get_int(1, smallest));
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, smallest_pos));
 
             ret = 123;
             // Note: Method arguments different from metholds on other column types
             ts = table.get()->where().minimum_timestamp(0, &ret);
-            CHECK_EQUAL(ret, smallest);
-            if (smallest != npos)
-                CHECK_EQUAL(ts, table.get()->get_timestamp(0, smallest));
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, smallest_pos));
 
             // TableView::avg
             double d;
@@ -735,7 +745,6 @@ TEST(Table_AggregateFuzz)
 
             i = table.get()->where().sum_int(1);
             CHECK_APPROXIMATELY_EQUAL(i, sum, 0.001);
-
         }
     }
 }

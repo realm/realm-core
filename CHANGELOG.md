@@ -2,8 +2,10 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
-
+* Fixed various bugs in aggregate methods of Table, TableView and Query for nullable columns.
+  Non-nullable columns might not have been affected. One of the bugs are described here
+  https://github.com/realm/realm-core/issues/2357
+  
 ### Breaking changes
 
 * Lorem ipsum.
@@ -24,9 +26,7 @@
 
 ### Bugfixes
 
-* Fixed various bugs in aggregate methods of Table, TableView and Query for nullable columns.
-  Non-nullable columns might not have been affected. One of the bugs are described here
-  https://github.com/realm/realm-core/issues/2357
+* Lorem ipsum.
 
 ### Breaking changes
 
