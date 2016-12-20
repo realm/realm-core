@@ -130,182 +130,95 @@ private:
 TEST_CASE("Transaction log parsing: schema change validation") {
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
+    config.schema_mode = SchemaMode::Additive;
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"table", {
+            {"unindexed", PropertyType::Int},
+            {"indexed", PropertyType::Int, "", "", false, true}
+        }},
+    });
+    r->read_group();
 
-    SECTION("Automatic") {
-        auto r = Realm::get_shared_realm(config);
-        r->update_schema({
-            {"table", {
-                {"unindexed", PropertyType::Int},
-                {"indexed", PropertyType::Int, "", "", false, true}
-            }},
-        });
-        r->read_group();
+    auto history = make_in_realm_history(config.path);
+    SharedGroup sg(*history, config.options());
 
-        auto history = make_in_realm_history(config.path);
-        SharedGroup sg(*history, config.options());
+    SECTION("adding a table is allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.add_table("new table");
+        table->add_column(type_String, "new col");
+        wt.commit();
 
-        SECTION("adding a table is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.add_table("new table");
-            table->add_column(type_String, "new col");
-            wt.commit();
-
-            REQUIRE_NOTHROW(r->refresh());
-        }
-
-        SECTION("adding an index to an existing column is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->add_search_index(0);
-            wt.commit();
-
-            REQUIRE_NOTHROW(r->refresh());
-        }
-
-        SECTION("removing an index from an existing column is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->remove_search_index(1);
-            wt.commit();
-
-            REQUIRE_NOTHROW(r->refresh());
-        }
-
-        SECTION("adding a column to an existing table is not allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->add_column(type_String, "new col");
-            wt.commit();
-
-            REQUIRE_THROWS(r->refresh());
-        }
-
-        SECTION("removing a column is not allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->remove_column(1);
-            wt.commit();
-
-            REQUIRE_THROWS(r->refresh());
-        }
-
-        SECTION("removing a table is not allowed") {
-            WriteTransaction wt(sg);
-            wt.get_group().remove_table("class_table");
-            wt.commit();
-
-            REQUIRE_THROWS(r->refresh());
-        }
-
-        SECTION("the realm is left in a useable state after a rejected change") {
-            r->begin_transaction();
-            TableRef table = r->read_group().get_table("class_table");
-            table->add_empty_row();
-            r->commit_transaction();
-
-            {
-                WriteTransaction wt(sg);
-                TableRef table = wt.get_table("class_table");
-                table->insert_column(0, type_String, "new col");
-                wt.commit();
-            }
-
-            REQUIRE_THROWS(r->refresh());
-            REQUIRE(table->get_int(0, 0) == 0);
-        }
+        REQUIRE_NOTHROW(r->refresh());
     }
 
-    SECTION("Additive") {
-        config.schema_mode = SchemaMode::Additive;
-        auto r = Realm::get_shared_realm(config);
-        r->update_schema({
-            {"table", {
-                {"unindexed", PropertyType::Int},
-                {"indexed", PropertyType::Int, "", "", false, true}
-            }},
-        });
-        r->read_group();
+    SECTION("adding an index to an existing column is allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("class_table");
+        table->add_search_index(0);
+        wt.commit();
 
-        auto history = make_in_realm_history(config.path);
-        SharedGroup sg(*history, config.options());
+        REQUIRE_NOTHROW(r->refresh());
+    }
 
-        SECTION("adding a table is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.add_table("new table");
-            table->add_column(type_String, "new col");
-            wt.commit();
+    SECTION("removing an index from an existing column is allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("class_table");
+        table->remove_search_index(1);
+        wt.commit();
 
-            REQUIRE_NOTHROW(r->refresh());
-        }
+        REQUIRE_NOTHROW(r->refresh());
+    }
 
-        SECTION("adding an index to an existing column is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->add_search_index(0);
-            wt.commit();
+    SECTION("adding a column at the end of an existing table is allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("class_table");
+        table->add_column(type_String, "new col");
+        wt.commit();
 
-            REQUIRE_NOTHROW(r->refresh());
-        }
+        REQUIRE_NOTHROW(r->refresh());
+    }
 
-        SECTION("removing an index from an existing column is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->remove_search_index(1);
-            wt.commit();
+    SECTION("adding a column at the beginning of an existing table is allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("class_table");
+        table->insert_column(0, type_String, "new col");
+        wt.commit();
 
-            REQUIRE_NOTHROW(r->refresh());
-        }
+        REQUIRE_NOTHROW(r->refresh());
+    }
 
-        SECTION("adding a column at the end of an existing table is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->add_column(type_String, "new col");
-            wt.commit();
+    SECTION("moving columns is allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("class_table");
+        _impl::TableFriend::move_column(*table->get_descriptor(), 0, 1);
+        wt.commit();
 
-            REQUIRE_NOTHROW(r->refresh());
-        }
+        REQUIRE_NOTHROW(r->refresh());
+    }
 
-        SECTION("adding a column at the beginning of an existing table is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->insert_column(0, type_String, "new col");
-            wt.commit();
+    SECTION("moving tables is allowed") {
+        WriteTransaction wt(sg);
+        wt.get_group().move_table(2, 0);
+        wt.commit();
+        REQUIRE_NOTHROW(r->refresh());
+    }
 
-            REQUIRE_NOTHROW(r->refresh());
-        }
+    SECTION("removing a column is not allowed") {
+        WriteTransaction wt(sg);
+        TableRef table = wt.get_table("class_table");
+        table->remove_column(1);
+        wt.commit();
 
-        SECTION("moving columns is allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            _impl::TableFriend::move_column(*table->get_descriptor(), 0, 1);
-            wt.commit();
+        REQUIRE_THROWS(r->refresh());
+    }
 
-            REQUIRE_NOTHROW(r->refresh());
-        }
+    SECTION("removing a table is not allowed") {
+        WriteTransaction wt(sg);
+        wt.get_group().remove_table("class_table");
+        wt.commit();
 
-        SECTION("moving tables is allowed") {
-            WriteTransaction wt(sg);
-            wt.get_group().move_table(2, 0);
-            wt.commit();
-            REQUIRE_NOTHROW(r->refresh());
-        }
-
-        SECTION("removing a column is not allowed") {
-            WriteTransaction wt(sg);
-            TableRef table = wt.get_table("class_table");
-            table->remove_column(1);
-            wt.commit();
-
-            REQUIRE_THROWS(r->refresh());
-        }
-
-        SECTION("removing a table is not allowed") {
-            WriteTransaction wt(sg);
-            wt.get_group().remove_table("class_table");
-            wt.commit();
-
-            REQUIRE_THROWS(r->refresh());
-        }
+        REQUIRE_THROWS(r->refresh());
     }
 }
 
@@ -1259,7 +1172,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             realm->commit_transaction();
 
             _impl::NotifierPackage notifiers;
-            _impl::transaction::advance(sg, &observer, SchemaMode::Automatic, notifiers);
+            _impl::transaction::advance(sg, &observer, notifiers);
             return observer;
         };
 

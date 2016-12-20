@@ -463,7 +463,7 @@ void Realm::begin_transaction()
     // state, but that's unavoidable.
     if (m_is_sending_notifications) {
         _impl::NotifierPackage notifiers;
-        transaction::begin(*m_shared_group, m_binding_context.get(), m_config.schema_mode, notifiers);
+        transaction::begin(*m_shared_group, m_binding_context.get(), notifiers);
         return;
     }
 
@@ -711,15 +711,13 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
             // With reference imported, advance temporary Realm to our version
             T imported_value = std::move(reference).import_into_realm(temporary_realm);
             transaction::advance(*temporary_realm->m_shared_group, temporary_realm->m_binding_context.get(),
-                                 temporary_realm->m_config.schema_mode, current_version);
+                                 current_version);
             reference = ThreadSafeReference<T>(imported_value);
 
         }
         // If we're behind, advance ourselves to the reference's version
         else if (reference_version > current_version) {
-
-            transaction::advance(*m_shared_group, m_binding_context.get(),
-                                 m_config.schema_mode, reference_version);
+            transaction::advance(*m_shared_group, m_binding_context.get(), reference_version);
             m_coordinator->process_available_async(*this);
         }
     }
