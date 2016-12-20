@@ -102,6 +102,11 @@ else
         cd ../..
     else
         sh ./util/build_core.sh "${remoteref}"
+        if [ ! -f "core-builds/${remoteref}" ]; then
+            echo "fatal error: core checkout failed on ref: ${remoteref}"
+            ls -lah
+            exit 0
+        fi
         cd ../benchmark-common-tasks
         cp main.cpp compatibility.hpp Makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
         echo "unix timestamp of build is ${unixtime}"
