@@ -6,6 +6,8 @@
   Non-nullable columns might not have been affected. One of the bugs are described here
   https://github.com/realm/realm-core/issues/2357
   
+* Prevent `stdin` from being accidentally closed during `~InterProcessCondVar()`.
+
 ### Breaking changes
 
 * Lorem ipsum.
