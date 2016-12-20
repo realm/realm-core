@@ -135,7 +135,7 @@ private:
         }
 
         Timestamp best = get(0);
-        size_t best_index = !best.is_null() ? 0 : npos; // npos if null
+        size_t best_index = best.is_null() ? npos : 0;
 
         for (size_t i = 1; i < size(); ++i) {
             Timestamp candidate = get(i);
