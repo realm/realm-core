@@ -164,7 +164,12 @@ template <int function, typename T, typename R, class ColType>
 R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t, size_t*) const, size_t column_ndx,
                            T count_target, size_t* return_ndx) const
 {
+    static_cast<void>(aggregateMethod);
     check_cookie();
+    size_t non_nulls = 0;
+            
+    if (return_ndx)
+        *return_ndx = npos;
 
     using ColTypeTraits = ColumnTypeTraits<typename ColType::value_type>;
     REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, ColTypeTraits::id);
@@ -172,6 +177,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
                  function == act_Average);
     REALM_ASSERT(m_table);
     REALM_ASSERT(column_ndx < m_table->get_column_count());
+
     if ((m_row_indexes.size() - m_num_detached_refs) == 0) {
         if (return_ndx) {
             if (function == act_Average)
@@ -185,6 +191,8 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
     typedef typename ColTypeTraits::leaf_type ArrType;
     const ColType* column = static_cast<ColType*>(&m_table->get_column_base(column_ndx));
 
+    // FIXME: Optimization temporarely removed for stability
+/*
     if (m_num_detached_refs == 0 && m_row_indexes.size() == column->size()) {
         // direct aggregate on the column
         if (function == act_Count)
@@ -192,40 +200,46 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
         else
             return (column->*aggregateMethod)(0, size_t(-1), size_t(-1), return_ndx); // end == limit == -1
     }
+*/
 
     // Array object instantiation must NOT allocate initial memory (capacity)
     // with 'new' because it will lead to mem leak. The column keeps ownership
     // of the payload in array and will free it itself later, so we must not call destroy() on array.
     ArrType arr(column->get_alloc());
+    
+    // FIXME: Speed optimization disabled because we need is_null() which is not available on all leaf types.
+
+/*
     const ArrType* arrp = nullptr;
     size_t leaf_start = 0;
     size_t leaf_end = 0;
     size_t row_ndx;
-
+*/
     R res = R{};
-    auto first = column->get(to_size_t(m_row_indexes.get(0)));
+    size_t row = to_size_t(m_row_indexes.get(0));
+    auto first = column->get(row);
 
-    if (return_ndx)
-        *return_ndx = 0;
-
-    if (function == act_Count)
+    if (function == act_Count) {
         res = static_cast<R>((first == count_target ? 1 : 0));
-    else {
-        // FIXME: This assumes that all non-count aggregates on nullable integer columns run with
-        // the NotNull condition.
+    }
+    else if(!column->is_null(row)) { // cannot just use if(v) on float/double types
         res = static_cast<R>(util::unwrap(first));
+        non_nulls++;
+        if (return_ndx) {
+            *return_ndx = 0;
+        }
     }
 
-    for (size_t ss = 1; ss < m_row_indexes.size(); ++ss) {
+    for (size_t tv_index = 1; tv_index < m_row_indexes.size(); ++tv_index) {
 
-        int64_t signed_row_ndx = m_row_indexes.get(ss);
+        int64_t signed_row_ndx = m_row_indexes.get(tv_index);
 
         // skip detached references:
         if (signed_row_ndx == detached_ref)
             continue;
 
-        row_ndx = to_size_t(signed_row_ndx);
-
+        // FIXME: Speed optimization disabled because we need is_null() which is not available on all leaf types.
+/*
         if (row_ndx < leaf_start || row_ndx >= leaf_end) {
             size_t ndx_in_leaf;
             typename ColType::LeafInfo leaf{&arrp, &arr};
@@ -233,36 +247,40 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
             leaf_start = row_ndx - ndx_in_leaf;
             leaf_end = leaf_start + arrp->size();
         }
-
-        auto v = arrp->get(row_ndx - leaf_start);
+*/
+        auto v = column->get(signed_row_ndx);
 
         if (function == act_Count && v == count_target) {
             res++;
         }
-        else {
-            // FIXME: This assumes that all non-count aggregates on nullable integer columns run with
-            // the NotNull condition.
+        else if (function != act_Count && !column->is_null(signed_row_ndx)){
+            non_nulls++;
             R unpacked = static_cast<R>(util::unwrap(v));
+            
             if (function == act_Sum || function == act_Average) {
                 res += unpacked;
             }
-            else if (function == act_Max && unpacked > res) {
+            else if ((function == act_Max && unpacked > res) || non_nulls == 1) {
                 res = unpacked;
                 if (return_ndx)
-                    *return_ndx = ss;
+                    *return_ndx = tv_index;
             }
-            else if (function == act_Min && unpacked < res) {
+            else if ((function == act_Min && unpacked < res) || non_nulls == 1) {
                 res = unpacked;
                 if (return_ndx)
-                    *return_ndx = ss;
+                    *return_ndx = tv_index;
             }
         }
     }
 
-    if (function == act_Average)
-        return res / (m_row_indexes.size() == 0 ? 1 : m_row_indexes.size());
-    else
+    if (function == act_Average) {
+        if (return_ndx)
+            *return_ndx = non_nulls;
+        return res / (non_nulls == 0 ? 1 : non_nulls);
+    }
+    else {
         return res;
+    }
 }
 
 // Min, Max and Count on Timestamp cannot utilize existing aggregate() methods, becuase these assume we have leaf
@@ -295,8 +313,9 @@ int64_t TableViewBase::sum_int(size_t column_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
         return aggregate<act_Sum, int64_t>(&IntNullColumn::sum, column_ndx, 0);
-    else
+    else {
         return aggregate<act_Sum, int64_t>(&IntegerColumn::sum, column_ndx, 0);
+    }
 }
 double TableViewBase::sum_float(size_t column_ndx) const
 {
@@ -356,9 +375,9 @@ double TableViewBase::minimum_double(size_t column_ndx, size_t* return_ndx) cons
 OldDateTime TableViewBase::minimum_olddatetime(size_t column_ndx, size_t* return_ndx) const
 {
     if (m_table->is_nullable(column_ndx))
-        return aggregate<act_Max, int64_t>(&IntNullColumn::minimum, column_ndx, 0, return_ndx);
+        return aggregate<act_Min, int64_t>(&IntNullColumn::minimum, column_ndx, 0, return_ndx);
     else
-        return aggregate<act_Max, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
+        return aggregate<act_Min, int64_t>(&IntegerColumn::minimum, column_ndx, 0, return_ndx);
 }
 
 Timestamp TableViewBase::minimum_timestamp(size_t column_ndx, size_t* return_ndx) const
