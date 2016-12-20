@@ -506,8 +506,8 @@ TEST(Table_AggregateFuzz)
 
         size_t rows = fastrand(10);
         table->add_empty_row(rows);
-        size_t largest = 0;
-        size_t smallest = 0;
+        int64_t largest = 0;
+        int64_t smallest = 0;
         size_t largest_pos = npos;
         size_t smallest_pos = npos;
 
