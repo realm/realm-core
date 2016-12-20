@@ -41,8 +41,13 @@ get_machid () {
         machid=$(cat /var/lib/dbus/machine-id)
     elif [ -f "/etc/machine-id" ]; then
         machid=$(cat /etc/machine-id)
+    elif [ -f "/etc/hostname" ]; then
+        machid=$(cat /etc/hostname)
     else
         machid=$(ifconfig en0 | awk '/ether/{print $2}')
+    fi
+    if [ -z "${machid}" ]; then
+        machid="unknown"
     fi
     echo "using machine id: ${machid}"
 }

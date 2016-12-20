@@ -71,15 +71,19 @@ def mkdirs(path):
             raise
 
 def getMachId():
-    machid = "unknown"
     if os.path.isfile("/var/lib/dbus/machine-id"):
         with open("/var/lib/dbus/machine-id") as f:
             machid = f.readline().strip()
     elif os.path.isfile("/etc/machine-id"):
         with open("/etc/machine-id") as f:
             machid = f.readline().strip()
+    elif os.path.isfile("/etc/hostname"):
+        with open("/etc/hostname") as f:
+            machid = f.readline().strip()
     else:
         machid = os.popen('ifconfig en0 | awk \'/ether/{print $2}\'').read().strip()
+    if not machid.strip():
+        machid = "unknown"
     return machid
 
 # The version of these benchmark scripts is set in the file
