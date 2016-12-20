@@ -37,6 +37,9 @@
 #include <locale>
 #endif
 
+#if REALM_PLATFORM_APPLE
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
 using namespace realm;
 
@@ -376,10 +379,36 @@ return true;
 // results in very special cases. Todo.
 util::Optional<std::string> case_map(StringData source, bool upper)
 {
+#if REALM_PLATFORM_APPLE == 1
     std::string result;
     result.resize(source.size());
 
-#ifdef _WIN32
+    if (source.is_null())
+        return util::none;
+    else if (source.size() == 0)
+        return result;
+
+    CFStringRef string = CFStringCreateWithCString(nullptr, source.data(), kCFStringEncodingUTF8);
+    CFMutableStringRef mString = CFStringCreateMutableCopy(0, 0, string);
+    CFLocaleRef locale = CFLocaleCopyCurrent();
+
+    if (upper)
+        CFStringUppercase(mString, locale);
+    else
+        CFStringLowercase(mString, locale);
+
+    std::vector<char> buffer;
+
+    CFIndex length = CFStringGetLength(mString) + 1;
+    buffer.resize(length);
+
+    CFStringGetCString(mString, &buffer[0], length, kCFStringEncodingUTF8);
+    return std::string(buffer.data(), buffer.size());
+
+#elif defined(_WIN32)
+    std::string result;
+    result.resize(source.size());
+
     const char* begin = source.data();
     const char* end = begin + source.size();
     auto output = result.begin();
@@ -430,6 +459,9 @@ util::Optional<std::string> case_map(StringData source, bool upper)
     // to its built-in support for UTF-8. In C++03 it is trivial when
     // __STDC_ISO_10646__ is defined. Also consider using ICU. Maybe
     // GNU has something to offer too.
+
+    std::string result;
+    result.resize(source.size());
 
     // For now we handle just the ASCII subset
     typedef std::char_traits<char> traits;
