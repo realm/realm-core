@@ -21,6 +21,7 @@ set(SOURCES
 
 set(HEADERS
     collection_notifications.hpp
+    execution_context_id.hpp
     index_set.hpp
     list.hpp
     object_schema.hpp
@@ -53,6 +54,7 @@ set(HEADERS
     util/generic/event_loop_signal.hpp
     util/uv/event_loop_signal.hpp
 
+    util/aligned_union.hpp
     util/atomic_shared_ptr.hpp
     util/compiler.hpp
     util/event_loop_signal.hpp

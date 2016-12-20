@@ -72,6 +72,7 @@ const std::string& realm::get_temporary_directory() noexcept
 
 Realm::Realm(Config config)
 : m_config(std::move(config))
+, m_execution_context(m_config.execution_context)
 {
     open_with_config(m_config, m_history, m_shared_group, m_read_only_group, this);
 
@@ -233,6 +234,8 @@ Realm::~Realm()
 
 Group& Realm::read_group()
 {
+    verify_open();
+
     if (!m_group) {
         m_group = &const_cast<Group&>(m_shared_group->begin_read());
         add_schema_change_handler();
@@ -428,15 +431,25 @@ static void check_read_write(Realm *realm)
 
 void Realm::verify_thread() const
 {
-    if (m_thread_id != std::this_thread::get_id()) {
+    if (!m_execution_context.contains<std::thread::id>())
+        return;
+
+    auto thread_id = m_execution_context.get<std::thread::id>();
+    if (thread_id != std::this_thread::get_id())
         throw IncorrectThreadException();
-    }
 }
 
 void Realm::verify_in_write() const
 {
     if (!is_in_transaction()) {
         throw InvalidTransactionException("Cannot modify managed objects outside of a write transaction.");
+    }
+}
+
+void Realm::verify_open() const
+{
+    if (is_closed()) {
+        throw ClosedRealmException();
     }
 }
 
@@ -502,6 +515,7 @@ void Realm::cancel_transaction()
 
 void Realm::invalidate()
 {
+    verify_open();
     verify_thread();
     check_read_write(this);
 
