@@ -79,7 +79,7 @@ checkout () {
 }
 
 if [ ! -d "${srcdir}" ]; then
-  git clone git@github.com:realm/realm-core.git "${srcdir}"
+  git clone https://github.com/realm/realm-core.git "${srcdir}"
   cd "${srcdir}"
   checkout
   sh build.sh clean
