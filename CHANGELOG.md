@@ -288,7 +288,9 @@
   indexes into the Table in all cases. Also, any `begin` and `end` arguments could point into 
   eitherthe View or the Table. These now always point into the Table. Also see 
   https://github.com/realm/realm-core/issues/1565
-
+* Moved get_uncommitted_changes from History class to Replication class. This removes the
+  need to call TrivialReplication::get_uncommitted_changes from a decendant of History.
+  
 ### Enhancements
 
 * Accessors pointing to subsumed rows are updated to the new row rather than detached.

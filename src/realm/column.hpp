@@ -697,6 +697,7 @@ public:
     void verify() const override;
     void to_dot(std::ostream&, StringData title) const override;
     void do_dump_node_structure(std::ostream&, int) const override;
+    std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const;
 #ifdef REALM_DEBUG
     using ColumnBase::verify;
     void tree_to_dot(std::ostream&) const;
@@ -745,7 +746,6 @@ protected:
 #ifdef REALM_DEBUG
     static void dump_node_structure(const Array& root, std::ostream&, int level);
 #endif
-    std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const;
 
 private:
     class EraseLeafElem;
