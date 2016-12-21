@@ -57,6 +57,7 @@ namespace _impl {
     class ListNotifier;
     class RealmCoordinator;
     class ResultsNotifier;
+    class RealmFriend;
 }
 
 // How to handle update_schema() being called on a file which has
@@ -172,6 +173,10 @@ public:
 
         /// A data structure storing data used to configure the Realm for sync support.
         std::shared_ptr<SyncConfig> sync_config;
+
+        // FIXME: Realm Java manages sync at the Java level, so it needs to create Realms using the sync history
+        //        format.
+        bool force_sync_history = false;
     };
 
     // Get a cached Realm or create a new one if no cached copies exists
@@ -181,7 +186,8 @@ public:
 
     // Updates a Realm to a given schema, using the Realm's pre-set schema mode.
     void update_schema(Schema schema, uint64_t version=0,
-                       MigrationFunction migration_function=nullptr);
+                       MigrationFunction migration_function=nullptr,
+                       bool in_transaction=false);
 
     // Read the schema version from the file specified by the given config, or
     // ObjectStore::NotVersioned if it does not exist
@@ -335,6 +341,8 @@ public:
 
     // FIXME private
     Group& read_group();
+
+    friend class _impl::RealmFriend;
 };
 
 class RealmFileException : public std::runtime_error {
@@ -399,6 +407,14 @@ class InvalidEncryptionKeyException : public std::logic_error {
 public:
     InvalidEncryptionKeyException() : std::logic_error("Encryption key must be 64 bytes.") {}
 };
+
+// FIXME Those are exposed for Java async queries, mainly because of handover related methods.
+class _impl::RealmFriend {
+public:
+    static SharedGroup& get_shared_group(Realm& realm);
+    static Group& read_group_to(Realm& realm, VersionID& version);
+};
+
 } // namespace realm
 
 #endif /* defined(REALM_REALM_HPP) */

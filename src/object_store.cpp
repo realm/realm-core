@@ -208,6 +208,12 @@ void validate_primary_column_uniqueness(Group const& group)
 }
 } // anonymous namespace
 
+// FIXME remove this after integrating OS's migration related logic into Realm java
+void ObjectStore::set_schema_version(Group& group, uint64_t version) {
+    ::create_metadata_tables(group);
+    ::set_schema_version(group, version);
+}
+
 uint64_t ObjectStore::get_schema_version(Group const& group) {
     ConstTableRef table = group.get_table(c_metadataTableName);
     if (!table || table->get_column_count() == 0) {
