@@ -105,7 +105,7 @@ else
         cd ../..
     else
         sh ./util/build_core.sh "${remoteref}"
-        if [ ! -f "core-builds/${remoteref}" ]; then
+        if [ ! -d "core-builds/${remoteref}" ]; then
             echo "fatal error: core checkout failed on ref: ${remoteref}"
             ls -lah
             exit 0
