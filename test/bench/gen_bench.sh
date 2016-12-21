@@ -46,6 +46,9 @@ get_machid () {
     else
         machid=$(ifconfig en0 | awk '/ether/{print $2}')
     fi
+    if [ -z "${machid}" ] && [ -f "/proc/self/cgroup" ]; then
+        machid=$(cat /proc/self/cgroup | grep docker | grep -o -E '[0-9a-f]{64}' | head -n 1)
+    fi
     if [ -z "${machid}" ]; then
         machid="unknown"
     fi

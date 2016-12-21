@@ -82,6 +82,9 @@ def getMachId():
             machid = f.readline().strip()
     else:
         machid = os.popen('ifconfig en0 | awk \'/ether/{print $2}\'').read().strip()
+    if not machid.strip() && os.path.isfile("/proc/self/cgroup"):
+        with open("/proc/self/cgroup") as f:
+            machid = f.readline().strip().split("/")[-1]
     if not machid.strip():
         machid = "unknown"
     return machid
