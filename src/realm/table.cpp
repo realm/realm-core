@@ -3243,6 +3243,13 @@ BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
+BinaryData Table::get_binary_at(size_t col_ndx, size_t ndx, size_t& pos) const noexcept
+{
+    return get_column<BinaryColumn, col_type_Binary>(col_ndx).get_at(ndx, pos);
+}
+
+
+
 void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
 {
     if (REALM_UNLIKELY(!is_attached()))
