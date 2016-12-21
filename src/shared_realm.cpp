@@ -710,6 +710,14 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
         auto current_version = m_shared_group->get_version_of_current_transaction();
         SharedGroup::VersionID reference_version = SharedGroup::VersionID(reference.m_version_id);
 
+        if (reference_version == current_version) {
+            return std::move(reference).import_into_realm(shared_from_this());
+        }
+
+        refresh();
+
+        current_version = m_shared_group->get_version_of_current_transaction();
+
         // If the reference's version is behind, advance it to our version
         if (reference_version < current_version) {
             // Duplicate config for uncached Realm so we don't advance the user's Realm
@@ -727,20 +735,10 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
             transaction::advance(*temporary_realm->m_shared_group, temporary_realm->m_binding_context.get(),
                                  current_version);
             reference = ThreadSafeReference<T>(imported_value);
-
-        }
-        // If we're behind, advance ourselves to the reference's version
-        else if (reference_version > current_version) {
-            transaction::advance(*m_shared_group, m_binding_context.get(), reference_version);
-            m_coordinator->process_available_async(*this);
         }
     }
-    T value = std::move(reference).import_into_realm(shared_from_this());
 
-    // Avoid weird partial-refresh semantics when importing old packages
-    refresh();
-
-    return value;
+    return std::move(reference).import_into_realm(shared_from_this());
 }
 
 template Object Realm::resolve_thread_safe_reference(ThreadSafeReference<Object> reference);
