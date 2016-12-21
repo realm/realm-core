@@ -16,7 +16,7 @@ When filing an issue, please provide as much of the following information as pos
 
 ## Contributing Enhancements
 
-We love contributions to Realm! If you'd like to contribute code, documentation, or any other improvements, please [file a Pull Request](https://github.com/realm/realm-core/pulls) on our GitHub repository. Make sure to accept our [CLA](#cla) and to follow our [style guide](https://github.com/realm/realm-core/doc/development/coding_style_guide.cpp).
+We love contributions to Realm! If you'd like to contribute code, documentation, or any other improvements, please [file a Pull Request](https://github.com/realm/realm-core/pulls) on our GitHub repository. Make sure to accept our [CLA](#cla) and to follow our [style guide](doc/development/coding_style_guide.cpp).
 
 ### Commit Messages
 
