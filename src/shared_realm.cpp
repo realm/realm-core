@@ -210,8 +210,8 @@ void Realm::open_with_config(const Config& config,
             options.durability = config.in_memory ? SharedGroupOptions::Durability::MemOnly :
                                                     SharedGroupOptions::Durability::Full;
             options.encryption_key = config.encryption_key.data();
-            options.allow_file_format_upgrade = !(config.disable_format_upgrade ||
-                                                  config.schema_mode == SchemaMode::ResetFile);
+            options.allow_file_format_upgrade = !config.disable_format_upgrade &&
+                                                config.schema_mode != SchemaMode::ResetFile;
             options.upgrade_callback = [&](int from_version, int to_version) {
                 if (realm) {
                     realm->upgrade_initial_version = from_version;
@@ -225,7 +225,6 @@ void Realm::open_with_config(const Config& config,
     catch (realm::FileFormatUpgradeRequired const& ex) {
         if (config.schema_mode != SchemaMode::ResetFile) {
             translate_file_exception(config.path, config.read_only());
-            return;
         }
         util::File::remove(config.path);
         open_with_config(config, history, shared_group, read_only_group, realm);
