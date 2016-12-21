@@ -18,3 +18,7 @@ Debug/
 Release/
 RelWithDebInfo/
 MinSizeRel/
+
+# IntelliJ
+.idea/
+

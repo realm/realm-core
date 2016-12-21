@@ -30,6 +30,7 @@ ResultsNotifier::ResultsNotifier(Results& target)
     set_table(*q.get_table());
     m_query_handover = Realm::Internal::get_shared_group(*get_realm()).export_for_handover(q, MutableSourcePayload::Move);
     SortDescriptor::generate_patch(target.get_sort(), m_sort_handover);
+    SortDescriptor::generate_patch(target.get_distinct(), m_distinct_handover);
 }
 
 void ResultsNotifier::target_results_moved(Results& old_target, Results& new_target)
@@ -151,6 +152,9 @@ void ResultsNotifier::run()
     if (m_sort) {
         m_tv.sort(m_sort);
     }
+    if (m_distinct) {
+        m_tv.distinct(m_distinct);
+    }
     m_last_seen_version = m_tv.sync_if_needed();
 
     calculate_changes();
@@ -211,6 +215,7 @@ void ResultsNotifier::do_attach_to(SharedGroup& sg)
     REALM_ASSERT(m_query_handover);
     m_query = sg.import_from_handover(std::move(m_query_handover));
     m_sort = SortDescriptor::create_from_and_consume_patch(m_sort_handover, *m_query->get_table());
+    m_distinct = SortDescriptor::create_from_and_consume_patch(m_distinct_handover, *m_query->get_table());
 }
 
 void ResultsNotifier::do_detach_from(SharedGroup& sg)
@@ -219,6 +224,7 @@ void ResultsNotifier::do_detach_from(SharedGroup& sg)
     REALM_ASSERT(!m_tv.is_attached());
 
     SortDescriptor::generate_patch(m_sort, m_sort_handover);
+    SortDescriptor::generate_patch(m_distinct, m_distinct_handover);
     m_query_handover = sg.export_for_handover(*m_query, MutableSourcePayload::Move);
     m_query = nullptr;
 }
