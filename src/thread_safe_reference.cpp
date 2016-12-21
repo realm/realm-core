@@ -104,13 +104,19 @@ ThreadSafeReference<Results>::ThreadSafeReference(Results const& results)
     SortDescriptor::HandoverPatch sort_order;
     SortDescriptor::generate_patch(results.get_sort(), sort_order);
     return sort_order;
-}()) { }
+}())
+, m_distinct_descriptor([&]() {
+    SortDescriptor::HandoverPatch distinct_descriptor;
+    SortDescriptor::generate_patch(results.get_distinct(), distinct_descriptor);
+    return distinct_descriptor;
+}()){ }
 
 Results ThreadSafeReference<Results>::import_into_realm(SharedRealm realm) && {
     return invalidate_after_import<Results>(*realm, [&](SharedGroup& shared_group) {
         Query query = *shared_group.import_from_handover(std::move(m_query));
         Table& table = *query.get_table();
         SortDescriptor sort_descriptor = SortDescriptor::create_from_and_consume_patch(m_sort_order, table);
-        return Results(std::move(realm), std::move(query), std::move(sort_descriptor));
+        SortDescriptor distinct_descriptor = SortDescriptor::create_from_and_consume_patch(m_distinct_descriptor, table);
+        return Results(std::move(realm), std::move(query), std::move(sort_descriptor), std::move(distinct_descriptor));
     });
 }

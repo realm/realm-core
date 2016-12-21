@@ -405,11 +405,10 @@ TEST_CASE("thread safe reference") {
             REQUIRE(results.size() == 2);
             REQUIRE(results.get(0).get_string(0) == "A");
             REQUIRE(results.get(1).get_string(0) == "B");
-            auto h = r->package_for_handover({{results}});
-            std::thread([h = std::move(h), config]() mutable {
+            auto ref = r->obtain_thread_safe_reference(results);
+            std::thread([ref = std::move(ref), config]() mutable {
                 SharedRealm r = Realm::get_shared_realm(config);
-                auto h_import = r->accept_handover(std::move(h));
-                Results results = h_import[0].get_results();
+                Results results = r->resolve_thread_safe_reference(std::move(ref));
 
                 REQUIRE(results.size() == 2);
                 REQUIRE(results.get(0).get_string(0) == "A");

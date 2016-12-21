@@ -110,6 +110,7 @@ private:
 
     std::unique_ptr<SharedGroup::Handover<Query>> m_query;
     SortDescriptor::HandoverPatch m_sort_order;
+    SortDescriptor::HandoverPatch m_distinct_descriptor;
 
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
     ThreadSafeReference(Results const& value);
