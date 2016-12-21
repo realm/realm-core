@@ -118,8 +118,10 @@ _impl::AnyHandover AnyThreadConfined::export_for_handover() const
         case AnyThreadConfined::Type::Results: {
             SortDescriptor::HandoverPatch sort_order;
             SortDescriptor::generate_patch(m_results.get_sort(), sort_order);
+            SortDescriptor::HandoverPatch distinct_descriptor;
+            SortDescriptor::generate_patch(m_results.get_distinct(), distinct_descriptor);
             return _impl::AnyHandover(shared_group.export_for_handover(m_results.get_query(), ConstSourcePayload::Copy),
-                                      std::move(sort_order));
+                                      std::move(sort_order), std::move(distinct_descriptor));
         }
     }
     REALM_UNREACHABLE();

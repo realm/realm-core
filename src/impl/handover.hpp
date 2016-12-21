@@ -66,6 +66,7 @@ private:
         struct {
             QueryHandover query_handover;
             SortDescriptor::HandoverPatch sort_order;
+            SortDescriptor::HandoverPatch distinct_descriptor;
         } m_results;
     };
 
@@ -75,8 +76,11 @@ private:
     AnyHandover(LinkViewHandover link_view)
     : m_type(AnyThreadConfined::Type::List), m_list({std::move(link_view)}) {}
 
-    AnyHandover(QueryHandover query_handover, SortDescriptor::HandoverPatch sort_order)
-    : m_type(AnyThreadConfined::Type::Results), m_results({std::move(query_handover), std::move(sort_order)}) {}
+    AnyHandover(QueryHandover query_handover,
+            SortDescriptor::HandoverPatch sort_order, SortDescriptor::HandoverPatch distinct_descriptor)
+    : m_type(AnyThreadConfined::Type::Results),
+      m_results({std::move(query_handover), std::move(sort_order), std::move(distinct_descriptor)}) {}
+
 };
 }
 }

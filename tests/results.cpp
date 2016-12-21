@@ -1276,10 +1276,10 @@ TEST_CASE("notifications: results") {
         }
     }
 
-    // Sort in descending order
-    results = results.sort({*table, {{0}}, {false}});
-
     SECTION("sorted notifications") {
+        // Sort in descending order
+        results = results.sort({*table, {{0}}, {false}});
+
         int notification_calls = 0;
         CollectionChangeSet change;
         auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
@@ -1419,6 +1419,85 @@ TEST_CASE("notifications: results") {
             REQUIRE(notification_calls == 3);
             REQUIRE(change.deletions.empty());
             REQUIRE_INDICES(change.insertions, 1);
+        }
+    }
+
+    SECTION("distinct notifications") {
+        results = results.distinct(SortDescriptor(*table, {{0}}));
+
+        int notification_calls = 0;
+        CollectionChangeSet change;
+        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            change = c;
+            ++notification_calls;
+        });
+
+        advance_and_notify(*r);
+
+        auto write = [&](auto&& f) {
+            r->begin_transaction();
+            f();
+            r->commit_transaction();
+            advance_and_notify(*r);
+        };
+
+        SECTION("modifications that leave a non-matching row non-matching do not send notifications") {
+            write([&] {
+                table->set_int(0, 6, 13);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("deleting non-matching rows does not send a notification") {
+            write([&] {
+                table->move_last_over(0);
+                table->move_last_over(6);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("modifying a matching row and leaving it matching marks that row as modified") {
+            write([&] {
+                table->set_int(0, 1, 3);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE_INDICES(change.modifications_new, 0);
+        }
+
+        SECTION("modifying a non-matching row which is after the distinct results in the table to be a same value \
+                in the distinct results doesn't send notification.") {
+            write([&] {
+                table->set_int(0, 6, 2);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("modifying a non-matching row which is before the distinct results in the table to be a same value \
+                in the distinct results send insert + delete.") {
+            write([&] {
+                table->set_int(0, 0, 2);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.deletions, 0);
+            REQUIRE_INDICES(change.insertions, 0);
+        }
+
+        SECTION("modifying a matching row to duplicated value in distinct results marks that row as deleted") {
+            write([&] {
+                table->set_int(0, 2, 2);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.deletions, 1);
+        }
+
+        SECTION("modifying a non-matching row to match and different value marks that row as inserted") {
+            write([&] {
+                table->set_int(0, 0, 1);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.insertions, 0);
         }
     }
 }

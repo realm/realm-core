@@ -339,7 +339,7 @@ TEST_CASE("handover") {
             REQUIRE(lst.get(1).get_int(0) == 2);
         }
 
-        SECTION("results") {
+        SECTION("sorted results") {
             auto& table = *get_table(*r, string_object);
             auto results = Results(r, table.where().not_equal(0, "C")).sort({table, {{0}}, {false}});
 
@@ -387,6 +387,54 @@ TEST_CASE("handover") {
             REQUIRE(results.size() == 2);
             REQUIRE(results.get(0).get_string(0) == "E");
             REQUIRE(results.get(1).get_string(0) == "B");
+        }
+
+        SECTION("distinct results") {
+            auto& table = *get_table(*r, string_object);
+            // Sort the results to make checks easier.
+            auto results = Results(r, table.where()).distinct({table, {{0}}}).sort({table, {{0}}, {true}});
+
+            r->begin_transaction();
+            Object strA1 = create_object(r, string_object);
+            strA1.row().set_string(0, "A");
+            Object strA2 = create_object(r, string_object);
+            strA2.row().set_string(0, "A");
+            Object strB1 = create_object(r, string_object);
+            strB1.row().set_string(0, "B");
+            r->commit_transaction();
+
+            REQUIRE(results.size() == 2);
+            REQUIRE(results.get(0).get_string(0) == "A");
+            REQUIRE(results.get(1).get_string(0) == "B");
+            auto h = r->package_for_handover({{results}});
+            std::thread([h = std::move(h), config]() mutable {
+                SharedRealm r = Realm::get_shared_realm(config);
+                auto h_import = r->accept_handover(std::move(h));
+                Results results = h_import[0].get_results();
+
+                REQUIRE(results.size() == 2);
+                REQUIRE(results.get(0).get_string(0) == "A");
+                REQUIRE(results.get(1).get_string(0) == "B");
+
+                r->begin_transaction();
+                results.get(0).move_last_over();
+                Object strC = create_object(r, string_object);
+                strC.row().set_string(0, "C");
+                r->commit_transaction();
+                REQUIRE(results.size() == 3);
+                REQUIRE(results.get(0).get_string(0) == "A");
+                REQUIRE(results.get(1).get_string(0) == "B");
+                REQUIRE(results.get(2).get_string(0) == "C");
+            }).join();
+
+            REQUIRE(results.size() == 2);
+            REQUIRE(results.get(0).get_string(0) == "A");
+            REQUIRE(results.get(1).get_string(0) == "B");
+            r->refresh();
+            REQUIRE(results.size() == 3);
+            REQUIRE(results.get(0).get_string(0) == "A");
+            REQUIRE(results.get(1).get_string(0) == "B");
+            REQUIRE(results.get(2).get_string(0) == "C");
         }
 
         SECTION("multiple types") {
