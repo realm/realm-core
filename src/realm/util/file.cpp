@@ -182,7 +182,11 @@ std::string make_temp_dir()
 #else // POSIX.1-2008 version
 
     StringBuffer buffer;
+#if REALM_ANDROID
+    buffer.append_c_str("/data/local/tmp/realm_XXXXXX");
+#else
     buffer.append_c_str(P_tmpdir "/realm_XXXXXX");
+#endif
     if (mkdtemp(buffer.c_str()) == 0)
         throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
     return buffer.str();
@@ -1196,7 +1200,7 @@ void File::set_encryption_key(const char* key)
     if (key) {
         char* buffer = new char[64];
         memcpy(buffer, key, 64);
-        m_encryption_key.reset(buffer);
+        m_encryption_key.reset(static_cast<const char*>(buffer));
     }
     else {
         m_encryption_key.reset();

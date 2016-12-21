@@ -2,7 +2,11 @@
 
 ### Bugfixes
 
-* Lorem Ipsum.
+* Fixed various bugs in aggregate methods of Table, TableView and Query for nullable columns
+  (max, min, avg, sum). The results of avg and sum could be wrong and the returned index of
+  the min and max rows could be wrong. Non-nullable columns might not have been affected.
+  One of the bugs are described here https://github.com/realm/realm-core/issues/2357
+* Prevent `stdin` from being accidentally closed during `~InterProcessCondVar()`.
 
 ### Breaking changes
 
@@ -24,6 +28,27 @@
 ### Internals
 
 * Unit tests now support JUnit output format.
+
+----------------------------------------------
+
+# 2.2.1 Release notes
+
+### Enhancements
+
+* Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
+  are now perfectly forwarded (via perfect forwarding) to
+  `std::stream::operator<<()`.
+
+-----------
+
+### Internals
+
+* Make `_impl::make_error_code(_impl::SimulatedFailure::FailureType)`
+  participate in overload resolution in unqualified ADL contexts like
+  `make_error_code(_impl::SimulatedFailure::sync_client__read_head)` and `ec ==
+  _impl::SimulatedFailure::sync_client__read_head`.
+* `P_tmpdir` should not be used on Android. A better default name for temporary
+  folders has been introduced.
 
 ----------------------------------------------
 

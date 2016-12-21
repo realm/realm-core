@@ -87,7 +87,6 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
                                           std::string tmp_path)
 {
     close();
-    uses_emulation = true;
     m_shared_part = &shared_part;
     static_cast<void>(base_path);
     static_cast<void>(condvar_name);
@@ -168,6 +167,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     }
 
 #endif
+    uses_emulation = true;
 }
 
 
