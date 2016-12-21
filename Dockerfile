@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     libprocps4-dev \
     libssl-dev \
     pandoc \
+    python-cheetah \
     python-matplotlib \
     python-pip \
     pkg-config \
