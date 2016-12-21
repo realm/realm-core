@@ -32,7 +32,7 @@ def readGitSha() {
 
 stage('Test Performance') {
   // Select docker-cph-X.  We want docker, metal (brix) and only one executor
-  // (exclusive)
+  // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
   node('docker && brix && exclusive') {
     getSourceArchive()
 
@@ -46,8 +46,11 @@ stage('Test Performance') {
     }
 
     def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
+    // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
+    // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
+    // MPLCONFIGDIR gives the python matplotlib library a config directory, otherwise it will try to make one on the user home dir which fails in docker
     buildEnv.inside {
-      withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks"]) {
+      withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks", "REALM_BENCH_MACHID=docker-brix","MPLCONFIGDIR=${env.WORKSPACE}/test/bench/config"]) {
         // FIXME: get cache of persisted (as in forever) results "core-benchmarks.zip" and unzip to $(pwd)/core-benchmarks
         sh '''
           cd test/bench

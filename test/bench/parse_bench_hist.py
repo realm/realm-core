@@ -20,6 +20,12 @@
 # is ordered by the "modified" timestamp of the csv files
 # from the input directory.
 #
+# The input directory relies on a machine id which can be
+# specified through the environment variable REALM_BENCH_MACHID
+# If not provided an attempt will be made to automatically discover
+# a unique hardware based id. The benchmark tools version is also
+# required as the first line in the `benchmark_version` file.
+#
 # remote useage:
 # $ ./parse_bench_hist.py --remote ip_address [inputdir [inputfile]]
 #
@@ -71,20 +77,20 @@ def mkdirs(path):
             raise
 
 def getMachId():
-    if os.path.isfile("/var/lib/dbus/machine-id"):
-        with open("/var/lib/dbus/machine-id") as f:
-            machid = f.readline().strip()
-    elif os.path.isfile("/etc/machine-id"):
-        with open("/etc/machine-id") as f:
-            machid = f.readline().strip()
-    elif os.path.isfile("/etc/hostname"):
-        with open("/etc/hostname") as f:
-            machid = f.readline().strip()
-    else:
-        machid = os.popen('ifconfig en0 | awk \'/ether/{print $2}\'').read().strip()
-    if not machid.strip() and os.path.isfile("/proc/self/cgroup"):
-        with open("/proc/self/cgroup") as f:
-            machid = f.readline().strip().split("/")[-1]
+    try:
+        machid = os.environ['REALM_BENCH_MACHID']
+    except KeyError:
+        if os.path.isfile("/var/lib/dbus/machine-id"):
+            with open("/var/lib/dbus/machine-id") as f:
+                machid = f.readline().strip()
+        elif os.path.isfile("/etc/machine-id"):
+            with open("/etc/machine-id") as f:
+                machid = f.readline().strip()
+        elif os.path.isfile("/etc/hostname"):
+            with open("/etc/hostname") as f:
+                machid = f.readline().strip()
+        else:
+            machid = os.popen('ifconfig en0 | awk \'/ether/{print $2}\'').read().strip()
     if not machid.strip():
         machid = "unknown"
     return machid

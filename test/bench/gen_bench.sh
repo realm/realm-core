@@ -37,7 +37,9 @@ EOF
 }
 
 get_machid () {
-    if [ -f "/var/lib/dbus/machine-id" ]; then
+    if [ ! -z "${REALM_BENCH_MACHID}" ]; then
+        machid="${REALM_BENCH_MACHID}"
+    elif [ -f "/var/lib/dbus/machine-id" ]; then
         machid=$(cat /var/lib/dbus/machine-id)
     elif [ -f "/etc/machine-id" ]; then
         machid=$(cat /etc/machine-id)
@@ -45,9 +47,6 @@ get_machid () {
         machid=$(cat /etc/hostname)
     else
         machid=$(ifconfig en0 | awk '/ether/{print $2}')
-    fi
-    if [ -z "${machid}" ] && [ -f "/proc/self/cgroup" ]; then
-        machid=$(cat /proc/self/cgroup | grep docker | grep -o -E '[0-9a-f]{64}' | head -n 1)
     fi
     if [ -z "${machid}" ]; then
         machid="unknown"
