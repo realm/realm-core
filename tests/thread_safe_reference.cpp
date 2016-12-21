@@ -21,17 +21,18 @@
 #include "util/test_file.hpp"
 
 #include "list.hpp"
-#include "object_accessor.hpp"
+#include "object.hpp"
 #include "object_schema.hpp"
-#include "property.hpp"
+#include "object_store.hpp"
+#include "results.hpp"
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
 
 #include <realm/history.hpp>
 #include <realm/util/optional.hpp>
 
-#include <thread>
 #include <future>
+#include <thread>
 
 using namespace realm;
 

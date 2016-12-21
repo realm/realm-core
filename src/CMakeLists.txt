@@ -24,6 +24,8 @@ set(HEADERS
     execution_context_id.hpp
     index_set.hpp
     list.hpp
+    object.hpp
+    object_accessor.hpp
     object_schema.hpp
     object_store.hpp
     property.hpp

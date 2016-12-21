@@ -18,12 +18,16 @@
 
 #include "shared_realm.hpp"
 
+#include "impl/collection_notifier.hpp"
 #include "impl/realm_coordinator.hpp"
 #include "impl/transact_log_handler.hpp"
 
 #include "binding_context.hpp"
+#include "list.hpp"
+#include "object.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
+#include "results.hpp"
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
 

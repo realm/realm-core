@@ -19,6 +19,10 @@
 #include "thread_safe_reference.hpp"
 
 #include "impl/realm_coordinator.hpp"
+#include "list.hpp"
+#include "object.hpp"
+#include "object_schema.hpp"
+#include "results.hpp"
 
 #include <realm/util/scope_exit.hpp>
 

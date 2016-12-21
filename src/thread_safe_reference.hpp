@@ -19,17 +19,18 @@
 #ifndef REALM_THREAD_SAFE_REFERENCE_HPP
 #define REALM_THREAD_SAFE_REFERENCE_HPP
 
-#include "list.hpp"
-#include "object_accessor.hpp"
-#include "results.hpp"
-
 #include <realm/group_shared.hpp>
-#include <realm/link_view.hpp>
-#include <realm/query.hpp>
-#include <realm/row.hpp>
-#include <realm/table_view.hpp>
 
 namespace realm {
+class LinkView;
+class List;
+class Object;
+class Query;
+class Realm;
+class Results;
+class TableView;
+template<typename T> class BasicRow;
+typedef BasicRow<Table> Row;
 
 // Opaque type representing an object for handover
 class ThreadSafeReferenceBase {
@@ -45,7 +46,7 @@ public:
 
 protected:
     // Precondition: The associated Realm is for the current thread and is not in a write transaction;.
-    ThreadSafeReferenceBase(SharedRealm source_realm);
+    ThreadSafeReferenceBase(std::shared_ptr<Realm> source_realm);
 
     SharedGroup& get_source_shared_group() const;
 
@@ -56,7 +57,7 @@ private:
     friend Realm;
 
     VersionID m_version_id;
-    SharedRealm m_source_realm; // Strong reference keeps alive so version stays pinned! Don't touch!!
+    std::shared_ptr<Realm> m_source_realm; // Strong reference keeps alive so version stays pinned! Don't touch!!
 
     bool has_same_config(Realm& realm) const;
     void invalidate();
@@ -71,7 +72,7 @@ private:
     ThreadSafeReference(T value);
 
     // Precondition: Realm and handover are on same version
-    T import_into_realm(SharedRealm realm) &&;
+    T import_into_realm(std::shared_ptr<Realm> realm) &&;
 };
 
 template<>
@@ -85,7 +86,7 @@ private:
     ThreadSafeReference(List const& value);
 
     // Precondition: Realm and handover are on same version.
-    List import_into_realm(SharedRealm realm) &&;
+    List import_into_realm(std::shared_ptr<Realm> realm) &&;
 };
 
 template<>
@@ -100,7 +101,7 @@ private:
     ThreadSafeReference(Object const& value);
 
     // Precondition: Realm and handover are on same version.
-    Object import_into_realm(SharedRealm realm) &&;
+    Object import_into_realm(std::shared_ptr<Realm> realm) &&;
 };
 
 template<>
@@ -116,7 +117,7 @@ private:
     ThreadSafeReference(Results const& value);
 
     // Precondition: Realm and handover are on same version.
-    Results import_into_realm(SharedRealm realm) &&;
+    Results import_into_realm(std::shared_ptr<Realm> realm) &&;
 };
 }
 
