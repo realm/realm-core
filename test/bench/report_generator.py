@@ -1,4 +1,8 @@
 import math
+import matplotlib as mpl
+# configure to use a backend that doesn't require a display since this
+# will be run from docker. It must be configured before importing pyplot
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.mlab import csv2rec
 from matplotlib.cbook import get_sample_data
