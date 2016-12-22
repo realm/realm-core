@@ -55,9 +55,9 @@
 int
 ptw32_getprocessors (int *count)
 {
-
-  return 8;
-#if 0  
+#if REALM_UWP
+  return 4; // FIXME: Find the real UWP method
+#endif  
   DWORD_PTR vProcessCPUs;
   DWORD_PTR vSystemCPUs;
   int result = 0;
