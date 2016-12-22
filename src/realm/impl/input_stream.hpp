@@ -63,8 +63,7 @@ public:
         size_t n = std::min(size, size_t(m_end - m_ptr));
         const char* begin = m_ptr;
         m_ptr += n;
-        const char* end = m_ptr;
-        std::copy_n(begin, end - begin, buffer);
+        std::copy_n(begin, n, buffer);
         return n;
     }
 
