@@ -109,6 +109,22 @@ private:
     const FailureType m_type;
 };
 
+std::error_code make_error_code(SimulatedFailure::FailureType) noexcept;
+
+} // namespace _impl
+} // namespace realm
+
+namespace std {
+
+template<> struct is_error_code_enum<realm::_impl::SimulatedFailure::FailureType> {
+    static const bool value = true;
+};
+
+} // namespace std
+
+namespace realm {
+namespace _impl {
+
 
 // Implementation
 

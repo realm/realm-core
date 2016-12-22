@@ -88,8 +88,6 @@ ptw32_getprocessors (int *count)
       result = EAGAIN;
     }
 
-#endif
-
   return (result);
 
 #endif
