@@ -1062,7 +1062,7 @@ bool File::is_same_file(const File& f) const
 #if REALM_UWP
     static_cast<void>(f);
     throw std::runtime_error("Not yet supported");
-#elif _WIN32 // Windows version
+#elif defined(_WIN32) // Windows version
     // FIXME: This version does not work on ReFS.
     BY_HANDLE_FILE_INFORMATION file_info;
     if (GetFileInformationByHandle(m_handle, &file_info)) {
