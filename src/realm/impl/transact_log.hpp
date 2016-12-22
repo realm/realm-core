@@ -2161,7 +2161,7 @@ inline void TransactLogParser::read_bytes(char* data, size_t size)
         size -= avail;
     }
     const char* to = m_input_begin + size;
-    std::copy_n(m_input_begin, to - m_input_begin, data);
+    std::copy_n(m_input_begin, size, data);
     m_input_begin = to;
 }
 
