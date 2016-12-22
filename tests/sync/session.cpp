@@ -88,12 +88,12 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         auto user = SyncManager::shared().get_user("user1a", "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1a-1",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { },
+                                     [](auto, auto) { },
                                      SyncSessionStopPolicy::AfterChangesUploaded,
                                      &path_1);
         auto session2 = sync_session(server, user, "/test1a-2",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { },
+                                     [](auto, auto) { },
                                      SyncSessionStopPolicy::AfterChangesUploaded,
                                      &path_2);
         EventLoop::main().run_until([&] { return session_is_active(*session1) && session_is_active(*session2); });
@@ -112,10 +112,10 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         auto user = SyncManager::shared().get_user("user1b", "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1b-1",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto) { });
         auto session2 = sync_session(server, user, "/test1b-2",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto) { });
         EventLoop::main().run_until([&] { return session_is_active(*session1) && session_is_active(*session2); });
 
         // Log the user out.
@@ -132,10 +132,10 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
         auto session1 = sync_session(server, user, "/test1c-1",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto) { });
         auto session2 = sync_session(server, user, "/test1c-2",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto) { });
         // Run the runloop many iterations to see if the sessions spuriously bind.
         std::atomic<int> run_count(0);
         EventLoop::main().run_until([&] { run_count++; return run_count >= 100; });
@@ -153,10 +153,10 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         auto user = SyncManager::shared().get_user(user_id, "not_a_real_token");
         auto session1 = sync_session(server, user, "/test1d-1",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto) { });
         auto session2 = sync_session(server, user, "/test1d-2",
                                      [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto, auto, auto) { });
+                                     [](auto, auto) { });
         // Make sure the sessions are bound.
         EventLoop::main().run_until([&] { return session_is_active(*session1) && session_is_active(*session2); });
         REQUIRE(user->all_sessions().size() == 2);
@@ -185,7 +185,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
             // Create the session within a nested scope, so we can control its lifetime.
             auto session = sync_session(server, user, path,
                                         [](auto&, auto&) { return s_test_token; },
-                                        [](auto, auto, auto, auto) { },
+                                        [](auto, auto) { },
                                         SyncSessionStopPolicy::Immediately,
                                         &on_disk_path);
             weak_session = session;
@@ -209,7 +209,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
             // Note that this should put the sessions at different paths.
             return sync_session(server, user, "/test",
                                 [](auto&, auto&) { return s_test_token; },
-                                [](auto, auto, auto, auto) { },
+                                [](auto, auto) { },
                                 SyncSessionStopPolicy::Immediately);
         };
         REQUIRE(create_session());
@@ -231,7 +231,7 @@ TEST_CASE("sync: log-in", "[sync]") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
                                     [](const std::string&, const std::string&) { return s_test_token; },
-                                    [&](auto, int, std::string, SyncSessionError) { ++error_count; });
+                                    [&](auto, auto) { ++error_count; });
 
         std::atomic<bool> download_did_complete(false);
         session->wait_for_download_completion([&](auto) { download_did_complete = true; });
@@ -244,7 +244,7 @@ TEST_CASE("sync: log-in", "[sync]") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
                                     [](const std::string&, const std::string&) { return "this is not a valid access token"; },
-                                    [&](auto, int, std::string, SyncSessionError) { ++error_count; });
+                                    [&](auto, auto) { ++error_count; });
 
         EventLoop::main().run_until([&] { return error_count > 0; });
         CHECK(session->is_in_error_state());
@@ -257,7 +257,7 @@ TEST_CASE("sync: log-in", "[sync]") {
         std::atomic<int> error_count(0);
         auto session = sync_session(server, user, "/test",
                                     [](const std::string&, const std::string&) { return "this is not a valid access token"; },
-                                    [&](auto, int, std::string, SyncSessionError) { ++error_count; });
+                                    [&](auto, auto) { ++error_count; });
 
         EventLoop::main().perform([&] {
             session->wait_for_download_completion([](auto) {

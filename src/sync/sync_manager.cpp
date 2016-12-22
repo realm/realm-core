@@ -174,7 +174,7 @@ void SyncManager::reset_for_testing()
         // NOTE: these should always match the defaults.
         m_log_level = util::Logger::Level::info;
         m_logger_factory = nullptr;
-        m_client_reconnect_mode = sync::Client::Reconnect::normal;
+        m_client_reconnect_mode = ReconnectMode::normal;
         m_client_validate_ssl = true;
     }
 }
@@ -191,35 +191,16 @@ void SyncManager::set_logger_factory(SyncLoggerFactory& factory) noexcept
     m_logger_factory = &factory;
 }
 
-void SyncManager::set_error_handler(std::function<sync::Client::ErrorHandler> handler)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    auto wrapped_handler = [=](int error_code, std::string message) {
-        // FIXME: If the sync team decides to route all errors through the session-level error handler, the client-level
-        // error handler might go away altogether.
-        switch (error_code) {
-            case 100:       // Connection closed (no error)
-            case 101:       // Unspecified non-critical error
-                return;
-            default:
-                handler(error_code, message);
-        }
-    };
-    m_error_handler = std::move(wrapped_handler);
-}
-
 void SyncManager::set_client_should_reconnect_immediately(bool reconnect_immediately)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    using Reconnect = sync::Client::Reconnect;
-    m_client_reconnect_mode = reconnect_immediately ? Reconnect::immediately : Reconnect::normal;
+    m_client_reconnect_mode = reconnect_immediately ? ReconnectMode::immediate : ReconnectMode::normal;
 }
 
 bool SyncManager::client_should_reconnect_immediately() const noexcept
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    using Reconnect = sync::Client::Reconnect;
-    return m_client_reconnect_mode == Reconnect::immediately;
+    return m_client_reconnect_mode == ReconnectMode::immediate;
 }
 
 void SyncManager::set_client_should_validate_ssl(bool validate_ssl)
@@ -432,7 +413,6 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
         logger = std::move(stderr_logger);
     }
     return std::make_unique<SyncClient>(std::move(logger),
-                                        std::move(m_error_handler),
                                         m_client_reconnect_mode,
                                         m_client_validate_ssl);
 }

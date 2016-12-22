@@ -26,19 +26,17 @@
 namespace realm {
 namespace _impl {
 
-using Reconnect = sync::Client::Reconnect;
+using ReconnectMode = sync::Client::ReconnectMode;
 
 struct SyncClient {
     sync::Client client;
 
     SyncClient(std::unique_ptr<util::Logger> logger,
-               std::function<sync::Client::ErrorHandler> handler,
-               Reconnect reconnect_mode = Reconnect::normal,
+               ReconnectMode reconnect_mode = ReconnectMode::normal,
                bool verify_ssl = true)
     : client(make_client(*logger, reconnect_mode, verify_ssl)) // Throws
     , m_logger(std::move(logger))
-    , m_thread([this, handler=std::move(handler)] {
-        client.set_error_handler(std::move(handler));
+    , m_thread([this] {
         client.run();
     }) // Throws
     {
@@ -57,11 +55,11 @@ struct SyncClient {
     }
 
 private:
-    static sync::Client make_client(util::Logger& logger, Reconnect reconnect_mode, bool verify_ssl)
+    static sync::Client make_client(util::Logger& logger, ReconnectMode reconnect_mode, bool verify_ssl)
     {
         sync::Client::Config config;
         config.logger = &logger;
-        config.reconnect = std::move(reconnect_mode);
+        config.reconnect_mode = std::move(reconnect_mode);
         config.verify_servers_ssl_certificate = verify_ssl;
         return sync::Client(std::move(config)); // Throws
     }

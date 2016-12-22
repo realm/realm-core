@@ -71,7 +71,6 @@ public:
 
     void set_log_level(util::Logger::Level) noexcept;
     void set_logger_factory(SyncLoggerFactory&) noexcept;
-    void set_error_handler(std::function<sync::Client::ErrorHandler>);
 
     /// Control whether the sync client attempts to reconnect immediately. Only set this to `true` for testing purposes.
     void set_client_should_reconnect_immediately(bool reconnect_immediately);
@@ -111,6 +110,7 @@ public:
     void reset_for_testing();
 
 private:
+    using ReconnectMode = sync::Client::ReconnectMode;
     void dropped_last_reference_to_session(SyncSession*);
 
     // Stop tracking the session for the given path if it is inactive.
@@ -133,8 +133,7 @@ private:
     // FIXME: Should probably be util::Logger::Level::error
     util::Logger::Level m_log_level = util::Logger::Level::info;
     SyncLoggerFactory* m_logger_factory = nullptr;
-    std::function<sync::Client::ErrorHandler> m_error_handler;
-    sync::Client::Reconnect m_client_reconnect_mode = sync::Client::Reconnect::normal;
+    ReconnectMode m_client_reconnect_mode = ReconnectMode::normal;
     bool m_client_validate_ssl = true;
 
     // Protects m_users
