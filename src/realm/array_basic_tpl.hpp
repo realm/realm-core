@@ -206,7 +206,7 @@ void BasicArray<T>::erase(size_t ndx)
         char* dst_begin = m_data + ndx * m_width;
         const char* src_begin = dst_begin + m_width;
         const char* src_end = m_data + m_size * m_width;
-        std::copy(src_begin, src_end, dst_begin);
+        std::copy_n(src_begin, src_end - src_begin, dst_begin);
     }
 
     // Update size (also in header)

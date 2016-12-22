@@ -136,12 +136,12 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
             }
             else if (add_size < remove_size) { // shrink gap
                 char* new_begin = modify_begin + add_size;
-                std::copy(old_begin, old_end, new_begin);
+                std::copy_n(old_begin, old_end - old_begin, new_begin);
             }
         }
 
         // Insert the data
-        modify_begin = std::copy(data, data + data_size, modify_begin);
+        modify_begin = std::copy_n(data, data_size, modify_begin);
         if (add_zero_term)
             *modify_begin = 0;
 

@@ -55,6 +55,9 @@
 int
 ptw32_getprocessors (int *count)
 {
+
+  return 8;
+#if 0  
   DWORD_PTR vProcessCPUs;
   DWORD_PTR vSystemCPUs;
   int result = 0;
@@ -88,4 +91,6 @@ ptw32_getprocessors (int *count)
 #endif
 
   return (result);
+
+#endif
 }

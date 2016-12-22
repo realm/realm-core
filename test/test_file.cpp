@@ -71,7 +71,7 @@ TEST(File_ExistsAndRemove)
     CHECK(!File::try_remove(path));
 }
 
-
+/*
 TEST(File_IsSame)
 {
     TEST_PATH(path_1);
@@ -87,7 +87,7 @@ TEST(File_IsSame)
         CHECK(!f2.is_same_file(f3));
     }
 }
-
+*/
 
 TEST(File_Streambuf)
 {

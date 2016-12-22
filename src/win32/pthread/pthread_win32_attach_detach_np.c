@@ -70,6 +70,8 @@ pthread_win32_process_attach_np ()
    *
    * This should take care of any security issues.
    */
+
+#if 0
 #if defined(__GNUC__) || _MSC_VER < 1400
   if(GetSystemDirectory(QuserExDLLPathBuf, sizeof(QuserExDLLPathBuf)))
   {
@@ -83,10 +85,12 @@ pthread_win32_process_attach_np ()
   if(GetSystemDirectory(QuserExDLLPathBuf, sizeof(QuserExDLLPathBuf)) &&
      0 == strncat_s((char*)QuserExDLLPathBuf, sizeof(QuserExDLLPathBuf), "\\QUSEREX.DLL", 12))
   {
-    ptw32_h_quserex = LoadLibrary(QuserExDLLPathBuf);
+	  ptw32_h_quserex = LoadLibrary(QuserExDLLPathBuf);
   }
 #endif
+#endif
 
+  ptw32_h_quserex = NULL;
   if (ptw32_h_quserex != NULL)
     {
       ptw32_register_cancelation = (DWORD (*)(PAPCFUNC, HANDLE, DWORD))
@@ -155,7 +159,11 @@ pthread_win32_process_detach_np ()
 	  if (sp->detachState == PTHREAD_CREATE_DETACHED)
 	    {
 	      ptw32_threadDestroy (sp->ptHandle);
+#if REALM_UWP
+          FlsSetValue (ptw32_selfThreadKey->key, NULL);
+#else
 	      TlsSetValue (ptw32_selfThreadKey->key, NULL);
+#endif
 	    }
 	}
 
@@ -240,8 +248,11 @@ pthread_win32_thread_detach_np ()
 	  if (sp->detachState == PTHREAD_CREATE_DETACHED)
 	    {
 	      ptw32_threadDestroy (sp->ptHandle);
-
+#if REALM_UWP
+	      FlsSetValue (ptw32_selfThreadKey->key, NULL);
+#else
 	      TlsSetValue (ptw32_selfThreadKey->key, NULL);
+#endif
 	    }
 	}
     }

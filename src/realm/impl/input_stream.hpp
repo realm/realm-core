@@ -64,7 +64,7 @@ public:
         const char* begin = m_ptr;
         m_ptr += n;
         const char* end = m_ptr;
-        std::copy(begin, end, buffer);
+        std::copy_n(begin, end - begin, buffer);
         return n;
     }
 
@@ -160,7 +160,7 @@ public:
                 // Replication::InputStream such that blocks can be handed over
                 // without copying. This is a straight forward change, but the
                 // result is going to be more complicated and less conventional.
-                std::copy(data, data + size_2, buffer);
+                std::copy_n(data, size_2, buffer);
                 return size_2;
             }
 

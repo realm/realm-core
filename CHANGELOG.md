@@ -15,7 +15,11 @@
   InvalidDatabase (as requested in issue #2275).
 
 ### Enhancements
-
+* Windows 10 UWP support. Use the new "UWP" configurations in Visual Studio to
+  compile core as a static .lib library for that platform. Also see sample App 
+  in the uwp_demo directory that uses the static library (compile the .lib first).
+  Note that it is currently just an internal preview with lots of limitations; see
+  https://github.com/realm/realm-core/issues/2059
 * Added 'void SharedGroup::get_stats(size_t& free_space, size_t& used_space)'
   allowing access to the size of free and used space (Requested in issue #2281).
 * Optimized Contains queries to use Boyer-Moore algorithm (around 10x speedup on large datasets)

@@ -65,7 +65,7 @@ try {
         buildNodeLinux: doBuildNodeInDocker(isPublishingRun, isPublishingLatestRun),
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
-        buildWindows: doBuildWindows(version, isPublishingRun),
+//        buildWindows: doBuildWindows(version, isPublishingRun),
         buildOsxDylibs: doBuildOsxDylibs(isPublishingRun, isPublishingLatestRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')

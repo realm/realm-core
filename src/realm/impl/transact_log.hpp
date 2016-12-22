@@ -647,7 +647,7 @@ inline void TransactLogBufferStream::transact_log_append(const char* data, size_
                                                          char** out_new_end)
 {
     transact_log_reserve(size, out_new_begin, out_new_end);
-    *out_new_begin = std::copy(data, data + size, *out_new_begin);
+    *out_new_begin = std::copy_n(data, size, *out_new_begin);
 }
 
 inline const char* TransactLogBufferStream::transact_log_data() const
@@ -781,7 +781,7 @@ inline char* TransactLogEncoder::encode_float(char* ptr, float value)
                       sizeof(float) * std::numeric_limits<unsigned char>::digits == 32,
                   "Unsupported 'float' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
-    return std::copy(val_ptr, val_ptr + sizeof value, ptr);
+    return std::copy_n(val_ptr, sizeof value, ptr);
 }
 
 inline char* TransactLogEncoder::encode_double(char* ptr, double value)
@@ -790,7 +790,7 @@ inline char* TransactLogEncoder::encode_double(char* ptr, double value)
                       sizeof(double) * std::numeric_limits<unsigned char>::digits == 64,
                   "Unsupported 'double' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
-    return std::copy(val_ptr, val_ptr + sizeof value, ptr);
+    return std::copy_n(val_ptr, sizeof value, ptr);
 }
 
 template <class T>
@@ -859,7 +859,7 @@ void TransactLogEncoder::append_string_instr(Instruction instr, const util::Tupl
     char* ptr = reserve(max_required_bytes); // Throws
     *ptr++ = char(instr);
     util::for_each<EncodeNumber>(append(numbers, string.size()), &ptr);
-    ptr = std::copy(string.data(), string.data() + string.size(), ptr);
+    ptr = std::copy_n(string.data(), string.size(), ptr);
     advance(ptr);
 }
 
@@ -2154,14 +2154,14 @@ inline void TransactLogParser::read_bytes(char* data, size_t size)
         if (size <= avail)
             break;
         const char* to = m_input_begin + avail;
-        std::copy(m_input_begin, to, data);
+        std::copy_n(m_input_begin, to - m_input_begin, data);
         if (!next_input_buffer())
             throw BadTransactLog();
         data += avail;
         size -= avail;
     }
     const char* to = m_input_begin + size;
-    std::copy(m_input_begin, to, data);
+    std::copy_n(m_input_begin, to - m_input_begin, data);
     m_input_begin = to;
 }
 

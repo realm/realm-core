@@ -36,7 +36,7 @@
 
 #include "pthread.h"
 #include "implement.h"
-
+#include <Windows.h>
 
 void *
 pthread_getspecific (pthread_key_t key)
@@ -75,8 +75,11 @@ pthread_getspecific (pthread_key_t key)
 #if defined(RETAIN_WSALASTERROR)
       int lastWSAerror = WSAGetLastError ();
 #endif
-      ptr = TlsGetValue (key->key);
-
+#if REALM_UWP
+      ptr = FlsGetValue(key->key);
+#else
+      ptr = TlsGetValue(key->key);
+#endif
       SetLastError (lasterror);
 #if defined(RETAIN_WSALASTERROR)
       WSASetLastError (lastWSAerror);

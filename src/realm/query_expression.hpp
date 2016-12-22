@@ -774,7 +774,7 @@ struct NullableVector {
     {
         if (this != &other) {
             init(other.m_size);
-            std::copy(other.m_first, other.m_first + other.m_size, m_first);
+            std::copy_n(other.m_first, other.m_size, m_first);
             m_null = other.m_null;
         }
         return *this;
@@ -783,7 +783,7 @@ struct NullableVector {
     NullableVector(const NullableVector& other)
     {
         init(other.m_size);
-        std::copy(other.m_first, other.m_first + other.m_size, m_first);
+        std::copy_n(other.m_first, other.m_size, m_first);
         m_null = other.m_null;
     }
 
