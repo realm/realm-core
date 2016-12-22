@@ -56,8 +56,8 @@ StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIn
                   "Index string conversion buffer too small");
     const char* s_buf = reinterpret_cast<const char*>(&s);
     const char* ns_buf = reinterpret_cast<const char*>(&ns);
-    std::copy(s_buf, s_buf + sizeof(s), buffer.data());
-    std::copy(ns_buf, ns_buf + sizeof(ns), buffer.data() + sizeof(s));
+    std::copy_n(s_buf, sizeof(s), buffer.data());
+    std::copy_n(ns_buf, sizeof(ns), buffer.data() + sizeof(s));
     return StringData{buffer.data(), index_size};
 }
 

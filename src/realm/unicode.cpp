@@ -379,7 +379,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
     std::string result;
     result.resize(source.size());
 
-#ifdef _WIN32
+#if defined(_WIN32) && !REALM_UWP
     const char* begin = source.data();
     const char* end = begin + source.size();
     auto output = result.begin();
@@ -389,7 +389,6 @@ util::Optional<std::string> case_map(StringData source, bool upper)
             return util::none;
 
         wchar_t tmp[2]; // FIXME: Why no room for UTF-16 surrogate
-
 
         int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, tmp, 1);
         if (n2 == 0)
@@ -417,7 +416,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
             return util::none;
 
         if (n3 != n) {
-            std::copy(begin, begin + n, output); // Cannot handle different size, copy source
+            std::copy_n(begin, n, output); // Cannot handle different size, copy source
         }
 
         begin += n;

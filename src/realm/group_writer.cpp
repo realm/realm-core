@@ -734,7 +734,7 @@ void GroupWriter::write(const char* data, size_t size)
     MapWindow* window = get_window(pos, size);
     char* dest_addr = window->translate(pos);
     window->encryption_read_barrier(dest_addr, size);
-    std::copy(data, data + size, dest_addr);
+    std::copy_n(data, size, dest_addr);
     window->encryption_write_barrier(dest_addr, size);
 }
 

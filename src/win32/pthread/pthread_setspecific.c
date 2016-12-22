@@ -156,7 +156,11 @@ pthread_setspecific (pthread_key_t key, const void *value)
 
       if (result == 0)
 	{
+#if REALM_UWP
+	  if (!FlsSetValue (key->key, (LPVOID) value))
+#else
 	  if (!TlsSetValue (key->key, (LPVOID) value))
+#endif
 	    {
 	      result = EAGAIN;
 	    }
