@@ -2153,7 +2153,6 @@ inline void TransactLogParser::read_bytes(char* data, size_t size)
         const size_t avail = m_input_end - m_input_begin;
         if (size <= avail)
             break;
-        const char* to = m_input_begin + avail;
         std::copy_n(m_input_begin, avail, data);
         if (!next_input_buffer())
             throw BadTransactLog();
