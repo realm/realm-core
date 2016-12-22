@@ -1258,7 +1258,7 @@ public:
                 begin = m_group.m_table_accessors.begin() + from_table_ndx;
                 end = m_group.m_table_accessors.begin() + to_table_ndx + 1;
                 Table* table = begin[0];
-                std::copy_n(begin + 1, end - (begin + 1), begin);
+                std::copy_n(begin + 1, to_table_ndx - from_table_ndx, begin);
                 end[-1] = table;
             }
             else { // from_table_ndx > to_table_ndx
