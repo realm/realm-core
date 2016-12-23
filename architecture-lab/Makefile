@@ -1,15 +1,39 @@
+CXXFLAGS = -pthread -Wall -pedantic -std=c++14 -ggdb -O2 -MMD
+
+ifeq ($(DEBUG),1)
+CXXFLAGS += -O0
+endif
+
+SRCS = \
+  cuckoo.cpp \
+  hash.cpp \
+  memory.cpp \
+  table.cpp \
+  tree.cpp \
+  array.cpp \
+  snapshot.cpp \
+  db.cpp \
+  direct_map.cpp \
+  object.cpp \
+  main.cpp
+
+OBJS = $(SRCS:%.cpp=%.o)
+DEPS = $(SRCS:%.cpp=%.d)
+
+all: test
+
 run: test
 	./test
 
-test : cuckoo.o hash.o memory.o table.o tree.o main.o array.o snapshot.o db.o direct_map.o object.o
-	g++ -pthread -Wall -pedantic -std=c++14 -ggdb -o test cuckoo.o hash.o memory.o \
-	table.o tree.o array.o snapshot.o db.o direct_map.o object.o main.o
+$(OBJS): Makefile
 
-%.o : %.cpp *.hpp
-	g++ -pthread -Wall -pedantic -std=c++14 -ggdb -O2 -c $<
+test : $(OBJS)
+	g++ $(CXXFLAGS) -o $@ $^
 
 clean:
-	rm *.o
-	rm ./test
-	rm ./testing.core2
+	rm -f $(OBJS)
+	rm -f $(DEPS)
+	rm -f ./test
+	rm -f ./testing.core2
 
+-include $(DEPS)
