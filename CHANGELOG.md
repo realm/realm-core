@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.3.0 Release notes
 
 ### Bugfixes
 
@@ -24,8 +24,7 @@
   allowing access to the size of free and used space (Requested in issue #2281).
 * Optimized Contains queries to use Boyer-Moore algorithm (around 10x speedup on large datasets)
 * Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
-  are now perfectly forwarded (via perfect forwarding) to
-  `std::stream::operator<<()`.
+  are now perfectly forwarded (via perfect forwarding) to `std::stream::operator<<()`.
 
 -----------
 
