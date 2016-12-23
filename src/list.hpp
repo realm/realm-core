@@ -31,12 +31,12 @@
 namespace realm {
 using RowExpr = BasicRowExpr<Table>;
 
-class AnyThreadConfined;
 class ObjectSchema;
 class Query;
 class Realm;
 class Results;
 class SortDescriptor;
+template <typename T> class ThreadSafeReference;
 
 class List {
 public:
@@ -108,7 +108,7 @@ public:
     };
 
 private:
-    friend AnyThreadConfined;
+    friend ThreadSafeReference<List>;
 
     std::shared_ptr<Realm> m_realm;
     mutable const ObjectSchema* m_object_schema = nullptr;
