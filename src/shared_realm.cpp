@@ -30,6 +30,7 @@
 #include "results.hpp"
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
+#include "sync/sync_config.hpp"
 
 #include "util/compiler.hpp"
 #include "util/format.hpp"
@@ -146,7 +147,9 @@ void Realm::open_with_config(const Config& config,
             bool server_synchronization_mode = bool(config.sync_config) || config.force_sync_history;
             if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
-                history = realm::sync::make_sync_history(config.path);
+                realm::sync::SyncHistory::Config history_config;
+                history_config.changeset_cooker = config.sync_config->transformer.get();
+                history = realm::sync::make_sync_history(config.path, history_config);
 #else
                 REALM_TERMINATE("Realm was not built with sync enabled");
 #endif
