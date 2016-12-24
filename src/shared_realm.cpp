@@ -709,7 +709,7 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
         throw std::logic_error("Cannot resolve thread safe reference more than once.");
     }
     if (!reference.has_same_config(*this)) {
-        throw MismatchedRealmException("Cannot resolve thread safe reference in Realm with different configuration"
+        throw MismatchedRealmException("Cannot resolve thread safe reference in Realm with different configuration "
                                        "than the source Realm.");
     }
 
