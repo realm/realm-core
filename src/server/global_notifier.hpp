@@ -19,6 +19,7 @@
 #ifndef REALM_OBJECT_STORE_GLOBAL_NOTIFIER_HPP
 #define REALM_OBJECT_STORE_GLOBAL_NOTIFIER_HPP
 
+#include "admin_realm.hpp"
 #include "results.hpp"
 #include "shared_realm.hpp"
 
@@ -37,28 +38,6 @@ namespace util {
 class SyncUser;
 class SyncSession;
 
-namespace _impl {
-class AdminRealmManager {
-public:
-    using RealmInfo = std::pair<std::string, std::string>;
-    AdminRealmManager(std::string local_root, std::string server_base_url, std::shared_ptr<SyncUser> user);
-    void start(std::function<void(std::vector<RealmInfo>, bool)> register_callback);
-    Realm::Config get_config(StringData realm_id, StringData realm_name);
-    void create_realm(StringData realm_id, StringData realm_name);
-
-private:
-    static void bind_sync_session(const std::string&, const SyncConfig&, std::shared_ptr<SyncSession>);
-    
-    const std::string m_regular_realms_dir;
-    const std::string m_server_base_url;
-    std::shared_ptr<SyncUser> m_user;
-    SharedRealm m_realm;
-    Results m_results;
-    NotificationToken m_notification_token;
-    bool m_first = true;
-};
-}
-
 /// Used to listen for changes across all, or a subset of all Realms on a
 /// particular sync server.
 class GlobalNotifier : public std::enable_shared_from_this<GlobalNotifier>  {
@@ -66,7 +45,8 @@ public:
     class Callback;
 
     static std::shared_ptr<GlobalNotifier> shared_notifier(std::unique_ptr<Callback> callback, std::string local_root_dir,
-                                                           std::string server_base_url, std::shared_ptr<SyncUser> user);
+                                                           std::string server_base_url, std::shared_ptr<SyncUser> user,
+                                                           bool calculate_changes = true);
     ~GlobalNotifier();
 
     // Start listening. No callbacks will be called until this function is
@@ -129,15 +109,23 @@ public:
         friend class GlobalNotifier;
     };
 
+    void add_realm(std::string local_path, std::string realm_name);
+
 private:
     GlobalNotifier(std::unique_ptr<Callback>, std::string local_root_dir,
-                   std::string server_base_url, std::shared_ptr<SyncUser> user);
+                   std::string server_base_url, std::shared_ptr<SyncUser> user,
+                   bool calculate_changes);
 
-    _impl::AdminRealmManager m_admin;
-    const std::unique_ptr<Callback> m_target;
+    AdminRealmListener m_admin;
+    const std::unique_ptr<Callback> m_target;    
+    const std::string m_server_base_url;
+    std::shared_ptr<SyncUser> m_user;
+    std::string m_regular_realms_dir;
 
-    // key is realm_id
+    // key is realm_name
     std::unordered_map<std::string, std::shared_ptr<_impl::RealmCoordinator>> m_listen_entries;
+
+    bool m_calculate_changes = true;
 
     std::mutex m_work_queue_mutex;
     std::condition_variable m_work_queue_cv;
@@ -154,6 +142,7 @@ private:
 
     bool m_waiting = false;
 
+    Realm::Config get_config(StringData realm_id, StringData realm_name);
     void register_realms(std::vector<std::pair<std::string, std::string>>, bool all);
     void on_change();
     void calculate();
