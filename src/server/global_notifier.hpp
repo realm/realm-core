@@ -45,6 +45,7 @@ class GlobalNotifier : public std::enable_shared_from_this<GlobalNotifier>  {
 public:
     class Callback;
 
+    using ChangesetTransformer = sync::SyncHistory::ChangesetCooker;
     static std::shared_ptr<GlobalNotifier> shared_notifier(std::unique_ptr<Callback> callback, std::string local_root_dir,
                                                            std::string server_base_url, std::shared_ptr<SyncUser> user,
                                                            std::shared_ptr<ChangesetTransformer> transformer = nullptr);
