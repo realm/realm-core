@@ -22,6 +22,7 @@
 #include "admin_realm.hpp"
 #include "results.hpp"
 #include "shared_realm.hpp"
+#include "sync/sync_config.hpp"
 
 #include <realm/version_id.hpp>
 
@@ -46,7 +47,7 @@ public:
 
     static std::shared_ptr<GlobalNotifier> shared_notifier(std::unique_ptr<Callback> callback, std::string local_root_dir,
                                                            std::string server_base_url, std::shared_ptr<SyncUser> user,
-                                                           bool calculate_changes = true);
+                                                           std::shared_ptr<ChangesetTransformer> transformer = nullptr);
     ~GlobalNotifier();
 
     // Start listening. No callbacks will be called until this function is
@@ -114,7 +115,7 @@ public:
 private:
     GlobalNotifier(std::unique_ptr<Callback>, std::string local_root_dir,
                    std::string server_base_url, std::shared_ptr<SyncUser> user,
-                   bool calculate_changes);
+                   std::shared_ptr<ChangesetTransformer> transformer);
 
     AdminRealmListener m_admin;
     const std::unique_ptr<Callback> m_target;    
@@ -125,7 +126,7 @@ private:
     // key is realm_name
     std::unordered_map<std::string, std::shared_ptr<_impl::RealmCoordinator>> m_listen_entries;
 
-    bool m_calculate_changes = true;
+    std::shared_ptr<ChangesetTransformer> m_transformer = nullptr;
 
     std::mutex m_work_queue_mutex;
     std::condition_variable m_work_queue_cv;

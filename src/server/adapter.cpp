@@ -17,6 +17,7 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "adapter.hpp"
+#include <realm/sync/changeset_cooker.hpp>
 
 using namespace realm;
 
@@ -24,10 +25,9 @@ Adapter::Adapter(std::function<void(SharedRealm)> realm_changed,
                  std::string local_root_dir, std::string server_base_url,
                  std::shared_ptr<SyncUser> user)
 : m_global_notifier(GlobalNotifier::shared_notifier(std::make_unique<Adapter::Callback>(realm_changed), 
-    local_root_dir, server_base_url, user, false))
+    local_root_dir, server_base_url, user, std::make_shared<sync::TrivialChangesetCooker>()))
 {
     m_global_notifier->start();
-    //m_global_notifier->add_realm("7df151ce2479057c21fe28d6830f5a17", "/7df151ce2479057c21fe28d6830f5a17/test");
 }
 
 std::vector<bool> Adapter::Callback::available(std::vector<std::pair<std::string, std::string>> realms,

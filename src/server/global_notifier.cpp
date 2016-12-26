@@ -44,21 +44,21 @@ using namespace realm::_impl;
 
 GlobalNotifier::GlobalNotifier(std::unique_ptr<Callback> async_target,
                                std::string local_root_dir, std::string server_base_url,
-                               std::shared_ptr<SyncUser> user, bool calculate_changes)
+                               std::shared_ptr<SyncUser> user, std::shared_ptr<ChangesetTransformer> transformer)
 : m_admin(local_root_dir, server_base_url, user)
 , m_target(std::move(async_target))
 , m_server_base_url(std::move(server_base_url))
 , m_user(std::move(user))
 , m_regular_realms_dir(util::File::resolve("realms", local_root_dir)) // Throws
-, m_calculate_changes(calculate_changes)
+, m_transformer(transformer)
 {
     util::try_make_dir(m_regular_realms_dir); // Throws
 }
 
 std::shared_ptr<GlobalNotifier> GlobalNotifier::shared_notifier(std::unique_ptr<Callback> callback, std::string local_root_dir,
                                                                            std::string server_base_url, std::shared_ptr<SyncUser> user,
-                                                                           bool calculate_changes) {
-    auto notifier = std::shared_ptr<GlobalNotifier>(new GlobalNotifier(std::move(callback), local_root_dir, server_base_url, user, calculate_changes));
+                                                                           std::shared_ptr<ChangesetTransformer> transformer) {
+    auto notifier = std::shared_ptr<GlobalNotifier>(new GlobalNotifier(std::move(callback), local_root_dir, server_base_url, user, transformer));
     notifier->m_signal = std::make_shared<util::EventLoopSignal<SignalCallback>>(SignalCallback{std::weak_ptr<GlobalNotifier>(notifier), &GlobalNotifier::on_change});
     return notifier;
 }
@@ -107,7 +107,7 @@ void GlobalNotifier::calculate()
         Group const& g = sg2.begin_read(sg.get_version_of_current_transaction());
 
         std::unordered_map<std::string, CollectionChangeSet> changes;
-        if (m_calculate_changes) {
+        if (!m_transformer) {
             _impl::TransactionChangeInfo info;
             info.track_all = true;
             _impl::transaction::advance(sg2, info, next.target_version);
@@ -126,7 +126,7 @@ void GlobalNotifier::calculate()
                 continue; // nothing to notify about
         }
         else {
-            LangBindHelper::advance_read(sg2, next.target_version);
+            //LangBindHelper::advance_read(sg2, next.target_version);
         }
 
         std::lock_guard<std::mutex> l2(m_deliver_queue_mutex);
@@ -148,8 +148,10 @@ Realm::Config GlobalNotifier::get_config(StringData realm_id, StringData realm_n
         new SyncConfig{m_user, m_server_base_url + realm_name.data(), SyncSessionStopPolicy::AfterChangesUploaded,
             [&](auto, const auto& config, auto session) {
                 session->bind_with_admin_token(config.user->refresh_token(), config.realm_url);
-
-           }}
+            }, 
+            [&](auto, auto) {
+            }, 
+            m_transformer}
     );
     config.schema_mode = SchemaMode::Additive;
     return config;
