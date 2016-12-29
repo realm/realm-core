@@ -43,9 +43,9 @@
 using namespace realm;
 using namespace realm::_impl;
 
-#define LOGE(fmt...) do { \
-    fprintf(stderr, fmt); \
-    ANDROID_LOG(ANDROID_LOG_ERROR, "REALM", fmt); \
+#define LOGE(...) do { \
+    fprintf(stderr, __VA_ARGS__); \
+    ANDROID_LOG(ANDROID_LOG_ERROR, "REALM", __VA_ARGS__); \
 } while (0)
 
 namespace {

@@ -25,9 +25,9 @@
 #include <android/log.h>
 #include <android/looper.h>
 
-#define LOGE(fmt...) do { \
-    fprintf(stderr, fmt); \
-    __android_log_print(ANDROID_LOG_ERROR, "REALM", fmt); \
+#define LOGE(...) do { \
+    fprintf(stderr, __VA_ARGS__); \
+    __android_log_print(ANDROID_LOG_ERROR, "REALM", __VA_ARGS__); \
 } while (0)
 
 namespace realm {
