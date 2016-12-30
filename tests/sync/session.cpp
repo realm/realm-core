@@ -371,3 +371,49 @@ TEST_CASE("sync: error handling", "[sync]") {
         }
     }
 }
+
+TEST_CASE("sync: progress notification", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    SyncServer server;
+    // Disable file-related functionality and metadata functionality for testing purposes.
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    auto user = SyncManager::shared().get_user("user", "not_a_real_token");
+
+    SECTION("runs at least once (initially when registered)") {
+        auto user = SyncManager::shared().get_user("user1a", "not_a_real_token");
+        auto session = sync_session(server, user, "/test1a",
+                                     [](auto&, auto&) { return s_test_token; },
+                                     [](auto, auto) { },
+                                     SyncSessionStopPolicy::AfterChangesUploaded);
+        EventLoop::main().run_until([&] { return session_is_active(*session); });
+        REQUIRE(!session->is_in_error_state());
+        std::atomic<bool> callback_was_called(false);
+
+        SECTION("for upload notifications, with no data transfer ongoing") {
+            session->register_progress_notifier([&](auto, auto) {
+                callback_was_called = true;
+            }, SyncSession::NotifierType::upload, false);
+            EventLoop::main().run_until([&] { return callback_was_called.load(); });
+        }
+
+        SECTION("for download notifications, with no data transfer ongoing") {
+            session->register_progress_notifier([&](auto, auto) {
+                callback_was_called = true;
+            }, SyncSession::NotifierType::download, false);
+            EventLoop::main().run_until([&] { return callback_was_called.load(); });
+        }
+
+        SECTION("can register another notifier while in the initial notification without deadlock") {
+            session->register_progress_notifier([&](auto, auto) {
+                callback_was_called = true;
+                session->register_progress_notifier([&](auto, auto) {
+                    callback_was_called = true;
+                }, SyncSession::NotifierType::upload, false);
+            }, SyncSession::NotifierType::download, false);
+            EventLoop::main().run_until([&] { return callback_was_called.load(); });
+        }
+    }
+}

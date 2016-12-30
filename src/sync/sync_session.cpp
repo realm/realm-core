@@ -393,6 +393,7 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::bad_changeset:
             case ClientError::bad_request_ident:
             case ClientError::bad_error_code:
+            case ClientError::bad_compression:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.
@@ -409,6 +410,49 @@ void SyncSession::handle_error(SyncError error)
     if (m_error_handler) {
         m_error_handler(shared_from_this(), std::move(error));
     }
+}
+
+void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable,
+                                         uint64_t uploaded, uint64_t uploadable)
+{
+    std::vector<std::function<void()>> invocations;
+    {
+        std::lock_guard<std::mutex> lock(m_progress_notifier_mutex);
+        m_current_uploadable = uploadable;
+        m_current_downloadable = downloadable;
+        m_current_downloaded = downloaded;
+        m_current_uploaded = uploaded;
+        for (auto& pair : m_notifiers) {
+            bool should_delete = false;
+            invocations.emplace_back(create_notifier_invocation(pair.second, should_delete));
+            if (should_delete) {
+                m_notifiers.erase(pair.first);
+            }
+        }
+    }
+    // Run the notifiers only after we've released the lock.
+    for (auto& invocation : invocations) {
+        invocation();
+    }
+}
+
+// Create a notifier invocation.
+// Precondition: all four download/upload status member variables have been set to their most up-to-date values.
+std::function<void()> SyncSession::create_notifier_invocation(const NotifierPackage& package, bool& is_expired)
+{
+    uint64_t transferred = (package.direction == NotifierType::download ? m_current_downloaded : m_current_uploaded);
+    uint64_t transferrable;
+    if (package.is_streaming) {
+        transferrable = (package.direction == NotifierType::download ? m_current_downloadable : m_current_uploadable);
+    } else {
+        transferrable = package.captured_transferrable;
+    }
+    // A notifier is expired if at least as many bytes have been transferred
+    // as were originally considered transferrable.
+    is_expired = !package.is_streaming && transferred >= package.captured_transferrable;
+    return [=](){
+        package.notifier(transferred, transferrable);
+    };
 }
 
 void SyncSession::create_sync_session()
@@ -438,6 +482,15 @@ void SyncSession::create_sync_session()
         }
     };
     m_session->set_sync_transact_callback(std::move(wrapped_callback));
+
+    // Set up the wrapped progress handler callback
+    auto wrapped_progress_handler = [this, weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
+                                                      uint_fast64_t uploaded, uint_fast64_t uploadable) {
+        if (auto self = weak_self.lock()) {
+            handle_progress_update(downloaded, downloadable, uploaded, uploadable);
+        }
+    };
+    m_session->set_progress_handler(std::move(wrapped_progress_handler));
 }
 
 void SyncSession::set_sync_transact_callback(std::function<sync::Session::SyncTransactCallback> callback)
@@ -546,6 +599,36 @@ bool SyncSession::wait_for_upload_completion_blocking()
         return true;
     }
     return false;
+}
+
+uint64_t SyncSession::register_progress_notifier(std::function<SyncProgressNotifierCallback> notifier,
+                                                 NotifierType direction, bool is_streaming)
+{
+    std::function<void()> invocation;
+    uint64_t token_value = 0;
+    {
+        std::lock_guard<std::mutex> lock(m_progress_notifier_mutex);
+        token_value = m_progress_notifier_token++;
+        auto current_transferrable = (direction == NotifierType::download
+                                      ? m_current_downloadable
+                                      : m_current_uploadable);
+        NotifierPackage package{std::move(notifier), is_streaming, direction, std::move(current_transferrable)};
+        bool skip_registration = false;
+        invocation = create_notifier_invocation(package, skip_registration);
+        if (skip_registration) {
+            token_value = 0;
+        } else {
+            m_notifiers.emplace(token_value, std::move(package));
+        }
+    }
+    invocation();
+    return token_value;
+}
+
+void SyncSession::unregister_progress_notifier(uint64_t token)
+{
+    std::lock_guard<std::mutex> lock(m_progress_notifier_mutex);
+    m_notifiers.erase(token);
 }
 
 void SyncSession::refresh_access_token(std::string access_token, util::Optional<std::string> server_url)

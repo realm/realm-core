@@ -25,6 +25,7 @@
 #include "sync_config.hpp"
 
 #include <mutex>
+#include <unordered_map>
 
 namespace realm {
 
@@ -49,6 +50,7 @@ class Session;
 }
 
 using SyncSessionTransactCallback = void(VersionID old_version, VersionID new_version);
+using SyncProgressNotifierCallback = void(uint64_t transferred_bytes, uint64_t transferrable_bytes);
 
 class SyncSession : public std::enable_shared_from_this<SyncSession> {
 public:
@@ -69,6 +71,30 @@ public:
 
     bool wait_for_upload_completion(std::function<void(std::error_code)> callback);
     bool wait_for_download_completion(std::function<void(std::error_code)> callback);
+
+    enum class NotifierType {
+        upload, download
+    };
+    // Register a notifier that updates the app regarding progress.
+    // The notifier will always be called immediately during the function, to provide
+    // the caller with an initial assessment of the state of synchronization.
+    //
+    // If `is_streaming` is true, then the notifier will be called forever, and will
+    // always contain the most up-to-date number of downloadable or uploadable bytes.
+    // Otherwise, the number of downloaded or uploaded bytes will always be reported
+    // relative to the number of downloadable or uploadable bytes at the point in time
+    // when the notifier was registered.
+    //
+    // An integer representing a token is returned. This token can be used to manually
+    // unregister the notifier. If the integer is 0, the notifier was not registered.
+    //
+    // Note that bindings should dispatch the callback onto a separate thread or queue
+    // in order to avoid blocking the sync client.
+    uint64_t register_progress_notifier(std::function<SyncProgressNotifierCallback>, NotifierType direction, bool is_streaming);
+
+    // Unregister a previously registered notifier. If the token is invalid,
+    // this method does nothing.
+    void unregister_progress_notifier(uint64_t);
 
     // Wait for any pending uploads to complete, blocking the calling thread.
     // Returns `false` if the method did not attempt to wait, either because the
@@ -153,6 +179,7 @@ private:
 
     void handle_error(SyncError);
     static std::string get_recovery_file_path();
+    void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t);
 
     void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);
     void set_error_handler(std::function<SyncSessionErrorHandler>);
@@ -166,7 +193,25 @@ private:
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
     std::function<SyncSessionErrorHandler> m_error_handler;
 
+    struct NotifierPackage {
+        std::function<SyncProgressNotifierCallback> notifier;
+        bool is_streaming;
+        NotifierType direction;
+        uint64_t captured_transferrable;
+    };
+    // A counter used as a token for progress notifications.
+    uint64_t m_progress_notifier_token = 1;
+    // How many bytes are uploadable or downloadable.
+    uint64_t m_current_uploadable;
+    uint64_t m_current_downloadable;
+    uint64_t m_current_uploaded;
+    uint64_t m_current_downloaded;
+    std::unordered_map<uint64_t, NotifierPackage> m_notifiers;
+
+    std::function<void()> create_notifier_invocation(const NotifierPackage&, bool&);
+
     mutable std::mutex m_state_mutex;
+    mutable std::mutex m_progress_notifier_mutex;
 
     const State* m_state = nullptr;
     size_t m_death_count = 0;
