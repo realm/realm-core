@@ -42,6 +42,13 @@ struct Header {
     uint8_t m_flags;
 };
 
+struct StreamingFooter {
+    uint64_t m_top_ref;
+    uint64_t m_magic_cookie;
+};
+
+static const uint_fast64_t footer_magic_cookie = 0x3034125237E526C8ULL;
+
 struct Entry {
     Entry() : Entry(0,0) {}
     Entry(unsigned s, unsigned l, unsigned v = 0) : start(s), length(l), version(v) {}
@@ -539,18 +546,37 @@ void RealmFile::check_leaked()
 RealmFile::RealmFile(std::ifstream& is)
     : m_is(is)
 {
+    unsigned topref = 0;
     union Buffer {
         Header file_header;
+        StreamingFooter file_footer;
         char plain[sizeof(Header)];
     } buffer;
 
     is.seekg (0);
     is.read(buffer.plain, sizeof(Header));
     if (is) {
-        unsigned topref = unsigned(buffer.file_header.m_top_ref[buffer.file_header.m_flags]);
+        if (std::memcmp(buffer.file_header.m_mnemonic, "T-DB", 4)) {
+            std::cerr << err_txt << "Not a realm file ?" << std::endl;
+        }
+        else {
+            topref = unsigned(buffer.file_header.m_top_ref[buffer.file_header.m_flags]);
+            if (topref == 0xFFFFFFFFULL && buffer.file_header.m_flags == 0) {
+                // Streaming format
+                is.seekg(0 - sizeof(StreamingFooter), is.end);
+                is.read(buffer.plain, sizeof(StreamingFooter));
+                if (buffer.file_footer.m_magic_cookie == footer_magic_cookie) {
+                    topref = unsigned(buffer.file_footer.m_top_ref);
+                }
+                else {
+                    std::cerr << err_txt << "Top ref not found" << std::endl;
+                    topref = 0;
+                }
+            }
+        }
+    }
+    if (topref) {
         process_group(topref);
-        // process_group(is, file_header.m_top_ref[0]);
-        // process_group(is, file_header.m_top_ref[1]);
     }
 }
 
