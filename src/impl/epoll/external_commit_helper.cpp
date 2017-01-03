@@ -65,7 +65,9 @@ void notify_fd(int fd)
         // write.
         if (ret != 0) {
             int err = errno;
-            throw std::system_error(err, std::system_category());
+            if (err != EAGAIN) {
+                throw std::system_error(err, std::system_category());
+            }
         }
         std::vector<uint8_t> buff(1024);
         read(fd, buff.data(), buff.size());
