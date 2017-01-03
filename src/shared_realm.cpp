@@ -212,7 +212,7 @@ void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
 
 SharedRealm Realm::get_shared_realm(Config config)
 {
-    auto coordinator = RealmCoordinator::get_coordinator(config.path);
+    auto coordinator = RealmCoordinator::get_coordinator(config);
     return coordinator->get_realm(std::move(config));
 }
 
