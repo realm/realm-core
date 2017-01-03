@@ -240,13 +240,13 @@ public:
     template <typename T>
     T resolve_thread_safe_reference(ThreadSafeReference<T> reference);
 
-    static SharedRealm make_shared_realm(Config config) {
+    static SharedRealm make_shared_realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator = nullptr) {
         struct make_shared_enabler : public Realm {
-            make_shared_enabler(Config config) : Realm(std::move(config)) {}
+            make_shared_enabler(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator)
+            : Realm(std::move(config), std::move(coordinator)) { }
         };
-        return std::make_shared<make_shared_enabler>(std::move(config));
+        return std::make_shared<make_shared_enabler>(std::move(config), std::move(coordinator));
     }
-    void init(std::shared_ptr<_impl::RealmCoordinator> coordinator);
 
     // Expose some internal functionality to other parts of the ObjectStore
     // without making it public to everyone
@@ -280,7 +280,7 @@ public:
 
 private:
     // `enable_shared_from_this` is unsafe with public constructors; use `make_shared_realm` instead
-    Realm(Config config);
+    Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator);
 
     Config m_config;
     AnyExecutionContextID m_execution_context;

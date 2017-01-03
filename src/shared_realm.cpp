@@ -70,7 +70,7 @@ const std::string& realm::get_temporary_directory() noexcept
     return temporary_directory;
 }
 
-Realm::Realm(Config config)
+Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator)
 : m_config(std::move(config))
 , m_execution_context(m_config.execution_context)
 {
@@ -79,10 +79,7 @@ Realm::Realm(Config config)
     if (m_read_only_group) {
         m_group = m_read_only_group.get();
     }
-}
 
-void Realm::init(std::shared_ptr<_impl::RealmCoordinator> coordinator)
-{
     // if there is an existing realm at the current path steal its schema/column mapping
     if (auto existing = coordinator ? coordinator->get_schema() : nullptr) {
         m_schema = *existing;
@@ -101,20 +98,6 @@ void Realm::init(std::shared_ptr<_impl::RealmCoordinator> coordinator)
     }
 
     m_coordinator = std::move(coordinator);
-
-    if (m_config.schema) {
-        try {
-            auto schema = std::move(*m_config.schema);
-            m_config.schema = util::none;
-            update_schema(std::move(schema), m_config.schema_version,
-                          std::move(m_config.migration_function));
-        }
-        catch (...) {
-            m_coordinator = nullptr; // don't try to unregister in the destructor as it'll deadlock
-            throw;
-        }
-    }
-
 }
 
 REALM_NOINLINE static void translate_file_exception(StringData path, bool read_only=false)
@@ -177,8 +160,6 @@ void Realm::open_with_config(const Config& config,
 {
     if (config.encryption_key.data() && config.encryption_key.size() != 64)
         throw InvalidEncryptionKeyException();
-    if (config.schema && config.schema_version == ObjectStore::NotVersioned)
-        throw std::logic_error("A schema version must be specified when the schema is specified");
     if (config.schema_mode == SchemaMode::ReadOnly && config.sync_config)
         throw std::logic_error("Synchronized Realms cannot be opened in read-only mode");
     if (config.schema_mode == SchemaMode::Additive && config.migration_function)
@@ -400,8 +381,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     bool additive = m_config.schema_mode == SchemaMode::Additive;
     if (migration_function && !additive) {
         auto wrapper = [&] {
-            SharedRealm old_realm(new Realm(m_config));
-            old_realm->init(nullptr);
+            SharedRealm old_realm(new Realm(m_config, nullptr));
             // Need to open in read-write mode so that it uses a SharedGroup, but
             // users shouldn't actually be able to write via the old realm
             old_realm->m_config.schema_mode = SchemaMode::ReadOnly;
@@ -425,7 +405,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
 void Realm::add_schema_change_handler()
 {
-    if (m_config.schema_mode == SchemaMode::Additive) {
+    if (m_coordinator && m_config.schema_mode == SchemaMode::Additive) {
         m_group->set_schema_change_notification_handler([&] {
             auto new_schema = ObjectStore::schema_from_group(read_group());
             auto required_changes = m_schema.compare(new_schema);
@@ -659,7 +639,7 @@ uint64_t Realm::get_schema_version(const Realm::Config &config)
         return coordinator->get_schema_version();
     }
 
-    return ObjectStore::get_schema_version(Realm(config).read_group());
+    return ObjectStore::get_schema_version(Realm(config, nullptr).read_group());
 }
 
 void Realm::close()

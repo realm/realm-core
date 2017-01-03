@@ -80,7 +80,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should reject mismatched config") {
-        config.cache = false;
+        SECTION("cached") { }
+        SECTION("uncached") { config.cache = false; }
 
         SECTION("schema version") {
             auto realm = Realm::get_shared_realm(config);
@@ -179,6 +180,29 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
         REQUIRE(it->persisted_properties[0].table_column == 0);
+    }
+
+    SECTION("should sensibly handle opening an uninitialized file without a schema specified") {
+        SECTION("cached") { }
+        SECTION("uncached") { config.cache = false; }
+
+        // create an empty file
+        File(config.path, File::mode_Write);
+
+        // open the empty file, but don't initialize the schema
+        Realm::Config config_without_schema = config;
+        config_without_schema.schema = util::none;
+        config_without_schema.schema_version = ObjectStore::NotVersioned;
+        auto realm = Realm::get_shared_realm(config_without_schema);
+        REQUIRE(realm->schema().empty());
+        REQUIRE(realm->schema_version() == ObjectStore::NotVersioned);
+        // verify that we can get another Realm instance
+        REQUIRE_NOTHROW(Realm::get_shared_realm(config_without_schema));
+
+        // verify that we can also still open the file with a proper schema
+        auto realm2 = Realm::get_shared_realm(config);
+        REQUIRE_FALSE(realm2->schema().empty());
+        REQUIRE(realm2->schema_version() == 1);
     }
 
     SECTION("should populate the table columns in the schema when opening as read-only") {
