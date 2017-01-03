@@ -44,10 +44,17 @@ public:
         }
 
         int message_pipe[2];
-        if (pipe2(message_pipe, O_CLOEXEC | O_NONBLOCK)) {
+        // pipe2 became part of bionic from API 9. But there are some devices with API > 10 that still have problems.
+        // See https://github.com/realm/realm-java/issues/3945 .
+        if (pipe(message_pipe)) {
             int err = errno;
-            LOGE("could not create WeakRealmNotifier ALooper message pipe: %s", strerror(err));
+            LOGE("could not create WeakRealmNotifier ALooper message pipe: %s.", strerror(err));
             return;
+        }
+        if (fcntl(message_pipe[0], F_SETFL, O_NONBLOCK) == -1 || fcntl(message_pipe[1], F_SETFL, O_NONBLOCK) == -1) {
+            int err = errno;
+            LOGE("could not set ALooper message pipe non-blocking: %s.", strerror(err));
+            // It still works in blocking mode.
         }
 
         if (ALooper_addFd(looper, message_pipe[0], 3 /* LOOPER_ID_USER */,
