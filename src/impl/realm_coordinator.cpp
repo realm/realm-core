@@ -101,8 +101,21 @@ void RealmCoordinator::create_sync_session()
 
 void RealmCoordinator::set_config(const Realm::Config& config)
 {
+    if (config.encryption_key.data() && config.encryption_key.size() != 64)
+        throw InvalidEncryptionKeyException();
+    if (config.schema_mode == SchemaMode::ReadOnly && config.sync_config)
+        throw std::logic_error("Synchronized Realms cannot be opened in read-only mode");
+    if (config.schema_mode == SchemaMode::Additive && config.migration_function)
+        throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
+    if (config.schema_mode == SchemaMode::ReadOnly && config.migration_function)
+        throw std::logic_error("Realms opened in read-only mode do not use a migration function");
+    if (config.schema && config.schema_version == ObjectStore::NotVersioned)
+        throw std::logic_error("A schema version must be specified when the schema is specified");
+    // ResetFile also won't use the migration function, but specifying one is
+    // allowed to simplify temporarily switching modes during development
+
     bool no_existing_realm = std::all_of(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers),
-                                         [](auto& realm) { return realm.expired(); });
+                                         [](auto& notifier) { return notifier.expired(); });
     if (no_existing_realm) {
         m_config = config;
     }
@@ -186,8 +199,6 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
         auto old_schema_version = m_schema_version;
         lock.unlock();
 
-        if (config.schema_version == ObjectStore::NotVersioned)
-            throw std::logic_error("A schema version must be specified when the schema is specified");
         if (old_schema_version != ObjectStore::NotVersioned && old_schema_version != config.schema_version)
             throw MismatchedConfigException("Realm at path '%1' already opened with different schema version.", config.path);
         realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function));
