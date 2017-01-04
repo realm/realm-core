@@ -24,6 +24,7 @@
 
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
+#include <realm/binary_data.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/sync/client.hpp>
@@ -134,6 +135,7 @@ public:
         std::string path;
         // User-supplied encryption key. Must be either empty or 64 bytes.
         std::vector<char> encryption_key;
+        BinaryData realm_data;
 
         bool in_memory = false;
         SchemaMode schema_mode = SchemaMode::Automatic;
@@ -210,6 +212,7 @@ public:
     void invalidate();
     bool compact();
     void write_copy(StringData path, BinaryData encryption_key);
+    BinaryData write_copy_to_mem();
 
     void verify_thread() const;
     void verify_in_write() const;
