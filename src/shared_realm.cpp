@@ -186,7 +186,7 @@ void Realm::open_with_config(const Config& config,
     if (config.schema_mode == SchemaMode::ReadOnly && config.migration_function)
         throw std::logic_error("Realms opened in read-only mode do not use a migration function");
     if (!config.realm_data.is_null() && !config.read_only())
-        throw std::logic_error("In-memory realms from static buffers can only be opened in read-only mode");
+        throw std::logic_error("In-memory realms initialized from memory buffers can only be opened in read-only mode");
     // ResetFile also won't use the migration function, but specifying one is
     // allowed to simplify temporarily switching modes during development
 
