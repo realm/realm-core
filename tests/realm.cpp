@@ -326,12 +326,12 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
     SECTION("Save and open Realm from in-memory buffer") {
         // Write in-memory copy of Realm to a buffer
         auto realm = Realm::get_shared_realm(config);
-        BinaryData realm_buffer = realm->write_copy_to_mem();
+        OwnedBinaryData realm_buffer = realm->write_copy_to_mem();
         
         // Open the buffer as a new (read-only in-memory) Realm
         realm::Realm::Config config2;
         config2.schema_mode = SchemaMode::ReadOnly;
-        config2.realm_data = realm_buffer;
+        config2.realm_data = realm_buffer.get();
         
         auto realm2 = Realm::get_shared_realm(config2);
         
@@ -342,8 +342,5 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
         REQUIRE(it->persisted_properties[0].table_column == 0);
-        
-        // Clean up (we still have ownership of the buffer
-        free((char*)realm_buffer.data());
     }
 }

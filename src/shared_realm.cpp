@@ -587,10 +587,14 @@ void Realm::write_copy(StringData path, BinaryData key)
     }
 }
 
-BinaryData Realm::write_copy_to_mem()
+OwnedBinaryData Realm::write_copy_to_mem()
 {
     verify_thread();
-    return read_group().write_to_mem();
+    BinaryData buffer = read_group().write_to_mem();
+
+    // Since OwnedBinaryData does not have a constructor directly taking
+    // ownership of BinaryData, we have to do this to avoid copying the buffer
+    return OwnedBinaryData(std::unique_ptr<char[]>((char*)buffer.data()), buffer.size());
 }
 
 void Realm::notify()

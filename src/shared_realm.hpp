@@ -212,7 +212,7 @@ public:
     void invalidate();
     bool compact();
     void write_copy(StringData path, BinaryData encryption_key);
-    BinaryData write_copy_to_mem();
+    OwnedBinaryData write_copy_to_mem();
 
     void verify_thread() const;
     void verify_in_write() const;
