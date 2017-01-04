@@ -43,10 +43,11 @@ using namespace realm::test_util;
 
 uint_fast64_t Timer::get_timer_ticks() const
 {
+// FIXME: Need to find UWP version of this
 #if !REALM_UWP
     return GetTickCount();
 #else
-	return 0;
+    return 0;
 #endif
 }
 
