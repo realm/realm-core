@@ -131,6 +131,7 @@ void GlobalNotifier::calculate()
 
         std::lock_guard<std::mutex> l2(m_deliver_queue_mutex);
         m_pending_deliveries.push({
+            next.info,
             sg.get_version_of_current_transaction(),
             next.target_version,
             std::move(next.realm),
@@ -140,12 +141,13 @@ void GlobalNotifier::calculate()
     }
 }
 
-Realm::Config GlobalNotifier::get_config(StringData realm_id, StringData realm_name)
+Realm::Config GlobalNotifier::get_config(std::string realm_path)
 {
     Realm::Config config;
-    config.path =  util::File::resolve(std::string(realm_id) + ".realm", m_regular_realms_dir);
+    auto realm_id = m_realm_ids[realm_path];
+    config.path =  util::File::resolve(realm_id + ".realm", m_regular_realms_dir);
     config.sync_config = std::shared_ptr<SyncConfig>(
-        new SyncConfig{m_user, m_server_base_url + realm_name.data(), SyncSessionStopPolicy::AfterChangesUploaded,
+        new SyncConfig{m_user, m_server_base_url + realm_path.data(), SyncSessionStopPolicy::AfterChangesUploaded,
             [&](auto, const auto& config, auto session) {
                 session->bind_with_admin_token(config.user->refresh_token(), config.realm_url);
             }, 
@@ -157,10 +159,10 @@ Realm::Config GlobalNotifier::get_config(StringData realm_id, StringData realm_n
     return config;
 }
 
-void GlobalNotifier::add_realm(std::string realm_id, std::string realm_name) {
-    auto config = get_config(realm_id, realm_name);
+void GlobalNotifier::register_realm(RealmInfo info) {
+    auto config = get_config(info.second);
     auto coordinator = _impl::RealmCoordinator::get_coordinator(config);
-    m_listen_entries[realm_name] = coordinator;
+    m_listen_entries[info.first] = coordinator;
 
     auto realm = Realm::make_shared_realm(std::move(config));
     if (realm->read_group().is_empty())
@@ -169,7 +171,7 @@ void GlobalNotifier::add_realm(std::string realm_id, std::string realm_name) {
     auto unowned_coordinator = coordinator.get();
 
     std::weak_ptr<GlobalNotifier> weak_self = shared_from_this();
-    coordinator->set_transaction_callback([weak_self, unowned_coordinator](VersionID old_version, VersionID new_version) {
+    coordinator->set_transaction_callback([weak_self, unowned_coordinator, info](VersionID old_version, VersionID new_version) {
         auto config = unowned_coordinator->get_config();
         config.schema = util::none;
         auto realm = Realm::make_shared_realm(std::move(config));
@@ -178,7 +180,7 @@ void GlobalNotifier::add_realm(std::string realm_id, std::string realm_name) {
 
         if (auto self = weak_self.lock()) {
             std::lock_guard<std::mutex> l(self->m_work_queue_mutex);
-            self->m_work_queue.push(RealmToCalculate{std::move(realm), new_version});
+            self->m_work_queue.push(RealmToCalculate{info, std::move(realm), new_version});
             self->m_work_queue_cv.notify_one();
         }
     });
@@ -188,7 +190,8 @@ void GlobalNotifier::register_realms(std::vector<AdminRealmListener::RealmInfo> 
 {
     std::vector<bool> new_realms;
     for (auto &realm_info : realms) {
-        new_realms.push_back(m_listen_entries.count(realm_info.second) == 0);
+        m_realm_ids[realm_info.second] = realm_info.first;
+        new_realms.push_back(m_listen_entries.count(realm_info.first) == 0);
     }
     std::vector<bool> monitor = m_target->available(realms, new_realms, all);
 
@@ -196,8 +199,7 @@ void GlobalNotifier::register_realms(std::vector<AdminRealmListener::RealmInfo> 
         if (!monitor[i])
             continue;
 
-        std::string &realm_id = realms[i].first, &realm_name = realms[i].second;
-        add_realm(realm_id, realm_name);
+        register_realm(realms[i]);
     }
 }
 
@@ -235,11 +237,13 @@ bool GlobalNotifier::has_pending()
     return !m_pending_deliveries.empty();
 }
 
-GlobalNotifier::ChangeNotification::ChangeNotification(VersionID old_version,
+GlobalNotifier::ChangeNotification::ChangeNotification(RealmInfo info,
+                                                       VersionID old_version,
                                                        VersionID new_version,
                                                        SharedRealm realm,
                                                        std::unordered_map<std::string, CollectionChangeSet> changes)
-: m_old_version(old_version)
+: realm_info(info)
+, m_old_version(old_version)
 , m_new_version(new_version)
 , m_realm(std::move(realm))
 , m_changes(std::move(changes))

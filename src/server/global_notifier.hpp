@@ -71,8 +71,13 @@ public:
     // Returns the target callback
     Callback *target() { return m_target.get(); }
 
+    // RealmInfo is combination of realm_id and realm_path
+    using RealmInfo = std::pair<std::string, std::string>;
+
     class ChangeNotification {
     public:
+        RealmInfo realm_info;
+
         // The Realm which changed, at the version immediately before the changes
         // made. `modifications` and `deletions` within the change sets are indices
         // in this Realm.
@@ -104,14 +109,14 @@ public:
         SharedRealm m_realm;
         std::unordered_map<std::string, CollectionChangeSet> m_changes;
 
-        ChangeNotification(VersionID old_version, VersionID new_version, SharedRealm,
-                           std::unordered_map<std::string, CollectionChangeSet>);
+        ChangeNotification(GlobalNotifier::RealmInfo, VersionID old_version, VersionID new_version, 
+                           SharedRealm, std::unordered_map<std::string, CollectionChangeSet>);
         ChangeNotification() = default;
 
         friend class GlobalNotifier;
     };
 
-    void add_realm(std::string local_path, std::string realm_name);
+    Realm::Config get_config(std::string realm_path);
 
 private:
     GlobalNotifier(std::unique_ptr<Callback>, std::string local_root_dir,
@@ -124,14 +129,15 @@ private:
     std::shared_ptr<SyncUser> m_user;
     std::string m_regular_realms_dir;
 
-    // key is realm_name
     std::unordered_map<std::string, std::shared_ptr<_impl::RealmCoordinator>> m_listen_entries;
+    std::unordered_map<std::string, std::string> m_realm_ids;
 
     std::shared_ptr<ChangesetTransformer> m_transformer = nullptr;
 
     std::mutex m_work_queue_mutex;
     std::condition_variable m_work_queue_cv;
     struct RealmToCalculate {
+        RealmInfo info;
         std::shared_ptr<Realm> realm;
         VersionID target_version;
     };
@@ -144,8 +150,9 @@ private:
 
     bool m_waiting = false;
 
-    Realm::Config get_config(StringData realm_id, StringData realm_name);
-    void register_realms(std::vector<std::pair<std::string, std::string>>, bool all);
+    void register_realms(std::vector<RealmInfo>, bool all);
+    void register_realm(RealmInfo info);
+
     void on_change();
     void calculate();
 
@@ -176,7 +183,7 @@ public:
     ///
     /// \param name The name (virtual path) by which the server knows that
     /// Realm.
-    virtual std::vector<bool> available(std::vector<std::pair<std::string, std::string>> realms,
+    virtual std::vector<bool> available(std::vector<GlobalNotifier::RealmInfo> realms,
                                         std::vector<bool> new_realms,
                                         bool all) = 0;
 
