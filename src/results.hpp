@@ -226,7 +226,7 @@ private:
     void prepare_async();
 
     template<typename Int, typename Float, typename Double, typename Timestamp>
-    util::Optional<Mixed> aggregate(size_t column, bool return_none_for_empty,
+    util::Optional<Mixed> aggregate(size_t column,
                                     const char* name,
                                     Int agg_int, Float agg_float,
                                     Double agg_double, Timestamp agg_timestamp);
