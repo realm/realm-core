@@ -101,7 +101,28 @@ void RealmCoordinator::create_sync_session()
 
 void RealmCoordinator::set_config(const Realm::Config& config)
 {
-    if ((!m_config.read_only() && !m_notifier) || (m_config.read_only() && m_weak_realm_notifiers.empty())) {
+    if (config.encryption_key.data() && config.encryption_key.size() != 64)
+        throw InvalidEncryptionKeyException();
+    if (config.schema_mode == SchemaMode::ReadOnly && config.sync_config)
+        throw std::logic_error("Synchronized Realms cannot be opened in read-only mode");
+    if (config.schema_mode == SchemaMode::Additive && config.migration_function)
+        throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
+    if (config.schema_mode == SchemaMode::ReadOnly && config.migration_function)
+        throw std::logic_error("Realms opened in read-only mode do not use a migration function");
+    if (config.schema && config.schema_version == ObjectStore::NotVersioned)
+        throw std::logic_error("A schema version must be specified when the schema is specified");
+    if (!config.realm_data.is_null() && (!config.read_only() || !config.in_memory))
+        throw std::logic_error("In-memory realms initialized from memory buffers can only be opened in read-only mode");
+    if (!config.realm_data.is_null() && !config.path.empty())
+        throw std::logic_error("Specifying both memory buffer and path is invalid");
+    if (!config.realm_data.is_null() && !config.encryption_key.empty())
+        throw std::logic_error("Memory buffers do not support encryption");
+    // ResetFile also won't use the migration function, but specifying one is
+    // allowed to simplify temporarily switching modes during development
+
+    bool no_existing_realm = std::all_of(begin(m_weak_realm_notifiers), end(m_weak_realm_notifiers),
+                                         [](auto& notifier) { return notifier.expired(); });
+    if (no_existing_realm) {
         m_config = config;
     }
     else {
@@ -116,9 +137,6 @@ void RealmCoordinator::set_config(const Realm::Config& config)
         }
         if (m_config.schema_mode != config.schema_mode) {
             throw MismatchedConfigException("Realm at path '%1' already opened with a different schema mode.", config.path);
-        }
-        if (m_config.schema_version != config.schema_version && config.schema_version != ObjectStore::NotVersioned) {
-            throw MismatchedConfigException("Realm at path '%1' already opened with different schema version.", config.path);
         }
 
 #if REALM_ENABLE_SYNC
@@ -148,35 +166,50 @@ void RealmCoordinator::set_config(const Realm::Config& config)
 
 std::shared_ptr<Realm> RealmCoordinator::get_realm(Realm::Config config)
 {
-    std::lock_guard<std::mutex> lock(m_realm_mutex);
+    std::unique_lock<std::mutex> lock(m_realm_mutex);
 
     set_config(config);
 
+    auto schema = std::move(config.schema);
+    auto migration_function = std::move(config.migration_function);
+    config.schema = {};
+
+    std::shared_ptr<Realm> realm;
     if (config.cache) {
         AnyExecutionContextID execution_context(config.execution_context);
         for (auto& cached_realm : m_weak_realm_notifiers) {
-            if (cached_realm.is_cached_for_execution_context(execution_context)) {
-                // can be null if we jumped in between ref count hitting zero and
-                // unregister_realm() getting the lock
-                if (auto realm = cached_realm.realm()) {
-                    return realm;
-                }
+            if (!cached_realm.is_cached_for_execution_context(execution_context))
+                continue;
+            realm = cached_realm.realm();
+            // can be null if we jumped in between ref count hitting zero and
+            // unregister_realm() getting the lock
+            if (realm)
+                break;
+        }
+    }
+    if (!realm) {
+        realm = Realm::make_shared_realm(std::move(config), shared_from_this());
+        if (!config.read_only() && !m_notifier && config.automatic_change_notifications) {
+            try {
+                m_notifier = std::make_unique<ExternalCommitHelper>(*this);
+            }
+            catch (std::system_error const& ex) {
+                lock.unlock();
+                throw RealmFileException(RealmFileException::Kind::AccessError, config.path, ex.code().message(), "");
             }
         }
+        m_weak_realm_notifiers.emplace_back(realm, m_config.cache);
     }
 
-    auto realm = Realm::make_shared_realm(std::move(config));
-    if (!config.read_only() && !m_notifier && config.automatic_change_notifications) {
-        try {
-            m_notifier = std::make_unique<ExternalCommitHelper>(*this);
-        }
-        catch (std::system_error const& ex) {
-            throw RealmFileException(RealmFileException::Kind::AccessError, config.path, ex.code().message(), "");
-        }
-    }
-    realm->init(shared_from_this());
+    if (schema) {
+        auto old_schema_version = m_schema_version;
+        lock.unlock();
 
-    m_weak_realm_notifiers.emplace_back(realm, m_config.cache);
+        if (old_schema_version != ObjectStore::NotVersioned && old_schema_version != config.schema_version)
+            throw MismatchedConfigException("Realm at path '%1' already opened with different schema version.", config.path);
+        realm->update_schema(std::move(*schema), config.schema_version, std::move(migration_function));
+    }
+
     return realm;
 }
 
@@ -192,14 +225,8 @@ const Schema* RealmCoordinator::get_schema() const noexcept
 
 void RealmCoordinator::update_schema(Schema const& schema, uint64_t schema_version)
 {
-    if (m_schema_version != uint64_t(-1) && m_schema_version != schema_version && m_weak_realm_notifiers.size() > 1) {
-        throw MismatchedConfigException("Realm at path '%1' already opened with a different schema version.", m_config.path);
-    }
-
     m_schema = schema;
     m_schema_version = schema_version;
-
-    // FIXME: notify realms of the schema change
 }
 
 RealmCoordinator::RealmCoordinator() = default;
