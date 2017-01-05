@@ -185,8 +185,12 @@ void Realm::open_with_config(const Config& config,
         throw std::logic_error("Realms opened in Additive-only schema mode do not use a migration function");
     if (config.schema_mode == SchemaMode::ReadOnly && config.migration_function)
         throw std::logic_error("Realms opened in read-only mode do not use a migration function");
-    if (!config.realm_data.is_null() && !config.read_only())
+    if (!config.realm_data.is_null() && (!config.read_only() || !config.in_memory))
         throw std::logic_error("In-memory realms initialized from memory buffers can only be opened in read-only mode");
+    if (!config.realm_data.is_null() && !config.path.empty())
+        throw std::logic_error("Specifying both memory buffer and path is invalid");
+    if (!config.realm_data.is_null() && !config.encryption_key.empty())
+        throw std::logic_error("Memory buffers do not support encryption");
     // ResetFile also won't use the migration function, but specifying one is
     // allowed to simplify temporarily switching modes during development
 
@@ -587,7 +591,7 @@ void Realm::write_copy(StringData path, BinaryData key)
     }
 }
 
-OwnedBinaryData Realm::write_copy_to_mem()
+OwnedBinaryData Realm::write_copy()
 {
     verify_thread();
     BinaryData buffer = read_group().write_to_mem();
