@@ -24,6 +24,7 @@
 
 #include <realm/util/optional.hpp>
 #include <realm/version_id.hpp>
+#include <realm/binary_data.hpp>
 
 #if REALM_ENABLE_SYNC
 #include <realm/sync/client.hpp>
@@ -131,9 +132,12 @@ public:
     using MigrationFunction = std::function<void (SharedRealm old_realm, SharedRealm realm, Schema&)>;
 
     struct Config {
+        // Path and binary data are mutually exclusive
         std::string path;
+        BinaryData realm_data;
         // User-supplied encryption key. Must be either empty or 64 bytes.
         std::vector<char> encryption_key;
+        
 
         bool in_memory = false;
         SchemaMode schema_mode = SchemaMode::Automatic;
@@ -210,6 +214,7 @@ public:
     void invalidate();
     bool compact();
     void write_copy(StringData path, BinaryData encryption_key);
+    OwnedBinaryData write_copy();
 
     void verify_thread() const;
     void verify_in_write() const;

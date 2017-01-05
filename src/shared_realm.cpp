@@ -160,7 +160,13 @@ void Realm::open_with_config(const Config& config,
 {
     try {
         if (config.read_only()) {
-            read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
+            if (config.realm_data.is_null()) {
+                read_only_group = std::make_unique<Group>(config.path, config.encryption_key.data(), Group::mode_ReadOnly);
+            }
+            else {
+                // Create in-memory read-only realm from existing buffer (without taking ownership of the buffer)
+                read_only_group = std::make_unique<Group>(config.realm_data, false);
+            }
         }
         else {
             bool server_synchronization_mode = bool(config.sync_config) || config.force_sync_history;
@@ -546,6 +552,16 @@ void Realm::write_copy(StringData path, BinaryData key)
     catch (...) {
         translate_file_exception(path);
     }
+}
+
+OwnedBinaryData Realm::write_copy()
+{
+    verify_thread();
+    BinaryData buffer = read_group().write_to_mem();
+
+    // Since OwnedBinaryData does not have a constructor directly taking
+    // ownership of BinaryData, we have to do this to avoid copying the buffer
+    return OwnedBinaryData(std::unique_ptr<char[]>((char*)buffer.data()), buffer.size());
 }
 
 void Realm::notify()
