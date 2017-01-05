@@ -34,6 +34,7 @@
 #include "util/misc.hpp"
 
 #include "test.hpp"
+#include "test_table_helper.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -901,12 +902,17 @@ TEST(Table_Floats)
 
 namespace {
 
-enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
-
-class TestTable : public Table {
+class TestTable01 : public TestTable {
 public:
-    TestTable(Allocator& a) : Table(a) { init(); }
-    TestTable() { init(); }
+    TestTable01(Allocator& a)
+        : TestTable(a)
+    {
+        init();
+    }
+    TestTable01()
+    {
+        init();
+    }
     void init()
     {
         add_column(type_Int, "first");
@@ -914,22 +920,14 @@ public:
         add_column(type_Bool, "third");
         add_column(type_Int, "fourth");
     }
-    void add(int first, int second, bool third, Days forth)
-    {
-        size_t ndx = add_empty_row(1);
-        set_int(0, ndx, first);
-        set_int(1, ndx, second);
-        set_bool(2, ndx, third);
-        set_int(3, ndx, forth);
-    }
 };
 
 } // anonymous namespace
 
 TEST(Table_2)
 {
-    TestTable table;
-    table.add(0, 10, true, Wed);
+    TestTable01 table;
+    add(table, 0, 10, true, Wed);
 
     CHECK_EQUAL(0, table.get_int(0, 0));
     CHECK_EQUAL(10, table.get_int(1, 0));
@@ -943,10 +941,10 @@ TEST(Table_2)
 
 TEST(Table_3)
 {
-    TestTable table;
+    TestTable01 table;
 
     for (size_t i = 0; i < 100; ++i) {
-        table.add(0, 10, true, Wed);
+        add(table, 0, 10, true, Wed);
     }
 
     // Test column searching
@@ -966,19 +964,12 @@ TEST(Table_3)
 
 namespace {
 
-class TestTableEnum : public Table {
+class TestTableEnum : public TestTable {
 public:
     TestTableEnum()
     {
         add_column(type_Int, "first");
         add_column(type_String, "second");
-    }
-
-    void add(Days first, std::string second)
-    {
-        size_t ndx = add_empty_row(1);
-        set_int(0, ndx, first);
-        set_string(1, ndx, second);
     }
 };
 
@@ -988,8 +979,8 @@ TEST(Table_4)
 {
     TestTableEnum table;
 
-    table.add(Mon, "Hello");
-    table.add(Mon, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
+    add(table, Mon, "Hello");
+    add(table, Mon, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
 
     CHECK_EQUAL(Mon, table.get_int(0, 0));
     CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello",
@@ -1007,18 +998,12 @@ TEST(Table_4)
 
 namespace {
 
-class TestTableFloats : public Table {
+class TestTableFloats : public TestTable {
 public:
     TestTableFloats()
     {
         add_column(type_Float, "first");
         add_column(type_Double, "second");
-    }
-    void add(float first, double second)
-    {
-        size_t ndx = add_empty_row(1);
-        set_float(0, ndx, first);
-        set_double(1, ndx, second);
     }
 };
 
@@ -1028,8 +1013,8 @@ TEST(Table_Float2)
 {
     TestTableFloats table;
 
-    table.add(1.1f, 2.2);
-    table.add(1.1f, 2.2);
+    add(table, 1.1f, 2.2);
+    add(table, 1.1f, 2.2);
 
     CHECK_EQUAL(1.1f, table.get_float(0, 0));
     CHECK_EQUAL(2.2, table.get_double(1, 1));
@@ -1042,10 +1027,10 @@ TEST(Table_Float2)
 
 TEST(Table_Delete)
 {
-    TestTable table;
+    TestTable01 table;
 
     for (size_t i = 0; i < 10; ++i) {
-        table.add(0, i, true, Wed);
+        add(table, 0, i, true, Wed);
     }
 
     table.remove(0);
@@ -1311,15 +1296,15 @@ TEST(Table_LowLevelCopy)
 
 TEST(Table_HighLevelCopy)
 {
-    TestTable table;
-    table.add(10, 120, false, Mon);
-    table.add(12, 100, true, Tue);
+    TestTable01 table;
+    add(table, 10, 120, false, Mon);
+    add(table, 12, 100, true, Tue);
 
 #ifdef REALM_DEBUG
     table.verify();
 #endif
 
-    TestTable table2 = table;
+    TestTable01 table2 = table;
 
 #ifdef REALM_DEBUG
     table2.verify();
@@ -1639,10 +1624,10 @@ st...  enum2          7 bytes     -1     [3]\n";
 
 TEST(Table_FindInt)
 {
-    TestTable table;
+    TestTable01 table;
 
     for (int i = 1000; i >= 0; --i) {
-        table.add(0, i, true, Wed);
+        add(table, 0, i, true, Wed);
     }
 
     CHECK_EQUAL(size_t(0),    table.column().second.find_first(1000));
@@ -1686,18 +1671,18 @@ TEST(Table_6)
 
 TEST(Table_FindAllInt)
 {
-    TestTable table;
+    TestTable01 table;
 
-    table.add(0, 10, true, Wed);
-    table.add(0, 20, true, Wed);
-    table.add(0, 10, true, Wed);
-    table.add(0, 20, true, Wed);
-    table.add(0, 10, true, Wed);
-    table.add(0, 20, true, Wed);
-    table.add(0, 10, true, Wed);
-    table.add(0, 20, true, Wed);
-    table.add(0, 10, true, Wed);
-    table.add(0, 20, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 20, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 20, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 20, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 20, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 20, true, Wed);
 
     // Search for a value that does not exits
     auto v0 = table.find_all_int(1, 5);
@@ -1720,18 +1705,18 @@ TEST(Table_FindAllInt)
 
 TEST(Table_SortedInt)
 {
-    TestTable table;
+    TestTable01 table;
 
-    table.add(0, 10, true, Wed); // 0: 4
-    table.add(0, 20, true, Wed); // 1: 7
-    table.add(0, 0, true, Wed);  // 2: 0
-    table.add(0, 40, true, Wed); // 3: 8
-    table.add(0, 15, true, Wed); // 4: 6
-    table.add(0, 11, true, Wed); // 5: 5
-    table.add(0, 6, true, Wed);  // 6: 3
-    table.add(0, 4, true, Wed);  // 7: 2
-    table.add(0, 99, true, Wed); // 8: 9
-    table.add(0, 2, true, Wed);  // 9: 1
+    add(table, 0, 10, true, Wed); // 0: 4
+    add(table, 0, 20, true, Wed); // 1: 7
+    add(table, 0, 0, true, Wed);  // 2: 0
+    add(table, 0, 40, true, Wed); // 3: 8
+    add(table, 0, 15, true, Wed); // 4: 6
+    add(table, 0, 11, true, Wed); // 5: 5
+    add(table, 0, 6, true, Wed);  // 6: 3
+    add(table, 0, 4, true, Wed);  // 7: 2
+    add(table, 0, 99, true, Wed); // 8: 9
+    add(table, 0, 2, true, Wed);  // 9: 1
 
     // Search for a value that does not exits
     auto v = table.get_sorted_view(1);
@@ -1757,18 +1742,18 @@ TEST(Table_SortedInt)
 TEST(Table_Sorted_Query_where)
 {
     // Using where(tv) instead of tableview(tv)
-    TestTable table;
+    TestTable01 table;
 
-    table.add(0, 10, true, Wed);  // 0: 4
-    table.add(0, 20, false, Wed); // 1: 7
-    table.add(0, 0, false, Wed);  // 2: 0
-    table.add(0, 40, false, Wed); // 3: 8
-    table.add(0, 15, false, Wed); // 4: 6
-    table.add(0, 11, true, Wed);  // 5: 5
-    table.add(0, 6, true, Wed);   // 6: 3
-    table.add(0, 4, true, Wed);   // 7: 2
-    table.add(0, 99, true, Wed);  // 8: 9
-    table.add(0, 2, true, Wed);   // 9: 1
+    add(table, 0, 10, true, Wed);  // 0: 4
+    add(table, 0, 20, false, Wed); // 1: 7
+    add(table, 0, 0, false, Wed);  // 2: 0
+    add(table, 0, 40, false, Wed); // 3: 8
+    add(table, 0, 15, false, Wed); // 4: 6
+    add(table, 0, 11, true, Wed);  // 5: 5
+    add(table, 0, 6, true, Wed);   // 6: 3
+    add(table, 0, 4, true, Wed);   // 7: 2
+    add(table, 0, 99, true, Wed);  // 8: 9
+    add(table, 0, 2, true, Wed);   // 9: 1
 
     // Count booleans
     size_t count_original = table.where().equal(2, false).count();
@@ -1847,14 +1832,14 @@ TEST(Table_IndexString)
 {
     TestTableEnum table;
 
-    table.add(Mon, "jeff");
-    table.add(Tue, "jim");
-    table.add(Wed, "jennifer");
-    table.add(Thu, "john");
-    table.add(Fri, "jimmy");
-    table.add(Sat, "jimbo");
-    table.add(Sun, "johnny");
-    table.add(Mon, "jennifer"); // duplicate
+    add(table, Mon, "jeff");
+    add(table, Tue, "jim");
+    add(table, Wed, "jennifer");
+    add(table, Thu, "john");
+    add(table, Fri, "jimmy");
+    add(table, Sat, "jimbo");
+    add(table, Sun, "johnny");
+    add(table, Mon, "jennifer"); // duplicate
 
     table.add_search_index(1);
     CHECK(table.has_search_index(1));
@@ -1880,14 +1865,14 @@ TEST(Table_IndexStringTwice)
 {
     TestTableEnum table;
 
-    table.add(Mon, "jeff");
-    table.add(Tue, "jim");
-    table.add(Wed, "jennifer");
-    table.add(Thu, "john");
-    table.add(Fri, "jimmy");
-    table.add(Sat, "jimbo");
-    table.add(Sun, "johnny");
-    table.add(Mon, "jennifer"); // duplicate
+    add(table, Mon, "jeff");
+    add(table, Tue, "jim");
+    add(table, Wed, "jennifer");
+    add(table, Thu, "john");
+    add(table, Fri, "jimmy");
+    add(table, Sat, "jimbo");
+    add(table, Sun, "johnny");
+    add(table, Mon, "jennifer"); // duplicate
 
     table.add_search_index(1);
     CHECK_EQUAL(true, table.has_search_index(1));
@@ -2229,14 +2214,14 @@ TEST(Table_Distinct)
 {
     TestTableEnum table;
 
-    table.add(Mon, "A");
-    table.add(Tue, "B");
-    table.add(Wed, "C");
-    table.add(Thu, "B");
-    table.add(Fri, "C");
-    table.add(Sat, "D");
-    table.add(Sun, "D");
-    table.add(Mon, "D");
+    add(table, Mon, "A");
+    add(table, Tue, "B");
+    add(table, Wed, "C");
+    add(table, Thu, "B");
+    add(table, Fri, "C");
+    add(table, Sat, "D");
+    add(table, Sun, "D");
+    add(table, Mon, "D");
 
     table.add_search_index(1);
     CHECK(table.has_search_index(1));
@@ -2254,14 +2239,14 @@ TEST(Table_Distinct)
 TEST(Table_DistinctEnums)
 {
     TestTableEnum table;
-    table.add(Mon, "A");
-    table.add(Tue, "B");
-    table.add(Wed, "C");
-    table.add(Thu, "B");
-    table.add(Fri, "C");
-    table.add(Sat, "D");
-    table.add(Sun, "D");
-    table.add(Mon, "D");
+    add(table, Mon, "A");
+    add(table, Tue, "B");
+    add(table, Wed, "C");
+    add(table, Thu, "B");
+    add(table, Fri, "C");
+    add(table, Sat, "D");
+    add(table, Sun, "D");
+    add(table, Mon, "D");
 
     table.add_search_index(0);
     CHECK(table.has_search_index(0));
@@ -2416,18 +2401,18 @@ TEST(Table_DistinctFromPersistedTable)
 
 TEST(Table_IndexInt)
 {
-    TestTable table;
+    TestTable01 table;
 
-    table.add(0, 1, true, Wed);
-    table.add(0, 15, true, Wed);
-    table.add(0, 10, true, Wed);
-    table.add(0, 20, true, Wed);
-    table.add(0, 11, true, Wed);
-    table.add(0, 45, true, Wed);
-    table.add(0, 10, true, Wed);
-    table.add(0, 0, true, Wed);
-    table.add(0, 30, true, Wed);
-    table.add(0, 9, true, Wed);
+    add(table, 0, 1, true, Wed);
+    add(table, 0, 15, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 20, true, Wed);
+    add(table, 0, 11, true, Wed);
+    add(table, 0, 45, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 0, true, Wed);
+    add(table, 0, 30, true, Wed);
+    add(table, 0, 9, true, Wed);
 
     // Create index for column two
     table.add_search_index(1);
@@ -2464,7 +2449,7 @@ TEST(Table_IndexInt)
     CHECK_EQUAL(9, table.find_first_int(1, 100));
 
     // Insert values
-    table.add(0, 29, true, Wed);
+    add(table, 0, 29, true, Wed);
     // TODO: More than add
 
     CHECK_EQUAL(0, table.find_first_int(1, 1));
@@ -2501,7 +2486,7 @@ TEST(Table_IndexInt)
 
 namespace {
 
-class TestTableAE : public Table {
+class TestTableAE : public TestTable {
 public:
     TestTableAE()
     {
@@ -2509,14 +2494,6 @@ public:
         add_column(type_String, "second");
         add_column(type_Bool, "third");
         add_column(type_Int, "fourth");
-    }
-    void add(int first, std::string second, bool third, Days forth)
-    {
-        size_t ndx = add_empty_row(1);
-        set_int(0, ndx, first);
-        set_string(1, ndx, second);
-        set_bool(2, ndx, third);
-        set_int(3, ndx, forth);
     }
 };
 
@@ -2527,11 +2504,11 @@ TEST(Table_AutoEnumeration)
     TestTableAE table;
 
     for (size_t i = 0; i < 5; ++i) {
-        table.add(1, "abd", true, Mon);
-        table.add(2, "eftg", true, Tue);
-        table.add(5, "hijkl", true, Wed);
-        table.add(8, "mnopqr", true, Thu);
-        table.add(9, "stuvxyz", true, Fri);
+        add(table, 1, "abd", true, Mon);
+        add(table, 2, "eftg", true, Tue);
+        add(table, 5, "hijkl", true, Wed);
+        add(table, 8, "mnopqr", true, Thu);
+        add(table, 9, "stuvxyz", true, Fri);
     }
 
     table.optimize();
@@ -2582,11 +2559,11 @@ TEST(Table_AutoEnumerationFindFindAll)
     TestTableAE table;
 
     for (size_t i = 0; i < 5; ++i) {
-        table.add(1, "abd", true, Mon);
-        table.add(2, "eftg", true, Tue);
-        table.add(5, "hijkl", true, Wed);
-        table.add(8, "mnopqr", true, Thu);
-        table.add(9, "stuvxyz", true, Fri);
+        add(table, 1, "abd", true, Mon);
+        add(table, 2, "eftg", true, Tue);
+        add(table, 5, "hijkl", true, Wed);
+        add(table, 8, "mnopqr", true, Thu);
+        add(table, 9, "stuvxyz", true, Fri);
     }
 
     table.optimize();
@@ -2733,9 +2710,9 @@ TEST(Table_SlabAlloc)
 {
     SlabAlloc alloc;
     alloc.attach_empty();
-    TestTable table(alloc);
+    TestTable01 table(alloc);
 
-    table.add(0, 10, true, Wed);
+    add(table, 0, 10, true, Wed);
 
     CHECK_EQUAL(0, table.get_int(0, 0));
     CHECK_EQUAL(10, table.get_int(1, 0));
@@ -2743,11 +2720,11 @@ TEST(Table_SlabAlloc)
     CHECK_EQUAL(Wed, table.get_int(3, 0));
 
     // Add some more rows
-    table.add(1, 10, true, Wed);
-    table.add(2, 20, true, Wed);
-    table.add(3, 10, true, Wed);
-    table.add(4, 20, true, Wed);
-    table.add(5, 10, true, Wed);
+    add(table, 1, 10, true, Wed);
+    add(table, 2, 20, true, Wed);
+    add(table, 3, 10, true, Wed);
+    add(table, 4, 20, true, Wed);
+    add(table, 5, 10, true, Wed);
 
     // Delete some rows
     table.remove(2);
@@ -3559,10 +3536,6 @@ TEST(Table_Mixed)
 #endif
 }
 
-namespace {
-REALM_TABLE_1(TestTableMX, first, Mixed)
-} // anonymous namespace
-
 TEST(Table_Mixed2)
 {
     Table table;
@@ -3739,177 +3712,135 @@ TEST(Table_LowLevelSubtables)
 
 
 namespace {
-REALM_TABLE_2(MyTable1, val, Int, val2, Int)
 
-REALM_TABLE_2(MyTable2, val, Int, subtab, Subtable<MyTable1>)
+template <class T>
+void my_table_1_add_columns(T t)
+{
+    t->add_column(type_Int, "val");
+    t->add_column(type_Int, "val2");
+}
 
-REALM_TABLE_1(MyTable3, subtab, Subtable<MyTable2>)
+template <class T>
+void my_table_2_add_columns(T t)
+{
+    DescriptorRef sub_descr;
+    t->add_column(type_Int, "val");
+    t->add_column(type_Table, "subtab", &sub_descr);
+    my_table_1_add_columns(sub_descr);
+}
 
-REALM_TABLE_1(MyTable4, mix, Mixed)
+template <class T>
+void my_table_3_add_columns(T t)
+{
+    DescriptorRef sub_descr;
+    t->add_column(type_Table, "subtab", &sub_descr);
+    my_table_2_add_columns(sub_descr);
+}
+
 } // anonymous namespace
-
 
 TEST(Table_HighLevelSubtables)
 {
-    MyTable3 t;
+    Table t;
+    my_table_3_add_columns(&t);
     {
-        MyTable3::Ref r1 = t.get_table_ref();
-        MyTable3::ConstRef r2 = t.get_table_ref();
-        MyTable3::ConstRef r3 = r2->get_table_ref();
+        TableRef r1 = t.get_table_ref();
+        ConstTableRef r2 = t.get_table_ref();
+        ConstTableRef r3 = r2->get_table_ref();
         r3 = t.get_table_ref(); // Also test assigment that converts to const
         static_cast<void>(r1);
         static_cast<void>(r3);
     }
 
-    t.add();
-    const MyTable3& ct = t;
+    t.add_empty_row();
+    const Table& ct = t;
     {
-        MyTable2::Ref s1 = t[0].subtab;
-        MyTable2::ConstRef s2 = t[0].subtab;
-        MyTable2::Ref s3 = t[0].subtab->get_table_ref();
-        MyTable2::ConstRef s4 = t[0].subtab->get_table_ref();
-        MyTable2::Ref s5 = t.column().subtab[0];
-        MyTable2::ConstRef s6 = t.column().subtab[0];
-        MyTable2::Ref s7 = t.column().subtab[0]->get_table_ref();
-        MyTable2::ConstRef s8 = t.column().subtab[0]->get_table_ref();
-        MyTable2::ConstRef cs1 = ct[0].subtab;
-        MyTable2::ConstRef cs2 = ct[0].subtab->get_table_ref();
-        MyTable2::ConstRef cs3 = ct.column().subtab[0];
-        MyTable2::ConstRef cs4 = ct.column().subtab[0]->get_table_ref();
-        s1 = t[0].subtab;
-        s2 = t[0].subtab; // Also test assigment that converts to const
+        TableRef s1 = t.get_subtable(0, 0);
+        ConstTableRef s2 = t.get_subtable(0, 0);
+        TableRef s3 = t.get_subtable(0, 0)->get_table_ref();
+        ConstTableRef s4 = t.get_subtable(0, 0)->get_table_ref();
+
+        ConstTableRef cs1 = ct.get_subtable(0, 0);
+        ConstTableRef cs2 = ct.get_subtable(0, 0)->get_table_ref();
+
         static_cast<void>(s1);
         static_cast<void>(s2);
         static_cast<void>(s3);
         static_cast<void>(s4);
-        static_cast<void>(s5);
-        static_cast<void>(s6);
-        static_cast<void>(s7);
-        static_cast<void>(s8);
         static_cast<void>(cs1);
         static_cast<void>(cs2);
-        static_cast<void>(cs3);
-        static_cast<void>(cs4);
     }
 
-    t[0].subtab->add();
+    t.get_subtable(0, 0)->add_empty_row();
     {
-        MyTable1::Ref s1 = t[0].subtab[0].subtab;
-        MyTable1::ConstRef s2 = t[0].subtab[0].subtab;
-        MyTable1::Ref s3 = t[0].subtab[0].subtab->get_table_ref();
-        MyTable1::ConstRef s4 = t[0].subtab[0].subtab->get_table_ref();
-        MyTable1::Ref s5 = t.column().subtab[0]->column().subtab[0];
-        MyTable1::ConstRef s6 = t.column().subtab[0]->column().subtab[0];
-        MyTable1::Ref s7 = t.column().subtab[0]->column().subtab[0]->get_table_ref();
-        MyTable1::ConstRef s8 = t.column().subtab[0]->column().subtab[0]->get_table_ref();
-        MyTable1::ConstRef cs1 = ct[0].subtab[0].subtab;
-        MyTable1::ConstRef cs2 = ct[0].subtab[0].subtab->get_table_ref();
-        MyTable1::ConstRef cs3 = ct.column().subtab[0]->column().subtab[0];
-        MyTable1::ConstRef cs4 = ct.column().subtab[0]->column().subtab[0]->get_table_ref();
-        s1 = t[0].subtab[0].subtab;
-        s2 = t[0].subtab[0].subtab; // Also test assigment that converts to const
+        TableRef s1 = t.get_subtable(0, 0)->get_subtable(1, 0);
+        ConstTableRef s2 = t.get_subtable(0, 0)->get_subtable(1, 0);
+        TableRef s3 = t.get_subtable(0, 0)->get_subtable(1, 0)->get_table_ref();
+        ConstTableRef s4 = t.get_subtable(0, 0)->get_subtable(1, 0)->get_table_ref();
+
+        ConstTableRef cs1 = ct.get_subtable(0, 0)->get_subtable(1, 0);
+        ConstTableRef cs2 = ct.get_subtable(0, 0)->get_subtable(1, 0)->get_table_ref();
+
         static_cast<void>(s1);
         static_cast<void>(s2);
         static_cast<void>(s3);
         static_cast<void>(s4);
-        static_cast<void>(s5);
-        static_cast<void>(s6);
-        static_cast<void>(s7);
-        static_cast<void>(s8);
         static_cast<void>(cs1);
         static_cast<void>(cs2);
-        static_cast<void>(cs3);
-        static_cast<void>(cs4);
     }
 
-    t[0].subtab[0].val = 1;
-    CHECK_EQUAL(t[0].subtab[0].val, 1);
-    CHECK_EQUAL(t.column().subtab[0]->column().val[0], 1);
-    CHECK_EQUAL(t[0].subtab->column().val[0], 1);
-    CHECK_EQUAL(t.column().subtab[0][0].val, 1);
-
-    t.column().subtab[0]->column().val[0] = 2;
-    CHECK_EQUAL(t[0].subtab[0].val, 2);
-    CHECK_EQUAL(t.column().subtab[0]->column().val[0], 2);
-    CHECK_EQUAL(t[0].subtab->column().val[0], 2);
-    CHECK_EQUAL(t.column().subtab[0][0].val, 2);
-
-    t[0].subtab->column().val[0] = 3;
-    CHECK_EQUAL(t[0].subtab[0].val, 3);
-    CHECK_EQUAL(t.column().subtab[0]->column().val[0], 3);
-    CHECK_EQUAL(t[0].subtab->column().val[0], 3);
-    CHECK_EQUAL(t.column().subtab[0][0].val, 3);
-
-    t.column().subtab[0][0].val = 4;
-    CHECK_EQUAL(t[0].subtab[0].val, 4);
-    CHECK_EQUAL(t.column().subtab[0]->column().val[0], 4);
-    CHECK_EQUAL(t[0].subtab->column().val[0], 4);
-    CHECK_EQUAL(t.column().subtab[0][0].val, 4);
-    CHECK_EQUAL(ct[0].subtab[0].val, 4);
-    CHECK_EQUAL(ct.column().subtab[0]->column().val[0], 4);
-    CHECK_EQUAL(ct[0].subtab->column().val[0], 4);
-    CHECK_EQUAL(ct.column().subtab[0][0].val, 4);
-
-    t[0].subtab[0].subtab->add();
-    t[0].subtab[0].subtab[0].val = 5;
-    CHECK_EQUAL(t[0].subtab[0].subtab[0].val, 5);
-    CHECK_EQUAL(t.column().subtab[0]->column().subtab[0]->column().val[0], 5);
-    CHECK_EQUAL(ct[0].subtab[0].subtab[0].val, 5);
-    CHECK_EQUAL(ct.column().subtab[0]->column().subtab[0]->column().val[0], 5);
-
-    t.column().subtab[0]->column().subtab[0]->column().val[0] = 6;
-    CHECK_EQUAL(t[0].subtab[0].subtab[0].val, 6);
-    CHECK_EQUAL(t.column().subtab[0]->column().subtab[0]->column().val[0], 6);
-    CHECK_EQUAL(ct[0].subtab[0].subtab[0].val, 6);
-    CHECK_EQUAL(ct.column().subtab[0]->column().subtab[0]->column().val[0], 6);
-
-    /*
-      Idea for compile time failure tests:
-
-        const MyTable2 t;
-#if    TEST_INDEX == 0
-        t[0].val = 7;
-#elsif TEST_INDEX == 1
-        t.column().val[0] = 7;
-#elsif TEST_INDEX == 2
-        t[0].subtab[0].val = 7;
-#elsif TEST_INDEX == 3
-        t[0].subtab->column().val[0] = 7;
-#endif
-    */
+    t.get_subtable(0, 0)->set_int(0, 0, 1);
+    CHECK_EQUAL(t.get_subtable(0, 0)->get_int(0, 0), 1);
 }
 
 
 TEST(Table_SubtableCopyOnSetAndInsert)
 {
-    MyTable1 t1;
-    t1.add(7, 8);
-    MyTable2 t2;
-    t2.add(9, &t1);
-    MyTable1::Ref r1 = t2[0].subtab;
+    TestTable t1;
+    my_table_1_add_columns(&t1);
+    add(t1, 7, 8);
+
+    Table t2;
+    my_table_2_add_columns(&t2);
+    t2.add_empty_row();
+    t2.set_subtable(1, 0, &t1);
+
+    TableRef r1 = t2.get_subtable(1, 0);
     CHECK(t1 == *r1);
-    MyTable4 t4;
-    t4.add();
-    t4[0].mix.set_subtable(t2);
-    MyTable2::Ref r2 = unchecked_cast<MyTable2>(t4[0].mix.get_subtable());
+
+    Table t4;
+    t4.add_column(type_Mixed, "mix");
+    t4.add_empty_row();
+    t4.set_mixed_subtable(0, 0, &t2);
+    auto r2 = t4.get_subtable(0, 0);
     CHECK(t2 == *r2);
 }
 
 
 TEST(Table_SetMethod)
 {
-    MyTable1 t;
-    t.add(8, 9);
-    CHECK_EQUAL(t[0].val, 8);
-    CHECK_EQUAL(t[0].val2, 9);
-    t.set(0, 2, 4);
-    CHECK_EQUAL(t[0].val, 2);
-    CHECK_EQUAL(t[0].val2, 4);
+    TestTable t;
+    my_table_1_add_columns(&t);
+    add(t, 8, 9);
+    CHECK_EQUAL(t.get_int(0, 0), 8);
+    CHECK_EQUAL(t.get_int(1, 0), 9);
+    set(t, 0, 2, 4);
+    CHECK_EQUAL(t.get_int(0, 0), 2);
+    CHECK_EQUAL(t.get_int(1, 0), 4);
 }
 
 
 namespace {
-REALM_TABLE_2(TableDateAndBinary, date, OldDateTime, bin, Binary)
+
+class TableDateAndBinary : public TestTable {
+public:
+    TableDateAndBinary()
+    {
+        add_column(type_OldDateTime, "date");
+        add_column(type_Binary, "bin");
+    }
+};
+
 } // anonymous namespace
 
 TEST(Table_DateAndBinary)
@@ -3921,10 +3852,11 @@ TEST(Table_DateAndBinary)
         char data[size];
         for (size_t i = 0; i < size; ++i)
             data[i] = static_cast<char>(i);
-        t.add(8, BinaryData(data, size));
-        CHECK_EQUAL(t[0].date, 8);
-        CHECK_EQUAL(t[0].bin.size(), size);
-        CHECK(std::equal(t[0].bin.data(), t[0].bin.data() + size, data));
+        add(t, 8, BinaryData(data, size));
+        CHECK_EQUAL(t.get_olddatetime(0, 0), 8);
+        BinaryData bin = t.get_binary(1, 0);
+        CHECK_EQUAL(bin.size(), size);
+        CHECK(std::equal(bin.data(), bin.data() + size, data));
     }
 
     // Test that 64-bit dates are preserved
@@ -3933,8 +3865,8 @@ TEST(Table_DateAndBinary)
 
         int64_t date = std::numeric_limits<int64_t>::max() - 400;
 
-        t.add(date, BinaryData(""));
-        CHECK_EQUAL(t[0].date.get().get_olddatetime(), date);
+        add(t, date, BinaryData(""));
+        CHECK_EQUAL(t.get_olddatetime(0, 0), date);
     }
 }
 
@@ -4099,33 +4031,28 @@ TEST(Table_SetSubTableByExample2)
 
 TEST(Table_HasSharedSpec)
 {
-    MyTable2 table1;
-    CHECK(!table1.has_shared_type());
     Group g;
-    MyTable2::Ref table2 = g.add_table<MyTable2>("foo");
+    auto table2 = g.add_table("foo");
+    my_table_2_add_columns(table2);
     CHECK(!table2->has_shared_type());
-    table2->add();
-    CHECK(table2[0].subtab->has_shared_type());
+    table2->add_empty_row();
+    CHECK(table2->get_subtable(1, 0)->has_shared_type());
 
     // Subtable in mixed column
-    TestTableMX::Ref table3 = g.add_table<TestTableMX>("bar");
+    auto table3 = g.add_table("bar");
+    table3->add_column(type_Mixed, "first");
+
     CHECK(!table3->has_shared_type());
-    table3->add();
-    table3[0].first.set_subtable<MyTable2>();
-    MyTable2::Ref table4 = table3[0].first.get_subtable<MyTable2>();
+    table3->add_empty_row();
+    table3->clear_subtable(0, 0);
+    TableRef table4 = table3->get_subtable(0, 0);
     CHECK(table4);
     CHECK(!table4->has_shared_type());
-    table4->add();
+    my_table_2_add_columns(table4);
+    table4->add_empty_row();
     CHECK(!table4->has_shared_type());
-    CHECK(table4[0].subtab->has_shared_type());
+    CHECK(table4->get_subtable(1, 0)->has_shared_type());
 }
-
-
-namespace {
-REALM_TABLE_3(TableAgg, c_int, Int, c_float, Float, c_double, Double)
-
-// TODO: Bool? OldDateTime
-} // anonymous namespace
 
 #if TEST_DURATION > 0
 #define TBL_SIZE REALM_MAX_BPNODE_SIZE * 10
@@ -4135,20 +4062,23 @@ REALM_TABLE_3(TableAgg, c_int, Int, c_float, Float, c_double, Double)
 
 TEST(Table_Aggregates)
 {
-    TableAgg table;
+    TestTable table;
+    table.add_column(type_Int, "c_int");
+    table.add_column(type_Float, "c_float");
+    table.add_column(type_Double, "c_double");
     int64_t i_sum = 0;
     double f_sum = 0;
     double d_sum = 0;
 
     for (int i = 0; i < TBL_SIZE; i++) {
-        table.add(5987654, 4.0f, 3.0);
+        add(table, 5987654, 4.0f, 3.0);
         i_sum += 5987654;
         f_sum += 4.0f;
         d_sum += 3.0;
     }
-    table.add(1, 1.1f, 1.2);
-    table.add(987654321, 11.0f, 12.0);
-    table.add(5, 4.0f, 3.0);
+    add(table, 1, 1.1f, 1.2);
+    add(table, 987654321, 11.0f, 12.0);
+    add(table, 5, 4.0f, 3.0);
     i_sum += 1 + 987654321 + 5;
     f_sum += double(1.1f) + double(11.0f) + double(4.0f);
     d_sum += 1.2 + 12.0 + 3.0;
@@ -4157,42 +4087,39 @@ TEST(Table_Aggregates)
     double epsilon = std::numeric_limits<double>::epsilon();
 
     // minimum
-    CHECK_EQUAL(1, table.column().c_int.minimum());
-    CHECK_EQUAL(1.1f, table.column().c_float.minimum());
-    CHECK_EQUAL(1.2, table.column().c_double.minimum());
+    CHECK_EQUAL(1, table.minimum_int(0));
+    CHECK_EQUAL(1.1f, table.minimum_float(1));
+    CHECK_EQUAL(1.2, table.minimum_double(2));
     // maximum
-    CHECK_EQUAL(987654321, table.column().c_int.maximum());
-    CHECK_EQUAL(11.0f, table.column().c_float.maximum());
-    CHECK_EQUAL(12.0, table.column().c_double.maximum());
+    CHECK_EQUAL(987654321, table.maximum_int(0));
+    CHECK_EQUAL(11.0f, table.maximum_float(1));
+    CHECK_EQUAL(12.0, table.maximum_double(2));
     // sum
-    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.column().c_int.sum()), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(f_sum, table.column().c_float.sum(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(d_sum, table.column().c_double.sum(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.sum_int(0)), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum, table.sum_float(1), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum, table.sum_double(2), 10 * epsilon);
     // average
-    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.column().c_int.average(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.column().c_float.average(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.column().c_double.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.average_int(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.average_float(1), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.average_double(2), 10 * epsilon);
 }
-
-namespace {
-REALM_TABLE_1(TableAgg2, c_count, Int)
-} // anonymous namespace
 
 
 TEST(Table_Aggregates2)
 {
-    TableAgg2 table;
+    TestTable table;
+    table.add_column(type_Int, "c_count");
     int c = -420;
     int s = 0;
     while (c < -20) {
-        table.add(c);
+        add(table, c);
         s += c;
         c++;
     }
 
-    CHECK_EQUAL(-420, table.column().c_count.minimum());
-    CHECK_EQUAL(-21, table.column().c_count.maximum());
-    CHECK_EQUAL(s, table.column().c_count.sum());
+    CHECK_EQUAL(-420, table.minimum_int(0));
+    CHECK_EQUAL(-21, table.maximum_int(0));
+    CHECK_EQUAL(s, table.sum_int(0));
 }
 
 // Test Table methods max, min, avg, sum, on both nullable and non-nullable columns
@@ -4442,16 +4369,13 @@ TEST(Table_FormerLeakCase)
 }
 
 
-namespace {
-
-REALM_TABLE_3(TablePivotAgg, sex, String, age, Int, hired, Bool)
-
-} // anonymous namespace
-
 TEST(Table_Pivot)
 {
     size_t count = 1717;
-    TablePivotAgg table;
+    TestTable table;
+    table.add_column(type_String, "sex");
+    table.add_column(type_Int, "age");
+    table.add_column(type_Bool, "hired");
     int64_t age_sum[2] = {0, 0};
     int64_t age_cnt[2] = {0, 0};
     int64_t age_min[2];
@@ -4461,7 +4385,7 @@ TEST(Table_Pivot)
     for (size_t i = 0; i < count; ++i) {
         size_t sex = i % 2;
         int64_t age = 3 + (i % 117);
-        table.add((sex == 0) ? "Male" : "Female", age, true);
+        add(table, (sex == 0) ? "Male" : "Female", age, true);
 
         age_sum[sex] += age;
         age_cnt[sex] += 1;

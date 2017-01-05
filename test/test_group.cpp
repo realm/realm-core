@@ -41,6 +41,7 @@ static const mode_t2 MS_MODE_MASK = 0x0000ffff;
 #include <realm/util/file.hpp>
 
 #include "test.hpp"
+#include "test_table_helper.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -78,35 +79,6 @@ using namespace realm::test_util;
 
 namespace {
 
-enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
-
-
-void test_table_fill_row(TableRef t, size_t ndx, std::string first, int second, bool third, Days forth)
-{
-    t->set_string(0, ndx, first);
-    t->set_int(1, ndx, second);
-    t->set_bool(2, ndx, third);
-    t->set_int(3, ndx, forth);
-}
-
-void test_table_insert_row(TableRef t, size_t ndx, std::string first, int second, bool third, Days forth)
-{
-    t->insert_empty_row(ndx, 1);
-    t->set_string(0, ndx, first);
-    t->set_int(1, ndx, second);
-    t->set_bool(2, ndx, third);
-    t->set_int(3, ndx, forth);
-}
-
-void test_table_add_row(TableRef t, std::string first, int second, bool third, Days forth)
-{
-    size_t ndx = t->add_empty_row(1);
-    t->set_string(0, ndx, first);
-    t->set_int(1, ndx, second);
-    t->set_bool(2, ndx, third);
-    t->set_int(3, ndx, forth);
-}
-
 template <class T>
 void test_table_add_columns(T t)
 {
@@ -116,13 +88,13 @@ void test_table_add_columns(T t)
     t->add_column(type_Int, "fourth");
 }
 
-void setup_table(TableRef t)
+template <class T>
+void setup_table(T t)
 {
-    t->add_empty_row(4);
-    test_table_fill_row(t, 0, "a", 1, true, Wed);
-    test_table_fill_row(t, 1, "b", 15, true, Wed);
-    test_table_fill_row(t, 2, "ccc", 10, true, Wed);
-    test_table_fill_row(t, 3, "dddd", 20, true, Wed);
+    add(t, "a", 1, true, Wed);
+    add(t, "b", 15, true, Wed);
+    add(t, "ccc", 10, true, Wed);
+    add(t, "dddd", 20, true, Wed);
 }
 
 } // Anonymous namespace
@@ -918,7 +890,7 @@ TEST(Group_Equal)
     test_table_add_columns(t2);
     setup_table(t2);
     CHECK(g1 == g2);
-    test_table_add_row(t2, "hey", 2, false, Thu);
+    add(t2, "hey", 2, false, Thu);
     CHECK(g1 != g2);
     auto t3 = g3.add_table("TABLE3");
     test_table_add_columns(t3);
@@ -1006,7 +978,7 @@ TEST(Group_Serialize0)
         CHECK_EQUAL(0, t->size());
 
         // Modify table
-        test_table_add_row(t, "Test", 1, true, Wed);
+        add(t, "Test", 1, true, Wed);
 
         CHECK_EQUAL("Test", t->get_string(0, 0));
         CHECK_EQUAL(1, t->get_int(1, 0));
@@ -1029,16 +1001,16 @@ TEST(Group_Serialize1)
         Group to_disk;
         auto table = to_disk.add_table("test");
         test_table_add_columns(table);
-        test_table_add_row(table, "", 1, true, Wed);
-        test_table_add_row(table, "", 15, true, Wed);
-        test_table_add_row(table, "", 10, true, Wed);
-        test_table_add_row(table, "", 20, true, Wed);
-        test_table_add_row(table, "", 11, true, Wed);
-        test_table_add_row(table, "", 45, true, Wed);
-        test_table_add_row(table, "", 10, true, Wed);
-        test_table_add_row(table, "", 0, true, Wed);
-        test_table_add_row(table, "", 30, true, Wed);
-        test_table_add_row(table, "", 9, true, Wed);
+        add(table, "", 1, true, Wed);
+        add(table, "", 15, true, Wed);
+        add(table, "", 10, true, Wed);
+        add(table, "", 20, true, Wed);
+        add(table, "", 11, true, Wed);
+        add(table, "", 45, true, Wed);
+        add(table, "", 10, true, Wed);
+        add(table, "", 0, true, Wed);
+        add(table, "", 30, true, Wed);
+        add(table, "", 9, true, Wed);
 
 #ifdef REALM_DEBUG
         to_disk.verify();
@@ -1061,8 +1033,8 @@ TEST(Group_Serialize1)
         table->set_string(0, 0, "test");
         t->set_string(0, 0, "test");
 
-        test_table_insert_row(table, 5, "hello", 100, false, Mon);
-        test_table_insert_row(t, 5, "hello", 100, false, Mon);
+        insert(table, 5, "hello", 100, false, Mon);
+        insert(t, 5, "hello", 100, false, Mon);
         table->remove(1);
         t->remove(1);
 
@@ -1089,14 +1061,14 @@ TEST(Group_Serialize2)
     Group to_disk;
     TableRef table1 = to_disk.add_table("test1");
     test_table_add_columns(table1);
-    test_table_add_row(table1, "", 1, true, Wed);
-    test_table_add_row(table1, "", 15, true, Wed);
-    test_table_add_row(table1, "", 10, true, Wed);
+    add(table1, "", 1, true, Wed);
+    add(table1, "", 15, true, Wed);
+    add(table1, "", 10, true, Wed);
 
     TableRef table2 = to_disk.add_table("test2");
     test_table_add_columns(table2);
-    test_table_add_row(table2, "hey", 0, true, Tue);
-    test_table_add_row(table2, "hello", 3232, false, Sun);
+    add(table2, "hey", 0, true, Tue);
+    add(table2, "hello", 3232, false, Sun);
 
 #ifdef REALM_DEBUG
     to_disk.verify();
@@ -1129,10 +1101,8 @@ TEST(Group_Serialize3)
     Group to_disk;
     TableRef table = to_disk.add_table("test");
     test_table_add_columns(table);
-    test_table_add_row(table, "1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1", 1, true,
-                       Wed);
-    test_table_add_row(table, "2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true,
-                       Wed);
+    add(table, "1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1", 1, true, Wed);
+    add(table, "2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
 
 #ifdef REALM_DEBUG
     to_disk.verify();
@@ -1160,16 +1130,16 @@ TEST(Group_Serialize_Mem)
     Group to_mem;
     TableRef table = to_mem.add_table("test");
     test_table_add_columns(table);
-    test_table_add_row(table, "", 1, true, Wed);
-    test_table_add_row(table, "", 15, true, Wed);
-    test_table_add_row(table, "", 10, true, Wed);
-    test_table_add_row(table, "", 20, true, Wed);
-    test_table_add_row(table, "", 11, true, Wed);
-    test_table_add_row(table, "", 45, true, Wed);
-    test_table_add_row(table, "", 10, true, Wed);
-    test_table_add_row(table, "", 0, true, Wed);
-    test_table_add_row(table, "", 30, true, Wed);
-    test_table_add_row(table, "", 9, true, Wed);
+    add(table, "", 1, true, Wed);
+    add(table, "", 15, true, Wed);
+    add(table, "", 10, true, Wed);
+    add(table, "", 20, true, Wed);
+    add(table, "", 11, true, Wed);
+    add(table, "", 45, true, Wed);
+    add(table, "", 10, true, Wed);
+    add(table, "", 0, true, Wed);
+    add(table, "", 30, true, Wed);
+    add(table, "", 9, true, Wed);
 
 #ifdef REALM_DEBUG
     to_mem.verify();
@@ -1199,8 +1169,8 @@ TEST(Group_Close)
     Group to_mem;
     TableRef table = to_mem.add_table("test");
     test_table_add_columns(table);
-    test_table_add_row(table, "", 1, true, Wed);
-    test_table_add_row(table, "", 2, true, Wed);
+    add(table, "", 1, true, Wed);
+    add(table, "", 2, true, Wed);
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -1217,11 +1187,11 @@ TEST(Group_Serialize_Optimized)
     test_table_add_columns(table);
 
     for (size_t i = 0; i < 5; ++i) {
-        test_table_add_row(table, "abd", 1, true, Mon);
-        test_table_add_row(table, "eftg", 2, true, Tue);
-        test_table_add_row(table, "hijkl", 5, true, Wed);
-        test_table_add_row(table, "mnopqr", 8, true, Thu);
-        test_table_add_row(table, "stuvxyz", 9, true, Fri);
+        add(table, "abd", 1, true, Mon);
+        add(table, "eftg", 2, true, Tue);
+        add(table, "hijkl", 5, true, Wed);
+        add(table, "mnopqr", 8, true, Thu);
+        add(table, "stuvxyz", 9, true, Fri);
     }
 
     table->optimize();
@@ -1243,7 +1213,7 @@ TEST(Group_Serialize_Optimized)
     CHECK(*table == *t);
 
     // Add a row with a known (but unique) value
-    test_table_add_row(table, "search_target", 9, true, Fri);
+    add(table, "search_target", 9, true, Fri);
 
     const size_t res = table->find_first_string(0, "search_target");
     CHECK_EQUAL(table->size() - 1, res);
@@ -1840,8 +1810,8 @@ TEST(Group_InvalidateTables)
         CHECK(subtable2->is_attached());
         CHECK(subtable3);
         CHECK(subtable3->is_attached());
-        test_table_add_row(subtable3, "alpha", 79542, true, Wed);
-        test_table_add_row(subtable3, "beta", 97, false, Mon);
+        add(subtable3, "alpha", 79542, true, Wed);
+        add(subtable3, "beta", 97, false, Mon);
         CHECK(table->is_attached());
         CHECK(subtable1->is_attached());
         CHECK(subtable2->is_attached());
@@ -1860,8 +1830,8 @@ TEST(Group_ToJSON)
     TableRef table = g.add_table("test");
     test_table_add_columns(table);
 
-    test_table_add_row(table, "jeff", 1, true, Wed);
-    test_table_add_row(table, "jim", 1, true, Wed);
+    add(table, "jeff", 1, true, Wed);
+    add(table, "jim", 1, true, Wed);
     std::ostringstream out;
     g.to_json(out);
     std::string str = out.str();
@@ -1878,8 +1848,8 @@ TEST(Group_ToString)
     TableRef table = g.add_table("test");
     test_table_add_columns(table);
 
-    test_table_add_row(table, "jeff", 1, true, Wed);
-    test_table_add_row(table, "jim", 1, true, Wed);
+    add(table, "jeff", 1, true, Wed);
+    add(table, "jim", 1, true, Wed);
     std::ostringstream out;
     g.to_string(out);
     std::string str = out.str();
@@ -1894,14 +1864,14 @@ TEST(Group_IndexString)
     TableRef table = to_mem.add_table("test");
     test_table_add_columns(table);
 
-    test_table_add_row(table, "jeff", 1, true, Wed);
-    test_table_add_row(table, "jim", 1, true, Wed);
-    test_table_add_row(table, "jennifer", 1, true, Wed);
-    test_table_add_row(table, "john", 1, true, Wed);
-    test_table_add_row(table, "jimmy", 1, true, Wed);
-    test_table_add_row(table, "jimbo", 1, true, Wed);
-    test_table_add_row(table, "johnny", 1, true, Wed);
-    test_table_add_row(table, "jennifer", 1, true, Wed); // duplicate
+    add(table, "jeff", 1, true, Wed);
+    add(table, "jim", 1, true, Wed);
+    add(table, "jennifer", 1, true, Wed);
+    add(table, "john", 1, true, Wed);
+    add(table, "jimmy", 1, true, Wed);
+    add(table, "jimbo", 1, true, Wed);
+    add(table, "johnny", 1, true, Wed);
+    add(table, "jennifer", 1, true, Wed); // duplicate
 
     table->add_search_index(0);
     CHECK(table->has_search_index(0));
