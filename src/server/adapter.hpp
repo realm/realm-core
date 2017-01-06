@@ -46,9 +46,21 @@ public:
 
         const Type type;
         const std::string object_type;
-        const std::string property;
-        const int value;
         const size_t row;
+
+        const std::string property;
+        const bool is_null;
+        const Mixed value;
+
+        Instruction(Type t, std::string o, size_t r) 
+        : type(t), object_type(o), row(r), is_null(false), value() {}
+
+        Instruction(Type t, std::string o, size_t r, std::string p) 
+        : type(t), object_type(o), row(r), property(p), is_null(false), value() {}
+
+        template<typename T>
+        Instruction(std::string o, size_t r, std::string p, bool n, T v)
+        : type(Type::SetProperty), object_type(o), row(r), property(p), is_null(n), value(v) {}
     };
 
     std::vector<Instruction> current(std::string realm_path);

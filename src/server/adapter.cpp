@@ -79,8 +79,6 @@ public:
         parsed_instructions.emplace_back(Adapter::Instruction{
             Adapter::Instruction::Type::Insertion,
             selected_object_type,
-            std::string(),
-            0,
             row_index
         });
         return true;
@@ -101,15 +99,15 @@ public:
     {
         return true;
     }
-    bool set_int(size_t column_index, size_t row_index, int_fast64_t, _impl::Instruction, size_t)
+    bool set_int(size_t column_index, size_t row_index, int_fast64_t value, _impl::Instruction, size_t)
     {
-        parsed_instructions.emplace_back(Adapter::Instruction{
-            Adapter::Instruction::Type::SetProperty,
+        parsed_instructions.emplace_back(Adapter::Instruction(
             selected_object_type,
-            selected_object_schema[column_index].name,
-            0,
-            row_index
-        });
+            row_index,
+            selected_object_schema->persisted_properties[column_index].name,
+            false,
+            (int64_t)value
+        ));
         return true;
     }
     bool add_int(size_t, size_t, int_fast64_t)
