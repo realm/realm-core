@@ -22,3 +22,5 @@ MinSizeRel/
 # IntelliJ
 .idea/
 
+# Visual Studio
+/.vs

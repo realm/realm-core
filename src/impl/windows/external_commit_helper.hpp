@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2015 Realm Inc.
+// Copyright 2017 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,27 +16,36 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_UTIL_COMPILER_HPP
-#define REALM_UTIL_COMPILER_HPP
+#include <realm/group_shared.hpp>
 
-#ifdef __has_cpp_attribute
-#define REALM_HAS_CPP_ATTRIBUTE(attr) __has_cpp_attribute(attr)
-#else
-#define REALM_HAS_CPP_ATTRIBUTE(attr) 0
-#endif
+#include <future>
+#include <windows.h>
 
-#if REALM_HAS_CPP_ATTRIBUTE(clang::fallthrough)
-#define REALM_FALLTHROUGH [[clang::fallthrough]]
-#else
-#define REALM_FALLTHROUGH
-#endif
+namespace realm {
+class Replication;
 
-// This should be renamed to REALM_UNREACHABLE as soon as REALM_UNREACHABLE is renamed to
-// REALM_ASSERT_NOT_REACHED which will better reflect its nature
-#if __GNUC__ || __clang__
-#define REALM_COMPILER_HINT_UNREACHABLE __builtin_unreachable
-#else
-#define REALM_COMPILER_HINT_UNREACHABLE abort
-#endif
+namespace _impl {
+class RealmCoordinator;
 
-#endif // REALM_UTIL_COMPILER_HPP
+class ExternalCommitHelper {
+public:
+    ExternalCommitHelper(RealmCoordinator& parent);
+    ~ExternalCommitHelper();
+
+    void notify_others();
+
+private:
+    void listen();
+
+    RealmCoordinator& m_parent;
+
+    // The listener thread
+    std::future<void> m_thread;
+
+    HANDLE m_event;
+    HANDLE m_close_mutex;
+};
+
+} // namespace _impl
+} // namespace realm
+

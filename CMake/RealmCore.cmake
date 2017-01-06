@@ -19,9 +19,13 @@
 include(ExternalProject)
 include(ProcessorCount)
 
-find_package(PkgConfig)
 find_package(Threads)
 
+if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    set(_REALM_DEBUG_SUFFIX "d")
+else()
+    set(_REALM_DEBUG_SUFFIX "-dbg")
+endif()
 
 # Load dependency info from dependencies.list into REALM_FOO_VERSION variables.
 file(STRINGS dependencies.list DEPENDENCIES)
@@ -42,6 +46,10 @@ if(APPLE)
     set(SSL_LIBRARIES ${FOUNDATION_FRAMEWORK} ${SECURITY_FRAMEWORK})
 elseif(REALM_PLATFORM STREQUAL "Android")
     # The Android core and sync libraries include the necessary portions of OpenSSL.
+    set(CRYPTO_LIBRARIES "")
+    set(SSL_LIBRARIES "")
+elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    # Windows doesn't do crypto right now, but that is subject to change
     set(CRYPTO_LIBRARIES "")
     set(SSL_LIBRARIES "")
 else()
@@ -78,7 +86,7 @@ function(use_realm_core enable_sync core_prefix sync_prefix)
         clone_and_build_realm_core("v${REALM_CORE_VERSION}")
         clone_and_build_realm_sync("v${REALM_SYNC_VERSION}")
     else()
-        if(APPLE OR REALM_PLATFORM STREQUAL "Android")
+        if(APPLE OR REALM_PLATFORM STREQUAL "Android" OR CMAKE_SYSTEM_NAME MATCHES "^Windows")
             download_realm_core(${REALM_CORE_VERSION})
         else()
             clone_and_build_realm_core("v${REALM_CORE_VERSION}")
@@ -113,13 +121,13 @@ function(download_realm_tarball url target libraries)
             COMMAND ${CMAKE_COMMAND} -E remove_directory ${target}
             COMMAND ${CMAKE_COMMAND} -E rename core ${target}
             COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${libraries})
-    elseif(REALM_PLATFORM STREQUAL "Android")
+    elseif(REALM_PLATFORM STREQUAL "Android" OR CMAKE_SYSTEM_NAME MATCHES "^Windows")
         add_custom_command(
             COMMENT "Extracting ${tarball_name}"
             OUTPUT ${libraries}
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${target}
-            COMMAND ${CMAKE_COMMAND} -E chdir ${target} tar xf ${tarball_path}
-            COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${libraries})
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${target}"
+            COMMAND "${CMAKE_COMMAND}" -E chdir "${target}" "${CMAKE_COMMAND}" -E tar xf "${tarball_path}"
+            COMMAND "${CMAKE_COMMAND}" -E touch_nocreate ${libraries})
     endif()
 
 endfunction()
@@ -133,8 +141,13 @@ macro(define_realm_core_target was_downloaded core_directory)
         set(include_directory "src/")
     endif()
       
-    if(APPLE)
-        set(core_platform "")
+    if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+        set(library_directory "lib")
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            set(core_platform 64)
+        else()
+            set(core_platform 32)
+        endif()
     elseif(REALM_PLATFORM STREQUAL "Android")
         if(ANDROID_ABI STREQUAL "armeabi-v7a") # Realm Core still uses this name
             set(core_platform "-android-arm-v7a")
@@ -143,8 +156,8 @@ macro(define_realm_core_target was_downloaded core_directory)
         endif()
     endif()
 
-    set(core_library_debug ${core_directory}/${library_directory}librealm${core_platform}-dbg.a)
-    set(core_library_release ${core_directory}/${library_directory}librealm${core_platform}.a)
+    set(core_library_debug ${core_directory}/${library_directory}/${CMAKE_STATIC_LIBRARY_PREFIX}realm${core_platform}${_REALM_DEBUG_SUFFIX}${CMAKE_STATIC_LIBRARY_SUFFIX})
+    set(core_library_release ${core_directory}/${library_directory}/${CMAKE_STATIC_LIBRARY_PREFIX}realm${core_platform}${CMAKE_STATIC_LIBRARY_SUFFIX})
     set(core_libraries ${core_library_debug} ${core_library_release})
 
     if(${was_downloaded})
@@ -172,26 +185,35 @@ endmacro()
 function(download_realm_core core_version)
     if(APPLE)
         set(basename "realm-core")
-        set(compression "xz")
+        set(compression "tar.xz")
         set(platform "")
     elseif(REALM_PLATFORM STREQUAL "Android")
         set(basename "realm-core-android")
-        set(compression "gz")
+        set(compression "tar.gz")
         if(ANDROID_ABI STREQUAL "armeabi-v7a")
             set(platform "-android-arm-v7a")
         else()
             set(platform "-android-${ANDROID_ABI}")
         endif()
+    elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+        set(basename "realm-core-windows")
+        set(compression "zip")
+        set(library_directory "lib")
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            set(platform 64)
+        else()
+            set(platform 32)
+        endif()
     endif()
-    set(tarball_name "${basename}-${core_version}.tar.${compression}")
+    set(tarball_name "${basename}-${core_version}.${compression}")
     set(url "https://static.realm.io/downloads/core/${tarball_name}")
     set(temp_tarball "/tmp/${tarball_name}")
     set(core_directory_parent "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}")
     set(core_directory "${core_directory_parent}/realm-core-${core_version}")
     set(tarball "${core_directory_parent}/${tarball_name}")
 
-    set(core_library_debug ${core_directory}/librealm${platform}-dbg.a)
-    set(core_library_release ${core_directory}/librealm${platform}.a)
+    set(core_library_debug ${core_directory}/${library_directory}/${CMAKE_STATIC_LIBRARY_PREFIX}realm${platform}${_REALM_DEBUG_SUFFIX}${CMAKE_STATIC_LIBRARY_SUFFIX})
+    set(core_library_release ${core_directory}/${library_directory}/${CMAKE_STATIC_LIBRARY_PREFIX}realm${platform}${CMAKE_STATIC_LIBRARY_SUFFIX})
     set(core_libraries ${core_library_debug} ${core_library_release})
 
     download_realm_tarball(${url} ${core_directory} "${core_libraries}")
@@ -356,6 +378,7 @@ macro(build_realm_sync)
     set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION_RELEASE ${sync_server_library_release})
     set_property(TARGET realm-sync-server PROPERTY IMPORTED_LOCATION ${sync_server_library_release})
 
+    find_package(PkgConfig)
     pkg_check_modules(YAML QUIET yaml-cpp)
     set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES} ${YAML_LDFLAGS})
 

@@ -32,7 +32,15 @@
 #include <realm/string_data.hpp>
 
 #include <cstdlib>
+
+#if WIN32
+#include <io.h>
+#include <fcntl.h>
+
+inline static int mkstemp(char* _template) { return _open(_mktemp(_template), _O_CREAT | _O_TEMPORARY, _S_IREAD | _S_IWRITE); }
+#else
 #include <unistd.h>
+#endif
 
 #if REALM_HAVE_CLANG_FEATURE(thread_sanitizer)
 #include <condition_variable>

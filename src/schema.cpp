@@ -97,7 +97,7 @@ struct IsNotRemoveProperty {
 struct GetRemovedColumn {
     size_t operator()(SchemaChange sc) const { return sc.visit(*this); }
     size_t operator()(schema_change::RemoveProperty p) const { return p.property->table_column; }
-    template<typename T> size_t operator()(T) const { __builtin_unreachable(); }
+    template<typename T> size_t operator()(T) const { REALM_COMPILER_HINT_UNREACHABLE(); }
 };
 }
 

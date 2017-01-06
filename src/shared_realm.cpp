@@ -27,6 +27,7 @@
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
 
+#include "util/compiler.hpp"
 #include "util/format.hpp"
 
 #include <realm/history.hpp>
@@ -342,7 +343,7 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
                 }
                 return false;
         }
-        __builtin_unreachable();
+        REALM_COMPILER_HINT_UNREACHABLE();
     };
 
     if (no_changes_required())

@@ -157,7 +157,7 @@ template<typename Container>
 void insert_empty_at(Container& container, size_t pos)
 {
     if (pos < container.size())
-        container.insert(container.begin() + pos, typename Container::value_type{});
+        container.emplace(container.begin() + pos);
 }
 
 // Shift `value` to reflect a move from `from` to `to`

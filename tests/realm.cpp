@@ -29,8 +29,6 @@
 
 #include <realm/group.hpp>
 
-#include <unistd.h>
-
 using namespace realm;
 
 TEST_CASE("SharedRealm: get_shared_realm()") {
@@ -217,11 +215,14 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it->persisted_properties[0].table_column == 0);
     }
 
+// The ExternalCommitHelper implementation on Windows doesn't rely on files
+#if !WIN32
     SECTION("should throw when creating the notification pipe fails") {
         util::try_make_dir(config.path + ".note");
         REQUIRE_THROWS(Realm::get_shared_realm(config));
         util::remove_dir(config.path + ".note");
     }
+#endif
 
     SECTION("should get different instances on different threads") {
         auto realm1 = Realm::get_shared_realm(config);

@@ -22,6 +22,6 @@ using namespace realm::util;
 
 GenericEventLoop (*realm::util::s_get_eventloop)() = [] { return GenericEventLoop(); };
 
-void (*realm::util::s_post_on_eventloop)(GenericEventLoop, EventLoopPostHandler*, void* user_data) = [](auto, auto, auto) { };
+void (*realm::util::s_post_on_eventloop)(GenericEventLoop, EventLoopPostHandler*, void* user_data) = [](GenericEventLoop, EventLoopPostHandler*, void*) { };
 
-void (*realm::util::s_release_eventloop)(GenericEventLoop) = [](auto) { };
+void (*realm::util::s_release_eventloop)(GenericEventLoop) = [](GenericEventLoop) { };

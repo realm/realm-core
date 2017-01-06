@@ -64,6 +64,8 @@ if(APPLE)
     list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
 elseif(REALM_HAVE_EPOLL)
     list(APPEND SOURCES impl/epoll/external_commit_helper.cpp)
+elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    list(APPEND SOURCES impl/windows/external_commit_helper.cpp)
 else()
     list(APPEND SOURCES impl/generic/external_commit_helper.cpp)
 endif()
@@ -77,6 +79,10 @@ set(INCLUDE_DIRS
     ${PEGTL_INCLUDE_DIR}
     ${UV_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR})
+
+if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    list(APPEND INCLUDE_DIRS ${REALM_CORE_INCLUDE_DIR}/win32/pthread)
+endif()
 
 if(REALM_ENABLE_SYNC)
     # Add the sync files separately to reduce merge conflicts.

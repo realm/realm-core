@@ -122,6 +122,7 @@ TEST_CASE("thread safe reference") {
     }
 
     SECTION("version mismatch") {
+#ifndef _MSC_VER // Visual C++'s buggy <future> needs its template argument to be default constructible so skip this test
         SECTION("resolves at older version") {
             r->begin_transaction();
             Object num = create_object(r, int_object);
@@ -153,6 +154,7 @@ TEST_CASE("thread safe reference") {
             REQUIRE(num_prime.row().get_int(0) == 11);
             REQUIRE(num.row().get_int(0) == 11);
         }
+#endif
         SECTION("resolve at newer version") {
             r->begin_transaction();
             Object num = create_object(r, int_object);

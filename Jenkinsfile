@@ -1,10 +1,6 @@
 #!groovy
 def getSourceArchive() {
-  checkout scm
-  sh 'git clean -ffdx -e .????????'
-  sshagent(['realm-ci-ssh']) {
-    sh 'git submodule update --init --recursive'
-  }
+  unstash 'source'
 }
 
 def readGitTag() {
@@ -89,13 +85,31 @@ def doBuild(String nodeSpec, String flavor, Boolean enableSync) {
   }
 }
 
+def doWindowsBuild() {
+  return {
+    node('windows') {
+      getSourceArchive()
+
+      bat """
+        "${tool 'cmake'}" .
+        "${tool 'cmake'}" --build . --config Release
+        tests\\Release\\tests.exe
+      """
+    }
+  }
+}
+
 def setBuildName(newBuildName) {
   currentBuild.displayName = "${currentBuild.displayName} - ${newBuildName}"
 }
 
 stage('prepare') {
   node('docker') {
-    getSourceArchive()
+    checkout scm
+    sh 'git clean -ffdx -e .????????'
+    sshagent(['realm-ci-ssh']) {
+      sh 'git submodule update --init --recursive'
+    }
 
     gitTag = readGitTag()
     gitSha = readGitSha()
@@ -107,6 +121,8 @@ stage('prepare') {
       echo "Building release: '${gitTag}'"
       setBuildName("Tag ${gitTag}")
     }
+
+    stash includes: '**', name: 'source'
   }
 }
 
@@ -116,7 +132,8 @@ stage('unit-tests') {
     linux_sync: doDockerBuild('linux', true, true),
     android: doDockerBuild('android', false, false),
     macos: doBuild('osx', 'macOS', false),
-    macos_sync: doBuild('osx', 'macOS', true)
+    macos_sync: doBuild('osx', 'macOS', true),
+    win32: doWindowsBuild()
   )
   currentBuild.result = 'SUCCESS'
 }
