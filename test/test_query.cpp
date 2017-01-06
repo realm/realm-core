@@ -5900,37 +5900,6 @@ TEST(Query_Const)
     const_table.where().equal(1, "a").remove();
 }
 
-namespace {
-
-REALM_TABLE_2(PhoneTable, type, String, number, String)
-
-REALM_TABLE_4(EmployeeTable, name, String, age, Int, hired, Bool, phones, Subtable<PhoneTable>)
-
-} // anonymous namespace
-
-TEST(Query_SubtablesTyped)
-{
-    // Create table
-    EmployeeTable employees;
-
-    // Add initial rows
-    employees.add("joe", 42, false, nullptr);
-    employees[0].phones->add("home", "324-323-3214");
-    employees[0].phones->add("work", "321-564-8678");
-
-    employees.add("jessica", 22, true, nullptr);
-    employees[1].phones->add("mobile", "434-426-4646");
-    employees[1].phones->add("school", "345-543-5345");
-
-    // Do a query
-    EmployeeTable::Query q = employees.where().hired.equal(true);
-    EmployeeTable::View view = q.find_all();
-
-    // Verify result
-    CHECK(view.size() == 1 && view[0].name == "jessica");
-}
-
-
 TEST(Query_AllTypesDynamicallyTyped)
 {
     for (int nullable = 0; nullable < 2; nullable++) {
@@ -6045,84 +6014,6 @@ TEST(Query_AggregateSortedView)
     CHECK_EQUAL(2.0, tv.minimum_double(0));
     CHECK_EQUAL(count, tv.maximum_double(0));
     CHECK_APPROXIMATELY_EQUAL((count + 1) * count / 2, tv.sum_double(0), .1);
-}
-
-
-namespace {
-
-REALM_TABLE_1(TestQuerySub, age, Int)
-
-REALM_TABLE_9(TestQueryAllTypes, bool_col, Bool, int_col, Int, float_col, Float, double_col, Double, string_col,
-              String, binary_col, Binary, date_col, OldDateTime, table_col, Subtable<TestQuerySub>, mixed_col, Mixed)
-
-} // unnamed namespace
-
-
-TEST(Query_AllTypesStaticallyTyped)
-{
-    TestQueryAllTypes table;
-
-    const char bin[4] = {0, 1, 2, 3};
-    BinaryData bin1(bin, sizeof bin / 2);
-    BinaryData bin2(bin, sizeof bin);
-    int_fast64_t time_now = time(nullptr);
-    TestQuerySub subtab;
-    subtab.add(100);
-    Mixed mix_int(int64_t(1));
-    Mixed mix_subtab((Mixed::subtable_tag()));
-
-    table.add(false, 54, 0.7f, 0.8, "foo", bin1, 0, 0, mix_int);
-    table.add(true, 506, 7.7f, 8.8, "banach", bin2, time_now, &subtab, mix_subtab);
-
-    CHECK_EQUAL(1, table.where().bool_col.equal(false).count());
-    CHECK_EQUAL(1, table.where().int_col.equal(54).count());
-    CHECK_EQUAL(1, table.where().float_col.equal(0.7f).count());
-    CHECK_EQUAL(1, table.where().double_col.equal(0.8).count());
-    CHECK_EQUAL(1, table.where().string_col.equal("foo").count());
-    CHECK_EQUAL(1, table.where().binary_col.equal(bin1).count());
-    CHECK_EQUAL(1, table.where().date_col.equal(0).count());
-    //    CHECK_EQUAL(1, table.where().table_col.equal(subtab).count());
-    //    CHECK_EQUAL(1, table.where().mixed_col.equal(mix_int).count());
-    // FIXME: It's not possible to construct a subtable query. .table_col.subtable() does not return an object with
-    // 'age':
-    //    CHECK_EQUAL(1, table.where().table_col.subtable().age.end_subtable().count());
-
-    TestQueryAllTypes::Query query = table.where().bool_col.equal(false);
-
-    size_t ndx = not_found;
-
-    CHECK_EQUAL(54, query.int_col.minimum());
-    query.int_col.minimum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    CHECK_EQUAL(54, query.int_col.maximum());
-    query.int_col.maximum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    CHECK_EQUAL(54, query.int_col.sum());
-    CHECK_EQUAL(54, query.int_col.average());
-
-    CHECK_EQUAL(0.7f, query.float_col.minimum());
-    query.float_col.minimum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    CHECK_EQUAL(0.7f, query.float_col.maximum());
-    query.float_col.maximum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    CHECK_EQUAL(0.7f, query.float_col.sum());
-    CHECK_EQUAL(0.7f, query.float_col.average());
-
-    CHECK_EQUAL(0.8, query.double_col.minimum());
-    query.double_col.minimum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    CHECK_EQUAL(0.8, query.double_col.maximum());
-    query.double_col.maximum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    CHECK_EQUAL(0.8, query.double_col.sum());
-    CHECK_EQUAL(0.8, query.double_col.average());
 }
 
 
