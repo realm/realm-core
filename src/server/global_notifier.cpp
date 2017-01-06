@@ -199,6 +199,15 @@ void GlobalNotifier::register_realms(std::vector<AdminRealmListener::RealmInfo> 
         if (!monitor[i])
             continue;
 
+// FIXME - remove for gn
+        m_pending_deliveries.push({
+            realms[i],
+            VersionID(),
+            VersionID(),
+            Realm::make_shared_realm(get_config(realms[i].second)),
+            {}
+        });
+
         register_realm(realms[i]);
     }
 }

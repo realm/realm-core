@@ -37,6 +37,13 @@ public:
             SetProperty,
         };
 
+        static std::string type_string(Type type) {
+            switch(type) {
+                case Type::Insertion:     return "Insert";
+                case Type::SetProperty:   return "Set";
+            }
+        }
+
         const Type type;
         const std::string object_type;
         const std::string property;
