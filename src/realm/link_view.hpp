@@ -187,8 +187,6 @@ inline LinkView::LinkView(const ctor_cookie&)
     , m_origin_table(TableRef())
     , m_origin_column(nullptr)
 {
-//    m_row_indexes.set_parent(&m_origin_column, row_ndx);
-//    m_row_indexes.init_from_parent();
 }
 
 inline std::shared_ptr<LinkView> LinkView::create(Table* origin_table, LinkListColumn& column, size_t row_ndx)

@@ -35,6 +35,8 @@ void LinkView::generate_patch(const ConstLinkViewRef& ref, std::unique_ptr<Hando
             patch->m_row_ndx = ref->get_origin_row_index();
         }
         else {
+            // if the LinkView has become detached, indicate it by passing
+            // a handover patch with a nullptr in m_table.
             patch.reset(new HandoverPatch);
             patch->m_table = nullptr;
         }
@@ -54,6 +56,8 @@ LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<HandoverPatc
             return result;
         }
         else {
+            // We end up here if we're handing over a detached linkview.
+            // This is indicated by a patch with a null m_table.
             LinkViewRef result = LinkView::create_detached();
             patch.reset();
             return result;
