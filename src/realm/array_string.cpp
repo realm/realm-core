@@ -86,11 +86,7 @@ void ArrayString::set(size_t ndx, StringData value)
         }
 
         // Calc min column width
-        size_t new_width;
-        if (m_width == 0 && value.size() == 0)
-            new_width = ::round_up(1); // Entire Array is nulls; expand to m_width > 0
-        else
-            new_width = ::round_up(value.size() + 1);
+        size_t new_width = ::round_up(value.size() + 1);
 
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
         alloc(m_size, new_width); // Throws
