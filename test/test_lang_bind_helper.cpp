@@ -9744,19 +9744,19 @@ TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
             TableView tv1;
             LangBindHelper::promote_to_write(sg_w);
             TableRef table = group_w.add_table("table");
-            auto sub_table = group_w.add_table("sub_table");
-            sub_table->add_column(type_Int, "int");
-            sub_table->add_empty_row();
-            sub_table->set_int(0, 0, 42);
+            auto table2 = group_w.add_table("table2");
+            table2->add_column(type_Int, "int");
+            table2->add_empty_row();
+            table2->set_int(0, 0, 42);
 
-            table->add_column_link(type_LinkList, "first", *sub_table);
+            table->add_column_link(type_LinkList, "first", *table2);
             table->add_empty_row();
             auto link_view = table->get_linklist(0, 0);
 
             link_view->add(0);
             LangBindHelper::commit_and_continue_as_read(sg_w);
 
-            Query qq = sub_table->where(link_view);
+            Query qq = table2->where(link_view);
             CHECK_EQUAL(qq.count(), 1);
             LangBindHelper::promote_to_write(sg_w);
             table->clear();
