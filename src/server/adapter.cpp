@@ -114,32 +114,74 @@ public:
     {
         return true;
     }
-    bool set_bool(size_t, size_t, bool, _impl::Instruction)
+    bool set_bool(size_t column_index, size_t row_index, bool value, _impl::Instruction)
     {
+        parsed_instructions.emplace_back(Adapter::Instruction(
+            selected_object_type,
+            row_index,
+            selected_object_schema->persisted_properties[column_index].name,
+            false,
+            value
+        ));
         return true;
     }
-    bool set_float(size_t, size_t, float, _impl::Instruction)
+    bool set_float(size_t column_index, size_t row_index, float value, _impl::Instruction)
     {
+        parsed_instructions.emplace_back(Adapter::Instruction(
+            selected_object_type,
+            row_index,
+            selected_object_schema->persisted_properties[column_index].name,
+            false,
+            value
+        ));
         return true;
     }
-    bool set_double(size_t, size_t, double, _impl::Instruction)
+    bool set_double(size_t column_index, size_t row_index, double value, _impl::Instruction)
     {
+        parsed_instructions.emplace_back(Adapter::Instruction(
+            selected_object_type,
+            row_index,
+            selected_object_schema->persisted_properties[column_index].name,
+            false,
+            value
+        ));
         return true;
     }
-    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t)
+    bool set_string(size_t column_index, size_t row_index, StringData value, _impl::Instruction, size_t)
     {
+        parsed_instructions.emplace_back(Adapter::Instruction(
+            selected_object_type,
+            row_index,
+            selected_object_schema->persisted_properties[column_index].name,
+            false,
+            value
+        ));
         return true;
     }
-    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction)
+    bool set_binary(size_t column_index, size_t row_index, BinaryData value, _impl::Instruction)
     {
+        parsed_instructions.emplace_back(Adapter::Instruction(
+            selected_object_type,
+            row_index,
+            selected_object_schema->persisted_properties[column_index].name,
+            false,
+            value
+        ));
         return true;
     }
     bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction)
     {
         return true;
     }
-    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction)
+    bool set_timestamp(size_t column_index, size_t row_index, Timestamp value, _impl::Instruction)
     {
+        parsed_instructions.emplace_back(Adapter::Instruction(
+            selected_object_type,
+            row_index,
+            selected_object_schema->persisted_properties[column_index].name,
+            false,
+            value
+        ));
         return true;
     }
     bool set_table(size_t, size_t, _impl::Instruction)
@@ -154,8 +196,15 @@ public:
     {
         return true;
     }
-    bool set_null(size_t, size_t, _impl::Instruction, size_t)
+    bool set_null(size_t column_index, size_t row_index, _impl::Instruction, size_t)
     {
+        parsed_instructions.emplace_back(Adapter::Instruction(
+            selected_object_type,
+            row_index,
+            selected_object_schema->persisted_properties[column_index].name,
+            true,
+            (int64_t)0
+        ));
         return true;
     }
     bool nullify_link(size_t, size_t, size_t)
