@@ -90,6 +90,8 @@ template Field<double> Snapshot::get_field<double>(Table, int) const;
 template Field<Table> Snapshot::get_field<Table>(Table, int) const;
 template Field<Row> Snapshot::get_field<Row>(Table, int) const;
 
+template Field<List<uint64_t>> Snapshot::get_field<List<uint64_t>>(Table, int) const;
+
 template<typename T>
 Field<T> SnapshotImpl::get_field(Table t, int number) const {
     _Table* table = m_top_ptr->tables.get_ref(mem, t.key);

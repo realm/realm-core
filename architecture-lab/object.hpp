@@ -27,14 +27,29 @@ struct SnapshotImpl;
 struct _Cluster;
 struct _Table;
 
+
+// type used to indicate that a field is a list of T
+template<typename T> struct List {
+};
+
+// helper for accessing a list
+template<typename T>
+struct ListAccessor;
+
 struct Object {
 
+    // singular entries
     template<typename T>
     T operator()(Field<T> f);
 
     template<typename T>
     void set(Field<T> f, T value);
 
+    // lists
+    template<typename T>
+    ListAccessor<T> operator()(Field<List<T>> f);
+
+    // implementation:
     SnapshotImpl* ss;
     uint64_t versioning_count;
     Table t;
@@ -56,5 +71,22 @@ struct ObjectIterator {
     TreeLeaf* leaf;
 };
 
+template<typename T>
+struct ListAccessor {
+    Object o;
+    Field<List<T>> f;
+
+    uint64_t get_size();
+
+    void set_size(uint64_t new_size);
+
+    T rd(uint64_t index);
+
+    void wr(uint64_t index, T value);
+
+    // not sure about this one:
+    template<typename TFunc>
+    void for_each(uint64_t first, uint64_t limit, TFunc func);
+};
 
 #endif

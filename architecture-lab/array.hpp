@@ -20,25 +20,30 @@
 #define __ARRAY_HPP__
 
 #include <cassert>
+#include <stdexcept>
 
 #include "refs.hpp"
 #include "memory.hpp"
+
 
 /*
   Array encoding: The least 11 bits of a ref is used to encode element size
   and capacity. 
   * Bits 2-0: element size (1,2,4 bits, 1,2,4,8 bytes)
-  * Bits 10-3: number of last entry (same as capacity-1)
-  * Bits 63-11: Data. For refs, which always have lowest bits 0, these are not stored
+  * Bits 10-3: size (0..255, both included)
+  * Bits 63-11: Data. For refs, which always have lowest 3 bits 0. These are not stored
   * If the element size and capacity allows, data are stored inline
   */
 
+// describes the encoding/decoding of single elements
 template<typename T> struct Encoding {
     static T get_from_quad(uint64_t data, int sz, int index);
     static int get_encoding_size(T);
+    static bool is_null(T value) { return value == 0; }
     static uint64_t set_in_quad(uint64_t quad, int esz, int index, T value);
+    static uint64_t encode(T value) { return value; }
+    static T decode(uint64_t enc) { return enc; }
 };
-
 
 template<typename T>
 struct _Array {
@@ -46,12 +51,12 @@ struct _Array {
     // helper methods:
     inline bool is_all_zero() { return data == 0; }
     inline int get_esz() { return data & 0x7; }
-    inline int get_cap() { return 1 + ((data >> 3) & 0xFF); }
+    inline unsigned int get_cap() { return (data >> 3) & 0xFF; }
     inline uint64_t get_data() { return data >> 11; }
     void set_data(uint64_t val) { uint64_t l = data & 0x7FF; data = l | (val << 11); }
     static int bits_required(int esz, int cap) { uint64_t sz = cap; return sz << esz; }
     int quads_required() { return (63 + bits_required(get_esz(), get_cap())) / 64; }
-    static inline bool can_be_inlined(int esz, int cap) { 
+    static inline bool can_be_inlined(int esz, int cap) {
         switch(esz) {
             case 0: return cap <= 52;
             case 1: return cap <= 26;
@@ -63,7 +68,7 @@ struct _Array {
         }
     }
     bool inline is_inlined() { return can_be_inlined(get_esz(), get_cap()); }
-    void inline init(int esz, int cap, uint64_t value) { data = esz | ((cap-1) << 3) | (value << 11); }
+    void inline init(int esz, int cap, uint64_t value) { data = esz | (cap << 3) | (value << 11); }
     _Array() { data = 0; }
 
     Ref<uint64_t> get_ref() { Ref<uint64_t> res; res.r = get_data() << 3; return res; }
@@ -143,7 +148,7 @@ inline double Encoding<double>::get_from_quad(uint64_t data, int sz, int index) 
 
 template<typename T>
 inline T _Array<T>::get(Memory& mem, int index) {
-    if (is_all_zero()) return 0;
+    if (is_all_zero()) return T(0);
     if (is_inlined()) {
         return Encoding<T>::get_from_quad(get_data(), get_esz(), index);
     }
@@ -152,6 +157,26 @@ inline T _Array<T>::get(Memory& mem, int index) {
     uint64_t quad = array[idx];
     return Encoding<T>::get_from_quad(quad, get_esz(), index);
 }
+
+template<typename T>
+struct _List { //: public _Array<T> { FIXME: better to use inheritance?
+    _Array<T> array;
+    _List(int j) { assert(j==0); }
+    uint64_t get_size() { return array.get_cap(); }
+    void set_size(Memory& mem, uint64_t size);
+    T get(Memory& mem, uint64_t index) { return array.get(mem, index); }
+    void set(Memory& mem, uint64_t index, T value) { array.set(mem, index, value); }
+};
+
+// Specialization for all arrays with lists as elements: a list always requires a full quad.
+template<typename T> struct Encoding<_List<T>> {
+    static _List<T> get_from_quad(uint64_t data, int sz, int index) { return decode(data); }
+    static int get_encoding_size(_List<T>) { return 6; }
+    static bool is_null(_List<T> value) { return value.array.data == 0; }
+    static uint64_t set_in_quad(uint64_t quad, int esz, int index, _List<T> value) { return encode(value); }
+    static uint64_t encode(_List<T> value) { return value.array.data; }
+    static _List<T> decode(uint64_t enc) { _List<T> res(0); res.array.data = enc; return res; }
+};
 
 #endif
 

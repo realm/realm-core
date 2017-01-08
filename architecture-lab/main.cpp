@@ -27,7 +27,7 @@
 
 int main(int argc, char* argv[]) {
     const int limit = 3000000;
-    const char* fields = "uifdtruuuu";
+    const char* fields = "uifdtruuuuU";
 
     Db& db = Db::create("testing.core2");
 
@@ -44,6 +44,7 @@ int main(int argc, char* argv[]) {
     Field<uint64_t> field_x1 = ss.get_field<uint64_t>(t,7);
     Field<uint64_t> field_x2 = ss.get_field<uint64_t>(t,8);
     Field<uint64_t> field_x3 = ss.get_field<uint64_t>(t,9);
+    Field<List<uint64_t>> field_y = ss.get_field<List<uint64_t>>(t,10);
 
     std::cout << "inserting " << limit << " keys..." << std::flush;
     start = std::chrono::high_resolution_clock::now();
@@ -55,8 +56,19 @@ int main(int argc, char* argv[]) {
     end = std::chrono::high_resolution_clock::now();
     std::chrono::nanoseconds ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
     std::cout << "   ...done in " << ns.count() << " nsecs/key" << std::endl;
-    std::cout << "validating " << limit << " keys not present..." << std::flush;
 
+    // FIXME: Just a happy go lucky test of lists - expand and put later
+    Object o = ss.get(t, {2});
+    ListAccessor<uint64_t> la = o(field_y);
+    uint64_t list_sz = la.get_size();
+    assert(list_sz == 0);
+    la.set_size(10);
+    list_sz = la.get_size();
+    assert(list_sz == 10);
+    for (unsigned j=0; j<10; ++j) la.wr(j, j*j+j);
+    for (unsigned j=0; j<10; ++j) assert(la.rd(j) == j*j+j);
+
+    std::cout << "validating " << limit << " keys not present..." << std::flush;
     start = std::chrono::high_resolution_clock::now();
     for (uint64_t key = 0; key < limit; key++) {
         if (ss.exists(t, { (key << 1) + 1} ))

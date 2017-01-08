@@ -21,9 +21,11 @@
 
 template<>
 inline int Encoding<uint64_t>::get_encoding_size(uint64_t data) {
+    /*
     if (data < 0x2ULL) return 0;
     if (data < 0x4ULL) return 1;
     if (data < 0x10ULL) return 2;
+    */
     if (data < 0x100ULL) return 3;
     if (data < 0x10000ULL) return 4;
     if (data < 0x100000000ULL) return 5;
@@ -60,7 +62,7 @@ _Array<T> _Array<T>::commit(Memory& mem, _Array<T> from) {
         Ref<uint64_t> to = mem.alloc_in_file<uint64_t>(to_ptr, 8 * quads);
         uint64_t* from_ptr = mem.txl(from_ref);
         for (int j=0; j<quads; ++j)
-            to_ptr[j] = from_ptr[j];
+            to_ptr[j] = from_ptr[j]; // TODO: forwarding for list members
         _Array<T> result = from;
         mem.free(from_ref);
         result.set_ref(to);
@@ -89,12 +91,13 @@ void ensure_storage(Memory& mem, _Array<T>& a, int index, int e_sz) {
     if (!_Array<T>::can_be_inlined(e_sz, new_cap)) {
         //new_cap = (new_cap + 15) & 0x1F0; // align
     }
+    assert(new_cap <= 255);
     a.init(e_sz, new_cap, 0);
     if (!a.is_inlined()) {
         a.alloc(mem);
     }
     for (int j=0; j<old_cap; ++j) {
-        uint64_t tmp = b.get(mem, j);
+        T tmp = b.get(mem, j);
         a.set(mem, j, tmp);
     }
     for (int j=old_cap; j < new_cap; ++j) {
@@ -135,7 +138,7 @@ uint64_t Encoding<double>::set_in_quad(uint64_t quad, int esz, int index, double
 template<typename T>
 void _Array<T>::set(Memory& mem, int index, T value) {
     // extend storage if necessary before performing write
-    if (value == 0 && is_all_zero()) return;
+    if (Encoding<T>::is_null(value) && is_all_zero()) return;
     int e_sz = Encoding<T>::get_encoding_size(value);
     ensure_storage(mem, *this, index, e_sz);
     e_sz = get_esz();
@@ -151,7 +154,28 @@ void _Array<T>::set(Memory& mem, int index, T value) {
     }
 }
 
+template<typename T>
+void _List<T>::set_size(Memory& mem, uint64_t size) {
+    if (size < array.get_cap()) {
+        // TODO truncate
+        throw std::runtime_error("truncating a list is unimplemented");
+    }
+    else if (size > array.get_cap()) {
+        ensure_storage(mem, array, size-1, array.get_esz());
+    }
+}
+
+// explicit instantiation
 template class _Array<uint64_t>;
 template class _Array<int64_t>;
 template class _Array<float>;
 template class _Array<double>;
+template class _Array<_List<uint64_t>>;
+template class _Array<_List<int64_t>>;
+template class _Array<_List<float>>;
+template class _Array<_List<double>>;
+
+template class _List<uint64_t>;
+template class _List<int64_t>;
+template class _List<float>;
+template class _List<double>;

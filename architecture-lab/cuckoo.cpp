@@ -110,7 +110,7 @@ int find_empty_in_leaf(Memory& mem, TreeLeaf* leaf_ptr, uint64_t hash) {
     while (subhash != subhash_limit) {
         uint8_t idx = leaf_ptr->condenser[subhash];
         --idx; // indices wrapped by one to make 0 be last possible index
-        if (idx >= leaf_ptr->sz) {
+        if (idx >= leaf_ptr->sz && leaf_ptr->sz < 255) {
             return subhash;
         }
         subhash++;

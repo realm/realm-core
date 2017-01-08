@@ -31,6 +31,10 @@ union ArrayReps {
     _Array<int64_t> as_i;
     _Array<float> as_f;
     _Array<double> as_d;
+    _Array<_List<uint64_t>> as_U;
+    _Array<_List<int64_t>> as_I;
+    _Array<_List<float>> as_F;
+    _Array<_List<double>> as_D;
 };
 
 template<typename T> T get(Memory&, ArrayReps&, int);
@@ -38,18 +42,39 @@ template<> uint64_t get<uint64_t>(Memory& mem, ArrayReps& ar, int index) { retur
 template<> int64_t get<int64_t>(Memory& mem, ArrayReps& ar, int index) { return ar.as_i.get(mem, index); }
 template<> float get<float>(Memory& mem, ArrayReps& ar, int index) { return ar.as_f.get(mem, index); }
 template<> double get<double>(Memory& mem, ArrayReps& ar, int index) { return ar.as_d.get(mem, index); }
+template<> _List<uint64_t> get<_List<uint64_t>>(Memory& mem, ArrayReps& ar, int index) { 
+    return ar.as_U.get(mem, index); 
+}
+template<> _List<int64_t> get<_List<int64_t>>(Memory& mem, ArrayReps& ar, int index) { 
+    return ar.as_I.get(mem, index); 
+}
+template<> _List<float> get<_List<float>>(Memory& mem, ArrayReps& ar, int index) { 
+    return ar.as_F.get(mem, index); 
+}
+template<> _List<double> get<_List<double>>(Memory& mem, ArrayReps& ar, int index) { 
+    return ar.as_D.get(mem, index); 
+}
 
 template<typename T> void set(Memory&, ArrayReps&, int, T);
 template<> void set(Memory& mem, ArrayReps& ar, int index, uint64_t val) { ar.as_u.set(mem, index, val); }
 template<> void set(Memory& mem, ArrayReps& ar, int index, int64_t val) { ar.as_i.set(mem, index, val); }
 template<> void set(Memory& mem, ArrayReps& ar, int index, float val) { ar.as_f.set(mem, index, val); }
 template<> void set(Memory& mem, ArrayReps& ar, int index, double val) { ar.as_d.set(mem, index, val); }
+template<> void set(Memory& mem, ArrayReps& ar, int index, _List<uint64_t> val) { ar.as_U.set(mem, index, val); }
+template<> void set(Memory& mem, ArrayReps& ar, int index, _List<int64_t> val) { ar.as_I.set(mem, index, val); }
+template<> void set(Memory& mem, ArrayReps& ar, int index, _List<float> val) { ar.as_F.set(mem, index, val); }
+template<> void set(Memory& mem, ArrayReps& ar, int index, _List<double> val) { ar.as_D.set(mem, index, val); }
 
 union Reps {
     uint64_t as_u;
     int64_t as_i;
     float as_f;
     double as_d;
+    _List<uint64_t> as_U;
+    _List<int64_t> as_I;
+    _List<float> as_F;
+    _List<double> as_D;
+    Reps() { as_u = 0; }
 };
 
 struct _Cluster { ArrayReps entries[1]; };
@@ -87,6 +112,10 @@ void ClusterMgr::free(Ref<DynType> payload, int capacity) {
                 case 'i': cluster_ptr->entries[j].as_i.free(mem); break;
                 case 'f': cluster_ptr->entries[j].as_f.free(mem); break;
                 case 'd': cluster_ptr->entries[j].as_d.free(mem); break;
+                case 'U': cluster_ptr->entries[j].as_U.free(mem); break;
+                case 'I': cluster_ptr->entries[j].as_I.free(mem); break;
+                case 'F': cluster_ptr->entries[j].as_F.free(mem); break;
+                case 'D': cluster_ptr->entries[j].as_D.free(mem); break;
                 default: throw std::runtime_error("Internal error, unsupported type specifier");
             }
         }
@@ -124,6 +153,14 @@ Ref<DynType> ClusterMgr::commit(Ref<DynType> from) {
                 case 'i': to_ptr->entries[k].as_i = _Array<int64_t>::commit(mem, from_ptr->entries[k].as_i); break;
                 case 'f': to_ptr->entries[k].as_f = _Array<float>::commit(mem, from_ptr->entries[k].as_f); break;
                 case 'd': to_ptr->entries[k].as_d = _Array<double>::commit(mem, from_ptr->entries[k].as_d); break;
+                case 'U': to_ptr->entries[k].as_U = _Array<_List<uint64_t>>::commit(mem, from_ptr->entries[k].as_U); 
+                    break;
+                case 'I': to_ptr->entries[k].as_I = _Array<_List<int64_t>>::commit(mem, from_ptr->entries[k].as_I); 
+                    break;
+                case 'F': to_ptr->entries[k].as_F = _Array<_List<float>>::commit(mem, from_ptr->entries[k].as_F); 
+                    break;
+                case 'D': to_ptr->entries[k].as_D = _Array<_List<double>>::commit(mem, from_ptr->entries[k].as_D); 
+                    break;
                 default: throw std::runtime_error("Internal error, unsupported type specifier");
             }
         }
@@ -144,6 +181,10 @@ void ClusterMgr::read_internalbuffer(Ref<DynType> payload, int index) {
             case 'i': values[col].as_i = p_ptr->entries[col].as_i.get(mem, index); break;
             case 'f': values[col].as_f = p_ptr->entries[col].as_f.get(mem, index); break;
             case 'd': values[col].as_d = p_ptr->entries[col].as_d.get(mem, index); break;
+            case 'U': values[col].as_U = p_ptr->entries[col].as_U.get(mem, index); break;
+            case 'I': values[col].as_I = p_ptr->entries[col].as_I.get(mem, index); break;
+            case 'F': values[col].as_F = p_ptr->entries[col].as_F.get(mem, index); break;
+            case 'D': values[col].as_D = p_ptr->entries[col].as_D.get(mem, index); break;
             default: throw std::runtime_error("Internal error, unsupported type specifier");
         }
     }
@@ -161,6 +202,10 @@ void ClusterMgr::write_internalbuffer(Ref<DynType>& payload, int index) {
             case 'i': p_ptr->entries[col].as_i.set(mem, index, values[col].as_i); break;
             case 'f': p_ptr->entries[col].as_f.set(mem, index, values[col].as_f); break;
             case 'd': p_ptr->entries[col].as_d.set(mem, index, values[col].as_d); break;
+            case 'U': p_ptr->entries[col].as_U.set(mem, index, values[col].as_U); break;
+            case 'I': p_ptr->entries[col].as_I.set(mem, index, values[col].as_I); break;
+            case 'F': p_ptr->entries[col].as_F.set(mem, index, values[col].as_F); break;
+            case 'D': p_ptr->entries[col].as_D.set(mem, index, values[col].as_D); break;
             default: throw std::runtime_error("Internal error, unsupported type specifier");
         }
     }
@@ -200,6 +245,34 @@ void ClusterMgr::swap_internalbuffer(Ref<DynType>& payload, int index) {
                 double tmp = array.get(mem, index);
                 p_ptr->entries[col].as_d.set(mem, index, values[col].as_d);
                 values[col].as_d = tmp;
+                break;
+            }
+            case 'U': {
+                _Array<_List<uint64_t>>& array = p_ptr->entries[col].as_U;
+                _List<uint64_t> tmp = array.get(mem, index);
+                p_ptr->entries[col].as_U.set(mem, index, values[col].as_U);
+                values[col].as_U = tmp;
+                break;
+            }
+            case 'I': {
+                _Array<_List<int64_t>>& array = p_ptr->entries[col].as_I;
+                _List<int64_t> tmp = array.get(mem, index);
+                p_ptr->entries[col].as_I.set(mem, index, values[col].as_I);
+                values[col].as_I = tmp;
+                break;
+            }
+            case 'F': {
+                _Array<_List<float>>& array = p_ptr->entries[col].as_F;
+                _List<float> tmp = array.get(mem, index);
+                p_ptr->entries[col].as_F.set(mem, index, values[col].as_F);
+                values[col].as_F = tmp;
+                break;
+            }
+            case 'D': {
+                _Array<_List<double>>& array = p_ptr->entries[col].as_D;
+                _List<double> tmp = array.get(mem, index);
+                p_ptr->entries[col].as_D.set(mem, index, values[col].as_D);
+                values[col].as_D = tmp;
                 break;
             }
             default: throw std::runtime_error("Internal error, unsupported type specifier");
@@ -338,6 +411,45 @@ Row Object::operator()<Row>(Field<Row> f) {
     return res;
 }
 
+template<typename T>
+ListAccessor<T> Object::operator()(Field<List<T>> f) {
+    ListAccessor<T> res;
+    res.o = *this;
+    res.f = f;
+    return res;
+}
+
+template<typename T>
+uint64_t ListAccessor<T>::get_size() {
+    Memory& mem = o.ss->refresh(&o);
+    _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[f.key], o.index);
+    return list.get_size();
+}
+
+template<typename T>
+T ListAccessor<T>::rd(uint64_t index) {
+    Memory& mem = o.ss->refresh(&o);
+    _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[f.key], o.index);
+    return list.get(mem, index);
+}
+
+template<typename T>
+void ListAccessor<T>::set_size(uint64_t size) {
+    Memory& mem = o.ss->change(&o);
+    _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[f.key], o.index);
+    list.set_size(mem, size);
+    ::set<_List<T>>(mem, o.cluster->entries[f.key], o.index, list);
+}
+
+template<typename T>
+void ListAccessor<T>::wr(uint64_t index, T value) {
+    Memory& mem = o.ss->change(&o);
+    _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[f.key], o.index);
+    list.set(mem, index, value);
+    ::set<_List<T>>(mem, o.cluster->entries[f.key], o.index, list);
+}
+
+
 // explicit instantiation
 template void Object::set<uint64_t>(Field<uint64_t>, uint64_t);
 template void Object::set<int64_t>(Field<int64_t>, int64_t);
@@ -352,3 +464,13 @@ template float Object::operator()<float>(Field<float>);
 template double Object::operator()<double>(Field<double>);
 template Table Object::operator()<Table>(Field<Table>);
 template Row Object::operator()<Row>(Field<Row>);
+
+template ListAccessor<uint64_t> Object::operator()<uint64_t>(Field<List<uint64_t>>);
+template ListAccessor<int64_t> Object::operator()<int64_t>(Field<List<int64_t>>);
+template ListAccessor<float> Object::operator()<float>(Field<List<float>>);
+template ListAccessor<double> Object::operator()<double>(Field<List<double>>);
+
+template class ListAccessor<uint64_t>;
+template class ListAccessor<int64_t>;
+template class ListAccessor<float>;
+template class ListAccessor<double>;
