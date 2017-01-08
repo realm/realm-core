@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import math
 import matplotlib as mpl
 # configure to use a backend that doesn't require a display since this
@@ -86,6 +87,7 @@ def makeSummaryGraph(outputDirectory, summary):
     summaryGraphName = "summary.png"
 
     ratios = {title:summary[title]['last_std'] for title in summary}
+    ratios = OrderedDict(sorted(ratios.items(), reverse=True))
 
     # the y locations for the groups
     indices = range(len(ratios))
@@ -98,8 +100,10 @@ def makeSummaryGraph(outputDirectory, summary):
     # add some text for labels, title and axes ticks
     ax.set_xlabel('Standard Deviation')
     ax.set_title('Standard Deviations From Mean')
-    ax.set_yticks(indices + widths)
-    ax.set_yticklabels(ratios.keys())
+    ax.set_yticks(indices)
+    ax.set_yticklabels('')
+    ax.set_yticks([x + (width/2.0) for x in indices], minor=True)
+    ax.set_yticklabels(ratios.keys(), minor=True)
     ax.set_ylim([0, len(ratios)])
     ax.set_xlim([-4, 4])
     # 2 std threshold line
@@ -123,7 +127,7 @@ def generateReport(outputDirectory, csvFiles):
         # do not assume that the csv files are ordered correctly (they are not)
         bench_data = np.sort(bench_data, order='tag')
 
-        print "generating graph: " + str(index) + "/" + str(len(csvFiles)) + " (" + fname + ")"
+        print "generating graph: " + str(index + 1) + "/" + str(len(csvFiles)) + " (" + fname + ")"
         formatter = TagFormatter(bench_data['tag'])
 
         fig, ax = plt.subplots()
@@ -157,5 +161,6 @@ def generateReport(outputDirectory, csvFiles):
         summary[title] = {'title': title, 'src': imgName, 'threshold': threshold,
                           'last_value': last_value, 'last_std': last_std, 'status': status}
 
+    summary = OrderedDict(sorted(summary.items()))
     writeReport(outputDirectory, summary)
 
