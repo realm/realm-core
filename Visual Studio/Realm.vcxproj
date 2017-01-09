@@ -167,13 +167,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
-    <AppContainerApplication>false</AppContainerApplication>
-    <ApplicationType>Windows</ApplicationType>
-    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <WholeProgramOptimization>
+    </WholeProgramOptimization>
     <TargetPlatformVersion>8.1</TargetPlatformVersion>
     <WindowsAppContainer>false</WindowsAppContainer>
-    <WholeProgramOptimization>false</WholeProgramOptimization>
-    <UseOfMfc>false</UseOfMfc>
     <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'" Label="Configuration">
