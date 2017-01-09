@@ -9774,7 +9774,7 @@ TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
 
             CHECK(tv.is_in_sync());
             CHECK(tv.is_attached());
-            CHECK_EQUAL(0, tv.size()); // FAILED. The query is built from a link view which has been deleted.
+            CHECK_EQUAL(0, tv.size()); 
         }
     }
 }
