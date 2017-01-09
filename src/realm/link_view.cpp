@@ -56,7 +56,7 @@ LinkViewRef LinkView::create_from_and_consume_patch(std::unique_ptr<HandoverPatc
             return result;
         }
         else {
-            // We end up here if we're handing over a detached linkview.
+            // We end up here if we're handing over a detached LinkView.
             // This is indicated by a patch with a null m_table.
             LinkViewRef result = LinkView::create_detached();
             patch.reset();
@@ -92,10 +92,10 @@ void LinkView::do_insert(size_t link_ndx, size_t target_row_ndx)
         REALM_ASSERT_3(link_ndx, ==, 0);
         ref_type ref = IntegerColumn::create(m_origin_column->get_alloc()); // Throws
         m_origin_column->set_row_ref(origin_row_ndx, ref);                  // Throws
-        m_row_indexes.init_from_parent();                                  // re-attach
+        m_row_indexes.init_from_parent();                                   // re-attach
     }
 
-    m_row_indexes.insert(link_ndx, target_row_ndx);               // Throws
+    m_row_indexes.insert(link_ndx, target_row_ndx);                // Throws
     m_origin_column->add_backlink(target_row_ndx, origin_row_ndx); // Throws
 }
 
@@ -137,7 +137,7 @@ size_t LinkView::do_set(size_t link_ndx, size_t target_row_ndx)
     size_t origin_row_ndx = get_origin_row_index();
     m_origin_column->remove_backlink(old_target_row_ndx, origin_row_ndx); // Throws
     m_origin_column->add_backlink(target_row_ndx, origin_row_ndx);        // Throws
-    m_row_indexes.set(link_ndx, target_row_ndx);                         // Throws
+    m_row_indexes.set(link_ndx, target_row_ndx);                          // Throws
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
     return old_target_row_ndx;
@@ -201,7 +201,7 @@ void LinkView::remove(size_t link_ndx)
     REALM_ASSERT_7(m_row_indexes.is_attached(), ==, true, &&, link_ndx, <, m_row_indexes.size());
 
     if (Replication* repl = get_repl())
-        repl->link_list_erase(*this, link_ndx); // Throws
+        repl->link_list_erase(*this, link_ndx);  // Throws
 
     size_t target_row_ndx = do_remove(link_ndx); // Throws
     if (m_origin_column->m_weak_links)
@@ -230,7 +230,7 @@ size_t LinkView::do_remove(size_t link_ndx)
     size_t target_row_ndx = to_size_t(m_row_indexes.get(link_ndx));
     size_t origin_row_ndx = get_origin_row_index();
     m_origin_column->remove_backlink(target_row_ndx, origin_row_ndx); // Throws
-    m_row_indexes.erase(link_ndx);                                   // Throws
+    m_row_indexes.erase(link_ndx);                                    // Throws
     typedef _impl::TableFriend tf;
     tf::bump_version(*m_origin_table);
     return target_row_ndx;

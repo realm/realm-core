@@ -180,7 +180,7 @@ inline LinkView::LinkView(const ctor_cookie&, Table* origin_table, LinkListColum
     m_row_indexes.init_from_parent();
 }
 
-// create a detached linkview. Only partially initialized, as it will never be used for
+// create a detached LinkView. Only partially initialized, as it will never be used for
 // anything, but indicating that it is detached.
 inline LinkView::LinkView(const ctor_cookie&)
     : RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()) // Throws
