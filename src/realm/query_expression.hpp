@@ -128,6 +128,9 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #define REALM_QUERY_EXPRESSION_HPP
 
 #include <realm/column_type_traits.hpp>
+#include <realm/column_link.hpp>
+#include <realm/column_linklist.hpp>
+#include <realm/link_view.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/impl/sequential_getter.hpp>
 
