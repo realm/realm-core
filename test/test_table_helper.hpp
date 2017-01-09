@@ -37,6 +37,12 @@ void TestTable::set(size_t column_ndx, size_t row_ndx, int value, bool is_defaul
 }
 
 template <>
+void TestTable::set(size_t column_ndx, size_t row_ndx, unsigned value, bool is_default)
+{
+    set_int(column_ndx, row_ndx, value, is_default);
+}
+
+template <>
 void TestTable::set(size_t column_ndx, size_t row_ndx, bool value, bool is_default)
 {
     set_bool(column_ndx, row_ndx, value, is_default);

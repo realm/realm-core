@@ -1029,7 +1029,7 @@ TEST(Table_Delete)
 {
     TestTable01 table;
 
-    for (size_t i = 0; i < 10; ++i) {
+    for (int i = 0; i < 10; ++i) {
         add(table, 0, i, true, Wed);
     }
 
