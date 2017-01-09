@@ -509,6 +509,10 @@ void Realm::invalidate()
     verify_thread();
     check_read_write(this);
 
+    if (m_is_sending_notifications) {
+        return;
+    }
+
     if (is_in_transaction()) {
         cancel_transaction();
     }
@@ -573,30 +577,37 @@ void Realm::notify()
 
     verify_thread();
 
-    m_is_sending_notifications = true;
-    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
-
     if (m_binding_context) {
         m_binding_context->before_notify();
     }
-    if (m_shared_group->has_changed()) { // Throws
-        if (m_binding_context) {
-            m_binding_context->changes_available();
-        }
-        if (m_auto_refresh) {
-            if (m_group) {
-                m_coordinator->advance_to_ready(*this);
-            }
-            else  {
-                if (m_binding_context) {
-                    m_binding_context->did_change({}, {});
-                }
-                m_coordinator->process_available_async(*this);
-            }
-        }
-    }
-    else {
+
+    auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
+    if (!m_shared_group->has_changed()) {
+        m_is_sending_notifications = true;
         m_coordinator->process_available_async(*this);
+        return;
+    }
+
+    if (m_binding_context) {
+        m_binding_context->changes_available();
+
+        // changes_available() may have advanced the read version, and if
+        // so we don't need to do anything further
+        if (!m_shared_group->has_changed())
+            return;
+    }
+
+    m_is_sending_notifications = true;
+    if (m_auto_refresh) {
+        if (m_group) {
+            m_coordinator->advance_to_ready(*this);
+        }
+        else  {
+            if (m_binding_context) {
+                m_binding_context->did_change({}, {});
+            }
+            m_coordinator->process_available_async(*this);
+        }
     }
 }
 

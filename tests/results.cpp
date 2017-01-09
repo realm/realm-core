@@ -24,6 +24,7 @@
 #include "util/format.hpp"
 
 #include "impl/realm_coordinator.hpp"
+#include "binding_context.hpp"
 #include "object_schema.hpp"
 #include "property.hpp"
 #include "results.hpp"
@@ -463,6 +464,31 @@ TEST_CASE("notifications: async delivery") {
         }
     }
 
+    SECTION("refresh() from within changes_available() do not interfere with notification delivery") {
+        struct Context : BindingContext {
+            Realm& realm;
+            Context(Realm& realm) : realm(realm) { }
+
+            void changes_available() override
+            {
+                REQUIRE(realm.refresh());
+            }
+        };
+
+        make_remote_change();
+        coordinator->on_change();
+
+        r->set_auto_refresh(false);
+        REQUIRE(notification_calls == 1);
+
+        r->notify();
+        REQUIRE(notification_calls == 1);
+
+        r->m_binding_context.reset(new Context(*r));
+        r->notify();
+        REQUIRE(notification_calls == 2);
+    }
+
     SECTION("refresh() from within a notification is a no-op") {
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
@@ -502,6 +528,61 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE(notification_calls == 3);
     }
 
+    SECTION("begin_transaction() from within a notification does not break delivering additional notifications") {
+        size_t calls = 0;
+        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            if (++calls == 1)
+                return;
+
+            // force the read version to advance by beginning a transaction
+            r->begin_transaction();
+            r->cancel_transaction();
+        });
+
+        auto results2 = results;
+        size_t calls2 = 0;
+        auto token2 = results2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            if (++calls2 == 1)
+                return;
+            REQUIRE_INDICES(c.insertions, 0);
+        });
+        advance_and_notify(*r);
+        REQUIRE(calls == 1);
+        REQUIRE(calls2 == 1);
+
+        make_remote_change(); // 1
+        coordinator->on_change();
+        make_remote_change(); // 2
+        r->notify(); // advances to version from 1
+
+        REQUIRE(calls == 2);
+        REQUIRE(calls2 == 2);
+    }
+
+    SECTION("begin_transaction() from within did_change() does not break delivering collection notification") {
+        struct Context : BindingContext {
+            Realm& realm;
+            Context(Realm& realm) : realm(realm) { }
+
+            void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+            {
+                if (!realm.is_in_transaction()) {
+                    // advances to version from 2 (and recursively calls this, hence the check above)
+                    realm.begin_transaction();
+                    realm.cancel_transaction();
+                }
+            }
+        };
+        r->m_binding_context.reset(new Context(*r));
+
+        make_remote_change(); // 1
+        coordinator->on_change();
+        make_remote_change(); // 2
+        r->notify(); // advances to version from 1
+    }
+
     SECTION("is_in_transaction() is reported correctly within a notification from begin_transaction() and changes can be made") {
         bool first = true;
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
@@ -524,17 +605,19 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE(table->get_int(0, 0) != 100);
     }
 
-    SECTION("invalidate() from within notification ends the write transaction started by begin_transaction()") {
+    SECTION("invalidate() from within notification is a no-op") {
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
             r->invalidate();
+            REQUIRE(r->is_in_read_transaction());
         });
         advance_and_notify(*r);
-        REQUIRE_FALSE(r->is_in_read_transaction());
+        REQUIRE(r->is_in_read_transaction());
         make_remote_change();
         coordinator->on_change();
         r->begin_transaction();
-        REQUIRE_FALSE(r->is_in_transaction());
+        REQUIRE(r->is_in_transaction());
+        r->cancel_transaction();
     }
 
     SECTION("cancel_transaction() from within notification ends the write transaction started by begin_transaction()") {
@@ -1961,7 +2044,7 @@ TEST_CASE("distinct") {
     //   1, Foo_1,  3
     //   2, Foo_2,  2
     //   0, Foo_0,  1
-                          
+
     r->commit_transaction();
     Results results(r, table->where());
 
@@ -1982,7 +2065,7 @@ TEST_CASE("distinct") {
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
-        //  2, Foo_2,  8       
+        //  2, Foo_2,  8
         REQUIRE(unique.size() == 3);
         REQUIRE(unique.get(0).get_int(2) == 10);
         REQUIRE(unique.get(1).get_int(2) == 9);
@@ -2002,7 +2085,7 @@ TEST_CASE("distinct") {
         Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{2}, {1}}));
         // unique is the same as the table
         REQUIRE(unique.size() == N);
-        for (int i = 0; i < N; ++i) {           
+        for (int i = 0; i < N; ++i) {
             REQUIRE(unique.get(i).get_string(1) == StringData(util::format("Foo_%1", i % 3).c_str()));
         }
     }
@@ -2038,7 +2121,7 @@ TEST_CASE("distinct") {
         REQUIRE(unique.size() == 3);
         REQUIRE(unique.first()->get_int(2) == 10);
         REQUIRE(unique.last()->get_int(2) == 8);
-        
+
         // sort() is only applied to unique
         Results reverse = unique.sort(SortDescriptor(unique.get_tableview().get_parent(), {{2}}, {true}));
         // reversed:
@@ -2054,7 +2137,7 @@ TEST_CASE("distinct") {
     SECTION("Chaining distinct") {
         Results first = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
         REQUIRE(first.size() == 3);
-        
+
         // distinct() will discard the previous applied distinct() calls
         Results second = first.distinct(SortDescriptor(first.get_tableview().get_parent(), {{2}}));
         REQUIRE(second.size() == N);

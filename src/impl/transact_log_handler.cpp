@@ -239,10 +239,13 @@ public:
                 func(TransactLogValidator());
             else
                 func();
-            if (context && old_version != sg.get_version_of_current_transaction()) {
+            auto new_version = sg.get_version_of_current_transaction();
+            if (context && old_version != new_version)
                 context->did_change({}, {});
-            }
-            m_notifiers.deliver(sg);
+            // did_change() can change the read version, and if it does we can't
+            // deliver notifiers
+            if (new_version == sg.get_version_of_current_transaction())
+                m_notifiers.deliver(sg);
             m_notifiers.after_advance();
             return;
         }
