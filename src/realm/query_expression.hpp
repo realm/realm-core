@@ -149,15 +149,6 @@ T minimum(T a, T b)
     return a < b ? a : b;
 }
 
-// FIXME, this needs to exist elsewhere
-typedef int64_t Int;
-typedef bool Bool;
-typedef realm::OldDateTime OldDateTime;
-typedef float Float;
-typedef double Double;
-typedef realm::StringData String;
-typedef realm::BinaryData Binary;
-
 #ifdef REALM_OLDQUERY_FALLBACK
 // Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify only_numeric somehow
 namespace {
