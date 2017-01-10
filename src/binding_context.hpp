@@ -74,6 +74,11 @@ public:
     // actually be called?
     virtual bool can_deliver_notifications() const noexcept { return true; }
 
+    // Called by the Realm when refresh called or a notification arrives which
+    // is triggered through write transaction committed by itself or a different
+    // Realm instance.
+    virtual void before_notify() { }
+
     // Called by the Realm when a write transaction is committed to the file by
     // a different Realm instance (possibly in a different process)
     virtual void changes_available() { }

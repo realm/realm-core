@@ -576,6 +576,9 @@ void Realm::notify()
     m_is_sending_notifications = true;
     auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
 
+    if (m_binding_context) {
+        m_binding_context->before_notify();
+    }
     if (m_shared_group->has_changed()) { // Throws
         if (m_binding_context) {
             m_binding_context->changes_available();
@@ -615,6 +618,9 @@ bool Realm::refresh()
     m_is_sending_notifications = true;
     auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
 
+    if (m_binding_context) {
+        m_binding_context->before_notify();
+    }
     if (m_group) {
         return m_coordinator->advance_to_latest(*this);
     }
