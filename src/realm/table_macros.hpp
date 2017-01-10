@@ -28,6 +28,7 @@
  ****************************************************************************/
 
 // clang-format off
+#ifndef REALM_DISABLE_TABLE_MACROS
 
 #define REALM_TABLE_1(Table, name1, type1) \
 struct Table##Spec: ::realm::SpecBase { \
@@ -928,6 +929,7 @@ struct Table##Spec: ::realm::SpecBase { \
 }; \
 typedef ::realm::BasicTable<Table##Spec> Table;
 
+#endif // REALM_DISABLE_TABLE_MACROS
 
 // clang-format on
 
