@@ -106,8 +106,11 @@ pthread_key_delete (pthread_key_t key)
 	      ptw32_mcs_lock_release (&keyLock);
 	    }
 	}
-
+#if REALM_UWP
+      FlsFree (key->key);
+#else
       TlsFree (key->key);
+#endif
       if (key->destructor != NULL)
 	{
 	  /* A thread could be holding the keyLock */

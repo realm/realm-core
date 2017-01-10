@@ -25,6 +25,8 @@
 #ifdef _WIN32
 #include "windows.h"
 #include "psapi.h"
+#include <chrono>
+#include <thread>
 #else
 #include <unistd.h>
 #endif
@@ -261,7 +263,7 @@ uint64_t fastrand(uint64_t max, bool is_seed)
 void millisleep(unsigned long milliseconds)
 {
 #ifdef _WIN32
-    _sleep(milliseconds);
+    std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
 #else
     // sleep() takes seconds and usleep() is deprecated, so use nanosleep()
     timespec ts;

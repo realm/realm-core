@@ -23,6 +23,10 @@
 #pragma warning(disable : 4800) // Visual Studio int->bool performance warnings
 #endif
 
+#ifdef _WIN32
+#define NOMINMAX
+#endif
+
 #ifdef REALM_HAVE_CONFIG
 #include <realm/util/config.h>
 #else
@@ -207,6 +211,10 @@
 #define REALM_ANDROID 1
 #else
 #define REALM_ANDROID 0
+#endif
+
+#ifndef REALM_UWP
+#define REALM_UWP 0
 #endif
 
 // Some documentation of the defines provided by Apple:

@@ -62,12 +62,14 @@ ptw32_cancel_callback (ULONG_PTR unused)
 DWORD
 ptw32_RegisterCancelation (PAPCFUNC unused1, HANDLE threadH, DWORD unused2)
 {
+#if !REALM_UWP
   CONTEXT context;
 
   context.ContextFlags = CONTEXT_CONTROL;
   GetThreadContext (threadH, &context);
   PTW32_PROGCTR (context) = (DWORD_PTR) ptw32_cancel_self;
   SetThreadContext (threadH, &context);
+#endif
   return 0;
 }
 

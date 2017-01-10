@@ -2,7 +2,33 @@
 
 ### Bugfixes
 
-* Lorem Ipsum.
+* Lorem ipsum.
+
+### Breaking changes
+
+* Lorem ipsum.
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 2.3.0 Release notes
+
+### Bugfixes
+
+* Fixed various bugs in aggregate methods of Table, TableView and Query for nullable columns
+  (max, min, avg, sum). The results of avg and sum could be wrong and the returned index of
+  the min and max rows could be wrong. Non-nullable columns might not have been affected.
+  One of the bugs are described here https://github.com/realm/realm-core/issues/2357
+* Prevent `stdin` from being accidentally closed during `~InterProcessCondVar()`.
 
 ### Breaking changes
 
@@ -11,10 +37,29 @@
   InvalidDatabase (as requested in issue #2275).
 
 ### Enhancements
-
+* Windows 10 UWP support. Use the new "UWP" configurations in Visual Studio to
+  compile core as a static .lib library for that platform. Also see sample App 
+  in the uwp_demo directory that uses the static library (compile the .lib first).
+  Note that it is currently just an internal preview with lots of limitations; see
+  https://github.com/realm/realm-core/issues/2059
 * Added 'void SharedGroup::get_stats(size_t& free_space, size_t& used_space)'
   allowing access to the size of free and used space (Requested in issue #2281).
 * Optimized Contains queries to use Boyer-Moore algorithm (around 10x speedup on large datasets)
+* Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
+  are now perfectly forwarded (via perfect forwarding) to `std::stream::operator<<()`.
+
+-----------
+
+### Internals
+
+* Unit tests now support JUnit output format.
+
+----------------------------------------------
+
+# 2.2.1 Release notes
+
+### Enhancements
+
 * Parameter arguments passed to logger methods (e.g., `util::Logger::info()`)
   are now perfectly forwarded (via perfect forwarding) to
   `std::stream::operator<<()`.
@@ -23,7 +68,12 @@
 
 ### Internals
 
-* Unit tests now support JUnit output format.
+* Make `_impl::make_error_code(_impl::SimulatedFailure::FailureType)`
+  participate in overload resolution in unqualified ADL contexts like
+  `make_error_code(_impl::SimulatedFailure::sync_client__read_head)` and `ec ==
+  _impl::SimulatedFailure::sync_client__read_head`.
+* `P_tmpdir` should not be used on Android. A better default name for temporary
+  folders has been introduced.
 
 ----------------------------------------------
 

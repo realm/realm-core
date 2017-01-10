@@ -123,7 +123,7 @@ query_expression.hpp
 lib_LIBRARIES    = librealm.a
 libexec_PROGRAMS = realmd
 bin_PROGRAMS     = realm-import realm-schema-dump
-DEV_PROGRAMS     = realm-config
+DEV_PROGRAMS     = realm-config realm-trawler
 
 librealm_a_SOURCES = \
 util/encrypted_file_mapping.cpp \
@@ -208,6 +208,8 @@ disable_sync_to_disk.cpp
 librealm_a_VERSION = 9:0:0
 
 realm_config_SOURCES = config_tool.cpp
+
+realm_trawler_SOURCES = realm_trawler.cpp
 
 realmd_SOURCES = realmd.cpp
 realmd_LIBS = librealm.a
