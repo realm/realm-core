@@ -9724,6 +9724,61 @@ TEST(LangBindHelper_HandoverQuery)
 }
 
 
+TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+    sg.begin_read();
+
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    SharedGroup::VersionID vid;
+    {
+        // Untyped interface
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover1;
+        std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery;
+        {
+            TableView tv1;
+            LangBindHelper::promote_to_write(sg_w);
+            TableRef table = group_w.add_table("table");
+            auto table2 = group_w.add_table("table2");
+            table2->add_column(type_Int, "int");
+            table2->add_empty_row();
+            table2->set_int(0, 0, 42);
+
+            table->add_column_link(type_LinkList, "first", *table2);
+            table->add_empty_row();
+            auto link_view = table->get_linklist(0, 0);
+
+            link_view->add(0);
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+
+            Query qq = table2->where(link_view);
+            CHECK_EQUAL(qq.count(), 1);
+            LangBindHelper::promote_to_write(sg_w);
+            table->clear();
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            CHECK_EQUAL(qq.count(), 0);
+            handoverQuery = sg_w.export_for_handover(qq, ConstSourcePayload::Copy);
+            vid = sg_w.get_version_of_current_transaction();
+        }
+        {
+            LangBindHelper::advance_read(sg, vid);
+            sg_w.close();
+
+            std::unique_ptr<Query> q(sg.import_from_handover(move(handoverQuery)));
+            realm::TableView tv = q->find_all();
+
+            CHECK(tv.is_in_sync());
+            CHECK(tv.is_attached());
+            CHECK_EQUAL(0, tv.size()); 
+        }
+    }
+}
+
 TEST(LangBindHelper_SubqueryHandoverDependentViews)
 {
     SHARED_GROUP_TEST_PATH(path);
