@@ -91,6 +91,8 @@ void TestTable::set(size_t column_ndx, size_t row_ndx, MyEnum value, bool is_def
     set_int(column_ndx, row_ndx, value, is_default);
 }
 
+constexpr size_t col_value = 0;
+constexpr size_t col_binary = 1;
 
 template <class T>
 void subsubtable_add_columns(T t)
@@ -99,6 +101,8 @@ void subsubtable_add_columns(T t)
     t->add_column(type_Binary, "binary");
 }
 
+constexpr size_t col_foo = 0;
+constexpr size_t col_bar = 1;
 
 template <class T>
 void subtable_add_columns(T t)
@@ -109,6 +113,15 @@ void subtable_add_columns(T t)
     subsubtable_add_columns(subdesc);
 }
 
+
+constexpr size_t col_alpha = 0;
+constexpr size_t col_beta = 1;
+constexpr size_t col_gamma = 2;
+constexpr size_t col_delta = 3;
+constexpr size_t col_epsilon = 4;
+constexpr size_t col_zeta = 5;
+constexpr size_t col_eta = 6;
+constexpr size_t col_theta = 7;
 
 template <class T>
 void my_table_add_columns(T table)
@@ -151,7 +164,7 @@ void round(TestContext& test_context, SharedGroup& db, int index)
             for (int i = 0; i < 10; ++i)
                 table->add_empty_row();
         }
-        table->add_int(0, 0, 1);
+        table->add_int(col_alpha, 0, 1);
         wt.commit();
     }
 
@@ -165,13 +178,13 @@ void round(TestContext& test_context, SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #4
         TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(6, 0);
+        TableRef subtable = table->get_subtable(col_eta, 0);
         if (subtable->is_empty()) {
             add(subtable, 0, nullptr);
             add(subtable, 100, nullptr);
             add(subtable, 0, nullptr);
         }
-        table->add_int(0, 0, 1);
+        table->add_int(col_alpha, 0, 1);
         wt.commit();
     }
 
@@ -179,13 +192,13 @@ void round(TestContext& test_context, SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #5
         TableRef table = wt.get_table("my_table");
-        table->add_int(0, 0, 1);
-        TableRef subtable = table->get_subtable(6, 0);
-        subtable->add_int(0, 0, 1);
-        TableRef subsubtable = subtable->get_subtable(1, 0);
+        table->add_int(col_alpha, 0, 1);
+        TableRef subtable = table->get_subtable(col_eta, 0);
+        subtable->add_int(col_foo, 0, 1);
+        TableRef subsubtable = subtable->get_subtable(col_bar, 0);
         for (int i = int(subsubtable->size()); i <= index; ++i)
             subsubtable->add_empty_row();
-        table->add_int(0, 0, 1);
+        table->add_int(col_alpha, 0, 1);
         wt.commit();
     }
 
@@ -194,15 +207,15 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #6
         TableRef table = wt.get_table("my_table");
         if (3 <= table->size()) {
-            if (table->get_int(0, 2) == 749321) {
+            if (table->get_int(col_alpha, 2) == 749321) {
                 table->remove(1);
             }
             else {
                 table->remove(2);
             }
         }
-        TableRef subtable = table->get_subtable(6, 0);
-        subtable->add_int(0, 0, 1);
+        TableRef subtable = table->get_subtable(col_eta, 0);
+        subtable->add_int(col_foo, 0, 1);
         wt.commit();
     }
 
@@ -210,21 +223,21 @@ void round(TestContext& test_context, SharedGroup& db, int index)
     {
         ReadTransaction rt(db);
         ConstTableRef table = rt.get_table("my_table");
-        CHECK_EQUAL(749321, table->get_int(0, 1));
-        ConstTableRef subtable = table->get_subtable(6, 0);
-        CHECK_EQUAL(100, subtable->get_int(0, 1));
+        CHECK_EQUAL(749321, table->get_int(col_alpha, 1));
+        ConstTableRef subtable = table->get_subtable(col_eta, 0);
+        CHECK_EQUAL(100, subtable->get_int(col_foo, 1));
     }
 
     {
         WriteTransaction wt(db); // Write transaction #7
         TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(6, 0);
-        TableRef subsubtable = subtable->get_subtable(1, 0);
-        subsubtable->set_int(0, index, index);
-        table->add_int(0, 0, 1);
-        subsubtable->add_int(0, index, 2);
-        subtable->add_int(0, 0, 1);
-        subsubtable->add_int(0, index, 2);
+        TableRef subtable = table->get_subtable(col_eta, 0);
+        TableRef subsubtable = subtable->get_subtable(col_bar, 0);
+        subsubtable->set_int(col_value, index, index);
+        table->add_int(col_alpha, 0, 1);
+        subsubtable->add_int(col_value, index, 2);
+        subtable->add_int(col_foo, 0, 1);
+        subsubtable->add_int(col_value, index, 2);
         wt.commit();
     }
 
@@ -232,12 +245,12 @@ void round(TestContext& test_context, SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #8
         TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(6, 0);
-        TableRef subsubtable = subtable->get_subtable(1, 0);
-        table->add_int(0, 0, 1);
-        subsubtable->add_int(0, index, 2);
-        subtable->add_int(0, 0, 1);
-        subsubtable->add_int(0, index, 2);
+        TableRef subtable = table->get_subtable(col_eta, 0);
+        TableRef subsubtable = subtable->get_subtable(col_bar, 0);
+        table->add_int(col_alpha, 0, 1);
+        subsubtable->add_int(col_value, index, 2);
+        subtable->add_int(col_foo, 0, 1);
+        subsubtable->add_int(col_value, index, 2);
         // Note: Implicit rollback
     }
 
@@ -245,21 +258,21 @@ void round(TestContext& test_context, SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #9
         TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(6, 0);
-        TableRef subsubtable = subtable->get_subtable(1, 0);
+        TableRef subtable = table->get_subtable(col_eta, 0);
+        TableRef subsubtable = subtable->get_subtable(col_bar, 0);
         size_t size = ((512 + index % 1024) * 1024) % max_blob_size;
         std::unique_ptr<char[]> data(new char[size]);
         for (size_t i = 0; i < size; ++i)
             data[i] = static_cast<unsigned char>((i + index) * 677 % 256);
-        subsubtable->set_binary(1, index, BinaryData(data.get(), size));
+        subsubtable->set_binary(col_binary, index, BinaryData(data.get(), size));
         wt.commit();
     }
 
     {
         WriteTransaction wt(db); // Write transaction #10
         TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(6, 0);
-        subtable->set_int(0, 2, index * 677);
+        TableRef subtable = table->get_subtable(col_eta, 0);
+        subtable->set_int(col_foo, 2, index * 677);
         wt.commit();
     }
 
@@ -270,20 +283,20 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         std::unique_ptr<char[]> data(new char[size]);
         for (size_t i = 0; i < size; ++i)
             data[i] = static_cast<unsigned char>((i + index + 73) * 677 % 256);
-        table->set_binary(5, index % 2, BinaryData(data.get(), size));
+        table->set_binary(col_zeta, index % 2, BinaryData(data.get(), size));
         wt.commit();
     }
 
     {
         WriteTransaction wt(db); // Write transaction #12
         TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(6, 0);
-        TableRef subsubtable = subtable->get_subtable(1, 0);
-        subsubtable->add_int(0, index, 1000);
-        table->add_int(0, 0, -1);
-        subsubtable->add_int(0, index, -2);
-        subtable->add_int(0, 0, -1);
-        subsubtable->add_int(0, index, -2);
+        TableRef subtable = table->get_subtable(col_eta, 0);
+        TableRef subsubtable = subtable->get_subtable(col_bar, 0);
+        subsubtable->add_int(col_value, index, 1000);
+        table->add_int(col_alpha, 0, -1);
+        subsubtable->add_int(col_value, index, -2);
+        subtable->add_int(col_foo, 0, -1);
+        subsubtable->add_int(col_value, index, -2);
         wt.commit();
     }
 
@@ -294,7 +307,7 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         std::unique_ptr<char[]> data(new char[size]);
         for (size_t i = 0; i < size; ++i)
             data[i] = static_cast<unsigned char>((i + index + 73) * 677 % 256);
-        table->set_binary(5, (index + 1) % 2, BinaryData(data.get(), size));
+        table->set_binary(col_zeta, (index + 1) % 2, BinaryData(data.get(), size));
         wt.commit();
     }
 
@@ -303,12 +316,12 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #14
         TableRef table = wt.get_table("my_table");
         TableRef subtable;
-        if (table->get_mixed(7, 1).get_type() == type_Table) {
-            subtable = table->get_subtable(7, 1);
+        if (table->get_mixed(col_theta, 1).get_type() == type_Table) {
+            subtable = table->get_subtable(col_theta, 1);
         }
         else {
-            table->clear_subtable(7, 1);
-            subtable = table->get_subtable(7, 1);
+            table->clear_subtable(col_theta, 1);
+            subtable = table->get_subtable(col_theta, 1);
             my_table_add_columns(subtable);
             subtable->add_empty_row();
             subtable->add_empty_row();
@@ -334,7 +347,7 @@ void round(TestContext& test_context, SharedGroup& db, int index)
         WriteTransaction wt(db); // Write transaction #15
         TableRef table = wt.get_table("my_table");
         table->optimize();
-        TableRef subtable = table->get_subtable(7, 1);
+        TableRef subtable = table->get_subtable(col_theta, 1);
         subtable->optimize();
         wt.commit();
     }
@@ -343,14 +356,14 @@ void round(TestContext& test_context, SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #16
         TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(7, 1);
+        TableRef subtable = table->get_subtable(col_theta, 1);
         TableRef subsubtable;
-        if (subtable->get_mixed(7, 0).get_type() == type_Table) {
-            subsubtable = subtable->get_subtable(7, 0);
+        if (subtable->get_mixed(col_theta, 0).get_type() == type_Table) {
+            subsubtable = subtable->get_subtable(col_theta, 0);
         }
         else {
-            subtable->clear_subtable(7, 0);
-            subsubtable = subtable->get_subtable(7, 0);
+            subtable->clear_subtable(col_theta, 0);
+            subsubtable = subtable->get_subtable(col_theta, 0);
             my_table_add_columns(subsubtable);
         }
         size_t size = (17 + 233 * index) % 523;
@@ -370,14 +383,14 @@ void round(TestContext& test_context, SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #17
         TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(7, 1);
+        TableRef subtable = table->get_subtable(col_theta, 1);
         TableRef subsubtable;
-        if (subtable->get_mixed(7, 1).get_type() == type_Table) {
-            subsubtable = subtable->get_subtable(7, 1);
+        if (subtable->get_mixed(col_theta, 1).get_type() == type_Table) {
+            subsubtable = subtable->get_subtable(col_theta, 1);
         }
         else {
-            subtable->clear_subtable(7, 1);
-            subsubtable = subtable->get_subtable(7, 1);
+            subtable->clear_subtable(col_theta, 1);
+            subsubtable = subtable->get_subtable(col_theta, 1);
             subtable_add_columns(subsubtable);
         }
         int num = 8;
@@ -385,7 +398,7 @@ void round(TestContext& test_context, SharedGroup& db, int index)
             add(subsubtable, i, nullptr);
         std::vector<TableRef> subsubsubtables;
         for (int i = 0; i < num; ++i)
-            subsubsubtables.push_back(subsubtable->get_subtable(1, i));
+            subsubsubtables.push_back(subsubtable->get_subtable(col_bar, i));
         for (int i = 0; i < 3; ++i) {
             for (int j = 0; j < num; j += 2) {
                 BinaryData bin("", 0);
@@ -398,8 +411,8 @@ void round(TestContext& test_context, SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #18
         TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(7, 1);
-        TableRef subsubtable = subtable->get_subtable(7, 1);
+        TableRef subtable = table->get_subtable(col_theta, 1);
+        TableRef subsubtable = subtable->get_subtable(col_theta, 1);
         ;
         subsubtable->clear();
         wt.commit();
@@ -409,14 +422,14 @@ void round(TestContext& test_context, SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #19
         TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(7, 1);
+        TableRef subtable = table->get_subtable(col_theta, 1);
         TableRef subsubtable;
-        if (subtable->get_mixed(7, 2).get_type() == type_Table) {
-            subsubtable = subtable->get_subtable(7, 2);
+        if (subtable->get_mixed(col_theta, 2).get_type() == type_Table) {
+            subsubtable = subtable->get_subtable(col_theta, 2);
         }
         else {
-            subtable->clear_subtable(7, 2);
-            subsubtable = subtable->get_subtable(7, 2);
+            subtable->clear_subtable(col_theta, 2);
+            subsubtable = subtable->get_subtable(col_theta, 2);
             subsubtable_add_columns(subsubtable);
         }
         int num = 9;
@@ -429,17 +442,17 @@ void round(TestContext& test_context, SharedGroup& db, int index)
     {
         WriteTransaction wt(db); // Write transaction #20
         TableRef table = wt.get_table("my_table");
-        TableRef subtable = table->get_subtable(7, 1);
+        TableRef subtable = table->get_subtable(col_theta, 1);
         TableRef subsubtable;
-        if (subtable->get_mixed(7, 3).get_type() == type_Table) {
-            subsubtable = subtable->get_subtable(7, 3);
+        if (subtable->get_mixed(col_theta, 3).get_type() == type_Table) {
+            subsubtable = subtable->get_subtable(col_theta, 3);
         }
         else {
-            subtable->clear_subtable(7, 3);
-            subsubtable = subtable->get_subtable(7, 3);
+            subtable->clear_subtable(col_theta, 3);
+            subsubtable = subtable->get_subtable(col_theta, 3);
             subsubtable_add_columns(subsubtable);
             // FIXME: Reenable this when it works!!!
-            //            subsubtable->column().value.set_index();
+            // subsubtable->add_search_index(col_value);
         }
         int num = 9;
         for (int i = 0; i < num; ++i)
@@ -496,94 +509,94 @@ TEST(Transactions_General)
     ConstTableRef table = rt.get_table("my_table");
     CHECK(2 <= table->size());
 
-    CHECK_EQUAL(num_threads * num_rounds * 4, table->get_int(0, 0));
-    CHECK_EQUAL(false, table->get_bool(1, 0));
-    CHECK_EQUAL(moja, table->get_int(2, 0));
-    CHECK_EQUAL(0, table->get_olddatetime(3, 0));
-    CHECK_EQUAL("", table->get_string(4, 0));
-    CHECK_EQUAL(3u, table->get_subtable(6, 0)->size());
-    CHECK_EQUAL(0, table->get_mixed(7, 0));
+    CHECK_EQUAL(num_threads * num_rounds * 4, table->get_int(col_alpha, 0));
+    CHECK_EQUAL(false, table->get_bool(col_beta, 0));
+    CHECK_EQUAL(moja, table->get_int(col_gamma, 0));
+    CHECK_EQUAL(0, table->get_olddatetime(col_delta, 0));
+    CHECK_EQUAL("", table->get_string(col_epsilon, 0));
+    CHECK_EQUAL(3u, table->get_subtable(col_eta, 0)->size());
+    CHECK_EQUAL(0, table->get_mixed(col_theta, 0));
 
-    CHECK_EQUAL(749321, table->get_int(0, 1));
-    CHECK_EQUAL(true, table->get_bool(1, 1));
-    CHECK_EQUAL(kumi_na_tatu, table->get_int(2, 1));
-    CHECK_EQUAL(99992, table->get_olddatetime(3, 1));
-    CHECK_EQUAL("click", table->get_string(4, 1));
-    CHECK_EQUAL(0u, table->get_subtable(6, 1)->size());
-    CHECK_EQUAL(table1_theta_size, table->get_subtable_size(7, 1));
-    CHECK_EQUAL(table->get_subtable(7, 1)->get_column_name(0), "alpha");
+    CHECK_EQUAL(749321, table->get_int(col_alpha, 1));
+    CHECK_EQUAL(true, table->get_bool(col_beta, 1));
+    CHECK_EQUAL(kumi_na_tatu, table->get_int(col_gamma, 1));
+    CHECK_EQUAL(99992, table->get_olddatetime(col_delta, 1));
+    CHECK_EQUAL("click", table->get_string(col_epsilon, 1));
+    CHECK_EQUAL(0u, table->get_subtable(col_eta, 1)->size());
+    CHECK_EQUAL(table1_theta_size, table->get_subtable_size(col_theta, 1));
+    CHECK_EQUAL(table->get_subtable(col_theta, 1)->get_column_name(0), "alpha");
 
     {
-        ConstTableRef subtable = table->get_subtable(6, 0);
-        CHECK_EQUAL(num_threads * num_rounds * 2, subtable->get_int(0, 0));
-        CHECK_EQUAL(size_t(num_threads), subtable->get_subtable(1, 0)->size());
-        CHECK_EQUAL(100, subtable->get_int(0, 1));
-        CHECK_EQUAL(0u, subtable->get_subtable(1, 1)->size());
-        CHECK_EQUAL(0u, subtable->get_subtable(1, 2)->size());
+        ConstTableRef subtable = table->get_subtable(col_eta, 0);
+        CHECK_EQUAL(num_threads * num_rounds * 2, subtable->get_int(col_foo, 0));
+        CHECK_EQUAL(size_t(num_threads), subtable->get_subtable(col_bar, 0)->size());
+        CHECK_EQUAL(100, subtable->get_int(col_foo, 1));
+        CHECK_EQUAL(0u, subtable->get_subtable(col_bar, 1)->size());
+        CHECK_EQUAL(0u, subtable->get_subtable(col_bar, 2)->size());
 
-        ConstTableRef subsubtable = subtable->get_subtable(1, 0);
+        ConstTableRef subsubtable = subtable->get_subtable(col_bar, 0);
         for (int i = 0; i != num_threads; ++i) {
-            CHECK_EQUAL(1000 + i, subsubtable->get_int(0, i));
+            CHECK_EQUAL(1000 + i, subsubtable->get_int(col_value, i));
             size_t size = ((512 + i % 1024) * 1024) % max_blob_size;
             std::unique_ptr<char[]> data(new char[size]);
             for (size_t j = 0; j != size; ++j)
                 data[j] = static_cast<unsigned char>((j + i) * 677 % 256);
-            CHECK_EQUAL(BinaryData(data.get(), size), subsubtable->get_binary(1, i));
+            CHECK_EQUAL(BinaryData(data.get(), size), subsubtable->get_binary(col_binary, i));
         }
     }
 
     {
-        ConstTableRef subtable = table->get_subtable(7, 1);
+        ConstTableRef subtable = table->get_subtable(col_theta, 1);
         for (size_t i = 0; i < table1_theta_size; ++i) {
-            CHECK_EQUAL(false, subtable->get_bool(1, i));
-            CHECK_EQUAL(0, subtable->get_olddatetime(3, i));
-            CHECK_EQUAL(BinaryData("", 0), subtable->get_binary(5, i));
-            CHECK_EQUAL(0u, subtable->get_subtable(6, i)->size());
+            CHECK_EQUAL(false, subtable->get_bool(col_beta, i));
+            CHECK_EQUAL(0, subtable->get_olddatetime(col_delta, i));
+            CHECK_EQUAL(BinaryData("", 0), subtable->get_binary(col_zeta, i));
+            CHECK_EQUAL(0u, subtable->get_subtable(col_eta, i)->size());
             if (4 <= i)
-                CHECK_EQUAL(type_Int, subtable->get_mixed(7, i).get_type());
+                CHECK_EQUAL(type_Int, subtable->get_mixed(col_theta, i).get_type());
         }
-        CHECK_EQUAL(size_t(num_threads * num_rounds * 5), subtable->get_subtable_size(7, 0));
-        CHECK_EQUAL(subtable->get_subtable(7, 0)->get_column_name(0), "alpha");
-        CHECK_EQUAL(0u, subtable->get_subtable_size(7, 1));
-        CHECK_EQUAL(subtable->get_subtable(7, 1)->get_column_name(0), "foo");
-        CHECK_EQUAL(size_t(num_threads * num_rounds * 9), subtable->get_subtable_size(7, 2));
-        CHECK_EQUAL(subtable->get_subtable(7, 2)->get_column_name(0), "value");
-        CHECK_EQUAL(size_t(num_threads * num_rounds * 9), subtable->get_subtable_size(7, 3));
-        CHECK_EQUAL(subtable->get_subtable(7, 3)->get_column_name(0), "value");
+        CHECK_EQUAL(size_t(num_threads * num_rounds * 5), subtable->get_subtable_size(col_theta, 0));
+        CHECK_EQUAL(subtable->get_subtable(col_theta, 0)->get_column_name(col_alpha), "alpha");
+        CHECK_EQUAL(0u, subtable->get_subtable_size(col_theta, 1));
+        CHECK_EQUAL(subtable->get_subtable(col_theta, 1)->get_column_name(col_foo), "foo");
+        CHECK_EQUAL(size_t(num_threads * num_rounds * 9), subtable->get_subtable_size(col_theta, 2));
+        CHECK_EQUAL(subtable->get_subtable(col_theta, 2)->get_column_name(col_value), "value");
+        CHECK_EQUAL(size_t(num_threads * num_rounds * 9), subtable->get_subtable_size(col_theta, 3));
+        CHECK_EQUAL(subtable->get_subtable(col_theta, 3)->get_column_name(col_value), "value");
 
-        ConstTableRef subsubtable = subtable->get_subtable(7, 0);
+        ConstTableRef subsubtable = subtable->get_subtable(col_theta, 0);
         for (int i = 0; i < num_threads * num_rounds; ++i) {
-            CHECK_EQUAL(0, subsubtable->get_int(0, 5 * i + 0));
-            CHECK_EQUAL(1, subsubtable->get_int(0, 5 * i + 1));
-            CHECK_EQUAL(2, subsubtable->get_int(0, 5 * i + 2));
-            CHECK_EQUAL(3, subsubtable->get_int(0, 5 * i + 3));
-            CHECK_EQUAL(4, subsubtable->get_int(0, 5 * i + 4));
-            CHECK_EQUAL(false, subsubtable->get_bool(1, 5 * i + 0));
-            CHECK_EQUAL(false, subsubtable->get_bool(1, 5 * i + 1));
-            CHECK_EQUAL(false, subsubtable->get_bool(1, 5 * i + 2));
-            CHECK_EQUAL(false, subsubtable->get_bool(1, 5 * i + 3));
-            CHECK_EQUAL(false, subsubtable->get_bool(1, 5 * i + 4));
-            CHECK_EQUAL(nne, subsubtable->get_int(2, 5 * i + 0));
-            CHECK_EQUAL(tano, subsubtable->get_int(2, 5 * i + 1));
-            CHECK_EQUAL(sita, subsubtable->get_int(2, 5 * i + 2));
-            CHECK_EQUAL(saba, subsubtable->get_int(2, 5 * i + 3));
-            CHECK_EQUAL(nane, subsubtable->get_int(2, 5 * i + 4));
-            CHECK_EQUAL(0, subsubtable->get_olddatetime(3, 5 * i + 0));
-            CHECK_EQUAL(0, subsubtable->get_olddatetime(3, 5 * i + 1));
-            CHECK_EQUAL(0, subsubtable->get_olddatetime(3, 5 * i + 2));
-            CHECK_EQUAL(0, subsubtable->get_olddatetime(3, 5 * i + 3));
-            CHECK_EQUAL(0, subsubtable->get_olddatetime(3, 5 * i + 4));
-            CHECK_EQUAL("", subsubtable->get_string(4, 5 * i + 0));
-            CHECK_EQUAL("", subsubtable->get_string(4, 5 * i + 1));
-            CHECK_EQUAL("", subsubtable->get_string(4, 5 * i + 2));
-            CHECK_EQUAL("", subsubtable->get_string(4, 5 * i + 3));
-            CHECK_EQUAL("", subsubtable->get_string(4, 5 * i + 4));
-            CHECK_EQUAL(0u, subsubtable->get_subtable(6, 5 * i + 0)->size());
-            CHECK_EQUAL(0u, subsubtable->get_subtable(6, 5 * i + 1)->size());
-            CHECK_EQUAL(0u, subsubtable->get_subtable(6, 5 * i + 2)->size());
-            CHECK_EQUAL(0u, subsubtable->get_subtable(6, 5 * i + 3)->size());
-            CHECK_EQUAL(0u, subsubtable->get_subtable(6, 5 * i + 4)->size());
-            CHECK_EQUAL("click", subsubtable->get_mixed(7, 5 * i + 3).get_string());
+            CHECK_EQUAL(0, subsubtable->get_int(col_alpha, 5 * i + 0));
+            CHECK_EQUAL(1, subsubtable->get_int(col_alpha, 5 * i + 1));
+            CHECK_EQUAL(2, subsubtable->get_int(col_alpha, 5 * i + 2));
+            CHECK_EQUAL(3, subsubtable->get_int(col_alpha, 5 * i + 3));
+            CHECK_EQUAL(4, subsubtable->get_int(col_alpha, 5 * i + 4));
+            CHECK_EQUAL(false, subsubtable->get_bool(col_beta, 5 * i + 0));
+            CHECK_EQUAL(false, subsubtable->get_bool(col_beta, 5 * i + 1));
+            CHECK_EQUAL(false, subsubtable->get_bool(col_beta, 5 * i + 2));
+            CHECK_EQUAL(false, subsubtable->get_bool(col_beta, 5 * i + 3));
+            CHECK_EQUAL(false, subsubtable->get_bool(col_beta, 5 * i + 4));
+            CHECK_EQUAL(nne, subsubtable->get_int(col_gamma, 5 * i + 0));
+            CHECK_EQUAL(tano, subsubtable->get_int(col_gamma, 5 * i + 1));
+            CHECK_EQUAL(sita, subsubtable->get_int(col_gamma, 5 * i + 2));
+            CHECK_EQUAL(saba, subsubtable->get_int(col_gamma, 5 * i + 3));
+            CHECK_EQUAL(nane, subsubtable->get_int(col_gamma, 5 * i + 4));
+            CHECK_EQUAL(0, subsubtable->get_olddatetime(col_delta, 5 * i + 0));
+            CHECK_EQUAL(0, subsubtable->get_olddatetime(col_delta, 5 * i + 1));
+            CHECK_EQUAL(0, subsubtable->get_olddatetime(col_delta, 5 * i + 2));
+            CHECK_EQUAL(0, subsubtable->get_olddatetime(col_delta, 5 * i + 3));
+            CHECK_EQUAL(0, subsubtable->get_olddatetime(col_delta, 5 * i + 4));
+            CHECK_EQUAL("", subsubtable->get_string(col_epsilon, 5 * i + 0));
+            CHECK_EQUAL("", subsubtable->get_string(col_epsilon, 5 * i + 1));
+            CHECK_EQUAL("", subsubtable->get_string(col_epsilon, 5 * i + 2));
+            CHECK_EQUAL("", subsubtable->get_string(col_epsilon, 5 * i + 3));
+            CHECK_EQUAL("", subsubtable->get_string(col_epsilon, 5 * i + 4));
+            CHECK_EQUAL(0u, subsubtable->get_subtable(col_eta, 5 * i + 0)->size());
+            CHECK_EQUAL(0u, subsubtable->get_subtable(col_eta, 5 * i + 1)->size());
+            CHECK_EQUAL(0u, subsubtable->get_subtable(col_eta, 5 * i + 2)->size());
+            CHECK_EQUAL(0u, subsubtable->get_subtable(col_eta, 5 * i + 3)->size());
+            CHECK_EQUAL(0u, subsubtable->get_subtable(col_eta, 5 * i + 4)->size());
+            CHECK_EQUAL("click", subsubtable->get_mixed(col_theta, 5 * i + 3).get_string());
         }
     }
     // End of read transaction
