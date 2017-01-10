@@ -19,4 +19,5 @@ tags/v2.0.0
 tags/v2.0.1
 tags/v2.1.0
 tags/v2.2.0
+tags/v2.3.0
 HEAD
