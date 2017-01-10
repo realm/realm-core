@@ -35,12 +35,24 @@ public:
         enum class Type {
             Insertion,
             SetProperty,
+            ListSet,
+            ListInsert,
+            ListMove,
+            ListSwap,
+            ListNullify,
+            ListClear,
         };
 
         static std::string type_string(Type type) {
             switch(type) {
-                case Type::Insertion:     return "Insert";
-                case Type::SetProperty:   return "Set";
+                case Type::Insertion:   return "Insert";
+                case Type::SetProperty: return "Set";
+                case Type::ListSet:     return "ListSet";
+                case Type::ListInsert:  return "ListInsert";
+                case Type::ListMove:    return "ListMove";
+                case Type::ListSwap:    return "ListSwap";
+                case Type::ListNullify: return "ListNullify";
+                case Type::ListClear:   return "ListClear";
             }
         }
 
@@ -52,11 +64,16 @@ public:
         const bool is_null;
         const Mixed value;
 
+        const size_t list_index = -1;
+
         Instruction(Type t, std::string o, size_t r) 
         : type(t), object_type(o), row(r), is_null(false), value() {}
 
         Instruction(Type t, std::string o, size_t r, std::string p) 
         : type(t), object_type(o), row(r), property(p), is_null(false), value() {}
+
+        Instruction(Type t, std::string o, size_t r, std::string p, size_t i, size_t l) 
+        : type(t), object_type(o), row(r), property(p), is_null(false), value((int64_t)i), list_index(l) {}
 
         template<typename T>
         Instruction(std::string o, size_t r, std::string p, bool n, T v)

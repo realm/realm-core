@@ -37,22 +37,28 @@ public:
     std::vector<Adapter::Instruction> parsed_instructions;
     size_t selected_table;
     std::string selected_object_type;
-    ObjectSchema *selected_object_schema;
+    ObjectSchema *selected_object_schema = nullptr;
+
+    size_t selected_list_column;
+    size_t selected_list_row;
 
     // No selection needed:
     bool select_table(size_t group_index, size_t, const size_t*)
     {
         selected_table = group_index;
         selected_object_type = ObjectStore::object_type_for_table_name(m_group.get_table_name(selected_table));
-        selected_object_schema = &*m_schema.find(selected_object_type);
+        selected_object_schema = selected_object_type.size() ? &*m_schema.find(selected_object_type) : nullptr;
         return true;
     }
     bool select_descriptor(size_t, const size_t*)
     {
         return true;
     }
-    bool select_link_list(size_t, size_t, size_t)
+    bool select_link_list(size_t column_index, size_t row_index, size_t group_index)
     {
+        select_table(group_index, 0, nullptr);
+        selected_list_column = column_index;
+        selected_list_row = row_index;
         return true;
     }
     bool insert_group_level_table(size_t, size_t, StringData)
@@ -76,11 +82,13 @@ public:
     bool insert_empty_rows(size_t row_index, size_t n_rows, size_t, bool)
     {
         REALM_ASSERT(n_rows == 1);
-        parsed_instructions.emplace_back(Adapter::Instruction{
-            Adapter::Instruction::Type::Insertion,
-            selected_object_type,
-            row_index
-        });
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                Adapter::Instruction::Type::Insertion,
+                selected_object_type,
+                row_index
+            });
+        }
         return true;
     }
     bool erase_rows(size_t, size_t, size_t, bool)
@@ -101,13 +109,15 @@ public:
     }
     bool set_int(size_t column_index, size_t row_index, int_fast64_t value, _impl::Instruction, size_t)
     {
-        parsed_instructions.emplace_back(Adapter::Instruction(
-            selected_object_type,
-            row_index,
-            selected_object_schema->persisted_properties[column_index].name,
-            false,
-            (int64_t)value
-        ));
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction(
+                selected_object_type,
+                row_index,
+                selected_object_schema->persisted_properties[column_index].name,
+                false,
+                (int64_t)value
+            ));
+        }
         return true;
     }
     bool add_int(size_t, size_t, int_fast64_t)
@@ -116,57 +126,67 @@ public:
     }
     bool set_bool(size_t column_index, size_t row_index, bool value, _impl::Instruction)
     {
-        parsed_instructions.emplace_back(Adapter::Instruction(
-            selected_object_type,
-            row_index,
-            selected_object_schema->persisted_properties[column_index].name,
-            false,
-            value
-        ));
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction(
+                selected_object_type,
+                row_index,
+                selected_object_schema->persisted_properties[column_index].name,
+                false,
+                value
+            ));
+        }
         return true;
     }
     bool set_float(size_t column_index, size_t row_index, float value, _impl::Instruction)
     {
-        parsed_instructions.emplace_back(Adapter::Instruction(
-            selected_object_type,
-            row_index,
-            selected_object_schema->persisted_properties[column_index].name,
-            false,
-            value
-        ));
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction(
+                selected_object_type,
+                row_index,
+                selected_object_schema->persisted_properties[column_index].name,
+                false,
+                value
+            ));
+        }
         return true;
     }
     bool set_double(size_t column_index, size_t row_index, double value, _impl::Instruction)
     {
-        parsed_instructions.emplace_back(Adapter::Instruction(
-            selected_object_type,
-            row_index,
-            selected_object_schema->persisted_properties[column_index].name,
-            false,
-            value
-        ));
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction(
+                selected_object_type,
+                row_index,
+                selected_object_schema->persisted_properties[column_index].name,
+                false,
+                value
+            ));
+        }
         return true;
     }
     bool set_string(size_t column_index, size_t row_index, StringData value, _impl::Instruction, size_t)
     {
-        parsed_instructions.emplace_back(Adapter::Instruction(
-            selected_object_type,
-            row_index,
-            selected_object_schema->persisted_properties[column_index].name,
-            false,
-            value
-        ));
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction(
+                selected_object_type,
+                row_index,
+                selected_object_schema->persisted_properties[column_index].name,
+                false,
+                value
+            ));
+        }
         return true;
     }
     bool set_binary(size_t column_index, size_t row_index, BinaryData value, _impl::Instruction)
     {
-        parsed_instructions.emplace_back(Adapter::Instruction(
-            selected_object_type,
-            row_index,
-            selected_object_schema->persisted_properties[column_index].name,
-            false,
-            value
-        ));
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction(
+                selected_object_type,
+                row_index,
+                selected_object_schema->persisted_properties[column_index].name,
+                false,
+                value
+            ));
+        }
         return true;
     }
     bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction)
@@ -175,13 +195,15 @@ public:
     }
     bool set_timestamp(size_t column_index, size_t row_index, Timestamp value, _impl::Instruction)
     {
-        parsed_instructions.emplace_back(Adapter::Instruction(
-            selected_object_type,
-            row_index,
-            selected_object_schema->persisted_properties[column_index].name,
-            false,
-            value
-        ));
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction(
+                selected_object_type,
+                row_index,
+                selected_object_schema->persisted_properties[column_index].name,
+                false,
+                value
+            ));
+        }
         return true;
     }
     bool set_table(size_t, size_t, _impl::Instruction)
@@ -192,23 +214,43 @@ public:
     {
         return true;
     }
-    bool set_link(size_t, size_t, size_t, size_t, _impl::Instruction)
+    bool set_link(size_t column_index, size_t row_index, size_t link_index, size_t, _impl::Instruction)
     {
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction(
+                selected_object_type,
+                row_index,
+                selected_object_schema->persisted_properties[column_index].name,
+                false,
+                (int64_t)link_index
+            ));
+        }
         return true;
     }
     bool set_null(size_t column_index, size_t row_index, _impl::Instruction, size_t)
     {
-        parsed_instructions.emplace_back(Adapter::Instruction(
-            selected_object_type,
-            row_index,
-            selected_object_schema->persisted_properties[column_index].name,
-            true,
-            (int64_t)0
-        ));
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction(
+                selected_object_type,
+                row_index,
+                selected_object_schema->persisted_properties[column_index].name,
+                true,
+                (int64_t)0
+            ));
+        }
         return true;
     }
-    bool nullify_link(size_t, size_t, size_t)
+    bool nullify_link(size_t column_index, size_t row_index, size_t)
     {
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction(
+                selected_object_type,
+                row_index,
+                selected_object_schema->persisted_properties[column_index].name,
+                true,
+                (int64_t)0
+            ));
+        }
         return true;
     }
     bool insert_substring(size_t, size_t, size_t, StringData)
@@ -263,32 +305,100 @@ public:
     }
 
     // Must have linklist selected:
-    bool link_list_set(size_t, size_t, size_t)
+    bool link_list_set(size_t list_index, size_t value, size_t)
     {
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                Adapter::Instruction::Type::ListSet,
+                selected_object_type,
+                selected_list_row,
+                selected_object_schema->persisted_properties[selected_list_column].name,
+                value,
+                list_index
+            });
+        }
         return true;
     }
-    bool link_list_insert(size_t, size_t, size_t)
+    bool link_list_insert(size_t list_index, size_t value, size_t)
     {
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                Adapter::Instruction::Type::ListInsert,
+                selected_object_type,
+                selected_list_row,
+                selected_object_schema->persisted_properties[selected_list_column].name,
+                value,
+                list_index
+            });
+        }
         return true;
     }
-    bool link_list_move(size_t, size_t)
+    bool link_list_move(size_t from_index, size_t to_index)
     {
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                Adapter::Instruction::Type::ListMove,
+                selected_object_type,
+                selected_list_row,
+                selected_object_schema->persisted_properties[selected_list_column].name,
+                to_index,
+                from_index
+            });
+        }
         return true;
     }
-    bool link_list_swap(size_t, size_t)
+    bool link_list_swap(size_t from_index, size_t to_index)
     {
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                Adapter::Instruction::Type::ListSwap,
+                selected_object_type,
+                selected_list_row,
+                selected_object_schema->persisted_properties[selected_list_column].name,
+                to_index,
+                from_index
+            });
+        }
         return true;
     }
-    bool link_list_erase(size_t, size_t)
+    bool link_list_erase(size_t list_index, size_t)
     {
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                Adapter::Instruction::Type::ListNullify,
+                selected_object_type,
+                selected_list_row,
+                selected_object_schema->persisted_properties[selected_list_column].name,
+                0,
+                list_index
+            });
+        }
         return true;
     }
-    bool link_list_nullify(size_t, size_t)
+    bool link_list_nullify(size_t list_index, size_t)
     {
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                Adapter::Instruction::Type::ListNullify,
+                selected_object_type,
+                selected_list_row,
+                selected_object_schema->persisted_properties[selected_list_column].name,
+                0,
+                list_index
+            });
+        }
         return true;
     }
     bool link_list_clear(size_t)
     {
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                Adapter::Instruction::Type::ListClear,
+                selected_object_type,
+                selected_list_row,
+                selected_object_schema->persisted_properties[selected_list_column].name
+            });
+        }
         return true;
     }
 
