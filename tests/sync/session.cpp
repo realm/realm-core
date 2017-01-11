@@ -322,8 +322,8 @@ TEST_CASE("sync: error handling", "[sync]") {
         std::time_t just_before_raw = std::time(nullptr);
         SyncSession::OnlyForTesting::handle_error(*session, std::move(initial_error));
         std::time_t just_after_raw = std::time(nullptr);
-        auto just_before = std::localtime(&just_before_raw);
-        auto just_after = std::localtime(&just_after_raw);
+        auto just_before = util::localtime(just_before_raw);
+        auto just_after = util::localtime(just_after_raw);
         // At this point final_error should be populated.
         CHECK(final_error.is_client_reset_requested());
         // The original file path should be present.
@@ -334,15 +334,15 @@ TEST_CASE("sync: error handling", "[sync]") {
         CHECK(idx != std::string::npos);
         idx = recovery_path.find(SyncManager::shared().recovery_directory_path());
         CHECK(idx != std::string::npos);
-        if (just_before->tm_year == just_after->tm_year) {
+        if (just_before.tm_year == just_after.tm_year) {
             idx = recovery_path.find(util::put_time(just_after_raw, "%Y"));
             CHECK(idx != std::string::npos);
         }
-        if (just_before->tm_mon == just_after->tm_mon) {
+        if (just_before.tm_mon == just_after.tm_mon) {
             idx = recovery_path.find(util::put_time(just_after_raw, "%m"));
             CHECK(idx != std::string::npos);
         }
-        if (just_before->tm_yday == just_after->tm_yday) {
+        if (just_before.tm_yday == just_after.tm_yday) {
             idx = recovery_path.find(util::put_time(just_after_raw, "%d"));
             CHECK(idx != std::string::npos);
         }

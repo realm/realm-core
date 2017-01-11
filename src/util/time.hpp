@@ -26,13 +26,25 @@
 namespace realm {
 namespace util {
 
+// Like std::localtime, but safe with reentrancy and multiple threads.
+inline std::tm localtime(std::time_t time)
+{
+    std::tm calendar_time;
+#if defined(WIN32)
+    auto* result = localtime_s(&time, &calendar_time);
+#else
+    auto* result = localtime_r(&time, &calendar_time);
+#endif
+    if (!result)
+        throw std::system_error(errno, std::system_category());
+
+    return calendar_time;
+}
+
 // Like std::put_time, but compatible with GCC 4.9.
 inline std::string put_time(std::time_t time, const char *format)
 {
-    std::tm* calendar_time = std::localtime(&time);
-    if (!calendar_time)
-        throw std::system_error(errno, std::system_category());
-
+    std::tm calendar_time = localtime(time);
     size_t estimated_length = strlen(format) + 1;
 
     size_t formatted_length;
@@ -42,7 +54,7 @@ inline std::string put_time(std::time_t time, const char *format)
     // buffer by 8 characters whenever it is too small to hold the resulting string.
     do {
         buffer.resize(estimated_length);
-        formatted_length = strftime(&buffer[0], buffer.size(), format, calendar_time);
+        formatted_length = strftime(&buffer[0], buffer.size(), format, &calendar_time);
         estimated_length += 8;
     } while (formatted_length == 0);
 
