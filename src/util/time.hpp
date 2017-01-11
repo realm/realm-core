@@ -19,6 +19,7 @@
 #ifndef REALM_OS_UTIL_TIME_HPP
 #define REALM_OS_UTIL_TIME_HPP
 
+#include <cstring>
 #include <ctime>
 #include <string>
 #include <system_error>
@@ -45,7 +46,7 @@ inline std::tm localtime(std::time_t time)
 inline std::string put_time(std::time_t time, const char *format)
 {
     std::tm calendar_time = localtime(time);
-    size_t estimated_length = strlen(format) + 1;
+    size_t estimated_length = std::strlen(format) + 1;
 
     size_t formatted_length;
     std::string buffer;
