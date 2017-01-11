@@ -8,7 +8,8 @@ try {
   def isPublishingRun
   def isPublishingLatestRun
 
-  timeout(time: 1, unit: 'HOURS') {
+  //usually benchmarks take < 10 minutes but running them all can take 3-4 hours
+  //timeout(time: 1, unit: 'HOURS') {
     stage('gather-info') {
       node {
         checkout([
@@ -99,7 +100,7 @@ try {
         )
       }
     }
-  }
+  //} // end timeout
 } catch(Exception e) {
   e.printStackTrace()
   throw e
