@@ -22,6 +22,7 @@
 
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
+#include "util/time.hpp"
 
 #include "sync/sync_config.hpp"
 #include "sync/sync_manager.hpp"
@@ -321,8 +322,8 @@ TEST_CASE("sync: error handling", "[sync]") {
         std::time_t just_before_raw = std::time(nullptr);
         SyncSession::OnlyForTesting::handle_error(*session, std::move(initial_error));
         std::time_t just_after_raw = std::time(nullptr);
-        auto just_before = std::localtime(&just_before_raw);
-        auto just_after = std::localtime(&just_after_raw);
+        auto just_before = util::localtime(just_before_raw);
+        auto just_after = util::localtime(just_after_raw);
         // At this point final_error should be populated.
         CHECK(final_error.is_client_reset_requested());
         // The original file path should be present.
@@ -333,40 +334,16 @@ TEST_CASE("sync: error handling", "[sync]") {
         CHECK(idx != std::string::npos);
         idx = recovery_path.find(SyncManager::shared().recovery_directory_path());
         CHECK(idx != std::string::npos);
-        if (just_before->tm_year == just_after->tm_year) {
-            std::stringstream stream;
-#if __GNUC__ < 5
-            char s[5];
-            strftime(s, 5, "%Y", just_after);
-            stream << s;
-#else
-            stream << std::put_time(just_after, "%Y");
-#endif
-            idx = recovery_path.find(stream.str());
+        if (just_before.tm_year == just_after.tm_year) {
+            idx = recovery_path.find(util::put_time(just_after_raw, "%Y"));
             CHECK(idx != std::string::npos);
         }
-        if (just_before->tm_mon == just_after->tm_mon) {
-            std::stringstream stream;
-#if __GNUC__ < 5
-            char s[3];
-            strftime(s, 3, "%m", just_after);
-            stream << s;
-#else
-            stream << std::put_time(just_after, "%m");
-#endif
-            idx = recovery_path.find(stream.str());
+        if (just_before.tm_mon == just_after.tm_mon) {
+            idx = recovery_path.find(util::put_time(just_after_raw, "%m"));
             CHECK(idx != std::string::npos);
         }
-        if (just_before->tm_yday == just_after->tm_yday) {
-            std::stringstream stream;
-#if __GNUC__ < 5
-            char s[3];
-            strftime(s, 3, "%d", just_after);
-            stream << s;
-#else
-            stream << std::put_time(just_after, "%d");
-#endif
-            idx = recovery_path.find(stream.str());
+        if (just_before.tm_yday == just_after.tm_yday) {
+            idx = recovery_path.find(util::put_time(just_after_raw, "%d"));
             CHECK(idx != std::string::npos);
         }
     }

@@ -58,7 +58,8 @@ set(HEADERS
     util/atomic_shared_ptr.hpp
     util/compiler.hpp
     util/event_loop_signal.hpp
-    util/format.hpp)
+    util/format.hpp
+    util/time.hpp)
 
 if(APPLE)
     list(APPEND SOURCES impl/apple/external_commit_helper.cpp impl/apple/keychain_helper.cpp)
