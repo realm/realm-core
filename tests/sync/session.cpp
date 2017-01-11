@@ -335,19 +335,37 @@ TEST_CASE("sync: error handling", "[sync]") {
         CHECK(idx != std::string::npos);
         if (just_before->tm_year == just_after->tm_year) {
             std::stringstream stream;
+#if __GNUC__ < 5
+            char s[5];
+            strftime(s, 5, "%Y", just_after);
+            stream << s;
+#else
             stream << std::put_time(just_after, "%Y");
+#endif
             idx = recovery_path.find(stream.str());
             CHECK(idx != std::string::npos);
         }
         if (just_before->tm_mon == just_after->tm_mon) {
             std::stringstream stream;
+#if __GNUC__ < 5
+            char s[3];
+            strftime(s, 3, "%m", just_after);
+            stream << s;
+#else
             stream << std::put_time(just_after, "%m");
+#endif
             idx = recovery_path.find(stream.str());
             CHECK(idx != std::string::npos);
         }
         if (just_before->tm_yday == just_after->tm_yday) {
             std::stringstream stream;
+#if __GNUC__ < 5
+            char s[3];
+            strftime(s, 3, "%d", just_after);
+            stream << s;
+#else
             stream << std::put_time(just_after, "%d");
+#endif
             idx = recovery_path.find(stream.str());
             CHECK(idx != std::string::npos);
         }

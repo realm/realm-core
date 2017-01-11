@@ -23,6 +23,7 @@
 
 #include <iomanip>
 #include <sstream>
+#include <system_error>
 
 #if WIN32
 #include <io.h>
@@ -200,7 +201,15 @@ std::string create_timestamped_template(const std::string& prefix, int wildcard_
     wildcard_count = std::min(WILDCARD_MAX, std::max(WILDCARD_MIN, wildcard_count));
     std::time_t time = std::time(nullptr);
     std::stringstream stream;
-    stream << prefix << "-" << std::put_time(std::localtime(&time), "%Y%m%d-%H%M%S") << "-" << std::string(wildcard_count, 'X');
+    stream << prefix << "-";
+#if __GNUC__ < 5
+    char s[16];
+    strftime(s, 16, "%Y%m%d-%H%M%S", std::localtime(&time));
+    stream << s;
+#else
+    stream << std::put_time(std::localtime(&time), "%Y%m%d-%H%M%S");
+#endif
+    stream << "-" << std::string(wildcard_count, 'X');
     return stream.str();
 }
 
