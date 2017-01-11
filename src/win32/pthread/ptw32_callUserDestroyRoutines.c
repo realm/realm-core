@@ -38,6 +38,10 @@
 #include "pthread.h"
 #include "implement.h"
 
+PVOID WINAPI FlsGetValue(_In_ DWORD dwFlsIndex);
+
+BOOL WINAPI FlsSetValue(_In_ DWORD dwFlsIndex, _In_opt_ PVOID lpFlsData);
+
 #if defined(__CLEANUP_CXX)
 # if defined(_MSC_VER)
 #  include <eh.h>

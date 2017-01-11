@@ -532,7 +532,8 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>mincore.lib</AdditionalOptions>
+      <AdditionalOptions>
+      </AdditionalOptions>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">
@@ -557,7 +558,8 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>mincore.lib</AdditionalOptions>
+      <AdditionalOptions>
+      </AdditionalOptions>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -710,7 +712,8 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>mincore.lib</AdditionalOptions>
+      <AdditionalOptions>
+      </AdditionalOptions>
       <AdditionalLibraryDirectories>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.14393.0\um\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>
       </AdditionalDependencies>
@@ -749,7 +752,8 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>mincore.lib</AdditionalOptions>
+      <AdditionalOptions>
+      </AdditionalOptions>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -977,7 +981,9 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\src\realm\unicode.cpp" />
+    <ClCompile Include="..\src\realm\unicode.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">/DREALM_UWP=1 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="..\src\realm\util\basic_system_errors.cpp" />
     <ClCompile Include="..\src\realm\util\encrypted_file_mapping.cpp" />
     <ClCompile Include="..\src\realm\util\file.cpp" />

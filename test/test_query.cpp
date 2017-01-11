@@ -5283,7 +5283,6 @@ TEST(Query_Unicode2)
     CHECK_EQUAL(1, tv3.get_source_ndx(0));
 }
 
-#if !REALM_UWP // FIXME UWP
 
 TEST(Query_Unicode3)
 {
@@ -5318,7 +5317,6 @@ TEST(Query_Unicode3)
     CHECK_EQUAL(1, tv4.size());
     CHECK_EQUAL(3, tv4.get_source_ndx(0));
 }
-#endif
 
 #endif
 

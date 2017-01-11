@@ -137,6 +137,8 @@ inline bool equal_sequence(const char*& begin, const char* end, const char* begi
 /// Returns none if invalid UTF-8 encoding was encountered.
 util::Optional<std::string> case_map(StringData source, bool upper);
 
+unsigned int unicode_case_convert(unsigned int unicode, bool upper);
+
 enum IgnoreErrorsTag { IgnoreErrors };
 std::string case_map(StringData source, bool upper, IgnoreErrorsTag);
 
