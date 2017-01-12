@@ -21,7 +21,7 @@
 
 #include <type_traits>
 #include <map>
-#include <realm/util/type_list.hpp>
+#include <realm/util/tuple.hpp>
 
 #include "test.hpp"
 
