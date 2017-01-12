@@ -678,12 +678,6 @@ public:
         return get_group().get_table(name); // Throws
     }
 
-    template <class T>
-    BasicTableRef<const T> get_table(StringData name) const
-    {
-        return get_group().get_table<T>(name); // Throws
-    }
-
     const Group& get_group() const noexcept;
 
     /// Get the version of the snapshot to which this read transaction is bound.
@@ -731,24 +725,6 @@ public:
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return get_group().get_or_add_table(name, was_added); // Throws
-    }
-
-    template <class T>
-    BasicTableRef<T> get_table(StringData name) const
-    {
-        return get_group().get_table<T>(name); // Throws
-    }
-
-    template <class T>
-    BasicTableRef<T> add_table(StringData name, bool require_unique_name = true) const
-    {
-        return get_group().add_table<T>(name, require_unique_name); // Throws
-    }
-
-    template <class T>
-    BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr) const
-    {
-        return get_group().get_or_add_table<T>(name, was_added); // Throws
     }
 
     Group& get_group() const noexcept;

@@ -31,7 +31,6 @@
 #include <realm/impl/output_stream.hpp>
 #include <realm/impl/continuous_transactions_history.hpp>
 #include <realm/table.hpp>
-#include <realm/table_basic_fwd.hpp>
 #include <realm/alloc_slab.hpp>
 
 namespace realm {
@@ -277,8 +276,6 @@ public:
     /// the dynamic type (descriptor) to match the statically specified custom
     /// table type.
     ///
-    /// \tparam T An instance of the BasicTable class template.
-    ///
     /// \param index Index of table in this group.
     ///
     /// \param name Name of table. All strings are valid table names as long as
@@ -334,30 +331,6 @@ public:
     TableRef insert_table(size_t index, StringData name, bool require_unique_name = true);
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr);
     TableRef get_or_insert_table(size_t index, StringData name, bool* was_added = nullptr);
-
-    template <class T>
-    BasicTableRef<T> get_table(size_t index);
-
-    template <class T>
-    BasicTableRef<const T> get_table(size_t index) const;
-
-    template <class T>
-    BasicTableRef<T> get_table(StringData name);
-
-    template <class T>
-    BasicTableRef<const T> get_table(StringData name) const;
-
-    template <class T>
-    BasicTableRef<T> add_table(StringData name, bool require_unique_name = true);
-
-    template <class T>
-    BasicTableRef<T> insert_table(size_t index, StringData name, bool require_unique_name = true);
-
-    template <class T>
-    BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr);
-
-    template <class T>
-    BasicTableRef<T> get_or_insert_table(size_t index, StringData name, bool* was_added = nullptr);
 
     void remove_table(size_t index);
     void remove_table(StringData name);
@@ -892,91 +865,6 @@ inline TableRef Group::get_or_add_table(StringData name, bool* was_added)
     DescSetter desc_setter = nullptr;                                               // Do not add any columns
     Table* table = do_get_or_add_table(name, desc_matcher, desc_setter, was_added); // Throws
     return TableRef(table);
-}
-
-template <class T>
-inline BasicTableRef<T> Group::get_table(size_t table_ndx)
-{
-    static_assert(IsBasicTable<T>::value, "Invalid table type");
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = &T::matches_dynamic_type;
-    Table* table = do_get_table(table_ndx, desc_matcher); // Throws
-    return BasicTableRef<T>(static_cast<T*>(table));
-}
-
-template <class T>
-inline BasicTableRef<const T> Group::get_table(size_t table_ndx) const
-{
-    static_assert(IsBasicTable<T>::value, "Invalid table type");
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = &T::matches_dynamic_type;
-    const Table* table = do_get_table(table_ndx, desc_matcher); // Throws
-    return BasicTableRef<const T>(static_cast<const T*>(table));
-}
-
-template <class T>
-inline BasicTableRef<T> Group::get_table(StringData name)
-{
-    static_assert(IsBasicTable<T>::value, "Invalid table type");
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = &T::matches_dynamic_type;
-    Table* table = do_get_table(name, desc_matcher); // Throws
-    return BasicTableRef<T>(static_cast<T*>(table));
-}
-
-template <class T>
-inline BasicTableRef<const T> Group::get_table(StringData name) const
-{
-    static_assert(IsBasicTable<T>::value, "Invalid table type");
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = &T::matches_dynamic_type;
-    const Table* table = do_get_table(name, desc_matcher); // Throws
-    return BasicTableRef<const T>(static_cast<const T*>(table));
-}
-
-template <class T>
-inline BasicTableRef<T> Group::insert_table(size_t table_ndx, StringData name, bool require_unique_name)
-{
-    static_assert(IsBasicTable<T>::value, "Invalid table type");
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    DescSetter desc_setter = &T::set_dynamic_type;
-    Table* table = do_insert_table(table_ndx, name, desc_setter, require_unique_name); // Throws
-    return BasicTableRef<T>(static_cast<T*>(table));
-}
-
-template <class T>
-inline BasicTableRef<T> Group::add_table(StringData name, bool require_unique_name)
-{
-    return insert_table<T>(size(), name, require_unique_name);
-}
-
-template <class T>
-BasicTableRef<T> Group::get_or_insert_table(size_t table_ndx, StringData name, bool* was_added)
-{
-    static_assert(IsBasicTable<T>::value, "Invalid table type");
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = &T::matches_dynamic_type;
-    DescSetter desc_setter = &T::set_dynamic_type;
-    Table* table = do_get_or_insert_table(table_ndx, name, desc_matcher, desc_setter, was_added); // Throws
-    return BasicTableRef<T>(static_cast<T*>(table));
-}
-
-template <class T>
-BasicTableRef<T> Group::get_or_add_table(StringData name, bool* was_added)
-{
-    static_assert(IsBasicTable<T>::value, "Invalid table type");
-    if (!is_attached())
-        throw LogicError(LogicError::detached_accessor);
-    DescMatcher desc_matcher = &T::matches_dynamic_type;
-    DescSetter desc_setter = &T::set_dynamic_type;
-    Table* table = do_get_or_add_table(name, desc_matcher, desc_setter, was_added); // Throws
-    return BasicTableRef<T>(static_cast<T*>(table));
 }
 
 template <class S>

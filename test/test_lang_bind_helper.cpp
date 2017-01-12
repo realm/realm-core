@@ -28,7 +28,7 @@
 #ifdef TEST_LANG_BIND_HELPER
 
 #include <realm/descriptor.hpp>
-#include <realm/table_macros.hpp>
+#include <realm/query_expression.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/to_string.hpp>

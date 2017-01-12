@@ -69,14 +69,6 @@ class TableFriend;
 class Replication;
 
 
-/// The Table class is non-polymorphic, that is, it has no virtual
-/// functions. This is important because it ensures that there is no run-time
-/// distinction between a Table instance and an instance of any variation of
-/// BasicTable<T>, and this, in turn, makes it valid to cast a pointer from
-/// Table to BasicTable<T> even when the instance is constructed as a Table. Of
-/// course, this also assumes that BasicTable<> is non-polymorphic, has no
-/// destructor, and adds no extra data members.
-///
 /// FIXME: Table assignment (from any group to any group) could be made aliasing
 /// safe as follows: Start by cloning source table into target allocator. On
 /// success, assign, and then deallocate any previous structure at the target.
@@ -425,9 +417,6 @@ public:
 
     TableRef get_link_target(size_t column_ndx) noexcept;
     ConstTableRef get_link_target(size_t column_ndx) const noexcept;
-
-    template <class T>
-    typename T::RowAccessor get_link_accessor(size_t column_ndx, size_t row_ndx);
 
     //@{
 
@@ -1991,17 +1980,6 @@ inline size_t* Table::record_subtable_path(size_t* begin, size_t* end) const noe
 inline size_t* Table::Parent::record_subtable_path(size_t* begin, size_t*) noexcept
 {
     return begin;
-}
-
-template <class T>
-typename T::RowAccessor Table::get_link_accessor(size_t column_ndx, size_t row_ndx)
-{
-    size_t row_pos_in_target = get_link(column_ndx, row_ndx);
-    TableRef target_table = get_link_target(column_ndx);
-
-    Table* table = &*target_table;
-    T* typed_table = reinterpret_cast<T*>(table);
-    return (*typed_table)[row_pos_in_target];
 }
 
 inline bool Table::is_marked() const noexcept

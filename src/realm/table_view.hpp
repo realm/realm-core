@@ -419,17 +419,12 @@ private:
     friend class Table;
     friend class Query;
     friend class SharedGroup;
-    template <class Tab, class View, class Impl>
-    friend class BasicTableViewBase;
 
     // Called by table to adjust any row references:
     void adj_row_acc_insert_rows(size_t row_ndx, size_t num_rows) noexcept;
     void adj_row_acc_erase_row(size_t row_ndx) noexcept;
     void adj_row_acc_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
     void adj_row_acc_clear() noexcept;
-
-    template <typename Tab>
-    friend class BasicTableView;
 };
 
 
@@ -576,8 +571,6 @@ private:
     friend class Query;
     friend class TableViewBase;
     friend class LinkView;
-    template <typename, typename, typename>
-    friend class BasicTableViewBase;
 };
 
 
