@@ -427,12 +427,10 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
         m_current_downloadable = downloadable;
         m_current_downloaded = downloaded;
         m_current_uploaded = uploaded;
-        for (auto& pair : m_notifiers) {
+        for (auto it = m_notifiers.begin(); it != m_notifiers.end();) {
             bool should_delete = false;
-            invocations.emplace_back(create_notifier_invocation(pair.second, should_delete));
-            if (should_delete) {
-                m_notifiers.erase(pair.first);
-            }
+            invocations.emplace_back(create_notifier_invocation(it->second, should_delete));
+            it = (should_delete ? m_notifiers.erase(it) : std::next(it));
         }
     }
     // Run the notifiers only after we've released the lock.

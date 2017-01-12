@@ -180,6 +180,11 @@ public:
         {
             session.handle_error(std::move(error));
         }
+
+        static void handle_progress_update(SyncSession& session, uint64_t downloaded, uint64_t downloadable,
+                                           uint64_t uploaded, uint64_t uploadable) {
+            session.handle_progress_update(downloaded, downloadable, uploaded, uploadable);
+        }
     };
 
 private:
