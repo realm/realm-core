@@ -361,7 +361,7 @@ macro(build_realm_sync)
 
     # Sync server library is built as part of the sync library build
     set(sync_server_library_debug ${sync_library_directory}/librealm-server${platform}-dbg.a)
-    set(sync_server_library_release ${sync_library_directory}/librealm$-server${platform}.a)
+    set(sync_server_library_release ${sync_library_directory}/librealm-server${platform}.a)
     set(sync_server_libraries ${sync_server_library_debug} ${sync_server_library_release})
 
     ExternalProject_Add_Step(realm-sync-lib ensure-server-libraries
