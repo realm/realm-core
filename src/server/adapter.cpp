@@ -56,7 +56,7 @@ public:
     }
     bool select_link_list(size_t column_index, size_t row_index, size_t group_index)
     {
-        select_table(group_index, 0, nullptr);
+        //select_table(group_index, 0, nullptr);
         selected_list_column = column_index;
         selected_list_row = row_index;
         return true;
@@ -91,20 +91,31 @@ public:
         }
         return true;
     }
-    bool erase_rows(size_t, size_t, size_t, bool)
+    bool erase_rows(size_t row_index, size_t n_rows, size_t, bool)
     {
+        REALM_ASSERT(n_rows == 1);
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                Adapter::Instruction::Type::Deletion,
+                selected_object_type,
+                row_index
+            });
+        }
         return true;
     }
     bool swap_rows(size_t, size_t)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool merge_rows(size_t, size_t)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool clear_table()
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool set_int(size_t column_index, size_t row_index, int_fast64_t value, _impl::Instruction, size_t)
@@ -122,6 +133,7 @@ public:
     }
     bool add_int(size_t, size_t, int_fast64_t)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool set_bool(size_t column_index, size_t row_index, bool value, _impl::Instruction)
@@ -191,6 +203,7 @@ public:
     }
     bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool set_timestamp(size_t column_index, size_t row_index, Timestamp value, _impl::Instruction)
@@ -208,10 +221,12 @@ public:
     }
     bool set_table(size_t, size_t, _impl::Instruction)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool set_mixed(size_t, size_t, const Mixed&, _impl::Instruction)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool set_link(size_t column_index, size_t row_index, size_t link_index, size_t, _impl::Instruction)
@@ -221,7 +236,7 @@ public:
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
-                false,
+                link_index == npos,
                 (int64_t)link_index
             ));
         }
@@ -255,10 +270,12 @@ public:
     }
     bool insert_substring(size_t, size_t, size_t, StringData)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool erase_substring(size_t, size_t, size_t, size_t)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool optimize_table()

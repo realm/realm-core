@@ -34,6 +34,7 @@ public:
     public:
         enum class Type {
             Insertion,
+            Deletion,
             SetProperty,
             ListSet,
             ListInsert,
@@ -46,6 +47,7 @@ public:
         static std::string type_string(Type type) {
             switch(type) {
                 case Type::Insertion:   return "Insert";
+                case Type::Deletion:    return "Delete";
                 case Type::SetProperty: return "Set";
                 case Type::ListSet:     return "ListSet";
                 case Type::ListInsert:  return "ListInsert";
