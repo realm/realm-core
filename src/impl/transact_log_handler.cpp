@@ -79,7 +79,7 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
         }
     }
 
-    auto max = max_element(begin(tables_needed), end(tables_needed));
+    auto max = std::max_element(begin(tables_needed), end(tables_needed));
     if (*max >= table_modifications_needed.size())
         table_modifications_needed.resize(*max + 1, false);
     if (*max >= table_moves_needed.size())
