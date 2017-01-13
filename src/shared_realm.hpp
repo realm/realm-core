@@ -258,7 +258,6 @@ public:
     // Expose some internal functionality to other parts of the ObjectStore
     // without making it public to everyone
     class Internal {
-        friend class _impl::AnyHandover;
         friend class _impl::CollectionNotifier;
         friend class _impl::ListNotifier;
         friend class _impl::ObjectNotifier;

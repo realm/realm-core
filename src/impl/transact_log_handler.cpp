@@ -147,8 +147,8 @@ void KVOAdapter::before(SharedGroup& sg)
         auto& builder = list.builder;
         auto& changes = list.observer->changes[list.col];
 
-        // KVO can't express moves (becuase NSArray doesn't have them), so
-        // transform them into a series of sets on each effected index when possible
+        // KVO can't express moves (becaue NSArray doesn't have them), so
+        // transform them into a series of sets on each affected index when possible
         if (!builder.insertions.empty() && builder.insertions.count() == builder.moves.size()) {
             changes.kind = BindingContext::ColumnInfo::Kind::Set;
             changes.indices = builder.modifications;
