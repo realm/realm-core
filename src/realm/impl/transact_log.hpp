@@ -81,46 +81,6 @@ enum Instruction {
     instr_LinkListSetAll = 38,  // Assign to link list entry
 };
 
-struct IntegerColumnIterator {
-    IntegerColumnIterator(const IntegerColumn& iter_values, size_t ndx)
-        : m_values(iter_values)
-        , m_ndx(ndx)
-    {
-    }
-    const IntegerColumn& m_values;
-    size_t m_ndx;
-    bool operator==(const IntegerColumnIterator& i) const
-    {
-        return m_ndx == i.m_ndx;
-    }
-    bool operator!=(const IntegerColumnIterator& i) const
-    {
-        return m_ndx != i.m_ndx;
-    }
-    size_t operator-(const IntegerColumnIterator& i) const
-    {
-        return m_ndx - i.m_ndx;
-    }
-    int_fast64_t operator*() const
-    {
-        return m_values.get(m_ndx);
-    }
-    IntegerColumnIterator& operator++()
-    {
-        ++m_ndx;
-        return *this;
-    }
-    IntegerColumnIterator operator++(int)
-    {
-        IntegerColumnIterator i = *this;
-        ++m_ndx;
-        return i;
-    }
-};
-
-using IntegerList = std::tuple<IntegerColumnIterator, IntegerColumnIterator>;
-using UnsignedList = std::tuple<const size_t*, const size_t*>;
-
 class TransactLogStream {
 public:
     /// Ensure contiguous free space in the transaction log
@@ -430,6 +390,9 @@ public:
     }
 
 private:
+    using IntegerList = std::tuple<IntegerColumnIterator, IntegerColumnIterator>;
+    using UnsignedList = std::tuple<const size_t*, const size_t*>;
+
     // Make sure this is in agreement with the actual integer encoding
     // scheme (see encode_int()).
     static constexpr int max_enc_bytes_per_int = 10;
@@ -889,7 +852,8 @@ inline char* TransactLogEncoder::encode<StringData>(char* ptr, StringData s)
 }
 
 template <>
-inline char* TransactLogEncoder::encode<IntegerList>(char* ptr, IntegerList list)
+inline char* TransactLogEncoder::encode<TransactLogEncoder::IntegerList>(char* ptr,
+                                                                         TransactLogEncoder::IntegerList list)
 {
     auto i = std::get<0>(list);
     auto end = std::get<1>(list);
@@ -909,7 +873,8 @@ inline char* TransactLogEncoder::encode<IntegerList>(char* ptr, IntegerList list
 }
 
 template <>
-inline char* TransactLogEncoder::encode<UnsignedList>(char* ptr, UnsignedList list)
+inline char* TransactLogEncoder::encode<TransactLogEncoder::UnsignedList>(char* ptr,
+                                                                          TransactLogEncoder::UnsignedList list)
 {
     auto i = std::get<0>(list);
     auto end = std::get<1>(list);
@@ -957,13 +922,13 @@ inline size_t TransactLogEncoder::max_size(StringData s)
 }
 
 template <>
-inline size_t TransactLogEncoder::max_size<IntegerList>(IntegerList)
+inline size_t TransactLogEncoder::max_size<TransactLogEncoder::IntegerList>(IntegerList)
 {
     return max_enc_bytes_per_num * max_numbers_per_chunk;
 }
 
 template <>
-inline size_t TransactLogEncoder::max_size<UnsignedList>(UnsignedList list)
+inline size_t TransactLogEncoder::max_size<TransactLogEncoder::UnsignedList>(UnsignedList list)
 {
     return max_enc_bytes_per_num * (std::get<1>(list) - std::get<0>(list));
 }
@@ -1625,7 +1590,7 @@ inline bool TransactLogEncoder::link_list_set_all(const IntegerColumn& values)
     size_t num_values = values.size();
     append_simple_instr(
         instr_LinkListSetAll, num_values,
-        std::make_tuple(IntegerColumnIterator(values, 0), IntegerColumnIterator(values, num_values))); // Throws
+        std::make_tuple(IntegerColumnIterator(&values, 0), IntegerColumnIterator(&values, num_values))); // Throws
     return true;
 }
 
