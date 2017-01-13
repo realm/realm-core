@@ -74,14 +74,7 @@ constexpr size_t last_latin_extended_2_unicode = 591;
 // to work for many countries.
 constexpr size_t last_greek_unicode = 1023; 
 
-// Converts unicodes 0...last_greek_unicode to their respective lower case characters using a popular
-// UnicodeData.txtfile (http://www.opensource.apple.com/source/Heimdal/Heimdal-247.9/lib/wind/UnicodeData.txt) that
-// contains case conversion information. The conversion does not take your current locale in count; it can be
-// slightly wrong in some countries! If the input is already lower case, or outside range 0...last_greek_unicode, then input value
-// is returned untouched.
-//
-// The method is called from case_map() on Windows 10 UWP only, because CharLowerW() / CharUpperW() is not supported
-// on early Windows 10 devices (it's supported on newer versions though).
+#if REALM_UWP
 unsigned int unicode_case_convert(unsigned int unicode, bool upper)
 {
     // clang-format off
@@ -101,7 +94,7 @@ unsigned int unicode_case_convert(unsigned int unicode, bool upper)
 
     return ret;
 }
-
+#endif
 
 bool set_string_compare_method(string_compare_method_t method, StringCompareCallback callback)
 {
