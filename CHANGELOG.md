@@ -6,7 +6,7 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* The table macros, supporting the typed interface, has been removed
 
 ### Enhancements
 

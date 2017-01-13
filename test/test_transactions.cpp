@@ -30,7 +30,6 @@
 #include <realm/lang_bind_helper.hpp>
 #include <realm/util/file.hpp>
 #include <realm/group_shared.hpp>
-#include <realm/table_macros.hpp>
 
 #include "util/crypt_key.hpp"
 #include "util/thread_wrapper.hpp"

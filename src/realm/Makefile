@@ -59,12 +59,7 @@ owned_data.hpp \
 timestamp.hpp \
 table.hpp \
 table_ref.hpp \
-table_basic_fwd.hpp \
-table_accessors.hpp \
-table_basic.hpp \
 table_view.hpp \
-table_view_basic.hpp \
-table_macros.hpp \
 row.hpp \
 descriptor_fwd.hpp \
 descriptor.hpp \
