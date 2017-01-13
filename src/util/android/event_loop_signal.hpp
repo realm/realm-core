@@ -16,8 +16,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#include <atomic>
+#include <algorithm>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <vector>
 
 #include <errno.h>
 #include <fcntl.h>
@@ -36,11 +39,79 @@ template<typename Callback>
 class EventLoopSignal : public std::enable_shared_from_this<EventLoopSignal<Callback>> {
 public:
     EventLoopSignal(Callback&& callback)
-    : m_callback(std::move(callback))
-    {
-        ALooper* looper = ALooper_forThread();
-        if (!looper) {
+    : m_callback(std::move(callback)), m_looper(ALooper_forThread()) {
+        if (!m_looper) {
             return;
+        }
+        ALooper_acquire(m_looper);
+        // Delay the alooper initialization to the first time notify called.
+    }
+
+    ~EventLoopSignal()
+    {
+        if (!m_looper) {
+            return;
+        }
+
+        if (inited) {
+            ALooper_removeFd(m_looper, m_message_pipe.read);
+            ::close(m_message_pipe.write);
+            ::close(m_message_pipe.read);
+            {
+                std::unique_lock<std::shared_timed_mutex> lock(s_mutex);
+                s_weak_ptrs.erase(std::remove(s_weak_ptrs.begin(), s_weak_ptrs.end(), &m_weak), s_weak_ptrs.end());
+            }
+        }
+        ALooper_release(m_looper);
+    }
+
+    EventLoopSignal(EventLoopSignal&&) = delete;
+    EventLoopSignal& operator=(EventLoopSignal&&) = delete;
+    EventLoopSignal(EventLoopSignal const&) = delete;
+    EventLoopSignal& operator=(EventLoopSignal const&) = delete;
+
+    void notify()
+    {
+        if (m_looper) {
+            init();
+            notify_fd(m_message_pipe.write);
+        }
+    }
+
+private:
+    Callback m_callback;
+    // Acquire a ref to looper since we may init/destroy in a different thread.
+    ALooper* m_looper;
+    // weak_ptr points to this.
+    std::weak_ptr<EventLoopSignal> m_weak;
+    // Flag to avoid checking the weak_ptr.
+    bool inited = false;
+
+    // We cannot unregister in the looper callback since it may not be called at all (eg. IntentService).
+    // And we have to ensure the looper callback has a valid this pointer to use.
+    // To achieve that, a list is used to maintain every weak_ptr to this object, and check if the data in the
+    // callback param is in the list.
+    static std::vector<std::weak_ptr<EventLoopSignal>*> s_weak_ptrs;
+    static std::shared_timed_mutex s_mutex; // shared_mutex is available from C++ 17
+
+    // pipe file descriptor pair we use to signal ALooper
+    struct {
+      int read = -1;
+      int write = -1;
+    } m_message_pipe;
+
+    // We need to delay the init to the first time notify since we cannot get the weak_ptr in the contructor.
+    inline void init()
+    {
+        if (inited) {
+            return;
+        }
+        inited = true;
+
+        m_weak = this->shared_from_this();
+        {
+            std::unique_lock<std::shared_timed_mutex> lock(s_mutex);
+            s_weak_ptrs.push_back(&m_weak);
         }
 
         int message_pipe[2];
@@ -57,9 +128,9 @@ public:
             // It still works in blocking mode.
         }
 
-        if (ALooper_addFd(looper, message_pipe[0], 3 /* LOOPER_ID_USER */,
-                          ALOOPER_EVENT_INPUT | ALOOPER_EVENT_HANGUP,
-                          &looper_callback, nullptr) != 1) {
+        if (ALooper_addFd(m_looper, message_pipe[0], ALOOPER_POLL_CALLBACK,
+                          ALOOPER_EVENT_INPUT,
+                          &looper_callback, &m_weak) != 1) {
             LOGE("Error adding WeakRealmNotifier callback to looper.");
             ::close(message_pipe[0]);
             ::close(message_pipe[1]);
@@ -69,62 +140,25 @@ public:
 
         m_message_pipe.read = message_pipe[0];
         m_message_pipe.write = message_pipe[1];
-        m_thread_has_looper = true;
     }
 
-    ~EventLoopSignal()
-    {
-        bool flag = true;
-        if (m_thread_has_looper.compare_exchange_strong(flag, false)) {
-            // closing one end of the pipe here will trigger ALOOPER_EVENT_HANGUP
-            //in the callback which will do the rest of the cleanup
-            ::close(m_message_pipe.write);
-        }
-    }
-
-    EventLoopSignal(EventLoopSignal&&) = delete;
-    EventLoopSignal& operator=(EventLoopSignal&&) = delete;
-    EventLoopSignal(EventLoopSignal const&) = delete;
-    EventLoopSignal& operator=(EventLoopSignal const&) = delete;
-
-    void notify()
-    {
-        if (m_thread_has_looper) {
-            // Pass ourself over the pipe so that we can od work on the target
-            // thread. This requires forming a new shared_ptr to ensure we
-            // continue to exist until then.
-            auto ptr = new std::shared_ptr<EventLoopSignal>(this->shared_from_this());
-            if (write(m_message_pipe.write, &ptr, sizeof(ptr)) != sizeof(ptr)) {
-                delete ptr;
-                LOGE("Buffer overrun when writing to WeakRealmNotifier's ALooper message pipe.");
-            }
-        }
-    }
-
-private:
-    Callback m_callback;
-    std::atomic<bool> m_thread_has_looper{false};
-
-    // pipe file descriptor pair we use to signal ALooper
-    struct {
-      int read = -1;
-      int write = -1;
-    } m_message_pipe;
-
-    static int looper_callback(int fd, int events, void*)
+    static int looper_callback(int, int events, void* data)
     {
         if ((events & ALOOPER_EVENT_INPUT) != 0) {
-            std::shared_ptr<EventLoopSignal>* ptr = nullptr;
-            while (read(fd, &ptr, sizeof(ptr)) == sizeof(ptr)) {
-                (*ptr)->m_callback();
-                delete ptr;
+            std::shared_ptr<EventLoopSignal> shared;
+            {
+                std::shared_lock<std::shared_timed_mutex> lock(s_mutex);
+                auto weak = static_cast<std::weak_ptr<EventLoopSignal>*>(data);
+                if (std::find(s_weak_ptrs.begin(), s_weak_ptrs.end(), weak) != s_weak_ptrs.end()) {
+                    // Even if the weak_ptr can be found in the list, the object still can be destroyed in between.
+                    // But share_ptr can ensure we either have a valid pointer or the object has gone.
+                    shared = weak->lock();
+                }
             }
-        }
-
-        if ((events & ALOOPER_EVENT_HANGUP) != 0) {
-            // this callback is always invoked on the looper thread so it's fine to get the looper like this
-            ALooper_removeFd(ALooper_forThread(), fd);
-            ::close(fd);
+            if (shared) {
+                // By holding a shared_ptr, this object won't be destroyed in the m_callback.
+                shared->m_callback();
+            }
         }
 
         if ((events & ALOOPER_EVENT_ERROR) != 0) {
@@ -134,6 +168,37 @@ private:
         // return 1 to continue receiving events
         return 1;
     }
+
+    // Write a byte to a pipe to notify anyone waiting for data on the pipe
+    static void notify_fd(int fd)
+    {
+        while (true) {
+            char c = 0;
+            ssize_t ret = write(fd, &c, 1);
+            if (ret == 1) {
+                break;
+            }
+
+            // If the pipe's buffer is full, we need to read some of the old data in
+            // it to make space. We don't just read in the code waiting for
+            // notifications so that we can notify multiple waiters with a single
+            // write.
+            if (ret != 0) {
+                int err = errno;
+                if (err != EAGAIN) {
+                    throw std::system_error(err, std::system_category());
+                }
+            }
+            std::vector<uint8_t> buff(1024);
+            read(fd, buff.data(), buff.size());
+        }
+    }
 };
+
+template<typename Callback>
+std::vector<std::weak_ptr<EventLoopSignal<Callback>>*> EventLoopSignal<Callback>::s_weak_ptrs;
+template<typename Callback>
+std::shared_timed_mutex EventLoopSignal<Callback>::s_mutex;
+
 } // namespace util
 } // namespace realm
