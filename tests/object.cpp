@@ -148,5 +148,13 @@ TEST_CASE("object") {
             REQUIRE_INDICES(change.columns[0], 0);
             REQUIRE_INDICES(change.columns[1], 0);
         }
+
+        SECTION("skipping a notification") {
+            auto token = require_no_change();
+            write([&] {
+                row.set_int(0, 1);
+                token.suppress_next();
+            });
+        }
     }
 }
