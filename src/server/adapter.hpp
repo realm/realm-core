@@ -20,6 +20,7 @@
 #define REALM_SYNC_ADAPTER_HPP
 
 #include "global_notifier.hpp"
+#include "property.hpp"
 
 namespace realm {
 
@@ -43,6 +44,8 @@ public:
             ListSwap,
             ListNullify,
             ListClear,
+            AddType,
+            AddProperty,
         };
 
         static std::string type_string(Type type) {
@@ -57,34 +60,48 @@ public:
                 case Type::ListSwap:    return "ListSwap";
                 case Type::ListNullify: return "ListNullify";
                 case Type::ListClear:   return "ListClear";
+                case Type::AddType:     return "AddType";
+                case Type::AddProperty: return "AddProperty";
             }
         }
 
         const Type type;
         const std::string object_type;
-        const size_t row;
+        const size_t row = -1;
 
         const std::string property;
-        const bool is_null;
+        const bool is_null = false;
         const Mixed value;
+
+        const PropertyType data_type = PropertyType::Int;
+        const std::string target_object_type = "";
+        const bool nullable = false;
 
         const size_t list_index = -1;
 
-        Instruction(Type t, std::string o, size_t r = -1) 
-        : type(t), object_type(o), row(r), is_null(false), value() {}
+        Instruction(Type t, std::string o) 
+        : type(t), object_type(o), value() {}
+
+        Instruction(Type t, std::string o, size_t r) 
+        : type(t), object_type(o), row(r), value() {}
 
         Instruction(Type t, std::string o, size_t r, std::string p) 
-        : type(t), object_type(o), row(r), property(p), is_null(false), value() {}
+        : type(t), object_type(o), row(r), property(p), value() {}
 
         Instruction(Type t, std::string o, size_t r, std::string p, size_t i, size_t l) 
-        : type(t), object_type(o), row(r), property(p), is_null(false), value((int64_t)i), list_index(l) {}
+        : type(t), object_type(o), row(r), property(p), value((int64_t)i), list_index(l) {}
+
+        Instruction(std::string o, std::string p, PropertyType t, bool n, std::string l = "") 
+        : type(Type::AddProperty), object_type(o), property(p), value(), data_type(t), target_object_type(l) {}
 
         template<typename T>
         Instruction(std::string o, size_t r, std::string p, bool n, T v)
         : type(Type::SetProperty), object_type(o), row(r), property(p), is_null(n), value(v) {}
     };
 
-    std::vector<Instruction> current(std::string realm_path);
+    using ChangeSet = std::vector<Instruction>;
+
+    ChangeSet current(std::string realm_path);
     void advance(std::string realm_path);
 
 private:

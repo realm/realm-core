@@ -38,33 +38,45 @@ public:
     size_t selected_table;
     std::string selected_object_type;
     ObjectSchema *selected_object_schema = nullptr;
-    bool schema_changed = false;
 
     size_t selected_list_column;
     size_t selected_list_row;
+
+    size_t selected_descriptor;
+    std::string selected_descriptor_object_type;
+    bool schema_changed = false;
 
     // No selection needed:
     bool select_table(size_t group_index, size_t, const size_t*)
     {
         selected_table = group_index;
-        selected_object_type = ObjectStore::object_type_for_table_name(m_group.get_table_name(selected_table));
+        selected_object_type = ObjectStore::object_type_for_table_name(m_group.get_table_name(group_index));
         selected_object_schema = selected_object_type.size() ? &*m_schema.find(selected_object_type) : nullptr;
         return true;
     }
     bool select_descriptor(size_t, const size_t*)
     {
+        // FIXME - caller to this is broken - for now just use last selected table
+        selected_descriptor = selected_table;
+        selected_descriptor_object_type = selected_object_type;
         return true;
     }
     bool select_link_list(size_t column_index, size_t row_index, size_t group_index)
     {
-        //select_table(group_index, 0, nullptr);
         selected_list_column = column_index;
         selected_list_row = row_index;
         return true;
     }
-    bool insert_group_level_table(size_t, size_t, StringData)
+    bool insert_group_level_table(size_t group_index, size_t, StringData)
     {
-        schema_changed = true;
+        auto object_type = ObjectStore::object_type_for_table_name(m_group.get_table_name(group_index));
+        if (object_type.size()) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                Adapter::Instruction::Type::AddType,
+                object_type
+            });
+            schema_changed = true;
+        }
         return true;
     }
     bool erase_group_level_table(size_t, size_t)
@@ -294,14 +306,31 @@ public:
     }
 
     // Must have descriptor selected:
-    bool insert_link_column(size_t, DataType, StringData, size_t, size_t)
+    bool insert_link_column(size_t, DataType data_type, StringData prop_name, size_t target_table_idx, size_t)
     {
-        schema_changed = true;
+        if (selected_descriptor_object_type.size()) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                selected_descriptor_object_type,
+                prop_name,
+                (PropertyType)data_type,
+                true,
+                ObjectStore::object_type_for_table_name(m_group.get_table_name(target_table_idx))
+            });
+            schema_changed = true;
+        }        
         return true;
     }
-    bool insert_column(size_t, DataType, StringData, bool)
+    bool insert_column(size_t, DataType data_type, StringData prop_name, bool nullable)
     {
-        schema_changed = true;
+        if (selected_descriptor_object_type.size()) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                selected_descriptor_object_type,
+                prop_name,
+                (PropertyType)data_type,
+                nullable
+            });
+            schema_changed = true;
+        }  
         return true;
     }
     bool erase_link_column(size_t, size_t, size_t)
@@ -470,7 +499,7 @@ void Adapter::Callback::realm_changed(GlobalNotifier::ChangeNotification changes
     m_realm_changed(changes.realm_info);
 }
 
-std::vector<Adapter::Instruction> Adapter::current(std::string realm_path) {
+Adapter::ChangeSet Adapter::current(std::string realm_path) {
     auto realm = Realm::make_shared_realm(m_global_notifier->get_config(realm_path));
     auto sync_history = static_cast<sync::SyncHistory *>(realm->history());
     auto progress = sync_history->get_cooked_progress();
@@ -485,8 +514,6 @@ std::vector<Adapter::Instruction> Adapter::current(std::string realm_path) {
     _impl::SimpleInputStream stream(buffer.data(), buffer.size());
     _impl::TransactLogParser parser;
     parser.parse(stream, handler);
-
-    realm->invalidate();
 
     return std::move(handler.parsed_instructions);
 }
