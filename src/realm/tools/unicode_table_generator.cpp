@@ -41,7 +41,7 @@ int main()
 {
     constexpr uint32_t last_unicode = 1023; // Last unicode we want to support. 1023 is the last greek unicode
 
-    // You need to download this file from unicode.org
+    // You need to download this file from ftp://ftp.unicode.org/Public/UNIDATA/UnicodeData.txt
     std::ifstream infile("UnicodeData.txt");
 
     std::string line;
