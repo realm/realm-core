@@ -33,9 +33,10 @@ public:
     class Instruction {
     public:
         enum class Type {
-            Insertion,
-            Deletion,
+            Insert,
+            Delete,
             SetProperty,
+            Clear,
             ListSet,
             ListInsert,
             ListMove,
@@ -46,9 +47,10 @@ public:
 
         static std::string type_string(Type type) {
             switch(type) {
-                case Type::Insertion:   return "Insert";
-                case Type::Deletion:    return "Delete";
+                case Type::Insert:      return "Insert";
+                case Type::Delete:      return "Delete";
                 case Type::SetProperty: return "Set";
+                case Type::Clear:       return "Clear";
                 case Type::ListSet:     return "ListSet";
                 case Type::ListInsert:  return "ListInsert";
                 case Type::ListMove:    return "ListMove";
@@ -68,7 +70,7 @@ public:
 
         const size_t list_index = -1;
 
-        Instruction(Type t, std::string o, size_t r) 
+        Instruction(Type t, std::string o, size_t r = -1) 
         : type(t), object_type(o), row(r), is_null(false), value() {}
 
         Instruction(Type t, std::string o, size_t r, std::string p) 

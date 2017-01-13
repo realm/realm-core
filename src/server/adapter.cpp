@@ -38,6 +38,7 @@ public:
     size_t selected_table;
     std::string selected_object_type;
     ObjectSchema *selected_object_schema = nullptr;
+    bool schema_changed = false;
 
     size_t selected_list_column;
     size_t selected_list_row;
@@ -63,18 +64,22 @@ public:
     }
     bool insert_group_level_table(size_t, size_t, StringData)
     {
+        schema_changed = true;
         return true;
     }
     bool erase_group_level_table(size_t, size_t)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool rename_group_level_table(size_t, StringData)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool move_group_level_table(size_t, size_t)
     {
+        REALM_ASSERT(0);
         return true;
     }
 
@@ -84,7 +89,7 @@ public:
         REALM_ASSERT(n_rows == 1);
         if (selected_object_schema) {
             parsed_instructions.emplace_back(Adapter::Instruction{
-                Adapter::Instruction::Type::Insertion,
+                Adapter::Instruction::Type::Insert,
                 selected_object_type,
                 row_index
             });
@@ -96,7 +101,7 @@ public:
         REALM_ASSERT(n_rows == 1);
         if (selected_object_schema) {
             parsed_instructions.emplace_back(Adapter::Instruction{
-                Adapter::Instruction::Type::Deletion,
+                Adapter::Instruction::Type::Delete,
                 selected_object_type,
                 row_index
             });
@@ -115,7 +120,12 @@ public:
     }
     bool clear_table()
     {
-        REALM_ASSERT(0);
+        if (selected_object_schema) {
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                Adapter::Instruction::Type::Clear,
+                selected_object_type
+            });
+        }
         return true;
     }
     bool set_int(size_t column_index, size_t row_index, int_fast64_t value, _impl::Instruction, size_t)
@@ -286,26 +296,32 @@ public:
     // Must have descriptor selected:
     bool insert_link_column(size_t, DataType, StringData, size_t, size_t)
     {
+        schema_changed = true;
         return true;
     }
     bool insert_column(size_t, DataType, StringData, bool)
     {
+        schema_changed = true;
         return true;
     }
     bool erase_link_column(size_t, size_t, size_t)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool erase_column(size_t)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool rename_column(size_t, StringData)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool move_column(size_t, size_t)
     {
+        REALM_ASSERT(0);
         return true;
     }
     bool add_search_index(size_t)
@@ -318,6 +334,7 @@ public:
     }
     bool set_link_type(size_t, LinkType)
     {
+        REALM_ASSERT(0);
         return true;
     }
 
@@ -458,7 +475,6 @@ std::vector<Adapter::Instruction> Adapter::current(std::string realm_path) {
     auto sync_history = static_cast<sync::SyncHistory *>(realm->history());
     auto progress = sync_history->get_cooked_progress();
     auto version = progress.version;
-
 
     util::AppendBuffer<char> buffer;
     version = sync_history->fetch_next_cooked_changeset(version, buffer);
