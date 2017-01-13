@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <cstring>
 
 std::vector<std::string> tokenize(const char* src,
     char delim,
