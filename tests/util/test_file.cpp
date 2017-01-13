@@ -152,7 +152,8 @@ SyncServer::SyncServer(bool start_immediately)
 SyncServer::~SyncServer()
 {
     m_server.stop();
-    m_thread.join();
+    if (m_thread.joinable())
+        m_thread.join();
 }
 
 void SyncServer::start()

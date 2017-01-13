@@ -90,7 +90,7 @@ struct SyncSession::State {
     virtual void enter_state(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
     virtual void refresh_access_token(std::unique_lock<std::mutex>&,
-                                      SyncSession&, const std::string&,
+                                      SyncSession&, std::string,
                                       const util::Optional<std::string>&) const { }
 
     virtual void bind_with_admin_token(std::unique_lock<std::mutex>&,
@@ -123,15 +123,20 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
     }
 
     void refresh_access_token(std::unique_lock<std::mutex>& lock, SyncSession& session,
-                              const std::string& access_token,
+                              std::string access_token,
                               const util::Optional<std::string>& server_url) const override
     {
         // Since the sync session was previously unbound, it's safe to do this from the
         // calling thread.
         if (!session.m_server_url) {
-            session.m_server_url = std::move(server_url);
+            session.m_server_url = server_url;
         }
-        session.m_session->bind(*session.m_server_url, std::move(access_token));
+        if (session.m_session_has_been_bound) {
+            session.m_session->refresh(std::move(access_token));
+        } else {
+            session.m_session->bind(*session.m_server_url, std::move(access_token));
+            session.m_session_has_been_bound = true;
+        }
         if (session.m_deferred_commit_notification) {
             session.m_session->nonsync_transact_notify(*session.m_deferred_commit_notification);
             session.m_deferred_commit_notification = util::none;
@@ -170,7 +175,7 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
 
 struct sync_session_states::Active : public SyncSession::State {
     void refresh_access_token(std::unique_lock<std::mutex>&, SyncSession& session,
-                              const std::string& access_token,
+                              std::string access_token,
                               const util::Optional<std::string>&) const override
     {
         session.m_session->refresh(std::move(access_token));
@@ -181,7 +186,7 @@ struct sync_session_states::Active : public SyncSession::State {
         session.advance_state(lock, waiting_for_access_token);
         std::shared_ptr<SyncSession> session_ptr = session.shared_from_this();
         lock.unlock();
-        session.m_config.bind_session_handler(session_ptr->m_realm_path, session_ptr->m_config, std::move(session_ptr));
+        session.m_config.bind_session_handler(session_ptr->m_realm_path, session_ptr->m_config, session_ptr);
         return false;
     }
 
@@ -460,6 +465,9 @@ void SyncSession::create_sync_session()
     REALM_ASSERT(!m_session);
     m_session = std::make_unique<sync::Session>(m_client.client, m_realm_path);
 
+    // The next time we get a token, call `bind()` instead of `refresh()`.
+    m_session_has_been_bound = false;
+
     // Configure the error handler.
     std::weak_ptr<SyncSession> weak_self = shared_from_this();
     auto wrapped_handler = [this, weak_self](std::error_code error_code, bool is_fatal, std::string message) {
@@ -638,7 +646,7 @@ void SyncSession::refresh_access_token(std::string access_token, util::Optional<
         // The first time this method is called, the server URL must be provided.
         return;
     }
-    m_state->refresh_access_token(lock, *this, access_token, server_url);
+    m_state->refresh_access_token(lock, *this, std::move(access_token), server_url);
 }
 
 void SyncSession::bind_with_admin_token(std::string admin_token, std::string server_url)

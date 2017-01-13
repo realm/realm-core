@@ -46,7 +46,7 @@ std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<Sy
 {
     std::string url = server.base_url() + path;
     SyncTestFile config({user, url, std::move(stop_policy),
-        [&](const std::string& path, const SyncConfig& config, std::shared_ptr<SyncSession> session) {
+        [&, fetch_access_token=std::forward<FetchAccessToken>(fetch_access_token)](const auto& path, const auto& config, auto session) {
             auto token = fetch_access_token(path, config.realm_url);
             session->refresh_access_token(std::move(token), config.realm_url);
         }, std::forward<ErrorHandler>(error_handler)});
@@ -271,6 +271,53 @@ TEST_CASE("sync: log-in", "[sync]") {
 
     // TODO: write a test that logs out a Realm with multiple sessions, then logs it back in?
     // TODO: write tests that check that a Session properly handles various types of errors reported via its callback.
+}
+
+TEST_CASE("sync: token refreshing", "[sync]") {
+    using PublicState = realm::SyncSession::PublicState;
+    using ProtocolError = realm::sync::ProtocolError;
+    if (!EventLoop::has_implementation())
+        return;
+
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    SyncServer server;
+    // Disable file-related functionality and metadata functionality for testing purposes.
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    auto user = SyncManager::shared().get_user("user-token-refreshing", "not_a_real_token");
+
+    SECTION("Can preemptively refresh token while session is active.") {
+        auto session = sync_session(server, user, "/test-token-refreshing",
+                                    [&](auto&, auto&) { return s_test_token; },
+                                    [](auto, auto) { },
+                                    SyncSessionStopPolicy::AfterChangesUploaded);
+        EventLoop::main().run_until([&] { return session_is_active(*session); });
+        REQUIRE(!session->is_in_error_state());
+
+        REQUIRE(session->state() == PublicState::Active);
+        session->refresh_access_token(s_test_token, none);
+        REQUIRE(session->state() == PublicState::Active);
+    }
+
+    SECTION("Can refresh token when expired while session is active.") {
+        std::atomic<bool> bind_function_called(false);
+        auto session = sync_session(server, user, "/test-token-refreshing",
+                                    [&](auto&, auto&) {
+                                        bind_function_called = true;
+                                        return s_test_token;
+                                    },
+                                    [](auto, auto) { },
+                                    SyncSessionStopPolicy::AfterChangesUploaded);
+        EventLoop::main().run_until([&] { return session_is_active(*session); });
+        REQUIRE(!session->is_in_error_state());
+        bind_function_called = false;
+
+        // Simulate the "token expired" error, which should cause the object store
+        // to request another token from the binding.
+        std::error_code code = std::error_code{static_cast<int>(ProtocolError::token_expired), realm::sync::protocol_error_category()};
+        SyncSession::OnlyForTesting::handle_error(*session, {code, "Too many pugs in the office.", false});
+        REQUIRE(bind_function_called == true);
+        REQUIRE(session->state() == PublicState::Active);
+    }
 }
 
 TEST_CASE("sync: error handling", "[sync]") {
