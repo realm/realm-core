@@ -108,14 +108,22 @@ public:
         }
         return true;
     }
-    bool erase_rows(size_t row_index, size_t n_rows, size_t, bool)
+    bool erase_rows(size_t row_index, size_t n_rows, size_t prior_num_rows, bool move_last_over)
     {
         REALM_ASSERT(n_rows == 1);
+        REALM_ASSERT(move_last_over);
         if (selected_object_schema) {
             parsed_instructions.emplace_back(Adapter::Instruction{
                 Adapter::Instruction::Type::Delete,
                 selected_object_type,
                 row_index
+            });
+            parsed_instructions.emplace_back(Adapter::Instruction{
+                selected_object_type,
+                prior_num_rows-1,
+                "ID",
+                false,
+                (int64_t)row_index
             });
         }
         return true;
