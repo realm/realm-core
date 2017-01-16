@@ -855,8 +855,8 @@ template <>
 inline char* TransactLogEncoder::encode<TransactLogEncoder::IntegerList>(char* ptr,
                                                                          TransactLogEncoder::IntegerList list)
 {
-    auto i = std::get<0>(list);
-    auto end = std::get<1>(list);
+    IntegerColumnIterator i = std::get<0>(list);
+    IntegerColumnIterator end = std::get<1>(list);
 
     while (end - i > max_numbers_per_chunk) {
         for (int j = 0; j < max_numbers_per_chunk; ++j)
@@ -876,8 +876,8 @@ template <>
 inline char* TransactLogEncoder::encode<TransactLogEncoder::UnsignedList>(char* ptr,
                                                                           TransactLogEncoder::UnsignedList list)
 {
-    auto i = std::get<0>(list);
-    auto end = std::get<1>(list);
+    const size_t* i = std::get<0>(list);
+    const size_t* end = std::get<1>(list);
 
     while (i != end)
         ptr = encode_int(ptr, *i++);
@@ -924,13 +924,17 @@ inline size_t TransactLogEncoder::max_size(StringData s)
 template <>
 inline size_t TransactLogEncoder::max_size<TransactLogEncoder::IntegerList>(IntegerList)
 {
+    // We only allocate space for 'max_numbers_per_chunk' at a time
     return max_enc_bytes_per_num * max_numbers_per_chunk;
 }
 
 template <>
 inline size_t TransactLogEncoder::max_size<TransactLogEncoder::UnsignedList>(UnsignedList list)
 {
-    return max_enc_bytes_per_num * (std::get<1>(list) - std::get<0>(list));
+    const size_t* begin = std::get<0>(list);
+    const size_t* end = std::get<1>(list);
+    // list contains (end - begin) elements
+    return max_enc_bytes_per_num * (end - begin);
 }
 
 template <class... L>
