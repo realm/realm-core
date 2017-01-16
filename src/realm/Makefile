@@ -5,7 +5,6 @@ util/inspect.hpp \
 util/assert.hpp \
 util/terminate.hpp \
 util/type_list.hpp \
-util/tuple.hpp \
 util/type_traits.hpp \
 util/safe_int_ops.hpp \
 util/bind_ptr.hpp \

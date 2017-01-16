@@ -21,7 +21,7 @@
 
 #include <type_traits>
 #include <map>
-#include <realm/util/type_list.hpp>
+#include <tuple>
 
 #include "test.hpp"
 
@@ -100,9 +100,9 @@ struct DoSomething<std::string, idx> {
         p->m_children[child].set_name("John Doe Jr.");
     }
     template <class L>
-    static void exec(Person* p, int child, util::Tuple<L> tuple)
+    static void exec(Person* p, int child, L tuple)
     {
-        p->m_children[child].set_name(util::at<idx>(tuple));
+        p->m_children[child].set_name(std::get<idx>(tuple));
     }
 };
 
@@ -121,9 +121,9 @@ struct DoSomething<int, idx> {
         p->m_children[child].set_age(10);
     }
     template <class L>
-    static void exec(Person* p, int child, util::Tuple<L> tuple)
+    static void exec(Person* p, int child, L tuple)
     {
-        p->m_children[child].set_age(util::at<idx>(tuple));
+        p->m_children[child].set_age(std::get<idx>(tuple));
     }
 };
 
@@ -142,9 +142,9 @@ struct DoSomething<bool, idx> {
         p->m_children[child].set_married(false);
     }
     template <class L>
-    static void exec(Person* p, int child, util::Tuple<L> tuple)
+    static void exec(Person* p, int child, L tuple)
     {
-        p->m_children[child].set_married(util::at<idx>(tuple));
+        p->m_children[child].set_married(std::get<idx>(tuple));
     }
 };
 
@@ -154,27 +154,27 @@ struct NotEqual;
 template <int idx>
 struct NotEqual<std::string, idx> {
     template <class L>
-    static bool exec(Person* p, util::Tuple<L> tuple)
+    static bool exec(Person* p, L tuple)
     {
-        return p->m_name != util::at<idx>(tuple);
+        return p->m_name != std::get<idx>(tuple);
     }
 };
 
 template <int idx>
 struct NotEqual<int, idx> {
     template <class L>
-    static bool exec(Person* p, util::Tuple<L> tuple)
+    static bool exec(Person* p, L tuple)
     {
-        return p->m_age != util::at<idx>(tuple);
+        return p->m_age != std::get<idx>(tuple);
     }
 };
 
 template <int idx>
 struct NotEqual<bool, idx> {
     template <class L>
-    static bool exec(Person* p, util::Tuple<L> tuple)
+    static bool exec(Person* p, L tuple)
     {
-        return p->m_married != util::at<idx>(tuple);
+        return p->m_married != std::get<idx>(tuple);
     }
 };
 
@@ -182,8 +182,8 @@ struct NotEqual<bool, idx> {
 TEST(TypeList_Basic)
 {
     Person person;
-    auto person_info = (util::tuple(), std::string("Paul"), 20, true);
-    auto person_info1 = (util::tuple(), std::string("John Doe"), 30, true);
+    auto person_info = std::make_tuple(std::string("Paul"), 20, true);
+    auto person_info1 = std::make_tuple(std::string("John Doe"), 30, true);
 
     using Dummy1 = util::TypeAppend<void, std::string>::type;
     using Dummy2 = util::TypeAppend<Dummy1, int>::type;
