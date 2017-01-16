@@ -492,10 +492,8 @@ Adapter::Adapter(std::function<void(std::string)> realm_changed,
 std::vector<bool> Adapter::Callback::available(std::vector<GlobalNotifier::RealmInfo> realms,
                                                std::vector<bool> new_realms,
                                                bool all) {
-    std::cout << "AVAILABLE" << std::endl;
     std::vector<bool> watch;
     for (auto realm : realms) {
-        std::cout << realm.second << std::endl;
         watch.push_back(true);
         m_realm_changed(realm);
     }
@@ -503,7 +501,6 @@ std::vector<bool> Adapter::Callback::available(std::vector<GlobalNotifier::Realm
 }
 
 void Adapter::Callback::realm_changed(GlobalNotifier::ChangeNotification changes) {
-    std::cout << "CHANGED " << changes.get_path() << std::endl;
     m_realm_changed(changes.realm_info);
 }
 
@@ -515,8 +512,9 @@ Adapter::ChangeSet Adapter::current(std::string realm_path) {
 
     util::AppendBuffer<char> buffer;
     version = sync_history->fetch_next_cooked_changeset(version, buffer);
-
-    std::cout << "Processing " << realm_path << " " << version << std::endl;
+    if (version == 0) {
+        return util::none;
+    }
 
     InstructionHander handler(realm->read_group());
     _impl::SimpleInputStream stream(buffer.data(), buffer.size());

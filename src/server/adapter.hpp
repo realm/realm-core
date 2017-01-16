@@ -99,7 +99,7 @@ public:
         : type(Type::SetProperty), object_type(o), row(r), property(p), is_null(n), value(v) {}
     };
 
-    using ChangeSet = std::vector<Instruction>;
+    using ChangeSet = util::Optional<std::vector<Instruction>>;
 
     ChangeSet current(std::string realm_path);
     void advance(std::string realm_path);
