@@ -369,10 +369,10 @@ void BenchmarkResults::save_results()
     baseline_file += ".baseline";
     int r;
     if (!util::File::exists(baseline_file)) {
-        r = link(name.c_str(), baseline_file.c_str());
+        link(name.c_str(), baseline_file.c_str());
     }
     if (util::File::exists(latest_csv_file)) {
-        r = unlink(latest_csv_file.c_str());
+        unlink(latest_csv_file.c_str());
     }
     r = link(csv_name.c_str(), latest_csv_file.c_str());
     static_cast<void>(r); // FIXME: Display if error

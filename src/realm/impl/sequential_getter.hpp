@@ -40,9 +40,10 @@ public:
 
     SequentialGetter(const Table& table, size_t column_ndx)
     {
-        if (column_ndx != not_found)
+        if (column_ndx != not_found) {
             m_column = static_cast<const ColType*>(&table.get_column_base(column_ndx));
-        init(m_column);
+            init(m_column);
+        }
     }
 
     SequentialGetter(const ColType* column)
@@ -110,8 +111,8 @@ public:
             return global_end - m_leaf_start;
     }
 
-    size_t m_leaf_start;
-    size_t m_leaf_end;
+    size_t m_leaf_start = 0;
+    size_t m_leaf_end = 0;
     const ColType* m_column = nullptr;
 
     const ArrayType* m_leaf_ptr = nullptr;
