@@ -67,14 +67,14 @@ namespace realm {
 // Highest character currently supported for *sorting* strings in Realm, when using STRING_COMPARE_CPP11.
 constexpr size_t last_latin_extended_2_unicode = 591;
 
+#if REALM_UWP
 // last_greek_unicode contains the highest character currently supported for *case insensitive search/queries*
 // in Windows 10 UWP. For other platforms, see case_map(). It's currently (jan 2017): iOS/Android: It looks like
 // only unicodes 0...127 are supported. Classical win32: Many unicodes for many countries; The Windows API methods 
 // CharLowerW() and CharUpperW() are used there, but they are not documented very well. But they seem
 // to work for many countries.
-constexpr size_t last_greek_unicode = 1023; 
+constexpr size_t last_greek_unicode = 1023;     
 
-#if REALM_UWP
 unsigned int unicode_case_convert(unsigned int unicode, bool upper)
 {
     // clang-format off
