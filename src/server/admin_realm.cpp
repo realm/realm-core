@@ -101,7 +101,9 @@ void AdminRealmListener::start(std::function<void(std::vector<RealmInfo>, bool)>
                     realms.emplace_back(table.get_string(id_col_ndx, i), realm_path);
                 }
             }
-            callback(std::move(realms), true);
+            if (realms.size()) {
+                callback(std::move(realms), true);
+            }
             m_first = false;
         }
         else {
@@ -111,7 +113,9 @@ void AdminRealmListener::start(std::function<void(std::vector<RealmInfo>, bool)>
                     realms.emplace_back(table.get_string(id_col_ndx, i), realm_path);
                 }
             }
-            callback(std::move(realms), false);
+            if (realms.size()) {
+                callback(std::move(realms), false);
+            }
         }
     });
 }
