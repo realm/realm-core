@@ -81,7 +81,7 @@ public:
 
     bool operator==(List const& rgt) const noexcept;
 
-    NotificationToken add_notification_callback(CollectionChangeCallback cb);
+    NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
 
     // These are implemented in object_accessor.hpp
     template <typename ValueType, typename ContextType>

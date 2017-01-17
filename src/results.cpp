@@ -573,7 +573,7 @@ NotificationToken Results::async(std::function<void (std::exception_ptr)> target
     return {m_notifier, m_notifier->add_callback(wrap)};
 }
 
-NotificationToken Results::add_notification_callback(CollectionChangeCallback cb)
+NotificationToken Results::add_notification_callback(CollectionChangeCallback cb) &
 {
     prepare_async();
     return {m_notifier, m_notifier->add_callback(std::move(cb))};
