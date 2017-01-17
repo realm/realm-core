@@ -300,7 +300,7 @@ Object Object::create(ContextType ctx, SharedRealm realm, const ObjectSchema &ob
     if (primary_prop) {
         // search for existing object based on primary key type
         ValueType primary_value = Accessor::dict_value_for_key(ctx, value, object_schema.primary_key);
-        row_index = get_for_primary_key_impl(ctx, table, *primary_prop, primary_value);
+        row_index = get_for_primary_key_impl(ctx, *table, *primary_prop, primary_value);
 
         if (row_index == realm::not_found) {
             row_index = table->add_empty_row();
@@ -350,7 +350,7 @@ Object Object::get_for_primary_key(ContextType ctx, SharedRealm realm, const Obj
     }
 
     auto table = ObjectStore::table_for_object_type(realm->read_group(), object_schema.name);
-    auto row_index = get_for_primary_key_impl(ctx, table, *primary_prop, primary_value);
+    auto row_index = get_for_primary_key_impl(ctx, *table, *primary_prop, primary_value);
 
     return Object(realm, object_schema, row_index == realm::not_found ? Row() : table->get(row_index));
 }

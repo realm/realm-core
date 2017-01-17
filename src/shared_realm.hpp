@@ -139,7 +139,7 @@ public:
         BinaryData realm_data;
         // User-supplied encryption key. Must be either empty or 64 bytes.
         std::vector<char> encryption_key;
-        
+
 
         bool in_memory = false;
         SchemaMode schema_mode = SchemaMode::Automatic;
@@ -264,6 +264,7 @@ public:
         friend class _impl::RealmCoordinator;
         friend class _impl::ResultsNotifier;
         friend class ThreadSafeReferenceBase;
+        friend class GlobalNotifier;
 
         // ResultsNotifier and ListNotifier need access to the SharedGroup
         // to be able to call the handover functions, which are not very wrappable
