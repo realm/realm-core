@@ -163,7 +163,6 @@ def doBuildCocoa(def isPublishingRun) {
         ]) {
             sh '''
               dir=$(pwd)
-              sh build.sh config $dir/install
               sh build.sh build-cocoa
               sh build.sh check-debug
 
@@ -210,11 +209,10 @@ def doBuildInDocker(String command) {
       def environment = environment()
       withEnv(environment) {
         buildEnv.inside {
-          sh 'sh build.sh config'
           try {
               sh "sh build.sh ${command}"
           } finally {
-              collectCompilerWarnings('gcc', true)
+            collectCompilerWarnings('gcc', true)
             recordTests(command)
           }
         }
@@ -276,7 +274,6 @@ def buildDiffCoverage() {
       def environment = environment()
       withEnv(environment) {
         buildEnv.inside {
-          sh 'sh build.sh config'
           sh 'sh build.sh jenkins-pipeline-coverage'
 
           sh 'mkdir -p coverage'
