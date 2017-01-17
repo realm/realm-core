@@ -20,6 +20,7 @@
 #include <cstring> // std::memcpy
 #include <iomanip>
 #include <limits>
+#include <tuple>
 
 #ifdef REALM_DEBUG
 #include <iostream>
@@ -31,7 +32,6 @@
 #pragma warning(disable : 4127) // Condition is constant warning
 #endif
 
-#include <realm/util/tuple.hpp>
 #include <realm/utilities.hpp>
 #include <realm/array.hpp>
 #include <realm/array_basic.hpp>
@@ -2021,7 +2021,7 @@ std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, MemStats sta
 
 namespace {
 
-typedef Tuple<TypeCons<size_t, TypeCons<int, TypeCons<bool, void>>>> VerifyBptreeResult;
+typedef std::tuple<size_t, int, bool> VerifyBptreeResult;
 
 // Returns (num_elems, leaf-level, general_form)
 VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_verifier)
@@ -2073,10 +2073,10 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
             Array child(alloc);
             child.init_from_ref(child_ref);
             VerifyBptreeResult r = verify_bptree(child, leaf_verifier);
-            elems_in_child = at<0>(r);
-            leaf_level_of_child = at<1>(r);
+            elems_in_child = std::get<0>(r);
+            leaf_level_of_child = std::get<1>(r);
             // Verify invar:bptree-node-form
-            bool child_on_general_form = at<2>(r);
+            bool child_on_general_form = std::get<2>(r);
             REALM_ASSERT(general_form || !child_on_general_form);
         }
         if (i == 0)
@@ -2106,7 +2106,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         REALM_ASSERT(!int_cast_with_overflow_detect(last_value / 2, total_elems));
         REALM_ASSERT_3(num_elems, ==, total_elems);
     }
-    return realm::util::tuple(num_elems, 1 + leaf_level_of_children, general_form);
+    return std::make_tuple(num_elems, 1 + leaf_level_of_children, general_form);
 }
 
 } // anonymous namespace

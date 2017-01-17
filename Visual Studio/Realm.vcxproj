@@ -1777,7 +1777,6 @@
     <ClInclude Include="..\src\realm\table_ref.hpp" />
     <ClInclude Include="..\src\realm\table_view.hpp" />
     <ClInclude Include="..\src\realm\realm_nmmintrin.h" />
-    <ClInclude Include="..\src\realm\util\tuple.hpp" />
     <ClInclude Include="..\src\realm\util\type_list.hpp" />
     <ClInclude Include="..\src\realm\util\utf8.hpp" />
     <ClInclude Include="..\src\realm\utilities.hpp" />
