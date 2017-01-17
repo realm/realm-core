@@ -55,7 +55,8 @@ private:
 };
 
 KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, BindingContext* context)
-: m_context(context)
+: _impl::TransactionChangeInfo{}
+, m_context(context)
 , m_observers(observers)
 {
     if (m_observers.empty())
