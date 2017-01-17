@@ -54,7 +54,7 @@ size_t ArrayBinary::read(size_t ndx, size_t pos, char* buffer, size_t max_size) 
 
         size_t size_to_copy = (pos > sz) ? 0 : std::min(max_size, sz - pos);
         const char* begin = m_blob.get(begin_idx) + pos;
-        std::copy_n(begin, size_to_copy, buffer);
+        realm::safe_copy_n(begin, size_to_copy, buffer);
         return size_to_copy;
     }
 }

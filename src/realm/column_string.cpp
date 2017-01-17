@@ -583,7 +583,7 @@ void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     // Copying string data from a column to itself requires an
     // intermediate copy of the data (constr:bptree-copy-to-self).
     std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
-    std::copy_n(value.data(), value.size(), buffer.get());
+    realm::safe_copy_n(value.data(), value.size(), buffer.get());
     StringData copy_of_value(value.is_null() ? nullptr : buffer.get(), value.size());
 
     if (m_search_index) {
