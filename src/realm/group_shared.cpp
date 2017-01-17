@@ -618,8 +618,10 @@ void spawn_daemon(const std::string& file)
 #else
         i = ::open("/dev/null", O_RDWR);
 #endif
-        int j = dup(i);
-        static_cast<void>(j);
+        if (i >= 0) {
+            int j = dup(i);
+            static_cast<void>(j);
+        }
 #ifdef REALM_ENABLE_LOGFILE
         std::cerr << "Detaching" << std::endl;
 #endif
