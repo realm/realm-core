@@ -606,12 +606,14 @@ TEST_TYPES(Column_FindAllIntMax, IntegerColumn, IntNullColumn)
 
 TEST_TYPES(Column_LowerUpperBound, IntegerColumn, FloatColumn)
 {
+    using T = typename TEST_TYPE::value_type;
+
     // Create column with sorted members
     ref_type ref = TEST_TYPE::create(Allocator::get_default());
     TEST_TYPE col(Allocator::get_default(), ref);
     col.add(5);
     for (size_t i = 5; i < 100; i += 5)
-        col.add(i);
+        col.add(static_cast<T>(i));
 
     // before first entry
     CHECK_EQUAL(0, col.lower_bound(0));
@@ -1227,7 +1229,7 @@ TEST_TYPES(Column_Iterators, std::true_type, std::false_type)
 
     CHECK_EQUAL(std_end - std_it, realm_end - realm_it);
 
-    while(std_it != std_end) {
+    while (std_it != std_end) {
         CHECK_EQUAL(*std_it, *realm_it);
         auto std_found = std::find(std_begin, std_end, *std_it);
         auto realm_found = std::find(realm_begin, realm_end, *realm_it);

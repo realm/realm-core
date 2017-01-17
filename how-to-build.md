@@ -11,10 +11,6 @@ tools. This includes a C/C++ compiler and GNU make. Realm is
 thoroughly tested with both GCC and Clang. It is known to work with
 GCC 4.2 and newer, as well as with Clang 3.0 and newer.
 
-If you are going to modify the Realm core library, you will need
-Cheetah for Python (http://www.cheetahtemplate.org). It is needed
-because some source files are generated from Cheetah templates.
-
 To run the benchmarking suite (make benchmark) on Linux, you will need
 the development part of the 'procps' library.
 
@@ -24,28 +20,24 @@ each of our major platforms:
 ### Ubuntu 10.04 and 12.04
 
     sudo apt-get install build-essential
-    sudo apt-get install python-cheetah
     sudo apt-get install libproc-dev
     sudo apt-get install libssl-dev
 
 ### Linux Mint 15, 16, Ubuntu 13.04, 13.10
 
     sudo apt-get install build-essential
-    sudo apt-get install python-cheetah
     sudo apt-get install libprocps0-dev
     sudo apt-get install libssl-dev
 
 ### Linux Mint 17, 17.1, Ubuntu 14.04
 
     sudo apt-get install build-essential
-    sudo apt-get install python-cheetah
     sudo apt-get install libprocps3-dev
     sudo apt-get install libssl-dev
 
 ### Fedora 17, 18, 19, 20, Amazon Linux 2012.09
 
     sudo yum install gcc gcc-c++
-    sudo yum install python-cheetah
     sudo yum install procps-devel
 
 ### OS X 10.10 and 10.11
@@ -53,20 +45,6 @@ each of our major platforms:
 On OS X, Clang is used as the C/C++ compiler by default. Clang is installed
 as part of Xcode. Xcode 7.0 or newer is required, and can be installed via
 the Mac App Store.
-
-Download the latest version of Python Cheetah
-(https://pypi.python.org/packages/source/C/Cheetah/Cheetah-2.4.4.tar.gz),
-then:
-
-    tar xf Cheetah-2.4.4.tar.gz
-    cd Cheetah-2.4.4/
-    sudo python setup.py install
-
-or alternatively using brew and pip:
-
-    brew install python
-    pip install cheetah
-
 
 Configure, build & test
 -------------------------

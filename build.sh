@@ -5,6 +5,6 @@ case "$1" in
         rake config["$2"]
         ;;
     *)
-        rake $@
+        rake "$@"
         ;;
 esac

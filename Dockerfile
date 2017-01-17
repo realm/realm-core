@@ -13,7 +13,6 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     ninja-build \
     pandoc \
-    python-cheetah \
     python-pip \
     pkg-config \
     ruby \

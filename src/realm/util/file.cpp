@@ -28,7 +28,6 @@
 #include <cstdlib>
 
 #ifdef _WIN32
-#define NOMINMAX
 #include <windows.h>
 #include <io.h>
 #include <direct.h>
@@ -52,6 +51,8 @@ using namespace realm::util;
 
 namespace {
 #ifdef _WIN32 // Windows - GetLastError()
+
+#undef max
 
 std::string get_last_error_msg(const char* prefix, DWORD err)
 {
@@ -162,10 +163,15 @@ std::string make_temp_dir()
 {
 #ifdef _WIN32 // Windows version
 
+#if REALM_UWP
+    throw std::runtime_error("File::make_temp_dir() not yet supported on Windows 10 UWP");
+#else
     StringBuffer buffer1;
     buffer1.resize(MAX_PATH + 1);
+
     if (GetTempPathA(MAX_PATH + 1, buffer1.data()) == 0)
         throw std::runtime_error("CreateDirectory() failed");
+
     StringBuffer buffer2;
     buffer2.resize(MAX_PATH);
     for (;;) {
@@ -179,11 +185,16 @@ std::string make_temp_dir()
             throw std::runtime_error("CreateDirectory() failed");
     }
     return std::string(buffer2.c_str());
+#endif
 
 #else // POSIX.1-2008 version
 
     StringBuffer buffer;
+#if REALM_ANDROID
+    buffer.append_c_str("/data/local/tmp/realm_XXXXXX");
+#else
     buffer.append_c_str(P_tmpdir "/realm_XXXXXX");
+#endif
     if (mkdtemp(buffer.c_str()) == 0)
         throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
     return buffer.str();
@@ -237,8 +248,9 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
             break;
     }
     DWORD flags_and_attributes = 0;
+    std::wstring ws(path.begin(), path.end());
     HANDLE handle =
-        CreateFileA(path.c_str(), desired_access, share_mode, 0, creation_disposition, flags_and_attributes, 0);
+        CreateFile2(ws.c_str(), desired_access, share_mode, creation_disposition, nullptr);
     if (handle != INVALID_HANDLE_VALUE) {
         m_handle = handle;
         m_have_lock = false;
@@ -768,7 +780,14 @@ void File::unlock() noexcept
 
     if (!m_have_lock)
         return;
-    BOOL r = UnlockFile(m_handle, 0, 0, 1, 0);
+
+    OVERLAPPED overlapped;
+    overlapped.hEvent = 0;
+    overlapped.OffsetHigh = 0;
+    overlapped.Offset = 0;
+    overlapped.Pointer = 0;
+    BOOL r = UnlockFileEx(m_handle, 0, 1, 0, &overlapped);
+
     REALM_ASSERT_RELEASE(r);
     m_have_lock = false;
 
@@ -808,13 +827,13 @@ void* File::map(AccessMode a, size_t size, int map_flags, size_t offset) const
     LARGE_INTEGER large_int;
     if (int_cast_with_overflow_detect(offset + size, large_int.QuadPart))
         throw std::runtime_error("Map size is too large");
-    HANDLE map_handle = CreateFileMapping(m_handle, 0, protect, large_int.HighPart, large_int.LowPart, 0);
+    HANDLE map_handle = CreateFileMappingFromApp(m_handle, 0, protect, offset + size, nullptr);
     if (REALM_UNLIKELY(!map_handle))
         throw std::runtime_error("CreateFileMapping() failed");
     if (int_cast_with_overflow_detect(offset, large_int.QuadPart))
         throw std::runtime_error("Map offset is too large");
     SIZE_T _size = size;
-    void* addr = MapViewOfFile(map_handle, desired_access, large_int.HighPart, large_int.LowPart, _size);
+    void* addr = MapViewOfFileFromApp(map_handle, desired_access, offset, _size);
     {
         BOOL r = CloseHandle(map_handle);
         REALM_ASSERT_RELEASE(r);
@@ -999,27 +1018,38 @@ void File::move(const std::string& old_path, const std::string& new_path)
 }
 
 
-bool File::copy(std::string source, std::string destination)
+void File::copy(const std::string& origin_path, const std::string& target_path)
 {
-    // Quick and dirty file copy, only used for unit tests. Todo, make more robust if used by Core.
-    char buf[1024];
-    size_t read;
-    File::try_remove(destination);
-    FILE* src = fopen(source.c_str(), "rb");
-    if (!src)
-        return false;
-
-    FILE* dst = fopen(destination.c_str(), "wb");
-    if (!dst) {
-        fclose(src);
-        return false;
+    File origin_file{origin_path, mode_Read};  // Throws
+    File target_file{target_path, mode_Write}; // Throws
+    size_t buffer_size = 4096;
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(buffer_size); // Throws
+    for (;;) {
+        size_t n = origin_file.read(buffer.get(), buffer_size); // Throws
+        target_file.write(buffer.get(), n);                     // Throws
+        if (n < buffer_size)
+            break;
     }
+}
 
-    while ((read = fread(buf, 1, 1024, src))) {
-        fwrite(buf, 1, read, dst);
+
+bool File::compare(const std::string& path_1, const std::string& path_2)
+{
+    File file_1{path_1}; // Throws
+    File file_2{path_2}; // Throws
+    size_t buffer_size = 4096;
+    std::unique_ptr<char[]> buffer_1 = std::make_unique<char[]>(buffer_size); // Throws
+    std::unique_ptr<char[]> buffer_2 = std::make_unique<char[]>(buffer_size); // Throws
+    for (;;) {
+        size_t n_1 = file_1.read(buffer_1.get(), buffer_size); // Throws
+        size_t n_2 = file_2.read(buffer_2.get(), buffer_size); // Throws
+        if (n_1 != n_2)
+            return false;
+        if (!std::equal(buffer_1.get(), buffer_1.get() + n_1, buffer_2.get()))
+            return false;
+        if (n_1 < buffer_size)
+            break;
     }
-    fclose(src);
-    fclose(dst);
     return true;
 }
 
@@ -1029,8 +1059,10 @@ bool File::is_same_file(const File& f) const
     REALM_ASSERT_RELEASE(is_attached());
     REALM_ASSERT_RELEASE(f.is_attached());
 
-#ifdef _WIN32 // Windows version
-
+#if REALM_UWP
+    static_cast<void>(f);
+    throw std::runtime_error("Not yet supported");
+#elif defined(_WIN32) // Windows version
     // FIXME: This version does not work on ReFS.
     BY_HANDLE_FILE_INFORMATION file_info;
     if (GetFileInformationByHandle(m_handle, &file_info)) {
@@ -1042,22 +1074,6 @@ bool File::is_same_file(const File& f) const
                    file_ndx_low == file_info.nFileIndexLow;
         }
     }
-
-    /*
-    FIXME: Here is how to do it on Windows Server 2012 and onwards. This new
-    solution correctly handles file identification on ReFS.
-
-    FILE_ID_INFO file_id_info;
-    if (GetFileInformationByHandleEx(m_handle, FileIdInfo, &file_id_info, sizeof file_id_info)) {
-        ULONGLONG vol_serial_num = file_id_info.VolumeSerialNumber;
-        EXT_FILE_ID_128 file_id     = file_id_info.FileId;
-        if (GetFileInformationByHandleEx(f.m_handle, FileIdInfo, &file_id_info,
-                                         sizeof file_id_info)) {
-            return vol_serial_num == file_id_info.VolumeSerialNumber &&
-                file_id == file_id_info.FileId;
-        }
-    }
-    */
 
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     std::string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
@@ -1077,6 +1093,22 @@ bool File::is_same_file(const File& f) const
     throw std::runtime_error(msg);
 
 #endif
+
+    /*
+    FIXME: Here is how to do it on Windows Server 2012 and onwards. This new
+    solution correctly handles file identification on ReFS.
+
+    FILE_ID_INFO file_id_info;
+    if (GetFileInformationByHandleEx(m_handle, FileIdInfo, &file_id_info, sizeof file_id_info)) {
+        ULONGLONG vol_serial_num = file_id_info.VolumeSerialNumber;
+        EXT_FILE_ID_128 file_id     = file_id_info.FileId;
+        if (GetFileInformationByHandleEx(f.m_handle, FileIdInfo, &file_id_info,
+                                         sizeof file_id_info)) {
+            return vol_serial_num == file_id_info.VolumeSerialNumber &&
+                file_id == file_id_info.FileId;
+        }
+    }
+    */
 }
 
 File::UniqueID File::get_unique_id() const
@@ -1186,7 +1218,7 @@ void File::set_encryption_key(const char* key)
     if (key) {
         char* buffer = new char[64];
         memcpy(buffer, key, 64);
-        m_encryption_key.reset(buffer);
+        m_encryption_key.reset(static_cast<const char*>(buffer));
     }
     else {
         m_encryption_key.reset();

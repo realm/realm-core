@@ -10,7 +10,6 @@ RUN touch /var/lib/rpm/* \
         which \
         chrpath \
         openssl-devel \
-        python-cheetah \
         devtoolset-3-gcc \
         devtoolset-3-gcc-c++ \
         devtoolset-3-binutils \

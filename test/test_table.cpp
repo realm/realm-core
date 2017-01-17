@@ -258,6 +258,497 @@ TEST(Table_OptimizeCrash)
     ttt.add(1, "AA");
 }
 
+TEST(Table_DateTimeMinMax)
+{
+    Group g;
+    TableRef table = g.add_table("test_table");
+
+    table->insert_column(0, type_Timestamp, "time", true);
+
+    // We test different code paths of the internal Core minmax method. First a null value as initial "best candidate",
+    // then non-null first. For each case we then try both a substitution of best candidate, then non-substitution. 4
+    // permutations in total.
+    
+    table->add_empty_row(3);
+    table->set_null(0, 0);
+    table->set_timestamp(0, 1, {0, 0});
+    table->set_timestamp(0, 2, {2, 2});
+
+    CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
+    CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
+
+    table->clear();
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->add_empty_row(3);
+    table->set_null(0, 0);
+    table->set_timestamp(0, 1, {0, 0});
+    table->set_timestamp(0, 2, {2, 2});
+
+    size_t idx; // tableview entry that points at the max/min value
+
+    CHECK_EQUAL(table->maximum_timestamp(0, &idx), Timestamp(2, 2));
+    CHECK_EQUAL(idx, 2);
+    CHECK_EQUAL(table->minimum_timestamp(0, &idx), Timestamp(0, 0));
+    CHECK_EQUAL(idx, 1);
+
+    table->clear();
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->add_empty_row(3);
+    table->set_null(0, 0);
+    table->set_timestamp(0, 1, {0, 0});
+    table->set_timestamp(0, 2, {2, 2});
+
+    CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
+    CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
+
+    table->clear();
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->add_empty_row(3);
+    table->set_null(0, 0);
+    table->set_timestamp(0, 1, {0, 0});
+    table->set_timestamp(0, 2, {2, 2});
+
+    CHECK_EQUAL(table->maximum_timestamp(0, &idx), Timestamp(2, 2));
+    CHECK_EQUAL(idx, 2);
+    CHECK_EQUAL(table->minimum_timestamp(0, &idx), Timestamp(0, 0));
+    CHECK_EQUAL(idx, 1);
+}
+
+TEST(Table_MinMaxSingleNullRow)
+{
+    // To illustrate/document behaviour
+    Group g;
+    TableRef table = g.add_table("test_table");
+
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->insert_column(1, type_Int, "int", true);
+    table->insert_column(2, type_Float, "float", true);
+    table->add_empty_row();
+
+    size_t ret;
+
+    // NOTE: Return-values of method calls are undefined if you have only null-entries in the table.
+    // The return-value is not necessarily a null-object. Always test the return_ndx argument!
+
+    // Maximum
+    {
+        table->maximum_timestamp(0, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().maximum_timestamp(0, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().maximum_timestamp(0, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->maximum_int(1, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().maximum_int(1, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().maximum_int(1, nullptr, 0, npos, npos, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->maximum_float(2, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().maximum_float(2, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().maximum_float(2, nullptr, 0, npos, npos, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->add_empty_row();
+
+        CHECK(table->maximum_timestamp(0).is_null()); // max on table
+        table.get()->where().find_all().maximum_timestamp(0, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().maximum_timestamp(0, &ret); // max on query
+        CHECK(ret == npos);
+    }
+
+    // Minimum
+    {
+        table->minimum_timestamp(0, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().minimum_timestamp(0, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().minimum_timestamp(0, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->minimum_int(1, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().minimum_int(1, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().minimum_int(1, nullptr, 0, npos, npos, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->minimum_float(2, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().minimum_float(2, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().minimum_float(2, nullptr, 0, npos, npos, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->add_empty_row();
+
+        CHECK(table->minimum_timestamp(0).is_null()); // max on table
+        table.get()->where().find_all().minimum_timestamp(0, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().minimum_timestamp(0, &ret); // max on query
+        CHECK(ret == npos);
+    }
+
+
+}
+
+TEST(TableView_AggregateBugs)
+{
+    // Tests against various aggregate bugs on TableViews: https://github.com/realm/realm-core/pull/2360
+    {
+        Table table;
+        table.add_column(type_Int, "ints", true);
+        table.add_empty_row(4);
+
+        table.set_int(0, 0, 1);
+        table.set_int(0, 1, 2);
+        table.set_null(0, 2);
+        table.set_int(0, 3, 42);
+
+        table.add_column(type_Double, "doubles", true);
+        table.set_double(1, 0, 1.);
+        table.set_double(1, 1, 2.);
+        table.set_null(1, 2);
+        table.set_double(1, 3, 42.);
+
+        auto tv = table.where().not_equal(0, 42).find_all();
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(tv.maximum_int(0), 2);
+
+        // average == sum / rows, where rows does *not* include values with null.
+        size_t vc; // number of non-null values that the average was computed from
+        CHECK_APPROXIMATELY_EQUAL(table.average_int(0, &vc), double(1 + 2 + 42) / 3, 0.001);
+        CHECK_EQUAL(vc, 3);
+
+        // There are currently 3 ways of doing average: on tableview, table and query:
+        CHECK_EQUAL(table.average_int(0), table.where().average_int(0, &vc));
+        CHECK_EQUAL(vc, 3);
+        CHECK_EQUAL(table.average_int(0), table.where().find_all().average_int(0, &vc));
+        CHECK_EQUAL(vc, 3);
+
+        // Core has an optimization where it executes average directly on the column if there
+        // are no query conditions. Bypass that here.
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(0, 1).find_all().average_int(0, &vc), double(2 + 42) / 2, 0.001);
+        CHECK_EQUAL(vc, 2);
+
+        // Add Double column and do same tests on that
+        table.add_column(type_Double, "doubles", true);
+        table.set_double(1, 0, 1.);
+        table.set_double(1, 1, 2.);
+        table.set_null(1, 2);
+        table.set_double(1, 3, 42.);
+
+        tv = table.where().not_equal(1, 42.).find_all();
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(tv.maximum_double(1), 2.);
+
+        // average == sum / rows, where rows does *not* include values with null.
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(1, &vc), double(1. + 2. + 42.) / 3, 0.001);
+        CHECK_EQUAL(vc, 3);
+
+        // There are currently 3 ways of doing average: on tableview, table and query:
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(1), table.where().average_double(1, &vc), 0.001);
+        CHECK_EQUAL(vc, 3);
+
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(1), table.where().find_all().average_double(1, &vc), 0.001);
+        CHECK_EQUAL(vc, 3);
+
+        // Core has an optimization where it executes average directly on the column if there
+        // are no query conditions. Bypass that here.
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(1, 1.).find_all().average_double(1, &vc), (2. + 42.) / 2, 0.001);
+        CHECK_EQUAL(vc, 2);
+    }
+
+    // Same as above, with null entry first
+    {
+        Table table;
+        table.add_column(type_Int, "value", true);
+        table.add_empty_row(4);
+        table.set_null(0, 0);
+        table.set_int(0, 1, 1);
+        table.set_int(0, 2, 2);
+        table.set_int(0, 3, 42);
+
+        auto tv = table.where().not_equal(0, 42).find_all();
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(tv.maximum_int(0), 2);
+
+        // average == sum / rows, where rows does *not* include values with null.
+        CHECK_APPROXIMATELY_EQUAL(table.average_int(0), double(1 + 2 + 42) / 3, 0.001);
+
+        // There are currently 3 ways of doing average: on tableview, table and query:
+        CHECK_EQUAL(table.average_int(0), table.where().average_int(0));
+        CHECK_EQUAL(table.average_int(0), table.where().find_all().average_int(0));
+
+        // Core has an optimization where it executes average directly on the column if there
+        // are no query conditions. Bypass that here.
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(0, 1).find_all().average_int(0), double(2 + 42) / 2, 0.001);
+    }
+}
+
+
+TEST(Table_AggregateFuzz)
+{
+    // Tests sum, avg, min, max on Table, TableView, Query, for types float, Timestamp, int
+    for(int iter = 0; iter < 50 + 1000 * TEST_DURATION; iter++)
+    {
+        Group g;
+        TableRef table = g.add_table("test_table");
+
+        table->insert_column(0, type_Timestamp, "time", true);
+        table->insert_column(1, type_Int, "int", true);
+        table->insert_column(2, type_Float, "float", true);
+
+        size_t rows = fastrand(10);
+        table->add_empty_row(rows);
+        int64_t largest = 0;
+        int64_t smallest = 0;
+        size_t largest_pos = npos;
+        size_t smallest_pos = npos;
+
+        double avg = 0;
+        int64_t sum = 0;
+        size_t nulls = 0;
+
+        // Create some rows with values and some rows with just nulls
+        for (size_t t = 0; t < rows; t++) {
+            bool null = (fastrand(1) == 0);
+            if (!null) {
+                int64_t value = fastrand(10);
+                sum += value;
+                if (largest_pos == npos || value > largest) {
+                    largest = value;
+                    largest_pos = t;
+                }
+                if (smallest_pos == npos || value < smallest) {
+                    smallest = value;
+                    smallest_pos = t;
+                }
+                table.get()->set_timestamp(0, t, Timestamp(value, 0));
+                table.get()->set_int(1, t, value);
+                table.get()->set_float(2, t, float(value));
+            }
+            else {
+                nulls++;
+            }
+        }
+
+        avg = double(sum) / (rows - nulls == 0 ? 1 : rows - nulls);
+
+        size_t ret;
+        float f;
+        int64_t i;
+        Timestamp ts;
+
+        // Test methods on Table
+        {
+            // Table::max
+            ret = 123;
+            f = table.get()->maximum_float(2, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, largest_pos));
+
+            ret = 123;
+            i = table.get()->maximum_int(1, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, largest_pos));
+
+            ret = 123;
+            ts = table.get()->maximum_timestamp(0, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest_pos));
+
+            // Table::min
+            ret = 123;
+            f = table.get()->minimum_float(2, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, smallest_pos));
+
+            ret = 123;
+            i = table.get()->minimum_int(1, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, smallest_pos));
+
+            ret = 123;
+            ts = table.get()->minimum_timestamp(0, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, smallest_pos));
+
+            // Table::avg
+            double d;
+
+            // number of non-null values used in computing the avg or sum
+            ret = 123;
+
+            // Table::avg
+            d = table.get()->average_float(2, &ret);
+            CHECK_EQUAL(ret, (rows - nulls));
+            if (ret != 0)
+                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+
+            ret = 123;
+            d = table.get()->average_int(1, &ret);
+            CHECK_EQUAL(ret, (rows - nulls));
+            if (ret != 0)
+                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+
+            // Table::sum
+            d = table.get()->sum_float(2);
+            CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
+
+            i = table.get()->sum_int(1);
+            CHECK_APPROXIMATELY_EQUAL(i, sum, 0.001);
+        }
+
+        // Test methods on TableView
+        {
+            // TableView::max
+            ret = 123;
+            f = table.get()->where().find_all().maximum_float(2, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, largest_pos));
+
+            ret = 123;
+            i = table.get()->where().find_all().maximum_int(1, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, largest_pos));
+
+            ret = 123;
+            ts = table.get()->where().find_all().maximum_timestamp(0, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest_pos));
+
+            // TableView::min
+            ret = 123;
+            f = table.get()->where().find_all().minimum_float(2, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, smallest_pos));
+
+            ret = 123;
+            i = table.get()->where().find_all().minimum_int(1, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, smallest_pos));
+
+            ret = 123;
+            ts = table.get()->where().find_all().minimum_timestamp(0, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, smallest_pos));
+
+            // TableView::avg
+            double d;
+
+            // number of non-null values used in computing the avg or sum
+            ret = 123;
+
+            // TableView::avg
+            d = table.get()->where().find_all().average_float(2, &ret);
+            CHECK_EQUAL(ret, (rows - nulls));
+            if (ret != 0)
+                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+
+            ret = 123;
+            d = table.get()->where().find_all().average_int(1, &ret);
+            CHECK_EQUAL(ret, (rows - nulls));
+            if (ret != 0)
+                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+
+            // TableView::sum
+            d = table.get()->where().find_all().sum_float(2);
+            CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
+
+            i = table.get()->where().find_all().sum_int(1);
+            CHECK_APPROXIMATELY_EQUAL(i, sum, 0.001);
+
+        }
+
+
+        // Test methods on Query
+        {
+            // TableView::max
+            ret = 123;
+            f = table.get()->where().maximum_float(2, nullptr, 0, npos, npos, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, largest_pos));
+
+            ret = 123;
+            i = table.get()->where().maximum_int(1, nullptr, 0, npos, npos, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, largest_pos));
+
+            ret = 123;
+            // Note: Method arguments different from metholds on other column types
+            ts = table.get()->where().maximum_timestamp(0, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest_pos)); 
+
+            // TableView::min
+            ret = 123;
+            f = table.get()->where().minimum_float(2, nullptr, 0, npos, npos, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, smallest_pos));
+
+            ret = 123;
+            i = table.get()->where().minimum_int(1, nullptr, 0, npos, npos, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, smallest_pos));
+
+            ret = 123;
+            // Note: Method arguments different from metholds on other column types
+            ts = table.get()->where().minimum_timestamp(0, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, smallest_pos));
+
+            // TableView::avg
+            double d;
+
+            // number of non-null values used in computing the avg or sum
+            ret = 123;
+
+            // TableView::avg
+            d = table.get()->where().average_float(2, &ret);
+            CHECK_EQUAL(ret, (rows - nulls));
+            if (ret != 0)
+                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+
+            ret = 123;
+            d = table.get()->where().average_int(1, &ret);
+            CHECK_EQUAL(ret, (rows - nulls));
+            if (ret != 0)
+                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+
+            // TableView::sum
+            d = table.get()->where().sum_float(2);
+            CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
+
+            i = table.get()->where().sum_int(1);
+            CHECK_APPROXIMATELY_EQUAL(i, sum, 0.001);
+        }
+    }
+}
+
 
 TEST(Table_1)
 {

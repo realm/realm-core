@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="csv debug|Win32">
       <Configuration>csv debug</Configuration>
@@ -57,22 +57,92 @@
       <Configuration>Static library, release</Configuration>
       <Platform>x64</Platform>
     </ProjectConfiguration>
+    <ProjectConfiguration Include="UWP Debug static lib|Win32">
+      <Configuration>UWP Debug static lib</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="UWP Debug static lib|x64">
+      <Configuration>UWP Debug static lib</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="UWP Release static lib|Win32">
+      <Configuration>UWP Release static lib</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="UWP Release static lib|x64">
+      <Configuration>UWP Release static lib</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{C18EDDC1-166A-49C4-B483-11458F48CF8E}</ProjectGuid>
     <RootNamespace>Realm</RootNamespace>
     <Keyword>Win32Proj</Keyword>
-    <TargetPlatformVersion>8.1</TargetPlatformVersion>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v140_xp</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>false</WholeProgramOptimization>
     <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v120</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v140</PlatformToolset>
+    <AppContainerApplication>true</AppContainerApplication>
+    <ApplicationType>Windows Store</ApplicationType>
+    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
+    <WindowsAppContainer>true</WindowsAppContainer>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v140</PlatformToolset>
+    <AppContainerApplication>true</AppContainerApplication>
+    <ApplicationType>Windows Store</ApplicationType>
+    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
+    <WindowsAppContainer>true</WindowsAppContainer>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <TargetPlatformVersion>8.1</TargetPlatformVersion>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <TargetPlatformVersion>8.1</TargetPlatformVersion>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <CharacterSet>Unicode</CharacterSet>
+    <TargetPlatformVersion>8.1</TargetPlatformVersion>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>false</WholeProgramOptimization>
@@ -83,33 +153,36 @@
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>
     </WholeProgramOptimization>
+    <TargetPlatformVersion>8.1</TargetPlatformVersion>
+    <WindowsAppContainer>false</WindowsAppContainer>
     <PlatformToolset>v140</PlatformToolset>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v140</PlatformToolset>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v140</PlatformToolset>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
+    <TargetPlatformVersion>8.1</TargetPlatformVersion>
+    <WindowsAppContainer>false</WindowsAppContainer>
     <PlatformToolset>v140</PlatformToolset>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
-    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <WholeProgramOptimization>
+    </WholeProgramOptimization>
+    <TargetPlatformVersion>8.1</TargetPlatformVersion>
+    <WindowsAppContainer>false</WindowsAppContainer>
     <PlatformToolset>v140</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v140</PlatformToolset>
+    <TargetPlatformVersion>8.1</TargetPlatformVersion>
+    <WindowsAppContainer>false</WindowsAppContainer>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -117,28 +190,25 @@
     <WholeProgramOptimization>false</WholeProgramOptimization>
     <PlatformToolset>v120</PlatformToolset>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'" Label="Configuration">
-    <ConfigurationType>StaticLibrary</ConfigurationType>
-    <CharacterSet>Unicode</CharacterSet>
-    <WholeProgramOptimization>false</WholeProgramOptimization>
-    <UseOfMfc>false</UseOfMfc>
-    <PlatformToolset>v140</PlatformToolset>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v140_xp</PlatformToolset>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v140_xp</PlatformToolset>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v120</PlatformToolset>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'" Label="Configuration">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v140</PlatformToolset>
+    <AppContainerApplication>true</AppContainerApplication>
+    <ApplicationType>Windows Store</ApplicationType>
+    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
+    <WindowsAppContainer>true</WindowsAppContainer>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <PlatformToolset>v140</PlatformToolset>
+    <AppContainerApplication>true</AppContainerApplication>
+    <ApplicationType>Windows Store</ApplicationType>
+    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
+    <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -164,6 +234,12 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
@@ -185,6 +261,12 @@
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
     <_ProjectFileVersion>10.0.30319.1</_ProjectFileVersion>
@@ -192,26 +274,38 @@
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'">$(SolutionDir)$(Configuration)\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">$(SolutionDir)$(Configuration)\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">lib\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">lib\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">lib\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(Configuration)\</IntDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'">$(Configuration)\</IntDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">$(Configuration)\</IntDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">$(Configuration)\</IntDir>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</LinkIncremental>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'">$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">lib\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">lib\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">lib\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\</IntDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'">$(Platform)\$(Configuration)\</IntDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">$(Platform)\$(Configuration)\</IntDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">$(Platform)\$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">$(Platform)\$(Configuration)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">$(Platform)\$(Configuration)\</IntDir>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'">false</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</LinkIncremental>
     <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</LinkIncremental>
+    <LinkIncremental Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</LinkIncremental>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)$(Configuration)\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'">$(SolutionDir)$(Configuration)\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">lib\</OutDir>
@@ -234,26 +328,38 @@
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'" />
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'" />
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'" />
+    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'" />
+    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'" />
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">AllRules.ruleset</CodeAnalysisRuleSet>
+    <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" />
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'" />
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'" />
     <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'" />
+    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'" />
+    <CodeAnalysisRules Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'" />
+    <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'" />
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
     <CodeAnalysisRuleSet Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">AllRules.ruleset</CodeAnalysisRuleSet>
@@ -272,10 +378,14 @@
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'" />
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">$(ProjectName)64d</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">$(ProjectName)64</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">$(ProjectName)32d</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">$(ProjectName)32</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">realm-x64-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">realm-uwp-x64-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">realm-uwp-x64</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">realm-x64</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">realm-x86-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">realm-uwp-x86-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">realm-uwp-x86</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">realm-x86</TargetName>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(IncludePath)</IncludePath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(LibraryPath)</LibraryPath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win32;$(IncludePath)</IncludePath>
@@ -283,10 +393,29 @@
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win32;$(LibraryPath)</LibraryPath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win32;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</IncludePath>
+    <ExcludePath>$(VC_IncludePath);$(WindowsSdk_71A_IncludePath);$(MSBuild_ExecutablePath);$(VC_LibraryPath_x64);</ExcludePath>
+    <SourcePath>$(VC_SourcePath);$(UniversalCRT_IncludePath)</SourcePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.14393.0\um\x64"</LibraryPath>
+    <LibraryWPath>$(WindowsSDK_MetadataPath); $(UniversalCRT_IncludePath)</LibraryWPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</IncludePath>
+    <ReferencePath>$(VC_ReferencesPath_x64); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</ReferencePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</LibraryPath>
+    <SourcePath>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(VC_SourcePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</SourcePath>
+    <LibraryWPath>$(WindowsSDK_MetadataPath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</LibraryWPath>
+    <ExcludePath />
+    <ExecutablePath>$(VC_ExecutablePath_x64);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(FxCopDir);$(PATH); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</ExecutablePath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -294,8 +423,8 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
-      <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
-      <AdditionalOptions>/DNOMINMAX /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION  /bigobj %(AdditionalOptions)</AdditionalOptions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <AdditionalOptions>/DREALM_DEBUG /DREALM_ENABLE_REPLICATION  /bigobj /DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
     </ClCompile>
     <Link>
@@ -363,7 +492,8 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -373,7 +503,58 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>WS2_32.lib </AdditionalOptions>
+      <AdditionalOptions>
+      </AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>false</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
+      <AdditionalOptions>/DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <TargetMachine>MachineX86</TargetMachine>
+      <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+    <Lib>
+      <AdditionalOptions>mincore.lib</AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>false</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
+      <AdditionalOptions>/DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <TargetMachine>MachineX86</TargetMachine>
+      <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+    <Lib>
+      <AdditionalOptions>mincore.lib</AdditionalOptions>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -382,9 +563,9 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories);</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>
@@ -392,7 +573,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>/DNOMINMAX /D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION  /bigobj</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions) /bigobj</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -403,7 +584,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX64</TargetMachine>
-      <AdditionalLibraryDirectories>C:\Program Files (x86)\Visual Leak Detector\lib\Win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\Visual Leak Detector\lib\Win64;%(AdditionalLibraryDirectories);$(UniversalCRT_LibraryPath_x64)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'">
@@ -482,8 +663,10 @@
       </PrecompiledHeader>
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt"</AdditionalIncludeDirectories>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
+      <AdditionalUsingDirectories>; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt"</AdditionalUsingDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -493,14 +676,84 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>WS2_32.lib </AdditionalOptions>
+      <AdditionalOptions>
+      </AdditionalOptions>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>false</MinimalRebuild>
+      <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <CompileAs>CompileAsCpp</CompileAs>
+      <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
+      <CompileAsWinRT>false</CompileAsWinRT>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <TargetMachine>MachineX64</TargetMachine>
+      <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+    <Lib>
+      <AdditionalOptions>mincore.lib</AdditionalOptions>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.14393.0\um\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>
+      </AdditionalDependencies>
+    </Lib>
+    <ProjectReference>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">
+    <Midl>
+      <TargetEnvironment>X64</TargetEnvironment>
+    </Midl>
+    <ClCompile>
+      <Optimization>Full</Optimization>
+      <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <MinimalRebuild>false</MinimalRebuild>
+      <BasicRuntimeChecks>
+      </BasicRuntimeChecks>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <PrecompiledHeader>
+      </PrecompiledHeader>
+      <CompileAs>CompileAsCpp</CompileAs>
+      <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION /D_ITERATOR_DEBUG_LEVEL=0 %(AdditionalOptions)</AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>false</SDLCheck>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <CompileAsWinRT>false</CompileAsWinRT>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Console</SubSystem>
+      <TargetMachine>MachineX64</TargetMachine>
+      <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+    <Lib>
+      <AdditionalOptions>mincore.lib</AdditionalOptions>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -508,7 +761,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
-      <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION /bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION /bigobj %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <BrowseInformation>true</BrowseInformation>
     </ClCompile>
@@ -565,7 +818,8 @@
       </PrecompiledHeader>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION </AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <Link>
       <AdditionalDependencies>
@@ -588,7 +842,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -658,10 +912,11 @@
       </PrecompiledHeader>
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <BufferSecurityCheck>true</BufferSecurityCheck>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>-D__STDC_LIMIT_MACROS</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION </AdditionalOptions>
+      <WarningLevel>Level3</WarningLevel>
     </ClCompile>
     <Link>
       <AdditionalDependencies>x64\Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -701,7 +956,10 @@
     <ClCompile Include="..\src\realm\history.cpp" />
     <ClCompile Include="..\src\realm\descriptor.cpp" />
     <ClCompile Include="..\src\realm\disable_sync_to_disk.cpp" />
-    <ClCompile Include="..\src\realm\impl\simulated_failure.cpp" />
+    <ClCompile Include="..\src\realm\impl\simulated_failure.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">
+      </ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\src\realm\impl\transact_log.cpp" />
     <ClCompile Include="..\src\realm\link_view.cpp" />
     <ClCompile Include="..\src\realm\query_engine.cpp" />
@@ -711,6 +969,10 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\src\realm\unicode.cpp" />
     <ClCompile Include="..\src\realm\util\basic_system_errors.cpp" />
@@ -718,12 +980,16 @@
     <ClCompile Include="..\src\realm\util\file.cpp" />
     <ClCompile Include="..\src\realm\importer.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\src\realm\importer_tool.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'">true</ExcludedFromBuild>
@@ -731,6 +997,8 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\src\realm\util\file_mapper.cpp" />
@@ -771,6 +1039,12 @@
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">Default</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">Default</CompileAs>
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">Default</CompileAs>
+      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">false</CompileAsWinRT>
+      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">false</CompileAsWinRT>
+      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">false</CompileAsWinRT>
+      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">false</CompileAsWinRT>
     </ClCompile>
     <ClCompile Include="..\test\fuzzy\afl.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
@@ -778,6 +1052,8 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -785,65 +1061,99 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\fuzz_group.cpp" />
     <ClCompile Include="..\test\large_tests\test_column_large.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">/DUSE_SSE42 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">/DUSE_SSE42 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ClCompile Include="..\test\large_tests\test_strings.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\test_column_timestamp.cpp" />
     <ClCompile Include="..\test\test_destroy_guard.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\test_array_integer.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\test_json.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\test_links.cpp" />
     <ClCompile Include="..\test\test_link_query_view.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\test_basic_utils.cpp" />
     <ClCompile Include="..\test\test_optional.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\test_priority_queue.cpp" />
     <ClCompile Include="..\test\test_replication.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\test_upgrade_database.cpp" />
     <ClCompile Include="..\test\util\jsmn.cpp" />
     <ClCompile Include="..\test\util\verified_integer.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\util\verified_string.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\main.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">/DUSE_SSE42 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'">/DUSE_SSE42 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">/DUSE_SSE42 %(AdditionalOptions)</AdditionalOptions>
@@ -867,20 +1177,32 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\test_all.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\test_alloc.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -889,8 +1211,12 @@
     <ClCompile Include="..\test\test_array.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -899,8 +1225,12 @@
     <ClCompile Include="..\test\test_array_blob.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -908,8 +1238,12 @@
     </ClCompile>
     <ClCompile Include="..\test\test_array_blobs_big.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
@@ -918,7 +1252,11 @@
     </ClCompile>
     <ClCompile Include="..\test\test_array_float.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
@@ -929,8 +1267,12 @@
     <ClCompile Include="..\test\test_array_string.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -939,8 +1281,12 @@
     <ClCompile Include="..\test\test_array_string_long.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -949,8 +1295,12 @@
     <ClCompile Include="..\test\test_column.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -959,8 +1309,12 @@
     <ClCompile Include="..\test\test_column_binary.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -969,7 +1323,11 @@
     <ClCompile Include="..\test\test_column_float.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
@@ -979,8 +1337,12 @@
     <ClCompile Include="..\test\test_column_mixed.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -989,8 +1351,12 @@
     <ClCompile Include="..\test\test_column_string.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -999,8 +1365,12 @@
     <ClCompile Include="..\test\test_array_binary.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1010,17 +1380,25 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\test_file_locks.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1029,8 +1407,12 @@
     <ClCompile Include="..\test\test_group.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1038,8 +1420,12 @@
     </ClCompile>
     <ClCompile Include="..\test\test_index_string.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
@@ -1048,8 +1434,12 @@
     </ClCompile>
     <ClCompile Include="..\test\test_lang_bind_helper.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
@@ -1058,8 +1448,12 @@
     </ClCompile>
     <ClCompile Include="..\test\test_self.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
@@ -1068,8 +1462,12 @@
     </ClCompile>
     <ClCompile Include="..\test\test_shared.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
@@ -1079,8 +1477,12 @@
     <ClCompile Include="..\test\test_string_data.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1089,8 +1491,12 @@
     <ClCompile Include="..\test\test_binary_data.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1099,8 +1505,12 @@
     <ClCompile Include="..\test\test_table.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1109,8 +1519,12 @@
     <ClCompile Include="..\test\test_transactions_lasse.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1120,7 +1534,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1130,7 +1548,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1140,7 +1562,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1150,7 +1576,11 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1159,8 +1589,12 @@
     <ClCompile Include="..\test\test_thread.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1169,8 +1603,12 @@
     <ClCompile Include="..\test\test_transactions.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1179,8 +1617,12 @@
     <ClCompile Include="..\test\test_utf8.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
@@ -1190,17 +1632,25 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\util\demangle.cpp" />
     <ClCompile Include="..\test\util\misc.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\test\util\random.cpp" />
@@ -1245,7 +1695,10 @@
     <ClInclude Include="..\src\realm\impl\input_stream.hpp" />
     <ClInclude Include="..\src\realm\impl\output_stream.hpp" />
     <ClInclude Include="..\src\realm\impl\sequential_getter.hpp" />
-    <ClInclude Include="..\src\realm\impl\simulated_failure.hpp" />
+    <ClInclude Include="..\src\realm\impl\simulated_failure.hpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">
+      </ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="..\src\realm\impl\transact_log.hpp" />
     <ClInclude Include="..\src\realm\importer.hpp" />
     <ClInclude Include="..\src\realm\link_view.hpp" />
@@ -1329,14 +1782,22 @@
     <ClInclude Include="..\test\util\jsmn.hpp" />
     <ClInclude Include="..\test\util\verified_integer.hpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="..\test\util\verified_string.hpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="..\test\pthread_test.hpp">
@@ -1346,8 +1807,12 @@
     <ClInclude Include="..\test\testsettings.hpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">true</ExcludedFromBuild>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

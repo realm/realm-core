@@ -3782,7 +3782,7 @@ double Table::maximum_double(size_t col_ndx, size_t* return_ndx) const
 OldDateTime Table::maximum_olddatetime(size_t col_ndx, size_t* return_ndx) const
 {
     if (!m_columns.is_attached())
-        return 0.;
+        return 0;
 
     if (is_nullable(col_ndx)) {
         const IntNullColumn& col = get_column<IntNullColumn, col_type_OldDateTime>(col_ndx);
@@ -6159,7 +6159,7 @@ void Table::print() const
             }
             switch (type) {
                 case col_type_Int: {
-                    size_t value = get_int(n, i);
+                    size_t value = to_size_t(get_int(n, i));
                     std::cout << std::setw(10) << value << " ";
                     break;
                 }

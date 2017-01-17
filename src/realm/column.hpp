@@ -95,6 +95,7 @@ public:
     const ColumnDataType operator->() const;
     const ColumnDataType operator[](ptrdiff_t offset) const;
     size_t get_col_ndx() const;
+
 protected:
     size_t m_col_ndx;
     const Column<ColumnDataType>* m_col;
@@ -1140,6 +1141,12 @@ Column<T>::Column(unattached_root_tag, Allocator& alloc)
 }
 
 template <class T>
+Column<T>::Column(std::unique_ptr<Array> root) noexcept
+    : m_tree(std::move(root))
+{
+}
+
+template <class T>
 Column<T>::~Column() noexcept
 {
 }
@@ -1564,8 +1571,8 @@ public:
     }
     ref_type create_leaf(size_t size) override
     {
-        ref_type ref = BpTree<T>::create_leaf(m_leaf_type, size, m_value, m_alloc); // Throws
-        return ref;
+        MemRef mem = BpTree<T>::create_leaf(m_leaf_type, size, m_value, m_alloc); // Throws
+        return mem.get_ref();
     }
 
 private:

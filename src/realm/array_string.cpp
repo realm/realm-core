@@ -86,11 +86,7 @@ void ArrayString::set(size_t ndx, StringData value)
         }
 
         // Calc min column width
-        size_t new_width;
-        if (m_width == 0 && value.size() == 0)
-            new_width = ::round_up(1); // Entire Array is nulls; expand to m_width > 0
-        else
-            new_width = ::round_up(value.size() + 1);
+        size_t new_width = ::round_up(value.size() + 1);
 
         // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
         alloc(m_size, new_width); // Throws
@@ -139,7 +135,7 @@ void ArrayString::set(size_t ndx, StringData value)
     // Set the value
     char* begin = m_data + (ndx * m_width);
     char* end = begin + (m_width - 1);
-    begin = std::copy(value.data(), value.data() + value.size(), begin);
+    begin = std::copy_n(value.data(), value.size(), begin);
     std::fill(begin, end, 0); // Pad with zero bytes
     static_assert(max_width <= max_width, "Padding size must fit in 7-bits");
 
@@ -191,7 +187,7 @@ void ArrayString::erase(size_t ndx)
         char* new_begin = m_data + ndx * m_width;
         char* old_begin = new_begin + m_width;
         char* old_end = m_data + m_size * m_width;
-        std::copy(old_begin, old_end, new_begin);
+        std::copy_n(old_begin, old_end - old_begin, new_begin);
     }
 
     --m_size;

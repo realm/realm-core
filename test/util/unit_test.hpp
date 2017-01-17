@@ -361,11 +361,10 @@ protected:
 
 /// Generates output that is compatible with the XML output of
 /// UnitTest++. Caller receives ownership of the returned reporter.
-///
-/// FIXME: Consider producing output that conforms to
-/// http://windyroad.com.au/dl/Open%20Source/JUnit.xsd.
 Reporter* create_xml_reporter(std::ostream&);
-
+/// Generates output that is compatible with the XML output of
+/// JUnit. See http://llg.cubic.org/docs/junit/
+Reporter* create_junit_reporter(std::ostream&);
 
 /// Run only those tests whose name is both included and not
 /// excluded. Caller receives ownership of the returned filter.
@@ -535,7 +534,7 @@ protected:
 
     /// Short hand for test_context.logger.info().
     template <class... Params>
-    void log(const char* message, Params...);
+    void log(const char* message, Params&&...);
 
     TestBase(TestContext&);
 };
@@ -845,9 +844,9 @@ inline TestBase::TestBase(TestContext& context)
 }
 
 template <class... Params>
-inline void TestBase::log(const char* message, Params... params)
+inline void TestBase::log(const char* message, Params&&... params)
 {
-    test_context.logger.info(message, params...); // Throws
+    test_context.logger.info(message, std::forward<Params>(params)...); // Throws
 }
 
 

@@ -3,8 +3,10 @@
 try {
   def gitTag
   def gitSha
+  def version
   def dependencies
   def isPublishingRun
+  def isPublishingLatestRun
 
   timeout(time: 1, unit: 'HOURS') {
     stage('gather-info') {
@@ -23,6 +25,7 @@ try {
 
         gitTag = readGitTag()
         gitSha = readGitSha()
+        version = get_version()
         echo "tag: ${gitTag}"
         if (gitTag == "") {
           echo "No tag given for this build"
@@ -141,7 +144,7 @@ def buildDockerEnv(name) {
   return docker.image(name)
 }
 
-def doBuildCocoa(def isPublishingRun) {
+def doBuildCocoa(def isPublishingRun, def isPublishingLatestRun) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -186,10 +189,12 @@ def doBuildCocoa(def isPublishingRun) {
             sh 'sh build.sh clean'
         }
       } finally {
-        collectCompilerWarnings('clang')
+        collectCompilerWarnings('clang', true)
         recordTests('check-debug-cocoa')
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          sh 's3cmd -c $s3cfg_config_file put realm-core-latest.tar.xz s3://static.realm.io/downloads/core/'
+          if (env.BRANCH_NAME == 'master') {
+            sh 's3cmd -c $s3cfg_config_file put realm-core-latest.tar.xz s3://static.realm.io/downloads/core/'
+          }
         }
       }
     }
@@ -209,7 +214,7 @@ def doBuildInDocker(String command) {
           try {
               sh "sh build.sh ${command}"
           } finally {
-            collectCompilerWarnings('gcc')
+              collectCompilerWarnings('gcc', true)
             recordTests(command)
           }
         }
@@ -217,6 +222,7 @@ def doBuildInDocker(String command) {
     }
   }
 }
+
 
 def doAndroidBuildInDocker(String abi, String buildType) {
   return {
@@ -232,7 +238,7 @@ def doAndroidBuildInDocker(String abi, String buildType) {
             sh "rake build-android-${abi}-${buildType}"
             stash includes: 'build.*/install/**', name: "install-${abi}-${buildType}"
           } finally {
-            collectCompilerWarnings('gcc')
+            collectCompilerWarnings('gcc', true)
           }
         }
       }
@@ -329,9 +335,14 @@ def doBuildNodeInDocker(String buildType, boolean isPublishingRun) {
                       stash includes: 'realm-core-*.tar.gz', name: 'node'
                   }
                   archiveArtifacts artifacts: 'realm-core-*.tar.gz'
+                  if (env.BRANCH_NAME == 'master') {
+                    withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+                      sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core/'
+                    }
+                  }
               }
           } finally {
-            collectCompilerWarnings('gcc')
+            collectCompilerWarnings('gcc', true)
           }
       }
     }
@@ -370,7 +381,7 @@ def doBuildNodeInOsx(String libType, String buildType, boolean isPublishingRun) 
   }
 }
 
-def doBuildOsxDylibs(def isPublishingRun) {
+def doBuildOsxDylibs(def isPublishingRun, def isPublishingLatestRun) {
   return {
     node('osx_vegas') {
       getSourceArchive()
@@ -400,143 +411,33 @@ def doBuildOsxDylibs(def isPublishingRun) {
           sh 'sh build.sh clean'
 
           withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-            sh 's3cmd -c $s3cfg_config_file put realm-core-dylib-osx-latest.zip s3://static.realm.io/downloads/core/'
+            if (isPublishingLatestRun) {
+              sh 's3cmd -c $s3cfg_config_file put realm-core-dylib-osx-latest.zip s3://static.realm.io/downloads/core/'
+            }
           }
         } finally {
-          collectCompilerWarnings('clang')
+          collectCompilerWarnings('clang', true)
         }
       }
     }
   }
 }
 
-def doBuildAndroid(def isPublishingRun) {
-    def target = 'build-android'
-    def buildName = "android-${target}-with-encryption"
-
-    def environment = environment()
-    environment << "REALM_ENABLE_ENCRYPTION=yes"
-    environment << "PATH=/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/sbin:/bin:/usr/local/bin:/opt/android-sdk-linux/tools:/opt/android-sdk-linux/platform-tools:/opt/android-ndk-r10e"
-    environment << "ANDROID_NDK_HOME=/opt/android-ndk-r10e"
-    environment << "ANDROID_NDK=/opt/android-ndk-r10e"
-
-    return {
-        node('fastlinux') {
-            getArchive()
-
-            withEnv(environment) {
-                sh "sh build.sh config '${pwd()}/install'"
-                sh "sh build.sh ${target}"
-                sh "sh build.sh package-android"
-            }
-            if (isPublishingRun) {
-              stash includes: 'realm-core-android-*.tar.gz', name: 'android-package'
-            }
-            archiveArtifacts artifacts: 'realm-core-android-*.tar.gz'
-
-            sh 'tar zxvf realm-core-android-latest.tar.gz'
-            dir('test/android') {
-                sh '$ANDROID_HOME/tools/android update project -p . --target android-9'
-                environment << "NDK_PROJECT_PATH=${pwd()}"
-                withEnv(environment) {
-                    dir('jni') {
-                        sh "${env.ANDROID_NDK_HOME}/ndk-build V=1"
-                    }
-                    sh 'ant debug'
-                    dir('bin') {
-                        stash includes: 'NativeActivity-debug.apk', name: 'android'
-                    }
-                }
-            }
-            collectCompilerWarnings('gcc')
-        }
-
-        // node('android-hub') {
-        //     sh 'rm -rf *'
-        //     unstash 'android'
-
-        //     sh 'adb devices | tee devices.txt'
-        //     def adbDevices = readFile('devices.txt')
-        //     def devices = getDeviceNames(adbDevices)
-
-        //     if (!devices) {
-        //         throw new IllegalStateException('No devices were found')
-        //     }
-
-        //     def device = devices[0] // Run the tests only on one device
-
-        //     timeout(10) {
-        //         sh """
-        //         set -ex
-        //         adb -s ${device} uninstall io.realm.coretest
-        //         adb -s ${device} install NativeActivity-debug.apk
-        //         adb -s ${device} logcat -c
-        //         adb -s ${device} shell am start -a android.intent.action.MAIN -n io.realm.coretest/android.app.NativeActivity
-        //         """
-
-        //         sh """
-        //         set -ex
-        //         prefix="The XML file is located in "
-        //         while [ true ]; do
-        //             sleep 10
-        //             line=\$(adb -s ${device} logcat -d -s native-activity 2>/dev/null | grep -m 1 -oE "\$prefix.*\\\$" | tr -d "\r")
-        //             if [ ! -z "\${line}" ]; then
-        //             	xml_file="\$(echo \$line | cut -d' ' -f7)"
-        //                 adb -s ${device} pull "\$xml_file"
-        //                 adb -s ${device} shell am force-stop io.realm.coretest
-        //             	break
-        //             fi
-        //         done
-        //         mkdir -p test
-        //         cp unit-test-report.xml test/unit-test-report.xml
-        //         """
-        //     }
-        //     recordTests('android-device')
-        // }
-    }
-}
-
 def recordTests(tag) {
     def tests = readFile('test/unit-test-report.xml')
-    def modifiedTests = tests.replaceAll('DefaultSuite', tag)
+    def modifiedTests = tests.replaceAll('realm-core-tests', tag)
     writeFile file: 'test/modified-test-report.xml', text: modifiedTests
-
-    step([
-        $class: 'XUnitBuilder',
-        testTimeMargin: '3000',
-        thresholdMode: 1,
-        thresholds: [
-        [
-        $class: 'FailedThreshold',
-        failureNewThreshold: '0',
-        failureThreshold: '0',
-        unstableNewThreshold: '0',
-        unstableThreshold: '0'
-        ], [
-        $class: 'SkippedThreshold',
-        failureNewThreshold: '0',
-        failureThreshold: '0',
-        unstableNewThreshold: '0',
-        unstableThreshold: '0'
-        ]
-        ],
-        tools: [[
-        $class: 'UnitTestJunitHudsonTestType',
-        deleteOutputFiles: true,
-        failIfNotNew: true,
-        pattern: 'test/modified-test-report.xml',
-        skipNoTestFiles: false,
-        stopProcessingIfError: true
-        ]]
-    ])
+    junit 'test/modified-test-report.xml'
 }
 
-def collectCompilerWarnings(compiler) {
+def collectCompilerWarnings(compiler, fail) {
     def parserName
     if (compiler == 'gcc') {
         parserName = 'GNU Make + GNU C Compiler (gcc)'
     } else if ( compiler == 'clang' ) {
         parserName = 'Clang (LLVM based)'
+    } else if ( compiler == 'msbuild' ) {
+        parserName = 'MSBuild'
     }
     step([
         $class: 'WarningsPublisher',
@@ -545,10 +446,7 @@ def collectCompilerWarnings(compiler) {
         consoleParsers: [[parserName: parserName]],
         defaultEncoding: '',
         excludePattern: '',
-        failedTotalAll: '0',
-        failedTotalHigh: '0',
-        failedTotalLow: '0',
-        failedTotalNormal: '0',
+        unstableTotalAll: fail?'0':'',
         healthy: '',
         includePattern: '',
         messagesPattern: '',
@@ -678,12 +576,13 @@ def doPublishLocalArtifacts() {
   // TODO create a Dockerfile for an image only containing s3cmd
   return {
     node('aws') {
+      deleteDir()
       unstash 'cocoa-package'
-      unstash 'dotnet-package'
       unstash 'node-linux-package'
       unstash 'node-cocoa-package'
       unstash 'android-package'
       unstash 'dylib-osx-package'
+      unstash 'windows-package'
 
       withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
         sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'

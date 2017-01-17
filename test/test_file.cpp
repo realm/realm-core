@@ -71,7 +71,8 @@ TEST(File_ExistsAndRemove)
     CHECK(!File::try_remove(path));
 }
 
-
+// FIXME: Not yet supported on Windows 10 UWP
+#if !REALM_UWP
 TEST(File_IsSame)
 {
     TEST_PATH(path_1);
@@ -87,6 +88,7 @@ TEST(File_IsSame)
         CHECK(!f2.is_same_file(f3));
     }
 }
+#endif
 
 
 TEST(File_Streambuf)

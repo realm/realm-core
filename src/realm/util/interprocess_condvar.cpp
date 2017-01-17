@@ -87,7 +87,6 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
                                           std::string tmp_path)
 {
     close();
-    uses_emulation = true;
     m_shared_part = &shared_part;
     static_cast<void>(base_path);
     static_cast<void>(condvar_name);
@@ -100,7 +99,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     int ret = mkfifo(m_resource_path.c_str(), 0600);
     if (ret == -1) {
         int err = errno;
-        if (err == ENOTSUP || err == EACCES) {
+        if (err == ENOTSUP || err == EACCES || err == EPERM) {
             // Filesystem doesn't support named pipes, so try putting it in tmp instead
             // Hash collisions are okay here because they just result in doing
             // extra work, as opposed to correctness problems
@@ -168,6 +167,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     }
 
 #endif
+    uses_emulation = true;
 }
 
 

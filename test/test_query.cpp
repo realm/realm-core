@@ -558,23 +558,23 @@ TEST(Query_NextGen_StringConditions)
 
     m = table1->column<String>(0).ends_with(table1->column<String>(1), true).find();
     CHECK_EQUAL(m, 2);
-    
+
     // Like (wildcard matching)
     m = table1->column<String>(0).like("b*", true).find();
     CHECK_EQUAL(m, 2);
-    
+
     m = table1->column<String>(0).like("b*", false).find();
     CHECK_EQUAL(m, 2);
-    
+
     m = table1->column<String>(0).like("*r", false).find();
     CHECK_EQUAL(m, 2);
-    
+
     m = table1->column<String>(0).like("f?o", false).find();
     CHECK_EQUAL(m, 0);
-    
+
     m = (table1->column<String>(0).like("f*", false) && table1->column<String>(0) == "foo").find();
     CHECK_EQUAL(m, 0);
-    
+
     m = table1->column<String>(0).like(table1->column<String>(1), true).find();
     CHECK_EQUAL(m, not_found);
 
@@ -617,7 +617,7 @@ TEST(Query_NextGen_StringConditions)
 
     m = table2->column<String>(0).contains(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
-    
+
     m = table2->column<String>(0).like(StringData(""), false).count();
     CHECK_EQUAL(m, 1);
 
@@ -641,7 +641,7 @@ TEST(Query_NextGen_StringConditions)
 
     m = table2->column<String>(0).contains(realm::null(), false).count();
     CHECK_EQUAL(m, 4);
-    
+
     m = table2->column<String>(0).like(realm::null(), false).count();
     CHECK_EQUAL(m, 1);
 
@@ -683,7 +683,7 @@ TEST(Query_NextGen_StringConditions)
 
     m = table3->link(0).column<String>(0).contains(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
-    
+
     m = table3->link(0).column<String>(0).like(StringData(""), false).count();
     CHECK_EQUAL(m, 1);
 
@@ -707,6 +707,16 @@ TEST(Query_NextGen_StringConditions)
 
     m = table3->link(0).column<String>(0).contains(realm::null(), false).count();
     CHECK_EQUAL(m, 4);
+    
+    // Test long string contains search (where needle is longer than 255 chars)
+    table2->add_empty_row();
+    table2->set_string(0, 0, "This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, needle, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!");
+    
+    m = table2->column<String>(0).contains("This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, needle", false).count();
+    CHECK_EQUAL(m, 1);
+    
+    m = table2->column<String>(0).contains("This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, needle", true).count();
+    CHECK_EQUAL(m, 1);
     
     m = table3->link(0).column<String>(0).like(realm::null(), false).count();
     CHECK_EQUAL(m, 1);
@@ -5069,7 +5079,7 @@ TEST(Query_FindAllContains)
 TEST(Query_FindAllLike)
 {
     TupleTableType ttt;
-    
+
     ttt.add(0, "foo");
     ttt.add(0, "foobar");
     ttt.add(0, "barfoo");
@@ -5077,7 +5087,7 @@ TEST(Query_FindAllLike)
     ttt.add(0, "fo");
     ttt.add(0, "fobar");
     ttt.add(0, "barfo");
-    
+
     TupleTableType::Query q1 = ttt.where().second.like("*foo*");
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
@@ -5103,7 +5113,7 @@ TEST(Query_FindAllLikeStackOverflow)
 TEST(Query_FindAllLikeCaseInsensitive)
 {
     TupleTableType ttt;
-    
+
     ttt.add(0, "Foo");
     ttt.add(0, "FOOBAR");
     ttt.add(0, "BaRfOo");
@@ -5111,7 +5121,7 @@ TEST(Query_FindAllLikeCaseInsensitive)
     ttt.add(0, "Fo");
     ttt.add(0, "Fobar");
     ttt.add(0, "baRFo");
-    
+
     TupleTableType::Query q1 = ttt.where().second.like("*foo*", false);
     TupleTableType::View tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
@@ -5273,6 +5283,8 @@ TEST(Query_Unicode2)
     CHECK_EQUAL(1, tv3.get_source_ndx(0));
 }
 
+#if !REALM_UWP // FIXME UWP
+
 TEST(Query_Unicode3)
 {
     TupleTableType ttt;
@@ -5306,6 +5318,7 @@ TEST(Query_Unicode3)
     CHECK_EQUAL(1, tv4.size());
     CHECK_EQUAL(3, tv4.get_source_ndx(0));
 }
+#endif
 
 #endif
 
@@ -9401,6 +9414,15 @@ struct HandoverQuery {
         return ret;
     }
 };
+struct SelfHandoverQuery {
+    template <typename Next>
+    auto operator()(Query& q, Next&& next)
+    {
+        // Export the query and then re-import it to the same SG
+        auto handover = next.state.sg->export_for_handover(q, ConstSourcePayload::Copy);
+        return next(*next.state.sg->import_from_handover(std::move(handover)));
+    }
+};
 struct InsertColumn {
     template <typename Next>
     auto operator()(Query& q, Next&& next)
@@ -9460,11 +9482,13 @@ void QueryInitHelper::operator()(Func&& fn)
     CHECK_EQUAL(count, (run<Func, CopyQuery>(fn)));
     CHECK_EQUAL(count, (run<Func, AndQuery>(fn)));
     CHECK_EQUAL(count, (run<Func, HandoverQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, SelfHandoverQuery>(fn)));
 
     // run, copy the query, rerun
     CHECK_EQUAL(count, (run<Func, PreRun, CopyQuery>(fn)));
     CHECK_EQUAL(count, (run<Func, PreRun, AndQuery>(fn)));
     CHECK_EQUAL(count, (run<Func, PreRun, HandoverQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, PreRun, SelfHandoverQuery>(fn)));
 
     // copy the query, insert column, then run
     CHECK_EQUAL(count, (run<Func, CopyQuery, InsertColumn>(fn)));
@@ -9674,24 +9698,28 @@ TEST(Query_TableInitialization)
     helper([&](Query& q, auto&& test) { test(q.begins_with(col_string, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.ends_with(col_string, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.contains(col_string, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.like(col_string, StringData{})); });
 
     helper([&](Query& q, auto&& test) { test(q.equal(col_string, StringData{}, false)); });
     helper([&](Query& q, auto&& test) { test(q.not_equal(col_string, StringData{}, false)); });
     helper([&](Query& q, auto&& test) { test(q.begins_with(col_string, StringData{}, false)); });
     helper([&](Query& q, auto&& test) { test(q.ends_with(col_string, StringData{}, false)); });
     helper([&](Query& q, auto&& test) { test(q.contains(col_string, StringData{}, false)); });
+    helper([&](Query& q, auto&& test) { test(q.like(col_string, StringData{}, false)); });
 
     helper([&](Query& q, auto&& test) { test(q.equal(col_string_enum, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.not_equal(col_string_enum, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.begins_with(col_string_enum, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.ends_with(col_string_enum, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.contains(col_string_enum, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.like(col_string_enum, StringData{})); });
 
     helper([&](Query& q, auto&& test) { test(q.equal(col_string_indexed, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.not_equal(col_string_indexed, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.begins_with(col_string_indexed, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.ends_with(col_string_indexed, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.contains(col_string_indexed, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.like(col_string_indexed, StringData{})); });
 
     // Conditions: binary data
     helper([&](Query& q, auto&& test) { test(q.equal(col_binary, BinaryData{})); });
@@ -9736,12 +9764,14 @@ TEST(Query_TableInitialization)
         test_operator([](auto&& a, auto&& b) { return a.begins_with(b); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.ends_with(b); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.contains(b); }, string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.like(b); }, string_col, StringData());
 
         test_operator([](auto&& a, auto&& b) { return a.equal(b, false); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.not_equal(b, false); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.begins_with(b, false); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.ends_with(b, false); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.contains(b, false); }, string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.like(b, false); }, string_col, StringData());
 
         auto null_string_col = [&] { return get_table().template column<String>(col_string_null); };
         test_operator(std::equal_to<>(), null_string_col, null());
@@ -9803,6 +9833,96 @@ TEST(Query_TableInitialization)
     helper([&](Query& q, auto&& test) {
         test(helper.table->column<LinkList>(col_list, q.equal_int(col_int, 0)).count() > 0);
     });
+}
+/*
+
+// These tests fail on Windows due to lack of tolerance for invalid UTF-8 in the case mapping methods
+ 
+TEST(Query_UTF8_Contains)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_String, "str1");
+    table1->add_empty_row();
+    table1->set_string(0, 0, StringData("\x0ff\x000", 2));
+    size_t m = table1->column<String>(0).contains(StringData("\x0ff\x000", 2), false).count();
+    CHECK_EQUAL(1, m);
+}
+
+
+TEST(Query_UTF8_Contains_Fuzzy)
+{
+    Table table;
+    table.add_column(type_String, "str1");
+    table.add_empty_row();
+
+    for (size_t t = 0; t < 10000; t++) {
+        char haystack[10];
+        char needle[7];
+
+        for (size_t c = 0; c < 10; c++)
+            haystack[c] = char(fastrand());
+
+        for (size_t c = 0; c < 7; c++)
+            needle[c] = char(fastrand());
+
+        table.set_string(0, 0, StringData(haystack, 10));
+
+        table.column<String>(0).contains(StringData(needle, fastrand(7)), false).count();
+        table.column<String>(0).contains(StringData(needle, fastrand(7)), true).count();
+    }
+}
+*/
+        
+TEST(Query_ArrayLeafRelocate) 
+{
+    for (size_t iter = 0; iter < 10; iter++) {
+        // Tests crash where a query node would have a SequentialGetter that pointed to an old array leaf
+        // that was relocated. https://github.com/realm/realm-core/issues/2269
+        Group group;
+
+        TableRef contact = group.add_table("contact");
+        TableRef contact_type = group.add_table("contact_type");
+
+        contact_type->add_column(type_Int, "id");
+        contact_type->add_column(type_String, "str");
+        contact->add_column_link(type_LinkList, "link", *contact_type);
+
+        contact_type.get()->add_empty_row(10);
+        contact.get()->add_empty_row(10);
+
+        Query q1 = (contact.get()->link(0).column<Int>(0) == 0);
+        Query q2 = contact_type.get()->where().equal(0, 0);
+        Query q3 = (contact_type.get()->column<Int>(0) + contact_type.get()->column<Int>(0) == 0);
+        Query q4 = (contact_type.get()->column<Int>(0) == 0);
+        Query q5 = (contact_type.get()->column<String>(1) == "hejsa");
+
+        TableView tv = q1.find_all();
+        TableView tv2 = q2.find_all();
+        TableView tv3 = q3.find_all();
+        TableView tv4 = q4.find_all();
+        TableView tv5 = q5.find_all();
+
+        contact.get()->insert_column(0, type_Float, "extra");
+        contact_type.get()->insert_column(0, type_Float, "extra");
+
+        for (size_t t = 0; t < REALM_MAX_BPNODE_SIZE + 1; t++) {
+            contact.get()->add_empty_row();
+            contact_type.get()->add_empty_row();
+            //  contact_type.get()->set_string(1, t, "hejsa");
+
+            LinkViewRef lv = contact.get()->get_linklist(1, contact.get()->size() - 1);
+            lv->add(contact_type.get()->size() - 1);
+
+            if (t == 0 || t == REALM_MAX_BPNODE_SIZE) {
+                tv.sync_if_needed();
+                tv2.sync_if_needed();
+                tv3.sync_if_needed();
+                tv4.sync_if_needed();
+                tv5.sync_if_needed();
+            }
+        }
+    }
 }
 
 #endif // TEST_QUERY

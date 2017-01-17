@@ -89,7 +89,7 @@ TEST(Upgrade_Database_2_3)
     // Automatic upgrade from Group
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        CHECK_OR_RETURN(File::copy(path, temp_copy));
+        File::copy(path, temp_copy);
 
         // Open copy. Group constructor will upgrade automatically if needed, also even though user requested ReadOnly. Todo,
         // discuss if this is OK.
@@ -124,7 +124,7 @@ TEST(Upgrade_Database_2_3)
     // Prohibit automatic upgrade by SharedGroup
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        CHECK_OR_RETURN(File::copy(path, temp_copy));
+        File::copy(path, temp_copy);
 
         bool no_create = false;
         SharedGroupOptions::Durability durability = SharedGroupOptions::Durability::Full;
@@ -138,7 +138,7 @@ TEST(Upgrade_Database_2_3)
     // Automatic upgrade from SharedGroup
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        CHECK_OR_RETURN(File::copy(path, temp_copy));
+        File::copy(path, temp_copy);
 
         SharedGroup sg(temp_copy);
         ReadTransaction rt(sg);
@@ -188,7 +188,7 @@ TEST(Upgrade_Database_2_3)
     // Begin from scratch; see if we can upgrade file and then use a write transaction
     {
         // Make a copy of the version 2 database so that we keep the original file intact and unmodified
-        CHECK_OR_RETURN(File::copy(path, temp_copy));
+        File::copy(path, temp_copy);
 
         SharedGroup sg(temp_copy);
         WriteTransaction rt(sg);
@@ -232,7 +232,7 @@ TEST(Upgrade_Database_2_3)
 
     // Automatic upgrade from SharedGroup with replication
     {
-        CHECK_OR_RETURN(File::copy(path, temp_copy));
+        File::copy(path, temp_copy);
 
         std::unique_ptr<Replication> hist = make_in_realm_history(temp_copy);
         SharedGroup sg(*hist);
@@ -292,7 +292,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
     // Make a copy of the database so that we keep the original file intact and unmodified
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    CHECK_OR_RETURN(File::copy(path, temp_copy));
+    File::copy(path, temp_copy);
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
@@ -433,7 +433,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    CHECK_OR_RETURN(File::copy(path, temp_copy));
+    File::copy(path, temp_copy);
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
@@ -574,7 +574,7 @@ TEST(Upgrade_Database_Binary)
     // Make a copy of the database so that we keep the original file intact and unmodified
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    CHECK_OR_RETURN(File::copy(path, temp_copy));
+    File::copy(path, temp_copy);
     SharedGroup g(temp_copy, 0);
 
     WriteTransaction wt(g);
@@ -666,7 +666,7 @@ TEST(Upgrade_Database_Strings_With_NUL)
     // Make a copy of the database so that we keep the original file intact and unmodified
     SHARED_GROUP_TEST_PATH(temp_copy);
 
-    CHECK_OR_RETURN(File::copy(path, temp_copy));
+    File::copy(path, temp_copy);
     SharedGroup g(temp_copy, 0);
 
     WriteTransaction wt(g);
@@ -729,7 +729,7 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format)
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
     CHECK_OR_RETURN(File::exists(path));
     SHARED_GROUP_TEST_PATH(temp_copy);
-    CHECK_OR_RETURN(File::copy(path, temp_copy));
+    File::copy(path, temp_copy);
     SharedGroup sg1(temp_copy);
     SharedGroup sg2(temp_copy); // verify that the we can open another shared group, and it won't deadlock
     using sgf = _impl::SharedGroupFriend;
@@ -749,7 +749,7 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format_new)
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
     CHECK_OR_RETURN(File::exists(path));
     SHARED_GROUP_TEST_PATH(temp_copy);
-    CHECK_OR_RETURN(File::copy(path, temp_copy));
+    File::copy(path, temp_copy);
 
     util::Thread t[10];
 
@@ -777,7 +777,7 @@ TEST(Upgrade_InRealmHistory)
     SHARED_GROUP_TEST_PATH(temp_path);
 
     {
-        CHECK_OR_RETURN(File::copy(path, temp_path));
+        File::copy(path, temp_path);
         std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
         SharedGroup sg(*hist);
         using sgf = _impl::SharedGroupFriend;
@@ -787,7 +787,7 @@ TEST(Upgrade_InRealmHistory)
     // Try again, but do it in two steps (2->3, 3->6).
     {
         File::remove(temp_path);
-        CHECK_OR_RETURN(File::copy(path, temp_path));
+        File::copy(path, temp_path);
         bool no_create = true;
         {
             SharedGroup sg(temp_path, no_create);
@@ -812,7 +812,7 @@ TEST(Upgrade_DatabaseWithCallback)
     SHARED_GROUP_TEST_PATH(temp_copy);
 
     // Make a copy of the version 4 database so that we keep the original file intact and unmodified
-    CHECK_OR_RETURN(File::copy(path, temp_copy));
+    File::copy(path, temp_copy);
 
     // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
     // in version 3
@@ -849,7 +849,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
     SHARED_GROUP_TEST_PATH(temp_copy);
 
     // Make a copy of the version 4 database so that we keep the original file intact and unmodified
-    CHECK_OR_RETURN(File::copy(path, temp_copy));
+    File::copy(path, temp_copy);
 
     // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
     // in version 3
@@ -911,7 +911,7 @@ TEST(Upgrade_Database_4_5_DateTime1)
         SHARED_GROUP_TEST_PATH(temp_copy);
 
         // Make a copy of the version 4 database so that we keep the original file intact and unmodified
-        CHECK_OR_RETURN(File::copy(path, temp_copy));
+        File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger Table::upgrade_olddatetime() for all tables because the file is
         // in version 4
@@ -1026,7 +1026,7 @@ TEST(Upgrade_Database_5_6_StringIndex)
 
         // Make a copy of the version 4 database so that we keep the
         // original file intact and unmodified
-        CHECK_OR_RETURN(File::copy(path, temp_copy));
+        File::copy(path, temp_copy);
 
         // Constructing this SharedGroup will trigger an upgrade
         // for all tables because the file is in version 4

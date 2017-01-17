@@ -41,7 +41,6 @@
 #include <sys/wait.h>
 #define ENABLE_ROBUST_AGAINST_DEATH_DURING_WRITE
 #else
-#define NOMINMAX
 #include <windows.h>
 #endif
 
@@ -9725,6 +9724,61 @@ TEST(LangBindHelper_HandoverQuery)
 }
 
 
+TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+    sg.begin_read();
+
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    Group& group_w = const_cast<Group&>(sg_w.begin_read());
+
+    SharedGroup::VersionID vid;
+    {
+        // Untyped interface
+        std::unique_ptr<SharedGroup::Handover<TableView>> handover1;
+        std::unique_ptr<SharedGroup::Handover<Query>> handoverQuery;
+        {
+            TableView tv1;
+            LangBindHelper::promote_to_write(sg_w);
+            TableRef table = group_w.add_table("table");
+            auto table2 = group_w.add_table("table2");
+            table2->add_column(type_Int, "int");
+            table2->add_empty_row();
+            table2->set_int(0, 0, 42);
+
+            table->add_column_link(type_LinkList, "first", *table2);
+            table->add_empty_row();
+            auto link_view = table->get_linklist(0, 0);
+
+            link_view->add(0);
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+
+            Query qq = table2->where(link_view);
+            CHECK_EQUAL(qq.count(), 1);
+            LangBindHelper::promote_to_write(sg_w);
+            table->clear();
+            LangBindHelper::commit_and_continue_as_read(sg_w);
+            CHECK_EQUAL(qq.count(), 0);
+            handoverQuery = sg_w.export_for_handover(qq, ConstSourcePayload::Copy);
+            vid = sg_w.get_version_of_current_transaction();
+        }
+        {
+            LangBindHelper::advance_read(sg, vid);
+            sg_w.close();
+
+            std::unique_ptr<Query> q(sg.import_from_handover(move(handoverQuery)));
+            realm::TableView tv = q->find_all();
+
+            CHECK(tv.is_in_sync());
+            CHECK(tv.is_attached());
+            CHECK_EQUAL(0, tv.size()); 
+        }
+    }
+}
+
 TEST(LangBindHelper_SubqueryHandoverDependentViews)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -11203,8 +11257,7 @@ TEST(LangBindHelper_VersionControl)
         MyTable::ConstRef t = g.get_table<MyTable>("test");
         CHECK_EQUAL(old_version, t[old_version].first);
         for (int k = num_random_tests; k; --k) {
-            int new_version =
-                random.draw_int_mod(num_versions);
+            int new_version = random.draw_int_mod(num_versions);
             // std::cerr << "Random jump: version " << old_version << " -> " << new_version << std::endl;
             if (new_version < old_version) {
                 CHECK(versions[new_version] < versions[old_version]);
@@ -12137,7 +12190,7 @@ TEST(LangBindHelper_InRealmHistory_Downgrade)
     }
     {
         // No history
-        CHECK_THROW(SharedGroup(path), InvalidDatabase);
+        CHECK_THROW(SharedGroup(path), IncompatibleHistories);
     }
 }
 
@@ -12659,5 +12712,112 @@ TEST(LangBindHelper_ColumnMoveUpdatesLinkedTables)
     g_r.verify();
 }
 
+TEST(LangBindHelper_Bug2321)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_r(hist, SharedGroupOptions(crypt_key()));
+    SharedGroup sg_w(hist, SharedGroupOptions(crypt_key()));
+    int i;
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.add_table("target");
+        target->add_column(type_Int, "data");
+        target->add_empty_row(REALM_MAX_BPNODE_SIZE + 2);
+        TableRef origin = group.add_table("origin");
+        origin->add_column_link(type_LinkList, "_link", *target);
+        origin->add_empty_row(2);
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef origin = group.get_table("origin");
+        LinkViewRef lv0 = origin->get_linklist(0, 0);
+        for (i = 0; i < (REALM_MAX_BPNODE_SIZE - 1); i++) {
+            lv0->add(i);
+        }
+        wt.commit();
+    }
+
+    ReadTransaction rt(sg_r);
+    ConstTableRef origin_read = rt.get_group().get_table("origin");
+    ConstLinkViewRef lv1 = origin_read->get_linklist(0, 0);
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef origin = group.get_table("origin");
+        LinkViewRef lv0 = origin->get_linklist(0, 0);
+        lv0->add(i++);
+        lv0->add(i++);
+        wt.commit();
+    }
+
+    // If MAX_BPNODE_SIZE is 4 and we run in debug mode, then the LinkView
+    // accessor was not refreshed correctly. It would still be a leaf class,
+    // but the header flags would tell it is a node.
+    LangBindHelper::advance_read(sg_r);
+    CHECK_EQUAL(lv1->size(), i);
+}
+
+TEST(LangBindHelper_Bug2295)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_w(hist);
+    SharedGroup sg_r(hist);
+    int i;
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.add_table("target");
+        target->add_column(type_Int, "data");
+        target->add_empty_row(REALM_MAX_BPNODE_SIZE + 2);
+        TableRef origin = group.add_table("origin");
+        origin->add_column_link(type_LinkList, "_link", *target);
+        origin->add_empty_row(2);
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef origin = group.get_table("origin");
+        LinkViewRef lv0 = origin->get_linklist(0, 0);
+        for (i = 0; i < (REALM_MAX_BPNODE_SIZE + 1); i++) {
+            lv0->add(i);
+        }
+        wt.commit();
+    }
+
+    ReadTransaction rt(sg_r);
+    ConstTableRef origin_read = rt.get_group().get_table("origin");
+    ConstLinkViewRef lv1 = origin_read->get_linklist(0, 0);
+
+    CHECK_EQUAL(lv1->size(), i);
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef origin = group.get_table("origin");
+        // With the error present, this will cause some areas to be freed
+        // that has already been freed in the above transaction
+        LinkViewRef lv0 = origin->get_linklist(0, 0);
+        lv0->add(i++);
+        wt.commit();
+    }
+
+    LangBindHelper::promote_to_write(sg_r);
+    // Here we write the duplicates to the free list
+    LangBindHelper::commit_and_continue_as_read(sg_r);
+    rt.get_group().verify();
+
+    CHECK_EQUAL(lv1->size(), i);
+}
 
 #endif

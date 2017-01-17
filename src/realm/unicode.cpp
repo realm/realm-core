@@ -379,7 +379,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
     std::string result;
     result.resize(source.size());
 
-#ifdef _WIN32
+#if defined(_WIN32) && !REALM_UWP
     const char* begin = source.data();
     const char* end = begin + source.size();
     auto output = result.begin();
@@ -389,7 +389,6 @@ util::Optional<std::string> case_map(StringData source, bool upper)
             return util::none;
 
         wchar_t tmp[2]; // FIXME: Why no room for UTF-16 surrogate
-
 
         int n2 = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, begin, n, tmp, 1);
         if (n2 == 0)
@@ -417,7 +416,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
             return util::none;
 
         if (n3 != n) {
-            std::copy(begin, begin + n, output); // Cannot handle different size, copy source
+            std::copy_n(begin, n, output); // Cannot handle different size, copy source
         }
 
         begin += n;
@@ -502,6 +501,40 @@ size_t search_case_fold(StringData haystack, const char* needle_upper, const cha
     return haystack.size(); // Not found
 }
 
+/// This method takes an array that maps chars (both upper- and lowercase) to distance that can be moved
+/// (and zero for chars not in needle), allowing the method to apply Boyer-Moore for quick substring search
+/// The map is calculated in the StringNode<ContainsIns> class (so it can be reused across searches)
+bool contains_ins(StringData haystack, const char* needle_upper, const char* needle_lower, size_t needle_size, const std::array<uint8_t, 256> &charmap)
+{
+    if (needle_size == 0)
+        return haystack.size() != 0;
+    
+    // Prepare vars to avoid lookups in loop
+    size_t last_char_pos = needle_size-1;
+    unsigned char lastCharU = needle_upper[last_char_pos];
+    unsigned char lastCharL = needle_lower[last_char_pos];
+    
+    // Do Boyer-Moore search
+    size_t p = last_char_pos;
+    while (p < haystack.size()) {
+        unsigned char c = haystack.data()[p]; // Get candidate for last char
+        
+        if (c == lastCharU || c == lastCharL) {
+            StringData candidate = haystack.substr(p-needle_size+1, needle_size);
+            if (equal_case_fold(candidate, needle_upper, needle_lower))
+                return true; // text found!
+        }
+        
+        // If we don't have a match, see how far we can move char_pos
+        if (charmap[c] == 0)
+            p += needle_size; // char was not present in search string
+        else
+            p += charmap[c];
+    }
+    
+    return false;
+}
+
 // pre-declaration
 bool matchlike_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower) noexcept;
 
@@ -511,18 +544,18 @@ bool matchlike_ins(const StringData& text, const StringData& pattern_upper, cons
     std::vector<size_t> patternpos;
     size_t p1 = 0; // position in text (haystack)
     size_t p2 = 0; // position in pattern (needle)
-    
+
     while (true) {
         if (p1 == text.size()) {
             if (p2 == pattern_lower.size())
                 return true;
-            if (p2 == pattern_lower.size()-1 && pattern_lower[p2] == '*')
+            if (p2 == pattern_lower.size() - 1 && pattern_lower[p2] == '*')
                 return true;
             goto no_match;
         }
         if (p2 == pattern_lower.size())
             goto no_match;
-        
+
         if (pattern_lower[p2] == '*') {
             textpos.push_back(p1);
             patternpos.push_back(++p2);
@@ -537,20 +570,20 @@ bool matchlike_ins(const StringData& text, const StringData& pattern_upper, cons
             }
             else {
                 size_t p = 1;
-                while (p1+p != text.size() && (text[p1+p] & 0xc0) == 0x80)
+                while (p1 + p != text.size() && (text[p1 + p] & 0xc0) == 0x80)
                     ++p;
                 p1 += p;
                 ++p2;
                 continue;
             }
         }
-        
+
         if (pattern_lower[p2] == text[p1] || pattern_upper[p2] == text[p1]) {
             ++p1;
             ++p2;
             continue;
         }
-        
+
     no_match:
         if (textpos.empty())
             return false;
@@ -558,10 +591,10 @@ bool matchlike_ins(const StringData& text, const StringData& pattern_upper, cons
             if (p1 == text.size()) {
                 textpos.pop_back();
                 patternpos.pop_back();
-                
+
                 if (textpos.empty())
                     return false;
-                
+
                 p1 = textpos.back();
             }
             else {
@@ -578,7 +611,7 @@ bool string_like_ins(StringData text, StringData upper, StringData lower) noexce
     if (text.is_null() || lower.is_null()) {
         return (text.is_null() && lower.is_null());
     }
-    
+
     return matchlike_ins(text, lower, upper);
 }
 
@@ -587,10 +620,10 @@ bool string_like_ins(StringData text, StringData pattern) noexcept
     if (text.is_null() || pattern.is_null()) {
         return (text.is_null() && pattern.is_null());
     }
-    
+
     std::string upper = case_map(pattern, true, IgnoreErrors);
     std::string lower = case_map(pattern, false, IgnoreErrors);
-    
+
     return matchlike_ins(text, lower.c_str(), upper.c_str());
 }
 
