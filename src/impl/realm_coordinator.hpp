@@ -77,6 +77,9 @@ public:
     // Clears all caches on existing coordinators
     static void clear_all_caches();
 
+    // Verify that there are no Realms open for any paths
+    static void assert_no_open_realms() noexcept;
+
     // Explicit constructor/destructor needed for the unique_ptrs to forward-declared types
     RealmCoordinator();
     ~RealmCoordinator();

@@ -19,14 +19,13 @@
 #ifndef REALM_OS_OBJECT_HPP
 #define REALM_OS_OBJECT_HPP
 
+#include "impl/collection_notifier.hpp"
 #include "shared_realm.hpp"
 
 #include <realm/row.hpp>
 
 namespace realm {
-class CollectionChangeCallback;
 class ObjectSchema;
-struct NotificationToken;
 
 namespace _impl {
     class ObjectNotifier;
@@ -34,11 +33,14 @@ namespace _impl {
 
 class Object {
 public:
-    Object(SharedRealm r, ObjectSchema const& s, BasicRowExpr<Table> const& o)
-    : m_realm(std::move(r)), m_object_schema(&s), m_row(o) { }
+    Object();
+    Object(SharedRealm r, ObjectSchema const& s, BasicRowExpr<Table> const& o);
+    Object(SharedRealm r, ObjectSchema const& s, Row const& o);
 
-    Object(SharedRealm r, ObjectSchema const& s, Row const& o)
-    : m_realm(std::move(r)), m_object_schema(&s), m_row(o) { }
+    Object(Object const&);
+    Object(Object&&);
+    Object& operator=(Object const&);
+    Object& operator=(Object&&);
 
     ~Object();
 
@@ -73,7 +75,7 @@ private:
     SharedRealm m_realm;
     const ObjectSchema *m_object_schema;
     Row m_row;
-    std::shared_ptr<_impl::ObjectNotifier> m_notifier;
+    _impl::CollectionNotifier::Handle<_impl::ObjectNotifier> m_notifier;
 
     template<typename ValueType, typename ContextType>
     void set_property_value_impl(ContextType ctx, const Property &property, ValueType value, bool try_update);

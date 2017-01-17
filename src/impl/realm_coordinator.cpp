@@ -302,6 +302,14 @@ void RealmCoordinator::clear_all_caches()
     }
 }
 
+void RealmCoordinator::assert_no_open_realms() noexcept
+{
+#ifdef REALM_DEBUG
+    std::lock_guard<std::mutex> lock(s_coordinator_mutex);
+    REALM_ASSERT(s_coordinators_per_path.empty());
+#endif
+}
+
 void RealmCoordinator::wake_up_notifier_worker()
 {
     if (m_notifier) {

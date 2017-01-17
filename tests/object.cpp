@@ -35,6 +35,8 @@
 using namespace realm;
 
 TEST_CASE("object") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
     config.automatic_change_notifications = false;
     config.cache = false;
@@ -62,6 +64,7 @@ TEST_CASE("object") {
     SECTION("add_notification_block()") {
         CollectionChangeSet change;
         Row row = table->get(0);
+        Object object(r, *r->schema().find("table"), row);
 
         auto write = [&](auto&& f) {
             r->begin_transaction();
@@ -72,7 +75,7 @@ TEST_CASE("object") {
         };
 
         auto require_change = [&] {
-            auto token = Object(r, *r->schema().find("table"), row).add_notification_block([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token = object.add_notification_block([&](CollectionChangeSet c, std::exception_ptr) {
                 change = c;
             });
             advance_and_notify(*r);
@@ -81,7 +84,7 @@ TEST_CASE("object") {
 
         auto require_no_change = [&] {
             bool first = true;
-            auto token = Object(r, *r->schema().find("table"), row).add_notification_block([&](CollectionChangeSet, std::exception_ptr) {
+            auto token = object.add_notification_block([&](CollectionChangeSet, std::exception_ptr) {
                 REQUIRE(first);
                 first = false;
             });

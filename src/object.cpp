@@ -23,7 +23,18 @@
 
 using namespace realm;
 
+Object::Object(SharedRealm r, ObjectSchema const& s, BasicRowExpr<Table> const& o)
+: m_realm(std::move(r)), m_object_schema(&s), m_row(o) { }
+
+Object::Object(SharedRealm r, ObjectSchema const& s, Row const& o)
+: m_realm(std::move(r)), m_object_schema(&s), m_row(o) { }
+
+Object::Object() = default;
 Object::~Object() = default;
+Object::Object(Object const&) = default;
+Object::Object(Object&&) = default;
+Object& Object::operator=(Object const&) = default;
+Object& Object::operator=(Object&&) = default;
 
 NotificationToken Object::add_notification_block(CollectionChangeCallback callback)
 {
