@@ -144,7 +144,7 @@ def buildDockerEnv(name) {
   return docker.image(name)
 }
 
-def doBuildCocoa(def isPublishingRun, def isPublishingLatestRun) {
+def doBuildCocoa(def isPublishingRun) {
   return {
     node('osx_vegas') {
       getArchive()
@@ -376,48 +376,6 @@ def doBuildNodeInOsx(String libType, String buildType, boolean isPublishingRun) 
           }
       } finally {
           collectCompilerWarnings('clang')
-      }
-    }
-  }
-}
-
-def doBuildOsxDylibs(def isPublishingRun, def isPublishingLatestRun) {
-  return {
-    node('osx_vegas') {
-      getSourceArchive()
-      def version = get_version()
-
-      def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes', 'UNITTEST_SHUFFLE=1',
-        'UNITTEST_XML=1', 'UNITTEST_THREADS=1']
-      withEnv(environment) {
-        sh 'sh build.sh config'
-        try {
-          sh '''
-            sh build.sh build
-            sh build.sh check-debug
-          '''
-
-          dir('src/realm') {
-            sh "zip --symlink ../../realm-core-dylib-osx-${version}.zip librealm*.dylib"
-          }
-
-          sh 'cp realm-core-dylib-osx-*.zip realm-core-dylib-osx-latest.zip'
-
-          if (isPublishingRun) {
-            stash includes: '*realm-core-dylib-osx-*.*.*.zip', name: 'dylib-osx-package'
-          }
-          archiveArtifacts artifacts: '*realm-core-dylib-osx-*.*.*.zip'
-
-          sh 'sh build.sh clean'
-
-          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-            if (isPublishingLatestRun) {
-              sh 's3cmd -c $s3cfg_config_file put realm-core-dylib-osx-latest.zip s3://static.realm.io/downloads/core/'
-            }
-          }
-        } finally {
-          collectCompilerWarnings('clang', true)
-        }
       }
     }
   }
