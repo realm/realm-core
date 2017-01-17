@@ -92,21 +92,9 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
         std::vector<SyncFileActionMetadata> completed_actions;
         SyncFileActionMetadataResults file_actions = m_metadata_manager->all_pending_actions();
         for (size_t i = 0; i < file_actions.size(); i++) {
-            SyncFileActionMetadata file_action = file_actions.get(i);
-            switch (file_action.action()) {
-                case SyncFileActionMetadata::Action::DeleteRealm:
-                    // Delete all the files for the given Realm.
-                    m_file_manager->remove_realm(file_action.original_name());
-                    completed_actions.emplace_back(std::move(file_action));
-                    break;
-                case SyncFileActionMetadata::Action::HandleRealmForClientReset:
-                    // Copy the primary Realm file to the recovery dir, and then delete the Realm.
-                    auto new_name = file_action.new_name();
-                    if (new_name && m_file_manager->copy_realm_file_to_recovery_directory(file_action.original_name(), *new_name)) {
-                        m_file_manager->remove_realm(file_action.original_name());
-                        completed_actions.emplace_back(std::move(file_action));
-                    }
-                    break;
+            auto file_action = file_actions.get(i);
+            if (run_file_action(file_action)) {
+                completed_actions.emplace_back(std::move(file_action));
             }
         }
         for (auto& action : completed_actions) {
@@ -163,22 +151,35 @@ bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
     if (!metadata) {
         return false;
     }
-    auto& md = *metadata;
+    if (run_file_action(*metadata)) {
+        metadata->remove();
+        return true;
+    }
+    return false;
+}
+
+// Perform a file action. Returns whether or not the file action can be removed.
+bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
+{
     switch (md.action()) {
         case SyncFileActionMetadata::Action::DeleteRealm:
             // Delete all the files for the given Realm.
             m_file_manager->remove_realm(md.original_name());
-            md.remove();
             return true;
         case SyncFileActionMetadata::Action::HandleRealmForClientReset:
             // Copy the primary Realm file to the recovery dir, and then delete the Realm.
             auto new_name = md.new_name();
-            if (new_name && m_file_manager->copy_realm_file_to_recovery_directory(md.original_name(), *new_name)) {
-                m_file_manager->remove_realm(md.original_name());
-                md.remove();
+            auto original_name = md.original_name();
+            if (!util::File::exists(original_name)) {
+                // The Realm file doesn't exist anymore.
+                return true;
+            } 
+            if (new_name && !util::File::exists(*new_name) && m_file_manager->copy_realm_file(original_name, *new_name)) {
+                // We successfully copied the Realm file to the recovery directory.
+                m_file_manager->remove_realm(original_name);
                 return true;
             }
-            break;
+            return false;
     }
     return false;
 }

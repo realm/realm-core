@@ -27,7 +27,7 @@ using namespace realm;
 using namespace realm::util;
 using File = realm::util::File;
 
-static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_manager/";
+static const std::string base_path = tmp_dir() + "realm_objectstore_sync_manager/";
 
 namespace {
 
@@ -249,6 +249,7 @@ TEST_CASE("sync_manager: persistent user state management", "[sync]") {
 }
 
 TEST_CASE("sync_manager: file actions", "[sync]") {
+    using Action = SyncFileActionMetadata::Action;
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
     auto file_manager = SyncFileManager(base_path);
@@ -269,9 +270,9 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
 
     SECTION("Action::DeleteRealm") {
         // Create some file actions
-        auto a1 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::DeleteRealm, realm_path_1, "user1", realm_url);
-        auto a2 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::DeleteRealm, realm_path_2, "user2", realm_url);
-        auto a3 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::DeleteRealm, realm_path_3, "user3", realm_url);
+        auto a1 = SyncFileActionMetadata(manager, Action::DeleteRealm, realm_path_1, realm_url, "user1");
+        auto a2 = SyncFileActionMetadata(manager, Action::DeleteRealm, realm_path_2, realm_url, "user2");
+        auto a3 = SyncFileActionMetadata(manager, Action::DeleteRealm, realm_path_3, realm_url, "user3");
 
         SECTION("should properly delete the Realm") {
             // Create some Realms
@@ -315,14 +316,14 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
     }
 
     SECTION("Action::HandleRealmForClientReset") {
+        const auto recovery_dir = file_manager.recovery_directory_path();
         // Create some file actions
-        const std::string recovery_1 = "recovery-1";
-        const std::string recovery_2 = "recovery-2";
-        const std::string recovery_3 = "recovery-3";
-        auto a1 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::HandleRealmForClientReset, realm_path_1, "user1", realm_url, recovery_1);
-        auto a2 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::HandleRealmForClientReset, realm_path_2, "user2", realm_url, recovery_2);
-        auto a3 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::HandleRealmForClientReset, realm_path_3, "user3", realm_url, recovery_3);
-        const std::string recovery_dir = file_manager.recovery_directory_path();
+        const std::string recovery_1 = util::file_path_by_appending_component(recovery_dir, "recovery-1");
+        const std::string recovery_2 = util::file_path_by_appending_component(recovery_dir, "recovery-2");
+        const std::string recovery_3 = util::file_path_by_appending_component(recovery_dir, "recovery-3");
+        auto a1 = SyncFileActionMetadata(manager, Action::HandleRealmForClientReset, realm_path_1, realm_url, "user1", recovery_1);
+        auto a2 = SyncFileActionMetadata(manager, Action::HandleRealmForClientReset, realm_path_2, realm_url, "user2", recovery_2);
+        auto a3 = SyncFileActionMetadata(manager, Action::HandleRealmForClientReset, realm_path_3, realm_url, "user3", recovery_3);
 
         SECTION("should properly copy the Realm file and delete the Realm") {
             // Create some Realms
@@ -338,9 +339,30 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_2);
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_3);
             // There should be recovery files.
-            CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_1)));
-            CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_2)));
-            CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_3)));
+            CHECK(File::exists(recovery_1));
+            CHECK(File::exists(recovery_2));
+            CHECK(File::exists(recovery_3));
+        }
+
+        SECTION("should copy the Realm to the recovery_directory_path") {
+            const std::string identity = "b241922032489d4836ecd0c82d0445f0";
+            const auto realm_base_path = file_manager.user_directory(identity) + "realmtasks";
+            std::string recovery_path = util::reserve_unique_file_name(file_manager.recovery_directory_path(),
+                                                                       util::create_timestamped_template("recovered_realm"));
+            create_dummy_realm(realm_base_path);
+            REQUIRE_REALM_EXISTS(realm_base_path);
+            REQUIRE(!File::exists(recovery_path));
+            // Manually create a file action metadata entry to simulate a client reset.
+            auto a = SyncFileActionMetadata(manager, Action::HandleRealmForClientReset, realm_base_path, realm_url, identity, recovery_path);
+            auto pending_actions = manager.all_pending_actions();
+            REQUIRE(pending_actions.size() == 4);
+
+            // Simulate client launch.
+            SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+
+            CHECK(pending_actions.size() == 0);
+            CHECK(File::exists(recovery_path));
+            REQUIRE_REALM_DOES_NOT_EXIST(realm_base_path);
         }
 
         SECTION("should fail gracefully if the Realm is missing") {
@@ -359,20 +381,23 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
         }
 
         SECTION("should work properly when manually driven") {
+            REQUIRE(!File::exists(recovery_1));
             // Create a Realm file
             create_dummy_realm(realm_path_4);
             // Configure the system
             SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
+            auto pending_actions = manager.all_pending_actions();
+            REQUIRE(pending_actions.size() == 0);
             // Add a file action after the system is configured.
             REQUIRE_REALM_EXISTS(realm_path_4);
-            auto a4 = SyncFileActionMetadata(manager, SyncFileActionMetadata::Action::HandleRealmForClientReset, realm_path_4, "user4", realm_url, recovery_1);
-            auto pending_actions = manager.all_pending_actions();
+            REQUIRE(File::exists(file_manager.recovery_directory_path()));
+            auto a4 = SyncFileActionMetadata(manager, Action::HandleRealmForClientReset, realm_path_4, realm_url, "user4", recovery_1);
             CHECK(pending_actions.size() == 1);
             // Force the recovery. (In a real application, the user would have closed the files by now.)
             REQUIRE(SyncManager::shared().immediately_run_file_actions(realm_path_4));
             // There should be recovery files.
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_4);
-            CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_1)));
+            CHECK(File::exists(recovery_1));
             pending_actions = manager.all_pending_actions();
             CHECK(pending_actions.size() == 0);
         }
@@ -382,7 +407,7 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             create_dummy_realm(realm_path_1);
             create_dummy_realm(realm_path_2);
             create_dummy_realm(realm_path_3);
-            create_dummy_realm(util::file_path_by_appending_component(recovery_dir, recovery_1));
+            create_dummy_realm(recovery_1);
             SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoEncryption);
             // Most file actions should be cleared.
             auto pending_actions = manager.all_pending_actions();
@@ -392,8 +417,8 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_2);
             REQUIRE_REALM_DOES_NOT_EXIST(realm_path_3);
             // There should be recovery files.
-            CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_2)));
-            CHECK(File::exists(util::file_path_by_appending_component(recovery_dir, recovery_3)));
+            CHECK(File::exists(recovery_2));
+            CHECK(File::exists(recovery_3));
         }
 
         SECTION("should do nothing if metadata is disabled") {
@@ -410,9 +435,9 @@ TEST_CASE("sync_manager: file actions", "[sync]") {
             REQUIRE_REALM_EXISTS(realm_path_2);
             REQUIRE_REALM_EXISTS(realm_path_3);
             // There should not be recovery files.
-            CHECK(!File::exists(util::file_path_by_appending_component(recovery_dir, recovery_1)));
-            CHECK(!File::exists(util::file_path_by_appending_component(recovery_dir, recovery_2)));
-            CHECK(!File::exists(util::file_path_by_appending_component(recovery_dir, recovery_3)));
+            CHECK(!File::exists(recovery_1));
+            CHECK(!File::exists(recovery_2));
+            CHECK(!File::exists(recovery_3));
         }
     }
 }

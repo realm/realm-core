@@ -60,9 +60,9 @@ std::string tmp_dir() {
     if (dir && *dir)
         return dir;
 #if REALM_ANDROID
-    return "/data/local/tmp";
+    return "/data/local/tmp/";
 #else
-    return "/tmp";
+    return "/tmp/";
 #endif
 }
 

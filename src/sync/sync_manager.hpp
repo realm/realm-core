@@ -36,6 +36,7 @@ class SyncSession;
 class SyncUser;
 class SyncFileManager;
 class SyncMetadataManager;
+class SyncFileActionMetadata;
 
 namespace _impl {
 struct SyncClient;
@@ -144,6 +145,8 @@ private:
     SyncLoggerFactory* m_logger_factory = nullptr;
     ReconnectMode m_client_reconnect_mode = ReconnectMode::normal;
     bool m_client_validate_ssl = true;
+
+    bool run_file_action(const SyncFileActionMetadata&);
 
     // Protects m_users
     mutable std::mutex m_user_mutex;
