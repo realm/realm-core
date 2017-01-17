@@ -37,6 +37,7 @@
 #include "pthread.h"
 #include "implement.h"
 
+int getpid(void);
 
 int
 pthread_mutex_destroy (pthread_mutex_t * mutex)
@@ -47,7 +48,7 @@ pthread_mutex_destroy (pthread_mutex_t * mutex)
   if(mutex->is_shared)
   {
     BOOL d;
-    int pid = getpid();
+    int pid = _getpid();
 
     if(mutex->cached_pid != pid)
     {

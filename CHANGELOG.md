@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed a few bugs (caused crashes) in pthread library on UWP.
 
 ### Breaking changes
 
@@ -10,7 +10,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Now supports case insensitive queries for UWP.
+* Upgraded Visual Studio project to version 2017.
 
 -----------
 
