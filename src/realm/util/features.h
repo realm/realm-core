@@ -27,9 +27,7 @@
 #define NOMINMAX
 #endif
 
-#ifdef REALM_HAVE_CONFIG
 #include <realm/util/config.h>
-#endif
 
 /* The maximum number of elements in a B+-tree node. Applies to inner nodes and
  * to leaves. The minimum allowable value is 2.

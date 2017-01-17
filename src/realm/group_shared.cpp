@@ -25,10 +25,6 @@
 #include <sstream>
 #include <type_traits>
 
-#ifdef REALM_HAVE_CONFIG
-#include <realm/util/config.h>
-#endif
-
 #include <realm/util/features.h>
 #include <realm/util/errno.hpp>
 #include <realm/util/safe_int_ops.hpp>
