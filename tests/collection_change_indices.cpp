@@ -59,6 +59,16 @@ TEST_CASE("collection_change: insert()") {
         c.insert(4);
         REQUIRE_MOVES(c, {10, 6}, {10, 2}, {3, 11});
     }
+
+    SECTION("shifts destination of previous row moves after the insertion point") {
+        c.move_over(10, 30);
+        c.move_over(15, 29);
+        c.move_over(16, 28);
+        c.move_over(20, 27);
+        c.insert(11, 3);
+        c.parse_complete();
+        REQUIRE_MOVES(c, {27, 23}, {28, 19}, {29, 18}, {30, 10});
+    }
 }
 
 TEST_CASE("collection_change: modify()") {

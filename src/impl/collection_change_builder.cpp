@@ -205,6 +205,24 @@ void CollectionChangeBuilder::insert(size_t index, size_t count, bool track_move
         if (move.to >= index)
             ++move.to;
     }
+
+    if (m_move_mapping.empty())
+        return;
+
+    // m_move_mapping is new_ndx -> old_ndx, so updating the keys requires
+    // deleting and re-inserting at the new index
+    std::vector<std::pair<size_t, size_t>> shifted;
+    for (auto it = m_move_mapping.begin(); it != m_move_mapping.end(); ) {
+        if (it->first >= index) {
+            shifted.emplace_back(it->first + count, it->second);
+            it = m_move_mapping.erase(it);
+        }
+        else {
+            ++it;
+        }
+    }
+    for (auto& pair : shifted)
+        m_move_mapping.insert(pair);
 }
 
 void CollectionChangeBuilder::erase(size_t index)
