@@ -208,6 +208,10 @@ public:
     size_t add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
     void insert_column_link(size_t column_ndx, DataType type, StringData name, Table& target,
                             LinkType link_type = link_Weak);
+
+    size_t add_column_list(DataType type, StringData name);
+    void insert_column_list(size_t column_ndx, DataType type, StringData name);
+
     void remove_column(size_t column_ndx);
     void rename_column(size_t column_ndx, StringData new_name);
     //@}
@@ -502,6 +506,17 @@ public:
     void nullify_link(size_t column_ndx, size_t row_ndx);
     void set_null(size_t column_ndx, size_t row_ndx, bool is_default = false);
     void set_null_unique(size_t col_ndx, size_t row_ndx);
+
+    template <class T>
+    void set(size_t c, size_t r, T value, bool is_default = false);
+
+    template <class T>
+    void set_list(size_t c, size_t r, const std::vector<T>& list);
+
+    TableView get_list(size_t column_ndx, size_t row_ndx);
+
+    template <class T>
+    std::vector<T> get_list(size_t column_ndx, size_t row_ndx);
 
     void add_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
 
@@ -2012,6 +2027,31 @@ inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept
         // Subtable with shared descriptor
         m_columns.set_ndx_in_parent(ndx_in_parent);
     }
+}
+
+template <class T>
+void Table::set_list(size_t c, size_t r, const std::vector<T>& list)
+{
+    size_t sz = list.size();
+    TableRef subtable = get_subtable(c, r);
+    subtable->clear();
+    subtable->add_empty_row(sz);
+    for (size_t i = 0; i < sz; i++) {
+        T value = list[i];
+        subtable->set(0, i, value);
+    }
+}
+
+template <class T>
+std::vector<T> Table::get_list(size_t c, size_t r)
+{
+    std::vector<T> vec;
+    TableRef subtable = get_subtable(c, r);
+    size_t sz = subtable->size();
+    for (size_t i = 0; i < sz; i++) {
+        vec.push_back(subtable->get<T>(0, i));
+    }
+    return vec;
 }
 
 // This class groups together information about the target of a link column

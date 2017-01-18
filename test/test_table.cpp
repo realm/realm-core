@@ -7833,5 +7833,76 @@ TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
     check_column_sizes(10 * REALM_MAX_BPNODE_SIZE);
 }
 
+TEST(Table_ListOfPrimitives)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    auto int_col = t->add_column_list(type_Int, "integers");
+    auto bool_col = t->add_column_list(type_Bool, "booleans");
+    auto string_col = t->add_column_list(type_String, "strings");
+    auto double_col = t->add_column_list(type_Double, "doubles");
+    auto timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
+    t->add_empty_row();
+
+    std::vector<int_fast64_t> integer_list = {1, 2, 3, 4};
+    t->set_list(int_col, 0, integer_list);
+
+    std::vector<bool> bool_list = {false, false, true, false, true};
+    t->set_list(bool_col, 0, bool_list);
+
+    std::vector<StringData> string_list = {"monday", "tuesday", "thursday", "friday", "saturday", "sunday"};
+    t->set_list(string_col, 0, string_list);
+
+    std::vector<double> double_list = {898742.09382, 3.14159265358979, 2.71828182845904};
+    t->set_list(double_col, 0, double_list);
+
+    auto now = std::chrono::system_clock::now();
+    std::chrono::minutes one_minute(1);
+    std::vector<Timestamp> timestamp_list = {now, now + one_minute};
+    t->set_list(timestamp_col, 0, timestamp_list);
+
+    TableView res = t->get_list(int_col, 0);
+    auto vec = t->get_list<int_fast64_t>(int_col, 0);
+    CHECK_EQUAL(integer_list.size(), res.size());
+    for (unsigned i = 0; i < res.size(); i++) {
+        CHECK_EQUAL(integer_list[i], res.get_int(0, i));
+        CHECK_EQUAL(integer_list[i], vec[i]);
+    }
+    t->set_list(0, 0, std::vector<int_fast64_t>());
+    res = t->get_list(int_col, 0);
+    CHECK_EQUAL(0, res.size());
+
+    res = t->get_list(bool_col, 0);
+    CHECK_EQUAL(bool_list.size(), res.size());
+    for (unsigned i = 0; i < res.size(); i++) {
+        CHECK_EQUAL(bool_list[i], res.get_bool(0, i));
+    }
+
+    res = t->get_list(string_col, 0);
+    CHECK_EQUAL(string_list.size(), res.size());
+    for (unsigned i = 0; i < res.size(); i++) {
+        CHECK_EQUAL(string_list[i], res.get_string(0, i));
+    }
+
+    Row r = t->get(0);
+    TableRef subtable = r.get_subtable(string_col);
+    subtable->insert_empty_row(2);
+    subtable->set_string(0, 2, "wednesday");
+    res.sync_if_needed();
+    CHECK_EQUAL(string_list.size() + 1, res.size());
+    CHECK_EQUAL(StringData("wednesday"), res.get_string(0, 2));
+
+    res = t->get_list(double_col, 0);
+    CHECK_EQUAL(double_list.size(), res.size());
+    for (unsigned i = 0; i < res.size(); i++) {
+        CHECK_EQUAL(double_list[i], res.get_double(0, i));
+    }
+
+    res = t->get_list(timestamp_col, 0);
+    CHECK_EQUAL(timestamp_list.size(), res.size());
+    for (unsigned i = 0; i < res.size(); i++) {
+        CHECK_EQUAL(timestamp_list[i], res.get_timestamp(0, i));
+    }
+}
 
 #endif // TEST_TABLE
