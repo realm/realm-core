@@ -155,5 +155,21 @@ TEST_CASE("object") {
                 token.suppress_next();
             });
         }
+
+        SECTION("skipping only effects the current transaction even if no notification would occur anyway") {
+            auto token = require_change();
+
+            // would not produce a notification even if it wasn't skipped because no changes were made
+            write([&] {
+                token.suppress_next();
+            });
+            REQUIRE(change.empty());
+
+            // should now produce a notification
+            write([&] {
+                row.set_int(0, 1);
+            });
+            REQUIRE_INDICES(change.modifications, 0);
+        }
     }
 }

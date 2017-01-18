@@ -167,6 +167,10 @@ void ResultsNotifier::do_prepare_handover(SharedGroup& sg)
         // object and bump its version to the current SG version
         if (m_tv_handover)
             m_tv_handover->version = sg.get_version_of_current_transaction();
+
+        // add_changes() needs to be called even if there are no changes to
+        // clear the skip flag on the callbacks
+        add_changes({});
         return;
     }
 

@@ -822,6 +822,25 @@ TEST_CASE("notifications: skip") {
         REQUIRE(calls3 == 1);
         REQUIRE(calls4 == 1);
     }
+
+    SECTION("skipping only effects the current transaction even if no notification would occur anyway") {
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        // would not produce a notification even if it wasn't skipped because no changes were made
+        r->begin_transaction();
+        token1.suppress_next();
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        // should now produce a notification
+        r->begin_transaction();
+        table->add_empty_row();
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+    }
 }
 
 #if REALM_PLATFORM_APPLE

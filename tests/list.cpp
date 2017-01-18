@@ -305,6 +305,24 @@ TEST_CASE("list") {
             REQUIRE_INDICES(change.insertions, 10);
         }
 
+        SECTION("skipping only effects the current transaction even if no notification would occur anyway") {
+            auto token = require_change();
+
+            // would not produce a notification even if it wasn't skipped because no changes were made
+            r->begin_transaction();
+            token.suppress_next();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(change.empty());
+
+            // should now produce a notification
+            r->begin_transaction();
+            lv->add(0);
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE_INDICES(change.insertions, 10);
+        }
+
         SECTION("modifying a different table does not send a change notification") {
             auto token = require_no_change();
             write([&] { other_lv->add(0); });

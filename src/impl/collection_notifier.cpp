@@ -286,6 +286,12 @@ void CollectionNotifier::prepare_handover()
     m_sg_version = m_sg->get_version_of_current_transaction();
     do_prepare_handover(*m_sg);
     m_has_run = true;
+
+#ifdef REALM_DEBUG
+    std::lock_guard<std::mutex> lock(m_callback_mutex);
+    for (auto& callback : m_callbacks)
+        REALM_ASSERT(!callback.skip_next);
+#endif
 }
 
 void CollectionNotifier::before_advance()
