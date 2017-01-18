@@ -127,8 +127,9 @@ public:
                 selected_object_type,
                 prior_num_rows-1,
                 "__ROW_ID",
+                PropertyType::Object,
                 false,
-                (int64_t)row_index
+                (size_t)row_index
             });
         }
         return true;
@@ -160,6 +161,7 @@ public:
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
+                PropertyType::Int,
                 false,
                 (int64_t)value
             ));
@@ -178,6 +180,7 @@ public:
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
+                PropertyType::Bool,
                 false,
                 value
             ));
@@ -191,6 +194,7 @@ public:
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
+                PropertyType::Float,
                 false,
                 value
             ));
@@ -204,6 +208,7 @@ public:
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
+                PropertyType::Double,
                 false,
                 value
             ));
@@ -217,6 +222,7 @@ public:
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
+                PropertyType::String,
                 false,
                 (std::string)value
             ));
@@ -230,8 +236,9 @@ public:
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
+                PropertyType::Data,
                 false,
-                value
+                (std::string)value
             ));
         }
         return true;
@@ -248,6 +255,7 @@ public:
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
+                PropertyType::Date,
                 false,
                 value
             ));
@@ -271,8 +279,9 @@ public:
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
+                PropertyType::Object,
                 link_index == npos,
-                (int64_t)link_index
+                (size_t)link_index
             ));
         }
         return true;
@@ -284,6 +293,7 @@ public:
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
+                selected_object_schema->persisted_properties[column_index].type,
                 true,
                 (int64_t)0
             ));
@@ -297,8 +307,9 @@ public:
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
+                PropertyType::Object,
                 true,
-                (int64_t)0
+                (size_t)0
             ));
         }
         return true;

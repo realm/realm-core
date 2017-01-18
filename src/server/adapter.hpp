@@ -21,6 +21,7 @@
 
 #include "global_notifier.hpp"
 #include "property.hpp"
+#include <mpark/variant.hpp>
 
 namespace realm {
 
@@ -67,14 +68,14 @@ public:
 
         const Type type;
         const std::string object_type;
+
         const size_t row = -1;
 
         const std::string property;
         const bool is_null = false;
-        const Mixed value;
-        const std::string string_value;
-
+        const mpark::variant<bool, int64_t, double, std::string, Timestamp, size_t> value;
         const PropertyType data_type = PropertyType::Int;
+
         const std::string target_object_type = "";
         const bool nullable = false;
 
@@ -95,12 +96,9 @@ public:
         Instruction(std::string o, std::string p, PropertyType t, bool n, std::string l = "") 
         : type(Type::AddProperty), object_type(o), property(p), value(), data_type(t), target_object_type(l) {}
 
-        Instruction(std::string o, size_t r, std::string p, bool n, std::string v)
-        : type(Type::SetProperty), object_type(o), row(r), property(p), is_null(n), value(), string_value(v) {}
-
         template<typename T>
-        Instruction(std::string o, size_t r, std::string p, bool n, T v)
-        : type(Type::SetProperty), object_type(o), row(r), property(p), is_null(n), value(v) {}
+        Instruction(std::string o, size_t r, std::string p, PropertyType t, bool n, T v)
+        : type(Type::SetProperty), object_type(o), row(r), property(p), is_null(n), value(v), data_type(t) {}
     };
 
     class ChangeSet : public std::vector<Instruction> {

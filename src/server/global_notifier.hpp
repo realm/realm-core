@@ -192,7 +192,7 @@ public:
     /// result of changing the Realm locally.
     ///
     /// This will also be called once for each Realm which already exists locally
-    /// on disk when the notifier is started, even if there are no changes.
+    /// on disk when the notifier is started, even if there are no m_changes.
     ///
     /// \param new_realm The Realm which changed, with the changes applied.
     /// `modifications_new` and `insertions` within the change sets are indices
