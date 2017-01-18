@@ -26,6 +26,7 @@
 #include <utility>
 
 #include <realm/util/features.h>
+#include <realm/utilities.hpp>
 #include <realm/util/safe_int_ops.hpp>
 #include <memory>
 
