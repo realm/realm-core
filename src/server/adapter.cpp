@@ -28,13 +28,18 @@ using namespace realm;
 
 class InstructionHander {
 public:
-    InstructionHander(Group &group) 
-    : m_group(group)
-    , m_schema(ObjectStore::schema_from_group(group)) {}
+    friend Adapter;
 
+    InstructionHander(SharedRealm realm)
+    : m_realm(realm)
+    , m_group(realm->read_group())
+    , m_schema(ObjectStore::schema_from_group(m_group))
+    , m_changes(realm) {}
+
+    SharedRealm m_realm;
     Group &m_group;
     Schema m_schema;
-    std::vector<Adapter::Instruction> parsed_instructions;
+    Adapter::ChangeSet m_changes;
     size_t selected_table;
     std::string selected_object_type;
     ObjectSchema *selected_object_schema = nullptr;
@@ -71,7 +76,7 @@ public:
     {
         auto object_type = ObjectStore::object_type_for_table_name(m_group.get_table_name(group_index));
         if (object_type.size()) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 Adapter::Instruction::Type::AddType,
                 object_type
             });
@@ -100,7 +105,7 @@ public:
     {
         REALM_ASSERT(n_rows == 1);
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 Adapter::Instruction::Type::Insert,
                 selected_object_type,
                 row_index
@@ -113,12 +118,12 @@ public:
         REALM_ASSERT(n_rows == 1);
         REALM_ASSERT(move_last_over);
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 Adapter::Instruction::Type::Delete,
                 selected_object_type,
                 row_index
             });
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 selected_object_type,
                 prior_num_rows-1,
                 "__ROW_ID",
@@ -141,7 +146,7 @@ public:
     bool clear_table()
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 Adapter::Instruction::Type::Clear,
                 selected_object_type
             });
@@ -151,7 +156,7 @@ public:
     bool set_int(size_t column_index, size_t row_index, int_fast64_t value, _impl::Instruction, size_t)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction(
+            m_changes.emplace_back(Adapter::Instruction(
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
@@ -169,7 +174,7 @@ public:
     bool set_bool(size_t column_index, size_t row_index, bool value, _impl::Instruction)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction(
+            m_changes.emplace_back(Adapter::Instruction(
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
@@ -182,7 +187,7 @@ public:
     bool set_float(size_t column_index, size_t row_index, float value, _impl::Instruction)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction(
+            m_changes.emplace_back(Adapter::Instruction(
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
@@ -195,7 +200,7 @@ public:
     bool set_double(size_t column_index, size_t row_index, double value, _impl::Instruction)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction(
+            m_changes.emplace_back(Adapter::Instruction(
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
@@ -208,12 +213,12 @@ public:
     bool set_string(size_t column_index, size_t row_index, StringData value, _impl::Instruction, size_t)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction(
+            m_changes.emplace_back(Adapter::Instruction(
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
                 false,
-                value
+                (std::string)value
             ));
         }
         return true;
@@ -221,7 +226,7 @@ public:
     bool set_binary(size_t column_index, size_t row_index, BinaryData value, _impl::Instruction)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction(
+            m_changes.emplace_back(Adapter::Instruction(
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
@@ -239,7 +244,7 @@ public:
     bool set_timestamp(size_t column_index, size_t row_index, Timestamp value, _impl::Instruction)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction(
+            m_changes.emplace_back(Adapter::Instruction(
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
@@ -262,7 +267,7 @@ public:
     bool set_link(size_t column_index, size_t row_index, size_t link_index, size_t, _impl::Instruction)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction(
+            m_changes.emplace_back(Adapter::Instruction(
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
@@ -275,7 +280,7 @@ public:
     bool set_null(size_t column_index, size_t row_index, _impl::Instruction, size_t)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction(
+            m_changes.emplace_back(Adapter::Instruction(
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
@@ -288,7 +293,7 @@ public:
     bool nullify_link(size_t column_index, size_t row_index, size_t)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction(
+            m_changes.emplace_back(Adapter::Instruction(
                 selected_object_type,
                 row_index,
                 selected_object_schema->persisted_properties[column_index].name,
@@ -317,7 +322,7 @@ public:
     bool insert_link_column(size_t, DataType data_type, StringData prop_name, size_t target_table_idx, size_t)
     {
         if (selected_descriptor_object_type.size()) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 selected_descriptor_object_type,
                 prop_name,
                 (PropertyType)data_type,
@@ -331,7 +336,7 @@ public:
     bool insert_column(size_t, DataType data_type, StringData prop_name, bool nullable)
     {
         if (selected_descriptor_object_type.size()) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 selected_descriptor_object_type,
                 prop_name,
                 (PropertyType)data_type,
@@ -379,7 +384,7 @@ public:
     bool link_list_set(size_t list_index, size_t value, size_t)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 Adapter::Instruction::Type::ListSet,
                 selected_object_type,
                 selected_list_row,
@@ -393,7 +398,7 @@ public:
     bool link_list_insert(size_t list_index, size_t value, size_t)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 Adapter::Instruction::Type::ListInsert,
                 selected_object_type,
                 selected_list_row,
@@ -407,7 +412,7 @@ public:
     bool link_list_move(size_t from_index, size_t to_index)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 Adapter::Instruction::Type::ListMove,
                 selected_object_type,
                 selected_list_row,
@@ -421,7 +426,7 @@ public:
     bool link_list_swap(size_t from_index, size_t to_index)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 Adapter::Instruction::Type::ListSwap,
                 selected_object_type,
                 selected_list_row,
@@ -435,7 +440,7 @@ public:
     bool link_list_erase(size_t list_index, size_t)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 Adapter::Instruction::Type::ListNullify,
                 selected_object_type,
                 selected_list_row,
@@ -449,7 +454,7 @@ public:
     bool link_list_nullify(size_t list_index, size_t)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 Adapter::Instruction::Type::ListNullify,
                 selected_object_type,
                 selected_list_row,
@@ -463,7 +468,7 @@ public:
     bool link_list_clear(size_t)
     {
         if (selected_object_schema) {
-            parsed_instructions.emplace_back(Adapter::Instruction{
+            m_changes.emplace_back(Adapter::Instruction{
                 Adapter::Instruction::Type::ListClear,
                 selected_object_type,
                 selected_list_row,
@@ -506,7 +511,7 @@ void Adapter::Callback::realm_changed(GlobalNotifier::ChangeNotification changes
     m_realm_changed(changes.realm_info);
 }
 
-Adapter::ChangeSet Adapter::current(std::string realm_path) {
+util::Optional<Adapter::ChangeSet> Adapter::current(std::string realm_path) {
     auto realm = Realm::make_shared_realm(m_global_notifier->get_config(realm_path));
     auto sync_history = static_cast<sync::SyncHistory *>(realm->history());
     auto progress = sync_history->get_cooked_progress();
@@ -518,12 +523,12 @@ Adapter::ChangeSet Adapter::current(std::string realm_path) {
         return util::none;
     }
 
-    InstructionHander handler(realm->read_group());
+    InstructionHander handler(realm);
     _impl::SimpleInputStream stream(buffer.data(), buffer.size());
     _impl::TransactLogParser parser;
     parser.parse(stream, handler);
 
-    return std::move(handler.parsed_instructions);
+    return std::move(handler.m_changes);
 }
 
 void Adapter::advance(std::string realm_path) {
