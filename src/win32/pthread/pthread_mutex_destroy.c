@@ -37,7 +37,9 @@
 #include "pthread.h"
 #include "implement.h"
 
-int getpid(void);
+#if REALM_UWP
+int _getpid(void);
+#endif
 
 int
 pthread_mutex_destroy (pthread_mutex_t * mutex)

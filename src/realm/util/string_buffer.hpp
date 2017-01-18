@@ -99,8 +99,6 @@ public:
 private:
     util::Buffer<char> m_buffer;
     size_t m_size; // Excluding the terminating zero
-    static char m_zero;
-
     void reallocate(size_t min_capacity);
 };
 
@@ -134,14 +132,16 @@ inline const char* StringBuffer::data() const noexcept
 
 inline char* StringBuffer::c_str() noexcept
 {
+	static char zero = 0;
     char* d = data();
-    return d ? d : &m_zero;
+    return d ? d : &zero;
 }
 
 inline const char* StringBuffer::c_str() const noexcept
 {
-    const char* d = data();
-    return d ? d : &m_zero;
+	static const char zero = 0;
+	const char* d = data();
+    return d ? d : &zero;
 }
 
 inline void StringBuffer::append(const std::string& s)
