@@ -121,7 +121,7 @@ public:
             parsed_instructions.emplace_back(Adapter::Instruction{
                 selected_object_type,
                 prior_num_rows-1,
-                "ID",
+                "__ROW_ID",
                 false,
                 (int64_t)row_index
             });
