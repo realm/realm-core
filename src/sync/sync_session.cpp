@@ -423,13 +423,15 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
     std::vector<std::function<void()>> invocations;
     {
         std::lock_guard<std::mutex> lock(m_progress_notifier_mutex);
-        m_current_uploadable = uploadable;
-        m_current_downloadable = downloadable;
-        m_current_downloaded = downloaded;
-        m_current_uploaded = uploaded;
+        m_current_progress = Progress{uploadable, downloadable, uploaded, downloaded};
+
         for (auto it = m_notifiers.begin(); it != m_notifiers.end();) {
+            auto& package = it->second;
+            package.update(*m_current_progress);
+
             bool should_delete = false;
-            invocations.emplace_back(create_notifier_invocation(it->second, should_delete));
+            invocations.emplace_back(package.create_invocation(*m_current_progress, should_delete));
+
             it = (should_delete ? m_notifiers.erase(it) : std::next(it));
         }
     }
@@ -439,21 +441,31 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
     }
 }
 
-// Create a notifier invocation.
-// Precondition: all four download/upload status member variables have been set to their most up-to-date values.
-std::function<void()> SyncSession::create_notifier_invocation(const NotifierPackage& package, bool& is_expired)
+void SyncSession::NotifierPackage::update(const Progress& current_progress)
 {
-    uint64_t transferred = (package.direction == NotifierType::download ? m_current_downloaded : m_current_uploaded);
+    if (is_streaming || captured_transferrable)
+        return;
+
+    captured_transferrable = direction == NotifierType::download ? current_progress.downloadable
+                                                                 : current_progress.uploadable;
+}
+
+std::function<void()> SyncSession::NotifierPackage::create_invocation(const Progress& current_progress, bool& is_expired) const
+{
+    REALM_ASSERT(is_streaming || captured_transferrable);
+
+    bool is_download = direction == NotifierType::download;
+    uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
     uint64_t transferrable;
-    if (package.is_streaming) {
-        transferrable = (package.direction == NotifierType::download ? m_current_downloadable : m_current_uploadable);
+    if (is_streaming) {
+        transferrable = is_download ? current_progress.downloadable : current_progress.uploadable;
     } else {
-        transferrable = package.captured_transferrable;
+        transferrable = *captured_transferrable;
     }
     // A notifier is expired if at least as many bytes have been transferred
     // as were originally considered transferrable.
-    is_expired = !package.is_streaming && transferred >= package.captured_transferrable;
-    return [=](){
+    is_expired = !is_streaming && transferred >= *captured_transferrable;
+    return [=, package=*this](){
         package.notifier(transferred, transferrable);
     };
 }
@@ -615,12 +627,15 @@ uint64_t SyncSession::register_progress_notifier(std::function<SyncProgressNotif
     {
         std::lock_guard<std::mutex> lock(m_progress_notifier_mutex);
         token_value = m_progress_notifier_token++;
-        auto current_transferrable = (direction == NotifierType::download
-                                      ? m_current_downloadable
-                                      : m_current_uploadable);
-        NotifierPackage package{std::move(notifier), is_streaming, direction, std::move(current_transferrable)};
+        NotifierPackage package{std::move(notifier), is_streaming, direction};
+        if (!m_current_progress) {
+            // Simply register the package, since we have no data yet.
+            m_notifiers.emplace(token_value, std::move(package));
+            return token_value;
+        }
+        package.update(*m_current_progress);
         bool skip_registration = false;
-        invocation = create_notifier_invocation(package, skip_registration);
+        invocation = package.create_invocation(*m_current_progress, skip_registration);
         if (skip_registration) {
             token_value = 0;
         } else {

@@ -261,7 +261,7 @@ TEST_CASE("sync: log-in", "[sync]") {
 
         EventLoop::main().perform([&] {
             session->wait_for_download_completion([](auto) {
-                fprintf(stderr, "Download completed.\n");
+                // Nothing to do here.
             });
         });
 
@@ -413,6 +413,13 @@ TEST_CASE("sync: progress notification", "[sync]") {
                                      [](auto, auto) { },
                                      SyncSessionStopPolicy::AfterChangesUploaded);
         EventLoop::main().run_until([&] { return session_is_active(*session); });
+        // Wait for uploads and downloads
+        std::atomic<bool> download_did_complete(false);
+        std::atomic<bool> upload_did_complete(false);
+        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
+        session->wait_for_upload_completion([&](auto) { upload_did_complete = true; });
+        EventLoop::main().run_until([&] { return download_did_complete.load() && upload_did_complete.load(); });
+
         REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);
 
@@ -431,13 +438,14 @@ TEST_CASE("sync: progress notification", "[sync]") {
         }
 
         SECTION("can register another notifier while in the initial notification without deadlock") {
+            std::atomic<uint64_t> counter(0);
             session->register_progress_notifier([&](auto, auto) {
-                callback_was_called = true;
+                counter++;
                 session->register_progress_notifier([&](auto, auto) {
-                    callback_was_called = true;
+                    counter++;
                 }, SyncSession::NotifierType::upload, false);
             }, SyncSession::NotifierType::download, false);
-            EventLoop::main().run_until([&] { return callback_was_called.load(); });
+            EventLoop::main().run_until([&] { return counter.load() == 2; });
         }
     }
 
@@ -448,17 +456,19 @@ TEST_CASE("sync: progress notification", "[sync]") {
                                      [](auto, auto) { },
                                      SyncSessionStopPolicy::AfterChangesUploaded);
         EventLoop::main().run_until([&] { return session_is_active(*session); });
+        // Wait for uploads and downloads
+        std::atomic<bool> download_did_complete(false);
+        std::atomic<bool> upload_did_complete(false);
+        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
+        session->wait_for_upload_completion([&](auto) { upload_did_complete = true; });
+        EventLoop::main().run_until([&] { return download_did_complete.load() && upload_did_complete.load(); });
+
         REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);
         std::atomic<uint64_t> transferred(0);
         std::atomic<uint64_t> transferrable(0);
         uint64_t current_transferred = 0;
         uint64_t current_transferrable = 0;
-        auto check_status = [&]() {
-            CHECK(callback_was_called.load());
-            CHECK(transferred.load() == current_transferred);
-            CHECK(transferrable.load() == current_transferrable);
-        };
 
         SECTION("for upload notifications") {
             session->register_progress_notifier([&](auto xferred, auto xferable) {
@@ -474,21 +484,27 @@ TEST_CASE("sync: progress notification", "[sync]") {
             current_transferred = 60;
             current_transferrable = 912;
             SyncSession::OnlyForTesting::handle_progress_update(*session, 25, 26, current_transferred, current_transferrable);
-            check_status();
+            CHECK(callback_was_called.load());
+            CHECK(transferred.load() == current_transferred);
+            CHECK(transferrable.load() == current_transferrable);
 
             // Second callback
             callback_was_called = false;
             current_transferred = 79;
             current_transferrable = 1021;
             SyncSession::OnlyForTesting::handle_progress_update(*session, 68, 191, current_transferred, current_transferrable);
-            check_status();
+            CHECK(callback_was_called.load());
+            CHECK(transferred.load() == current_transferred);
+            CHECK(transferrable.load() == current_transferrable);
 
             // Third callback
             callback_was_called = false;
             current_transferred = 150;
             current_transferrable = 1228;
             SyncSession::OnlyForTesting::handle_progress_update(*session, 199, 591, current_transferred, current_transferrable);
-            check_status();
+            CHECK(callback_was_called.load());
+            CHECK(transferred.load() == current_transferred);
+            CHECK(transferrable.load() == current_transferrable);
         }
 
         SECTION("for download notifications") {
@@ -505,21 +521,27 @@ TEST_CASE("sync: progress notification", "[sync]") {
             current_transferred = 60;
             current_transferrable = 912;
             SyncSession::OnlyForTesting::handle_progress_update(*session, current_transferred, current_transferrable, 25, 26);
-            check_status();
+            CHECK(callback_was_called.load());
+            CHECK(transferred.load() == current_transferred);
+            CHECK(transferrable.load() == current_transferrable);
 
             // Second callback
             callback_was_called = false;
             current_transferred = 79;
             current_transferrable = 1021;
             SyncSession::OnlyForTesting::handle_progress_update(*session, current_transferred, current_transferrable, 68, 191);
-            check_status();
+            CHECK(callback_was_called.load());
+            CHECK(transferred.load() == current_transferred);
+            CHECK(transferrable.load() == current_transferrable);
 
             // Third callback
             callback_was_called = false;
             current_transferred = 150;
             current_transferrable = 1228;
             SyncSession::OnlyForTesting::handle_progress_update(*session, current_transferred, current_transferrable, 199, 591);
-            check_status();
+            CHECK(callback_was_called.load());
+            CHECK(transferred.load() == current_transferred);
+            CHECK(transferrable.load() == current_transferrable);
         }
 
         SECTION("token unregistration works") {
@@ -536,7 +558,9 @@ TEST_CASE("sync: progress notification", "[sync]") {
             current_transferred = 60;
             current_transferrable = 912;
             SyncSession::OnlyForTesting::handle_progress_update(*session, current_transferred, current_transferrable, 25, 26);
-            check_status();
+            CHECK(callback_was_called.load());
+            CHECK(transferred.load() == current_transferred);
+            CHECK(transferrable.load() == current_transferrable);
 
             // Unregister
             session->unregister_progress_notifier(token);
@@ -606,17 +630,19 @@ TEST_CASE("sync: progress notification", "[sync]") {
                                      [](auto, auto) { },
                                      SyncSessionStopPolicy::AfterChangesUploaded);
         EventLoop::main().run_until([&] { return session_is_active(*session); });
+        // Wait for uploads and downloads
+        std::atomic<bool> download_did_complete(false);
+        std::atomic<bool> upload_did_complete(false);
+        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
+        session->wait_for_upload_completion([&](auto) { upload_did_complete = true; });
+        EventLoop::main().run_until([&] { return download_did_complete.load() && upload_did_complete.load(); });
+
         REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);
         std::atomic<uint64_t> transferred(0);
         std::atomic<uint64_t> transferrable(0);
         uint64_t current_transferred = 0;
         uint64_t current_transferrable = 0;
-        auto check_status = [&](uint64_t original_transferrable) {
-            CHECK(callback_was_called.load());
-            CHECK(transferred.load() == current_transferred);
-            CHECK(transferrable.load() == original_transferrable);
-        };
 
         SECTION("for upload notifications") {
             // Prime the progress updater
@@ -638,14 +664,18 @@ TEST_CASE("sync: progress notification", "[sync]") {
             current_transferred = 66;
             current_transferrable = 582;
             SyncSession::OnlyForTesting::handle_progress_update(*session, 25, 26, current_transferred, current_transferrable);
-            check_status(original_transferrable);
+            CHECK(callback_was_called.load());
+            CHECK(transferred.load() == current_transferred);
+            CHECK(transferrable.load() == original_transferrable);
 
             // Second callback
             callback_was_called = false;
             current_transferred = original_transferrable + 100;
             current_transferrable = 1021;
             SyncSession::OnlyForTesting::handle_progress_update(*session, 68, 191, current_transferred, current_transferrable);
-            check_status(original_transferrable);
+            CHECK(callback_was_called.load());
+            CHECK(transferred.load() == current_transferred);
+            CHECK(transferrable.load() == original_transferrable);
 
             // The notifier should be unregistered at this point, and not fire.
             callback_was_called = false;
@@ -675,14 +705,18 @@ TEST_CASE("sync: progress notification", "[sync]") {
             current_transferred = 66;
             current_transferrable = 582;
             SyncSession::OnlyForTesting::handle_progress_update(*session, current_transferred, current_transferrable, 25, 26);
-            check_status(original_transferrable);
+            CHECK(callback_was_called.load());
+            CHECK(transferred.load() == current_transferred);
+            CHECK(transferrable.load() == original_transferrable);
 
             // Second callback
             callback_was_called = false;
             current_transferred = original_transferrable + 100;
             current_transferrable = 1021;
             SyncSession::OnlyForTesting::handle_progress_update(*session, current_transferred, current_transferrable, 68, 191);
-            check_status(original_transferrable);
+            CHECK(callback_was_called.load());
+            CHECK(transferred.load() == current_transferred);
+            CHECK(transferrable.load() == original_transferrable);
 
             // The notifier should be unregistered at this point, and not fire.
             callback_was_called = false;
@@ -712,7 +746,9 @@ TEST_CASE("sync: progress notification", "[sync]") {
             current_transferred = 66;
             current_transferrable = 912;
             SyncSession::OnlyForTesting::handle_progress_update(*session, 25, 26, current_transferred, current_transferrable);
-            check_status(original_transferrable);
+            CHECK(callback_was_called.load());
+            CHECK(transferred.load() == current_transferred);
+            CHECK(transferrable.load() == original_transferrable);
 
             // Unregister
             session->unregister_progress_notifier(token);
