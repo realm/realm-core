@@ -50,7 +50,7 @@ public:
 
     // Make sure that memory in the specified range is synchronized with any
     // changes made globally visible through call to write_barrier
-    void read_barrier(const void* addr, size_t size, UniqueLock& lock, Header_to_size header_to_size);
+    void read_barrier(const void* addr, size_t size, Header_to_size header_to_size);
 
     // Ensures that any changes made to memory in the specified range
     // becomes visible to any later calls to read_barrier()
@@ -96,7 +96,7 @@ private:
 };
 
 
-inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, UniqueLock& lock,
+inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size,
                                                Header_to_size header_to_size)
 {
     size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) >> m_page_shift;
@@ -104,8 +104,6 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Un
 
     // make sure the first page is available
     if (!m_up_to_date_pages[first_idx]) {
-        if (!lock.holds_lock())
-            lock.lock();
         refresh_page(first_idx);
     }
 
@@ -120,8 +118,6 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Un
 
     for (size_t idx = first_idx + 1; idx <= last_idx; ++idx) {
         if (!m_up_to_date_pages[idx]) {
-            if (!lock.holds_lock())
-                lock.lock();
             refresh_page(idx);
         }
     }
