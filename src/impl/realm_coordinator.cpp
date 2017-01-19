@@ -599,6 +599,20 @@ void RealmCoordinator::run_async_notifiers()
         for (auto& notifier : new_notifiers) {
             notifier->detach();
         }
+
+        // We want to advance the non-new notifiers to the same version as the
+        // new notifiers to avoid having to merge changes from any new
+        // transaction that happen immediately after this into the new notifier
+        // changes
+        version = m_advancer_sg->get_version_of_current_transaction();
+        m_advancer_sg->end_read();
+    }
+    else {
+        // If we have no new notifiers we want to just advance to the latest
+        // version, but we have to pick a "latest" version while holding the
+        // notifier lock to avoid advancing over a transaction which should be
+        // skipped
+        m_advancer_sg->begin_read();
         version = m_advancer_sg->get_version_of_current_transaction();
         m_advancer_sg->end_read();
     }
