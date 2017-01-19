@@ -70,7 +70,9 @@ const uint16_t relaxed_sync_threshold = 50;
 //         changing `daemon_started` and `daemon_ready` from 1-bit to 8-bit
 //         fields.
 // 8       Placing the commitlog history inside the Realm file.
-const uint_fast16_t g_shared_info_version = 8;
+// 9       Fair write transactions requires an additional condition variable,
+//         `write_fairness`
+const uint_fast16_t g_shared_info_version = 9;
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -495,6 +497,9 @@ struct alignas(8) SharedGroup::SharedInfo {
     InterprocessCondVar::SharedPart work_to_do;
     InterprocessCondVar::SharedPart daemon_becomes_ready;
     InterprocessCondVar::SharedPart new_commit_available;
+    InterprocessCondVar::SharedPart pick_next_writer;
+    std::atomic<uint32_t> next_ticket;
+    uint32_t next_served = 0;
 #endif
 
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
@@ -537,6 +542,8 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
     history_type = ht;
 #ifndef _WIN32
     InterprocessCondVar::init_shared_part(new_commit_available); // Throws
+    InterprocessCondVar::init_shared_part(pick_next_writer); // Throws
+    next_ticket = 0;
 #ifdef REALM_ASYNC_DAEMON
     InterprocessCondVar::init_shared_part(room_to_write);        // Throws
     InterprocessCondVar::init_shared_part(work_to_do);           // Throws
@@ -1047,6 +1054,8 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 #ifndef _WIN32
             m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit",
                                                    options.temp_dir);
+            m_pick_next_writer.set_shared_part(info->pick_next_writer, m_lockfile_prefix, "pick_writer",
+                                                   options.temp_dir);
 #ifdef REALM_ASYNC_DAEMON
             m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix, "daemon_ready",
                                                    options.temp_dir);
@@ -1272,6 +1281,7 @@ void SharedGroup::close() noexcept
     m_daemon_becomes_ready.close();
 #endif
     m_new_commit_available.close();
+    m_pick_next_writer.close();
 #endif
     // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another thread may
     // interleave which is not permitted on Windows. It is permitted on *nix.
@@ -1709,10 +1719,17 @@ void SharedGroup::do_end_read() noexcept
 void SharedGroup::do_begin_write()
 {
     SharedInfo* info = m_file_map.get_addr();
-    // Get write lock
-    // Note that this will not get released until we call
-    // commit() or rollback()
+    // Get write lock - the write lock is held until do_end_write().
+    // 
+    // We use a ticketing scheme to ensure fairness wrt performing write transactions.
+    // (But cannot do that on Windows until we have interprocess condition variables there)
+#ifndef _WIN32
+    uint_fast32_t my_ticket = info->next_ticket.fetch_add(1, std::memory_order_relaxed);
+#endif
     m_writemutex.lock(); // Throws
+#ifndef _WIN32
+    while (my_ticket != info->next_served) m_pick_next_writer.wait(m_writemutex, nullptr);
+#endif
 
     if (info->commit_in_critical_phase) {
         m_writemutex.unlock();
@@ -1735,12 +1752,17 @@ void SharedGroup::do_begin_write()
         info->free_write_slots--;
         m_balancemutex.unlock();
     }
-#endif // _WIN32
+#endif // REALM_ASYNC_DAEMON
 }
 
 
 void SharedGroup::do_end_write() noexcept
 {
+#ifndef _WIN32
+    SharedInfo* info = m_file_map.get_addr();
+    info->next_served++;
+    m_pick_next_writer.notify_all();
+#endif
     m_writemutex.unlock();
 }
 

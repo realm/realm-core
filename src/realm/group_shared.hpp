@@ -555,6 +555,7 @@ private:
     util::InterprocessCondVar m_daemon_becomes_ready;
 #endif
     util::InterprocessCondVar m_new_commit_available;
+    util::InterprocessCondVar m_pick_next_writer;
 #endif
     std::function<void(int, int)> m_upgrade_callback;
 

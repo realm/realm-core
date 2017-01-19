@@ -3,10 +3,15 @@
 ### Bugfixes
 
 * Fixed a few bugs (caused crashes) in pthread library on UWP.
+* Possibly fixed some cases of extreme file size growth, by preventing starvation
+  when trying to start a write transaction, while simultaneously pinning an older
+  version. (issue #2395)
 
 ### Breaking changes
 
 * The table macros, supporting the typed interface, has been removed
+* Layout and version change for the .lock file required in order to prevent
+  starvation when waiting to start a write transaction (see above).
 
 ### Enhancements
 
