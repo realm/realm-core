@@ -131,6 +131,7 @@ public:
                 false,
                 (size_t)row_index
             });
+            // FIXME - query backlinks and update
         }
         return true;
     }
