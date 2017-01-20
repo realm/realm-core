@@ -237,7 +237,8 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
     // It's uncertain if this is allowed by the C++ standard. For details, see
     // http://stackoverflow.com/questions/19120779/is-char-p-0-stdequalp-p-p-well-defined-according-to-the-c-standard.
     // So we use a safe C++14 method instead that takes two range pairs.
-    return std::equal(first1, last1, first2, first2 + (last1 - first1));
+    size_t len = last1 - first1;
+    return std::equal(first1, last1, first2, first2 + len);
 #else
     return std::equal(first1, last1, first2);
 #endif
