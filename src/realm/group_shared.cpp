@@ -1728,7 +1728,29 @@ void SharedGroup::do_begin_write()
 #endif
     m_writemutex.lock(); // Throws
 #ifndef _WIN32
-    while (my_ticket != info->next_served) m_pick_next_writer.wait(m_writemutex, nullptr);
+    // allow for comparison even after wrap around of ticket numbering:
+    int32_t diff = int32_t(my_ticket - info->next_served);
+    bool should_yield = diff > 0; // ticket is in the future
+    if (should_yield) {
+        timespec ts;
+        timeval tv;
+        gettimeofday(&tv, nullptr);
+        ts.tv_sec = tv.tv_sec;
+        ts.tv_nsec = tv.tv_usec * 1000;
+        ts.tv_nsec += 500000000;        // 500 msec wait
+        if (ts.tv_nsec >= 1000000000) { // overflow
+            ts.tv_nsec -= 1000000000;
+            ts.tv_sec += 1;
+        }
+        m_pick_next_writer.wait(m_writemutex, &ts);
+    }
+    // we may get here because a) it's our turn, b) we timed out, c) spurious return
+    // we don't distinguish, satisfied that events b) and c) should be rare.
+    // In any case, we have to *make* it our turn. Failure to do so could leave us
+    // with 'next_served' permanently trailing 'next_ticket'. In doing so, we may
+    // bypass other waiters, hence the condition for waiting should take this situation
+    // into account by comparing with '>' instead of '!='
+    info->next_served = my_ticket;
 #endif
 
     if (info->commit_in_critical_phase) {
