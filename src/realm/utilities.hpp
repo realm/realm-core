@@ -227,7 +227,7 @@ struct is_any<T, U, Ts...> : is_any<T, Ts...> {
 };
 
 
-// Use safe_equal() instead of std::equal() if one of the parameters can be a null pointer.
+// Use realm::safe_equal() instead of std::equal() if one of the parameters can be a null pointer.
 template <class InputIterator1, class InputIterator2>
 bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 first2)
 {
@@ -243,13 +243,13 @@ bool safe_equal(InputIterator1 first1, InputIterator1 last1, InputIterator2 firs
 #endif
 }
 
-// Use safe_copy_n() instead of realm::safe_copy_n() if one of the parameters can be a null pointer.
+// Use realm::safe_copy_n() instead of std::copy_n() if one of the parameters can be a null pointer. See the
+// explanation of safe_equal() above; same things apply.
 template< class InputIt, class Size, class OutputIt>
 OutputIt safe_copy_n(InputIt first, Size count, OutputIt result)
 {
 #if defined(_MSC_VER)
-    // Windows has a special check in debug mode against passing a null pointer std::equal().
-    // It's uncertain if this is allowed by the C++ standard. This loop and the method prototype is copy pasted
+    // This loop and the method prototype is copy pasted
     // from "Possible implementation" on http://en.cppreference.com/w/cpp/algorithm/copy_n
     if (count > 0) {
         *result++ = *first;
