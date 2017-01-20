@@ -486,8 +486,7 @@ size_t GroupWriter::get_free_space() {
     if (m_free_lengths.is_attached()) {
         size_t sum = 0;
         for (size_t j = 0; j < m_free_lengths.size(); ++j) {
-            int64_t l = m_free_lengths.get(j);
-            REALM_ASSERT_EX(l >= 0, l);
+            int64_t l = to_size_t(m_free_lengths.get(j));
             sum += static_cast<size_t>(l);
         }
         return sum;
