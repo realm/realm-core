@@ -111,6 +111,8 @@ public:
     util::Optional<ChangeSet> current(std::string realm_path);
     void advance(std::string realm_path);
 
+    SharedRealm realm_at_path(std::string path);
+
 private:
     std::shared_ptr<GlobalNotifier> m_global_notifier;
 

@@ -557,3 +557,7 @@ void Adapter::advance(std::string realm_path) {
     
     realm->invalidate();
 }
+
+SharedRealm Adapter::realm_at_path(std::string path) {
+    return Realm::make_shared_realm(m_global_notifier->get_config(path));
+}
