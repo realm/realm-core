@@ -26,11 +26,14 @@
 #include "array.hpp"
 #include "snapshot_impl.hpp"
 
+using _String = _List<char>;
+
 union ArrayReps {
     _Array<uint64_t> as_u;
     _Array<int64_t> as_i;
     _Array<float> as_f;
     _Array<double> as_d;
+    _Array<_String> as_s;
     _Array<_List<uint64_t>> as_U;
     _Array<_List<int64_t>> as_I;
     _Array<_List<float>> as_F;
@@ -42,6 +45,7 @@ template<> uint64_t get<uint64_t>(Memory& mem, ArrayReps& ar, int index) { retur
 template<> int64_t get<int64_t>(Memory& mem, ArrayReps& ar, int index) { return ar.as_i.get(mem, index); }
 template<> float get<float>(Memory& mem, ArrayReps& ar, int index) { return ar.as_f.get(mem, index); }
 template<> double get<double>(Memory& mem, ArrayReps& ar, int index) { return ar.as_d.get(mem, index); }
+template<> _String get<_String>(Memory& mem, ArrayReps& ar, int index) { return ar.as_s.get(mem, index); }
 template<> _List<uint64_t> get<_List<uint64_t>>(Memory& mem, ArrayReps& ar, int index) { 
     return ar.as_U.get(mem, index); 
 }
@@ -60,6 +64,7 @@ template<> void set(Memory& mem, ArrayReps& ar, int index, uint64_t val) { ar.as
 template<> void set(Memory& mem, ArrayReps& ar, int index, int64_t val) { ar.as_i.set(mem, index, val); }
 template<> void set(Memory& mem, ArrayReps& ar, int index, float val) { ar.as_f.set(mem, index, val); }
 template<> void set(Memory& mem, ArrayReps& ar, int index, double val) { ar.as_d.set(mem, index, val); }
+template<> void set(Memory& mem, ArrayReps& ar, int index, _String val) { ar.as_s.set(mem, index, val); }
 template<> void set(Memory& mem, ArrayReps& ar, int index, _List<uint64_t> val) { ar.as_U.set(mem, index, val); }
 template<> void set(Memory& mem, ArrayReps& ar, int index, _List<int64_t> val) { ar.as_I.set(mem, index, val); }
 template<> void set(Memory& mem, ArrayReps& ar, int index, _List<float> val) { ar.as_F.set(mem, index, val); }
@@ -70,6 +75,7 @@ union Reps {
     int64_t as_i;
     float as_f;
     double as_d;
+    _String as_s;
     _List<uint64_t> as_U;
     _List<int64_t> as_I;
     _List<float> as_F;
@@ -112,6 +118,9 @@ void ClusterMgr::free(Ref<DynType> payload, int capacity) {
                 case 'i': cluster_ptr->entries[j].as_i.free(mem); break;
                 case 'f': cluster_ptr->entries[j].as_f.free(mem); break;
                 case 'd': cluster_ptr->entries[j].as_d.free(mem); break;
+                case 's': cluster_ptr->entries[j].as_s.free(mem); break;
+                case 'T':
+                case 'R':
                 case 'U': cluster_ptr->entries[j].as_U.free(mem); break;
                 case 'I': cluster_ptr->entries[j].as_I.free(mem); break;
                 case 'F': cluster_ptr->entries[j].as_F.free(mem); break;
@@ -153,6 +162,9 @@ Ref<DynType> ClusterMgr::commit(Ref<DynType> from) {
                 case 'i': to_ptr->entries[k].as_i = _Array<int64_t>::commit(mem, from_ptr->entries[k].as_i); break;
                 case 'f': to_ptr->entries[k].as_f = _Array<float>::commit(mem, from_ptr->entries[k].as_f); break;
                 case 'd': to_ptr->entries[k].as_d = _Array<double>::commit(mem, from_ptr->entries[k].as_d); break;
+                case 's': to_ptr->entries[k].as_s = _Array<_String>::commit(mem, from_ptr->entries[k].as_s); break;
+                case 'T':
+                case 'R':
                 case 'U': to_ptr->entries[k].as_U = _Array<_List<uint64_t>>::commit(mem, from_ptr->entries[k].as_U); 
                     break;
                 case 'I': to_ptr->entries[k].as_I = _Array<_List<int64_t>>::commit(mem, from_ptr->entries[k].as_I); 
@@ -181,6 +193,9 @@ void ClusterMgr::read_internalbuffer(Ref<DynType> payload, int index) {
             case 'i': values[col].as_i = p_ptr->entries[col].as_i.get(mem, index); break;
             case 'f': values[col].as_f = p_ptr->entries[col].as_f.get(mem, index); break;
             case 'd': values[col].as_d = p_ptr->entries[col].as_d.get(mem, index); break;
+            case 's': values[col].as_s = p_ptr->entries[col].as_s.get(mem, index); break;
+            case 'T':
+            case 'R':
             case 'U': values[col].as_U = p_ptr->entries[col].as_U.get(mem, index); break;
             case 'I': values[col].as_I = p_ptr->entries[col].as_I.get(mem, index); break;
             case 'F': values[col].as_F = p_ptr->entries[col].as_F.get(mem, index); break;
@@ -202,6 +217,9 @@ void ClusterMgr::write_internalbuffer(Ref<DynType>& payload, int index) {
             case 'i': p_ptr->entries[col].as_i.set(mem, index, values[col].as_i); break;
             case 'f': p_ptr->entries[col].as_f.set(mem, index, values[col].as_f); break;
             case 'd': p_ptr->entries[col].as_d.set(mem, index, values[col].as_d); break;
+            case 's': p_ptr->entries[col].as_s.set(mem, index, values[col].as_s); break;
+            case 'T':
+            case 'R':
             case 'U': p_ptr->entries[col].as_U.set(mem, index, values[col].as_U); break;
             case 'I': p_ptr->entries[col].as_I.set(mem, index, values[col].as_I); break;
             case 'F': p_ptr->entries[col].as_F.set(mem, index, values[col].as_F); break;
@@ -247,6 +265,15 @@ void ClusterMgr::swap_internalbuffer(Ref<DynType>& payload, int index) {
                 values[col].as_d = tmp;
                 break;
             }
+            case 's': {
+                _Array<_String>& array = p_ptr->entries[col].as_s;
+                _String tmp = array.get(mem, index);
+                p_ptr->entries[col].as_s.set(mem, index, values[col].as_s);
+                values[col].as_s = tmp;
+                break;
+            }
+            case 'T':
+            case 'R':
             case 'U': {
                 _Array<_List<uint64_t>>& array = p_ptr->entries[col].as_U;
                 _List<uint64_t> tmp = array.get(mem, index);
@@ -389,6 +416,25 @@ void Object::set<Row>(Field<Row> f, Row value) {
     ::set<uint64_t>(mem, cluster->entries[f.key], index, value.key);
 }
 
+void Object::set(Field<String> f, std::string value) {
+    Memory& mem = ss->change(this);
+    _String s = ::get<_String>(mem, cluster->entries[f.key], index);
+    uint64_t limit = value.size();
+    s.set_size(mem, limit);
+    for (uint64_t k = 0; k < limit; ++k) s.set(mem, k, value[k]);
+    ::set<_String>(mem, cluster->entries[f.key], index, s);
+}
+
+std::string Object::operator()(Field<String> f) {
+    Memory& mem = ss->refresh(this);
+    _String s = ::get<_String>(mem, cluster->entries[f.key], index);
+    std::string res;
+    uint64_t limit = s.get_size();
+    res.reserve(limit);
+    for (uint64_t k = 0; k < limit; ++k) res.push_back(s.get(mem, k));
+    return res;
+}
+
 template<typename T>
 T Object::operator()(Field<T> f) {
     Memory& mem = ss->refresh(this);
@@ -416,6 +462,26 @@ ListAccessor<T> Object::operator()(Field<List<T>> f) {
     ListAccessor<T> res;
     res.o = *this;
     res.f = f;
+    return res;
+}
+
+template<>
+ListAccessor<Table> Object::operator()(Field<List<Table>> f) {
+    ListAccessor<Table> res;
+    Field<List<uint64_t>> f2;
+    f2.key = f.key;
+    res.list.o = *this;
+    res.list.f = f2;
+    return res;
+}
+
+template<>
+ListAccessor<Row> Object::operator()(Field<List<Row>> f) {
+    ListAccessor<Row> res;
+    Field<List<uint64_t>> f2;
+    f2.key = f.key;
+    res.list.o = *this;
+    res.list.f = f2;
     return res;
 }
 
@@ -469,8 +535,12 @@ template ListAccessor<uint64_t> Object::operator()<uint64_t>(Field<List<uint64_t
 template ListAccessor<int64_t> Object::operator()<int64_t>(Field<List<int64_t>>);
 template ListAccessor<float> Object::operator()<float>(Field<List<float>>);
 template ListAccessor<double> Object::operator()<double>(Field<List<double>>);
+template ListAccessor<Table> Object::operator()<Table>(Field<List<Table>>);
+template ListAccessor<Row> Object::operator()<Row>(Field<List<Row>>);
 
 template class ListAccessor<uint64_t>;
 template class ListAccessor<int64_t>;
 template class ListAccessor<float>;
 template class ListAccessor<double>;
+template class ListAccessor<Table>;
+template class ListAccessor<Row>;

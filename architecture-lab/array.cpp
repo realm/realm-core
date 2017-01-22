@@ -51,6 +51,10 @@ inline int Encoding<double>::get_encoding_size(double) {
     return 6;
 }
 
+template<>
+inline int Encoding<char>::get_encoding_size(char) {
+    return 3;
+}
 
 template<typename T>
 _Array<T> _Array<T>::commit(Memory& mem, _Array<T> from) {
@@ -61,8 +65,10 @@ _Array<T> _Array<T>::commit(Memory& mem, _Array<T> from) {
         uint64_t* to_ptr;
         Ref<uint64_t> to = mem.alloc_in_file<uint64_t>(to_ptr, 8 * quads);
         uint64_t* from_ptr = mem.txl(from_ref);
-        for (int j=0; j<quads; ++j)
-            to_ptr[j] = from_ptr[j]; // TODO: forwarding for list members
+        for (int j=0; j<quads; ++j) {
+            to_ptr[j] = from_ptr[j];
+            Encoding<T>::commit_from_quad(mem, to_ptr[j]);
+        }
         _Array<T> result = from;
         mem.free(from_ref);
         result.set_ref(to);
@@ -70,6 +76,14 @@ _Array<T> _Array<T>::commit(Memory& mem, _Array<T> from) {
     }
     return from;
 }
+
+template<typename T>
+void Encoding<_List<T>>::commit_from_quad(Memory& mem, uint64_t& quad) {
+    _List<T> list = decode(quad);
+    list.array = _Array<T>::commit(mem, list.array);
+    quad = encode(list);
+}
+
 
 template<typename T>
 void ensure_storage(Memory& mem, _Array<T>& a, int index, int e_sz) {
@@ -170,12 +184,15 @@ template class _Array<uint64_t>;
 template class _Array<int64_t>;
 template class _Array<float>;
 template class _Array<double>;
+template class _Array<char>;
 template class _Array<_List<uint64_t>>;
 template class _Array<_List<int64_t>>;
 template class _Array<_List<float>>;
 template class _Array<_List<double>>;
+template class _Array<_List<char>>;
 
 template class _List<uint64_t>;
 template class _List<int64_t>;
 template class _List<float>;
 template class _List<double>;
+template class _List<char>;

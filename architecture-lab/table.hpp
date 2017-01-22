@@ -98,6 +98,12 @@ inline void _Table::check_field<Row>(int col) const {
 }
 
 template<>
+inline void _Table::check_field<String>(int col) const {
+    if (typeinfo[col] != 's')
+        throw std::runtime_error("Wrong field type");
+}
+
+template<>
 inline void _Table::check_field<List<uint64_t>>(int col) const {
     if (typeinfo[col] != 'U')
         throw std::runtime_error("Wrong field type");
@@ -118,6 +124,18 @@ inline void _Table::check_field<List<float>>(int col) const {
 template<>
 inline void _Table::check_field<List<double>>(int col) const {
     if (typeinfo[col] != 'D')
+        throw std::runtime_error("Wrong field type");
+}
+
+template<>
+inline void _Table::check_field<List<Table>>(int col) const {
+    if (typeinfo[col] != 'T')
+        throw std::runtime_error("Wrong field type");
+}
+
+template<>
+inline void _Table::check_field<List<Row>>(int col) const {
+    if (typeinfo[col] != 'R')
         throw std::runtime_error("Wrong field type");
 }
 

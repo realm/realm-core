@@ -26,8 +26,8 @@
 #include "db.hpp"
 
 int main(int argc, char* argv[]) {
-    const int limit = 3000000;
-    const char* fields = "uifdtruuuuU";
+    const int limit = 30000;
+    const char* fields = "uifdtruuuuUTs";
 
     Db& db = Db::create("testing.core2");
 
@@ -45,6 +45,8 @@ int main(int argc, char* argv[]) {
     Field<uint64_t> field_x2 = ss.get_field<uint64_t>(t,8);
     Field<uint64_t> field_x3 = ss.get_field<uint64_t>(t,9);
     Field<List<uint64_t>> field_y = ss.get_field<List<uint64_t>>(t,10);
+    Field<List<Table>> field_t = ss.get_field<List<Table>>(t,11);
+    Field<String> field_s = ss.get_field<String>(t,12);
 
     std::cout << "inserting " << limit << " keys..." << std::flush;
     start = std::chrono::high_resolution_clock::now();
@@ -67,6 +69,12 @@ int main(int argc, char* argv[]) {
     assert(list_sz == 10);
     for (unsigned j=0; j<10; ++j) la.wr(j, j*j+j);
     for (unsigned j=0; j<10; ++j) assert(la.rd(j) == j*j+j);
+    ListAccessor<Table> ta = o(field_t);
+    ta.set_size(1);
+    ta.wr(0, t);
+    o.set(field_s, "dette er en streng");
+    std::string s = o(field_s);
+    assert(s == "dette er en streng");
 
     std::cout << "validating " << limit << " keys not present..." << std::flush;
     start = std::chrono::high_resolution_clock::now();
@@ -206,6 +214,15 @@ int main(int argc, char* argv[]) {
     std::cout << "   ...done in " << ms.count() << " msecs" << std::endl << std::endl;
 
     const Snapshot& s2 = db.open_snapshot();
+    {
+        Object o = s2.get(t, {2});
+        ListAccessor<uint64_t> la = o(field_y);
+        uint64_t list_sz = la.get_size();
+        assert(list_sz == 10);
+        for (unsigned j=0; j<10; ++j) assert(la.rd(j) == j*j+j);
+        std::string s = o(field_s);
+        assert(s == "dette er en streng");
+    }
     std::cout << "checking values (after commit, from file) for " << limit << " keys..." << std::flush;
     start = std::chrono::high_resolution_clock::now();
     for (uint64_t key = 0; key < limit; key++) {
@@ -217,6 +234,15 @@ int main(int argc, char* argv[]) {
     db.release(std::move(s2));
 
     Snapshot& s3 = db.create_changes();
+    {
+        Object o = s3.get(t, {2});
+        ListAccessor<uint64_t> la = o(field_y);
+        uint64_t list_sz = la.get_size();
+        assert(list_sz == 10);
+        for (unsigned j=0; j<10; ++j) assert(la.rd(j) == j*j+j);
+        for (unsigned j=0; j<10; ++j) la.wr(j, j*j-j);
+        for (unsigned j=0; j<10; ++j) assert(la.rd(j) == j*j-j);
+    }
     std::cout << "setting values for " << limit << " keys..." << std::flush;
     start = std::chrono::high_resolution_clock::now();
     for (uint64_t key = 0; key < limit; key++) {
@@ -235,6 +261,13 @@ int main(int argc, char* argv[]) {
     std::cout << "   ...done in " << ms.count() << " msecs" << std::endl << std::endl;
 
     const Snapshot& s4 = db.open_snapshot();
+    {
+        Object o = s4.get(t, {2});
+        ListAccessor<uint64_t> la = o(field_y);
+        uint64_t list_sz = la.get_size();
+        assert(list_sz == 10);
+        for (unsigned j=0; j<10; ++j) assert(la.rd(j) == j*j-j);
+    }
     std::cout << "checking values (after commit, from file) for " << limit << " keys..." << std::flush;
     start = std::chrono::high_resolution_clock::now();
     for (uint64_t key = 0; key < limit; key++) {

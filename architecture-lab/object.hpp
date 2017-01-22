@@ -19,6 +19,8 @@
 #ifndef __OBJECT_HPP__
 #define __OBJECT_HPP__
 
+#include <string>
+
 #include "uids.hpp"
 
 // fwd decls
@@ -30,6 +32,10 @@ struct _Table;
 
 // type used to indicate that a field is a list of T
 template<typename T> struct List {
+};
+
+// type used to indicate that a field is a string
+struct String {
 };
 
 // helper for accessing a list
@@ -44,6 +50,10 @@ struct Object {
 
     template<typename T>
     void set(Field<T> f, T value);
+
+    // overload for strings
+    void set(Field<String> f, std::string value);
+    std::string operator()(Field<String> f);
 
     // lists
     template<typename T>
@@ -88,5 +98,25 @@ struct ListAccessor {
     template<typename TFunc>
     void for_each(uint64_t first, uint64_t limit, TFunc func);
 };
+
+// specializations for Table and Row fields
+template<>
+struct ListAccessor<Table> {
+    ListAccessor<uint64_t> list;
+    uint64_t get_size() { return list.get_size(); }
+    void set_size(uint64_t new_size) { list.set_size(new_size); }
+    Table rd(uint64_t index) { Table t; t.key = list.rd(index); return t; }
+    void wr(uint64_t index, Table value) { list.wr(index, value.key); }
+};
+
+template<>
+struct ListAccessor<Row> {
+    ListAccessor<uint64_t> list;
+    uint64_t get_size() { return list.get_size(); }
+    void set_size(uint64_t new_size) { list.set_size(new_size); }
+    Row rd(uint64_t index) { Row t; t.key = list.rd(index); return t; }
+    void wr(uint64_t index, Row value) { list.wr(index, value.key); }
+};
+
 
 #endif

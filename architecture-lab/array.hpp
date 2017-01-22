@@ -43,6 +43,7 @@ template<typename T> struct Encoding {
     static uint64_t set_in_quad(uint64_t quad, int esz, int index, T value);
     static uint64_t encode(T value) { return value; }
     static T decode(uint64_t enc) { return enc; }
+    static void commit_from_quad(Memory& mem, uint64_t& quad) {};
 };
 
 template<typename T>
@@ -83,6 +84,7 @@ struct _Array {
     }
     void free(Memory& mem) {
         if (!is_inlined()) {
+            // TODO: Handle freeing of individual elements of lists!
             mem.free(get_ref(), 8 * quads_required());
             set_data(0);
         }
@@ -146,6 +148,12 @@ inline double Encoding<double>::get_from_quad(uint64_t data, int sz, int index) 
     return static_cast<double>(v);
 }
 
+template<>
+inline char Encoding<char>::get_from_quad(uint64_t data, int sz, int index) {
+    assert(sz <= 3);
+    return Encoding<uint64_t>::get_from_quad(data, sz, index);
+}
+
 template<typename T>
 inline T _Array<T>::get(Memory& mem, int index) {
     if (is_all_zero()) return T(0);
@@ -168,6 +176,8 @@ struct _List { //: public _Array<T> { FIXME: better to use inheritance?
     void set(Memory& mem, uint64_t index, T value) { array.set(mem, index, value); }
 };
 
+
+
 // Specialization for all arrays with lists as elements: a list always requires a full quad.
 template<typename T> struct Encoding<_List<T>> {
     static _List<T> get_from_quad(uint64_t data, int sz, int index) { return decode(data); }
@@ -176,6 +186,7 @@ template<typename T> struct Encoding<_List<T>> {
     static uint64_t set_in_quad(uint64_t quad, int esz, int index, _List<T> value) { return encode(value); }
     static uint64_t encode(_List<T> value) { return value.array.data; }
     static _List<T> decode(uint64_t enc) { _List<T> res(0); res.array.data = enc; return res; }
+    static void commit_from_quad(Memory& mem, uint64_t& quad);
 };
 
 #endif

@@ -89,8 +89,13 @@ template Field<float> Snapshot::get_field<float>(Table, int) const;
 template Field<double> Snapshot::get_field<double>(Table, int) const;
 template Field<Table> Snapshot::get_field<Table>(Table, int) const;
 template Field<Row> Snapshot::get_field<Row>(Table, int) const;
+template Field<String> Snapshot::get_field<String>(Table, int) const;
 
 template Field<List<uint64_t>> Snapshot::get_field<List<uint64_t>>(Table, int) const;
+template Field<List<int64_t>> Snapshot::get_field<List<int64_t>>(Table, int) const;
+template Field<List<float>> Snapshot::get_field<List<float>>(Table, int) const;
+template Field<List<double>> Snapshot::get_field<List<double>>(Table, int) const;
+template Field<List<Table>> Snapshot::get_field<List<Table>>(Table, int) const;
 
 template<typename T>
 Field<T> SnapshotImpl::get_field(Table t, int number) const {
