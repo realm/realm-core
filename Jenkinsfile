@@ -1,5 +1,12 @@
 #!groovy
 
+@Library('realm-ci')
+
+node('docker') {
+    s3Download('static.realm.io', 'videos.json')
+}
+
+/*
 try {
   def gitTag
   def gitSha
@@ -650,3 +657,4 @@ def getSourceArchive() {
   sh 'git clean -ffdx -e .????????'
   sh 'git submodule update --init'
 }
+*/
