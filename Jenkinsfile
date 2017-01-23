@@ -3,5 +3,5 @@
 @Library('realm-ci') _
 
 node('docker') {
-    s3Download('static.realm.io', 'videos.json')
+    s3Download(bucket: 'static.realm.io', key: 'videos.json')
 }
