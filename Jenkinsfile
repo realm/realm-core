@@ -3,5 +3,7 @@
 @Library('realm-ci') _
 
 node('docker') {
-    s3Download(bucket: 'static.realm.io', key: 'videos.json')
+    deleteDir()
+    s3Get(bucket: 'static.realm.io', key: 'videos.json')
+    s3Put(source: 'videos.json', bucket: 'static.realm.io', key: 'videos.json.bak')
 }
