@@ -58,13 +58,6 @@ public:
 
     /// Guarantees that the returned string is zero terminated, that
     /// is, *(c_str()+size()) is zero. The caller may read from
-    /// *c_str() up to and including *(c_str()+size()), the caller may
-    /// write from *c_str() up to, but not including,
-    /// *(c_str()+size()).
-    char* c_str() noexcept;
-
-    /// Guarantees that the returned string is zero terminated, that
-    /// is, *(c_str()+size()) is zero. The caller may read from
     /// *c_str() up to and including *(c_str()+size()).
     const char* c_str() const noexcept;
 

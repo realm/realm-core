@@ -187,17 +187,19 @@ std::string make_temp_dir()
     return std::string(buffer2.c_str());
 #endif
 
+
 #else // POSIX.1-2008 version
 
-    StringBuffer buffer;
 #if REALM_ANDROID
-    buffer.append_c_str("/data/local/tmp/realm_XXXXXX");
+    char* buffer = "/data/local/tmp/realm_XXXXXX";
 #else
-    buffer.append_c_str(P_tmpdir "/realm_XXXXXX");
+	std::string tmp = std::string(P_tmpdir) + std::string("/realm_XXXXXX") + std::string("\0", 1);
+	char* buffer = new char[tmp.size()];
+	memcpy(buffer, tmp.c_str(), tmp.size());
 #endif
-    if (mkdtemp(buffer.c_str()) == 0)
+    if (mkdtemp(buffer) == 0)
         throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
-    return buffer.str();
+    return std::string(buffer);
 
 #endif
 }
