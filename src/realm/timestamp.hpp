@@ -21,7 +21,6 @@
 
 #include <cstdint>
 #include <ostream>
-#include <chrono>
 #include <realm/util/assert.hpp>
 
 namespace realm {
@@ -75,15 +74,6 @@ public:
     Timestamp(realm::null)
         : m_is_null(true)
     {
-    }
-    template <class T>
-    Timestamp(std::chrono::time_point<T> t)
-        : m_is_null(false)
-    {
-        auto time_since_epoc = t.time_since_epoch();
-        uint64_t nano_seconds = std::chrono::duration_cast<std::chrono::nanoseconds>(time_since_epoc).count();
-        m_seconds = nano_seconds / nanoseconds_per_second;
-        m_nanoseconds = nano_seconds % nanoseconds_per_second;
     }
     Timestamp()
         : Timestamp(null{})
