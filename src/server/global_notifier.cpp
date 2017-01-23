@@ -156,6 +156,7 @@ Realm::Config GlobalNotifier::get_config(std::string realm_path)
             m_transformer}
     );
     config.schema_mode = SchemaMode::Additive;
+    config.cache = false;
     return config;
 }
 

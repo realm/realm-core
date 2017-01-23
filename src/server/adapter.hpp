@@ -91,7 +91,7 @@ public:
         : type(t), object_type(o), row(r), property(p), value() {}
 
         Instruction(Type t, std::string o, size_t r, std::string p, size_t i, size_t l) 
-        : type(t), object_type(o), row(r), property(p), value((int64_t)i), list_index(l) {}
+        : type(t), object_type(o), row(r), property(p), value(i), list_index(l) {}
 
         Instruction(std::string o, std::string p, PropertyType t, bool n, std::string l = "") 
         : type(Type::AddProperty), object_type(o), property(p), value(), data_type(t), target_object_type(l) {}
