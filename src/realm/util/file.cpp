@@ -187,22 +187,19 @@ std::string make_temp_dir()
     return std::string(buffer2.c_str());
 #endif
 
-
 #else // POSIX.1-2008 version
 
 #if REALM_ANDROID
     char* buffer = "/data/local/tmp/realm_XXXXXX";
 #else
 	std::string tmp = std::string(P_tmpdir) + std::string("/realm_XXXXXX") + std::string("\0", 1);
-	char* buffer = new char[tmp.size()];
-	memcpy(buffer, tmp.c_str(), tmp.size());
+	std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
+	memcpy(buffer.get(), tmp.c_str(), tmp.size());
 #endif
-	if (mkdtemp(buffer) == 0) {
-		delete buffer;
+	if (mkdtemp(buffer.get()) == 0) {
 		throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
 	}
-	delete buffer;
-    return std::string(buffer);
+    return std::string(buffer.get());
 
 #endif
 }
