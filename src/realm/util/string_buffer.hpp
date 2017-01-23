@@ -130,13 +130,6 @@ inline const char* StringBuffer::data() const noexcept
     return m_buffer.data();
 }
 
-inline char* StringBuffer::c_str() noexcept
-{
-    static char zero = 0;
-    char* d = data();
-    return d ? d : &zero;
-}
-
 inline const char* StringBuffer::c_str() const noexcept
 {
     static const char zero = 0;
