@@ -74,17 +74,20 @@ void ArrayString::set(size_t ndx, StringData value)
     REALM_ASSERT_3(ndx, <, m_size);
     REALM_ASSERT_3(value.size(), <, max_width); // otherwise we have to use another column type
 
+    // if m_width == 0 and m_nullable == true, then entire array contains only null entries
+    // if m_width == 0 and m_nullable == false, then entire array contains only "" entries
+    if ((m_nullable ? value.is_null() : value.size() == 0) && m_width == 0) {
+        return; // existing element in array already equals the value we want to set it to
+    }
+
+    if (is_read_only() && m_width > value.size() && get(ndx) == value)
+        return;
+
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
-        // if m_width == 0 and m_nullable == true, then entire array contains only null entries
-        // if m_width == 0 and m_nullable == false, then entire array contains only "" entries
-        if ((m_nullable ? value.is_null() : value.size() == 0) && m_width == 0) {
-            return; // existing element in array already equals the value we want to set it to
-        }
-
         // Calc min column width
         size_t new_width = ::round_up(value.size() + 1);
 

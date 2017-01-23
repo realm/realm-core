@@ -560,6 +560,8 @@ void Array::add_to_column(IntegerColumn* column, int64_t value)
 void Array::set(size_t ndx, int64_t value)
 {
     REALM_ASSERT_3(ndx, <, m_size);
+    if ((this->*(m_vtable->getter))(ndx) == value)
+        return;
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -671,6 +673,9 @@ void Array::truncate(size_t new_size)
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
 
+    if (new_size == m_size)
+        return;
+
     copy_on_write(); // Throws
 
     // Update size in accessor and in header. This leaves the capacity
@@ -696,6 +701,9 @@ void Array::truncate_and_destroy_children(size_t new_size)
     // FIXME: See FIXME in truncate().
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
+
+    if (new_size == m_size)
+        return;
 
     copy_on_write(); // Throws
 
@@ -746,6 +754,9 @@ void Array::ensure_minimum_width(int_fast64_t value)
 
 void Array::set_all_to_zero()
 {
+    if (m_size == 0 || m_width == 0)
+        return;
+
     copy_on_write(); // Throws
 
     m_capacity = calc_item_count(get_capacity_from_header(), 0);
@@ -758,9 +769,6 @@ void Array::set_all_to_zero()
 void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 {
     if (diff != 0) {
-        // Check if we need to copy before modifying
-        copy_on_write(); // Throws
-
         for (size_t i = 0, n = size(); i != n;) {
             REALM_TEMPEX(i = adjust_ge, m_width, (i, n, limit, diff))
         }
@@ -781,6 +789,7 @@ size_t Array::adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64
             // the width, return the current position to the caller so that it
             // can switch to the appropriate specialization for the new width.
             ensure_minimum_width(shifted); // Throws
+            copy_on_write(); // Throws
             if (m_width != w)
                 return i;
 
@@ -1613,7 +1622,7 @@ void Array::copy_on_write()
     // member)
     if (!m_no_relocation) {
 #else
-    if (m_alloc.is_read_only(m_ref)) {
+    if (is_read_only()) {
 #endif
         // Calculate size in bytes (plus a bit of matchcount room for expansion)
         size_t array_size = calc_byte_len(m_size, m_width);
