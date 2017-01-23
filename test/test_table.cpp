@@ -7837,11 +7837,11 @@ TEST(Table_ListOfPrimitives)
 {
     Group g;
     TableRef t = g.add_table("table");
-    auto int_col = t->add_column_list(type_Int, "integers");
-    auto bool_col = t->add_column_list(type_Bool, "booleans");
-    auto string_col = t->add_column_list(type_String, "strings");
-    auto double_col = t->add_column_list(type_Double, "doubles");
-    auto timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
+    size_t int_col = t->add_column_list(type_Int, "integers");
+    size_t bool_col = t->add_column_list(type_Bool, "booleans");
+    size_t string_col = t->add_column_list(type_String, "strings");
+    size_t double_col = t->add_column_list(type_Double, "doubles");
+    size_t timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
     t->add_empty_row();
 
     std::vector<int_fast64_t> integer_list = {1, 2, 3, 4};
@@ -7856,52 +7856,41 @@ TEST(Table_ListOfPrimitives)
     std::vector<double> double_list = {898742.09382, 3.14159265358979, 2.71828182845904};
     t->set_list(double_col, 0, double_list);
 
-    auto now = std::chrono::system_clock::now();
-    std::chrono::minutes one_minute(1);
-    std::vector<Timestamp> timestamp_list = {now, now + one_minute};
+    time_t seconds_since_epoc = time(nullptr);
+    std::vector<Timestamp> timestamp_list = {Timestamp(seconds_since_epoc, 0), Timestamp(seconds_since_epoc + 60, 0)};
     t->set_list(timestamp_col, 0, timestamp_list);
 
-    TableView res = t->get_list(int_col, 0);
-    auto vec = t->get_list<int_fast64_t>(int_col, 0);
-    CHECK_EQUAL(integer_list.size(), res.size());
-    for (unsigned i = 0; i < res.size(); i++) {
-        CHECK_EQUAL(integer_list[i], res.get_int(0, i));
-        CHECK_EQUAL(integer_list[i], vec[i]);
+    auto int_vec = t->get_list<int_fast64_t>(int_col, 0);
+    CHECK_EQUAL(integer_list.size(), int_vec.size());
+    for (unsigned i = 0; i < int_vec.size(); i++) {
+        CHECK_EQUAL(integer_list[i], int_vec[i]);
     }
     t->set_list(0, 0, std::vector<int_fast64_t>());
-    res = t->get_list(int_col, 0);
-    CHECK_EQUAL(0, res.size());
+    int_vec = t->get_list<int_fast64_t>(int_col, 0);
+    CHECK_EQUAL(0, int_vec.size());
 
-    res = t->get_list(bool_col, 0);
-    CHECK_EQUAL(bool_list.size(), res.size());
-    for (unsigned i = 0; i < res.size(); i++) {
-        CHECK_EQUAL(bool_list[i], res.get_bool(0, i));
+    auto bool_vec = t->get_list<bool>(bool_col, 0);
+    CHECK_EQUAL(bool_list.size(), bool_vec.size());
+    for (unsigned i = 0; i < bool_vec.size(); i++) {
+        CHECK_EQUAL(bool_list[i], bool_vec[i]);
     }
 
-    res = t->get_list(string_col, 0);
-    CHECK_EQUAL(string_list.size(), res.size());
-    for (unsigned i = 0; i < res.size(); i++) {
-        CHECK_EQUAL(string_list[i], res.get_string(0, i));
+    auto string_vec = t->get_list<StringData>(string_col, 0);
+    CHECK_EQUAL(string_list.size(), string_vec.size());
+    for (unsigned i = 0; i < string_vec.size(); i++) {
+        CHECK_EQUAL(string_list[i], string_vec[i]);
     }
 
-    Row r = t->get(0);
-    TableRef subtable = r.get_subtable(string_col);
-    subtable->insert_empty_row(2);
-    subtable->set_string(0, 2, "wednesday");
-    res.sync_if_needed();
-    CHECK_EQUAL(string_list.size() + 1, res.size());
-    CHECK_EQUAL(StringData("wednesday"), res.get_string(0, 2));
-
-    res = t->get_list(double_col, 0);
-    CHECK_EQUAL(double_list.size(), res.size());
-    for (unsigned i = 0; i < res.size(); i++) {
-        CHECK_EQUAL(double_list[i], res.get_double(0, i));
+    auto double_vec = t->get_list<double>(double_col, 0);
+    CHECK_EQUAL(double_list.size(), double_vec.size());
+    for (unsigned i = 0; i < double_vec.size(); i++) {
+        CHECK_EQUAL(double_list[i], double_vec[i]);
     }
 
-    res = t->get_list(timestamp_col, 0);
-    CHECK_EQUAL(timestamp_list.size(), res.size());
-    for (unsigned i = 0; i < res.size(); i++) {
-        CHECK_EQUAL(timestamp_list[i], res.get_timestamp(0, i));
+    auto timestamp_vec = t->get_list<Timestamp>(timestamp_col, 0);
+    CHECK_EQUAL(timestamp_list.size(), timestamp_vec.size());
+    for (unsigned i = 0; i < timestamp_vec.size(); i++) {
+        CHECK_EQUAL(timestamp_list[i], timestamp_vec[i]);
     }
 }
 

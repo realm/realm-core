@@ -200,7 +200,9 @@ public:
         mixed_history_type,
 
         /// Adding rows to a table with no columns is not supported.
-        table_has_no_columns
+        table_has_no_columns,
+        /// Only simple types are supported
+        type_not_supported
     };
 
     LogicError(ErrorKind message);

@@ -293,9 +293,8 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
 
 size_t Table::add_column_list(DataType type, StringData name)
 {
-    DescriptorRef subdesc;
-    size_t ndx = add_column(type_Table, name, &subdesc);
-    subdesc->add_column(type, "list");
+    size_t ndx = get_column_count();
+    insert_column_list(ndx, type, name);
     return ndx;
 }
 
@@ -303,7 +302,24 @@ void Table::insert_column_list(size_t column_ndx, DataType type, StringData name
 {
     DescriptorRef subdesc;
     insert_column(column_ndx, type_Table, name, &subdesc);
-    subdesc->add_column(type, "list");
+    switch (type) {
+        case type_Int:
+        case type_Bool:
+        case type_Float:
+        case type_Double:
+        case type_String:
+        case type_Binary:
+        case type_Timestamp:
+            subdesc->add_column(type, "list");
+            break;
+        case type_OldDateTime:
+        case type_Table:
+        case type_Mixed:
+        case type_Link:
+        case type_LinkList:
+            throw LogicError(LogicError::type_not_supported);
+            break;
+    }
 }
 
 size_t Table::get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept
@@ -2949,13 +2965,6 @@ void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
 void Table::set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value, bool is_default)
 {
     set<int_fast64_t>(column_ndx, row_ndx, value, is_default);
-}
-
-TableView Table::get_list(size_t c, size_t r)
-{
-    TableRef subtable = get_subtable(c, r);
-    TableView tv = subtable->where().find_all();
-    return tv;
 }
 
 void Table::add_int(size_t col_ndx, size_t ndx, int_fast64_t value)
