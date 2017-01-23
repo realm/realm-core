@@ -77,7 +77,8 @@ public:
     void dump();
 #endif
 
-    size_t get_free_space();
+    size_t get_free_space() const;
+    size_t get_bytes_written() const noexcept;
 private:
     class MapWindow;
     Group& m_group;
@@ -87,6 +88,7 @@ private:
     ArrayInteger m_free_versions;  // 6th slot in Group::m_top
     uint64_t m_current_version;
     uint64_t m_readlock_version;
+    size_t m_bytes_written = 0;
 
     // Currently cached memory mappings. We keep as many as 16 1MB windows
     // open for writing. The allocator will favor sequential allocation
@@ -158,6 +160,11 @@ inline void GroupWriter::set_versions(uint64_t current, uint64_t read_lock) noex
     REALM_ASSERT(read_lock <= current);
     m_current_version = current;
     m_readlock_version = read_lock;
+}
+
+inline size_t GroupWriter::get_bytes_written() const noexcept
+{
+    return m_bytes_written;
 }
 
 } // namespace realm

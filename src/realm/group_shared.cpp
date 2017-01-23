@@ -1908,6 +1908,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
             // mode the file on disk may very likely be in an invalid state.
             break;
     }
+    m_bytes_written += out.get_bytes_written();
     size_t new_file_size = out.get_file_size();
     // Update reader info. If this fails in any way, the ringbuffer may be corrupted.
     // This can lead to other readers seing invalid data which is likely to cause them

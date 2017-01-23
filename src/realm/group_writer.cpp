@@ -471,7 +471,8 @@ ref_type GroupWriter::write_group()
     return top_ref;
 }
 
-size_t GroupWriter::get_free_space() {
+size_t GroupWriter::get_free_space() const
+{
     if (m_free_lengths.is_attached()) {
         size_t sum = 0;
         for (size_t j=0; j<m_free_lengths.size(); ++j)
@@ -715,6 +716,8 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 
 void GroupWriter::write(const char* data, size_t size)
 {
+    m_bytes_written += size;
+
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
     REALM_ASSERT_3((pos & 0x7), ==, 0); // Write position should always be 64bit aligned
@@ -730,6 +733,8 @@ void GroupWriter::write(const char* data, size_t size)
 
 ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checksum)
 {
+    m_bytes_written += size;
+
     // Get position of free space to write in (expanding file if needed)
     size_t pos = get_free_space(size);
     REALM_ASSERT_3((pos & 0x7), ==, 0); // Write position should always be 64bit aligned
@@ -750,6 +755,8 @@ ref_type GroupWriter::write_array(const char* data, size_t size, uint32_t checks
 
 void GroupWriter::write_array_at(MapWindow* window, ref_type ref, const char* data, size_t size)
 {
+    m_bytes_written += size;
+
     size_t pos = size_t(ref);
 
     REALM_ASSERT_3(pos + size, <=, to_size_t(m_group.m_top.get(2) / 2));

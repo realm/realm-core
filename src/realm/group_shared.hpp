@@ -516,6 +516,12 @@ public:
     // Release pinned version (not thread safe)
     void unpin_version(VersionID version);
 
+#ifdef REALM_DEBUG
+    // Get the number of bytes written to the Realm file via this specific
+    // SharedGroup instance
+    size_t get_bytes_written() const noexcept;
+#endif
+
 private:
     struct SharedInfo;
     struct ReadCount;
@@ -530,6 +536,7 @@ private:
     // Member variables
     size_t m_free_space = 0;
     size_t m_used_space = 0;
+    size_t m_bytes_written = 0;
     Group m_group;
     ReadLockInfo m_read_lock;
     uint_fast32_t m_local_max_entry;
@@ -1177,6 +1184,13 @@ inline SharedGroup::version_type WriteTransaction::get_version() const noexcept
     using sgf = _impl::SharedGroupFriend;
     return sgf::get_version_of_bound_snapshot(*m_shared_group);
 }
+
+#ifdef REALM_DEBUG
+inline size_t SharedGroup::get_bytes_written() const noexcept
+{
+    return m_bytes_written;
+}
+#endif
 
 } // namespace realm
 
