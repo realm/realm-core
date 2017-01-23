@@ -18,11 +18,12 @@
 
 // All unit tests here suddenly broke on Windows, maybe after encryption was added
 
-#include <map>
-#include <sstream>
-#include <mutex>
-#include <condition_variable>
 #include <atomic>
+#include <condition_variable>
+#include <map>
+#include <mutex>
+#include <random>
+#include <sstream>
 
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
@@ -9774,7 +9775,7 @@ TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
 
             CHECK(tv.is_in_sync());
             CHECK(tv.is_attached());
-            CHECK_EQUAL(0, tv.size()); 
+            CHECK_EQUAL(0, tv.size());
         }
     }
 }
@@ -12214,6 +12215,127 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path);
         CHECK_LOGIC_ERROR(SharedGroup(*hist, SharedGroupOptions(crypt_key())), LogicError::mixed_history_type);
+    }
+}
+#include <deque>
+
+ONLY(LangBindHelper_InRealmHistory_FileSize)
+{
+    for (size_t delay = 1; delay < 5; ++delay) {
+        SHARED_GROUP_TEST_PATH(path);
+
+        std::mt19937 mt(123);
+        auto rand = [&](size_t limit) {
+            std::uniform_int_distribution<size_t> d(0, limit);
+            return d(mt);
+        };
+
+        {
+            SHARED_GROUP_TEST_PATH(initial_path);
+
+            std::unique_ptr<Replication> hist = make_in_realm_history(initial_path);
+            SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+            WriteTransaction wt(sg);
+            auto table = wt.add_table("table");
+            table->add_column(type_Int, "int1");
+            table->add_column(type_Int, "int2");
+            table->add_column(type_Int, "int3");
+            table->add_column(type_String, "string1");
+            table->add_column(type_String, "string2");
+            table->add_column(type_String, "string3");
+            table->add_column(type_Float, "float");
+            table->add_column(type_Double, "double");
+
+            table->add_empty_row(5000);
+            for (size_t i = 0; i < 5000; ++i) {
+                table->set_int(0, i, rand(10));
+                table->set_int(1, i, rand(1000));
+                table->set_int(2, i, mt());
+
+                char buffer[100] = {};
+                table->set_string(3, i, StringData(buffer, 10));
+                table->set_string(4, i, StringData(buffer, 20));
+                table->set_string(5, i, StringData(buffer, 100));
+            }
+            wt.commit();
+            ReadTransaction rt(sg);
+            rt.get_group().write(path);
+        }
+
+        {
+            std::unique_ptr<Replication> hist = make_in_realm_history(path);
+            SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+            WriteTransaction wt(sg);
+            wt.commit();
+        }
+        if (delay == 1)
+            std::cerr << "initial: " << File(path).get_size() << "\n";
+
+        std::unique_ptr<Replication> hist = make_in_realm_history(path);
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+        std::unique_ptr<Replication> hist2 = make_in_realm_history(path);
+        SharedGroup sg2(*hist2, SharedGroupOptions(crypt_key()));
+        sg2.begin_read();
+
+        std::deque<VersionID> version_queue;
+        for (size_t commits = 0; commits < 10; ++commits) {
+            WriteTransaction wt(sg);
+            auto table = wt.get_table("table");
+            for (size_t i = 0; i < 10; ++i) {
+                size_t row = rand(table->size());
+                bool fields[8] = {};
+                fields[rand(7)] = true;
+                fields[rand(7)] = true;
+                fields[rand(7)] = true;
+
+                if (fields[0])
+                    table->set_int(0, row, rand(10));
+                else
+                    table->set_int(0, row, table->get_int(0, row));
+                if (fields[1])
+                    table->set_int(1, row, rand(1000));
+                else
+                    table->set_int(1, row, table->get_int(1, row));
+                if (fields[2])
+                    table->set_int(2, row, mt());
+                else
+                    table->set_int(2, row, table->get_int(2, row));
+
+                char buffer[100] = {};
+                arc4random_buf(buffer, 100);
+                if (fields[3])
+                    table->set_string(3, row, StringData(buffer, 10));
+                else
+                    table->set_string(3, row, table->get_string(3, row));
+                if (fields[4])
+                    table->set_string(4, row, StringData(buffer, 20));
+                else
+                    table->set_string(4, row, table->get_string(4, row));
+                if (fields[5])
+                    table->set_string(5, row, StringData(buffer, 100));
+                else
+                    table->set_string(5, row, table->get_string(5, row));
+
+                if (fields[6])
+                    table->set_float(6, row, table->get_float(6, row) + 0.1f);
+                else
+                    table->set_float(6, row, table->get_float(6, row));
+                if (fields[7])
+                    table->set_double(7, row, table->get_double(7, row) + 0.1);
+                else
+                    table->set_double(7, row, table->get_double(7, row));
+            }
+            wt.commit();
+            ReadTransaction rt(sg);
+            version_queue.push_back(sg.get_version_of_current_transaction());
+
+            if (version_queue.size() > delay) {
+                LangBindHelper::advance_read(sg2, version_queue.front());
+                version_queue.pop_front();
+            }
+        }
+
+        std::cerr << "delay: " << delay << " " << File(path).get_size() << " " << sg.get_bytes_written() << "\n";
     }
 }
 
