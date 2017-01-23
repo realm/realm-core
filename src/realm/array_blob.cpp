@@ -104,6 +104,9 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
         size_t add_size = add_zero_term ? data_size + 1 : data_size;
         size_t new_size = m_size - remove_size + add_size;
 
+        if (remove_size == add_size && memcmp(m_data + begin, data, data_size) == 0)
+            return get_ref();
+
         // If size of BinaryData is below 'max_binary_size', the data is stored directly
         // in a single ArrayBlob. If more space is needed, the root blob will just contain
         // references to child blobs holding the actual data. Context flag will indicate

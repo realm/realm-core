@@ -979,6 +979,8 @@ protected:
 
     std::pair<ref_type, size_t> get_to_dot_parent(size_t ndx_in_parent) const override;
 
+    bool is_read_only() const noexcept;
+
 protected:
     // Getters and Setters for adaptive-packed arrays
     typedef int64_t (Array::*Getter)(size_t) const; // Note: getters must not throw
@@ -1942,6 +1944,12 @@ inline void Array::update_child_ref(size_t child_ndx, ref_type new_ref)
 inline ref_type Array::get_child_ref(size_t child_ndx) const noexcept
 {
     return get_as_ref(child_ndx);
+}
+
+inline bool Array::is_read_only() const noexcept
+{
+    REALM_ASSERT_DEBUG(is_attached());
+    return m_alloc.is_read_only(m_ref);
 }
 
 
