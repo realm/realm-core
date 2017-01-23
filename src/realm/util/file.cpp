@@ -197,8 +197,11 @@ std::string make_temp_dir()
 	char* buffer = new char[tmp.size()];
 	memcpy(buffer, tmp.c_str(), tmp.size());
 #endif
-    if (mkdtemp(buffer) == 0)
-        throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
+	if (mkdtemp(buffer) == 0) {
+		delete buffer;
+		throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
+	}
+	delete buffer;
     return std::string(buffer);
 
 #endif
