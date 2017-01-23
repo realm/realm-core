@@ -7837,11 +7837,11 @@ TEST(Table_ListOfPrimitives)
 {
     Group g;
     TableRef t = g.add_table("table");
-    auto int_col = t->add_column_list(type_Int, "integers");
-    auto bool_col = t->add_column_list(type_Bool, "booleans");
-    auto string_col = t->add_column_list(type_String, "strings");
-    auto double_col = t->add_column_list(type_Double, "doubles");
-    auto timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
+    size_t int_col = t->add_column_list(type_Int, "integers");
+    size_t bool_col = t->add_column_list(type_Bool, "booleans");
+    size_t string_col = t->add_column_list(type_String, "strings");
+    size_t double_col = t->add_column_list(type_Double, "doubles");
+    size_t timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
     t->add_empty_row();
 
     std::vector<int_fast64_t> integer_list = {1, 2, 3, 4};
@@ -7856,9 +7856,8 @@ TEST(Table_ListOfPrimitives)
     std::vector<double> double_list = {898742.09382, 3.14159265358979, 2.71828182845904};
     t->set_list(double_col, 0, double_list);
 
-    auto now = std::chrono::system_clock::now();
-    std::chrono::minutes one_minute(1);
-    std::vector<Timestamp> timestamp_list = {now, now + one_minute};
+    time_t seconds_since_epoc = time(nullptr);
+    std::vector<Timestamp> timestamp_list = {Timestamp(seconds_since_epoc, 0), Timestamp(seconds_since_epoc + 60, 0)};
     t->set_list(timestamp_col, 0, timestamp_list);
 
     TableView res = t->get_list(int_col, 0);

@@ -2045,9 +2045,10 @@ void Table::set_list(size_t c, size_t r, const std::vector<T>& list)
 template <class T>
 std::vector<T> Table::get_list(size_t c, size_t r)
 {
-    std::vector<T> vec;
     TableRef subtable = get_subtable(c, r);
     size_t sz = subtable->size();
+    std::vector<T> vec;
+    vec.reserve(sz);
     for (size_t i = 0; i < sz; i++) {
         vec.push_back(subtable->get<T>(0, i));
     }
