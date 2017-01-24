@@ -12219,6 +12219,7 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
 }
 #include <deque>
 
+#if 0
 ONLY(LangBindHelper_InRealmHistory_FileSize)
 {
     for (size_t delay = 1; delay < 5; ++delay) {
@@ -12340,6 +12341,7 @@ ONLY(LangBindHelper_InRealmHistory_FileSize)
                   // << "\n";
     }
 }
+#endif
 
 // Check that stored column indices are correct after a
 // column removal. Not updating the stored index was
