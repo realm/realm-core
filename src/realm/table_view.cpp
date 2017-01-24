@@ -248,12 +248,12 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
             leaf_end = leaf_start + arrp->size();
         }
 */
-        auto v = column->get(signed_row_ndx);
+        auto v = column->get(to_size_t(signed_row_ndx));
 
         if (function == act_Count && v == count_target) {
             res++;
         }
-        else if (function != act_Count && !column->is_null(signed_row_ndx)){
+        else if (function != act_Count && !column->is_null(to_size_t(signed_row_ndx))){
             non_nulls++;
             R unpacked = static_cast<R>(util::unwrap(v));
             

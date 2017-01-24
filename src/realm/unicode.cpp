@@ -423,7 +423,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
             return util::none;
 
         if (n3 != n) {
-            std::copy_n(begin, n, output); // Cannot handle different size, copy source
+            realm::safe_copy_n(begin, n, output); // Cannot handle different size, copy source
         }
 
         begin += n;

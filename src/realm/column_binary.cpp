@@ -389,7 +389,7 @@ void BinaryColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
         // Copying binary data from a column to itself requires an
         // intermediate copy of the data (constr:bptree-copy-to-self).
         std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
-        std::copy_n(value.data(), value.size(), buffer.get());
+        realm::safe_copy_n(value.data(), value.size(), buffer.get());
         BinaryData copy_of_value(buffer.get(), value.size());
         set(row_ndx, copy_of_value); // Throws
     }
@@ -415,8 +415,8 @@ void BinaryColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 
     std::unique_ptr<char[]> buffer_1(new char[value_1.size()]); // Throws
     std::unique_ptr<char[]> buffer_2(new char[value_2.size()]); // Throws
-    std::copy_n(value_1.data(), value_1.size(), buffer_1.get());
-    std::copy_n(value_2.data(), value_2.size(), buffer_2.get());
+    realm::safe_copy_n(value_1.data(), value_1.size(), buffer_1.get());
+    realm::safe_copy_n(value_2.data(), value_2.size(), buffer_2.get());
 
     if (value_1.is_null()) {
         set(row_ndx_2, BinaryData());

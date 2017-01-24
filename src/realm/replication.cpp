@@ -873,5 +873,5 @@ void TrivialReplication::do_clear_interrupt() noexcept
 void TrivialReplication::transact_log_append(const char* data, size_t size, char** new_begin, char** new_end)
 {
     internal_transact_log_reserve(size, new_begin, new_end);
-    *new_begin = std::copy_n(data, size, *new_begin);
+    *new_begin = realm::safe_copy_n(data, size, *new_begin);
 }

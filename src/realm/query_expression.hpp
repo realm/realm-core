@@ -768,7 +768,7 @@ struct NullableVector {
     {
         if (this != &other) {
             init(other.m_size);
-            std::copy_n(other.m_first, other.m_size, m_first);
+            realm::safe_copy_n(other.m_first, other.m_size, m_first);
             m_null = other.m_null;
         }
         return *this;
@@ -777,7 +777,7 @@ struct NullableVector {
     NullableVector(const NullableVector& other)
     {
         init(other.m_size);
-        std::copy_n(other.m_first, other.m_size, m_first);
+        realm::safe_copy_n(other.m_first, other.m_size, m_first);
         m_null = other.m_null;
     }
 
