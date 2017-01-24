@@ -727,11 +727,8 @@ void Array::truncate_and_destroy_children(size_t new_size)
 }
 
 
-void Array::ensure_minimum_width(int_fast64_t value)
+void Array::do_ensure_minimum_width(int_fast64_t value)
 {
-    if (value >= m_lbound && value <= m_ubound)
-        return;
-
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
 
@@ -1614,57 +1611,48 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
     return new_array.get_mem();
 }
 
-void Array::copy_on_write()
+void Array::do_copy_on_write()
 {
-#if REALM_ENABLE_MEMDEBUG
-    // We want to relocate this array regardless if there is a need or not, in order to catch use-after-free bugs.
-    // Only exception is inside GroupWriter::write_group() (see explanation at the definition of the m_no_relocation
-    // member)
-    if (!m_no_relocation) {
-#else
-    if (is_read_only()) {
-#endif
-        // Calculate size in bytes (plus a bit of matchcount room for expansion)
-        size_t array_size = calc_byte_len(m_size, m_width);
-        size_t rest = (~array_size & 0x7) + 1;
-        if (rest < 8)
-            array_size += rest; // 64bit blocks
-        size_t new_size = array_size + 64;
+    // Calculate size in bytes (plus a bit of matchcount room for expansion)
+    size_t array_size = calc_byte_len(m_size, m_width);
+    size_t rest = (~array_size & 0x7) + 1;
+    if (rest < 8)
+        array_size += rest; // 64bit blocks
+    size_t new_size = array_size + 64;
 
-        // Create new copy of array
-        MemRef mref = m_alloc.alloc(new_size); // Throws
-        const char* old_begin = get_header_from_data(m_data);
-        const char* old_end = get_header_from_data(m_data) + array_size;
-        char* new_begin = mref.get_addr();
-        std::copy_n(old_begin, old_end - old_begin, new_begin);
+    // Create new copy of array
+    MemRef mref = m_alloc.alloc(new_size); // Throws
+    const char* old_begin = get_header_from_data(m_data);
+    const char* old_end = get_header_from_data(m_data) + array_size;
+    char* new_begin = mref.get_addr();
+    std::copy_n(old_begin, old_end - old_begin, new_begin);
 
-        ref_type old_ref = m_ref;
+    ref_type old_ref = m_ref;
 
-        // Update internal data
-        m_ref = mref.get_ref();
-        m_data = get_data_from_header(new_begin);
-        m_capacity = calc_item_count(new_size, m_width);
-        REALM_ASSERT_DEBUG(m_capacity > 0);
+    // Update internal data
+    m_ref = mref.get_ref();
+    m_data = get_data_from_header(new_begin);
+    m_capacity = calc_item_count(new_size, m_width);
+    REALM_ASSERT_DEBUG(m_capacity > 0);
 
-        // Update capacity in header. Uses m_data to find header, so
-        // m_data must be initialized correctly first.
-        set_header_capacity(new_size);
+    // Update capacity in header. Uses m_data to find header, so
+    // m_data must be initialized correctly first.
+    set_header_capacity(new_size);
 
-        update_parent();
+    update_parent();
 
 #if REALM_ENABLE_MEMDEBUG
-        if (!m_alloc.is_read_only(old_ref)) {
-            // Overwrite free'd array with 0x77. We cannot overwrite the header because free_() needs to know the size
-            // of the allocated block in order to free it. This size is computed from the width and size header
-            // fields.
-            memset(const_cast<char*>(old_begin) + header_size, 0x77, old_end - old_begin - header_size);
-        }
-#endif
-
-        // Mark original as deleted, so that the space can be reclaimed in
-        // future commits, when no versions are using it anymore
-        m_alloc.free_(old_ref, old_begin);
+    if (!m_alloc.is_read_only(old_ref)) {
+        // Overwrite free'd array with 0x77. We cannot overwrite the header because free_() needs to know the size
+        // of the allocated block in order to free it. This size is computed from the width and size header
+        // fields.
+        memset(const_cast<char*>(old_begin) + header_size, 0x77, old_end - old_begin - header_size);
     }
+#endif
+
+    // Mark original as deleted, so that the space can be reclaimed in
+    // future commits, when no versions are using it anymore
+    m_alloc.free_(old_ref, old_begin);
 }
 
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size, int_fast64_t value,
