@@ -44,6 +44,13 @@ void App1::MainPage::Button_Click(Platform::Object^ sender, Windows::UI::Xaml::R
 
 }
 
+
+void App1::MainPage::TextBlock_SelectionChanged(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e)
+{
+    
+}
+
+
 void App1::MainPage::Button_Click_1(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e)
 {
     StringData sd = tbl->get_string(0, 0);
