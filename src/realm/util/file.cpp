@@ -191,20 +191,19 @@ std::string make_temp_dir()
 
 #if REALM_ANDROID
     char[] buffer = "/data/local/tmp/realm_XXXXXX";
-	if (mkdtemp(buffer) == 0) {
-		throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
-	}
-	return std::string(buffer);
+    if (mkdtemp(buffer) == 0) {
+        throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
+    }
+    return std::string(buffer);
 #else
-	std::string tmp = std::string(P_tmpdir) + std::string("/realm_XXXXXX") + std::string("\0", 1);
-	std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
-	memcpy(buffer.get(), tmp.c_str(), tmp.size());
-	if (mkdtemp(buffer.get()) == 0) {
-		throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
-	}
-	return std::string(buffer.get()); 
+    std::string tmp = std::string(P_tmpdir) + std::string("/realm_XXXXXX") + std::string("\0", 1);
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
+    memcpy(buffer.get(), tmp.c_str(), tmp.size());
+    if (mkdtemp(buffer.get()) == 0) {
+        throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
+    }
+    return std::string(buffer.get()); 
 #endif
-
 
 #endif
 }
