@@ -31,6 +31,8 @@
 #include "impl/apple/external_commit_helper.hpp"
 #elif REALM_USE_EPOLL
 #include "impl/epoll/external_commit_helper.hpp"
+#elif WIN32
+#include "impl/windows/external_commit_helper.hpp"
 #else
 #include "impl/generic/external_commit_helper.hpp"
 #endif

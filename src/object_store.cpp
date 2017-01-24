@@ -50,14 +50,12 @@ const size_t c_zeroRowIndex = 0;
 const char c_object_table_prefix[] = "class_";
 
 void create_metadata_tables(Group& group) {
-    TableRef table = group.get_or_add_table(c_primaryKeyTableName);
-    if (table->get_column_count() == 0) {
-        table->add_column(type_String, c_primaryKeyObjectClassColumnName);
-        table->add_column(type_String, c_primaryKeyPropertyNameColumnName);
-    }
-    table->add_search_index(table->get_column_index(c_primaryKeyObjectClassColumnName));
-
-    table = group.get_or_add_table(c_metadataTableName);
+    // FIXME: the order of the creation of the two tables seems to
+    // matter for some Android devices. The reason is unclear, and
+    // further investigation is required.
+    // See https://github.com/realm/realm-java/issues/3651
+    
+    TableRef table = group.get_or_add_table(c_metadataTableName);
     if (table->get_column_count() == 0) {
         table->add_column(type_Int, c_versionColumnName);
 
@@ -65,6 +63,13 @@ void create_metadata_tables(Group& group) {
         table->add_empty_row();
         table->set_int(c_versionColumnIndex, c_zeroRowIndex, ObjectStore::NotVersioned);
     }
+
+    table = group.get_or_add_table(c_primaryKeyTableName);
+    if (table->get_column_count() == 0) {
+        table->add_column(type_String, c_primaryKeyObjectClassColumnName);
+        table->add_column(type_String, c_primaryKeyPropertyNameColumnName);
+    }
+    table->add_search_index(table->get_column_index(c_primaryKeyObjectClassColumnName));
 }
 
 void set_schema_version(Group& group, uint64_t version) {
@@ -207,6 +212,12 @@ void validate_primary_column_uniqueness(Group const& group)
     }
 }
 } // anonymous namespace
+
+// FIXME remove this after integrating OS's migration related logic into Realm java
+void ObjectStore::set_schema_version(Group& group, uint64_t version) {
+    ::create_metadata_tables(group);
+    ::set_schema_version(group, version);
+}
 
 uint64_t ObjectStore::get_schema_version(Group const& group) {
     ConstTableRef table = group.get_table(c_metadataTableName);

@@ -1,10 +1,6 @@
 #!groovy
 def getSourceArchive() {
-  checkout scm
-  sh 'git clean -ffdx -e .????????'
-  sshagent(['realm-ci-ssh']) {
-    sh 'git submodule update --init --recursive'
-  }
+  unstash 'source'
 }
 
 def readGitTag() {
@@ -52,7 +48,7 @@ if (env.BRANCH_NAME == 'master') {
 def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
   def sync = enableSync ? "sync" : ""
   def label = "${flavor}${enableSync ? '-sync' : ''}"
-  
+
   return {
     node('docker') {
       getSourceArchive()
@@ -74,6 +70,32 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
   }
 }
 
+def doAndroidDockerBuild() {
+  return {
+    node('docker') {
+      getSourceArchive()
+      wrap([$class: 'AnsiColorBuildWrapper']) {
+        def image = buildDockerEnv('ci/realm-object-store:android')
+        docker.image('tracer0tong/android-emulator').withRun { emulator ->
+          image.inside("--link ${emulator.id}:emulator") {
+            sh '''rm -rf build
+              mkdir build
+              cd build
+              cmake -DREALM_PLATFORM=Android -DANDROID_NDK=/opt/android-ndk -GNinja ..
+              ninja
+              adb connect emulator
+              timeout 10m adb wait-for-device
+              adb push tests/tests /data/local/tmp
+              adb shell '/data/local/tmp/tests || echo __ADB_FAIL__' | tee adb.log
+              ! grep __ADB_FAIL__ adb.log
+            '''
+          }
+        }
+      }
+    }
+  }
+}
+
 def doBuild(String nodeSpec, String flavor, Boolean enableSync) {
   def sync = enableSync ? "sync" : ""
   def label = "${flavor}${enableSync ? '-sync' : ''}"
@@ -89,13 +111,31 @@ def doBuild(String nodeSpec, String flavor, Boolean enableSync) {
   }
 }
 
+def doWindowsBuild() {
+  return {
+    node('windows') {
+      getSourceArchive()
+
+      bat """
+        "${tool 'cmake'}" .
+        "${tool 'cmake'}" --build . --config Release
+        tests\\Release\\tests.exe
+      """
+    }
+  }
+}
+
 def setBuildName(newBuildName) {
   currentBuild.displayName = "${currentBuild.displayName} - ${newBuildName}"
 }
 
 stage('prepare') {
   node('docker') {
-    getSourceArchive()
+    checkout scm
+    sh 'git clean -ffdx -e .????????'
+    sshagent(['realm-ci-ssh']) {
+      sh 'git submodule update --init --recursive'
+    }
 
     gitTag = readGitTag()
     gitSha = readGitSha()
@@ -107,6 +147,8 @@ stage('prepare') {
       echo "Building release: '${gitTag}'"
       setBuildName("Tag ${gitTag}")
     }
+
+    stash includes: '**', name: 'source'
   }
 }
 
@@ -114,9 +156,10 @@ stage('unit-tests') {
   parallel(
     linux: doDockerBuild('linux', true, false),
     linux_sync: doDockerBuild('linux', true, true),
-    android: doDockerBuild('android', false, false),
+    android: doAndroidDockerBuild(),
     macos: doBuild('osx', 'macOS', false),
-    macos_sync: doBuild('osx', 'macOS', true)
+    macos_sync: doBuild('osx', 'macOS', true) //,
+    // win32: doWindowsBuild()
   )
   currentBuild.result = 'SUCCESS'
 }

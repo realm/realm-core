@@ -24,6 +24,7 @@
 #include "util/format.hpp"
 
 #include "impl/realm_coordinator.hpp"
+#include "binding_context.hpp"
 #include "object_schema.hpp"
 #include "property.hpp"
 #include "results.hpp"
@@ -32,8 +33,6 @@
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 #include <realm/query_engine.hpp>
-
-#include <unistd.h>
 
 #if REALM_ENABLE_SYNC
 #include "sync/sync_manager.hpp"
@@ -54,6 +53,8 @@ private:
 };
 
 TEST_CASE("notifications: async delivery") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -127,7 +128,7 @@ TEST_CASE("notifications: async delivery") {
         SECTION("refresh() blocks due to initial results not being ready") {
             REQUIRE(notification_calls == 0);
             joining_thread thread([&] {
-                usleep(5000);
+                std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
             r->refresh();
@@ -137,7 +138,7 @@ TEST_CASE("notifications: async delivery") {
         SECTION("begin_transaction() blocks due to initial results not being ready") {
             REQUIRE(notification_calls == 0);
             joining_thread thread([&] {
-                usleep(5000);
+                std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
             r->begin_transaction();
@@ -328,7 +329,7 @@ TEST_CASE("notifications: async delivery") {
         SECTION("refresh() blocks") {
             REQUIRE(notification_calls == 1);
             joining_thread thread([&] {
-                usleep(5000);
+                std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
             r->refresh();
@@ -337,7 +338,7 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("refresh() advances to the first version with notifiers ready that is at least a recent as the newest at the time it is called") {
             joining_thread thread([&] {
-                usleep(5000);
+                std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 make_remote_change();
                 coordinator->on_change();
                 make_remote_change();
@@ -359,7 +360,7 @@ TEST_CASE("notifications: async delivery") {
         SECTION("begin_transaction() blocks") {
             REQUIRE(notification_calls == 1);
             joining_thread thread([&] {
-                usleep(5000);
+                std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
             r->begin_transaction();
@@ -409,7 +410,7 @@ TEST_CASE("notifications: async delivery") {
         SECTION("refresh() blocks") {
             REQUIRE(notification_calls == 1);
             joining_thread thread([&] {
-                usleep(5000);
+                std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
             r->refresh();
@@ -419,7 +420,7 @@ TEST_CASE("notifications: async delivery") {
         SECTION("begin_transaction() blocks") {
             REQUIRE(notification_calls == 1);
             joining_thread thread([&] {
-                usleep(5000);
+                std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
             r->begin_transaction();
@@ -465,6 +466,31 @@ TEST_CASE("notifications: async delivery") {
         }
     }
 
+    SECTION("refresh() from within changes_available() do not interfere with notification delivery") {
+        struct Context : BindingContext {
+            Realm& realm;
+            Context(Realm& realm) : realm(realm) { }
+
+            void changes_available() override
+            {
+                REQUIRE(realm.refresh());
+            }
+        };
+
+        make_remote_change();
+        coordinator->on_change();
+
+        r->set_auto_refresh(false);
+        REQUIRE(notification_calls == 1);
+
+        r->notify();
+        REQUIRE(notification_calls == 1);
+
+        r->m_binding_context.reset(new Context(*r));
+        r->notify();
+        REQUIRE(notification_calls == 2);
+    }
+
     SECTION("refresh() from within a notification is a no-op") {
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
@@ -504,6 +530,61 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE(notification_calls == 3);
     }
 
+    SECTION("begin_transaction() from within a notification does not break delivering additional notifications") {
+        size_t calls = 0;
+        token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            if (++calls == 1)
+                return;
+
+            // force the read version to advance by beginning a transaction
+            r->begin_transaction();
+            r->cancel_transaction();
+        });
+
+        auto results2 = results;
+        size_t calls2 = 0;
+        auto token2 = results2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            if (++calls2 == 1)
+                return;
+            REQUIRE_INDICES(c.insertions, 0);
+        });
+        advance_and_notify(*r);
+        REQUIRE(calls == 1);
+        REQUIRE(calls2 == 1);
+
+        make_remote_change(); // 1
+        coordinator->on_change();
+        make_remote_change(); // 2
+        r->notify(); // advances to version from 1
+
+        REQUIRE(calls == 2);
+        REQUIRE(calls2 == 2);
+    }
+
+    SECTION("begin_transaction() from within did_change() does not break delivering collection notification") {
+        struct Context : BindingContext {
+            Realm& realm;
+            Context(Realm& realm) : realm(realm) { }
+
+            void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+            {
+                if (!realm.is_in_transaction()) {
+                    // advances to version from 2 (and recursively calls this, hence the check above)
+                    realm.begin_transaction();
+                    realm.cancel_transaction();
+                }
+            }
+        };
+        r->m_binding_context.reset(new Context(*r));
+
+        make_remote_change(); // 1
+        coordinator->on_change();
+        make_remote_change(); // 2
+        r->notify(); // advances to version from 1
+    }
+
     SECTION("is_in_transaction() is reported correctly within a notification from begin_transaction() and changes can be made") {
         bool first = true;
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
@@ -526,17 +607,19 @@ TEST_CASE("notifications: async delivery") {
         REQUIRE(table->get_int(0, 0) != 100);
     }
 
-    SECTION("invalidate() from within notification ends the write transaction started by begin_transaction()") {
+    SECTION("invalidate() from within notification is a no-op") {
         token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr err) {
             REQUIRE_FALSE(err);
             r->invalidate();
+            REQUIRE(r->is_in_read_transaction());
         });
         advance_and_notify(*r);
-        REQUIRE_FALSE(r->is_in_read_transaction());
+        REQUIRE(r->is_in_read_transaction());
         make_remote_change();
         coordinator->on_change();
         r->begin_transaction();
-        REQUIRE_FALSE(r->is_in_transaction());
+        REQUIRE(r->is_in_transaction());
+        r->cancel_transaction();
     }
 
     SECTION("cancel_transaction() from within notification ends the write transaction started by begin_transaction()") {
@@ -554,6 +637,8 @@ TEST_CASE("notifications: async delivery") {
 }
 
 TEST_CASE("notifications: skip") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -741,10 +826,31 @@ TEST_CASE("notifications: skip") {
         REQUIRE(calls3 == 1);
         REQUIRE(calls4 == 1);
     }
+
+    SECTION("skipping only effects the current transaction even if no notification would occur anyway") {
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        // would not produce a notification even if it wasn't skipped because no changes were made
+        r->begin_transaction();
+        token1.suppress_next();
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        // should now produce a notification
+        r->begin_transaction();
+        table->add_empty_row();
+        r->commit_transaction();
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+    }
 }
 
 #if REALM_PLATFORM_APPLE
 TEST_CASE("notifications: async error handling") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -902,6 +1008,8 @@ TEST_CASE("notifications: async error handling") {
 
 #if REALM_ENABLE_SYNC
 TEST_CASE("notifications: sync") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     SyncServer server(false);
     SyncTestFile config(server);
     config.cache = false;
@@ -944,6 +1052,8 @@ TEST_CASE("notifications: sync") {
 #endif
 
 TEST_CASE("notifications: results") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -1276,10 +1386,10 @@ TEST_CASE("notifications: results") {
         }
     }
 
-    // Sort in descending order
-    results = results.sort({*table, {{0}}, {false}});
-
     SECTION("sorted notifications") {
+        // Sort in descending order
+        results = results.sort({*table, {{0}}, {false}});
+
         int notification_calls = 0;
         CollectionChangeSet change;
         auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
@@ -1421,6 +1531,85 @@ TEST_CASE("notifications: results") {
             REQUIRE_INDICES(change.insertions, 1);
         }
     }
+
+    SECTION("distinct notifications") {
+        results = results.distinct(SortDescriptor(*table, {{0}}));
+
+        int notification_calls = 0;
+        CollectionChangeSet change;
+        auto token = results.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr err) {
+            REQUIRE_FALSE(err);
+            change = c;
+            ++notification_calls;
+        });
+
+        advance_and_notify(*r);
+
+        auto write = [&](auto&& f) {
+            r->begin_transaction();
+            f();
+            r->commit_transaction();
+            advance_and_notify(*r);
+        };
+
+        SECTION("modifications that leave a non-matching row non-matching do not send notifications") {
+            write([&] {
+                table->set_int(0, 6, 13);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("deleting non-matching rows does not send a notification") {
+            write([&] {
+                table->move_last_over(0);
+                table->move_last_over(6);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("modifying a matching row and leaving it matching marks that row as modified") {
+            write([&] {
+                table->set_int(0, 1, 3);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.modifications, 0);
+            REQUIRE_INDICES(change.modifications_new, 0);
+        }
+
+        SECTION("modifying a non-matching row which is after the distinct results in the table to be a same value \
+                in the distinct results doesn't send notification.") {
+            write([&] {
+                table->set_int(0, 6, 2);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("modifying a non-matching row which is before the distinct results in the table to be a same value \
+                in the distinct results send insert + delete.") {
+            write([&] {
+                table->set_int(0, 0, 2);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.deletions, 0);
+            REQUIRE_INDICES(change.insertions, 0);
+        }
+
+        SECTION("modifying a matching row to duplicated value in distinct results marks that row as deleted") {
+            write([&] {
+                table->set_int(0, 2, 2);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.deletions, 1);
+        }
+
+        SECTION("modifying a non-matching row to match and different value marks that row as inserted") {
+            write([&] {
+                table->set_int(0, 0, 1);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.insertions, 0);
+        }
+    }
 }
 
 TEST_CASE("results: notifications after move") {
@@ -1476,6 +1665,8 @@ TEST_CASE("results: notifications after move") {
 }
 
 TEST_CASE("results: implicit background notifier") {
+    _impl::RealmCoordinator::assert_no_open_realms();
+
     InMemoryTestFile config;
     config.cache = false;
     config.automatic_change_notifications = false;
@@ -1884,7 +2075,7 @@ TEST_CASE("distinct") {
     //   1, Foo_1,  3
     //   2, Foo_2,  2
     //   0, Foo_0,  1
-                          
+
     r->commit_transaction();
     Results results(r, table->where());
 
@@ -1905,7 +2096,7 @@ TEST_CASE("distinct") {
         // unique:
         //  0, Foo_0, 10
         //  1, Foo_1,  9
-        //  2, Foo_2,  8       
+        //  2, Foo_2,  8
         REQUIRE(unique.size() == 3);
         REQUIRE(unique.get(0).get_int(2) == 10);
         REQUIRE(unique.get(1).get_int(2) == 9);
@@ -1925,7 +2116,7 @@ TEST_CASE("distinct") {
         Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{2}, {1}}));
         // unique is the same as the table
         REQUIRE(unique.size() == N);
-        for (int i = 0; i < N; ++i) {           
+        for (int i = 0; i < N; ++i) {
             REQUIRE(unique.get(i).get_string(1) == StringData(util::format("Foo_%1", i % 3).c_str()));
         }
     }
@@ -1961,7 +2152,7 @@ TEST_CASE("distinct") {
         REQUIRE(unique.size() == 3);
         REQUIRE(unique.first()->get_int(2) == 10);
         REQUIRE(unique.last()->get_int(2) == 8);
-        
+
         // sort() is only applied to unique
         Results reverse = unique.sort(SortDescriptor(unique.get_tableview().get_parent(), {{2}}, {true}));
         // reversed:
@@ -1977,7 +2168,7 @@ TEST_CASE("distinct") {
     SECTION("Chaining distinct") {
         Results first = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
         REQUIRE(first.size() == 3);
-        
+
         // distinct() will discard the previous applied distinct() calls
         Results second = first.distinct(SortDescriptor(first.get_tableview().get_parent(), {{2}}));
         REQUIRE(second.size() == N);
@@ -2025,5 +2216,229 @@ TEST_CASE("distinct") {
         //   1, Foo_1,  9
         REQUIRE(further_filtered.size() == 1);
         REQUIRE(further_filtered.get(0).get_int(2) == 9);
+    }
+}
+
+
+TEST_CASE("aggregate") {
+#define SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW() \
+    SECTION("results built from table") { \
+        results = Results(r, *table); \
+    } \
+    SECTION("results built from query") { \
+        results = Results(r, table->where()); \
+    } \
+    SECTION("results built from tableview") { \
+        results = Results(r, table->where().find_all()); \
+    } \
+    SECTION("results built from linkview") { \
+        r->begin_transaction(); \
+        auto link_table = r->read_group().get_table("class_linking_object"); \
+        link_table->add_empty_row(1); \
+        auto link_view = link_table->get_linklist(0, 0); \
+        auto table_view = table->where().find_all(); \
+        for (size_t i = 0; i< table_view.size(); ++i) { \
+            link_view->add(table_view.get_source_ndx(i)); \
+        } \
+        r->commit_transaction(); \
+        results = Results(r, link_view); \
+    }
+
+    const int column_count = 4;
+    InMemoryTestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+
+
+    auto r = Realm::get_shared_realm(config);
+    r->update_schema({
+        {"object", {
+            {"int", PropertyType::Int, "", "", false, false, true},
+            {"float", PropertyType::Float,  "", "", false, false, true},
+            {"double", PropertyType::Double, "", "", false, false, true},
+            {"date", PropertyType::Date, "", "", false, false, true},
+        }},
+        {"linking_object", {
+            {"link", PropertyType::Array, "object", "", false, false, false}
+        }},
+    });
+
+    auto table = r->read_group().get_table("class_object");
+
+    SECTION("one row with null values") {
+        r->begin_transaction();
+        table->add_empty_row(3);
+        for (int i = 0; i < column_count; ++i) {
+            table->set_null(i, 0);
+        }
+
+        table->set_int(0, 1, 0);
+        table->set_float(1, 1, 0.f);
+        table->set_double(2, 1, 0.0);
+        table->set_timestamp(3, 1, Timestamp(0, 0));
+
+        table->set_int(0, 2, 2);
+        table->set_float(1, 2, 2.f);
+        table->set_double(2, 2, 2.0);
+        table->set_timestamp(3, 2, Timestamp(2, 0));
+        // table:
+        //  null, null, null,  null,
+        //  0,    0,    0,    (0, 0)
+        //  2,    2,    2,    (2, 0)
+        r->commit_transaction();
+
+        SECTION("max") {
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
+
+            REQUIRE(results.max(0)->get_int() == 2);
+            REQUIRE(results.max(1)->get_float() == 2.f);
+            REQUIRE(results.max(2)->get_double() == 2.0);
+            REQUIRE(results.max(3)->get_timestamp() == Timestamp(2, 0));
+        }
+
+        SECTION("min") {
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
+
+            REQUIRE(results.min(0)->get_int() == 0);
+            REQUIRE(results.min(1)->get_float() == 0.f);
+            REQUIRE(results.min(2)->get_double() == 0.0);
+            REQUIRE(results.min(3)->get_timestamp() == Timestamp(0, 0));
+        }
+
+        SECTION("average") {
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
+
+            REQUIRE(results.average(0)->get_double() == 1.0);
+            REQUIRE(results.average(1)->get_double() == 1.0);
+            REQUIRE(results.average(2)->get_double() == 1.0);
+            REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
+        }
+
+        SECTION("sum") {
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
+
+            REQUIRE(results.sum(0)->get_int() == 2);
+            REQUIRE(results.sum(1)->get_double() == 2.0);
+            REQUIRE(results.sum(2)->get_double() == 2.0);
+            REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
+        }
+    }
+
+    SECTION("rows with all null values") {
+        const int row_count = 3;
+        r->begin_transaction();
+        table->add_empty_row(row_count);
+        for (int i = 0; i < column_count; ++i) {
+            for (int j = 0; j < row_count; ++j) {
+                table->set_null(i, j);
+            }
+        }
+        // table:
+        //  null, null, null,  null,  null
+        //  null, null, null,  null,  null
+        //  null, null, null,  null,  null
+        r->commit_transaction();
+
+        SECTION("max") {
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
+
+            REQUIRE(!results.max(0));
+            REQUIRE(!results.max(1));
+            REQUIRE(!results.max(2));
+            REQUIRE(!results.max(3));
+        }
+
+        SECTION("min") {
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
+
+            REQUIRE(!results.min(0));
+            REQUIRE(!results.min(1));
+            REQUIRE(!results.min(2));
+            REQUIRE(!results.min(3));
+        }
+
+        SECTION("average") {
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
+
+            REQUIRE(!results.average(0));
+            REQUIRE(!results.average(1));
+            REQUIRE(!results.average(2));
+            REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
+        }
+
+        SECTION("sum") {
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
+
+            REQUIRE(results.sum(0)->get_int() == 0);
+            REQUIRE(results.sum(1)->get_double() == 0.0);
+            REQUIRE(results.sum(2)->get_double() == 0.0);
+            REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
+        }
+    }
+
+    SECTION("empty") {
+        SECTION("max") {
+            Results results;
+
+            SECTION("empty results") {
+                results = Results();
+            }
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
+
+            REQUIRE(!results.max(0));
+            REQUIRE(!results.max(1));
+            REQUIRE(!results.max(2));
+            REQUIRE(!results.max(3));
+        }
+
+        SECTION("min") {
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
+
+            REQUIRE(!results.min(0));
+            REQUIRE(!results.min(1));
+            REQUIRE(!results.min(2));
+            REQUIRE(!results.min(3));
+        }
+
+        SECTION("average") {
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
+
+            REQUIRE(!results.average(0));
+            REQUIRE(!results.average(1));
+            REQUIRE(!results.average(2));
+            REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
+        }
+
+        SECTION("sum") {
+            Results results;
+
+            SECTIONS_RESULT_BUILT_FROM_TABLE_QUERY_TABLE_VIEW()
+
+            REQUIRE(results.sum(0)->get_int() == 0);
+            REQUIRE(results.sum(1)->get_double() == 0.0);
+            REQUIRE(results.sum(2)->get_double() == 0.0);
+            REQUIRE_THROWS_AS(results.sum(3), Results::UnsupportedColumnTypeException);
+        }
     }
 }

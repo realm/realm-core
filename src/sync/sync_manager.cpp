@@ -88,6 +88,18 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
         }
 
         REALM_ASSERT(m_metadata_manager);
+        // Perform any necessary file actions.
+        std::vector<SyncFileActionMetadata> completed_actions;
+        SyncFileActionMetadataResults file_actions = m_metadata_manager->all_pending_actions();
+        for (size_t i = 0; i < file_actions.size(); i++) {
+            auto file_action = file_actions.get(i);
+            if (run_file_action(file_action)) {
+                completed_actions.emplace_back(std::move(file_action));
+            }
+        }
+        for (auto& action : completed_actions) {
+            action.remove();
+        }
         // Load persisted users into the users map.
         SyncUserMetadataResults users = m_metadata_manager->all_unmarked_users();
         for (size_t i = 0; i < users.size(); i++) {
@@ -128,6 +140,48 @@ void SyncManager::configure_file_system(const std::string& base_file_path,
                                                                             user_data.server_url) });
         }
     }
+}
+
+bool SyncManager::immediately_run_file_actions(const std::string& realm_path)
+{
+    if (!m_metadata_manager) {
+        return false;
+    }
+    auto metadata = SyncFileActionMetadata::metadata_for_path(realm_path, *m_metadata_manager);
+    if (!metadata) {
+        return false;
+    }
+    if (run_file_action(*metadata)) {
+        metadata->remove();
+        return true;
+    }
+    return false;
+}
+
+// Perform a file action. Returns whether or not the file action can be removed.
+bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
+{
+    switch (md.action()) {
+        case SyncFileActionMetadata::Action::DeleteRealm:
+            // Delete all the files for the given Realm.
+            m_file_manager->remove_realm(md.original_name());
+            return true;
+        case SyncFileActionMetadata::Action::HandleRealmForClientReset:
+            // Copy the primary Realm file to the recovery dir, and then delete the Realm.
+            auto new_name = md.new_name();
+            auto original_name = md.original_name();
+            if (!util::File::exists(original_name)) {
+                // The Realm file doesn't exist anymore.
+                return true;
+            } 
+            if (new_name && !util::File::exists(*new_name) && m_file_manager->copy_realm_file(original_name, *new_name)) {
+                // We successfully copied the Realm file to the recovery directory.
+                m_file_manager->remove_realm(original_name);
+                return true;
+            }
+            return false;
+    }
+    return false;
 }
 
 void SyncManager::reset_for_testing()
@@ -174,7 +228,7 @@ void SyncManager::reset_for_testing()
         // NOTE: these should always match the defaults.
         m_log_level = util::Logger::Level::info;
         m_logger_factory = nullptr;
-        m_client_reconnect_mode = sync::Client::Reconnect::normal;
+        m_client_reconnect_mode = ReconnectMode::normal;
         m_client_validate_ssl = true;
     }
 }
@@ -191,35 +245,16 @@ void SyncManager::set_logger_factory(SyncLoggerFactory& factory) noexcept
     m_logger_factory = &factory;
 }
 
-void SyncManager::set_error_handler(std::function<sync::Client::ErrorHandler> handler)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    auto wrapped_handler = [=](int error_code, std::string message) {
-        // FIXME: If the sync team decides to route all errors through the session-level error handler, the client-level
-        // error handler might go away altogether.
-        switch (error_code) {
-            case 100:       // Connection closed (no error)
-            case 101:       // Unspecified non-critical error
-                return;
-            default:
-                handler(error_code, message);
-        }
-    };
-    m_error_handler = std::move(wrapped_handler);
-}
-
 void SyncManager::set_client_should_reconnect_immediately(bool reconnect_immediately)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    using Reconnect = sync::Client::Reconnect;
-    m_client_reconnect_mode = reconnect_immediately ? Reconnect::immediately : Reconnect::normal;
+    m_client_reconnect_mode = reconnect_immediately ? ReconnectMode::immediate : ReconnectMode::normal;
 }
 
 bool SyncManager::client_should_reconnect_immediately() const noexcept
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    using Reconnect = sync::Client::Reconnect;
-    return m_client_reconnect_mode == Reconnect::immediately;
+    return m_client_reconnect_mode == ReconnectMode::immediate;
 }
 
 void SyncManager::set_client_should_validate_ssl(bool validate_ssl)
@@ -333,6 +368,13 @@ std::string SyncManager::path_for_realm(const std::string& user_identity, const 
     return m_file_manager->path(user_identity, raw_realm_url);
 }
 
+std::string SyncManager::recovery_directory_path() const
+{
+    std::lock_guard<std::mutex> lock(m_file_system_mutex);
+    REALM_ASSERT(m_file_manager);
+    return m_file_manager->recovery_directory_path();        
+}
+
 std::shared_ptr<SyncSession> SyncManager::get_existing_active_session(const std::string& path) const
 {
     std::lock_guard<std::mutex> lock(m_session_mutex);
@@ -440,7 +482,6 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
         logger = std::move(stderr_logger);
     }
     return std::make_unique<SyncClient>(std::move(logger),
-                                        std::move(m_error_handler),
                                         m_client_reconnect_mode,
                                         m_client_validate_ssl);
 }

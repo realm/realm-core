@@ -23,6 +23,7 @@
 
 #include "binding_context.hpp"
 #include "list.hpp"
+#include "object.hpp"
 #include "object_schema.hpp"
 #include "property.hpp"
 #include "results.hpp"
@@ -300,6 +301,24 @@ TEST_CASE("list") {
             token.suppress_next();
             r->commit_transaction();
 
+            advance_and_notify(*r);
+            REQUIRE_INDICES(change.insertions, 10);
+        }
+
+        SECTION("skipping only effects the current transaction even if no notification would occur anyway") {
+            auto token = require_change();
+
+            // would not produce a notification even if it wasn't skipped because no changes were made
+            r->begin_transaction();
+            token.suppress_next();
+            r->commit_transaction();
+            advance_and_notify(*r);
+            REQUIRE(change.empty());
+
+            // should now produce a notification
+            r->begin_transaction();
+            lv->add(0);
+            r->commit_transaction();
             advance_and_notify(*r);
             REQUIRE_INDICES(change.insertions, 10);
         }

@@ -21,18 +21,33 @@ include(CheckSymbolExists)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 set(CMAKE_CXX_EXTENSIONS off)
-add_compile_options("$<$<CONFIG:DEBUG>:-DREALM_DEBUG>")
-add_compile_options("$<$<CONFIG:COVERAGE>:-DREALM_DEBUG>")
-add_compile_options(
-    -DREALM_HAVE_CONFIG
-    -Wall
-    -Wextra
-    -Wno-missing-field-initializers
-    -Wempty-body
-    -Wparentheses
-    -Wunknown-pragmas
-    -Wunreachable-code
+
+set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
+    $<$<CONFIG:DEBUG>:REALM_DEBUG>
+    $<$<CONFIG:COVERAGE>:REALM_DEBUG>
 )
+
+if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+    add_compile_options(
+        -Wall
+        -Wextra
+        -Wno-missing-field-initializers
+        -Wempty-body
+        -Wparentheses
+        -Wunknown-pragmas
+        -Wunreachable-code
+        -DREALM_HAVE_CONFIG
+    )
+endif()
+
+if(MSVC)
+    add_definitions(
+        /D_UNICODE
+        /DPTW32_STATIC_LIB
+        /D_CRT_SECURE_NO_WARNINGS
+        /D_SCL_SECURE_NO_WARNINGS
+    )
+endif()
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
     add_compile_options(

@@ -110,9 +110,7 @@ adb shell /data/tests
 
 ## License
 
-Realm Object Store is published under the Apache 2.0 license. The underlying core is available under the
-[Realm Core Binary License](https://github.com/realm/realm-object-store/blob/master/LICENSE#L210-L243)
-while we work to open-source it under the Apache 2.0 license.
+Realm Object Store is published under the Apache 2.0 license. The [underlying core](https://github.com/realm/realm-core) is also published under the Apache 2.0 license.
 
 **This product is not being made available to any person located in Cuba, Iran,
 North Korea, Sudan, Syria or the Crimea region, or to any other person that is

@@ -47,7 +47,7 @@ T stot(std::string const& s) {
 // check a precondition and throw an exception if it is not met
 // this should be used iff the condition being false indicates a bug in the caller
 // of the function checking its preconditions
-#define precondition(condition, message) if (!__builtin_expect(condition, 1)) {  throw std::logic_error(message); }
+#define precondition(condition, message) if (!REALM_LIKELY(condition)) { throw std::logic_error(message); }
 
 // FIXME: TrueExpression and FalseExpression should be supported by core in some way
 struct TrueExpression : realm::Expression {

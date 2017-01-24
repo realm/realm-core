@@ -178,9 +178,6 @@ void EventLoop::Impl::run_until(std::function<bool()> predicate)
 {
     REALM_ASSERT(m_loop.get() == CFRunLoopGetCurrent());
 
-    if (predicate())
-        return;
-
     auto callback = [](CFRunLoopObserverRef, CFRunLoopActivity, void* info) {
         if ((*static_cast<std::function<bool()>*>(info))()) {
             CFRunLoopStop(CFRunLoopGetCurrent());

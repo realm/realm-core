@@ -43,9 +43,9 @@
 using namespace realm;
 using namespace realm::_impl;
 
-#define LOGE(fmt...) do { \
-    fprintf(stderr, fmt); \
-    ANDROID_LOG(ANDROID_LOG_ERROR, "REALM", fmt); \
+#define LOGE(...) do { \
+    fprintf(stderr, __VA_ARGS__); \
+    ANDROID_LOG(ANDROID_LOG_ERROR, "REALM", __VA_ARGS__); \
 } while (0)
 
 namespace {
@@ -65,7 +65,9 @@ void notify_fd(int fd)
         // write.
         if (ret != 0) {
             int err = errno;
-            throw std::system_error(err, std::system_category());
+            if (err != EAGAIN) {
+                throw std::system_error(err, std::system_category());
+            }
         }
         std::vector<uint8_t> buff(1024);
         read(fd, buff.data(), buff.size());

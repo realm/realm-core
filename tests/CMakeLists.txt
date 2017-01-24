@@ -8,11 +8,12 @@ set(HEADERS
 
 set(SOURCES
     collection_change_indices.cpp
-    handover.cpp
+    thread_safe_reference.cpp
     index_set.cpp
     list.cpp
     main.cpp
     migrations.cpp
+    object.cpp
     object_store.cpp
     parser.cpp
     realm.cpp

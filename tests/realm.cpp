@@ -29,8 +29,6 @@
 
 #include <realm/group.hpp>
 
-#include <unistd.h>
-
 using namespace realm;
 
 TEST_CASE("SharedRealm: get_shared_realm()") {
@@ -80,7 +78,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
     SECTION("should reject mismatched config") {
-        config.cache = false;
+        SECTION("cached") { }
+        SECTION("uncached") { config.cache = false; }
 
         SECTION("schema version") {
             auto realm = Realm::get_shared_realm(config);
@@ -181,6 +180,29 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it->persisted_properties[0].table_column == 0);
     }
 
+    SECTION("should sensibly handle opening an uninitialized file without a schema specified") {
+        SECTION("cached") { }
+        SECTION("uncached") { config.cache = false; }
+
+        // create an empty file
+        File(config.path, File::mode_Write);
+
+        // open the empty file, but don't initialize the schema
+        Realm::Config config_without_schema = config;
+        config_without_schema.schema = util::none;
+        config_without_schema.schema_version = ObjectStore::NotVersioned;
+        auto realm = Realm::get_shared_realm(config_without_schema);
+        REQUIRE(realm->schema().empty());
+        REQUIRE(realm->schema_version() == ObjectStore::NotVersioned);
+        // verify that we can get another Realm instance
+        REQUIRE_NOTHROW(Realm::get_shared_realm(config_without_schema));
+
+        // verify that we can also still open the file with a proper schema
+        auto realm2 = Realm::get_shared_realm(config);
+        REQUIRE_FALSE(realm2->schema().empty());
+        REQUIRE(realm2->schema_version() == 1);
+    }
+
     SECTION("should populate the table columns in the schema when opening as read-only") {
         Realm::get_shared_realm(config);
 
@@ -193,10 +215,58 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it->persisted_properties[0].table_column == 0);
     }
 
+// The ExternalCommitHelper implementation on Windows doesn't rely on files
+#if !WIN32
     SECTION("should throw when creating the notification pipe fails") {
         util::try_make_dir(config.path + ".note");
         REQUIRE_THROWS(Realm::get_shared_realm(config));
         util::remove_dir(config.path + ".note");
+    }
+#endif
+
+    SECTION("should get different instances on different threads") {
+        auto realm1 = Realm::get_shared_realm(config);
+        std::thread([&]{
+            auto realm2 = Realm::get_shared_realm(config);
+            REQUIRE(realm1 != realm2);
+        }).join();
+    }
+
+    SECTION("should detect use of Realm on incorrect thread") {
+        auto realm = Realm::get_shared_realm(config);
+        std::thread([&]{
+            REQUIRE_THROWS_AS(realm->verify_thread(), IncorrectThreadException);
+        }).join();
+    }
+
+    SECTION("should get different instances for different explicit execuction contexts") {
+        config.execution_context = 0;
+        auto realm1 = Realm::get_shared_realm(config);
+        config.execution_context = 1;
+        auto realm2 = Realm::get_shared_realm(config);
+        REQUIRE(realm1 != realm2);
+
+        config.execution_context = util::none;
+        auto realm3 = Realm::get_shared_realm(config);
+        REQUIRE(realm1 != realm3);
+        REQUIRE(realm2 != realm3);
+    }
+
+    SECTION("can use Realm with explicit execution context on different thread") {
+        config.execution_context = 1;
+        auto realm = Realm::get_shared_realm(config);
+        std::thread([&]{
+            REQUIRE_NOTHROW(realm->verify_thread());
+        }).join();
+    }
+
+    SECTION("should get same instance for same explicit execution context on different thread") {
+        config.execution_context = 1;
+        auto realm1 = Realm::get_shared_realm(config);
+        std::thread([&]{
+            auto realm2 = Realm::get_shared_realm(config);
+            REQUIRE(realm1 == realm2);
+        }).join();
     }
 }
 
@@ -226,6 +296,7 @@ TEST_CASE("SharedRealm: notifications") {
     size_t change_count = 0;
     auto realm = Realm::get_shared_realm(config);
     realm->m_binding_context.reset(new Context{&change_count});
+    realm->m_binding_context->realm = realm;
 
     SECTION("local notifications are sent synchronously") {
         realm->begin_transaction();
@@ -241,5 +312,162 @@ TEST_CASE("SharedRealm: notifications") {
         REQUIRE(change_count == 0);
         util::EventLoop::main().run_until([&]{ return change_count > 0; });
         REQUIRE(change_count == 1);
+    }
+
+    SECTION("refresh() from within changes_available() refreshes") {
+        struct Context : BindingContext {
+            Realm& realm;
+            Context(Realm& realm) : realm(realm) { }
+
+            void changes_available() override
+            {
+                REQUIRE(realm.refresh());
+            }
+        };
+        realm->m_binding_context.reset(new Context{*realm});
+        realm->set_auto_refresh(false);
+
+        auto r2 = Realm::get_shared_realm(config);
+        r2->begin_transaction();
+        r2->commit_transaction();
+        realm->notify();
+        // Should return false as the realm was already advanced
+        REQUIRE_FALSE(realm->refresh());
+    }
+
+    SECTION("refresh() from within did_change() is a no-op") {
+        struct Context : BindingContext {
+            Realm& realm;
+            Context(Realm& realm) : realm(realm) { }
+
+            void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+            {
+                // Create another version so that refresh() could do something
+                auto r2 = Realm::get_shared_realm(realm.config());
+                r2->begin_transaction();
+                r2->commit_transaction();
+
+                // Should be a no-op
+                REQUIRE_FALSE(realm.refresh());
+            }
+        };
+        realm->m_binding_context.reset(new Context{*realm});
+
+        auto r2 = Realm::get_shared_realm(config);
+        r2->begin_transaction();
+        r2->commit_transaction();
+        REQUIRE(realm->refresh());
+
+        realm->m_binding_context.reset();
+        // Should advance to the version created in the previous did_change()
+        REQUIRE(realm->refresh());
+        // No more versions, so returns false
+        REQUIRE_FALSE(realm->refresh());
+    }
+
+    SECTION("begin_write() from within did_change() produces recursive notifications") {
+        struct Context : BindingContext {
+            Realm& realm;
+            size_t calls = 0;
+            Context(Realm& realm) : realm(realm) { }
+
+            void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+            {
+                ++calls;
+                if (realm.is_in_transaction())
+                    return;
+
+                // Create another version so that begin_write() advances the version
+                auto r2 = Realm::get_shared_realm(realm.config());
+                r2->begin_transaction();
+                r2->commit_transaction();
+
+                realm.begin_transaction();
+                realm.cancel_transaction();
+            }
+        };
+        auto context = new Context{*realm};
+        realm->m_binding_context.reset(context);
+
+        auto r2 = Realm::get_shared_realm(config);
+        r2->begin_transaction();
+        r2->commit_transaction();
+        REQUIRE(realm->refresh());
+        REQUIRE(context->calls == 2);
+
+        // Despite not sending a new notification we did advance the version, so
+        // no more versions to refresh to
+        REQUIRE_FALSE(realm->refresh());
+    }
+}
+
+TEST_CASE("SharedRealm: closed realm") {
+    TestFile config;
+    config.schema_version = 1;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int, "", "", false, false, false}
+        }},
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    realm->close();
+
+    REQUIRE(realm->is_closed());
+
+    REQUIRE_THROWS_AS(realm->read_group(), ClosedRealmException);
+    REQUIRE_THROWS_AS(realm->begin_transaction(), ClosedRealmException);
+    REQUIRE(!realm->is_in_transaction());
+    REQUIRE_THROWS_AS(realm->commit_transaction(), InvalidTransactionException);
+    REQUIRE_THROWS_AS(realm->cancel_transaction(), InvalidTransactionException);
+
+    REQUIRE_THROWS_AS(realm->refresh(), ClosedRealmException);
+    REQUIRE_THROWS_AS(realm->invalidate(), ClosedRealmException);
+    REQUIRE_THROWS_AS(realm->compact(), ClosedRealmException);
+}
+
+TEST_CASE("ShareRealm: in-memory mode from buffer") {
+    TestFile config;
+    config.schema_version = 1;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int, "", "", false, false, false}
+        }},
+    };
+
+    SECTION("Save and open Realm from in-memory buffer") {
+        // Write in-memory copy of Realm to a buffer
+        auto realm = Realm::get_shared_realm(config);
+        OwnedBinaryData realm_buffer = realm->write_copy();
+
+        // Open the buffer as a new (read-only in-memory) Realm
+        realm::Realm::Config config2;
+        config2.in_memory = true;
+        config2.schema_mode = SchemaMode::ReadOnly;
+        config2.realm_data = realm_buffer.get();
+
+        auto realm2 = Realm::get_shared_realm(config2);
+
+        // Verify that it can read the schema and that it is the same
+        REQUIRE(realm->schema().size() == 1);
+        auto it = realm->schema().find("object");
+        REQUIRE(it != realm->schema().end());
+        REQUIRE(it->persisted_properties.size() == 1);
+        REQUIRE(it->persisted_properties[0].name == "value");
+        REQUIRE(it->persisted_properties[0].table_column == 0);
+
+        // Test invalid configs
+        realm::Realm::Config config3;
+        config3.realm_data = realm_buffer.get();
+        REQUIRE_THROWS(Realm::get_shared_realm(config3)); // missing in_memory and read-only
+
+        config3.in_memory = true;
+        config3.schema_mode = SchemaMode::ReadOnly;
+        config3.path = "path";
+        REQUIRE_THROWS(Realm::get_shared_realm(config3)); // both buffer and path
+
+        config3.path = "";
+        config3.encryption_key = {'a'};
+        REQUIRE_THROWS(Realm::get_shared_realm(config3)); // both buffer and encryption
     }
 }
