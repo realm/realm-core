@@ -190,7 +190,7 @@ std::string make_temp_dir()
 #else // POSIX.1-2008 version
 
 #if REALM_ANDROID
-    char[] buffer = "/data/local/tmp/realm_XXXXXX";
+    char buffer[] = "/data/local/tmp/realm_XXXXXX";
     if (mkdtemp(buffer) == 0) {
         throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
     }
