@@ -21,6 +21,7 @@
 
 #include <realm.hpp>
 #include <realm/util/file.hpp>
+#include <realm/disable_sync_to_disk.hpp>
 
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
@@ -52,9 +53,9 @@ namespace {
     https://github.com/realm/realm-java/blob/bp-performance-test/realm/src/androidTest/java/io/realm/RealmPerformanceTest.java
 */
 
-const size_t min_repetitions = 10;
-const size_t max_repetitions = 1000;
-const double min_duration_s = 0.1;
+const size_t min_repetitions = 100;
+const size_t max_repetitions = 10000;
+const double min_duration_s = 0.5;
 const double min_warmup_time_s = 0.05;
 
 struct Benchmark {
@@ -851,6 +852,7 @@ TEST(benchmark_common_tasks_main)
 int main(int, const char**)
 {
     bool success;
+    realm::disable_sync_to_disk();
 
     success = get_default_test_list().run();
 
