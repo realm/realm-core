@@ -60,8 +60,7 @@ struct SyncClient {
 #endif
 
     void cancel_reconnect_delay() {
-        // FIXME: Implement after https://github.com/realm/realm-sync/issues/794
-        // client.cancel_reconnect_delay();
+        client.cancel_reconnect_delay();
     }
 
     void stop()
