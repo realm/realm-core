@@ -936,6 +936,9 @@ protected:
     void copy_on_write();
 
 private:
+    void do_copy_on_write();
+    void do_ensure_minimum_width(int_fast64_t);
+
     template <size_t w>
     int64_t sum(size_t start, size_t end) const;
 
@@ -1950,6 +1953,27 @@ inline bool Array::is_read_only() const noexcept
 {
     REALM_ASSERT_DEBUG(is_attached());
     return m_alloc.is_read_only(m_ref);
+}
+
+inline void Array::copy_on_write()
+{
+#if REALM_ENABLE_MEMDEBUG
+    // We want to relocate this array regardless if there is a need or not, in order to catch use-after-free bugs.
+    // Only exception is inside GroupWriter::write_group() (see explanation at the definition of the m_no_relocation
+    // member)
+    if (!m_no_relocation) {
+#else
+    if (is_read_only()) {
+#endif
+        do_copy_on_write();
+    }
+}
+
+inline void Array::ensure_minimum_width(int_fast64_t value)
+{
+    if (value >= m_lbound && value <= m_ubound)
+        return;
+    do_ensure_minimum_width(value);
 }
 
 
