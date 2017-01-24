@@ -12268,8 +12268,8 @@ ONLY(LangBindHelper_InRealmHistory_FileSize)
             WriteTransaction wt(sg);
             wt.commit();
         }
-        if (delay == 1)
-            std::cerr << "initial: " << File(path).get_size() << "\n";
+        // if (delay == 1)
+            // std::cerr << "initial: " << File(path).get_size() << "\n";
 
         std::unique_ptr<Replication> hist = make_in_realm_history(path);
         SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
@@ -12290,40 +12290,40 @@ ONLY(LangBindHelper_InRealmHistory_FileSize)
 
                 if (fields[0])
                     table->set_int(0, row, rand(10));
-                else
-                    table->set_int(0, row, table->get_int(0, row));
+                // else
+                    // table->set_int(0, row, table->get_int(0, row));
                 if (fields[1])
                     table->set_int(1, row, rand(1000));
-                else
-                    table->set_int(1, row, table->get_int(1, row));
+                // else
+                    // table->set_int(1, row, table->get_int(1, row));
                 if (fields[2])
                     table->set_int(2, row, mt());
-                else
-                    table->set_int(2, row, table->get_int(2, row));
+                // else
+                    // table->set_int(2, row, table->get_int(2, row));
 
                 char buffer[100] = {};
                 arc4random_buf(buffer, 100);
                 if (fields[3])
                     table->set_string(3, row, StringData(buffer, 10));
-                else
-                    table->set_string(3, row, table->get_string(3, row));
+                // else
+                    // table->set_string(3, row, table->get_string(3, row));
                 if (fields[4])
                     table->set_string(4, row, StringData(buffer, 20));
-                else
-                    table->set_string(4, row, table->get_string(4, row));
+                // else
+                    // table->set_string(4, row, table->get_string(4, row));
                 if (fields[5])
                     table->set_string(5, row, StringData(buffer, 100));
-                else
-                    table->set_string(5, row, table->get_string(5, row));
+                // else
+                    // table->set_string(5, row, table->get_string(5, row));
 
                 if (fields[6])
                     table->set_float(6, row, table->get_float(6, row) + 0.1f);
-                else
-                    table->set_float(6, row, table->get_float(6, row));
+                // else
+                    // table->set_float(6, row, table->get_float(6, row));
                 if (fields[7])
                     table->set_double(7, row, table->get_double(7, row) + 0.1);
-                else
-                    table->set_double(7, row, table->get_double(7, row));
+                // else
+                    // table->set_double(7, row, table->get_double(7, row));
             }
             wt.commit();
             ReadTransaction rt(sg);
@@ -12335,7 +12335,9 @@ ONLY(LangBindHelper_InRealmHistory_FileSize)
             }
         }
 
-        std::cerr << "delay: " << delay << " " << File(path).get_size() << " " << sg.get_bytes_written() << "\n";
+        // std::cerr << "delay: " << delay << " " << File(path).get_size() << " "
+                  // << sg.get_bytes_written()
+                  // << "\n";
     }
 }
 
