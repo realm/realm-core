@@ -68,6 +68,8 @@ class TableFriend;
 
 class Replication;
 
+template <typename T>
+class List;
 
 /// FIXME: Table assignment (from any group to any group) could be made aliasing
 /// safe as follows: Start by cloning source table into target allocator. On
@@ -513,8 +515,10 @@ public:
     template <class T>
     void set_list(size_t c, size_t r, const std::vector<T>& list);
 
+    /// The object returned here is only valid during the current transaction
+    /// It cannot be updated or handed over.
     template <class T>
-    std::vector<T> get_list(size_t column_ndx, size_t row_ndx);
+    List<T> get_list(size_t column_ndx, size_t row_ndx);
 
     void add_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
 
@@ -1453,6 +1457,78 @@ private:
     friend class Group;
 };
 
+template <typename T>
+class List {
+public:
+    class Iterator : public std::iterator<std::input_iterator_tag, T> {
+    public:
+        Iterator(List& l, size_t ndx)
+            : m_list(l)
+            , m_ndx(ndx)
+        {
+        }
+        T operator*()
+        {
+            return m_list[m_ndx];
+        }
+        Iterator& operator++()
+        {
+            m_ndx++;
+            return *this;
+        }
+        bool operator!=(const Iterator& rhs)
+        {
+            return m_ndx != rhs.m_ndx;
+        }
+
+    private:
+        List& m_list;
+        size_t m_ndx;
+    };
+
+    List(TableRef t)
+        : m_table(t)
+    {
+    }
+    size_t size() const
+    {
+        return (*m_table).size();
+    }
+    void set(size_t ndx, T value)
+    {
+        (*m_table).template set<T>(0, ndx, value);
+    }
+    void insert(size_t ndx, T value)
+    {
+        (*m_table).insert_empty_row(ndx);
+        set(ndx, value);
+    }
+    T remove(size_t ndx)
+    {
+        T ret = (*m_table).template get<T>(0, ndx);
+        (*m_table).remove(ndx);
+        return ret;
+    }
+    void clear()
+    {
+        (*m_table).clear();
+    }
+    T operator[](size_t ndx)
+    {
+        return (*m_table).template get<T>(0, ndx);
+    }
+    Iterator begin()
+    {
+        return Iterator(*this, 0);
+    }
+    Iterator end()
+    {
+        return Iterator(*this, size());
+    }
+
+private:
+    TableRef m_table;
+};
 
 class Table::Parent : public ArrayParent {
 public:
@@ -2041,16 +2117,9 @@ void Table::set_list(size_t c, size_t r, const std::vector<T>& list)
 }
 
 template <class T>
-std::vector<T> Table::get_list(size_t c, size_t r)
+List<T> Table::get_list(size_t c, size_t r)
 {
-    TableRef subtable = get_subtable(c, r);
-    size_t sz = subtable->size();
-    std::vector<T> vec;
-    vec.reserve(sz);
-    for (size_t i = 0; i < sz; i++) {
-        vec.push_back(subtable->get<T>(0, i));
-    }
-    return vec;
+    return List<T>(get_subtable(c, r));
 }
 
 // This class groups together information about the target of a link column

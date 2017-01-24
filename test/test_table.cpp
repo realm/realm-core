@@ -7861,11 +7861,19 @@ TEST(Table_ListOfPrimitives)
     t->set_list(timestamp_col, 0, timestamp_list);
 
     auto int_vec = t->get_list<int_fast64_t>(int_col, 0);
+    std::vector<int> vec(int_vec.size());
+    std::copy(int_vec.begin(), int_vec.end(), vec.begin());
     CHECK_EQUAL(integer_list.size(), int_vec.size());
-    for (unsigned i = 0; i < int_vec.size(); i++) {
-        CHECK_EQUAL(integer_list[i], int_vec[i]);
+    unsigned j = 0;
+    for (auto i : int_vec) {
+        CHECK_EQUAL(vec[j], i);
+        CHECK_EQUAL(integer_list[j++], i);
     }
-    t->set_list(0, 0, std::vector<int_fast64_t>());
+    CHECK_EQUAL(3, int_vec.remove(2));
+    CHECK_EQUAL(integer_list.size() - 1, int_vec.size());
+    CHECK_EQUAL(4, int_vec[2]);
+
+    int_vec.clear();
     int_vec = t->get_list<int_fast64_t>(int_col, 0);
     CHECK_EQUAL(0, int_vec.size());
 
@@ -7880,6 +7888,10 @@ TEST(Table_ListOfPrimitives)
     for (unsigned i = 0; i < string_vec.size(); i++) {
         CHECK_EQUAL(string_list[i], string_vec[i]);
     }
+
+    string_vec.insert(2, "Wednesday");
+    CHECK_EQUAL(string_list.size() + 1, string_vec.size());
+    CHECK_EQUAL(StringData("Wednesday"), string_vec[2]);
 
     auto double_vec = t->get_list<double>(double_col, 0);
     CHECK_EQUAL(double_list.size(), double_vec.size());
