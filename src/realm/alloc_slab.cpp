@@ -420,7 +420,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     // Check for double free
     for (auto& c : free_space) {
         if ((ref >= c.ref && ref < (c.ref + c.size)) || (ref < c.ref && ref_end > c.ref)) {
-            REALM_ASSERT(!"Double Free");
+            REALM_ASSERT(false && "Double Free");
         }
     }
 #endif

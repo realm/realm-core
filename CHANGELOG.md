@@ -12,6 +12,7 @@
 
 * Now supports case insensitive queries for UWP.
 * Upgraded Visual Studio project to version 2017.
+* Fixed a bug in handover of detached linked lists. (issue #2378).
 
 -----------
 

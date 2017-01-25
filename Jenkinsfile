@@ -65,7 +65,7 @@ try {
         buildNodeLinux: doBuildNodeInDocker(isPublishingRun, isPublishingLatestRun),
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
-        // buildWindows: doBuildWindows(version, isPublishingRun),
+        buildWindows: doBuildWindows(version, isPublishingRun),
         buildOsxDylibs: doBuildOsxDylibs(isPublishingRun, isPublishingLatestRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
@@ -201,10 +201,9 @@ def doBuildWindows(String version, boolean isPublishingRun) {
         node('windows') {
             getArchive()
             try {
-	      for (platform in ['Win32', 'x64']) {
-                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=Debug /p:Platform=${platform}"
-                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, release\" /p:Platform=${platform}"
-                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, debug\" /p:Platform=${platform}"
+              for (platform in ['Win32', 'x64']) {
+                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"8.1 Debug static lib\" /p:Platform=${platform}"
+                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"8.1 Release static lib\" /p:Platform=${platform}"
               }
               dir('Visual Studio') {
                 stash includes: 'lib/*.lib', name: 'windows-libs'
@@ -627,7 +626,7 @@ def doPublishLocalArtifacts() {
       unstash 'node-cocoa-package'
       unstash 'android-package'
       unstash 'dylib-osx-package'
-      // unstash 'windows-package'
+      unstash 'windows-package'
 
       withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
         sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
