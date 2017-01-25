@@ -34,12 +34,32 @@ public:
     : m_realm(realm)
     , m_group(realm->read_group())
     , m_schema(ObjectStore::schema_from_group(m_group))
-    , m_changes(realm) {}
+    , m_changes(realm) {
+        for (auto object_schema : m_schema) {
+            for (auto &link_prop : object_schema.persisted_properties) {
+                if (link_prop.type == PropertyType::Object || link_prop.type == PropertyType::Array) {
+                    auto link_props = m_linking_properties.find(link_prop.object_type);
+                    if (link_props == m_linking_properties.end()) {
+                        LinkingProperties linking({{object_schema.name, link_prop}});
+                        m_linking_properties.emplace(link_prop.object_type, std::move(linking));
+                    }
+                    else {
+                        link_props->second.push_back({object_schema.name, link_prop});
+                    }
+                }
+            }
+        }
+    }
 
     SharedRealm m_realm;
     Group &m_group;
     Schema m_schema;
+
+    using LinkingProperties = std::vector<std::pair<std::string, Property>>;
+    std::map<std::string, LinkingProperties> m_linking_properties;
+
     Adapter::ChangeSet m_changes;
+
     size_t selected_table;
     std::string selected_object_type;
     ObjectSchema *selected_object_schema = nullptr;
@@ -123,15 +143,55 @@ public:
                 selected_object_type,
                 row_index
             });
-            m_changes.emplace_back(Adapter::Instruction{
-                selected_object_type,
-                prior_num_rows-1,
-                "__ROW_ID",
-                PropertyType::Object,
-                false,
-                (size_t)row_index
-            });
-            // FIXME - query backlinks and update
+            if (row_index < prior_num_rows-1) {
+                m_changes.emplace_back(Adapter::Instruction{
+                    selected_object_type,
+                    prior_num_rows-1,
+                    "__ROW_ID",
+                    PropertyType::Object,
+                    false,
+                    (size_t)row_index
+                });
+
+                // update backlinks
+                TableRef table = ObjectStore::table_for_object_type(m_group, selected_object_type);
+                for (auto linking_object_property : m_linking_properties[selected_object_type]) {
+                    TableRef linking_table = ObjectStore::table_for_object_type(m_group, linking_object_property.first);
+
+                    // skip if
+                    //if (row_index >= linking_table->size()) continue;
+
+                    auto tv = table->get_backlink_view(row_index, linking_table.get(), linking_object_property.second.table_column);
+                    for (size_t linking_index = 0; linking_index < tv.size(); linking_index++) {
+                        size_t linking_row = tv.get(linking_index).get_index();
+                        if (linking_object_property.second.type == PropertyType::Object) {
+                            m_changes.emplace_back(Adapter::Instruction(
+                                linking_object_property.first,
+                                linking_row,
+                                linking_object_property.second.name,
+                                PropertyType::Object,
+                                false,
+                                (size_t)row_index
+                            ));
+                        }
+                        else {
+                            auto link_view = linking_table->get_linklist(linking_object_property.second.table_column, linking_row);
+                            auto list_index = link_view->find(row_index);
+                            while (list_index != npos) {
+                                m_changes.emplace_back(Adapter::Instruction(
+                                    Adapter::Instruction::Type::ListSet,
+                                    linking_object_property.first,
+                                    linking_row,
+                                    linking_object_property.second.name,
+                                    row_index,
+                                    list_index
+                                ));
+                                list_index = link_view->find(row_index, list_index + 1);
+                            }
+                        }
+                    }
+                }
+            }
         }
         return true;
     }
