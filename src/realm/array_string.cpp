@@ -80,18 +80,10 @@ void ArrayString::set(size_t ndx, StringData value)
         return; // existing element in array already equals the value we want to set it to
     }
 
-    if (is_read_only() && m_width > value.size() && get(ndx) == value)
-        return;
-
-    // Check if we need to copy before modifying
-    copy_on_write(); // Throws
-
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
         // Calc min column width
         size_t new_width = ::round_up(value.size() + 1);
-
-        // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
         alloc(m_size, new_width); // Throws
 
         char* base = m_data;
@@ -132,6 +124,11 @@ void ArrayString::set(size_t ndx, StringData value)
 
         m_width = uint_least8_t(new_width);
     }
+    else if (is_read_only()) {
+        if (get(ndx) == value)
+            return;
+        copy_on_write();
+    }
 
     REALM_ASSERT_3(0, <, m_width);
 
@@ -158,12 +155,9 @@ void ArrayString::insert(size_t ndx, StringData value)
     REALM_ASSERT_3(ndx, <=, m_size);
     REALM_ASSERT(value.size() < max_width); // otherwise we have to use another column type
 
-    // Check if we need to copy before modifying
-    copy_on_write(); // Throws
-
-    // Todo: Below code will perform up to 3 memcpy() operations in worst case. Todo, if we improve the
-    // allocator to make a gap for the new value for us, we can have just 1. We can also have 2 by merging
-    // memmove() and set(), but it's a bit complex. May be done after support of realm::null() is completed.
+    // FIXME: this performs up to 2 memcpy() operations. This could be improved
+    // by making the allocator make a gap for the new value for us, but it's a
+    // bit complex.
 
     // Allocate room for the new value
     alloc(m_size + 1, m_width); // Throws
