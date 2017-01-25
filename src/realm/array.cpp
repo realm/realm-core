@@ -219,8 +219,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_size = get_size_from_header(header);
 
     // Capacity is how many items there are room for
-    bool is_read_only = m_alloc.is_read_only(mem.get_ref());
-    if (is_read_only) {
+    if (m_alloc.is_read_only(mem.get_ref())) {
         m_capacity = m_size;
     }
     else {
