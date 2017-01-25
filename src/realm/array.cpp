@@ -603,8 +603,6 @@ void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
 
-    // Check if we need to copy before modifying
-    copy_on_write(); // Throws
 
     Getter old_getter = m_getter; // Save old getter before potential width expansion
 
@@ -729,8 +727,6 @@ void Array::truncate_and_destroy_children(size_t new_size)
 
 void Array::do_ensure_minimum_width(int_fast64_t value)
 {
-    // Check if we need to copy before modifying
-    copy_on_write(); // Throws
 
     // Make room for the new value
     size_t width = bit_width(value);
@@ -1611,14 +1607,14 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
     return new_array.get_mem();
 }
 
-void Array::do_copy_on_write()
+void Array::do_copy_on_write(size_t minimum_size)
 {
     // Calculate size in bytes (plus a bit of matchcount room for expansion)
     size_t array_size = calc_byte_len(m_size, m_width);
-    size_t rest = (~array_size & 0x7) + 1;
+    size_t new_size = std::max(array_size + 64, minimum_size);
+    size_t rest = (~new_size & 0x7) + 1;
     if (rest < 8)
-        array_size += rest; // 64bit blocks
-    size_t new_size = array_size + 64;
+        new_size += rest; // 64bit blocks
 
     // Create new copy of array
     MemRef mref = m_alloc.alloc(new_size); // Throws
@@ -1697,12 +1693,16 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     return mem;
 }
 
-
-// FIXME: It may be worth trying to combine this with copy_on_write()
-// to avoid two copies.
 void Array::alloc(size_t init_size, size_t width)
 {
     REALM_ASSERT(is_attached());
+
+    size_t needed_bytes = calc_byte_len(init_size, width);
+    REALM_ASSERT_3(needed_bytes, <=, max_array_payload);
+
+    if (is_read_only())
+        do_copy_on_write(needed_bytes);
+
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
     REALM_ASSERT_3(m_capacity, >, 0);
     if (m_capacity < init_size || width != m_width) {
