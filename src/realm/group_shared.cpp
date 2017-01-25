@@ -1731,25 +1731,41 @@ void SharedGroup::do_begin_write()
     // allow for comparison even after wrap around of ticket numbering:
     int32_t diff = int32_t(my_ticket - info->next_served);
     bool should_yield = diff > 0; // ticket is in the future
+
+    timespec time_limit;  // only compute the time limit if we're going to use it:
     if (should_yield) {
-        timespec ts;
         timeval tv;
         gettimeofday(&tv, nullptr);
-        ts.tv_sec = tv.tv_sec;
-        ts.tv_nsec = tv.tv_usec * 1000;
-        ts.tv_nsec += 500000000;        // 500 msec wait
-        if (ts.tv_nsec >= 1000000000) { // overflow
-            ts.tv_nsec -= 1000000000;
-            ts.tv_sec += 1;
+        time_limit.tv_sec = tv.tv_sec;
+        time_limit.tv_nsec = tv.tv_usec * 1000;
+        time_limit.tv_nsec += 500000000;        // 500 msec wait
+        if (time_limit.tv_nsec >= 1000000000) { // overflow
+            time_limit.tv_nsec -= 1000000000;
+            time_limit.tv_sec += 1;
         }
-        m_pick_next_writer.wait(m_writemutex, &ts);
     }
-    // we may get here because a) it's our turn, b) we timed out, c) spurious return
-    // we don't distinguish, satisfied that events b) and c) should be rare.
-    // In any case, we have to *make* it our turn. Failure to do so could leave us
-    // with 'next_served' permanently trailing 'next_ticket'. In doing so, we may
-    // bypass other waiters, hence the condition for waiting should take this situation
-    // into account by comparing with '>' instead of '!='
+
+    while (should_yield) {
+
+        m_pick_next_writer.wait(m_writemutex, &time_limit);
+        timeval tv;
+        gettimeofday(&tv, nullptr);
+        if (time_limit.tv_sec < tv.tv_sec
+            || (time_limit.tv_sec == tv.tv_sec && time_limit.tv_nsec < tv.tv_usec * 1000)) {
+            // Timeout!
+            break;
+        }
+        diff = int32_t(my_ticket - info->next_served);
+        should_yield = diff > 0; // ticket is in the future, so yield to someone else
+    }
+
+    // we may get here because a) it's our turn, b) we timed out
+    // we don't distinguish, satisfied that event b) should be rare.
+    // In case b), we have to *make* it our turn. Failure to do so could leave us
+    // with 'next_served' permanently trailing 'next_ticket'.
+    //
+    // In doing so, we may bypass other waiters, hence the condition for yielding
+    // should take this situation into account by comparing with '>' instead of '!='
     info->next_served = my_ticket;
 #endif
 
