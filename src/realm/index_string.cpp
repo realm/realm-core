@@ -197,7 +197,7 @@ size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, IntegerColu
     return size_t(FindRes_column);
 }
 
-template <IndexMethod method, class T>
+template <IndexMethod method>
 size_t IndexArray::index_string(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
                                 ColumnBase* column) const
 {
@@ -310,28 +310,28 @@ size_t IndexArray::index_string_find_first(StringData value, ColumnBase* column)
 {
     InternalFindResult dummy;
     IntegerColumn dummycol;
-    return index_string<index_FindFirst, StringData>(value, dummycol, dummy, column);
+    return index_string<index_FindFirst>(value, dummycol, dummy, column);
 }
 
 
 void IndexArray::index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const
 {
     InternalFindResult dummy;
-    index_string<index_FindAll, StringData>(value, result, dummy, column);
+    index_string<index_FindAll>(value, result, dummy, column);
 }
 
 FindRes IndexArray::index_string_find_all_no_copy(StringData value, ColumnBase* column,
                                                   InternalFindResult& result) const
 {
     IntegerColumn dummy;
-    return static_cast<FindRes>(index_string<index_FindAll_nocopy, StringData>(value, dummy, result, column));
+    return static_cast<FindRes>(index_string<index_FindAll_nocopy>(value, dummy, result, column));
 }
 
 size_t IndexArray::index_string_count(StringData value, ColumnBase* column) const
 {
     IntegerColumn dummy1;
     InternalFindResult dummy2;
-    return index_string<index_Count, StringData>(value, dummy1, dummy2, column);
+    return index_string<index_Count>(value, dummy1, dummy2, column);
 }
 
 IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
