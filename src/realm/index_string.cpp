@@ -580,7 +580,7 @@ StringIndex::NodeChange StringIndex::do_insert(size_t row_ndx, key_type key, siz
         Array old_keys(alloc);
         get_child(*m_array, 0, old_keys);
         const size_t old_offsets_size = old_keys.size();
-        REALM_ASSERT(m_array->size() == old_offsets_size + 1);
+        REALM_ASSERT_EX(m_array->size() == old_offsets_size + 1, m_array->size(), old_offsets_size + 1);
 
         bool noextend = old_offsets_size >= REALM_MAX_BPNODE_SIZE;
 

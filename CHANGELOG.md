@@ -2,6 +2,7 @@
 
 ### Bugfixes
 
+* Fixed a bug in handover of detached linked lists. (issue #2378).
 * Fixed a few bugs (caused crashes) in pthread library on UWP.
 
 ### Breaking changes

@@ -167,13 +167,10 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
-    <AppContainerApplication>false</AppContainerApplication>
-    <ApplicationType>Windows</ApplicationType>
-    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <WholeProgramOptimization>
+    </WholeProgramOptimization>
     <TargetPlatformVersion>8.1</TargetPlatformVersion>
     <WindowsAppContainer>false</WindowsAppContainer>
-    <WholeProgramOptimization>false</WholeProgramOptimization>
-    <UseOfMfc>false</UseOfMfc>
     <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'" Label="Configuration">
@@ -384,14 +381,14 @@
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'" />
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">realm-x64-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">realm-uwp-x64-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">realm-uwp-x64</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">realm-x64</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">realm-x86-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">realm-uwp-x86-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">realm-uwp-x86</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">realm-x86</TargetName>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(IncludePath)</IncludePath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(LibraryPath)</LibraryPath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win32;$(IncludePath)</IncludePath>
