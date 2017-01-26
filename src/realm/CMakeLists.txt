@@ -61,10 +61,6 @@ set(REALM_SOURCES
     views.cpp
 ) # REALM_SOURCES
 
-if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    list(APPEND REALM_SOURCES $<TARGET_OBJECTS:pthread_win32> $<TARGET_OBJECTS:getopt_win32>)
-endif()
-
 set(REALM_INSTALL_GENERAL_HEADERS
     ${CMAKE_CURRENT_BINARY_DIR}/version.hpp
     alloc.hpp
@@ -209,6 +205,10 @@ if(REALM_LIBTYPE STREQUAL "STATIC")
         # (the bindings), so build as position independent code.
         POSITION_INDEPENDENT_CODE true
     )
+endif()
+
+if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    list(APPEND REALM_EXTRA_LIBS pthread_win32 getopt_win32)
 endif()
 
 target_link_libraries(
