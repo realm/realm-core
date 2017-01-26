@@ -253,7 +253,7 @@ def doBuildWindows() {
                 bat '''
                     cmake -DREALM_BUILD_LIB_ONLY=1 -DCMAKE_BUILD_TYPE=Release ..
                     cmake --build .
-                    cpack
+                    cpack -C Release
                 '''
             }
         }
