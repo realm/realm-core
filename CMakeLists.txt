@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.1)
 
 project(Realm)
+
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake" ${CMAKE_MODULE_PATH})
 
 cmake_policy(SET CMP0048 NEW)
