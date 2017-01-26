@@ -253,6 +253,7 @@ def doBuildWindows() {
                 bat '''
                     cmake -DREALM_BUILD_LIB_ONLY=1 ..
                     cmake --build .
+                    cpack
                 '''
             }
         }
