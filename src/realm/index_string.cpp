@@ -202,22 +202,22 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
                                 ColumnBase* column) const
 {
     // Return`realm::not_found`, or an index to the (any) match
-    bool first(method == index_FindFirst);
+    constexpr bool first(method == index_FindFirst);
     // Return 0, or the number of items that match the specified `value`
-    bool get_count(method == index_Count);
+    constexpr bool get_count(method == index_Count);
     // Place all row indexes containing `value` into `result`
     // Returns one of FindRes_not_found[==0] if no matches found
     // Returns FindRes_single, if one match found: the result row literal is
     // both placed in `result_ref.payload` and added to `column`
     // Returns FindRes_column, if more than one match found: the matching row
     // literals are copied into `column`
-    bool all(method == index_FindAll);
+    constexpr bool all(method == index_FindAll);
     // Same as `index_FindAll` but does not copy matching rows into `column`
     // returns FindRes_not_found if there are no matches
     // returns FindRes_single and the row index (literal) in result_ref.payload
     // or returns FindRes_column and the reference to a column of duplicates in
     // result_ref.result with the results in the bounds start_ndx, and end_ndx
-    bool allnocopy(method == index_FindAll_nocopy);
+    constexpr bool allnocopy(method == index_FindAll_nocopy);
 
     const char* data = m_data;
     const char* header;
