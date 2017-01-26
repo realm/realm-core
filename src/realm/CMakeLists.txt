@@ -208,6 +208,7 @@ if(REALM_LIBTYPE STREQUAL "STATIC")
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    set_property(TARGET realm APPEND PROPERTY COMPILE_DEFINITIONS PTW32_STATIC_LIB)
     list(APPEND REALM_EXTRA_LIBS pthread_win32 getopt_win32)
 endif()
 
