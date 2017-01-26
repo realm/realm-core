@@ -9917,4 +9917,27 @@ TEST(Query_ArrayLeafRelocate)
     }
 }
 
+TEST(Query_ColumnDeletion)
+{
+    Table foo;
+    foo.add_column(type_Int, "a");
+    foo.add_column(type_Int, "b");
+    foo.add_empty_row(10);
+    foo.set_int(0, 4, 123);
+    foo.set_int(0, 7, 123);
+    foo.set_int(1, 2, 456);
+    foo.set_int(1, 4, 456);
+
+    auto q = foo.column<Int>(0) == 123 || foo.column<Int>(1) == 456;
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
+
+    foo.remove_column(0);
+    size_t x = 0;
+    CHECK_LOGIC_ERROR(x = q.count(), LogicError::column_index_out_of_range);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_index_out_of_range);
+    CHECK_EQUAL(x, 0);
+    CHECK_EQUAL(tv.size(), 0);
+}
+
 #endif // TEST_QUERY

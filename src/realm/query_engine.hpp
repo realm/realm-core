@@ -261,6 +261,8 @@ public:
             m_child->apply_handover_patch(patches, group);
     }
 
+    virtual void verify_column() = 0;
+
     std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
     size_t m_condition_column_idx = npos; // Column of search criteria
@@ -308,13 +310,21 @@ protected:
         }
     }
 
+    void do_verify_column(const ColumnBase* col, size_t col_ndx = npos) const
+    {
+        if (col_ndx == npos)
+            col_ndx = m_condition_column_idx;
+        if (m_table && (col_ndx != npos)) {
+            m_table->verify_column(col_ndx, col);
+        }
+    }
+
 private:
     virtual void table_changed() = 0;
 };
 
 // For conditions on a subtable (encapsulated in subtable()...end_subtable()). These return the parent row as match if
-// and
-// only if one or more subtable rows match the condition.
+// and only if one or more subtable rows match the condition.
 class SubtableNode : public ParentNode {
 public:
     SubtableNode(size_t column, std::unique_ptr<ParentNode> condition)
@@ -349,6 +359,12 @@ public:
             m_column = &m_table->get_column_table(m_condition_column_idx);
         else // Mixed
             m_column = &m_table->get_column_mixed(m_condition_column_idx);
+    }
+
+    void verify_column() override
+    {
+        if (m_table)
+            m_table->verify_column(m_condition_column_idx, m_column);
     }
 
     std::string validate() override
@@ -615,6 +631,11 @@ protected:
         m_condition_column = &get_column<ColType>(m_condition_column_idx);
     }
 
+    void verify_column() override
+    {
+        do_verify_column(m_condition_column);
+    }
+
     void init() override
     {
         ColumnNodeBase::init();
@@ -840,6 +861,11 @@ public:
         m_condition_column.init(&get_column<ColType>(m_condition_column_idx));
     }
 
+    void verify_column() override
+    {
+        do_verify_column(m_condition_column.m_column);
+    }
+
     void init() override
     {
         ParentNode::init();
@@ -909,6 +935,11 @@ public:
         m_condition_column = &get_column<BinaryColumn>(m_condition_column_idx);
     }
 
+    void verify_column() override
+    {
+        do_verify_column(m_condition_column);
+    }
+
     void init() override
     {
         m_dD = 100.0;
@@ -970,6 +1001,11 @@ public:
         m_condition_column = &get_column<TimestampColumn>(m_condition_column_idx);
     }
 
+    void verify_column() override
+    {
+        do_verify_column(m_condition_column);
+    }
+
     void init() override
     {
         m_dD = 100.0;
@@ -1018,6 +1054,11 @@ public:
     {
         m_condition_column = &get_column_base(m_condition_column_idx);
         m_column_type = get_real_column_type(m_condition_column_idx);
+    }
+
+    void verify_column() override
+    {
+        do_verify_column(m_condition_column);
     }
 
     void init() override
@@ -1555,6 +1596,13 @@ public:
         }
     }
 
+    void verify_column() override
+    {
+        for (auto& condition : m_conditions) {
+            condition->verify_column();
+        }
+    }
+
     void init() override
     {
         m_dD = 10.0;
@@ -1673,6 +1721,11 @@ public:
         m_condition->set_table(*m_table);
     }
 
+    void verify_column() override
+    {
+        m_condition->verify_column();
+    }
+
     void init() override
     {
         m_dD = 10.0;
@@ -1772,6 +1825,12 @@ public:
     {
         m_getter1.init(&get_column<ColType>(m_condition_column_idx1));
         m_getter2.init(&get_column<ColType>(m_condition_column_idx2));
+    }
+
+    void verify_column() override
+    {
+        do_verify_column(m_getter1.m_column, m_condition_column_idx1);
+        do_verify_column(m_getter2.m_column, m_condition_column_idx2);
     }
 
     void init() override
@@ -1876,6 +1935,11 @@ public:
         m_expression->set_base_table(m_table.get());
     }
 
+    void verify_column() override
+    {
+        // no cached column accessors => do nothing
+    }
+
     size_t find_first_local(size_t start, size_t end) override
     {
         return m_expression->find_first(start, end);
@@ -1923,6 +1987,11 @@ public:
         m_column_type = m_table->get_column_type(m_origin_column);
         m_column = &const_cast<Table*>(m_table.get())->get_column_link_base(m_origin_column);
         REALM_ASSERT(m_column_type == type_Link || m_column_type == type_LinkList);
+    }
+
+    void verify_column() override
+    {
+        do_verify_column(m_column, m_origin_column);
     }
 
     size_t find_first_local(size_t start, size_t end) override
