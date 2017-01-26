@@ -251,7 +251,7 @@ def doBuildWindows() {
 
             dir('build-dir') {
                 bat '''
-                    cmake ..
+                    cmake -DREALM_BUILD_LIB_ONLY=1 ..
                     cmake --build .
                 '''
             }

@@ -37,7 +37,7 @@ include(GetGitRevisionDescription)
 git_describe(REALM_VERSION)
 
 if(NOT DEFINED REALM_LIBTYPE)
-  set(REALM_LIBTYPE "SHARED")
+  set(REALM_LIBTYPE "STATIC")
 endif()
 
 # Project-wide build flags
