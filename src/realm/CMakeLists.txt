@@ -266,3 +266,10 @@ if (NOT APPLE AND NOT ANDROID AND NOT REALM_BUILD_LIB_ONLY)
     install(TARGETS realmd
             DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 endif()
+
+if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    add_custom_target(
+            combined ALL
+            COMMAND ${CMAKE_CXX_ARCHIVE_CREATE} librealm.lib
+            $<TARGET_FILE:realm> $<TARGET_FILE:pthread_win32> $<TARGET_FILE:getopt_win32>)
+endif()
