@@ -268,6 +268,13 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             REQUIRE(realm1 == realm2);
         }).join();
     }
+
+    SECTION("should not modify the schema when fetching from the cache") {
+        auto realm = Realm::get_shared_realm(config);
+        auto object_schema = &*realm->schema().find("object");
+        Realm::get_shared_realm(config);
+        REQUIRE(object_schema == &*realm->schema().find("object"));
+    }
 }
 
 TEST_CASE("SharedRealm: notifications") {
