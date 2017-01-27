@@ -68,8 +68,8 @@ try {
     buildNodeOsxSharedRelease: doBuildNodeInOsx('SHARED', 'Release', isPublishingRun),
     buildNodeOsxSharedDebug: doBuildNodeInOsx('SHARED', 'Debug', isPublishingRun),
     addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
-    buildWin32Release: doBuildWindows(buildType: 'Release', isUWP: false),
-    buildUwpRelease: doBuildWindows(buildType: 'Release', isUWP: true)
+    buildWin32Release: doBuildWindows('Release', false),
+    buildUwpRelease: doBuildWindows('Release', true)
     //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
   ]
 
@@ -245,7 +245,7 @@ def doAndroidBuildInDocker(String abi, String buildType) {
   }
 }
 
-def doBuildWindows(buildType, isUWP) {
+def doBuildWindows(String buildType, boolean isUWP) {
     def cmakeDefinitions = isUWP ? '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0' : ''
 
     return {
