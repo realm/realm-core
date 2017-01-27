@@ -70,8 +70,8 @@ try {
     addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
     buildWin32Release: doBuildWindows('Release', false, 'win32'),
     buildUwpWin32Release: doBuildWindows('Release', true, 'win32'),
-    buildUwpWin64Release: doBuildWindows('Release', true, 'win64'),
-    buildUwpArmRelease: doBuildWindows('Release', true, 'arm')
+    buildUwpWin64Release: doBuildWindows('Release', true, 'win64')
+    //buildUwpArmRelease: doBuildWindows('Release', true, 'arm')
     //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
   ]
 
