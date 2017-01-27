@@ -69,6 +69,10 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
     $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
 )
 
+if(CMAKE_SYSTEM_NAME STREQUAL WindowsStore AND CMAKE_SYSTEM_VERSION STREQUAL 10.0)
+    add_definitions(-DREALM_UWP=1)
+endif()
+
 # Coverage-specific build flags
 if(REALM_COVERAGE)
   if(MSVC)
