@@ -196,8 +196,10 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
             REQUIRE(on_disk_path.size() > 0);
             REQUIRE(weak_session.lock());
         }
-        // Session is dead, so the SyncUser's weak pointer to it should be nulled out.
-        REQUIRE(weak_session.expired());
+        // Wait for the session to die. It may not happen immediately if a progress or error handler
+        // is called on a background thread and keeps the session alive past the scope of the above block.
+        EventLoop::main().run_until([&] { return weak_session.expired(); });
+
         // The next time we request it, it'll be created anew.
         // The call to `get_session()` should result in `SyncUser::register_session()` being called.
         auto session = SyncManager::shared().get_session(on_disk_path, config);
