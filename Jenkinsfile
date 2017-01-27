@@ -8,7 +8,7 @@ try {
   def isPublishingRun
   def isPublishingLatestRun
 
-  timeout(time: 1, unit: 'HOURS') {
+  timeout(time: 2, unit: 'HOURS') {
     stage('gather-info') {
       node {
         checkout([
