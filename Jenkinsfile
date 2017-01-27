@@ -254,7 +254,7 @@ def doBuildWindows(String buildType, boolean isUWP) {
 
             dir('build-dir') {
                 bat """
-                    cmake ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015\" ..
+                    cmake ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015\" -DCMAKE_BUILD_TYPE=${buildType} ..
                     cmake --build . --config ${buildType}
                     cpack -C ${buildType}
                 """
