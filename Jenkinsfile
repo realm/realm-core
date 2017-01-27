@@ -68,8 +68,10 @@ try {
     buildNodeOsxSharedRelease: doBuildNodeInOsx('SHARED', 'Release', isPublishingRun),
     buildNodeOsxSharedDebug: doBuildNodeInOsx('SHARED', 'Debug', isPublishingRun),
     addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
-    buildWin32Release: doBuildWindows('Release', false),
-    buildUwpRelease: doBuildWindows('Release', true)
+    buildWin32Release: doBuildWindows('Release', false, 'win32'),
+    buildUwpWin32Release: doBuildWindows('Release', true, 'win32'),
+    buildUwpWin64Release: doBuildWindows('Release', true, 'win64'),
+    buildUwpArmRelease: doBuildWindows('Release', true, 'arm')
     //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
   ]
 
@@ -245,8 +247,14 @@ def doAndroidBuildInDocker(String abi, String buildType) {
   }
 }
 
-def doBuildWindows(String buildType, boolean isUWP) {
+def doBuildWindows(String buildType, boolean isUWP, String arch) {
     def cmakeDefinitions = isUWP ? '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0' : ''
+    def archSuffix = ''
+    if (arch == 'win64') {
+        archSuffix = ' Win64'
+    } else if (arch == 'arm') {
+        archSuffix = ' ARM'
+    }
 
     return {
         node('windows') {
@@ -254,7 +262,7 @@ def doBuildWindows(String buildType, boolean isUWP) {
 
             dir('build-dir') {
                 bat """
-                    cmake ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015\" -DCMAKE_BUILD_TYPE=${buildType} ..
+                    cmake ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015${archSuffix}\" -DCMAKE_BUILD_TYPE=${buildType} ..
                     cmake --build . --config ${buildType}
                     cpack -C ${buildType}
                 """
