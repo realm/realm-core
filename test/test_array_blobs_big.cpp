@@ -382,6 +382,13 @@ TEST(ArrayBigBlobs_get_at)
     read = c.get_at(1, get_pos);
     CHECK(read.is_null());
 
+    // Try to assign a new value
+    c.set(1, BinaryData(lazy_fox));
+    get_pos = 0;
+    read = c.get_at(0, get_pos);
+    CHECK_EQUAL(get_pos, 0);
+    CHECK_EQUAL(std::string(read.data(), read.size()), lazy_fox);
+
     // Read a NULL entry
     c.set(1, BinaryData());
     get_pos = 0;

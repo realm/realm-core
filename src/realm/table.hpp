@@ -404,6 +404,12 @@ public:
     DataType get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
     Timestamp get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
 
+    /// Return data from position 'pos' and onwards. If the blob is distributed
+    /// across multiple arrays, you will only get data from one array. 'pos'
+    /// will be updated to be an index to next available data. It will be 0
+    /// if no more data. This method replaces get_binary().
+    BinaryData get_binary_at(size_t col_ndx, size_t ndx, size_t& pos) const noexcept;
+
     template <class T>
     T get(size_t c, size_t r) const noexcept;
 
@@ -496,6 +502,7 @@ public:
     void set_double(size_t column_ndx, size_t row_ndx, double value, bool is_default = false);
     void set_string(size_t column_ndx, size_t row_ndx, StringData value, bool is_default = false);
     size_t set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
+    void set_binary_big(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default = false);
     void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default = false);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value, bool is_default = false);
     void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default = false);

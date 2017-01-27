@@ -3243,7 +3243,7 @@ BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
-void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
+void Table::set_binary_big(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -3257,8 +3257,6 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_def
         throw LogicError(LogicError::column_index_out_of_range);
     if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
-    if (REALM_UNLIKELY(value.size() > ArrayBlob::max_binary_size))
-        throw LogicError(LogicError::binary_too_big);
     bump_version();
 
     // FIXME: Loophole: Assertion violation in Table::get_column_binary() on
@@ -3271,6 +3269,17 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_def
                          is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
+BinaryData Table::get_binary_at(size_t col_ndx, size_t ndx, size_t& pos) const noexcept
+{
+    return get_column<BinaryColumn, col_type_Binary>(col_ndx).get_at(ndx, pos);
+}
+
+void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
+{
+    if (REALM_UNLIKELY(value.size() > ArrayBlob::max_binary_size))
+        throw LogicError(LogicError::binary_too_big);
+    set_binary_big(col_ndx, ndx, value, is_default);
+}
 
 Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const noexcept
 {
