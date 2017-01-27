@@ -31,7 +31,6 @@ set(REALM_SOURCES
     impl/output_stream.cpp
     impl/simulated_failure.cpp
     impl/transact_log.cpp
-    importer.cpp
     index_string.cpp
     lang_bind_helper.cpp
     link_view.cpp
@@ -106,7 +105,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     impl/continuous_transactions_history.hpp
     impl/input_stream.hpp
     impl/transact_log.hpp
-    importer.hpp
     index_string.hpp
     lang_bind_helper.hpp
     link_view.hpp
@@ -255,7 +253,7 @@ install(FILES ${REALM_INSTALL_UTIL_HEADERS}
 
 if (NOT APPLE AND NOT ANDROID AND NOT REALM_BUILD_LIB_ONLY)
     add_executable(realm-config config_tool.cpp)
-    add_executable(realm-importer importer_tool.cpp)
+    add_executable(realm-importer importer_tool.cpp importer.cpp importer.hpp)
     target_link_libraries(realm-importer realm)
 
     install(TARGETS realm-config realm-importer
