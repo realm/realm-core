@@ -68,7 +68,8 @@ try {
     buildNodeOsxSharedRelease: doBuildNodeInOsx('SHARED', 'Release', isPublishingRun),
     buildNodeOsxSharedDebug: doBuildNodeInOsx('SHARED', 'Debug', isPublishingRun),
     addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
-    buildWindows: doBuildWindows()
+    buildWin32Release: doBuildWindows(buildType: 'Release', isUWP: false),
+    buildUwpRelease: doBuildWindows(buildType: 'Release', isUWP: true)
     //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
   ]
 
@@ -244,17 +245,19 @@ def doAndroidBuildInDocker(String abi, String buildType) {
   }
 }
 
-def doBuildWindows() {
+def doBuildWindows(buildType, isUWP) {
+    def cmakeDefinitions = isUWP ? '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0' : ''
+
     return {
         node('windows') {
             getArchive()
 
             dir('build-dir') {
-                bat '''
-                    cmake -DREALM_BUILD_LIB_ONLY=1 -DCMAKE_BUILD_TYPE=Release ..
-                    cmake --build . --config Release
-                    cpack -C Release
-                '''
+                bat """
+                    cmake ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015\" ..
+                    cmake --build . --config ${buildType}
+                    cpack -C ${buildType}
+                """
             }
         }
     }
