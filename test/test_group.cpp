@@ -931,11 +931,7 @@ TEST(Group_Invalid2)
 {
     // Try to open buffer with invalid data
     const char* const str = "invalid data";
-    const size_t size = strlen(str);
-    char* const data = new char[strlen(str)];
-    std::copy(str, str + size, data);
-    CHECK_THROW(Group(BinaryData(data, size)), InvalidDatabase);
-    delete[] data;
+    CHECK_THROW(Group(BinaryData(str, strlen(str))), InvalidDatabase);
 }
 
 

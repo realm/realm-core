@@ -619,15 +619,16 @@ void spawn_daemon(const std::string& file)
         int i;
         for (i = m - 1; i >= 0; --i)
             close(i);
-        i = ::open("/dev/null", O_RDWR);
 #ifdef REALM_ENABLE_LOGFILE
         // FIXME: Do we want to always open the log file? Should it be configurable?
         i = ::open((file + ".log").c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
 #else
-        i = dup(i);
+        i = ::open("/dev/null", O_RDWR);
 #endif
-        i = dup(i);
-        static_cast<void>(i);
+        if (i >= 0) {
+            int j = dup(i);
+            static_cast<void>(j);
+        }
 #ifdef REALM_ENABLE_LOGFILE
         std::cerr << "Detaching" << std::endl;
 #endif

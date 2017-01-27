@@ -89,7 +89,7 @@ TEST(File_NoSpuriousTryLockFailures)
     CondVar cond;
     int num_slaves_ready = 0;
     int num_good_locks = 0;
-    bool slaves_run[num_slaves];
+    bool slaves_run[num_slaves] = {false};
     std::map<int, int> results;
     bool terminate = false;
 
@@ -156,7 +156,6 @@ TEST(File_NoSpuriousTryLockFailures)
     std::string str_path = path;
     ThreadWrapper slaves[num_slaves];
     for (int i = 0; i != num_slaves; ++i) {
-        slaves_run[i] = false;
         slaves[i].start([=] { slave(i, str_path); });
     }
     master();

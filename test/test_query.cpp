@@ -2965,8 +2965,8 @@ TEST(Query_DoubleCoordinates)
 
     for (size_t t = 0; t < 100000; t++) {
         table->add_empty_row(1);
-        table->set_double(0, t, (t * 12345) % 1000);
-        table->set_double(1, t, (t * 12345) % 1000);
+        table->set_double(0, t, double((t * 12345) % 1000));
+        table->set_double(1, t, double((t * 12345) % 1000));
 
         if (table->get_double(0, t) >= 100. && table->get_double(0, t) <= 110. && table->get_double(1, t) >= 100. &&
             table->get_double(1, t) <= 110.) {
@@ -8758,7 +8758,7 @@ TEST(Query_MaximumSumAverage)
             CHECK_EQUAL(d, 7.);
 
             dbl = table1->where().not_equal(2, 1234.).sum_double(2);
-            CHECK_APPROXIMATELY_EQUAL(d, 7., 0.001);
+            CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
 
 
             // Those with criteria now only include some rows, whereof none are null

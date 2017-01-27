@@ -671,7 +671,7 @@ inline void TransactLogBufferStream::transact_log_append(const char* data, size_
                                                          char** out_new_end)
 {
     transact_log_reserve(size, out_new_begin, out_new_end);
-    *out_new_begin = std::copy_n(data, size, *out_new_begin);
+    *out_new_begin = realm::safe_copy_n(data, size, *out_new_begin);
 }
 
 inline const char* TransactLogBufferStream::transact_log_data() const
@@ -825,7 +825,7 @@ inline char* TransactLogEncoder::encode<float>(char* ptr, float value)
                       sizeof(float) * std::numeric_limits<unsigned char>::digits == 32,
                   "Unsupported 'float' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
-    return std::copy_n(val_ptr, sizeof value, ptr);
+    return realm::safe_copy_n(val_ptr, sizeof value, ptr);
 }
 
 template <>
@@ -835,7 +835,7 @@ inline char* TransactLogEncoder::encode<double>(char* ptr, double value)
                       sizeof(double) * std::numeric_limits<unsigned char>::digits == 64,
                   "Unsupported 'double' representation");
     const char* val_ptr = reinterpret_cast<char*>(&value);
-    return std::copy_n(val_ptr, sizeof value, ptr);
+    return realm::safe_copy_n(val_ptr, sizeof value, ptr);
 }
 
 template <>
@@ -2166,14 +2166,14 @@ inline void TransactLogParser::read_bytes(char* data, size_t size)
         const size_t avail = m_input_end - m_input_begin;
         if (size <= avail)
             break;
-        std::copy_n(m_input_begin, avail, data);
+        realm::safe_copy_n(m_input_begin, avail, data);
         if (!next_input_buffer())
             throw BadTransactLog();
         data += avail;
         size -= avail;
     }
     const char* to = m_input_begin + size;
-    std::copy_n(m_input_begin, size, data);
+    realm::safe_copy_n(m_input_begin, size, data);
     m_input_begin = to;
 }
 

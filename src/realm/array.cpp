@@ -446,7 +446,7 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     const char* begin_2 = m_data + begin * bytes_per_elem;
     const char* end_2 = m_data + end * bytes_per_elem;
     char* dest_begin_2 = m_data + dest_begin * bytes_per_elem;
-    std::copy_n(begin_2, end_2 - begin_2, dest_begin_2);
+    realm::safe_copy_n(begin_2, end_2 - begin_2, dest_begin_2);
 }
 
 void Array::move_backward(size_t begin, size_t end, size_t dest_end)
@@ -1558,7 +1558,7 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
         const char* src_begin = header;
         const char* src_end = header + size;
         char* dst_begin = clone_header;
-        std::copy_n(src_begin, src_end - src_begin, dst_begin);
+        realm::safe_copy_n(src_begin, src_end - src_begin, dst_begin);
 
         // Update with correct capacity
         set_header_capacity(size, clone_header);
@@ -1627,7 +1627,7 @@ void Array::copy_on_write()
         const char* old_begin = get_header_from_data(m_data);
         const char* old_end = get_header_from_data(m_data) + array_size;
         char* new_begin = mref.get_addr();
-        std::copy_n(old_begin, old_end - old_begin, new_begin);
+        realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
 
         ref_type old_ref = m_ref;
 

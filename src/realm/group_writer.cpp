@@ -485,8 +485,9 @@ ref_type GroupWriter::write_group()
 size_t GroupWriter::get_free_space() {
     if (m_free_lengths.is_attached()) {
         size_t sum = 0;
-        for (size_t j=0; j<m_free_lengths.size(); ++j)
-            sum += m_free_lengths.get(j);
+        for (size_t j = 0; j < m_free_lengths.size(); ++j) {
+            sum += to_size_t(m_free_lengths.get(j));
+        }
         return sum;
     } else {
         return 0;
@@ -734,7 +735,7 @@ void GroupWriter::write(const char* data, size_t size)
     MapWindow* window = get_window(pos, size);
     char* dest_addr = window->translate(pos);
     window->encryption_read_barrier(dest_addr, size);
-    std::copy_n(data, size, dest_addr);
+    realm::safe_copy_n(data, size, dest_addr);
     window->encryption_write_barrier(dest_addr, size);
 }
 

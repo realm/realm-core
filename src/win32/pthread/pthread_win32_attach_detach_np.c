@@ -45,7 +45,7 @@ static HINSTANCE ptw32_h_quserex;
 BOOL
 pthread_win32_process_attach_np ()
 {
-  TCHAR QuserExDLLPathBuf[1024];
+//  TCHAR QuserExDLLPathBuf[1024]; // obsolete; belongs to "#if 0" section below
   BOOL result = TRUE;
 
   result = ptw32_processInitialize ();
@@ -71,7 +71,7 @@ pthread_win32_process_attach_np ()
    * This should take care of any security issues.
    */
 
-#if 0
+#if 0 // obsolete
 #if defined(__GNUC__) || _MSC_VER < 1400
   if(GetSystemDirectory(QuserExDLLPathBuf, sizeof(QuserExDLLPathBuf)))
   {
