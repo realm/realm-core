@@ -261,7 +261,7 @@ public:
             m_child->apply_handover_patch(patches, group);
     }
 
-    virtual void verify_column() = 0;
+    virtual void verify_column() const = 0;
 
     std::unique_ptr<ParentNode> m_child;
     std::vector<ParentNode*> m_children;
@@ -361,7 +361,7 @@ public:
             m_column = &m_table->get_column_mixed(m_condition_column_idx);
     }
 
-    void verify_column() override
+    void verify_column() const override
     {
         if (m_table)
             m_table->verify_column(m_condition_column_idx, m_column);
@@ -631,7 +631,7 @@ protected:
         m_condition_column = &get_column<ColType>(m_condition_column_idx);
     }
 
-    void verify_column() override
+    void verify_column() const override
     {
         do_verify_column(m_condition_column);
     }
@@ -861,7 +861,7 @@ public:
         m_condition_column.init(&get_column<ColType>(m_condition_column_idx));
     }
 
-    void verify_column() override
+    void verify_column() const override
     {
         do_verify_column(m_condition_column.m_column);
     }
@@ -935,7 +935,7 @@ public:
         m_condition_column = &get_column<BinaryColumn>(m_condition_column_idx);
     }
 
-    void verify_column() override
+    void verify_column() const override
     {
         do_verify_column(m_condition_column);
     }
@@ -1001,7 +1001,7 @@ public:
         m_condition_column = &get_column<TimestampColumn>(m_condition_column_idx);
     }
 
-    void verify_column() override
+    void verify_column() const override
     {
         do_verify_column(m_condition_column);
     }
@@ -1056,7 +1056,7 @@ public:
         m_column_type = get_real_column_type(m_condition_column_idx);
     }
 
-    void verify_column() override
+    void verify_column() const override
     {
         do_verify_column(m_condition_column);
     }
@@ -1596,7 +1596,7 @@ public:
         }
     }
 
-    void verify_column() override
+    void verify_column() const override
     {
         for (auto& condition : m_conditions) {
             condition->verify_column();
@@ -1721,7 +1721,7 @@ public:
         m_condition->set_table(*m_table);
     }
 
-    void verify_column() override
+    void verify_column() const override
     {
         m_condition->verify_column();
     }
@@ -1827,7 +1827,7 @@ public:
         m_getter2.init(&get_column<ColType>(m_condition_column_idx2));
     }
 
-    void verify_column() override
+    void verify_column() const override
     {
         do_verify_column(m_getter1.m_column, m_condition_column_idx1);
         do_verify_column(m_getter2.m_column, m_condition_column_idx2);
@@ -1935,7 +1935,7 @@ public:
         m_expression->set_base_table(m_table.get());
     }
 
-    void verify_column() override
+    void verify_column() const override
     {
         // no cached column accessors => do nothing
     }
@@ -1989,7 +1989,7 @@ public:
         REALM_ASSERT(m_column_type == type_Link || m_column_type == type_LinkList);
     }
 
-    void verify_column() override
+    void verify_column() const override
     {
         do_verify_column(m_column, m_origin_column);
     }

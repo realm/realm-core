@@ -1161,19 +1161,7 @@ private:
     const BacklinkColumn& get_column_backlink(size_t ndx) const noexcept;
     BacklinkColumn& get_column_backlink(size_t ndx);
 
-    void verify_column(size_t col_ndx, const ColumnBase* col) const
-    {
-        if (col_ndx < m_cols.size()) {
-            if (m_cols[col_ndx] == col)
-                return;
-            // A column could have been inserted. Check if col can be found further on
-            for (auto it = m_cols.begin() + col_ndx + 1; it < m_cols.end(); ++it) {
-                if (*it == col)
-                    return;
-            }
-        }
-        throw LogicError(LogicError::column_index_out_of_range);
-    }
+    void verify_column(size_t col_ndx, const ColumnBase* col) const;
 
     void instantiate_before_change();
     void validate_column_type(const ColumnBase& col, ColumnType expected_type, size_t ndx) const;
@@ -1655,6 +1643,19 @@ inline bool Table::has_shared_type() const noexcept
     return !m_top.is_attached();
 }
 
+inline void Table::verify_column(size_t col_ndx, const ColumnBase* col) const
+{
+    if (col_ndx < m_cols.size()) {
+        if (m_cols[col_ndx] == col)
+            return;
+        // The column might be elsewhere in the list
+        for (auto it : m_cols) {
+            if (it == col)
+                return;
+        }
+    }
+    throw LogicError(LogicError::column_does_not_exist);
+}
 
 class Table::UnbindGuard {
 public:

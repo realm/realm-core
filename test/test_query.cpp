@@ -9934,8 +9934,8 @@ TEST(Query_ColumnDeletion)
 
     foo.remove_column(0);
     size_t x = 0;
-    CHECK_LOGIC_ERROR(x = q.count(), LogicError::column_index_out_of_range);
-    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_index_out_of_range);
+    CHECK_LOGIC_ERROR(x = q.count(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
     CHECK_EQUAL(x, 0);
     CHECK_EQUAL(tv.size(), 0);
 }
