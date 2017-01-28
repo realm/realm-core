@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
 
     std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
     Snapshot& ss = db.create_changes();
-    Table t = ss.create_table("my_table", fields);
+    Table t = ss.create_table(fields);
     Field<uint64_t> field_a = ss.get_field<uint64_t>(t, 0);
     Field<int64_t> field_b = ss.get_field<int64_t>(t, 1);
     Field<float> field_c = ss.get_field<float>(t, 2);
@@ -342,8 +342,8 @@ int main(int argc, char* argv[]) {
     start = std::chrono::high_resolution_clock::now();
     job2(&results);
     end = std::chrono::high_resolution_clock::now();
-    ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
-    std::cout << "   ...done in " << ns.count() << " nsecs" << std::endl << std::endl;
+    ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / count;
+    std::cout << "   ...done in " << ns.count() << " nsecs/element" << std::endl << std::endl;
 
     ss.print_stat(std::cout);
     std::cout << "Committing to stable storage" << std::flush;

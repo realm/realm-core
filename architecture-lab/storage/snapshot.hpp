@@ -25,13 +25,11 @@
 
 class Snapshot {
 public:
-    // manipulate tables:
-    // FIXME: name ignored, only one table possible
-    virtual Table create_table(const char* name, const char* typeinfo) = 0;
-    virtual Table create_anon_table(const char* typeinfo) = 0;
-    // FIXME: unimplemented
-    virtual Table get_table(const char* name) const = 0;
-  
+    // low level table/table layout interface:
+    virtual Table create_table(const char* typeinfo) = 0;
+    virtual Table get_table_dir() = 0;
+    virtual Table get_layout_dir() = 0;
+
     // fields and their definitions:
     // throws if the field type does not match the table runtime typeinfo for that field
     template<typename T>

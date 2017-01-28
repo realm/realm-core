@@ -58,12 +58,7 @@ void _Snapshot::init() {
     tables.init(64);
 }
 
-Table SnapshotImpl::create_table(const char* name, const char* typeinfo) {
-    // FIXME
-    return create_anon_table(typeinfo);
-}
-
-Table SnapshotImpl::create_anon_table(const char* typeinfo) {
+Table SnapshotImpl::create_table(const char* typeinfo) {
     assert(mem.is_writable(m_top));
     uint64_t key = m_top_ptr->tables.insert(mem);
     Ref<_Table>* table = m_top_ptr->tables.get_ref(mem, key);
@@ -72,8 +67,12 @@ Table SnapshotImpl::create_anon_table(const char* typeinfo) {
     return {key};
 }
 
-Table SnapshotImpl::get_table(const char* name) const {
-    return {0};
+Table SnapshotImpl::get_table_dir() {
+    return m_top_ptr->table_directory;
+}
+
+Table SnapshotImpl::get_layout_dir() {
+    return m_top_ptr->table_layouts;
 }
 
 template<typename T>

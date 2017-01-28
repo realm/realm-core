@@ -25,6 +25,8 @@
 struct _Snapshot {
     _DirectMap<Ref<_Table>> tables;
     uint64_t version;
+    Table table_directory;
+    Table table_layouts;
     static Ref<_Snapshot> commit(Memory& mem, Ref<_Snapshot> from);
     static Ref<_Snapshot> cow(Memory& mem, Ref<_Snapshot> from);
     void init();
@@ -36,10 +38,10 @@ public:
     SnapshotImpl(Memory& mem, Ref<_Snapshot> top_ref, bool writable);
 
     // manipulate tables:
-    Table create_table(const char* name, const char* typeinfo);
-    Table create_anon_table(const char* typeinfo);
-    Table get_table(const char* name) const;
-  
+    Table create_table(const char* typeinfo);
+    Table get_table_dir();
+    Table get_layout_dir();
+
     // fields and their definitions
     template<typename T>
     Field<T> get_field(Table t, int number) const; // add field name instead of number
