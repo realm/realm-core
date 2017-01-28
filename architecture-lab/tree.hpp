@@ -36,7 +36,7 @@ struct _TreeTop {
     void cow_path(Memory& mem, uint64_t index, Ref<DynType> leaf);
 
     // get leaf at index
-    Ref<DynType> lookup(const Memory& mem, uint64_t index);
+    Ref<DynType> lookup(const Memory& mem, uint64_t index) const;
 
     void init(uint64_t capacity);
 

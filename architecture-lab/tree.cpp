@@ -84,7 +84,7 @@ inline Ref<DynType> step_with_trace(const Memory& mem, Ref<DynType> ref, uint64_
 }
 
 // Get leaf at index:
-Ref<DynType> _TreeTop::lookup(const Memory& mem, uint64_t index) {
+Ref<DynType> _TreeTop::lookup(const Memory& mem, uint64_t index) const {
     Ref<DynType> ref = top_level;
     uint64_t masked_index = index & mask;
     switch (levels) {

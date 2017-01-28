@@ -66,8 +66,8 @@ Table SnapshotImpl::create_table(const char* name, const char* typeinfo) {
 Table SnapshotImpl::create_anon_table(const char* typeinfo) {
     assert(mem.is_writable(m_top));
     uint64_t key = m_top_ptr->tables.insert(mem);
-    _Table* table = m_top_ptr->tables.get_ref(mem, key);
-    table->init(typeinfo);
+    Ref<_Table>* table = m_top_ptr->tables.get_ref(mem, key);
+    *table = _Table::create(mem, typeinfo);
     versioning_counter += 2;
     return {key};
 }
@@ -99,20 +99,24 @@ template Field<List<Table>> Snapshot::get_field<List<Table>>(Table, int) const;
 
 template<typename T>
 Field<T> SnapshotImpl::get_field(Table t, int number) const {
-    _Table* table = m_top_ptr->tables.get_ref(mem, t.key);
-    table->check_field<T>(number);
-    return {(unsigned) number};
+    Ref<_Table> table = m_top_ptr->tables.get(mem, t.key);
+    _Table* table_ptr = mem.txl(table);
+    return table_ptr->check_field<T>(number);
 }
 
 void SnapshotImpl::insert(Table t, Row r) {
     assert(mem.is_writable(m_top));
     m_top_ptr->tables.cow_path(mem, t.key);
-    _Table* table = m_top_ptr->tables.get_ref(mem, t.key);
-    table->insert(mem, r.key);
+    Ref<_Table>* table = m_top_ptr->tables.get_ref(mem, t.key);
+    *table = _Table::cow(mem, *table);
+    _Table* table_ptr = mem.txl(*table);
+    table_ptr->insert(mem, r.key);
 }
 
 bool SnapshotImpl::exists(Table t, Row r) const {
-    return m_top_ptr->tables.get_ref(mem, t.key)->find(mem, r.key);
+    Ref<_Table> table = m_top_ptr->tables.get(mem, t.key);
+    _Table* table_ptr = mem.txl(table);
+    return table_ptr->find(mem, r.key);
 }
 
 Object SnapshotImpl::get(Table t, Row r) const {
@@ -121,9 +125,10 @@ Object SnapshotImpl::get(Table t, Row r) const {
     res.versioning_count = versioning_counter;
     res.t = t;
     res.r = r;
-    _Table* table = m_top_ptr->tables.get_ref(mem, t.key);
-    res.table = table;
-    table->get_cluster(mem, r.key, res);
+    Ref<_Table> table = m_top_ptr->tables.get(mem, t.key);
+    _Table* table_ptr = mem.txl(table);
+    res.table = table_ptr;
+    table_ptr->get_cluster(mem, r.key, res);
     return res;
 }
 
@@ -137,9 +142,11 @@ Object SnapshotImpl::change(Table t, Row r) {
     res.r = r;
     assert(mem.is_writable(m_top));
     m_top_ptr->tables.cow_path(mem, t.key);
-    _Table* table = m_top_ptr->tables.get_ref(mem, t.key);
-    res.table = table;
-    table->change_cluster(mem, r.key, res);
+    Ref<_Table>* table = m_top_ptr->tables.get_ref(mem, t.key);
+    *table = _Table::cow(mem, *table);
+    _Table* table_ptr = mem.txl(*table);
+    res.table = table_ptr;
+    table_ptr->change_cluster(mem, r.key, res);
     return res;
 }
 
@@ -196,14 +203,16 @@ bool SnapshotImpl::first_access(Table t, ObjectIterator& oi, uint64_t start_inde
     oi.o.versioning_count = versioning_counter;
     oi.o.t = t;
     oi.o.r = {0}; // set by 'first_access'
-    _Table* table = m_top_ptr->tables.get_ref(mem, t.key);
-    oi.o.table = table;
+    Ref<_Table> table = m_top_ptr->tables.get(mem, t.key);
+    _Table* table_ptr = mem.txl(table);
+    oi.o.table = table_ptr;
     oi.tree_index = start_index;
-    bool ok = table->first_access(mem, oi);
+    bool ok = table_ptr->first_access(mem, oi);
     return ok;
 }
 
 uint64_t SnapshotImpl::get_universe_size(Table t) const {
-    _Table* table = m_top_ptr->tables.get_ref(mem, t.key);
-    return table->cuckoo.primary_tree.mask+1;
+    Ref<_Table> table = m_top_ptr->tables.get(mem, t.key);
+    _Table* table_ptr = mem.txl(table);
+    return table_ptr->cuckoo.primary_tree.mask+1;
 }

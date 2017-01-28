@@ -23,7 +23,7 @@
 
 // in-db representation:
 struct _Snapshot {
-    _DirectMap<_Table> tables;
+    _DirectMap<Ref<_Table>> tables;
     uint64_t version;
     static Ref<_Snapshot> commit(Memory& mem, Ref<_Snapshot> from);
     static Ref<_Snapshot> cow(Memory& mem, Ref<_Snapshot> from);

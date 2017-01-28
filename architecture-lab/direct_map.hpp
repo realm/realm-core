@@ -35,7 +35,7 @@ struct _DirectMap {
     void copied_to_file(Memory& mem);
 
     // make entry at index writable (assumes map is already writable):
-    // _TEntry must support 'embedded_cow'
+    // _TEntry must support 'copied_from_file'
     void cow_path(Memory& mem, uint64_t index);
 
     // entries must be default constructible

@@ -121,6 +121,17 @@ _TEntry* _DirectMap<_TEntry>::get_ref(Memory& mem, uint64_t key) {
 }
 
 template<typename _TEntry>
+_TEntry _DirectMap<_TEntry>::get(Memory& mem, uint64_t key) const {
+    using _TLeaf = _DirectMapLeaf<_TEntry>;
+    Ref<_TLeaf> leaf = tree.lookup(mem, key).as<_TLeaf>();
+    _TLeaf* leaf_ptr = mem.txl(leaf);
+    int in_leaf_idx = leaf_ptr->find(key);
+    if (in_leaf_idx >= 0)
+        return leaf_ptr->entries[in_leaf_idx].entry;
+    throw NotFound();
+}
+
+template<typename _TEntry>
 uint64_t _DirectMap<_TEntry>::insert(Memory& mem) {
     using _TLeaf = _DirectMapLeaf<_TEntry>;
     for (;;) {
@@ -175,4 +186,4 @@ void _DirectMap<_TEntry>::init(size_t initial_size) {
 }
 
 // Explicit instantiations:
-template class _DirectMap<_Table>;
+template class _DirectMap<Ref<_Table>>;

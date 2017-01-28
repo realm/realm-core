@@ -86,8 +86,8 @@ union Reps {
 struct _Cluster { ArrayReps entries[1]; };
 
 struct ClusterMgr : public PayloadMgr {
-    ClusterMgr(Memory& mem, int num_fields, const char* typeinfo) 
-        : mem(mem), num_fields(num_fields), typeinfo(typeinfo) {};
+    ClusterMgr(Memory& mem, int num_fields, const _FieldInfo* field_info);
+    ~ClusterMgr();
     virtual void cow(Ref<DynType>& payload, int old_capacity, int new_capacity);
     virtual void free(Ref<DynType> payload, int capacity);
     virtual void read_internalbuffer(Ref<DynType> payload, int from);
@@ -97,9 +97,26 @@ struct ClusterMgr : public PayloadMgr {
     virtual Ref<DynType> commit(Ref<DynType> from);
     Memory& mem;
     int num_fields;
-    const char* typeinfo;
-    Reps values[16];
+    const _FieldInfo* field_info;
+    Reps* values;
+    Reps value_buffer[64];
 };
+
+ClusterMgr::ClusterMgr(Memory& mem, int num_fields, const _FieldInfo* field_info)
+    : mem(mem), num_fields(num_fields), field_info(field_info) {
+    if (num_fields <= 64) {
+        values = value_buffer;
+    }
+    else {
+        values = new Reps[num_fields];
+    }
+}
+
+ClusterMgr::~ClusterMgr() {
+    if (num_fields > 64) {
+        delete[] values;
+    }
+}
 
 
 void ClusterMgr::init_internalbuffer() {
@@ -111,7 +128,7 @@ void ClusterMgr::free(Ref<DynType> payload, int capacity) {
         Ref<_Cluster> cluster = payload.as<_Cluster>();
         _Cluster* cluster_ptr = mem.txl(cluster);
         for (int j=0; j < num_fields; j++) {
-            switch(typeinfo[j]) {
+            switch(field_info[j].type) {
                 case 't': 
                 case 'r':
                 case 'u': cluster_ptr->entries[j].as_u.free(mem); break;
@@ -155,7 +172,7 @@ Ref<DynType> ClusterMgr::commit(Ref<DynType> from) {
         _Cluster* to_ptr;
         Ref<_Cluster> to = mem.alloc_in_file<_Cluster>(to_ptr, num_fields * sizeof(uint64_t));
         for (int k = 0; k < num_fields; ++k) {
-            switch(typeinfo[k]) {
+            switch(field_info[k].type) {
                 case 't': 
                 case 'r':
                 case 'u': to_ptr->entries[k].as_u = _Array<uint64_t>::commit(mem, from_ptr->entries[k].as_u); break;
@@ -186,7 +203,7 @@ void ClusterMgr::read_internalbuffer(Ref<DynType> payload, int index) {
     Ref<_Cluster> p_ref = payload.as<_Cluster>();
     _Cluster* p_ptr = mem.txl(p_ref);
     for (int col = 0; col < num_fields; ++col) {
-        switch (typeinfo[col]) {
+        switch (field_info[col].type) {
             case 't': 
             case 'r':
             case 'u': values[col].as_u = p_ptr->entries[col].as_u.get(mem, index); break;
@@ -210,7 +227,7 @@ void ClusterMgr::write_internalbuffer(Ref<DynType>& payload, int index) {
     Ref<_Cluster> p_ref = payload.as<_Cluster>();
     _Cluster* p_ptr = mem.txl(p_ref);
     for (int col = 0; col < num_fields; ++col) {
-        switch (typeinfo[col]) {
+        switch (field_info[col].type) {
             case 't': 
             case 'r':
             case 'u': p_ptr->entries[col].as_u.set(mem, index, values[col].as_u); break;
@@ -234,7 +251,7 @@ void ClusterMgr::swap_internalbuffer(Ref<DynType>& payload, int index) {
     Ref<_Cluster> p_ref = payload.as<_Cluster>();
     _Cluster* p_ptr = mem.txl(p_ref);
     for (int col = 0; col < num_fields; ++col) {
-        switch (typeinfo[col]) {
+        switch (field_info[col].type) {
             case 't': 
             case 'r':
             case 'u': {
@@ -310,25 +327,33 @@ void ClusterMgr::swap_internalbuffer(Ref<DynType>& payload, int index) {
 Ref<_Table> _Table::cow(Memory& mem, Ref<_Table> from) {
     if (!mem.is_writable(from)) {
         _Table* to_ptr;
-        Ref<_Table> to = mem.alloc<_Table>(to_ptr);
         _Table* from_ptr = mem.txl(from);
+        Ref<_Table> to = mem.alloc<_Table>(to_ptr, get_allocation_size(from_ptr->num_fields));
         *to_ptr = *from_ptr;
+        for (uint16_t j = 1; j < to_ptr->num_fields; ++j) {
+            to_ptr->fields[j] = from_ptr->fields[j];
+        }
         mem.free(from);
+        to_ptr->copied_from_file(mem);
         return to;
     }
     return from;
 }
 
-void _Table::copied_from_file(Memory& mem) {} // does nothing, could forward to cuckoo?
+void _Table::copied_from_file(Memory& mem) {} // could forward to cuckoo?
 
 Ref<_Table> _Table::commit(Memory& mem, Ref<_Table> from) {
     if (mem.is_writable(from)) {
         _Table* to_ptr;
-        Ref<_Table> to = mem.alloc_in_file<_Table>(to_ptr);
         _Table* from_ptr = mem.txl(from);
+        Ref<_Table> to =
+            mem.alloc_in_file<_Table>(to_ptr, get_allocation_size(from_ptr->num_fields));
         *to_ptr = *from_ptr;
+        for (uint16_t j = 1; j < to_ptr->num_fields; ++j) {
+            to_ptr->fields[j] = from_ptr->fields[j];
+        }
         mem.free(from);
-        ClusterMgr pm(mem,to_ptr->num_fields, to_ptr->typeinfo);
+        ClusterMgr pm(mem,to_ptr->num_fields, to_ptr->fields);
         to_ptr->cuckoo.copied_to_file(mem, pm);
         return to;
     }
@@ -336,12 +361,12 @@ Ref<_Table> _Table::commit(Memory& mem, Ref<_Table> from) {
 }
 
 void _Table::copied_to_file(Memory& mem) {
-    ClusterMgr pm(mem, num_fields, typeinfo);
+    ClusterMgr pm(mem, num_fields, fields);
     cuckoo.copied_to_file(mem, pm);
 }
 
 void _Table::insert(Memory& mem, uint64_t key) {
-    ClusterMgr pm(mem, num_fields, typeinfo);
+    ClusterMgr pm(mem, num_fields, fields);
     pm.init_internalbuffer();
     cuckoo.insert(mem, key << 1, pm);
 }
@@ -361,7 +386,7 @@ void _Table::get_cluster(Memory& mem, uint64_t key, Object& o) {
 }
 
 void _Table::change_cluster(Memory& mem, uint64_t key, Object& o) {
-    ClusterMgr pm(mem, num_fields, typeinfo);
+    ClusterMgr pm(mem, num_fields, fields);
     Ref<DynType> payload;
     int index;
     bool res = cuckoo.find_and_cow_path(mem, pm, key, payload, index);
@@ -382,11 +407,17 @@ bool _Table::find(Memory& mem, uint64_t key) {
     return cuckoo.find(mem, key, dot, dummy);
 }
 
-void _Table::init(const char* t_info) {
-    num_fields = strlen(t_info);
-    for (int j = 0; j < num_fields; ++j)
-        typeinfo[j] = t_info[j];
-    cuckoo.init();
+Ref<_Table> _Table::create(Memory& mem, const char* t_info) {
+    int num_fields = strlen(t_info);
+    _Table* table_ptr;
+    Ref<_Table> result = mem.alloc<_Table>(table_ptr, _Table::get_allocation_size(num_fields));
+    table_ptr->num_fields = num_fields;
+    for (int j = 0; j < num_fields; ++j) {
+        table_ptr->fields[j].type = t_info[j];
+        table_ptr->fields[j].key = (rand() << 16) | j; // add random number for upper 48 bits
+    }
+    table_ptr->cuckoo.init();
+    return result;
 }
 
 bool _Table::first_access(Memory& mem, ObjectIterator& oi) {
@@ -401,33 +432,48 @@ bool _Table::first_access(Memory& mem, ObjectIterator& oi) {
 template<typename T>
 void Object::set(Field<T> f, T value) {
     Memory& mem = ss->change(this);
-    ::set<T>(mem, cluster->entries[f.key], index, value);
+    uint16_t idx = f.key;
+    if (f.key != table->fields[idx].key)
+        throw std::runtime_error("Stale or invalid field specifier");
+    ::set<T>(mem, cluster->entries[idx], index, value);
 }
 
 template<>
 void Object::set<Table>(Field<Table> f, Table value) {
     Memory& mem = ss->change(this);
-    ::set<uint64_t>(mem, cluster->entries[f.key], index, value.key);
+    uint16_t idx = f.key;
+    if (f.key != table->fields[idx].key)
+        throw std::runtime_error("Stale or invalid field specifier");
+    ::set<uint64_t>(mem, cluster->entries[idx], index, value.key);
 }
 
 template<>
 void Object::set<Row>(Field<Row> f, Row value) {
     Memory& mem = ss->change(this);
-    ::set<uint64_t>(mem, cluster->entries[f.key], index, value.key);
+    uint16_t idx = f.key;
+    if (f.key != table->fields[idx].key)
+        throw std::runtime_error("Stale or invalid field specifier");
+    ::set<uint64_t>(mem, cluster->entries[idx], index, value.key);
 }
 
 void Object::set(Field<String> f, std::string value) {
     Memory& mem = ss->change(this);
-    _String s = ::get<_String>(mem, cluster->entries[f.key], index);
+    uint16_t idx = f.key;
+    if (f.key != table->fields[idx].key)
+        throw std::runtime_error("Stale or invalid field specifier");
+    _String s = ::get<_String>(mem, cluster->entries[idx], index);
     uint64_t limit = value.size();
     s.set_size(mem, limit);
     for (uint64_t k = 0; k < limit; ++k) s.set(mem, k, value[k]);
-    ::set<_String>(mem, cluster->entries[f.key], index, s);
+    ::set<_String>(mem, cluster->entries[idx], index, s);
 }
 
 std::string Object::operator()(Field<String> f) {
     Memory& mem = ss->refresh(this);
-    _String s = ::get<_String>(mem, cluster->entries[f.key], index);
+    uint16_t idx = f.key;
+    if (f.key != table->fields[idx].key)
+        throw std::runtime_error("Stale or invalid field specifier");
+    _String s = ::get<_String>(mem, cluster->entries[idx], index);
     std::string res;
     uint64_t limit = s.get_size();
     res.reserve(limit);
@@ -438,22 +484,31 @@ std::string Object::operator()(Field<String> f) {
 template<typename T>
 T Object::operator()(Field<T> f) {
     Memory& mem = ss->refresh(this);
-    return ::get<T>(mem, cluster->entries[f.key], index);
+    uint16_t idx = f.key;
+    if (f.key != table->fields[idx].key)
+        throw std::runtime_error("Stale or invalid field specifier");
+    return ::get<T>(mem, cluster->entries[idx], index);
 }
 
 template<>
 Table Object::operator()<Table>(Field<Table> f) {
     Memory& mem = ss->refresh(this);
+    uint16_t idx = f.key;
+    if (f.key != table->fields[idx].key)
+        throw std::runtime_error("Stale or invalid field specifier");
     Table res;
-    res.key = ::get<uint64_t>(mem, cluster->entries[f.key], index);
+    res.key = ::get<uint64_t>(mem, cluster->entries[idx], index);
     return res;
 }
 
 template<>
 Row Object::operator()<Row>(Field<Row> f) {
     Memory& mem = ss->refresh(this);
+    uint16_t idx = f.key;
+    if (f.key != table->fields[idx].key)
+        throw std::runtime_error("Stale or invalid field specifier");
     Row res;
-    res.key = ::get<uint64_t>(mem, cluster->entries[f.key], index);
+    res.key = ::get<uint64_t>(mem, cluster->entries[idx], index);
     return res;
 }
 
@@ -488,31 +543,43 @@ ListAccessor<Row> Object::operator()(Field<List<Row>> f) {
 template<typename T>
 uint64_t ListAccessor<T>::get_size() {
     Memory& mem = o.ss->refresh(&o);
-    _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[f.key], o.index);
+    uint16_t idx = f.key;
+    if (f.key != o.table->fields[idx].key)
+        throw std::runtime_error("Stale or invalid field specifier");
+    _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[idx], o.index);
     return list.get_size();
 }
 
 template<typename T>
 T ListAccessor<T>::rd(uint64_t index) {
     Memory& mem = o.ss->refresh(&o);
-    _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[f.key], o.index);
+    uint16_t idx = f.key;
+    if (f.key != o.table->fields[idx].key)
+        throw std::runtime_error("Stale or invalid field specifier");
+    _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[idx], o.index);
     return list.get(mem, index);
 }
 
 template<typename T>
 void ListAccessor<T>::set_size(uint64_t size) {
     Memory& mem = o.ss->change(&o);
-    _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[f.key], o.index);
+    uint16_t idx = f.key;
+    if (f.key != o.table->fields[idx].key)
+        throw std::runtime_error("Stale or invalid field specifier");
+    _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[idx], o.index);
     list.set_size(mem, size);
-    ::set<_List<T>>(mem, o.cluster->entries[f.key], o.index, list);
+    ::set<_List<T>>(mem, o.cluster->entries[idx], o.index, list);
 }
 
 template<typename T>
 void ListAccessor<T>::wr(uint64_t index, T value) {
     Memory& mem = o.ss->change(&o);
-    _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[f.key], o.index);
+    uint16_t idx = f.key;
+    if (f.key != o.table->fields[idx].key)
+        throw std::runtime_error("Stale or invalid field specifier");
+    _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[idx], o.index);
     list.set(mem, index, value);
-    ::set<_List<T>>(mem, o.cluster->entries[f.key], o.index, list);
+    ::set<_List<T>>(mem, o.cluster->entries[idx], o.index, list);
 }
 
 

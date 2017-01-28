@@ -24,6 +24,7 @@
 /* Typed references
  */
 class DynType {};
+class Memory;
 
 template <typename T>
 struct Ref {
@@ -31,6 +32,11 @@ struct Ref {
     void operator=(const Ref<T>& other) { r = other.r; }
     Ref(const Ref<T>& other) { r = other.r; }
     Ref() : r(0) {}
+    void copied_from_file(Memory& mem) { };
+    void copied_to_file(Memory& mem) { 
+        Ref<T> to = T::commit(mem, *this);
+        if (to.r != r) r = to.r;
+    }
 };
 
 template <>
