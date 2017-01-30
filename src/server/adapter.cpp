@@ -571,9 +571,11 @@ std::vector<bool> Adapter::Callback::available(std::vector<GlobalNotifier::Realm
                                                bool all) {
     std::cout << "AVAILABLE" << std::endl;
     std::vector<bool> watch;
-    for (auto realm : realms) {
+    for (size_t i = 0; i < realms.size(); i++) {
         watch.push_back(true);
-        m_realm_changed(realm);
+        if (!new_realms[i]) {
+            m_realm_changed(realms[i]);
+        }
     }
     return watch;
 }
