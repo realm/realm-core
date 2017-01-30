@@ -113,6 +113,8 @@ public:
 
     SharedRealm realm_at_path(std::string path);
 
+    void close() { m_global_notifier.reset(); }
+
 private:
     std::shared_ptr<GlobalNotifier> m_global_notifier;
 

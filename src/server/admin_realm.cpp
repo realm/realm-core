@@ -97,7 +97,7 @@ void AdminRealmListener::start(std::function<void(std::vector<RealmInfo>, bool)>
         if (changes.empty() || m_first) {
             for (size_t i = 0, size = table.size(); i < size; ++i) {
                 std::string realm_path = table.get_string(name_col_ndx, i);
-                if (realm_path != "/__admin") {
+                if (!realm_path.compare(0, 2, "__")) {
                     realms.emplace_back(table.get_string(id_col_ndx, i), realm_path);
                 }
             }
@@ -109,7 +109,7 @@ void AdminRealmListener::start(std::function<void(std::vector<RealmInfo>, bool)>
         else {
             for (auto i : changes.insertions.as_indexes()) {
                 std::string realm_path = table.get_string(name_col_ndx, i);
-                if (realm_path != "/__admin") {
+                if (!realm_path.compare(0, 2, "__")) {
                     realms.emplace_back(table.get_string(id_col_ndx, i), realm_path);
                 }
             }
