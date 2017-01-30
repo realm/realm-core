@@ -436,7 +436,7 @@ def doBuildAndroid(def isPublishingRun) {
 
             def device = devices[0] // Run the tests only on one device
 
-            timeout(10) {
+            timeout(20) {
                 sh """
                 set -ex
                 adb -s ${device} uninstall io.realm.coretest
