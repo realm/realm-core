@@ -84,6 +84,8 @@ const char* LogicError::what() const noexcept
                    "the SharedGroup constructor) was not consistent across the session";
         case table_has_no_columns:
             return "Table has no columns";
+        case type_not_supported:
+            return "Only list of simple types are supported";
     }
     return "Unknown error";
 }
