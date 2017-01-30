@@ -68,9 +68,6 @@ class TableFriend;
 
 class Replication;
 
-template <typename T>
-class List;
-
 /// FIXME: Table assignment (from any group to any group) could be made aliasing
 /// safe as follows: Start by cloning source table into target allocator. On
 /// success, assign, and then deallocate any previous structure at the target.
@@ -514,6 +511,9 @@ public:
 
     template <class T>
     void set_list(size_t c, size_t r, const std::vector<T>& list);
+
+    template <typename T>
+    class List;
 
     /// The object returned here is only valid during the current transaction
     /// It cannot be updated or handed over.
@@ -1458,7 +1458,7 @@ private:
 };
 
 template <typename T>
-class List {
+class Table::List {
 public:
     class Iterator : public std::iterator<std::input_iterator_tag, T> {
     public:
@@ -2117,7 +2117,7 @@ void Table::set_list(size_t c, size_t r, const std::vector<T>& list)
 }
 
 template <class T>
-List<T> Table::get_list(size_t c, size_t r)
+Table::List<T> Table::get_list(size_t c, size_t r)
 {
     return List<T>(get_subtable(c, r));
 }
