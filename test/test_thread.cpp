@@ -27,6 +27,7 @@
 
 #ifndef _WIN32
 #include <unistd.h>
+#include <sys/time.h>
 #endif
 
 #include <realm/group_shared_options.hpp>
@@ -674,13 +675,20 @@ NONCONCURRENT_TEST(Thread_CondvarTimeout)
     SharedGroupOptions default_options;
     mutex.set_shared_part(mutex_part, path, "");
     changed.set_shared_part(condvar_part, path, "", default_options.temp_dir);
-    struct timespec time;
-    time.tv_sec = 0;
-    time.tv_nsec = 100000000; // 0.1 sec
+    struct timespec time_limit;
+    timeval tv;
+    gettimeofday(&tv, nullptr);
+    time_limit.tv_sec = tv.tv_sec;
+    time_limit.tv_nsec = tv.tv_usec * 1000;
+    time_limit.tv_nsec += 100000000;        // 100 msec wait
+    if (time_limit.tv_nsec >= 1000000000) { // overflow
+        time_limit.tv_nsec -= 1000000000;
+        time_limit.tv_sec += 1;
+    }
     {
         std::lock_guard<InterprocessMutex> l(mutex);
         for (int i = 0; i < 5; ++i)
-            changed.wait(mutex, &time);
+            changed.wait(mutex, &time_limit);
     }
     changed.release_shared_part();
     mutex.release_shared_part();
