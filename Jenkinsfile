@@ -384,7 +384,7 @@ def doBuildNodeInOsx(String libType, String buildType, boolean isPublishingRun) 
               archiveArtifacts artifacts: 'realm-core-*.tar.gz'
           }
       } finally {
-          collectCompilerWarnings('clang')
+          collectCompilerWarnings('clang', true)
       }
     }
   }
