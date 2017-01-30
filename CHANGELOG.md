@@ -16,7 +16,7 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Updated OpenSSL to 1.0.2k.
 
 ----------------------------------------------
 
