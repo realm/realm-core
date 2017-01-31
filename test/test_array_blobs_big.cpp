@@ -312,7 +312,7 @@ TEST(ArrayBigBlobs_get_at)
     // Read from an offset larger than size of data
     get_pos = 50;
     read = c.get_at(0, get_pos);
-    CHECK(read.is_null());
+    CHECK(read.size() == 0);
 
     // Construct a huge blob
     std::vector<char> big_blob(0x2000000);
@@ -380,7 +380,7 @@ TEST(ArrayBigBlobs_get_at)
     // Read outside data
     get_pos = 0x2000000;
     read = c.get_at(1, get_pos);
-    CHECK(read.is_null());
+    CHECK(read.size() == 0);
 
     // Try to assign a new value
     c.set(1, BinaryData(lazy_fox));
@@ -394,6 +394,13 @@ TEST(ArrayBigBlobs_get_at)
     get_pos = 0;
     read = c.get_at(1, get_pos);
     CHECK(read.is_null());
+
+    // Insert an empty string - should not result in NULL return
+    c.set(1, BinaryData("", 0));
+    get_pos = 0;
+    read = c.get_at(1, get_pos);
+    CHECK(!read.is_null());
+    CHECK(read.size() == 0);
 
     c.destroy();
 }

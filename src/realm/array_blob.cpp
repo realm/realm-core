@@ -34,7 +34,7 @@ BinaryData ArrayBlob::get_at(size_t& pos) const noexcept
             ndx++;
             if (ndx >= size()) {
                 pos = 0;
-                return {};
+                return {"", 0};
             }
             offset -= current_size;
             current_size = Array::get_size_from_header(m_alloc.translate(Array::get_as_ref(ndx)));
@@ -57,7 +57,7 @@ BinaryData ArrayBlob::get_at(size_t& pos) const noexcept
             return {get(offset), size() - offset};
         }
         else {
-            return {};
+            return {"", 0};
         }
     }
 }
