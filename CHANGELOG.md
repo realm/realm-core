@@ -19,6 +19,10 @@
 ### Internals
 
 * Updated OpenSSL to 1.0.2k.
+* Setting environment variable `UNITTEST_XML` to a nonempty value will no longer
+  disable the normal console output while running the test suite. Instead, in
+  that case, reporting will happen both to the console and to the JUnit XML
+  file.
 
 ----------------------------------------------
 
