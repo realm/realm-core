@@ -19,3 +19,5 @@ set(TEST_UTIL_SOURCES
 
 add_library(test-util ${TEST_UTIL_SOURCES})
 
+target_link_libraries(test-util realm)
+

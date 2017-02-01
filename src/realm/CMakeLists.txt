@@ -176,9 +176,7 @@ set(REALM_OTHER_UTIL_HEADERS
 ) # REALM_OTHER_UTIL_HEADERS
 
 add_library(realm-objects OBJECT ${REALM_SOURCES})
-
 set_target_properties(realm-objects PROPERTIES POSITION_INDEPENDENT_CODE true)
-
 if(APPLE)
     set_target_properties(
             realm-objects PROPERTIES
@@ -203,47 +201,61 @@ endif()
 # https://cmake.org/cmake/help/v3.7/command/add_library.html#object-libraries
 add_library(realm STATIC $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
 
-add_library(realm-shared SHARED $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
-
-set_target_properties(
-    realm-shared PROPERTIES
-    SOVERSION 9.0.0
-    LIBRARY_OUTPUT_NAME realm
-)
-
 target_link_libraries(
-    realm
-    ${REALM_EXTRA_LIBS}
-    ${CMAKE_THREAD_LIBS_INIT}
+        realm
+        ${REALM_EXTRA_LIBS}
+        ${CMAKE_THREAD_LIBS_INIT}
 )
 
-target_link_libraries(
-    realm-shared
-    ${REALM_EXTRA_LIBS}
-    ${CMAKE_THREAD_LIBS_INIT}
-)
+if(NOT ANDROID)
+    add_library(realm-shared SHARED $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
 
-if(REALM_ENABLE_ENCRYPTION)
+    set_target_properties(
+        realm-shared PROPERTIES
+        SOVERSION 9.0.0
+        LIBRARY_OUTPUT_NAME realm
+    )
+
+    target_link_libraries(
+        realm-shared
+        ${REALM_EXTRA_LIBS}
+        ${CMAKE_THREAD_LIBS_INIT}
+    )
+endif()
+
+if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)
     if(ANDROID)
         include(ExternalProject)
 
         # Generate the build script with info provided by the android toolchain
         configure_file(${CMAKE_MODULE_PATH}/android-build-openssl.sh.in ${PROJECT_BINARY_DIR}/android-build-openssl.sh @ONLY)
 
-        ExternalProject_Add(openssl
+        ExternalProject_Add(openssl-ext
             URL http://www.openssl.org/source/openssl-${ANDROID_OPENSSL_VERSION}.tar.gz
             CONFIGURE_COMMAND ""
             BUILD_COMMAND "${PROJECT_BINARY_DIR}/android-build-openssl.sh"
             INSTALL_COMMAND ""
             BUILD_IN_SOURCE 1
         )
-        add_dependencies(realm openssl)
-        add_dependencies(realm-shared openssl)
-        include_directories(${PROJECT_BINARY_DIR}/libcrypto/include)
-        target_link_libraries(realm-objects ${PROJECT_BINARY_DIR}/libcrypto/lib/libcrypto.a)
-    elseif(NOT APPLE)
+        set(OPENSSL_INCLUDE_DIR ${PROJECT_BINARY_DIR}/libcrypto/include)
+        set(OPENSSL_LIB_DIR ${PROJECT_BINARY_DIR}/libcrypto/lib)
+
+        #include_directories(${OPENSSL_INCLUDE_DIR})
+        add_library(openssl STATIC IMPORTED)
+        add_dependencies(openssl openssl-ext)
+        file(MAKE_DIRECTORY ${OPENSSL_INCLUDE_DIR})
+        set_target_properties(openssl PROPERTIES
+                              IMPORTED_LOCATION ${OPENSSL_LIB_DIR}/libcrypto.a
+                              INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INCLUDE_DIR})
+
+        # This is just to force the download of OpenSSL before realm-objects
+        add_dependencies(realm-objects openssl)
+        target_include_directories(realm-objects PUBLIC ${OPENSSL_INCLUDE_DIR})
+        target_link_libraries(realm openssl)
+    else()
         include(FindOpenSSL)
-        target_link_libraries(realm-objects ${OPENSSL_LIBRARIES})
+        target_link_libraries(realm ${OPENSSL_LIBRARIES})
+        target_link_libraries(realm-shared ${OPENSSL_LIBRARIES})
     endif()
 endif()
 
@@ -254,9 +266,11 @@ endif(APPLE)
 
 install(TARGETS realm
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
-install(TARGETS realm-shared
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
-        RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
+if(NOT ANDROID)
+    install(TARGETS realm-shared
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
+            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
+endif()
 install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
         COMPONENT devel)

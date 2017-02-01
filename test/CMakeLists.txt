@@ -26,12 +26,10 @@ add_executable(realm-tests ${TESTS} main.cpp)
 
 target_link_libraries(
   realm-tests
-  realm test-util
+  test-util
   ${EXTRA_TEST_LIBS}
   ${PLATFORM_LIBRARIES}
 )
-
-include_directories(${PROJECT_BINARY_DIR}/libcrypto/include)
 
 target_include_directories(
   realm-tests
@@ -43,9 +41,8 @@ add_test(
   COMMAND realm-tests
 )
 
-set(BENCHMARKS benchmark-common-tasks/main.cpp)
-add_executable(realm-benchmark-common-tasks ${BENCHMARKS})
-target_link_libraries(realm-benchmark-common-tasks ${PLATFORM_LIBRARIES} realm test-util)
+add_executable(realm-benchmark-common-tasks benchmark-common-tasks/main.cpp)
+target_link_libraries(realm-benchmark-common-tasks ${PLATFORM_LIBRARIES} test-util)
 add_test(RealmBenchmarkCommonTasks realm-benchmark-common-tasks)
 
 # FIXME: Add other benchmarks
