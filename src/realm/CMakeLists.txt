@@ -198,9 +198,12 @@ if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     list(APPEND REALM_EXTRA_LIBS pthread_win32 getopt_win32)
 endif()
 
-add_library(realm STATIC $<TARGET_OBJECTS:realm-objects>)
+# The placeholder file is needed in order to make builds work on Xcode
+# The issue is described in the last sentence here:
+# https://cmake.org/cmake/help/v3.7/command/add_library.html#object-libraries
+add_library(realm STATIC $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
 
-add_library(realm-shared SHARED $<TARGET_OBJECTS:realm-objects>)
+add_library(realm-shared SHARED $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
 
 set_target_properties(
     realm-shared PROPERTIES
