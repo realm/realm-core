@@ -5,4 +5,5 @@ if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
 endif()
 
 install(FILES realm.hpp
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+        COMPONENT devel)

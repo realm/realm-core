@@ -71,6 +71,10 @@ try {
     buildWin32Release: doBuildWindows('Release', false, 'win32'),
     buildUwpWin32Release: doBuildWindows('Release', true, 'win32'),
     buildUwpWin64Release: doBuildWindows('Release', true, 'win64')
+    packageGeneric: doBuildPackage('generic', 'tgz'),
+    packageCentos7: doBuildPackage('centos-7', 'rpm'),
+    packageCentos6: doBuildPackage('centos-6', 'rpm'),
+    packageUbuntu1604: doBuildPackage('ubuntu-1604', 'deb')
     //buildUwpArmRelease: doBuildWindows('Release', true, 'arm')
     //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
   ]
@@ -112,14 +116,6 @@ try {
           }
       }
   }
-
-  stage 'build-packages'
-  parallel(
-    generic: doBuildPackage('generic', 'tgz'),
-    centos7: doBuildPackage('centos-7', 'rpm'),
-    centos6: doBuildPackage('centos-6', 'rpm'),
-    ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
-  )
 
   if (isPublishingRun) {
       stage('publish-packages') {

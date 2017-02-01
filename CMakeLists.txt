@@ -1,32 +1,8 @@
 cmake_minimum_required(VERSION 3.4)
 
-project(Realm)
-
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake" ${CMAKE_MODULE_PATH})
 
-cmake_policy(SET CMP0048 NEW)
-
-# Project version
-set(REALM_VERSION_MAJOR 1)
-set(REALM_VERSION_MINOR 5)
-set(REALM_VERSION_PATCH 1)
-set(REALM_VERSION_EXTRA "")
-set(REALM_SOVERSION "9.0.0")
-
-if(ANDROID)
-    set(ANDROID_OPENSSL_VERSION "1.0.1t")
-    set(REALM_LIBTYPE "STATIC")
-    list(APPEND PLATFORM_LIBRARIES log)
-    list(APPEND PLATFORM_LIBRARIES android)
-    if (ANDROID_ABI STREQUAL mips)
-        list(APPEND PLATFORM_LIBRARIES atomic)
-    endif()
-endif()
-
-project(
-    realm
-    VERSION ${REALM_VERSION_MAJOR}.${REALM_VERSION_MINOR}.${REALM_VERSION_PATCH}
-)
+project(realm VERSION 2.3.0)
 
 # Include general CMake modules
 include(GNUInstallDirs)
@@ -35,10 +11,6 @@ include(GetGitRevisionDescription)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
-
-if(NOT DEFINED REALM_LIBTYPE)
-  set(REALM_LIBTYPE "STATIC")
-endif()
 
 # Project-wide build flags
 set(CMAKE_CXX_STANDARD 14)
@@ -52,15 +24,17 @@ else()
   set(CMAKE_CXX_FLAGS, "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic")
 endif()
 
-# Import some flags for the environment variables (for compatibility with build.sh)
+# Import some flags from the environment variables
+# (for compatibility with build.sh)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} $ENV{EXTRA_CFLAGS}")
 set(CMAKE_LINKER_FLAGS $ENV{EXTRA_LDFLAGS})
 
+# Add the MinSizeDebug configuration, used for packaging releases for Cocoa.
 if(CMAKE_CONFIGURATION_TYPES)
-    # Add the MinSizeDebug configuration, used for packaging releases for Cocoa.
     list(APPEND CMAKE_CONFIGURATION_TYPES MinSizeDebug)
     list(REMOVE_DUPLICATES CMAKE_CONFIGURATION_TYPES)
-    set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES}" CACHE STRING "Add MinSizeDebug configuration" FORCE)
+    set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES}"
+        CACHE STRING "Add MinSizeDebug configuration" FORCE)
 endif()
 
 # Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
@@ -69,14 +43,16 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
     $<$<CONFIG:MinSizeDebug>:REALM_DEBUG=1>
 )
 
-if(CMAKE_SYSTEM_NAME STREQUAL WindowsStore AND CMAKE_SYSTEM_VERSION STREQUAL 10.0)
+# Add REALM_UWP=1 to compile with Windows UWP support
+if(WINDOWS_STORE AND CMAKE_SYSTEM_VERSION STREQUAL 10.0)
     add_definitions(-DREALM_UWP=1)
 endif()
 
 # Coverage-specific build flags
 if(REALM_COVERAGE)
   if(MSVC)
-    message( FATAL_ERROR "Code coverage is not yet supported on Visual Studio builds" )
+    message(FATAL_ERROR
+            "Code coverage is not yet supported on Visual Studio builds")
   else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs -ftest-coverage -fno-inline -fno-elide-constructors")
   endif()
@@ -122,11 +98,20 @@ if(APPLE)
         set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_RelWithDebInfo "bitcode")
         set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_MinSizeRel "bitcode")
     endif()
-endif(APPLE)
+elseif(ANDROID)
+    set(ANDROID_OPENSSL_VERSION "1.0.1t")
+    set(REALM_LIBTYPE "STATIC")
+    list(APPEND PLATFORM_LIBRARIES log)
+    list(APPEND PLATFORM_LIBRARIES android)
+    if(ANDROID_ABI STREQUAL mips)
+        list(APPEND PLATFORM_LIBRARIES atomic)
+    endif()
+endif()
 
 # Find dependencies
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
+
 if(NOT APPLE AND NOT ANDROID)
     include(FindOpenSSL)
 endif()
@@ -156,18 +141,28 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR}/src) # For generated files (like
 add_subdirectory(src)
 
 # Enable CTest and include unit tests
-if(NOT REALM_BUILD_LIB_ONLY)
+if(NOT REALM_BUILD_LIB_ONLY AND NOT REALM_NO_TESTS)
     enable_testing()
     add_subdirectory(test)
 endif()
 
 # Enable CPack
-set(CPACK_GENERATOR "TGZ")
-string(TOLOWER "realm-core-${REALM_LIBTYPE}-${CMAKE_BUILD_TYPE}" REALM_PACKAGE_NAME)
+set(CPACK_GENERATOR "TGZ;RPM;DEB")
+string(TOLOWER "realm-core-${CMAKE_BUILD_TYPE}" REALM_PACKAGE_NAME)
 set(CPACK_PACKAGE_NAME ${REALM_PACKAGE_NAME})
-set(CPACK_PACKAGE_VERSION_MAJOR ${REALM_VERSION_MAJOR})
-set(CPACK_PACKAGE_VERSION_MINOR ${REALM_VERSION_MINOR})
-set(CPACK_PACKAGE_VERSION_PATCH ${REALM_VERSION_PATCH})
+set(CPACK_PACKAGE_VERSION ${REALM_VERSION})
 set(CPACK_PACKAGE_VENDOR "Realm Inc.")
+set(CPACK_PACKAGE_CONTACT "Realm <help@realm.io>")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Realm is a mobile database: a replacement for Core Data & SQLite")
+set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_SOURCE_DIR}/tools/cmake/run_ldconfig.sh")
+set(CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_SOURCE_DIR}/tools/cmake/run_ldconfig.sh")
+set(CPACK_RPM_COMPONENT_INSTALL ON)
+set(CPACK_DEBIAN_POST_INSTALL_SCRIPT_FILE "${CMAKE_SOURCE_DIR}/tools/cmake/run_ldconfig.sh")
+set(CPACK_DEBIAN_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_SOURCE_DIR}/tools/cmake/run_ldconfig.sh")
+set(CPACK_DEB_COMPONENT_INSTALL ON)
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 include(CPack)
+cpack_add_component(runtime DEPENDS runtime)
+cpack_add_component(devel DEPENDS devel)
+

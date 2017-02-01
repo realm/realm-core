@@ -61,7 +61,6 @@ set(REALM_SOURCES
 ) # REALM_SOURCES
 
 set(REALM_INSTALL_GENERAL_HEADERS
-    ${CMAKE_CURRENT_BINARY_DIR}/version.hpp
     alloc.hpp
     alloc_slab.hpp
     array.hpp
@@ -176,42 +175,47 @@ set(REALM_OTHER_UTIL_HEADERS
     util/errno.hpp
 ) # REALM_OTHER_UTIL_HEADERS
 
-add_library(realm ${REALM_LIBTYPE} ${REALM_SOURCES})
+add_library(realm-objects OBJECT ${REALM_SOURCES})
 
-set_target_properties(
-    realm PROPERTIES
-    VERSION ${PROJECT_VERSION}
-    SOVERSION ${REALM_SOVERSION}
-)
+set_target_properties(realm-objects PROPERTIES POSITION_INDEPENDENT_CODE true)
 
-set_target_properties(
-    realm PROPERTIES
-    XCODE_ATTRIBUTE_INSTALL_PATH "/"
-    XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
-    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL "\$(GCC_OPTIMIZATION_LEVEL_\$(CONFIGURATION))"
-    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_Debug "0"
-    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_MinSizeDebug "z"
-    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_Release "3"
-    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelWithDebInfo "3"
-    XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelMinSize "3"
-)
-
-if(REALM_LIBTYPE STREQUAL "STATIC")
+if(APPLE)
     set_target_properties(
-        realm PROPERTIES
-        # The static library may get included in a dynamic library
-        # (the bindings), so build as position independent code.
-        POSITION_INDEPENDENT_CODE true
+            realm-objects PROPERTIES
+            XCODE_ATTRIBUTE_INSTALL_PATH "/"
+            XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
+            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL "\$(GCC_OPTIMIZATION_LEVEL_\$(CONFIGURATION))"
+            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_Debug "0"
+            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_MinSizeDebug "z"
+            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_Release "3"
+            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelWithDebInfo "3"
+            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelMinSize "3"
     )
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    set_property(TARGET realm APPEND PROPERTY COMPILE_DEFINITIONS PTW32_STATIC_LIB)
+    set_property(TARGET realm-objects APPEND PROPERTY COMPILE_DEFINITIONS PTW32_STATIC_LIB)
     list(APPEND REALM_EXTRA_LIBS pthread_win32 getopt_win32)
 endif()
 
+add_library(realm STATIC $<TARGET_OBJECTS:realm-objects>)
+
+add_library(realm-shared SHARED $<TARGET_OBJECTS:realm-objects>)
+
+set_target_properties(
+    realm-shared PROPERTIES
+    SOVERSION 9.0.0
+    LIBRARY_OUTPUT_NAME realm
+)
+
 target_link_libraries(
     realm
+    ${REALM_EXTRA_LIBS}
+    ${CMAKE_THREAD_LIBS_INIT}
+)
+
+target_link_libraries(
+    realm-shared
     ${REALM_EXTRA_LIBS}
     ${CMAKE_THREAD_LIBS_INIT}
 )
@@ -231,8 +235,10 @@ if(REALM_ENABLE_ENCRYPTION)
             BUILD_IN_SOURCE 1
         )
         add_dependencies(realm openssl)
+        add_dependencies(realm-shared openssl)
         include_directories(${PROJECT_BINARY_DIR}/libcrypto/include)
         target_link_libraries(realm ${PROJECT_BINARY_DIR}/libcrypto/lib/libcrypto.a)
+        target_link_libraries(realm-shared ${PROJECT_BINARY_DIR}/libcrypto/lib/libcrypto.a)
     elseif(NOT APPLE)
         target_link_libraries(realm ${OPENSSL_LIBRARIES})
     endif()
@@ -240,16 +246,29 @@ endif()
 
 if(APPLE)
     target_link_libraries(realm ${Foundation})
+    target_link_libraries(realm-shared ${Foundation})
 endif(APPLE)
 
 install(TARGETS realm
-        COMPONENT core
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+        ARCHIVE
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        COMPONENT devel)
+install(TARGETS realm-shared
+        LIBRARY
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        COMPONENT runtime)
 install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm)
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
+        COMPONENT devel)
 install(FILES ${REALM_INSTALL_UTIL_HEADERS}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util)
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util
+        COMPONENT devel)
+install(FILES ${PROJECT_BINARY_DIR}/src/realm/version.hpp
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
+        COMPONENT devel)
+install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util
+        COMPONENT devel)
 
 if (NOT APPLE AND NOT ANDROID AND NOT REALM_BUILD_LIB_ONLY)
     add_executable(realm-config config_tool.cpp)
@@ -257,10 +276,12 @@ if (NOT APPLE AND NOT ANDROID AND NOT REALM_BUILD_LIB_ONLY)
     target_link_libraries(realm-importer realm)
 
     install(TARGETS realm-config realm-importer
+            COMPONENT runtime
             DESTINATION ${CMAKE_INSTALL_BINDIR})
 
     add_executable(realmd realmd.cpp)
     target_link_libraries(realmd realm)
     install(TARGETS realmd
+            COMPONENT runtime
             DESTINATION ${CMAKE_INSTALL_LIBEXECDIR})
 endif()

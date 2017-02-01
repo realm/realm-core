@@ -11,7 +11,7 @@ touch /var/lib/rpm/*
 yum install -y /out/*.rpm
 
 # include build test here to ensure that everything is properly installed
-packages=(realm realm-devel realm-node realm-node-devel realm-utils)
+packages=(realm-core-release-runtime realm-core-release-devel)
 
 for x in "${packages[@]}"; do
   rpm -q $x
