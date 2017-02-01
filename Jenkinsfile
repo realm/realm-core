@@ -260,7 +260,7 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
                 bat """
                     cmake ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015${archSuffix}\" -DCMAKE_BUILD_TYPE=${buildType} ..
                     cmake --build . --config ${buildType}
-                    cpack -C ${buildType}
+                    cpack -C ${buildType} -D CPACK_GENERATOR="TGZ"
                 """
             }
         }
@@ -333,7 +333,7 @@ def doBuildNodeInDocker(String buildType, boolean isPublishingRun) {
                       -DCMAKE_BUILD_TYPE=${buildType} \\
                       -GNinja ..
                 ninja
-                cpack
+                cpack -D CPACK_GENERATOR="TGZ"
               """
               dir('build-dir') {
                   if (isPublishingRun) {
@@ -371,7 +371,7 @@ def doBuildNodeInOsx(String libType, String buildType, boolean isPublishingRun) 
                       -DCMAKE_BUILD_TYPE=${buildType} \\
                       -GNinja ..
                 ninja
-                cpack
+                cpack -D CPACK_GENERATOR="TGZ"
               """
           dir('build-dir') {
               if (isPublishingRun) {
