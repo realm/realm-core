@@ -112,10 +112,6 @@ endif()
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-if(REALM_ENABLE_ENCRYPTION AND NOT APPLE AND NOT ANDROID)
-    include(FindOpenSSL)
-endif()
-
 # Options (passed to CMake)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode.")
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations.")
