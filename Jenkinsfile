@@ -70,7 +70,7 @@ try {
     addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
     buildWin32Release: doBuildWindows('Release', false, 'win32'),
     buildUwpWin32Release: doBuildWindows('Release', true, 'win32'),
-    buildUwpWin64Release: doBuildWindows('Release', true, 'win64')
+    buildUwpWin64Release: doBuildWindows('Release', true, 'win64'),
     packageGeneric: doBuildPackage('generic', 'tgz'),
     packageCentos7: doBuildPackage('centos-7', 'rpm'),
     packageCentos6: doBuildPackage('centos-6', 'rpm'),
