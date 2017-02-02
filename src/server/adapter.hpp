@@ -21,9 +21,11 @@
 
 #include "global_notifier.hpp"
 #include "property.hpp"
-#include <mpark/variant.hpp>
+#include "json.hpp"
 
 namespace realm {
+
+using json = nlohmann::json;
 
 class SyncUser;
 
@@ -32,80 +34,39 @@ public:
     Adapter(std::function<void(std::string)> realm_changed, std::string local_root_dir,
             std::string server_base_url, std::shared_ptr<SyncUser> user);
 
-    class Instruction {
-    public:
-        enum class Type {
-            Insert,
-            Delete,
-            SetProperty,
-            Clear,
-            ListSet,
-            ListInsert,
-            ListMove,
-            ListSwap,
-            ListNullify,
-            ListClear,
-            AddType,
-            AddProperty,
-        };
-
-        static std::string type_string(Type type) {
-            switch(type) {
-                case Type::Insert:      return "Insert";
-                case Type::Delete:      return "Delete";
-                case Type::SetProperty: return "Set";
-                case Type::Clear:       return "Clear";
-                case Type::ListSet:     return "ListSet";
-                case Type::ListInsert:  return "ListInsert";
-                case Type::ListMove:    return "ListMove";
-                case Type::ListSwap:    return "ListSwap";
-                case Type::ListNullify: return "ListNullify";
-                case Type::ListClear:   return "ListClear";
-                case Type::AddType:     return "AddType";
-                case Type::AddProperty: return "AddProperty";
-            }
-        }
-
-        const Type type;
-        const std::string object_type;
-
-        const size_t row = -1;
-
-        const std::string property;
-        const bool is_null = false;
-        const mpark::variant<bool, int64_t, double, std::string, Timestamp, size_t> value;
-        const PropertyType data_type = PropertyType::Int;
-
-        const std::string target_object_type = "";
-        const bool nullable = false;
-
-        const size_t list_index = -1;
-
-        Instruction(Type t, std::string o) 
-        : type(t), object_type(o), value() {}
-
-        Instruction(Type t, std::string o, size_t r) 
-        : type(t), object_type(o), row(r), value() {}
-
-        Instruction(Type t, std::string o, size_t r, std::string p) 
-        : type(t), object_type(o), row(r), property(p), value() {}
-
-        Instruction(Type t, std::string o, size_t r, std::string p, size_t i, size_t l) 
-        : type(t), object_type(o), row(r), property(p), value(i), list_index(l) {}
-
-        Instruction(std::string o, std::string p, PropertyType t, bool n, std::string l = "") 
-        : type(Type::AddProperty), object_type(o), property(p), value(), data_type(t), target_object_type(l) {}
-
-        template<typename T>
-        Instruction(std::string o, size_t r, std::string p, PropertyType t, bool n, T v)
-        : type(Type::SetProperty), object_type(o), row(r), property(p), is_null(n), value(v), data_type(t) {}
+    enum class InstructionType {
+        Insert,
+        Delete,
+        SetProperty,
+        Clear,
+        ListSet,
+        ListInsert,
+        ListErase,
+        ListClear,
+        AddType,
+        AddProperty,
     };
 
-    class ChangeSet : public std::vector<Instruction> {
+    static std::string instruction_type_string(InstructionType type) {
+        switch(type) {
+            case InstructionType::Insert:      return "Insert";
+            case InstructionType::Delete:      return "Delete";
+            case InstructionType::SetProperty: return "Set";
+            case InstructionType::Clear:       return "Clear";
+            case InstructionType::ListSet:     return "ListSet";
+            case InstructionType::ListInsert:  return "ListInsert";
+            case InstructionType::ListErase:   return "ListErase";
+            case InstructionType::ListClear:   return "ListClear";
+            case InstructionType::AddType:     return "AddType";
+            case InstructionType::AddProperty: return "AddProperty";
+        }
+    }
+
+    class ChangeSet {
     public:
-        ChangeSet(SharedRealm realm) : std::vector<Instruction>(), m_realm(realm) {}
-    private:
-        SharedRealm m_realm;
+        ChangeSet(json instructions, SharedRealm realm) : json(instructions), realm(realm) {}
+        const json json;
+        const SharedRealm realm;
     };
 
     util::Optional<ChangeSet> current(std::string realm_path);
