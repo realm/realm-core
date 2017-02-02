@@ -213,7 +213,7 @@ target_link_libraries(
         ${CMAKE_THREAD_LIBS_INIT}
 )
 
-if(NOT ANDROID)
+if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_library(realm-shared SHARED $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
 
     set_target_properties(
@@ -272,7 +272,7 @@ endif(APPLE)
 
 install(TARGETS realm
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
-if(NOT ANDROID)
+if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
     install(TARGETS realm-shared
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
             RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
