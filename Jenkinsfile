@@ -10,7 +10,7 @@ try {
 
   timeout(time: 1, unit: 'HOURS') {
     stage('gather-info') {
-      node {
+      node('docker') {
         checkout([
           $class: 'GitSCM',
           branches: scm.branches,
