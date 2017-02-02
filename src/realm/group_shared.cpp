@@ -1048,21 +1048,25 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit",
                                                    options.temp_dir);
 #ifdef REALM_ASYNC_DAEMON
-            m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix, "daemon_ready",
-                                                   options.temp_dir);
-            m_work_to_do.set_shared_part(info->work_to_do, m_lockfile_prefix, "work_ready", options.temp_dir);
-            m_room_to_write.set_shared_part(info->room_to_write, m_lockfile_prefix, "allow_write", options.temp_dir);
-            // In async mode, we need to make sure the daemon is running and ready:
-            if (options.durability == Durability::Async && !is_backend) {
-                while (info->daemon_ready == 0) {
-                    if (info->daemon_started == 0) {
-                        spawn_daemon(path);
-                        info->daemon_started = 1;
+            if (options.durability == Durability::Async) {
+                m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix,
+                                                       "daemon_ready", options.temp_dir);
+                m_work_to_do.set_shared_part(info->work_to_do, m_lockfile_prefix,
+                                             "work_ready", options.temp_dir);
+                m_room_to_write.set_shared_part(info->room_to_write, m_lockfile_prefix,
+                                                "allow_write", options.temp_dir);
+                // In async mode, we need to make sure the daemon is running and ready:
+                if (!is_backend) {
+                    while (info->daemon_ready == 0) {
+                        if (info->daemon_started == 0) {
+                            spawn_daemon(path);
+                            info->daemon_started = 1;
+                        }
+                        // FIXME: It might be more robust to sleep a little, then restart the loop
+                        // std::cerr << "Waiting for daemon" << std::endl;
+                        m_daemon_becomes_ready.wait(m_controlmutex, 0);
+                        // std::cerr << " - notified" << std::endl;
                     }
-                    // FIXME: It might be more robust to sleep a little, then restart the loop
-                    // std::cerr << "Waiting for daemon" << std::endl;
-                    m_daemon_becomes_ready.wait(m_controlmutex, 0);
-                    // std::cerr << " - notified" << std::endl;
                 }
             }
 // std::cerr << "daemon should be ready" << std::endl;

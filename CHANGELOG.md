@@ -13,6 +13,8 @@
 * Avoid copying copy-on-write data structures when the write does not actually
   change the existing value.
 * Improve performance of deleting all rows in a TableView.
+* Don't open the notification pipes on platforms which support the async commit
+  daemon when async commits are not enabled.
 
 -----------
 
