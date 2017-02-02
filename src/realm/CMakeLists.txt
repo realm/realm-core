@@ -177,6 +177,7 @@ set(REALM_OTHER_UTIL_HEADERS
 
 add_library(realm-objects OBJECT ${REALM_SOURCES})
 set_target_properties(realm-objects PROPERTIES POSITION_INDEPENDENT_CODE true)
+
 if(APPLE)
     set_target_properties(
             realm-objects PROPERTIES

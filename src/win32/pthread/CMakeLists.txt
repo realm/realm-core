@@ -3,3 +3,4 @@ add_library(pthread_win32 STATIC pthread.c)
 set_property(TARGET pthread_win32 APPEND PROPERTY COMPILE_DEFINITIONS PTW32_STATIC_LIB)
 
 target_include_directories(pthread_win32 INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(realm-objects INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
