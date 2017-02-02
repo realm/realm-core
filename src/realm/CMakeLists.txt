@@ -196,7 +196,7 @@ endif()
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_dependencies(realm-objects pthread_win32 getopt_win32)
     set_property(TARGET realm-objects APPEND PROPERTY COMPILE_DEFINITIONS PTW32_STATIC_LIB)
-    target_include_directories(realm-objects INTERFACE
+    include_directories(realm-objects INTERFACE
                                ${CMAKE_CURRENT_SOURCE_DIR}/../win32
                                ${CMAKE_CURRENT_SOURCE_DIR}/../win32/pthread)
     list(APPEND REALM_EXTRA_LIBS pthread_win32 getopt_win32)
