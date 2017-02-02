@@ -246,7 +246,7 @@ public:
             }
 
             iter word_end = i;
-            size_t word_size = word_end - word_begin;
+            auto word_size = word_end - word_begin;
             if (word_size == 1 && *word_begin == '-') {
                 exclude = true;
                 continue;
