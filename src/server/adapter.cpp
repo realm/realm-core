@@ -33,9 +33,8 @@ public:
     ChangesetCookerInstructionHander(const Group &group)
     : m_group(group)
     , m_schema(ObjectStore::schema_from_group(m_group)) {
-        m_table_names.reserve(m_group.size());
         for (size_t i = 0; i < m_group.size(); i++) {
-            m_table_names.push_back(m_group.get_table_name(i));
+            m_table_names[i] = m_group.get_table_name(i);
         }
 
         for (auto object_schema : m_schema) {
@@ -56,7 +55,7 @@ public:
 
     const Group &m_group;
     Schema m_schema;
-    std::vector<std::string> m_table_names;
+    std::map<size_t, std::string> m_table_names;
 
     json json_instructions;
 
@@ -68,17 +67,12 @@ public:
     ObjectSchema *selected_object_schema = nullptr;
     Property *selected_primary = nullptr;
 
-    size_t list_table_index;
-    ConstTableRef list_table;
-    ObjectSchema *list_object_schema = nullptr;
     Property *list_property = nullptr;
-    Property *list_primary = nullptr;
+    json list_parent_identity;
 
-    size_t list_row;
-
-    ObjectSchema *list_target_object_schema;
     ConstTableRef list_target_table;
-    Property *list_target_primary;
+    ObjectSchema *list_target_object_schema = nullptr;
+    Property *list_target_primary = nullptr;
 
     json get_identity(size_t row, ConstTableRef &table, Property *primary_key) {
 //        if (primary_key) {
@@ -112,38 +106,28 @@ public:
     bool select_table(size_t group_index, size_t levels, const size_t* path)
     {
         selected_table_index = group_index;
-
         select(m_table_names[group_index], selected_object_schema, selected_table, selected_primary);
-
         return true;
     }
     bool select_descriptor(size_t levels, const size_t* path)
     {
-        // FIXME - caller to this is broken - for now just use last selected table
         return true;
     }
     bool select_link_list(size_t column_index, size_t row_index, size_t group_index)
     {
-        list_table_index = group_index;
-        list_row = row_index;
+        REALM_ASSERT(selected_object_schema != nullptr);
 
-        select(m_table_names[group_index], list_object_schema, list_table, list_primary);
+        list_parent_identity = get_identity(row_index, selected_table, selected_primary);
 
-        if (list_object_schema) {
-            list_property = &list_object_schema->persisted_properties[column_index];
-            REALM_ASSERT(list_property->table_column == column_index);
-        }
-        else {
-            list_property = nullptr;
-        }
+        list_property = &selected_object_schema->persisted_properties[column_index];
+        REALM_ASSERT(list_property->table_column == column_index);
+
+        select(m_table_names[group_index], list_target_object_schema, list_target_table, list_target_primary);
 
         return true;
     }
     bool insert_group_level_table(size_t group_index, size_t num_tables, StringData name)
     {
-        if (m_table_names.size() <= group_index) {
-            m_table_names.resize(group_index + 1);
-        }
         m_table_names[group_index] = name;
         std::string object_type = ObjectStore::object_type_for_table_name(m_table_names[group_index]);
         if (object_type.size()) {
@@ -472,9 +456,8 @@ public:
         REALM_ASSERT(0);    
         return true;
     }
-    bool move_column(size_t, size_t)
+    bool move_column(size_t from, size_t to)
     {
-        REALM_ASSERT(0);    
         return true;
     }
     bool add_search_index(size_t)
@@ -494,12 +477,12 @@ public:
     // Must have linklist selected:
     bool link_list_set(size_t list_index, size_t list_target_index, size_t prior_size)
     {
-        if (list_object_schema) {
+        if (list_property) {
             json_instructions.push_back({
                 {"type", Adapter::instruction_type_string(Adapter::InstructionType::ListSet)},
-                {"object_type", list_object_schema->name},
+                {"object_type", selected_object_schema->name},
                 {"property", list_property->name},
-                {"identity", get_identity(list_row, list_table, list_primary)},
+                {"identity", list_parent_identity},
                 {"list_index", list_index},
                 {"object_identity", get_identity(list_target_index, list_target_table, list_target_primary)}
             }); 
@@ -508,12 +491,12 @@ public:
     }
     bool link_list_insert(size_t list_index, size_t list_target_index, size_t prior_size)
     {
-        if (list_object_schema) {
+        if (list_property) {
             json_instructions.push_back({
                 {"type", Adapter::instruction_type_string(Adapter::InstructionType::ListInsert)},
-                {"object_type", list_object_schema->name},
+                {"object_type", selected_object_schema->name},
                 {"property", list_property->name},
-                {"identity", get_identity(list_row, list_table, list_primary)},
+                {"identity", list_parent_identity},
                 {"list_index", list_index},
                 {"object_identity", get_identity(list_target_index, list_target_table, list_target_primary)}
             }); 
@@ -522,26 +505,26 @@ public:
     }
     bool link_list_move(size_t from_index, size_t to_index)
     {
-        if (list_object_schema) {
+        if (list_property) {
             REALM_ASSERT(0);
         }
         return true;
     }
     bool link_list_swap(size_t from_index, size_t to_index)
     {
-        if (list_object_schema) {
+        if (list_property) {
             REALM_ASSERT(0);
         }
         return true;
     }
     bool link_list_erase(size_t list_index, size_t prior_size)
     {
-        if (list_object_schema) {
+        if (list_property) {
             json_instructions.push_back({
                 {"type", Adapter::instruction_type_string(Adapter::InstructionType::ListErase)},
-                {"object_type", list_object_schema->name},
+                {"object_type", selected_object_schema->name},
                 {"property", list_property->name},
-                {"identity", get_identity(list_row, list_table, list_primary)},
+                {"identity", list_parent_identity},
                 {"list_index", list_index},
             }); 
         } 
@@ -549,12 +532,12 @@ public:
     }
     bool link_list_nullify(size_t list_index, size_t prior_size)
     {
-        if (list_object_schema) {
+        if (list_property) {
             json_instructions.push_back({
                 {"type", Adapter::instruction_type_string(Adapter::InstructionType::ListSet)},
-                {"object_type", list_object_schema->name},
+                {"object_type", selected_object_schema->name},
                 {"property", list_property->name},
-                {"identity", get_identity(list_row, list_table, list_primary)},
+                {"identity", list_parent_identity},
                 {"list_index", list_index},
                 {"object_identity", nullptr}
             }); 
@@ -563,12 +546,12 @@ public:
     }
     bool link_list_clear(size_t prior_size)
     {
-        if (list_object_schema) {
+        if (list_property) {
             json_instructions.push_back({
                 {"type", Adapter::instruction_type_string(Adapter::InstructionType::ListClear)},
-                {"object_type", list_object_schema->name},
+                {"object_type", selected_object_schema->name},
                 {"property", list_property->name},
-                {"identity", get_identity(list_row, list_table, list_primary)},
+                {"identity", list_parent_identity},
             }); 
         } 
         return true;
