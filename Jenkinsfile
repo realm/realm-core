@@ -71,7 +71,7 @@ try {
     buildWin32Release: doBuildWindows('Release', false, 'win32'),
     buildUwpWin32Release: doBuildWindows('Release', true, 'win32'),
     buildUwpWin64Release: doBuildWindows('Release', true, 'win64'),
-    packageGeneric: doBuildPackage('generic', 'tgz'),
+    packageGeneric: doBuildPackage('generic', 'tar.gz'),
     packageCentos7: doBuildPackage('centos-7', 'rpm'),
     packageCentos6: doBuildPackage('centos-6', 'rpm'),
     packageUbuntu1604: doBuildPackage('ubuntu-1604', 'deb')

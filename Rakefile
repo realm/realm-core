@@ -238,9 +238,7 @@ end
 
 APPLE_BINDINGS = {
   'cocoa' => { name: 'Cocoa', path: '../realm-cocoa/core',
-               platforms: platforms(REALM_COCOA_SUPPORTED_PLATFORMS, ENV['REALM_COCOA_PLATFORMS']) },
-  'dotnet-cocoa' => { name: '.NET', path: '../realm-dotnet/wrappers',
-                      platforms: platforms(REALM_DOTNET_COCOA_SUPPORTED_PLATFORMS, ENV['REALM_DOTNET_COCOA_PLATFORMS']) }
+               platforms: platforms(REALM_COCOA_SUPPORTED_PLATFORMS, ENV['REALM_COCOA_PLATFORMS']) }
 }.freeze
 
 apple_build_dir = ENV['build_dir'] || REALM_BUILD_DIR_APPLE
