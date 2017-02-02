@@ -4,6 +4,7 @@
 
 * Fixed a bug in handover of detached linked lists. (issue #2378).
 * Fixed a few bugs (caused crashes) in pthread library on UWP.
+* Fixes a bug in chuncked binary column returning null value (#2418)
 
 ### Breaking changes
 
@@ -13,6 +14,9 @@
 
 * Now supports case insensitive queries for UWP.
 * Upgraded Visual Studio project to version 2017.
+* Enable reading and writing of big blobs via Table interface.
+  Only to be used by Sync. The old interface still has a check on 
+  the size of the binary blob.
 
 -----------
 

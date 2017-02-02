@@ -407,7 +407,7 @@ public:
     /// Return data from position 'pos' and onwards. If the blob is distributed
     /// across multiple arrays, you will only get data from one array. 'pos'
     /// will be updated to be an index to next available data. It will be 0
-    /// if no more data. This method replaces get_binary().
+    /// if no more data.
     BinaryData get_binary_at(size_t col_ndx, size_t ndx, size_t& pos) const noexcept;
 
     template <class T>
@@ -502,13 +502,17 @@ public:
     void set_double(size_t column_ndx, size_t row_ndx, double value, bool is_default = false);
     void set_string(size_t column_ndx, size_t row_ndx, StringData value, bool is_default = false);
     size_t set_string_unique(size_t column_ndx, size_t row_ndx, StringData value);
-    void set_binary_big(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default = false);
     void set_binary(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default = false);
     void set_mixed(size_t column_ndx, size_t row_ndx, Mixed value, bool is_default = false);
     void set_link(size_t column_ndx, size_t row_ndx, size_t target_row_ndx, bool is_default = false);
     void nullify_link(size_t column_ndx, size_t row_ndx);
     void set_null(size_t column_ndx, size_t row_ndx, bool is_default = false);
     void set_null_unique(size_t col_ndx, size_t row_ndx);
+
+    // Sync needs to store blobs bigger than 16 M. This function can be used for that. Data should be read
+    // out again using the get_binary_at() function. Should not be used for user data as normal get_binary()
+    // will just return null if the data is bigger than the limit.
+    void set_binary_big(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default = false);
 
     void add_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
 
