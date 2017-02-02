@@ -145,7 +145,7 @@ def buildDockerEnv(name) {
 
 def doBuildCocoa(def isPublishingRun) {
   return {
-    node('osx_vegas') {
+    node('macos || osx_vegas') {
       getArchive()
 
       try {
@@ -158,7 +158,7 @@ def doBuildCocoa(def isPublishingRun) {
           'UNITTEST_REANDOM_SEED=random',
           'UNITTEST_XML=1',
           'UNITTEST_THREADS=1',
-          'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer/'
+          'DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/'
         ]) {
             sh '''
               dir=$(pwd)
@@ -356,7 +356,7 @@ def doBuildNodeInDocker(String buildType, boolean isPublishingRun) {
 
 def doBuildNodeInOsx(String libType, String buildType, boolean isPublishingRun) {
   return {
-    node('osx_vegas') {
+    node('macos || osx_vegas') {
       getArchive()
 
       try {
