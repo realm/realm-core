@@ -58,6 +58,7 @@ public:
     std::map<size_t, std::string> m_table_names;
     std::map<size_t, std::map<size_t, int64_t>> m_int_primaries;
     std::map<size_t, std::map<size_t, std::string>> m_string_primaries;
+    std::map<size_t, std::map<size_t, size_t>> m_row_mapping;
     json json_instructions;
 
     using LinkingProperties = std::vector<std::pair<std::string, Property>>;
@@ -85,6 +86,13 @@ public:
                         return primary->second;
                     }
                 }
+                auto mappings = m_row_mapping.find(table->get_index_in_group());
+                if (mappings != m_row_mapping.end()) {
+                    auto mapping = mappings->second.find(row);
+                    if (mapping != mappings->second.end()) {
+                        return table->get_int(primary_key->table_column, mapping->second);
+                    }
+                }
                 return table->get_int(primary_key->table_column, row); 
             }
             else if (primary_key->type == PropertyType::String) {
@@ -93,6 +101,13 @@ public:
                     auto primary = primaries->second.find(row);
                     if (primary != primaries->second.end()) {
                         return primary->second;
+                    }
+                }
+                auto mappings = m_row_mapping.find(table->get_index_in_group());
+                if (mappings != m_row_mapping.end()) {
+                    auto mapping = mappings->second.find(row);
+                    if (mapping != mappings->second.end()) {
+                        return table->get_string(primary_key->table_column, mapping->second);
                     }
                 }
                 return table->get_string(primary_key->table_column, row); 
@@ -192,50 +207,36 @@ public:
                 {"object_type", selected_object_schema->name},
                 {"identity", get_identity(row_index, selected_table, selected_primary)}
             });
+
+            // change identity for objects with no primary key
             if (!selected_primary && row_index < prior_num_rows-1) {
-                // need to change identity since there is now primary key
                 json_instructions.push_back({
                     {"type", Adapter::instruction_type_string(Adapter::InstructionType::ChangeIdentity)},
                     {"object_type", selected_object_schema->name},
                     {"identity", prior_num_rows-1},
                     {"new_identity", row_index}
-            }); 
+                });
             }
 
-            // // add instructions to nullify backlinks
-            // auto table = ObjectStore::table_for_object_type(m_group, selected_object_type);
-            // for (auto linking_object_property : m_linking_properties[selected_object_type]) {
-            //     auto linking_table = ObjectStore::table_for_object_type(m_group, linking_object_property.first);
-            //     size_t linking_table_index = linking_table->get_index_in_group();
-            //     size_t linking_column = linking_object_property.second.table_column;
-            //     size_t backlink_count = linking_table->get_backlink_count(row_index, *table, linking_column);
-            //     for (size_t backlink_index = 0; backlink_index < backlink_count; backlink_index++) {
-            //         size_t linking_row = table->get_backlink(row_index, *linking_table, linking_column, backlink_index);
-            //         if (linking_object_property.second.type == PropertyType::Object) {
-            //             REALM_ASSERT(linking_table->get_link(linking_column, linking_row) == row_index);
-
-            //             json_instructions.push_back({
-            //                 {"type", Adapter::instruction_type_string(Adapter::InstructionType::SetProperty)},
-            //                 {"object_type", selected_object_type},
-            //                 {"identity", get_identity(row_index)},
-            //                 {"property", linking_object_property.second}
-            //             });
-            //             m_encoder.nullify_link(linking_column, linking_row, linking_table_index);
-            //         }
-            //         else {
-            //             m_encoder.select_link_list(linking_column, linking_row, linking_table_index);
-
-            //             auto link_view = linking_table->get_linklist(linking_column, linking_row);
-            //             auto list_index = link_view->find(row_index);
-
-            //             auto size = link_view->size();
-            //             while (list_index != npos) {
-            //                 link_list_nullify(list_index, size--);
-            //                 list_index = link_view->find(row_index, list_index + 1);
-            //             }
-            //         }
-            //     }
-            // }
+            // update row mappings
+            if (selected_primary) {
+                if (selected_primary->type == PropertyType::Int) {
+                    if (m_int_primaries[selected_table_index].count(prior_num_rows-1)) {
+                        m_int_primaries[selected_table_index][row_index] = m_int_primaries[selected_table_index][prior_num_rows-1];
+                        m_int_primaries[selected_table_index].erase(prior_num_rows-1);
+                    }
+                }
+                else {
+                    REALM_ASSERT(selected_primary->type == PropertyType::String);
+                    if (m_string_primaries[selected_table_index].count(prior_num_rows-1)) {
+                        m_string_primaries[selected_table_index][row_index] = m_string_primaries[selected_table_index][prior_num_rows-1];
+                        m_string_primaries[selected_table_index].erase(prior_num_rows-1);
+                    }
+                } 
+            }
+            else {
+                m_row_mapping[selected_table_index][row_index] = prior_num_rows-1;
+            }
         }
         return true;
     }
