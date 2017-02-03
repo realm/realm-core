@@ -30,7 +30,6 @@
 #include "results.hpp"
 #include "schema.hpp"
 #include "thread_safe_reference.hpp"
-#include "sync/sync_config.hpp"
 
 #include "util/compiler.hpp"
 #include "util/format.hpp"
@@ -39,6 +38,7 @@
 #include <realm/util/scope_exit.hpp>
 
 #if REALM_ENABLE_SYNC
+#include "sync/sync_config.hpp"
 #include <realm/sync/history.hpp>
 #endif
 
