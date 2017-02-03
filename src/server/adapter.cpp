@@ -95,7 +95,7 @@ public:
                 }
                 return table->get_int(primary_key->table_column, row); 
             }
-            else if (primary_key->type == PropertyType::String) {
+            if (primary_key->type == PropertyType::String) {
                 auto primaries = m_string_primaries.find(table->get_index_in_group());
                 if (primaries != m_string_primaries.end()) {
                     auto primary = primaries->second.find(row);
@@ -221,6 +221,9 @@ public:
             // update row mappings
             if (selected_primary) {
                 if (selected_primary->type == PropertyType::Int) {
+                    if (m_int_primaries[selected_table_index].count(row_index)) {
+                        m_int_primaries[selected_table_index].erase(row_index);
+                    }
                     if (m_int_primaries[selected_table_index].count(prior_num_rows-1)) {
                         m_int_primaries[selected_table_index][row_index] = m_int_primaries[selected_table_index][prior_num_rows-1];
                         m_int_primaries[selected_table_index].erase(prior_num_rows-1);
@@ -228,6 +231,9 @@ public:
                 }
                 else {
                     REALM_ASSERT(selected_primary->type == PropertyType::String);
+                    if (m_string_primaries[selected_table_index].count(row_index)) {
+                        m_string_primaries[selected_table_index].erase(row_index);
+                    }
                     if (m_string_primaries[selected_table_index].count(prior_num_rows-1)) {
                         m_string_primaries[selected_table_index][row_index] = m_string_primaries[selected_table_index][prior_num_rows-1];
                         m_string_primaries[selected_table_index].erase(prior_num_rows-1);
