@@ -255,22 +255,6 @@ TEST_CASE("sync: log-in", "[sync]") {
         CHECK(session->is_in_error_state());
     }
 
-    SECTION("Session is invalid after invalid token while waiting on download to complete") {
-        std::atomic<int> error_count(0);
-        auto session = sync_session(server, user, "/test",
-                                    [](const std::string&, const std::string&) { return "this is not a valid access token"; },
-                                    [&](auto, auto) { ++error_count; });
-
-        EventLoop::main().perform([&] {
-            session->wait_for_download_completion([](auto) {
-                // Nothing to do here.
-            });
-        });
-
-        EventLoop::main().run_until([&] { return error_count > 0; });
-        CHECK(session->is_in_error_state());
-    }
-
     // TODO: write a test that logs out a Realm with multiple sessions, then logs it back in?
     // TODO: write tests that check that a Session properly handles various types of errors reported via its callback.
 }
