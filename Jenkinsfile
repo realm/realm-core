@@ -91,7 +91,7 @@ for (def i = 0; i < androidAbis.size(); i++) {
 
 appleSdks = ['macosx',
              'iphoneos', 'iphonesimulator',
-             'appletvos', 'appletvsimulator'
+             'appletvos', 'appletvsimulator',
              'watchos', 'watchsimulator']
 appleBuildTypes = ['MinSizeDebug', 'Release']
 
