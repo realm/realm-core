@@ -213,6 +213,10 @@ target_link_libraries(
 )
 
 if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
+    set(REALM_SKIP_SHARED_LIB ON)
+endif()
+
+if(NOT REALM_SKIP_SHARED_LIB)
     add_library(realm-shared SHARED $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
 
     set_target_properties(

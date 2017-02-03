@@ -399,6 +399,8 @@ def doBuildNodeInOsx(String libType, String buildType, boolean isPublishingRun) 
 
 def doBuildCocoa(String sdk, String buildType, boolean tests) {
     def testsDefinition = tests ? "" : "-D REALM_NO_TESTS=1"
+    def skipSharedLib = tests ? "" : "-D REALM_SKIP_SHARED_LIB=1"
+
     return {
         node('macos || osx_vegas') {
             getArchive()
@@ -410,7 +412,7 @@ def doBuildCocoa(String sdk, String buildType, boolean tests) {
                     cmake -D REALM_ENABLE_ENCRYPTION=yes \\
                           -D REALM_ENABLE_ASSERTIONS=yes \\
                           -D CMAKE_BUILD_TYPE=${buildType} \\
-                          ${testsDefinition} -G Xcode ..
+                          ${testsDefinition} ${skipSharedLib} -G Xcode ..
                     xcodebuild -sdk ${sdk} \\
                                -configuration ${buildType} \\
                                ONLY_ACTIVE_ARCH=NO
