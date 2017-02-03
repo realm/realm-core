@@ -45,6 +45,7 @@ public:
         ListClear,
         AddType,
         AddProperty,
+        ChangeIdentity,
     };
 
     static std::string instruction_type_string(InstructionType type) {
@@ -59,6 +60,7 @@ public:
             case InstructionType::ListClear:   return "ListClear";
             case InstructionType::AddType:     return "AddType";
             case InstructionType::AddProperty: return "AddProperty";
+            case InstructionType::ChangeIdentity:   return "ChangeIdentity";
         }
     }
 

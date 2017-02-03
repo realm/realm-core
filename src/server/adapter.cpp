@@ -192,6 +192,15 @@ public:
                 {"object_type", selected_object_schema->name},
                 {"identity", get_identity(row_index, selected_table, selected_primary)}
             });
+            if (!selected_primary && row_index < prior_num_rows-1) {
+                // need to change identity since there is now primary key
+                json_instructions.push_back({
+                    {"type", Adapter::instruction_type_string(Adapter::InstructionType::ChangeIdentity)},
+                    {"object_type", selected_object_schema->name},
+                    {"identity", prior_num_rows-1},
+                    {"new_identity", row_index}
+            }); 
+            }
 
             // // add instructions to nullify backlinks
             // auto table = ObjectStore::table_for_object_type(m_group, selected_object_type);
@@ -568,12 +577,11 @@ public:
     {
         if (list_property) {
             json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::ListSet)},
+                {"type", Adapter::instruction_type_string(Adapter::InstructionType::ListErase)},
                 {"object_type", selected_object_schema->name},
                 {"property", list_property->name},
                 {"identity", list_parent_identity},
                 {"list_index", list_index},
-                {"object_identity", nullptr}
             }); 
         } 
         return true;
