@@ -1937,7 +1937,7 @@ public:
 
     void verify_column() const override
     {
-        // no cached column accessors => do nothing
+        m_expression->verify_column();
     }
 
     size_t find_first_local(size_t start, size_t end) override
