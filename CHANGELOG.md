@@ -13,6 +13,7 @@
 * Avoid copying copy-on-write data structures when the write does not actually
   change the existing value.
 * Improve performance of deleting all rows in a TableView.
+* Allow the `add_int()` API to be called on a `Row`.
 
 -----------
 
