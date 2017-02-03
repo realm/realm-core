@@ -410,7 +410,6 @@ def doBuildCocoa(String sdk, String buildType, boolean tests) {
                     cmake -D REALM_ENABLE_ENCRYPTION=yes \\
                           -D REALM_ENABLE_ASSERTIONS=yes \\
                           -D CMAKE_BUILD_TYPE=${buildType} \\
-                          -D CPACK_GENERATOR=TGZ \\
                           ${testsDefinition} -G Xcode ..
                     xcodebuild -sdk ${sdk} \\
                                -configuration ${buildType} \\
