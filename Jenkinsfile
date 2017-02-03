@@ -59,13 +59,13 @@ stage 'check'
 parallelExecutors = [
 checkLinuxRelease: doBuildInDocker('check'),
 checkLinuxDebug: doBuildInDocker('check-debug'),
-buildCocoa: doBuildCocoa(isPublishingRun),
+//buildCocoa: doBuildCocoa(isPublishingRun),
 buildNodeLinuxDebug: doBuildNodeInDocker('Debug', isPublishingRun),
 buildNodeLinuxRelease: doBuildNodeInDocker('Release', isPublishingRun),
-buildNodeOsxStaticRelease: doBuildNodeInOsx('STATIC', 'Release', isPublishingRun),
-buildNodeOsxStaticDebug: doBuildNodeInOsx('STATIC', 'Debug', isPublishingRun),
-buildNodeOsxSharedRelease: doBuildNodeInOsx('SHARED', 'Release', isPublishingRun),
-buildNodeOsxSharedDebug: doBuildNodeInOsx('SHARED', 'Debug', isPublishingRun),
+//buildNodeOsxStaticRelease: doBuildNodeInOsx('STATIC', 'Release', isPublishingRun),
+//buildNodeOsxStaticDebug: doBuildNodeInOsx('STATIC', 'Debug', isPublishingRun),
+//buildNodeOsxSharedRelease: doBuildNodeInOsx('SHARED', 'Release', isPublishingRun),
+//buildNodeOsxSharedDebug: doBuildNodeInOsx('SHARED', 'Debug', isPublishingRun),
 addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
 buildWin32Release: doBuildWindows('Release', false, 'win32'),
 buildUwpWin32Release: doBuildWindows('Release', true, 'win32'),
@@ -89,10 +89,23 @@ for (def i = 0; i < androidAbis.size(); i++) {
   }
 }
 
-appleSdks = []
+appleSdks = ['macosx',
+             'iphoneos', 'iphonesimulator',
+             'appletvos', 'appletvsimulator'
+             'watchos', 'watchsimulator']
+appleBuildTypes = ['MinSizeDebug', 'Release']
+
+for (def i = 0; i < appleSdks.size(); i++) {
+    def sdk = appleSdks[i]
+    for (def j = 0; j < appleBuildTypes.size(); j++) {
+        def buildType = appleBuildTypes[j]
+        parallelExecutors["${sdk}${buildType}"] = doBuildCocoa(sdk, buildType)
+    }
+}
+
 
 if (env.CHANGE_TARGET) {
-parallelExecutors['diffCoverage'] = buildDiffCoverage()
+    parallelExecutors['diffCoverage'] = buildDiffCoverage()
 }
 
 parallel parallelExecutors
@@ -381,6 +394,32 @@ def doBuildNodeInOsx(String libType, String buildType, boolean isPublishingRun) 
       }
     }
   }
+}
+
+def doBuildCocoa(String sdk, String buildType) {
+    return {
+        node('macos || osx_vegas') {
+            getArchive()
+
+            try {
+                sh """
+                    mkdir build-dir
+                    cd build-dir
+                    cmake -D REALM_ENABLE_ENCRYPTION=yes \\
+                          -D REALM_ENABLE_ASSERTIONS=yes \\
+                          -D CMAKE_BUILD_TYPE=${buildType} \\
+                          -G Xcode ..
+                    xcodebuild -sdk ${sdk} \\
+                               -configuration ${buildType} \\
+                               ONLY_ACTIVE_ARCH=NO
+                    xcodebuild -sdk ${sdk} \\
+                               -configuration ${buildType} \\
+                               -target package \\
+                               ONLY_ACTIVE_ARCH=NO
+                """
+            }
+        }
+    }
 }
 
 def recordTests(tag) {
