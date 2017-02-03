@@ -97,9 +97,10 @@ appleBuildTypes = ['MinSizeDebug', 'Release']
 
 for (def i = 0; i < appleSdks.size(); i++) {
     def sdk = appleSdks[i]
+    def tests = sdk == 'macosx' ? true : false
     for (def j = 0; j < appleBuildTypes.size(); j++) {
         def buildType = appleBuildTypes[j]
-        parallelExecutors["${sdk}${buildType}"] = doBuildCocoa(sdk, buildType)
+        parallelExecutors["${sdk}${buildType}"] = doBuildCocoa(sdk, buildType, tests)
     }
 }
 
@@ -396,7 +397,8 @@ def doBuildNodeInOsx(String libType, String buildType, boolean isPublishingRun) 
   }
 }
 
-def doBuildCocoa(String sdk, String buildType) {
+def doBuildCocoa(String sdk, String buildType, boolean tests) {
+    def testsDefinition = tests ? "" : "-D REALM_NO_TESTS=1"
     return {
         node('macos || osx_vegas') {
             getArchive()
@@ -408,7 +410,8 @@ def doBuildCocoa(String sdk, String buildType) {
                     cmake -D REALM_ENABLE_ENCRYPTION=yes \\
                           -D REALM_ENABLE_ASSERTIONS=yes \\
                           -D CMAKE_BUILD_TYPE=${buildType} \\
-                          -G Xcode ..
+                          -D CPACK_GENERATOR=TGZ \\
+                          ${testsDefinition} -G Xcode ..
                     xcodebuild -sdk ${sdk} \\
                                -configuration ${buildType} \\
                                ONLY_ACTIVE_ARCH=NO
