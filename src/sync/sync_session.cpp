@@ -506,7 +506,7 @@ std::function<void()> SyncSession::NotifierPackage::create_invocation(const Prog
 
 void SyncSession::create_sync_session()
 {
-  	REALM_ASSERT(!m_session);
+    REALM_ASSERT(!m_session);
     sync::Session::Config session_config;
     session_config.changeset_cooker = m_config.transformer.get();
     m_session = std::make_unique<sync::Session>(m_client.client, m_realm_path, session_config);
