@@ -417,6 +417,8 @@ def doBuildCocoa(String sdk, String buildType) {
                                -target package \\
                                ONLY_ACTIVE_ARCH=NO
                 """
+            } finally {
+                collectCompilerWarnings('clang', true)
             }
         }
     }
