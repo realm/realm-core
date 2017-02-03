@@ -171,7 +171,7 @@ set(REALM_INSTALL_UTIL_HEADERS
 ) # REALM_INSTALL_UTIL_HEADERS
 
 set(REALM_OTHER_UTIL_HEADERS
-    util/aes_cryptor.hpp
+    util/aes_cryptor.hppd
     util/errno.hpp
 ) # REALM_OTHER_UTIL_HEADERS
 
@@ -182,7 +182,6 @@ set_property(TARGET realm-objects APPEND PROPERTY COMPILE_DEFINITIONS PIC)
 if(APPLE)
     set_target_properties(
             realm-objects PROPERTIES
-            XCODE_ATTRIBUTE_INSTALL_PATH "/"
             XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
             XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL "\$(GCC_OPTIMIZATION_LEVEL_\$(CONFIGURATION))"
             XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_Debug "0"
@@ -218,9 +217,16 @@ if(NOT ANDROID AND NOT CMAKE_SYSTEM_NAME MATCHES "^Windows")
 
     set_target_properties(
         realm-shared PROPERTIES
-        SOVERSION 9.0.0
         LIBRARY_OUTPUT_NAME realm
     )
+
+    # Creating the symbolic link fails on Cocoa builds
+    if(NOT APPLE)
+        set_target_properties(
+                realm-shared PROPERTIES
+                SOVERSION 9.0.0
+        )
+    endif()
 
     target_link_libraries(
         realm-shared

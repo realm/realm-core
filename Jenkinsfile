@@ -1,137 +1,134 @@
 #!groovy
 
-try {
-  def gitTag
-  def gitSha
-  def version
-  def dependencies
-  def isPublishingRun
-  def isPublishingLatestRun
+def gitTag
+def gitSha
+def version
+def dependencies
+def isPublishingRun
+def isPublishingLatestRun
 
-  timeout(time: 1, unit: 'HOURS') {
-    stage('gather-info') {
-      node('docker') {
-        checkout([
-          $class: 'GitSCM',
-          branches: scm.branches,
-          gitTool: 'native git',
-          extensions: scm.extensions + [[$class: 'CleanCheckout']],
-          userRemoteConfigs: scm.userRemoteConfigs
-        ])
-        stash includes: '**', name: 'core-source'
+timeout(time: 1, unit: 'HOURS') {
+stage('gather-info') {
+  node('docker') {
+    checkout([
+      $class: 'GitSCM',
+      branches: scm.branches,
+      gitTool: 'native git',
+      extensions: scm.extensions + [[$class: 'CleanCheckout']],
+      userRemoteConfigs: scm.userRemoteConfigs
+    ])
+    stash includes: '**', name: 'core-source'
 
-        dependencies = readProperties file: 'dependencies.list'
-        echo "VERSION: ${dependencies.VERSION}"
+    dependencies = readProperties file: 'dependencies.list'
+    echo "VERSION: ${dependencies.VERSION}"
 
-        gitTag = readGitTag()
-        gitSha = readGitSha()
-        version = get_version()
-        echo "tag: ${gitTag}"
-        if (gitTag == "") {
-          echo "No tag given for this build"
-          setBuildName(gitSha)
-        } else {
-          if (gitTag != "v${dependencies.VERSION}") {
-            def message = "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
-            echo message
-            throw new IllegalStateException(message)
-          } else {
-            echo "Building release: '${gitTag}'"
-            setBuildName("Tag ${gitTag}")
-          }
-        }
-      }
-
-      isPublishingRun = gitTag != ""
-      echo "Publishing Run: ${isPublishingRun}"
-
-      rpmVersion = dependencies.VERSION.replaceAll("-", "_")
-      echo "rpm version: ${rpmVersion}"
-
-      if (['master'].contains(env.BRANCH_NAME)) {
-        // If we're on master, instruct the docker image builds to push to the
-        // cache registry
-        env.DOCKER_PUSH = "1"
-      }
-    }
-
-  stage 'check'
-
-  parallelExecutors = [
-    checkLinuxRelease: doBuildInDocker('check'),
-    checkLinuxDebug: doBuildInDocker('check-debug'),
-    buildCocoa: doBuildCocoa(isPublishingRun),
-    buildNodeLinuxDebug: doBuildNodeInDocker('Debug', isPublishingRun),
-    buildNodeLinuxRelease: doBuildNodeInDocker('Release', isPublishingRun),
-    buildNodeOsxStaticRelease: doBuildNodeInOsx('STATIC', 'Release', isPublishingRun),
-    buildNodeOsxStaticDebug: doBuildNodeInOsx('STATIC', 'Debug', isPublishingRun),
-    buildNodeOsxSharedRelease: doBuildNodeInOsx('SHARED', 'Release', isPublishingRun),
-    buildNodeOsxSharedDebug: doBuildNodeInOsx('SHARED', 'Debug', isPublishingRun),
-    addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
-    buildWin32Release: doBuildWindows('Release', false, 'win32'),
-    buildUwpWin32Release: doBuildWindows('Release', true, 'win32'),
-    buildUwpWin64Release: doBuildWindows('Release', true, 'win64'),
-    packageGeneric: doBuildPackage('generic', 'tar.gz'),
-    packageCentos7: doBuildPackage('centos-7', 'rpm'),
-    packageCentos6: doBuildPackage('centos-6', 'rpm'),
-    packageUbuntu1604: doBuildPackage('ubuntu-1604', 'deb')
-    //buildUwpArmRelease: doBuildWindows('Release', true, 'arm')
-    //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
-  ]
-
-  androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
-  androidBuildTypes = ['Debug', 'Release']
-
-  for (def i = 0; i < androidAbis.size(); i++) {
-      def abi = androidAbis[i]
-      for (def j=0; j < androidBuildTypes.size(); j++) {
-          def buildType = androidBuildTypes[j]
-          parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType)
-      }
-  }
-
-  if (env.CHANGE_TARGET) {
-    parallelExecutors['diffCoverage'] = buildDiffCoverage()
-  }
-
-  parallel parallelExecutors
-
-  stage('aggregate') {
-      node('docker') {
-          getArchive()
-          for (def i = 0; i < androidAbis.size(); i++) {
-              def abi = androidAbis[i]
-              for (def j=0; j < androidBuildTypes.size(); j++) {
-                  def buildType = androidBuildTypes[j]
-                  unstash "install-${abi}-${buildType}"
-              }
-          }
-
-          def buildEnv = docker.build 'realm-core:snapshot'
-          def environment = environment()
-          withEnv(environment) {
-              buildEnv.inside {
-                  sh 'rake package-android'
-              }
-          }
-      }
-  }
-
-  if (isPublishingRun) {
-      stage('publish-packages') {
-          parallel(
-            generic: doPublishGeneric(),
-                   centos7: doPublish('centos-7', 'rpm', 'el', 7),
-                   centos6: doPublish('centos-6', 'rpm', 'el', 6),
-                   ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
-                   others: doPublishLocalArtifacts()
-              )
+    gitTag = readGitTag()
+    gitSha = readGitSha()
+    version = get_version()
+    echo "tag: ${gitTag}"
+    if (gitTag == "") {
+      echo "No tag given for this build"
+      setBuildName(gitSha)
+    } else {
+      if (gitTag != "v${dependencies.VERSION}") {
+        def message = "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
+        echo message
+        throw new IllegalStateException(message)
+      } else {
+        echo "Building release: '${gitTag}'"
+        setBuildName("Tag ${gitTag}")
       }
     }
   }
-} catch(Exception e) {
-  e.printStackTrace()
-  throw e
+
+  isPublishingRun = gitTag != ""
+  echo "Publishing Run: ${isPublishingRun}"
+
+  rpmVersion = dependencies.VERSION.replaceAll("-", "_")
+  echo "rpm version: ${rpmVersion}"
+
+  if (['master'].contains(env.BRANCH_NAME)) {
+    // If we're on master, instruct the docker image builds to push to the
+    // cache registry
+    env.DOCKER_PUSH = "1"
+  }
+}
+
+stage 'check'
+
+parallelExecutors = [
+checkLinuxRelease: doBuildInDocker('check'),
+checkLinuxDebug: doBuildInDocker('check-debug'),
+buildCocoa: doBuildCocoa(isPublishingRun),
+buildNodeLinuxDebug: doBuildNodeInDocker('Debug', isPublishingRun),
+buildNodeLinuxRelease: doBuildNodeInDocker('Release', isPublishingRun),
+buildNodeOsxStaticRelease: doBuildNodeInOsx('STATIC', 'Release', isPublishingRun),
+buildNodeOsxStaticDebug: doBuildNodeInOsx('STATIC', 'Debug', isPublishingRun),
+buildNodeOsxSharedRelease: doBuildNodeInOsx('SHARED', 'Release', isPublishingRun),
+buildNodeOsxSharedDebug: doBuildNodeInOsx('SHARED', 'Debug', isPublishingRun),
+addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
+buildWin32Release: doBuildWindows('Release', false, 'win32'),
+buildUwpWin32Release: doBuildWindows('Release', true, 'win32'),
+buildUwpWin64Release: doBuildWindows('Release', true, 'win64'),
+packageGeneric: doBuildPackage('generic', 'tar.gz'),
+packageCentos7: doBuildPackage('centos-7', 'rpm'),
+packageCentos6: doBuildPackage('centos-6', 'rpm'),
+packageUbuntu1604: doBuildPackage('ubuntu-1604', 'deb')
+//buildUwpArmRelease: doBuildWindows('Release', true, 'arm')
+//threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
+]
+
+androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
+androidBuildTypes = ['Debug', 'Release']
+
+for (def i = 0; i < androidAbis.size(); i++) {
+  def abi = androidAbis[i]
+  for (def j=0; j < androidBuildTypes.size(); j++) {
+      def buildType = androidBuildTypes[j]
+      parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType)
+  }
+}
+
+appleSdks = []
+
+if (env.CHANGE_TARGET) {
+parallelExecutors['diffCoverage'] = buildDiffCoverage()
+}
+
+parallel parallelExecutors
+
+stage('aggregate') {
+  node('docker') {
+      getArchive()
+      for (def i = 0; i < androidAbis.size(); i++) {
+          def abi = androidAbis[i]
+          for (def j=0; j < androidBuildTypes.size(); j++) {
+              def buildType = androidBuildTypes[j]
+              unstash "install-${abi}-${buildType}"
+          }
+      }
+
+      def buildEnv = docker.build 'realm-core:snapshot'
+      def environment = environment()
+      withEnv(environment) {
+          buildEnv.inside {
+              sh 'rake package-android'
+          }
+      }
+  }
+}
+
+if (isPublishingRun) {
+  stage('publish-packages') {
+      parallel(
+        generic: doPublishGeneric(),
+               centos7: doPublish('centos-7', 'rpm', 'el', 7),
+               centos6: doPublish('centos-6', 'rpm', 'el', 6),
+               ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
+               others: doPublishLocalArtifacts()
+          )
+  }
+}
 }
 
 def buildDockerEnv(name) {

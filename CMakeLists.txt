@@ -64,6 +64,8 @@ if(APPLE)
 
     # Enable Apple-specific platforms on Xcode
     if(CMAKE_GENERATOR STREQUAL Xcode)
+        unset(CMAKE_XCODE_ATTRIBUTE_INSTALL_PATH)
+
         set(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS
             "macosx iphoneos iphonesimulator appletvos appletvsimulator watchos watchsimulator"
         )
