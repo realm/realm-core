@@ -25,7 +25,10 @@
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "property.hpp"
+#include "results.hpp"
 #include "schema.hpp"
+
+#include "impl/realm_coordinator.hpp"
 
 #include <realm/group.hpp>
 
@@ -478,3 +481,67 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
         REQUIRE_THROWS(Realm::get_shared_realm(config3)); // both buffer and encryption
     }
 }
+
+TEST_CASE("ShareRealm: realm closed in did_change callback") {
+    TestFile config;
+    config.schema_version = 1;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int, "", "", false, false, false}
+        }},
+    };
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    auto r1 = Realm::get_shared_realm(config);
+
+    r1->begin_transaction();
+    auto table = r1->read_group().get_table("class_object");
+    auto row_idx = table->add_empty_row(1);
+    auto table_idx = table->get_index_in_group();
+    r1->commit_transaction();
+
+    // Cannot be a member var of Context since Realm.close will free the context.
+    static SharedRealm* shared_realm;
+    shared_realm = &r1;
+    struct Context : public BindingContext {
+        void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+        {
+            (*shared_realm)->close();
+            (*shared_realm).reset();
+        }
+    };
+
+    SECTION("did_change") {
+        r1->m_binding_context.reset(new Context());
+        r1->invalidate();
+
+        auto r2 = Realm::get_shared_realm(config);
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->add_empty_row(1);
+        r2->commit_transaction();
+        r2.reset();
+
+        r1->notify();
+    }
+
+    SECTION("did_change with async results") {
+        r1->m_binding_context.reset(new Context());
+        Results results(r1, table->where());
+        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            // Should not be called.
+            REQUIRE(false);
+        });
+
+        auto r2 = Realm::get_shared_realm(config);
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->add_empty_row(1);
+        r2->commit_transaction();
+        r2.reset();
+
+        auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+        coordinator->on_change();
+
+        r1->notify();
+    }
+}
+

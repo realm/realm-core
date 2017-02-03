@@ -155,7 +155,7 @@ bool DeepChangeChecker::operator()(size_t ndx)
 
 CollectionNotifier::CollectionNotifier(std::shared_ptr<Realm> realm)
 : m_realm(std::move(realm))
-, m_sg_version(Realm::Internal::get_shared_group(*m_realm).get_version_of_current_transaction())
+, m_sg_version(Realm::Internal::get_shared_group(*m_realm)->get_version_of_current_transaction())
 {
 }
 

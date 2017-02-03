@@ -268,7 +268,7 @@ public:
 
         // ResultsNotifier and ListNotifier need access to the SharedGroup
         // to be able to call the handover functions, which are not very wrappable
-        static SharedGroup& get_shared_group(Realm& realm) { return *realm.m_shared_group; }
+        static const std::unique_ptr<SharedGroup>& get_shared_group(Realm& realm) { return realm.m_shared_group; }
 
         // CollectionNotifier needs to be able to access the owning
         // coordinator to wake up the worker thread when a callback is

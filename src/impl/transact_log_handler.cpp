@@ -642,10 +642,10 @@ public:
 };
 
 template<typename Func>
-void advance_with_notifications(BindingContext* context, SharedGroup& sg, Func&& func,
+void advance_with_notifications(BindingContext* context, const std::unique_ptr<SharedGroup>& sg, Func&& func,
                                 _impl::NotifierPackage& notifiers)
 {
-    auto old_version = sg.get_version_of_current_transaction();
+    auto old_version = sg->get_version_of_current_transaction();
     std::vector<BindingContext::ObserverState> observers;
     if (context) {
         observers = context->get_observed_rows();
@@ -657,20 +657,23 @@ void advance_with_notifications(BindingContext* context, SharedGroup& sg, Func&&
     if (observers.empty() && (!notifiers || notifiers.version())) {
         notifiers.before_advance();
         func(TransactLogValidator());
-        auto new_version = sg.get_version_of_current_transaction();
+        auto new_version = sg->get_version_of_current_transaction();
         if (context && old_version != new_version)
             context->did_change({}, {});
+        // did_change() could close the Realm. Just return if it does.
+        if (!sg)
+            return;
         // did_change() can change the read version, and if it does we can't
         // deliver notifiers
-        if (new_version == sg.get_version_of_current_transaction())
-            notifiers.deliver(sg);
+        if (new_version == sg->get_version_of_current_transaction())
+            notifiers.deliver(*sg);
         notifiers.after_advance();
         return;
     }
 
-    func(KVOTransactLogObserver(observers, context, notifiers, sg));
-    notifiers.package_and_wait(sg.get_version_of_current_transaction().version); // is a no-op if parse_complete() was called
-    notifiers.deliver(sg);
+    func(KVOTransactLogObserver(observers, context, notifiers, *sg));
+    notifiers.package_and_wait(sg->get_version_of_current_transaction().version); // is a no-op if parse_complete() was called
+    notifiers.deliver(*sg);
     notifiers.after_advance();
 }
 
@@ -685,10 +688,10 @@ void advance(SharedGroup& sg, BindingContext*, VersionID version)
     LangBindHelper::advance_read(sg, TransactLogValidator(), version);
 }
 
-void advance(SharedGroup& sg, BindingContext* context, NotifierPackage& notifiers)
+void advance(const std::unique_ptr<SharedGroup>& sg, BindingContext* context, NotifierPackage& notifiers)
 {
     advance_with_notifications(context, sg, [&](auto&&... args) {
-        LangBindHelper::advance_read(sg, std::move(args)..., notifiers.version().value_or(VersionID{}));
+        LangBindHelper::advance_read(*sg, std::move(args)..., notifiers.version().value_or(VersionID{}));
     }, notifiers);
 }
 
@@ -697,10 +700,10 @@ void begin_without_validation(SharedGroup& sg)
     LangBindHelper::promote_to_write(sg);
 }
 
-void begin(SharedGroup& sg, BindingContext* context, NotifierPackage& notifiers)
+void begin(const std::unique_ptr<SharedGroup>& sg, BindingContext* context, NotifierPackage& notifiers)
 {
     advance_with_notifications(context, sg, [&](auto&&... args) {
-        LangBindHelper::promote_to_write(sg, std::move(args)...);
+        LangBindHelper::promote_to_write(*sg, std::move(args)...);
     }, notifiers);
 }
 
