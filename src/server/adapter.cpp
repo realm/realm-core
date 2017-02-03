@@ -208,40 +208,36 @@ public:
                 {"identity", get_identity(row_index, selected_table, selected_primary)}
             });
 
-            // change identity for objects with no primary key
-            if (!selected_primary && row_index < prior_num_rows-1) {
-                json_instructions.push_back({
-                    {"type", Adapter::instruction_type_string(Adapter::InstructionType::ChangeIdentity)},
-                    {"object_type", selected_object_schema->name},
-                    {"identity", prior_num_rows-1},
-                    {"new_identity", row_index}
-                });
-            }
-
-            // update row mappings
-            if (selected_primary) {
-                if (selected_primary->type == PropertyType::Int) {
-                    if (m_int_primaries[selected_table_index].count(row_index)) {
-                        m_int_primaries[selected_table_index].erase(row_index);
-                    }
-                    if (m_int_primaries[selected_table_index].count(prior_num_rows-1)) {
-                        m_int_primaries[selected_table_index][row_index] = m_int_primaries[selected_table_index][prior_num_rows-1];
-                        m_int_primaries[selected_table_index].erase(prior_num_rows-1);
-                    }
-                }
-                else {
-                    REALM_ASSERT(selected_primary->type == PropertyType::String);
-                    if (m_string_primaries[selected_table_index].count(row_index)) {
-                        m_string_primaries[selected_table_index].erase(row_index);
-                    }
-                    if (m_string_primaries[selected_table_index].count(prior_num_rows-1)) {
-                        m_string_primaries[selected_table_index][row_index] = m_string_primaries[selected_table_index][prior_num_rows-1];
-                        m_string_primaries[selected_table_index].erase(prior_num_rows-1);
-                    }
-                } 
-            }
-            else {
+            // handle move_last_over
+            if (row_index < prior_num_rows-1) {
+                // update row mappings
                 m_row_mapping[selected_table_index][row_index] = prior_num_rows-1;
+
+                if (!selected_primary) {
+                    // change identity for objects with no primary key
+                    json_instructions.push_back({
+                        {"type", Adapter::instruction_type_string(Adapter::InstructionType::ChangeIdentity)},
+                        {"object_type", selected_object_schema->name},
+                        {"identity", prior_num_rows-1},
+                        {"new_identity", row_index}
+                    });
+                }
+                else if (selected_primary) {
+                    // update primary cache for objects with primary keys
+                    if (selected_primary->type == PropertyType::Int) {
+                        if (m_int_primaries[selected_table_index].count(prior_num_rows-1)) {
+                            m_int_primaries[selected_table_index][row_index] = m_int_primaries[selected_table_index][prior_num_rows-1];
+                            m_int_primaries[selected_table_index].erase(prior_num_rows-1);
+                        }
+                    }
+                    else {
+                        REALM_ASSERT(selected_primary->type == PropertyType::String);
+                        if (m_string_primaries[selected_table_index].count(prior_num_rows-1)) {
+                            m_string_primaries[selected_table_index][row_index] = m_string_primaries[selected_table_index][prior_num_rows-1];
+                            m_string_primaries[selected_table_index].erase(prior_num_rows-1);
+                        }
+                    } 
+                }
             }
         }
         return true;
