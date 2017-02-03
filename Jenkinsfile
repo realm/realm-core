@@ -104,7 +104,6 @@ for (def i = 0; i < appleSdks.size(); i++) {
     }
 }
 
-
 if (env.CHANGE_TARGET) {
     parallelExecutors['diffCoverage'] = buildDiffCoverage()
 }
@@ -415,6 +414,10 @@ def doBuildCocoa(String sdk, String buildType, boolean tests) {
                           ${testsDefinition} ${skipSharedLib} -G Xcode ..
                     xcodebuild -sdk ${sdk} \\
                                -configuration ${buildType} \\
+                               ONLY_ACTIVE_ARCH=NO
+                    xcodebuild -sdk ${sdk} \\
+                               -configuration ${buildType} \\
+                               -target install \\
                                ONLY_ACTIVE_ARCH=NO
                     xcodebuild -sdk ${sdk} \\
                                -configuration ${buildType} \\
