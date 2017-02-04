@@ -59,8 +59,8 @@ stage 'check'
 parallelExecutors = [
 checkLinuxRelease: doBuildInDocker('check'),
 checkLinuxDebug: doBuildInDocker('check-debug'),
-buildMacOsDebug: doBuildMacOs(sdk, 'Debug'),
-buildMacOsRelease: doBuildMacOs(sdk, 'Release'),
+buildMacOsDebug: doBuildMacOs('Debug'),
+buildMacOsRelease: doBuildMacOs('Release'),
 buildNodeLinuxDebug: doBuildNodeInDocker('Debug', isPublishingRun),
 buildNodeLinuxRelease: doBuildNodeInDocker('Release', isPublishingRun),
 buildWin32Release: doBuildWindows('Release', false, 'win32'),
@@ -389,6 +389,7 @@ def doBuildNodeInOsx(String libType, String buildType, boolean isPublishingRun) 
 }
 
 def doBuildMacOs(String sdk, String buildType) {
+    def sdk = 'maxosx'
     return {
         node('macos || osx_vegas') {
             getArchive()
