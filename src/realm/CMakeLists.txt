@@ -100,7 +100,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     group_writer.hpp
     handover_defs.hpp
     history.hpp
-    history.hpp
     impl/continuous_transactions_history.hpp
     impl/input_stream.hpp
     impl/transact_log.hpp
@@ -284,13 +283,16 @@ if(APPLE)
     endif()
 endif(APPLE)
 
+
 install(TARGETS realm
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
+
 if(NOT REALM_SKIP_SHARED_LIB)
     install(TARGETS realm-shared
             LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
             RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
 endif()
+
 install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
         COMPONENT devel)

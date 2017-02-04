@@ -59,14 +59,10 @@ stage 'check'
 parallelExecutors = [
 checkLinuxRelease: doBuildInDocker('check'),
 checkLinuxDebug: doBuildInDocker('check-debug'),
-//buildCocoa: doBuildCocoa(isPublishingRun),
+buildMacOsDebug: doBuildMacOs(sdk, 'Debug'),
+buildMacOsRelease: doBuildMacOs(sdk, 'Release'),
 buildNodeLinuxDebug: doBuildNodeInDocker('Debug', isPublishingRun),
 buildNodeLinuxRelease: doBuildNodeInDocker('Release', isPublishingRun),
-//buildNodeOsxStaticRelease: doBuildNodeInOsx('STATIC', 'Release', isPublishingRun),
-//buildNodeOsxStaticDebug: doBuildNodeInOsx('STATIC', 'Debug', isPublishingRun),
-//buildNodeOsxSharedRelease: doBuildNodeInOsx('SHARED', 'Release', isPublishingRun),
-//buildNodeOsxSharedDebug: doBuildNodeInOsx('SHARED', 'Debug', isPublishingRun),
-addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer'),
 buildWin32Release: doBuildWindows('Release', false, 'win32'),
 buildUwpWin32Release: doBuildWindows('Release', true, 'win32'),
 buildUwpWin64Release: doBuildWindows('Release', true, 'win64'),
@@ -89,18 +85,14 @@ for (def i = 0; i < androidAbis.size(); i++) {
   }
 }
 
-appleSdks = ['macosx',
-             'iphoneos', 'iphonesimulator',
-             'appletvos', 'appletvsimulator',
-             'watchos', 'watchsimulator']
+appleSdks = ['macosx', 'iphone', 'appletv', 'watch']
 appleBuildTypes = ['MinSizeDebug', 'Release']
 
 for (def i = 0; i < appleSdks.size(); i++) {
     def sdk = appleSdks[i]
-    def tests = sdk == 'macosx' ? true : false
     for (def j = 0; j < appleBuildTypes.size(); j++) {
         def buildType = appleBuildTypes[j]
-        parallelExecutors["${sdk}${buildType}"] = doBuildCocoa(sdk, buildType, tests)
+        parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
     }
 }
 
@@ -396,10 +388,7 @@ def doBuildNodeInOsx(String libType, String buildType, boolean isPublishingRun) 
   }
 }
 
-def doBuildCocoa(String sdk, String buildType, boolean tests) {
-    def testsDefinition = tests ? "" : "-D REALM_NO_TESTS=1"
-    def skipSharedLib = tests ? "" : "-D REALM_SKIP_SHARED_LIB=1"
-
+def doBuildMacOs(String sdk, String buildType) {
     return {
         node('macos || osx_vegas') {
             getArchive()
@@ -419,6 +408,51 @@ def doBuildCocoa(String sdk, String buildType, boolean tests) {
                                -configuration ${buildType} \\
                                -target install \\
                                ONLY_ACTIVE_ARCH=NO
+                    xcodebuild -sdk ${sdk} \\
+                               -configuration ${buildType} \\
+                               -target package \\
+                               ONLY_ACTIVE_ARCH=NO
+                """
+            } finally {
+                collectCompilerWarnings('clang', true)
+            }
+        }
+    }
+}
+
+def doBuildAppleDevice(String sdk, String buildType) {
+    return {
+        node('macos || osx_vegas') {
+            getArchive()
+
+            try {
+                sh """
+                    mkdir build-dir
+                    cd build-dir
+                    cmake -D REALM_ENABLE_ENCRYPTION=yes \\
+                          -D REALM_ENABLE_ASSERTIONS=yes \\
+                          -D CMAKE_BUILD_TYPE=${buildType} \\
+                          -D REALM_NO_TESTS=1 \\
+                          -D REALM_SKIP_SHARED_LIB=1 \\
+                          -G Xcode ..
+                    xcodebuild -sdk ${sdk}os \\
+                               -configuration ${buildType} \\
+                               ONLY_ACTIVE_ARCH=NO
+                    xcodebuild -sdk ${sdk}os \\
+                               -configuration ${buildType} \\
+                               -target install \\
+                               ONLY_ACTIVE_ARCH=NO
+                    xcodebuild -sdk ${sdk}simulator \\
+                               -configuration ${buildType} \\
+                               ONLY_ACTIVE_ARCH=NO
+                    xcodebuild -sdk ${sdk}simulator \\
+                               -configuration ${buildType} \\
+                               -target install \\
+                               ONLY_ACTIVE_ARCH=NO
+                    lipo -create
+                         -output src/realm/${buildType}/librealm.a
+                         src/realm/${buildType}-${sdk}os/librealm.a
+                         src/realm/${buildType}-${sdk}simulator/librealm.a
                     xcodebuild -sdk ${sdk} \\
                                -configuration ${buildType} \\
                                -target package \\
