@@ -92,7 +92,7 @@ for (def i = 0; i < appleSdks.size(); i++) {
     def sdk = appleSdks[i]
     for (def j = 0; j < appleBuildTypes.size(); j++) {
         def buildType = appleBuildTypes[j]
-        parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
+        parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType, version)
     }
 }
 
@@ -422,7 +422,7 @@ def doBuildMacOs(String buildType) {
     }
 }
 
-def doBuildAppleDevice(String sdk, String buildType) {
+def doBuildAppleDevice(String sdk, String buildType, String version) {
     return {
         node('macos || osx_vegas') {
             getArchive()
