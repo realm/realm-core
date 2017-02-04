@@ -388,8 +388,8 @@ def doBuildNodeInOsx(String libType, String buildType, boolean isPublishingRun) 
   }
 }
 
-def doBuildMacOs(String sdk, String buildType) {
-    def sdk = 'maxosx'
+def doBuildMacOs(String buildType) {
+    def sdk = 'macosx'
     return {
         node('macos || osx_vegas') {
             getArchive()
