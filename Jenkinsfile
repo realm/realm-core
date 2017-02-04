@@ -457,6 +457,8 @@ def doBuildAppleDevice(String sdk, String buildType) {
                                -configuration ${buildType} \\
                                -target install \\
                                ONLY_ACTIVE_ARCH=NO
+                    mkdir -p install/lib
+                    cp src/realm/${buildType}/librealm.a install/lib
                     xcodebuild -sdk ${sdk}os \\
                                -configuration ${buildType} \\
                                -target package \\
