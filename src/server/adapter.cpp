@@ -209,34 +209,41 @@ public:
             });
 
             // handle move_last_over
-            if (row_index < prior_num_rows-1) {
-                // update row mappings
-                m_row_mapping[selected_table_index][row_index] = prior_num_rows-1;
+            size_t old_row_index = prior_num_rows - 1;
+            if (selected_primary) {
+                auto &row_mapping = m_row_mapping[selected_table_index];
+                auto &int_primaries = m_int_primaries[selected_table_index];
+                auto &string_primaries = m_string_primaries[selected_table_index];
 
-                if (!selected_primary) {
+                // invalidate caches
+                if (row_mapping.count(row_index)) row_mapping.erase(row_index);
+                if (int_primaries.count(row_index)) int_primaries.erase(row_index);
+                if (string_primaries.count(row_index)) string_primaries.erase(row_index);
+
+                // update caches for moved object
+                if (row_index < old_row_index) {
+                    row_mapping[row_index] = old_row_index;
+
+                    // update primary key caches
+                    if (int_primaries.count(old_row_index)) {
+                        int_primaries[row_index] = int_primaries[old_row_index];
+                        int_primaries.erase(old_row_index);
+                    }
+                    if (string_primaries.count(old_row_index)) {
+                        string_primaries[row_index] = string_primaries[old_row_index];
+                        string_primaries.erase(old_row_index);
+                    }
+                }
+            }
+            else {
+                if (row_index < old_row_index) {
                     // change identity for objects with no primary key
                     json_instructions.push_back({
                         {"type", Adapter::instruction_type_string(Adapter::InstructionType::ChangeIdentity)},
                         {"object_type", selected_object_schema->name},
-                        {"identity", prior_num_rows-1},
+                        {"identity", old_row_index},
                         {"new_identity", row_index}
                     });
-                }
-                else if (selected_primary) {
-                    // update primary cache for objects with primary keys
-                    if (selected_primary->type == PropertyType::Int) {
-                        if (m_int_primaries[selected_table_index].count(prior_num_rows-1)) {
-                            m_int_primaries[selected_table_index][row_index] = m_int_primaries[selected_table_index][prior_num_rows-1];
-                            m_int_primaries[selected_table_index].erase(prior_num_rows-1);
-                        }
-                    }
-                    else {
-                        REALM_ASSERT(selected_primary->type == PropertyType::String);
-                        if (m_string_primaries[selected_table_index].count(prior_num_rows-1)) {
-                            m_string_primaries[selected_table_index][row_index] = m_string_primaries[selected_table_index][prior_num_rows-1];
-                            m_string_primaries[selected_table_index].erase(prior_num_rows-1);
-                        }
-                    } 
                 }
             }
         }
