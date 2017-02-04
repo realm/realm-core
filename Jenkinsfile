@@ -85,7 +85,7 @@ for (def i = 0; i < androidAbis.size(); i++) {
   }
 }
 
-appleSdks = ['macosx', 'iphone', 'appletv', 'watch']
+appleSdks = [iphone', 'appletv', 'watch']
 appleBuildTypes = ['MinSizeDebug', 'Release']
 
 for (def i = 0; i < appleSdks.size(); i++) {
@@ -401,7 +401,7 @@ def doBuildMacOs(String buildType) {
                     cmake -D REALM_ENABLE_ENCRYPTION=yes \\
                           -D REALM_ENABLE_ASSERTIONS=yes \\
                           -D CMAKE_BUILD_TYPE=${buildType} \\
-                          ${testsDefinition} ${skipSharedLib} -G Xcode ..
+                          -G Xcode ..
                     xcodebuild -sdk ${sdk} \\
                                -configuration ${buildType} \\
                                ONLY_ACTIVE_ARCH=NO
@@ -450,6 +450,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
                                -configuration ${buildType} \\
                                -target install \\
                                ONLY_ACTIVE_ARCH=NO
+                    mkdir -p src/realm/${buildType}
                     lipo -create \\
                          -output src/realm/${buildType}/librealm.a \\
                          src/realm/${buildType}-${sdk}os/librealm.a \\
