@@ -400,6 +400,7 @@ def doBuildMacOs(String buildType) {
                     cd build-dir
                     cmake -D REALM_ENABLE_ENCRYPTION=yes \\
                           -D REALM_ENABLE_ASSERTIONS=yes \\
+                          -D CMAKE_INSTALL_PREFIX=\$(pwd)/install \\
                           -D CMAKE_BUILD_TYPE=${buildType} \\
                           -G Xcode ..
                     xcodebuild -sdk ${sdk} \\
@@ -432,7 +433,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
                     cd build-dir
                     cmake -D REALM_ENABLE_ENCRYPTION=yes \\
                           -D REALM_ENABLE_ASSERTIONS=yes \\
-                          -D CMAKE_INSTALL_PREFIX=\$(pwd)/install
+                          -D CMAKE_INSTALL_PREFIX=\$(pwd)/install \\
                           -D CMAKE_BUILD_TYPE=${buildType} \\
                           -D REALM_NO_TESTS=1 \\
                           -D REALM_SKIP_SHARED_LIB=1 \\
