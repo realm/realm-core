@@ -85,7 +85,7 @@ for (def i = 0; i < androidAbis.size(); i++) {
   }
 }
 
-appleSdks = [iphone', 'appletv', 'watch']
+appleSdks = ['iphone', 'appletv', 'watch']
 appleBuildTypes = ['MinSizeDebug', 'Release']
 
 for (def i = 0; i < appleSdks.size(); i++) {
