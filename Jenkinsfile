@@ -455,7 +455,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
                          -output src/realm/${buildType}/librealm.a \\
                          src/realm/${buildType}-${sdk}os/librealm.a \\
                          src/realm/${buildType}-${sdk}simulator/librealm.a
-                    xcodebuild -sdk ${sdk} \\
+                    xcodebuild -sdk ${sdk}os \\
                                -configuration ${buildType} \\
                                -target package \\
                                ONLY_ACTIVE_ARCH=NO
