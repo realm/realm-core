@@ -432,6 +432,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
                     cd build-dir
                     cmake -D REALM_ENABLE_ENCRYPTION=yes \\
                           -D REALM_ENABLE_ASSERTIONS=yes \\
+                          -D CMAKE_INSTALL_PREFIX=\$(pwd)/install
                           -D CMAKE_BUILD_TYPE=${buildType} \\
                           -D REALM_NO_TESTS=1 \\
                           -D REALM_SKIP_SHARED_LIB=1 \\
@@ -439,22 +440,22 @@ def doBuildAppleDevice(String sdk, String buildType) {
                     xcodebuild -sdk ${sdk}os \\
                                -configuration ${buildType} \\
                                ONLY_ACTIVE_ARCH=NO
-                    xcodebuild -sdk ${sdk}os \\
-                               -configuration ${buildType} \\
-                               -target install \\
-                               ONLY_ACTIVE_ARCH=NO
                     xcodebuild -sdk ${sdk}simulator \\
                                -configuration ${buildType} \\
-                               ONLY_ACTIVE_ARCH=NO
-                    xcodebuild -sdk ${sdk}simulator \\
-                               -configuration ${buildType} \\
-                               -target install \\
                                ONLY_ACTIVE_ARCH=NO
                     mkdir -p src/realm/${buildType}
                     lipo -create \\
                          -output src/realm/${buildType}/librealm.a \\
                          src/realm/${buildType}-${sdk}os/librealm.a \\
                          src/realm/${buildType}-${sdk}simulator/librealm.a
+                    xcodebuild -sdk ${sdk}os \\
+                               -configuration ${buildType} \\
+                               -target install \\
+                               ONLY_ACTIVE_ARCH=NO
+                    xcodebuild -sdk ${sdk}simulator \\
+                               -configuration ${buildType} \\
+                               -target install \\
+                               ONLY_ACTIVE_ARCH=NO
                     xcodebuild -sdk ${sdk}os \\
                                -configuration ${buildType} \\
                                -target package \\
