@@ -450,9 +450,9 @@ def doBuildAppleDevice(String sdk, String buildType) {
                                -configuration ${buildType} \\
                                -target install \\
                                ONLY_ACTIVE_ARCH=NO
-                    lipo -create
-                         -output src/realm/${buildType}/librealm.a
-                         src/realm/${buildType}-${sdk}os/librealm.a
+                    lipo -create \\
+                         -output src/realm/${buildType}/librealm.a \\
+                         src/realm/${buildType}-${sdk}os/librealm.a \\
                          src/realm/${buildType}-${sdk}simulator/librealm.a
                     xcodebuild -sdk ${sdk} \\
                                -configuration ${buildType} \\
