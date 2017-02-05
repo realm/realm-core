@@ -460,8 +460,8 @@ def doBuildAppleDevice(String sdk, String buildType, String version) {
                     mkdir -p install/lib
                     cp src/realm/${buildType}/librealm.a install/lib
                     cd install
-                    tar -cvzf realm-core-${sdk}os-${version}-${buildType.toLowerCase()}.tar.gz lib include
-                    mv *.tar.gz ..
+                    tar -cvJf realm-core-${sdk}os-${version}-${buildType.toLowerCase()}.tar.xz lib include
+                    mv *.tar.xz ..
                 """
             } finally {
                 collectCompilerWarnings('clang', true)
