@@ -13,7 +13,9 @@
 * Avoid copying copy-on-write data structures when the write does not actually
   change the existing value.
 * Improve performance of deleting all rows in a TableView.
-* Allow the `add_int()` API to be called on a `Row`.
+* Allow the `add_int()` API to be called on a `Row`
+* Don't open the notification pipes on platforms which support the async commit
+  daemon when async commits are not enabled
 
 -----------
 
