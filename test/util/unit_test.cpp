@@ -18,7 +18,6 @@
 
 #include <cstdlib>
 #include <functional>
-#include <memory>
 #include <stdexcept>
 #include <map>
 #include <string>
@@ -71,7 +70,7 @@ public:
     {
     }
 
-    ~XmlReporter() noexcept
+    ~XmlReporter() noexcept override
     {
     }
 
@@ -158,6 +157,7 @@ protected:
     std::ostream& m_out;
 };
 
+
 class JUnitReporter : public XmlReporter
 {
 public:
@@ -166,7 +166,7 @@ public:
     {
     }
 
-    ~JUnitReporter() noexcept
+    ~JUnitReporter() noexcept override
     {
     }
     void summary(const SharedContext& context, const Summary& results_summary) override
@@ -216,6 +216,45 @@ public:
         m_out << "  </testsuite>\n</testsuites>\n";
     }
 };
+
+
+class ManifoldReporter : public Reporter {
+public:
+    ManifoldReporter(std::initializer_list<Reporter*> subreporters)
+    {
+        for (Reporter* r : subreporters)
+            m_subreporters.push_back(r);
+    }
+
+    void begin(const TestContext& context) override
+    {
+        for (Reporter* r : m_subreporters)
+            r->begin(context);
+    }
+
+    void fail(const TestContext& context, const char* file_name, long line_number,
+              const std::string& message) override
+    {
+        for (Reporter* r : m_subreporters)
+            r->fail(context, file_name, line_number, message);
+    }
+
+    void end(const TestContext& context, double elapsed_seconds) override
+    {
+        for (Reporter* r : m_subreporters)
+            r->end(context, elapsed_seconds);
+    }
+
+    void summary(const SharedContext& context, const Summary& results_summary) override
+    {
+        for (Reporter* r : m_subreporters)
+            r->summary(context, results_summary);
+    }
+
+protected:
+    std::vector<Reporter*> m_subreporters;
+};
+
 
 class WildcardFilter : public Filter {
 public:
@@ -933,20 +972,26 @@ void SimpleReporter::summary(const SharedContext& context, const Summary& result
     }
 }
 
-Reporter* create_junit_reporter(std::ostream& out)
+std::unique_ptr<Reporter> create_junit_reporter(std::ostream& out)
 {
-    return new JUnitReporter(out);
+    return std::make_unique<JUnitReporter>(out);
 }
 
-Reporter* create_xml_reporter(std::ostream& out)
+std::unique_ptr<Reporter> create_xml_reporter(std::ostream& out)
 {
-    return new XmlReporter(out);
+    return std::make_unique<XmlReporter>(out);
+}
+
+std::unique_ptr<Reporter> create_twofold_reporter(Reporter& subreporter_1, Reporter& subreporter_2)
+{
+    using list = std::initializer_list<Reporter*>;
+    return std::make_unique<ManifoldReporter>(list{&subreporter_1, &subreporter_2});
 }
 
 
-Filter* create_wildcard_filter(const std::string& filter)
+std::unique_ptr<Filter> create_wildcard_filter(const std::string& filter)
 {
-    return new WildcardFilter(filter);
+    return std::make_unique<WildcardFilter>(filter);
 }
 
 

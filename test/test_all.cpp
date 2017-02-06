@@ -420,19 +420,23 @@ bool run_tests(util::Logger* logger)
     const char* xml_str = getenv("UNITTEST_XML");
     xml = (xml_str && strlen(xml_str) != 0);
 #endif
-    std::unique_ptr<Reporter> reporter;
+    std::vector<std::unique_ptr<Reporter>> reporters;
+    {
+        const char* str = getenv("UNITTEST_PROGRESS");
+        bool report_progress = str && strlen(str) != 0;
+        std::unique_ptr<Reporter> reporter = std::make_unique<CustomReporter>(report_progress);
+        reporters.push_back(std::move(reporter));
+    }
     if (xml) {
         std::string path = get_test_path_prefix();
         std::string xml_path = path + "unit-test-report.xml";
         xml_file.open(xml_path.c_str());
-        reporter.reset(create_junit_reporter(xml_file));
+        std::unique_ptr<Reporter> reporter_1 = create_junit_reporter(xml_file);
+        std::unique_ptr<Reporter> reporter_2 = create_twofold_reporter(*reporters.back(), *reporter_1);
+        reporters.push_back(std::move(reporter_1));
+        reporters.push_back(std::move(reporter_2));
     }
-    else {
-        const char* str = getenv("UNITTEST_PROGRESS");
-        bool report_progress = str && strlen(str) != 0;
-        reporter.reset(new CustomReporter(report_progress));
-    }
-    config.reporter = reporter.get();
+    config.reporter = reporters.back().get();
 
     // Set up filter
     const char* filter_str = getenv("UNITTEST_FILTER");
@@ -441,7 +445,7 @@ bool run_tests(util::Logger* logger)
         filter_str = test_only;
     std::unique_ptr<Filter> filter;
     if (filter_str && strlen(filter_str) != 0)
-        filter.reset(create_wildcard_filter(filter_str));
+        filter = create_wildcard_filter(filter_str);
     config.filter = filter.get();
 
     // Set intra test log level threshold
@@ -490,8 +494,7 @@ bool run_tests(util::Logger* logger)
     if (test_only)
         std::cout << "\n*** BE AWARE THAT MOST TESTS WERE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
 
-    if (!xml)
-        std::cout << "\n";
+    std::cout << "\n";
 
     return success;
 }
