@@ -17,12 +17,19 @@
 * Enable reading and writing of big blobs via Table interface.
   Only to be used by Sync. The old interface still has a check on 
   the size of the binary blob.
+* Avoid copying copy-on-write data structures when the write does not actually
+  change the existing value.
+* Improve performance of deleting all rows in a TableView.
 
 -----------
 
 ### Internals
 
-* Lorem ipsum.
+* Updated OpenSSL to 1.0.2k.
+* Setting environment variable `UNITTEST_XML` to a nonempty value will no longer
+  disable the normal console output while running the test suite. Instead, in
+  that case, reporting will happen both to the console and to the JUnit XML
+  file.
 
 ----------------------------------------------
 

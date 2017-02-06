@@ -115,7 +115,7 @@ def buildDockerEnv(name) {
 
 def doBuildCocoa(def isPublishingRun, def isPublishingLatestRun) {
   return {
-    node('osx_vegas') {
+    node('macos || osx_vegas') {
       getArchive()
 
       try {
@@ -311,7 +311,7 @@ def doBuildNodeInDocker(def isPublishingRun, def isPublishingLatestRun) {
 
 def doBuildNodeInOsx(def isPublishingRun, def isPublishingLatestRun) {
   return {
-    node('osx_vegas') {
+    node('macos || osx_vegas') {
       getArchive()
 
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
@@ -342,7 +342,7 @@ def doBuildNodeInOsx(def isPublishingRun, def isPublishingLatestRun) {
 
 def doBuildOsxDylibs(def isPublishingRun, def isPublishingLatestRun) {
   return {
-    node('osx_vegas') {
+    node('macos || osx_vegas') {
       getSourceArchive()
       def version = get_version()
 

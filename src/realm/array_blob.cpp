@@ -118,7 +118,8 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
             return reinterpret_cast<ArrayBlob*>(&new_root)->replace(begin, end, data, data_size, add_zero_term);
         }
 
-        copy_on_write(); // Throws
+        if (remove_size == add_size && is_read_only() && memcmp(m_data + begin, data, data_size) == 0)
+            return get_ref();
 
         // Reallocate if needed - also updates header
         alloc(new_size, 1); // Throws
