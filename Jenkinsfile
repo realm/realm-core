@@ -43,8 +43,8 @@ timeout(time: 1, unit: 'HOURS') {
     stage 'check'
 
     parallelExecutors = [
-            checkLinuxRelease   : doBuildInDocker('check'),
-            checkLinuxDebug     : doBuildInDocker('check-debug'),
+            checkLinuxRelease   : doBuildInDocker('Release'),
+            checkLinuxDebug     : doBuildInDocker('Debug'),
             buildMacOsDebug     : doBuildMacOs('Debug'),
             buildMacOsRelease   : doBuildMacOs('Release'),
             buildWin32Release   : doBuildWindows('Release', false, 'win32'),
@@ -108,7 +108,7 @@ def buildDockerEnv(name) {
     return docker.image(name)
 }
 
-def doBuildInDocker(String command) {
+def doBuildInDocker(String buildType) {
     return {
         node('docker') {
             getArchive()
@@ -118,7 +118,14 @@ def doBuildInDocker(String command) {
             withEnv(environment) {
                 buildEnv.inside {
                     try {
-                        sh "sh build.sh ${command}"
+                        sh """
+                           mkdir build-dir
+                           cd build-dir
+                           cmake -D CMAKE_BUILD_TYPE=${buildType} -G Ninja ..
+                           ninja
+                           cd test
+                           ./realm-tests
+                        """
                     } finally {
                         collectCompilerWarnings('gcc', true)
                         recordTests(command)

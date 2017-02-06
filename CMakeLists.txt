@@ -49,6 +49,7 @@ if(WINDOWS_STORE AND CMAKE_SYSTEM_VERSION STREQUAL 10.0)
 endif()
 
 # Coverage-specific build flags
+option(REALM_COVERAGE "Add coverage support." OFF)
 if(REALM_COVERAGE)
   if(MSVC)
     message(FATAL_ERROR
