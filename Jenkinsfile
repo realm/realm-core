@@ -1,12 +1,5 @@
 #!groovy
 
-gitTag
-gitSha
-version
-dependencies
-isPublishingRun
-isPublishingLatestRun
-
 timeout(time: 1, unit: 'HOURS') {
     stage('gather-info') {
         node('docker') {
