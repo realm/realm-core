@@ -69,7 +69,7 @@ timeout(time: 1, unit: 'HOURS') {
         }
     }
 
-    appleSdks = ['iphone', 'appletv', 'watch']
+    appleSdks = ['ios', 'tvos', 'watchos']
     appleBuildTypes = ['MinSizeDebug', 'Release']
 
     for (def i = 0; i < appleSdks.size(); i++) {

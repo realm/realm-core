@@ -15,7 +15,7 @@ function usage {
     echo "${BOLD}Usage:${NORM} ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>]"
     echo ""
     echo "${BOLD}Arguments:${NORM}"
-    echo "   build_type=<Release|Debug>"
+    echo "   build_type=<Release|Debug|MinSizeDebug>"
     echo "   target_os=<android|ios|watchos|tvos>"
     echo "   android_abi=<armeabi|armeabi-v7a|x86|mips|x86_64|arm64-v8a>"
     exit 1;
@@ -43,6 +43,7 @@ while getopts ":o:a:t:v:" opt; do
         t)
             BUILD_TYPE=${OPTARG}
             [ "${BUILD_TYPE}" == "Debug" ] ||
+            [ "${BUILD_TYPE}" == "MinSizeDebug" ] ||
             [ "${BUILD_TYPE}" == "Release" ] || usage
             ;;
         v) VERSION=${OPTARG};;
