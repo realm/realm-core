@@ -424,18 +424,15 @@ bool run_tests(util::Logger* logger)
     {
         const char* str = getenv("UNITTEST_PROGRESS");
         bool report_progress = str && strlen(str) != 0;
-        std::unique_ptr<Reporter> reporter =
-            std::make_unique<CustomReporter>(report_progress);
+        std::unique_ptr<Reporter> reporter = std::make_unique<CustomReporter>(report_progress);
         reporters.push_back(std::move(reporter));
     }
     if (xml) {
         std::string path = get_test_path_prefix();
         std::string xml_path = path + "unit-test-report.xml";
         xml_file.open(xml_path.c_str());
-        std::unique_ptr<Reporter> reporter_1 =
-            create_junit_reporter(xml_file);
-        std::unique_ptr<Reporter> reporter_2 =
-            create_twofold_reporter(*reporters.back(), *reporter_1);
+        std::unique_ptr<Reporter> reporter_1 = create_junit_reporter(xml_file);
+        std::unique_ptr<Reporter> reporter_2 = create_twofold_reporter(*reporters.back(), *reporter_1);
         reporters.push_back(std::move(reporter_1));
         reporters.push_back(std::move(reporter_2));
     }

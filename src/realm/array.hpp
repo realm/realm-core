@@ -936,7 +936,7 @@ protected:
     void copy_on_write();
 
 private:
-    void do_copy_on_write(size_t minimum_size=0);
+    void do_copy_on_write(size_t minimum_size = 0);
     void do_ensure_minimum_width(int_fast64_t);
 
     template <size_t w>

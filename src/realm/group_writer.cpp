@@ -248,8 +248,7 @@ void GroupWriter::sync_all_mappings()
 GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 {
     auto match = std::find_if(m_map_windows.begin(), m_map_windows.end(), [=](auto& window) {
-        return window->matches(start_ref, size)
-            || window->extends_to_match(m_alloc.get_file(), start_ref, size);
+        return window->matches(start_ref, size) || window->extends_to_match(m_alloc.get_file(), start_ref, size);
     });
     if (match != m_map_windows.end()) {
         // move matching window to top (to keep LRU order)

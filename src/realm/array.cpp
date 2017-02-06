@@ -781,7 +781,7 @@ size_t Array::adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64
             // the width, return the current position to the caller so that it
             // can switch to the appropriate specialization for the new width.
             ensure_minimum_width(shifted); // Throws
-            copy_on_write(); // Throws
+            copy_on_write();               // Throws
             if (m_width != w)
                 return i;
 
