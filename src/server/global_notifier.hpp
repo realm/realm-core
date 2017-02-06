@@ -150,7 +150,7 @@ private:
 
     bool m_waiting = false;
 
-    void register_realms(std::vector<RealmInfo>, bool all);
+    void register_realms(std::vector<RealmInfo>);
     void register_realm(RealmInfo info);
 
     void on_change();
@@ -183,9 +183,7 @@ public:
     ///
     /// \param name The name (virtual path) by which the server knows that
     /// Realm.
-    virtual std::vector<bool> available(std::vector<GlobalNotifier::RealmInfo> realms,
-                                        std::vector<bool> new_realms,
-                                        bool all) = 0;
+    virtual std::vector<bool> available(std::vector<GlobalNotifier::RealmInfo> realms) = 0;
 
     /// Called when a Realm  has changed due to a transaction performed on behalf
     /// of the synchronization mechanism. This function is not called as a

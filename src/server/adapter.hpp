@@ -84,9 +84,7 @@ private:
     class Callback : public GlobalNotifier::Callback {
     public:
         Callback(std::function<void(GlobalNotifier::RealmInfo)> changed) : m_realm_changed(changed) {}
-        virtual std::vector<bool> available(std::vector<GlobalNotifier::RealmInfo> realms,
-                                            std::vector<bool> new_realms,
-                                            bool all);
+        virtual std::vector<bool> available(std::vector<GlobalNotifier::RealmInfo> realms);
         virtual void realm_changed(GlobalNotifier::ChangeNotification changes);
 
     private:

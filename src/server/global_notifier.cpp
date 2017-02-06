@@ -76,8 +76,8 @@ GlobalNotifier::~GlobalNotifier()
 
 void GlobalNotifier::start()
 {
-    m_admin.start([this](auto&& realms, bool all) {
-        this->register_realms(std::move(realms), all);
+    m_admin.start([this](auto&& realms) {
+        this->register_realms(std::move(realms));
     });
     if (!m_work_thread.joinable()) {
         m_work_thread = std::thread([this] { calculate(); });
@@ -187,29 +187,19 @@ void GlobalNotifier::register_realm(RealmInfo info) {
     });
 }
 
-void GlobalNotifier::register_realms(std::vector<AdminRealmListener::RealmInfo> realms, bool all)
+void GlobalNotifier::register_realms(std::vector<AdminRealmListener::RealmInfo> realms)
 {
     std::vector<bool> new_realms;
     for (auto &realm_info : realms) {
         m_realm_ids[realm_info.second] = realm_info.first;
-        new_realms.push_back(m_listen_entries.count(realm_info.first) == 0);
     }
-    std::vector<bool> monitor = m_target->available(realms, new_realms, all);
+
+    std::vector<bool> monitor = m_target->available(realms);
 
     for (size_t i = 0; i < realms.size(); i++) {
-        if (!monitor[i])
-            continue;
-
-// FIXME - remove for gn
-        m_pending_deliveries.push({
-            realms[i],
-            VersionID(),
-            VersionID(),
-            Realm::make_shared_realm(get_config(realms[i].second)),
-            {}
-        });
-
-        register_realm(realms[i]);
+        if (monitor[i] && m_listen_entries.count(realms[i].first) == 0) {
+            register_realm(realms[i]);
+        }
     }
 }
 

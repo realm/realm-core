@@ -641,15 +641,11 @@ Adapter::Adapter(std::function<void(std::string)> realm_changed,
     m_global_notifier->start();
 }
 
-std::vector<bool> Adapter::Callback::available(std::vector<GlobalNotifier::RealmInfo> realms,
-                                               std::vector<bool> new_realms,
-                                               bool all) {
+std::vector<bool> Adapter::Callback::available(std::vector<GlobalNotifier::RealmInfo> realms) {
     std::vector<bool> watch;
     for (size_t i = 0; i < realms.size(); i++) {
         watch.push_back(true);
-        if (!new_realms[i]) {
-            m_realm_changed(realms[i]);
-        }
+        m_realm_changed(realms[i]);
     }
     return watch;
 }

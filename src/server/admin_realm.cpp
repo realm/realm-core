@@ -86,7 +86,7 @@ AdminRealmListener::AdminRealmListener(std::string local_root, std::string serve
     m_realm = Realm::get_shared_realm(std::move(config));
 }
 
-void AdminRealmListener::start(std::function<void(std::vector<RealmInfo>, bool)> callback)
+void AdminRealmListener::start(std::function<void(std::vector<RealmInfo>)> callback)
 {
     m_results = Results(m_realm, *ObjectStore::table_for_object_type(m_realm->read_group(), "RealmFile"));
     m_notification_token = m_results.add_notification_callback([=](CollectionChangeSet changes, std::exception_ptr) {
@@ -94,28 +94,27 @@ void AdminRealmListener::start(std::function<void(std::vector<RealmInfo>, bool)>
         size_t id_col_ndx   = table.get_column_index("id");
         size_t name_col_ndx = table.get_column_index("path");
         std::vector<RealmInfo> realms;
-        if (changes.empty() || m_first) {
+
+        auto add_realm = [&](auto index) {
+            std::string realm_path = table.get_string(name_col_ndx, index);
+            if (true || !realm_path.compare(0, 2, "__")) {
+                realms.emplace_back(table.get_string(id_col_ndx, index), realm_path);
+            }
+        };
+
+        if (changes.empty()) {
             for (size_t i = 0, size = table.size(); i < size; ++i) {
-                std::string realm_path = table.get_string(name_col_ndx, i);
-                if (!realm_path.compare(0, 2, "__")) {
-                    realms.emplace_back(table.get_string(id_col_ndx, i), realm_path);
-                }
+                add_realm(i);
             }
-            if (realms.size()) {
-                callback(std::move(realms), true);
-            }
-            m_first = false;
         }
         else {
             for (auto i : changes.insertions.as_indexes()) {
-                std::string realm_path = table.get_string(name_col_ndx, i);
-                if (!realm_path.compare(0, 2, "__")) {
-                    realms.emplace_back(table.get_string(id_col_ndx, i), realm_path);
-                }
+                add_realm(i);
             }
-            if (realms.size()) {
-                callback(std::move(realms), false);
-            }
+        }
+
+        if (realms.size()) {
+            callback(std::move(realms));
         }
     });
 }

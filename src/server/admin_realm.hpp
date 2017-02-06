@@ -38,14 +38,13 @@ class AdminRealmListener {
 public:
     using RealmInfo = std::pair<std::string, std::string>;
     AdminRealmListener(std::string local_root, std::string server_base_url, std::shared_ptr<SyncUser> user);
-    void start(std::function<void(std::vector<RealmInfo>, bool)> register_callback);
+    void start(std::function<void(std::vector<RealmInfo>)> register_callback);
     void create_realm(StringData realm_id, StringData realm_name);
 
 private:    
     SharedRealm m_realm;
     Results m_results;
     NotificationToken m_notification_token;
-    bool m_first = true;
 };
 
 } // namespace realm
