@@ -10,6 +10,7 @@ timeout(time: 1, unit: 'HOURS') {
             echo "VERSION: ${dependencies.VERSION}"
 
             gitTag = readGitTag()
+            sh 'env | sort'
             gitSha = env.GIT_COMMIT.take(8)
             version = gitTag ? "${dependencies.VERSION}-g${gitSha}" : dependencies.VERSION
 
