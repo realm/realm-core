@@ -489,6 +489,7 @@ private:
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
     friend class Group;
+    friend class SharedGroup;
     friend class GroupWriter;
 };
 

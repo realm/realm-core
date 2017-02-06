@@ -1850,18 +1850,19 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // the the per-table accessor dirty flags (Table::m_dirty) to prune the
     // traversal to the set of accessors that were touched by the changes in the
     // transaction logs.
+    // Update memory mapping if database file has grown
+
+    if (new_file_size > m_alloc.get_baseline()) {
+        m_alloc.remap(new_file_size); // Throws
+    }
+
+    m_alloc.invalidate_cache();
 
     bool schema_changed = false;
     _impl::TransactLogParser parser; // Throws
     TransactAdvancer advancer(*this, schema_changed);
     parser.parse(in, advancer); // Throws
 
-    // Update memory mapping if database file has grown
-    if (new_file_size > m_alloc.get_baseline()) {
-        m_alloc.remap(new_file_size); // Throws
-    }
-
-    m_alloc.invalidate_cache();
     m_top.detach();                                 // Soft detach
     bool create_group_when_missing = false;         // See Group::attach_shared().
     attach(new_top_ref, create_group_when_missing); // Throws
