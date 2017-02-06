@@ -65,8 +65,8 @@ if [ "${OS}" == "android" ] && [ -z "${ARCH}" ]; then
 fi
 
 # Create a build folder
-mkdir build-dir
-cd build-dir || exit
+tmpdir=$(mktemp -d "$(pwd)/build-${OS}${ARCH}-${BUILD_TYPE}.XXXXXX")
+cd "${tmpdir}" || exit
 
 
 if [ "${OS}" == "android" ]; then
