@@ -10,7 +10,8 @@ timeout(time: 1, unit: 'HOURS') {
             echo "VERSION: ${dependencies.VERSION}"
 
             gitTag = readGitTag()
-            gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD > GIT_COMMIT').trim().take(8)
+            gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
+            gitDescribeVersion = sh(returnStdout: true, script: 'git describe').trim()
             version = gitTag ? "${dependencies.VERSION}-g${gitSha}" : dependencies.VERSION
 
             echo "tag: ${gitTag}"
@@ -140,18 +141,7 @@ def doAndroidBuildInDocker(String abi, String buildType) {
             withEnv(environment) {
                 buildEnv.inside {
                     try {
-                        sh """
-                    mkdir build-dir
-                    cd build-dir
-                    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/android.toolchain.cmake \\
-                          -D CMAKE_INSTALL_PREFIX=install \\
-                          -D CMAKE_BUILD_TYPE=${buildType} \\
-                          -D ANDROID_API=${abi} \\
-                          -D REALM_ENABLE_ENCRYPTION=1 \\
-                          ..
-                    make -j${cores} -l${cores}
-                    make package
-                """
+                        sh "./build.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
                     } finally {
                         collectCompilerWarnings('gcc', true )
                     }
@@ -274,41 +264,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
             getArchive()
 
             try {
-                sh """
-                    mkdir build-dir
-                    cd build-dir
-                    cmake -D REALM_ENABLE_ENCRYPTION=yes \\
-                          -D REALM_ENABLE_ASSERTIONS=yes \\
-                          -D CMAKE_INSTALL_PREFIX=\$(pwd)/install \\
-                          -D CMAKE_BUILD_TYPE=${buildType} \\
-                          -D REALM_NO_TESTS=1 \\
-                          -D REALM_SKIP_SHARED_LIB=1 \\
-                          -G Xcode ..
-                    xcodebuild -sdk ${sdk}os \\
-                               -configuration ${buildType} \\
-                               ONLY_ACTIVE_ARCH=NO
-                    xcodebuild -sdk ${sdk}simulator \\
-                               -configuration ${buildType} \\
-                               ONLY_ACTIVE_ARCH=NO
-                    mkdir -p src/realm/${buildType}
-                    lipo -create \\
-                         -output src/realm/${buildType}/librealm.a \\
-                         src/realm/${buildType}-${sdk}os/librealm.a \\
-                         src/realm/${buildType}-${sdk}simulator/librealm.a
-                    xcodebuild -sdk ${sdk}os \\
-                               -configuration ${buildType} \\
-                               -target install \\
-                               ONLY_ACTIVE_ARCH=NO
-                    xcodebuild -sdk ${sdk}simulator \\
-                               -configuration ${buildType} \\
-                               -target install \\
-                               ONLY_ACTIVE_ARCH=NO
-                    mkdir -p install/lib
-                    cp src/realm/${buildType}/librealm.a install/lib
-                    cd install
-                    tar -cvJf realm-core-${sdk}os-${version}-${buildType.toLowerCase()}.tar.xz lib include
-                    mv *.tar.xz ..
-                """
+                sh "./build.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}"
             } finally {
                 collectCompilerWarnings('clang', true)
             }
