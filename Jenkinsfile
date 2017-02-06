@@ -361,7 +361,7 @@ def environment() {
 def readGitTag() {
     def command = 'git describe --exact-match --tags HEAD'
     def returnStatus = sh(returnStatus: true, script: command)
-    if (returnStatus) {
+    if (returnStatus == 0) {
         def tag = sh(returnStdout: true, script: command).trim()
         return tag
     } else {
