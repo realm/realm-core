@@ -203,7 +203,7 @@ def doBuildInDocker(String command) {
 
 
 def doAndroidBuildInDocker(String abi, String buildType) {
-    def cores = Runtime.getRuntime().availableProcessors()
+    def cores = 4
   return {
     node('docker') {
       getArchive()
