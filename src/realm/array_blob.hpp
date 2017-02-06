@@ -113,8 +113,7 @@ inline void ArrayBlob::clear()
     // Turn this object back to a single element blob
     truncate_and_destroy_children(0);
     set_context_flag(false);
-    set_header_hasrefs(false);
-    m_has_refs = false;
+    set_has_refs(false);
 }
 
 inline const char* ArrayBlob::get(const char* header, size_t pos) noexcept

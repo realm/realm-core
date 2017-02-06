@@ -558,6 +558,7 @@ public:
     ///
     /// This information is guaranteed to be cached in the array accessor.
     bool has_refs() const noexcept;
+    void set_has_refs(bool) noexcept;
 
     /// This information is guaranteed to be cached in the array accessor.
     ///
@@ -1416,6 +1417,15 @@ inline bool Array::has_refs() const noexcept
     return m_has_refs;
 }
 
+inline void Array::set_has_refs(bool value) noexcept
+{
+    if (m_has_refs != value) {
+        REALM_ASSERT(!is_read_only());
+        m_has_refs = value;
+        set_header_hasrefs(value);
+    }
+}
+
 inline bool Array::get_context_flag() const noexcept
 {
     return m_context_flag;
@@ -1423,8 +1433,11 @@ inline bool Array::get_context_flag() const noexcept
 
 inline void Array::set_context_flag(bool value) noexcept
 {
-    m_context_flag = value;
-    set_header_context_flag(value);
+    if (m_context_flag != value) {
+        REALM_ASSERT(!is_read_only());
+        m_context_flag = value;
+        set_header_context_flag(value);
+    }
 }
 
 inline ref_type Array::get_ref() const noexcept
