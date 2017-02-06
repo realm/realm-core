@@ -102,27 +102,6 @@ if (env.CHANGE_TARGET) {
 
 parallel parallelExecutors
 
-stage('aggregate') {
-  node('docker') {
-      getArchive()
-      for (def i = 0; i < androidAbis.size(); i++) {
-          def abi = androidAbis[i]
-          for (def j=0; j < androidBuildTypes.size(); j++) {
-              def buildType = androidBuildTypes[j]
-              unstash "install-${abi}-${buildType}"
-          }
-      }
-
-      def buildEnv = docker.build 'realm-core:snapshot'
-      def environment = environment()
-      withEnv(environment) {
-          buildEnv.inside {
-              sh 'rake package-android'
-          }
-      }
-  }
-}
-
 if (isPublishingRun) {
   stage('publish-packages') {
       parallel(
@@ -224,9 +203,9 @@ def doBuildInDocker(String command) {
 
 
 def doAndroidBuildInDocker(String abi, String buildType) {
+    def cores = Runtime.getRuntime().availableProcessors()
   return {
     node('docker') {
-        sh 'rm -rf *'
       getArchive()
 
       def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
@@ -234,9 +213,19 @@ def doAndroidBuildInDocker(String abi, String buildType) {
       withEnv(environment) {
         buildEnv.inside {
             try {
-            sh "rake build-android-${abi}-${buildType}"
-            stash includes: 'build.*/install/**', name: "install-${abi}-${buildType}"
-          } finally {
+                sh """
+                    mkdir build-dir
+                    cd build-dir
+                    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/android.toolchain.cmake \\
+                          -D CMAKE_INSTALL_PREFIX=install \\
+                          -D CMAKE_BUILD_TYPE=${buildType} \\
+                          -D ANDROID_API=${abi} \\
+                          -D REALM_ENABLE_ENCRYPTION=1 \\
+                          ..
+                    make -j${cores} -l${cores}
+                    make package
+                """
+            } finally {
             collectCompilerWarnings('gcc', true)
           }
         }
