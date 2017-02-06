@@ -22,6 +22,7 @@
 #include <stddef.h>
 #include <cmath>
 #include <cstring>
+#include <memory>
 #include <algorithm>
 #include <vector>
 #include <list>
@@ -359,15 +360,17 @@ protected:
 };
 
 
-/// Generates output that is compatible with the XML output of
-/// UnitTest++. Caller receives ownership of the returned reporter.
-Reporter* create_xml_reporter(std::ostream&);
-/// Generates output that is compatible with the XML output of
-/// JUnit. See http://llg.cubic.org/docs/junit/
-Reporter* create_junit_reporter(std::ostream&);
+/// Generates output that is compatible with the XML output of UnitTest++.
+std::unique_ptr<Reporter> create_xml_reporter(std::ostream&);
+
+/// Generates output that is compatible with the XML output of JUnit. See
+/// http://llg.cubic.org/docs/junit/
+std::unique_ptr<Reporter> create_junit_reporter(std::ostream&);
+
+std::unique_ptr<Reporter> create_twofold_reporter(Reporter& subreporter_1, Reporter& subreporter_2);
 
 /// Run only those tests whose name is both included and not
-/// excluded. Caller receives ownership of the returned filter.
+/// excluded.
 ///
 /// EBNF:
 ///
@@ -389,7 +392,7 @@ Reporter* create_junit_reporter(std::ostream&);
 /// whose names start with `Bar`. Another example is `Foo* - Foo2 *X`,
 /// which will include all tests whose names start with `Foo`, except
 /// `Foo2` and those whose names end with an `X`.
-Filter* create_wildcard_filter(const std::string&);
+std::unique_ptr<Filter> create_wildcard_filter(const std::string&);
 
 
 class TestContext {

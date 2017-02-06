@@ -13,12 +13,19 @@
 
 * Now supports case insensitive queries for UWP.
 * Upgraded Visual Studio project to version 2017.
+* Avoid copying copy-on-write data structures when the write does not actually
+  change the existing value.
+* Improve performance of deleting all rows in a TableView.
 
 -----------
 
 ### Internals
 
-* Lorem ipsum.
+* Updated OpenSSL to 1.0.2k.
+* Setting environment variable `UNITTEST_XML` to a nonempty value will no longer
+  disable the normal console output while running the test suite. Instead, in
+  that case, reporting will happen both to the console and to the JUnit XML
+  file.
 
 ----------------------------------------------
 
