@@ -178,12 +178,6 @@ ReturnType type_punning(OriginalType variable) noexcept
 // Also see the comments in Array::index_string()
 enum FindRes {
     // Indicate that no results were found in the search
-    // Do not change this from 0. There are several places in the find method,
-    // (Array::index_string) which can skip a conditional (of the search type)
-    // if and only if FindRes_not_found is the same as returning a value of 0
-    // for when the search method is a count of the value. ie. we can return a
-    // result of 0 regardless of if we are counting the values or if we are
-    // returning a column or a single index; 0 means no results in all cases.
     FindRes_not_found,
     // Indicates a single result is found
     FindRes_single,

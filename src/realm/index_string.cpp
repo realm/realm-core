@@ -219,6 +219,8 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
     // result_ref.result with the results in the bounds start_ndx, and end_ndx
     constexpr bool allnocopy(method == index_FindAll_nocopy);
 
+    constexpr size_t local_not_found = (allnocopy || all) ? FindRes_not_found : first ? not_found : 0;
+
     const char* data = m_data;
     const char* header;
     uint_least8_t width = m_width;
@@ -241,7 +243,7 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
 
         // If key is outside range, we know there can be no match
         if (pos == offsets_size)
-            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+            return local_not_found;
 
         // Get entry under key
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -258,8 +260,8 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
 
         key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
-        if (stored_key != key) // keys don't match so return not found (0 implies FindRes_not_found if `all==true`)
-            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+        if (stored_key != key)
+            return local_not_found;
 
         // Literal row index (tagged)
         if (ref & 1) {
@@ -275,7 +277,7 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
 
                 return first ? row_ref : get_count ? 1 : FindRes_single;
             }
-            return allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
+            return local_not_found;
         }
 
         const char* sub_header = m_alloc.translate(to_ref(ref));
