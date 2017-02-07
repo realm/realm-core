@@ -16,7 +16,8 @@ ENV PATH ${PATH}:${NDK_HOME}
 # Keep the packages in alphabetical order to make it easy to avoid duplication
 RUN DEBIAN_FRONTEND=noninteractive dpkg --add-architecture i386 \
     && apt-get update -qq \
-    && apt-get install -y bsdmainutils \
+    && apt-get install -y adb \
+                          bsdmainutils \
                           build-essential \
                           cmake \
                           curl \
