@@ -1040,15 +1040,9 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
         size_t new_file_size = new_read_lock.m_file_size;
         ref_type new_top_ref = new_read_lock.m_top_ref;
 
-        // Update memory mapping if database file has grown
+        // Synchronize readers view of the file
         SlabAlloc& alloc = m_group.m_alloc;
-        if (new_file_size > alloc.get_baseline()) {
-            alloc.remap(new_file_size); // Throws
-        }
-
-        // it's important to invalidate the translation cache in the slab allocator,
-        // so that new translations trigger decryption properly.
-        alloc.invalidate_cache();
+        alloc.update_reader_view(new_file_size);
 
         hist.update_early_from_top_ref(new_version, new_file_size, new_top_ref); // Throws
     }
