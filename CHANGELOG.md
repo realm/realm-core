@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.3.1 Release notes
 
 ### Bugfixes
 
@@ -8,10 +8,6 @@
   traversing the transaction history. This bug could be reported as corruption
   in general, or more likely as corruption of the transaction log. It is much
   more likely to trigger if encryption is enabled. (issue #2383).
-
-### Breaking changes
-
-* Lorem ipsum.
 
 ### Enhancements
 
