@@ -23,6 +23,8 @@
 #include "property.hpp"
 #include "json.hpp"
 
+#include <set>
+
 namespace realm {
 
 using json = nlohmann::json;
