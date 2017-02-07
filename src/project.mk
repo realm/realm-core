@@ -75,7 +75,7 @@ ifneq ($(REALM_HAVE_CONFIG),)
 endif
 
 ifneq ($(REALM_ANDROID),)
-  PROJECT_CFLAGS += -fPIC -DPIC
+  PROJECT_CFLAGS += -fPIC -DPIC -Wno-maybe-uninitialized
   # android.toolchain.cmake has `-fsigned-char` by default, we have to use the same
   # to avoid lto linking problems.
   CFLAGS_OPTIM = -Os -ffunction-sections -fdata-sections -DNDEBUG -fsigned-char -fvisibility=hidden
