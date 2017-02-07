@@ -6025,9 +6025,19 @@ void Table::generate_patch(const Table* table, std::unique_ptr<HandoverPatch>& p
     if (table) {
         patch.reset(new Table::HandoverPatch);
         patch->m_table_num = table->get_index_in_group();
-        // must be group level table!
-        if (patch->m_table_num == npos) {
-            throw std::runtime_error("Table handover failed: not a group level table");
+        patch->m_is_sub_table = (patch->m_table_num == npos);
+
+        if (patch->m_is_sub_table) {
+            auto col = dynamic_cast<SubtableColumn*>(table->m_columns.get_parent());
+            if (col) {
+                Table* parent_table = col->m_table;
+                patch->m_table_num = parent_table->get_index_in_group();
+                patch->m_col_ndx = col->get_column_index();
+                patch->m_row_ndx = table->m_columns.get_ndx_in_parent();
+            }
+            else {
+                throw std::runtime_error("Table handover failed: not a group level table");
+            }
         }
     }
     else {
@@ -6039,7 +6049,14 @@ void Table::generate_patch(const Table* table, std::unique_ptr<HandoverPatch>& p
 TableRef Table::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
 {
     if (patch) {
-        TableRef result(group.get_table(patch->m_table_num));
+        TableRef result;
+        if (patch->m_is_sub_table) {
+            auto parent_table = group.get_table(patch->m_table_num);
+            result = parent_table->get_subtable(patch->m_col_ndx, patch->m_row_ndx);
+        }
+        else {
+            result = group.get_table(patch->m_table_num);
+        }
         patch.reset();
         return result;
     }
