@@ -128,7 +128,7 @@ def doBuildInDocker(String buildType) {
                         """
                     } finally {
                         collectCompilerWarnings('gcc', true)
-                        recordTests(command)
+                        recordTests("Linux-${buildType}")
                     }
                 }
             }
@@ -173,11 +173,12 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
 
             dir('build-dir') {
                 bat """
-                    cmake ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015${
-                    archSuffix
-                }\" -DCMAKE_BUILD_TYPE=${buildType} ..
+                    cmake ${cmakeDefinitions} \\
+                          -DREALM_BUILD_LIB_ONLY=1 \\
+                          -G \"Visual Studio 14 2015${archSuffix}\" \\
+                          -DCMAKE_BUILD_TYPE=${buildType} ..
                     cmake --build . --config ${buildType}
-                    cpack -C ${buildType} -D CPACK_GENERATOR="TGZ"
+                    cpack -C ${buildType} -D CPACK_GENERATOR=\"TGZ\"
                 """
             }
         }
@@ -187,27 +188,24 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
 def buildDiffCoverage() {
     return {
         node('docker') {
-            checkout([
-                    $class           : 'GitSCM',
-                    branches         : scm.branches,
-                    gitTool          : 'native git',
-                    extensions       : scm.extensions + [[$class: 'CleanCheckout']],
-                    userRemoteConfigs: scm.userRemoteConfigs
-            ])
+            getSourceArchive()
 
             def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
             def environment = environment()
             withEnv(environment) {
                 buildEnv.inside {
-                    sh 'sh build.sh jenkins-pipeline-coverage'
-
-                    sh 'mkdir -p coverage'
-                    sh "diff-cover build.make.cover/gcovr.xml " +
-                            "--compare-branch=origin/${env.CHANGE_TARGET} " +
-                            "--html-report coverage/diff-coverage-report.html " +
-                            "| grep -F Coverage: " +
-                            "| head -n 1 " +
-                            "> diff-coverage"
+                    sh """
+                        mkdir build-dir
+                        cd build-dir
+                        cmake -D CMAKE_BUILD_TYPE=Debug \\
+                              -D REALM_COVERAGE=ON \\
+                              -G Ninja ..
+                        mkdir coverage
+                        diff-cover gcovr.xml \\
+                                   --compare-branch=origin/${env.CHANGE_TARGET} \\
+                                   --html-report coverage/diff-coverage-report.html \\
+                                   | grep -f Coverage: | head -n 1 > diff-coverage
+                    """
 
                     publishHTML(target: [
                             allowMissing         : false,
