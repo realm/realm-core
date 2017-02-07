@@ -173,10 +173,7 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
 
             dir('build-dir') {
                 bat """
-                    cmake ${cmakeDefinitions} \\
-                          -DREALM_BUILD_LIB_ONLY=1 \\
-                          -G \"Visual Studio 14 2015${archSuffix}\" \\
-                          -DCMAKE_BUILD_TYPE=${buildType} ..
+                    cmake ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015${archSuffix}\" -DCMAKE_BUILD_TYPE=${buildType} ..
                     cmake --build . --config ${buildType}
                     cpack -C ${buildType} -D CPACK_GENERATOR=\"TGZ\"
                 """
