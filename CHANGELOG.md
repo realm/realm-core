@@ -3,6 +3,11 @@
 ### Bugfixes
 
 * Fixed a bug in handover of detached linked lists. (issue #2378).
+* Fixed a bug in advance_read(): The memory mappings need to be updated and
+  the translation cache in the slab allocator must be invalidated prior to
+  traversing the transaction history. This bug could be reported as corruption
+  in general, or more likely as corruption of the transaction log. It is much
+  more likely to trigger if encryption is enabled. (issue #2383).
 
 ### Breaking changes
 
