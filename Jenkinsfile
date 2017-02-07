@@ -65,7 +65,7 @@ timeout(time: 1, unit: 'HOURS') {
         def abi = androidAbis[i]
         for (def j = 0; j < androidBuildTypes.size(); j++) {
             def buildType = androidBuildTypes[j]
-            parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Debug')
+            parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'x86' && buildType == 'Debug')
         }
     }
 
