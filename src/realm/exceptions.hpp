@@ -203,7 +203,10 @@ public:
         table_has_no_columns,
 
         /// Referring to a column that has been deleted.
-        column_does_not_exist
+        column_does_not_exist,
+
+        /// Only simple types are supported
+        type_not_supported
     };
 
     LogicError(ErrorKind message);

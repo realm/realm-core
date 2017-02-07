@@ -263,7 +263,7 @@
 /// since the latter it an invariant.
 
 
-using namespace realm;
+namespace realm {
 using namespace realm::util;
 
 const int_fast64_t realm::Table::max_integer;
@@ -291,6 +291,36 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
     get_descriptor()->insert_column_link(col_ndx, type, name, target, link_type); // Throws
 }
 
+size_t Table::add_column_list(DataType type, StringData name, bool nullable)
+{
+    size_t ndx = get_column_count();
+    insert_column_list(ndx, type, name, nullable);
+    return ndx;
+}
+
+void Table::insert_column_list(size_t column_ndx, DataType type, StringData name, bool nullable)
+{
+    DescriptorRef subdesc;
+    insert_column(column_ndx, type_Table, name, false, &subdesc);
+    switch (type) {
+        case type_Int:
+        case type_Bool:
+        case type_Float:
+        case type_Double:
+        case type_String:
+        case type_Binary:
+        case type_Timestamp:
+            subdesc->add_column(type, "list", nullptr, nullable);
+            break;
+        case type_OldDateTime:
+        case type_Table:
+        case type_Mixed:
+        case type_Link:
+        case type_LinkList:
+            throw LogicError(LogicError::type_not_supported);
+            break;
+    }
+}
 
 size_t Table::get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept
 {
@@ -2683,8 +2713,6 @@ size_t Table::get_index_in_group() const noexcept
     return index_in_parent;
 }
 
-namespace realm {
-
 template <>
 bool Table::get(size_t col_ndx, size_t ndx) const noexcept
 {
@@ -2812,9 +2840,6 @@ Timestamp Table::get(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
-} // namespace realm;
-
-
 template <class ColType, class T>
 size_t Table::do_find_unique(ColType& col, size_t ndx, T&& value, bool& conflict)
 {
@@ -2883,6 +2908,12 @@ int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
     return get<int64_t>(col_ndx, ndx);
 }
 
+template <>
+int Table::get(size_t col_ndx, size_t ndx) const noexcept
+{
+    return int(get<int64_t>(col_ndx, ndx));
+}
+
 size_t Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -2917,7 +2948,8 @@ size_t Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
     return ndx;
 }
 
-void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
+template <>
+void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -2934,6 +2966,17 @@ void Table::set_int(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_defa
 
     if (Replication* repl = get_repl())
         repl->set_int(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+}
+
+template <>
+void Table::set(size_t col_ndx, size_t ndx, int value, bool is_default)
+{
+    set<int_fast64_t>(col_ndx, ndx, value, is_default);
+}
+
+void Table::set_int(size_t column_ndx, size_t row_ndx, int_fast64_t value, bool is_default)
+{
+    set<int_fast64_t>(column_ndx, row_ndx, value, is_default);
 }
 
 void Table::add_int(size_t col_ndx, size_t ndx, int_fast64_t value)
@@ -2974,7 +3017,8 @@ Timestamp Table::get_timestamp(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
-void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value, bool is_default)
+template <>
+void Table::set(size_t col_ndx, size_t ndx, Timestamp value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Timestamp);
@@ -2996,14 +3040,18 @@ void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value, bool is_d
     }
 }
 
+void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value, bool is_default)
+{
+    set<Timestamp>(col_ndx, ndx, value, is_default);
+}
 
 bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 {
     return get<bool>(col_ndx, ndx);
 }
 
-
-void Table::set_bool(size_t col_ndx, size_t ndx, bool value, bool is_default)
+template <>
+void Table::set(size_t col_ndx, size_t ndx, bool value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
@@ -3023,6 +3071,10 @@ void Table::set_bool(size_t col_ndx, size_t ndx, bool value, bool is_default)
         repl->set_bool(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
+void Table::set_bool(size_t column_ndx, size_t row_ndx, bool value, bool is_default)
+{
+    set<bool>(column_ndx, row_ndx, value, is_default);
+}
 
 OldDateTime Table::get_olddatetime(size_t col_ndx, size_t ndx) const noexcept
 {
@@ -3051,14 +3103,13 @@ void Table::set_olddatetime(size_t col_ndx, size_t ndx, OldDateTime value, bool 
                               is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
-
 float Table::get_float(size_t col_ndx, size_t ndx) const noexcept
 {
     return get<float>(col_ndx, ndx);
 }
 
-
-void Table::set_float(size_t col_ndx, size_t ndx, float value, bool is_default)
+template <>
+void Table::set(size_t col_ndx, size_t ndx, float value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -3071,14 +3122,18 @@ void Table::set_float(size_t col_ndx, size_t ndx, float value, bool is_default)
         repl->set_float(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
+void Table::set_float(size_t column_ndx, size_t row_ndx, float value, bool is_default)
+{
+    set<float>(column_ndx, row_ndx, value, is_default);
+}
 
 double Table::get_double(size_t col_ndx, size_t ndx) const noexcept
 {
     return get<double>(col_ndx, ndx);
 }
 
-
-void Table::set_double(size_t col_ndx, size_t ndx, double value, bool is_default)
+template <>
+void Table::set(size_t col_ndx, size_t ndx, double value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
     REALM_ASSERT_3(ndx, <, m_size);
@@ -3092,14 +3147,18 @@ void Table::set_double(size_t col_ndx, size_t ndx, double value, bool is_default
                          is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
+void Table::set_double(size_t column_ndx, size_t row_ndx, double value, bool is_default)
+{
+    set<double>(column_ndx, row_ndx, value, is_default);
+}
 
 StringData Table::get_string(size_t col_ndx, size_t ndx) const noexcept
 {
     return get<StringData>(col_ndx, ndx);
 }
 
-
-void Table::set_string(size_t col_ndx, size_t ndx, StringData value, bool is_default)
+template <>
+void Table::set(size_t col_ndx, size_t ndx, StringData value, bool is_default)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -3123,6 +3182,11 @@ void Table::set_string(size_t col_ndx, size_t ndx, StringData value, bool is_def
     if (Replication* repl = get_repl())
         repl->set_string(this, col_ndx, ndx, value,
                          is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+}
+
+void Table::set_string(size_t column_ndx, size_t row_ndx, StringData value, bool is_default)
+{
+    set<StringData>(column_ndx, row_ndx, value, is_default);
 }
 
 
@@ -3242,8 +3306,8 @@ BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const noexcept
     return get<BinaryData>(col_ndx, ndx);
 }
 
-
-void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
+template <>
+void Table::set(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -3269,6 +3333,11 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_def
     if (Replication* repl = get_repl())
         repl->set_binary(this, col_ndx, ndx, value,
                          is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
+}
+
+void Table::set_binary(size_t column_ndx, size_t row_ndx, BinaryData value, bool is_default)
+{
+    set<BinaryData>(column_ndx, row_ndx, value, is_default);
 }
 
 
@@ -6256,3 +6325,5 @@ void Table::dump_node_structure(std::ostream& out, int level) const
 }
 
 #endif // LCOV_EXCL_STOP ignore debug functions
+
+} // namespace realm

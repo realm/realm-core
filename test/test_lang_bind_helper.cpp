@@ -740,6 +740,50 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkListSort)
     CHECK_EQUAL(0, lvr->get(3).get_index());
 }
 
+TEST(LangBindHelper_AdvanceReadTransact_ListOfPrimitives)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg(hist);
+    SharedGroup sg_w(hist);
+
+    // Start a read transaction (to be repeatedly advanced)
+    ReadTransaction rt(sg);
+    const Group& group = rt.get_group();
+    CHECK_EQUAL(0, group.size());
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef t = wt.add_table("foo");
+        t->add_column(type_Int, "j");
+        auto row = t->add_empty_row();
+        t->set_int(0, row, 5);
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+    auto t_foo = group.get_table("foo");
+    auto int_val = t_foo->get_int(0, 0);
+    CHECK_EQUAL(int_val, 5);
+
+    {
+        WriteTransaction wt(sg_w);
+        TableRef t = wt.add_table("bar");
+        t->add_column_list(type_Int, "i");
+        auto row = t->add_empty_row();
+        t->set_list(0, row, std::vector<int>({1, 2, 3, 4}));
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+
+    // Verify sorted LinkList (see above)
+    auto t_bar = group.get_table("bar");
+    auto vec(t_bar->get_list<int>(0, 0));
+    CHECK_EQUAL(vec->size(), 4);
+    CHECK_EQUAL((*vec)[0], 1);
+}
+
 
 TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
 {

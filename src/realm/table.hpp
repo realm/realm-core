@@ -68,7 +68,6 @@ class TableFriend;
 
 class Replication;
 
-
 /// FIXME: Table assignment (from any group to any group) could be made aliasing
 /// safe as follows: Start by cloning source table into target allocator. On
 /// success, assign, and then deallocate any previous structure at the target.
@@ -208,6 +207,10 @@ public:
     size_t add_column_link(DataType type, StringData name, Table& target, LinkType link_type = link_Weak);
     void insert_column_link(size_t column_ndx, DataType type, StringData name, Table& target,
                             LinkType link_type = link_Weak);
+
+    size_t add_column_list(DataType type, StringData name, bool nullable = false);
+    void insert_column_list(size_t column_ndx, DataType type, StringData name, bool nullable = false);
+
     void remove_column(size_t column_ndx);
     void rename_column(size_t column_ndx, StringData new_name);
     //@}
@@ -502,6 +505,22 @@ public:
     void nullify_link(size_t column_ndx, size_t row_ndx);
     void set_null(size_t column_ndx, size_t row_ndx, bool is_default = false);
     void set_null_unique(size_t col_ndx, size_t row_ndx);
+
+    template <class T>
+    void set(size_t c, size_t r, T value, bool is_default = false);
+
+    template <class T>
+    void set_list(size_t c, size_t r, const std::vector<T>& list);
+
+    template <typename T>
+    class List;
+
+    /// The object returned here is only valid during the current transaction
+    /// It cannot be updated or handed over.
+    template <class T>
+    std::unique_ptr<List<T>> get_list(size_t column_ndx, size_t row_ndx);
+    template <class T>
+    std::unique_ptr<const List<T>> get_list(size_t column_ndx, size_t row_ndx) const;
 
     void add_int(size_t column_ndx, size_t row_ndx, int_fast64_t value);
 
@@ -1442,6 +1461,137 @@ private:
     friend class Group;
 };
 
+/*****************************************************************************/
+
+template <class T>
+using ListRef = std::unique_ptr<Table::List<T>>;
+template <class T>
+using ConstListRef = std::unique_ptr<const Table::List<T>>;
+
+template <typename T>
+class Table::List {
+public:
+    class Iterator {
+    public:
+        typedef std::forward_iterator_tag iterator_category;
+        typedef T value_type;
+        typedef ptrdiff_t difference_type;
+        typedef T* pointer;
+        typedef const T& reference;
+
+        Iterator(const List& l, size_t ndx)
+            : m_list(l)
+            , m_ndx(ndx)
+        {
+        }
+        T operator*() const
+        {
+            return m_list[m_ndx];
+        }
+        Iterator& operator++()
+        {
+            ++m_ndx;
+            return *this;
+        }
+        Iterator operator++(int)
+        {
+            Iterator tmp(*this);
+            ++m_ndx;
+            return tmp;
+        }
+        bool operator!=(const Iterator& rhs) const
+        {
+            return m_ndx != rhs.m_ndx;
+        }
+
+    private:
+        const List& m_list;
+        size_t m_ndx;
+    };
+
+    List(Table* t)
+        : m_table(t)
+    {
+    }
+    size_t size() const
+    {
+        return m_table->size();
+    }
+    void resize(size_t new_size)
+    {
+        size_t current_size = size();
+        if (new_size > current_size) {
+            m_table->add_empty_row(new_size - current_size);
+        }
+        else {
+            while (current_size > new_size) {
+                m_table->remove(--current_size);
+            }
+        }
+    }
+    T get(size_t ndx) const
+    {
+        return m_table->template get<T>(0, ndx);
+    }
+    void set(size_t ndx, T value)
+    {
+        m_table->template set<T>(0, ndx, value);
+    }
+    void insert(size_t ndx, T value)
+    {
+        m_table->insert_empty_row(ndx);
+        set(ndx, value);
+    }
+    T remove(size_t ndx)
+    {
+        T ret = m_table->template get<T>(0, ndx);
+        m_table->remove(ndx);
+        return ret;
+    }
+    void remove(size_t from, size_t to)
+    {
+        while (from < to) {
+            remove(--to);
+        }
+    }
+    void swap(size_t ndx1, size_t ndx2)
+    {
+        m_table->swap_rows(ndx1, ndx2);
+    }
+    void clear()
+    {
+        m_table->clear();
+    }
+    bool is_null(size_t ndx) const
+    {
+        return m_table->is_null(0, ndx);
+    }
+    T operator[](size_t ndx) const
+    {
+        return get(ndx);
+    }
+    Iterator begin() const
+    {
+        return Iterator(*this, 0);
+    }
+    Iterator end() const
+    {
+        return Iterator(*this, size());
+    }
+    Columns<T> self()
+    {
+        return m_table->template column<T>(0);
+    }
+    Query where(TableViewBase* tv = nullptr) const
+    {
+        return m_table->where(tv);
+    }
+
+private:
+    TableRef m_table;
+};
+
+/*****************************************************************************/
 
 class Table::Parent : public ArrayParent {
 public:
@@ -1477,7 +1627,9 @@ protected:
 };
 
 
-// Implementation:
+/*****************************************************************************/
+/*                               Implementation                              */
+/*****************************************************************************/
 
 
 inline uint_fast64_t Table::get_version_counter() const noexcept
@@ -2026,6 +2178,31 @@ inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept
         // Subtable with shared descriptor
         m_columns.set_ndx_in_parent(ndx_in_parent);
     }
+}
+
+template <class T>
+void Table::set_list(size_t c, size_t r, const std::vector<T>& value_list)
+{
+    size_t sz = value_list.size();
+    TableRef subtable = get_subtable(c, r);
+    subtable->clear();
+    subtable->add_empty_row(sz);
+    for (size_t i = 0; i < sz; i++) {
+        T value = value_list[i];
+        subtable->set(0, i, value);
+    }
+}
+
+template <class T>
+std::unique_ptr<Table::List<T>> Table::get_list(size_t c, size_t r)
+{
+    return std::make_unique<List<T>>(get_subtable_ptr(c, r));
+}
+
+template <class T>
+std::unique_ptr<const Table::List<T>> Table::get_list(size_t c, size_t r) const
+{
+    return std::make_unique<const List<T>>(const_cast<Table*>(get_subtable_ptr(c, r)));
 }
 
 // This class groups together information about the target of a link column
