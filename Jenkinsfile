@@ -169,6 +169,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                                 adb push test/realm-tests /data/local/tmp
                                 find test -type f -name *.json -exec adb push {} /data/local/tmp \\;
                                 find test -type f -name *.realm -exec adb push {} /data/local/tmp \\;
+                                adb shell mount
                                 adb shell \'/data/local/tmp/realm-tests || echo __ADB_FAIL__\' | tee adb.log
                                 ! grep __ADB_FAIL__ adb.log
                             '''
