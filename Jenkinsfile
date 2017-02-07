@@ -198,7 +198,8 @@ def buildDiffCoverage() {
                               -D REALM_COVERAGE=ON \\
                               -G Ninja ..
                         ninja
-                        test/realm-tests
+                        cd test
+                        ./realm-tests
                         mkdir coverage
                         diff-cover gcovr.xml \\
                                    --compare-branch=origin/${env.CHANGE_TARGET} \\
@@ -277,10 +278,10 @@ def doBuildAppleDevice(String sdk, String buildType) {
 }
 
 def recordTests(tag) {
-    def tests = readFile('test/unit-test-report.xml')
+    def tests = readFile('build-dir/test/unit-test-report.xml')
     def modifiedTests = tests.replaceAll('realm-core-tests', tag)
-    writeFile file: 'test/modified-test-report.xml', text: modifiedTests
-    junit 'test/modified-test-report.xml'
+    writeFile file: 'build-dir/test/modified-test-report.xml', text: modifiedTests
+    junit 'build-dir/test/modified-test-report.xml'
 }
 
 def collectCompilerWarnings(compiler, fail) {
