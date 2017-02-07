@@ -224,11 +224,10 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
     uint_least8_t width = m_width;
     bool is_inner_node = m_is_inner_bptree_node;
     typedef StringIndex::key_type key_type;
-    key_type key;
     size_t stringoffset = 0;
 
     // Create 4 byte index key
-    key = StringIndex::create_key(value, stringoffset);
+    key_type key = StringIndex::create_key(value, stringoffset);
 
     for (;;) {
         // Get subnode table
