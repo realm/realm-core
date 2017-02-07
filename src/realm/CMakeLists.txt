@@ -277,12 +277,11 @@ if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)
 endif()
 
 if(APPLE)
-    target_link_libraries(realm ${Foundation})
-    if(NOT REALM_SKIP_SHARED_LIB)
-        target_link_libraries(realm-shared ${Foundation})
-    endif()
+  target_link_libraries(realm ${Foundation})
+  if(NOT REALM_SKIP_SHARED_LIB)
+    target_link_libraries(realm-shared ${Foundation})
+  endif()
 endif(APPLE)
-
 
 install(TARGETS realm
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
