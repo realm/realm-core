@@ -200,6 +200,7 @@ def buildDiffCoverage() {
                         ninja
                         cd test
                         ./realm-tests
+                        gcovr --filter='.*src/realm.*' -x >gcovr.xml
                         mkdir coverage
                         diff-cover gcovr.xml \\
                                    --compare-branch=origin/${env.CHANGE_TARGET} \\
@@ -211,7 +212,7 @@ def buildDiffCoverage() {
                             allowMissing         : false,
                             alwaysLinkToLastBuild: false,
                             keepAll              : true,
-                            reportDir            : 'coverage',
+                            reportDir            : 'build-dir/test/coverage',
                             reportFiles          : 'diff-coverage-report.html',
                             reportName           : 'Diff Coverage'
                     ])
