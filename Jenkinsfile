@@ -65,7 +65,7 @@ timeout(time: 1, unit: 'HOURS') {
         def abi = androidAbis[i]
         for (def j = 0; j < androidBuildTypes.size(); j++) {
             def buildType = androidBuildTypes[j]
-            parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType)
+            parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'x86')
         }
     }
 
@@ -137,7 +137,7 @@ def doBuildInDocker(String buildType) {
 }
 
 
-def doAndroidBuildInDocker(String abi, String buildType) {
+def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmulator) {
     def cores = 4
     return {
         node('docker') {
@@ -146,11 +146,31 @@ def doAndroidBuildInDocker(String abi, String buildType) {
             def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
             def environment = environment()
             withEnv(environment) {
-                buildEnv.inside {
-                    try {
-                        sh "./build.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
-                    } finally {
-                        collectCompilerWarnings('gcc', true )
+                if(!runTestsInEmulator) {
+                    buildEnv.inside {
+                        try {
+                            sh "./build.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
+                        } finally {
+                            collectCompilerWarnings('gcc', true )
+                        }
+                    }
+                } else {
+                    docker.image('tracer0tong/android-emulator').withRun { emulator ->
+                        buildEnv.inside("--link ${emulator.id}:emulator") {
+                            try {
+                                sh "./build.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
+                            } finally {
+                                collectCompilerWarnings('gcc', true )
+                            }
+                            sh '''
+                                cd $(find . -type d -maxdepth 1 -name build-android*)
+                                adb connect emulator
+                                timeout 10m adb wait-for-device
+                                adb push test/* /data/local/tmp
+                                adb shell '/data/local/tmp/tests || echo __ADB_FAIL__' | tee adb.log
+                                ! grep __ADB_FAIL__ adb.log
+                            '''
+                        }
                     }
                 }
             }
