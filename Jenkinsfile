@@ -197,6 +197,7 @@ def buildDiffCoverage() {
                         cmake -D CMAKE_BUILD_TYPE=Debug \\
                               -D REALM_COVERAGE=ON \\
                               -G Ninja ..
+                        ninja
                         test/realm-tests
                         mkdir coverage
                         diff-cover gcovr.xml \\
