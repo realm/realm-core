@@ -191,22 +191,24 @@ def buildDiffCoverage() {
             def environment = environment()
             withEnv(environment) {
                 buildEnv.inside {
-                    sh """
+                    sh '''
                         mkdir build-dir
                         cd build-dir
-                        cmake -D CMAKE_BUILD_TYPE=Debug \\
-                              -D REALM_COVERAGE=ON \\
+                        cmake -D CMAKE_BUILD_TYPE=Debug \
+                              -D REALM_COVERAGE=ON \
                               -G Ninja ..
                         ninja
                         cd test
                         ./realm-tests
                         gcovr --filter='.*src/realm.*' -x >gcovr.xml
                         mkdir coverage
+                     '''
+                    def coverageResult = sh(returnStdout: true, script: """
                         diff-cover gcovr.xml \\
                                    --compare-branch=origin/${env.CHANGE_TARGET} \\
                                    --html-report coverage/diff-coverage-report.html \\
-                                   | grep -f Coverage: | head -n 1 > diff-coverage
-                    """
+                                   | grep Coverage: | head -n 1 > diff-coverage
+                    """)
 
                     publishHTML(target: [
                             allowMissing         : false,
@@ -216,8 +218,6 @@ def buildDiffCoverage() {
                             reportFiles          : 'diff-coverage-report.html',
                             reportName           : 'Diff Coverage'
                     ])
-
-                    def coverageResults = readFile('diff-coverage')
 
                     withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
                         sh "curl -H \"Authorization: token ${env.githubToken}\" " +
