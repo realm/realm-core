@@ -203,7 +203,7 @@ def buildDiffCoverage() {
                         gcovr --filter='.*src/realm.*' -x >gcovr.xml
                         mkdir coverage
                      '''
-                    def coverageResult = sh(returnStdout: true, script: """
+                    def coverageResults = sh(returnStdout: true, script: """
                         diff-cover gcovr.xml \\
                                    --compare-branch=origin/${env.CHANGE_TARGET} \\
                                    --html-report coverage/diff-coverage-report.html \\
