@@ -18,6 +18,7 @@
 
 * Now supports case insensitive queries for UWP.
 * Upgraded Visual Studio project to version 2017.
+* Support handover of TableViews and Queries based on SubTables
 
 -----------
 

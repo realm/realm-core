@@ -230,7 +230,13 @@ void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
     // not going through Table::create_from_and_consume_patch because we need to use
     // set_table() to update all table references
     if (patch.m_table) {
-        set_table(dest_group.get_table(patch.m_table->m_table_num));
+        if (patch.m_table->m_is_sub_table) {
+            auto parent_table = dest_group.get_table(patch.m_table->m_table_num);
+            set_table(parent_table->get_subtable(patch.m_table->m_col_ndx, patch.m_table->m_row_ndx));
+        }
+        else {
+            set_table(dest_group.get_table(patch.m_table->m_table_num));
+        }
     }
     REALM_ASSERT(patch.m_node_data.empty());
 }
@@ -795,6 +801,9 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
                    size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                    size_t* return_ndx) const
 {
+    if (!m_table->is_attached()) {
+        throw LogicError{LogicError::detached_accessor};
+    }
     if (limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
             *resultcount = 0;
