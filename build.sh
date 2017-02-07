@@ -74,7 +74,7 @@ if [ "${OS}" == "android" ]; then
     cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/android.toolchain.cmake \
           -D CMAKE_INSTALL_PREFIX=install \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D ANDROID_API="${ARCH}" \
+          -D ANDROID_ABI="${ARCH}" \
           -D REALM_ENABLE_ENCRYPTION=1 \
           -D REALM_VERSION="${VERSION}" \
           ..
