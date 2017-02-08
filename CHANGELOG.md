@@ -2,7 +2,6 @@
 
 ### Bugfixes
 
-* Fixed a bug in handover of detached linked lists. (issue #2378).
 * Fixed a few bugs (caused crashes) in pthread library on UWP.
 
 ### Breaking changes
@@ -13,9 +12,34 @@
 
 * Now supports case insensitive queries for UWP.
 * Upgraded Visual Studio project to version 2017.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 2.3.1 Release notes
+
+### Bugfixes
+
+* Fixed a bug in handover of detached linked lists. (issue #2378).
+* Fixed a bug in advance_read(): The memory mappings need to be updated and
+  the translation cache in the slab allocator must be invalidated prior to
+  traversing the transaction history. This bug could be reported as corruption
+  in general, or more likely as corruption of the transaction log. It is much
+  more likely to trigger if encryption is enabled. (issue #2383).
+
+### Enhancements
+
 * Avoid copying copy-on-write data structures when the write does not actually
   change the existing value.
 * Improve performance of deleting all rows in a TableView.
+* Allow the `add_int()` API to be called on a `Row`
+* Don't open the notification pipes on platforms which support the async commit
+  daemon when async commits are not enabled
 
 -----------
 
