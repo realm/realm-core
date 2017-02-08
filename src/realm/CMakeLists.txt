@@ -176,7 +176,7 @@ set(REALM_OTHER_UTIL_HEADERS
 
 add_library(realm-objects OBJECT ${REALM_SOURCES})
 set_target_properties(realm-objects PROPERTIES POSITION_INDEPENDENT_CODE true)
-target_compile_definitionsy(realm-objects PUBLIC PIC)
+target_compile_definitions(realm-objects PUBLIC PIC)
 
 if(APPLE)
     set_target_properties(
