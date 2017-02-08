@@ -75,15 +75,15 @@ size_t IndexArray::from_list<index_FindFirst>(StringData value, IntegerColumn& r
     if (lower == it_end)
         return not_found;
 
-    const size_t first_row_ref = to_size_t(*lower);
+    const size_t first_row_ndx = to_size_t(*lower);
 
     // The buffer is needed when for when this is an integer index.
     StringIndex::StringConversionBuffer buffer;
-    StringData str = column->get_index_data(first_row_ref, buffer);
+    StringData str = column->get_index_data(first_row_ndx, buffer);
     if (str != value)
         return not_found;
 
-    return first_row_ref;
+    return first_row_ndx;
 }
 
 template <>
@@ -100,11 +100,11 @@ size_t IndexArray::from_list<index_Count>(StringData value, IntegerColumn& resul
     if (lower == it_end)
         return 0;
 
-    const size_t first_row_ref = to_size_t(*lower);
+    const size_t first_row_ndx = to_size_t(*lower);
 
     // The buffer is needed when for when this is an integer index.
     StringIndex::StringConversionBuffer buffer;
-    StringData str = column->get_index_data(first_row_ref, buffer);
+    StringData str = column->get_index_data(first_row_ndx, buffer);
     if (str != value)
         return 0;
 
@@ -127,11 +127,11 @@ size_t IndexArray::from_list<index_FindAll>(StringData value, IntegerColumn& res
     if (lower == it_end)
         return size_t(FindRes_not_found);
 
-    const size_t first_row_ref = to_size_t(*lower);
+    const size_t first_row_ndx = to_size_t(*lower);
 
     // The buffer is needed when for when this is an integer index.
     StringIndex::StringConversionBuffer buffer;
-    StringData str = column->get_index_data(first_row_ref, buffer);
+    StringData str = column->get_index_data(first_row_ndx, buffer);
     if (str != value)
         return size_t(FindRes_not_found);
 
@@ -139,8 +139,8 @@ size_t IndexArray::from_list<index_FindAll>(StringData value, IntegerColumn& res
 
     // Copy all matches into result column
     for (IntegerColumn::const_iterator it = lower; it != upper; ++it) {
-        const size_t cur_row_ref = to_size_t(*it);
-        result.add(cur_row_ref);
+        const size_t cur_row_ndx = to_size_t(*it);
+        result.add(cur_row_ndx);
     }
 
     return size_t(FindRes_column);
@@ -159,11 +159,11 @@ size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, IntegerColu
     if (lower == it_end)
         return size_t(FindRes_not_found);
 
-    const size_t first_row_ref = to_size_t(*lower);
+    const size_t first_row_ndx = to_size_t(*lower);
 
     // The buffer is needed when for when this is an integer index.
     StringIndex::StringConversionBuffer buffer;
-    StringData str = column->get_index_data(first_row_ref, buffer);
+    StringData str = column->get_index_data(first_row_ndx, buffer);
     if (str != value)
         return size_t(FindRes_not_found);
 
@@ -177,8 +177,8 @@ size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, IntegerColu
     }
 
     // Check string value at upper, if equal return matches in (lower, upper]
-    const size_t last_row_ref = to_size_t(*upper);
-    str = column->get_index_data(last_row_ref, buffer);
+    const size_t last_row_ndx = to_size_t(*upper);
+    str = column->get_index_data(last_row_ndx, buffer);
     if (str == value) {
         result_ref.payload = rows.get_ref();
         result_ref.start_ndx = lower.get_col_ndx();
@@ -265,17 +265,17 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
 
         // Literal row index (tagged)
         if (ref & 1) {
-            size_t row_ref = size_t(uint64_t(ref) >> 1);
+            size_t row_ndx = size_t(uint64_t(ref) >> 1);
 
             // The buffer is needed when for when this is an integer index.
             StringIndex::StringConversionBuffer buffer;
-            StringData str = column->get_index_data(row_ref, buffer);
+            StringData str = column->get_index_data(row_ndx, buffer);
             if (str == value) {
-                result_ref.payload = row_ref;
+                result_ref.payload = row_ndx;
                 if (all)
-                    result.add(row_ref);
+                    result.add(row_ndx);
 
-                return first ? row_ref : get_count ? 1 : FindRes_single;
+                return first ? row_ndx : get_count ? 1 : FindRes_single;
             }
             return local_not_found;
         }
