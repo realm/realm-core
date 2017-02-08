@@ -318,7 +318,7 @@ void BasicArray_Minimum(TestContext& test_context)
 
     CHECK_EQUAL(false, f.minimum(res));
 
-    T values[] = {T(1.1), T(2.2), T(1.0), T(5.5), T(4.4)};
+    T values[] = {T(1.1), T(2.2), T(-1.0), T(5.5), T(4.4)};
     for (size_t i = 0; i < 5; ++i)
         f.add(values[i]);
     CHECK_EQUAL(5, f.size());

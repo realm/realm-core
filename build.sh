@@ -78,7 +78,7 @@ if [ "${OS}" == "android" ]; then
           -D REALM_ENABLE_ENCRYPTION=1 \
           -D REALM_VERSION="${VERSION}" \
           ..
-    make -j "${CORES}" -l "${CORES}"
+    make -j "${CORES}" -l "${CORES}" VERBOSE=1
     make package
 else
     case "${OS}" in
