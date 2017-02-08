@@ -167,9 +167,9 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                                 adb connect emulator
                                 timeout 10m adb wait-for-device
                                 adb push test/realm-tests /data/local/tmp
-                                find test -type f -name *.json -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                find test -type f -name *.realm -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                find test -type f -name *.txt -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
                                 adb shell \'cd /data/local/tmp; ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
                                 ! grep __ADB_FAIL__ adb.log
                             '''
