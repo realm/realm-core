@@ -1645,14 +1645,13 @@ inline bool Table::has_shared_type() const noexcept
 
 inline void Table::verify_column(size_t col_ndx, const ColumnBase* col) const
 {
-    if (col_ndx < m_cols.size()) {
-        if (m_cols[col_ndx] == col)
+    // Check if the column exists at the expected location
+    if (REALM_LIKELY(col_ndx < m_cols.size() && m_cols[col_ndx] == col))
+        return;
+    // The column might be elsewhere in the list
+    for (auto c : m_cols) {
+        if (c == col)
             return;
-        // The column might be elsewhere in the list
-        for (auto it : m_cols) {
-            if (it == col)
-                return;
-        }
     }
     throw LogicError(LogicError::column_does_not_exist);
 }

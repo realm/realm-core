@@ -170,8 +170,12 @@ public:
 
     virtual void init()
     {
+        // Verify that the cached column accessor is still valid
+        verify_column(); // throws
+
         if (m_child)
             m_child->init();
+
         m_column_action_specializer = nullptr;
     }
 
@@ -336,6 +340,8 @@ public:
 
     void init() override
     {
+        ParentNode::init();
+
         m_dD = 10.0;
 
         // m_condition is first node in condition of subtable query.
@@ -345,10 +351,6 @@ public:
             std::vector<ParentNode*> v;
             m_condition->gather_children(v);
         }
-
-        // m_child is next node of parent query
-        if (m_child)
-            m_child->init();
     }
 
     void table_changed() override
@@ -647,9 +649,6 @@ protected:
         m_leaf_end = 0;
         m_array_ptr.reset(); // Explicitly destroy the old one first, because we're reusing the memory.
         m_array_ptr.reset(new (&m_leaf_cache_storage) LeafType(m_table->get_alloc()));
-
-        if (m_child)
-            m_child->init();
     }
 
     void get_leaf(const ColType& col, size_t ndx)
@@ -942,10 +941,9 @@ public:
 
     void init() override
     {
-        m_dD = 100.0;
+        ParentNode::init();
 
-        if (m_child)
-            m_child->init();
+        m_dD = 100.0;
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1008,10 +1006,9 @@ public:
 
     void init() override
     {
-        m_dD = 100.0;
+        ParentNode::init();
 
-        if (m_child)
-            m_child->init();
+        m_dD = 100.0;
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1063,6 +1060,8 @@ public:
 
     void init() override
     {
+        ParentNode::init();
+
         m_dT = 10.0;
         m_probes = 0;
         m_matches = 0;
@@ -1163,9 +1162,6 @@ public:
         m_dD = 100.0;
 
         StringNodeBase::init();
-
-        if (m_child)
-            m_child->init();
     }
 
 
@@ -1228,9 +1224,6 @@ public:
         m_dD = 100.0;
         
         StringNodeBase::init();
-        
-        if (m_child)
-            m_child->init();
     }
     
     
@@ -1304,9 +1297,6 @@ public:
         m_dD = 100.0;
         
         StringNodeBase::init();
-        
-        if (m_child)
-            m_child->init();
     }
     
     
@@ -1436,9 +1426,6 @@ public:
             REALM_ASSERT_DEBUG(dynamic_cast<const StringEnumColumn*>(m_condition_column));
             m_cse.init(static_cast<const StringEnumColumn*>(m_condition_column));
         }
-
-        if (m_child)
-            m_child->init();
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1605,6 +1592,8 @@ public:
 
     void init() override
     {
+        ParentNode::init();
+
         m_dD = 10.0;
 
         m_start.clear();
@@ -1622,9 +1611,6 @@ public:
             v.clear();
             condition->gather_children(v);
         }
-
-        if (m_child)
-            m_child->init();
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1728,6 +1714,8 @@ public:
 
     void init() override
     {
+        ParentNode::init();
+
         m_dD = 10.0;
 
         std::vector<ParentNode*> v;
@@ -1740,9 +1728,6 @@ public:
         m_known_range_start = 0;
         m_known_range_end = 0;
         m_first_in_known_range = not_found;
-
-        if (m_child)
-            m_child->init();
     }
 
     size_t find_first_local(size_t start, size_t end) override;
@@ -1835,10 +1820,8 @@ public:
 
     void init() override
     {
+        ParentNode::init();
         m_dD = 100.0;
-
-        if (m_child)
-            m_child->init();
     }
 
     size_t find_first_local(size_t start, size_t end) override
@@ -1899,6 +1882,8 @@ public:
         , m_value(from.m_value)
         , m_condition_column(from.m_condition_column)
         , m_column_type(from.m_column_type)
+        , m_condition_column_idx1(from.m_condition_column_idx1)
+        , m_condition_column_idx2(from.m_condition_column_idx2)
     {
         if (m_condition_column)
             m_condition_column_idx = m_condition_column->get_column_index();

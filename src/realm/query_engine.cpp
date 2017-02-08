@@ -51,9 +51,6 @@ size_t ParentNode::find_first(size_t start, size_t end)
 
 void ParentNode::aggregate_local_prepare(Action TAction, DataType col_id, bool nullable)
 {
-    // Verify that the cached column accessor is still valid
-    verify_column(); // throws
-
     if (TAction == act_ReturnFirst) {
         if (nullable)
             m_column_action_specializer = &ThisType::column_action_specialization<act_ReturnFirst, IntNullColumn>;
