@@ -65,7 +65,7 @@ timeout(time: 1, unit: 'HOURS') {
         def abi = androidAbis[i]
         for (def j = 0; j < androidBuildTypes.size(); j++) {
             def buildType = androidBuildTypes[j]
-            parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'x86' && buildType == 'Release')
+            parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'x86' && buildType == 'Debug')
         }
     }
 
@@ -208,6 +208,7 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
 def buildDiffCoverage() {
     return {
         node('docker') {
+            // We need the whole git repo since diff-cover is going to perform some git operations
             getSourceArchive()
 
             def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
@@ -301,6 +302,9 @@ def doBuildAppleDevice(String sdk, String buildType) {
     }
 }
 
+/**
+ *  Wraps the test recorder by adding a tag which will make the test distinguishible
+ */
 def recordTests(tag) {
     def tests = readFile('build-dir/test/unit-test-report.xml')
     def modifiedTests = tests.replaceAll('realm-core-tests', tag)
