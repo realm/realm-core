@@ -105,9 +105,6 @@ elseif(ANDROID)
     set(ANDROID_OPENSSL_VERSION "1.0.1t")
     list(APPEND PLATFORM_LIBRARIES log)
     list(APPEND PLATFORM_LIBRARIES android)
-    if(ANDROID_ABI STREQUAL mips)
-        list(APPEND PLATFORM_LIBRARIES atomic)
-    endif()
 endif()
 
 # Find dependencies

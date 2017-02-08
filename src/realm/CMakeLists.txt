@@ -211,6 +211,10 @@ target_link_libraries(
         ${CMAKE_THREAD_LIBS_INIT}
 )
 
+if(ANDROID)
+  target_link_libraries(realm atomic)
+endif()
+
 if(ANDROID OR CMAKE_SYSTEM_NAME MATCHES "^Windows")
     set(REALM_SKIP_SHARED_LIB ON)
 endif()
@@ -236,6 +240,10 @@ if(NOT REALM_SKIP_SHARED_LIB)
         ${REALM_EXTRA_LIBS}
         ${CMAKE_THREAD_LIBS_INIT}
     )
+
+  if(ANDROID)
+    target_link_libraries(realm-shared atomic)
+  endif()
 endif()
 
 if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)
