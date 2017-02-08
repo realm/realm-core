@@ -65,7 +65,7 @@ timeout(time: 1, unit: 'HOURS') {
         def abi = androidAbis[i]
         for (def j = 0; j < androidBuildTypes.size(); j++) {
             def buildType = androidBuildTypes[j]
-            parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'x86' && buildType == 'Debug')
+            parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'x86' && buildType == 'Release')
         }
     }
 
@@ -167,10 +167,9 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                                 adb connect emulator
                                 timeout 10m adb wait-for-device
                                 adb push test/realm-tests /data/local/tmp
-                                find test -type f -name *.json -exec adb push {} /data/local/tmp \\;
-                                find test -type f -name *.realm -exec adb push {} /data/local/tmp \\;
-                                adb shell mount
-                                adb shell ls -l
+                                find test -type f -name *.json -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                find test -type f -name *.realm -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                find test -type f -name *.txt -maxdepth 1 -exec adb push {} /data/local/tmp \\;
                                 adb shell \'cd /data/local/tmp; ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
                                 ! grep __ADB_FAIL__ adb.log
                             '''
