@@ -20,6 +20,11 @@
 
 #include "sync_test_utils.hpp"
 
+#include "object_schema.hpp"
+#include "object_store.hpp"
+#include "property.hpp"
+#include "schema.hpp"
+
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 #include "util/time.hpp"
@@ -42,7 +47,9 @@ template <typename FetchAccessToken, typename ErrorHandler>
 std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<SyncUser> user, const std::string& path,
                                           FetchAccessToken&& fetch_access_token, ErrorHandler&& error_handler,
                                           SyncSessionStopPolicy stop_policy=SyncSessionStopPolicy::AfterChangesUploaded,
-                                          std::string* on_disk_path=nullptr)
+                                          std::string* on_disk_path=nullptr,
+                                          util::Optional<Schema> schema=none,
+                                          Realm::Config* out_config=nullptr)
 {
     std::string url = server.base_url() + path;
     SyncTestFile config({user, url, std::move(stop_policy),
@@ -50,8 +57,14 @@ std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<Sy
             auto token = fetch_access_token(path, config.realm_url);
             session->refresh_access_token(std::move(token), config.realm_url);
         }, std::forward<ErrorHandler>(error_handler)});
+    if (schema) {
+        config.schema = *schema;
+    }
     if (on_disk_path) {
         *on_disk_path = config.path;
+    }
+    if (out_config) {
+        *out_config = config;
     }
 
     std::shared_ptr<SyncSession> session;
@@ -379,6 +392,119 @@ TEST_CASE("sync: error handling", "[sync]") {
             idx = recovery_path.find(util::put_time(just_after_raw, "%d"));
             CHECK(idx != std::string::npos);
         }
+    }
+}
+
+TEST_CASE("sync: stop policy behavior", "[sync]") {
+    using ProtocolError = realm::sync::ProtocolError;
+    if (!EventLoop::has_implementation())
+        return;
+
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    // Server is initially stopped so we can control when the session exits the dying state.
+    SyncServer server(false);
+    auto schema = Schema{
+        {"sync_session_object", {
+            {"value 1", PropertyType::Int},
+            {"value 2", PropertyType::Int},
+        }},
+    };
+
+    constexpr int count = 2;
+    auto add_objects = [](Realm::Config& config) {
+        auto r = Realm::get_shared_realm(config);
+        TableRef table = ObjectStore::table_for_object_type(r->read_group(), "sync_session_object");
+        REQUIRE(table);
+        r->begin_transaction();
+        for (int i = 0; i < count; ++i) {
+            uint64_t row_idx = table->add_empty_row();
+            table->set_int(0, row_idx, i * 2);
+            table->set_int(1, row_idx, (count - i) * 2);
+        }
+        r->commit_transaction();
+    };
+
+    SECTION("properly transitions from active directly to inactive, and nothing bad happens", "[Immediately]") {
+        auto user = SyncManager::shared().get_user("user-dying-state-1", "not_a_real_token");
+        Realm::Config config;
+        auto session = sync_session(server, user, "/test-dying-state-1",
+                                    [](auto&, auto&) { return s_test_token; },
+                                    [](auto, auto) { },
+                                    SyncSessionStopPolicy::Immediately,
+                                    nullptr, schema, &config);
+        EventLoop::main().run_until([&] { return session_is_active(*session); });
+        // Add a couple of objects to the Realm.
+        add_objects(config);
+        // Now close the session, causing the state to transition directly to Inactive.
+        session->close();
+        REQUIRE(session_is_inactive(*session));
+    }
+
+    SECTION("properly transitions from active to dying to inactive if nothing bad happens", "[AfterChangesUploaded]") {
+        auto user = SyncManager::shared().get_user("user-dying-state-2", "not_a_real_token");
+        Realm::Config config;
+        auto session = sync_session(server, user, "/test-dying-state-2",
+                                    [](auto&, auto&) { return s_test_token; },
+                                    [](auto, auto) { },
+                                    SyncSessionStopPolicy::AfterChangesUploaded,
+                                    nullptr, schema, &config);
+        EventLoop::main().run_until([&] { return session_is_active(*session); });
+        // Add a couple of objects to the Realm.
+        add_objects(config);
+        // Now close the session, causing the state to transition to Dying.
+        // (it should remain stuck there until we start the server)
+        REQUIRE(session_is_active(*session));
+        session->close();
+        REQUIRE(session->state() == SyncSession::PublicState::Dying);
+        server.start();
+        EventLoop::main().run_until([&] { return session_is_inactive(*session); });
+    }
+
+    SECTION("properly transitions from active to dying to inactive if a fatal error happens", "[AfterChangesUploaded]") {
+        std::atomic<bool> error_handler_invoked(false);
+        auto user = SyncManager::shared().get_user("user-dying-state-3", "not_a_real_token");
+        Realm::Config config;
+        auto session = sync_session(server, user, "/test-dying-state-3",
+                                    [](auto&, auto&) { return s_test_token; },
+                                    [&](auto, auto) { error_handler_invoked = true; },
+                                    SyncSessionStopPolicy::AfterChangesUploaded,
+                                    nullptr, schema, &config);
+        EventLoop::main().run_until([&] { return session_is_active(*session); });
+        // Add a couple of objects to the Realm.
+        add_objects(config);
+        // Now close the session, causing the state to transition to Dying.
+        // (it should remain stuck there since we didn't start the server)
+        session->close();
+        REQUIRE(session->state() == SyncSession::PublicState::Dying);
+        // Fire a simulated *fatal* error.
+        std::error_code code = std::error_code{static_cast<int>(ProtocolError::bad_syntax), realm::sync::protocol_error_category()};
+        SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", true});
+        CHECK(session_is_inactive(*session));
+        // The session shouldn't report fatal errors when in the dying state.
+        CHECK(!error_handler_invoked);
+    }
+
+    SECTION("ignores and swallows non-fatal errors if in the dying state.", "[AfterChangesUploaded]") {
+        std::atomic<bool> error_handler_invoked(false);
+        auto user = SyncManager::shared().get_user("user-dying-state-4", "not_a_real_token");
+        Realm::Config config;
+        auto session = sync_session(server, user, "/test-dying-state-4",
+                                    [](auto&, auto&) { return s_test_token; },
+                                    [&](auto, auto) { error_handler_invoked = true; },
+                                    SyncSessionStopPolicy::AfterChangesUploaded,
+                                    nullptr, schema, &config);
+        EventLoop::main().run_until([&] { return session_is_active(*session); });
+        // Add a couple of objects to the Realm.
+        add_objects(config);
+        // Now close the session, causing the state to transition to Dying.
+        // (it should remain stuck there since we didn't start the server)
+        session->close();
+        REQUIRE(session->state() == SyncSession::PublicState::Dying);
+        // Fire a simulated *non-fatal* error.
+        std::error_code code = std::error_code{static_cast<int>(ProtocolError::other_error), realm::sync::protocol_error_category()};
+        SyncSession::OnlyForTesting::handle_error(*session, {code, "Not a real error message", false});
+        REQUIRE(session->state() == SyncSession::PublicState::Dying);
+        CHECK(!error_handler_invoked);
     }
 }
 
