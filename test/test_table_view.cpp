@@ -25,7 +25,8 @@
 #include <ostream>
 #include <cwchar>
 
-#include <realm/table_macros.hpp>
+#include <realm/table_view.hpp>
+#include <realm/query_expression.hpp>
 
 #include "util/misc.hpp"
 

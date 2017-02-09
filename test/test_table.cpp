@@ -502,7 +502,7 @@ TEST(Table_AggregateFuzz)
         table->insert_column(1, type_Int, "int", true);
         table->insert_column(2, type_Float, "float", true);
 
-        size_t rows = fastrand(10);
+        size_t rows = size_t(fastrand(10));
         table->add_empty_row(rows);
         int64_t largest = 0;
         int64_t smallest = 0;
@@ -606,7 +606,7 @@ TEST(Table_AggregateFuzz)
             CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
 
             i = table.get()->sum_int(1);
-            CHECK_APPROXIMATELY_EQUAL(i, sum, 0.001);
+            CHECK_EQUAL(i, sum);
         }
 
         // Test methods on TableView
@@ -672,7 +672,7 @@ TEST(Table_AggregateFuzz)
             CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
 
             i = table.get()->where().find_all().sum_int(1);
-            CHECK_APPROXIMATELY_EQUAL(i, sum, 0.001);
+            CHECK_EQUAL(i, sum);
 
         }
 
@@ -742,7 +742,7 @@ TEST(Table_AggregateFuzz)
             CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
 
             i = table.get()->where().sum_int(1);
-            CHECK_APPROXIMATELY_EQUAL(i, sum, 0.001);
+            CHECK_EQUAL(i, sum);
         }
     }
 }

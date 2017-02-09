@@ -5,7 +5,6 @@ util/inspect.hpp \
 util/assert.hpp \
 util/terminate.hpp \
 util/type_list.hpp \
-util/tuple.hpp \
 util/type_traits.hpp \
 util/safe_int_ops.hpp \
 util/bind_ptr.hpp \
@@ -59,12 +58,7 @@ owned_data.hpp \
 timestamp.hpp \
 table.hpp \
 table_ref.hpp \
-table_basic_fwd.hpp \
-table_accessors.hpp \
-table_basic.hpp \
 table_view.hpp \
-table_view_basic.hpp \
-table_macros.hpp \
 row.hpp \
 descriptor_fwd.hpp \
 descriptor.hpp \

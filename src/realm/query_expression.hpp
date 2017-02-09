@@ -128,6 +128,9 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #define REALM_QUERY_EXPRESSION_HPP
 
 #include <realm/column_type_traits.hpp>
+#include <realm/column_link.hpp>
+#include <realm/column_linklist.hpp>
+#include <realm/link_view.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/impl/sequential_getter.hpp>
 
@@ -148,15 +151,6 @@ T minimum(T a, T b)
 {
     return a < b ? a : b;
 }
-
-// FIXME, this needs to exist elsewhere
-typedef int64_t Int;
-typedef bool Bool;
-typedef realm::OldDateTime OldDateTime;
-typedef float Float;
-typedef double Double;
-typedef realm::StringData String;
-typedef realm::BinaryData Binary;
 
 #ifdef REALM_OLDQUERY_FALLBACK
 // Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify only_numeric somehow
@@ -206,9 +200,10 @@ int no_timestamp(const Timestamp&)
     REALM_ASSERT(false);
     return 0;
 }
-#endif // REALM_OLDQUERY_FALLBACK
 
 } // anonymous namespace
+
+#endif // REALM_OLDQUERY_FALLBACK
 
 template <class T>
 struct Plus {
@@ -774,7 +769,7 @@ struct NullableVector {
     {
         if (this != &other) {
             init(other.m_size);
-            std::copy_n(other.m_first, other.m_size, m_first);
+            realm::safe_copy_n(other.m_first, other.m_size, m_first);
             m_null = other.m_null;
         }
         return *this;
@@ -783,7 +778,7 @@ struct NullableVector {
     NullableVector(const NullableVector& other)
     {
         init(other.m_size);
-        std::copy_n(other.m_first, other.m_size, m_first);
+        realm::safe_copy_n(other.m_first, other.m_size, m_first);
         m_null = other.m_null;
     }
 

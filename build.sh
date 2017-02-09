@@ -220,7 +220,7 @@ download_openssl()
     fi
 
     echo 'Downloading OpenSSL...'
-    openssl_ver='1.0.2j'
+    openssl_ver='1.0.2k'
     curl -L -s "http://www.openssl.org/source/openssl-${openssl_ver}.tar.gz" -o openssl.tar.gz || return 1
     tar -xzf openssl.tar.gz || return 1
     mv openssl-$openssl_ver openssl || return 1
@@ -367,7 +367,7 @@ build_cocoa()
         ln -sf librealm-macosx-dbg.a "$tmpdir/$dir_basename"/librealm-dbg.a
     fi
 
-    cp tools/LICENSE "$tmpdir/$dir_basename" || exit 1
+    cp LICENSE "$tmpdir/$dir_basename" || exit 1
     if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
         command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
         pandoc -f markdown -t plain -o "$tmpdir/$dir_basename/CHANGELOG.txt" CHANGELOG.md || exit 1
@@ -1088,7 +1088,7 @@ EOF
         (cd "$REALM_HOME/$node_directory/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
         rm -rf "$temp_dir" || exit 1
 
-        cp tools/LICENSE "$node_directory" || exit 1
+        cp LICENSE "$node_directory" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
             pandoc -f markdown -t plain -o "$node_directory/CHANGELOG.txt" CHANGELOG.md || exit 1

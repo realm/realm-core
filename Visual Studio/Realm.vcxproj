@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="csv debug|Win32">
       <Configuration>csv debug</Configuration>
@@ -84,41 +84,41 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v140_xp</PlatformToolset>
+    <PlatformToolset>v141_xp</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>false</WholeProgramOptimization>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
     <ApplicationType>Windows Store</ApplicationType>
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
-    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
-    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
+    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.10586.0</WindowsTargetPlatformMinVersion>
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
     <ApplicationType>Windows Store</ApplicationType>
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
-    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
-    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
+    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.10586.0</WindowsTargetPlatformMinVersion>
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -126,27 +126,27 @@
     <CharacterSet>Unicode</CharacterSet>
     <TargetPlatformVersion>8.1</TargetPlatformVersion>
     <WholeProgramOptimization>false</WholeProgramOptimization>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
     <TargetPlatformVersion>8.1</TargetPlatformVersion>
     <WholeProgramOptimization>false</WholeProgramOptimization>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
     <TargetPlatformVersion>8.1</TargetPlatformVersion>
     <WholeProgramOptimization>false</WholeProgramOptimization>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>false</WholeProgramOptimization>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -155,63 +155,63 @@
     </WholeProgramOptimization>
     <TargetPlatformVersion>8.1</TargetPlatformVersion>
     <WindowsAppContainer>false</WindowsAppContainer>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
     <TargetPlatformVersion>8.1</TargetPlatformVersion>
     <WindowsAppContainer>false</WindowsAppContainer>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
-    <AppContainerApplication>false</AppContainerApplication>
-    <ApplicationType>Windows</ApplicationType>
-    <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
+    <WholeProgramOptimization>
+    </WholeProgramOptimization>
     <TargetPlatformVersion>8.1</TargetPlatformVersion>
     <WindowsAppContainer>false</WindowsAppContainer>
-    <WholeProgramOptimization>false</WholeProgramOptimization>
-    <UseOfMfc>false</UseOfMfc>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <TargetPlatformVersion>8.1</TargetPlatformVersion>
     <WindowsAppContainer>false</WindowsAppContainer>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <CharacterSet>Unicode</CharacterSet>
     <WholeProgramOptimization>false</WholeProgramOptimization>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
     <ApplicationType>Windows Store</ApplicationType>
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
-    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
-    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
+    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.10586.0</WindowsTargetPlatformMinVersion>
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
-    <PlatformToolset>v140</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
     <ApplicationType>Windows Store</ApplicationType>
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
-    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
-    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
+    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.10586.0</WindowsTargetPlatformMinVersion>
     <WindowsAppContainer>true</WindowsAppContainer>
+    <BasicRuntimeChecks>Default</BasicRuntimeChecks>
+    <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+    <Optimization>MaxSpeed</Optimization>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -381,14 +381,14 @@
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'" />
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
-    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">$(ProjectName) $(Configuration) $(Platform)</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">realm-x64-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">realm-uwp-x64-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">realm-uwp-x64</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'">realm-x64</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">realm-x86-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">realm-uwp-x86-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">realm-uwp-x86</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|Win32'">realm-x86</TargetName>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(IncludePath)</IncludePath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win64;$(LibraryPath)</LibraryPath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">C:\Program Files %28x86%29\Visual Leak Detector\lib\Win32;$(IncludePath)</IncludePath>
@@ -400,25 +400,25 @@
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</IncludePath>
     <ExcludePath>$(VC_IncludePath);$(WindowsSdk_71A_IncludePath);$(MSBuild_ExecutablePath);$(VC_LibraryPath_x64);</ExcludePath>
     <SourcePath>$(VC_SourcePath);$(UniversalCRT_IncludePath)</SourcePath>
-    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.14393.0\um\x64"</LibraryPath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.10586.0\um\x64"</LibraryPath>
     <LibraryWPath>$(WindowsSDK_MetadataPath); $(UniversalCRT_IncludePath)</LibraryWPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</IncludePath>
-    <ReferencePath>$(VC_ReferencesPath_x64); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</ReferencePath>
-    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</LibraryPath>
-    <SourcePath>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(VC_SourcePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</SourcePath>
-    <LibraryWPath>$(WindowsSDK_MetadataPath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</LibraryWPath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</IncludePath>
+    <ReferencePath>$(VC_ReferencesPath_x64); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</ReferencePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</LibraryPath>
+    <SourcePath>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(VC_SourcePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</SourcePath>
+    <LibraryWPath>$(WindowsSDK_MetadataPath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</LibraryWPath>
     <ExcludePath />
-    <ExecutablePath>$(VC_ExecutablePath_x64);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(FxCopDir);$(PATH); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</ExecutablePath>
+    <ExecutablePath>$(VC_ExecutablePath_x64);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(FxCopDir);$(PATH); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</ExecutablePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -513,7 +513,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -532,17 +532,18 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>mincore.lib</AdditionalOptions>
+      <AdditionalOptions>
+      </AdditionalOptions>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -557,7 +558,8 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>mincore.lib</AdditionalOptions>
+      <AdditionalOptions>
+      </AdditionalOptions>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -666,10 +668,10 @@
       </PrecompiledHeader>
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt"</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt"</AdditionalIncludeDirectories>
       <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
-      <AdditionalUsingDirectories>; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt"</AdditionalUsingDirectories>
+      <AdditionalUsingDirectories>; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt"</AdditionalUsingDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -692,7 +694,7 @@
       <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
       <CompileAs>CompileAsCpp</CompileAs>
@@ -710,8 +712,9 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>mincore.lib</AdditionalOptions>
-      <AdditionalLibraryDirectories>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.14393.0\um\x64</AdditionalLibraryDirectories>
+      <AdditionalOptions>
+      </AdditionalOptions>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.10586.0\um\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>
       </AdditionalDependencies>
     </Lib>
@@ -725,7 +728,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Full</Optimization>
-      <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>
       </BasicRuntimeChecks>
@@ -735,11 +738,12 @@
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>/DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION /D_ITERATOR_DEBUG_LEVEL=0 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>false</SDLCheck>
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <CompileAsWinRT>false</CompileAsWinRT>
+      <Optimization>MaxSpeed</Optimization>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -749,14 +753,15 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>mincore.lib</AdditionalOptions>
+      <AdditionalOptions>
+      </AdditionalOptions>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -845,7 +850,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -977,7 +982,9 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">true</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="..\src\realm\unicode.cpp" />
+    <ClCompile Include="..\src\realm\unicode.cpp">
+      <AdditionalOptions Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">/DREALM_UWP=1 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="..\src\realm\util\basic_system_errors.cpp" />
     <ClCompile Include="..\src\realm\util\encrypted_file_mapping.cpp" />
     <ClCompile Include="..\src\realm\util\file.cpp" />
@@ -1709,7 +1716,6 @@
     <ClInclude Include="..\src\realm\null.hpp" />
     <ClInclude Include="..\src\realm\query_expression.hpp" />
     <ClInclude Include="..\src\realm\string_data.hpp" />
-    <ClInclude Include="..\src\realm\table_basic_fwd.hpp" />
     <ClInclude Include="..\src\realm\timestamp.hpp" />
     <ClInclude Include="..\src\realm\unicode.hpp" />
     <ClInclude Include="..\src\realm\util\assert.hpp" />
@@ -1765,14 +1771,9 @@
     <ClInclude Include="..\src\realm\util\string_buffer.hpp" />
     <ClInclude Include="..\src\realm\table.hpp" />
     <ClInclude Include="..\src\realm\row.hpp" />
-    <ClInclude Include="..\src\realm\table_accessors.hpp" />
-    <ClInclude Include="..\src\realm\table_basic.hpp" />
-    <ClInclude Include="..\src\realm\table_macros.hpp" />
     <ClInclude Include="..\src\realm\table_ref.hpp" />
     <ClInclude Include="..\src\realm\table_view.hpp" />
-    <ClInclude Include="..\src\realm\table_view_basic.hpp" />
     <ClInclude Include="..\src\realm\realm_nmmintrin.h" />
-    <ClInclude Include="..\src\realm\util\tuple.hpp" />
     <ClInclude Include="..\src\realm\util\type_list.hpp" />
     <ClInclude Include="..\src\realm\util\utf8.hpp" />
     <ClInclude Include="..\src\realm\utilities.hpp" />
