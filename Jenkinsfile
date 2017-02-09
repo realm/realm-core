@@ -65,7 +65,7 @@ timeout(time: 1, unit: 'HOURS') {
         def abi = androidAbis[i]
         for (def j = 0; j < androidBuildTypes.size(); j++) {
             def buildType = androidBuildTypes[j]
-            parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'x86' && buildType == 'Release')
+            parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
         }
     }
 
@@ -155,7 +155,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                         }
                     }
                 } else {
-                    docker.image('tracer0tong/android-emulator').withRun { emulator ->
+                    docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
                             try {
                                 sh "./build.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
