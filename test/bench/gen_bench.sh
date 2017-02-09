@@ -18,7 +18,7 @@ show_help () {
   show_usage
   echo ""
   cat <<EOF
-./util/build_core.sh
+gen_bench.sh
 
 This script generates the benchmark results for the given version of core
 (branch, commit, or tag) and places the results in the directory specified
@@ -28,10 +28,10 @@ run. If no version of core is specified, HEAD is assumed.
 
 Examples:
 
-$ ./util/build_core.sh # HEAD is assumed by default.
-$ ./util/build_core.sh tags/v0.97.3 # Tags must be prefixed with "tags/".
-$ ./util/build_core.sh ea310804 # Can be a short commit ID.
-$ ./util/build_core.sh 32b3b79d2ab90e784ad5f14f201d682be9746781
+$ ./gen_bench.sh # HEAD is assumed by default.
+$ ./gen_bench.sh tags/v0.97.3 # Tags must be prefixed with "tags/".
+$ ./gen_bench.sh ea310804 # Can be a short commit ID.
+$ ./gen_bench.sh 32b3b79d2ab90e784ad5f14f201d682be9746781
 
 EOF
 }
