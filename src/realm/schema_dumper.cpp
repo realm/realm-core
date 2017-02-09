@@ -56,6 +56,7 @@ void show_help(const std::string& program_name)
                                               "\n"
                                               "  -k,--key     Encryption key to decrypt the Realm\n"
                                               "  -u,--upgrade Perform file format upgrade if required\n"
+                                              "  -s,--sync    Use the sync history type (experimental, make a backup!)\n"
                                               "  -h,--help    Print this message\n";
 }
 
@@ -117,6 +118,7 @@ struct Configuration {
     std::string path;
     Optional<std::string> key;
     bool upgrade = false;
+    bool sync = false;
 };
 
 void parse_arguments(int argc, char* argv[], Configuration& configuration)
@@ -124,9 +126,10 @@ void parse_arguments(int argc, char* argv[], Configuration& configuration)
     static struct option long_options[] = {{"key", required_argument, nullptr, 'k'},
                                            {"upgrade", no_argument, nullptr, 'u'},
                                            {"help", no_argument, nullptr, 'h'},
+                                           {"sync", no_argument, nullptr, 's'},
                                            {nullptr, 0, nullptr, 0}};
 
-    static const char* opt_desc = "k:uh";
+    static const char* opt_desc = "k:uhs";
 
     int opt_index = 0;
     char opt;
@@ -142,6 +145,9 @@ void parse_arguments(int argc, char* argv[], Configuration& configuration)
             case 'h':
                 show_help(argv[0]);
                 std::exit(EXIT_SUCCESS);
+            case 's':
+                configuration.sync = true;
+                break;
             default:
                 show_help(argv[0]);
                 std::exit(EXIT_FAILURE);
@@ -183,6 +189,23 @@ using realm::LangBindHelper;
 using realm::ReadTransaction;
 using realm::SharedGroup;
 using realm::SharedGroupOptions;
+using realm::TrivialReplication;
+using realm::IncompatibleHistories;
+
+// This is a hacked together pseudo-sync history. This shouldn't be used
+// seriously, and is only to help us debug certain weird things on the sync
+// side. Sorry.
+
+class PseudoSyncHistory: public TrivialReplication {
+    public:
+    PseudoSyncHistory(const std::string& path) : TrivialReplication(path) { }
+    virtual void initiate_session(version_type) { }
+    virtual void terminate_session() noexcept { }
+    virtual HistoryType get_history_type() const noexcept { return hist_Sync; }
+    virtual realm::_impl::History* get_history() { return nullptr; }
+    virtual version_type prepare_changeset(const char*, size_t, version_type orig_version) { return orig_version; }
+    virtual void finalize_changeset() noexcept { }
+};
 
 class SchemaDumper {
 public:
@@ -199,6 +222,7 @@ private:
 
     // private members
     const Configuration& m_config;
+    std::unique_ptr<PseudoSyncHistory> m_repl;
     SharedGroup m_sg{SharedGroup::unattached_tag{}};
 };
 
@@ -261,7 +285,17 @@ void SchemaDumper::open()
     SharedGroupOptions options;
     options.encryption_key = encryption_key;
     options.allow_file_format_upgrade = upgrade_file_format;
-    m_sg.open(m_config.path, dont_create, options);
+
+    if (m_config.sync) {
+        LOG("Opening file in sync mode.");
+        m_repl = std::make_unique<PseudoSyncHistory>(m_config.path);
+        m_sg.open(*m_repl, options);
+    }
+    else {
+        LOG("Opening file in classic mode (non-sync).");
+        m_sg.open(m_config.path, dont_create, options);
+    }
+
 }
 
 } // unnamed namespace
@@ -279,6 +313,15 @@ int main(int argc, char* argv[])
     }
     catch (const realm::FileFormatUpgradeRequired&) {
         LOG("Error: This Realm file requires a file format upgrade before being usable");
+        std::exit(EXIT_FAILURE);
+    }
+    catch (const IncompatibleHistories&) {
+        if (config.sync) {
+            LOG("Error: tried to open a classic Realm in Sync mode (remove the `-s` option?).");
+        }
+        else {
+            LOG("Error: tried to open a Sync Realm in classic mode (use the `-s` option?).");
+        }
         std::exit(EXIT_FAILURE);
     }
 }
