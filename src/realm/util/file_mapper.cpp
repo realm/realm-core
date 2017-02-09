@@ -20,7 +20,7 @@
 
 #ifndef _WIN32
 
-#include "file_mapper.hpp"
+#include <realm/util/file_mapper.hpp>
 
 #include <cerrno>
 #include <sys/mman.h>
@@ -31,8 +31,8 @@
 
 #if REALM_ENABLE_ENCRYPTION
 
-#include "encrypted_file_mapping.hpp"
-#include "aes_cryptor.hpp"
+#include <realm/util/encrypted_file_mapping.hpp>
+#include <realm/util/aes_cryptor.hpp>
 
 #include <memory>
 #include <csignal>
