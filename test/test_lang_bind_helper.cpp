@@ -12746,4 +12746,27 @@ TEST(LangBindHelper_Bug2295)
     CHECK_EQUAL(lv1->size(), i);
 }
 
+TEST(LangBindHelper_BigBinary)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_w(hist);
+    SharedGroup sg_r(hist);
+
+    ReadTransaction rt(sg_r);
+
+    {
+        std::unique_ptr<char> data(new char[0x1000000]);
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.add_table("target");
+        target->add_column(type_Binary, "data");
+        target->add_empty_row();
+        target->set_binary_big(0, 0, BinaryData(data.get(), 0x1000000));
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg_r);
+}
+
 #endif

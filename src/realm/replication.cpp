@@ -142,8 +142,10 @@ public:
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_binary(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_binary(col_ndx, row_ndx, value);                   // Throws
-            return true;
+            if (value.size() <= ArrayBlob::max_binary_size) {
+                m_table->set_binary(col_ndx, row_ndx, value); // Throws
+                return true;
+            }
         }
         return false;
     }
