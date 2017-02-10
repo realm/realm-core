@@ -12756,7 +12756,7 @@ TEST(LangBindHelper_BigBinary)
     ReadTransaction rt(sg_r);
 
     {
-        std::unique_ptr<char> data(new char[0x1000000]);
+        std::unique_ptr<char[]> data(new char[0x1000000]);
         WriteTransaction wt(sg_w);
         Group& group = wt.get_group();
         TableRef target = group.add_table("target");
