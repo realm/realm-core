@@ -894,7 +894,7 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
     return new_addr;
 #else
     static_cast<void>(map_flags);
-    return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size);
+    return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size, m_encryption_key.get());
 #endif
 }
 
