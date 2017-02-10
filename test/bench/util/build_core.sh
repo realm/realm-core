@@ -6,7 +6,7 @@ builddir=./core-builds
 
 showUsage () {
   cat <<EOF
-Usage: $0 [-h|--help] [<branch>|<commit>|<tag>]
+Usage: $0 [-h|--help] [<branch>|<commit>|<tag>] [local-repo-reference]
 EOF
 }
 
@@ -20,6 +20,12 @@ showHelp () {
 This script builds the given version of core (branch, commit, or tag) in a
 dedicated ${builddir} directory. This enables, for instance, comparing the
 performance of various of versions of core on the same machine.
+
+The optional third parameter [local-repo-reference] can be used to specify
+an existing local checkout of the same repository. Using an already
+existing repository as an alternate will require fewer objects to be
+copied from the repository being cloned, reducing network and local
+storage costs.
 
 Examples:
 
@@ -49,13 +55,16 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ $# -gt 1 ]; then
+if [ $# -gt 2 ]; then
   showUsage
   exit 1
 elif [ $# -eq 0 ]; then
   ref=master
+elif [ $# -eq 1 ]; then
+  ref=$1
 else
   ref=$1
+  localrepo=$2
 fi
 
 basedir="${builddir}/${ref}"
@@ -79,7 +88,11 @@ checkout () {
 }
 
 if [ ! -d "${srcdir}" ]; then
-  git clone https://github.com/realm/realm-core.git "${srcdir}"
+  if [ -z "$localrepo" ]; then
+    git clone https://github.com/realm/realm-core.git "${srcdir}"
+  else
+    git clone https://github.com/realm/realm-core.git --reference "${localrepo}" "${srcdir}"
+  fi
   cd "${srcdir}"
   checkout
   sh build.sh clean

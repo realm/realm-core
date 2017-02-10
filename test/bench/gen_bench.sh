@@ -103,7 +103,8 @@ else
         echo "building HEAD"
         cd ../..
     else
-        sh ./util/build_core.sh "${remoteref}"
+        rootdir=$(git rev-parse --show-toplevel)
+        sh ./util/build_core.sh "${remoteref}" "${rootdir}"
         if [ ! -d "core-builds/${remoteref}" ]; then
             echo "fatal error: core checkout failed on ref: ${remoteref}"
             ls -lah
