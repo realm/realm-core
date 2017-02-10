@@ -21,8 +21,8 @@
 
 #include "global_notifier.hpp"
 #include "property.hpp"
-#include "json.hpp"
 
+#include <json.hpp>
 #include <set>
 
 namespace realm {
@@ -48,21 +48,23 @@ public:
         AddType,
         AddProperty,
         ChangeIdentity,
+        SwapIdentity,
     };
 
     static std::string instruction_type_string(InstructionType type) {
         switch(type) {
-            case InstructionType::Insert:      return "Insert";
-            case InstructionType::Delete:      return "Delete";
-            case InstructionType::SetProperty: return "Set";
-            case InstructionType::Clear:       return "Clear";
-            case InstructionType::ListSet:     return "ListSet";
-            case InstructionType::ListInsert:  return "ListInsert";
-            case InstructionType::ListErase:   return "ListErase";
-            case InstructionType::ListClear:   return "ListClear";
-            case InstructionType::AddType:     return "AddType";
-            case InstructionType::AddProperty: return "AddProperty";
+            case InstructionType::Insert:           return "Insert";
+            case InstructionType::Delete:           return "Delete";
+            case InstructionType::SetProperty:      return "Set";
+            case InstructionType::Clear:            return "Clear";
+            case InstructionType::ListSet:          return "ListSet";
+            case InstructionType::ListInsert:       return "ListInsert";
+            case InstructionType::ListErase:        return "ListErase";
+            case InstructionType::ListClear:        return "ListClear";
+            case InstructionType::AddType:          return "AddType";
+            case InstructionType::AddProperty:      return "AddProperty";
             case InstructionType::ChangeIdentity:   return "ChangeIdentity";
+            case InstructionType::SwapIdentity:     return "SwapIdentity";
         }
     }
 
