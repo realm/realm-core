@@ -12184,7 +12184,7 @@ TEST(LangBindHelper_InRealmHistory_Downgrade)
     {
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path);
-        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+        SharedGroup sg(*hist);
         WriteTransaction wt(sg);
         wt.commit();
     }
