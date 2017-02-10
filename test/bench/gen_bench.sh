@@ -77,6 +77,11 @@ fi
 
 #get the hash from nice names like tags/v2.0.0
 remoteref=$(git rev-list -n 1 "${ref}")
+ret=$?
+if [ $ret -gt 0 ]; then
+    echo "could not parse ref ${ref} exiting"
+    exit 1
+fi
 unixtime=$(git show -s --format=%at ${remoteref})
 
 
