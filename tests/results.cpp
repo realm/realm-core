@@ -2038,6 +2038,22 @@ TEST_CASE("results: snapshots") {
         auto snapshot = results.snapshot();
         CHECK_THROWS(snapshot.add_notification_callback([](CollectionChangeSet, std::exception_ptr) {}));
     }
+
+    SECTION("accessors should return none for detached row") {
+        auto table = r->read_group().get_table("class_object");
+        write([=] {
+            table->add_empty_row();
+        });
+        Results results(r, *table);
+        auto snapshot = results.snapshot();
+        write([=] {;
+            table->clear();
+        });
+
+        REQUIRE_FALSE(snapshot.get(0).is_attached());
+        REQUIRE_FALSE(snapshot.first()->is_attached());
+        REQUIRE_FALSE(snapshot.last()->is_attached());
+    }
 }
 
 TEST_CASE("distinct") {
