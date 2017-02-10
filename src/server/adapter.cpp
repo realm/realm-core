@@ -36,21 +36,6 @@ public:
         for (size_t i = 0; i < m_group.size(); i++) {
             m_table_names[i] = m_group.get_table_name(i);
         }
-
-        for (auto object_schema : m_schema) {
-            for (auto &link_prop : object_schema.persisted_properties) {
-                if (link_prop.type == PropertyType::Object || link_prop.type == PropertyType::Array) {
-                    auto link_props = m_linking_properties.find(link_prop.object_type);
-                    if (link_props == m_linking_properties.end()) {
-                        LinkingProperties linking({{object_schema.name, link_prop}});
-                        m_linking_properties.emplace(link_prop.object_type, std::move(linking));
-                    }
-                    else {
-                        link_props->second.push_back({object_schema.name, link_prop});
-                    }
-                }
-            }
-        }
     }
 
     const Group &m_group;
@@ -62,7 +47,6 @@ public:
     json json_instructions;
 
     using LinkingProperties = std::vector<std::pair<std::string, Property>>;
-    std::map<std::string, LinkingProperties> m_linking_properties;
 
     size_t selected_table_index;
     ConstTableRef selected_table;
@@ -135,6 +119,8 @@ public:
     // No selection needed:
     bool select_table(size_t group_index, size_t levels, const size_t* path)
     {
+        REALM_ASSERT(levels == 0);
+
         selected_table_index = group_index;
         select(m_table_names[group_index], selected_object_schema, selected_table, selected_primary);
         return true;
@@ -156,10 +142,10 @@ public:
 
         return true;
     }
-    bool insert_group_level_table(size_t group_index, size_t num_tables, StringData name)
+    bool insert_group_level_table(size_t table_index, size_t num_tables, StringData name)
     {
-        m_table_names[group_index] = name;
-        std::string object_type = ObjectStore::object_type_for_table_name(m_table_names[group_index]);
+        m_table_names[table_index] = name;
+        std::string object_type = ObjectStore::object_type_for_table_name(m_table_names[table_index]);
         if (object_type.size()) {
             json_instructions.push_back({
                 {"type", Adapter::instruction_type_string(Adapter::InstructionType::AddType)},
@@ -657,14 +643,13 @@ util::Optional<Adapter::ChangeSet> Adapter::current(std::string realm_path) {
     auto realm = Realm::make_shared_realm(m_global_notifier->get_config(realm_path));
     auto sync_history = static_cast<sync::SyncHistory *>(realm->history());
     auto progress = sync_history->get_cooked_progress();
-    auto version = progress.version;
 
-    util::AppendBuffer<char> buffer;
-    version = sync_history->fetch_next_cooked_changeset(version, buffer);
-    if (version == 0) {
+    if (progress.changeset_index >= sync_history->get_num_cooked_changesets()) {
         return util::none;
     }
 
+    util::AppendBuffer<char> buffer;
+    sync_history->get_cooked_changeset(progress.changeset_index, buffer);
     return ChangeSet(json::parse(std::string(buffer.data(), buffer.size())), realm);
 }
 
@@ -672,13 +657,7 @@ void Adapter::advance(std::string realm_path) {
     auto realm = Realm::make_shared_realm(m_global_notifier->get_config(realm_path));
     auto sync_history = static_cast<sync::SyncHistory *>(realm->history());
     auto progress = sync_history->get_cooked_progress();
-
-    util::AppendBuffer<char> buffer;
-    auto version = sync_history->fetch_next_cooked_changeset(progress.version, buffer);
-
-    if (version) {
-        sync_history->set_cooked_progress({version, 0});
-    }
+    sync_history->set_cooked_progress({progress.changeset_index + 1, 0});
     
     realm->invalidate();
 }
