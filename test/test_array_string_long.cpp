@@ -108,6 +108,14 @@ TEST_TYPES(ArrayStringLong_Basic, non_nullable, nullable)
     CHECK_EQUAL("", c.get(4));
     CHECK_EQUAL("", c.get(5));
 
+    c.add("hi");
+    c.add("hello");
+
+    // Test that you can set a value obtained from the same blob
+    c.set(0, c.get(6));
+    CHECK_EQUAL("hi", c.get(0));
+    c.set(0, c.get(7));
+    CHECK_EQUAL("hello", c.get(0));
 
     // TEST(ArrayStringLong_Add)
 
