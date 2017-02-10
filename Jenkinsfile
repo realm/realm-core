@@ -40,51 +40,50 @@ timeout(time: 1, unit: 'HOURS') {
         }
     }
 
-    stage 'check'
+    stage('check') {
+        parallelExecutors = [checkLinuxRelease   : doBuildInDocker('Release'),
+                             checkLinuxDebug     : doBuildInDocker('Debug'),
+                             buildMacOsDebug     : doBuildMacOs('Debug'),
+                             buildMacOsRelease   : doBuildMacOs('Release'),
+                             buildWin32Release   : doBuildWindows('Release', false, 'win32'),
+                             buildUwpWin32Release: doBuildWindows('Release', true, 'win32'),
+                             buildUwpWin64Release: doBuildWindows('Release', true, 'win64'),
+                             packageGeneric      : doBuildPackage('generic', 'tar.gz'),
+                             packageCentos7      : doBuildPackage('centos-7', 'rpm'),
+                             packageCentos6      : doBuildPackage('centos-6', 'rpm'),
+                             packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb')
+                             //buildUwpArmRelease: doBuildWindows('Release', true, 'arm')
+                             //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
+            ]
 
-    parallelExecutors = [
-            checkLinuxRelease   : doBuildInDocker('Release'),
-            checkLinuxDebug     : doBuildInDocker('Debug'),
-            buildMacOsDebug     : doBuildMacOs('Debug'),
-            buildMacOsRelease   : doBuildMacOs('Release'),
-            buildWin32Release   : doBuildWindows('Release', false, 'win32'),
-            buildUwpWin32Release: doBuildWindows('Release', true, 'win32'),
-            buildUwpWin64Release: doBuildWindows('Release', true, 'win64'),
-            packageGeneric      : doBuildPackage('generic', 'tar.gz'),
-            packageCentos7      : doBuildPackage('centos-7', 'rpm'),
-            packageCentos6      : doBuildPackage('centos-6', 'rpm'),
-            packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb')
-            //buildUwpArmRelease: doBuildWindows('Release', true, 'arm')
-            //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
-    ]
+        androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
+        androidBuildTypes = ['Debug', 'Release']
 
-    androidAbis = ['armeabi-v7a', 'x86', 'mips', 'x86_64', 'arm64-v8a']
-    androidBuildTypes = ['Debug', 'Release']
-
-    for (def i = 0; i < androidAbis.size(); i++) {
-        def abi = androidAbis[i]
-        for (def j = 0; j < androidBuildTypes.size(); j++) {
-            def buildType = androidBuildTypes[j]
-            parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
+        for (def i = 0; i < androidAbis.size(); i++) {
+            def abi = androidAbis[i]
+            for (def j = 0; j < androidBuildTypes.size(); j++) {
+                def buildType = androidBuildTypes[j]
+                parallelExecutors["android-${abi}-${buildType}"] = doAndroidBuildInDocker(abi, buildType, abi == 'armeabi-v7a' && buildType == 'Release')
+            }
         }
-    }
 
-    appleSdks = ['ios', 'tvos', 'watchos']
-    appleBuildTypes = ['MinSizeDebug', 'Release']
+        appleSdks = ['ios', 'tvos', 'watchos']
+        appleBuildTypes = ['MinSizeDebug', 'Release']
 
-    for (def i = 0; i < appleSdks.size(); i++) {
-        def sdk = appleSdks[i]
-        for (def j = 0; j < appleBuildTypes.size(); j++) {
-            def buildType = appleBuildTypes[j]
-            parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
+        for (def i = 0; i < appleSdks.size(); i++) {
+            def sdk = appleSdks[i]
+            for (def j = 0; j < appleBuildTypes.size(); j++) {
+                def buildType = appleBuildTypes[j]
+                parallelExecutors["${sdk}${buildType}"] = doBuildAppleDevice(sdk, buildType)
+            }
         }
-    }
 
-    if (env.CHANGE_TARGET) {
-        parallelExecutors['diffCoverage'] = buildDiffCoverage()
-    }
+        if (env.CHANGE_TARGET) {
+            parallelExecutors['diffCoverage'] = buildDiffCoverage()
+        }
 
-    parallel parallelExecutors
+        parallel parallelExecutors
+    }
 
     if (isPublishingRun) {
         stage('publish-packages') {
@@ -162,17 +161,25 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                             } finally {
                                 collectCompilerWarnings('gcc', true )
                             }
-                            sh '''
-                                cd $(find . -type d -maxdepth 1 -name build-android*)
-                                adb connect emulator
-                                timeout 10m adb wait-for-device
-                                adb push test/realm-tests /data/local/tmp
-                                find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
-                                adb shell \'cd /data/local/tmp; ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
-                                ! grep __ADB_FAIL__ adb.log
-                            '''
+                            try {
+                                sh '''
+                                   cd $(find . -type d -maxdepth 1 -name build-android*)
+                                   adb connect emulator
+                                   timeout 10m adb wait-for-device
+                                   adb push test/realm-tests /data/local/tmp
+                                   find test -type f -name "*.json" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                   find test -type f -name "*.realm" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                   find test -type f -name "*.txt" -maxdepth 1 -exec adb push {} /data/local/tmp \\;
+                                   adb shell \'cd /data/local/tmp; ./realm-tests || echo __ADB_FAIL__\' | tee adb.log
+                                   ! grep __ADB_FAIL__ adb.log
+                               '''
+                            } finally {
+                                sh '''
+                                   cd $(find . -type d -maxdepth 1 -name build-android*)/test
+                                   adb pull /data/local/tmp/unit-test-report.xml
+                                '''
+                                recordTests('android')
+                            }
                         }
                     }
                 }
@@ -224,15 +231,15 @@ def buildDiffCoverage() {
                         ninja
                         cd test
                         ./realm-tests
-                        gcovr --filter='.*src/realm.*' -x >gcovr.xml
+                        gcovr --filter=\'.*src/realm.*\' -x >gcovr.xml
                         mkdir coverage
                      '''
                     def coverageResults = sh(returnStdout: true, script: """
-                        diff-cover gcovr.xml \\
+                        diff-cover build-dir/test/gcovr.xml \\
                                    --compare-branch=origin/${env.CHANGE_TARGET} \\
-                                   --html-report coverage/diff-coverage-report.html \\
+                                   --html-report build-dir/test/coverage/diff-coverage-report.html \\
                                    | grep Coverage: | head -n 1 > diff-coverage
-                    """)
+                    """).trim()
 
                     publishHTML(target: [
                             allowMissing         : false,
@@ -244,9 +251,11 @@ def buildDiffCoverage() {
                     ])
 
                     withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
-                        sh "curl -H \"Authorization: token ${env.githubToken}\" " +
-                                "-d '{ \"body\": \"${coverageResults}\\n\\nPlease check your coverage here: ${env.BUILD_URL}Diff_Coverage\"}' " +
-                                "\"https://api.github.com/repos/realm/realm-core/issues/${env.CHANGE_ID}/comments\""
+                        sh """
+                           curl -H \"Authorization: token ${env.githubToken}\" \\
+                                -d '{ \"body\": \"${coverageResults}\\n\\nPlease check your coverage here: ${env.BUILD_URL}Diff_Coverage\"}' \\
+                                \"https://api.github.com/repos/realm/realm-core/issues/${env.CHANGE_ID}/comments\"
+                        """
                     }
                 }
             }
