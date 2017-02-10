@@ -118,6 +118,8 @@ else
         cd ../benchmark-common-tasks
         cp main.cpp compatibility.hpp Makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
         echo "unix timestamp of build is ${unixtime}"
+        # The breaking change of SharedGroup construction syntax occured after tags/v2.0.0-rc2, we must use a legacy
+        # adaptor for constructing SharedGroups in revisions of core before this time.
         if [ "${unixtime}" -lt "1473070980" ]; then
             echo "Using legacy compatibility of SharedGroup"
             cp compatibility_legacy.cpp "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/compatibility.cpp"
