@@ -291,9 +291,12 @@ def doBuildMacOs(String buildType) {
                                -target package \\
                                ONLY_ACTIVE_ARCH=NO
                     for file in realm-core-*.tar.gz; do
-                        mv -i \"\${file}\" \"\${file/HEAD-HASH-NOTFOUND/${version}}\"
+                        mv -i \"\${file}\" \"\${file/HEAD-HASH-NOTFOUND/${gitDescribeVersion}}\"
                     done
                 """
+                dir('build-dir') {
+                    archiveArtifacts('*.tar.gz')
+                }
             } finally {
                 collectCompilerWarnings('clang', true)
             }
