@@ -175,7 +175,8 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                                '''
                             } finally {
                                 sh '''
-                                   cd $(find . -type d -maxdepth 1 -name build-android*)/test
+                                   mkdir build-dir
+                                   cd build-dir/test
                                    adb pull /data/local/tmp/unit-test-report.xml
                                 '''
                                 recordTests('android')
