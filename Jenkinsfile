@@ -158,6 +158,10 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                         buildEnv.inside("--link ${emulator.id}:emulator") {
                             try {
                                 sh "./build.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
+                                def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-android*').trim()
+                                dir(buildDir) {
+                                    archiveArtifacts('*.tgz')
+                                }
                             } finally {
                                 collectCompilerWarnings('gcc', true )
                             }
@@ -208,6 +212,7 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
                     cmake --build . --config ${buildType}
                     cpack -C ${buildType} -D CPACK_GENERATOR=\"TGZ\"
                 """
+                archiveArtifacts('*.tgz')
             }
         }
     }
