@@ -10018,10 +10018,14 @@ TEST(Query_ColumnDeletionExpression)
 
     // StringNodeBase
     q = foo.column<String>(2) == StringData("Hello, world");
+    q1 = !(foo.column<String>(2) == StringData("Hello, world"));
     tv = q.find_all();
+    tv1 = q1.find_all();
     CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv1.size(), 4);
     foo.remove_column(2);
     CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
 
     // FloatDoubleNode
     q = foo.column<Float>(2) > 0.0f;
@@ -10051,6 +10055,9 @@ TEST(Query_ColumnDeletionLinks)
     bar->add_column_link(type_Link, "link", *foobar);
 
     foo->add_column_link(type_Link, "link", *bar);
+    DescriptorRef subdesc;
+    foo->add_column(type_Table, "sub", &subdesc);
+    subdesc->add_column(type_Int, "int");
 
     foobar->add_empty_row(5);
     bar->add_empty_row(5);
@@ -10060,15 +10067,21 @@ TEST(Query_ColumnDeletionLinks)
         bar->set_int(0, i, i);
         bar->set_link(1, i, i);
         foo->set_link(0, i, i);
+        auto sub = foo->get_subtable(1, 0);
+        auto r = sub->add_empty_row();
+        sub->set_int(0, r, i);
     }
     auto q = foo->link(0).link(1).column<Int>(0) == 2;
     auto q1 = foo->column<Link>(0).is_null();
     auto q2 = foo->column<Link>(0) == bar->get(2);
+    auto q3 = foo->where().subtable(1).greater(0, 3).end_subtable();
     auto tv = q.find_all();
     auto cnt = q1.count();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(cnt, 5);
     cnt = q2.count();
+    CHECK_EQUAL(cnt, 1);
+    cnt = q3.count();
     CHECK_EQUAL(cnt, 1);
     // remove integer column, should not affect query
     bar->remove_column(0);
@@ -10080,6 +10093,9 @@ TEST(Query_ColumnDeletionLinks)
     foo->remove_column(0);
     CHECK_LOGIC_ERROR(q1.count(), LogicError::column_does_not_exist);
     CHECK_LOGIC_ERROR(q2.count(), LogicError::column_does_not_exist);
+    // Remove subtable column
+    foo->remove_column(0);
+    CHECK_LOGIC_ERROR(q3.count(), LogicError::column_does_not_exist);
 }
 
 #endif // TEST_QUERY

@@ -318,7 +318,7 @@ protected:
     {
         if (col_ndx == npos)
             col_ndx = m_condition_column_idx;
-        if (m_table && (col_ndx != npos)) {
+        if (m_table && col_ndx != npos) {
             m_table->verify_column(col_ndx, col);
         }
     }
