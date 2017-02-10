@@ -41,6 +41,7 @@ public:
     const Group &m_group;
     Schema m_schema;
     std::map<size_t, std::string> m_table_names;
+    std::map<size_t, std::pair<std::string, std::string>> m_primary_key_properties;
     std::map<size_t, std::map<size_t, int64_t>> m_int_primaries;
     std::map<size_t, std::map<size_t, std::string>> m_string_primaries;
     std::map<size_t, std::map<size_t, size_t>> m_row_mapping;
@@ -50,6 +51,7 @@ public:
     ConstTableRef m_selected_table;
     ObjectSchema *m_selected_object_schema = nullptr;
     Property *m_selected_primary = nullptr;
+    bool m_selected_is_primary_key_table;
 
     Property *m_list_property = nullptr;
     json m_list_parent_identity;
@@ -115,12 +117,14 @@ public:
     }
 
     // No selection needed:
-    bool select_table(size_t group_index, size_t levels, const size_t* path)
+    bool select_table(size_t table_index, size_t levels, const size_t* path)
     {
         REALM_ASSERT(levels == 0);
 
-        m_selected_table_index = group_index;
-        select(m_table_names[group_index], m_selected_object_schema, m_selected_table, m_selected_primary);
+        m_selected_table_index = table_index;
+        select(m_table_names[table_index], m_selected_object_schema, m_selected_table, m_selected_primary);
+        m_selected_is_primary_key_table = !m_selected_object_schema && m_table_names[table_index] == "pk";
+
         return true;
     }
     bool select_descriptor(size_t levels, const size_t* path)
@@ -348,6 +352,11 @@ public:
                 {"property", m_selected_table->get_column_name(column_index)},
                 {"value", value}
             });
+        }
+        else if (m_selected_is_primary_key_table) {
+            auto &prop = m_primary_key_properties.emplace(std::make_pair(row_index, std::pair<std::string, std::string>())).first->second;
+            if (column_index == 0) prop.first = value;
+            else if (column_index == 1) prop.second = value;
         }
         return true;
     }
@@ -601,8 +610,17 @@ public:
         return true;
     }
 
-    void parse_complete()
+    void generate_primary_key_instructions()
     {
+        if (m_primary_key_properties.size()) {
+            for (auto pk : m_primary_key_properties) {
+                m_json_instructions.push_back({
+                    {"type", Adapter::instruction_type_string(Adapter::InstructionType::AddPrimaryKey)},
+                    {"object_type", pk.second.first},
+                    {"property", pk.second.second},
+                });     
+            }
+        }
     }
 };
 
@@ -615,6 +633,7 @@ public:
         _impl::TransactLogParser parser;
         ChangesetCookerInstructionHander cooker_handler(group);
         parser.parse(stream, cooker_handler);
+        cooker_handler.generate_primary_key_instructions();
         std::string out_string = cooker_handler.m_json_instructions.dump();
         out_buffer.append(out_string.c_str(), out_string.size()); // Throws
         return true;

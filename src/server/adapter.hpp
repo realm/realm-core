@@ -47,6 +47,7 @@ public:
         ListClear,
         AddType,
         AddProperty,
+        AddPrimaryKey,
         ChangeIdentity,
         SwapIdentity,
     };
@@ -63,6 +64,7 @@ public:
             case InstructionType::ListClear:        return "ListClear";
             case InstructionType::AddType:          return "AddType";
             case InstructionType::AddProperty:      return "AddProperty";
+            case InstructionType::AddPrimaryKey:    return "AddPrimaryKey";
             case InstructionType::ChangeIdentity:   return "ChangeIdentity";
             case InstructionType::SwapIdentity:     return "SwapIdentity";
         }
