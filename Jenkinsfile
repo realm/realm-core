@@ -271,14 +271,24 @@ def doBuildMacOs(String buildType) {
             getArchive()
 
             try {
-                sh """
-                    mkdir build-dir
-                    cd build-dir
-                    cmake -D REALM_ENABLE_ENCRYPTION=yes \\
-                          -D REALM_ENABLE_ASSERTIONS=yes \\
-                          -D CMAKE_INSTALL_PREFIX=\$(pwd)/install \\
-                          -D CMAKE_BUILD_TYPE=${buildType} \\
-                          -G Xcode ..
+                dir('build-dir') {
+                    // This is a dirty trick to work around a bug in xcode
+                    // It will hang if launched on the same project (cmake trying the compiler out)
+                    // in parallel.
+                    retry(3) {
+                        timeout(time: 30, unit: 'SECONDS') {
+                            sh """
+                                rm -rf *
+                                cmake -D REALM_ENABLE_ENCRYPTION=yes \\
+                                      -D REALM_ENABLE_ASSERTIONS=yes \\
+                                      -D CMAKE_INSTALL_PREFIX=\$(pwd)/install \\
+                                      -D CMAKE_BUILD_TYPE=${buildType} \\
+                                      -G Xcode ..
+                            """
+                        }
+                    }
+
+                    sh """
                     xcodebuild -sdk ${sdk} \\
                                -configuration ${buildType} \\
                                ONLY_ACTIVE_ARCH=NO
@@ -294,7 +304,6 @@ def doBuildMacOs(String buildType) {
                         mv -i \"\${file}\" \"\${file/HEAD-HASH-NOTFOUND/${gitDescribeVersion}}\"
                     done
                 """
-                dir('build-dir') {
                     archiveArtifacts('*.tar.gz')
                 }
             } finally {
