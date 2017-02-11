@@ -610,15 +610,15 @@ public:
         return true;
     }
 
-    void generate_primary_key_instructions()
+    void append_primary_key_identifiers()
     {
-        if (m_primary_key_properties.size()) {
-            for (auto pk : m_primary_key_properties) {
-                m_json_instructions.push_back({
-                    {"type", Adapter::instruction_type_string(Adapter::InstructionType::AddPrimaryKey)},
-                    {"object_type", pk.second.first},
-                    {"property", pk.second.second},
-                });     
+        for (auto pk : m_primary_key_properties) {
+            for (auto &json : m_json_instructions) {
+                if (json["type"].get<std::string>() == Adapter::instruction_type_string(Adapter::InstructionType::AddType) &&
+                    json["object_type"].get<std::string>() == pk.second.first) {
+                    json["primary_key"] = pk.second.second;
+                    break;
+                }
             }
         }
     }
@@ -633,7 +633,7 @@ public:
         _impl::TransactLogParser parser;
         ChangesetCookerInstructionHander cooker_handler(group);
         parser.parse(stream, cooker_handler);
-        cooker_handler.generate_primary_key_instructions();
+        cooker_handler.append_primary_key_identifiers();
         std::string out_string = cooker_handler.m_json_instructions.dump();
         out_buffer.append(out_string.c_str(), out_string.size()); // Throws
         return true;
