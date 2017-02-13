@@ -332,7 +332,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
                         sh "./build.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}"
                     }
                 }
-                def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-android*').trim()
+                def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-*').trim()
                 dir(buildDir) {
                     archiveArtifacts('*.tar.gz')
                 }
