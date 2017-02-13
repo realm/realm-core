@@ -1741,7 +1741,7 @@ void SharedGroup::do_begin_write()
     //    be the case since the distance will be bounded by the number of threads
     //    and each thread cannot ever hold more than one ticket.
     // b) we could use 64 bit counters instead, but it is unclear if all platforms
-    //    support correct interprocess atomics for 64 bit values on all platforms.
+    //    have support for interprocess atomics for 64 bit values.
 
     timespec time_limit;  // only compute the time limit if we're going to use it:
     if (should_yield) {
