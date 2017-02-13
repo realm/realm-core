@@ -149,10 +149,10 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                     buildEnv.inside {
                         try {
                             sh "./build.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
-                                def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-android*').trim()
-                                dir(buildDir) {
-                                    archiveArtifacts('*.tar.gz')
-                                }
+                            def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-android*').trim()
+                            dir(buildDir) {
+                                archiveArtifacts('*.tar.gz')
+                            }
                         } finally {
                             collectCompilerWarnings('gcc', true )
                         }
