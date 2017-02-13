@@ -3,6 +3,7 @@
 ### Bugfixes
 
 * Fixed a few bugs (caused crashes) in pthread library on UWP.
+* Fixed a bug when deleting a column used in a query (#2408)
 
 ### Breaking changes
 
