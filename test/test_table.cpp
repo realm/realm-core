@@ -875,22 +875,22 @@ TEST(Table_Floats)
     // Test adding a single empty row
     // and filling it with values
     size_t ndx = table.add_empty_row();
-    table.set_float(0, ndx, float(1.12));
-    table.set_double(1, ndx, double(102.13));
+    table.set_float(0, ndx, 1.12f);
+    table.set_double(1, ndx, 102.13);
 
-    CHECK_EQUAL(float(1.12), table.get_float(0, ndx));
-    CHECK_EQUAL(double(102.13), table.get_double(1, ndx));
+    CHECK_EQUAL(1.12f, table.get_float(0, ndx));
+    CHECK_EQUAL(102.13, table.get_double(1, ndx));
 
     // Test adding multiple rows
     ndx = table.add_empty_row(7);
     for (size_t i = ndx; i < 7; ++i) {
-        table.set_float(0, i, float(1.12) + 100 * i);
-        table.set_double(1, i, double(102.13) * 200 * i);
+        table.set_float(0, i, 1.12f + 100 * i);
+        table.set_double(1, i, 102.13 * 200 * i);
     }
 
     for (size_t i = ndx; i < 7; ++i) {
-        const float v1 = float(1.12) + 100 * i;
-        const double v2 = double(102.13) * 200 * i;
+        const float v1 = 1.12f + 100 * i;
+        const double v2 = 102.13 * 200 * i;
         CHECK_EQUAL(v1, table.get_float(0, i));
         CHECK_EQUAL(v2, table.get_double(1, i));
     }
