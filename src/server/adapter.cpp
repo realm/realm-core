@@ -125,9 +125,9 @@ public:
 
     json get_identity(size_t row, ConstTableRef &table, Property *primary_key) {
         if (primary_key) {
-            if (primary_key->type == PropertyType::Int) {
-                auto primaries = m_int_primaries.find(table->get_index_in_group());
-                if (primaries != m_int_primaries.end()) {
+            auto get_or_lookup_primary = [&](auto realm_primaries, auto get_primary) {
+                auto primaries = realm_primaries.find(table->get_index_in_group());
+                if (primaries != realm_primaries.end()) {
                     auto primary = primaries->second.find(row);
                     if (primary != primaries->second.end()) {
                         return primary->second;
@@ -137,28 +137,19 @@ public:
                 if (mappings != m_primary_key_lookup_row_mapping.end()) {
                     auto mapping = mappings->second.find(row);
                     if (mapping != mappings->second.end()) {
-                        return table->get_int(primary_key->table_column, mapping->second);
+                        return get_primary(primary_key->table_column, mapping->second);
                     }
                 }
-                return table->get_int(primary_key->table_column, row); 
-            }
-            if (primary_key->type == PropertyType::String) {
-                auto primaries = m_string_primaries.find(table->get_index_in_group());
-                if (primaries != m_string_primaries.end()) {
-                    auto primary = primaries->second.find(row);
-                    if (primary != primaries->second.end()) {
-                        return primary->second;
-                    }
-                }
-                auto mappings = m_primary_key_lookup_row_mapping.find(table->get_index_in_group());
-                if (mappings != m_primary_key_lookup_row_mapping.end()) {
-                    auto mapping = mappings->second.find(row);
-                    if (mapping != mappings->second.end()) {
-                        return table->get_string(primary_key->table_column, mapping->second);
-                    }
-                }
-                return table->get_string(primary_key->table_column, row); 
-            }
+                return get_primary(primary_key->table_column, row); 
+            };
+
+            if (primary_key->type == PropertyType::Int)
+                return get_or_lookup_primary(m_int_primaries, [&](auto column, auto row) { 
+                    return table->get_int(column, row); } );
+
+            if (primary_key->type == PropertyType::String)
+                return get_or_lookup_primary(m_string_primaries, [&](auto column, auto row) { 
+                    return (std::string)table->get_string(column, row); } );
         }
         return row;
     }
