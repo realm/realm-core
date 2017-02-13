@@ -293,8 +293,8 @@ public:
     {
         if (m_selected_object_schema && !m_selected_primary) {
             add_instruction(Adapter::InstructionType::SwapIdentity, {
-                {"identity_first", row_index_1},
-                {"identity_second", row_index_2}
+                {"identity", row_index_1},
+                {"swap_identity", row_index_2}
             });
         }
         return true;
