@@ -77,6 +77,7 @@ if [ "${OS}" == "android" ]; then
           -D ANDROID_ABI="${ARCH}" \
           -D REALM_ENABLE_ENCRYPTION=1 \
           -D REALM_VERSION="${VERSION}" \
+          -D CPACK_SYSTEM_NAME="Android-${ARCH}"
           ..
     make -j "${CORES}" -l "${CORES}" VERBOSE=1
     make package
