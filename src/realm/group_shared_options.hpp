@@ -87,8 +87,13 @@ struct SharedGroupOptions {
     /// This string should include a trailing slash '/'.
     std::string temp_dir;
 
+    /// sys_tmp_dir will be used if the temp_dir is empty when creating SharedGroupOptions.
+    /// It must be writable and allowed to create pipe/fifo file on it.
+    static void set_sys_tmp_dir(const std::string& dir) noexcept { sys_tmp_dir = dir; }
+    static std::string get_sys_tmp_dir() noexcept { return sys_tmp_dir; }
+
 private:
-    const static std::string sys_tmp_dir;
+    static std::string sys_tmp_dir;
 };
 
 } // end namespace realm
