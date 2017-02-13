@@ -60,6 +60,62 @@ public:
     ObjectSchema *m_list_target_object_schema = nullptr;
     Property *m_list_target_primary = nullptr;
 
+    bool m_last_is_collapsable = false;
+
+    void add_instruction(Adapter::InstructionType type, 
+                         json &&inst = {}, bool 
+                         collasable = false, 
+                         util::Optional<std::string> object_type = util::none) {
+        inst["type"] = Adapter::instruction_type_string(type);
+        inst["object_type"] = object_type ? *object_type : m_selected_object_schema->name;
+        m_json_instructions.push_back(std::move(inst));
+
+        m_last_is_collapsable = collasable;
+    }
+
+    void add_insert_instruction(json &&identity) {
+        add_instruction(Adapter::InstructionType::Insert, {
+            {"identity", std::move(identity)},
+            {"values", {}}
+        }, true);
+    }
+
+    void add_set_instruction(size_t row, size_t column, json &&value) {
+        json identity = get_identity(row, m_selected_table, m_selected_primary);
+
+        // collapse values if inserting/setting values for the last object
+        if (m_last_is_collapsable) {
+            json &last = m_json_instructions.back();
+            if (identity == last["identity"] && m_selected_object_schema->name == last["object_type"].get<std::string>()) {
+                last["values"][m_selected_table->get_column_name(column)] = value;
+                return;
+            }
+        }
+
+        // if not collapsed create new
+        add_instruction(Adapter::InstructionType::Set, {
+            {"identity", std::move(identity)},
+            {"values", {{m_selected_table->get_column_name(column), value}}}
+        }, true);
+    }
+
+    void add_column_instruction(std::string object_type, std::string prop_name, json &&prop) {
+        if (m_json_instructions.size()) {
+            json &last = m_json_instructions.back();
+            if (last["object_type"].get<std::string>() == object_type && (
+                last["type"].get<std::string>() == "ADD_TYPE" || 
+                last["type"].get<std::string>() == "ADD_PROPERTIES")) 
+            {
+                last["properties"][prop_name] = prop;
+                return;
+            }
+        }
+
+        add_instruction(Adapter::InstructionType::AddProperties, {{"properties", 
+            {{prop_name, prop}}
+        }}, false, object_type);
+    }
+
     json get_identity(size_t row, ConstTableRef &table, Property *primary_key) {
         if (primary_key) {
             if (primary_key->type == PropertyType::Int) {
@@ -149,10 +205,9 @@ public:
         m_table_names[table_index] = name;
         std::string object_type = ObjectStore::object_type_for_table_name(m_table_names[table_index]);
         if (object_type.size()) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::AddType)},
-                {"object_type", object_type}
-            });
+            add_instruction(Adapter::InstructionType::AddType, {
+                {"properties", {}}
+            }, false, object_type);
         }
         return true;
     }
@@ -176,12 +231,8 @@ public:
     bool insert_empty_rows(size_t row_index, size_t n_rows, size_t prior_num_rows, bool unordered)
     {
         REALM_ASSERT(n_rows == 1);
-        if (m_selected_object_schema && !m_selected_primary) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::Insert)},
-                {"object_type", m_selected_object_schema->name},
-                {"identity", row_index}
-            });
+        if (m_selected_object_schema) {
+            add_insert_instruction(row_index);
         }
         return true;
     }
@@ -190,9 +241,7 @@ public:
         REALM_ASSERT(n_rows == 1);
         REALM_ASSERT(move_last_over);
         if (m_selected_object_schema) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::Delete)},
-                {"object_type", m_selected_object_schema->name},
+            add_instruction(Adapter::InstructionType::Delete, {
                 {"identity", get_identity(row_index, m_selected_table, m_selected_primary)}
             });
 
@@ -226,9 +275,7 @@ public:
             else {
                 if (row_index < old_row_index) {
                     // change identity for objects with no primary key
-                    m_json_instructions.push_back({
-                        {"type", Adapter::instruction_type_string(Adapter::InstructionType::ChangeIdentity)},
-                        {"object_type", m_selected_object_schema->name},
+                    add_instruction(Adapter::InstructionType::ChangeIdentity, {
                         {"identity", old_row_index},
                         {"new_identity", row_index}
                     });
@@ -240,9 +287,7 @@ public:
     bool swap_rows(size_t row_index_1, size_t row_index_2)
     {
         if (m_selected_object_schema && !m_selected_primary) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::SwapIdentity)},
-                {"object_type", m_selected_object_schema->name},
+            add_instruction(Adapter::InstructionType::SwapIdentity, {
                 {"identity_first", row_index_1},
                 {"identity_second", row_index_2}
             });
@@ -262,31 +307,25 @@ public:
     bool clear_table()
     {
         if (m_selected_object_schema) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::Clear)},
-                {"object_type", m_selected_object_schema->name},
-            });
+            add_instruction(Adapter::InstructionType::Clear);
         }
         return true;
     }
     bool set_int(size_t column_index, size_t row_index, int_fast64_t value, _impl::Instruction inst, size_t)
     {
         if (m_selected_object_schema) {
+            // overwrite identity of last addition if this is the primary key
             if (m_selected_primary && m_selected_primary->table_column == column_index) {
                 m_int_primaries[m_selected_table_index][row_index] = value;
-                m_json_instructions.push_back({
-                    {"type", Adapter::instruction_type_string(Adapter::InstructionType::Insert)},
-                    {"object_type", m_selected_object_schema->name},
-                    {"identity", value}
-                });
+
+                auto &last = m_json_instructions.back();
+                REALM_ASSERT(last["type"].get<std::string>() == "INSERT");
+                last["identity"] = value;
+                last["values"][m_selected_table->get_column_name(column_index)] = value;
             }
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::SetProperty)},
-                {"object_type", m_selected_object_schema->name},
-                {"identity", get_identity(row_index, m_selected_table, m_selected_primary)},
-                {"property", m_selected_table->get_column_name(column_index)},
-                {"value", value}
-            });
+            else {
+                add_set_instruction(row_index, column_index, value);
+            }
         }
         return true;
     }
@@ -298,39 +337,21 @@ public:
     bool set_bool(size_t column_index, size_t row_index, bool value, _impl::Instruction inst)
     {
         if (m_selected_object_schema) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::SetProperty)},
-                {"object_type", m_selected_object_schema->name},
-                {"identity", get_identity(row_index, m_selected_table, m_selected_primary)},
-                {"property", m_selected_table->get_column_name(column_index)},
-                {"value", value}
-            });
+            add_set_instruction(row_index, column_index, value);
         }
         return true;
     }
     bool set_float(size_t column_index, size_t row_index, float value, _impl::Instruction inst)
     {
         if (m_selected_object_schema) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::SetProperty)},
-                {"object_type", m_selected_object_schema->name},
-                {"identity", get_identity(row_index, m_selected_table, m_selected_primary)},
-                {"property", m_selected_table->get_column_name(column_index)},
-                {"value", value}
-            });
+            add_set_instruction(row_index, column_index, value);
         }
         return true;
     }
     bool set_double(size_t column_index, size_t row_index, double value, _impl::Instruction inst)
     {
         if (m_selected_object_schema) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::SetProperty)},
-                {"object_type", m_selected_object_schema->name},
-                {"identity", get_identity(row_index, m_selected_table, m_selected_primary)},
-                {"property", m_selected_table->get_column_name(column_index)},
-                {"value", value}
-            });
+            add_set_instruction(row_index, column_index, value);
         }
         return true;
     }
@@ -339,19 +360,15 @@ public:
         if (m_selected_object_schema) {
             if (m_selected_primary && m_selected_primary->table_column == column_index) {
                 m_string_primaries[m_selected_table_index][row_index] = value;
-                m_json_instructions.push_back({
-                    {"type", Adapter::instruction_type_string(Adapter::InstructionType::Insert)},
-                    {"object_type", m_selected_object_schema->name},
-                    {"identity", value}
-                });
+  
+                auto &last = m_json_instructions.back();
+                REALM_ASSERT(last["type"].get<std::string>() == "INSERT");
+                last["identity"] = value;
+                last["values"][m_selected_table->get_column_name(column_index)] = value;
             }
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::SetProperty)},
-                {"object_type", m_selected_object_schema->name},
-                {"identity", get_identity(row_index, m_selected_table, m_selected_primary)},
-                {"property", m_selected_table->get_column_name(column_index)},
-                {"value", value}
-            });
+            else {
+                add_set_instruction(row_index, column_index, value);
+            }
         }
         else if (m_selected_is_primary_key_table) {
             auto &prop = m_primary_key_properties.emplace(std::make_pair(row_index, std::pair<std::string, std::string>())).first->second;
@@ -363,14 +380,7 @@ public:
     bool set_binary(size_t column_index, size_t row_index, BinaryData value, _impl::Instruction inst)
     {
         if (m_selected_object_schema) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::SetProperty)},
-                {"object_type", m_selected_object_schema->name},
-                {"identity", get_identity(row_index, m_selected_table, m_selected_primary)},
-                {"property", m_selected_table->get_column_name(column_index)},
-                {"non_json_type", "data"},
-                {"value", value}
-            });
+            add_set_instruction(row_index, column_index, {"data", value});
         }
         return true;
     }
@@ -382,14 +392,8 @@ public:
     bool set_timestamp(size_t column_index, size_t row_index, Timestamp ts, _impl::Instruction inst)
     {
         if (m_selected_object_schema) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::SetProperty)},
-                {"object_type", m_selected_object_schema->name},
-                {"identity", get_identity(row_index, m_selected_table, m_selected_primary)},
-                {"property", m_selected_table->get_column_name(column_index)},
-                {"non_json_type", "date"},
-                {"value", (int64_t)(ts.get_seconds() * 1000 + ts.get_nanoseconds() / 1000000)}
-            });
+            int64_t value = ts.get_seconds() * 1000 + ts.get_nanoseconds() / 1000000;
+            add_set_instruction(row_index, column_index, {"date", value});
         }
         return true;
     }
@@ -406,13 +410,7 @@ public:
     bool set_null(size_t column_index, size_t row_index, _impl::Instruction inst, size_t)
     {
         if (m_selected_object_schema) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::SetProperty)},
-                {"object_type", m_selected_object_schema->name},
-                {"identity", get_identity(row_index, m_selected_table, m_selected_primary)},
-                {"property", m_selected_table->get_column_name(column_index)},
-                {"value", nullptr}
-            });
+            add_set_instruction(row_index, column_index, nullptr);
         }
         return true;
     }
@@ -425,26 +423,15 @@ public:
             std::string table_name = m_group.get_table_name(target_group_level_ndx);
             select(table_name, target_object_schema, target_table, target_primary);
 
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::SetProperty)},
-                {"object_type", m_selected_object_schema->name},
-                {"identity", get_identity(row_index, m_selected_table, m_selected_primary)},
-                {"property", m_selected_table->get_column_name(column_index)},
-                {"object_identity", link_index == npos ? json(nullptr) : get_identity(link_index, target_table, target_primary)}
-            });
+            json value = link_index == npos ? json(nullptr) : get_identity(link_index, target_table, target_primary);
+            add_set_instruction(row_index, column_index, std::move(value));
         }
         return true;
     }
     bool nullify_link(size_t column_index, size_t row_index, size_t target_group_level_ndx)
     {
         if (m_selected_object_schema) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::SetProperty)},
-                {"object_type", m_selected_object_schema->name},
-                {"identity", get_identity(row_index, m_selected_table, m_selected_primary)},
-                {"property", m_selected_table->get_column_name(column_index)},
-                {"object_identity", nullptr}
-            });
+            add_set_instruction(row_index, column_index, nullptr);
         }
         return true;
     }
@@ -467,13 +454,10 @@ public:
     bool insert_link_column(size_t col_ndx, DataType data_type, StringData prop_name, size_t target_table_index, size_t backlink_col_ndx)
     {
         std::string object_type = ObjectStore::object_type_for_table_name(m_table_names[m_selected_table_index]);
-        if (object_type.size()) { 
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::AddProperty)},
-                {"object_type", object_type},
-                {"property", prop_name},
-                {"property_type", data_type == DataType::type_Link ? "object" : "list"},
-                {"target_object_type", ObjectStore::object_type_for_table_name(m_table_names[target_table_index])}
+        if (object_type.size()) {
+            add_column_instruction(object_type, prop_name, {
+                {"type", data_type == DataType::type_Link ? "object" : "list"},
+                {"object_type", ObjectStore::object_type_for_table_name(m_table_names[target_table_index])}
             });
         }
         return true;
@@ -481,17 +465,11 @@ public:
     bool insert_column(size_t col_ndx, DataType data_type, StringData prop_name, bool nullable)
     {
         std::string object_type = ObjectStore::object_type_for_table_name(m_table_names[m_selected_table_index]);
-        if (object_type.size()) { 
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::AddProperty)},
-                {"object_type", object_type},
-                {"property", prop_name},
-                {"property_type", string_for_property_type((PropertyType)data_type)}
+        if (object_type.size()) {
+            add_column_instruction(object_type, prop_name, {
+                {"type", string_for_property_type((PropertyType)data_type)},
+                {"nullable", nullable}            
             });
-            if (nullable) {
-                m_json_instructions.back()["nullable"] = true;
-
-            }
         }
         return true;
     }
@@ -532,11 +510,9 @@ public:
     bool link_list_set(size_t list_index, size_t m_list_target_index, size_t prior_size)
     {
         if (m_list_property) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::ListSet)},
-                {"object_type", m_selected_object_schema->name},
-                {"property", m_list_property->name},
+            add_instruction(Adapter::InstructionType::ListSet, {
                 {"identity", m_list_parent_identity},
+                {"property", m_list_property->name},
                 {"list_index", list_index},
                 {"object_identity", get_identity(m_list_target_index, m_list_target_table, m_list_target_primary)}
             }); 
@@ -546,11 +522,9 @@ public:
     bool link_list_insert(size_t list_index, size_t m_list_target_index, size_t prior_size)
     {
         if (m_list_property) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::ListInsert)},
-                {"object_type", m_selected_object_schema->name},
-                {"property", m_list_property->name},
+            add_instruction(Adapter::InstructionType::ListInsert, {
                 {"identity", m_list_parent_identity},
+                {"property", m_list_property->name},
                 {"list_index", list_index},
                 {"object_identity", get_identity(m_list_target_index, m_list_target_table, m_list_target_primary)}
             }); 
@@ -574,11 +548,9 @@ public:
     bool link_list_erase(size_t list_index, size_t prior_size)
     {
         if (m_list_property) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::ListErase)},
-                {"object_type", m_selected_object_schema->name},
-                {"property", m_list_property->name},
+            add_instruction(Adapter::InstructionType::ListErase, {
                 {"identity", m_list_parent_identity},
+                {"property", m_list_property->name},
                 {"list_index", list_index},
             }); 
         } 
@@ -587,11 +559,9 @@ public:
     bool link_list_nullify(size_t list_index, size_t prior_size)
     {
         if (m_list_property) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::ListErase)},
-                {"object_type", m_selected_object_schema->name},
-                {"property", m_list_property->name},
+            add_instruction(Adapter::InstructionType::ListErase, {
                 {"identity", m_list_parent_identity},
+                {"property", m_list_property->name},
                 {"list_index", list_index},
             }); 
         } 
@@ -600,11 +570,9 @@ public:
     bool link_list_clear(size_t prior_size)
     {
         if (m_list_property) {
-            m_json_instructions.push_back({
-                {"type", Adapter::instruction_type_string(Adapter::InstructionType::ListClear)},
-                {"object_type", m_selected_object_schema->name},
-                {"property", m_list_property->name},
+            add_instruction(Adapter::InstructionType::ListClear, {
                 {"identity", m_list_parent_identity},
+                {"property", m_list_property->name},
             }); 
         } 
         return true;
@@ -686,8 +654,9 @@ void Adapter::advance(std::string realm_path) {
     auto realm = Realm::make_shared_realm(m_global_notifier->get_config(realm_path));
     auto sync_history = static_cast<sync::SyncHistory *>(realm->history());
     auto progress = sync_history->get_cooked_progress();
-    sync_history->set_cooked_progress({progress.changeset_index + 1, 0});
-    
+    if (progress.changeset_index < sync_history->get_num_cooked_changesets()) {
+        sync_history->set_cooked_progress({progress.changeset_index + 1, 0});
+    }
     realm->invalidate();
 }
 

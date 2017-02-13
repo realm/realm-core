@@ -39,32 +39,32 @@ public:
     enum class InstructionType {
         Insert,
         Delete,
-        SetProperty,
+        Set,
         Clear,
         ListSet,
         ListInsert,
         ListErase,
         ListClear,
         AddType,
-        AddProperty,
+        AddProperties,
         ChangeIdentity,
         SwapIdentity,
     };
 
     static std::string instruction_type_string(InstructionType type) {
         switch(type) {
-            case InstructionType::Insert:           return "Insert";
-            case InstructionType::Delete:           return "Delete";
-            case InstructionType::SetProperty:      return "Set";
-            case InstructionType::Clear:            return "Clear";
-            case InstructionType::ListSet:          return "ListSet";
-            case InstructionType::ListInsert:       return "ListInsert";
-            case InstructionType::ListErase:        return "ListErase";
-            case InstructionType::ListClear:        return "ListClear";
-            case InstructionType::AddType:          return "AddType";
-            case InstructionType::AddProperty:      return "AddProperty";
-            case InstructionType::ChangeIdentity:   return "ChangeIdentity";
-            case InstructionType::SwapIdentity:     return "SwapIdentity";
+            case InstructionType::Insert:           return "INSERT";
+            case InstructionType::Delete:           return "DELETE";
+            case InstructionType::Set:              return "SET";
+            case InstructionType::Clear:            return "CLEAR";
+            case InstructionType::ListSet:          return "LIST_SET";
+            case InstructionType::ListInsert:       return "LIST_INSERT";
+            case InstructionType::ListErase:        return "LIST_ERASE";
+            case InstructionType::ListClear:        return "LIST_CLEAR";
+            case InstructionType::AddType:          return "ADD_TYPE";
+            case InstructionType::AddProperties:    return "ADD_PROPERTIES";
+            case InstructionType::ChangeIdentity:   return "CHANGE_IDENTITY";
+            case InstructionType::SwapIdentity:     return "SWAP_IDENTITY";
         }
     }
 
