@@ -79,6 +79,7 @@ if [ "${OS}" == "android" ]; then
           -D REALM_VERSION="${VERSION}" \
           -D CPACK_SYSTEM_NAME="Android-${ARCH}" \
           ..
+
     make -j "${CORES}" -l "${CORES}" VERBOSE=1
     make package
 else
@@ -88,14 +89,20 @@ else
         tvos) SDK="appletv";;
     esac
 
-    cmake -D REALM_ENABLE_ENCRYPTION=yes \
-          -D REALM_ENABLE_ASSERTIONS=yes \
-          -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
-          -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-          -D REALM_NO_TESTS=1 \
-          -D REALM_SKIP_SHARED_LIB=1 \
-          -D REALM_VERSION="${VERSION}" \
-          -G Xcode ..
+    # This loop serves the purpose or working around an xcodebuild issue
+    # where it will hang when checking for the compiler
+    for i in 1 2 3; do
+        echo "Trying to run CMake: ${i}"
+        timeout 1m cmake -D REALM_ENABLE_ENCRYPTION=yes \
+                         -D REALM_ENABLE_ASSERTIONS=yes \
+                         -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
+                         -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+                         -D REALM_NO_TESTS=1 \
+                         -D REALM_SKIP_SHARED_LIB=1 \
+                         -D REALM_VERSION="${VERSION}" \
+                         -G Xcode .. && break
+    done
+
     xcodebuild -sdk "${SDK}os" \
                -configuration "${BUILD_TYPE}" \
                ONLY_ACTIVE_ARCH=NO
