@@ -121,7 +121,7 @@ else
     cp "src/realm/${BUILD_TYPE}/librealm.a" install/lib
     cd install || exit
     LOWERCASE_BUILD_TYPE=$(echo "${BUILD_TYPE}" | tr '[:upper:]' '[:lower:]')
-    tar -cvJf "realm-core-${SDK}os-${VERSION}-${LOWERCASE_BUILD_TYPE}.tar.xz" lib include
+    tar -cvJf "realm-core-${LOWERCASE_BUILD_TYPE}-${VERSION}-${SDK}os.tar.xz" lib include
     mv ./*.tar.xz ..
 fi
 

@@ -334,7 +334,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
                 }
                 def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-*').trim()
                 dir(buildDir) {
-                    archiveArtifacts('*.tar.gz')
+                    archiveArtifacts('*.tar.xz')
                 }
             } finally {
                 collectCompilerWarnings('clang', true)
