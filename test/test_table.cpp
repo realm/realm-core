@@ -7253,7 +7253,7 @@ TEST(Table_RowAccessor_Null)
         row.set_bool(col_bool, true);
         row.set_int(col_int, 1);
         row.set_string(col_string, "1");
-        row.set_float(col_float, 1.0);
+        row.set_float(col_float, 1.0f);
         row.set_double(col_double, 1.0);
         row.set_olddatetime(col_date, OldDateTime(1));
         row.set_binary(col_binary, BinaryData("a"));
