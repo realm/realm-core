@@ -65,7 +65,7 @@ try {
         buildNodeLinux: doBuildNodeInDocker(isPublishingRun, isPublishingLatestRun),
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
-        // buildWindows: doBuildWindows(version, isPublishingRun),
+        buildWindows: doBuildWindows(version, isPublishingRun),
         buildOsxDylibs: doBuildOsxDylibs(isPublishingRun, isPublishingLatestRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
@@ -115,7 +115,7 @@ def buildDockerEnv(name) {
 
 def doBuildCocoa(def isPublishingRun, def isPublishingLatestRun) {
   return {
-    node('osx_vegas') {
+    node('macos || osx_vegas') {
       getArchive()
 
       try {
@@ -128,7 +128,7 @@ def doBuildCocoa(def isPublishingRun, def isPublishingLatestRun) {
           'UNITTEST_REANDOM_SEED=random',
           'UNITTEST_XML=1',
           'UNITTEST_THREADS=1',
-          'DEVELOPER_DIR=/Applications/Xcode-7.3.1.app/Contents/Developer/'
+          'DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/'
         ]) {
             sh '''
               dir=$(pwd)
@@ -201,10 +201,9 @@ def doBuildWindows(String version, boolean isPublishingRun) {
         node('windows') {
             getArchive()
             try {
-	      for (platform in ['Win32', 'x64']) {
-                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=Debug /p:Platform=${platform}"
-                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, release\" /p:Platform=${platform}"
-                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"Static lib, debug\" /p:Platform=${platform}"
+              for (platform in ['Win32', 'x64']) {
+                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"8.1 Debug static lib\" /p:Platform=${platform}"
+                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"8.1 Release static lib\" /p:Platform=${platform}"
               }
               dir('Visual Studio') {
                 stash includes: 'lib/*.lib', name: 'windows-libs'
@@ -312,7 +311,7 @@ def doBuildNodeInDocker(def isPublishingRun, def isPublishingLatestRun) {
 
 def doBuildNodeInOsx(def isPublishingRun, def isPublishingLatestRun) {
   return {
-    node('osx_vegas') {
+    node('macos || osx_vegas') {
       getArchive()
 
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
@@ -343,7 +342,7 @@ def doBuildNodeInOsx(def isPublishingRun, def isPublishingLatestRun) {
 
 def doBuildOsxDylibs(def isPublishingRun, def isPublishingLatestRun) {
   return {
-    node('osx_vegas') {
+    node('macos || osx_vegas') {
       getSourceArchive()
       def version = get_version()
 
@@ -627,7 +626,7 @@ def doPublishLocalArtifacts() {
       unstash 'node-cocoa-package'
       unstash 'android-package'
       unstash 'dylib-osx-package'
-      // unstash 'windows-package'
+      unstash 'windows-package'
 
       withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
         sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'

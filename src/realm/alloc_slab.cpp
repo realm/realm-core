@@ -189,7 +189,7 @@ void SlabAlloc::detach() noexcept
         default:
             REALM_UNREACHABLE();
     }
-    invalidate_cache();
+    internal_invalidate_cache();
 
     // Release all allocated memory - this forces us to create new
     // slabs after re-attaching thereby ensuring that the slabs are
@@ -420,7 +420,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     // Check for double free
     for (auto& c : free_space) {
         if ((ref >= c.ref && ref < (c.ref + c.size)) || (ref < c.ref && ref_end > c.ref)) {
-            REALM_ASSERT(!"Double Free");
+            REALM_ASSERT(false && "Double Free");
         }
     }
 #endif
@@ -1005,7 +1005,7 @@ size_t SlabAlloc::get_total_size() const noexcept
 
 void SlabAlloc::reset_free_space_tracking()
 {
-    invalidate_cache();
+    internal_invalidate_cache();
     if (is_free_space_clean())
         return;
 
@@ -1032,12 +1032,15 @@ void SlabAlloc::reset_free_space_tracking()
 }
 
 
-void SlabAlloc::remap(size_t file_size)
+void SlabAlloc::update_reader_view(size_t file_size)
 {
+    internal_invalidate_cache();
+    if (file_size <= m_baseline) {
+        return;
+    }
     REALM_ASSERT(file_size % 8 == 0); // 8-byte alignment required
     REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     REALM_ASSERT_DEBUG(is_free_space_clean());
-    REALM_ASSERT(m_baseline <= file_size);
 
     // Extend mapping by adding sections
     REALM_ASSERT_DEBUG(matches_section_boundary(file_size));

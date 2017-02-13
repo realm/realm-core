@@ -200,7 +200,10 @@ public:
         mixed_history_type,
 
         /// Adding rows to a table with no columns is not supported.
-        table_has_no_columns
+        table_has_no_columns,
+
+        /// Referring to a column that has been deleted.
+        column_does_not_exist
     };
 
     LogicError(ErrorKind message);
