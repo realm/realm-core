@@ -1736,9 +1736,18 @@ void SharedGroup::do_begin_write()
     // allow for comparison even after wrap around of ticket numbering:
     int32_t diff = int32_t(my_ticket - info->next_served);
     bool should_yield = diff > 0; // ticket is in the future
+    // a) the above comparison is only guaranteed to be correct, if the distance
+    //    between my_ticket and info->next_served is less than 2^30. This will
+    //    be the case since the distance will be bounded by the number of threads
+    //    and each thread cannot ever hold more than one ticket.
+    // b) we could use 64 bit counters instead, but it is unclear if all platforms
+    //    support correct interprocess atomics for 64 bit values on all platforms.
 
     timespec time_limit;  // only compute the time limit if we're going to use it:
     if (should_yield) {
+        // This clock is not monotonic, so time can move backwards. This can lead
+        // to a wrong time limit, but the only effect of a wrong time limit is that
+        // we momentarily loose fairness, so we accept it.
         timeval tv;
         gettimeofday(&tv, nullptr);
         time_limit.tv_sec = tv.tv_sec;
