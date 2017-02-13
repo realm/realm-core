@@ -327,7 +327,11 @@ def doBuildAppleDevice(String sdk, String buildType) {
             getArchive()
 
             try {
-                sh "./build.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}"
+                retry(3) {
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh "./build.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}"
+                    }
+                }
                 def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-android*').trim()
                 dir(buildDir) {
                     archiveArtifacts('*.tar.gz')
