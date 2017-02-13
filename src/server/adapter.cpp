@@ -42,14 +42,15 @@ public:
     Schema m_schema;
     std::map<size_t, std::string> m_table_names;
 
-    // primary caches consisting of primary keys set from the realm plus those
-    // set mid-changeset
+    // primary caches consisting of primary keys set mid-changeset
+    // these are updated to reflect inter-changeset row changes
     std::map<size_t, std::pair<std::string, std::string>> m_primary_key_properties;
     std::map<size_t, std::map<size_t, int64_t>> m_int_primaries;
     std::map<size_t, std::map<size_t, std::string>> m_string_primaries;
 
     // mapping inter-changetset rows to the index from the beginning of the changeset
-    std::map<size_t, std::map<size_t, size_t>> m_row_mapping;
+    // used for primary key lookup
+    std::map<size_t, std::map<size_t, size_t>> m_primary_key_lookup_row_mapping;
 
     json m_json_instructions;
 
@@ -132,8 +133,8 @@ public:
                         return primary->second;
                     }
                 }
-                auto mappings = m_row_mapping.find(table->get_index_in_group());
-                if (mappings != m_row_mapping.end()) {
+                auto mappings = m_primary_key_lookup_row_mapping.find(table->get_index_in_group());
+                if (mappings != m_primary_key_lookup_row_mapping.end()) {
                     auto mapping = mappings->second.find(row);
                     if (mapping != mappings->second.end()) {
                         return table->get_int(primary_key->table_column, mapping->second);
@@ -149,8 +150,8 @@ public:
                         return primary->second;
                     }
                 }
-                auto mappings = m_row_mapping.find(table->get_index_in_group());
-                if (mappings != m_row_mapping.end()) {
+                auto mappings = m_primary_key_lookup_row_mapping.find(table->get_index_in_group());
+                if (mappings != m_primary_key_lookup_row_mapping.end()) {
                     auto mapping = mappings->second.find(row);
                     if (mapping != mappings->second.end()) {
                         return table->get_string(primary_key->table_column, mapping->second);
@@ -254,7 +255,7 @@ public:
             // handle move_last_over
             size_t old_row_index = prior_num_rows - 1;
             if (m_selected_primary) {
-                auto &row_mapping = m_row_mapping[m_selected_table_index];
+                auto &row_mapping = m_primary_key_lookup_row_mapping[m_selected_table_index];
                 auto &int_primaries = m_int_primaries[m_selected_table_index];
                 auto &string_primaries = m_string_primaries[m_selected_table_index];
 
