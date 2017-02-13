@@ -4,7 +4,7 @@ timeout(time: 1, unit: 'HOURS') {
     stage('gather-info') {
         node('docker') {
             getSourceArchive()
-            stash includes: '**', name: 'core-source'
+            stash includes: '**', name: 'core-source', useDefaultExcludes: false
 
             dependencies = readProperties file: 'dependencies.list'
             echo "VERSION: ${dependencies.VERSION}"
@@ -221,8 +221,7 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
 def buildDiffCoverage() {
     return {
         node('docker') {
-            // We need the whole git repo since diff-cover is going to perform some git operations
-            getSourceArchive()
+            getArchive()
 
             def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
             def environment = environment()
