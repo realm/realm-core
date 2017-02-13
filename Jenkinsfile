@@ -329,7 +329,10 @@ def doBuildAppleDevice(String sdk, String buildType) {
             try {
                 retry(3) {
                     timeout(time: 10, unit: 'MINUTES') {
-                        sh "./build.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}"
+                        sh """
+                            rm -rf build-*
+                            ./build.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
+                        """
                     }
                 }
                 def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-*').trim()
