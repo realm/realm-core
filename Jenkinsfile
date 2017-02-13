@@ -328,7 +328,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
 
             try {
                 retry(3) {
-                    timeout(time: 5, unit: 'MINUTES') {
+                    timeout(time: 10, unit: 'MINUTES') {
                         sh "./build.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}"
                     }
                 }
