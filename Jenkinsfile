@@ -88,12 +88,12 @@ timeout(time: 1, unit: 'HOURS') {
     if (isPublishingRun) {
         stage('publish-packages') {
             parallel(
-                    generic: doPublishGeneric(),
-                    centos7: doPublish('centos-7', 'rpm', 'el', 7),
-                    centos6: doPublish('centos-6', 'rpm', 'el', 6),
-                    ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
-                    others: doPublishLocalArtifacts()
-            )
+              generic: doPublishGeneric(),
+                     centos7: doPublish('centos-7', 'rpm', 'el', 7),
+                     centos6: doPublish('centos-6', 'rpm', 'el', 6),
+                     ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
+                     others: doPublishLocalArtifacts()
+                )
         }
     }
 }
@@ -214,7 +214,7 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
                 bat """
                     cmake ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015${archSuffix}\" -DCMAKE_BUILD_TYPE=${buildType} ..
                     cmake --build . --config ${buildType}
-                    cpack -C ${buildType} -D CPACK_GENERATOR=TGZ -d CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${arch}
+                    cpack -C ${buildType} -D CPACK_GENERATOR=TGZ -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${arch}
                 """
                 archiveArtifacts('*.tar.gz')
             }
@@ -251,13 +251,13 @@ def buildDiffCoverage() {
                     """).trim()
 
                     publishHTML(target: [
-                            allowMissing         : false,
-                            alwaysLinkToLastBuild: false,
-                            keepAll              : true,
-                            reportDir            : 'build-dir/test/coverage',
-                            reportFiles          : 'diff-coverage-report.html',
-                            reportName           : 'Diff Coverage'
-                    ])
+                                  allowMissing         : false,
+                                         alwaysLinkToLastBuild: false,
+                                         keepAll              : true,
+                                         reportDir            : 'build-dir/test/coverage',
+                                         reportFiles          : 'diff-coverage-report.html',
+                                         reportName           : 'Diff Coverage'
+                                    ])
 
                     withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
                         sh """
@@ -328,6 +328,10 @@ def doBuildAppleDevice(String sdk, String buildType) {
 
             try {
                 sh "./build.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}"
+                def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-android*').trim()
+                dir(buildDir) {
+                    archiveArtifacts('*.tar.gz')
+                }
             } finally {
                 collectCompilerWarnings('clang', true)
             }
@@ -355,29 +359,29 @@ def collectCompilerWarnings(compiler, fail) {
         parserName = 'MSBuild'
     }
     step([
-            $class                 : 'WarningsPublisher',
-            canComputeNew          : false,
-            canRunOnFailed         : true,
-            canResolveRelativePaths: false,
-            consoleParsers         : [[parserName: parserName]],
-            defaultEncoding        : '',
-            excludePattern         : '',
-            unstableTotalAll       : fail ? '0' : '',
-            healthy                : '',
-            includePattern         : '',
-            messagesPattern        : '',
-            unHealthy              : ''
-    ])
+           $class                 : 'WarningsPublisher',
+          canComputeNew          : false,
+          canRunOnFailed         : true,
+          canResolveRelativePaths: false,
+          consoleParsers         : [[parserName: parserName]],
+          defaultEncoding        : '',
+          excludePattern         : '',
+          unstableTotalAll       : fail ? '0' : '',
+          healthy                : '',
+          includePattern         : '',
+          messagesPattern        : '',
+          unHealthy              : ''
+             ])
 }
 
 def environment() {
     return [
-            "REALM_MAX_BPNODE_SIZE_DEBUG=4",
-            "UNITTEST_SHUFFLE=1",
-            "UNITTEST_RANDOM_SEED=random",
-            "UNITTEST_THREADS=1",
-            "UNITTEST_XML=1"
-    ]
+        "REALM_MAX_BPNODE_SIZE_DEBUG=4",
+        "UNITTEST_SHUFFLE=1",
+        "UNITTEST_RANDOM_SEED=random",
+        "UNITTEST_THREADS=1",
+        "UNITTEST_XML=1"
+        ]
 }
 
 def readGitTag() {
@@ -441,24 +445,24 @@ def doPublishGeneric() {
             }
 
             step([
-                    $class                              : 'S3BucketPublisher',
-                    dontWaitForConcurrentBuildCompletion: false,
-                    entries                             : [[
-                                                                   bucket                 : 'realm-ci-artifacts',
-                                                                   excludedFile           : '',
-                                                                   flatten                : false,
-                                                                   gzipFiles              : false,
-                                                                   managedArtifacts       : false,
-                                                                   noUploadOnFailure      : true,
-                                                                   selectedRegion         : 'us-east-1',
-                                                                   sourceFile             : "core/v${version}/linux/*.tgz",
-                                                                   storageClass           : 'STANDARD',
-                                                                   uploadFromSlave        : false,
-                                                                   useServerSideEncryption: false
-                                                           ]],
-                    profileName                         : 'hub-jenkins-user',
-                    userMetadata                        : []
-            ])
+                   $class                              : 'S3BucketPublisher',
+                  dontWaitForConcurrentBuildCompletion: false,
+                  entries                             : [[
+                           bucket                 : 'realm-ci-artifacts',
+                                                          excludedFile           : '',
+                                                          flatten                : false,
+                                                          gzipFiles              : false,
+                                                          managedArtifacts       : false,
+                                                          noUploadOnFailure      : true,
+                                                          selectedRegion         : 'us-east-1',
+                                                          sourceFile             : "core/v${version}/linux/*.tgz",
+                                                          storageClass           : 'STANDARD',
+                                                          uploadFromSlave        : false,
+                                                          useServerSideEncryption: false
+                             ]],
+                  profileName                         : 'hub-jenkins-user',
+                  userMetadata                        : []
+                     ])
         }
     }
 }
@@ -494,10 +498,10 @@ def getArchive() {
 
 def getSourceArchive() {
     checkout([
-            $class           : 'GitSCM',
-            branches         : scm.branches,
-            gitTool          : 'native git',
-            extensions       : scm.extensions + [[$class: 'CleanCheckout']],
-            userRemoteConfigs: scm.userRemoteConfigs
-    ])
+               $class           : 'GitSCM',
+              branches         : scm.branches,
+              gitTool          : 'native git',
+              extensions       : scm.extensions + [[$class: 'CleanCheckout']],
+              userRemoteConfigs: scm.userRemoteConfigs
+                 ])
 }
