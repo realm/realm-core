@@ -26,11 +26,11 @@
 
 using namespace realm;
 
-class ChangesetCookerInstructionHander {
+class ChangesetCookerInstructionHandler {
 public:
     friend Adapter;
 
-    ChangesetCookerInstructionHander(const Group &group)
+    ChangesetCookerInstructionHandler(const Group &group)
     : m_group(group)
     , m_schema(ObjectStore::schema_from_group(m_group)) {
         for (size_t i = 0; i < m_group.size(); i++) {
@@ -41,10 +41,16 @@ public:
     const Group &m_group;
     Schema m_schema;
     std::map<size_t, std::string> m_table_names;
+
+    // primary caches consisting of primary keys set from the realm plus those
+    // set mid-changeset
     std::map<size_t, std::pair<std::string, std::string>> m_primary_key_properties;
     std::map<size_t, std::map<size_t, int64_t>> m_int_primaries;
     std::map<size_t, std::map<size_t, std::string>> m_string_primaries;
+
+    // mapping inter-changetset rows to the index from the beginning of the changeset
     std::map<size_t, std::map<size_t, size_t>> m_row_mapping;
+
     json m_json_instructions;
 
     size_t m_selected_table_index;
@@ -259,7 +265,14 @@ public:
 
                 // update caches for moved object
                 if (row_index < old_row_index) {
-                    row_mapping[row_index] = old_row_index;
+                    auto old_row_iter = row_mapping.find(old_row_index);
+                    if (old_row_iter != row_mapping.end()) {
+                        row_mapping[row_index] = old_row_iter->second;
+                        row_mapping.erase(old_row_iter);
+                    }
+                    else {
+                        row_mapping[row_index] = old_row_index;
+                    }
 
                     // update primary key caches
                     if (int_primaries.count(old_row_index)) {
@@ -599,7 +612,7 @@ public:
                         util::AppendBuffer<char>& out_buffer) override {
         _impl::SimpleInputStream stream(changeset, changeset_size);
         _impl::TransactLogParser parser;
-        ChangesetCookerInstructionHander cooker_handler(group);
+        ChangesetCookerInstructionHandler cooker_handler(group);
         parser.parse(stream, cooker_handler);
         cooker_handler.append_primary_key_identifiers();
         std::string out_string = cooker_handler.m_json_instructions.dump();
