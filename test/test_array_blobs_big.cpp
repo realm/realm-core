@@ -382,8 +382,7 @@ TEST(ArrayBigBlobs_get_at)
     read = c.get_at(1, get_pos);
     CHECK(read.size() == 0);
 
-    // Try to assign a new small value to a blob holding a big value. This will fail
-    // if the context flag is not reset properly by the clear operation.
+    // Try to assign a new small value to a blob holding a big value.
     c.set(1, BinaryData(lazy_fox));
     get_pos = 0;
     read = c.get_at(0, get_pos);

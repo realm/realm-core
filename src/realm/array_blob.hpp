@@ -40,7 +40,6 @@ public:
     void insert(size_t pos, const char* data, size_t data_size, bool add_zero_term = false);
     ref_type replace(size_t begin, size_t end, const char* data, size_t data_size, bool add_zero_term = false);
     void erase(size_t begin, size_t end);
-    void clear();
 
     /// Get the specified element without the cost of constructing an
     /// array instance. If an array instance is already available, or
@@ -106,14 +105,6 @@ inline void ArrayBlob::erase(size_t begin, size_t end)
     const char* data = nullptr;
     size_t data_size = 0;
     replace(begin, end, data, data_size);
-}
-
-inline void ArrayBlob::clear()
-{
-    // Turn this object back to a single element blob
-    truncate_and_destroy_children(0);
-    set_context_flag(false);
-    set_has_refs(false);
 }
 
 inline const char* ArrayBlob::get(const char* header, size_t pos) noexcept

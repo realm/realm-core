@@ -12752,76 +12752,35 @@ TEST(LangBindHelper_BigBinary)
     ShortCircuitHistory hist(path);
     SharedGroup sg_w(hist);
     SharedGroup sg_r(hist);
+    std::string big_data(0x1000000, 'x');
 
     ReadTransaction rt(sg_r);
-
     {
-        std::unique_ptr<char[]> data(new char[0x1000000]);
+        std::string data(16777362, 'y');
         WriteTransaction wt(sg_w);
         Group& group = wt.get_group();
-        TableRef target = group.add_table("target");
+        TableRef target = group.add_table("big");
         target->add_column(type_Binary, "data");
         target->add_empty_row();
-        target->set_binary_big(0, 0, BinaryData(data.get(), 0x1000000));
+        target->set_binary_big(0, 0, BinaryData(data.data(), 16777362));
         wt.commit();
     }
 
     LangBindHelper::advance_read(sg_r);
-}
-
-
-TEST(LangBindHelper_AFLSetBigBinary)
-{
-    // Test case generated in [realm-core-2.3.1] on Mon Feb 13 15:49:33 2017.
-    SHARED_GROUP_TEST_PATH(path);
-    const char* key = nullptr;
-    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg_r(*hist_r, SharedGroupOptions(key));
-    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
-    Group& g = const_cast<Group&>(sg_w.begin_write());
-    Group& g_r = const_cast<Group&>(sg_r.begin_read());
-    std::vector<TableView> table_views;
-
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.get_table("big");
+        target->set_binary_big(0, 0, BinaryData(big_data.data(), 0x1000000));
+        group.verify();
+        wt.commit();
+    }
     LangBindHelper::advance_read(sg_r);
-    g_r.verify();
-    try { g.add_table(""); } catch (const TableNameInUse&) { }
-    g.verify();
-    g.get_table(0)->insert_column_link(0, type_Link, "link_col_0_0", *g.get_table(0));
-    g.get_table(0)->add_column(type_Int, "int_col_0, 1", true);
-    g.get_table(0)->insert_column(0, type_Double, "double_col_0_0", true);
-    g.get_table(0)->insert_column_link(0, type_Link, "link_col_0_self", *g.get_table(0));
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    LangBindHelper::promote_to_write(sg_w);
-    g.get_table(0)->add_column(type_Timestamp, "timestamp_col_0", false);
-    _impl::TableFriend::move_column(*(g.get_table(0)->get_descriptor()), 2, 1);
-    g.get_table(0)->add_search_index(4);
-    _impl::TableFriend::move_column(*(g.get_table(0)->get_descriptor()), 4, 2);
-    _impl::TableFriend::move_column(*(g.get_table(0)->get_descriptor()), 4, 0);
-    g.get_table(0)->add_column(type_Binary, "binary_col_0_0", true);
-    g.get_table(0)->insert_column_link(0, type_Link, "link_col_self_1", *g.get_table(0));
-    g.get_table(0)->insert_column(6, type_Binary, "binary_col_0_1", false);
-    g.get_table(0)->clear();
-    g.get_table(0)->add_empty_row(16);
-    {
-        std::string data(16777362, 'y');
-        g.get_table(0)->set_binary_big(6, 14, BinaryData(data.data(), 16777362));
-    }
-    LangBindHelper::commit_and_continue_as_read(sg_w);
-    g.verify();
-    LangBindHelper::promote_to_write(sg_w);
-    g.verify();
-    g.get_table(0)->add_column(type_Double, "double_col_0_1", false);
-    g.get_table(0)->insert_column_link(4, type_Link, "link_col_self_2", *g.get_table(0));
-    g.get_table(0)->insert_column_link(0, type_Link, "", *g.get_table(0));
-    g.get_table(0)->remove_column(9);
-    g.get_table(0)->add_empty_row(16);
-    {
-        std::string data(16777362, 'y');
-        g.get_table(0)->set_binary_big(8, 14, BinaryData(data.data(), 16777362));
-    }
-    g.verify();
+    const Group& g = rt.get_group();
+    auto t = g.get_table("big");
+    size_t pos = 0;
+    BinaryData bin = t->get_binary_at(0, 0, pos);
+    CHECK_EQUAL(memcmp(big_data.data(), bin.data(), bin.size()), 0);
 }
-
 
 #endif

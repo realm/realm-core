@@ -64,39 +64,49 @@ BinaryData ArrayBlob::get_at(size_t& pos) const noexcept
 
 ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t data_size, bool add_zero_term)
 {
+    size_t sz = blob_size();
     REALM_ASSERT_3(begin, <=, end);
-    REALM_ASSERT_3(end, <=, m_size);
+    REALM_ASSERT_3(end, <=, sz);
     REALM_ASSERT(data_size == 0 || data);
 
     // The context flag indicates if the array contains references to blobs
     // holding the actual data.
     if (get_context_flag()) {
-        REALM_ASSERT(begin == 0 && end == 0); // For the time being, only support append
+        REALM_ASSERT((begin == 0 || begin == sz) && end == sz); // Only append or total replace supported
+        if (begin == sz && end == sz) {
+            // Append
+            // We might have room for more data in the last node
+            ArrayBlob lastNode(m_alloc);
+            lastNode.init_from_ref(get_as_ref(size() - 1));
+            lastNode.set_parent(this, size() - 1);
 
-        // We might have room for more data in the last node
-        ArrayBlob lastNode(m_alloc);
-        lastNode.init_from_ref(get_as_ref(size() - 1));
-        lastNode.set_parent(this, size() - 1);
+            size_t space_left = max_binary_size - lastNode.size();
+            size_t size_to_copy = std::min(space_left, data_size);
+            lastNode.add(data, size_to_copy);
+            data_size -= space_left;
+            data += space_left;
 
-        size_t space_left = max_binary_size - lastNode.size();
-        size_t size_to_copy = std::min(space_left, data_size);
-        lastNode.add(data, size_to_copy);
-        data_size -= space_left;
-        data += space_left;
+            while (data_size) {
+                // Create new nodes as required
+                size_to_copy = std::min(size_t(max_binary_size), data_size);
+                ArrayBlob new_blob(m_alloc);
+                new_blob.create(); // Throws
 
-        while (data_size) {
-            // Create new nodes as required
-            size_to_copy = std::min(size_t(max_binary_size), data_size);
+                // Copy data
+                ref_type ref = new_blob.add(data, size_to_copy);
+                // Add new node in hosting node
+                Array::add(ref);
+
+                data_size -= size_to_copy;
+                data += size_to_copy;
+            }
+        }
+        else if (begin == 0 && end == sz) {
+            // Replace all. Start from scratch
+            destroy_deep();
             ArrayBlob new_blob(m_alloc);
-            new_blob.create(); // Throws
-
-            // Copy data
-            ref_type ref = new_blob.add(data, size_to_copy);
-            // Add new node in hosting node
-            Array::add(ref);
-
-            data_size -= size_to_copy;
-            data += size_to_copy;
+            new_blob.create();                                   // Throws
+            return new_blob.add(data, data_size, add_zero_term); // Throws
         }
     }
     else {
