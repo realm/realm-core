@@ -287,7 +287,7 @@ def doBuildMacOs(String buildType) {
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
                     retry(3) {
-                        timeout(time: 30, unit: 'SECONDS') {
+                        timeout(time: 1, unit: 'MINUTES') {
                             sh """
                                 rm -rf *
                                 cmake -D REALM_ENABLE_ENCRYPTION=yes \\
