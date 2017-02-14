@@ -45,7 +45,7 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
 
 # Add REALM_UWP=1 to compile with Windows UWP support
 if(WINDOWS_STORE AND CMAKE_SYSTEM_VERSION STREQUAL 10.0)
-    add_definitions(-DREALM_UWP=1 -D_CRT_SECURE_NO_WARNINGS)
+    add_definitions(-DREALM_UWP=1 -D_SCL_SECURE_NO_WARNINGS)
 endif()
 
 # Coverage-specific build flags
