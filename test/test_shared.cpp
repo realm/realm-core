@@ -3061,7 +3061,7 @@ TEST(Shared_Bptree_insert_failure)
     g.get_table(0)->add_empty_row(396);
 }
 
-TEST(SharedGroupOptions_tmp_dir)
+NONCONCURRENT_TEST(SharedGroupOptions_tmp_dir)
 {
     const std::string initial_system_dir = SharedGroupOptions::get_sys_tmp_dir();
 
