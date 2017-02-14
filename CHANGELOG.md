@@ -4,6 +4,7 @@
 
 * Fixed a few bugs (caused crashes) in pthread library on UWP.
 * Fixes a bug in chuncked binary column returning null value (#2418)
+* Fixed a bug when deleting a column used in a query (#2408)
 
 ### Breaking changes
 

@@ -1172,6 +1172,8 @@ private:
     const BacklinkColumn& get_column_backlink(size_t ndx) const noexcept;
     BacklinkColumn& get_column_backlink(size_t ndx);
 
+    void verify_column(size_t col_ndx, const ColumnBase* col) const;
+
     void instantiate_before_change();
     void validate_column_type(const ColumnBase& col, ColumnType expected_type, size_t ndx) const;
 
@@ -1652,6 +1654,18 @@ inline bool Table::has_shared_type() const noexcept
     return !m_top.is_attached();
 }
 
+inline void Table::verify_column(size_t col_ndx, const ColumnBase* col) const
+{
+    // Check if the column exists at the expected location
+    if (REALM_LIKELY(col_ndx < m_cols.size() && m_cols[col_ndx] == col))
+        return;
+    // The column might be elsewhere in the list
+    for (auto c : m_cols) {
+        if (c == col)
+            return;
+    }
+    throw LogicError(LogicError::column_does_not_exist);
+}
 
 class Table::UnbindGuard {
 public:

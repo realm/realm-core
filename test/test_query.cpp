@@ -9917,4 +9917,185 @@ TEST(Query_ArrayLeafRelocate)
     }
 }
 
+TEST(Query_ColumnDeletionSimple)
+{
+    Table foo;
+    foo.add_column(type_Int, "a");
+    foo.add_column(type_Int, "b");
+    foo.add_empty_row(10);
+    foo.set_int(0, 3, 123);
+    foo.set_int(0, 4, 123);
+    foo.set_int(0, 7, 123);
+    foo.set_int(1, 2, 456);
+    foo.set_int(1, 4, 456);
+
+    auto q1 = foo.column<Int>(0) == 123;
+    auto q2 = foo.column<Int>(1) == 456;
+    auto q3 = q1 || q2;
+    TableView tv1 = q1.find_all();
+    TableView tv2 = q2.find_all();
+    TableView tv3 = q3.find_all();
+    CHECK_EQUAL(tv1.size(), 3);
+    CHECK_EQUAL(tv2.size(), 2);
+    CHECK_EQUAL(tv3.size(), 4);
+
+    foo.remove_column(0);
+
+    size_t x = 0;
+    CHECK_LOGIC_ERROR(x = q1.count(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_EQUAL(x, 0);
+    CHECK_EQUAL(tv1.size(), 0);
+
+    // This one should succeed in spite the column index is 1 and we
+    x = q2.count();
+    tv2.sync_if_needed();
+    CHECK_EQUAL(x, 2);
+    CHECK_EQUAL(tv2.size(), 2);
+
+    x = 0;
+    CHECK_LOGIC_ERROR(x = q3.count(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv3.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_EQUAL(x, 0);
+    CHECK_EQUAL(tv3.size(), 0);
+}
+
+TEST(Query_ColumnDeletionExpression)
+{
+    Table foo;
+    foo.add_column(type_Int, "a");
+    foo.add_column(type_Int, "b");
+    foo.add_column(type_Timestamp, "c");
+    foo.add_column(type_Timestamp, "d");
+    foo.add_column(type_String, "e");
+    foo.add_column(type_Float, "f");
+    foo.add_column(type_Binary, "g");
+    foo.add_empty_row(5);
+    foo.set_int(0, 0, 0);
+    foo.set_int(0, 1, 1);
+    foo.set_int(0, 2, 2);
+    foo.set_int(0, 3, 3);
+    foo.set_int(0, 4, 4);
+    foo.set_int(1, 0, 0);
+    foo.set_int(1, 1, 0);
+    foo.set_int(1, 2, 3);
+    foo.set_int(1, 3, 5);
+    foo.set_int(1, 4, 3);
+    foo.set_timestamp(2, 0, Timestamp(100, 100));
+    foo.set_timestamp(3, 0, Timestamp(200, 100));
+    foo.set_string(4, 0, StringData("Hello, world"));
+    foo.set_float(5, 0, 3.141592);
+    foo.set_float(5, 1, 1.0);
+    foo.set_binary(6, 0, BinaryData("Binary", 6));
+
+    // Expression
+    auto q = foo.column<Int>(0) == foo.column<Int>(1) + 1;
+    // TwoColumnsNode
+    auto q1 = foo.column<Int>(0) == foo.column<Int>(1);
+    TableView tv = q.find_all();
+    TableView tv1 = q1.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv1.size(), 1);
+
+    foo.remove_column(0);
+    size_t x = 0;
+    CHECK_LOGIC_ERROR(x = q.count(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_EQUAL(x, 0);
+    CHECK_EQUAL(tv.size(), 0);
+
+    q = foo.column<Timestamp>(1) < foo.column<Timestamp>(2);
+    // TimestampNode
+    q1 = foo.column<Timestamp>(2) == Timestamp(200, 100);
+    tv = q.find_all();
+    tv1 = q1.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv1.size(), 1);
+    foo.remove_column(2);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+
+    // StringNodeBase
+    q = foo.column<String>(2) == StringData("Hello, world");
+    q1 = !(foo.column<String>(2) == StringData("Hello, world"));
+    tv = q.find_all();
+    tv1 = q1.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv1.size(), 4);
+    foo.remove_column(2);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+
+    // FloatDoubleNode
+    q = foo.column<Float>(2) > 0.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    foo.remove_column(2);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+
+    // BinaryNode
+    q = foo.column<Binary>(2) != BinaryData("Binary", 6);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 4);
+    foo.remove_column(2);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+}
+
+TEST(Query_ColumnDeletionLinks)
+{
+    Group g;
+    TableRef foo = g.add_table("foo");
+    TableRef bar = g.add_table("bar");
+    TableRef foobar = g.add_table("foobar");
+
+    foobar->add_column(type_Int, "int");
+
+    bar->add_column(type_Int, "int");
+    bar->add_column_link(type_Link, "link", *foobar);
+
+    foo->add_column_link(type_Link, "link", *bar);
+    DescriptorRef subdesc;
+    foo->add_column(type_Table, "sub", &subdesc);
+    subdesc->add_column(type_Int, "int");
+
+    foobar->add_empty_row(5);
+    bar->add_empty_row(5);
+    foo->add_empty_row(10);
+    for (size_t i = 0; i < 5; i++) {
+        foobar->set_int(0, i, i);
+        bar->set_int(0, i, i);
+        bar->set_link(1, i, i);
+        foo->set_link(0, i, i);
+        auto sub = foo->get_subtable(1, 0);
+        auto r = sub->add_empty_row();
+        sub->set_int(0, r, i);
+    }
+    auto q = foo->link(0).link(1).column<Int>(0) == 2;
+    auto q1 = foo->column<Link>(0).is_null();
+    auto q2 = foo->column<Link>(0) == bar->get(2);
+    auto q3 = foo->where().subtable(1).greater(0, 3).end_subtable();
+    auto tv = q.find_all();
+    auto cnt = q1.count();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(cnt, 5);
+    cnt = q2.count();
+    CHECK_EQUAL(cnt, 1);
+    cnt = q3.count();
+    CHECK_EQUAL(cnt, 1);
+    // remove integer column, should not affect query
+    bar->remove_column(0);
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 1);
+    // remove link column, disaster
+    bar->remove_column(0);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    foo->remove_column(0);
+    CHECK_LOGIC_ERROR(q1.count(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(q2.count(), LogicError::column_does_not_exist);
+    // Remove subtable column
+    foo->remove_column(0);
+    CHECK_LOGIC_ERROR(q3.count(), LogicError::column_does_not_exist);
+}
+
 #endif // TEST_QUERY
