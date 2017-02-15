@@ -69,6 +69,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     array_binary.hpp
     array_blob.hpp
     array_blobs_big.hpp
+    array_direct.hpp
     array_integer.hpp
     array_string.hpp
     array_string_long.hpp
@@ -131,6 +132,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     timestamp.hpp
     unicode.hpp
     utilities.hpp
+    version_id.hpp
     views.hpp
 ) # REALM_INSTALL_GENERAL_HEADERS
 
