@@ -58,7 +58,7 @@ static void reachability_callback(SCNetworkReachabilityRef, SCNetworkReachabilit
 
 NetworkReachabilityObserver::NetworkReachabilityObserver(util::Optional<std::string> hostname,
                                                          std::function<void (const NetworkReachabilityStatus)> handler)
-: m_callback_queue(dispatch_queue_create("io.realm.sync.reachability", nullptr))
+: m_callback_queue(dispatch_queue_create("io.realm.sync.reachability", DISPATCH_QUEUE_SERIAL))
 , m_reachability_callback([=]() { reachability_changed(); })
 , m_change_handler(std::move(handler))
 {
