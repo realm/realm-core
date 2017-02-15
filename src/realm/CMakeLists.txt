@@ -229,14 +229,6 @@ if(NOT REALM_SKIP_SHARED_LIB)
         LIBRARY_OUTPUT_NAME realm
     )
 
-    # Creating the symbolic link fails on Cocoa builds
-    if(NOT APPLE)
-        set_target_properties(
-                realm-shared PROPERTIES
-                SOVERSION 9.0.0
-        )
-    endif()
-
     target_link_libraries(
         realm-shared
         ${REALM_EXTRA_LIBS}
