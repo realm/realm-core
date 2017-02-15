@@ -37,7 +37,7 @@ echo "Building core"
 
 cd ../../
 REALM_ENABLE_ENCRYPTION=yes sh build.sh config
-CXX="$compiler" REALM_HAVE_CONFIG=yes make -j check-debug-norun "$flags"
+CXX="$compiler" REALM_HAVE_CONFIG=yes make -j $num_fuzzers check-debug-norun "$flags"
 
 echo "Building fuzz target"
 
@@ -51,7 +51,7 @@ rm -rf findings/*
 
 # see also stop_parallel_fuzzer.sh
 time_out="1000" # ms
-memory="100" # MB
+memory="150" # MB
 
 echo "Starting $num_fuzzers fuzzers in parallel"
 
