@@ -120,7 +120,7 @@ def doBuildCocoa(def isPublishingRun, def isPublishingLatestRun) {
 
       try {
         withEnv([
-          'PATH=$PATH:/usr/local/bin',
+          'PATH+PREPEND=/usr/local/bin',
           'REALM_ENABLE_ENCRYPTION=yes',
           'REALM_ENABLE_ASSERTIONS=yes',
           'MAKEFLAGS=CFLAGS_DEBUG\\=-Oz',
