@@ -12783,4 +12783,32 @@ TEST(LangBindHelper_BigBinary)
     CHECK_EQUAL(memcmp(big_data.data(), bin.data(), bin.size()), 0);
 }
 
+TEST(LangBindHelper_CopyOnWriteOverflow)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_w(hist);
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.add_table("big");
+        target->add_column(type_Binary, "data");
+        target->add_empty_row();
+        {
+            std::string data(0xfffff0, 'x');
+            target->set_binary(0, 0, BinaryData(data.data(), 0xfffff0));
+        }
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        group.get_table(0)->set_binary(0, 0, BinaryData{"Hello", 5});
+        group.verify();
+        wt.commit();
+    }
+}
+
 #endif
