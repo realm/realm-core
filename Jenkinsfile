@@ -311,9 +311,6 @@ def doBuildMacOs(String buildType) {
                                -configuration ${buildType} \\
                                -target package \\
                                ONLY_ACTIVE_ARCH=NO
-                    for file in realm-core-*.tar.gz; do
-                        mv -i \"\${file}\" \"\${file/HEAD-HASH-NOTFOUND/${gitDescribeVersion}}\"
-                    done
                 """
                     archiveArtifacts('*.tar.gz')
                 }
