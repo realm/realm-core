@@ -543,5 +543,17 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
 
         r1->notify();
     }
+
+    SECTION("refresh") {
+        r1->m_binding_context.reset(new Context());
+
+        auto r2 = Realm::get_shared_realm(config);
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->add_empty_row(1);
+        r2->commit_transaction();
+        r2.reset();
+
+        REQUIRE_FALSE(r1->refresh());
+    }
 }
 

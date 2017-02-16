@@ -754,6 +754,11 @@ bool RealmCoordinator::advance_to_latest(Realm& realm)
 
     auto version = sg->get_version_of_current_transaction();
     transaction::advance(sg, realm.m_binding_context.get(), notifiers);
+
+    // Realm could be closed in the callbacks.
+    if (realm.is_closed())
+        return false;
+
     return version != sg->get_version_of_current_transaction();
 }
 
