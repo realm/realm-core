@@ -158,8 +158,8 @@ stage('unit-tests') {
     linux_sync: doDockerBuild('linux', true, true),
     android: doAndroidDockerBuild(),
     macos: doBuild('osx', 'macOS', false),
-    macos_sync: doBuild('osx', 'macOS', true) //,
-    // win32: doWindowsBuild()
+    macos_sync: doBuild('osx', 'macOS', true),
+    win32: doWindowsBuild()
   )
   currentBuild.result = 'SUCCESS'
 }
