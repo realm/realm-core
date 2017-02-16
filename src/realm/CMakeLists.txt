@@ -312,7 +312,7 @@ if(ANDROID)
             DESTINATION ${CMAKE_INSTALL_LIBDIR}
             COMPONENT devel)
     install(DIRECTORY ${OPENSSL_INCLUDE_DIR}/openssl
-            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openssl
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
             COMPONENT devel)
 endif()
 
