@@ -311,8 +311,7 @@ if(ANDROID)
     install(FILES ${OPENSSL_LIB_DIR}/libcrypto.a ${OPENSSL_LIB_DIR}/libssl.a
             DESTINATION ${CMAKE_INSTALL_LIBDIR}
             COMPONENT devel)
-    file(GLOB OPENSSL_INCLUDE_FILES ${OPENSSL_INCLUDE_DIR}/openssl/*.h)
-    install(FILES ${OPENSSL_INCLUDE_FILES}
+    install(DIRECTORY ${OPENSSL_INCLUDE_DIR}/openssl
             DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openssl
             COMPONENT devel)
 endif()
