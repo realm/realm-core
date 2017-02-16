@@ -765,13 +765,11 @@ void TableViewBase::do_sync()
             m_row_indexes.clear();
         else
             m_row_indexes.init_from_ref(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()));
+
         // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();
 
-        // find_all needs to call size() on the tableview. But if we're
-        // out of sync, size() will then call do_sync and we'll have an infinite regress
-        // SO: fake that we're up to date BEFORE calling find_all.
         m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
     }
     m_num_detached_refs = 0;
