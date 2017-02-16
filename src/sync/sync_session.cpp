@@ -48,7 +48,6 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 ///    * ACTIVE: when the binding successfully refreshes the token
 ///    * INACTIVE: if asked to log out, or if asked to close and the stop policy
 ///                is Immediate.
-///    * DYING: if asked to close and the stop policy is AfterChangesUploaded
 ///    * ERROR: if a fatal error occurs
 ///
 /// ACTIVE: the session is connected to the Realm Object Server and is actively
@@ -87,6 +86,7 @@ constexpr const char SyncError::c_recovery_file_path_key[];
 struct SyncSession::State {
     virtual ~State() { }
 
+    // Move the given session into this state. All state transitions MUST be carried out through this method.
     virtual void enter_state(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
     virtual void refresh_access_token(std::unique_lock<std::mutex>&,
@@ -96,20 +96,22 @@ struct SyncSession::State {
     virtual void bind_with_admin_token(std::unique_lock<std::mutex>&,
                                        SyncSession&, const std::string&, const std::string&) const { }
 
-    /// Returns true iff the lock is still locked when the method returns.
+    // Returns true iff the lock is still locked when the method returns.
     virtual bool access_token_expired(std::unique_lock<std::mutex>&, SyncSession&) const { return true; }
 
     virtual void nonsync_transact_notify(std::unique_lock<std::mutex>&, SyncSession&, sync::Session::version_type) const { }
 
+    // Perform any work needed to reactivate a session that is not already active.
+    // Returns true iff the session should ask the binding to get a token for `bind()`.
     virtual bool revive_if_needed(std::unique_lock<std::mutex>&, SyncSession&) const { return false; }
 
+    // The user that owns this session has been logged out, and the session should take appropriate action.
     virtual void log_out(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
-    virtual void close_if_connecting(std::unique_lock<std::mutex>&, SyncSession&) const { }
-
+    // The session should be closed and moved to `inactive`, in accordance with its stop policy and other state.
     virtual void close(std::unique_lock<std::mutex>&, SyncSession&) const { }
 
-    /// Returns true iff the error has been fully handled and the error handler should immediately return.
+    // Returns true iff the error has been fully handled and the error handler should immediately return.
     virtual bool handle_error(std::unique_lock<std::mutex>&, SyncSession&, const SyncError&) const { return false; }
 
     static const State& waiting_for_access_token;
@@ -146,7 +148,6 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
         }
         session.advance_state(lock, active);
         if (session.m_deferred_close) {
-            session.m_deferred_close = false;
             session.m_state->close(lock, session);
         }
     }
@@ -154,6 +155,12 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
     void log_out(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
         session.advance_state(lock, inactive);
+    }
+
+    bool revive_if_needed(std::unique_lock<std::mutex>&, SyncSession& session) const override
+    {
+        session.m_deferred_close = false;
+        return false;
     }
 
     void nonsync_transact_notify(std::unique_lock<std::mutex>&,
@@ -164,15 +171,19 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
         session.m_deferred_commit_notification = version;
     }
 
-    void close_if_connecting(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
+    void close(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
     {
-        // Ignore the sync configuration's stop policy as we're not yet connected.
-        session.advance_state(lock, inactive);
-    }
-
-    void close(std::unique_lock<std::mutex>&, SyncSession& session) const override
-    {
-        session.m_deferred_close = true;
+        switch (session.m_config.stop_policy) {
+            case SyncSessionStopPolicy::Immediately:
+                // Immediately kill the session.
+                session.advance_state(lock, inactive);
+                break;
+            case SyncSessionStopPolicy::LiveIndefinitely:
+            case SyncSessionStopPolicy::AfterChangesUploaded:
+                // Defer handling closing the session until after the login response succeeds.
+                session.m_deferred_close = true;
+                break;
+        }
     }
 };
 
@@ -581,12 +592,6 @@ void SyncSession::close()
 {
     std::unique_lock<std::mutex> lock(m_state_mutex);
     m_state->close(lock, *this);
-}
-
-void SyncSession::close_if_connecting()
-{
-    std::unique_lock<std::mutex> lock(m_state_mutex);
-    m_state->close_if_connecting(lock, *this);
 }
 
 void SyncSession::unregister(std::unique_lock<std::mutex>& lock)

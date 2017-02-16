@@ -112,6 +112,7 @@ public:
     bool wait_for_upload_completion_blocking();
 
     // If the sync session is currently `Dying`, ask it to stay alive instead.
+    // If the sync session is currently `WaitingForAccessToken`, cancel any deferred close.
     // If the sync session is currently `Inactive`, recreate it. Otherwise, a no-op.
     static void revive_if_needed(std::shared_ptr<SyncSession> session);
 
@@ -121,14 +122,14 @@ public:
     // be set.
     void refresh_access_token(std::string access_token, util::Optional<std::string> server_url);
 
+    // FIXME: we need an API to allow the binding to tell sync that the access token fetch failed
+    // or was cancelled, and cannot be retried.
+
     // Give the `SyncSession` an administrator token, and ask it to immediately `bind()` the session.
     void bind_with_admin_token(std::string admin_token, std::string server_url);
 
     // Inform the sync session that it should close.
     void close();
-
-    // Inform the sync session that it should close, but only if it is not yet connected.
-    void close_if_connecting();
 
     // Inform the sync session that it should log out.
     void log_out();

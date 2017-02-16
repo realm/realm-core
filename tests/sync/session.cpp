@@ -319,6 +319,66 @@ TEST_CASE("sync: token refreshing", "[sync]") {
     }
 }
 
+TEST_CASE("sync: SyncSession.close() API", "[sync]") {
+    using PublicState = realm::SyncSession::PublicState;
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    SyncServer server;
+
+    auto user = SyncManager::shared().get_user("close-api-tests-user", "not_a_real_token");
+
+    SECTION("Behaves properly when called on session in the 'waiting for token' state for Immediate") {
+        std::atomic<bool> bind_function_called(false);
+
+        // Make a session that won't leave the 'waiting for token' state.
+        std::string url = server.base_url() + "/test-close-for-waiting-token";
+        SyncTestFile config({user, url,
+            SyncSessionStopPolicy::Immediately,
+            [&](auto&, auto&, std::shared_ptr<SyncSession>) {
+                bind_function_called = true;
+            },
+            [&](auto, auto) { }
+        });
+        std::shared_ptr<SyncSession> session;
+        {
+            auto realm = Realm::get_shared_realm(config);
+            session = SyncManager::shared().get_session(config.path, *config.sync_config);
+        }
+        REQUIRE(session);
+        EventLoop::main().run_until([&] { return bind_function_called == true; });
+        REQUIRE(session->state() == PublicState::WaitingForAccessToken);
+        session->close();
+        REQUIRE(session_is_inactive(*session));
+        // Test trying to call bind on the session after it's been closed. Should be a no-op.
+        session->refresh_access_token(s_test_token, url);
+        REQUIRE(session_is_inactive(*session));
+    }
+
+    SECTION("Behaves properly when called on session in the 'active' or 'inactive' state") {
+        auto session = sync_session(server, user, "/test-close-for-active",
+                                    [&](auto&, auto&) { return s_test_token; },
+                                    [](auto, auto) { },
+                                    SyncSessionStopPolicy::AfterChangesUploaded);
+        EventLoop::main().run_until([&] { return session_is_active(*session); });
+        REQUIRE(session_is_active(*session));
+        session->close();
+        EventLoop::main().run_until([&] { return session_is_inactive(*session); });
+        REQUIRE(session_is_inactive(*session));
+        // Try closing the session again. This should be a no-op.
+        session->close();
+        REQUIRE(session_is_inactive(*session));
+    }
+
+    SECTION("Behaves properly when called on session in the 'error' state") {
+        auto session = sync_session(server, user, "/test-close-for-error",
+                                    [&](auto&, auto&) { return "NOT A VALID TOKEN"; },
+                                    [](auto, auto) { },
+                                    SyncSessionStopPolicy::AfterChangesUploaded);
+        EventLoop::main().run_until([&] { return session->state() == PublicState::Error; });
+        session->close();
+        REQUIRE(session->state() == PublicState::Error);
+    }
+}
+
 TEST_CASE("sync: error handling", "[sync]") {
     using ProtocolError = realm::sync::ProtocolError;
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
