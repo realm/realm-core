@@ -1220,7 +1220,7 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>/DPTW32_STATIC_LIB WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -1373,7 +1373,7 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>/DPTW32_STATIC_LIB WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|ARM'">
@@ -1403,7 +1403,7 @@
       <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <Lib>
-      <AdditionalOptions>/DPTW32_STATIC_LIB WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>WS2_32.lib %(AdditionalOptions)</AdditionalOptions>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
