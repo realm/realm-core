@@ -460,6 +460,7 @@ find_android_ndk()
 }
 
 CONFIG_MK="src/config.mk"
+CONFIG_TMP="src/config.tmp"
 
 require_config()
 {
@@ -690,7 +691,7 @@ case "$MODE" in
             android_ndk_home="$(find_android_ndk)" || android_ndk_home="none"
         fi
 
-        cat >"$CONFIG_MK" <<EOF
+        cat >"$CONFIG_TMP" <<EOF
 CONFIG_VERSION        = ${CONFIG_VERSION}
 REALM_VERSION         = $realm_version
 INSTALL_PREFIX        = $install_prefix
@@ -716,8 +717,14 @@ TVOS_SDKS             = ${tvos_sdks:-none}
 TVOS_SDKS_AVAIL       = $tvos_sdks_avail
 ANDROID_NDK_HOME      = $android_ndk_home
 EOF
+        CONFIG_STATUS="Existing"
+        if ! [ -e $CONFIG_MK ] || [ "$(diff $CONFIG_TMP $CONFIG_MK)" ]; then
+            cp $CONFIG_TMP $CONFIG_MK
+            CONFIG_STATUS="New"
+        fi
+        rm $CONFIG_TMP
         if ! [ "$INTERACTIVE" ]; then
-            echo "New configuration in $CONFIG_MK:"
+            echo "$CONFIG_STATUS configuration in $CONFIG_MK:"
             cat "$CONFIG_MK" | sed 's/^/    /' || exit 1
             echo "Done configuring"
         fi
