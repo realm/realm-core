@@ -361,6 +361,7 @@ protected:
     TableViewBase(Table* parent);
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
     TableViewBase(Table* parent, size_t column, BasicRowExpr<const Table> row);
+    TableViewBase(Table* parent, ConstLinkViewRef link_view);
 
     enum DistinctViewTag { DistinctView };
     TableViewBase(DistinctViewTag, Table* parent, size_t column_ndx);
@@ -560,6 +561,7 @@ public:
 private:
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
+    TableView(Table& parent, ConstLinkViewRef);
 
     TableView(DistinctViewTag, Table& parent, size_t column_ndx);
 
@@ -751,6 +753,17 @@ inline TableViewBase::TableViewBase(DistinctViewTag, Table* parent, size_t colum
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
 {
     REALM_ASSERT(m_distinct_column_source != npos);
+
+    allocate_row_indexes();
+}
+
+inline TableViewBase::TableViewBase(Table* parent, ConstLinkViewRef link_view)
+    : RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default())
+    , m_table(parent->get_table_ref()) // Throws
+    , m_linkview_source(std::move(link_view))
+    , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+{
+    REALM_ASSERT(m_linkview_source);
 
     allocate_row_indexes();
 }
@@ -1168,6 +1181,11 @@ inline TableView::TableView(Table& parent)
 
 inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit)
     : TableViewBase(&parent, query, start, end, limit)
+{
+}
+
+inline TableView::TableView(Table& parent, ConstLinkViewRef link_view)
+: TableViewBase(&parent, std::move(link_view))
 {
 }
 
