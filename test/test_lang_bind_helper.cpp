@@ -12164,7 +12164,7 @@ TEST(LangBindHelper_InRealmHistory_Upgrade)
     SHARED_GROUP_TEST_PATH(path_2);
     {
         // No history
-        SharedGroup sg(path_2);
+        SharedGroup sg(path_2, false, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
@@ -12184,13 +12184,13 @@ TEST(LangBindHelper_InRealmHistory_Downgrade)
     {
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path);
-        SharedGroup sg(*hist);
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.commit();
     }
     {
         // No history
-        CHECK_THROW(SharedGroup(path), IncompatibleHistories);
+        CHECK_THROW(SharedGroup(path, false, SharedGroupOptions(crypt_key())), IncompatibleHistories);
     }
 }
 
