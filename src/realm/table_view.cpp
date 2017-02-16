@@ -518,45 +518,35 @@ uint64_t TableViewBase::outside_version() const
 {
     check_cookie();
 
-    // If the TableView directly or indirectly depends on a LinkList that has been deleted, then its m_table has been
-    // set to 0 and there is no way to know its version number. So return biggest possible value to trigger a refresh
-    // later
-    uint64_t max = std::numeric_limits<uint64_t>::max();
-
-    LinkView* lvp = dynamic_cast<LinkView*>(m_query.m_view);
-    if (lvp) {
-        // This LinkView depends on Query that is restricted by LinkList (with where(&linklist))
-        if (lvp->is_attached()) {
-            return lvp->get_origin_table().m_version;
-        }
-        else {
-            // LinkList was deleted
-            return max;
-        }
-    }
-
-    TableView* tvp = dynamic_cast<TableView*>(m_query.m_view);
-    if (tvp) {
-        // This LinkView depends on a Query that is restricted by a LinkView (with where(&linkview))
-        return tvp->outside_version();
-    }
+    // If the TableView directly or indirectly depends on a view that has been deleted, there is no way to know
+    // its version number. Return the biggest possible value to trigger a refresh later.
+    const uint64_t max = std::numeric_limits<uint64_t>::max();
 
     if (m_linkview_source) {
-        // m_linkview_source is set if-and-only-if this TableView was created by LinkView::get_as_sorted_view().
-        if (m_linkview_source->is_attached()) {
-            return m_linkview_source->get_origin_table().m_version;
+        // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
+        return m_linkview_source->is_attached() ? m_linkview_source->get_origin_table().m_version : max;
+    }
+
+    if (m_linked_column) {
+        // m_linked_column is set when this TableView was created by Table::get_backlink_view().
+        return m_linked_row ? m_linked_row.get_table()->m_version : max;
+    }
+
+    if (m_query.m_table) {
+        // m_query.m_table is set when this TableView was created by a query.
+
+        if (auto* view = dynamic_cast<LinkView*>(m_query.m_view)) {
+            // This TableView depends on Query that is restricted by a LinkView (with where(&link_view))
+            return view->is_attached() ? view->get_origin_table().m_version : max;
         }
-        else {
-            return max;
+
+        if (auto* view = dynamic_cast<TableView*>(m_query.m_view)) {
+            // This LinkView depends on a Query that is restricted by a TableView (with where(&table_view))
+            return view->outside_version();
         }
     }
 
-    if (m_linked_column && !m_linked_row) {
-        // m_linked_column is set when created by Table::get_backlink_view.
-        return max;
-    }
-
-    // This TableView was created by a method directly on Table, such as Table::find_all(int64_t)
+    // This TableView was either created by Table::get_distinct_view(), or a Query that is not restricted to a view.
     return m_table->m_version;
 }
 
