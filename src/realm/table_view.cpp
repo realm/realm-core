@@ -729,8 +729,12 @@ void TableViewBase::sort(SortDescriptor order)
 
 void TableViewBase::do_sync()
 {
-    // A TableView can be "born" from 4 different sources: LinkView, Table::get_distinct_view(),
-    // Table::find_all() or Query. Here we sync with the respective source.
+    // This TableView can be "born" from 4 different sources:
+    // - LinkView
+    // - Query::find_all()
+    // - Table::get_distinct_view()
+    // - Table::get_backlink_view()
+    // Here we sync with the respective source.
 
     if (m_linkview_source) {
         m_row_indexes.clear();

@@ -314,9 +314,8 @@ public:
     virtual std::unique_ptr<TableViewBase> clone() const = 0;
 
 protected:
-    // This TableView can be "born" from 5 different sources:
+    // This TableView can be "born" from 4 different sources:
     // - LinkView
-    // - Table::find_all()
     // - Query::find_all()
     // - Table::get_distinct_view()
     // - Table::get_backlink_view()
