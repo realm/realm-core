@@ -675,21 +675,6 @@ void TableView::clear(RemoveMode underlying_mode)
         m_last_seen_version = outside_version();
 }
 
-void TableViewBase::sync_distinct_view(size_t column)
-{
-    m_row_indexes.clear();
-    m_num_detached_refs = 0;
-    m_distinct_column_source = column;
-    if (m_distinct_column_source != npos) {
-        REALM_ASSERT(m_table);
-        REALM_ASSERT(m_table->has_search_index(m_distinct_column_source));
-        if (!m_table->is_degenerate()) {
-            const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
-            col.get_search_index()->distinct(m_row_indexes);
-        }
-    }
-}
-
 void TableViewBase::distinct(size_t column)
 {
     distinct(SortDescriptor(*m_table, {{column}}));
@@ -732,7 +717,12 @@ void TableViewBase::do_sync()
             m_row_indexes.add(m_linkview_source->get(t).get_index());
     }
     else if (m_distinct_column_source != npos) {
-        sync_distinct_view(m_distinct_column_source);
+        m_row_indexes.clear();
+        REALM_ASSERT(m_table->has_search_index(m_distinct_column_source));
+        if (!m_table->is_degenerate()) {
+            const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
+            col.get_search_index()->distinct(m_row_indexes);
+        }
     }
     else if (m_linked_column) {
         m_row_indexes.clear();

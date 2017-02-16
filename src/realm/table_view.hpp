@@ -285,9 +285,6 @@ public:
     // if the TableView depends on an object (LinkView or row) that has been deleted.
     uint_fast64_t sync_if_needed() const;
 
-    // Set this undetached TableView to be a distinct view, and sync immediately.
-    void sync_distinct_view(size_t column_ndx);
-
     // Sort m_row_indexes according to one column
     void sort(size_t column, bool ascending = true);
 
@@ -365,6 +362,9 @@ protected:
     TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit);
     TableViewBase(Table* parent, size_t column, BasicRowExpr<const Table> row);
 
+    enum DistinctViewTag { DistinctView };
+    TableViewBase(DistinctViewTag, Table* parent, size_t column_ndx);
+
     /// Copy constructor.
     TableViewBase(const TableViewBase&);
 
@@ -408,6 +408,7 @@ protected:
     TableViewBase(TableViewBase& source, HandoverPatch& patch, MutableSourcePayload mode);
 
 private:
+    void allocate_row_indexes();
     void detach() const noexcept; // may have to remove const
     size_t find_first_integer(size_t column_ndx, int64_t value) const;
     template <class oper>
@@ -560,6 +561,8 @@ private:
     TableView(Table& parent);
     TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit);
 
+    TableView(DistinctViewTag, Table& parent, size_t column_ndx);
+
     TableView find_all_integer(size_t column_ndx, int64_t value);
     ConstTableView find_all_integer(size_t column_ndx, int64_t value) const;
 
@@ -692,6 +695,18 @@ inline size_t TableViewBase::find_by_source_ndx(size_t source_ndx) const noexcep
     return m_row_indexes.find_first(source_ndx);
 }
 
+inline void TableViewBase::allocate_row_indexes()
+{
+    // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
+    // a free-standing container, and beause `IntegerColumn` does not conform to the
+    // RAII idiom (nor should it).
+    Allocator& alloc = m_row_indexes.get_alloc();
+    _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
+    ref_guard.reset(IntegerColumn::create(alloc)); // Throws
+    m_table->register_view(this);                   // Throws
+    m_row_indexes.init_from_ref(alloc, ref_guard.release());
+}
+
 inline TableViewBase::TableViewBase()
     : RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default()) // Throws
 {
@@ -704,14 +719,7 @@ inline TableViewBase::TableViewBase(Table* parent)
     , m_table(parent->get_table_ref()) // Throws
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
 {
-    // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
-    // a free-standing container, and beause `IntegerColumn` does not conform to the
-    // RAII idiom (nor should it).
-    Allocator& alloc = m_row_indexes.get_alloc();
-    _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
-    ref_guard.reset(IntegerColumn::create(alloc)); // Throws
-    parent->register_view(this);                   // Throws
-    m_row_indexes.init_from_ref(alloc, ref_guard.release());
+    allocate_row_indexes();
 }
 
 inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, size_t end, size_t limit)
@@ -723,14 +731,7 @@ inline TableViewBase::TableViewBase(Table* parent, Query& query, size_t start, s
     , m_limit(limit)
     , m_last_seen_version(outside_version())
 {
-    // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
-    // a free-standing container, and beause `IntegerColumn` does not conform to the
-    // RAII idiom (nor should it).
-    Allocator& alloc = m_row_indexes.get_alloc();
-    _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
-    ref_guard.reset(IntegerColumn::create(alloc)); // Throws
-    parent->register_view(this);                   // Throws
-    m_row_indexes.init_from_ref(alloc, ref_guard.release());
+    allocate_row_indexes();
 }
 
 inline TableViewBase::TableViewBase(Table* parent, size_t column, BasicRowExpr<const Table> row)
@@ -740,14 +741,18 @@ inline TableViewBase::TableViewBase(Table* parent, size_t column, BasicRowExpr<c
     , m_linked_row(row)
     , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
 {
-    // FIXME: This code is unreasonably complicated because it uses `IntegerColumn` as
-    // a free-standing container, and beause `IntegerColumn` does not conform to the
-    // RAII idiom (nor should it).
-    Allocator& alloc = m_row_indexes.get_alloc();
-    _impl::DeepArrayRefDestroyGuard ref_guard(alloc);
-    ref_guard.reset(IntegerColumn::create(alloc)); // Throws
-    parent->register_view(this);                   // Throws
-    m_row_indexes.init_from_ref(alloc, ref_guard.release());
+    allocate_row_indexes();
+}
+
+inline TableViewBase::TableViewBase(DistinctViewTag, Table* parent, size_t column_ndx)
+    : RowIndexes(IntegerColumn::unattached_root_tag(), Allocator::get_default())
+    , m_table(parent->get_table_ref()) // Throws
+    , m_distinct_column_source(column_ndx)
+    , m_last_seen_version(m_table ? util::make_optional(m_table->m_version) : util::none)
+{
+    REALM_ASSERT(m_distinct_column_source != npos);
+
+    allocate_row_indexes();
 }
 
 inline TableViewBase::TableViewBase(const TableViewBase& tv)
@@ -1163,6 +1168,11 @@ inline TableView::TableView(Table& parent)
 
 inline TableView::TableView(Table& parent, Query& query, size_t start, size_t end, size_t limit)
     : TableViewBase(&parent, query, start, end, limit)
+{
+}
+
+inline TableView::TableView(TableViewBase::DistinctViewTag, Table& parent, size_t column_ndx)
+    : TableViewBase(TableViewBase::DistinctView, &parent, column_ndx)
 {
 }
 
