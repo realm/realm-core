@@ -4403,14 +4403,7 @@ TableView Table::get_range_view(size_t begin, size_t end)
 {
     REALM_ASSERT(!m_columns.is_attached() || end <= size());
 
-    TableView ctv(*this);
-    if (m_columns.is_attached()) {
-        IntegerColumn& refs = ctv.m_row_indexes;
-        for (size_t i = begin; i < end; ++i) {
-            refs.add(i);
-        }
-    }
-    return ctv;
+    return where().find_all(begin, end);
 }
 
 ConstTableView Table::get_range_view(size_t begin, size_t end) const
