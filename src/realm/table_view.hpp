@@ -243,8 +243,6 @@ public:
     Timestamp maximum_timestamp(size_t column_ndx, size_t* return_ndx = nullptr) const;
     size_t count_timestamp(size_t column_ndx, Timestamp target) const;
 
-    void apply_same_order(TableViewBase& order);
-
     // Simple pivot aggregate method. Experimental! Please do not
     // document method publicly.
     void aggregate(size_t group_by_column, size_t aggr_column, Table::AggrType op, Table& result) const;
