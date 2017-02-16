@@ -254,8 +254,8 @@ if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)
             INSTALL_COMMAND ""
             BUILD_IN_SOURCE 1
         )
-        set(OPENSSL_INCLUDE_DIR ${PROJECT_BINARY_DIR}/libcrypto/include)
-        set(OPENSSL_LIB_DIR ${PROJECT_BINARY_DIR}/libcrypto/lib)
+        set(OPENSSL_INCLUDE_DIR ${PROJECT_BINARY_DIR}/openssl/include)
+        set(OPENSSL_LIB_DIR ${PROJECT_BINARY_DIR}/openssl/lib)
 
         #include_directories(${OPENSSL_INCLUDE_DIR})
         add_library(openssl STATIC IMPORTED)
@@ -306,6 +306,16 @@ install(FILES ${PROJECT_BINARY_DIR}/src/realm/version.hpp
 install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util
         COMPONENT devel)
+
+if(ANDROID)
+    install(FILES ${OPENSSL_LIB_DIR}/libcrypto.a ${OPENSSL_LIB_DIR}/libssl.a
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            COMPONENT devel)
+    file(GLOB OPENSSL_INCLUDE_FILES ${OPENSSL_INCLUDE_DIR}/openssl/*.h)
+    install(FILES ${OPENSSL_INCLUDE_FILES}
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openssl
+            COMPONENT devel)
+endif()
 
 if (NOT APPLE AND NOT ANDROID AND NOT REALM_BUILD_LIB_ONLY)
     add_executable(realm-config config_tool.cpp)

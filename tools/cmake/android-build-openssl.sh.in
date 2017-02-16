@@ -79,8 +79,10 @@ sed -i.backup /OPENSSL_cleanse/d crypto/sha/sha256.c
 
 make depend DEPFLAG=-I@ANDROID_TOOLCHAIN_ROOT@/lib/gcc/@ANDROID_TOOLCHAIN_MACHINE_NAME@/4.9/include
 make build_crypto
+make build_ssl
 
-mkdir -p @PROJECT_BINARY_DIR@/libcrypto/lib
-mkdir -p @PROJECT_BINARY_DIR@/libcrypto/include
-cp -RL include/* @PROJECT_BINARY_DIR@/libcrypto/include
-cp libcrypto.a @PROJECT_BINARY_DIR@/libcrypto/lib
+mkdir -p @PROJECT_BINARY_DIR@/openssl/lib
+mkdir -p @PROJECT_BINARY_DIR@/openssl/include
+cp -RL include/* @PROJECT_BINARY_DIR@/openssl/include
+cp libcrypto.a @PROJECT_BINARY_DIR@/openssl/lib
+cp libssl.a @PROJECT_BINARY_DIR@/openssl/lib
