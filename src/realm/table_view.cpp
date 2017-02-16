@@ -749,17 +749,9 @@ void TableViewBase::do_sync()
                 m_row_indexes.add(m_linked_column->get_backlink(linked_row_ndx, i));
         }
     }
-    // precondition: m_table is attached
-    else if (!m_query.m_table) {
-        // This case gets invoked if the TableView origined from Table::find_all(T value). It is temporarely disabled
-        // because it doesn't take the search parameter in count. FIXME/Todo
-        REALM_ASSERT(false);
-        // no valid query
-        m_row_indexes.clear();
-        for (size_t i = 0; i < m_table->size(); i++)
-            m_row_indexes.add(i);
-    }
     else {
+        REALM_ASSERT(m_query.m_table);
+
         // valid query, so clear earlier results and reexecute it.
         if (m_row_indexes.is_attached())
             m_row_indexes.clear();
@@ -770,7 +762,7 @@ void TableViewBase::do_sync()
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();
 
-        m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
+        m_query.find_all(*const_cast<TableViewBase*>(this), m_start, m_end, m_limit);
     }
     m_num_detached_refs = 0;
 
