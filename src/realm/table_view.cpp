@@ -741,10 +741,10 @@ void TableViewBase::do_sync()
         for (size_t t = 0; t < m_linkview_source->size(); t++)
             m_row_indexes.add(m_linkview_source->get(t).get_index());
     }
-    else if (m_table && m_distinct_column_source != npos) {
+    else if (m_distinct_column_source != npos) {
         sync_distinct_view(m_distinct_column_source);
     }
-    else if (m_table && m_linked_column) {
+    else if (m_linked_column) {
         m_row_indexes.clear();
         if (m_linked_row.is_attached()) {
             size_t linked_row_ndx = m_linked_row.get_index();
@@ -783,17 +783,14 @@ bool TableViewBase::is_in_table_order() const
     else if (m_linkview_source) {
         return false;
     }
-    else if (m_table && m_linked_column) {
+    else if (m_distinct_column_source != npos) {
+        return !m_sorting_predicate;
+    }
+    else if (m_linked_column) {
         return false;
-    }
-    else if (!m_query.m_table) {
-        // TableView originated from Table::find_all().
-        return !m_sorting_predicate;
-    }
-    else if (m_query.produces_results_in_table_order()) {
-        return !m_sorting_predicate;
     }
     else {
-        return false;
+        REALM_ASSERT(m_query.m_table);
+        return m_query.produces_results_in_table_order() && !m_sorting_predicate;
     }
 }
