@@ -22,8 +22,6 @@
 #include <realm/utilities.hpp>
 #include <realm/alloc.hpp>
 
-using namespace realm::util;
-
 // clang-format off
 /* wid == 16/32 likely when accessing offsets in B tree */
 #define REALM_TEMPEX(fun, wid, arg) \
