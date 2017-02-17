@@ -219,7 +219,7 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
     // result_ref.result with the results in the bounds start_ndx, and end_ndx
     constexpr bool allnocopy(method == index_FindAll_nocopy);
 
-    constexpr size_t local_not_found = (allnocopy || all) ? FindRes_not_found : first ? not_found : 0;
+    constexpr size_t local_not_found = (allnocopy || all) ? size_t(FindRes_not_found) : first ? not_found : 0;
 
     const char* data = m_data;
     const char* header;
