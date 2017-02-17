@@ -295,10 +295,8 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
         width = get_width_from_header(header);
         is_inner_node = get_is_inner_bptree_node_from_header(header);
 
-        if (value.size() - stringoffset >= 4)
-            stringoffset += 4;
-        else
-            stringoffset += value.size() - stringoffset + 1;
+        // Go to next key part of the string. If the offset exceeds the string length, the key will be 0
+        stringoffset += 4;
 
         // Update 4 byte index key
         key = StringIndex::create_key(value, stringoffset);
