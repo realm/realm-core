@@ -84,6 +84,7 @@ InterprocessCondVar::~InterprocessCondVar() noexcept
     close();
 }
 
+#ifdef REALM_CONDVAR_EMULATION
 static void make_non_blocking(int fd)
 {
     // Make reading or writing from the file descriptor return -1 when the file descriptor's buffer is empty
@@ -93,6 +94,7 @@ static void make_non_blocking(int fd)
         throw std::system_error(errno, std::system_category());
     }
 }
+#endif
 
 void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, std::string condvar_name,
                                           std::string tmp_path)
