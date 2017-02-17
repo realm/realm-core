@@ -713,17 +713,17 @@ TEST(LinkList_MultiLinkQuery)
     table3->add_empty_row();
     table3->set_int(0, 0, 100);
     table3->set_string(1, 0, "foo");
-    table3->set_float(2, 0, 100.0);
+    table3->set_float(2, 0, 100.0f);
 
     table3->add_empty_row();
     table3->set_int(0, 1, 200);
     table3->set_string(1, 1, "bar");
-    table3->set_float(2, 1, 200.0);
+    table3->set_float(2, 1, 200.0f);
 
     table3->add_empty_row();
     table3->set_int(0, 2, 300);
     table3->set_string(1, 2, "baz");
-    table3->set_float(2, 2, 300.0);
+    table3->set_float(2, 2, 300.0f);
 
     LinkViewRef lvr;
 
