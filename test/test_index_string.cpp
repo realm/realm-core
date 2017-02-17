@@ -1687,4 +1687,83 @@ TEST(StringIndex_Fuzzy)
 }
 
 
+TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    // Create a column with string values
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+
+    const char* strings[] = {
+        "john", "John", "jOhn", "JOhn", "joHn", "JoHn", "jOHn", "JOHn", "johN", "JohN", "jOhN", "JOhN", "joHN", "JoHN", "jOHN", "JOHN", "john" /* yes, an extra to test the "bucket" case as well */,
+        "hans", "Hansapark", "george", "billion dollar startup",
+        "abcde", "abcdE", "Abcde", "AbcdE",
+        "common", "common"
+    };
+
+    for (const char* string : strings) {
+        col.add(string);
+    }
+
+
+    // Create a new index on column
+    const StringIndex& ndx = *col.create_search_index();
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+    {
+        // case sensitive
+        ndx.find_all(results, strings[0]);
+        CHECK_EQUAL(2, results.size());
+        CHECK_EQUAL(col.get(results.get(0)), strings[0]);
+        CHECK_EQUAL(col.get(results.get(1)), strings[0]);
+        results.clear();
+    }
+
+    {
+        constexpr bool case_insensitive = true;
+        const char* needle = "john";
+        StringData upper_needle = case_map(needle, true);
+        ndx.find_all(results, needle, case_insensitive);
+        CHECK_EQUAL(17, results.size());
+        for (size_t i = 0; i < results.size(); ++i) {
+            StringData upper_result = case_map(col.get(results.get(i)), true);
+            CHECK_EQUAL(upper_result, upper_needle);
+
+        }
+        results.clear();
+    }
+
+
+    {
+        struct TestData {
+            const bool case_insensitive;
+            const char* const needle;
+            const size_t result_size;
+        };
+
+        TestData td[] = {
+            {true, "Hans", 1},
+            {true, "Geor", 0},
+            {true, "George", 1},
+            {true, "geoRge", 1},
+            {true, "Billion Dollar Startup", 1},
+            {true, "ABCDE", 4},
+            {true, "commON", 2},
+        };
+
+        for (const TestData& t : td) {
+            ndx.find_all(results, t.needle, t.case_insensitive);
+            CHECK_EQUAL(t.result_size, results.size());
+            results.clear();
+        }
+    }
+
+    // Clean up
+    results.destroy();
+    col.destroy();
+}
+
+
 #endif // TEST_INDEX_STRING
