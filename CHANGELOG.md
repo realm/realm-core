@@ -19,7 +19,8 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Remove the BinaryData constructor taking a temporary object to prevent some
+  errors in unit tests at compile time.
 
 ----------------------------------------------
 
