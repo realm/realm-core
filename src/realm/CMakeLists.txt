@@ -242,33 +242,24 @@ endif()
 
 if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)
     if(ANDROID)
-        include(ExternalProject)
+        string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
+        set(OPENSSL_FILENAME "openssl-${BUILD_TYPE}-${ANDROID_OPENSSL_VERSION}-Android-${ANDROID_ABI}")
+        set(OPENSSL_URL  "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${ANDROID_ABI}/${OPENSSL_FILENAME}.tar.gz")
 
-        # Generate the build script with info provided by the android toolchain
-        configure_file(${CMAKE_MODULE_PATH}/android-build-openssl.sh.in ${PROJECT_BINARY_DIR}/android-build-openssl.sh @ONLY)
+        message(STATUS "Downloading OpenSSL...")
+        file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}.tar.gz")
 
-        ExternalProject_Add(openssl-ext
-            URL http://www.openssl.org/source/openssl-${ANDROID_OPENSSL_VERSION}.tar.gz
-            CONFIGURE_COMMAND ""
-            BUILD_COMMAND "${PROJECT_BINARY_DIR}/android-build-openssl.sh"
-            INSTALL_COMMAND ""
-            BUILD_IN_SOURCE 1
-        )
-        set(OPENSSL_INCLUDE_DIR ${PROJECT_BINARY_DIR}/openssl/include)
-        set(OPENSSL_LIB_DIR ${PROJECT_BINARY_DIR}/openssl/lib)
+        message(STATUS "Uncompressing OpenSSL...")
+        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${OPENSSL_FILENAME}.tar.gz")
 
-        #include_directories(${OPENSSL_INCLUDE_DIR})
-        add_library(openssl STATIC IMPORTED)
-        add_dependencies(openssl openssl-ext)
-        file(MAKE_DIRECTORY ${OPENSSL_INCLUDE_DIR})
-        set_target_properties(openssl PROPERTIES
-                              IMPORTED_LOCATION ${OPENSSL_LIB_DIR}/libcrypto.a
-                              INTERFACE_INCLUDE_DIRECTORIES ${OPENSSL_INCLUDE_DIR})
+        message(STATUS "Importing OpenSSL...")
+        include(${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}/openssl.cmake)
+        get_target_property(OPENSSL_INCLUDE_DIR crypto INTERFACE_INCLUDE_DIRECTORIES)
+        get_target_property(CRYPTO_LIB crypto IMPORTED_LOCATION)
+        get_target_property(SSL_LIB ssl IMPORTED_LOCATION)
 
-        # This is just to force the download of OpenSSL before realm-objects
-        add_dependencies(realm-objects openssl)
         target_include_directories(realm-objects PUBLIC ${OPENSSL_INCLUDE_DIR})
-        target_link_libraries(realm openssl)
+        target_link_libraries(realm crypto)
     else()
         include(FindOpenSSL)
         target_link_libraries(realm ${OPENSSL_LIBRARIES})
@@ -308,7 +299,7 @@ install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
         COMPONENT devel)
 
 if(ANDROID)
-    install(FILES ${OPENSSL_LIB_DIR}/libcrypto.a ${OPENSSL_LIB_DIR}/libssl.a
+    install(FILES ${CRYPTO_LIB} ${SSL_LIB}
             DESTINATION ${CMAKE_INSTALL_LIBDIR}
             COMPONENT devel)
     install(DIRECTORY ${OPENSSL_INCLUDE_DIR}/openssl
