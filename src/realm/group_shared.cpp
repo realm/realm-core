@@ -684,11 +684,11 @@ void spawn_daemon(const std::string& file)
 } // anonymous namespace
 
 #if !REALM_UWP
-const std::string SharedGroupOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
+std::string SharedGroupOptions::sys_tmp_dir = getenv("TMPDIR") ? getenv("TMPDIR") : "";
 #else
 // FIXME: getenv not supported on UWP. You must provide a temp path manually to the
 // SharedGroupOptions and pass it to the SharedGroup constructor.
-const std::string SharedGroupOptions::sys_tmp_dir = "";
+std::string SharedGroupOptions::sys_tmp_dir = "";
 #endif
 
 // NOTES ON CREATION AND DESTRUCTION OF SHARED MUTEXES:
