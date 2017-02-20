@@ -1540,6 +1540,13 @@ TEST(Table_Range)
     CHECK_EQUAL(10, tv.size());
     for (size_t i = 0; i < tv.size(); ++i)
         CHECK_EQUAL(int64_t(i + 10), tv.get_int(0, i));
+
+    for (size_t i = 0; i < 5; ++i)
+        table.insert_empty_row(0);
+
+    CHECK(tv.sync_if_needed());
+    for (size_t i = 0; i < tv.size(); ++i)
+        CHECK_EQUAL(int64_t(i + 5), tv.get_int(0, i));
 }
 
 TEST(Table_RangeConst)
