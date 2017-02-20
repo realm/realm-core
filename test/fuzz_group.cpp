@@ -177,6 +177,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
         if (log) {
             *log << "// Test case generated in " REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
+            *log << "// REALM_MAX_BPNODE_SIZE is " << REALM_MAX_BPNODE_SIZE << "\n";
             *log << "// ----------------------------------------------------------------------\n";
             std::string printable_key;
             if (key == nullptr) {
