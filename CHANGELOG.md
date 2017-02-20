@@ -2,6 +2,10 @@
 
 ### Bugfixes
 
+* Added SharedGroupOptions::set_sys_tmp_dir() and
+  SharedGroupOptions::set_sys_tmp_dir() to solve crash when compacting a Realm
+  file on Android external storage which is caused by invalid default sys_tmp_dir.
+  (https://github.com/realm/realm-java/issues/4140)
 * Fixed a few bugs (caused crashes) in pthread library on UWP.
 * Possibly fixed some cases of extreme file size growth, by preventing starvation
   when trying to start a write transaction, while simultaneously pinning an older
@@ -23,7 +27,8 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Remove the BinaryData constructor taking a temporary object to prevent some
+  errors in unit tests at compile time.
 
 ----------------------------------------------
 

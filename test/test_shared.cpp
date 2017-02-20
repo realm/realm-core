@@ -3089,4 +3089,25 @@ TEST(Shared_Bptree_insert_failure)
     g.get_table(0)->add_empty_row(396);
 }
 
+NONCONCURRENT_TEST(SharedGroupOptions_tmp_dir)
+{
+    const std::string initial_system_dir = SharedGroupOptions::get_sys_tmp_dir();
+
+    const std::string test_dir = "/test-temp";
+    SharedGroupOptions::set_sys_tmp_dir(test_dir);
+    CHECK(SharedGroupOptions::get_sys_tmp_dir().compare(test_dir) == 0);
+
+    // Without specifying the temp dir, sys_tmp_dir should be used.
+    SharedGroupOptions options;
+    CHECK(options.temp_dir.compare(test_dir) == 0);
+
+    // Should use the specified temp dir.
+    const std::string test_dir2 = "/test2-temp";
+    SharedGroupOptions options2(SharedGroupOptions::Durability::Full, nullptr, true,
+            std::function<void(int, int)>(), test_dir2);
+    CHECK(options2.temp_dir.compare(test_dir2) == 0);
+
+    SharedGroupOptions::set_sys_tmp_dir(initial_system_dir);
+}
+
 #endif // TEST_SHARED
