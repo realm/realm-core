@@ -202,7 +202,7 @@ void Realm::open_with_config(const Config& config,
             shared_group = std::make_unique<SharedGroup>(*history, options);
         }
     }
-    catch (realm::FileFormatUpgradeRequired const& ex) {
+    catch (realm::FileFormatUpgradeRequired const&) {
         if (config.schema_mode != SchemaMode::ResetFile) {
             translate_file_exception(config.path, config.read_only());
         }
