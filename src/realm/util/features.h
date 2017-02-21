@@ -95,7 +95,7 @@
 #ifdef _MSC_VER
 #  define REALM_DIAG_IGNORE_UNSIGNED_MINUS() REALM_PRAGMA(warning(disable:4146))
 #else
-#  define REALM_DIAG_IGNORE_UNSIGNED_MINUS()
+#define REALM_DIAG_IGNORE_UNSIGNED_MINUS()
 #endif
 
 /* Compiler is MSVC (Microsoft Visual C++) */
@@ -175,7 +175,7 @@
 
 
 #if defined ANDROID
-#  define REALM_ANDROID 1
+#define REALM_ANDROID 1
 #else
 #define REALM_ANDROID 0
 #endif
@@ -219,7 +219,7 @@
 #endif
 
 
-#if REALM_ANDROID || REALM_IOS || REALM_WATCHOS
+#if REALM_ANDROID || REALM_IOS || REALM_WATCHOS || REALM_TVOS
 #define REALM_MOBILE 1
 #else
 #define REALM_MOBILE 0

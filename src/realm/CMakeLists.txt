@@ -172,7 +172,7 @@ set(REALM_INSTALL_UTIL_HEADERS
 ) # REALM_INSTALL_UTIL_HEADERS
 
 set(REALM_OTHER_UTIL_HEADERS
-    util/aes_cryptor.hppd
+    util/aes_cryptor.hpp
     util/errno.hpp
 ) # REALM_OTHER_UTIL_HEADERS
 
@@ -197,8 +197,8 @@ if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     add_dependencies(realm-objects pthread_win32 getopt_win32)
     set_property(TARGET realm-objects APPEND PROPERTY COMPILE_DEFINITIONS PTW32_STATIC_LIB)
     include_directories(realm-objects INTERFACE
-                               ${CMAKE_CURRENT_SOURCE_DIR}/../win32
-                               ${CMAKE_CURRENT_SOURCE_DIR}/../win32/pthread)
+                        ${CMAKE_PROJECT_DIR}/src/win32
+                        ${CMAKE_PROJECT_DIR}/src/win32/pthread)
     list(APPEND REALM_EXTRA_LIBS pthread_win32 getopt_win32)
 endif()
 
@@ -214,7 +214,7 @@ target_link_libraries(
 )
 
 if(ANDROID)
-  target_link_libraries(realm atomic)
+    target_link_libraries(realm atomic)
 endif()
 
 if(ANDROID OR CMAKE_SYSTEM_NAME MATCHES "^Windows")
@@ -225,26 +225,26 @@ if(NOT REALM_SKIP_SHARED_LIB)
     add_library(realm-shared SHARED $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
 
     set_target_properties(
-        realm-shared PROPERTIES
-        LIBRARY_OUTPUT_NAME realm
+            realm-shared PROPERTIES
+            LIBRARY_OUTPUT_NAME realm
     )
 
     target_link_libraries(
-        realm-shared
-        ${REALM_EXTRA_LIBS}
-        ${CMAKE_THREAD_LIBS_INIT}
+            realm-shared
+            ${REALM_EXTRA_LIBS}
+            ${CMAKE_THREAD_LIBS_INIT}
     )
 
-  if(ANDROID)
-    target_link_libraries(realm-shared atomic)
-  endif()
+    if(ANDROID)
+        target_link_libraries(realm-shared atomic)
+    endif()
 endif()
 
 if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)
     if(ANDROID)
         string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
         set(OPENSSL_FILENAME "openssl-${BUILD_TYPE}-${ANDROID_OPENSSL_VERSION}-Android-${ANDROID_ABI}")
-        set(OPENSSL_URL  "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${ANDROID_ABI}/${OPENSSL_FILENAME}.tar.gz")
+        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${ANDROID_ABI}/${OPENSSL_FILENAME}.tar.gz")
 
         message(STATUS "Downloading OpenSSL...")
         file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}.tar.gz")
@@ -270,10 +270,10 @@ if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)
 endif()
 
 if(APPLE)
-  target_link_libraries(realm ${Foundation})
-  if(NOT REALM_SKIP_SHARED_LIB)
-    target_link_libraries(realm-shared ${Foundation})
-  endif()
+    target_link_libraries(realm ${Foundation})
+    if(NOT REALM_SKIP_SHARED_LIB)
+        target_link_libraries(realm-shared ${Foundation})
+    endif()
 endif(APPLE)
 
 install(TARGETS realm
@@ -307,7 +307,7 @@ if(ANDROID)
             COMPONENT devel)
 endif()
 
-if (NOT APPLE AND NOT ANDROID AND NOT REALM_BUILD_LIB_ONLY)
+if(NOT APPLE AND NOT ANDROID AND NOT REALM_BUILD_LIB_ONLY)
     add_executable(realm-config config_tool.cpp)
     add_executable(realm-importer importer_tool.cpp importer.cpp importer.hpp)
     target_link_libraries(realm-importer realm)
