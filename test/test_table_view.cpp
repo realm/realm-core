@@ -1900,31 +1900,31 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     t.add_empty_row(7);
     t.set_string(0, 0, StringData(""));
     t.set_int(1, 0, 100);
-    t.set_float(2, 0, 100.);
+    t.set_float(2, 0, 100.f);
 
     t.set_string(0, 1, realm::null());
     t.set_int(1, 1, 200);
-    t.set_float(2, 1, 200.);
+    t.set_float(2, 1, 200.f);
 
     t.set_string(0, 2, StringData(""));
     t.set_int(1, 2, 100);
-    t.set_float(2, 2, 100.);
+    t.set_float(2, 2, 100.f);
 
     t.set_string(0, 3, realm::null());
     t.set_int(1, 3, 200);
-    t.set_float(2, 3, 200.);
+    t.set_float(2, 3, 200.f);
 
     t.set_string(0, 4, "foo");
     t.set_int(1, 4, 300);
-    t.set_float(2, 4, 300.);
+    t.set_float(2, 4, 300.f);
 
     t.set_string(0, 5, "foo");
     t.set_int(1, 5, 400);
-    t.set_float(2, 5, 400.);
+    t.set_float(2, 5, 400.f);
 
     t.set_string(0, 6, "bar");
     t.set_int(1, 6, 500);
-    t.set_float(2, 6, 500.);
+    t.set_float(2, 6, 500.f);
 
     origin->add_empty_row(t.size());
     for (size_t i = 0; i < t.size(); ++i)

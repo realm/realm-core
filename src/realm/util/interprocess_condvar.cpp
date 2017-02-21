@@ -27,6 +27,11 @@
 #include <poll.h>
 #endif
 
+#ifndef _WIN32
+#include <sys/time.h>
+#endif
+
+
 using namespace realm;
 using namespace realm::util;
 
@@ -236,9 +241,17 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
         int r;
         {
             if (tp) {
-                long miliseconds = tp->tv_sec * 1000 + tp->tv_nsec / 1000000;
-                REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<int>(miliseconds));
-                int timeout = int(miliseconds);
+                // poll requires a timeout in millisecs, but we get the timeout
+                // as an absolute point in time, so we need to convert.
+                timeval tv;
+                gettimeofday(&tv, nullptr);
+
+                long milliseconds = (tp->tv_sec - tv.tv_sec) * 1000 + (tp->tv_nsec / 1000000) - (tv.tv_usec / 1000);
+                if (milliseconds < 0) { // negative timeout will mean no timeout. We don't want that.
+                    milliseconds = 0;
+                }
+                REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<int>(milliseconds));
+                int timeout = int(milliseconds);
                 r = poll(&poll_d, 1, timeout);
             }
             else

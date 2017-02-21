@@ -1454,11 +1454,6 @@ size_t Query::find_internal(size_t start, size_t end) const
         return r;
 }
 
-bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b)
-{
-    return a.first < b.first;
-}
-
 void Query::add_node(std::unique_ptr<ParentNode> node)
 {
     REALM_ASSERT(node);

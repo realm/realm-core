@@ -22,6 +22,7 @@
 #include <realm.hpp>
 #include <realm/util/file.hpp>
 
+#include "compatibility.hpp"
 #include "../util/timer.hpp"
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
@@ -30,10 +31,10 @@
 #include "../util/crypt_key.hpp"
 #endif
 
+using namespace compatibility;
 using namespace realm;
 using namespace realm::util;
 using namespace realm::test_util;
-using namespace realm::test_util::unit_test;
 
 namespace {
 #define BASE_SIZE 3600
@@ -116,7 +117,7 @@ struct AddTable : Benchmark {
         TableRef t = tr.add_table(name());
         t->add_column(type_String, "first");
         t->add_column(type_Int, "second");
-        t->add_column(type_OldDateTime, "third");
+        t->add_column(type_Float, "third");
         tr.commit();
     }
 
@@ -428,6 +429,7 @@ struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             t->set_int(0, i, r.draw_int(0, BASE_SIZE * 2));
         }
+        t->add_search_index(0);
         tr.commit();
     }
 
@@ -435,8 +437,7 @@ struct BenchmarkDistinctIntFewDupes : BenchmarkWithIntsTable {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
-        ConstTableView view = table->where().find_all();
-        view.distinct(0);
+        ConstTableView view = table->get_distinct_view(0);
     }
 };
 
@@ -456,6 +457,7 @@ struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
         for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
             t->set_int(0, i, r.draw_int(0, 10));
         }
+        t->add_search_index(0);
         tr.commit();
     }
 
@@ -463,8 +465,7 @@ struct BenchmarkDistinctIntManyDupes : BenchmarkWithIntsTable {
     {
         ReadTransaction tr(group);
         ConstTableRef table = tr.get_table("IntOnly");
-        ConstTableView view = table->where().find_all();
-        view.distinct(0);
+        ConstTableView view = table->get_distinct_view(0);
     }
 };
 
@@ -689,30 +690,30 @@ struct BenchmarkGetLinkList : Benchmark {
     }
 };
 
-const char* to_lead_cstr(SharedGroupOptions::Durability level)
+const char* to_lead_cstr(RealmDurability level)
 {
     switch (level) {
-        case SharedGroupOptions::Durability::Full:
+        case RealmDurability::Full:
             return "Full   ";
-        case SharedGroupOptions::Durability::MemOnly:
+        case RealmDurability::MemOnly:
             return "MemOnly";
 #ifndef _WIN32
-        case SharedGroupOptions::Durability::Async:
+        case RealmDurability::Async:
             return "Async  ";
 #endif
     }
     return nullptr;
 }
 
-const char* to_ident_cstr(SharedGroupOptions::Durability level)
+const char* to_ident_cstr(RealmDurability level)
 {
     switch (level) {
-        case SharedGroupOptions::Durability::Full:
+        case RealmDurability::Full:
             return "Full";
-        case SharedGroupOptions::Durability::MemOnly:
+        case RealmDurability::MemOnly:
             return "MemOnly";
 #ifndef _WIN32
-        case SharedGroupOptions::Durability::Async:
+        case RealmDurability::Async:
             return "Async";
 #endif
     }
@@ -732,29 +733,30 @@ void run_benchmark_once(Benchmark& benchmark, SharedGroup& sg, Timer& timer)
     timer.unpause();
 }
 
+
 /// This little piece of likely over-engineering runs the benchmark a number of times,
 /// with each durability setting, and reports the results for each run.
-template <typename B>
-void run_benchmark(TestContext& test_context, BenchmarkResults& results)
+template<typename B>
+void run_benchmark(BenchmarkResults& results)
 {
-    typedef std::pair<SharedGroupOptions::Durability, const char*> config_pair;
+    typedef std::pair<RealmDurability, const char*> config_pair;
     std::vector<config_pair> configs;
 
-    configs.push_back(config_pair(SharedGroupOptions::Durability::MemOnly, nullptr));
+    configs.push_back(config_pair(RealmDurability::MemOnly, nullptr));
 #if REALM_ENABLE_ENCRYPTION
-    configs.push_back(config_pair(SharedGroupOptions::Durability::MemOnly, crypt_key(true)));
+    configs.push_back(config_pair(RealmDurability::MemOnly, crypt_key(true)));
 #endif
 
-    configs.push_back(config_pair(SharedGroupOptions::Durability::Full, nullptr));
+    configs.push_back(config_pair(RealmDurability::Full, nullptr));
 
 #if REALM_ENABLE_ENCRYPTION
-    configs.push_back(config_pair(SharedGroupOptions::Durability::Full, crypt_key(true)));
+    configs.push_back(config_pair(RealmDurability::Full, crypt_key(true)));
 #endif
 
     Timer timer(Timer::type_UserTime);
 
     for (auto it = configs.begin(); it != configs.end(); ++it) {
-        SharedGroupOptions::Durability level = it->first;
+        RealmDurability level = it->first;
         const char* key = it->second;
         B benchmark;
 
@@ -767,11 +769,16 @@ void run_benchmark(TestContext& test_context, BenchmarkResults& results)
                  << (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
         std::string ident = ident_ss.str();
 
-        // Open a SharedGroup:
-        SHARED_GROUP_TEST_PATH(realm_path);
-        std::unique_ptr<SharedGroup> group;
-        group.reset(new SharedGroup(realm_path, false, SharedGroupOptions(level, key)));
+        realm::test_util::unit_test::TestDetails test_details;
+        test_details.suite_name = "BenchmarkCommonTasks";
+        test_details.test_name = ident.c_str();
+        test_details.file_name = __FILE__;
+        test_details.line_number = __LINE__;
 
+        // Open a SharedGroup:
+        SharedGroupTestPathGuard realm_path("benchmark_common_tasks" + ident);
+        std::unique_ptr<SharedGroup> group;
+        group.reset(create_new_shared_group(realm_path, level, key));
         benchmark.before_all(*group);
 
         // Warm-up and initial measuring:
@@ -812,12 +819,12 @@ void run_benchmark(TestContext& test_context, BenchmarkResults& results)
 
 extern "C" int benchmark_common_tasks_main();
 
-TEST(benchmark_common_tasks_main)
+int benchmark_common_tasks_main()
 {
     std::string results_file_stem = test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
 
-#define BENCH(B) run_benchmark<B>(test_context, results)
+#define BENCH(B) run_benchmark<B>(results)
 
     BENCH(BenchmarkUnorderedTableViewClear);
     BENCH(BenchmarkEmptyCommit);
@@ -845,15 +852,12 @@ TEST(benchmark_common_tasks_main)
     BENCH(BenchmarkGetLinkList);
 
 #undef BENCH
+    return 0;
 }
 
 #if !REALM_IOS
 int main(int, const char**)
 {
-    bool success;
-
-    success = get_default_test_list().run();
-
-    return success ? EXIT_SUCCESS : EXIT_FAILURE;
+    return benchmark_common_tasks_main();
 }
 #endif

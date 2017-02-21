@@ -1535,7 +1535,7 @@ TEST(Query_Expressions0)
     table.add_empty_row(1);
 
     table.set_int(0, 0, 20);
-    table.set_float(1, 0, 3.0);
+    table.set_float(1, 0, 3.0f);
     table.set_double(2, 0, 3.0);
 
     match = (1 / second == 1 / second).find();
@@ -1590,9 +1590,9 @@ TEST(Query_LimitUntyped2)
     table.set_int(0, 1, 30000);
     table.set_int(0, 2, 40000);
 
-    table.set_float(1, 0, 10000.);
-    table.set_float(1, 1, 30000.);
-    table.set_float(1, 2, 40000.);
+    table.set_float(1, 0, 10000.f);
+    table.set_float(1, 1, 30000.f);
+    table.set_float(1, 2, 40000.f);
 
     table.set_double(2, 0, 10000.);
     table.set_double(2, 1, 30000.);
@@ -1993,28 +1993,28 @@ TEST(Query_TwoColsVaryOperators)
     table.add_empty_row();
     table.set_int(0, 0, 5);
     table.set_int(1, 0, 10);
-    table.set_float(2, 0, 5);
-    table.set_float(3, 0, 10);
-    table.set_double(4, 0, 5);
-    table.set_double(5, 0, 10);
+    table.set_float(2, 0, 5.0f);
+    table.set_float(3, 0, 10.0f);
+    table.set_double(4, 0, 5.0);
+    table.set_double(5, 0, 10.0);
 
     // row 1
     table.add_empty_row();
     table.set_int(0, 1, 10);
     table.set_int(1, 1, 5);
-    table.set_float(2, 1, 10);
-    table.set_float(3, 1, 5);
-    table.set_double(4, 1, 10);
-    table.set_double(5, 1, 5);
+    table.set_float(2, 1, 10.0f);
+    table.set_float(3, 1, 5.0f);
+    table.set_double(4, 1, 10.0);
+    table.set_double(5, 1, 5.0);
 
     // row 2
     table.add_empty_row();
     table.set_int(0, 2, -10);
     table.set_int(1, 2, -5);
-    table.set_float(2, 2, -10);
-    table.set_float(3, 2, -5);
-    table.set_double(4, 2, -10);
-    table.set_double(5, 2, -5);
+    table.set_float(2, 2, -10.0f);
+    table.set_float(3, 2, -5.0f);
+    table.set_double(4, 2, -10.0);
+    table.set_double(5, 2, -5.0);
 
 
     CHECK_EQUAL(not_found, table.where().equal_int(size_t(0), size_t(1)).find());
@@ -8467,11 +8467,11 @@ TEST(Query_AverageNullableColumns)
     table.set_int(col_int, 0, 2);
     table.set_int(col_int, 1, 4);
 
-    table.set_float(col_float, 0, 2);
-    table.set_float(col_float, 1, 4);
+    table.set_float(col_float, 0, 2.0f);
+    table.set_float(col_float, 1, 4.0f);
 
-    table.set_double(col_double, 1, 4);
-    table.set_double(col_double, 0, 2);
+    table.set_double(col_double, 1, 4.0);
+    table.set_double(col_double, 0, 2.0);
 
     CHECK_EQUAL(3, table.where().average_int(col_int));
     CHECK_EQUAL(3, table.where().average_float(col_float));
@@ -9984,8 +9984,8 @@ TEST(Query_ColumnDeletionExpression)
     foo.set_timestamp(2, 0, Timestamp(100, 100));
     foo.set_timestamp(3, 0, Timestamp(200, 100));
     foo.set_string(4, 0, StringData("Hello, world"));
-    foo.set_float(5, 0, 3.141592);
-    foo.set_float(5, 1, 1.0);
+    foo.set_float(5, 0, 3.141592f);
+    foo.set_float(5, 1, 1.0f);
     foo.set_binary(6, 0, BinaryData("Binary", 6));
 
     // Expression

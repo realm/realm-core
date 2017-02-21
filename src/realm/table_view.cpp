@@ -518,45 +518,35 @@ uint64_t TableViewBase::outside_version() const
 {
     check_cookie();
 
-    // If the TableView directly or indirectly depends on a LinkList that has been deleted, then its m_table has been
-    // set to 0 and there is no way to know its version number. So return biggest possible value to trigger a refresh
-    // later
-    uint64_t max = std::numeric_limits<uint64_t>::max();
-
-    LinkView* lvp = dynamic_cast<LinkView*>(m_query.m_view);
-    if (lvp) {
-        // This LinkView depends on Query that is restricted by LinkList (with where(&linklist))
-        if (lvp->is_attached()) {
-            return lvp->get_origin_table().m_version;
-        }
-        else {
-            // LinkList was deleted
-            return max;
-        }
-    }
-
-    TableView* tvp = dynamic_cast<TableView*>(m_query.m_view);
-    if (tvp) {
-        // This LinkView depends on a Query that is restricted by a LinkView (with where(&linkview))
-        return tvp->outside_version();
-    }
+    // If the TableView directly or indirectly depends on a view that has been deleted, there is no way to know
+    // its version number. Return the biggest possible value to trigger a refresh later.
+    const uint64_t max = std::numeric_limits<uint64_t>::max();
 
     if (m_linkview_source) {
-        // m_linkview_source is set if-and-only-if this TableView was created by LinkView::get_as_sorted_view().
-        if (m_linkview_source->is_attached()) {
-            return m_linkview_source->get_origin_table().m_version;
+        // m_linkview_source is set when this TableView was created by LinkView::get_as_sorted_view().
+        return m_linkview_source->is_attached() ? m_linkview_source->get_origin_table().m_version : max;
+    }
+
+    if (m_linked_column) {
+        // m_linked_column is set when this TableView was created by Table::get_backlink_view().
+        return m_linked_row ? m_linked_row.get_table()->m_version : max;
+    }
+
+    if (m_query.m_table) {
+        // m_query.m_table is set when this TableView was created by a query.
+
+        if (auto* view = dynamic_cast<LinkView*>(m_query.m_view)) {
+            // This TableView depends on Query that is restricted by a LinkView (with where(&link_view))
+            return view->is_attached() ? view->get_origin_table().m_version : max;
         }
-        else {
-            return max;
+
+        if (auto* view = dynamic_cast<TableView*>(m_query.m_view)) {
+            // This LinkView depends on a Query that is restricted by a TableView (with where(&table_view))
+            return view->outside_version();
         }
     }
 
-    if (m_linked_column && !m_linked_row) {
-        // m_linked_column is set when created by Table::get_backlink_view.
-        return max;
-    }
-
-    // This TableView was created by a method directly on Table, such as Table::find_all(int64_t)
+    // This TableView was either created by Table::get_distinct_view(), or a Query that is not restricted to a view.
     return m_table->m_version;
 }
 
@@ -685,21 +675,6 @@ void TableView::clear(RemoveMode underlying_mode)
         m_last_seen_version = outside_version();
 }
 
-void TableViewBase::sync_distinct_view(size_t column)
-{
-    m_row_indexes.clear();
-    m_num_detached_refs = 0;
-    m_distinct_column_source = column;
-    if (m_distinct_column_source != npos) {
-        REALM_ASSERT(m_table);
-        REALM_ASSERT(m_table->has_search_index(m_distinct_column_source));
-        if (!m_table->is_degenerate()) {
-            const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
-            col.get_search_index()->distinct(m_row_indexes);
-        }
-    }
-}
-
 void TableViewBase::distinct(size_t column)
 {
     distinct(SortDescriptor(*m_table, {{column}}));
@@ -729,18 +704,27 @@ void TableViewBase::sort(SortDescriptor order)
 
 void TableViewBase::do_sync()
 {
-    // A TableView can be "born" from 4 different sources: LinkView, Table::get_distinct_view(),
-    // Table::find_all() or Query. Here we sync with the respective source.
+    // This TableView can be "born" from 4 different sources:
+    // - LinkView
+    // - Query::find_all()
+    // - Table::get_distinct_view()
+    // - Table::get_backlink_view()
+    // Here we sync with the respective source.
 
     if (m_linkview_source) {
         m_row_indexes.clear();
         for (size_t t = 0; t < m_linkview_source->size(); t++)
             m_row_indexes.add(m_linkview_source->get(t).get_index());
     }
-    else if (m_table && m_distinct_column_source != npos) {
-        sync_distinct_view(m_distinct_column_source);
+    else if (m_distinct_column_source != npos) {
+        m_row_indexes.clear();
+        REALM_ASSERT(m_table->has_search_index(m_distinct_column_source));
+        if (!m_table->is_degenerate()) {
+            const ColumnBase& col = m_table->get_column_base(m_distinct_column_source);
+            col.get_search_index()->distinct(m_row_indexes);
+        }
     }
-    else if (m_table && m_linked_column) {
+    else if (m_linked_column) {
         m_row_indexes.clear();
         if (m_linked_row.is_attached()) {
             size_t linked_row_ndx = m_linked_row.get_index();
@@ -749,30 +733,20 @@ void TableViewBase::do_sync()
                 m_row_indexes.add(m_linked_column->get_backlink(linked_row_ndx, i));
         }
     }
-    // precondition: m_table is attached
-    else if (!m_query.m_table) {
-        // This case gets invoked if the TableView origined from Table::find_all(T value). It is temporarely disabled
-        // because it doesn't take the search parameter in count. FIXME/Todo
-        REALM_ASSERT(false);
-        // no valid query
-        m_row_indexes.clear();
-        for (size_t i = 0; i < m_table->size(); i++)
-            m_row_indexes.add(i);
-    }
     else {
+        REALM_ASSERT(m_query.m_table);
+
         // valid query, so clear earlier results and reexecute it.
         if (m_row_indexes.is_attached())
             m_row_indexes.clear();
         else
             m_row_indexes.init_from_ref(Allocator::get_default(), IntegerColumn::create(Allocator::get_default()));
+
         // if m_query had a TableView filter, then sync it. If it had a LinkView filter, no sync is needed
         if (m_query.m_view)
             m_query.m_view->sync_if_needed();
 
-        // find_all needs to call size() on the tableview. But if we're
-        // out of sync, size() will then call do_sync and we'll have an infinite regress
-        // SO: fake that we're up to date BEFORE calling find_all.
-        m_query.find_all(*(const_cast<TableViewBase*>(this)), m_start, m_end, m_limit);
+        m_query.find_all(*const_cast<TableViewBase*>(this), m_start, m_end, m_limit);
     }
     m_num_detached_refs = 0;
 
@@ -789,17 +763,14 @@ bool TableViewBase::is_in_table_order() const
     else if (m_linkview_source) {
         return false;
     }
-    else if (m_table && m_linked_column) {
+    else if (m_distinct_column_source != npos) {
+        return !m_sorting_predicate;
+    }
+    else if (m_linked_column) {
         return false;
-    }
-    else if (!m_query.m_table) {
-        // TableView originated from Table::find_all().
-        return !m_sorting_predicate;
-    }
-    else if (m_query.produces_results_in_table_order()) {
-        return !m_sorting_predicate;
     }
     else {
-        return false;
+        REALM_ASSERT(m_query.m_table);
+        return m_query.produces_results_in_table_order() && !m_sorting_predicate;
     }
 }

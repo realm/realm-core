@@ -2,8 +2,15 @@
 
 ### Bugfixes
 
+* Added SharedGroupOptions::set_sys_tmp_dir() and
+  SharedGroupOptions::set_sys_tmp_dir() to solve crash when compacting a Realm
+  file on Android external storage which is caused by invalid default sys_tmp_dir.
+  (https://github.com/realm/realm-java/issues/4140)
 * Fixed a few bugs (caused crashes) in pthread library on UWP.
 * Fixes a bug in chuncked binary column returning null value (#2418)
+* Possibly fixed some cases of extreme file size growth, by preventing starvation
+  when trying to start a write transaction, while simultaneously pinning an older
+  version. (issue #2395)
 * Fixed a bug when deleting a column used in a query (#2408)
 * Fixed a crash that occurred if you tried to override a binary with a size close
   to the limit.
@@ -11,6 +18,8 @@
 ### Breaking changes
 
 * The table macros, supporting the typed interface, has been removed
+* Layout and version change for the .lock file required in order to prevent
+  starvation when waiting to start a write transaction (see above).
 
 ### Enhancements
 
@@ -24,7 +33,8 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Remove the BinaryData constructor taking a temporary object to prevent some
+  errors in unit tests at compile time.
 
 ----------------------------------------------
 

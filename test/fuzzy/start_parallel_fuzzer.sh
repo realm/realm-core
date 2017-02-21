@@ -36,7 +36,8 @@ fi
 echo "Building core"
 
 cd ../../
-REALM_ENABLE_ENCRYPTION=yes sh build.sh config
+RAND_NODE_SIZE=$(python -c "import random; print (random.randint(4,999), 1000)[bool(random.randint(0,1))]")
+REALM_MAX_BPNODE_SIZE_DEBUG="$RAND_NODE_SIZE" REALM_ENABLE_ENCRYPTION=yes sh build.sh config
 CXX="$compiler" REALM_HAVE_CONFIG=yes make -j $num_fuzzers check-debug-norun "$flags"
 
 echo "Building fuzz target"
