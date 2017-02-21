@@ -556,4 +556,3 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
         REQUIRE_FALSE(r1->refresh());
     }
 }
-

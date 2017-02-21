@@ -464,6 +464,10 @@ void Realm::begin_transaction()
         throw InvalidTransactionException("The Realm is already in a write transaction");
     }
 
+    // Any of the callbacks to user code below could drop the last remaining
+    // strong reference to `this`
+    auto retain_self = shared_from_this();
+
     // If we're already in the middle of sending notifications, just begin the
     // write transaction without sending more notifications. If this actually
     // advances the read version this could leave the user in an inconsistent
@@ -579,10 +583,11 @@ void Realm::notify()
         return;
     }
 
-    // In case the SharedRealm gets descturcted in the did_change callback.
-    auto realm_ref = this->shared_from_this();
-
     verify_thread();
+
+    // Any of the callbacks to user code below could drop the last remaining
+    // strong reference to `this`
+    auto retain_self = shared_from_this();
 
     if (m_binding_context) {
         m_binding_context->before_notify();
@@ -634,6 +639,10 @@ bool Realm::refresh()
     if (m_is_sending_notifications) {
         return false;
     }
+
+    // Any of the callbacks to user code below could drop the last remaining
+    // strong reference to `this`
+    auto retain_self = shared_from_this();
 
     m_is_sending_notifications = true;
     auto cleanup = util::make_scope_exit([this]() noexcept { m_is_sending_notifications = false; });
@@ -724,6 +733,10 @@ T Realm::resolve_thread_safe_reference(ThreadSafeReference<T> reference)
         throw MismatchedRealmException("Cannot resolve thread safe reference in Realm with different configuration "
                                        "than the source Realm.");
     }
+
+    // Any of the callbacks to user code below could drop the last remaining
+    // strong reference to `this`
+    auto retain_self = shared_from_this();
 
     // Ensure we're on the same version as the reference
     if (!m_group) {
