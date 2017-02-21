@@ -117,8 +117,37 @@ task :afl_flags => :bpnode_size_4 do
     ENV['REALM_ENABLE_ENCRYPTION'] = '1'
 end
 
+task :afl_dir do
+    if @build_dir.to_s.empty?
+        @build_dir="build.make.release"
+    end
+    @afl_dir="#{@build_dir}/test/fuzzy/"
+    puts "AFL commands are directed to: #{@afl_dir}"
+end
+
 desc 'Build and instrument the code for fuzz testing with AFL in release mode.'
-task 'afl' => [:afl_flags, 'build-release']
+task 'afl-build' => [:afl_flags, 'build-release', :afl_dir]
+
+desc 'Start a fuzz test session, build and instrument the code if necessary.'
+task 'afl-start' => 'afl-build' do
+    Dir.chdir(@afl_dir) do
+        sh "sh simple_start.sh"
+    end
+end
+
+desc 'Check if there is a currently ongoing fuzz test and how many crashes it has found.'
+task 'afl-status' => :afl_dir do
+    Dir.chdir(@afl_dir) do
+        sh "afl-whatsup findings/"
+    end
+end
+
+desc 'Stop a fuzz test session and minimise results.'
+task 'afl-stop' => :afl_dir do
+    Dir.chdir(@afl_dir) do
+        sh "sh simple_stop.sh"
+    end
+end
 
 task :asan_flags do
   ENV['ASAN_OPTIONS'] = 'detect_odr_violation=2'

@@ -32,6 +32,7 @@ echo "Cleaning up the findings directory"
 
 pkill afl-fuzz
 rm -rf findings/*
+mkdir findings
 
 # see also stop_parallel_fuzzer.sh
 time_out="1000" # ms
