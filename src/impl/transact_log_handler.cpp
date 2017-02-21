@@ -342,9 +342,8 @@ void expand_to(std::vector<size_t>& cols, size_t i)
     if (old_size > i)
         return;
 
-    auto new_size = std::max(old_size * 2, i + 1);
-    cols.resize(new_size);
-    std::iota(&cols[old_size], &cols[new_size], old_size == 0 ? 0 : cols[old_size - 1] + 1);
+    cols.resize(std::max(old_size * 2, i + 1));
+    std::iota(begin(cols) + old_size, end(cols), old_size == 0 ? 0 : cols[old_size - 1] + 1);
 }
 
 void adjust_ge(std::vector<size_t>& values, size_t i)
