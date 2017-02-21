@@ -96,4 +96,8 @@ add_executable(realm-benchmark-common-tasks benchmark-common-tasks/main.cpp)
 target_link_libraries(realm-benchmark-common-tasks ${PLATFORM_LIBRARIES} test-util)
 add_test(RealmBenchmarkCommonTasks realm-benchmark-common-tasks)
 
+add_executable(realm-benchmark-crud benchmark-crud/main.cpp)
+target_link_libraries(realm-benchmark-crud ${PLATFORM_LIBRARIES} test-util)
+add_test(RealmBenchmarkCrud realm-benchmark-crud)
+
 # FIXME: Add other benchmarks
