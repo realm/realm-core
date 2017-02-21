@@ -55,7 +55,7 @@ public:
         m_realm->commit_transaction();
 
         _impl::CollectionChangeBuilder c;
-        _impl::TransactionChangeInfo info;
+        _impl::TransactionChangeInfo info{};
         info.lists.push_back({m_table_ndx, 0, 0, &c});
         info.table_modifications_needed.resize(m_group.size(), true);
         info.table_moves_needed.resize(m_group.size(), true);
@@ -256,7 +256,7 @@ TEST_CASE("Transaction log parsing: schema change reporting") {
         f();
         r->commit_transaction();
 
-        _impl::TransactionChangeInfo info;
+        _impl::TransactionChangeInfo info{};
         info.table_modifications_needed.resize(10, true);
         _impl::transaction::advance(sg, info);
 
@@ -408,7 +408,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             f();
             r->commit_transaction();
 
-            _impl::TransactionChangeInfo info;
+            _impl::TransactionChangeInfo info{};
             info.table_modifications_needed = tables_needed;
             info.table_moves_needed = tables_needed;
             _impl::transaction::advance(sg, info);
@@ -1932,7 +1932,7 @@ TEST_CASE("DeepChangeChecker") {
         f();
         r->commit_transaction();
 
-        _impl::TransactionChangeInfo info;
+        _impl::TransactionChangeInfo info{};
         info.table_modifications_needed.resize(g.size(), true);
         info.table_moves_needed.resize(g.size(), true);
         _impl::transaction::advance(sg, info);
