@@ -6,6 +6,8 @@
   SharedGroupOptions::set_sys_tmp_dir() to solve crash when compacting a Realm
   file on Android external storage which is caused by invalid default sys_tmp_dir.
   (https://github.com/realm/realm-java/issues/4140)
+* Fixed a race condition where asynchronous readers could read wrong data if
+  a write transaction triggered a file remapping.
 
 ### Breaking changes
 
