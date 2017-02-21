@@ -198,8 +198,12 @@ inline void Buffer<T>::reserve(size_t used_size, size_t min_capacity)
     if (REALM_LIKELY(current_capacity >= min_capacity))
         return;
     size_t new_capacity = current_capacity;
-    if (REALM_UNLIKELY(int_multiply_with_overflow_detect(new_capacity, 2)))
+
+    // Use growth factor 1.5.
+    if (REALM_UNLIKELY(int_multiply_with_overflow_detect(new_capacity, 3)))
         new_capacity = std::numeric_limits<size_t>::max();
+    new_capacity /= 2;
+
     if (REALM_UNLIKELY(new_capacity < min_capacity))
         new_capacity = min_capacity;
     resize(new_capacity, 0, used_size, 0); // Throws
