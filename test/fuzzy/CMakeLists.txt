@@ -24,8 +24,8 @@ file(COPY ${AFL_SEEDS}
 
 
 add_executable(fuzz-transact-log ${TEST_AFL_TRANSACT_LOG})
-target_link_libraries(fuzz-transact-log test-util realm)
+target_link_libraries(fuzz-transact-log ${PLATFORM_LIBRARIES} test-util realm)
 
 add_executable(fuzz-group ${TEST_AFL_SOURCES})
-target_link_libraries(fuzz-group test-util realm)
+target_link_libraries(fuzz-group ${PLATFORM_LIBRARIES} test-util realm)
 
