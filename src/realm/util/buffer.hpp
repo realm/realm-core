@@ -153,7 +153,7 @@ public:
     void clear() noexcept;
 
 private:
-    util::Buffer<char> m_buffer;
+    util::Buffer<T> m_buffer;
     size_t m_size;
 };
 
