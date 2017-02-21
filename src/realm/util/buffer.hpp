@@ -152,6 +152,12 @@ public:
     /// Set the size to zero. The capacity remains unchanged.
     void clear() noexcept;
 
+    /// Release the underlying buffer and reset the size. Note: The returned
+    /// buffer may be larger than the amount of data appended to this buffer.
+    /// Callers should call `size()` prior to releasing the buffer to know the
+    /// usable/logical size.
+    Buffer<T> release() noexcept;
+
 private:
     util::Buffer<T> m_buffer;
     size_t m_size;
@@ -275,6 +281,13 @@ template <class T>
 inline void AppendBuffer<T>::clear() noexcept
 {
     m_size = 0;
+}
+
+template <class T>
+inline Buffer<T> AppendBuffer<T>::release() noexcept
+{
+    m_size = 0;
+    return std::move(m_buffer);
 }
 
 
