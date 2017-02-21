@@ -117,8 +117,8 @@ task :afl_flags => :bpnode_size_4 do
     ENV['REALM_ENABLE_ENCRYPTION'] = '1'
 end
 
-desc 'Build and instrument the code for fuzz testing with AFL.'
-task 'afl' => [:afl_flags, 'build-debug']
+desc 'Build and instrument the code for fuzz testing with AFL in release mode.'
+task 'afl' => [:afl_flags, 'build-release']
 
 task :asan_flags do
   ENV['ASAN_OPTIONS'] = 'detect_odr_violation=2'
