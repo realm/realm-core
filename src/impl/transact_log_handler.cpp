@@ -483,17 +483,18 @@ public:
         REALM_ASSERT(unordered);
         size_t last_row = prior_num_rows - 1;
 
-        for (auto it = begin(m_info.lists); it != end(m_info.lists); ) {
-            if (it->table_ndx == current_table()) {
-                if (it->row_ndx == row_ndx) {
-                    *it = std::move(m_info.lists.back());
-                    m_info.lists.pop_back();
-                    continue;
-                }
-                if (it->row_ndx == last_row)
-                    it->row_ndx = row_ndx;
+        for (size_t i = 0; i < m_info.lists.size(); ++i) {
+            auto& list = m_info.lists[i];
+            if (list.table_ndx != current_table())
+                continue;
+            if (list.row_ndx == row_ndx) {
+                if (i + 1 < m_info.lists.size())
+                    m_info.lists[i] = std::move(m_info.lists.back());
+                m_info.lists.pop_back();
+                continue;
             }
-            ++it;
+            if (list.row_ndx == last_row)
+                list.row_ndx = row_ndx;
         }
 
         if (auto change = get_change())
