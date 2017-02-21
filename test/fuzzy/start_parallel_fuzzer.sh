@@ -6,12 +6,7 @@ fi
 num_fuzzers="$1"
 executable_path="$2"
 
-compiler="afl-g++"
-flags="COMPILER_IS_GCC_LIKE=yes"
-
 if [ "$(uname)" = "Darwin" ]; then
-    compiler="afl-clang++"
-
     # FIXME: Consider detecting if ReportCrash was already unloaded and skip this message
     #        or print and don't try to run AFL.
     echo "----------------------------------------------------------------------------------------"
@@ -32,17 +27,6 @@ else
         exit 1
     fi
 fi
-
-echo "Building core"
-
-cd ../../
-REALM_ENABLE_ENCRYPTION=yes sh build.sh config
-CXX="$compiler" REALM_HAVE_CONFIG=yes make -j check-debug-norun "$flags"
-
-echo "Building fuzz target"
-
-cd -
-CXX="$compiler" make -j check-debug-norun "$flags"
 
 echo "Cleaning up the findings directory"
 

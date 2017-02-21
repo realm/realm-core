@@ -59,6 +59,19 @@ if(REALM_COVERAGE)
   endif()
 endif()
 
+# AFL specific build flags
+option(REALM_AFL "Compile for fuzz testing." OFF)
+if(REALM_AFL)
+    if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
+        SET(CMAKE_CXX_COMPILER "afl-clang++")
+    elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
+        SET(CMAKE_CXX_COMPILER "afl-g++")
+    else()
+        message(FATAL_ERROR
+            "Running AFL with your compiler (${CMAKE_CXX_COMPILER_ID}) is not supported")
+    endif()
+endif()
+
 # Platform-specific build configuration
 if(APPLE)
     find_library(Foundation Foundation)

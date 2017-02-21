@@ -112,6 +112,14 @@ task 'gcovr' => 'check-cover' do
   end
 end
 
+task :afl_flags => :bpnode_size_4 do
+    ENV['REALM_AFL'] = '1'
+    ENV['REALM_ENABLE_ENCRYPTION'] = '1'
+end
+
+desc 'Build and instrument the code for fuzz testing with AFL.'
+task 'afl' => [:afl_flags, 'build-debug']
+
 task :asan_flags do
   ENV['ASAN_OPTIONS'] = 'detect_odr_violation=2'
   ENV['EXTRA_CFLAGS'] = '-fsanitize=address'
@@ -165,6 +173,7 @@ end
 
 task :bpnode_size_4 do
   ENV['REALM_MAX_BPNODE_SIZE'] = '4'
+  ENV['REALM_MAX_BPNODE_SIZE_DEBUG'] = '4'
 end
 
 task jenkins_flags: [:jenkins_workspace, :bpnode_size_4]

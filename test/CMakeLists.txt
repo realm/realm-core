@@ -1,4 +1,5 @@
 add_subdirectory(util)
+add_subdirectory(fuzzy)
 
 set(NORMAL_TESTS
     test_all.cpp
