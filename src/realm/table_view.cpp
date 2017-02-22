@@ -293,6 +293,12 @@ Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx)
     Timestamp best = Timestamp{};
     size_t ndx = npos;
     for (size_t t = 0; t < size(); t++) {
+        int64_t signed_row_ndx = m_row_indexes.get(t);
+
+        // skip detached references:
+        if (signed_row_ndx == detached_ref)
+            continue;
+
         Timestamp ts = get_timestamp(column_ndx, t);
         // Because realm::Greater(non-null, null) == false, we need to pick the initial 'best' manually when we see
         // the first non-null entry
@@ -423,6 +429,12 @@ size_t TableViewBase::count_timestamp(size_t column_ndx, Timestamp target) const
 {
     size_t count = 0;
     for (size_t t = 0; t < size(); t++) {
+        int64_t signed_row_ndx = m_row_indexes.get(t);
+
+        // skip detached references:
+        if (signed_row_ndx == detached_ref)
+            continue;
+        
         Timestamp ts = get_timestamp(column_ndx, t);
         realm::Equal e;
         if (e(ts, target, ts.is_null(), target.is_null())) {
