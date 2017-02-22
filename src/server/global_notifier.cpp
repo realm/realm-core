@@ -195,10 +195,10 @@ void GlobalNotifier::calculate()
         auto realm2 = Realm::make_shared_realm(config);
         auto& sg2 = Realm::Internal::get_shared_group(*realm2);
 
-        Group const& g = sg2.begin_read(sg.get_version_of_current_transaction());
+        Group const& g = sg2->begin_read(sg->get_version_of_current_transaction());
         _impl::TransactionChangeInfo info;
         info.track_all = true;
-        _impl::transaction::advance(sg2, info, next.target_version);
+        _impl::transaction::advance(*sg2, info, next.target_version);
 
         std::unordered_map<std::string, CollectionChangeSet> changes;
         changes.reserve(info.tables.size());
@@ -216,7 +216,7 @@ void GlobalNotifier::calculate()
 
         std::lock_guard<std::mutex> l2(m_deliver_queue_mutex);
         m_pending_deliveries.push({
-            sg.get_version_of_current_transaction(),
+            sg->get_version_of_current_transaction(),
             next.target_version,
             std::move(next.realm),
             std::move(changes)
