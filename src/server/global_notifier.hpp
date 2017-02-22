@@ -116,7 +116,9 @@ public:
         friend class GlobalNotifier;
     };
 
-    Realm::Config get_config(std::string realm_path);
+    realm::Realm::Config get_config(std::string path,
+                                    util::Optional<std::string> realm_id = util::none,
+                                    util::Optional<Schema> schema = util::none);
 
 private:
     GlobalNotifier(std::unique_ptr<Callback>, std::string local_root_dir,

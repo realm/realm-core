@@ -305,7 +305,7 @@ public:
         // resolving a PK conflict, but for tables with primary keys we use the PK
         // instead of the row index for the identity
         if (m_selected_object_schema) {
-            REALM_ASSERT(0);
+            REALM_ASSERT(false);
         }
         return true;
     }
@@ -640,7 +640,7 @@ void Adapter::Callback::realm_changed(GlobalNotifier::ChangeNotification changes
 }
 
 util::Optional<Adapter::ChangeSet> Adapter::current(std::string realm_path) {
-    auto realm = Realm::make_shared_realm(m_global_notifier->get_config(realm_path));
+    auto realm = realm::Realm::get_shared_realm(m_global_notifier->get_config(realm_path));
 
     REALM_ASSERT(dynamic_cast<sync::SyncHistory *>(realm->history()));
     auto sync_history = static_cast<sync::SyncHistory *>(realm->history());
@@ -656,7 +656,7 @@ util::Optional<Adapter::ChangeSet> Adapter::current(std::string realm_path) {
 }
 
 void Adapter::advance(std::string realm_path) {
-    auto realm = Realm::make_shared_realm(m_global_notifier->get_config(realm_path));
+    auto realm = realm::Realm::get_shared_realm(m_global_notifier->get_config(realm_path));
     auto sync_history = static_cast<sync::SyncHistory *>(realm->history());
     auto progress = sync_history->get_cooked_progress();
     if (progress.changeset_index < sync_history->get_num_cooked_changesets()) {
@@ -665,6 +665,8 @@ void Adapter::advance(std::string realm_path) {
     realm->invalidate();
 }
 
-SharedRealm Adapter::realm_at_path(std::string path) {
-    return Realm::get_shared_realm(m_global_notifier->get_config(path));
+realm::Realm::Config Adapter::get_config(std::string path,
+                                         util::Optional<std::string> realm_id,
+                                         util::Optional<Schema> schema) {
+    return m_global_notifier->get_config(path, realm_id, std::move(schema));
 }

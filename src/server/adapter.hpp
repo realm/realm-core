@@ -78,7 +78,9 @@ public:
     util::Optional<ChangeSet> current(std::string realm_path);
     void advance(std::string realm_path);
 
-    SharedRealm realm_at_path(std::string path);
+    realm::Realm::Config get_config(std::string path, 
+                                    util::Optional<std::string> realm_id = util::none,
+                                    util::Optional<Schema> schema = util::none);
 
     void close() { m_global_notifier.reset(); }
 

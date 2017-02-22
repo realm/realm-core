@@ -141,13 +141,30 @@ void GlobalNotifier::calculate()
     }
 }
 
-Realm::Config GlobalNotifier::get_config(std::string realm_path)
-{
+realm::Realm::Config GlobalNotifier::get_config(std::string path, 
+                                                util::Optional<std::string> realm_id,
+                                                util::Optional<Schema> schema) {
     Realm::Config config;
-    auto realm_id = m_realm_ids[realm_path];
-    config.path =  util::File::resolve(realm_id + ".realm", m_regular_realms_dir);
+    if (m_realm_ids.find(path) != m_realm_ids.end()) {
+        // use realm_id for existing realm
+        realm_id = m_realm_ids[path];
+    }
+    else if (realm_id && schema) {
+        // create realm in admin realm with realm_id
+        m_realm_ids[path] = *realm_id;
+        m_admin.create_realm(*realm_id, path);
+
+        // set schema
+        config.schema = schema;
+        config.schema_version = 0;
+    }
+    else {
+        throw std::runtime_error("No existing realm at path " + path);
+    }
+
+    config.path =  util::File::resolve(*realm_id + ".realm", m_regular_realms_dir);
     config.sync_config = std::shared_ptr<SyncConfig>(
-        new SyncConfig{m_user, m_server_base_url + realm_path.data(), SyncSessionStopPolicy::AfterChangesUploaded,
+        new SyncConfig{m_user, m_server_base_url + path.data(), SyncSessionStopPolicy::AfterChangesUploaded,
             [&](auto, const auto& config, auto session) {
                 session->bind_with_admin_token(config.user->refresh_token(), config.realm_url);
             }, 
