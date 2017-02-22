@@ -1,7 +1,8 @@
 # NEXT RELEASE
 
 ### Bugfixes
-
+* Fixed bug when encryption was used. It would cause crashes and corrupted data 
+  (sometimes pieces of data from earlier commits could be seen).
 * Added SharedGroupOptions::set_sys_tmp_dir() and
   SharedGroupOptions::set_sys_tmp_dir() to solve crash when compacting a Realm
   file on Android external storage which is caused by invalid default sys_tmp_dir.
