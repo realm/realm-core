@@ -185,8 +185,7 @@ ExternalCommitHelper::DaemonThread::DaemonThread()
     m_shutdown_read_fd = pipe_fd[0];
     m_shutdown_write_fd = pipe_fd[1];
 
-    struct epoll_event event;
-
+    epoll_event event{};
     event.events = EPOLLIN;
     event.data.fd = m_shutdown_read_fd;
     ret = epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, m_shutdown_read_fd, &event);
@@ -229,10 +228,10 @@ void ExternalCommitHelper::DaemonThread::add_commit_helper(ExternalCommitHelper*
     REALM_ASSERT(std::this_thread::get_id() != m_thread_id);
 
     std::lock_guard<std::mutex> lock(m_mutex);
-    struct epoll_event event;
 
     m_helpers.push_back(helper);
 
+    epoll_event event{};
     event.events = EPOLLIN | EPOLLET;
     event.data.fd = helper->m_notify_fd;
     int ret = epoll_ctl(m_epoll_fd, EPOLL_CTL_ADD, helper->m_notify_fd, &event);
@@ -251,10 +250,9 @@ void ExternalCommitHelper::DaemonThread::remove_commit_helper(ExternalCommitHelp
 
     m_helpers.erase(std::remove(m_helpers.begin(), m_helpers.end(), helper), m_helpers.end());
 
-    struct epoll_event event;
-
     // In kernel versions before 2.6.9, the EPOLL_CTL_DEL operation required a non-NULL pointer in event, even
     // though this argument is ignored. See man page of epoll_ctl.
+    epoll_event event{};
     epoll_ctl(m_epoll_fd, EPOLL_CTL_DEL, helper->m_notify_fd, &event);
 }
 
@@ -265,7 +263,7 @@ void ExternalCommitHelper::DaemonThread::listen()
     int ret;
 
     while (true) {
-        struct epoll_event ev;
+        epoll_event ev{};
         ret = epoll_wait(m_epoll_fd, &ev, 1, -1);
 
         if (ret == -1 && errno == EINTR) {
