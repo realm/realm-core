@@ -115,6 +115,10 @@ end
 task :afl_flags => :bpnode_size_4 do
     ENV['REALM_AFL'] = '1'
     ENV['REALM_ENABLE_ENCRYPTION'] = '1'
+    # turn on all assertions explicity since
+    # we build in release mode for speed
+    ENV['REALM_ENABLE_ASSERTIONS'] = '1'
+    ENV['REALM_DEBUG'] = '1'
 end
 
 task :afl_dir do
