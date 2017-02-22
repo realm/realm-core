@@ -21,13 +21,8 @@ set(CMAKE_CXX_EXTENSIONS off)
 if(MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3")
 else()
-  set(CMAKE_CXX_FLAGS, "${CMAKE_CXX_FLAGS} -Wextra -Wpedantic -Wundef")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wundef -Wshadow -Wunreachable-code -Wshorten-64-to-32 -Wold-style-cast -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types")
 endif()
-
-# Import some flags from the environment variables
-# (for compatibility with build.sh)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} $ENV{EXTRA_CFLAGS}")
-set(CMAKE_LINKER_FLAGS $ENV{EXTRA_LDFLAGS})
 
 # Add the MinSizeDebug configuration, used for packaging releases for Cocoa.
 if(APPLE AND CMAKE_CONFIGURATION_TYPES)
@@ -63,62 +58,26 @@ endif()
 option(REALM_AFL "Compile for fuzz testing." OFF)
 if(REALM_AFL)
     if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
-        SET(CMAKE_CXX_COMPILER "afl-clang++")
+        set(FUZZ_COMPILER_NAME "afl-clang++")
     elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
-        SET(CMAKE_CXX_COMPILER "afl-g++")
+        set(FUZZ_COMPILER_NAME "afl-g++")
     else()
         message(FATAL_ERROR
             "Running AFL with your compiler (${CMAKE_CXX_COMPILER_ID}) is not supported")
     endif()
+    find_program(AFL ${FUZZ_COMPILER_NAME})
+    if(NOT AFL)
+        message(FATAL_ERROR "AFL not found!")
+    endif()
+    set(CMAKE_CXX_COMPILER "${AFL}")
 endif()
 
 # Platform-specific build configuration
 if(APPLE)
     find_library(Foundation Foundation)
-
-    # Enable Apple-specific platforms on Xcode
-    if(CMAKE_GENERATOR STREQUAL Xcode)
-        unset(CMAKE_XCODE_ATTRIBUTE_INSTALL_PATH)
-
-        set(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS
-            "macosx iphoneos iphonesimulator appletvos appletvsimulator watchos watchsimulator"
-        )
-        set(CMAKE_XCODE_EFFECTIVE_PLATFORMS
-            "-macosx;-iphoneos;-iphonesimulator;-appletvos;-appletvsimulator;-watchos;-watchsimulator"
-        )
-        set(CMAKE_XCODE_ATTRIBUTE_CLANG_CXX_LIBRARY "libc++")
-
-        # Deployment targets
-        set(CMAKE_XCODE_ATTRIBUTE_MACOSX_DEPLOYMENT_TARGET "10.8")
-        set(CMAKE_XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "7.0")
-        set(CMAKE_XCODE_ATTRIBUTE_WATCHOS_DEPLOYMENT_TARGET "2.0")
-        set(CMAKE_XCODE_ATTRIBUTE_TVOS_DEPLOYMENT_TARGET "9.0")
-
-        # Architectures. Everything but iOS uses the default architectures.
-        set(CMAKE_XCODE_ATTRIBUTE_ARCHS[sdk=iphoneos*] "\$(ARCHS_iphoneos_\$(CONFIGURATION))")
-        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_Debug "armv7 arm64")
-        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_MinSizeDebug "armv7 arm64")
-        # iOS release configurations need to build for armv7s for sake of CocoaPods.
-        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_Release "armv7 armv7s arm64")
-        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_RelWithDebInfo "armv7 armv7s arm64")
-        set(CMAKE_XCODE_ATTRIBUTE_ARCHS_iphoneos_MinSizeRel "armv7 armv7s arm64")
-
-        # Bitcode. May be overridden by Rakefile.
-        set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE[sdk=iphone*] "YES")
-        set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE[sdk=watch*] "YES")
-        set(CMAKE_XCODE_ATTRIBUTE_ENABLE_BITCODE[sdk=appletv*] "YES")
-        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE "\$(BITCODE_GENERATION_MODE_\$(CONFIGURATION))")
-        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_Debug "marker")
-        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_MinSizeDebug "marker")
-        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_Release "bitcode")
-        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_RelWithDebInfo "bitcode")
-        set(CMAKE_XCODE_ATTRIBUTE_BITCODE_GENERATION_MODE_MinSizeRel "bitcode")
-    endif()
 elseif(ANDROID)
-  set(ANDROID_OPENSSL_VERSION "1.0.2k")
-  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Os")
-  list(APPEND PLATFORM_LIBRARIES log)
-  list(APPEND PLATFORM_LIBRARIES android)
+    set(ANDROID_OPENSSL_VERSION "1.0.2k")
+    list(APPEND PLATFORM_LIBRARIES log android)
 endif()
 
 # Find dependencies
@@ -128,8 +87,9 @@ find_package(Threads REQUIRED)
 # Options (passed to CMake)
 option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode.")
 option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations.")
-option(REALM_ENABLE_ENCRYPTION "Enable encryption.")
+option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
+option(REALM_ENABLE_MEMDEBUG "Add additional memory checks")
 
 check_include_files(malloc.h HAVE_MALLOC_H)
 

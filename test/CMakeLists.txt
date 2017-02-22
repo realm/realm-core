@@ -83,7 +83,19 @@ file(COPY ${REQUIRED_TEST_FILES}
 
 # FIXME: Benchmarks
 
-add_executable(realm-tests ${TESTS} main.cpp)
+if(APPLE)
+    set(MAIN_FILE main.mm)
+else()
+    set(MAIN_FILE main.cpp)
+endif()
+
+add_executable(realm-tests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES})
+
+if(APPLE)
+    set_target_properties(realm-tests PROPERTIES
+                          MACOSX_BUNDLE YES
+                          RESOURCE "${REQUIRED_TEST_FILES}")
+endif()
 
 target_link_libraries(realm-tests
                       test-util ${EXTRA_TEST_LIBS} ${PLATFORM_LIBRARIES}

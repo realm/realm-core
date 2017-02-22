@@ -1,10 +1,6 @@
 This file explains how to build and install the Realm core library.
 
-_NOTE_: This is going to change very soon as a new build system based
-on CMake will be introduced.
-
-Prerequisites
--------------
+## Prerequisites
 
 To build the Realm core library, you need the standard set of build
 tools. This includes a C/C++ compiler and GNU make. Realm is
@@ -46,8 +42,7 @@ On OS X, Clang is used as the C/C++ compiler by default. Clang is installed
 as part of Xcode. Xcode 7.0 or newer is required, and can be installed via
 the Mac App Store.
 
-Configure, build & test
--------------------------
+## Configure, build & test
 
 Run the following commands to configure, build and test core:
 
@@ -57,8 +52,7 @@ Run the following commands to configure, build and test core:
     cmake --build
     ctest
 
-Building for Android, iOS, watchOS and tvOS
--------------------------------------------
+## Building for Android, iOS, watchOS and tvOS
 
 Building for Android required the NDK r10e installed.
 
@@ -73,8 +67,7 @@ The command shows the available options simply with:
 These commands produce a tarball containing the realm static library
 and its include files.
 
-Configuration
--------------
+## Configuration
 
 It is possible to install into a non-default location by running the
 following command before building and installing:
@@ -88,8 +81,7 @@ CMake can automatically detect your compiler and its location but it allows
 all kinds of customizations. For a brief overview you can reference to this
 CMake [wiki page](http://www.vtk.org/Wiki/CMake_Useful_Variables#Compilers_and_Tools)
 
-Testing
--------
+## Testing
 
 The core library comes with a suite of unit tests. You can run it in one of the
 following ways:
@@ -161,7 +153,7 @@ These are the available variables:
    testing process as soon as a check fails or an unexpected exception is thrown
    in a test.
 
-Memory debugging:
+### Memory debugging:
 
 Realm currently allows for uninitialized data to be written to a database
 file. This is not an error (technically), but it does cause Valgrind to report
@@ -171,7 +163,7 @@ following example:
 
     cmake -D REALM_ENABLE_ALLOC_SET_ZERO=ON -D CMAKE_BUILD_TYPE=Debug ..
 
-Measuring test coverage:
+### Measuring test coverage:
 
 You can measure how much of the code is tested by executing:
 
@@ -179,8 +171,7 @@ You can measure how much of the code is tested by executing:
     ./realm-tests
     gcovr --filter='.*src/realm.*'
 
-Install
--------
+## Install
 
 You can install core itself on Linux if needed, but be aware that the API exposed
 is not stable or supported!
@@ -200,7 +191,7 @@ The following libraries will be installed:
     /usr/local/lib/librealm.so
     /usr/local/lib/librealm.a
 
-Note: '.so' is replaced by '.dylib' on OS X.
+_Note: '.so' is replaced by '.dylib' on OS X._
 
 The following programs will be installed:
 
