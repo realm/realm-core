@@ -89,6 +89,59 @@ bool session_is_inactive(const SyncSession& session)
 
 }
 
+TEST_CASE("SyncSession: error handler should work after session resurrection", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    SyncServer server(false);
+
+    auto user = SyncManager::shared().get_user("error-handler-after-resurrection-user", "not_a_real_token");
+
+    std::atomic<int> error_count(0);
+    std::string on_disk_path;
+    Realm::Config config;
+    SyncSession* original_session;
+    {
+        Schema schema{
+            {"sync_session_object", {
+                {"value 1", PropertyType::Int},
+                {"value 2", PropertyType::Int},
+            }},
+        };
+
+        // Create a session, then wait for it to log in.
+        auto session = sync_session(server, user, "/error-handler-after-resurrection",
+                                    [](auto&, auto&) { return s_test_token; },
+                                    [&](auto, auto) { error_count++; },
+                                    SyncSessionStopPolicy::AfterChangesUploaded,
+                                    &on_disk_path,
+                                    schema,
+                                    &config);
+        EventLoop::main().run_until([&] { return session_is_active(*session); });
+
+        original_session = session.get();
+        // After dropping the last external reference to the session, it should stay in the `dying` state,
+        // waiting on the schema changes to upload, since server is not running.
+    }
+
+    REQUIRE(original_session->state() == SyncSession::PublicState::Dying);
+
+    // Revive the session.
+    auto session = SyncManager::shared().get_session(on_disk_path, *config.sync_config);
+    // Ensure we got the same session back, and that it's been moved back to `active`.
+    REQUIRE(session.get() == original_session);
+    REQUIRE(session_is_active(*session));
+    REQUIRE(error_count == 0);
+
+    // Start the server to allow it to process log-in attempts.
+    server.start();
+
+    // Force an error by providing a bogus access token.
+    session->refresh_access_token("not_a_real_token", none);
+    EventLoop::main().run_until([&] { return session->is_in_error_state(); });
+}
+
 TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
