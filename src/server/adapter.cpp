@@ -668,5 +668,6 @@ void Adapter::advance(std::string realm_path) {
 realm::Realm::Config Adapter::get_config(std::string path,
                                          util::Optional<std::string> realm_id,
                                          util::Optional<Schema> schema) {
-    return m_global_notifier->get_config(path, realm_id, std::move(schema));
+    auto config = m_global_notifier->get_config(path, realm_id, std::move(schema));
+    return config;
 }

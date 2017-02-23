@@ -162,7 +162,21 @@ realm::Realm::Config GlobalNotifier::get_config(std::string path,
         throw std::runtime_error("No existing realm at path " + path);
     }
 
-    config.path =  util::File::resolve(*realm_id + ".realm", m_regular_realms_dir);
+    std::cout << *realm_id << " " << path << std::endl;
+
+    char *path_str = strdup(path.c_str());
+    char *tok = strtok(path_str, "/");
+    std::string file_path = m_regular_realms_dir;
+    while (tok != NULL) {
+        util::try_make_dir(file_path);\
+        file_path += "/";
+        file_path += tok;
+        tok = strtok(NULL, "/");
+        std::cout << file_path << std::endl;
+    }
+    free(path_str);
+
+    config.path = file_path + ".realm";
     config.sync_config = std::shared_ptr<SyncConfig>(
         new SyncConfig{m_user, m_server_base_url + path.data(), SyncSessionStopPolicy::AfterChangesUploaded,
             [&](auto, const auto& config, auto session) {
@@ -208,7 +222,14 @@ void GlobalNotifier::register_realms(std::vector<AdminRealmListener::RealmInfo> 
 {
     std::vector<bool> new_realms;
     for (auto &realm_info : realms) {
-        m_realm_ids[realm_info.second] = realm_info.first;
+        if (m_realm_ids.find(realm_info.second) == m_realm_ids.end()) {
+            // only set if we don't have a locally generated id
+            m_realm_ids[realm_info.second] = realm_info.first;
+        }
+        else {
+            // update server id to our local id
+            realm_info.first = m_realm_ids[realm_info.second];
+        }
     }
 
     std::vector<bool> monitor = m_target->available(realms);
