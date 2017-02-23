@@ -41,34 +41,78 @@ union ArrayReps {
 };
 
 template<typename T> T get(Memory&, ArrayReps&, int);
-template<> uint64_t get<uint64_t>(Memory& mem, ArrayReps& ar, int index) { return ar.as_u.get(mem, index); }
-template<> int64_t get<int64_t>(Memory& mem, ArrayReps& ar, int index) { return ar.as_i.get(mem, index); }
-template<> float get<float>(Memory& mem, ArrayReps& ar, int index) { return ar.as_f.get(mem, index); }
-template<> double get<double>(Memory& mem, ArrayReps& ar, int index) { return ar.as_d.get(mem, index); }
-template<> _String get<_String>(Memory& mem, ArrayReps& ar, int index) { return ar.as_s.get(mem, index); }
+template<> uint64_t get<uint64_t>(Memory& mem, ArrayReps& ar, int index) { 
+    return ar.as_u.get(mem, index); 
+}
+
+template<> int64_t get<int64_t>(Memory& mem, ArrayReps& ar, int index) { 
+    return ar.as_i.get(mem, index); 
+}
+
+template<> float get<float>(Memory& mem, ArrayReps& ar, int index) { 
+    return ar.as_f.get(mem, index); 
+}
+
+template<> double get<double>(Memory& mem, ArrayReps& ar, int index) { 
+    return ar.as_d.get(mem, index); 
+}
+
+template<> _String get<_String>(Memory& mem, ArrayReps& ar, int index) { 
+    return ar.as_s.get(mem, index); 
+}
+
 template<> _List<uint64_t> get<_List<uint64_t>>(Memory& mem, ArrayReps& ar, int index) { 
     return ar.as_U.get(mem, index); 
 }
+
 template<> _List<int64_t> get<_List<int64_t>>(Memory& mem, ArrayReps& ar, int index) { 
     return ar.as_I.get(mem, index); 
 }
+
 template<> _List<float> get<_List<float>>(Memory& mem, ArrayReps& ar, int index) { 
     return ar.as_F.get(mem, index); 
 }
+
 template<> _List<double> get<_List<double>>(Memory& mem, ArrayReps& ar, int index) { 
     return ar.as_D.get(mem, index); 
 }
 
-template<typename T> void set(Memory&, ArrayReps&, int, T);
-template<> void set(Memory& mem, ArrayReps& ar, int index, uint64_t val) { ar.as_u.set(mem, index, val); }
-template<> void set(Memory& mem, ArrayReps& ar, int index, int64_t val) { ar.as_i.set(mem, index, val); }
-template<> void set(Memory& mem, ArrayReps& ar, int index, float val) { ar.as_f.set(mem, index, val); }
-template<> void set(Memory& mem, ArrayReps& ar, int index, double val) { ar.as_d.set(mem, index, val); }
-template<> void set(Memory& mem, ArrayReps& ar, int index, _String val) { ar.as_s.set(mem, index, val); }
-template<> void set(Memory& mem, ArrayReps& ar, int index, _List<uint64_t> val) { ar.as_U.set(mem, index, val); }
-template<> void set(Memory& mem, ArrayReps& ar, int index, _List<int64_t> val) { ar.as_I.set(mem, index, val); }
-template<> void set(Memory& mem, ArrayReps& ar, int index, _List<float> val) { ar.as_F.set(mem, index, val); }
-template<> void set(Memory& mem, ArrayReps& ar, int index, _List<double> val) { ar.as_D.set(mem, index, val); }
+template<typename T> void set(Memory&, ArrayReps&, int, T, int);
+template<> void set(Memory& mem, ArrayReps& ar, int index, uint64_t val, int size) { 
+    ar.as_u.set(mem, index, val, size); 
+}
+
+template<> void set(Memory& mem, ArrayReps& ar, int index, int64_t val, int size) { 
+    ar.as_i.set(mem, index, val, size); 
+}
+
+template<> void set(Memory& mem, ArrayReps& ar, int index, float val, int size) { 
+    ar.as_f.set(mem, index, val, size); 
+}
+
+template<> void set(Memory& mem, ArrayReps& ar, int index, double val, int size) { 
+    ar.as_d.set(mem, index, val, size); 
+}
+
+template<> void set(Memory& mem, ArrayReps& ar, int index, _String val, int size) { 
+    ar.as_s.set(mem, index, val, size); 
+}
+
+template<> void set(Memory& mem, ArrayReps& ar, int index, _List<uint64_t> val, int size) { 
+    ar.as_U.set(mem, index, val, size); 
+}
+
+template<> void set(Memory& mem, ArrayReps& ar, int index, _List<int64_t> val, int size) { 
+    ar.as_I.set(mem, index, val, size); 
+}
+
+template<> void set(Memory& mem, ArrayReps& ar, int index, _List<float> val, int size) { 
+    ar.as_F.set(mem, index, val, size); 
+}
+
+template<> void set(Memory& mem, ArrayReps& ar, int index, _List<double> val, int size) { 
+    ar.as_D.set(mem, index, val, size); 
+}
 
 union Reps {
     uint64_t as_u;
@@ -91,9 +135,9 @@ struct ClusterMgr : public PayloadMgr {
     virtual void cow(Ref<DynType>& payload, int old_capacity, int new_capacity);
     virtual void free(Ref<DynType> payload, int capacity);
     virtual void read_internalbuffer(Ref<DynType> payload, int from);
-    virtual void write_internalbuffer(Ref<DynType>& payload, int to);
+    virtual void write_internalbuffer(Ref<DynType>& payload, int to, int capacity);
     virtual void init_internalbuffer();
-    virtual void swap_internalbuffer(Ref<DynType>& payload, int index);
+    virtual void swap_internalbuffer(Ref<DynType>& payload, int index, int capacity);
     virtual Ref<DynType> commit(Ref<DynType> from);
     Memory& mem;
     int num_fields;
@@ -222,7 +266,7 @@ void ClusterMgr::read_internalbuffer(Ref<DynType> payload, int index) {
     }
 }
 
-void ClusterMgr::write_internalbuffer(Ref<DynType>& payload, int index) {
+void ClusterMgr::write_internalbuffer(Ref<DynType>& payload, int index, int capacity) {
     assert(mem.is_writable(payload));
     Ref<_Cluster> p_ref = payload.as<_Cluster>();
     _Cluster* p_ptr = mem.txl(p_ref);
@@ -230,23 +274,23 @@ void ClusterMgr::write_internalbuffer(Ref<DynType>& payload, int index) {
         switch (field_info[col].type) {
             case 't': 
             case 'r':
-            case 'u': p_ptr->entries[col].as_u.set(mem, index, values[col].as_u); break;
-            case 'i': p_ptr->entries[col].as_i.set(mem, index, values[col].as_i); break;
-            case 'f': p_ptr->entries[col].as_f.set(mem, index, values[col].as_f); break;
-            case 'd': p_ptr->entries[col].as_d.set(mem, index, values[col].as_d); break;
-            case 's': p_ptr->entries[col].as_s.set(mem, index, values[col].as_s); break;
+            case 'u': p_ptr->entries[col].as_u.set(mem, index, values[col].as_u, capacity); break;
+            case 'i': p_ptr->entries[col].as_i.set(mem, index, values[col].as_i, capacity); break;
+            case 'f': p_ptr->entries[col].as_f.set(mem, index, values[col].as_f, capacity); break;
+            case 'd': p_ptr->entries[col].as_d.set(mem, index, values[col].as_d, capacity); break;
+            case 's': p_ptr->entries[col].as_s.set(mem, index, values[col].as_s, capacity); break;
             case 'T':
             case 'R':
-            case 'U': p_ptr->entries[col].as_U.set(mem, index, values[col].as_U); break;
-            case 'I': p_ptr->entries[col].as_I.set(mem, index, values[col].as_I); break;
-            case 'F': p_ptr->entries[col].as_F.set(mem, index, values[col].as_F); break;
-            case 'D': p_ptr->entries[col].as_D.set(mem, index, values[col].as_D); break;
+            case 'U': p_ptr->entries[col].as_U.set(mem, index, values[col].as_U, capacity); break;
+            case 'I': p_ptr->entries[col].as_I.set(mem, index, values[col].as_I, capacity); break;
+            case 'F': p_ptr->entries[col].as_F.set(mem, index, values[col].as_F, capacity); break;
+            case 'D': p_ptr->entries[col].as_D.set(mem, index, values[col].as_D, capacity); break;
             default: throw std::runtime_error("Internal error, unsupported type specifier");
         }
     }
 }
 
-void ClusterMgr::swap_internalbuffer(Ref<DynType>& payload, int index) {
+void ClusterMgr::swap_internalbuffer(Ref<DynType>& payload, int index, int capacity) {
     assert(mem.is_writable(payload));
     Ref<_Cluster> p_ref = payload.as<_Cluster>();
     _Cluster* p_ptr = mem.txl(p_ref);
@@ -257,35 +301,35 @@ void ClusterMgr::swap_internalbuffer(Ref<DynType>& payload, int index) {
             case 'u': {
                 _Array<uint64_t>& array = p_ptr->entries[col].as_u;
                 uint64_t tmp = array.get(mem, index);
-                p_ptr->entries[col].as_u.set(mem, index, values[col].as_u);
+                p_ptr->entries[col].as_u.set(mem, index, values[col].as_u, capacity);
                 values[col].as_u = tmp;
                 break;
             }
             case 'i': {
                 _Array<int64_t>& array = p_ptr->entries[col].as_i;
                 int64_t tmp = array.get(mem, index);
-                p_ptr->entries[col].as_i.set(mem, index, values[col].as_i);
+                p_ptr->entries[col].as_i.set(mem, index, values[col].as_i, capacity);
                 values[col].as_i = tmp;
                 break;
             }
             case 'f': {
                 _Array<float>& array = p_ptr->entries[col].as_f;
                 float tmp = array.get(mem, index);
-                p_ptr->entries[col].as_f.set(mem, index, values[col].as_u);
+                p_ptr->entries[col].as_f.set(mem, index, values[col].as_u, capacity);
                 values[col].as_f = tmp;
                 break;
             }
             case 'd': {
                 _Array<double>& array = p_ptr->entries[col].as_d;
                 double tmp = array.get(mem, index);
-                p_ptr->entries[col].as_d.set(mem, index, values[col].as_d);
+                p_ptr->entries[col].as_d.set(mem, index, values[col].as_d, capacity);
                 values[col].as_d = tmp;
                 break;
             }
             case 's': {
                 _Array<_String>& array = p_ptr->entries[col].as_s;
                 _String tmp = array.get(mem, index);
-                p_ptr->entries[col].as_s.set(mem, index, values[col].as_s);
+                p_ptr->entries[col].as_s.set(mem, index, values[col].as_s, capacity);
                 values[col].as_s = tmp;
                 break;
             }
@@ -294,28 +338,28 @@ void ClusterMgr::swap_internalbuffer(Ref<DynType>& payload, int index) {
             case 'U': {
                 _Array<_List<uint64_t>>& array = p_ptr->entries[col].as_U;
                 _List<uint64_t> tmp = array.get(mem, index);
-                p_ptr->entries[col].as_U.set(mem, index, values[col].as_U);
+                p_ptr->entries[col].as_U.set(mem, index, values[col].as_U, capacity);
                 values[col].as_U = tmp;
                 break;
             }
             case 'I': {
                 _Array<_List<int64_t>>& array = p_ptr->entries[col].as_I;
                 _List<int64_t> tmp = array.get(mem, index);
-                p_ptr->entries[col].as_I.set(mem, index, values[col].as_I);
+                p_ptr->entries[col].as_I.set(mem, index, values[col].as_I, capacity);
                 values[col].as_I = tmp;
                 break;
             }
             case 'F': {
                 _Array<_List<float>>& array = p_ptr->entries[col].as_F;
                 _List<float> tmp = array.get(mem, index);
-                p_ptr->entries[col].as_F.set(mem, index, values[col].as_F);
+                p_ptr->entries[col].as_F.set(mem, index, values[col].as_F, capacity);
                 values[col].as_F = tmp;
                 break;
             }
             case 'D': {
                 _Array<_List<double>>& array = p_ptr->entries[col].as_D;
                 _List<double> tmp = array.get(mem, index);
-                p_ptr->entries[col].as_D.set(mem, index, values[col].as_D);
+                p_ptr->entries[col].as_D.set(mem, index, values[col].as_D, capacity);
                 values[col].as_D = tmp;
                 break;
             }
@@ -374,11 +418,13 @@ void _Table::insert(Memory& mem, uint64_t key) {
 void _Table::get_cluster(Memory& mem, uint64_t key, Object& o) {
     Ref<DynType> payload;
     int index;
-    if (cuckoo.find(mem, key, payload, index)) {
+    uint8_t size;
+    if (cuckoo.find(mem, key, payload, index, size)) {
         Ref<_Cluster> pl = payload.as<_Cluster>();
         _Cluster* pl_ptr = mem.txl(pl);
         o.cluster = pl_ptr;
         o.index = index;
+        o.size = size;
         o.is_writable = mem.is_writable(pl);
         return;
     }
@@ -389,7 +435,8 @@ void _Table::change_cluster(Memory& mem, uint64_t key, Object& o) {
     ClusterMgr pm(mem, num_fields, fields);
     Ref<DynType> payload;
     int index;
-    bool res = cuckoo.find_and_cow_path(mem, pm, key, payload, index);
+    uint8_t size;
+    bool res = cuckoo.find_and_cow_path(mem, pm, key, payload, index, size);
     if (!res) {
         throw NotFound();
     }
@@ -398,13 +445,15 @@ void _Table::change_cluster(Memory& mem, uint64_t key, Object& o) {
     _Cluster* pl_ptr = mem.txl(pl);
     o.cluster = pl_ptr;
     o.index = index;
+    o.size = size;
     o.is_writable = true;
 }
 
 bool _Table::find(Memory& mem, uint64_t key) {
-    int dummy;
-    Ref<DynType> dot;
-    return cuckoo.find(mem, key, dot, dummy);
+    int dummy_index;
+    uint8_t dummy_size;
+    Ref<DynType> dummy_ref;
+    return cuckoo.find(mem, key, dummy_ref, dummy_index, dummy_size);
 }
 
 Ref<_Table> _Table::create(Memory& mem, const char* t_info) {
@@ -435,7 +484,7 @@ void Object::set(Field<T> f, T value) {
     uint16_t idx = f.key;
     if (f.key != table->fields[idx].key)
         throw std::runtime_error("Stale or invalid field specifier");
-    ::set<T>(mem, cluster->entries[idx], index, value);
+    ::set<T>(mem, cluster->entries[idx], index, value, size);
 }
 
 template<>
@@ -444,7 +493,7 @@ void Object::set<Table>(Field<Table> f, Table value) {
     uint16_t idx = f.key;
     if (f.key != table->fields[idx].key)
         throw std::runtime_error("Stale or invalid field specifier");
-    ::set<uint64_t>(mem, cluster->entries[idx], index, value.key);
+    ::set<uint64_t>(mem, cluster->entries[idx], index, value.key, size);
 }
 
 template<>
@@ -453,7 +502,7 @@ void Object::set<Row>(Field<Row> f, Row value) {
     uint16_t idx = f.key;
     if (f.key != table->fields[idx].key)
         throw std::runtime_error("Stale or invalid field specifier");
-    ::set<uint64_t>(mem, cluster->entries[idx], index, value.key);
+    ::set<uint64_t>(mem, cluster->entries[idx], index, value.key, size);
 }
 
 void Object::set(Field<String> f, std::string value) {
@@ -465,7 +514,7 @@ void Object::set(Field<String> f, std::string value) {
     uint64_t limit = value.size();
     s.set_size(mem, limit);
     for (uint64_t k = 0; k < limit; ++k) s.set(mem, k, value[k]);
-    ::set<_String>(mem, cluster->entries[idx], index, s);
+    ::set<_String>(mem, cluster->entries[idx], index, s, size);
 }
 
 std::string Object::operator()(Field<String> f) {
@@ -568,7 +617,7 @@ void ListAccessor<T>::set_size(uint64_t size) {
         throw std::runtime_error("Stale or invalid field specifier");
     _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[idx], o.index);
     list.set_size(mem, size);
-    ::set<_List<T>>(mem, o.cluster->entries[idx], o.index, list);
+    ::set<_List<T>>(mem, o.cluster->entries[idx], o.index, list, o.size);
 }
 
 template<typename T>
@@ -579,7 +628,7 @@ void ListAccessor<T>::wr(uint64_t index, T value) {
         throw std::runtime_error("Stale or invalid field specifier");
     _List<T> list = ::get<_List<T>>(mem, o.cluster->entries[idx], o.index);
     list.set(mem, index, value);
-    ::set<_List<T>>(mem, o.cluster->entries[idx], o.index, list);
+    ::set<_List<T>>(mem, o.cluster->entries[idx], o.index, list, o.size);
 }
 
 

@@ -86,7 +86,7 @@ void Encoding<_List<T>>::commit_from_quad(Memory& mem, uint64_t& quad) {
 
 
 template<typename T>
-void ensure_storage(Memory& mem, _Array<T>& a, int index, int e_sz) {
+void ensure_storage(Memory& mem, _Array<T>& a, int index, int e_sz, int capacity) {
     // make room for non-zero value of e_sz at index. Also, as this
     // always happen in preparation for a later write, make sure the
     // array is writable.
@@ -103,7 +103,16 @@ void ensure_storage(Memory& mem, _Array<T>& a, int index, int e_sz) {
     if (e_sz < b.get_esz()) 
         e_sz = b.get_esz();
     if (!_Array<T>::can_be_inlined(e_sz, new_cap)) {
-        //new_cap = (new_cap + 15) & 0x1F0; // align
+        // TODO:
+        // this is a fine optimization for simple arrays, but it is wrong
+        // for lists....instead, a different path for writing into the arrays
+        // in the top of the cluster should be provided, where the true capacity
+        // could be propagated from the Leaf of the Cuckoo tree.... this cannot
+        // be done easily, however, before the Leaf and the Cluster is fused
+        // into one:
+        // new_cap = (new_cap + 15) & 0x1F0; // align
+        if (capacity > new_cap)
+            new_cap = capacity;
     }
     assert(new_cap <= 255);
     a.init(e_sz, new_cap, 0);
@@ -112,10 +121,10 @@ void ensure_storage(Memory& mem, _Array<T>& a, int index, int e_sz) {
     }
     for (int j=0; j<old_cap; ++j) {
         T tmp = b.get(mem, j);
-        a.set(mem, j, tmp);
+        a.set_unchecked(mem, j, tmp);
     }
     for (int j=old_cap; j < new_cap; ++j) {
-        a.set(mem, j, 0);
+        a.set_unchecked(mem, j, 0);
     }
     if (!b.is_inlined()) {
         b.free(mem);
@@ -150,12 +159,8 @@ uint64_t Encoding<double>::set_in_quad(uint64_t quad, int esz, int index, double
 }
 
 template<typename T>
-void _Array<T>::set(Memory& mem, int index, T value) {
-    // extend storage if necessary before performing write
-    if (Encoding<T>::is_null(value) && is_all_zero()) return;
-    int e_sz = Encoding<T>::get_encoding_size(value);
-    ensure_storage(mem, *this, index, e_sz);
-    e_sz = get_esz();
+void _Array<T>::set_unchecked(Memory& mem, int index, T value) {
+    int e_sz = get_esz();
     if (is_inlined()) {
         uint64_t q = Encoding<T>::set_in_quad(get_data(), e_sz, index, value);
         set_data(q);
@@ -169,13 +174,22 @@ void _Array<T>::set(Memory& mem, int index, T value) {
 }
 
 template<typename T>
+void _Array<T>::set(Memory& mem, int index, T value, int capacity) {
+    // extend storage if necessary before performing write
+    if (Encoding<T>::is_null(value) && is_all_zero()) return;
+    int e_sz = Encoding<T>::get_encoding_size(value);
+    ensure_storage(mem, *this, index, e_sz, capacity);
+    set_unchecked(mem, index, value);
+}
+
+template<typename T>
 void _List<T>::set_size(Memory& mem, uint64_t size) {
     if (size < array.get_cap()) {
         // TODO truncate
         throw std::runtime_error("truncating a list is unimplemented");
     }
     else if (size > array.get_cap()) {
-        ensure_storage(mem, array, size-1, array.get_esz());
+        ensure_storage(mem, array, size-1, array.get_esz(), 0);
     }
 }
 

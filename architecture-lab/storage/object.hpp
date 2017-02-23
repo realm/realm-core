@@ -66,7 +66,8 @@ struct Object {
     Row r;
     _Table* table;
     _Cluster* cluster;
-    int index;
+    uint8_t index;
+    uint8_t size;
     bool is_writable;
 };
 

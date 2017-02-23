@@ -25,9 +25,9 @@ struct PayloadMgr {
     virtual void cow(Ref<DynType>& payload, int old_capacity, int new_capacity) = 0;
     virtual void free(Ref<DynType> payload, int capacity) = 0;
     virtual void read_internalbuffer(Ref<DynType> payload, int from) = 0;
-    virtual void write_internalbuffer(Ref<DynType>& payload, int to) = 0;
+    virtual void write_internalbuffer(Ref<DynType>& payload, int to, int capacity) = 0;
     virtual void init_internalbuffer() = 0;
-    virtual void swap_internalbuffer(Ref<DynType>& payload, int index) = 0;
+    virtual void swap_internalbuffer(Ref<DynType>& payload, int index, int capacity) = 0;
     virtual Ref<DynType> commit(Ref<DynType> payload) = 0;
 };
 

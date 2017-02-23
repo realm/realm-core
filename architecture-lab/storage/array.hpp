@@ -58,6 +58,7 @@ struct _Array {
     static int bits_required(int esz, int cap) { uint64_t sz = cap; return sz << esz; }
     int quads_required() { return (63 + bits_required(get_esz(), get_cap())) / 64; }
     static inline bool can_be_inlined(int esz, int cap) {
+        return false; // don't use inlining for now, current implementation is inefficient
         switch(esz) {
             case 0: return cap <= 52;
             case 1: return cap <= 26;
@@ -93,7 +94,8 @@ struct _Array {
         return mem.is_writable(get_ref());
     }
     inline T get(Memory& mem, int index);
-    void set(Memory& mem, int index, T value);
+    void set(Memory& mem, int index, T value, int capacity);
+    void set_unchecked(Memory& mem, int index, T value);
 };
 
 static inline int get_shift_in_quad(int sz, int index) {
@@ -173,7 +175,7 @@ struct _List { //: public _Array<T> { FIXME: better to use inheritance?
     uint64_t get_size() { return array.get_cap(); }
     void set_size(Memory& mem, uint64_t size);
     T get(Memory& mem, uint64_t index) { return array.get(mem, index); }
-    void set(Memory& mem, uint64_t index, T value) { array.set(mem, index, value); }
+    void set(Memory& mem, uint64_t index, T value) { array.set(mem, index, value, 0); }
 };
 
 

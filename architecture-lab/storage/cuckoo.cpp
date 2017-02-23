@@ -29,12 +29,13 @@ void _Cuckoo::init() {
     secondary_tree.init(0);
 }
 
+struct CondensationEntry { uint8_t idx; uint8_t quick_key; };
 
 struct TreeLeaf {
     uint16_t sz;
     uint16_t capacity;
     uint32_t reserved;
-    uint8_t condenser[256];
+    CondensationEntry condenser[256];
     Ref<DynType> payload;
     uint64_t keys[256]; // <-- must come last
 };
@@ -87,16 +88,19 @@ void _Cuckoo::copied_to_file(Memory& mem, PayloadMgr& pmgr) {
 
 // return index with matching key, or -1 if no match found
 int find_in_leaf(Memory& mem, TreeLeaf* leaf_ptr, uint64_t hash, uint64_t key) {
-    uint8_t subhash = hash; // cut off all above one byte
-    uint8_t subhash_limit = subhash + 4;
+    int subhash = hash & 0xFF; // cut off all above one byte
+    int subhash_limit = (subhash + 4) & 0xFF;
     key >>= 1; // shift out hash indicator prior to key comparions
     while (subhash != subhash_limit) {
-        uint8_t idx = leaf_ptr->condenser[subhash];
+        uint8_t idx = leaf_ptr->condenser[subhash].idx;
+        uint8_t quick_key = leaf_ptr->condenser[subhash].quick_key;
         subhash++;
-        --idx; // indices wrapped by one to make 0 be last possible index
-        if (idx >= leaf_ptr->sz) {
+        subhash &= 0xFF;
+        if (idx == 0)
             continue;
-        }
+        if (quick_key != (key & 0xFF))
+            continue;
+        --idx; // indices wrapped by one to make 0 be last possible index
         if ((leaf_ptr->keys[idx] >> 1) == key)
             return idx;
     }
@@ -105,20 +109,20 @@ int find_in_leaf(Memory& mem, TreeLeaf* leaf_ptr, uint64_t hash, uint64_t key) {
 
 // return subhash for empty index within search range of hash, -1 if no match
 int find_empty_in_leaf(Memory& mem, TreeLeaf* leaf_ptr, uint64_t hash) {
-    uint8_t subhash = hash; // cut off all above one byte
-    uint8_t subhash_limit = subhash + 4;
+    int subhash = hash & 0xFF; // cut off all above one byte
+    int subhash_limit = (subhash + 4) & 0xFF;
     while (subhash != subhash_limit) {
-        uint8_t idx = leaf_ptr->condenser[subhash];
-        --idx; // indices wrapped by one to make 0 be last possible index
-        if (idx >= leaf_ptr->sz && leaf_ptr->sz < 255) {
+        uint8_t idx = leaf_ptr->condenser[subhash].idx;
+        if (idx == 0 && leaf_ptr->sz < 255)
             return subhash;
-        }
+        --idx; // indices wrapped by one to make 0 be last possible index
         subhash++;
+        subhash &= 0xFF;
     }
     return -1;
 }
 
-bool _Cuckoo::find(Memory& mem, uint64_t key, Ref<DynType>& payload, int& index) {
+bool _Cuckoo::find(Memory& mem, uint64_t key, Ref<DynType>& payload, int& index, uint8_t& size) {
     key <<= 1;
     uint64_t h_1 = hash_a(key);
     Ref<DynType> leaf = primary_tree.lookup(mem, h_1);
@@ -127,6 +131,7 @@ bool _Cuckoo::find(Memory& mem, uint64_t key, Ref<DynType>& payload, int& index)
     int in_leaf_idx = find_in_leaf(mem, leaf_ptr, h_1, key);
     if (in_leaf_idx >= 0) {
         index = in_leaf_idx;
+        size = leaf_ptr->sz;
         payload = leaf_ptr->payload;
         return true;
     }
@@ -138,6 +143,7 @@ bool _Cuckoo::find(Memory& mem, uint64_t key, Ref<DynType>& payload, int& index)
     in_leaf_idx = find_in_leaf(mem, leaf_ptr, h_2, key);
     if (in_leaf_idx >= 0) {
         index = in_leaf_idx;
+        size = leaf_ptr->sz;
         payload = leaf_ptr->payload;
         return true;
     }
@@ -151,7 +157,7 @@ bool _Cuckoo::find(Memory& mem, uint64_t key, Ref<DynType>& payload, int& index)
 // get a null ref back if key could not be found. If found, cow the path to the payload
 // and return a pointer allowing for later update of the payload ref.
 bool _Cuckoo::find_and_cow_path(Memory& mem, PayloadMgr& pm, uint64_t key, 
-                                Ref<DynType>& payload, int& index) {
+                                Ref<DynType>& payload, int& index, uint8_t& size) {
     key <<= 1;
     uint64_t h_1 = hash_a(key);
     Ref<DynType> leaf = primary_tree.lookup(mem, h_1);
@@ -183,6 +189,7 @@ bool _Cuckoo::find_and_cow_path(Memory& mem, PayloadMgr& pm, uint64_t key,
         payload = leaf_ptr->payload;
     }
     index = in_leaf_idx;
+    size = leaf_ptr->sz;
     return true;
 }
 
@@ -220,19 +227,21 @@ bool insert_in_leaf(Memory& mem, Ref<DynType> leaf, _TreeTop* tree_ptr,
     }
     // we now have a writable leaf with sufficient capacity, update it:
     if (conflict) { // we're reusing the spot of an old key:
-        uint8_t idx = leaf_ptr->condenser[subhash];
+        uint8_t idx = leaf_ptr->condenser[subhash].idx;
         --idx;
         uint64_t old_key = leaf_ptr->keys[idx];
         leaf_ptr->keys[idx] = key;
-        pm.swap_internalbuffer(leaf_ptr->payload, idx);
+        leaf_ptr->condenser[subhash].quick_key = key >> 1;
+        pm.swap_internalbuffer(leaf_ptr->payload, idx, leaf_ptr->sz);
         key = old_key;
     } else { // we're adding a new key:
         uint8_t idx = leaf_ptr->sz;
         leaf_ptr->keys[idx] = key;
-        pm.write_internalbuffer(leaf_ptr->payload, idx);
+        leaf_ptr->condenser[subhash].quick_key = key >> 1;
+        pm.write_internalbuffer(leaf_ptr->payload, idx, leaf_ptr->sz);
         ++leaf_ptr->sz;
         ++idx;
-        leaf_ptr->condenser[subhash] = idx;
+        leaf_ptr->condenser[subhash].idx = idx;
         tree_ptr->count++;
     }
     return conflict;
@@ -252,6 +261,7 @@ bool _Cuckoo::first_access(Memory& mem, ObjectIterator& oi) {
                 oi.leaf = leaf_ptr;
                 oi.o.r.key = leaf_ptr->keys[0] >> 1;
                 oi.o.index = 0;
+                oi.o.size = leaf_ptr->sz;
                 Ref<DynType> payload = leaf_ptr->payload;
                 oi.o.cluster = mem.txl(payload.as<_Cluster>());
                 return true;
