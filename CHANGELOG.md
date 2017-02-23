@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.3.2 Release notes
 
 ### Bugfixes
 * Fixed bug when encryption was used. It would cause crashes and corrupted data 
@@ -7,14 +7,6 @@
   SharedGroupOptions::set_sys_tmp_dir() to solve crash when compacting a Realm
   file on Android external storage which is caused by invalid default sys_tmp_dir.
   (https://github.com/realm/realm-java/issues/4140)
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
 
 -----------
 
