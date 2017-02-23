@@ -1,4 +1,4 @@
-CXXFLAGS = -pthread -Wall -pedantic -std=c++14 -ggdb -O2 -MMD
+CXXFLAGS = -pthread -Wall -pedantic -std=c++14 -ggdb -O3 -MMD
 
 ifeq ($(DEBUG),1)
 CXXFLAGS += -O0
@@ -30,6 +30,7 @@ run: test
 	./test
 
 perf: test_perf
+	rm -f perf.core2
 	./test_perf
 
 lib: libstorage.a
@@ -43,7 +44,6 @@ test : main.o libstorage.a
 	g++ -pthread main.o -L. -lstorage -o test
 
 test_perf : test_perf.o libstorage.a
-	rm -f perf.core2
 	g++ -pthread test_perf.o -L. -lstorage -o test_perf
 
 clean:
