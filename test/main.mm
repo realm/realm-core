@@ -22,7 +22,7 @@
 #include "util/test_path.hpp"
 #include "test_all.hpp"
 
-int main(int argc, const char *argv[])
+int main()
 {
     std::string tmp_dir{[NSTemporaryDirectory() UTF8String]};
     realm::test_util::set_test_path_prefix(tmp_dir);
