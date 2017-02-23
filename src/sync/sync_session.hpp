@@ -114,7 +114,7 @@ public:
     // If the sync session is currently `Dying`, ask it to stay alive instead.
     // If the sync session is currently `WaitingForAccessToken`, cancel any deferred close.
     // If the sync session is currently `Inactive`, recreate it. Otherwise, a no-op.
-    static void revive_if_needed(std::shared_ptr<SyncSession> session);
+    void revive_if_needed();
 
     // Give the `SyncSession` a new, valid token, and ask it to refresh the underlying session.
     // If the session can't accept a new token, this method does nothing.
@@ -153,6 +153,13 @@ public:
         return m_server_url;
     }
 
+    // Create an external reference to this session. The sync session attempts to remain active
+    // as long as an external reference to the session exists.
+    std::shared_ptr<SyncSession> external_reference();
+
+    // Return an existing external reference to this session, if one exists. Otherwise, returns `nullptr`.
+    std::shared_ptr<SyncSession> existing_external_reference();
+
     // Expose some internal functionality to other parts of the ObjectStore
     // without making it public to everyone
     class Internal {
@@ -189,6 +196,8 @@ public:
     };
 
 private:
+    using std::enable_shared_from_this<SyncSession>::shared_from_this;
+
     struct State;
     friend struct _impl::sync_session_states::WaitingForAccessToken;
     friend struct _impl::sync_session_states::Active;
@@ -215,6 +224,7 @@ private:
 
     void create_sync_session();
     void unregister(std::unique_lock<std::mutex>& lock);
+    void did_drop_external_reference();
 
     std::function<SyncSessionTransactCallback> m_sync_transact_callback;
     std::function<SyncSessionErrorHandler> m_error_handler;
@@ -279,6 +289,9 @@ private:
 
     // The fully-resolved URL of this Realm, including the server and the path.
     util::Optional<std::string> m_server_url;
+
+    class ExternalReference;
+    std::weak_ptr<ExternalReference> m_external_reference;
 };
 
 }

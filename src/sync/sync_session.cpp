@@ -237,7 +237,13 @@ struct sync_session_states::Dying : public SyncSession::State {
     void enter_state(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
         size_t current_death_count = ++session.m_death_count;
-        session.m_session->async_wait_for_upload_completion([session=&session, current_death_count](std::error_code) {
+        std::weak_ptr<SyncSession> weak_session = session.shared_from_this();
+        session.m_session->async_wait_for_upload_completion([weak_session, current_death_count](std::error_code) {
+            auto session = weak_session.lock();
+
+            // We expect SyncManager to keep us alive until we move out of the `Dying` state.
+            REALM_ASSERT(session);
+
             std::unique_lock<std::mutex> lock(session->m_state_mutex);
             if (session->m_state == &State::dying && session->m_death_count == current_death_count) {
                 session->advance_state(lock, inactive);
@@ -310,7 +316,6 @@ const SyncSession::State& SyncSession::State::active = Active();
 const SyncSession::State& SyncSession::State::dying = Dying();
 const SyncSession::State& SyncSession::State::inactive = Inactive();
 const SyncSession::State& SyncSession::State::error = Error();
-
 
 SyncSession::SyncSession(SyncClient& client, std::string realm_path, SyncConfig config)
 : m_state(&State::inactive)
@@ -567,19 +572,16 @@ void SyncSession::nonsync_transact_notify(sync::Session::version_type version)
     m_state->nonsync_transact_notify(lock, *this, version);
 }
 
-void SyncSession::revive_if_needed(std::shared_ptr<SyncSession> session)
+void SyncSession::revive_if_needed()
 {
-    REALM_ASSERT(session);
     util::Optional<std::function<SyncBindSessionHandler>&> handler;
     {
-        std::unique_lock<std::mutex> lock(session->m_state_mutex);
-        if (session->m_state->revive_if_needed(lock, *session)) {
-            handler = session->m_config.bind_session_handler;
-        }
+        std::unique_lock<std::mutex> lock(m_state_mutex);
+        if (m_state->revive_if_needed(lock, *this))
+            handler = m_config.bind_session_handler;
     }
-    if (handler) {
-        handler.value()(session->m_realm_path, session->m_config, session);
-    }
+    if (handler)
+        handler.value()(m_realm_path, m_config, shared_from_this());
 }
 
 void SyncSession::log_out()
@@ -709,4 +711,53 @@ SyncSession::PublicState SyncSession::state() const
         return PublicState::Error;
     }
     REALM_UNREACHABLE();
+}
+
+// Represents a reference to the SyncSession from outside of the sync subsystem.
+// We attempt to keep the SyncSession in an active state as long as it has an external reference.
+class SyncSession::ExternalReference {
+public:
+    ExternalReference(std::shared_ptr<SyncSession> session) : m_session(std::move(session))
+    {}
+
+    ~ExternalReference()
+    {
+        m_session->did_drop_external_reference();
+    }
+
+private:
+    std::shared_ptr<SyncSession> m_session;
+};
+
+std::shared_ptr<SyncSession> SyncSession::external_reference()
+{
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+
+    if (auto external_reference = m_external_reference.lock())
+        return std::shared_ptr<SyncSession>(external_reference, this);
+
+    auto external_reference = std::make_shared<ExternalReference>(shared_from_this());
+    m_external_reference = external_reference;
+    return std::shared_ptr<SyncSession>(external_reference, this);
+}
+
+std::shared_ptr<SyncSession> SyncSession::existing_external_reference()
+{
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+
+    if (auto external_reference = m_external_reference.lock())
+        return std::shared_ptr<SyncSession>(external_reference, this);
+
+    return nullptr;
+}
+
+void SyncSession::did_drop_external_reference()
+{
+    std::unique_lock<std::mutex> lock(m_state_mutex);
+
+    // If the session is being resurrected we should not close the session.
+    if (!m_external_reference.expired())
+        return;
+
+    m_state->close(lock, *this);
 }

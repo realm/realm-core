@@ -121,7 +121,6 @@ public:
 
 private:
     using ReconnectMode = sync::Client::ReconnectMode;
-    void dropped_last_reference_to_session(SyncSession*);
 
     // Stop tracking the session for the given path if it is inactive.
     // No-op if the session is either still active or in the active sessions list
@@ -135,8 +134,7 @@ private:
     _impl::SyncClient& get_sync_client() const;
     std::unique_ptr<_impl::SyncClient> create_sync_client() const;
 
-    std::shared_ptr<SyncSession> get_existing_active_session_locked(const std::string& path) const;
-    std::unique_ptr<SyncSession> get_existing_inactive_session_locked(const std::string& path);
+    std::shared_ptr<SyncSession> get_existing_session_locked(const std::string& path) const;
 
     mutable std::mutex m_mutex;
 
@@ -156,7 +154,7 @@ private:
 
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
 
-    // Protects m_active_sessions and m_inactive_sessions
+    // Protects m_sessions
     mutable std::mutex m_session_mutex;
 
     // Protects m_file_manager and m_metadata_manager
@@ -170,8 +168,7 @@ private:
     // sessions until the session itself calls unregister_session to remove
     // itself from inactive sessions once it's done with whatever async cleanup
     // it needs to do.
-    std::unordered_map<std::string, std::weak_ptr<SyncSession>> m_active_sessions;
-    std::unordered_map<std::string, std::unique_ptr<SyncSession>> m_inactive_sessions;
+    std::unordered_map<std::string, std::shared_ptr<SyncSession>> m_sessions;
 };
 
 } // namespace realm
