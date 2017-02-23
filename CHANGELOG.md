@@ -21,6 +21,7 @@
 
 * Remove the BinaryData constructor taking a temporary object to prevent some
   errors in unit tests at compile time.
+* Avoid assertions in aggregate functions for the timestamp type.
 
 ----------------------------------------------
 

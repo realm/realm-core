@@ -3431,4 +3431,26 @@ TEST(TableView_InsertColumnsAfterSort)
     CHECK_EQUAL(tv.get_int(2, 10), 0);
 }
 
+TEST(TableView_TimestampMaxRemoveRow)
+{
+    Table table;
+    table.add_column(type_Timestamp, "time");
+    for (size_t i = 0; i < 10; ++i) {
+        table.add_empty_row();
+        table.set_timestamp(0, i, Timestamp(i, 0));
+    }
+
+    TableView tv = table.where().find_all();
+    CHECK_EQUAL(tv.size(), 10);
+    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(9, 0));
+
+    table.move_last_over(9);
+    CHECK_EQUAL(tv.size(), 10); // not changed since sync_if_needed hasn't been called
+    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0)); // but aggregate functions skip removed rows
+
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 9);
+    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0));    
+}
+
 #endif // TEST_TABLE_VIEW
