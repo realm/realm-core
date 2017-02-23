@@ -121,6 +121,9 @@ public:
     {
     }
 
+    AppendBuffer(AppendBuffer&&) noexcept = default;
+    AppendBuffer& operator=(AppendBuffer&&) noexcept = default;
+
     /// Returns the current size of the buffer.
     size_t size() const noexcept;
 
