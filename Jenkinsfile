@@ -290,7 +290,7 @@ def doBuildMacOs(String buildType) {
                         timeout(time: 1, unit: 'MINUTES') {
                             sh """
                                 rm -rf *
-                                cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake
+                                cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake \\
                                       -D CMAKE_INSTALL_PREFIX=\$(pwd)/install \\
                                       -D CMAKE_BUILD_TYPE=${buildType} \\
                                       -G Xcode ..
