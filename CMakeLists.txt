@@ -8,28 +8,21 @@ project(realm VERSION 2.3.0)
 include(GNUInstallDirs)
 include(CheckIncludeFiles)
 include(GetGitRevisionDescription)
+include(utilities)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
 
 # Project-wide build flags
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_STANDARD_REQUIRED on)
-set(CMAKE_CXX_EXTENSIONS off)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Set global warnings settings
 if(MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3")
 else()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wundef -Wshadow -Wunreachable-code -Wshorten-64-to-32 -Wold-style-cast -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types")
-endif()
-
-# Add the MinSizeDebug configuration, used for packaging releases for Cocoa.
-if(APPLE AND CMAKE_CONFIGURATION_TYPES)
-    list(APPEND CMAKE_CONFIGURATION_TYPES MinSizeDebug)
-    list(REMOVE_DUPLICATES CMAKE_CONFIGURATION_TYPES)
-    set(CMAKE_CONFIGURATION_TYPES "${CMAKE_CONFIGURATION_TYPES}"
-        CACHE STRING "Add MinSizeDebug configuration" FORCE)
 endif()
 
 # Add REALM_DEBUG=1 to compile definitions for Debug / MinSizeDebug targets
@@ -85,11 +78,11 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 # Options (passed to CMake)
-option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode.")
-option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations.")
+option(REALM_ENABLE_ASSERTIONS "Enable assertions in release mode." OFF)
+option(REALM_ENABLE_ALLOC_SET_ZERO "Zero all allocations." OFF)
 option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
+option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
-option(REALM_ENABLE_MEMDEBUG "Add additional memory checks")
 
 check_include_files(malloc.h HAVE_MALLOC_H)
 

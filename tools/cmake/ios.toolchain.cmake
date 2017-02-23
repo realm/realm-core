@@ -1,10 +1,14 @@
-include(utilities.cmake)
+include("${CMAKE_CURRENT_LIST_DIR}/utilities.cmake")
 
 check_generator("Xcode")
 
 fix_xcode_try_compile()
 
 set_common_xcode_attributes()
+
+set(REALM_SKIP_SHARED_LIB ON)
+
+set(CMAKE_OSX_SYSROOT "iphoneos")
 
 set(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS "iphoneos iphonesimulator")
 set(CMAKE_XCODE_EFFECTIVE_PLATFORMS "-iphoneos;-iphonesimulator")

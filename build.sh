@@ -2,6 +2,7 @@
 
 #Set Script Name variable
 SCRIPT=$(basename "${BASH_SOURCE[0]}")
+DIR=$(dirname "${BASH_SOURCE[0]}")
 
 # Set fonts
 NORM="\e[0m"
@@ -89,12 +90,10 @@ else
         tvos) SDK="appletv";;
     esac
 
-    cmake -D REALM_ENABLE_ENCRYPTION=yes \
-          -D REALM_ENABLE_ASSERTIONS=yes \
+    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/${OS}.toolchain.cmake \
           -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D REALM_NO_TESTS=1 \
-          -D REALM_SKIP_SHARED_LIB=1 \
           -D REALM_VERSION="${VERSION}" \
           -G Xcode ..
 

@@ -180,17 +180,8 @@ add_library(realm-objects OBJECT ${REALM_SOURCES})
 set_target_properties(realm-objects PROPERTIES POSITION_INDEPENDENT_CODE true)
 target_compile_definitions(realm-objects PUBLIC PIC)
 
-if(APPLE)
-    set_target_properties(
-            realm-objects PROPERTIES
-            XCODE_ATTRIBUTE_SKIP_INSTALL "NO"
-            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL "\$(GCC_OPTIMIZATION_LEVEL_\$(CONFIGURATION))"
-            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_Debug "0"
-            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_MinSizeDebug "z"
-            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_Release "3"
-            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelWithDebInfo "3"
-            XCODE_ATTRIBUTE_GCC_OPTIMIZATION_LEVEL_RelMinSize "3"
-    )
+if(COMMAND set_target_xcode_attributes)
+    set_target_xcode_attributes(realm-objects)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
@@ -200,6 +191,8 @@ if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
                         ${CMAKE_PROJECT_DIR}/src/win32
                         ${CMAKE_PROJECT_DIR}/src/win32/pthread)
     list(APPEND REALM_EXTRA_LIBS pthread_win32 getopt_win32)
+elseif(ANDROID)
+    list(APPEND REALM_EXTRA_LIBS atomic)
 endif()
 
 # The placeholder file is needed in order to make builds work on Xcode
@@ -212,10 +205,6 @@ target_link_libraries(
         ${REALM_EXTRA_LIBS}
         ${CMAKE_THREAD_LIBS_INIT}
 )
-
-if(ANDROID)
-    target_link_libraries(realm atomic)
-endif()
 
 if(ANDROID OR CMAKE_SYSTEM_NAME MATCHES "^Windows")
     set(REALM_SKIP_SHARED_LIB ON)
@@ -234,10 +223,6 @@ if(NOT REALM_SKIP_SHARED_LIB)
             ${REALM_EXTRA_LIBS}
             ${CMAKE_THREAD_LIBS_INIT}
     )
-
-    if(ANDROID)
-        target_link_libraries(realm-shared atomic)
-    endif()
 endif()
 
 if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)
@@ -279,12 +264,6 @@ endif(APPLE)
 install(TARGETS realm
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT devel)
 
-if(NOT REALM_SKIP_SHARED_LIB)
-    install(TARGETS realm-shared
-            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
-            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
-endif()
-
 install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
         COMPONENT devel)
@@ -297,6 +276,12 @@ install(FILES ${PROJECT_BINARY_DIR}/src/realm/version.hpp
 install(FILES ${PROJECT_BINARY_DIR}/src/realm/util/config.h
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util
         COMPONENT devel)
+
+if(NOT REALM_SKIP_SHARED_LIB)
+    install(TARGETS realm-shared
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
+            RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime)
+endif()
 
 if(ANDROID)
     install(FILES ${CRYPTO_LIB} ${SSL_LIB}

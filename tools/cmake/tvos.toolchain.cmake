@@ -6,6 +6,8 @@ fix_xcode_try_compile()
 
 set_common_xcode_attributes()
 
+set(REALM_SKIP_SHARED_LIB ON)
+
 set(CMAKE_XCODE_ATTRIBUTE_SUPPORTED_PLATFORMS "appletvos appletvsimulator")
 set(CMAKE_XCODE_EFFECTIVE_PLATFORMS "-appletvos;-appletvsimulator")
 set(CMAKE_XCODE_ATTRIBUTE_TVOS_DEPLOYMENT_TARGET "9.0")

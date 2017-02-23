@@ -16,6 +16,7 @@
  *
  **************************************************************************/
 
+#define __ASSERT_MACROS_DEFINE_VERSIONS_WITHOUT_UNDERSCORES 0
 #import <Foundation/Foundation.h>
 
 #include "util/test_path.hpp"
