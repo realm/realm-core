@@ -51,7 +51,7 @@ using namespace realm::util;
 using namespace realm::test_util;
 using namespace realm::_impl;
 
-const int limit = 2000000;
+const int limit = 10000000;
 
 TEST(PerfTest) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
@@ -82,14 +82,99 @@ TEST(PerfTest) {
         std::cout << "setting values (4 random values/key) " << limit << " keys..." << std::flush;
         start = std::chrono::high_resolution_clock::now();
         for (int idx = 0; idx < limit; ++idx) {
-            t->set_int(0, idx, rand() % 10000);
-            t->set_int(1, idx, rand() % 10000);
-            t->set_int(2, idx, rand() % 10000);
-            t->set_int(3, idx, rand() % 10000);
+            t->set_int(0, idx, rand() % 2000);
+            t->set_int(1, idx, rand() % 2000);
+            t->set_int(2, idx, rand() % 2000);
+            t->set_int(3, idx, rand() % 2000);
         }
         end = std::chrono::high_resolution_clock::now();
         ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
         std::cout << "   ...done in " << ns.count() << " nsecs/key" << std::endl;
+
+        std::cout << "committing " << limit << " keys..." << std::flush;
+        start = std::chrono::high_resolution_clock::now();
+        wt.commit();
+        end = std::chrono::high_resolution_clock::now();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end-start);
+        std::cout << "   ...done in " << ms.count() << " millisecs " << std::endl;
+
+    }
+    {
+        WriteTransaction wt(sg);
+        TableRef t = wt.get_table("my_table");
+
+        std::cout << "first access (seq order) " << limit << " keys..." << std::flush;
+        int sum = 0;
+        start = std::chrono::high_resolution_clock::now();
+        for (int idx = 0; idx < limit; ++idx) {
+            sum += t->get_int(0, idx);
+        }
+        end = std::chrono::high_resolution_clock::now();
+        auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
+        auto baseline = ns;
+        std::cout << "   ...done in " << ns.count() << " nsecs/key" << std::endl;
+
+        std::cout << "2nd access, same field (seq order) " << limit << " keys..." << std::flush;
+        sum = 0;
+        start = std::chrono::high_resolution_clock::now();
+        for (int idx = 0; idx < limit; ++idx) {
+            sum += t->get_int(0, idx);
+            sum += t->get_int(0, idx);
+        }
+        end = std::chrono::high_resolution_clock::now();
+        ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
+        std::cout << "   ...done in " << (ns - baseline).count() << " nsecs/key" << std::endl;
+
+        std::cout << "2nd access, other field (seq order) " << limit << " keys..." << std::flush;
+        sum = 0;
+        start = std::chrono::high_resolution_clock::now();
+        for (int idx = 0; idx < limit; ++idx) {
+            sum += t->get_int(0, idx);
+            sum += t->get_int(1, idx);
+        }
+        end = std::chrono::high_resolution_clock::now();
+        ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
+        std::cout << "   ...done in " << (ns - baseline).count() << " nsecs/key" << std::endl;
+
+
+
+        std::cout << "first access (random order) " << limit << " keys..." << std::flush;
+        sum = 0;
+        start = std::chrono::high_resolution_clock::now();
+        for (int j = 0; j < limit; ++j) {
+            int idx = shuffle[j];
+            sum += t->get_int(0, idx);
+        }
+        end = std::chrono::high_resolution_clock::now();
+        ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
+        baseline = ns;
+        std::cout << "   ...done in " << ns.count() << " nsecs/key" << std::endl;
+
+        std::cout << "2nd access, same field (random order) " << limit << " keys..." << std::flush;
+        sum = 0;
+        start = std::chrono::high_resolution_clock::now();
+        for (int j = 0; j < limit; ++j) {
+            int idx = shuffle[j];
+            sum += t->get_int(0, idx);
+            sum += t->get_int(0, idx);
+        }
+        end = std::chrono::high_resolution_clock::now();
+        ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
+        std::cout << "   ...done in " << (ns - baseline).count() << " nsecs/key" << std::endl;
+
+        std::cout << "2nd access, other field (random order) " << limit << " keys..." << std::flush;
+        sum = 0;
+        start = std::chrono::high_resolution_clock::now();
+        for (int j = 0; j < limit; ++j) {
+            int idx = shuffle[j];
+            sum += t->get_int(0, idx);
+            sum += t->get_int(1, idx);
+        }
+        end = std::chrono::high_resolution_clock::now();
+        ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
+        std::cout << "   ...done in " << (ns - baseline).count() << " nsecs/key" << std::endl;
+
+
 
         std::cout << "manual query (4 reads/key) for " << limit << " keys..." << std::flush;
         int count = 0;
@@ -127,7 +212,6 @@ TEST(PerfTest) {
         std::cout << "   ...done in " << ns.count() << " nsecs/key" << std::endl;
         CHECK_EQUAL(count, count3);
 
-
         std::cout << "committing " << limit << " keys..." << std::flush;
         start = std::chrono::high_resolution_clock::now();
         wt.commit();
@@ -137,6 +221,7 @@ TEST(PerfTest) {
     }
 }
 
+#if 0
 
 TEST(PerfTest_UID) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
@@ -173,10 +258,10 @@ TEST(PerfTest_UID) {
         start = std::chrono::high_resolution_clock::now();
         for (int j = 0; j < limit; ++j) {
             int idx = t->find_first_int(4, j);
-            t->set_int(0, idx, rand() % 10000);
-            t->set_int(1, idx, rand() % 10000);
-            t->set_int(2, idx, rand() % 10000);
-            t->set_int(3, idx, rand() % 10000);
+            t->set_int(0, idx, rand() % 2000);
+            t->set_int(1, idx, rand() % 2000);
+            t->set_int(2, idx, rand() % 2000);
+            t->set_int(3, idx, rand() % 2000);
         }
         end = std::chrono::high_resolution_clock::now();
         ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
@@ -214,3 +299,4 @@ TEST(PerfTest_UID) {
         std::cout << "   ...done in " << ms.count() << " millisecs " << std::endl;
     }
 }
+#endif

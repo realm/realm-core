@@ -26,7 +26,7 @@
 #include "db.hpp"
 
 int main(int argc, char* argv[]) {
-    const int limit = 2000000;
+    const int limit = 10000000;
     const char* fields = "uuuu";
 
     Db& db = Db::create("perf.core2");
@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
     end = std::chrono::high_resolution_clock::now();
     std::chrono::nanoseconds ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
     std::cout << "   ...done in " << ns.count() << " nsecs/key" << std::endl;
-
+/*
     std::cout << "validating " << limit << " keys not present..." << std::flush;
     start = std::chrono::high_resolution_clock::now();
     for (uint64_t key = 0; key < limit; key++) {
@@ -76,16 +76,16 @@ int main(int argc, char* argv[]) {
     ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
     std::cout << "   ...done in " << ns.count() << " nsecs/key" << std::endl;
     ss.print_stat(std::cout);
-
-    std::cout << std::endl << "setting values for later (4 random values/object)" << limit << " keys..." << std::flush;
+*/
+    std::cout << std::endl << "setting values for later (4 random values/object) " << limit << " keys..." << std::flush;
     start = std::chrono::high_resolution_clock::now();
 
     for (uint64_t key = 0; key < limit; key ++) {
         auto o = ss.change(t, { key << 1 });
-        uint64_t a = rand() % 10000L;
-        uint64_t b = rand() % 10000L;
-        uint64_t c = rand() % 10000L;
-        uint64_t d = rand() % 10000L;
+        uint64_t a = rand() % 2000L;
+        uint64_t b = rand() % 2000L;
+        uint64_t c = rand() % 2000L;
+        uint64_t d = rand() % 2000L;
         o.set(field_x0, a);
         o.set(field_x1, b);
         o.set(field_x2, c);
@@ -95,6 +95,42 @@ int main(int argc, char* argv[]) {
     end = std::chrono::high_resolution_clock::now();
     ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
     std::cout << "   ...done in " << ns.count() << " nsecs/key" << std::endl;
+
+    std::cout << "first access " << std::flush;
+    int sum = 0;
+    start = std::chrono::high_resolution_clock::now();
+    for (uint64_t key = 0; key < limit; key++) {
+        auto o = ss.get(t, {key << 1});
+        sum += o(field_x0);
+    }
+    end = std::chrono::high_resolution_clock::now();
+    ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
+    std::cout << "   ...done in " << ns.count() << " nsecs/query" << std::endl;
+    auto baseline = ns;
+
+    std::cout << "2nd access, same field " << std::flush;
+    sum = 0;
+    start = std::chrono::high_resolution_clock::now();
+    for (uint64_t key = 0; key < limit; key++) {
+        auto o = ss.get(t, {key << 1});
+        sum += o(field_x0);
+        sum += o(field_x0);
+    }
+    end = std::chrono::high_resolution_clock::now();
+    ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
+    std::cout << "   ...done in " << (ns - baseline).count() << " nsecs/query" << std::endl;
+
+    std::cout << "2nd access, other field " << std::flush;
+    sum = 0;
+    start = std::chrono::high_resolution_clock::now();
+    for (uint64_t key = 0; key < limit; key++) {
+        auto o = ss.get(t, {key << 1});
+        sum += o(field_x0);
+        sum += o(field_x1);
+    }
+    end = std::chrono::high_resolution_clock::now();
+    ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
+    std::cout << "   ...done in " << (ns - baseline).count() << " nsecs/query" << std::endl;
 
     int count = 0; // count all entries satisfying search criteria used later
     auto query = [&](Object& o) 
