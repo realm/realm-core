@@ -291,6 +291,7 @@ Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx)
 {
     C compare = C();
     Timestamp best = Timestamp{};
+    TimestampColumn& column = m_table->get_column_timestamp(column_ndx);
     size_t ndx = npos;
     for (size_t t = 0; t < size(); t++) {
         int64_t signed_row_ndx = m_row_indexes.get(t);
@@ -299,7 +300,7 @@ Timestamp TableViewBase::minmax_timestamp(size_t column_ndx, size_t* return_ndx)
         if (signed_row_ndx == detached_ref)
             continue;
 
-        Timestamp ts = get_timestamp(column_ndx, t);
+        auto ts = column.get(signed_row_ndx);
         // Because realm::Greater(non-null, null) == false, we need to pick the initial 'best' manually when we see
         // the first non-null entry
         if ((ndx == npos && !ts.is_null()) || compare(ts, best, ts.is_null(), best.is_null())) {
@@ -427,6 +428,7 @@ size_t TableViewBase::count_double(size_t column_ndx, double target) const
 
 size_t TableViewBase::count_timestamp(size_t column_ndx, Timestamp target) const
 {
+    TimestampColumn& column = m_table->get_column_timestamp(column_ndx);
     size_t count = 0;
     for (size_t t = 0; t < size(); t++) {
         int64_t signed_row_ndx = m_row_indexes.get(t);
@@ -434,8 +436,9 @@ size_t TableViewBase::count_timestamp(size_t column_ndx, Timestamp target) const
         // skip detached references:
         if (signed_row_ndx == detached_ref)
             continue;
-        
-        Timestamp ts = get_timestamp(column_ndx, t);
+
+        auto ts = column.get(signed_row_ndx);
+
         realm::Equal e;
         if (e(ts, target, ts.is_null(), target.is_null())) {
             count++;
