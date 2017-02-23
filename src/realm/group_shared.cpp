@@ -1795,14 +1795,14 @@ SharedGroup::version_type SharedGroup::commit_and_continue_as_read()
     VersionID version_id = VersionID();      // Latest available snapshot
     grab_read_lock(m_read_lock, version_id); // Throws
 
-    do_end_write();
-
     // Free memory that was allocated during the write transaction.
     using gf = _impl::GroupFriend;
     gf::reset_free_space_tracking(m_group); // Throws
 
     // Remap file if it has grown, and update refs in underlying node structure
     gf::remap_and_update_refs(m_group, m_read_lock.m_top_ref, m_read_lock.m_file_size); // Throws
+
+    do_end_write();
 
     m_transact_stage = transact_Reading;
 

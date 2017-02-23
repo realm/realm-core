@@ -12820,4 +12820,93 @@ TEST(LangBindHelper_Bug2295)
     CHECK_EQUAL(lv1->size(), i);
 }
 
+namespace {
+
+void do_io_on_group(std::string path, size_t id, size_t num_rows) {
+    // This is checking a race condition which might not be triggered
+    // immediately. You can make this a long running test by setting the
+    // iterations to 500000 for example.
+    const size_t num_iterations = 5;
+    const size_t payload_length_small = 10;
+    const size_t payload_length_large = 10000; // > 4096 == page_size
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    const char* key = crypt_key(true);
+    for (size_t rep = 0; rep < num_iterations; ++rep) {
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        SharedGroup sg(*hist, SharedGroupOptions(key));
+
+        const size_t payload_length = rep % 10 == 0 ? payload_length_large : payload_length_small;
+        const char payload_char = 'a' + static_cast<char>((id + rep) % 26);
+        std::string std_payload(payload_length, payload_char);
+        StringData payload(std_payload);
+        if (rep % 3 == 0)
+            payload = StringData(); // null
+        for (size_t i = 0; i < num_rows; ++i) {
+            ReadTransaction rt(sg);
+            {
+                LangBindHelper::promote_to_write(sg);
+
+                Group& group = const_cast<Group&>(rt.get_group());
+                TableRef t = group.get_table(0);
+                t->set_string(id, i, payload);
+
+                LangBindHelper::commit_and_continue_as_read(sg);
+            }
+            {
+                Group& group = const_cast<Group&>(rt.get_group());
+                ConstTableRef t = group.get_table(0);
+                StringData s = t->get_string(id, i);
+                if (rep % 3 == 0) {
+                    REALM_ASSERT_EX(s.is_null(), i, rep);
+                } else {
+                    const char* str_data = s.data();
+                    REALM_ASSERT_EX(s.size() == payload_length, s.size(), payload_length);
+                    for (size_t n = 0; n < payload_length; ++n) {
+                        REALM_ASSERT_EX(str_data[n] == payload_char, i, rep, n, str_data[n], payload_char);
+                    }
+                }
+                REALM_ASSERT_EX(s == payload, i, rep, s.size(), payload.size());
+            }
+        }
+    }
+}
+
+} // end anonymous namespace
+
+
+TEST(Thread_AsynchronousIODataConsistency)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const int num_threads = 8;
+    const int num_rows = 200; //2 + REALM_MAX_BPNODE_SIZE;
+    const char* key = crypt_key(true);
+    std::cout << "using encryption key: " << key << std::endl;
+    //ShortCircuitHistory hist(path);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroup sg(*hist, SharedGroupOptions(key));
+
+    {
+        WriteTransaction wt(sg);
+        Group& group = wt.get_group();
+        TableRef t = group.add_table("table");
+        // add a column for each thread to write to
+        for (int i = 0; i < num_threads; ++i) {
+            std::stringstream ss;
+            ss << "string_col" << i;
+            t->add_column(type_String, ss.str().c_str(), true);
+        }
+        t->add_empty_row(num_rows);
+        wt.commit();
+    }
+
+    Thread io_threads[num_threads];
+    for (int i = 0; i < num_threads; ++i) {
+        io_threads[i].start(std::bind(do_io_on_group, std::string(path), i, num_rows));
+    }
+    for (int i = 0; i < num_threads; ++i) {
+        io_threads[i].join();
+    }
+}
+
+
 #endif
