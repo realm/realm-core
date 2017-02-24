@@ -29,6 +29,7 @@
 
 * Remove the BinaryData constructor taking a temporary object to prevent some
   errors in unit tests at compile time.
+* Disable copying of various classes to prevent incorrect use at compile time.
 
 ----------------------------------------------
 
