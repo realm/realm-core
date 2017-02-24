@@ -196,6 +196,10 @@ public:
     {
     }
 
+    // Disable copying, this is not supported.
+    ColumnBase& operator=(const ColumnBase&) = delete;
+    ColumnBase(const ColumnBase&) = delete;
+
     // Getter function for index. For integer index, the caller must supply a
     // buffer that we can store the extracted value in (it may be bitpacked, so
     // we cannot return a pointer in to the Array as we do with String index).
