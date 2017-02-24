@@ -24,13 +24,14 @@
 # 2.3.2 Release notes
 
 ### Bugfixes
-* Fixed bug when encryption was used. It would cause crashes and corrupted data 
-  (sometimes pieces of data from earlier commits could be seen). PR #2465.
-  (fixes https://github.com/realm/realm-core/issues/2383)
+* Fixed race condition bug that could cause crashes and corrupted data
+  under rare circumstances with heavy load from multiple threads accessing
+  encrypted data. (sometimes pieces of data from earlier commits could be seen).
+  PR #2465 fixes issue #2383
 * Added SharedGroupOptions::set_sys_tmp_dir() and
   SharedGroupOptions::set_sys_tmp_dir() to solve crash when compacting a Realm
   file on Android external storage which is caused by invalid default sys_tmp_dir.
-  (https://github.com/realm/realm-java/issues/4140)
+  (issue #4140)
 
 -----------
 
