@@ -121,6 +121,10 @@ public:
 
     virtual ~Allocator() noexcept;
 
+    // Disable copying. Copying an allocator can produce double frees.
+    Allocator(const Allocator&) = delete;
+    Allocator& operator=(const Allocator&) = delete;
+
     virtual void verify() const = 0;
 
 #ifdef REALM_DEBUG

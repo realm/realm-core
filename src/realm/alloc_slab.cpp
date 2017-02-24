@@ -74,6 +74,9 @@ struct SlabAlloc::MappedFile {
     /// Indicates if attaching to the file was succesfull
     bool m_success = false;
 
+    MappedFile() {}
+    MappedFile(const MappedFile&) = delete;
+    MappedFile& operator=(const MappedFile&) = delete;
     ~MappedFile()
     {
         m_file.close();
