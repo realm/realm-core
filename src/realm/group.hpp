@@ -102,6 +102,7 @@ public:
 
     // FIXME: Implement a proper copy constructor (fairly trivial).
     Group(const Group&) = delete;
+    Group& operator=(const Group&) = delete;
 
     ~Group() noexcept override;
 
