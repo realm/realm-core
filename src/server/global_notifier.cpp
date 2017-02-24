@@ -162,8 +162,6 @@ realm::Realm::Config GlobalNotifier::get_config(std::string path,
         throw std::runtime_error("No existing realm at path " + path);
     }
 
-    std::cout << *realm_id << " " << path << std::endl;
-
     char *path_str = strdup(path.c_str());
     char *tok = strtok(path_str, "/");
     std::string file_path = m_regular_realms_dir;
@@ -172,7 +170,6 @@ realm::Realm::Config GlobalNotifier::get_config(std::string path,
         file_path += "/";
         file_path += tok;
         tok = strtok(NULL, "/");
-        std::cout << file_path << std::endl;
     }
     free(path_str);
 
