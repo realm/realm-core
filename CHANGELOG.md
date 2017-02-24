@@ -10,7 +10,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Use only a single file descriptor in our emulation of interprocess condition variables
+  on most platforms rather than two.
 
 -----------
 
