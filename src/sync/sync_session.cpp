@@ -239,14 +239,11 @@ struct sync_session_states::Dying : public SyncSession::State {
         size_t current_death_count = ++session.m_death_count;
         std::weak_ptr<SyncSession> weak_session = session.shared_from_this();
         session.m_session->async_wait_for_upload_completion([weak_session, current_death_count](std::error_code) {
-            auto session = weak_session.lock();
-
-            // We expect SyncManager to keep us alive until we move out of the `Dying` state.
-            REALM_ASSERT(session);
-
-            std::unique_lock<std::mutex> lock(session->m_state_mutex);
-            if (session->m_state == &State::dying && session->m_death_count == current_death_count) {
-                session->advance_state(lock, inactive);
+            if (auto session = weak_session.lock()) {
+                std::unique_lock<std::mutex> lock(session->m_state_mutex);
+                if (session->m_state == &State::dying && session->m_death_count == current_death_count) {
+                    session->advance_state(lock, inactive);
+                }
             }
         });
     }
