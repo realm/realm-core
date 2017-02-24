@@ -1,4 +1,4 @@
-include("${CMAKE_CURRENT_LIST_DIR}/utilities.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/Utilities.cmake")
 
 check_generator("Xcode")
 
