@@ -48,12 +48,6 @@ typedef BasicRow<Table> Row;
 typedef std::shared_ptr<Realm> SharedRealm;
 typedef std::weak_ptr<Realm> WeakRealm;
 
-// Sets a path to a directory where Realm can write temporary files and named pipes.
-// This string should include a trailing slash '/'.
-void set_temporary_directory(std::string directory_path);
-
-const std::string& get_temporary_directory() noexcept;
-
 namespace _impl {
     class AnyHandover;
     class CollectionNotifier;

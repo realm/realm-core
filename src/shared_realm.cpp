@@ -44,37 +44,6 @@
 using namespace realm;
 using namespace realm::_impl;
 
-static std::string get_initial_temporary_directory()
-{
-    auto tmp_dir = getenv("TMPDIR");
-    if (!tmp_dir) {
-        return std::string();
-    }
-    std::string tmp_dir_str(tmp_dir);
-    if (!tmp_dir_str.empty() && tmp_dir_str.back() != '/') {
-        tmp_dir_str += '/';
-    }
-    return tmp_dir_str;
-}
-
-static std::string temporary_directory = get_initial_temporary_directory();
-
-void realm::set_temporary_directory(std::string directory_path)
-{
-    if (directory_path.empty()) {
-        throw std::invalid_argument("'directory_path` is empty.");
-    }
-    if (directory_path.back() != '/') {
-        throw std::invalid_argument("'directory_path` must ends with '/'.");
-    }
-    temporary_directory = std::move(directory_path);
-}
-
-const std::string& realm::get_temporary_directory() noexcept
-{
-    return temporary_directory;
-}
-
 Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator)
 : m_config(std::move(config))
 , m_execution_context(m_config.execution_context)
@@ -198,7 +167,6 @@ void Realm::open_with_config(const Config& config,
                     realm->upgrade_final_version = to_version;
                 }
             };
-            options.temp_dir = get_temporary_directory();
             shared_group = std::make_unique<SharedGroup>(*history, options);
         }
     }

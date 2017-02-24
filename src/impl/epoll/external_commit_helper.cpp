@@ -21,6 +21,7 @@
 #include "util/format.hpp"
 
 #include <realm/util/assert.hpp>
+#include <realm/group_shared_options.hpp>
 
 #include <algorithm>
 #include <errno.h>
@@ -115,7 +116,7 @@ ExternalCommitHelper::ExternalCommitHelper(RealmCoordinator& parent)
 : m_parent(parent)
 {
     std::string path;
-    std::string temporary_dir = realm::get_temporary_directory();
+    std::string temporary_dir = SharedGroupOptions::get_sys_tmp_dir();
     if (temporary_dir.empty()) {
         path = parent.get_path() + ".note";
     } else {
