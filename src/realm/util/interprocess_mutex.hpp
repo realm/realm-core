@@ -155,7 +155,7 @@ inline InterprocessMutex::LockInfo::~LockInfo() noexcept
 
 inline void InterprocessMutex::free_lock_info()
 {
-    // It has not been initiated yet.
+    // It has not been initialized yet.
     if (!m_lock_info)
         return;
 
