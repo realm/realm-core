@@ -33,6 +33,10 @@ public:
     {
     }
 
+    // Disable copying, this is not allowed.
+    ArrayBlob& operator=(const ArrayBlob&) = delete;
+    ArrayBlob(const ArrayBlob&) = delete;
+
     const char* get(size_t index) const noexcept;
     BinaryData get_at(size_t& pos) const noexcept;
     bool is_null(size_t index) const noexcept;
