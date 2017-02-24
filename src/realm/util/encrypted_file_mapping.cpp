@@ -371,6 +371,9 @@ void EncryptedFileMapping::mark_up_to_date(size_t i) noexcept
 
 bool EncryptedFileMapping::copy_up_to_date_page(size_t page) noexcept
 {
+    // Precondition: this method must never be called for a page which
+    // is already up to date.
+    REALM_ASSERT(!m_up_to_date_pages[page]);
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         if (m == this || page >= m->m_page_count)
