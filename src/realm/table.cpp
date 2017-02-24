@@ -379,11 +379,6 @@ void Table::remove_backlink_broken_rows(const CascadeState& cascade_state)
         else {
             table.do_remove(i->row_ndx, broken_reciprocal_backlinks);
         }
-
-        if (Replication* repl = table.get_repl()) {
-            size_t num_rows_to_erase = 1;
-            repl->erase_rows(&table, i->row_ndx, num_rows_to_erase, prior_num_rows, is_move_last_over); // Throws
-        }
     }
 }
 
@@ -2179,18 +2174,12 @@ void Table::erase_row(size_t row_ndx, bool is_move_last_over)
     }
 
     if (skip_cascade) {
-        size_t prior_num_rows = m_size;
         bool broken_reciprocal_backlinks = false;
         if (is_move_last_over) {
             do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
         }
         else {
             do_remove(row_ndx, broken_reciprocal_backlinks); // Throws
-        }
-
-        if (Replication* repl = get_repl()) {
-            size_t num_rows_to_erase = 1;
-            repl->erase_rows(this, row_ndx, num_rows_to_erase, prior_num_rows, is_move_last_over); // Throws
         }
         return;
     }
@@ -2274,10 +2263,6 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
             else {
                 do_remove(row_ndx, broken_reciprocal_backlinks); // Throws
             }
-            if (repl) {
-                size_t num_rows_to_erase = 1;
-                repl->erase_rows(this, row_ndx, num_rows_to_erase, prior_num_rows, is_move_last_over); // Throws
-            }
         }
         return;
     }
@@ -2325,10 +2310,24 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
 void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
 {
     size_t num_cols = m_spec.get_column_count();
-    for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
-        ColumnBase& col = get_column_base(col_ndx);
+    size_t num_public_cols = m_spec.get_public_column_count();
+
+    for (size_t col_ndx = num_cols; col_ndx > num_public_cols; --col_ndx) {
+        ColumnBase& col = get_column_base(col_ndx - 1);
+        size_t prior_num_rows = m_size;
+        col.erase_rows(row_ndx, 1, prior_num_rows, broken_reciprocal_backlinks); // Throws
+    }
+
+    if (Replication* repl = get_repl()) {
         size_t num_rows_to_erase = 1;
-        col.erase_rows(row_ndx, num_rows_to_erase, m_size, broken_reciprocal_backlinks); // Throws
+        bool is_move_last_over = false;
+        repl->erase_rows(this, row_ndx, num_rows_to_erase, m_size, is_move_last_over); // Throws
+    }
+
+    for (size_t col_ndx = num_public_cols; col_ndx > 0; --col_ndx) {
+        ColumnBase& col = get_column_base(col_ndx - 1);
+        size_t prior_num_rows = m_size;
+        col.erase_rows(row_ndx, 1, prior_num_rows, broken_reciprocal_backlinks); // Throws
     }
     adj_row_acc_erase_row(row_ndx);
     --m_size;
@@ -2341,16 +2340,38 @@ void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
 void Table::do_move_last_over(size_t row_ndx, bool broken_reciprocal_backlinks)
 {
     size_t num_cols = m_spec.get_column_count();
+    size_t num_public_cols = m_spec.get_public_column_count();
+
     // We must start with backlink columns in case the corresponding link
     // columns are in the same table so that the link columns are not updated
     // twice. Backlink columns will nullify the rows in connected link columns
     // first so by the time we get to the link column in this loop, the rows to
     // be removed have already been nullified.
-    for (size_t col_ndx = num_cols; col_ndx > 0; --col_ndx) {
+    //
+    // This phase also generates replication instructions documenting the side-
+    // effects of deleting the object (i.e. link nullifications). These instructions
+    // must come before the actual deletion of the object, but at the same time
+    // the Replication object may need a consistent view of the row (not including
+    // link columns). Therefore we first delete the row in backlink columns, then
+    // generate the instruction, and then delete the row in the remaining columns.
+    for (size_t col_ndx = num_cols; col_ndx > num_public_cols; --col_ndx) {
         ColumnBase& col = get_column_base(col_ndx - 1);
         size_t prior_num_rows = m_size;
         col.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
     }
+
+    if (Replication* repl = get_repl()) {
+        size_t num_rows_to_erase = 1;
+        bool is_move_last_over = true;
+        repl->erase_rows(this, row_ndx, num_rows_to_erase, m_size, is_move_last_over); // Throws
+    }
+
+    for (size_t col_ndx = num_public_cols; col_ndx > 0; --col_ndx) {
+        ColumnBase& col = get_column_base(col_ndx - 1);
+        size_t prior_num_rows = m_size;
+        col.move_last_row_over(row_ndx, prior_num_rows, broken_reciprocal_backlinks); // Throws
+    }
+
     size_t last_row_ndx = m_size - 1;
     adj_row_acc_move_over(last_row_ndx, row_ndx);
     --m_size;
