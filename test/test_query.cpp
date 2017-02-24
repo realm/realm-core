@@ -3518,6 +3518,34 @@ TEST(Query_SubtableBug)
     CHECK_EQUAL(1, t1.size());
 }
 
+TEST(Query_ListOfPrimitivesQuery)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    size_t int_col = t->add_column_list(type_Int, "integers", true);
+
+    t->add_empty_row(10);
+    t->set_list(int_col, 0, std::vector<int64_t>({1, 2, 3}));
+    t->set_list(int_col, 1, std::vector<int64_t>({1, 3, 5}));
+    t->set_list(int_col, 2, std::vector<int64_t>({100, 400, 200, 500, 300}));
+
+    auto q = t->where().subtable(0).equal(0, 3).end_subtable();
+    auto tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    q = t->where().subtable(int_col).greater(0, 100).Or().equal(0, 5).end_subtable();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+
+    auto list = t->get_list<int64_t>(int_col, 2);
+    q = list->self() > 225;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
+    tv.sort(0);
+    for (unsigned i = 0; i < 3; i++) {
+        CHECK_EQUAL(tv[i].get_int(0), (i + 3) * 100);
+    }
+}
+
 
 TEST(Query_Sort1)
 {

@@ -966,9 +966,9 @@ typename ColumnTypeTraits<T>::sum_type Column<T>::sum(size_t start, size_t end, 
 {
     using sum_type = typename ColumnTypeTraits<T>::sum_type;
     if (nullable)
-        return aggregate<T, sum_type, act_Sum, NotNull>(*this, 0, start, end, limit, return_ndx);
+        return aggregate<T, sum_type, act_Sum, realm::NotNull>(*this, 0, start, end, limit, return_ndx);
     else
-        return aggregate<T, sum_type, act_Sum, None>(*this, 0, start, end, limit, return_ndx);
+        return aggregate<T, sum_type, act_Sum, realm::None>(*this, 0, start, end, limit, return_ndx);
 }
 
 template <class T>

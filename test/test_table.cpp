@@ -7840,5 +7840,97 @@ TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
     check_column_sizes(10 * REALM_MAX_BPNODE_SIZE);
 }
 
+TEST(Table_ListOfPrimitives)
+{
+    Group g;
+    TableRef t = g.add_table("table");
+    size_t int_col = t->add_column_list(type_Int, "integers", true);
+    size_t bool_col = t->add_column_list(type_Bool, "booleans");
+    size_t string_col = t->add_column_list(type_String, "strings");
+    size_t double_col = t->add_column_list(type_Double, "doubles");
+    size_t timestamp_col = t->add_column_list(type_Timestamp, "timestamps");
+    t->add_empty_row();
+
+    std::vector<int_fast64_t> integer_list = {1, 2, 3, 4};
+    t->set_list(int_col, 0, integer_list);
+
+    std::vector<bool> bool_list = {false, false, true, false, true};
+    t->set_list(bool_col, 0, bool_list);
+
+    std::vector<StringData> string_list = {"monday", "tuesday", "thursday", "friday", "saturday", "sunday"};
+    t->set_list(string_col, 0, string_list);
+
+    std::vector<double> double_list = {898742.09382, 3.14159265358979, 2.71828182845904};
+    t->set_list(double_col, 0, double_list);
+
+    time_t seconds_since_epoc = time(nullptr);
+    std::vector<Timestamp> timestamp_list = {Timestamp(seconds_since_epoc, 0), Timestamp(seconds_since_epoc + 60, 0)};
+    t->set_list(timestamp_col, 0, timestamp_list);
+
+    auto int_vec = t->get_list<int_fast64_t>(int_col, 0);
+    std::vector<int> vec(int_vec->size());
+    std::copy(int_vec->begin(), int_vec->end(), vec.begin());
+    CHECK_EQUAL(integer_list.size(), int_vec->size());
+    unsigned j = 0;
+    // {1, 2, 3, 4}
+    for (auto i : *int_vec) {
+        CHECK_EQUAL(vec[j], i);
+        CHECK_EQUAL(integer_list[j++], i);
+    }
+    auto f = std::find(int_vec->begin(), int_vec->end(), 3);
+    CHECK_EQUAL(3, *f++);
+    CHECK_EQUAL(4, *f);
+    CHECK_EQUAL(3, int_vec->remove(2));
+    // {1, 2, 4}
+    CHECK_EQUAL(integer_list.size() - 1, int_vec->size());
+    CHECK_EQUAL(4, (*int_vec)[2]);
+    int_vec->resize(6);
+    // {1, 2, 4, null, null, null}
+    CHECK(int_vec->is_null(5));
+    int_vec->swap(0, 1);
+    // {2, 1, 4, null, null, null}
+    CHECK_EQUAL(2, (*int_vec)[0]);
+    CHECK_EQUAL(1, (*int_vec)[1]);
+    int_vec->remove(0, 2);
+    // {4, null, null, null}
+    CHECK_EQUAL(4, (*int_vec)[0]);
+    int_vec->resize(2);
+    // {4, null}
+    CHECK_EQUAL(2, int_vec->size());
+    CHECK_EQUAL(4, (*int_vec)[0]);
+    CHECK(int_vec->is_null(1));
+
+    int_vec->clear();
+    int_vec = t->get_list<int_fast64_t>(int_col, 0);
+    CHECK_EQUAL(0, int_vec->size());
+
+    auto bool_vec = t->get_list<bool>(bool_col, 0);
+    CHECK_EQUAL(bool_list.size(), bool_vec->size());
+    for (unsigned i = 0; i < bool_vec->size(); i++) {
+        CHECK_EQUAL(bool_list[i], (*bool_vec)[i]);
+    }
+
+    auto string_vec = t->get_list<StringData>(string_col, 0);
+    CHECK_EQUAL(string_list.size(), string_vec->size());
+    for (unsigned i = 0; i < string_vec->size(); i++) {
+        CHECK_EQUAL(string_list[i], (*string_vec)[i]);
+    }
+
+    string_vec->insert(2, "Wednesday");
+    CHECK_EQUAL(string_list.size() + 1, string_vec->size());
+    CHECK_EQUAL(StringData("Wednesday"), string_vec->get(2));
+
+    auto double_vec = t->get_list<double>(double_col, 0);
+    CHECK_EQUAL(double_list.size(), double_vec->size());
+    for (unsigned i = 0; i < double_vec->size(); i++) {
+        CHECK_EQUAL(double_list[i], double_vec->get(i));
+    }
+
+    auto timestamp_vec = t->get_list<Timestamp>(timestamp_col, 0);
+    CHECK_EQUAL(timestamp_list.size(), timestamp_vec->size());
+    for (unsigned i = 0; i < timestamp_vec->size(); i++) {
+        CHECK_EQUAL(timestamp_list[i], timestamp_vec->get(i));
+    }
+}
 
 #endif // TEST_TABLE
