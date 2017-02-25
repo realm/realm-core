@@ -150,9 +150,8 @@ realm::Realm::Config GlobalNotifier::get_config(std::string path,
         realm_id = m_realm_ids[path];
     }
     else if (realm_id && schema) {
-        // create realm in admin realm with realm_id
+        // use our local realm id
         m_realm_ids[path] = *realm_id;
-        m_admin.create_realm(*realm_id, path);
 
         // set schema
         config.schema = schema;
@@ -224,7 +223,7 @@ void GlobalNotifier::register_realms(std::vector<AdminRealmListener::RealmInfo> 
             m_realm_ids[realm_info.second] = realm_info.first;
         }
         else {
-            // update server id to our local id
+            // replace with our local id
             realm_info.first = m_realm_ids[realm_info.second];
         }
     }
