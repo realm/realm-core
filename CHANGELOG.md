@@ -2,10 +2,6 @@
 
 ### Bugfixes
 
-* Added SharedGroupOptions::set_sys_tmp_dir() and
-  SharedGroupOptions::set_sys_tmp_dir() to solve crash when compacting a Realm
-  file on Android external storage which is caused by invalid default sys_tmp_dir.
-  (https://github.com/realm/realm-java/issues/4140)
 * Fixed a few bugs (caused crashes) in pthread library on UWP.
 * Possibly fixed some cases of extreme file size growth, by preventing starvation
   when trying to start a write transaction, while simultaneously pinning an older
@@ -27,9 +23,28 @@
 
 ### Internals
 
+* Disable copying of various classes to prevent incorrect use at compile time.
+
+----------------------------------------------
+
+# 2.3.2 Release notes
+
+### Bugfixes
+* Fixed bug when encryption was used. It would cause crashes and corrupted data 
+  (sometimes pieces of data from earlier commits could be seen). PR #2465.
+  (fixes https://github.com/realm/realm-core/issues/2383)
+* Added SharedGroupOptions::set_sys_tmp_dir() and
+  SharedGroupOptions::set_sys_tmp_dir() to solve crash when compacting a Realm
+  file on Android external storage which is caused by invalid default sys_tmp_dir.
+  (https://github.com/realm/realm-java/issues/4140)
+
+-----------
+
+### Internals
+
 * Remove the BinaryData constructor taking a temporary object to prevent some
   errors in unit tests at compile time.
-* Disable copying of various classes to prevent incorrect use at compile time.
+* Avoid assertions in aggregate functions for the timestamp type.
 
 ----------------------------------------------
 
