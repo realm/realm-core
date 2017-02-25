@@ -10,13 +10,36 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Use only a single file descriptor in our emulation of interprocess condition variables
+  on most platforms rather than two.
 
 -----------
 
 ### Internals
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 2.3.2 Release notes
+
+### Bugfixes
+* Fixed race condition bug that could cause crashes and corrupted data
+  under rare circumstances with heavy load from multiple threads accessing
+  encrypted data. (sometimes pieces of data from earlier commits could be seen).
+  PR #2465 fixes issue #2383
+* Added SharedGroupOptions::set_sys_tmp_dir() and
+  SharedGroupOptions::set_sys_tmp_dir() to solve crash when compacting a Realm
+  file on Android external storage which is caused by invalid default sys_tmp_dir.
+  (issue #4140)
+
+-----------
+
+### Internals
+
+* Remove the BinaryData constructor taking a temporary object to prevent some
+  errors in unit tests at compile time.
+* Avoid assertions in aggregate functions for the timestamp type.
 
 ----------------------------------------------
 

@@ -64,14 +64,16 @@ InterprocessCondVar::InterprocessCondVar()
 
 void InterprocessCondVar::close() noexcept
 {
-    if (uses_emulation) { // true if emulating a process shared condvar
-        uses_emulation = false;
 #ifdef REALM_CONDVAR_EMULATION
+    if (m_fd_read != -1) {
         ::close(m_fd_read);
-        ::close(m_fd_write);
-#endif
-        return; // we don't need to clean up the SharedPart
+        m_fd_read = -1;
     }
+    if (m_fd_write != -1) {
+        ::close(m_fd_write);
+        m_fd_write = -1;
+    }
+#endif
     // we don't do anything to the shared part, other CondVars may share it
     m_shared_part = nullptr;
 }
@@ -82,6 +84,17 @@ InterprocessCondVar::~InterprocessCondVar() noexcept
     close();
 }
 
+#ifdef REALM_CONDVAR_EMULATION
+static void make_non_blocking(int fd)
+{
+    // Make reading or writing from the file descriptor return -1 when the file descriptor's buffer is empty
+    // rather than blocking until there's data available.
+    int ret = fcntl(fd, F_SETFL, O_NONBLOCK);
+    if (ret == -1) {
+        throw std::system_error(errno, std::system_category());
+    }
+}
+#endif
 
 void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, std::string condvar_name,
                                           std::string tmp_path)
@@ -128,15 +141,11 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
         }
     }
 
-    m_fd_write = open(m_resource_path.c_str(), O_RDWR);
-    if (m_fd_write == -1) {
-        throw std::system_error(errno, std::system_category());
-    }
-
-    m_fd_read = open(m_resource_path.c_str(), O_RDONLY);
+    m_fd_read = open(m_resource_path.c_str(), O_RDWR);
     if (m_fd_read == -1) {
         throw std::system_error(errno, std::system_category());
     }
+    m_fd_write = -1;
 
 #else // !REALM_TVOS
 
@@ -152,22 +161,14 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
 
 #endif // REALM_TVOS
 
-    // Make writing to the pipe return -1 when the pipe's buffer is full
-    // rather than blocking until there's space available
-    ret = fcntl(m_fd_write, F_SETFL, O_NONBLOCK);
-    if (ret == -1) {
-        throw std::system_error(errno, std::system_category());
+    if (m_fd_read != -1) {
+        make_non_blocking(m_fd_read);
+    }
+    if (m_fd_write != -1) {
+        make_non_blocking(m_fd_write);
     }
 
-    // Make reading from the pipe return -1 when the pipe's buffer is empty
-    // rather than blocking until there's data available
-    ret = fcntl(m_fd_read, F_SETFL, O_NONBLOCK);
-    if (ret == -1) {
-        throw std::system_error(errno, std::system_category());
-    }
-
-#endif
-    uses_emulation = true;
+#endif // REALM_CONDVAR_EMULATION
 }
 
 
@@ -307,7 +308,7 @@ void InterprocessCondVar::notify() noexcept
 #ifdef REALM_CONDVAR_EMULATION
     if (m_shared_part->wait_counter > m_shared_part->signal_counter) {
         m_shared_part->signal_counter++;
-        notify_fd(m_fd_write);
+        notify_fd(m_fd_write != -1 ? m_fd_write : m_fd_read);
     }
 #else
     m_shared_part->notify();
@@ -326,7 +327,7 @@ void InterprocessCondVar::notify_all() noexcept
 #ifdef REALM_CONDVAR_EMULATION
     while (m_shared_part->wait_counter > m_shared_part->signal_counter) {
         m_shared_part->signal_counter++;
-        notify_fd(m_fd_write);
+        notify_fd(m_fd_write != -1 ? m_fd_write : m_fd_read);
     }
 #else
     m_shared_part->notify_all();

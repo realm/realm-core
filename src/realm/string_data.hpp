@@ -92,7 +92,7 @@ public:
 
     // StringData does not store data, callers must manage their own strings.
     template <class T, class A>
-    StringData(std::basic_string<char, T, A>&&) = delete;
+    StringData(const std::basic_string<char, T, A>&&) = delete;
 
     template <class T, class A>
     StringData(const util::Optional<std::basic_string<char, T, A>>&);
