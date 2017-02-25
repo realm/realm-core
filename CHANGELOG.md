@@ -95,6 +95,10 @@
 * Attempts to open a Realm file with a different history type (Mobile Platform vs
   Mobile Database) now throws an IncompatibleHistories exception instead of a
   InvalidDatabase (as requested in issue #2275).
+* Announcing what will later be a breaking change:
+  Deprecated Table::get_binary() and added Table::get_binary_at(). Once get_binary()
+  is removed, we are free to split blobs into smaller chunks.
+  This should reduce fragmentation.
 
 ### Enhancements
 * Windows 10 UWP support. Use the new "UWP" configurations in Visual Studio to

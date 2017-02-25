@@ -399,10 +399,19 @@ public:
     float get_float(size_t column_ndx, size_t row_ndx) const noexcept;
     double get_double(size_t column_ndx, size_t row_ndx) const noexcept;
     StringData get_string(size_t column_ndx, size_t row_ndx) const noexcept;
+
+    /// Deprecated. This method will be removed in the near future.
+    /// Instead, get_binary_at() should be used.
     BinaryData get_binary(size_t column_ndx, size_t row_ndx) const noexcept;
     Mixed get_mixed(size_t column_ndx, size_t row_ndx) const noexcept;
     DataType get_mixed_type(size_t column_ndx, size_t row_ndx) const noexcept;
     Timestamp get_timestamp(size_t column_ndx, size_t row_ndx) const noexcept;
+
+    /// Return data from position 'pos' and onwards. If the blob is distributed
+    /// across multiple arrays, you will only get data from one array. 'pos' 
+    /// will be updated to be an index to next available data. It will be 0 
+    /// if no more data. This method replaces get_binary().
+    BinaryData get_binary_at(size_t col_ndx, size_t ndx, size_t& pos) const noexcept;
 
     template <class T>
     T get(size_t c, size_t r) const noexcept;
