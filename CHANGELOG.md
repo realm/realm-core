@@ -7,6 +7,8 @@
   when trying to start a write transaction, while simultaneously pinning an older
   version. (issue #2395)
 * Fixed a bug when deleting a column used in a query (#2408)
+* `seekpos()` and `seekoff()` in `realm::util::MemoryInputStreambuf` now behave
+  correctly when argument is out of range.
 
 ### Breaking changes
 
