@@ -10,6 +10,8 @@
 * Fixed a bug when deleting a column used in a query (#2408)
 * Fixed a crash that occurred if you tried to override a binary with a size close
   to the limit.
+* `seekpos()` and `seekoff()` in `realm::util::MemoryInputStreambuf` now behave
+  correctly when argument is out of range.
 
 ### Breaking changes
 
