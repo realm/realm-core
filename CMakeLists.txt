@@ -9,6 +9,7 @@ include(GNUInstallDirs)
 include(CheckIncludeFiles)
 include(GetGitRevisionDescription)
 include(Utilities)
+include(SpecialtyBuilds)
 
 # Get accurate git-describe version
 git_describe(REALM_VERSION)
@@ -37,35 +38,6 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS
 # Add REALM_UWP=1 to compile with Windows UWP support
 if(WINDOWS_STORE AND CMAKE_SYSTEM_VERSION STREQUAL 10.0)
     add_definitions(-DREALM_UWP=1 -D_SCL_SECURE_NO_WARNINGS)
-endif()
-
-# Coverage-specific build flags
-option(REALM_COVERAGE "Add coverage support." OFF)
-if(REALM_COVERAGE)
-  if(MSVC)
-    message(FATAL_ERROR
-            "Code coverage is not yet supported on Visual Studio builds")
-  else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage -fprofile-arcs -ftest-coverage -fno-inline -fno-elide-constructors")
-  endif()
-endif()
-
-# AFL specific build flags
-option(REALM_AFL "Compile for fuzz testing." OFF)
-if(REALM_AFL)
-    if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
-        set(FUZZ_COMPILER_NAME "afl-clang++")
-    elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
-        set(FUZZ_COMPILER_NAME "afl-g++")
-    else()
-        message(FATAL_ERROR
-            "Running AFL with your compiler (${CMAKE_CXX_COMPILER_ID}) is not supported")
-    endif()
-    find_program(AFL ${FUZZ_COMPILER_NAME})
-    if(NOT AFL)
-        message(FATAL_ERROR "AFL not found!")
-    endif()
-    set(CMAKE_CXX_COMPILER "${AFL}")
 endif()
 
 # Platform-specific build configuration

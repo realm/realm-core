@@ -83,7 +83,7 @@ file(COPY ${REQUIRED_TEST_FILES}
 
 # FIXME: Benchmarks
 
-if(APPLE)
+if(CMAKE_GENERATOR STREQUAL Xcode)
     set(MAIN_FILE main.mm)
 else()
     set(MAIN_FILE main.cpp)
@@ -91,7 +91,7 @@ endif()
 
 add_executable(realm-tests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES})
 
-if(APPLE)
+if(CMAKE_GENERATOR STREQUAL Xcode)
     set_target_properties(realm-tests PROPERTIES
                           MACOSX_BUNDLE YES
                           RESOURCE "${REQUIRED_TEST_FILES}")
