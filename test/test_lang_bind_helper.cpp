@@ -12746,4 +12746,69 @@ TEST(LangBindHelper_Bug2295)
     CHECK_EQUAL(lv1->size(), i);
 }
 
+TEST(LangBindHelper_BigBinary)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_w(hist);
+    SharedGroup sg_r(hist);
+    std::string big_data(0x1000000, 'x');
+
+    ReadTransaction rt(sg_r);
+    {
+        std::string data(16777362, 'y');
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.add_table("big");
+        target->add_column(type_Binary, "data");
+        target->add_empty_row();
+        target->set_binary_big(0, 0, BinaryData(data.data(), 16777362));
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg_r);
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.get_table("big");
+        target->set_binary_big(0, 0, BinaryData(big_data.data(), 0x1000000));
+        group.verify();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg_r);
+    const Group& g = rt.get_group();
+    auto t = g.get_table("big");
+    size_t pos = 0;
+    BinaryData bin = t->get_binary_at(0, 0, pos);
+    CHECK_EQUAL(memcmp(big_data.data(), bin.data(), bin.size()), 0);
+}
+
+TEST(LangBindHelper_CopyOnWriteOverflow)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_w(hist);
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.add_table("big");
+        target->add_column(type_Binary, "data");
+        target->add_empty_row();
+        {
+            std::string data(0xfffff0, 'x');
+            target->set_binary(0, 0, BinaryData(data.data(), 0xfffff0));
+        }
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        group.get_table(0)->set_binary(0, 0, BinaryData{"Hello", 5});
+        group.verify();
+        wt.commit();
+    }
+}
+
 #endif
