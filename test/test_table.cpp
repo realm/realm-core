@@ -835,6 +835,12 @@ TEST(Table_StringOrBinaryTooBig)
     table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size - 1));
     table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size - 1)));
     table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size - 1)));
+    table.set_binary_big(1, 0, BinaryData(large_buf.get(), large_bin_size));
+    size_t pos = 0;
+    table.get_binary_at(1, 0, pos);
+    CHECK_EQUAL(pos, 0xFFFFF0);
+    table.get_binary_at(1, 0, pos);
+    CHECK_EQUAL(pos, 0);
 }
 
 
