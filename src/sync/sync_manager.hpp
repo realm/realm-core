@@ -154,20 +154,17 @@ private:
 
     mutable std::unique_ptr<_impl::SyncClient> m_sync_client;
 
-    // Protects m_sessions
-    mutable std::mutex m_session_mutex;
-
     // Protects m_file_manager and m_metadata_manager
     mutable std::mutex m_file_system_mutex;
     std::unique_ptr<SyncFileManager> m_file_manager;
     std::unique_ptr<SyncMetadataManager> m_metadata_manager;
 
-    // Active sessions are sessions which the client code holds a strong
-    // reference to. When the last strong reference is released, the session is
-    // moved to inactive sessions. Inactive sessions are promoted back to active
-    // sessions until the session itself calls unregister_session to remove
-    // itself from inactive sessions once it's done with whatever async cleanup
-    // it needs to do.
+    // Protects m_sessions
+    mutable std::mutex m_session_mutex;
+
+    // Map of sessions by path name.
+    // Sessions remove themselves from this map by calling `unregister_session` once they're
+    // inactive and have performed any necessary cleanup work.
     std::unordered_map<std::string, std::shared_ptr<SyncSession>> m_sessions;
 };
 
