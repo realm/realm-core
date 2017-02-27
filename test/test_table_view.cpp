@@ -3453,4 +3453,32 @@ TEST(TableView_TimestampMaxRemoveRow)
     CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0));    
 }
 
+TEST(TableView_Sort_Danish_Letters)
+{
+    Table table;
+    table.add_column(type_String, "s");
+    table.set_string(0, table.add_empty_row(), "Æble");
+    table.set_string(0, table.add_empty_row(), "Øl");
+    table.set_string(0, table.add_empty_row(), "Århus");
+
+    CHECK_EQUAL(3, table.size());
+    CHECK_EQUAL("Æble",  table.get_string(0, 0));
+    CHECK_EQUAL("Øl",    table.get_string(0, 1));
+    CHECK_EQUAL("Århus", table.get_string(0, 2));
+
+    TableView tv1 = table.where().find_all();
+    tv1.sort(0, true);
+    CHECK_EQUAL(3, tv1.size());
+    CHECK_EQUAL("Æble",  tv1.get_string(0, 0));
+    CHECK_EQUAL("Øl",    tv1.get_string(0, 1));
+    CHECK_EQUAL("Århus", tv1.get_string(0, 2));
+
+    TableView tv2 = table.where().find_all();
+    tv2.sort(0, false);
+    CHECK_EQUAL(3, tv2.size());
+    CHECK_EQUAL("Æble",  tv2.get_string(0, 2));
+    CHECK_EQUAL("Øl",    tv2.get_string(0, 1));
+    CHECK_EQUAL("Århus", tv2.get_string(0, 0));
+}
+
 #endif // TEST_TABLE_VIEW
