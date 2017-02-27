@@ -56,7 +56,7 @@ def doDockerBuild(String flavor, Boolean withCoverage, Boolean enableSync) {
       sshagent(['realm-ci-ssh']) {
         image.inside("-v /etc/passwd:/etc/passwd:ro -v ${env.HOME}:${env.HOME} -v ${env.SSH_AUTH_SOCK}:${env.SSH_AUTH_SOCK} -e HOME=${env.HOME}") {
           if(withCoverage) {
-            sh "./workflow/test_coverage.sh ${sync} && mv coverage.build ${label}.build"
+            sh "rm -rf coverage.build ${label}.build && ./workflow/test_coverage.sh ${sync} && mv coverage.build ${label}.build"
           } else {
             sh "./workflow/build.sh ${flavor} ${sync}"
           }
