@@ -104,8 +104,8 @@ It requires a root device or an emulator:
 
 ```
 make
-adb push tests/tests /data
-adb shell /data/tests
+adb push tests/tests /data/local/tmp
+adb shell /data/local/tmp/tests
 ```
 
 ## License
