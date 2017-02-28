@@ -1,6 +1,7 @@
 include_directories(../external/catch/single_include .)
 
 set(HEADERS
+    util/any.hpp
     util/event_loop.hpp
     util/index_helpers.hpp
     util/test_file.hpp
