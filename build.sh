@@ -870,7 +870,7 @@ EOF
         for target in $ANDROID_PLATFORMS; do
             temp_dir="$(mktemp -d /tmp/realm.build-android.XXXX)" || exit 1
             if [ "$target" = "arm" ]; then
-                platform="8"
+                platform="9"
             elif [ "$target" = "arm64" -o "$target" = "x86_64" ]; then
                 platform="21"
             else
