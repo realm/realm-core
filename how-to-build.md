@@ -49,7 +49,7 @@ Run the following commands to configure, build and test core:
     mkdir build-dir # create a build folder
     cd build-dir
     cmake ..
-    cmake --build
+    cmake --build .
     ctest
 
 ## Building for Android, iOS, watchOS and tvOS
