@@ -291,7 +291,6 @@ def doBuildMacOs(String buildType) {
                             sh """
                                 rm -rf *
                                 cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake \\
-                                      -D CMAKE_INSTALL_PREFIX=\$(pwd)/install \\
                                       -D CMAKE_BUILD_TYPE=${buildType} \\
                                       -G Xcode ..
                             """
@@ -299,19 +298,12 @@ def doBuildMacOs(String buildType) {
                     }
 
                     sh """
-                    xcodebuild -sdk ${sdk} \\
-                               -configuration ${buildType} \\
-                               ONLY_ACTIVE_ARCH=NO
-                    xcodebuild -sdk ${sdk} \\
-                               -configuration ${buildType} \\
-                               -target install \\
-                               ONLY_ACTIVE_ARCH=NO
-                    xcodebuild -sdk ${sdk} \\
+                    xcodebuild -sdk macosx \\
                                -configuration ${buildType} \\
                                -target package \\
                                ONLY_ACTIVE_ARCH=NO
                 """
-                    archiveArtifacts('*.tar.gz')
+                    archiveArtifacts('*.tar.xz')
                 }
             } finally {
                 collectCompilerWarnings('clang', true)
