@@ -194,8 +194,8 @@ void Object::set_property_value_impl(ContextType ctx, const Property &property, 
             break;
         }
         case PropertyType::Data: {
-            auto str = Accessor::to_binary(ctx, value);
-            m_row.set_binary(column, BinaryData(str));
+            auto data = Accessor::to_binary(ctx, value);
+            m_row.set_binary(column, BinaryData(data));
             break;
         }
         case PropertyType::Any:
@@ -272,7 +272,7 @@ ValueType Object::get_property_value_impl(ContextType ctx, const Property &prope
         case PropertyType::Array:
             return Accessor::from_list(ctx, List(m_realm, static_cast<LinkViewRef>(m_row.get_linklist(column))));
         case PropertyType::LinkingObjects: {
-            auto target_object_schema = m_realm->config().schema->find(property.object_type);
+            auto target_object_schema = m_realm->schema().find(property.object_type);
             auto link_property = target_object_schema->property_for_name(property.link_origin_property_name);
             TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), target_object_schema->name);
             auto tv = m_row.get_table()->get_backlink_view(m_row.get_index(), table.get(), link_property->table_column);
