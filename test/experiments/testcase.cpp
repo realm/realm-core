@@ -82,10 +82,10 @@ TEST(PerfTest) {
         std::cout << "setting values (4 random values/key) " << limit << " keys..." << std::flush;
         start = std::chrono::high_resolution_clock::now();
         for (int idx = 0; idx < limit; ++idx) {
-            t->set_int(0, idx, rand() % 2000);
-            t->set_int(1, idx, rand() % 2000);
-            t->set_int(2, idx, rand() % 2000);
-            t->set_int(3, idx, rand() % 2000);
+            t->set_int(0, idx, rand() % 10000);
+            t->set_int(1, idx, rand() % 10000);
+            t->set_int(2, idx, rand() % 10000);
+            t->set_int(3, idx, rand() % 10000);
         }
         end = std::chrono::high_resolution_clock::now();
         ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
@@ -221,17 +221,14 @@ TEST(PerfTest) {
     }
 }
 
-#if 0
+#if 1
 
 TEST(PerfTest_UID) {
     std::chrono::time_point<std::chrono::high_resolution_clock> start, end;
 
-    std::vector<unsigned> shuffle;
+    std::vector<uint64_t> shuffle;
     shuffle.reserve(limit);
-    for (int j=0; j<limit; ++j) shuffle.push_back(j);
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(shuffle.begin(), shuffle.end(), g);
+    for (int j=0; j<limit; ++j) shuffle.push_back( (uint64_t(rand()) << 31) + rand());
     const char* path = "testing_UID.realm";
     SharedGroup sg(path);
     {
@@ -254,24 +251,66 @@ TEST(PerfTest_UID) {
         std::chrono::nanoseconds ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
         std::cout << "   ...done in " << ns.count() << " nsecs/key" << std::endl;
 
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle(shuffle.begin(), shuffle.end(), g);
+
         std::cout << "setting values (4 random values/key) UID order " << limit << " keys..." << std::flush;
         start = std::chrono::high_resolution_clock::now();
         for (int j = 0; j < limit; ++j) {
-            int idx = t->find_first_int(4, j);
-            t->set_int(0, idx, rand() % 2000);
-            t->set_int(1, idx, rand() % 2000);
-            t->set_int(2, idx, rand() % 2000);
-            t->set_int(3, idx, rand() % 2000);
+            int idx = t->find_first_int(4, shuffle[j]);
+            t->set_int(0, idx, rand() % 10000);
+            t->set_int(1, idx, rand() % 10000);
+            t->set_int(2, idx, rand() % 10000);
+            t->set_int(3, idx, rand() % 10000);
         }
         end = std::chrono::high_resolution_clock::now();
         ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
         std::cout << "   ...done in " << ns.count() << " nsecs/key" << std::endl;
 
+
+        std::cout << "first access (seq order) " << limit << " keys..." << std::flush;
+        int sum = 0;
+        start = std::chrono::high_resolution_clock::now();
+        for (int j = 0; j < limit; ++j) {
+            int idx = t->find_first_int(4, shuffle[j]);
+            sum += t->get_int(0, idx);
+        }
+        end = std::chrono::high_resolution_clock::now();
+        ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
+        auto baseline = ns;
+        std::cout << "   ...done in " << ns.count() << " nsecs/key" << std::endl;
+
+        std::cout << "2nd access, same field (seq order) " << limit << " keys..." << std::flush;
+        sum = 0;
+        start = std::chrono::high_resolution_clock::now();
+        for (int j = 0; j < limit; ++j) {
+            int idx = t->find_first_int(4, shuffle[j]);
+            sum += t->get_int(0, idx);
+            sum += t->get_int(0, idx);
+        }
+        end = std::chrono::high_resolution_clock::now();
+        ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
+        std::cout << "   ...done in " << (ns - baseline).count() << " nsecs/key" << std::endl;
+
+        std::cout << "2nd access, other field (seq order) " << limit << " keys..." << std::flush;
+        sum = 0;
+        start = std::chrono::high_resolution_clock::now();
+        for (int j = 0; j < limit; ++j) {
+            int idx = t->find_first_int(4, shuffle[j]);
+            sum += t->get_int(0, idx);
+            sum += t->get_int(1, idx);
+        }
+        end = std::chrono::high_resolution_clock::now();
+        ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end-start) / limit;
+        std::cout << "   ...done in " << (ns - baseline).count() << " nsecs/key" << std::endl;
+
+        
         std::cout << "manual query (4 reads/key) UID order, for " << limit << " keys..." << std::flush;
         int count = 0;
         start = std::chrono::high_resolution_clock::now();
         for (int j = 0; j < limit; ++j) {
-            int idx = t->find_first_int(4, j);
+            int idx = t->find_first_int(4, shuffle[j]);
             if ((t->get_int(0, idx) < 1000) && (t->get_int(1, idx) < 1000)
                 && (t->get_int(2, idx) < 1000) && (t->get_int(3, idx) < 1000))
                 count++;

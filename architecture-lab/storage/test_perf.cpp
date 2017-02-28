@@ -82,10 +82,10 @@ int main(int argc, char* argv[]) {
 
     for (uint64_t key = 0; key < limit; key ++) {
         auto o = ss.change(t, { key << 1 });
-        uint64_t a = rand() % 2000L;
-        uint64_t b = rand() % 2000L;
-        uint64_t c = rand() % 2000L;
-        uint64_t d = rand() % 2000L;
+        uint64_t a = rand() % 10000L;
+        uint64_t b = rand() % 10000L;
+        uint64_t c = rand() % 10000L;
+        uint64_t d = rand() % 10000L;
         o.set(field_x0, a);
         o.set(field_x1, b);
         o.set(field_x2, c);
