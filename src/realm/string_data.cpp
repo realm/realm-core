@@ -29,20 +29,30 @@ bool StringData::matchlike(const StringData& text, const StringData& pattern) no
 
     while (true) {
         if (p1 == text.size()) {
+            // We're at the end of the text. This is a match if:
+            // - we're also at the end of the pattern; or
             if (p2 == pattern.size())
                 return true;
+
+            // - we're at the last character of the pattern, and it's a multi-character wildcard.
             if (p2 == pattern.size() - 1 && pattern[p2] == '*')
                 return true;
+
             goto no_match;
         }
-        if (p2 == pattern.size())
+
+        if (p2 == pattern.size()) {
+            // We've hit the end of the pattern without matching the entirety of the text.
             goto no_match;
+        }
 
         if (pattern[p2] == '*') {
+            // Multi-character wildcard. Remember our position in case we need to backtrack.
             textpos.push_back(p1);
             patternpos.push_back(++p2);
             continue;
         }
+
         if (pattern[p2] == '?') {
             // utf-8 encoded characters may take up multiple bytes
             if ((text[p1] & 0x80) == 0) {
@@ -67,23 +77,28 @@ bool StringData::matchlike(const StringData& text, const StringData& pattern) no
         }
 
     no_match:
-        if (textpos.empty())
+        if (textpos.empty()) {
+            // We were performing the outermost level of matching, so if we made it here the text did not match.
             return false;
-        else {
-            if (p1 == text.size()) {
-                textpos.pop_back();
-                patternpos.pop_back();
-
-                if (textpos.empty())
-                    return false;
-
-                p1 = textpos.back();
-            }
-            else {
-                p1 = textpos.back();
-                textpos.back() = ++p1;
-            }
-            p2 = patternpos.back();
         }
+
+        if (p1 == text.size()) {
+            // We've hit the end of the text without a match, so backtrack.
+            textpos.pop_back();
+            patternpos.pop_back();
+
+            if (textpos.empty()) {
+                // We finished our last backtrack attempt without finding a match, so the text did not match.
+                return false;
+            }
+
+            p1 = textpos.back();
+        }
+        else {
+            // Reattempt the match from the next character.
+            p1 = textpos.back();
+            textpos.back() = ++p1;
+        }
+        p2 = patternpos.back();
     }
 }
