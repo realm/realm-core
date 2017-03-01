@@ -28,11 +28,13 @@ set(SOURCES
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/sync_test_utils.hpp
+        sync/session/session_util.hpp
     )
     list(APPEND SOURCES 
         sync/file.cpp
         sync/metadata.cpp
-        sync/session.cpp
+        sync/session/session.cpp
+        sync/session/progress_notifications.cpp
         sync/sync_manager.cpp
         sync/sync_test_utils.cpp
         sync/user.cpp
