@@ -20,9 +20,14 @@
 
 using namespace realm;
 
-bool StringData::matchlike(const StringData& text, const StringData& pattern, const StringData* alternate_pattern) noexcept
+namespace {
+
+template <bool has_alternate_pattern>
+REALM_FORCEINLINE
+bool matchlike(const StringData& text, const StringData& pattern, const StringData* alternate_pattern=nullptr) noexcept
 {
     // If alternate_pattern is provided, it is assumed to differ from `pattern` only in case.
+    REALM_ASSERT_DEBUG(has_alternate_pattern == bool(alternate_pattern));
     REALM_ASSERT_DEBUG(!alternate_pattern || pattern.size() == alternate_pattern->size());
 
     std::vector<size_t> textpos;
@@ -79,7 +84,7 @@ bool StringData::matchlike(const StringData& text, const StringData& pattern, co
             continue;
         }
 
-        if (alternate_pattern && (*alternate_pattern)[p2] == text[p1]) {
+        if (has_alternate_pattern && (*alternate_pattern)[p2] == text[p1]) {
             ++p1;
             ++p2;
             continue;
@@ -106,4 +111,17 @@ bool StringData::matchlike(const StringData& text, const StringData& pattern, co
         p1 = ++textpos.back();
         p2 = patternpos.back();
     }
+}
+
+} // unnamed namespace
+
+bool StringData::matchlike(const realm::StringData& text, const realm::StringData& pattern) noexcept
+{
+    return ::matchlike<false>(text, pattern);
+}
+
+bool StringData::matchlike_ins(const StringData& text, const StringData& pattern_upper,
+                               const StringData& pattern_lower) noexcept
+{
+    return ::matchlike<true>(text, pattern_upper, &pattern_lower);
 }

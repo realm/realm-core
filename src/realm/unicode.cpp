@@ -535,18 +535,13 @@ bool contains_ins(StringData haystack, const char* needle_upper, const char* nee
     return false;
 }
 
-bool matchlike_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower) noexcept
-{
-    return StringData::matchlike(text, pattern_upper, &pattern_lower);
-}
-
 bool string_like_ins(StringData text, StringData upper, StringData lower) noexcept
 {
     if (text.is_null() || lower.is_null()) {
         return (text.is_null() && lower.is_null());
     }
 
-    return matchlike_ins(text, lower, upper);
+    return StringData::matchlike_ins(text, lower, upper);
 }
 
 bool string_like_ins(StringData text, StringData pattern) noexcept
@@ -558,7 +553,7 @@ bool string_like_ins(StringData text, StringData pattern) noexcept
     std::string upper = case_map(pattern, true, IgnoreErrors);
     std::string lower = case_map(pattern, false, IgnoreErrors);
 
-    return matchlike_ins(text, lower.c_str(), upper.c_str());
+    return StringData::matchlike_ins(text, lower.c_str(), upper.c_str());
 }
 
 } // namespace realm

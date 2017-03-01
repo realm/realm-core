@@ -164,10 +164,12 @@ private:
     const char* m_data;
     size_t m_size;
 
-    static bool matchlike(const StringData& text, const StringData& pattern,
-                          const StringData* alternate_pattern=nullptr) noexcept;
+    static bool matchlike(const StringData& text, const StringData& pattern) noexcept;
+    static bool matchlike_ins(const StringData& text, const StringData& pattern_upper,
+                              const StringData& pattern_lower) noexcept;
 
-    friend bool matchlike_ins(const StringData&, const StringData&, const StringData&) noexcept;
+    friend bool string_like_ins(StringData, StringData) noexcept;
+    friend bool string_like_ins(StringData, StringData, StringData) noexcept;
 };
 
 
