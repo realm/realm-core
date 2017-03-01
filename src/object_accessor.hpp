@@ -86,65 +86,19 @@ public:
     static Mixed to_mixed(ContextType, ValueType&);
 };
 
-struct InvalidatedObjectException : public std::logic_error {
-    InvalidatedObjectException(const std::string& object_type, const std::string& message) :
-        std::logic_error(message), object_type(object_type) {}
-    const std::string object_type;
-};
-
-struct InvalidPropertyException : public std::logic_error {
-    InvalidPropertyException(const std::string& object_type, const std::string& property_name, const std::string& message) :
-        std::logic_error(message), object_type(object_type), property_name(property_name) {}
-    const std::string object_type;
-    const std::string property_name;
-};
-
-struct MissingPropertyValueException : public std::logic_error {
-    MissingPropertyValueException(const std::string& object_type, const std::string& property_name, const std::string& message) :
-        std::logic_error(message), object_type(object_type), property_name(property_name) {}
-    const std::string object_type;
-    const std::string property_name;
-};
-
-struct MissingPrimaryKeyException : public std::logic_error {
-    MissingPrimaryKeyException(const std::string& object_type, const std::string& message) : std::logic_error(message), object_type(object_type) {}
-    const std::string object_type;
-};
-
-struct ReadOnlyPropertyException : public std::logic_error {
-    ReadOnlyPropertyException(const std::string& object_type, const std::string& property_name, const std::string& message) :
-        std::logic_error(message), object_type(object_type), property_name(property_name) {}
-    const std::string object_type;
-    const std::string property_name;
-};
-
-struct MutationOutsideTransactionException : public std::logic_error {
-    MutationOutsideTransactionException(const std::string& message) : std::logic_error(message) {}
-};
-
 //
 // template method implementations
 //
 template <typename ValueType, typename ContextType>
 void Object::set_property_value(ContextType ctx, std::string prop_name, ValueType value, bool try_update)
 {
-    const Property *prop = m_object_schema->property_for_name(prop_name);
-    if (!prop) {
-        throw InvalidPropertyException(m_object_schema->name, prop_name,
-            "Setting invalid property '" + prop_name + "' on object '" + m_object_schema->name + "'.");
-    }
-    set_property_value_impl(ctx, *prop, value, try_update);
+    set_property_value_impl(ctx, property_for_name(prop_name), value, try_update);
 }
 
 template <typename ValueType, typename ContextType>
 ValueType Object::get_property_value(ContextType ctx, std::string prop_name)
 {
-    const Property *prop = m_object_schema->property_for_name(prop_name);
-    if (!prop) {
-        throw InvalidPropertyException(m_object_schema->name, prop_name,
-            "Getting invalid property '" + prop_name + "' on object '" + m_object_schema->name + "'.");
-    }
-    return get_property_value_impl<ValueType>(ctx, *prop);
+    return get_property_value_impl<ValueType>(ctx, property_for_name(prop_name));
 }
 
 template <typename ValueType, typename ContextType>
@@ -153,10 +107,7 @@ void Object::set_property_value_impl(ContextType ctx, const Property &property, 
     using Accessor = NativeAccessor<ValueType, ContextType>;
 
     verify_attached();
-
-    if (!m_realm->is_in_transaction()) {
-        throw MutationOutsideTransactionException("Can only set property values within a transaction.");
-    }
+    m_realm->verify_in_write();
 
     size_t column = property.table_column;
     if (property.is_nullable && Accessor::is_null(ctx, value)) {
@@ -226,18 +177,16 @@ void Object::set_property_value_impl(ContextType ctx, const Property &property, 
             break;
         }
         case PropertyType::LinkingObjects:
-            throw ReadOnlyPropertyException(m_object_schema->name, property.name,
-                                            util::format("Cannot modify read-only property '%1.%2'",
-                                                         m_object_schema->name, property.name));
+            throw ReadOnlyPropertyException(m_object_schema->name, property.name);
     }
 }
 
 template <typename ValueType, typename ContextType>
 ValueType Object::get_property_value_impl(ContextType ctx, const Property &property)
 {
-    using Accessor = NativeAccessor<ValueType, ContextType>;
-
     verify_attached();
+
+    using Accessor = NativeAccessor<ValueType, ContextType>;
 
     size_t column = property.table_column;
     if (property.is_nullable && m_row.is_null(column)) {
@@ -281,11 +230,9 @@ ValueType Object::get_property_value_impl(ContextType ctx, const Property &prope
 template<typename ValueType, typename ContextType>
 Object Object::create(ContextType ctx, SharedRealm realm, const ObjectSchema &object_schema, ValueType value, bool try_update)
 {
-    using Accessor = NativeAccessor<ValueType, ContextType>;
+    realm->verify_in_write();
 
-    if (!realm->is_in_transaction()) {
-        throw MutationOutsideTransactionException("Can only create objects within a transaction.");
-    }
+    using Accessor = NativeAccessor<ValueType, ContextType>;
 
     // get or create our accessor
     bool created = false;
@@ -293,9 +240,8 @@ Object Object::create(ContextType ctx, SharedRealm realm, const ObjectSchema &ob
     // try to get existing row if updating
     size_t row_index = realm::not_found;
     realm::TableRef table = ObjectStore::table_for_object_type(realm->read_group(), object_schema.name);
-    const Property *primary_prop = object_schema.primary_key_property();
 
-    if (primary_prop) {
+    if (auto primary_prop = object_schema.primary_key_property()) {
         // search for existing object based on primary key type
         ValueType primary_value = Accessor::dict_value_for_key(ctx, value, object_schema.primary_key);
         row_index = get_for_primary_key_impl(ctx, *table, *primary_prop, primary_value);
@@ -318,21 +264,21 @@ Object Object::create(ContextType ctx, SharedRealm realm, const ObjectSchema &ob
     // populate
     Object object(realm, object_schema, table->get(row_index));
     for (const Property& prop : object_schema.persisted_properties) {
-        if (!prop.is_primary) {
-            if (Accessor::dict_has_value_for_key(ctx, value, prop.name)) {
-                object.set_property_value_impl(ctx, prop, Accessor::dict_value_for_key(ctx, value, prop.name), try_update);
+        if (prop.is_primary)
+            continue;
+
+        if (Accessor::dict_has_value_for_key(ctx, value, prop.name)) {
+            object.set_property_value_impl(ctx, prop, Accessor::dict_value_for_key(ctx, value, prop.name), try_update);
+        }
+        else if (created) {
+            if (Accessor::has_default_value_for_property(ctx, realm.get(), object_schema, prop.name)) {
+                object.set_property_value_impl(ctx, prop, Accessor::default_value_for_property(ctx, realm.get(), object_schema, prop.name), try_update);
             }
-            else if (created) {
-                if (Accessor::has_default_value_for_property(ctx, realm.get(), object_schema, prop.name)) {
-                    object.set_property_value_impl(ctx, prop, Accessor::default_value_for_property(ctx, realm.get(), object_schema, prop.name), try_update);
-                }
-                else if (prop.is_nullable || prop.type == PropertyType::Array) {
-                    object.set_property_value_impl(ctx, prop, Accessor::null_value(ctx), try_update);
-                }
-                else {
-                    throw MissingPropertyValueException(object_schema.name, prop.name,
-                        "Missing property value for property " + prop.name);
-                }
+            else if (prop.is_nullable || prop.type == PropertyType::Array) {
+                object.set_property_value_impl(ctx, prop, Accessor::null_value(ctx), try_update);
+            }
+            else {
+                throw MissingPropertyValueException(object_schema.name, prop.name);
             }
         }
     }
@@ -344,7 +290,7 @@ Object Object::get_for_primary_key(ContextType ctx, SharedRealm realm, const Obj
 {
     auto primary_prop = object_schema.primary_key_property();
     if (!primary_prop) {
-        throw MissingPrimaryKeyException(object_schema.name, object_schema.name + " does not have a primary key");
+        throw MissingPrimaryKeyException(object_schema.name);
     }
 
     auto table = ObjectStore::table_for_object_type(realm->read_group(), object_schema.name);
@@ -363,14 +309,6 @@ size_t Object::get_for_primary_key_impl(ContextType ctx, Table const& table, con
     }
     else {
         return table.find_first_int(primary_prop.table_column, Accessor::to_long(ctx, primary_value));
-    }
-}
-
-inline void Object::verify_attached() {
-    if (!m_row.is_attached()) {
-        throw InvalidatedObjectException(m_object_schema->name,
-            "Accessing object of type " + m_object_schema->name + " which has been deleted"
-        );
     }
 }
 
