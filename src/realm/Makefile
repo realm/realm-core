@@ -176,6 +176,7 @@ query.cpp \
 query_engine.cpp \
 row.cpp \
 spec.cpp \
+string_data.cpp \
 table.cpp \
 table_view.cpp \
 unicode.cpp \
