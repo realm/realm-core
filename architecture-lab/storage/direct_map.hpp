@@ -26,9 +26,10 @@
 #include "memory.hpp"
 #include "tree.hpp"
 
-template<typename _TEntry>
+template<typename _TLeaf, typename _TEntry>
 struct _DirectMap {
-    _TreeTop tree;
+
+    _TreeTop<_TLeaf> tree;
 
     // The map was copied to file, so recursively copy all changed leafs to file
     // _TEntry must support 'copied_to_file'

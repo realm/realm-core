@@ -22,6 +22,7 @@
 #include "refs.hpp"
 #include "memory.hpp"
 
+template <typename TLeaf>
 struct _TreeTop {
     uint64_t mask;
     uint64_t count;
@@ -29,20 +30,23 @@ struct _TreeTop {
     Ref<DynType> top_level;
 
     struct LeafCommitter {
-        virtual Ref<DynType> commit(Ref<DynType> from) = 0;
+        virtual Ref<TLeaf> commit(Ref<TLeaf> from) = 0;
     };
 
     void copied_to_file(Memory& mem, LeafCommitter& lc);
-    void cow_path(Memory& mem, uint64_t index, Ref<DynType> leaf);
+    void cow_path(Memory& mem, uint64_t index, Ref<TLeaf> leaf);
+
+    uint64_t allocate_free_index(Memory& mem);
+    void release_index(Memory& mem, uint64_t index);
 
     // get leaf at index
-    Ref<DynType> lookup(const Memory& mem, uint64_t index) const;
+    Ref<TLeaf> lookup(const Memory& mem, uint64_t index) const;
 
     void init(uint64_t capacity);
 
     void free(Memory& mem);
 
-    static Ref<DynType> dispatch_commit(Memory& mem, Ref<DynType> from, int levels, LeafCommitter& lc);
+    static Ref<TLeaf> dispatch_commit(Memory& mem, Ref<TLeaf> from, int levels, LeafCommitter& lc);
 };
 
 #endif

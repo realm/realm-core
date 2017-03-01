@@ -58,17 +58,17 @@ void clone_leaf(TreeLeaf* from, TreeLeaf* to, int to_capacity) {
     for (int j=from->sz; j<to_capacity; ++j) to->keys[j] = 0;
 }
 
-struct CuckooLeafCommitter : public _TreeTop::LeafCommitter {
-    virtual Ref<DynType> commit(Ref<DynType> from);
+struct CuckooLeafCommitter : public _TreeTop<TreeLeaf>::LeafCommitter {
+    virtual Ref<TreeLeaf> commit(Ref<TreeLeaf> from);
     Memory& mem;
     PayloadMgr& pmgr;
     CuckooLeafCommitter(Memory& mem, PayloadMgr& pmgr) : mem(mem), pmgr(pmgr) {}
 };
 
-Ref<DynType> CuckooLeafCommitter::commit(Ref<DynType> from) {
+Ref<TreeLeaf> CuckooLeafCommitter::commit(Ref<TreeLeaf> from) {
     if (is_null(from)) return from;
     if (mem.is_writable(from)) {
-        TreeLeaf* from_ptr = mem.txl(from.as<TreeLeaf>());
+        TreeLeaf* from_ptr = mem.txl(from);
         TreeLeaf* to_ptr;
         Ref<TreeLeaf> to = mem.alloc_in_file<TreeLeaf>(to_ptr, get_leaf_size(from_ptr->sz));
         clone_leaf(from_ptr, to_ptr, from_ptr->sz);
@@ -125,8 +125,7 @@ int find_empty_in_leaf(Memory& mem, TreeLeaf* leaf_ptr, uint64_t hash) {
 bool _Cuckoo::find(Memory& mem, uint64_t key, Ref<DynType>& payload, int& index, uint8_t& size) {
     key <<= 1;
     uint64_t h_1 = hash_a(key);
-    Ref<DynType> leaf = primary_tree.lookup(mem, h_1);
-    Ref<TreeLeaf> leaf_ref = leaf.as<TreeLeaf>();
+    Ref<TreeLeaf> leaf_ref = primary_tree.lookup(mem, h_1);
     TreeLeaf* leaf_ptr = mem.txl(leaf_ref);
     int in_leaf_idx = find_in_leaf(mem, leaf_ptr, h_1, key);
     if (in_leaf_idx >= 0) {
@@ -137,8 +136,7 @@ bool _Cuckoo::find(Memory& mem, uint64_t key, Ref<DynType>& payload, int& index,
     }
     key |= 1;
     uint64_t h_2 = hash_b(key);
-    leaf = primary_tree.lookup(mem, h_2);
-    leaf_ref = leaf.as<TreeLeaf>();
+    leaf_ref = primary_tree.lookup(mem, h_2);
     leaf_ptr = mem.txl(leaf_ref);
     in_leaf_idx = find_in_leaf(mem, leaf_ptr, h_2, key);
     if (in_leaf_idx >= 0) {
@@ -195,11 +193,10 @@ bool _Cuckoo::find_and_cow_path(Memory& mem, PayloadMgr& pm, uint64_t key,
 
 struct KeyInUse {};
 
-bool insert_in_leaf(Memory& mem, Ref<DynType> leaf, _TreeTop* tree_ptr, 
+bool insert_in_leaf(Memory& mem, Ref<TreeLeaf> leaf, _TreeTop<TreeLeaf>* tree_ptr, 
 		    uint64_t hash, uint64_t &key, PayloadMgr& pm) {
 
-    Ref<TreeLeaf> typed_leaf = leaf.as<TreeLeaf>();
-    TreeLeaf* leaf_ptr = mem.txl(typed_leaf);
+    TreeLeaf* leaf_ptr = mem.txl(leaf);
     if (find_in_leaf(mem, leaf_ptr, hash, key) >= 0)
         throw KeyInUse();
     bool conflict = false;
@@ -283,7 +280,7 @@ bool ObjectIterator::next_access() {
     return false;
 }
 
-void _Cuckoo::rehash_tree(Memory& mem, _TreeTop& tree, PayloadMgr& pm) {
+void _Cuckoo::rehash_tree(Memory& mem, _TreeTop<TreeLeaf>& tree, PayloadMgr& pm) {
     for (uint64_t index = 0; index < tree.mask; index += 256) {
         Ref<DynType> leaf = tree.lookup(mem, index);
         if (mem.is_valid(leaf)) {
@@ -303,7 +300,7 @@ void _Cuckoo::rehash_tree(Memory& mem, _TreeTop& tree, PayloadMgr& pm) {
 
 void _Cuckoo::grow_tree(Memory& mem, PayloadMgr& pm) {
     // make a backup and set up new tree:
-    _TreeTop t_p = primary_tree;
+    _TreeTop<TreeLeaf> t_p = primary_tree;
     uint64_t sz1 = 1 + 2*t_p.mask;
     primary_tree.init(sz1);
     // iterate through old tree, rehashing everything
@@ -318,14 +315,14 @@ void _Cuckoo::insert(Memory& mem, uint64_t key, PayloadMgr& pm) {
     int collision_count = 1;
     while (collision_count < max_collisions) {
         uint64_t hash;
-        _TreeTop* tree_ptr;
+        _TreeTop<TreeLeaf>* tree_ptr;
         if ((key & 1) == 0) { // key encodes which hash was used
             hash = hash_a(key);
         } else {
             hash = hash_b(key);
         }
         tree_ptr = &primary_tree;
-        Ref<DynType> leaf = tree_ptr->lookup(mem, hash);
+        Ref<TreeLeaf> leaf = tree_ptr->lookup(mem, hash);
         // insert, potentially update 'key' with value to move
         //uint64_t old_key = key;
         bool conflict = insert_in_leaf(mem, leaf, tree_ptr, hash, key, pm);

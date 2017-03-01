@@ -24,9 +24,11 @@
 #include "payload.hpp"
 #include "object.hpp"
 
+struct TreeLeaf;
+
 struct _Cuckoo {
-    _TreeTop primary_tree;
-    _TreeTop secondary_tree; // not used atm
+    _TreeTop<TreeLeaf> primary_tree;
+    _TreeTop<TreeLeaf> secondary_tree; // not used atm
 
     // update internals as we've been copied into file:
     void copied_to_file(Memory& mem, PayloadMgr& pm);
@@ -45,7 +47,7 @@ struct _Cuckoo {
 
     bool first_access(Memory& mem, ObjectIterator& oc);
 private:
-    void rehash_tree(Memory& mem, _TreeTop& tree, PayloadMgr& pm);
+    void rehash_tree(Memory& mem, _TreeTop<TreeLeaf>& tree, PayloadMgr& pm);
     void grow_tree(Memory& mem, PayloadMgr& pm);
 
 };

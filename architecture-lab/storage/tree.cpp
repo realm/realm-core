@@ -21,20 +21,27 @@
 
 // interior node of radix tree
 struct _TreeNode {
+    // bitmap indicating if underlying subtree is completely filled.
+    uint64_t next_level_filled[8];
+
+    // refs to next level in tree.
     Ref<DynType> next_level[256];
 
     // Fixme: put cow operation here!
-    static Ref<DynType> commit(Memory& mem, Ref<DynType> from, int levels, _TreeTop::LeafCommitter& lc);
+    template <typename TLeaf>
+    static Ref<DynType> commit(Memory& mem, Ref<DynType> from, int levels, 
+                               typename _TreeTop<TLeaf>::LeafCommitter& lc);
 };
 
-
-void _TreeTop::copied_to_file(Memory& mem, LeafCommitter& lc) {
+template<typename TLeaf>
+void _TreeTop<TLeaf>::copied_to_file(Memory& mem, LeafCommitter& lc) {
     // this is sort the inverse of cow_path
     top_level = dispatch_commit(mem, top_level, levels, lc);
 }
 
-Ref<DynType> _TreeTop::dispatch_commit(Memory& mem, Ref<DynType> from, int levels, 
-                                       _TreeTop::LeafCommitter& lc) {
+template<typename TLeaf>
+Ref<TLeaf> _TreeTop<TLeaf>::dispatch_commit(Memory& mem, Ref<TLeaf> from, int levels, 
+                                              LeafCommitter& lc) {
     if (is_null(from)) return from;
     if (levels == 1) {
         return lc.commit(from);
@@ -43,13 +50,15 @@ Ref<DynType> _TreeTop::dispatch_commit(Memory& mem, Ref<DynType> from, int level
     }
 }
 
-Ref<DynType> _TreeNode::commit(Memory& mem, Ref<DynType> from, int levels, _TreeTop::LeafCommitter& lc) {
+template<typename TLeaf>
+Ref<DynType> _TreeNode::commit(Memory& mem, Ref<DynType> from, int levels, 
+                               typename _TreeTop<TLeaf>::LeafCommitter& lc) {
     if (mem.is_writable(from)) {
         _TreeNode* to_ptr;
         Ref<_TreeNode> to = mem.alloc_in_file<_TreeNode>(to_ptr);
         _TreeNode* from_ptr = mem.txl(from.as<_TreeNode>());
         for (int i=0; i<256; ++i) {
-            to_ptr->next_level[i] = _TreeTop::dispatch_commit(mem, from_ptr->next_level[i], levels-1, lc);
+            to_ptr->next_level[i] = _TreeTop<TLeaf>::dispatch_commit(mem, from_ptr->next_level[i], levels-1, lc);
         }
         mem.free(from);
         return to;
@@ -57,7 +66,8 @@ Ref<DynType> _TreeNode::commit(Memory& mem, Ref<DynType> from, int levels, _Tree
     return from;
 }
 
-void _TreeTop::init(uint64_t capacity) {
+template<typename TLeaf>
+void _TreeTop<TLeaf>::init(uint64_t capacity) {
     int bits = 4; //minimal size of tree is 16
     while ((1ULL<<bits) < capacity) ++bits;
     mask = (1ULL << bits) - 1;
@@ -84,7 +94,8 @@ inline Ref<DynType> step_with_trace(const Memory& mem, Ref<DynType> ref, uint64_
 }
 
 // Get leaf at index:
-Ref<DynType> _TreeTop::lookup(const Memory& mem, uint64_t index) const {
+template<typename TLeaf>
+Ref<TLeaf> _TreeTop<TLeaf>::lookup(const Memory& mem, uint64_t index) const {
     Ref<DynType> ref = top_level;
     uint64_t masked_index = index & mask;
     switch (levels) {
@@ -103,18 +114,19 @@ Ref<DynType> _TreeTop::lookup(const Memory& mem, uint64_t index) const {
         case 2:
             ref = step(mem, ref, masked_index, 8);
         case 1:
-            return ref;
+            return ref.as<TLeaf>();
         case 0:
-            return Ref<DynType>(); // empty tree <-- this should assert!
+            return Ref<TLeaf>(); // empty tree <-- this should assert!
     }
-    return Ref<DynType>(); // not possible
+    return Ref<TLeaf>(); // not possible
 }
 
 // Set leaf at index:
 // copy-on-write the path from the tree top to the leaf, but not the top or leaf themselves.
 // caller is responsible for copy-on-writing the leaf PRIOR to the call, and for
 // copy-on-writing the top PRIOR to the call so that it can be updated.
-void _TreeTop::cow_path(Memory& mem, uint64_t index, Ref<DynType> leaf) {
+template<typename TLeaf>
+void _TreeTop<TLeaf>::cow_path(Memory& mem, uint64_t index, Ref<TLeaf> leaf) {
     Ref<DynType> ref = top_level;
     Ref<DynType>* tracking_ref = &top_level;
     uint64_t masked_index = index & mask;
@@ -154,7 +166,8 @@ void free_tree_internal(int level, Memory& mem, Ref<DynType> ref) {
     mem.free(ref);
 }
 
-void _TreeTop::free(Memory& mem) {
+template<typename TLeaf>
+void _TreeTop<TLeaf>::free(Memory& mem) {
     if (levels > 1)
         free_tree_internal(levels, mem, top_level);
     top_level = Ref<DynType>();
