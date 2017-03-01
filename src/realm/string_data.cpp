@@ -86,19 +86,15 @@ bool StringData::matchlike(const StringData& text, const StringData& pattern) no
             // We've hit the end of the text without a match, so backtrack.
             textpos.pop_back();
             patternpos.pop_back();
-
-            if (textpos.empty()) {
-                // We finished our last backtrack attempt without finding a match, so the text did not match.
-                return false;
-            }
-
-            p1 = textpos.back();
         }
-        else {
-            // Reattempt the match from the next character.
-            p1 = textpos.back();
-            textpos.back() = ++p1;
+
+        if (textpos.empty()) {
+            // We finished our last backtrack attempt without finding a match, so the text did not match.
+            return false;
         }
+
+        // Reattempt the match from the next character.
+        p1 = ++textpos.back();
         p2 = patternpos.back();
     }
 }

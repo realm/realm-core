@@ -310,6 +310,7 @@ TEST(StringData_Like)
     CHECK(foobar.like("???*"));
     CHECK(foofoo.like("?oo*?oo"));
     CHECK(foobarfoo.like("?oo*?oo"));
+    CHECK(!foobarfoo.like("*f*x*"));
 }
 
 TEST(StringData_Like_CaseInsensitive)
