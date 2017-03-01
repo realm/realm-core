@@ -83,7 +83,7 @@ public:
     //
     // Deprecated
     //
-    static Mixed to_mixed(ContextType, ValueType&) { throw std::logic_error("'Any' type is unsupported"); }
+    static Mixed to_mixed(ContextType, ValueType&);
 };
 
 struct InvalidatedObjectException : public std::logic_error {
@@ -264,20 +264,16 @@ ValueType Object::get_property_value_impl(ContextType ctx, const Property &prope
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
             TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), linkObjectSchema->name);
-            if (m_row.is_null_link(property.table_column)) {
-                return Accessor::null_value(ctx);
-            }
-            return Accessor::from_object(ctx, std::move(Object(m_realm, *linkObjectSchema, table->get(m_row.get_link(column)))));
+            return Accessor::from_object(ctx, Object(m_realm, *linkObjectSchema, table->get(m_row.get_link(column))));
         }
         case PropertyType::Array:
-            return Accessor::from_list(ctx, List(m_realm, static_cast<LinkViewRef>(m_row.get_linklist(column))));
+            return Accessor::from_list(ctx, List(m_realm, m_row.get_linklist(column)));
         case PropertyType::LinkingObjects: {
             auto target_object_schema = m_realm->schema().find(property.object_type);
             auto link_property = target_object_schema->property_for_name(property.link_origin_property_name);
             TableRef table = ObjectStore::table_for_object_type(m_realm->read_group(), target_object_schema->name);
             auto tv = m_row.get_table()->get_backlink_view(m_row.get_index(), table.get(), link_property->table_column);
-            Results results(m_realm, std::move(tv));
-            return Accessor::from_results(ctx, std::move(results));
+            return Accessor::from_results(ctx, Results(m_realm, std::move(tv)));
         }
     }
 }
