@@ -90,7 +90,9 @@ else
         tvos) SDK="appletv";;
     esac
 
-    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/${OS}.toolchain.cmake \
+    [[ "${BUILD_TYPE}" = "Release" ]] && suffix="" || suffix="-dbg"
+
+    cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${OS}.toolchain.cmake" \
           -D CMAKE_INSTALL_PREFIX="$(pwd)/install" \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
           -D REALM_NO_TESTS=1 \
@@ -105,9 +107,9 @@ else
                ONLY_ACTIVE_ARCH=NO
     mkdir -p "src/realm/${BUILD_TYPE}"
     lipo -create \
-         -output "src/realm/${BUILD_TYPE}/librealm.a" \
-         "src/realm/${BUILD_TYPE}-${SDK}os/librealm.a" \
-         "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm.a"
+         -output "src/realm/${BUILD_TYPE}/librealm${suffix}.a" \
+         "src/realm/${BUILD_TYPE}-${SDK}os/librealm${suffix}.a" \
+         "src/realm/${BUILD_TYPE}-${SDK}simulator/librealm${suffix}.a"
     xcodebuild -sdk "${SDK}os" \
                -configuration "${BUILD_TYPE}" \
                -target install \

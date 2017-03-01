@@ -111,6 +111,7 @@ def buildDockerEnv(name) {
 }
 
 def doBuildInDocker(String buildType) {
+    def suffix = buildType == "Release" ? "" : "-dbg"
     return {
         node('docker') {
             getArchive()
@@ -126,7 +127,7 @@ def doBuildInDocker(String buildType) {
                            cmake -D CMAKE_BUILD_TYPE=${buildType} -G Ninja ..
                            ninja
                            cd test
-                           ./realm-tests
+                           ./realm-tests${suffix}
                         """
                     } finally {
                         collectCompilerWarnings('gcc', true)
@@ -242,7 +243,7 @@ def buildDiffCoverage() {
                               -G Ninja ..
                         ninja
                         cd test
-                        ./realm-tests
+                        ./realm-tests-dbg
                         gcovr --filter=\'.*src/realm.*\' -x >gcovr.xml
                         mkdir coverage
                      '''
