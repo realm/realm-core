@@ -127,7 +127,7 @@ def doBuildInDocker(String buildType) {
                            cmake -D CMAKE_BUILD_TYPE=${buildType} -G Ninja ..
                            ninja
                            cd test
-                           ./realm-tests${suffix}
+                           ./realm-tests
                         """
                     } finally {
                         collectCompilerWarnings('gcc', true)
@@ -243,7 +243,7 @@ def buildDiffCoverage() {
                               -G Ninja ..
                         ninja
                         cd test
-                        ./realm-tests-dbg
+                        ./realm-tests
                         gcovr --filter=\'.*src/realm.*\' -x >gcovr.xml
                         mkdir coverage
                      '''
@@ -288,7 +288,7 @@ def doBuildMacOs(String buildType) {
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
                     retry(3) {
-                        timeout(time: 1, unit: 'MINUTES') {
+                        timeout(time: 2, unit: 'MINUTES') {
                             sh """
                                 rm -rf *
                                 cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake \\
