@@ -111,7 +111,7 @@ def buildDockerEnv(name) {
 }
 
 def doBuildInDocker(String buildType) {
-    def suffix = buildType == "Release" ? "" : "-dbg"
+    def suffix = buildType == 'Release' ? '' : '-dbg'
     return {
         node('docker') {
             getArchive()
@@ -496,11 +496,13 @@ def getArchive() {
 }
 
 def getSourceArchive() {
-    checkout([
-               $class           : 'GitSCM',
-              branches         : scm.branches,
-              gitTool          : 'native git',
-              extensions       : scm.extensions + [[$class: 'CleanCheckout']],
-              userRemoteConfigs: scm.userRemoteConfigs
-                 ])
+    checkout(
+        [
+          $class           : 'GitSCM',
+          branches         : scm.branches,
+          gitTool          : 'native git',
+          extensions       : scm.extensions + [[$class: 'CleanCheckout']],
+          userRemoteConfigs: scm.userRemoteConfigs
+        ]
+    )
 }

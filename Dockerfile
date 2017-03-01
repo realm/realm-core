@@ -15,8 +15,6 @@ RUN apt-get update && apt-get install -y \
     pandoc \
     python-pip \
     pkg-config \
-    ruby \
-    ruby-dev \
     s3cmd \
     unzip \
     && rm -rf /var/lib/apt/lists/*
