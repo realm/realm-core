@@ -368,6 +368,7 @@ TEST(StringData_Like_CaseInsensitive)
     CHECK(string_like_ins(foobar, "???*"));
     CHECK(string_like_ins(foofoo, "?oo*?oo"));
     CHECK(string_like_ins(foobarfoo, "?oo*?oo"));
+    CHECK(!string_like_ins(foobarfoo, "*f*x*"));
 }
 
 TEST(StringData_Substrings)

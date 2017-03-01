@@ -20,8 +20,11 @@
 
 using namespace realm;
 
-bool StringData::matchlike(const StringData& text, const StringData& pattern) noexcept
+bool StringData::matchlike(const StringData& text, const StringData& pattern, const StringData* alternate_pattern) noexcept
 {
+    // If alternate_pattern is provided, it is assumed to differ from `pattern` only in case.
+    REALM_ASSERT_DEBUG(!alternate_pattern || pattern.size() == alternate_pattern->size());
+
     std::vector<size_t> textpos;
     std::vector<size_t> patternpos;
     size_t p1 = 0; // position in text (haystack)
@@ -71,6 +74,12 @@ bool StringData::matchlike(const StringData& text, const StringData& pattern) no
         }
 
         if (pattern[p2] == text[p1]) {
+            ++p1;
+            ++p2;
+            continue;
+        }
+
+        if (alternate_pattern && (*alternate_pattern)[p2] == text[p1]) {
             ++p1;
             ++p2;
             continue;

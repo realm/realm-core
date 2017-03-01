@@ -535,75 +535,9 @@ bool contains_ins(StringData haystack, const char* needle_upper, const char* nee
     return false;
 }
 
-// pre-declaration
-bool matchlike_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower) noexcept;
-
 bool matchlike_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower) noexcept
 {
-    std::vector<size_t> textpos;
-    std::vector<size_t> patternpos;
-    size_t p1 = 0; // position in text (haystack)
-    size_t p2 = 0; // position in pattern (needle)
-
-    while (true) {
-        if (p1 == text.size()) {
-            if (p2 == pattern_lower.size())
-                return true;
-            if (p2 == pattern_lower.size() - 1 && pattern_lower[p2] == '*')
-                return true;
-            goto no_match;
-        }
-        if (p2 == pattern_lower.size())
-            goto no_match;
-
-        if (pattern_lower[p2] == '*') {
-            textpos.push_back(p1);
-            patternpos.push_back(++p2);
-            continue;
-        }
-        if (pattern_lower[p2] == '?') {
-            // utf-8 encoded characters may take up multiple bytes
-            if ((text[p1] & 0x80) == 0) {
-                ++p1;
-                ++p2;
-                continue;
-            }
-            else {
-                size_t p = 1;
-                while (p1 + p != text.size() && (text[p1 + p] & 0xc0) == 0x80)
-                    ++p;
-                p1 += p;
-                ++p2;
-                continue;
-            }
-        }
-
-        if (pattern_lower[p2] == text[p1] || pattern_upper[p2] == text[p1]) {
-            ++p1;
-            ++p2;
-            continue;
-        }
-
-    no_match:
-        if (textpos.empty())
-            return false;
-        else {
-            if (p1 == text.size()) {
-                textpos.pop_back();
-                patternpos.pop_back();
-
-                if (textpos.empty())
-                    return false;
-
-                p1 = textpos.back();
-            }
-            else {
-                p1 = textpos.back();
-                textpos.back() = ++p1;
-            }
-            p2 = patternpos.back();
-        }
-    }
+    return StringData::matchlike(text, pattern_upper, &pattern_lower);
 }
 
 bool string_like_ins(StringData text, StringData upper, StringData lower) noexcept
