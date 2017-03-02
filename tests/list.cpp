@@ -30,6 +30,7 @@
 #include "schema.hpp"
 
 #include "impl/realm_coordinator.hpp"
+#include "impl/object_accessor_impl.hpp"
 
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
@@ -655,5 +656,138 @@ TEST_CASE("list") {
         List list(r, lv);
         auto objectschema = &*r->schema().find("target");
         REQUIRE(&list.get_object_schema() == objectschema);
+    }
+
+    SECTION("add(RowExpr)") {
+        List list(r, lv);
+        r->begin_transaction();
+        SECTION("adds rows from the correct table") {
+            list.add(target->get(5));
+            REQUIRE(list.size() == 11);
+            REQUIRE(list.get_unchecked(10) == 5);
+        }
+
+        SECTION("throws for rows from the wrong table") {
+            REQUIRE_THROWS(list.add(origin->get(0)));
+        }
+        r->cancel_transaction();
+    }
+
+    SECTION("insert(RowExpr)") {
+        List list(r, lv);
+        r->begin_transaction();
+
+        SECTION("insert rows from the correct table") {
+            list.insert(0, target->get(5));
+            REQUIRE(list.size() == 11);
+            REQUIRE(list.get_unchecked(0) == 5);
+        }
+
+        SECTION("throws for rows from the wrong table") {
+            REQUIRE_THROWS(list.insert(0, origin->get(0)));
+        }
+
+        SECTION("throws for out of bounds insertions") {
+            REQUIRE_THROWS(list.insert(11, target->get(5)));
+            REQUIRE_NOTHROW(list.insert(10, target->get(5)));
+        }
+        r->cancel_transaction();
+    }
+
+    SECTION("set(RowExpr)") {
+        List list(r, lv);
+        r->begin_transaction();
+
+        SECTION("assigns for rows from the correct table") {
+            list.set(0, target->get(5));
+            REQUIRE(list.size() == 10);
+            REQUIRE(list.get_unchecked(0) == 5);
+        }
+
+        SECTION("throws for rows from the wrong table") {
+            REQUIRE_THROWS(list.set(0, origin->get(0)));
+        }
+
+        SECTION("throws for out of bounds sets") {
+            REQUIRE_THROWS(list.set(10, target->get(5)));
+        }
+        r->cancel_transaction();
+    }
+
+    SECTION("find(RowExpr)") {
+        List list(r, lv);
+
+        SECTION("returns index in list for values in the list") {
+            REQUIRE(list.find(target->get(5)) == 5);
+        }
+
+        SECTION("returns npos for values not in the list") {
+            r->begin_transaction();
+            list.remove(1);
+            REQUIRE(list.find(target->get(1)) == npos);
+            r->cancel_transaction();
+        }
+
+        SECTION("throws for row in wrong table") {
+            REQUIRE_THROWS(list.find(origin->get(0)));
+        }
+    }
+
+    SECTION("add(Context)") {
+        CppContext ctx(r);
+        List list(r, lv);
+        ctx.object_schema = &list.get_object_schema();
+        r->begin_transaction();
+
+        SECTION("adds boxed RowExpr") {
+            list.add(ctx, util::Any(target->get(5)));
+            REQUIRE(list.size() == 11);
+            REQUIRE(list.get_unchecked(10) == 5);
+        }
+
+        SECTION("adds boxed realm::Object") {
+            realm::Object obj(r, list.get_object_schema(), target->get(5));
+            list.add(ctx, util::Any(obj));
+            REQUIRE(list.size() == 11);
+            REQUIRE(list.get_unchecked(10) == 5);
+        }
+
+        SECTION("creates new object for dictionary") {
+            list.add(ctx, util::Any(AnyDict{{"value", 20LL}}));
+            REQUIRE(list.size() == 11);
+            REQUIRE(target->size() == 11);
+            REQUIRE(list.get(10).get_int(0) == 20);
+        }
+
+        SECTION("throws for object in wrong table") {
+            REQUIRE_THROWS(list.add(ctx, util::Any(origin->get(0))));
+            realm::Object obj(r, *r->schema().find("origin"), origin->get(0));
+            REQUIRE_THROWS(list.add(ctx, util::Any(obj)));
+        }
+
+        r->cancel_transaction();
+    }
+
+    SECTION("find(Context)") {
+        CppContext ctx(r);
+        List list(r, lv);
+
+        SECTION("returns index in list for boxed RowExpr") {
+            REQUIRE(list.find(ctx, util::Any(target->get(5))) == 5);
+        }
+
+        SECTION("returns index in list for boxed Object") {
+            realm::Object obj(r, *r->schema().find("origin"), target->get(5));
+            REQUIRE(list.find(ctx, util::Any(obj)) == 5);
+        }
+
+        SECTION("does not insert new objects for dictionaries") {
+            REQUIRE(list.find(ctx, util::Any(AnyDict{{"value", 20LL}})) == npos);
+            REQUIRE(target->size() == 10);
+        }
+
+        SECTION("throws for object in wrong table") {
+            REQUIRE_THROWS(list.find(ctx, util::Any(origin->get(0))));
+        }
     }
 }

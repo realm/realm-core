@@ -61,6 +61,7 @@ ObjectSchema::ObjectSchema(std::string name, std::initializer_list<Property> per
     for (auto const& prop : persisted_properties) {
         if (prop.is_primary) {
             primary_key = prop.name;
+            break;
         }
     }
 }

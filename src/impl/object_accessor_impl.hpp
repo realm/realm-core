@@ -28,69 +28,121 @@ using AnyDict = std::map<std::string, util::Any>;
 using AnyVector = std::vector<util::Any>;
 
 struct CppContext {
-    bool dict_has_value_for_key(util::Any& dict, const std::string &prop_name)
+    std::shared_ptr<Realm> realm;
+    const ObjectSchema* object_schema;
+
+    CppContext() = default;
+    CppContext(std::shared_ptr<Realm> realm) : realm(std::move(realm)) { }
+    CppContext(CppContext& c, realm::Property const& prop)
+    : realm(c.realm)
+    , object_schema(&*realm->schema().find(prop.object_type))
+    { }
+
+    util::Optional<util::Any> value_for_property(util::Any& dict,
+                                                 const std::string &prop_name, size_t) const
     {
-        return any_cast<AnyDict>(dict).count(prop_name) != 0;
+        auto const& v = any_cast<AnyDict&>(dict);
+        auto it = v.find(prop_name);
+        return it == v.end() ? util::none : util::make_optional(it->second);
     }
 
-    util::Any dict_value_for_key(util::Any& dict, const std::string &prop_name)
-    {
-        return any_cast<AnyDict>(dict).at(prop_name);
+    template<typename Func>
+    void enumerate_list(util::Any& value, Func&& fn) {
+        for (auto&& v : any_cast<AnyVector&>(value))
+            fn(v);
     }
 
-    size_t list_size(util::Any& v) { return any_cast<AnyVector>(v).size(); }
-    util::Any list_value_at_index(util::Any& v, size_t index)
+    util::Optional<util::Any>
+    default_value_for_property(Realm*, ObjectSchema const&, std::string const&) const
     {
-        return any_cast<AnyVector>(v)[index];
+        return util::none;
     }
 
-    bool has_default_value_for_property(Realm*, ObjectSchema const&, std::string const&)
-    {
-        return false;
-    }
+    template<typename T>
+    T unbox(util::Any& v, bool = false, bool = false) const { return any_cast<T>(v); }
 
-    util::Any default_value_for_property(Realm*, ObjectSchema const&, std::string const&)
-    {
-        return null_value();
-    }
+    util::Any box(BinaryData v) { return std::string(v); }
+    util::Any box(bool v) { return v; }
+    util::Any box(double v) { return v; }
+    util::Any box(float v) { return v; }
+    util::Any box(long long v) { return v; }
+    util::Any box(StringData v) { return std::string(v); }
+    util::Any box(Timestamp v) { return v; }
+    util::Any box(List v) { return v; }
+    util::Any box(TableRef v) { return v; }
+    util::Any box(Results v) { return v; }
+    util::Any box(Object v) { return v; }
+    util::Any box(Mixed) { REALM_TERMINATE("not supported"); }
 
-    Timestamp to_timestamp(util::Any& v) { return any_cast<Timestamp>(v); }
-    bool to_bool(util::Any& v) { return any_cast<bool>(v); }
-    double to_double(util::Any& v) { return any_cast<double>(v); }
-    float to_float(util::Any& v) { return any_cast<float>(v); }
-    long long to_long(util::Any& v) { return any_cast<long long>(v); }
-    std::string to_binary(util::Any& v) { return any_cast<std::string>(v); }
-    std::string to_string(util::Any& v) { return any_cast<std::string>(v); }
-    Mixed to_mixed(util::Any&) { throw std::logic_error("'Any' type is unsupported"); }
+    bool is_null(util::Any const& v) const noexcept { return !v.has_value(); }
+    util::Any null_value() const noexcept { return {}; }
 
-    util::Any from_binary(BinaryData v) { return std::string(v); }
-    util::Any from_bool(bool v) { return v; }
-    util::Any from_double(double v) { return v; }
-    util::Any from_float(float v) { return v; }
-    util::Any from_long(long long v) { return v; }
-    util::Any from_string(StringData v) { return std::string(v); }
-    util::Any from_timestamp(Timestamp v) { return v; }
-    util::Any from_list(List v) { return v; }
-    util::Any from_results(Results v) { return v; }
-    util::Any from_object(Object v) { return v; }
-
-    bool is_null(util::Any& v) { return !v.has_value(); }
-    util::Any null_value() { return {}; }
-
-    size_t to_existing_object_index(SharedRealm, util::Any&)
-    {
-        REALM_TERMINATE("not implemented");
-    }
-    size_t to_object_index(SharedRealm realm, util::Any& value,
-                           std::string const& object_type, bool update)
-    {
-        if (auto object = any_cast<Object>(&value)) {
-            return object->row().get_index();
-        }
-
-        return Object::create(*this, realm, *realm->schema().find(object_type), value, update).row().get_index();
-    }
+    void will_change(Object const&, Property const&) {}
+    void did_change() {}
+    std::string print(util::Any const&) const { return "not implemented"; }
+    bool allow_missing(util::Any const&) const { return false; }
 };
+
+template<>
+inline StringData CppContext::unbox(util::Any& v, bool, bool) const
+{
+    if (!v.has_value())
+        return StringData();
+    auto value = any_cast<std::string&>(v);
+    return StringData(value.c_str(), value.size());
+}
+
+template<>
+inline BinaryData CppContext::unbox(util::Any& v, bool, bool) const
+{
+    if (!v.has_value())
+        return BinaryData();
+    auto value = any_cast<std::string&>(v);
+    return BinaryData(value.c_str(), value.size());
+}
+
+template<>
+inline RowExpr CppContext::unbox(util::Any& v, bool create, bool update) const
+{
+    if (auto object = any_cast<Object>(&v))
+        return object->row();
+    if (auto row = any_cast<RowExpr>(&v))
+        return *row;
+    if (!create)
+        return RowExpr();
+
+    return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, update).row();
+}
+
+template<>
+inline util::Optional<bool> CppContext::unbox(util::Any& v, bool, bool) const
+{
+    return v.has_value() ? util::make_optional(unbox<bool>(v)) : util::none;
+}
+
+template<>
+inline util::Optional<int64_t> CppContext::unbox(util::Any& v, bool, bool) const
+{
+    return v.has_value() ? util::make_optional(unbox<int64_t>(v)) : util::none;
+}
+
+template<>
+inline util::Optional<double> CppContext::unbox(util::Any& v, bool, bool) const
+{
+    return v.has_value() ? util::make_optional(unbox<double>(v)) : util::none;
+}
+
+template<>
+inline util::Optional<float> CppContext::unbox(util::Any& v, bool, bool) const
+{
+    return v.has_value() ? util::make_optional(unbox<float>(v)) : util::none;
+}
+
+template<>
+inline Mixed CppContext::unbox(util::Any&, bool, bool) const
+{
+    throw std::logic_error("'Any' type is unsupported");
+}
 }
 
 #endif /* REALM_OS_OBJECT_ACCESSOR_IMPL_HPP */

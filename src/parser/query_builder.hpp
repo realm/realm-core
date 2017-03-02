@@ -23,13 +23,18 @@
 #include <memory>
 #include <vector>
 
+#include <realm/binary_data.hpp>
 #include <realm/null.hpp>
+#include <realm/string_data.hpp>
 #include <realm/timestamp.hpp>
 
 namespace realm {
 class Query;
 class Realm;
 class Schema;
+class Table;
+template<typename> class BasicRowExpr;
+using RowExpr = BasicRowExpr<Table>;
 
 namespace parser {
     struct Predicate;
@@ -48,8 +53,8 @@ public:
     virtual long long long_for_argument(size_t argument_index) = 0;
     virtual float float_for_argument(size_t argument_index) = 0;
     virtual double double_for_argument(size_t argument_index) = 0;
-    virtual std::string string_for_argument(size_t argument_index) = 0;
-    virtual std::string binary_for_argument(size_t argument_index) = 0;
+    virtual StringData string_for_argument(size_t argument_index) = 0;
+    virtual BinaryData binary_for_argument(size_t argument_index) = 0;
     virtual Timestamp timestamp_for_argument(size_t argument_index) = 0;
     virtual size_t object_index_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
@@ -58,30 +63,38 @@ public:
 template<typename ValueType, typename ContextType>
 class ArgumentConverter : public Arguments {
 public:
-    ArgumentConverter(ContextType& context, std::shared_ptr<Realm> realm, std::vector<ValueType> arguments)
-    : m_arguments(std::move(arguments))
-    , m_ctx(context)
-    , m_realm(std::move(realm))
+    ArgumentConverter(ContextType& context, const ValueType* arguments, size_t count)
+    : m_ctx(context)
+    , m_arguments(arguments)
+    , m_count(count)
     {}
 
-    virtual bool bool_for_argument(size_t argument_index) { return m_ctx.to_bool(argument_at(argument_index)); }
-    virtual long long long_for_argument(size_t argument_index) { return m_ctx.to_long(argument_at(argument_index)); }
-    virtual float float_for_argument(size_t argument_index) { return m_ctx.to_float(argument_at(argument_index)); }
-    virtual double double_for_argument(size_t argument_index) { return m_ctx.to_double(argument_at(argument_index)); }
-    virtual std::string string_for_argument(size_t argument_index) { return m_ctx.to_string(argument_at(argument_index)); }
-    virtual std::string binary_for_argument(size_t argument_index) { return m_ctx.to_binary(argument_at(argument_index)); }
-    virtual Timestamp timestamp_for_argument(size_t argument_index) { return m_ctx.to_timestamp(argument_at(argument_index)); }
-    virtual size_t object_index_for_argument(size_t argument_index) { return m_ctx.to_existing_object_index(m_realm, argument_at(argument_index)); }
-    virtual bool is_argument_null(size_t argument_index) { return m_ctx.is_null(argument_at(argument_index)); }
+    bool bool_for_argument(size_t i) override { return get<bool>(i); }
+    long long long_for_argument(size_t i) override { return get<int64_t>(i); }
+    float float_for_argument(size_t i) override { return get<float>(i); }
+    double double_for_argument(size_t i) override { return get<double>(i); }
+    StringData string_for_argument(size_t i) override { return get<StringData>(i); }
+    BinaryData binary_for_argument(size_t i) override { return get<BinaryData>(i); }
+    Timestamp timestamp_for_argument(size_t i) override { return get<Timestamp>(i); }
+    size_t object_index_for_argument(size_t i) override { return get<RowExpr>(i).get_index(); }
+    bool is_argument_null(size_t i) override { return m_ctx.is_null(at(i)); }
 
 private:
-    std::vector<ValueType> m_arguments;
     ContextType& m_ctx;
-    std::shared_ptr<Realm> m_realm;
+    const ValueType* m_arguments;
+    size_t m_count;
 
-    ValueType& argument_at(size_t index) const
+    const ValueType& at(size_t index) const
     {
-        return m_arguments.at(index);
+        if (index >= m_count)
+            throw std::out_of_range("vector");
+        return m_arguments[index];
+    }
+
+    template<typename T>
+    T get(size_t index) const
+    {
+        return m_ctx.template unbox<T>(at(index));
     }
 };
 } // namespace query_builder

@@ -26,6 +26,7 @@
 
 namespace realm {
 class ObjectSchema;
+using RowExpr = BasicRowExpr<Table>;
 
 namespace _impl {
     class ObjectNotifier;
@@ -34,8 +35,7 @@ namespace _impl {
 class Object {
 public:
     Object();
-    Object(SharedRealm r, ObjectSchema const& s, BasicRowExpr<Table> const& o);
-    Object(SharedRealm r, ObjectSchema const& s, Row const& o);
+    Object(SharedRealm r, ObjectSchema const& s, RowExpr const& o);
 
     Object(Object const&);
     Object(Object&&);
@@ -46,17 +46,17 @@ public:
 
     // property getter/setter
     template<typename ValueType, typename ContextType>
-    void set_property_value(ContextType& ctx, std::string prop_name,
+    void set_property_value(ContextType& ctx, StringData prop_name,
                             ValueType value, bool try_update);
 
     template<typename ValueType, typename ContextType>
-    ValueType get_property_value(ContextType& ctx, std::string prop_name);
+    ValueType get_property_value(ContextType& ctx, StringData prop_name);
 
     // create an Object from a native representation
     template<typename ValueType, typename ContextType>
     static Object create(ContextType& ctx, SharedRealm realm,
                          const ObjectSchema &object_schema, ValueType value,
-                         bool try_update);
+                         bool try_update, Row* = nullptr);
 
     template<typename ValueType, typename ContextType>
     static Object get_for_primary_key(ContextType& ctx, SharedRealm realm,
@@ -65,7 +65,7 @@ public:
 
     SharedRealm const& realm() const { return m_realm; }
     ObjectSchema const& get_object_schema() const { return *m_object_schema; }
-    Row row() const { return m_row; }
+    RowExpr row() const { return m_row; }
 
     bool is_valid() const { return m_row.is_attached(); }
 
@@ -79,7 +79,8 @@ private:
 
 
     template<typename ValueType, typename ContextType>
-    void set_property_value_impl(ContextType& ctx, const Property &property, ValueType value, bool try_update, bool is_default=false);
+    void set_property_value_impl(ContextType& ctx, const Property &property,
+                                 ValueType value, bool try_update, bool is_default=false);
     template<typename ValueType, typename ContextType>
     ValueType get_property_value_impl(ContextType& ctx, const Property &property);
 
@@ -88,7 +89,7 @@ private:
                                            const Property &primary_prop, ValueType primary_value);
 
     void verify_attached() const;
-    Property const& property_for_name(std::string const& prop_name) const;
+    Property const& property_for_name(StringData prop_name) const;
 };
 
 struct InvalidatedObjectException : public std::logic_error {
