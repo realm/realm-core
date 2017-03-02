@@ -193,9 +193,11 @@ void Object::set_property_value_impl(ContextType ctx, const Property &property, 
                 m_row.set_string(column, string_value);
             break;
         }
-        case PropertyType::Data:
-            m_row.set_binary(column, BinaryData(Accessor::to_binary(ctx, value)));
+        case PropertyType::Data: {
+            auto str = Accessor::to_binary(ctx, value);
+            m_row.set_binary(column, BinaryData(str));
             break;
+        }
         case PropertyType::Any:
             m_row.set_mixed(column, Accessor::to_mixed(ctx, value));
             break;
