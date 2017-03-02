@@ -439,6 +439,7 @@ TEST_CASE("object") {
         auto linking = any_cast<Results>(linkobj.get_property_value<util::Any>(&d, "origin"));
         REQUIRE(linking.size() == 1);
 
+        REQUIRE_THROWS(obj.set_property_value(&d, "pk", util::Any(5LL), false));
         REQUIRE_THROWS(obj.set_property_value(&d, "not a property", util::Any(5LL), false));
 
         r->commit_transaction();

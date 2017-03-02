@@ -28,9 +28,11 @@
 #include "schema.hpp"
 #include "util/format.hpp"
 
-#include <string>
 #include <realm/link_view.hpp>
+#include <realm/util/assert.hpp>
 #include <realm/table_view.hpp>
+
+#include <string>
 
 namespace realm {
 //
@@ -109,6 +111,9 @@ void Object::set_property_value_impl(ContextType ctx, const Property &property, 
     verify_attached();
     m_realm->verify_in_write();
 
+    if (property.is_primary)
+        throw std::logic_error("Cannot modify primary key after creation");
+
     size_t column = property.table_column;
     if (property.is_nullable && Accessor::is_null(ctx, value)) {
         if (property.type == PropertyType::Object) {
@@ -125,10 +130,7 @@ void Object::set_property_value_impl(ContextType ctx, const Property &property, 
             m_row.set_bool(column, Accessor::to_bool(ctx, value));
             break;
         case PropertyType::Int:
-            if (property.is_primary)
-                m_row.set_int_unique(column, Accessor::to_long(ctx, value));
-            else
-                m_row.set_int(column, Accessor::to_long(ctx, value));
+            m_row.set_int(column, Accessor::to_long(ctx, value));
             break;
         case PropertyType::Float:
             m_row.set_float(column, Accessor::to_float(ctx, value));
@@ -137,11 +139,8 @@ void Object::set_property_value_impl(ContextType ctx, const Property &property, 
             m_row.set_double(column, Accessor::to_double(ctx, value));
             break;
         case PropertyType::String: {
-            auto string_value = Accessor::to_string(ctx, value);
-            if (property.is_primary)
-                m_row.set_string_unique(column, string_value);
-            else
-                m_row.set_string(column, string_value);
+            auto str = Accessor::to_string(ctx, value);
+            m_row.set_string(column, str);
             break;
         }
         case PropertyType::Data: {
@@ -249,8 +248,14 @@ Object Object::create(ContextType ctx, SharedRealm realm, const ObjectSchema &ob
         if (row_index == realm::not_found) {
             row_index = table->add_empty_row();
             created = true;
-            Object object(realm, object_schema, table->get(row_index));
-            object.set_property_value_impl(ctx, *primary_prop, primary_value, try_update);
+            if (primary_prop->type == PropertyType::Int)
+                table->set_int_unique(primary_prop->table_column, row_index, Accessor::to_long(ctx, primary_value));
+            else if (primary_prop->type == PropertyType::String) {
+                auto value = Accessor::to_string(ctx, primary_value);
+                table->set_string_unique(primary_prop->table_column, row_index, value);
+            }
+            else
+                REALM_UNREACHABLE();
         }
         else if (!try_update) {
             throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value.", object_schema.name));
