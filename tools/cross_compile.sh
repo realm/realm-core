@@ -5,9 +5,9 @@ SCRIPT=$(basename "${BASH_SOURCE[0]}")
 DIR=$(dirname "${BASH_SOURCE[0]}")
 
 # Set fonts
-NORM="\e[0m"
-BOLD="\e[1m"
-RED="${BOLD}\e[31m"
+NORM="$(tput sgr0)"
+BOLD="$(tput bold)"
+RED="${BOLD}$(tput setaf 1)"
 
 # Number of cores
 CORES=$(getconf _NPROCESSORS_ONLN)
