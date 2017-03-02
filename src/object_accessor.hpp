@@ -94,7 +94,13 @@ public:
 template <typename ValueType, typename ContextType>
 void Object::set_property_value(ContextType ctx, std::string prop_name, ValueType value, bool try_update)
 {
-    set_property_value_impl(ctx, property_for_name(prop_name), value, try_update);
+    verify_attached();
+    m_realm->verify_in_write();
+    auto& property = property_for_name(prop_name);
+    if (property.is_primary)
+        throw std::logic_error("Cannot modify primary key after creation");
+
+    set_property_value_impl(ctx, property, value, try_update);
 }
 
 template <typename ValueType, typename ContextType>
@@ -104,67 +110,59 @@ ValueType Object::get_property_value(ContextType ctx, std::string prop_name)
 }
 
 template <typename ValueType, typename ContextType>
-void Object::set_property_value_impl(ContextType ctx, const Property &property, ValueType value, bool try_update)
+void Object::set_property_value_impl(ContextType ctx, const Property &property, ValueType value, bool try_update, bool is_default)
 {
     using Accessor = NativeAccessor<ValueType, ContextType>;
 
-    verify_attached();
-    m_realm->verify_in_write();
-
-    if (property.is_primary)
-        throw std::logic_error("Cannot modify primary key after creation");
-
+    auto& table = *m_row.get_table();
     size_t column = property.table_column;
+    size_t row = m_row.get_index();
     if (property.is_nullable && Accessor::is_null(ctx, value)) {
         if (property.type == PropertyType::Object) {
-            m_row.nullify_link(column);
+            if (!is_default)
+                table.nullify_link(column, row);
         }
         else {
-            m_row.set_null(column);
+            table.set_null(column, row, is_default);
         }
         return;
     }
 
     switch (property.type) {
         case PropertyType::Bool:
-            m_row.set_bool(column, Accessor::to_bool(ctx, value));
+            table.set_bool(column, row, Accessor::to_bool(ctx, value), is_default);
             break;
         case PropertyType::Int:
-            m_row.set_int(column, Accessor::to_long(ctx, value));
+            table.set_int(column, row, Accessor::to_long(ctx, value), is_default);
             break;
         case PropertyType::Float:
-            m_row.set_float(column, Accessor::to_float(ctx, value));
+            table.set_float(column, row, Accessor::to_float(ctx, value), is_default);
             break;
         case PropertyType::Double:
-            m_row.set_double(column, Accessor::to_double(ctx, value));
+            table.set_double(column, row, Accessor::to_double(ctx, value), is_default);
             break;
         case PropertyType::String: {
             auto str = Accessor::to_string(ctx, value);
-            m_row.set_string(column, str);
+            table.set_string(column, row, str, is_default);
             break;
         }
         case PropertyType::Data: {
             auto data = Accessor::to_binary(ctx, value);
-            m_row.set_binary(column, BinaryData(data));
+            table.set_binary(column, row, BinaryData(data), is_default);
             break;
         }
         case PropertyType::Any:
-            m_row.set_mixed(column, Accessor::to_mixed(ctx, value));
+            table.set_mixed(column, row, Accessor::to_mixed(ctx, value), is_default);
             break;
         case PropertyType::Date:
-            m_row.set_timestamp(column, Accessor::to_timestamp(ctx, value));
+            table.set_timestamp(column, row, Accessor::to_timestamp(ctx, value), is_default);
             break;
         case PropertyType::Object: {
-            if (Accessor::is_null(ctx, value)) {
-                m_row.nullify_link(column);
-            }
-            else {
-                m_row.set_link(column, Accessor::to_object_index(ctx, m_realm, value, property.object_type, try_update));
-            }
+            table.set_link(column, row, Accessor::to_object_index(ctx, m_realm, value, property.object_type, try_update), is_default);
             break;
         }
         case PropertyType::Array: {
-            realm::LinkViewRef link_view = m_row.get_linklist(column);
+            LinkViewRef link_view = m_row.get_linklist(column);
             link_view->clear();
             if (!Accessor::is_null(ctx, value)) {
                 size_t count = Accessor::list_size(ctx, value);
@@ -277,7 +275,7 @@ Object Object::create(ContextType ctx, SharedRealm realm, const ObjectSchema &ob
         }
         else if (created) {
             if (Accessor::has_default_value_for_property(ctx, realm.get(), object_schema, prop.name)) {
-                object.set_property_value_impl(ctx, prop, Accessor::default_value_for_property(ctx, realm.get(), object_schema, prop.name), try_update);
+                object.set_property_value_impl(ctx, prop, Accessor::default_value_for_property(ctx, realm.get(), object_schema, prop.name), try_update, true);
             }
             else if (prop.is_nullable || prop.type == PropertyType::Array) {
                 object.set_property_value_impl(ctx, prop, Accessor::null_value(ctx), try_update);

@@ -79,7 +79,7 @@ private:
 
 
     template<typename ValueType, typename ContextType>
-    void set_property_value_impl(ContextType ctx, const Property &property, ValueType value, bool try_update);
+    void set_property_value_impl(ContextType ctx, const Property &property, ValueType value, bool try_update, bool is_default=false);
     template<typename ValueType, typename ContextType>
     ValueType get_property_value_impl(ContextType ctx, const Property &property);
 

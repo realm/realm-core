@@ -19,6 +19,7 @@
 #include "catch.hpp"
 
 #include "util/any.hpp"
+#include "util/event_loop.hpp"
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
 
@@ -447,4 +448,51 @@ TEST_CASE("object") {
         REQUIRE_THROWS(obj.get_property_value<util::Any>(&d, "not a property"));
         REQUIRE_THROWS(obj.set_property_value(&d, "int", util::Any(5LL), false));
     }
+
+#if REALM_ENABLE_SYNC
+    if (!util::EventLoop::has_implementation())
+        return;
+
+    SyncServer server(false);
+    SyncTestFile config1(server, "shared");
+    config1.schema = config.schema;
+    SyncTestFile config2(server, "shared");
+    config2.schema = config.schema;
+
+    SECTION("defaults do not override values explicitly passed to create()") {
+        d["pk after list"] = {
+            {"int 1", 10LL},
+            {"int 2", 10LL},
+        };
+        AnyDict v1{
+            {"pk", 7LL},
+            {"array 1", AnyVec{AnyDict{{"value", 1LL}}}},
+            {"array 2", AnyVec{AnyDict{{"value", 2LL}}}},
+        };
+        auto v2 = v1;
+        v1["int 1"] = 1LL;
+        v2["int 2"] = 2LL;
+
+        auto r1 = Realm::get_shared_realm(config1);
+        auto r2 = Realm::get_shared_realm(config2);
+
+        r1->begin_transaction();
+        r2->begin_transaction();
+        auto obj = Object::create(&d, r1, *r1->schema().find("pk after list"), util::Any(v1), false);
+        Object::create(&d, r2, *r2->schema().find("pk after list"), util::Any(v2), false);
+        r2->commit_transaction();
+        r1->commit_transaction();
+
+        server.start();
+        util::EventLoop::main().run_until([&] {
+            return r1->read_group().get_table("class_array target")->size() == 4;
+        });
+
+        REQUIRE(obj.row().get_linklist(0)->size() == 2);
+        REQUIRE(obj.row().get_int(1) == 1); // non-default from r1
+        REQUIRE(obj.row().get_int(2) == 7); // pk
+        REQUIRE(obj.row().get_int(3) == 2); // non-default from r2
+        REQUIRE(obj.row().get_linklist(4)->size() == 2);
+    }
+#endif
 }
