@@ -152,7 +152,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
                         try {
-                            sh "./build.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
+                            sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
                             def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-android*').trim()
                             dir(buildDir) {
                                 archiveArtifacts('*.tar.gz')
@@ -165,7 +165,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                     docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
                             try {
-                                sh "./build.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
+                                sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
                                 def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-android*').trim()
                                 dir(buildDir) {
                                     archiveArtifacts('*.tar.gz')
@@ -323,7 +323,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
                     timeout(time: 15, unit: 'MINUTES') {
                         sh """
                             rm -rf build-*
-                            ./build.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
+                            tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
                         """
                     }
                 }
