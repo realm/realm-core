@@ -1,5 +1,7 @@
 #!groovy
 
+cocoaStashes = []
+
 timeout(time: 1, unit: 'HOURS') {
     stage('gather-info') {
         node('docker') {
@@ -91,7 +93,9 @@ timeout(time: 1, unit: 'HOURS') {
     stage('Aggregate') {
         node('docker') {
             getArchive()
-            unstash name:'cocoa'
+            for (int i = 0; i < cocoaStashes.size(); i++) {
+                unstash name:cocoaStashes[i]
+            }
             sh 'tools/build-cocoa.sh'
             archiveArtifacts('realm-core-cocoa*.tar.xz')
         }
@@ -315,7 +319,9 @@ def doBuildMacOs(String buildType) {
                 """
                 }
                 archiveArtifacts("build-macos-${buildType}/*.tar.xz")
-                stash includes:"build-macos-${buildType}/*.tar.xz", name:'cocoa'
+
+                stash includes:"build-macos-${buildType}/*.tar.xz", name:"macos-${buildType}"
+                cocoaStashes.append("macos-${buildType}")
             } finally {
                 collectCompilerWarnings('clang', true)
             }
@@ -338,7 +344,8 @@ def doBuildAppleDevice(String sdk, String buildType) {
                     }
                 }
                 archiveArtifacts("build-${sdk}-${buildType}/*.tar.xz")
-                stash includes:"build-${sdk}-${buildType}/*.tar.xz", name:'cocoa'
+                stash includes:"build-${sdk}-${buildType}/*.tar.xz", name:"cocoa-${sdk}-${buildType}"
+                cocoaStashes.append("cocoa-${sdk}-${buildType}")
             } finally {
                 collectCompilerWarnings('clang', true)
             }
