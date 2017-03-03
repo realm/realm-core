@@ -90,7 +90,6 @@ timeout(time: 1, unit: 'HOURS') {
 
     stage('Aggregate') {
         node('docker') {
-            deleteDir()
             getArchive()
             unstash name:'cocoa'
             sh 'tools/build-cocoa.sh'

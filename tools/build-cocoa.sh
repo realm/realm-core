@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 #Set Script Name variable
 SCRIPT=$(basename "${BASH_SOURCE[0]}")
 

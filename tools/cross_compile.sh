@@ -1,8 +1,9 @@
 #!/bin/bash
 
+set -e
+
 #Set Script Name variable
 SCRIPT=$(basename "${BASH_SOURCE[0]}")
-DIR=$(dirname "${BASH_SOURCE[0]}")
 
 # Set fonts
 NORM="$(tput sgr0)"
