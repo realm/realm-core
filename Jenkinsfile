@@ -306,6 +306,7 @@ def doBuildMacOs(String buildType) {
                                 rm -rf *
                                 cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake \\
                                       -D CMAKE_BUILD_TYPE=${buildType} \\
+                                      -D REALM_VERSION=${gitDescribeVersion} \\
                                       -G Xcode ..
                             """
                         }

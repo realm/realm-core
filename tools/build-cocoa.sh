@@ -44,6 +44,7 @@ if [ ! -z "$BUILD" ]; then
                 cd "${folder_name}" || exit 1
                 cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${p}.toolchain.cmake" \
                       -D CMAKE_BUILD_TYPE="${bt}" \
+                      -D REALM_VERSION="$(git describe)" \
                       -G Xcode ..
                 cmake --build . --config "${bt}" --target package
             )
