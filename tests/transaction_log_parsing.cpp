@@ -1273,7 +1273,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 }
             }
 
-            bool modified(size_t index, size_t col) const
+            bool modified(size_t index, size_t col) const noexcept
             {
                 auto it = std::find_if(begin(m_result), end(m_result),
                                        [=](auto&& change) { return (void *)(uintptr_t)index == change.info; });
@@ -1282,12 +1282,12 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 return it->changes[col].kind != BindingContext::ColumnInfo::Kind::None;
             }
 
-            bool invalidated(size_t index) const
+            bool invalidated(size_t index) const noexcept
             {
                 return std::find(begin(m_invalidated), end(m_invalidated), (void *)(uintptr_t)index) != end(m_invalidated);
             }
 
-            bool has_array_change(size_t index, size_t col, ColumnInfo::Kind kind, IndexSet values) const
+            bool has_array_change(size_t index, size_t col, ColumnInfo::Kind kind, IndexSet values) const noexcept
             {
                 auto& changes = m_result[index].changes;
                 if (changes.size() <= col)
@@ -1297,7 +1297,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                                                          values.as_indexes().begin(), values.as_indexes().end());
             }
 
-            size_t initial_column_index(size_t index, size_t col) const
+            size_t initial_column_index(size_t index, size_t col) const noexcept
             {
                 auto it = std::find_if(begin(m_result), end(m_result),
                                        [=](auto&& change) { return (void *)(uintptr_t)index == change.info; });
