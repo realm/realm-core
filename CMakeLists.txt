@@ -87,7 +87,9 @@ if(NOT REALM_BUILD_LIB_ONLY AND NOT REALM_NO_TESTS)
     add_subdirectory(test)
 endif()
 
-# Enable CPack
+# CPack
+install(FILES LICENSE CHANGELOG.md DESTINATION . COMPONENT devel)
+
 if(APPLE)
     set(CPACK_GENERATOR "TXZ")
 elseif(ANDROID)
@@ -95,8 +97,7 @@ elseif(ANDROID)
 else()
     set(CPACK_GENERATOR "TGZ;RPM;DEB")
 endif()
-string(TOLOWER "realm-core-${CMAKE_BUILD_TYPE}" REALM_PACKAGE_NAME)
-set(CPACK_PACKAGE_NAME ${REALM_PACKAGE_NAME})
+set(CPACK_PACKAGE_NAME "realm-core-${CMAKE_BUILD_TYPE}")
 set(CPACK_PACKAGE_VERSION ${REALM_VERSION})
 set(CPACK_PACKAGE_VENDOR "Realm Inc.")
 set(CPACK_PACKAGE_CONTACT "Realm <help@realm.io>")

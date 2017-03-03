@@ -66,12 +66,9 @@ if [ "${OS}" == "android" ] && [ -z "${ARCH}" ]; then
     usage
 fi
 
-# Create a build folder
-tmpdir=$(mktemp -d "$(pwd)/build-${OS}${ARCH}-${BUILD_TYPE}.XXXXXX")
-cd "${tmpdir}" || exit
-
-
 if [ "${OS}" == "android" ]; then
+    mkdir -p "build-android-${ARCH}-${BUILD_TYPE}"
+    cd "build-android-${ARCH}-${BUILD_TYPE}" || exit 1
     cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/android.toolchain.cmake \
           -D CMAKE_INSTALL_PREFIX=install \
           -D CMAKE_BUILD_TYPE="${BUILD_TYPE}" \
@@ -84,6 +81,8 @@ if [ "${OS}" == "android" ]; then
     make -j "${CORES}" -l "${CORES}" VERBOSE=1
     make package
 else
+    mkdir -p "build-${OS}-${BUILD_TYPE}"
+    cd "build-${OS}-${BUILD_TYPE}" || exit 1
     case "${OS}" in
         ios) SDK="iphone";;
         watchos) SDK="watch";;
@@ -120,12 +119,7 @@ else
                ONLY_ACTIVE_ARCH=NO
     mkdir -p install/lib
     cp "src/realm/${BUILD_TYPE}/librealm.a" install/lib
-    cd install || exit
-    LOWERCASE_BUILD_TYPE=$(echo "${BUILD_TYPE}" | tr '[:upper:]' '[:lower:]')
-    tar -cvJf "realm-core-${LOWERCASE_BUILD_TYPE}-${VERSION}-${SDK}os.tar.xz" lib include
+    cd install || exit 1
+    tar -cvJf "realm-core-${BUILD_TYPE}-${VERSION}-${SDK}os.tar.xz" lib include
     mv ./*.tar.xz ..
 fi
-
-
-
-

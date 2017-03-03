@@ -88,6 +88,16 @@ timeout(time: 1, unit: 'HOURS') {
         parallel parallelExecutors
     }
 
+    stage('Aggregate') {
+        node('docker') {
+            deleteDir()
+            getArchive()
+            unstash name:'cocoa'
+            sh 'tools/build-cocoa.sh'
+            archiveArtifacts(realm-core-cocoa*.tar.xz)
+        }
+    }
+
     if (isPublishingRun) {
         stage('publish-packages') {
             parallel(
@@ -283,7 +293,7 @@ def doBuildMacOs(String buildType) {
             getArchive()
 
             try {
-                dir('build-dir') {
+                dir("build-macos-${buildType}") {
                     // This is a dirty trick to work around a bug in xcode
                     // It will hang if launched on the same project (cmake trying the compiler out)
                     // in parallel.
@@ -304,8 +314,9 @@ def doBuildMacOs(String buildType) {
                                -target package \\
                                ONLY_ACTIVE_ARCH=NO
                 """
-                    archiveArtifacts('*.tar.xz')
                 }
+                archiveArtifacts("build-macos-${buildType}/*.tar.xz")
+                stash includes:"build-macos-${buildType}/*.tar.xz", name:'cocoa'
             } finally {
                 collectCompilerWarnings('clang', true)
             }
@@ -327,10 +338,8 @@ def doBuildAppleDevice(String sdk, String buildType) {
                         """
                     }
                 }
-                def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-*').trim()
-                dir(buildDir) {
-                    archiveArtifacts('*.tar.xz')
-                }
+                archiveArtifacts("build-${sdk}-${buildType}/*.tar.xz")
+                stash includes:"build-${sdk}-${buildType}/*.tar.xz", name:'cocoa'
             } finally {
                 collectCompilerWarnings('clang', true)
             }
