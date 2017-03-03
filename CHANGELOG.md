@@ -14,10 +14,14 @@
 ### Breaking changes
 
 * Disable copying of various classes to prevent incorrect use at compile time.
+* History type enumeration value `Replication::hist_Sync` renamed to
+  `Replication::hist_SyncClient`.
 
 ### Enhancements
 
-* Lorem ipsum.
+* New history type enumeration value `Replication::hist_SyncServer`. This allows
+  for the sync server to start using the same kind of in-Realm history scheme as
+  is currently used by clients.
 
 -----------
 
