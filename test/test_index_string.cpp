@@ -1706,6 +1706,10 @@ TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
         col.add(string);
     }
 
+    // Generate 255 strings with 1..255 'a' chars
+    for (int i = 1; i < 256; ++i) {
+        col.add(std::string(i, 'a').c_str());
+    }
 
     // Create a new index on column
     const StringIndex& ndx = *col.create_search_index();
@@ -1758,6 +1762,16 @@ TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
             CHECK_EQUAL(t.result_size, results.size());
             results.clear();
         }
+    }
+
+    // Test generated 'a'-strings
+    for (int i = 1; i < 256; ++i) {
+        const std::string str = std::string(i, 'A');
+        ndx.find_all(results, str.c_str(), false);
+        CHECK_EQUAL(0, results.size());
+        ndx.find_all(results, str.c_str(), true);
+        CHECK_EQUAL(1, results.size());
+        results.clear();
     }
 
     // Clean up
