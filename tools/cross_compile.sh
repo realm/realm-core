@@ -5,18 +5,13 @@ set -e
 #Set Script Name variable
 SCRIPT=$(basename "${BASH_SOURCE[0]}")
 
-# Set fonts
-NORM="$(tput sgr0)"
-BOLD="$(tput bold)"
-RED="${BOLD}$(tput setaf 1)"
-
 # Number of cores
 CORES=$(getconf _NPROCESSORS_ONLN)
 
 function usage {
-    echo "${BOLD}Usage:${NORM} ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>]"
+    echo "$Usage: ${SCRIPT} -t <build_type> -o <target_os> -v <version> [-a <android_abi>]"
     echo ""
-    echo "${BOLD}Arguments:${NORM}"
+    echo "Arguments:"
     echo "   build_type=<Release|Debug|MinSizeDebug>"
     echo "   target_os=<android|ios|watchos|tvos>"
     echo "   android_abi=<armeabi|armeabi-v7a|x86|mips|x86_64|arm64-v8a>"
@@ -57,13 +52,13 @@ shift $((OPTIND-1))
 
 # Check for obligatory fields
 if [ -z "${OS}" ] || [ -z "${BUILD_TYPE}" ]; then
-    echo "${RED}ERROR:${NORM} options -o, -t and -v are always needed";
+    echo "ERROR: options -o, -t and -v are always needed";
     usage
 fi
 
 # Check for android-related obligatory fields
 if [ "${OS}" == "android" ] && [ -z "${ARCH}" ]; then
-    echo "${RED}ERROR:${NORM} option -a is needed for android builds";
+    echo "ERROR: option -a is needed for android builds";
     usage
 fi
 
