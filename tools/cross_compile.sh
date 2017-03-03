@@ -114,7 +114,7 @@ else
                -target install \
                ONLY_ACTIVE_ARCH=NO
     mkdir -p install/lib
-    cp "src/realm/${BUILD_TYPE}/librealm.a" install/lib
+    cp "src/realm/${BUILD_TYPE}/librealm${suffix}.a" install/lib
     cd install || exit 1
     tar -cvJf "realm-core-${BUILD_TYPE}-${VERSION}-${SDK}os.tar.xz" lib include
     mv ./*.tar.xz ..
