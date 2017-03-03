@@ -75,7 +75,9 @@ public:
     // chooses to run it on. The method returns immediately with true if the callback was
     // successfully registered, false otherwise. If the method returns false the callback will
     // never be run.
-    // If this method is called before the session has been `bind()`ed, it will return false.
+    // This method will return true if the completion handler was registered, either immediately
+    // or placed in a queue. If it returns true the completion handler will always be called
+    // at least once, except in the case where a logged-out session is never logged back in.
     bool wait_for_upload_completion(std::function<void(std::error_code)> callback);
 
     // Register a callback that will be called when all pending downloads have been completed.
@@ -105,11 +107,6 @@ public:
     // Unregister a previously registered notifier. If the token is invalid,
     // this method does nothing.
     void unregister_progress_notifier(uint64_t);
-
-    // Wait for any pending uploads to complete, blocking the calling thread.
-    // Returns `false` if the method did not attempt to wait, either because the
-    // session is in an error state or because it hasn't yet been `bind()`ed.
-    bool wait_for_upload_completion_blocking();
 
     // If the sync session is currently `Dying`, ask it to stay alive instead.
     // If the sync session is currently `WaitingForAccessToken`, cancel any deferred close.
@@ -210,8 +207,6 @@ private:
     SyncSession(_impl::SyncClient&, std::string realm_path, SyncConfig);
     // }
 
-    bool can_wait_for_network_completion() const;
-
     void handle_error(SyncError);
     static std::string get_recovery_file_path();
     void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t);
@@ -272,6 +267,13 @@ private:
 
     std::string m_realm_path;
     _impl::SyncClient& m_client;
+
+    // For storing wait-for-completion requests if the session isn't yet ready to handle them.
+    struct CompletionWaitPackage {
+        void(sync::Session::*waiter)(std::function<void(std::error_code)>);
+        std::function<void(std::error_code)> callback;
+    };
+    std::vector<CompletionWaitPackage> m_completion_wait_packages;
 
     // The underlying `Session` object that is owned and managed by this `SyncSession`.
     // The session is first created when the `SyncSession` is moved out of its initial `inactive` state.
