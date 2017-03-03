@@ -94,7 +94,7 @@ timeout(time: 1, unit: 'HOURS') {
             getArchive()
             unstash name:'cocoa'
             sh 'tools/build-cocoa.sh'
-            archiveArtifacts(realm-core-cocoa*.tar.xz)
+            archiveArtifacts('realm-core-cocoa*.tar.xz')
         }
     }
 
