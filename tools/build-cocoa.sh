@@ -55,7 +55,8 @@ fi
 rm -rf core
 mkdir core
 
-tar -C core -Jxvf "build-macos-Release/realm-core-Release-$(git describe)-Darwin-devel.tar.xz" include LICENSE CHANGELOG.md
+filename=$(find "build-${p}-${bt}" -maxdepth 1 -type f -name "realm-core-Release-*-Darwin-devel.tar.xz")
+tar -C core -Jxvf "${filename}" include LICENSE CHANGELOG.md
 
 for bt in "${BUILD_TYPES[@]}"; do
     [ "$bt" = "Release" ] && suffix="" || suffix="-dbg"
