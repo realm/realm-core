@@ -59,9 +59,9 @@ filename=$(find "build-macos-Release" -maxdepth 1 -type f -name "realm-core-Rele
 tar -C core -Jxvf "${filename}" include LICENSE CHANGELOG.md
 
 for bt in "${BUILD_TYPES[@]}"; do
-    [ "$bt" = "Release" ] && suffix="" || suffix="-dbg"
+    [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
     for p in "${PLATFORMS[@]}"; do
-        [ "$p" = "macos" ] && infix="macosx" || infix="${p}"
+        [[ "$p" = "macos" ]] && infix="macosx" || infix="${p}"
         filename=$(find "build-${p}-${bt}" -maxdepth 1 -type f -name "realm-core-*-devel.tar.xz")
         tar -C core -Jxvf "${filename}" "lib/librealm${suffix}.a"
         mv "core/lib/librealm${suffix}.a" "core/librealm-${infix}${suffix}.a"
