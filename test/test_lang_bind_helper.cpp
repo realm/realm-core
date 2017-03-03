@@ -178,12 +178,28 @@ public:
 
     HistoryType get_history_type() const noexcept override
     {
-        return hist_OutOfRealm;
+        return hist_InRealm;
     }
 
     _impl::History* get_history() override
     {
         return this;
+    }
+
+    int get_history_schema_version() const noexcept override
+    {
+        return 0;
+    }
+
+    bool is_upgradable_history_schema(int) const noexcept override
+    {
+        REALM_ASSERT(false);
+        return false;
+    }
+
+    void upgrade_history_schema(int) override
+    {
+        REALM_ASSERT(false);
     }
 
     void update_early_from_top_ref(version_type, size_t, ref_type) override

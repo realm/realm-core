@@ -81,7 +81,10 @@ const char* LogicError::what() const noexcept
                    "not consistent across the session";
         case mixed_history_type:
             return "History type (as specified by the Replication implementation passed to "
-                   "the SharedGroup constructor) was not consistent across the session";
+                "the SharedGroup constructor) was not consistent across the session";
+        case mixed_history_schema_version:
+            return "History schema version (as specified by the Replication implementation passed "
+                "to the SharedGroup constructor) was not consistent across the session";
         case table_has_no_columns:
             return "Table has no columns";
         case column_does_not_exist:
