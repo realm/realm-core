@@ -384,8 +384,8 @@ size_t IndexArray::index_string<index_FindAll_ins>(StringData value, IntegerColu
     const char* top_header = get_header_from_data(m_data);
     work_list.push_back({top_header, 0, -1});
 
-    StringData upper_value = case_map(value, true);
-    StringData lower_value = case_map(value, false);
+    const util::Optional<std::string> upper_value = case_map(value, true);
+    const util::Optional<std::string> lower_value = case_map(value, false);
 
     while (!work_list.empty()) {
         WorkItem item = work_list.back();
@@ -451,7 +451,7 @@ size_t IndexArray::index_string<index_FindAll_ins>(StringData value, IntegerColu
             // The buffer is needed when for when this is an integer index.
             StringIndex::StringConversionBuffer buffer;
             const StringData str = column->get_index_data(row_ndx, buffer);
-            const StringData upper_str = case_map(str, true);
+            const util::Optional<std::string> upper_str = case_map(str, true);
             if (upper_str == upper_value) {
                 result.add(row_ndx);
             }
