@@ -26,7 +26,6 @@
 #include "uids.hpp"
 #include "object.hpp"
 
-struct NotFound {};
 
 struct _FieldInfo {
     uint64_t key; // [48 bit random + 16 bit index leading here]

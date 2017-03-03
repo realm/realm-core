@@ -21,12 +21,10 @@
 #include "direct_map.hpp"
 #include "table.hpp"
 
-// fwd decl
-template<typename TEntry> struct DirectMapLeaf;
 
 // in-db representation:
 struct _Snapshot {
-    _DirectMap<DirectMapLeaf<Ref<_Table>>, Ref<_Table>> tables;
+    _DirectMap<_DirectMapLeaf<Ref<_Table>>> tables;
     uint64_t version;
     Table table_directory;
     Table table_layouts;
