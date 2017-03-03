@@ -321,7 +321,7 @@ def doBuildMacOs(String buildType) {
                 archiveArtifacts("build-macos-${buildType}/*.tar.xz")
 
                 stash includes:"build-macos-${buildType}/*.tar.xz", name:"macos-${buildType}"
-                cocoaStashes.append("macos-${buildType}")
+                cocoaStashes << "macos-${buildType}"
             } finally {
                 collectCompilerWarnings('clang', true)
             }
@@ -345,7 +345,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
                 }
                 archiveArtifacts("build-${sdk}-${buildType}/*.tar.xz")
                 stash includes:"build-${sdk}-${buildType}/*.tar.xz", name:"cocoa-${sdk}-${buildType}"
-                cocoaStashes.append("cocoa-${sdk}-${buildType}")
+                cocoaStashes << "cocoa-${sdk}-${buildType}"
             } finally {
                 collectCompilerWarnings('clang', true)
             }
