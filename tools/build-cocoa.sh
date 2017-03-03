@@ -55,7 +55,7 @@ fi
 rm -rf core
 mkdir core
 
-filename=$(find "build-${p}-${bt}" -maxdepth 1 -type f -name "realm-core-Release-*-Darwin-devel.tar.xz")
+filename=$(find "build-macos-Release" -maxdepth 1 -type f -name "realm-core-Release-*-Darwin-devel.tar.xz")
 tar -C core -Jxvf "${filename}" include LICENSE CHANGELOG.md
 
 for bt in "${BUILD_TYPES[@]}"; do
