@@ -475,12 +475,32 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             }
                         }
                         else if (type == type_Int) {
+                            bool add_int = get_next(s) % 2 == 0;
                             int64_t value = get_int64(s);
-                            if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_int(" << col_ndx << ", " << row_ndx
-                                     << ", " << value << ");\n";
+                            if (add_int) {
+                                if (log) {
+                                    *log << "try { g.get_table(" << table_ndx << ")->add_int(" << col_ndx
+                                    << ", " << row_ndx << ", " << value
+                                    << "); } catch (const LogicError& le) { CHECK(le.kind() == "
+                                    "LogicError::illegal_combination); }\n";
+                                }
+                                try {
+                                    t->add_int(col_ndx, row_ndx, value);
+                                }
+                                catch (const LogicError& le) {
+                                    if (le.kind() != LogicError::illegal_combination) {
+                                        throw;
+                                    }
+                                }
                             }
-                            t->set_int(col_ndx, row_ndx, get_next(s));
+                            else {
+                                if (log) {
+                                    *log << "g.get_table(" << table_ndx << ")->set_int(" << col_ndx << ", " << row_ndx
+                                    << ", " << value << ");\n";
+                                }
+                                t->set_int(col_ndx, row_ndx, get_next(s));
+                            }
+
                         }
                         else if (type == type_Bool) {
                             bool value = get_next(s) % 2 == 0;
