@@ -62,6 +62,9 @@ for bt in "${BUILD_TYPES[@]}"; do
     [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
     for p in "${PLATFORMS[@]}"; do
         [[ "$p" = "macos" ]] && infix="macosx" || infix="${p}"
+        if [[ "$p" = "macos" ]] && [[ "${bt}" = "MinSizeDebug" ]]; then
+            bt="Debug"
+        fi
         filename=$(find "build-${p}-${bt}" -maxdepth 1 -type f -name "realm-core-*-devel.tar.xz")
         if [ -z "${filename}" ]; then
             filename=$(find "build-${p}-${bt}" -maxdepth 1 -type f -name "realm-core-*.tar.xz")
