@@ -69,6 +69,7 @@ enum INS {
     REMOVE_COLUMN,
     SET,
     REMOVE_ROW,
+    MERGE_ROWS,
     ADD_COLUMN_LINK,
     ADD_COLUMN_LINK_LIST,
     CLEAR_TABLE,
@@ -591,6 +592,22 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.get_table(" << table_ndx << ")->remove(" << row_ndx << ");\n";
                     }
                     t->remove(row_ndx);
+                }
+            }
+            else if (instr == MERGE_ROWS && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->size() > 1) {
+                    size_t row_ndx1 = get_next(s) % t->size();
+                    size_t row_ndx2 = get_next(s) % t->size();
+                    if (row_ndx1 == row_ndx2) {
+                        row_ndx2 = (row_ndx2 + 1) % t->size();
+                    }
+
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->merge_rows(" << row_ndx1 << ", " << row_ndx2 << ");\n";
+                    }
+                    t->merge_rows(row_ndx1, row_ndx2);
                 }
             }
             else if (instr == MOVE_LAST_OVER && g.size() > 0) {
