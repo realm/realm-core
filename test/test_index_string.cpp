@@ -1780,4 +1780,59 @@ TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
 }
 
 
+TEST_TYPES(StringIndex_Insensitive_Unicode, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    // Create a column with string values
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+
+    const char* strings[] = {
+        "æøå", "ÆØÅ",
+    };
+
+    for (const char* string : strings) {
+        col.add(string);
+    }
+
+    // Create a new index on column
+    const StringIndex& ndx = *col.create_search_index();
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+
+    {
+        struct TestData {
+            const bool case_insensitive;
+            const char* const needle;
+            const size_t result_size;
+        };
+
+        TestData td[] = {
+            {false, "æøå", 1},
+            {false, "ÆØÅ", 1},
+            {true, "æøå", 2},
+            {true, "Æøå", 2},
+            {true, "æØå", 2},
+            {true, "ÆØå", 2},
+            {true, "æøÅ", 2},
+            {true, "ÆøÅ", 2},
+            {true, "æØÅ", 2},
+            {true, "ÆØÅ", 2},
+        };
+
+        for (const TestData& t : td) {
+            ndx.find_all(results, t.needle, t.case_insensitive);
+            CHECK_EQUAL(t.result_size, results.size());
+            results.clear();
+        }
+    }
+
+    // Clean up
+    results.destroy();
+    col.destroy();
+}
+
+
 #endif // TEST_INDEX_STRING
