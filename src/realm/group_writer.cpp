@@ -342,11 +342,9 @@ ref_type GroupWriter::write_group()
     max_free_list_size += 80;
 
     int num_free_lists = is_shared ? 3 : 2;
-    int max_top_size = 3 + num_free_lists;
-    if (is_shared)
-        ++max_top_size; // database version (a.k.a. transaction number)
     size_t max_free_space_needed =
-        Array::get_max_byte_size(max_top_size) + num_free_lists * Array::get_max_byte_size(max_free_list_size);
+        Array::get_max_byte_size(top.size()) +
+        num_free_lists * Array::get_max_byte_size(max_free_list_size);
 
     // Reserve space for remaining arrays. We ask for one extra byte beyond the
     // maximum number that is required. This ensures that even if we end up

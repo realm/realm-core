@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Bug fixed in `GroupWriter::write_group()` where the maximum size of the top
+  array was calculated incorrectly. This bug had the potential to cause
+  corruption in Realm files.
 
 ### Breaking changes
 
