@@ -63,6 +63,9 @@ for bt in "${BUILD_TYPES[@]}"; do
     for p in "${PLATFORMS[@]}"; do
         [[ "$p" = "macos" ]] && infix="macosx" || infix="${p}"
         filename=$(find "build-${p}-${bt}" -maxdepth 1 -type f -name "realm-core-*-devel.tar.xz")
+        if [ -z "${filename}" ]; then
+            filename=$(find "build-${p}-${bt}" -maxdepth 1 -type f -name "realm-core-*.tar.xz")
+        fi
         tar -C core -Jxvf "${filename}" "lib/librealm${suffix}.a"
         mv "core/lib/librealm${suffix}.a" "core/librealm-${infix}${suffix}.a"
         rm -rf core/lib
