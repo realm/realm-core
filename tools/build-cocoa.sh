@@ -28,25 +28,22 @@ done
 
 shift $((OPTIND-1))
 
-BUILD_TYPES=( Release MinSizeDebug )
-if [ -z "${MACOS_ONLY}" ]; then
-    PLATFORMS=( macos ios watchos tvos )
-else
-    PLATFORMS=( macos )
-fi
+BUILD_TYPES=( Release Debug )
+[[ -z $MACOS_ONLY ]] && PLATFORMS=( macos ios watchos tvos ) || PLATFORMS=( macos )
 
-if [ ! -z "$BUILD" ]; then
+if [[ ! -z $BUILD ]]; then
     for bt in "${BUILD_TYPES[@]}"; do
         for p in "${PLATFORMS[@]}"; do
-            folder_name="build-${p}-${bt}"
+            [[ $p = "macos" ]] && prefix="" || prefix="MinSize"
+            folder_name="build-${p}-${prefix}${bt}"
             mkdir -p "${folder_name}"
             (
                 cd "${folder_name}" || exit 1
                 cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${p}.toolchain.cmake" \
-                      -D CMAKE_BUILD_TYPE="${bt}" \
+                      -D CMAKE_BUILD_TYPE="${prefix}${bt}" \
                       -D REALM_VERSION="$(git describe)" \
                       -G Xcode ..
-                cmake --build . --config "${bt}" --target package
+                cmake --build . --config "${prefix}${bt}" --target package
             )
         done
     done
@@ -62,12 +59,10 @@ for bt in "${BUILD_TYPES[@]}"; do
     [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
     for p in "${PLATFORMS[@]}"; do
         [[ "$p" = "macos" ]] && infix="macosx" || infix="${p}"
-        if [[ "$p" = "macos" ]] && [[ "${bt}" = "MinSizeDebug" ]]; then
-            bt="Debug"
-        fi
-        filename=$(find "build-${p}-${bt}" -maxdepth 1 -type f -name "realm-core-*-devel.tar.xz")
+        [[ "$p" = "macos" ]] && prefix="" || prefix="MinSize"
+        filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*-devel.tar.xz")
         if [ -z "${filename}" ]; then
-            filename=$(find "build-${p}-${bt}" -maxdepth 1 -type f -name "realm-core-*.tar.xz")
+            filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*.tar.xz")
         fi
         tar -C core -Jxvf "${filename}" "lib/librealm${suffix}.a"
         mv "core/lib/librealm${suffix}.a" "core/librealm-${infix}${suffix}.a"
