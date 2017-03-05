@@ -34,7 +34,7 @@ BUILD_TYPES=( Release Debug )
 if [[ ! -z $BUILD ]]; then
     for bt in "${BUILD_TYPES[@]}"; do
         for p in "${PLATFORMS[@]}"; do
-            [[ $p = "macos" ]] && prefix="" || prefix="MinSize"
+            [[ $p = "macos" && $bt = "Debug" ]] && prefix="" || prefix="MinSize"
             folder_name="build-${p}-${prefix}${bt}"
             mkdir -p "${folder_name}"
             (
@@ -59,7 +59,7 @@ for bt in "${BUILD_TYPES[@]}"; do
     [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
     for p in "${PLATFORMS[@]}"; do
         [[ "$p" = "macos" ]] && infix="macosx" || infix="${p}"
-        [[ "$p" = "macos" ]] && prefix="" || prefix="MinSize"
+        [[ "$p" = "macos" && $bt = "Debug" ]] && prefix="" || prefix="MinSize"
         filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*-devel.tar.xz")
         if [ -z "${filename}" ]; then
             filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*.tar.xz")
