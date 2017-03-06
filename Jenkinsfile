@@ -297,27 +297,29 @@ def doBuildMacOs(String buildType) {
 
             try {
                 dir("build-macos-${buildType}") {
-                    // This is a dirty trick to work around a bug in xcode
-                    // It will hang if launched on the same project (cmake trying the compiler out)
-                    // in parallel.
-                    retry(3) {
-                        timeout(time: 2, unit: 'MINUTES') {
-                            sh """
-                                rm -rf *
-                                cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake \\
-                                      -D CMAKE_BUILD_TYPE=${buildType} \\
-                                      -D REALM_VERSION=${gitDescribeVersion} \\
-                                      -G Xcode ..
-                            """
+                    withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
+                        // This is a dirty trick to work around a bug in xcode
+                        // It will hang if launched on the same project (cmake trying the compiler out)
+                        // in parallel.
+                        retry(3) {
+                            timeout(time: 2, unit: 'MINUTES') {
+                                sh """
+                                    rm -rf *
+                                    cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake \\
+                                          -D CMAKE_BUILD_TYPE=${buildType} \\
+                                          -D REALM_VERSION=${gitDescribeVersion} \\
+                                          -G Xcode ..
+                                """
+                            }
                         }
-                    }
 
-                    sh """
-                    xcodebuild -sdk macosx \\
-                               -configuration ${buildType} \\
-                               -target package \\
-                               ONLY_ACTIVE_ARCH=NO
-                """
+                        sh """
+                            xcodebuild -sdk macosx \\
+                                       -configuration ${buildType} \\
+                                       -target package \\
+                                       ONLY_ACTIVE_ARCH=NO
+                            """
+                    }
                 }
                 archiveArtifacts("build-macos-${buildType}/*.tar.xz")
 
@@ -336,12 +338,14 @@ def doBuildAppleDevice(String sdk, String buildType) {
             getArchive()
 
             try {
-                retry(3) {
-                    timeout(time: 15, unit: 'MINUTES') {
-                        sh """
-                            rm -rf build-*
-                            tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
-                        """
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
+                    retry(3) {
+                        timeout(time: 15, unit: 'MINUTES') {
+                            sh """
+                                rm -rf build-*
+                                tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
+                            """
+                        }
                     }
                 }
                 archiveArtifacts("build-${sdk}-${buildType}/*.tar.xz")
