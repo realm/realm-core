@@ -92,7 +92,7 @@ timeout(time: 1, unit: 'HOURS') {
     }
 
     stage('Aggregate') {
-        parallel [
+        parallel (
           cocoa: {
                 node('docker') {
                     getArchive()
@@ -113,7 +113,7 @@ timeout(time: 1, unit: 'HOURS') {
                     archiveArtifacts('realm-core-android*.tar.gz')
                 }
             }
-        ]
+        )
     }
 
     if (isPublishingRun) {
