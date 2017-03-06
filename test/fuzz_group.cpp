@@ -65,6 +65,7 @@ enum INS {
     INSERT_ROW,
     ADD_EMPTY_ROW,
     INSERT_COLUMN,
+    RENAME_COLUMN,
     ADD_COLUMN,
     REMOVE_COLUMN,
     SET,
@@ -336,6 +337,19 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.get_table(" << table_ndx << ")->remove_column(" << col_ndx << ");\n";
                     }
                     t->remove_column(col_ndx);
+                }
+            }
+            else if (instr == RENAME_COLUMN && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->get_column_count() > 0) {
+                    size_t col_ndx = get_next(s) % t->get_column_count();
+                    std::string name = create_column_name(s);
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->rename_column("
+                             << col_ndx << ", " << name << ");\n";
+                    }
+                    t->rename_column(col_ndx, name);
                 }
             }
             else if (instr == MOVE_COLUMN && g.size() > 0) {
