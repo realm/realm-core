@@ -58,10 +58,10 @@ tar -C core -Jxvf "${filename}" include LICENSE CHANGELOG.md
 for bt in "${BUILD_TYPES[@]}"; do
     [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
     for p in "${PLATFORMS[@]}"; do
-        [[ "$p" = "macos" ]] && infix="macosx" || infix="${p}"
-        [[ "$p" != "macos" && $bt = "Debug" ]] && prefix="MinSize" || prefix=""
+        [[ $p = "macos" ]] && infix="macosx" || infix="${p}"
+        [[ $p != "macos" && $bt = "Debug" ]] && prefix="MinSize" || prefix=""
         filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*-devel.tar.xz")
-        if [ -z "${filename}" ]; then
+        if [[ -z $filename ]]; then
             filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*.tar.xz")
         fi
         tar -C core -Jxvf "${filename}" "lib/librealm${suffix}.a"
@@ -73,7 +73,7 @@ done
 ln -s core/librealm-macosx.a core/librealm.a
 ln -s core/librealm-macosx-dbg.a core/librealm-dbg.a
 
-if [ ! -z "${COPY}" ]; then
+if [[ ! -z $COPY ]]; then
     rm -rf "${DESTINATION}/core"
     cp -R core "${DESTINATION}"
 fi
