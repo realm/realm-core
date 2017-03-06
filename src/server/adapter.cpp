@@ -52,7 +52,7 @@ public:
     // used for primary key lookup
     std::map<size_t, std::map<size_t, size_t>> m_primary_key_lookup_row_mapping;
 
-    json m_json_instructions;
+    nlohmann::json m_json_instructions;
 
     size_t m_selected_table_index;
     ConstTableRef m_selected_table;
@@ -61,7 +61,7 @@ public:
     bool m_selected_is_primary_key_table;
 
     Property *m_list_property = nullptr;
-    json m_list_parent_identity;
+    nlohmann::json m_list_parent_identity;
 
     ConstTableRef m_list_target_table;
     ObjectSchema *m_list_target_object_schema = nullptr;
@@ -70,7 +70,7 @@ public:
     bool m_last_is_collapsable = false;
 
     void add_instruction(Adapter::InstructionType type, 
-                         json &&inst = {}, bool 
+                         nlohmann::json &&inst = {}, bool 
                          collasable = false, 
                          util::Optional<std::string> object_type = util::none) {
         inst["type"] = Adapter::instruction_type_string(type);
@@ -80,19 +80,19 @@ public:
         m_last_is_collapsable = collasable;
     }
 
-    void add_insert_instruction(json &&identity) {
+    void add_insert_instruction(nlohmann::json &&identity) {
         add_instruction(Adapter::InstructionType::Insert, {
             {"identity", std::move(identity)},
             {"values", {}}
         }, true);
     }
 
-    void add_set_instruction(size_t row, size_t column, json &&value) {
-        json identity = get_identity(row, m_selected_table, m_selected_primary);
+    void add_set_instruction(size_t row, size_t column, nlohmann::json &&value) {
+        nlohmann::json identity = get_identity(row, m_selected_table, m_selected_primary);
 
         // collapse values if inserting/setting values for the last object
         if (m_last_is_collapsable) {
-            json &last = m_json_instructions.back();
+            nlohmann::json &last = m_json_instructions.back();
             if (identity == last["identity"] && m_selected_object_schema->name == last["object_type"].get<std::string>()) {
                 last["values"][m_selected_table->get_column_name(column)] = value;
                 return;
@@ -106,9 +106,9 @@ public:
         }, true);
     }
 
-    void add_column_instruction(std::string object_type, std::string prop_name, json &&prop) {
+    void add_column_instruction(std::string object_type, std::string prop_name, nlohmann::json &&prop) {
         if (m_json_instructions.size()) {
-            json &last = m_json_instructions.back();
+            nlohmann::json &last = m_json_instructions.back();
             if (last["object_type"].get<std::string>() == object_type && (
                 last["type"].get<std::string>() == "ADD_TYPE" || 
                 last["type"].get<std::string>() == "ADD_PROPERTIES")) 
@@ -123,7 +123,7 @@ public:
         }}, false, object_type);
     }
 
-    json get_identity(size_t row, ConstTableRef &table, Property *primary_key) {
+    nlohmann::json get_identity(size_t row, ConstTableRef &table, Property *primary_key) {
         if (primary_key) {
             auto get_or_lookup_primary = [&](auto realm_primaries, auto get_primary) {
                 auto primaries = realm_primaries.find(table->get_index_in_group());
@@ -428,7 +428,7 @@ public:
             std::string table_name = m_group.get_table_name(target_group_level_ndx);
             select(table_name, target_object_schema, target_table, target_primary);
 
-            json value = link_index == npos ? json(nullptr) : get_identity(link_index, target_table, target_primary);
+            nlohmann::json value = link_index == npos ? nlohmann::json(nullptr) : get_identity(link_index, target_table, target_primary);
             add_set_instruction(row_index, column_index, std::move(value));
         }
         return true;
@@ -652,7 +652,7 @@ util::Optional<Adapter::ChangeSet> Adapter::current(std::string realm_path) {
 
     util::AppendBuffer<char> buffer;
     sync_history->get_cooked_changeset(progress.changeset_index, buffer);
-    return ChangeSet(json::parse(std::string(buffer.data(), buffer.size())), realm);
+    return ChangeSet(nlohmann::json::parse(std::string(buffer.data(), buffer.size())), realm);
 }
 
 void Adapter::advance(std::string realm_path) {

@@ -27,8 +27,6 @@
 
 namespace realm {
 
-using json = nlohmann::json;
-
 class SyncUser;
 
 class Adapter {
@@ -70,8 +68,8 @@ public:
 
     class ChangeSet {
     public:
-        ChangeSet(json instructions, SharedRealm realm) : json(instructions), realm(realm) {}
-        const json json;
+        ChangeSet(nlohmann::json instructions, SharedRealm realm) : json(instructions), realm(realm) {}
+        const nlohmann::json json;
         const SharedRealm realm;
     };
 
