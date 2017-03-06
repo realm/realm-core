@@ -660,7 +660,8 @@ void Adapter::advance(std::string realm_path) {
     auto sync_history = static_cast<sync::SyncHistory *>(realm->history());
     auto progress = sync_history->get_cooked_progress();
     if (progress.changeset_index < sync_history->get_num_cooked_changesets()) {
-        sync_history->set_cooked_progress(sync::SyncHistory::CookedProgress{progress.changeset_index + 1, 0});
+        progress.changeset_index++;
+        sync_history->set_cooked_progress(progress);
     }
     realm->invalidate();
 }
