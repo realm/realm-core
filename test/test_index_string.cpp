@@ -1780,6 +1780,8 @@ TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
 }
 
 
+/* Disabled until we have better support for case mapping unicode characters
+
 TEST_TYPES(StringIndex_Insensitive_Unicode, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
@@ -1833,6 +1835,8 @@ TEST_TYPES(StringIndex_Insensitive_Unicode, non_nullable, nullable)
     results.destroy();
     col.destroy();
 }
+
+*/
 
 
 #endif // TEST_INDEX_STRING
