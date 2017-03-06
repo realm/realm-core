@@ -519,16 +519,17 @@ void SyncSession::handle_error(SyncError error)
 }
 
 void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloadable,
-                                         uint64_t uploaded, uint64_t uploadable)
+                                         uint64_t uploaded, uint64_t uploadable, bool is_fresh)
 {
     std::vector<std::function<void()>> invocations;
     {
         std::lock_guard<std::mutex> lock(m_progress_notifier_mutex);
         m_current_progress = Progress{uploadable, downloadable, uploaded, downloaded};
+        m_latest_progress_data_is_fresh = is_fresh;
 
         for (auto it = m_notifiers.begin(); it != m_notifiers.end();) {
             auto& package = it->second;
-            package.update(*m_current_progress);
+            package.update(*m_current_progress, is_fresh);
 
             bool should_delete = false;
             invocations.emplace_back(package.create_invocation(*m_current_progress, should_delete));
@@ -542,18 +543,26 @@ void SyncSession::handle_progress_update(uint64_t downloaded, uint64_t downloada
     }
 }
 
-void SyncSession::NotifierPackage::update(const Progress& current_progress)
+void SyncSession::NotifierPackage::update(const Progress& current_progress, bool data_is_fresh)
 {
-    if (is_streaming || captured_transferrable)
+    if (is_streaming || captured_transferrable || !data_is_fresh)
         return;
 
     captured_transferrable = direction == NotifierType::download ? current_progress.downloadable
                                                                  : current_progress.uploadable;
 }
 
-std::function<void()> SyncSession::NotifierPackage::create_invocation(const Progress& current_progress, bool& is_expired) const
+// PRECONDITION: `update()` must first be called on the same package.
+std::function<void()> SyncSession::NotifierPackage::create_invocation(const Progress& current_progress,
+                                                                      bool& is_expired) const
 {
-    REALM_ASSERT(is_streaming || captured_transferrable);
+    // It's possible for a non-streaming notifier to not yet have fresh transferrable bytes data.
+    // In that case, we don't call it at all.
+    // NOTE: `update()` is always called before `create_invocation()`, and will
+    // set `captured_transferrable` on the notifier package if fresh data has
+    // been received and the package is for a non-streaming notifier.
+    if (!is_streaming && !captured_transferrable)
+        return [](){ };
 
     bool is_download = direction == NotifierType::download;
     uint64_t transferred = is_download ? current_progress.downloaded : current_progress.uploaded;
@@ -606,9 +615,10 @@ void SyncSession::create_sync_session()
 
     // Set up the wrapped progress handler callback
     auto wrapped_progress_handler = [this, weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
-                                                      uint_fast64_t uploaded, uint_fast64_t uploadable, uint_fast64_t) {
+                                                      uint_fast64_t uploaded, uint_fast64_t uploadable,
+                                                      bool is_fresh) {
         if (auto self = weak_self.lock()) {
-            handle_progress_update(downloaded, downloadable, uploaded, uploadable);
+            handle_progress_update(downloaded, downloadable, uploaded, uploadable, is_fresh);
         }
     };
     m_session->set_progress_handler(std::move(wrapped_progress_handler));
@@ -697,7 +707,7 @@ uint64_t SyncSession::register_progress_notifier(std::function<SyncProgressNotif
             m_notifiers.emplace(token_value, std::move(package));
             return token_value;
         }
-        package.update(*m_current_progress);
+        package.update(*m_current_progress, m_latest_progress_data_is_fresh);
         bool skip_registration = false;
         invocation = package.create_invocation(*m_current_progress, skip_registration);
         if (skip_registration) {

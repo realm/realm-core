@@ -101,8 +101,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
                                      [](auto&, auto&) { return s_test_token; },
                                      [](auto, auto) { });
         // Run the runloop many iterations to see if the sessions spuriously bind.
-        std::atomic<int> run_count(0);
-        EventLoop::main().run_until([&] { run_count++; return run_count >= 100; });
+        spin_runloop();
         REQUIRE(sessions_are_inactive(*session1));
         REQUIRE(sessions_are_inactive(*session2));
         REQUIRE(user->all_sessions().size() == 0);
@@ -128,8 +127,7 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
         user->log_out();
         REQUIRE(user->state() == SyncUser::State::LoggedOut);
         // Run the runloop many iterations to see if the sessions spuriously rebind.
-        std::atomic<int> run_count(0);
-        EventLoop::main().run_until([&] { run_count++; return run_count >= 100; });
+        spin_runloop();
         REQUIRE(sessions_are_inactive(*session1));
         REQUIRE(sessions_are_inactive(*session2));
         REQUIRE(user->all_sessions().size() == 0);

@@ -24,7 +24,128 @@
 
 #include <realm/util/scope_exit.hpp>
 
-TEST_CASE("sync: progress notification", "[sync]") {
+namespace {
+
+void wait_for_session_to_activate(SyncSession& session)
+{
+    EventLoop::main().run_until([&] { return sessions_are_active(session); });
+    // Wait for uploads and downloads
+    std::atomic<bool> download_did_complete(false);
+    std::atomic<bool> upload_did_complete(false);
+    session.wait_for_download_completion([&](auto) { download_did_complete = true; });
+    session.wait_for_upload_completion([&](auto) { upload_did_complete = true; });
+    EventLoop::main().run_until([&] { return download_did_complete.load() && upload_did_complete.load(); });
+}
+
+}
+
+TEST_CASE("progress notifications stale data flag", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    SyncServer server;
+    // Disable file-related functionality and metadata functionality for testing purposes.
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+    std::atomic<bool> bind_handler_called(false);
+    auto user = SyncManager::shared().get_user("user-test-sync-stale-flag", "not_a_real_token");
+    // Keep the session stuck in 'waiting for upload', so we can run tests without
+    // worrying about 'fresh' progress data being automatically delivered.
+    auto session = sync_session_with_bind_handler(server, user, "/test-sync-progress-stale-flag",
+                                                  [&](auto&, auto&, std::shared_ptr<SyncSession>) {
+                                                      bind_handler_called = true;
+                                                  },
+                                                  [](auto, auto) { },
+                                                  SyncSessionStopPolicy::Immediately);
+    EventLoop::main().run_until([&] { return bind_handler_called == true && SyncSession::OnlyForTesting::has_stale_progress(*session); });
+    REQUIRE(!session->is_in_error_state());
+    REQUIRE(!SyncSession::OnlyForTesting::has_fresh_progress(*session));
+
+    std::atomic<int> call_count(0);
+    std::atomic<uint64_t> transferred(0);
+    std::atomic<uint64_t> transferrable(0);
+    uint64_t current_transferred = 0;
+    uint64_t current_transferrable = 0;
+
+    SECTION("streaming notifiers run with or without stale data") {
+        session->register_progress_notifier([&](auto xferred, auto xferable) {
+            transferred = xferred;
+            transferrable = xferable;
+            ++call_count;
+        }, SyncSession::NotifierType::download, true);
+        // Wait for the initial callback.
+        EventLoop::main().run_until([&] { return call_count.load() > 0; });
+        
+        // Send a stale notification
+        call_count = 0;
+        current_transferred = 12;
+        current_transferrable = 202;
+        SyncSession::OnlyForTesting::handle_progress_update(*session, current_transferred, current_transferrable, 3, 103, false);
+        // Require that the notifier finally be called.
+        EventLoop::main().run_until([&] { return call_count.load() > 0; });
+        CHECK(transferred == current_transferred);
+        CHECK(transferrable == current_transferrable);
+
+        // Send a fresh notification
+        call_count = 0;
+        current_transferred = 13;
+        current_transferrable = 203;
+        SyncSession::OnlyForTesting::handle_progress_update(*session, current_transferred, current_transferrable, 3, 103, true);
+        // Require that the notifier finally be called.
+        EventLoop::main().run_until([&] { return call_count.load() > 0; });
+        CHECK(transferred == current_transferred);
+        CHECK(transferrable == current_transferrable);
+    }
+
+    SECTION("non-streaming notifiers don't run until fresh data is available") {
+        session->register_progress_notifier([&](auto xferred, auto xferable) {
+            transferred = xferred;
+            transferrable = xferable;
+            ++call_count;
+        }, SyncSession::NotifierType::download, false);
+
+        // Send a stale notification
+        SyncSession::OnlyForTesting::handle_progress_update(*session, 10, 200, 1, 100, false);
+        std::atomic<int> spin_count(0);
+        EventLoop::main().run_until([&] {
+            ++spin_count;
+            return spin_count.load() > 2; 
+        });
+        REQUIRE(call_count.load() == 0);
+
+        // Send another stale notification
+        SyncSession::OnlyForTesting::handle_progress_update(*session, 11, 201, 2, 101, false);
+        spin_count = 0;
+        EventLoop::main().run_until([&] {
+            ++spin_count;
+            return spin_count.load() > 2; 
+        });
+        REQUIRE(call_count.load() == 0);
+
+        // Send a fresh notification
+        current_transferred = 12;
+        current_transferrable = 202;
+        auto original_transferrable = current_transferrable;
+        SyncSession::OnlyForTesting::handle_progress_update(*session, current_transferred, current_transferrable, 3, 103, true);
+        // Require that the notifier finally be called.
+        EventLoop::main().run_until([&] { return call_count.load() > 0; });
+        CHECK(transferred == current_transferred);
+        CHECK(transferrable == current_transferrable);
+
+        // Send a fresh notification
+        current_transferred = 13;
+        current_transferrable = 203;
+        call_count = 0;
+        SyncSession::OnlyForTesting::handle_progress_update(*session, current_transferred, current_transferrable, 4, 104, true);
+        // Require that the notifier finally be called.
+        EventLoop::main().run_until([&] { return call_count.load() > 0; });
+        CHECK(transferred == current_transferred);
+        CHECK(transferrable == original_transferrable);
+    }
+}
+
+// FIXME: break this up into smaller discrete test cases
+TEST_CASE("progress notification", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
@@ -37,16 +158,10 @@ TEST_CASE("sync: progress notification", "[sync]") {
     SECTION("runs at least once (initially when registered)") {
         auto user = SyncManager::shared().get_user("user-test-sync-1", "not_a_real_token");
         auto session = sync_session(server, user, "/test-sync-progress-1",
-                                     [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto) { },
-                                     SyncSessionStopPolicy::AfterChangesUploaded);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        // Wait for uploads and downloads
-        std::atomic<bool> download_did_complete(false);
-        std::atomic<bool> upload_did_complete(false);
-        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
-        session->wait_for_upload_completion([&](auto) { upload_did_complete = true; });
-        EventLoop::main().run_until([&] { return download_did_complete.load() && upload_did_complete.load(); });
+                                    [](auto&, auto&) { return s_test_token; },
+                                    [](auto, auto) { },
+                                    SyncSessionStopPolicy::AfterChangesUploaded);
+        wait_for_session_to_activate(*session);
 
         REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);
@@ -80,16 +195,10 @@ TEST_CASE("sync: progress notification", "[sync]") {
     SECTION("properly runs for streaming notifiers") {
         auto user = SyncManager::shared().get_user("user-test-sync-2", "not_a_real_token");
         auto session = sync_session(server, user, "/test-sync-progress-2",
-                                     [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto) { },
-                                     SyncSessionStopPolicy::AfterChangesUploaded);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        // Wait for uploads and downloads
-        std::atomic<bool> download_did_complete(false);
-        std::atomic<bool> upload_did_complete(false);
-        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
-        session->wait_for_upload_completion([&](auto) { upload_did_complete = true; });
-        EventLoop::main().run_until([&] { return download_did_complete.load() && upload_did_complete.load(); });
+                                    [](auto&, auto&) { return s_test_token; },
+                                    [](auto, auto) { },
+                                    SyncSessionStopPolicy::AfterChangesUploaded);
+        wait_for_session_to_activate(*session);
 
         REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);
@@ -254,16 +363,10 @@ TEST_CASE("sync: progress notification", "[sync]") {
     SECTION("properly runs for non-streaming notifiers") {
         auto user = SyncManager::shared().get_user("user-test-sync-3", "not_a_real_token");
         auto session = sync_session(server, user, "/test-sync-progress-3",
-                                     [](auto&, auto&) { return s_test_token; },
-                                     [](auto, auto) { },
-                                     SyncSessionStopPolicy::AfterChangesUploaded);
-        EventLoop::main().run_until([&] { return sessions_are_active(*session); });
-        // Wait for uploads and downloads
-        std::atomic<bool> download_did_complete(false);
-        std::atomic<bool> upload_did_complete(false);
-        session->wait_for_download_completion([&](auto) { download_did_complete = true; });
-        session->wait_for_upload_completion([&](auto) { upload_did_complete = true; });
-        EventLoop::main().run_until([&] { return download_did_complete.load() && upload_did_complete.load(); });
+                                    [](auto&, auto&) { return s_test_token; },
+                                    [](auto, auto) { },
+                                    SyncSessionStopPolicy::AfterChangesUploaded);
+        wait_for_session_to_activate(*session);
 
         REQUIRE(!session->is_in_error_state());
         std::atomic<bool> callback_was_called(false);

@@ -187,8 +187,18 @@ public:
         }
 
         static void handle_progress_update(SyncSession& session, uint64_t downloaded, uint64_t downloadable,
-                                           uint64_t uploaded, uint64_t uploadable) {
-            session.handle_progress_update(downloaded, downloadable, uploaded, uploadable);
+                                           uint64_t uploaded, uint64_t uploadable, bool is_fresh=true) {
+            session.handle_progress_update(downloaded, downloadable, uploaded, uploadable, is_fresh);
+        }
+
+        static bool has_stale_progress(SyncSession& session)
+        {
+            return session.m_current_progress != none && !session.m_latest_progress_data_is_fresh;
+        }
+
+        static bool has_fresh_progress(SyncSession& session)
+        {
+            return session.m_latest_progress_data_is_fresh;
         }
     };
 
@@ -209,7 +219,7 @@ private:
 
     void handle_error(SyncError);
     static std::string get_recovery_file_path();
-    void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t);
+    void handle_progress_update(uint64_t, uint64_t, uint64_t, uint64_t, bool);
 
     void set_sync_transact_callback(std::function<SyncSessionTransactCallback>);
     void set_error_handler(std::function<SyncSessionErrorHandler>);
@@ -240,12 +250,13 @@ private:
         NotifierType direction;
         util::Optional<uint64_t> captured_transferrable;
 
-        void update(const Progress&);
-        std::function<void()> create_invocation(const Progress&, bool& is_expired) const;
+        void update(const Progress&, bool);
+        std::function<void()> create_invocation(const Progress&, bool&) const;
     };
 
     // A counter used as a token to identify progress notifier callbacks registered on this session.
     uint64_t m_progress_notifier_token = 1;
+    bool m_latest_progress_data_is_fresh;
 
     // Will be `none` until we've received the initial notification from sync.  Note that this
     // happens only once ever during the lifetime of a given `SyncSession`, since these values are

@@ -18,6 +18,7 @@
 
 #include "sync/sync_test_utils.hpp"
 
+#include "util/event_loop.hpp"
 #include "util/test_file.hpp"
 
 #include "sync/sync_config.hpp"
@@ -48,6 +49,11 @@ template <typename... S>
 bool sessions_are_inactive(const SyncSession& session, const S&... s)
 {
     return sessions_are_inactive(session) && sessions_are_inactive(s...);
+}
+
+inline void spin_runloop(int count=2)
+{
+    EventLoop::main().run_until([count, spin_count=0]() mutable { spin_count++; return spin_count > count; });
 }
 
 // Identical to `sync_session(...)`, but takes a bind-session callback that is
