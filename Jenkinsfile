@@ -174,6 +174,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
         node('docker') {
             getArchive()
             def stashName = "android-${abi}-${buildType}"
+            def buildDir = "build-${stashName}"
 
             def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
             def environment = environment()
@@ -182,7 +183,6 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                     buildEnv.inside {
                         try {
                             sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
-                            def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-android*').trim()
                             dir(buildDir) {
                                 archiveArtifacts('*.tar.gz')
                             }
@@ -197,7 +197,6 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                         buildEnv.inside("--link ${emulator.id}:emulator") {
                             try {
                                 sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
-                                def buildDir = sh(returnStdout: true, script: 'find . -type d -maxdepth 1 -name build-android*').trim()
                                 dir(buildDir) {
                                     archiveArtifacts('*.tar.gz')
                                 }
