@@ -1,6 +1,7 @@
 #!groovy
 
 cocoaStashes = []
+androidStashes = []
 
 timeout(time: 1, unit: 'HOURS') {
     stage('gather-info') {
@@ -91,14 +92,28 @@ timeout(time: 1, unit: 'HOURS') {
     }
 
     stage('Aggregate') {
-        node('docker') {
-            getArchive()
-            for (int i = 0; i < cocoaStashes.size(); i++) {
-                unstash name:cocoaStashes[i]
+        parallel [
+          cocoa: {
+                node('docker') {
+                    getArchive()
+                    for (int i = 0; i < cocoaStashes.size(); i++) {
+                        unstash name:cocoaStashes[i]
+                    }
+                    sh 'tools/build-cocoa.sh'
+                    archiveArtifacts('realm-core-cocoa*.tar.xz')
+                }
+            },
+          android: {
+                node('docker') {
+                    getArchive()
+                    for (int i = 0; i < androidStashes.size(); i++) {
+                        unstash name:androidStashes[i]
+                    }
+                    sh 'tools/build-android.sh'
+                    archiveArtifacts('realm-core-android*.tar.gz')
+                }
             }
-            sh 'tools/build-cocoa.sh'
-            archiveArtifacts('realm-core-cocoa*.tar.xz')
-        }
+        ]
     }
 
     if (isPublishingRun) {
@@ -158,6 +173,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
     return {
         node('docker') {
             getArchive()
+            def stashName = "android-${abi}-${buildType}"
 
             def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
             def environment = environment()
@@ -170,6 +186,8 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                             dir(buildDir) {
                                 archiveArtifacts('*.tar.gz')
                             }
+                            stash includes:"${buildDir}/*.tar.gz", name:stashName
+                            androidStashes << stashName
                         } finally {
                             collectCompilerWarnings('gcc', true )
                         }
@@ -183,6 +201,8 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                                 dir(buildDir) {
                                     archiveArtifacts('*.tar.gz')
                                 }
+                                stash includes:"${buildDir}/*.tar.gz", name:stashName
+                                androidStashes << stashName
                             } finally {
                                 collectCompilerWarnings('gcc', true )
                             }
