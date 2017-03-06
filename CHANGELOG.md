@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix a hang in LIKE queries that could occur if the pattern required backtracking.
 
 ### Breaking changes
 
