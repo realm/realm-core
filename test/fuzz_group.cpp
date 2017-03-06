@@ -617,7 +617,19 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     if (row_ndx1 == row_ndx2) {
                         row_ndx2 = (row_ndx2 + 1) % t->size();
                     }
-
+                    // A restriction of merge_rows is that any linklists in the
+                    // "to" row must be empty because merging lists is not defined.
+                    for (size_t col_ndx = 0; col_ndx != t->get_column_count(); ++col_ndx) {
+                        if (t->get_column_type(col_ndx) == DataType::type_LinkList) {
+                            if (!t->get_linklist(col_ndx, row_ndx2)->is_empty()) {
+                                if (log) {
+                                    *log << "g.get_table(" << table_ndx << ")->get_linklist("
+                                    << col_ndx << ", " << row_ndx2 << ")->clear();";
+                                }
+                                t->get_linklist(col_ndx, row_ndx2)->clear();
+                            }
+                        }
+                    }
                     if (log) {
                         *log << "g.get_table(" << table_ndx << ")->merge_rows(" << row_ndx1 << ", " << row_ndx2 << ");\n";
                     }
