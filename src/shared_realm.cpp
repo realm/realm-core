@@ -299,11 +299,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
 
             case SchemaMode::Additive:
                 if (required_changes.empty()) {
-                    if (version == m_schema_version) {
-                        set_schema(std::move(schema), version);
-                        return true;
-                    }
-                    return false;
+                    set_schema(std::move(schema), version);
+                    return version == m_schema_version;
                 }
                 ObjectStore::verify_valid_additive_changes(required_changes);
                 return false;
