@@ -3,10 +3,15 @@
 ### Bugfixes
 
 * Fixed a few bugs (caused crashes) in pthread library on UWP.
+* Fixes a bug in chuncked binary column returning null value (#2418)
 * Possibly fixed some cases of extreme file size growth, by preventing starvation
   when trying to start a write transaction, while simultaneously pinning an older
   version. (issue #2395)
 * Fixed a bug when deleting a column used in a query (#2408)
+* Fixed a crash that occurred if you tried to override a binary with a size close
+  to the limit.
+* `seekpos()` and `seekoff()` in `realm::util::MemoryInputStreambuf` now behave
+  correctly when argument is out of range.
 
 ### Breaking changes
 
@@ -19,6 +24,9 @@
 * Now supports case insensitive queries for UWP.
 * Upgraded Visual Studio project to version 2017.
 * Support handover of TableViews and Queries based on SubTables
+* Enable reading and writing of big blobs via Table interface.
+  Only to be used by Sync. The old interface still has a check on 
+  the size of the binary blob.
 
 -----------
 
