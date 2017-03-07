@@ -12918,4 +12918,38 @@ TEST(LangBindHelper_CopyOnWriteOverflow)
     }
 }
 
+ONLY(LangBindHelper_MixedStringRollback)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    g.add_table("table");
+    g.get_table(0)->add_column(type_Mixed, "mixed_column", false);
+    g.get_table(0)->add_empty_row();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    // try with string
+    LangBindHelper::promote_to_write(sg_w);
+    {
+        StringData str_data("any string data");
+        Mixed mixed(str_data);
+        g.get_table(0)->set_mixed(0, 0, mixed);
+    }
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+
+    // do the same with binary data
+    LangBindHelper::promote_to_write(sg_w);
+    {
+        BinaryData bin_data("any binary data");
+        Mixed mixed(bin_data);
+        g.get_table(0)->set_mixed(0, 0, mixed);
+    }
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+}
+
 #endif
