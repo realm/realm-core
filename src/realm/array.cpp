@@ -1608,12 +1608,13 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 
 void Array::do_copy_on_write(size_t minimum_size)
 {
-    // Calculate size in bytes (plus a bit of matchcount room for expansion)
+    // Calculate size in bytes
     size_t array_size = calc_byte_len(m_size, m_width);
-    size_t new_size = std::max(array_size + 64, minimum_size);
-    size_t rest = (~new_size & 0x7) + 1;
-    if (rest < 8)
-        new_size += rest; // 64bit blocks
+    size_t new_size = std::max(array_size, minimum_size);
+    new_size = (new_size + 0x7) & ~size_t(0x7); // 64bit blocks
+    // Plus a bit of matchcount room for expansion
+    if (new_size < max_array_payload - 64)
+        new_size += 64;
 
     // Create new copy of array
     MemRef mref = m_alloc.alloc(new_size); // Throws
