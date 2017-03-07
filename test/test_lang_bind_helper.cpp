@@ -12918,7 +12918,7 @@ TEST(LangBindHelper_CopyOnWriteOverflow)
     }
 }
 
-ONLY(LangBindHelper_MixedStringRollback)
+TEST(LangBindHelper_MixedStringRollback)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* key = crypt_key();
