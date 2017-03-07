@@ -2,7 +2,11 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix a hang in LIKE queries that could occur if the pattern required
+  backtracking.
+* Bug fixed in `GroupWriter::write_group()` where the maximum size of the top
+  array was calculated incorrectly. This bug had the potential to cause
+  corruption in Realm files.
 
 ### Breaking changes
 
@@ -11,7 +15,7 @@
 ### Enhancements
 
 * Use only a single file descriptor in our emulation of interprocess condition variables
-  on most platforms rather than two.
+  on most platforms rather than two. PR [#2460](https://github.com/realm/realm-core/pull/2460). Fixes Cocoa issue [#4676](https://github.com/realm/realm-cocoa/issues/4676).
 
 -----------
 
@@ -27,19 +31,19 @@
 * Fixed race condition bug that could cause crashes and corrupted data
   under rare circumstances with heavy load from multiple threads accessing
   encrypted data. (sometimes pieces of data from earlier commits could be seen).
-  PR #2465 fixes issue #2383
+  PR [#2465](https://github.com/realm/realm-core/pull/2465). Fixes issue [#2383](https://github.com/realm/realm-core/issues/2383).
 * Added SharedGroupOptions::set_sys_tmp_dir() and
   SharedGroupOptions::set_sys_tmp_dir() to solve crash when compacting a Realm
   file on Android external storage which is caused by invalid default sys_tmp_dir.
-  (issue #4140)
+  PR [#2445](https://github.com/realm/realm-core/pull/2445). Fixes Java issue [#4140](https://github.com/realm/realm-java/issues/4140).
 
 -----------
 
 ### Internals
 
 * Remove the BinaryData constructor taking a temporary object to prevent some
-  errors in unit tests at compile time.
-* Avoid assertions in aggregate functions for the timestamp type.
+  errors in unit tests at compile time. PR [#2446](https://github.com/realm/realm-core/pull/2446).
+* Avoid assertions in aggregate functions for the timestamp type. PR [#2466](https://github.com/realm/realm-core/pull/2466).
 
 ----------------------------------------------
 
