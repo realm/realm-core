@@ -201,7 +201,8 @@ void Query::set_table(TableRef tr)
     m_table = tr;
     if (m_table) {
         fetch_descriptor();
-        if (ParentNode* root = root_node())
+        ParentNode* root = root_node();
+        if (root && !m_table->is_degenerate())
             root->set_table(*m_table);
     }
     else {

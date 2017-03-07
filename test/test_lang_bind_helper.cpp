@@ -10471,7 +10471,7 @@ TEST(Query_ListOfPrimitivesHandover)
     Group& group_w = const_cast<Group&>(sg_w.begin_read());
     SharedGroup::VersionID vid;
 
-    std::unique_ptr<SharedGroup::Handover<TableView>> handover;
+    std::unique_ptr<SharedGroup::Handover<TableView>> table_view_handover;
     {
         LangBindHelper::promote_to_write(sg_w);
 
@@ -10495,53 +10495,62 @@ TEST(Query_ListOfPrimitivesHandover)
         set_list(t->get_subtable(int_col, 1), std::vector<int64_t>({1, 3, 5, 7}));
         set_list(t->get_subtable(int_col, 2), std::vector<int64_t>({100, 400, 200, 500, 300}));
 
-        auto q = t->get_subtable(int_col, 2)->column<Int>(0) > 225;
-        auto tv = q.find_all();
+        auto query = t->get_subtable(int_col, 2)->column<Int>(0) > 225;
+        auto tv = query.find_all();
 
         LangBindHelper::commit_and_continue_as_read(sg_w);
         vid = sg_w.get_version_of_current_transaction();
-        handover = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        table_view_handover = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
     }
 
     LangBindHelper::advance_read(sg, vid);
-    auto tv = sg.import_from_handover(std::move(handover));
-    tv->sync_if_needed();
-    CHECK_EQUAL(tv->size(), 3);
-    CHECK_EQUAL(tv->get_int(0, 0), 400);
+    auto table_view = sg.import_from_handover(std::move(table_view_handover));
+    table_view->sync_if_needed();
+    CHECK_EQUAL(table_view->size(), 3);
+    CHECK_EQUAL(table_view->get_int(0, 0), 400);
 
     {
         LangBindHelper::promote_to_write(sg_w);
 
         TableRef t = group_w.get_or_add_table("table");
-        auto l = t->get_subtable(0, 2);
-        l->insert_empty_row(0);
-        l->set_int(0, 0, 600);
+        auto sub = t->get_subtable(0, 2);
+        sub->insert_empty_row(0);
+        sub->set_int(0, 0, 600);
         t->remove(0);
-        // tv is now associated with row 1
+        // table_view is now associated with row 1
 
         LangBindHelper::commit_and_continue_as_read(sg_w);
     }
 
     LangBindHelper::advance_read(sg);
-    tv->sync_if_needed();
-    CHECK_EQUAL(tv->size(), 4);
-    CHECK_EQUAL(tv->get_int(0, 0), 600);
-    auto list = group.get_table("table")->get_subtable(0, 0);
-    auto q = list->where();
-    auto sum = q.sum_int(0);
+    table_view->sync_if_needed();
+    CHECK_EQUAL(table_view->size(), 4);
+    CHECK_EQUAL(table_view->get_int(0, 0), 600);
+    auto subtable = group.get_table("table")->get_subtable(0, 0);
+    auto query = subtable->where();
+    auto sum = query.sum_int(0);
     CHECK_EQUAL(sum, 16);
 
     {
         LangBindHelper::promote_to_write(sg_w);
 
         TableRef t = group_w.get_or_add_table("table");
-        // Remove the row, tv is associated with
+        // Remove the row, table_view is associated with
         t->remove(1);
 
+        // Create a view based on a degenerate table
+        auto q = t->get_subtable(0, 2)->column<Int>(0) > 225;
+        auto tv = q.find_all();
+
         LangBindHelper::commit_and_continue_as_read(sg_w);
+        table_view_handover = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
     }
     LangBindHelper::advance_read(sg);
-    CHECK(!tv->is_attached());
+    CHECK(!table_view->is_attached());
+
+    table_view = sg.import_from_handover(std::move(table_view_handover));
+    table_view->sync_if_needed();
+    CHECK_EQUAL(table_view->size(), 0);
 
     {
         LangBindHelper::promote_to_write(sg_w);
@@ -10554,7 +10563,7 @@ TEST(Query_ListOfPrimitivesHandover)
     }
     LangBindHelper::advance_read(sg);
     sum = 0;
-    CHECK_LOGIC_ERROR(sum = q.sum_int(0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(sum = query.sum_int(0), LogicError::detached_accessor);
     CHECK_EQUAL(sum, 0);
 }
 
