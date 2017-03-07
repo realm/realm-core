@@ -39,6 +39,7 @@ set(REALM_SOURCES
     replication.cpp
     row.cpp
     spec.cpp
+    string_data.cpp
     table.cpp
     table_view.cpp
     unicode.cpp
