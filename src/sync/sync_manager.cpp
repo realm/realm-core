@@ -24,8 +24,6 @@
 #include "sync/sync_session.hpp"
 #include "sync/sync_user.hpp"
 
-#include <thread>
-
 using namespace realm;
 using namespace realm::_impl;
 
@@ -385,6 +383,15 @@ std::shared_ptr<SyncSession> SyncManager::get_existing_session_locked(const std:
         return nullptr;
     }
     return it->second;
+}
+
+std::shared_ptr<SyncSession> SyncManager::get_existing_session(const std::string& path) const
+{
+    std::lock_guard<std::mutex> lock(m_session_mutex);
+    if (auto session = get_existing_session_locked(path)) {
+        return session->external_reference();
+    }
+    return nullptr;
 }
 
 std::shared_ptr<SyncSession> SyncManager::get_session(const std::string& path, const SyncConfig& sync_config)

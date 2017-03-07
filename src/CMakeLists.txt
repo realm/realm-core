@@ -9,6 +9,7 @@ set(SOURCES
     schema.cpp
     shared_realm.cpp
     thread_safe_reference.cpp
+    binding_callback_thread_observer.cpp
     impl/collection_change_builder.cpp
     impl/collection_notifier.cpp
     impl/list_notifier.cpp
@@ -35,6 +36,7 @@ set(HEADERS
     schema.hpp
     shared_realm.hpp
     thread_safe_reference.hpp
+    binding_callback_thread_observer.hpp
 
     impl/apple/external_commit_helper.hpp
     impl/apple/keychain_helper.hpp
