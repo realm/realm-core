@@ -3,10 +3,10 @@
 ### Bugfixes
 
 * Fix a hang in LIKE queries that could occur if the pattern required
-  backtracking.
+  backtracking. PR [#2477](https://github.com/realm/realm-core/pull/2477).
 * Bug fixed in `GroupWriter::write_group()` where the maximum size of the top
   array was calculated incorrectly. This bug had the potential to cause
-  corruption in Realm files.
+  corruption in Realm files. PR [#2480](https://github.com/realm/realm-core/pull/2480).
 
 ### Breaking changes
 
