@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.3.3 Release notes
 
 ### Bugfixes
 
@@ -8,20 +8,10 @@
   array was calculated incorrectly. This bug had the potential to cause
   corruption in Realm files. PR [#2480](https://github.com/realm/realm-core/pull/2480).
 
-### Breaking changes
-
-* Lorem ipsum.
-
 ### Enhancements
 
 * Use only a single file descriptor in our emulation of interprocess condition variables
   on most platforms rather than two. PR [#2460](https://github.com/realm/realm-core/pull/2460). Fixes Cocoa issue [#4676](https://github.com/realm/realm-cocoa/issues/4676).
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
