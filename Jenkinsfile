@@ -112,26 +112,6 @@ timeout(time: 1, unit: 'HOURS') {
                     sh 'tools/build-android.sh'
                     archiveArtifacts('realm-core-android*.tar.gz')
                 }
-            },
-          warnings: {
-              node('docker') {
-                  getArchive()
-                  step([
-                        $class: 'WarningsPublisher',
-                        canComputeNew: false,
-                        canResolveRelativePaths: false,
-                        consoleParsers: [
-                            [parserName: 'GNU C Compiler 4 (gcc)'],
-                            [parserName: 'MSBuild'],
-                            [parserName: 'Clang (LLVM based)']],
-                        defaultEncoding: '',
-                        excludePattern: '',
-                        healthy: '',
-                        includePattern: '',
-                        messagesPattern: '',
-                        unHealthy: ''
-                    ])
-                }
             }
         )
     }
@@ -178,6 +158,7 @@ def doBuildInDocker(String buildType) {
                            ./realm-tests
                         """
                     } finally {
+                        collectCompilerWarnings('gcc', true)
                         recordTests("Linux-${buildType}")
                     }
                 }
@@ -200,22 +181,30 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
+                        try {
                             sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
                             dir(buildDir) {
                                 archiveArtifacts('*.tar.gz')
                             }
                             stash includes:"${buildDir}/*.tar.gz", name:stashName
                             androidStashes << stashName
+                        } finally {
+                            collectCompilerWarnings('gcc', true )
+                        }
                     }
                 } else {
                     docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
                         buildEnv.inside("--link ${emulator.id}:emulator") {
+                            try {
                                 sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
                                 dir(buildDir) {
                                     archiveArtifacts('*.tar.gz')
                                 }
                                 stash includes:"${buildDir}/*.tar.gz", name:stashName
                                 androidStashes << stashName
+                            } finally {
+                                collectCompilerWarnings('gcc', true )
+                            }
                             try {
                                 sh '''
                                    cd $(find . -type d -maxdepth 1 -name build-android*)
@@ -325,6 +314,7 @@ def doBuildMacOs(String buildType) {
         node('macos || osx_vegas') {
             getArchive()
 
+            try {
                 dir("build-macos-${buildType}") {
                     withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
                         // This is a dirty trick to work around a bug in xcode
@@ -354,6 +344,9 @@ def doBuildMacOs(String buildType) {
 
                 stash includes:"build-macos-${buildType}/*.tar.xz", name:"macos-${buildType}"
                 cocoaStashes << "macos-${buildType}"
+            } finally {
+                collectCompilerWarnings('clang', true)
+            }
         }
     }
 }
@@ -363,6 +356,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('macos || osx_vegas') {
             getArchive()
 
+            try {
                 withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
                     retry(3) {
                         timeout(time: 15, unit: 'MINUTES') {
@@ -376,6 +370,9 @@ def doBuildAppleDevice(String sdk, String buildType) {
                 archiveArtifacts("build-${sdk}-${buildType}/*.tar.xz")
                 stash includes:"build-${sdk}-${buildType}/*.tar.xz", name:"cocoa-${sdk}-${buildType}"
                 cocoaStashes << "cocoa-${sdk}-${buildType}"
+            } finally {
+                collectCompilerWarnings('clang', true)
+            }
         }
     }
 }
@@ -388,6 +385,31 @@ def recordTests(tag) {
     def modifiedTests = tests.replaceAll('realm-core-tests', tag)
     writeFile file: 'build-dir/test/modified-test-report.xml', text: modifiedTests
     junit 'build-dir/test/modified-test-report.xml'
+}
+
+def collectCompilerWarnings(compiler, fail) {
+    def parserName
+    if (compiler == 'gcc') {
+        parserName = 'GNU Make + GNU C Compiler (gcc)'
+    } else if (compiler == 'clang') {
+        parserName = 'Clang (LLVM based)'
+    } else if (compiler == 'msbuild') {
+        parserName = 'MSBuild'
+    }
+    step([
+           $class                 : 'WarningsPublisher',
+          canComputeNew          : false,
+          canRunOnFailed         : true,
+          canResolveRelativePaths: false,
+          consoleParsers         : [[parserName: parserName]],
+          defaultEncoding        : '',
+          excludePattern         : '',
+          unstableTotalAll       : fail ? '0' : '',
+          healthy                : '',
+          includePattern         : '',
+          messagesPattern        : '',
+          unHealthy              : ''
+             ])
 }
 
 def environment() {
