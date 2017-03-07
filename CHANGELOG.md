@@ -12,11 +12,6 @@
   to the limit.
 * `seekpos()` and `seekoff()` in `realm::util::MemoryInputStreambuf` now behave
   correctly when argument is out of range.
-* Fix a hang in LIKE queries that could occur if the pattern required
-  backtracking.
-* Bug fixed in `GroupWriter::write_group()` where the maximum size of the top
-  array was calculated incorrectly. This bug had the potential to cause
-  corruption in Realm files.
 
 ### Breaking changes
 
@@ -31,14 +26,29 @@
 * Enable reading and writing of big blobs via Table interface.
   Only to be used by Sync. The old interface still has a check on 
   the size of the binary blob.
-* Use only a single file descriptor in our emulation of interprocess condition variables
-  on most platforms rather than two. PR [#2460](https://github.com/realm/realm-core/pull/2460). Fixes Cocoa issue [#4676](https://github.com/realm/realm-cocoa/issues/4676).
 
 -----------
 
 ### Internals
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 2.3.3 Release notes
+
+### Bugfixes
+
+* Fix a hang in LIKE queries that could occur if the pattern required
+  backtracking. PR [#2477](https://github.com/realm/realm-core/pull/2477).
+* Bug fixed in `GroupWriter::write_group()` where the maximum size of the top
+  array was calculated incorrectly. This bug had the potential to cause
+  corruption in Realm files. PR [#2480](https://github.com/realm/realm-core/pull/2480).
+
+### Enhancements
+
+* Use only a single file descriptor in our emulation of interprocess condition variables
+  on most platforms rather than two. PR [#2460](https://github.com/realm/realm-core/pull/2460). Fixes Cocoa issue [#4676](https://github.com/realm/realm-cocoa/issues/4676).
 
 ----------------------------------------------
 
