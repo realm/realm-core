@@ -590,4 +590,97 @@ TEST(MixedColumn_SwapRows)
     }
 }
 
+TEST(Mixed_CompareRawTypes)
+{
+    Mixed m;
+    {
+        int64_t equal = 0;
+        int64_t not_equal = 1;
+        m.set_int(equal);
+        CHECK(m == equal);
+        CHECK(m != not_equal);
+        CHECK(equal == m);
+        CHECK(not_equal != m);
+    }
+    {
+        bool equal = false;
+        bool not_equal = true;
+        m.set_bool(equal);
+        CHECK(m == equal);
+        CHECK(m != not_equal);
+        CHECK(equal == m);
+        CHECK(not_equal != m);
+    }
+    {
+        float equal = 1.1f;
+        float not_equal = 1.11f;
+        m.set_float(equal);
+        CHECK(m == equal);
+        CHECK(m != not_equal);
+        CHECK(equal == m);
+        CHECK(not_equal != m);
+    }
+    {
+        double equal = 2.77;
+        double not_equal = 2.89;
+        m.set_double(equal);
+        CHECK(m == equal);
+        CHECK(m != not_equal);
+        CHECK(equal == m);
+        CHECK(not_equal != m);
+    }
+    {
+        char equal_chars [] = { "hello world" };
+        char not_equal_chars [] = { "hello" };
+        StringData equal(equal_chars);
+        StringData not_equal(not_equal_chars);
+        m.set_string(equal);
+        // StringData
+        CHECK(m == equal);
+        CHECK(m != not_equal);
+        CHECK(equal == m);
+        CHECK(not_equal != m);
+        // char *
+        CHECK(m == equal_chars);
+        CHECK(m != not_equal_chars);
+        CHECK(equal_chars == m);
+        CHECK(not_equal_chars != m);
+        // const char *
+        const char* const_equal = equal_chars;
+        const char* const_not_equal = not_equal_chars;
+        CHECK(m == const_equal);
+        CHECK(m != const_not_equal);
+        CHECK(const_equal == m);
+        CHECK(const_not_equal != m);
+    }
+    {
+        BinaryData equal("data");
+        BinaryData not_equal("beta");
+        m.set_binary(equal);
+        CHECK(m == equal);
+        CHECK(m != not_equal);
+        CHECK(equal == m);
+        CHECK(not_equal != m);
+    }
+    {
+        OldDateTime equal(26);
+        OldDateTime not_equal(27);
+        m.set_olddatetime(equal);
+        CHECK(m == equal);
+        CHECK(m != not_equal);
+        CHECK(equal == m);
+        CHECK(not_equal != m);
+    }
+    {
+        Timestamp equal(23, 24);
+        Timestamp not_equal(23, 25);
+        m.set_timestamp(equal);
+        CHECK(m == equal);
+        CHECK(m != not_equal);
+        CHECK(equal == m);
+        CHECK(not_equal != m);
+    }
+}
+
+
 #endif // TEST_COLUMN_MIXED
