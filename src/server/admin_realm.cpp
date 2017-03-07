@@ -97,9 +97,7 @@ void AdminRealmListener::start(std::function<void(std::vector<RealmInfo>)> callb
 
         auto add_realm = [&](auto index) {
             std::string realm_path = table.get_string(name_col_ndx, index);
-            if (strncmp(realm_path.c_str(), "/__", 3)) {
-                realms.emplace_back(table.get_string(id_col_ndx, index), realm_path);
-            }
+            realms.emplace_back(table.get_string(id_col_ndx, index), realm_path);
         };
 
         if (changes.empty()) {
