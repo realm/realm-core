@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed a crash when rolling back a transaction which set binary or string data
+ inside a Mixed type.
 
 ### Breaking changes
 
