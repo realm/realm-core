@@ -1396,7 +1396,7 @@ versions [0.97.0].**
 ### Bugfixes:
 
 * Corrected a bug which caused handover of a query with a restricting
-  view to loose the restricting view.
+  view to lose the restricting view.
 
 ----------------------------------------------
 
