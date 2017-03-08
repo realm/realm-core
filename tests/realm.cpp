@@ -35,12 +35,9 @@
 namespace realm {
 class TestHelper {
 public:
-    static realm::VersionID realm_version(SharedRealm &shared_realm) {
+    static const std::unique_ptr<SharedGroup> &get_shared_group(SharedRealm &shared_realm) {
         Realm &realm = *(shared_realm.get());
-        auto &shared_group = realm::Realm::Internal::get_shared_group(realm);
-        shared_group->begin_read();
-        shared_group->pin_version();
-        return shared_group->get_version_of_current_transaction();
+        return realm::Realm::Internal::get_shared_group(realm);
     }
 
     static void begin_read(SharedRealm &shared_realm, VersionID version) {
@@ -212,8 +209,11 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
         auto realm = Realm::get_shared_realm(config);
         REQUIRE(realm->schema().size() == 1);
-        realm::VersionID old_version = TestHelper::realm_version(realm);
 
+        auto &shared_group = TestHelper::get_shared_group(realm);
+        shared_group->begin_read();
+        shared_group->pin_version();
+        realm::VersionID old_version = shared_group->get_version_of_current_transaction();
         realm->close();
 
         config.schema = Schema{
