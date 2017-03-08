@@ -2,7 +2,6 @@
 
 ### Bugfixes
 
-* Fixed a few bugs (caused crashes) in pthread library on UWP.
 * Fixes a bug in chuncked binary column returning null value. 
   Issue [#2418](https://github.com/realm/realm-core/pull/2418).
 * Possibly fixed some cases of extreme file size growth, by preventing starvation
@@ -10,9 +9,9 @@
   version. [#2395](https://github.com/realm/realm-core/pull/2395)
 * Fixed a bug when deleting a column used in a query [#2408](https://github.com/realm/realm-core/pull/2408)
 * Fixed a crash that occurred if you tried to override a binary with a size close
-  to the limit.
+  to the limit. [#2416](https://github.com/realm/realm-core/pull/2416)
 * `seekpos()` and `seekoff()` in `realm::util::MemoryInputStreambuf` now behave
-  correctly when argument is out of range.
+  correctly when argument is out of range. [#2472](https://github.com/realm/realm-core/pull/2472)
 
 ### Breaking changes
 
