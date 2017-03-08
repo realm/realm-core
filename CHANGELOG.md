@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.4.0 Release notes
 
 ### Bugfixes
 
@@ -7,7 +7,8 @@
 * Possibly fixed some cases of extreme file size growth, by preventing starvation
   when trying to start a write transaction, while simultaneously pinning an older
   version. [#2395](https://github.com/realm/realm-core/pull/2395)
-* Fixed a bug when deleting a column used in a query [#2408](https://github.com/realm/realm-core/pull/2408)
+* Fixed a bug when deleting a column used in a query
+  [#2408](https://github.com/realm/realm-core/pull/2408)
 * Fixed a crash that occurred if you tried to override a binary with a size close
   to the limit. [#2416](https://github.com/realm/realm-core/pull/2416)
 * `seekpos()` and `seekoff()` in `realm::util::MemoryInputStreambuf` now behave
@@ -27,12 +28,6 @@
 * Enable reading and writing of big blobs via Table interface.
   Only to be used by Sync. The old interface still has a check on 
   the size of the binary blob.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
