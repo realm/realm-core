@@ -33,20 +33,22 @@
 #include <realm/group.hpp>
 
 namespace realm {
-    class TestHelper {
-    public:
-        static realm::VersionID realm_version(SharedRealm &shared_realm) {
-            Realm &realm = *(shared_realm.get());
-            auto &shared_group = realm::Realm::Internal::get_shared_group(realm);
-            return shared_group->get_version_of_current_transaction();
-        }
+class TestHelper {
+public:
+    static realm::VersionID realm_version(SharedRealm &shared_realm) {
+        Realm &realm = *(shared_realm.get());
+        auto &shared_group = realm::Realm::Internal::get_shared_group(realm);
+        shared_group->begin_read();
+        shared_group->pin_version();
+        return shared_group->get_version_of_current_transaction();
+    }
 
-        static void begin_read(SharedRealm &shared_realm, VersionID version) {
-            Realm::Internal::begin_read(*shared_realm, version);
-        }
+    static void begin_read(SharedRealm &shared_realm, VersionID version) {
+        Realm::Internal::begin_read(*shared_realm, version);
+    }
 
 
-    };
+};
 }
 
 using namespace realm;
