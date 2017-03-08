@@ -1137,6 +1137,23 @@ TEST_CASE("migration: Additive") {
         REQUIRE(realm3->schema().find("object")->persisted_properties[0].table_column == 1);
         REQUIRE(realm3->schema().find("object")->persisted_properties[1].table_column == 2);
     }
+
+    SECTION("increasing schema version without modifying schema properly leaves the schema untouched") {
+        TestFile config1;
+        config1.schema = schema;
+        config1.schema_mode = SchemaMode::Additive;
+        config1.schema_version = 0;
+
+        auto realm1 = Realm::get_shared_realm(config1);
+        REQUIRE(realm1->schema().size() == 1);
+        Schema schema1 = realm1->schema();
+        realm1->close();
+
+        auto config2 = config1;
+        config2.schema_version = 1;
+        auto realm2 = Realm::get_shared_realm(config2);
+        REQUIRE(realm2->schema() == schema1);
+    }
 }
 
 TEST_CASE("migration: Manual") {
