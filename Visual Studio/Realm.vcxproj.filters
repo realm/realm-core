@@ -168,7 +168,6 @@
     <ClInclude Include="..\src\realm\null.hpp" />
     <ClInclude Include="..\src\realm\query_expression.hpp" />
     <ClInclude Include="..\src\realm\string_data.hpp" />
-    <ClInclude Include="..\src\realm\table_basic_fwd.hpp" />
     <ClInclude Include="..\src\realm\timestamp.hpp" />
     <ClInclude Include="..\src\realm\unicode.hpp" />
     <ClInclude Include="..\src\realm\util\assert.hpp" />
@@ -224,14 +223,9 @@
     <ClInclude Include="..\src\realm\util\string_buffer.hpp" />
     <ClInclude Include="..\src\realm\table.hpp" />
     <ClInclude Include="..\src\realm\row.hpp" />
-    <ClInclude Include="..\src\realm\table_accessors.hpp" />
-    <ClInclude Include="..\src\realm\table_basic.hpp" />
-    <ClInclude Include="..\src\realm\table_macros.hpp" />
     <ClInclude Include="..\src\realm\table_ref.hpp" />
     <ClInclude Include="..\src\realm\table_view.hpp" />
-    <ClInclude Include="..\src\realm\table_view_basic.hpp" />
     <ClInclude Include="..\src\realm\realm_nmmintrin.h" />
-    <ClInclude Include="..\src\realm\util\tuple.hpp" />
     <ClInclude Include="..\src\realm\util\type_list.hpp" />
     <ClInclude Include="..\src\realm\util\utf8.hpp" />
     <ClInclude Include="..\src\realm\utilities.hpp" />

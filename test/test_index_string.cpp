@@ -23,6 +23,7 @@
 #include <realm/index_string.hpp>
 #include <realm/column_linklist.hpp>
 #include <realm/column_string.hpp>
+#include <realm/query_expression.hpp>
 #include <realm/util/to_string.hpp>
 #include <set>
 #include "test.hpp"
@@ -1381,53 +1382,6 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
 
     col.destroy();
 }
-
-TEST(StringIndex_Deny_Duplicates)
-{
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), ref, true);
-    StringData duplicate("duplicate");
-    // create subindex of repeated elements on a leaf
-    size_t num_repeats = 100;
-    for (size_t i = 0; i < num_repeats; ++i) {
-        col.add(duplicate);
-    }
-
-    // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
-
-    CHECK(ndx.has_duplicate_values());
-
-    col.set_search_index_allow_duplicate_values(false);
-    CHECK(ndx.has_duplicate_values());
-
-    size_t ndx_count = ndx.count(duplicate);
-    CHECK_THROW(col.add(duplicate), realm::LogicError);
-    CHECK(ndx_count == ndx.count(duplicate));
-
-    col.clear();
-    CHECK(!ndx.has_duplicate_values());
-
-    col.add(duplicate);
-    CHECK_THROW(col.add(duplicate), realm::LogicError);
-    CHECK(!ndx.has_duplicate_values());
-
-    col.clear();
-    col.set_search_index_allow_duplicate_values(true);
-    CHECK(!ndx.has_duplicate_values());
-
-    // Populate tree with duplicates through insert() at back
-    for (size_t i = 0; i < num_repeats; ++i) {
-        col.insert(col.size(), duplicate);
-    }
-    CHECK(ndx.has_duplicate_values());
-    CHECK(col.get(0) == duplicate);
-    CHECK(col.get(col.size() - 1) == duplicate);
-    CHECK(col.count(duplicate) == num_repeats);
-
-    col.destroy();
-}
-
 
 TEST(StringIndex_MaxBytes)
 {

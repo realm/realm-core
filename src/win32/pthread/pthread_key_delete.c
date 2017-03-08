@@ -37,6 +37,7 @@
 #include "pthread.h"
 #include "implement.h"
 
+BOOL WINAPI FlsFree(_In_ DWORD dwFlsIndex);
 
 int
 pthread_key_delete (pthread_key_t key)

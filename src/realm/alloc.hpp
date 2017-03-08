@@ -1,4 +1,4 @@
-/*************************************************************************
+﻿/*************************************************************************
  *
  * Copyright 2016 Realm Inc.
  *
@@ -261,7 +261,7 @@ protected:
     /// Bump the global version counter. This method should be called when
     /// version bumping is initiated. Then following calls to should_propagate_version()
     /// can be used to prune the version bumping.
-    uint_fast64_t bump_global_version() noexcept;
+    void bump_global_version() noexcept;
 
     /// Determine if the "local_version" is out of sync, so that it should
     /// be updated. In that case: also update it. Called from Table::bump_version
@@ -272,10 +272,9 @@ protected:
     friend class Group;
 };
 
-inline uint_fast64_t Allocator::bump_global_version() noexcept
+inline void Allocator::bump_global_version() noexcept
 {
-    ++m_table_versioning_counter;
-    return m_table_versioning_counter;
+    m_table_versioning_counter += 1;
 }
 
 

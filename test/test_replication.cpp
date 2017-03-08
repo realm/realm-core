@@ -28,6 +28,7 @@
 #include <realm/replication.hpp>
 
 #include "test.hpp"
+#include "test_table_helper.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -124,14 +125,29 @@ private:
     std::vector<Buffer<char>> m_changesets;
 };
 
-REALM_TABLE_1(MySubsubsubtable, first, Int)
+namespace {
 
-REALM_TABLE_3(MySubsubtable, a, Int, b, Subtable<MySubsubsubtable>, c, Int)
+void my_table_add_columns(TableRef t)
+{
+    t->add_column(type_Int, "my_int");
+    t->add_column(type_Bool, "my_bool");
+    t->add_column(type_Float, "my_float");
+    t->add_column(type_Double, "my_double");
+    t->add_column(type_String, "my_string");
+    t->add_column(type_Binary, "my_binary");
+    t->add_column(type_OldDateTime, "my_olddatetime");
+    DescriptorRef sub_descr1;
+    t->add_column(type_Table, "my_subtable", &sub_descr1);
+    t->add_column(type_Mixed, "my_mixed");
 
-REALM_TABLE_1(MySubtable, t, Subtable<MySubsubtable>)
+    sub_descr1->add_column(type_Int, "a");
+    DescriptorRef sub_descr2;
+    sub_descr1->add_column(type_Table, "b", &sub_descr2);
+    sub_descr1->add_column(type_Int, "c");
 
-REALM_TABLE_9(MyTable, my_int, Int, my_bool, Bool, my_float, Float, my_double, Double, my_string, String, my_binary,
-              Binary, my_olddatetime, OldDateTime, my_subtable, Subtable<MySubtable>, my_mixed, Mixed)
+    sub_descr2->add_column(type_Int, "first");
+}
+}
 
 
 TEST(Replication_General)
@@ -145,52 +161,53 @@ TEST(Replication_General)
     SharedGroup sg_1(repl);
     {
         WriteTransaction wt(sg_1);
-        MyTable::Ref table = wt.add_table<MyTable>("my_table");
-        table->add();
+        TableRef table = wt.add_table("my_table");
+        my_table_add_columns(table);
+        table->add_empty_row();
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
-        MyTable::Ref table = wt.get_table<MyTable>("my_table");
+        TableRef table = wt.get_table("my_table");
         char buf[] = {'1'};
         BinaryData bin(buf);
         Mixed mix;
         mix.set_int(1);
-        table->set(0, 2, true, 2.0f, 2.0, "xx", bin, 728, 0, mix);
-        table->add(3, true, 3.0f, 3.0, "xxx", bin, 729, 0, mix);
-        table->insert(0, 1, true, 1.0f, 1.0, "x", bin, 727, 0, mix);
+        set(table, 0, 2, true, 2.0f, 2.0, "xx", bin, 728, nullptr, mix);
+        add(table, 3, true, 3.0f, 3.0, "xxx", bin, 729, nullptr, mix);
+        insert(table, 0, 1, true, 1.0f, 1.0, "x", bin, 727, nullptr, mix);
 
-        table->add(3, true, 3.0f, 0.0, "", bin, 729, 0, mix); // empty string
-        table->add(3, true, 3.0f, 1.0, "", bin, 729, 0, mix); // empty string
+        add(table, 3, true, 3.0f, 0.0, "", bin, 729, nullptr, mix); // empty string
+        add(table, 3, true, 3.0f, 1.0, "", bin, 729, nullptr, mix); // empty string
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
-        MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        table[0].my_int = 9;
+        TableRef table = wt.get_table("my_table");
+        table->set_int(0, 0, 9);
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
-        MyTable::Ref table = wt.get_table<MyTable>("my_table");
-        table[0].my_int = 10;
+        TableRef table = wt.get_table("my_table");
+        table->set_int(0, 0, 10);
         wt.commit();
     }
     // Test Table::move_last_over()
     {
         WriteTransaction wt(sg_1);
-        MyTable::Ref table = wt.get_table<MyTable>("my_table");
+        TableRef table = wt.get_table("my_table");
         char buf[] = {'9'};
         BinaryData bin(buf);
         Mixed mix;
         mix.set_float(9.0f);
-        table->insert(2, 8, false, 8.0f, 8.0, "y8", bin, 282, 0, mix);
-        table->insert(1, 9, false, 9.0f, 9.0, "y9", bin, 292, 0, mix);
+        insert(table, 2, 8, false, 8.0f, 8.0, "y8", bin, 282, nullptr, mix);
+        insert(table, 1, 9, false, 9.0f, 9.0, "y9", bin, 292, nullptr, mix);
         wt.commit();
     }
     {
         WriteTransaction wt(sg_1);
-        MyTable::Ref table = wt.get_table<MyTable>("my_table");
+        TableRef table = wt.get_table("my_table");
         table->move_last_over(1);
         wt.commit();
     }
@@ -205,14 +222,14 @@ TEST(Replication_General)
         rt_1.get_group().verify();
         rt_2.get_group().verify();
         CHECK(rt_1.get_group() == rt_2.get_group());
-        MyTable::ConstRef table = rt_2.get_table<MyTable>("my_table");
+        auto table = rt_2.get_table("my_table");
         CHECK_EQUAL(6, table->size());
-        CHECK_EQUAL(10, table[0].my_int);
-        CHECK_EQUAL(3, table[1].my_int);
-        CHECK_EQUAL(2, table[2].my_int);
-        CHECK_EQUAL(8, table[3].my_int);
+        CHECK_EQUAL(10, table->get_int(0, 0));
+        CHECK_EQUAL(3, table->get_int(0, 1));
+        CHECK_EQUAL(2, table->get_int(0, 2));
+        CHECK_EQUAL(8, table->get_int(0, 3));
 
-        StringData sd1 = table[4].my_string.get();
+        StringData sd1 = table->get_string(4, 4);
 
         CHECK(!sd1.is_null());
     }

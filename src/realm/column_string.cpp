@@ -244,18 +244,10 @@ std::unique_ptr<StringIndex> StringColumn::release_search_index() noexcept
 }
 
 
-void StringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
-                                        bool allow_duplicate_valaues)
+void StringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index.reset(
-        new StringIndex(ref, parent, ndx_in_parent, this, !allow_duplicate_valaues, m_array->get_alloc())); // Throws
-}
-
-
-void StringColumn::set_search_index_allow_duplicate_values(bool allow) noexcept
-{
-    m_search_index->set_allow_duplicate_values(allow);
+    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, m_array->get_alloc())); // Throws
 }
 
 
@@ -583,7 +575,7 @@ void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     // Copying string data from a column to itself requires an
     // intermediate copy of the data (constr:bptree-copy-to-self).
     std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
-    std::copy_n(value.data(), value.size(), buffer.get());
+    realm::safe_copy_n(value.data(), value.size(), buffer.get());
     StringData copy_of_value(value.is_null() ? nullptr : buffer.get(), value.size());
 
     if (m_search_index) {

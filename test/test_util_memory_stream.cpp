@@ -53,11 +53,10 @@ using namespace realm;
 
 namespace {
 
-TEST(MemoryStream_Input)
+TEST(MemoryStream_InputBasic)
 {
-    const char buf[] = "123 4567";
     realm::util::MemoryInputStream in;
-    in.set_buffer(buf, buf + sizeof(buf) - 1);
+    in.set_c_string("123 4567");
     in.unsetf(std::ios_base::skipws);
 
     CHECK_EQUAL(in.eof(), false);
@@ -87,6 +86,99 @@ TEST(MemoryStream_Input)
     CHECK_EQUAL(number, 567);
     CHECK_EQUAL(in.eof(), true);
     CHECK_EQUAL(in.tellg(), -1);
+}
+
+
+TEST(MemoryStream_InputSeek)
+{
+    realm::util::MemoryInputStream in;
+
+    // No buffer
+    CHECK_EQUAL(0, in.tellg());
+    in.seekg(0);
+    CHECK(in);
+    CHECK_EQUAL(0, in.tellg());
+    in.seekg(0);
+    CHECK(in);
+    in.seekg(1); // Out of range
+    CHECK_NOT(in);
+    in.clear();
+    CHECK(in);
+    in.seekg(-1); // Out of range
+    CHECK_NOT(in);
+
+    // Absolute
+    in.set_c_string("AB");
+    CHECK_EQUAL(0, in.tellg());
+    in.seekg(0);
+    CHECK(in);
+    CHECK_EQUAL(0, in.tellg());
+    in.seekg(1);
+    CHECK(in);
+    CHECK_EQUAL(1, in.tellg());
+    in.seekg(2);
+    CHECK(in);
+    CHECK_EQUAL(2, in.tellg());
+    in.seekg(3); // Out of range
+    CHECK_NOT(in);
+    in.clear();
+    CHECK_EQUAL(2, in.tellg());
+    CHECK(in);
+    in.seekg(-1); // Out of range
+    CHECK_NOT(in);
+    in.clear();
+    CHECK_EQUAL(2, in.tellg());
+
+    // Relative
+    in.set_c_string("AB");
+    CHECK_EQUAL(0, in.tellg());
+    in.seekg(0, std::ios_base::beg);
+    CHECK(in);
+    CHECK_EQUAL(0, in.tellg());
+    in.seekg(0, std::ios_base::cur);
+    CHECK(in);
+    CHECK_EQUAL(0, in.tellg());
+    in.seekg(0, std::ios_base::end);
+    CHECK(in);
+    CHECK_EQUAL(2, in.tellg());
+    in.seekg(+1, std::ios_base::beg);
+    CHECK(in);
+    CHECK_EQUAL(1, in.tellg());
+    in.seekg(+1, std::ios_base::cur);
+    CHECK(in);
+    CHECK_EQUAL(2, in.tellg());
+    in.seekg(-1, std::ios_base::end);
+    CHECK(in);
+    CHECK_EQUAL(1, in.tellg());
+    in.seekg(-1, std::ios_base::cur);
+    CHECK(in);
+    CHECK_EQUAL(0, in.tellg());
+    in.seekg(-1, std::ios_base::beg); // Out of range
+    CHECK_NOT(in);
+    in.clear();
+    CHECK_EQUAL(0, in.tellg());
+    in.seekg(+3, std::ios_base::beg); // Out of range
+    CHECK_NOT(in);
+    in.clear();
+    CHECK_EQUAL(0, in.tellg());
+    in.seekg(+1, std::ios_base::cur);
+    in.seekg(-2, std::ios_base::cur); // Out of range
+    CHECK_NOT(in);
+    in.clear();
+    CHECK_EQUAL(1, in.tellg());
+    in.seekg(+2, std::ios_base::cur); // Out of range
+    CHECK_NOT(in);
+    in.clear();
+    CHECK_EQUAL(1, in.tellg());
+    in.seekg(+1, std::ios_base::cur);
+    in.seekg(-3, std::ios_base::end); // Out of range
+    CHECK_NOT(in);
+    in.clear();
+    CHECK_EQUAL(2, in.tellg());
+    in.seekg(+1, std::ios_base::end); // Out of range
+    CHECK_NOT(in);
+    in.clear();
+    CHECK_EQUAL(2, in.tellg());
 }
 
 } // unnamed namespace

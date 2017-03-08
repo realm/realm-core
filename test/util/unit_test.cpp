@@ -222,32 +222,32 @@ class ManifoldReporter : public Reporter {
 public:
     ManifoldReporter(std::initializer_list<Reporter*> subreporters)
     {
-        for (Reporter* r: subreporters)
+        for (Reporter* r : subreporters)
             m_subreporters.push_back(r);
     }
 
     void begin(const TestContext& context) override
     {
-        for (Reporter* r: m_subreporters)
+        for (Reporter* r : m_subreporters)
             r->begin(context);
     }
 
     void fail(const TestContext& context, const char* file_name, long line_number,
               const std::string& message) override
     {
-        for (Reporter* r: m_subreporters)
+        for (Reporter* r : m_subreporters)
             r->fail(context, file_name, line_number, message);
     }
 
     void end(const TestContext& context, double elapsed_seconds) override
     {
-        for (Reporter* r: m_subreporters)
+        for (Reporter* r : m_subreporters)
             r->end(context, elapsed_seconds);
     }
 
     void summary(const SharedContext& context, const Summary& results_summary) override
     {
-        for (Reporter* r: m_subreporters)
+        for (Reporter* r : m_subreporters)
             r->summary(context, results_summary);
     }
 

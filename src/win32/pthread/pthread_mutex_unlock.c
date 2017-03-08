@@ -54,7 +54,7 @@ pthread_mutex_unlock (pthread_mutex_t * mutex)
   if(mx.is_shared) {  
     BOOL d;
     HANDLE h;
-    int pid = getpid();
+    int pid = _getpid();
 
     if(mutex->cached_pid != pid)
         h = OpenMutexA(MUTEX_ALL_ACCESS, 1, mutex->shared_name);

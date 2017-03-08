@@ -321,16 +321,10 @@ void LinkView::sort(const SortDescriptor& order)
 
 TableView LinkView::get_sorted_view(SortDescriptor order) const
 {
-    TableView v(m_origin_column->get_target_table()); // sets m_table
-    v.m_last_seen_version = m_origin_table->m_version;
-    // sets m_linkview_source to indicate that this TableView was generated from a LinkView
-    v.m_linkview_source = shared_from_this();
-    if (m_row_indexes.is_attached()) {
-        for (size_t t = 0; t < m_row_indexes.size(); t++) // todo, simpler way?
-            v.m_row_indexes.add(get(t).get_index());
-        v.sort(std::move(order));
-    }
-    return v;
+    TableView tv(m_origin_column->get_target_table(), shared_from_this());
+    tv.do_sync();
+    tv.sort(std::move(order));
+    return tv;
 }
 
 TableView LinkView::get_sorted_view(size_t column_index, bool ascending) const
