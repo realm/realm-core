@@ -28,6 +28,7 @@
 
 * Now supports case insensitive queries for UWP.
 * Upgraded Visual Studio project to version 2017.
+* Support handover of TableViews and Queries based on SubTables
 * Enable reading and writing of big blobs via Table interface.
   Only to be used by Sync. The old interface still has a check on 
   the size of the binary blob.
