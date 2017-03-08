@@ -1746,7 +1746,7 @@ void SharedGroup::do_begin_write()
     if (should_yield) {
         // This clock is not monotonic, so time can move backwards. This can lead
         // to a wrong time limit, but the only effect of a wrong time limit is that
-        // we momentarily loose fairness, so we accept it.
+        // we momentarily lose fairness, so we accept it.
         timeval tv;
         gettimeofday(&tv, nullptr);
         time_limit.tv_sec = tv.tv_sec;
