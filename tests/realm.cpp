@@ -32,6 +32,23 @@
 
 #include <realm/group.hpp>
 
+namespace realm {
+    class TestHelper {
+    public:
+        static realm::VersionID realm_version(SharedRealm &shared_realm) {
+            Realm &realm = *(shared_realm.get());
+            auto &shared_group = realm::Realm::Internal::get_shared_group(realm);
+            return shared_group->get_version_of_current_transaction();
+        }
+
+        static void begin_read(SharedRealm &shared_realm, VersionID version) {
+            Realm::Internal::begin_read(*shared_realm, version);
+        }
+
+
+    };
+}
+
 using namespace realm;
 
 TEST_CASE("SharedRealm: get_shared_realm()") {
@@ -181,6 +198,39 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
         REQUIRE(it->persisted_properties[0].table_column == 0);
+    }
+
+    SECTION("should read the proper schema from the file if a custom version is supplied") {
+        Realm::get_shared_realm(config);
+
+        config.schema = util::none;
+        config.cache = false;
+        config.schema_mode = SchemaMode::Additive;
+        config.schema_version = 0;
+
+        auto realm = Realm::get_shared_realm(config);
+        REQUIRE(realm->schema().size() == 1);
+        realm::VersionID old_version = TestHelper::realm_version(realm);
+
+        realm->close();
+
+        config.schema = Schema{
+            {"object", {
+                {"value", PropertyType::Int, "", "", false, false, false}
+            }},
+            {"object1", {
+                {"value", PropertyType::Int, "", "", false, false, false}
+            }},
+        };
+        config.schema_version = 1;
+        realm = Realm::get_shared_realm(config);
+        REQUIRE(realm->schema().size() == 2);
+
+        auto old_realm = Realm::get_shared_realm(config);
+        old_realm->invalidate();
+
+        TestHelper::begin_read(old_realm, old_version);
+        REQUIRE(old_realm->schema().size() == 1);
     }
 
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {

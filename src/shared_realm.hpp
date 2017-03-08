@@ -259,6 +259,7 @@ public:
         friend class _impl::ResultsNotifier;
         friend class ThreadSafeReferenceBase;
         friend class GlobalNotifier;
+        friend class TestHelper;
 
         // ResultsNotifier and ListNotifier need access to the SharedGroup
         // to be able to call the handover functions, which are not very wrappable
