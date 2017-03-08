@@ -2,7 +2,7 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed an assertion on a corner case of reallocation on large arrays.
 
 ### Breaking changes
 
