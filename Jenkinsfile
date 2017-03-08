@@ -64,7 +64,8 @@ try {
         buildNodeLinux: doBuildNodeInDocker(isPublishingRun, isPublishingLatestRun),
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
-        buildWindows: doBuildWindows(version, isPublishingRun),
+        buildWindows: doBuildWindows(false, version, isPublishingRun),
+        buildWindowsUniversal: doBuildWindows(true, version, isPublishingRun),
         buildOsxDylibs: doBuildOsxDylibs(version, isPublishingRun, isPublishingLatestRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
@@ -195,38 +196,40 @@ def doBuildInDocker(String command) {
   }
 }
 
-def doBuildWindows(String version, boolean isPublishingRun) {
-    return {
-        node('windows') {
-            getArchive()
-            try {
-              for (platform in ['Win32', 'x64']) {
-                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"8.1 Debug static lib\" /p:Platform=${platform}"
-                bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"8.1 Release static lib\" /p:Platform=${platform}"
-              }
-              dir('Visual Studio') {
-                stash includes: 'lib/*.lib', name: 'windows-libs'
-              }
-              dir('src') {
-                stash includes: '**/*.h', name: 'windows-c-includes'
-                stash includes: '**/*.hpp', name: 'windows-cxx-includes'
-              }
-              dir('packaging-tmp') {
-                unstash 'windows-libs'
-                dir('include') {
-                  unstash 'windows-c-includes'
-                  unstash 'windows-cxx-includes'
-                }
-              }
-              zip dir:'packaging-tmp', zipFile:"realm-core-windows-${version}.zip", archive:true
-              if (isPublishingRun) {
-                stash includes:"realm-core-windows-${version}.zip", name:'windows-package'
-              }
-            } finally {
-              collectCompilerWarnings('msbuild', false)
-            }
+def doBuildWindows(boolean isUniversal, String version, boolean isPublishingRun) {
+  def configuration = isUniversal ? 'UWP' : '8.1'
+  def packageName = isUniversal ? 'windows-universal' : 'windows'
+  return {
+    node('windows') {
+      getArchive()
+      try {
+        for (platform in ['Win32', 'x64']) {
+          bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Debug static lib\" /p:Platform=${platform}"
+          bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Release static lib\" /p:Platform=${platform}"
         }
+        dir('Visual Studio') {
+          stash includes: 'lib/*.lib', name: 'windows-libs'
+        }
+        dir('src') {
+          stash includes: '**/*.h', name: 'windows-c-includes'
+          stash includes: '**/*.hpp', name: 'windows-cxx-includes'
+        }
+        dir('packaging-tmp') {
+          unstash 'windows-libs'
+          dir('include') {
+            unstash 'windows-c-includes'
+            unstash 'windows-cxx-includes'
+          }
+        }
+        zip dir:'packaging-tmp', zipFile:"realm-core-${packageName}-${version}.zip", archive:true
+        if (isPublishingRun) {
+          stash includes:"realm-core-${packageName}-${version}.zip", name:'${packageName}-package'
+        }
+      } finally {
+        collectCompilerWarnings('msbuild', false)
+      }
     }
+  }
 }
 
 def buildDiffCoverage() {
@@ -675,6 +678,7 @@ def doPublishLocalArtifacts() {
       unstash 'android-package'
       unstash 'dylib-osx-package'
       unstash 'windows-package'
+      unstash 'windows-universal-package'
 
       withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
         sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
