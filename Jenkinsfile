@@ -199,11 +199,12 @@ def doBuildInDocker(String command) {
 def doBuildWindows(boolean isUniversal, String version, boolean isPublishingRun) {
   def configuration = isUniversal ? 'UWP' : '8.1'
   def packageName = isUniversal ? 'windows-universal' : 'windows'
+  def platforms = isUniversal ? ['Win32', 'x64', 'ARM'] : ['Win32', 'x64'];
   return {
     node('windows') {
       getArchive()
       try {
-        for (platform in ['Win32', 'x64']) {
+        for (platform in platforms) {
           bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Debug static lib\" /p:Platform=${platform}"
           bat "\"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Release static lib\" /p:Platform=${platform}"
         }
