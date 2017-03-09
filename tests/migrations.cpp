@@ -1154,6 +1154,22 @@ TEST_CASE("migration: Additive") {
         auto realm2 = Realm::get_shared_realm(config2);
         REQUIRE(realm2->schema() == schema1);
     }
+
+    SECTION("update_schema() does not begin a write transaction when extra columns are present") {
+        realm->begin_transaction();
+
+        auto realm2 = Realm::get_shared_realm(config);
+        // will deadlock if it tries to start a write transaction
+        realm2->update_schema(remove_property(schema, "object", "value"));
+    }
+
+    SECTION("update_schema() does not begin a write transaction when indexes are changed without bumping schema version") {
+        realm->begin_transaction();
+
+        auto realm2 = Realm::get_shared_realm(config);
+        // will deadlock if it tries to start a write transaction
+        realm->update_schema(set_indexed(schema, "object", "value 2", true));
+    }
 }
 
 TEST_CASE("migration: Manual") {

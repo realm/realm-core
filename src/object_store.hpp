@@ -62,7 +62,9 @@ public:
 
     // check if any of the schema changes in the list are forbidden in
     // additive-only mode, and if any are throw an exception
-    static void verify_valid_additive_changes(std::vector<SchemaChange> const& changes);
+    // returns true if any of the changes are not no-ops
+    static bool verify_valid_additive_changes(std::vector<SchemaChange> const& changes,
+                                              bool update_indexes=false);
 
     // check if changes is empty, and throw an exception if not
     static void verify_no_changes_required(std::vector<SchemaChange> const& changes);
