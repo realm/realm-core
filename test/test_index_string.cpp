@@ -1838,6 +1838,19 @@ TEST_TYPES(StringIndex_Insensitive_Unicode, non_nullable, nullable)
 
 */
 
+namespace {
+
+std::string create_random_a_string(size_t max_len) {
+    std::string s;
+    size_t len = fastrand(max_len);
+    for (size_t p = 0; p < len; p++) {
+        s += fastrand(1) == 0 ? 'a' : 'A';
+    }
+    return s;
+}
+
+}
+
 
 TEST(StringIndex_Insensitive_Fuzz)
 {
@@ -1852,26 +1865,14 @@ TEST(StringIndex_Insensitive_Fuzz)
 
         // Add 'rows' number of rows in the column
         for (size_t t = 0; t < rows; t++) {
-            std::string s;
-
-            // Create string like "AAaAaa"
-            size_t len = fastrand(max_str_len); // 2 * keylength - 1
-            for (size_t p = 0; p < len; p++) {
-                s = s + (fastrand(1) == 0 ? 'a' : 'A');
-            }
-            col.add(s);
+            std::string str = create_random_a_string(max_str_len);
+            col.add(str);
         }
 
         col.create_search_index();
 
         for (size_t t = 0; t < 1000; t++) {
-            std::string s;
-
-            // Create string like "aaAAaAAaa" to search for
-            size_t len = fastrand(max_str_len);
-            for (size_t p = 0; p < len; p++) {
-                s = s + (fastrand(1) == 0 ? 'a' : 'A');
-            }
+            std::string s = create_random_a_string(max_str_len);
 
             ref_type results_ref = IntegerColumn::create(Allocator::get_default());
             IntegerColumn res(Allocator::get_default(), results_ref);
