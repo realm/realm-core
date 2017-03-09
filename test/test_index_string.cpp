@@ -1878,8 +1878,10 @@ TEST(StringIndex_Insensitive_Fuzz)
             col.find_all(res, s, 0, -1, true);
 
             // Check that all items in 'res' point at a match in 'col'
+            auto s_upper = case_map(s, true);
             for (size_t t = 0; t < res.size(); t++) {
-                CHECK_EQUAL(col.get(res.get(t)), s);
+                auto res_upper = case_map(col.get(res.get(t)), true);
+                CHECK_EQUAL(res_upper, s_upper);
             }
 
             // Check that all matches in 'col' exist in 'res'
