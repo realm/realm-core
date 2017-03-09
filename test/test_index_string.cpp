@@ -1838,6 +1838,31 @@ TEST_TYPES(StringIndex_Insensitive_Unicode, non_nullable, nullable)
 
 */
 
+
+TEST_TYPES(StringIndex_45, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+    col.create_search_index();
+    std::string a4 = std::string(4, 'a');
+    std::string A5 = std::string(5, 'A');
+
+    col.add(a4);
+    col.add(a4);
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn res(Allocator::get_default(), results_ref);
+
+    col.find_all(res, A5, 0, realm::npos, true);
+    CHECK_EQUAL(res.size(), 0);
+
+    res.destroy();
+    col.destroy();
+}
+
+
 namespace {
 
 std::string create_random_a_string(size_t max_len) {
