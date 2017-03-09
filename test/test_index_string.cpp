@@ -1728,11 +1728,11 @@ TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
     {
         constexpr bool case_insensitive = true;
         const char* needle = "john";
-        StringData upper_needle = case_map(needle, true);
+        auto upper_needle = case_map(needle, true);
         ndx.find_all(results, needle, case_insensitive);
         CHECK_EQUAL(17, results.size());
         for (size_t i = 0; i < results.size(); ++i) {
-            StringData upper_result = case_map(col.get(results.get(i)), true);
+            auto upper_result = case_map(col.get(results.get(i)), true);
             CHECK_EQUAL(upper_result, upper_needle);
 
         }
