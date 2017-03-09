@@ -1846,6 +1846,7 @@ TEST(StringIndex_Insensitive_Fuzz)
 
     ref_type ref = StringColumn::create(Allocator::get_default());
     StringColumn col(Allocator::get_default(), ref);
+    col.create_search_index();
 
     for (size_t iter = 0; iter < iters; iter++) {
         size_t rows = fastrand(2 * REALM_MAX_BPNODE_SIZE - 1);
@@ -1861,8 +1862,6 @@ TEST(StringIndex_Insensitive_Fuzz)
             }
             col.add(s);
         }
-
-        col.create_search_index();
 
         for (size_t t = 0; t < 1000; t++) {
             std::string s;
