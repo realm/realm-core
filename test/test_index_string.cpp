@@ -1844,11 +1844,10 @@ TEST(StringIndex_Insensitive_Fuzz)
     const size_t max_str_len = 9;
     const size_t iters = 100;
 
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), ref);
-    col.create_search_index();
-
     for (size_t iter = 0; iter < iters; iter++) {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn col(Allocator::get_default(), ref);
+
         size_t rows = fastrand(2 * REALM_MAX_BPNODE_SIZE - 1);
 
         // Add 'rows' number of rows in the column
@@ -1862,6 +1861,8 @@ TEST(StringIndex_Insensitive_Fuzz)
             }
             col.add(s);
         }
+
+        col.create_search_index();
 
         for (size_t t = 0; t < 1000; t++) {
             std::string s;
@@ -1892,8 +1893,8 @@ TEST(StringIndex_Insensitive_Fuzz)
             }
             res.destroy();
         }
+        col.destroy();
     }
-    col.destroy();
 }
 
 
