@@ -1839,4 +1839,59 @@ TEST_TYPES(StringIndex_Insensitive_Unicode, non_nullable, nullable)
 */
 
 
+TEST(StringIndex_Insensitive_Fuzz)
+{
+    const size_t max_str_len = 9;
+    const size_t iters = 100;
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref);
+
+    for (size_t iter = 0; iter < iters; iter++) {
+        size_t rows = fastrand(2 * REALM_MAX_BPNODE_SIZE - 1);
+
+        // Add 'rows' number of rows in the column
+        for (size_t t = 0; t < rows; t++) {
+            std::string s;
+
+            // Create string like "AAaAaa"
+            size_t len = fastrand(max_str_len); // 2 * keylength - 1
+            for (size_t p = 0; p < len; p++) {
+                s = s + (fastrand(1) == 0 ? 'a' : 'A');
+            }
+            col.add(s);
+        }
+
+        col.create_search_index();
+
+        for (size_t t = 0; t < 1000; t++) {
+            std::string s;
+
+            // Create string like "aaAAaAAaa" to search for
+            size_t len = fastrand(max_str_len);
+            for (size_t p = 0; p < len; p++) {
+                s = s + (fastrand(1) == 0 ? 'a' : 'A');
+            }
+
+            ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+            IntegerColumn res(Allocator::get_default(), results_ref);
+
+            col.find_all(res, s, 0, -1, true);
+
+            // Check that all items in 'res' point at a match in 'col'
+            for (size_t t = 0; t < res.size(); t++) {
+                CHECK_EQUAL(col.get(res.get(t)), s);
+            }
+
+            // Check that all matches in 'col' exist in 'res'
+            for (size_t t = 0; t < col.size(); t++) {
+                if (col.get(t) == s) {
+                    CHECK(res.find_first(t) != npos);
+                }
+            }
+        }
+    }
+}
+
+
 #endif // TEST_INDEX_STRING
