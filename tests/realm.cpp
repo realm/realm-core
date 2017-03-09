@@ -32,6 +32,22 @@
 
 #include <realm/group.hpp>
 
+namespace realm {
+class TestHelper {
+public:
+    static const std::unique_ptr<SharedGroup> &get_shared_group(SharedRealm &shared_realm) {
+        Realm &realm = *(shared_realm.get());
+        return realm::Realm::Internal::get_shared_group(realm);
+    }
+
+    static void begin_read(SharedRealm &shared_realm, VersionID version) {
+        Realm::Internal::begin_read(*shared_realm, version);
+    }
+
+
+};
+}
+
 using namespace realm;
 
 TEST_CASE("SharedRealm: get_shared_realm()") {
@@ -181,6 +197,42 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it->persisted_properties.size() == 1);
         REQUIRE(it->persisted_properties[0].name == "value");
         REQUIRE(it->persisted_properties[0].table_column == 0);
+    }
+
+    SECTION("should read the proper schema from the file if a custom version is supplied") {
+        Realm::get_shared_realm(config);
+
+        config.schema = util::none;
+        config.cache = false;
+        config.schema_mode = SchemaMode::Additive;
+        config.schema_version = 0;
+
+        auto realm = Realm::get_shared_realm(config);
+        REQUIRE(realm->schema().size() == 1);
+
+        auto &shared_group = TestHelper::get_shared_group(realm);
+        shared_group->begin_read();
+        shared_group->pin_version();
+        realm::VersionID old_version = shared_group->get_version_of_current_transaction();
+        realm->close();
+
+        config.schema = Schema{
+            {"object", {
+                {"value", PropertyType::Int, "", "", false, false, false}
+            }},
+            {"object1", {
+                {"value", PropertyType::Int, "", "", false, false, false}
+            }},
+        };
+        config.schema_version = 1;
+        realm = Realm::get_shared_realm(config);
+        REQUIRE(realm->schema().size() == 2);
+
+        auto old_realm = Realm::get_shared_realm(config);
+        old_realm->invalidate();
+
+        TestHelper::begin_read(old_realm, old_version);
+        REQUIRE(old_realm->schema().size() == 1);
     }
 
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {

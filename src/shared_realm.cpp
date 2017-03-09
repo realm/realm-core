@@ -204,6 +204,8 @@ void Realm::Internal::begin_read(Realm& realm, VersionID version_id)
 {
     REALM_ASSERT(!realm.m_group);
     realm.m_group = &const_cast<Group&>(realm.m_shared_group->begin_read(version_id));
+    realm.m_schema_version = ObjectStore::get_schema_version(*realm.m_group);
+    realm.m_schema = ObjectStore::schema_from_group(*realm.m_group);
     realm.add_schema_change_handler();
 }
 
