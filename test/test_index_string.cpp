@@ -1872,23 +1872,23 @@ TEST(StringIndex_Insensitive_Fuzz)
         col.create_search_index();
 
         for (size_t t = 0; t < 1000; t++) {
-            std::string s = create_random_a_string(max_str_len);
+            std::string needle = create_random_a_string(max_str_len);
 
             ref_type results_ref = IntegerColumn::create(Allocator::get_default());
             IntegerColumn res(Allocator::get_default(), results_ref);
 
-            col.find_all(res, s, 0, realm::npos, true);
+            col.find_all(res, needle, 0, realm::npos, true);
 
             // Check that all items in 'res' point at a match in 'col'
-            auto s_upper = case_map(s, true);
+            auto needle_upper = case_map(needle, true);
             for (size_t res_ndx = 0; res_ndx < res.size(); res_ndx++) {
                 auto res_upper = case_map(col.get(to_size_t(res.get(res_ndx))), true);
-                CHECK_EQUAL(res_upper, s_upper);
+                CHECK_EQUAL(res_upper, needle_upper);
             }
 
             // Check that all matches in 'col' exist in 'res'
             for (size_t col_ndx = 0; col_ndx < col.size(); col_ndx++) {
-                if (col.get(col_ndx) == s) {
+                if (col.get(col_ndx) == needle) {
                     CHECK(res.find_first(col_ndx) != npos);
                 }
             }
