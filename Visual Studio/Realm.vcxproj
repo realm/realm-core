@@ -433,6 +433,8 @@
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">lib\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">lib\</OutDir>
     <OutDir Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">lib\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|ARM'">lib\</OutDir>
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|ARM'">lib\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\</IntDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">$(Platform)\$(Configuration)\</IntDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'">$(Platform)\$(Configuration)\</IntDir>
@@ -563,6 +565,10 @@
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='csv importer|ARM'" />
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'" />
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|ARM'">realm-arm-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|ARM'">realm-uwp-arm-dbg</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|ARM'">realm-uwp-arm</TargetName>
+    <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, release|ARM'">realm-arm</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">realm-x64-dbg</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">realm-uwp-x64-dbg</TargetName>
     <TargetName Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">realm-uwp-x64</TargetName>
