@@ -12926,28 +12926,20 @@ TEST(LangBindHelper_MixedStringRollback)
     SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
     Group& g = const_cast<Group&>(sg_w.begin_write());
 
-    g.add_table("table");
-    g.get_table(0)->add_column(type_Mixed, "mixed_column", false);
-    g.get_table(0)->add_empty_row();
+    TableRef t = g.add_table("table");
+    t->add_column(type_Mixed, "mixed_column", false);
+    t->add_empty_row();
     LangBindHelper::commit_and_continue_as_read(sg_w);
 
     // try with string
     LangBindHelper::promote_to_write(sg_w);
-    {
-        StringData str_data("any string data");
-        Mixed mixed(str_data);
-        g.get_table(0)->set_mixed(0, 0, mixed);
-    }
+    t->set_mixed(0, 0, StringData("any string data"));
     LangBindHelper::rollback_and_continue_as_read(sg_w);
     g.verify();
 
     // do the same with binary data
     LangBindHelper::promote_to_write(sg_w);
-    {
-        BinaryData bin_data("any binary data");
-        Mixed mixed(bin_data);
-        g.get_table(0)->set_mixed(0, 0, mixed);
-    }
+    t->set_mixed(0, 0, BinaryData("any binary data"));
     LangBindHelper::rollback_and_continue_as_read(sg_w);
     g.verify();
 }
