@@ -1881,7 +1881,7 @@ TEST(StringIndex_Insensitive_Fuzz)
             // Check that all items in 'res' point at a match in 'col'
             auto s_upper = case_map(s, true);
             for (size_t res_ndx = 0; res_ndx < res.size(); res_ndx++) {
-                auto res_upper = case_map(col.get(res.get(res_ndx)), true);
+                auto res_upper = case_map(col.get(to_size_t(res.get(res_ndx))), true);
                 CHECK_EQUAL(res_upper, s_upper);
             }
 
