@@ -147,8 +147,8 @@
     <AppContainerApplication>true</AppContainerApplication>
     <ApplicationType>Windows Store</ApplicationType>
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
-    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
-    <WindowsTargetPlatformMinVersion>10.0.10586.0</WindowsTargetPlatformMinVersion>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'" Label="Configuration">
@@ -157,8 +157,8 @@
     <AppContainerApplication>true</AppContainerApplication>
     <ApplicationType>Windows Store</ApplicationType>
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
-    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
-    <WindowsTargetPlatformMinVersion>10.0.10586.0</WindowsTargetPlatformMinVersion>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -279,8 +279,8 @@
     <AppContainerApplication>true</AppContainerApplication>
     <ApplicationType>Windows Store</ApplicationType>
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
-    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
-    <WindowsTargetPlatformMinVersion>10.0.10586.0</WindowsTargetPlatformMinVersion>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|ARM'" Label="Configuration">
@@ -289,8 +289,8 @@
     <AppContainerApplication>true</AppContainerApplication>
     <ApplicationType>Windows Store</ApplicationType>
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
-    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
-    <WindowsTargetPlatformMinVersion>10.0.10586.0</WindowsTargetPlatformMinVersion>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'" Label="Configuration">
@@ -299,8 +299,8 @@
     <AppContainerApplication>true</AppContainerApplication>
     <ApplicationType>Windows Store</ApplicationType>
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
-    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
-    <WindowsTargetPlatformMinVersion>10.0.10586.0</WindowsTargetPlatformMinVersion>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
     <WindowsAppContainer>true</WindowsAppContainer>
     <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -312,8 +312,8 @@
     <AppContainerApplication>true</AppContainerApplication>
     <ApplicationType>Windows Store</ApplicationType>
     <ApplicationTypeRevision>10.0</ApplicationTypeRevision>
-    <WindowsTargetPlatformVersion>10.0.10586.0</WindowsTargetPlatformVersion>
-    <WindowsTargetPlatformMinVersion>10.0.10586.0</WindowsTargetPlatformMinVersion>
+    <WindowsTargetPlatformVersion>10.0.14393.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformMinVersion>10.0.14393.0</WindowsTargetPlatformMinVersion>
     <WindowsAppContainer>true</WindowsAppContainer>
     <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -587,41 +587,41 @@
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</IncludePath>
     <ExcludePath>$(VC_IncludePath);$(WindowsSdk_71A_IncludePath);$(MSBuild_ExecutablePath);$(VC_LibraryPath_x64);</ExcludePath>
     <SourcePath>$(VC_SourcePath);$(UniversalCRT_IncludePath)</SourcePath>
-    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.10586.0\um\x64"</LibraryPath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.14393.0\um\x64"</LibraryPath>
     <LibraryWPath>$(WindowsSDK_MetadataPath); $(UniversalCRT_IncludePath)</LibraryWPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</IncludePath>
     <ExcludePath>$(VC_IncludePath);$(WindowsSdk_71A_IncludePath);$(MSBuild_ExecutablePath);$(VC_LibraryPath_x64);</ExcludePath>
     <SourcePath>$(VC_SourcePath);$(UniversalCRT_IncludePath)</SourcePath>
-    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.10586.0\um\x64"</LibraryPath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.14393.0\um\x64"</LibraryPath>
     <LibraryWPath>$(WindowsSDK_MetadataPath); $(UniversalCRT_IncludePath)</LibraryWPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</IncludePath>
-    <ReferencePath>$(VC_ReferencesPath_x64); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</ReferencePath>
-    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</LibraryPath>
-    <SourcePath>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(VC_SourcePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</SourcePath>
-    <LibraryWPath>$(WindowsSDK_MetadataPath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</LibraryWPath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</IncludePath>
+    <ReferencePath>$(VC_ReferencesPath_x64); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</ReferencePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</LibraryPath>
+    <SourcePath>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(VC_SourcePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</SourcePath>
+    <LibraryWPath>$(WindowsSDK_MetadataPath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</LibraryWPath>
     <ExcludePath />
-    <ExecutablePath>$(VC_ExecutablePath_x64);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(FxCopDir);$(PATH); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</ExecutablePath>
+    <ExecutablePath>$(VC_ExecutablePath_x64);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(FxCopDir);$(PATH); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</ExecutablePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|ARM'">
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</IncludePath>
-    <ReferencePath>$(VC_ReferencesPath_x64); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</ReferencePath>
-    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</LibraryPath>
-    <SourcePath>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(VC_SourcePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</SourcePath>
-    <LibraryWPath>$(WindowsSDK_MetadataPath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</LibraryWPath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</IncludePath>
+    <ReferencePath>$(VC_ReferencesPath_x64); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</ReferencePath>
+    <LibraryPath>$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</LibraryPath>
+    <SourcePath>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(VC_SourcePath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</SourcePath>
+    <LibraryWPath>$(WindowsSDK_MetadataPath); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</LibraryWPath>
     <ExcludePath />
-    <ExecutablePath>$(VC_ExecutablePath_x64);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(FxCopDir);$(PATH); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"</ExecutablePath>
+    <ExecutablePath>$(VC_ExecutablePath_x64);$(WindowsSDK_ExecutablePath);$(VS_ExecutablePath);$(MSBuild_ExecutablePath);$(FxCopDir);$(PATH); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"</ExecutablePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -716,7 +716,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -742,7 +742,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -954,10 +954,10 @@
       </PrecompiledHeader>
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt"</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt"</AdditionalIncludeDirectories>
       <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
-      <AdditionalUsingDirectories>; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt"</AdditionalUsingDirectories>
+      <AdditionalUsingDirectories>; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt"</AdditionalUsingDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -983,10 +983,10 @@
       </PrecompiledHeader>
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt"</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories); "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt"</AdditionalIncludeDirectories>
       <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
-      <AdditionalUsingDirectories>; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt"</AdditionalUsingDirectories>
+      <AdditionalUsingDirectories>; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt"</AdditionalUsingDirectories>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -1028,7 +1028,7 @@
     <Lib>
       <AdditionalOptions>
       </AdditionalOptions>
-      <AdditionalLibraryDirectories>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.10586.0\um\x64</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.14393.0\um\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>
       </AdditionalDependencies>
     </Lib>
@@ -1062,7 +1062,7 @@
     <Lib>
       <AdditionalOptions>
       </AdditionalOptions>
-      <AdditionalLibraryDirectories>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.10586.0\um\x64</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.14393.0\um\x64</AdditionalLibraryDirectories>
       <AdditionalDependencies>
       </AdditionalDependencies>
     </Lib>
@@ -1141,7 +1141,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -1230,7 +1230,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -1259,7 +1259,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
