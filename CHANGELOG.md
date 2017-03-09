@@ -3,6 +3,8 @@
 ### Bugfixes
 
 * Fixed an assertion on a corner case of reallocation on large arrays.
+  PR [#2500](https://github.com/realm/realm-core/pull/2500).
+  Fixes issue [#2451](https://github.com/realm/realm-core/issues/2451).
 
 ### Breaking changes
 
