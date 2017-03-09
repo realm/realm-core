@@ -3,7 +3,8 @@
 ### Bugfixes
 
 * Fixed a crash when rolling back a transaction which set binary or string data
- inside a Mixed type.
+  inside a Mixed type.
+  PR [#2501](https://github.com/realm/realm-core/pull/2501).
 
 ### Breaking changes
 
