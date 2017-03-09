@@ -1888,7 +1888,8 @@ TEST(StringIndex_Insensitive_Fuzz)
 
             // Check that all matches in 'col' exist in 'res'
             for (size_t col_ndx = 0; col_ndx < col.size(); col_ndx++) {
-                if (col.get(col_ndx) == needle) {
+                auto str_upper = case_map(col.get(col_ndx), true);
+                if (str_upper == needle_upper) {
                     CHECK(res.find_first(col_ndx) != npos);
                 }
             }
