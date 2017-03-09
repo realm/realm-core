@@ -1879,15 +1879,15 @@ TEST(StringIndex_Insensitive_Fuzz)
 
             // Check that all items in 'res' point at a match in 'col'
             auto s_upper = case_map(s, true);
-            for (size_t t = 0; t < res.size(); t++) {
-                auto res_upper = case_map(col.get(res.get(t)), true);
+            for (size_t res_ndx = 0; res_ndx < res.size(); res_ndx++) {
+                auto res_upper = case_map(col.get(res.get(res_ndx)), true);
                 CHECK_EQUAL(res_upper, s_upper);
             }
 
             // Check that all matches in 'col' exist in 'res'
-            for (size_t t = 0; t < col.size(); t++) {
-                if (col.get(t) == s) {
-                    CHECK(res.find_first(t) != npos);
+            for (size_t col_ndx = 0; col_ndx < col.size(); col_ndx++) {
+                if (col.get(col_ndx) == s) {
+                    CHECK(res.find_first(col_ndx) != npos);
                 }
             }
             res.destroy();
