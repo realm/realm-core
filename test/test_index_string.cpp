@@ -1888,8 +1888,10 @@ TEST(StringIndex_Insensitive_Fuzz)
                     CHECK(res.find_first(t) != npos);
                 }
             }
+            res.destroy();
         }
     }
+    col.destroy();
 }
 
 
