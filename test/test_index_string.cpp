@@ -1876,7 +1876,7 @@ TEST(StringIndex_Insensitive_Fuzz)
             ref_type results_ref = IntegerColumn::create(Allocator::get_default());
             IntegerColumn res(Allocator::get_default(), results_ref);
 
-            col.find_all(res, s, 0, -1, true);
+            col.find_all(res, s, 0, realm::npos, true);
 
             // Check that all items in 'res' point at a match in 'col'
             auto s_upper = case_map(s, true);
