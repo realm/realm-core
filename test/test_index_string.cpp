@@ -1857,7 +1857,7 @@ TEST_TYPES(StringIndex_Insensitive_Fuzz, non_nullable, nullable)
     constexpr bool nullable = TEST_TYPE::value;
 
     const size_t max_str_len = 9;
-    const size_t iters = 100;
+    const size_t iters = 10;
 
     for (size_t iter = 0; iter < iters; iter++) {
         ref_type ref = StringColumn::create(Allocator::get_default());
