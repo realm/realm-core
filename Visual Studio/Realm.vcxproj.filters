@@ -50,6 +50,7 @@
     <ClCompile Include="..\src\realm\index_string.cpp" />
     <ClCompile Include="..\src\realm\query.cpp" />
     <ClCompile Include="..\src\realm\spec.cpp" />
+    <ClCompile Include="..\src\realm\string_data.cpp" />
     <ClCompile Include="..\src\realm\util\string_buffer.cpp" />
     <ClCompile Include="..\src\realm\table.cpp" />
     <ClCompile Include="..\src\realm\row.cpp" />

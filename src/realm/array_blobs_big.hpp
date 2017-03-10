@@ -133,7 +133,7 @@ inline void ArrayBigBlobs::erase(size_t ndx)
 {
     ref_type blob_ref = Array::get_as_ref(ndx);
     if (blob_ref != 0) {                       // nothing to destroy if null
-        Array::destroy(blob_ref, get_alloc()); // Shallow
+        Array::destroy_deep(blob_ref, get_alloc()); // Deep
     }
     Array::erase(ndx);
 }
