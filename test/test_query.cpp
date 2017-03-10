@@ -1956,6 +1956,108 @@ TEST(Query_size)
     CHECK_EQUAL(6, tv.size());
 }
 
+
+TEST(Query_SubtableExpression)
+{
+    Group g;
+
+    TableRef table = g.add_table("foo");
+
+    DescriptorRef subdescr;
+    table->add_column(type_Table, "integers", &subdescr);
+    subdescr->add_column(type_Int, "list");
+    table->add_column(type_Table, "strings", &subdescr);
+    subdescr->add_column(type_String, "list", nullptr, true);
+
+    table->add_empty_row(4);
+
+    auto set_int_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
+        size_t sz = value_list.size();
+        subtable->clear();
+        if (sz) {
+            subtable->add_empty_row(sz);
+            for (size_t i = 0; i < sz; i++) {
+                subtable->set_int(0, i, value_list[i]);
+            }
+        }
+    };
+    auto set_string_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
+        size_t sz = value_list.size();
+        subtable->clear();
+        subtable->add_empty_row(sz);
+        for (size_t i = 0; i < sz; i++) {
+            if (value_list[i] < 100) {
+                std::string str("Str_");
+                str += util::to_string(value_list[i]);
+                subtable->set_string(0, i, str);
+            }
+        }
+    };
+    set_int_list(table->get_subtable(0, 0), std::vector<Int>({0, 1}));
+    set_int_list(table->get_subtable(0, 1), std::vector<Int>({2, 3, 4, 5}));
+    set_int_list(table->get_subtable(0, 2), std::vector<Int>({6, 7, 8, 9}));
+    set_int_list(table->get_subtable(0, 3), std::vector<Int>({}));
+    set_string_list(table->get_subtable(1, 0), std::vector<Int>({0, 1}));
+    set_string_list(table->get_subtable(1, 1), std::vector<Int>({2, 3, 4, 5}));
+    set_string_list(table->get_subtable(1, 2), std::vector<Int>({6, 7, 100, 8, 9}));
+
+    Query q;
+    TableView tv;
+    q = table->column<SubTable>(0).list<Int>() == 5;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 1);
+    q = table->column<SubTable>(1).list<String>() == StringData("Str_5");
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 1);
+    q = table->column<SubTable>(0).list<Int>().min() >= 2;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_source_ndx(0), 1);
+    CHECK_EQUAL(tv.get_source_ndx(1), 2);
+    q = table->column<SubTable>(0).list<Int>().max() > 6;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 2);
+    q = table->column<SubTable>(0).list<Int>().sum() == 14;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 1);
+    q = table->column<SubTable>(0).list<Int>().average() < 4;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_source_ndx(0), 0);
+    CHECK_EQUAL(tv.get_source_ndx(1), 1);
+
+    TableRef baa = g.add_table("baa");
+    baa->add_column_link(type_Link, "link", *table);
+    baa->add_column_link(type_LinkList, "linklist", *table);
+    baa->add_empty_row(3);
+    baa->set_link(0, 0, 1);
+    baa->set_link(0, 1, 0);
+    auto lv = baa->get_linklist(1, 0);
+    lv->add(0);
+    lv->add(1);
+    lv = baa->get_linklist(1, 1);
+    lv->add(1);
+    lv->add(2);
+    lv->add(3);
+
+    q = baa->link(0).column<SubTable>(0).list<Int>() == 5;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 0);
+
+    q = baa->link(1).column<SubTable>(1).list<String>() == StringData("Str_5");
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+
+    q = baa->link(1).column<SubTable>(0).list<Int>().average() >= 2.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+}
+
 TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
 {
     Group group;
@@ -9707,7 +9809,9 @@ TEST(Query_TableInitialization)
         table.set_binary(col_binary, i, BinaryData(str), false);
         table.set_link(col_link, i, i);
         table.get_linklist(col_list, i)->add(i);
-        table.get_subtable(col_table, i)->add_empty_row();
+        auto subtable = table.get_subtable(col_table, i);
+        auto row = subtable->add_empty_row();
+        subtable->set_int(0, row, i);
     }
     LangBindHelper::commit_and_continue_as_read(sg);
 
@@ -9938,6 +10042,11 @@ TEST(Query_TableInitialization)
 
         auto list_table = [&] { return get_table().template column<SubTable>(col_table); };
         helper([&](Query&, auto&& test) { test(list_table().size() == 1); });
+        helper([&](Query&, auto&& test) { test(list_table().list<Int>() > 0); });
+        helper([&](Query&, auto&& test) { test(list_table().list<Int>().max() > 0); });
+        helper([&](Query&, auto&& test) { test(list_table().list<Int>().min() > 0); });
+        helper([&](Query&, auto&& test) { test(list_table().list<Int>().sum() > 0); });
+        helper([&](Query&, auto&& test) { test(list_table().list<Int>().average() > 0); });
     };
 
     // Test all of the query expressions directly, over a link, over a backlink
