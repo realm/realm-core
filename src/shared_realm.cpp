@@ -63,6 +63,8 @@ Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator
         // otherwise get the schema from the group
         m_schema_version = ObjectStore::get_schema_version(read_group());
         m_schema = ObjectStore::schema_from_group(read_group());
+        if (coordinator && m_schema_version != ObjectStore::NotVersioned)
+            coordinator->cache_schema(m_schema, m_schema_version);
 
         if (m_shared_group) {
             m_schema_transaction_version = m_shared_group->get_version_of_current_transaction().version;
@@ -219,7 +221,7 @@ void Realm::set_schema(Schema schema, uint64_t version)
 {
     schema.copy_table_columns_from(m_schema);
     m_schema = schema;
-    m_coordinator->update_schema(schema, version);
+    m_coordinator->set_schema_version(version);
 }
 
 bool Realm::read_schema_from_group_if_needed()
@@ -373,7 +375,8 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
     if (!in_transaction) {
         commit_transaction();
     }
-    m_coordinator->update_schema(m_schema, version);
+
+    m_coordinator->set_schema_version(version);
 }
 
 void Realm::add_schema_change_handler()
@@ -383,8 +386,9 @@ void Realm::add_schema_change_handler()
             auto new_schema = ObjectStore::schema_from_group(read_group());
             auto required_changes = m_schema.compare(new_schema);
             ObjectStore::verify_valid_additive_changes(required_changes);
+            m_schema_version = ObjectStore::get_schema_version(read_group());
+            m_coordinator->cache_schema(new_schema, m_schema_version);
             m_schema.copy_table_columns_from(new_schema);
-            m_coordinator->update_schema(m_schema, m_schema_version);
         });
     }
 }

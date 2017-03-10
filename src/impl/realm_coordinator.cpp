@@ -234,15 +234,16 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm()
     return get_realm(m_config);
 }
 
-const Schema* RealmCoordinator::get_schema() const noexcept
+void RealmCoordinator::cache_schema(Schema const& new_schema, uint64_t new_schema_version)
 {
-    return m_schema_version == uint64_t(-1) ? nullptr : &m_schema;
+    m_cached_schema = new_schema;
+    m_schema_version = new_schema_version;
 }
 
-void RealmCoordinator::update_schema(Schema const& schema, uint64_t schema_version)
+void RealmCoordinator::set_schema_version(uint64_t new_schema_version)
 {
-    m_schema = schema;
-    m_schema_version = schema_version;
+    m_cached_schema = util::none;
+    m_schema_version = new_schema_version;
 }
 
 RealmCoordinator::RealmCoordinator() = default;

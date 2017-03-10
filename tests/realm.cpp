@@ -270,6 +270,41 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it->persisted_properties[0].table_column == 0);
     }
 
+    SECTION("should support using different table subsets on different threads") {
+        config.cache = false;
+        auto realm1 = Realm::get_shared_realm(config);
+
+        config.schema = Schema{
+            {"object 2", {
+                {"value", PropertyType::Int, "", "", false, false, false}
+            }},
+        };
+        auto realm2 = Realm::get_shared_realm(config);
+
+        config.schema = util::none;
+        auto realm3 = Realm::get_shared_realm(config);
+
+        config.schema = Schema{
+            {"object", {
+                {"value", PropertyType::Int, "", "", false, false, false}
+            }},
+        };
+        auto realm4 = Realm::get_shared_realm(config);
+
+        realm1->refresh();
+        realm2->refresh();
+
+        REQUIRE(realm1->schema().size() == 1);
+        REQUIRE(realm1->schema().find("object") != realm1->schema().end());
+        REQUIRE(realm2->schema().size() == 1);
+        REQUIRE(realm2->schema().find("object 2") != realm2->schema().end());
+        REQUIRE(realm3->schema().size() == 2);
+        REQUIRE(realm3->schema().find("object") != realm2->schema().end());
+        REQUIRE(realm3->schema().find("object 2") != realm2->schema().end());
+        REQUIRE(realm4->schema().size() == 1);
+        REQUIRE(realm4->schema().find("object") != realm1->schema().end());
+    }
+
 // The ExternalCommitHelper implementation on Windows doesn't rely on files
 #if !WIN32
     SECTION("should throw when creating the notification pipe fails") {
@@ -460,6 +495,33 @@ TEST_CASE("SharedRealm: notifications") {
         // Despite not sending a new notification we did advance the version, so
         // no more versions to refresh to
         REQUIRE_FALSE(realm->refresh());
+    }
+}
+
+TEST_CASE("SharedRealm: schema updating from external changes") {
+    TestFile config;
+    config.cache = false;
+    config.schema_version = 0;
+    config.schema_mode = SchemaMode::Additive;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int, "", "", false, false, false}
+        }},
+    };
+
+    SECTION("newly added columns update table columns but are not added to properties") {
+        auto r1 = Realm::get_shared_realm(config);
+        auto r2 = Realm::get_shared_realm(config);
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->insert_column(0, type_String, "new col");
+        r2->commit_transaction();
+
+        auto& object_schema = *r1->schema().find("object");
+        REQUIRE(object_schema.persisted_properties.size() == 1);
+        REQUIRE(object_schema.persisted_properties[0].table_column == 0);
+        r1->refresh();
+        REQUIRE(object_schema.persisted_properties.size() == 1);
+        REQUIRE(object_schema.persisted_properties[0].table_column == 1);
     }
 }
 

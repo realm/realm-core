@@ -979,17 +979,18 @@ TEST_CASE("migration: ResetFile") {
 }
 
 TEST_CASE("migration: Additive") {
-    InMemoryTestFile config;
-    config.schema_mode = SchemaMode::Additive;
-    config.cache = false;
-    auto realm = Realm::get_shared_realm(config);
-
     Schema schema = {
         {"object", {
             {"value", PropertyType::Int, "", "", false, true, false},
             {"value 2", PropertyType::Int, "", "", false, false, true},
         }},
     };
+
+    TestFile config;
+    config.schema_mode = SchemaMode::Additive;
+    config.cache = false;
+    config.schema = schema;
+    auto realm = Realm::get_shared_realm(config);
     realm->update_schema(schema);
 
     SECTION("can add new properties to existing tables") {
@@ -1133,9 +1134,46 @@ TEST_CASE("migration: Additive") {
         REQUIRE(realm->schema().find("object")->persisted_properties[0].table_column == 1);
         REQUIRE(realm->schema().find("object")->persisted_properties[1].table_column == 2);
 
+        // Gets the schema from the RealmCoordinator
         auto realm3 = Realm::get_shared_realm(config);
         REQUIRE(realm3->schema().find("object")->persisted_properties[0].table_column == 1);
         REQUIRE(realm3->schema().find("object")->persisted_properties[1].table_column == 2);
+
+        // Close and re-open the file entirely so that the coordinator is recreated
+        realm.reset();
+        realm2.reset();
+        realm3.reset();
+
+        realm = Realm::get_shared_realm(config);
+        REQUIRE(realm->schema() == schema);
+        REQUIRE(realm->schema().find("object")->persisted_properties[0].table_column == 1);
+        REQUIRE(realm->schema().find("object")->persisted_properties[1].table_column == 2);
+    }
+
+    SECTION("can have different subsets of columns in different Realm instances") {
+        auto config2 = config;
+        config2.schema = add_property(schema, "object",
+                                      {"value 3", PropertyType::Int, "", "", false, false, false});
+        auto config3 = config;
+        config3.schema = remove_property(schema, "object", "value 2");
+
+        auto config4 = config;
+        config4.schema = util::none;
+
+        auto realm2 = Realm::get_shared_realm(config2);
+        auto realm3 = Realm::get_shared_realm(config3);
+        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 2);
+        REQUIRE(realm2->schema().find("object")->persisted_properties.size() == 3);
+        REQUIRE(realm3->schema().find("object")->persisted_properties.size() == 1);
+
+        realm->refresh();
+        realm2->refresh();
+        REQUIRE(realm->schema().find("object")->persisted_properties.size() == 2);
+        REQUIRE(realm2->schema().find("object")->persisted_properties.size() == 3);
+
+        // No schema specified; should see all of them
+        auto realm4 = Realm::get_shared_realm(config4);
+        REQUIRE(realm4->schema().find("object")->persisted_properties.size() == 3);
     }
 
     SECTION("increasing schema version without modifying schema properly leaves the schema untouched") {

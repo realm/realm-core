@@ -57,7 +57,7 @@ public:
 
     Realm::Config get_config() const { return m_config; }
 
-    const Schema* get_schema() const noexcept;
+    const Schema* get_schema() const noexcept { return m_cached_schema ? &*m_cached_schema : nullptr; }
     uint64_t get_schema_version() const noexcept { return m_schema_version; }
     const std::string& get_path() const noexcept { return m_config.path; }
     const std::vector<char>& get_encryption_key() const noexcept { return m_config.encryption_key; }
@@ -92,7 +92,8 @@ public:
     void on_change();
 
     // Update the cached schema
-    void update_schema(Schema const& new_schema, uint64_t new_schema_version);
+    void cache_schema(Schema const& new_schema, uint64_t new_schema_version);
+    void set_schema_version(uint64_t new_schema_version);
 
     static void register_notifier(std::shared_ptr<CollectionNotifier> notifier);
 
@@ -123,7 +124,7 @@ public:
 
 private:
     Realm::Config m_config;
-    Schema m_schema;
+    util::Optional<Schema> m_cached_schema;
     uint64_t m_schema_version = -1;
 
     std::mutex m_realm_mutex;
