@@ -209,6 +209,11 @@ size_t IndexArray::from_list<index_FindAll_ins>(StringData upper_value, IntegerC
     StringData first_str = column->get_index_data(to_size_t(*rows.cbegin()), buffer);
     StringData last_str = column->get_index_data(to_size_t(*(rows.cend() - 1)), buffer);
     if (first_str == last_str) {
+        auto first_str_upper = case_map(first_str, true);
+        if (first_str_upper != upper_value) {
+            return size_t(FindRes_not_found); // is ignored
+        }
+
         for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
             const size_t row_ndx = to_size_t(*it);
             result.add(row_ndx);
