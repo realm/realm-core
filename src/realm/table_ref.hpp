@@ -259,6 +259,11 @@ public:
         return (*this->get())[i];
     }
 
+    explicit BasicTableRef(T* t) noexcept
+        : util::bind_ptr<T>(t)
+    {
+    }
+
 private:
     friend class SubtableColumnBase;
     friend class Table;
@@ -266,11 +271,6 @@ private:
 
     template <class>
     friend class BasicTableRef;
-
-    explicit BasicTableRef(T* t) noexcept
-        : util::bind_ptr<T>(t)
-    {
-    }
 
     typedef typename util::bind_ptr<T>::casting_move_tag casting_move_tag;
     template <class U>

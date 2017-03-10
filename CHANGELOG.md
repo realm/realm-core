@@ -10,7 +10,9 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Allow query for size of strings, binaries, linklists and subtables:
+  Query q = table->where().size_equal(2, 5);
+  Query q = table1->column<SubTable>(2).size() == 5;
 
 -----------
 

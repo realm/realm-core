@@ -17,8 +17,64 @@
  **************************************************************************/
 
 #include <realm/query_engine.hpp>
+#include <realm/column_table.hpp>
 
 using namespace realm;
+
+namespace realm {
+
+Columns<SubTable>::Columns(const Columns& other, QueryNodeHandoverPatches* patches)
+    : Subexpr2<SubTable>(other)
+    , m_link_map(other.m_link_map, patches)
+    , m_column_ndx(other.m_column_ndx)
+    , m_column(other.m_column)
+{
+    if (m_column && patches)
+        m_column_ndx = m_column->get_column_index();
+}
+
+void Columns<SubTable>::evaluate(size_t index, ValueBase& destination)
+{
+    Value<ConstTableRef>* d = dynamic_cast<Value<ConstTableRef>*>(&destination);
+    REALM_ASSERT(d);
+
+    if (m_link_map.m_link_columns.size() > 0) {
+        std::vector<size_t> links = m_link_map.get_links(index);
+        auto sz = links.size();
+
+        if (m_link_map.only_unary_links()) {
+            ConstTableRef val;
+            if (sz == 1) {
+                val = ConstTableRef(m_column->get_subtable_ptr(links[0]));
+            }
+            d->init(false, 1, val);
+        }
+        else {
+            d->init(true, sz);
+            for (size_t t = 0; t < sz; t++) {
+                const Table* table = m_column->get_subtable_ptr(links[t]);
+                d->m_storage.set(t, ConstTableRef(table));
+            }
+        }
+    }
+    else {
+        size_t rows = std::min(m_column->size() - index, ValueBase::default_size + 0);
+
+        d->init(false, rows);
+
+        for (size_t t = 0; t < rows; t++) {
+            const Table* table = m_column->get_subtable_ptr(index + t);
+            d->m_storage.set(t, ConstTableRef(table));
+        }
+    }
+}
+
+void Columns<SubTable>::verify_column() const
+{
+    m_link_map.verify_columns();
+    m_link_map.target_table()->verify_column(m_column_ndx, m_column);
+}
+}
 
 size_t ParentNode::find_first(size_t start, size_t end)
 {

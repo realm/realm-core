@@ -374,6 +374,29 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
     }
 }
 
+template <class Cond>
+std::unique_ptr<ParentNode> make_size_condition_node(const Descriptor& descriptor, size_t column_ndx, int64_t value)
+{
+    DataType type = descriptor.get_column_type(column_ndx);
+    switch (type) {
+        case type_String: {
+            return std::unique_ptr<ParentNode>{new SizeNode<StringColumn, Cond>(value, column_ndx)};
+        }
+        case type_Binary: {
+            return std::unique_ptr<ParentNode>{new SizeNode<BinaryColumn, Cond>(value, column_ndx)};
+        }
+        case type_LinkList: {
+            return std::unique_ptr<ParentNode>{new SizeNode<LinkListColumn, Cond>(value, column_ndx)};
+        }
+        case type_Table: {
+            return std::unique_ptr<ParentNode>{new SizeNode<SubtableColumn, Cond>(value, column_ndx)};
+        }
+        default: {
+            throw LogicError{LogicError::type_mismatch};
+        }
+    }
+}
+
 } // anonymous namespace
 
 void Query::fetch_descriptor()
@@ -391,6 +414,16 @@ Query& Query::add_condition(size_t column_ndx, T value)
 {
     REALM_ASSERT_DEBUG(m_current_descriptor);
     auto node = make_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
+    add_node(std::move(node));
+    return *this;
+}
+
+
+template <typename TConditionFunction>
+Query& Query::add_size_condition(size_t column_ndx, int64_t value)
+{
+    REALM_ASSERT_DEBUG(m_current_descriptor);
+    auto node = make_size_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
     add_node(std::move(node));
     return *this;
 }
@@ -729,6 +762,39 @@ Query& Query::less(size_t column_ndx, Timestamp value)
     return add_condition<Less>(column_ndx, value);
 }
 
+// ------------- size
+Query& Query::size_equal(size_t column_ndx, int64_t value)
+{
+    return add_size_condition<Equal>(column_ndx, value);
+}
+Query& Query::size_not_equal(size_t column_ndx, int64_t value)
+{
+    return add_size_condition<NotEqual>(column_ndx, value);
+}
+Query& Query::size_greater(size_t column_ndx, int64_t value)
+{
+    return add_size_condition<Greater>(column_ndx, value);
+}
+Query& Query::size_greater_equal(size_t column_ndx, int64_t value)
+{
+    return add_size_condition<GreaterEqual>(column_ndx, value);
+}
+Query& Query::size_less_equal(size_t column_ndx, int64_t value)
+{
+    return add_size_condition<LessEqual>(column_ndx, value);
+}
+Query& Query::size_less(size_t column_ndx, int64_t value)
+{
+    return add_size_condition<Less>(column_ndx, value);
+}
+Query& Query::size_between(size_t column_ndx, int64_t from, int64_t to)
+{
+    group();
+    size_greater_equal(column_ndx, from);
+    size_less_equal(column_ndx, to);
+    end_group();
+    return *this;
+}
 
 // Strings, StringData()
 
