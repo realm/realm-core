@@ -330,11 +330,25 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         return;
     // Either the schema version has changed or we need to do non-migration changes
 
-    m_group->set_schema_change_notification_handler(nullptr);
     if (!in_transaction) {
+        bool schema_changed = false;
+        m_group->set_schema_change_notification_handler([&]{
+            schema_changed = true;
+            m_schema = ObjectStore::schema_from_group(read_group());
+            m_schema_version = ObjectStore::get_schema_version(read_group());
+            m_coordinator->cache_schema(m_schema, m_schema_version);
+            required_changes = m_schema.compare(schema);
+        });
         transaction::begin_without_validation(*m_shared_group);
+        add_schema_change_handler();
+
+        // Beginning the write transaction may have advanced the version and left
+        // us with nothing to do if someone else initialized the schema on disk
+        if (schema_changed && no_changes_required()) {
+            cancel_transaction();
+            return;
+        }
     }
-    add_schema_change_handler();
 
     // Cancel the write transaction if we exit this function before committing it
     auto cleanup = util::make_scope_exit([&]() noexcept {
@@ -342,16 +356,6 @@ void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction mig
         if (!in_transaction && is_in_transaction())
             cancel_transaction();
     });
-
-    // If beginning the write transaction advanced the version, then someone else
-    // may have updated the schema and we need to re-read it
-    // We can't just begin the write transaction before checking anything because
-    // that means that write transactions would block opening Realms in other processes
-    if (read_schema_from_group_if_needed()) {
-        required_changes = m_schema.compare(schema);
-        if (no_changes_required())
-            return;
-    }
 
     bool additive = m_config.schema_mode == SchemaMode::Additive;
     if (migration_function && !additive) {
