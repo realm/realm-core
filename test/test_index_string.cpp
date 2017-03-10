@@ -1927,4 +1927,46 @@ TEST_TYPES(StringIndex_Insensitive_Fuzz, non_nullable, nullable)
 }
 
 
+// Exercise the StringIndex case insensitive search for strings with very long, common prefixes
+// to cover the special case code paths where different strings are stored in a list.
+TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+    const StringIndex& ndx = *col.create_search_index();
+
+    std::string long1 = std::string(StringIndex::s_max_offset + 10, 'a');
+    std::string long2 = long1 + "b";
+    std::string long3 = long1 + "c";
+
+    // Add the strings in a "random" order
+    col.add(long1);
+    col.add(long2);
+    col.add(long2);
+    col.add(long1);
+    col.add(long3);
+    col.add(long2);
+    col.add(long1);
+    col.add(long1);
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+
+    col.find_all(results, long1, 0, realm::npos, true);
+    CHECK_EQUAL(results.size(), 4);
+    results.clear();
+    ndx.find_all(results, long2.c_str(), true);
+    CHECK_EQUAL(results.size(), 3);
+    results.clear();
+    ndx.find_all(results, long3.c_str(), true);
+    CHECK_EQUAL(results.size(), 1);
+    results.clear();
+
+    results.destroy();
+    col.destroy();
+}
+
+
 #endif // TEST_INDEX_STRING
