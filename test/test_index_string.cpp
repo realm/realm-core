@@ -1852,14 +1852,16 @@ std::string create_random_a_string(size_t max_len) {
 }
 
 
-TEST(StringIndex_Insensitive_Fuzz)
+TEST_TYPES(StringIndex_Insensitive_Fuzz, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     const size_t max_str_len = 9;
     const size_t iters = 100;
 
     for (size_t iter = 0; iter < iters; iter++) {
         ref_type ref = StringColumn::create(Allocator::get_default());
-        StringColumn col(Allocator::get_default(), ref);
+        StringColumn col(Allocator::get_default(), ref, nullable);
 
         size_t rows = fastrand(2 * REALM_MAX_BPNODE_SIZE - 1);
 
