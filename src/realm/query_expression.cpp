@@ -31,7 +31,7 @@ void Columns<Link>::evaluate(size_t index, ValueBase& destination)
     destination.import(v);
 }
 
-void Columns<SubTable>::evaluate(size_t index, ValueBase& destination)
+void Columns<SubTable>::evaluate_internal(size_t index, ValueBase& destination, size_t nb_elements)
 {
     REALM_ASSERT_DEBUG(dynamic_cast<Value<ConstTableRef>*>(&destination) != nullptr);
     Value<ConstTableRef>* d = static_cast<Value<ConstTableRef>*>(&destination);
@@ -57,8 +57,7 @@ void Columns<SubTable>::evaluate(size_t index, ValueBase& destination)
         }
     }
     else {
-        // Adding zero to ValueBase::default_size to avoid taking the address
-        size_t rows = std::min(m_column->size() - index, ValueBase::default_size + 0);
+        size_t rows = std::min(m_column->size() - index, nb_elements);
 
         d->init(false, rows);
 

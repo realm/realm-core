@@ -2461,6 +2461,21 @@ private:
     }
 };
 
+template <typename T>
+class ListColumns;
+template <typename T, typename Operation>
+class ListColumnAggregate;
+namespace aggregate_operations {
+template <typename T>
+class Minimum;
+template <typename T>
+class Maximum;
+template <typename T>
+class Sum;
+template <typename T>
+class Average;
+}
+
 template <>
 class Columns<SubTable> : public Subexpr2<SubTable> {
 public:
@@ -2486,7 +2501,23 @@ public:
         return std::unique_ptr<Subexpr>(new Columns<SubTable>(*this, patches));
     }
 
-    void evaluate(size_t index, ValueBase& destination) override;
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        evaluate_internal(index, destination, ValueBase::default_size);
+    }
+    void evaluate_internal(size_t index, ValueBase& destination, size_t nb_elements);
+
+    template <typename T>
+    ListColumns<T> column(size_t ndx) const
+    {
+        return ListColumns<T>(ndx, Columns<SubTable>(*this, nullptr));
+    }
+
+    template <typename T>
+    ListColumns<T> list() const
+    {
+        return column<T>(0);
+    }
 
     SizeOperator<Size<ConstTableRef>> size()
     {
@@ -2498,6 +2529,10 @@ private:
     size_t m_column_ndx;
     const SubtableColumn* m_column = nullptr;
     friend class Table;
+    template <class T>
+    friend class ListColumns;
+    template <class T, class U>
+    friend class ListColumnAggregate;
 
     Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {})
         : m_link_map(table, links)
@@ -2515,6 +2550,162 @@ private:
         if (m_column && patches)
             m_column_ndx = m_column->get_column_index();
     }
+};
+
+template <typename T>
+class ListColumns : public Subexpr2<T> {
+public:
+    ListColumns(size_t column_ndx, Columns<SubTable> column)
+        : m_column_ndx(column_ndx)
+        , m_subtable_column(std::move(column))
+    {
+    }
+
+    ListColumns(const ListColumns& other, QueryNodeHandoverPatches* patches)
+        : m_column_ndx(other.m_column_ndx)
+        , m_subtable_column(other.m_subtable_column, patches)
+    {
+    }
+
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return make_subexpr<ListColumns>(*this, patches);
+    }
+
+    const Table* get_base_table() const override
+    {
+        return m_subtable_column.get_base_table();
+    }
+
+    void set_base_table(const Table* table) override
+    {
+        m_subtable_column.set_base_table(table);
+    }
+
+    void verify_column() const override
+    {
+        m_subtable_column.verify_column();
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        Value<ConstTableRef> subtables;
+        m_subtable_column.evaluate_internal(index, subtables, 1);
+        size_t sz = 0;
+        for (size_t i = 0; i < subtables.m_values; i++) {
+            auto val = subtables.m_storage[i];
+            if (val)
+                sz += val->size();
+        }
+        auto v = make_value_for_link<typename util::RemoveOptional<T>::type>(false, sz);
+        size_t k = 0;
+        for (size_t i = 0; i < subtables.m_values; i++) {
+            auto table = subtables.m_storage[i];
+            if (table) {
+                size_t s = table->size();
+                for (size_t j = 0; j < s; j++) {
+                    if (!table->is_null(m_column_ndx, j)) {
+                        v.m_storage.set(k++, table->get<T>(m_column_ndx, j));
+                    }
+                }
+            }
+        }
+        destination.import(v);
+    }
+
+    ListColumnAggregate<T, aggregate_operations::Minimum<T>> min() const
+    {
+        return {m_column_ndx, m_subtable_column};
+    }
+
+    ListColumnAggregate<T, aggregate_operations::Maximum<T>> max() const
+    {
+        return {m_column_ndx, m_subtable_column};
+    }
+
+    ListColumnAggregate<T, aggregate_operations::Sum<T>> sum() const
+    {
+        return {m_column_ndx, m_subtable_column};
+    }
+
+    ListColumnAggregate<T, aggregate_operations::Average<T>> average() const
+    {
+        return {m_column_ndx, m_subtable_column};
+    }
+
+
+private:
+    size_t m_column_ndx;
+    Columns<SubTable> m_subtable_column;
+};
+
+template <typename T, typename Operation>
+class ListColumnAggregate : public Subexpr2<typename Operation::ResultType> {
+public:
+    using R = typename Operation::ResultType;
+
+    ListColumnAggregate(size_t column_ndx, Columns<SubTable> column)
+        : m_column_ndx(column_ndx)
+        , m_subtable_column(std::move(column))
+    {
+    }
+
+    ListColumnAggregate(const ListColumnAggregate& other, QueryNodeHandoverPatches* patches)
+        : m_column_ndx(other.m_column_ndx)
+        , m_subtable_column(other.m_subtable_column, patches)
+    {
+    }
+
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return make_subexpr<ListColumnAggregate>(*this, patches);
+    }
+
+    const Table* get_base_table() const override
+    {
+        return m_subtable_column.get_base_table();
+    }
+
+    void set_base_table(const Table* table) override
+    {
+        m_subtable_column.set_base_table(table);
+    }
+
+    void verify_column() const override
+    {
+        m_subtable_column.verify_column();
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        Value<ConstTableRef> subtables;
+        m_subtable_column.evaluate_internal(index, subtables, 1);
+        REALM_ASSERT_DEBUG(subtables.m_values > 0 || subtables.m_from_link_list);
+        size_t sz = subtables.m_values;
+        // The result is an aggregate value for each table
+        auto v = make_value_for_link<R>(!subtables.m_from_link_list, sz);
+        for (unsigned i = 0; i < sz; i++) {
+            auto table = subtables.m_storage[i];
+            Operation op;
+            if (table) {
+                size_t s = table->size();
+                for (unsigned j = 0; j < s; j++) {
+                    op.accumulate(table->get<T>(m_column_ndx, j));
+                }
+            }
+            if (op.is_null()) {
+                v.m_storage.set_null(i);
+            }
+            else {
+                v.m_storage.set(i, op.result());
+            }
+        }
+        destination.import(v);
+    }
+
+private:
+    size_t m_column_ndx;
+    Columns<SubTable> m_subtable_column;
 };
 
 template <class Operator>
@@ -2801,16 +2992,6 @@ private:
 
 template <typename T, typename Operation>
 class SubColumnAggregate;
-namespace aggregate_operations {
-template <typename T>
-class Minimum;
-template <typename T>
-class Maximum;
-template <typename T>
-class Sum;
-template <typename T>
-class Average;
-}
 
 template <typename T>
 class SubColumns : public Subexpr {
