@@ -97,9 +97,11 @@ benchmark-common-tasks: check-norun/subdir/util
 benchmark-history-types: check-norun/subdir/util
 	@$(MAKE) -C benchmark-history-types check
 
-.PHONY: fuzzy
-fuzzy: check-norun/subdir/util
-	@$(MAKE) -C fuzzy check
+.PHONY: fuzz fuzz-debug
+fuzz: check-norun/subdir/fuzzy
+	@$(MAKE) -C fuzzy release
+fuzz-debug: check-debug-norun/subdir/fuzzy
+	@$(MAKE) -C fuzzy debug
 
 # Build and run whatever is in experiements/testcase.cpp
 .PHONY: check-testcase check-testcase-debug memcheck-testcase memcheck-testcase-debug
