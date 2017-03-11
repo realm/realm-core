@@ -35,16 +35,15 @@
 namespace realm {
 class TestHelper {
 public:
-    static const std::unique_ptr<SharedGroup> &get_shared_group(SharedRealm &shared_realm) {
-        Realm &realm = *(shared_realm.get());
-        return realm::Realm::Internal::get_shared_group(realm);
+    static SharedGroup& get_shared_group(SharedRealm const& shared_realm)
+    {
+        return *Realm::Internal::get_shared_group(*shared_realm);
     }
 
-    static void begin_read(SharedRealm &shared_realm, VersionID version) {
+    static void begin_read(SharedRealm const& shared_realm, VersionID version)
+    {
         Realm::Internal::begin_read(*shared_realm, version);
     }
-
-
 };
 }
 
@@ -134,6 +133,17 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         }
     }
 
+    SECTION("should verify that the schema is valid") {
+        config.schema = Schema{
+            {"object",
+                {{"value", PropertyType::Int}},
+                {{"invalid backlink", PropertyType::LinkingObjects, "object", "value"}}
+            }
+        };
+        REQUIRE_THROWS_WITH(Realm::get_shared_realm(config),
+                            Catch::Matchers::Contains("origin of linking objects property"));
+    }
+
     SECTION("should apply the schema if one is supplied") {
         Realm::get_shared_realm(config);
 
@@ -210,10 +220,10 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         auto realm = Realm::get_shared_realm(config);
         REQUIRE(realm->schema().size() == 1);
 
-        auto &shared_group = TestHelper::get_shared_group(realm);
-        shared_group->begin_read();
-        shared_group->pin_version();
-        realm::VersionID old_version = shared_group->get_version_of_current_transaction();
+        auto& shared_group = TestHelper::get_shared_group(realm);
+        shared_group.begin_read();
+        shared_group.pin_version();
+        VersionID old_version = shared_group.get_version_of_current_transaction();
         realm->close();
 
         config.schema = Schema{
@@ -228,9 +238,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         realm = Realm::get_shared_realm(config);
         REQUIRE(realm->schema().size() == 2);
 
+        config.schema = util::none;
         auto old_realm = Realm::get_shared_realm(config);
-        old_realm->invalidate();
-
         TestHelper::begin_read(old_realm, old_version);
         REQUIRE(old_realm->schema().size() == 1);
     }
@@ -299,10 +308,10 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(realm2->schema().size() == 1);
         REQUIRE(realm2->schema().find("object 2") != realm2->schema().end());
         REQUIRE(realm3->schema().size() == 2);
-        REQUIRE(realm3->schema().find("object") != realm2->schema().end());
-        REQUIRE(realm3->schema().find("object 2") != realm2->schema().end());
+        REQUIRE(realm3->schema().find("object") != realm3->schema().end());
+        REQUIRE(realm3->schema().find("object 2") != realm3->schema().end());
         REQUIRE(realm4->schema().size() == 1);
-        REQUIRE(realm4->schema().find("object") != realm1->schema().end());
+        REQUIRE(realm4->schema().find("object") != realm4->schema().end());
     }
 
 // The ExternalCommitHelper implementation on Windows doesn't rely on files
@@ -505,23 +514,78 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
     config.schema_mode = SchemaMode::Additive;
     config.schema = Schema{
         {"object", {
-            {"value", PropertyType::Int, "", "", false, false, false}
+            {"value", PropertyType::Int, "", "", true, false, false},
+            {"value 2", PropertyType::Int, "", "", false, true, false},
         }},
     };
 
     SECTION("newly added columns update table columns but are not added to properties") {
         auto r1 = Realm::get_shared_realm(config);
         auto r2 = Realm::get_shared_realm(config);
-        r2->begin_transaction();
-        r2->read_group().get_table("class_object")->insert_column(0, type_String, "new col");
-        r2->commit_transaction();
+        auto test = [&] {
+            r2->begin_transaction();
+            r2->read_group().get_table("class_object")->insert_column(0, type_String, "new col");
+            r2->commit_transaction();
 
-        auto& object_schema = *r1->schema().find("object");
-        REQUIRE(object_schema.persisted_properties.size() == 1);
-        REQUIRE(object_schema.persisted_properties[0].table_column == 0);
-        r1->refresh();
-        REQUIRE(object_schema.persisted_properties.size() == 1);
-        REQUIRE(object_schema.persisted_properties[0].table_column == 1);
+            auto& object_schema = *r1->schema().find("object");
+            REQUIRE(object_schema.persisted_properties.size() == 2);
+            REQUIRE(object_schema.persisted_properties[0].table_column == 0);
+            r1->refresh();
+            REQUIRE(object_schema.persisted_properties[0].table_column == 1);
+        };
+        SECTION("with an active read transaction") {
+            r1->read_group();
+            test();
+        }
+        SECTION("without an active read transaction") {
+            r1->invalidate();
+            test();
+        }
+    }
+
+    SECTION("beginning a read transaction checks for incompatible changes") {
+        auto r = Realm::get_shared_realm(config);
+        r->invalidate();
+
+        auto& sg = TestHelper::get_shared_group(r);
+        WriteTransaction wt(sg);
+        auto& table = *wt.get_table("class_object");
+
+        SECTION("removing a property") {
+            table.remove_column(0);
+            wt.commit();
+            REQUIRE_THROWS_WITH(r->refresh(),
+                                Catch::Matchers::Contains("Property 'object.value' has been removed."));
+        }
+
+        SECTION("change property type") {
+            table.remove_column(1);
+            table.add_column(type_Float, "value 2");
+            wt.commit();
+            REQUIRE_THROWS_WITH(r->refresh(),
+                                Catch::Matchers::Contains("Property 'object.value 2' has been changed from 'int' to 'float'"));
+        }
+
+        SECTION("make property optional") {
+            table.remove_column(1);
+            table.add_column(type_Int, "value 2", true);
+            wt.commit();
+            REQUIRE_THROWS_WITH(r->refresh(),
+                                Catch::Matchers::Contains("Property 'object.value 2' has been made optional"));
+        }
+
+        SECTION("recreate column with no changes") {
+            table.remove_column(1);
+            table.add_column(type_Int, "value 2");
+            wt.commit();
+            REQUIRE_NOTHROW(r->refresh());
+        }
+
+        SECTION("remove index from non-PK") {
+            table.remove_search_index(1);
+            wt.commit();
+            REQUIRE_NOTHROW(r->refresh());
+        }
     }
 }
 
@@ -668,5 +732,316 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
         r2.reset();
 
         REQUIRE_FALSE(r1->refresh());
+    }
+}
+
+TEST_CASE("RealmCoordinator: schema cache") {
+    TestFile config;
+    auto coordinator = _impl::RealmCoordinator::get_coordinator(config.path);
+
+    Schema cache_schema;
+    uint64_t cache_sv = -1, cache_tv = -1;
+
+    Schema schema{
+        {"object", {
+            {"value", PropertyType::Int}
+        }},
+    };
+    Schema schema2{
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+        {"object 2", {
+            {"value", PropertyType::Int},
+        }},
+    };
+
+    SECTION("valid initial schema sets cache") {
+        coordinator->cache_schema(schema, 5, 10);
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_schema == schema);
+        REQUIRE(cache_sv == 5);
+        REQUIRE(cache_tv == 10);
+    }
+
+    SECTION("cache can be updated with newer schema") {
+        coordinator->cache_schema(schema, 5, 10);
+        coordinator->cache_schema(schema2, 6, 11);
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_schema == schema2);
+        REQUIRE(cache_sv == 6);
+        REQUIRE(cache_tv == 11);
+    }
+
+    SECTION("empty schema is ignored") {
+        coordinator->cache_schema(Schema{}, 5, 10);
+        REQUIRE_FALSE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+
+        coordinator->cache_schema(schema, 5, 10);
+        coordinator->cache_schema(Schema{}, 5, 10);
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_schema == schema);
+        REQUIRE(cache_sv == 5);
+        REQUIRE(cache_tv == 10);
+    }
+
+    SECTION("schema for older transaction is ignored") {
+        coordinator->cache_schema(schema, 5, 10);
+        coordinator->cache_schema(schema2, 4, 8);
+
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_schema == schema);
+        REQUIRE(cache_sv == 5);
+        REQUIRE(cache_tv == 10);
+
+        coordinator->advance_schema_cache(10, 20);
+        coordinator->cache_schema(schema, 6, 15);
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_tv == 20); // should not have dropped to 15
+    }
+
+    SECTION("advance_schema() from transaction version bumps transaction version") {
+        coordinator->cache_schema(schema, 5, 10);
+        coordinator->advance_schema_cache(10, 12);
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_schema == schema);
+        REQUIRE(cache_sv == 5);
+        REQUIRE(cache_tv == 12);
+    }
+
+    SECTION("advance_schema() ending before transaction version does nothing") {
+        coordinator->cache_schema(schema, 5, 10);
+        coordinator->advance_schema_cache(8, 9);
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_schema == schema);
+        REQUIRE(cache_sv == 5);
+        REQUIRE(cache_tv == 10);
+    }
+
+    SECTION("advance_schema() extending over transaction version bumps version") {
+        coordinator->cache_schema(schema, 5, 10);
+        coordinator->advance_schema_cache(3, 15);
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_schema == schema);
+        REQUIRE(cache_sv == 5);
+        REQUIRE(cache_tv == 15);
+    }
+
+    SECTION("advance_schema() with no cahced schema does nothing") {
+        coordinator->advance_schema_cache(3, 15);
+        REQUIRE_FALSE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+    }
+}
+
+TEST_CASE("SharedRealm: coordinator schema cache") {
+    TestFile config;
+    config.cache = false;
+    auto r = Realm::get_shared_realm(config);
+    auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+
+    Schema cache_schema;
+    uint64_t cache_sv = -1, cache_tv = -1;
+
+    Schema schema{
+        {"object", {
+            {"value", PropertyType::Int}
+        }},
+    };
+    Schema schema2{
+        {"object", {
+            {"value", PropertyType::Int},
+        }},
+        {"object 2", {
+            {"value", PropertyType::Int},
+        }},
+    };
+
+    class ExternalWriter {
+    private:
+        std::unique_ptr<Replication> history;
+        std::unique_ptr<SharedGroup> shared_group;
+        std::unique_ptr<Group> read_only_group;
+
+    public:
+        WriteTransaction wt;
+        ExternalWriter(Realm::Config const& config)
+        : wt([&]() -> SharedGroup& {
+            Realm::open_with_config(config, history, shared_group, read_only_group, nullptr);
+            return *shared_group;
+        }())
+        {
+        }
+    };
+
+    auto external_write = [&](Realm::Config const& config, auto&& fn) {
+        ExternalWriter wt(config);
+        fn(wt.wt);
+        wt.wt.commit();
+    };
+
+    SECTION("is initially empty for uninitialized file") {
+        REQUIRE_FALSE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+    }
+    r->update_schema(schema);
+
+    SECTION("is empty after calling update_schema()") {
+        REQUIRE_FALSE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+    }
+
+    Realm::get_shared_realm(config);
+    SECTION("is populated after getting another Realm without a schema specified") {
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_sv == 0);
+        REQUIRE(cache_schema == schema);
+        REQUIRE(cache_schema.begin()->persisted_properties[0].table_column == 0);
+    }
+
+    coordinator = nullptr;
+    r = nullptr;
+    r = Realm::get_shared_realm(config);
+    coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+    REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+
+    SECTION("is populated after opening an initialized file") {
+        REQUIRE(cache_sv == 0);
+        REQUIRE(cache_tv == 2); // with in-realm history the version doesn't reset
+        REQUIRE(cache_schema == schema);
+        REQUIRE(cache_schema.begin()->persisted_properties[0].table_column == 0);
+    }
+
+    SECTION("transaction version is bumped after a local write") {
+        auto tv = cache_tv;
+        r->begin_transaction();
+        r->commit_transaction();
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_tv == tv + 1);
+    }
+
+    SECTION("notify() without a read transaction does not bump transaction version") {
+        auto tv = cache_tv;
+
+        SECTION("non-schema change") {
+            external_write(config, [](auto& wt) {
+                wt.get_table("class_object")->add_empty_row();
+            });
+        }
+        SECTION("schema change") {
+            external_write(config, [](auto& wt) {
+                wt.add_table("class_object 2");
+            });
+        }
+
+        r->notify();
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_tv == tv);
+        REQUIRE(cache_schema == schema);
+    }
+
+    SECTION("notify() with a read transaction bumps transaction version") {
+        r->read_group();
+        external_write(config, [](auto& wt) {
+            wt.get_table("class_object")->add_empty_row();
+        });
+
+        r->notify();
+        auto tv = cache_tv;
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_tv == tv + 1);
+    }
+
+    SECTION("notify() with a read transaction updates schema folloing external schema change") {
+        r->read_group();
+        external_write(config, [](auto& wt) {
+            wt.add_table("class_object 2");
+        });
+
+        r->notify();
+        auto tv = cache_tv;
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_tv == tv + 1);
+        REQUIRE(cache_schema.size() == 2);
+        REQUIRE(cache_schema.find("object 2") != cache_schema.end());
+    }
+
+    SECTION("transaction version is bumped after refresh() following external non-schema write") {
+        external_write(config, [](auto& wt) {
+            wt.get_table("class_object")->add_empty_row();
+        });
+
+        r->refresh();
+        auto tv = cache_tv;
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_tv == tv + 1);
+    }
+
+    SECTION("schema is reread following refresh() over external schema change") {
+        external_write(config, [](auto& wt) {
+            wt.add_table("class_object 2");
+        });
+
+        r->refresh();
+        auto tv = cache_tv;
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_tv == tv + 1);
+        REQUIRE(cache_schema.size() == 2);
+        REQUIRE(cache_schema.find("object 2") != cache_schema.end());
+    }
+
+    SECTION("update_schema() to version already on disk updates cache") {
+        r->read_group();
+        external_write(config, [](auto& wt) {
+            auto table = wt.add_table("class_object 2");
+            table->add_column(type_Int, "value");
+        });
+
+        auto tv = cache_tv;
+        r->update_schema(schema2);
+
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_tv == tv + 1); // only +1 because update_schema() did not perform a write
+        REQUIRE(cache_schema.size() == 2);
+        REQUIRE(cache_schema.find("object 2") != cache_schema.end());
+    }
+
+    SECTION("update_schema() to version already on disk updates cache") {
+        r->read_group();
+        external_write(config, [](auto& wt) {
+            auto table = wt.add_table("class_object 2");
+            table->add_column(type_Int, "value");
+        });
+
+        auto tv = cache_tv;
+        r->update_schema(schema2);
+
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_tv == tv + 1); // only +1 because update_schema() did not perform a write
+        REQUIRE(cache_schema.size() == 2);
+        REQUIRE(cache_schema.find("object 2") != cache_schema.end());
+    }
+
+    SECTION("update_schema() to version populated on disk while waiting for the write lock updates cache") {
+        r->read_group();
+
+        // We want to commit the write while we're waiting on the write lock on
+        // this thread, which can't really be done in a properly synchronized manner
+        JoiningThread thread([&] {
+            ExternalWriter writer(config);
+            auto table = writer.wt.add_table("class_object 2");
+            table->add_column(type_Int, "value");
+            std::this_thread::sleep_for(std::chrono::microseconds(10000));
+            writer.wt.commit();
+        });
+        std::this_thread::sleep_for(std::chrono::microseconds(5000));
+
+        auto tv = cache_tv;
+        r->update_schema(Schema{
+            {"object", {{"value", PropertyType::Int}}},
+            {"object 2", {{"value", PropertyType::Int}}},
+        });
+
+        REQUIRE(coordinator->get_cached_schema(cache_schema, cache_sv, cache_tv));
+        REQUIRE(cache_tv == tv + 1); // only +1 because update_schema()'s write was rolled back
+        REQUIRE(cache_schema.size() == 2);
+        REQUIRE(cache_schema.find("object 2") != cache_schema.end());
     }
 }

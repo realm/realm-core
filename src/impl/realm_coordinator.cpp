@@ -234,16 +234,46 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm()
     return get_realm(m_config);
 }
 
-void RealmCoordinator::cache_schema(Schema const& new_schema, uint64_t new_schema_version)
+bool RealmCoordinator::get_cached_schema(Schema& schema, uint64_t& schema_version,
+                                         uint64_t& transaction) const noexcept
 {
-    m_cached_schema = new_schema;
-    m_schema_version = new_schema_version;
+    if (!m_cached_schema)
+        return false;
+    schema = *m_cached_schema;
+    schema_version = m_schema_version;
+    transaction = m_schema_transaction_version_max;
+    return true;
 }
 
-void RealmCoordinator::set_schema_version(uint64_t new_schema_version)
+void RealmCoordinator::cache_schema(Schema const& new_schema, uint64_t new_schema_version,
+                                    uint64_t transaction_version)
+{
+    if (transaction_version < m_schema_transaction_version_max)
+        return;
+    if (new_schema.empty() || new_schema_version == ObjectStore::NotVersioned)
+        return;
+
+    m_cached_schema = new_schema;
+    m_schema_version = new_schema_version;
+    m_schema_transaction_version_min = transaction_version;
+    m_schema_transaction_version_max = transaction_version;
+}
+
+void RealmCoordinator::clear_schema_cache_and_set_schema_version(uint64_t new_schema_version)
 {
     m_cached_schema = util::none;
     m_schema_version = new_schema_version;
+}
+
+void RealmCoordinator::advance_schema_cache(uint64_t previous, uint64_t next)
+{
+    if (!m_cached_schema)
+        return;
+    REALM_ASSERT(previous <= m_schema_transaction_version_max);
+    if (next < m_schema_transaction_version_min)
+        return;
+    m_schema_transaction_version_min = std::min(previous, m_schema_transaction_version_min);
+    m_schema_transaction_version_max = std::max(next, m_schema_transaction_version_max);
 }
 
 RealmCoordinator::RealmCoordinator() = default;

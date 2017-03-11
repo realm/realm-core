@@ -41,17 +41,6 @@
 
 using namespace realm;
 
-class joining_thread {
-public:
-    template<typename... Args>
-    joining_thread(Args&&... args) : m_thread(std::forward<Args>(args)...) { }
-    ~joining_thread() { if (m_thread.joinable()) m_thread.join(); }
-    void join() { m_thread.join(); }
-
-private:
-    std::thread m_thread;
-};
-
 TEST_CASE("notifications: async delivery") {
     _impl::RealmCoordinator::assert_no_open_realms();
 
@@ -127,7 +116,7 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("refresh() blocks due to initial results not being ready") {
             REQUIRE(notification_calls == 0);
-            joining_thread thread([&] {
+            JoiningThread thread([&] {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
@@ -137,7 +126,7 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("begin_transaction() blocks due to initial results not being ready") {
             REQUIRE(notification_calls == 0);
-            joining_thread thread([&] {
+            JoiningThread thread([&] {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
@@ -328,7 +317,7 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("refresh() blocks") {
             REQUIRE(notification_calls == 1);
-            joining_thread thread([&] {
+            JoiningThread thread([&] {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
@@ -337,7 +326,7 @@ TEST_CASE("notifications: async delivery") {
         }
 
         SECTION("refresh() advances to the first version with notifiers ready that is at least a recent as the newest at the time it is called") {
-            joining_thread thread([&] {
+            JoiningThread thread([&] {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 make_remote_change();
                 coordinator->on_change();
@@ -359,7 +348,7 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("begin_transaction() blocks") {
             REQUIRE(notification_calls == 1);
-            joining_thread thread([&] {
+            JoiningThread thread([&] {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
@@ -409,7 +398,7 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("refresh() blocks") {
             REQUIRE(notification_calls == 1);
-            joining_thread thread([&] {
+            JoiningThread thread([&] {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
@@ -419,7 +408,7 @@ TEST_CASE("notifications: async delivery") {
 
         SECTION("begin_transaction() blocks") {
             REQUIRE(notification_calls == 1);
-            joining_thread thread([&] {
+            JoiningThread thread([&] {
                 std::this_thread::sleep_for(std::chrono::microseconds(5000));
                 coordinator->on_change();
             });
