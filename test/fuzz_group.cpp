@@ -20,11 +20,11 @@
 #include <realm/link_view.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/history.hpp>
-#include "test.hpp"
 
 #include <ctime>
 #include <cstdio>
 #include <fstream>
+#include <iostream>
 
 using namespace realm;
 using namespace realm::util;
@@ -116,6 +116,16 @@ unsigned char get_next(State& s)
     return byte;
 }
 
+const char* get_encryption_key()
+{
+#if REALM_ENABLE_ENCRYPTION
+    return "1234567890123456789012345678901123456789012345678901234567890123";
+#else
+    return nullptr;
+#endif
+
+}
+
 int64_t get_int64(State& s)
 {
     int64_t v = 0;
@@ -165,7 +175,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
     // Max number of rows in a table. Overridden only by add_empty_row_max() and only in the case where
     // max_rows is not exceeded *prior* to executing add_empty_row.
     const size_t max_rows = 100000;
-    using realm::test_util::crypt_key;
 
     try {
         State s;
@@ -173,7 +182,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         s.pos = 0;
 
         const bool use_encryption = get_next(s) % 2 == 0;
-        const char* key = use_encryption ? crypt_key(true) : nullptr;
+        const char* key = use_encryption ? get_encryption_key() : nullptr;
 
         if (log) {
             *log << "// Test case generated in " REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
@@ -853,6 +862,53 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
     }
 }
 
+struct RealmPathGuard {
+RealmPathGuard(const std::string& path) : m_path(path)
+{
+    cleanup();
+}
+~RealmPathGuard() noexcept
+{
+    cleanup();
+}
+operator std::string()
+{
+    return m_path;
+}
+private:
+std::string m_path;
+void cleanup() const noexcept
+{
+    try {
+        File::try_remove(m_path);
+        do_clean_dir(m_path + ".management", ".management");
+        if (File::is_dir(m_path + ".management"))
+            remove_dir(m_path + ".management");
+        File::try_remove(m_path + ".lock");
+    }
+    catch (...) {
+        // Exception deliberately ignored
+    }
+}
+void do_clean_dir(const std::string& path, const std::string& guard_string) const
+{
+    DirScanner ds(path, true);
+    std::string name;
+    while (ds.next(name)) {
+        std::string subpath = File::resolve(name, path);
+        if (File::is_dir(subpath)) {
+            do_clean_dir(subpath, guard_string);
+            remove_dir(subpath);
+        }
+        else {
+            if (subpath.find(guard_string) == std::string::npos)
+                throw std::runtime_error("Bad test dir path");
+            File::remove(subpath);
+        }
+    }
+}
+};
+
 
 void usage(const char* argv[])
 {
@@ -896,7 +952,7 @@ int run_fuzzy(int argc, const char* argv[])
     }
 
     disable_sync_to_disk();
-    realm::test_util::SharedGroupTestPathGuard path(name + ".realm");
+    RealmPathGuard path(name + ".realm");
 
     std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
     parse_and_apply_instructions(contents, path, log);
