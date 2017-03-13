@@ -123,11 +123,8 @@ set(REALM_INSTALL_GENERAL_HEADERS
     spec.hpp
     string_data.hpp
     table.hpp
-    table_basic.hpp
-    table_basic_fwd.hpp
     table_ref.hpp
     table_view.hpp
-    table_view_basic.hpp
     timestamp.hpp
     unicode.hpp
     utilities.hpp
