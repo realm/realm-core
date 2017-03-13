@@ -142,8 +142,10 @@ public:
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_binary(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_binary(col_ndx, row_ndx, value);                   // Throws
-            return true;
+            if (value.size() <= ArrayBlob::max_binary_size) {
+                m_table->set_binary(col_ndx, row_ndx, value); // Throws
+                return true;
+            }
         }
         return false;
     }
@@ -873,5 +875,5 @@ void TrivialReplication::do_clear_interrupt() noexcept
 void TrivialReplication::transact_log_append(const char* data, size_t size, char** new_begin, char** new_end)
 {
     internal_transact_log_reserve(size, new_begin, new_end);
-    *new_begin = std::copy_n(data, size, *new_begin);
+    *new_begin = realm::safe_copy_n(data, size, *new_begin);
 }

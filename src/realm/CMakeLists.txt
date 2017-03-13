@@ -126,7 +126,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     table_accessors.hpp
     table_basic.hpp
     table_basic_fwd.hpp
-    table_macros.hpp
     table_ref.hpp
     table_view.hpp
     table_view_basic.hpp

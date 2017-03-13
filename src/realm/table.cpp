@@ -3243,7 +3243,7 @@ BinaryData Table::get_binary(size_t col_ndx, size_t ndx) const noexcept
 }
 
 
-void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
+void Table::set_binary_big(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
 {
     if (REALM_UNLIKELY(!is_attached()))
         throw LogicError(LogicError::detached_accessor);
@@ -3257,8 +3257,6 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_def
         throw LogicError(LogicError::column_index_out_of_range);
     if (!is_nullable(col_ndx) && value.is_null())
         throw LogicError(LogicError::column_not_nullable);
-    if (REALM_UNLIKELY(value.size() > ArrayBlob::max_binary_size))
-        throw LogicError(LogicError::binary_too_big);
     bump_version();
 
     // FIXME: Loophole: Assertion violation in Table::get_column_binary() on
@@ -3271,6 +3269,17 @@ void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_def
                          is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
 }
 
+BinaryData Table::get_binary_at(size_t col_ndx, size_t ndx, size_t& pos) const noexcept
+{
+    return get_column<BinaryColumn, col_type_Binary>(col_ndx).get_at(ndx, pos);
+}
+
+void Table::set_binary(size_t col_ndx, size_t ndx, BinaryData value, bool is_default)
+{
+    if (REALM_UNLIKELY(value.size() > ArrayBlob::max_binary_size))
+        throw LogicError(LogicError::binary_too_big);
+    set_binary_big(col_ndx, ndx, value, is_default);
+}
 
 Mixed Table::get_mixed(size_t col_ndx, size_t ndx) const noexcept
 {
@@ -4028,8 +4037,8 @@ TableView Table::get_distinct_view(size_t col_ndx)
 {
     REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
 
-    TableView tv(*this);
-    tv.sync_distinct_view(col_ndx);
+    TableView tv(TableView::DistinctView, *this, col_ndx);
+    tv.do_sync();
     return tv;
 }
 
@@ -4403,14 +4412,7 @@ TableView Table::get_range_view(size_t begin, size_t end)
 {
     REALM_ASSERT(!m_columns.is_attached() || end <= size());
 
-    TableView ctv(*this);
-    if (m_columns.is_attached()) {
-        IntegerColumn& refs = ctv.m_row_indexes;
-        for (size_t i = begin; i < end; ++i) {
-            refs.add(i);
-        }
-    }
-    return ctv;
+    return where().find_all(begin, end);
 }
 
 ConstTableView Table::get_range_view(size_t begin, size_t end) const
@@ -5888,13 +5890,11 @@ void Table::refresh_column_accessors(size_t col_ndx_begin)
         }
 
         if (column_has_search_index) {
-            bool allow_duplicate_values = true;
             if (col->has_search_index()) {
-                col->set_search_index_allow_duplicate_values(allow_duplicate_values);
             }
             else {
                 ref_type ref = m_columns.get_as_ref(ndx_in_parent + 1);
-                col->set_search_index_ref(ref, &m_columns, ndx_in_parent + 1, allow_duplicate_values); // Throws
+                col->set_search_index_ref(ref, &m_columns, ndx_in_parent + 1); // Throws
             }
         }
 
@@ -5963,9 +5963,21 @@ void Table::generate_patch(const Table* table, std::unique_ptr<HandoverPatch>& p
     if (table) {
         patch.reset(new Table::HandoverPatch);
         patch->m_table_num = table->get_index_in_group();
-        // must be group level table!
-        if (patch->m_table_num == npos) {
-            throw std::runtime_error("Table handover failed: not a group level table");
+        patch->m_is_sub_table = (patch->m_table_num == npos);
+
+        if (patch->m_is_sub_table) {
+            auto col = dynamic_cast<SubtableColumn*>(table->m_columns.get_parent());
+            if (col) {
+                Table* parent_table = col->m_table;
+                patch->m_table_num = parent_table->get_index_in_group();
+                if (patch->m_table_num == npos)
+                    throw std::runtime_error("Table handover failed: only first level subtables supported");
+                patch->m_col_ndx = col->get_column_index();
+                patch->m_row_ndx = table->m_columns.get_ndx_in_parent();
+            }
+            else {
+                throw std::runtime_error("Table handover failed: not a group level table");
+            }
         }
     }
     else {
@@ -5977,7 +5989,14 @@ void Table::generate_patch(const Table* table, std::unique_ptr<HandoverPatch>& p
 TableRef Table::create_from_and_consume_patch(std::unique_ptr<HandoverPatch>& patch, Group& group)
 {
     if (patch) {
-        TableRef result(group.get_table(patch->m_table_num));
+        TableRef result;
+        if (patch->m_is_sub_table) {
+            auto parent_table = group.get_table(patch->m_table_num);
+            result = parent_table->get_subtable(patch->m_col_ndx, patch->m_row_ndx);
+        }
+        else {
+            result = group.get_table(patch->m_table_num);
+        }
         patch.reset();
         return result;
     }

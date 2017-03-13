@@ -135,7 +135,7 @@ void ArrayString::set(size_t ndx, StringData value)
     // Set the value
     char* begin = m_data + (ndx * m_width);
     char* end = begin + (m_width - 1);
-    begin = std::copy_n(value.data(), value.size(), begin);
+    begin = realm::safe_copy_n(value.data(), value.size(), begin);
     std::fill(begin, end, 0); // Pad with zero bytes
     static_assert(max_width <= max_width, "Padding size must fit in 7-bits");
 
@@ -184,7 +184,7 @@ void ArrayString::erase(size_t ndx)
         char* new_begin = m_data + ndx * m_width;
         char* old_begin = new_begin + m_width;
         char* old_end = m_data + m_size * m_width;
-        std::copy_n(old_begin, old_end - old_begin, new_begin);
+        realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
     }
 
     --m_size;

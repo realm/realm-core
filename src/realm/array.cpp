@@ -20,6 +20,7 @@
 #include <cstring> // std::memcpy
 #include <iomanip>
 #include <limits>
+#include <tuple>
 
 #ifdef REALM_DEBUG
 #include <iostream>
@@ -31,7 +32,6 @@
 #pragma warning(disable : 4127) // Condition is constant warning
 #endif
 
-#include <realm/util/tuple.hpp>
 #include <realm/utilities.hpp>
 #include <realm/array.hpp>
 #include <realm/array_basic.hpp>
@@ -445,7 +445,7 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     const char* begin_2 = m_data + begin * bytes_per_elem;
     const char* end_2 = m_data + end * bytes_per_elem;
     char* dest_begin_2 = m_data + dest_begin * bytes_per_elem;
-    std::copy_n(begin_2, end_2 - begin_2, dest_begin_2);
+    realm::safe_copy_n(begin_2, end_2 - begin_2, dest_begin_2);
 }
 
 void Array::move_backward(size_t begin, size_t end, size_t dest_end)
@@ -781,7 +781,7 @@ size_t Array::adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64
             // the width, return the current position to the caller so that it
             // can switch to the appropriate specialization for the new width.
             ensure_minimum_width(shifted); // Throws
-            copy_on_write(); // Throws
+            copy_on_write();               // Throws
             if (m_width != w)
                 return i;
 
@@ -1559,7 +1559,7 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
         const char* src_begin = header;
         const char* src_end = header + size;
         char* dst_begin = clone_header;
-        std::copy_n(src_begin, src_end - src_begin, dst_begin);
+        realm::safe_copy_n(src_begin, src_end - src_begin, dst_begin);
 
         // Update with correct capacity
         set_header_capacity(size, clone_header);
@@ -1608,19 +1608,20 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
 
 void Array::do_copy_on_write(size_t minimum_size)
 {
-    // Calculate size in bytes (plus a bit of matchcount room for expansion)
+    // Calculate size in bytes
     size_t array_size = calc_byte_len(m_size, m_width);
-    size_t new_size = std::max(array_size + 64, minimum_size);
-    size_t rest = (~new_size & 0x7) + 1;
-    if (rest < 8)
-        new_size += rest; // 64bit blocks
+    size_t new_size = std::max(array_size, minimum_size);
+    new_size = (new_size + 0x7) & ~size_t(0x7); // 64bit blocks
+    // Plus a bit of matchcount room for expansion
+    if (new_size < max_array_payload - 64)
+        new_size += 64;
 
     // Create new copy of array
     MemRef mref = m_alloc.alloc(new_size); // Throws
     const char* old_begin = get_header_from_data(m_data);
     const char* old_end = get_header_from_data(m_data) + array_size;
     char* new_begin = mref.get_addr();
-    std::copy_n(old_begin, old_end - old_begin, new_begin);
+    realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
 
     ref_type old_ref = m_ref;
 
@@ -2013,7 +2014,7 @@ std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, MemStats sta
 
 namespace {
 
-typedef Tuple<TypeCons<size_t, TypeCons<int, TypeCons<bool, void>>>> VerifyBptreeResult;
+typedef std::tuple<size_t, int, bool> VerifyBptreeResult;
 
 // Returns (num_elems, leaf-level, general_form)
 VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_verifier)
@@ -2065,10 +2066,10 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
             Array child(alloc);
             child.init_from_ref(child_ref);
             VerifyBptreeResult r = verify_bptree(child, leaf_verifier);
-            elems_in_child = at<0>(r);
-            leaf_level_of_child = at<1>(r);
+            elems_in_child = std::get<0>(r);
+            leaf_level_of_child = std::get<1>(r);
             // Verify invar:bptree-node-form
-            bool child_on_general_form = at<2>(r);
+            bool child_on_general_form = std::get<2>(r);
             REALM_ASSERT(general_form || !child_on_general_form);
         }
         if (i == 0)
@@ -2098,7 +2099,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         REALM_ASSERT(!int_cast_with_overflow_detect(last_value / 2, total_elems));
         REALM_ASSERT_3(num_elems, ==, total_elems);
     }
-    return realm::util::tuple(num_elems, 1 + leaf_level_of_children, general_form);
+    return std::make_tuple(num_elems, 1 + leaf_level_of_children, general_form);
 }
 
 } // anonymous namespace

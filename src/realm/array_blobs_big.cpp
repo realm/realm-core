@@ -74,8 +74,7 @@ void ArrayBigBlobs::set(size_t ndx, BinaryData value, bool add_zero_term)
     else if (ref != 0 && value.data() != nullptr) {
         blob.init_from_ref(ref);
         blob.set_parent(this, ndx);
-        ref_type new_ref = blob.replace(0, blob.size(),
-                                        value.data(), value.size(), add_zero_term); // Throws
+        ref_type new_ref = blob.replace(0, blob.blob_size(), value.data(), value.size(), add_zero_term); // Throws
         if (new_ref != ref) {
             Array::set_as_ref(ndx, new_ref);
         }

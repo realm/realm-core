@@ -25,15 +25,16 @@
 #include <ostream>
 #include <cwchar>
 
-#include <realm/table_macros.hpp>
+#include <realm/table_view.hpp>
+#include <realm/query_expression.hpp>
 
 #include "util/misc.hpp"
 
 #include "test.hpp"
+#include "test_table_helper.hpp"
 
 using namespace realm;
 using namespace test_util;
-
 
 // Test independence and thread-safety
 // -----------------------------------
@@ -64,21 +65,6 @@ using namespace test_util;
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
 
-
-namespace {
-
-REALM_TABLE_1(TestTableInt, first, Int)
-
-REALM_TABLE_2(TestTableInt2, first, Int, second, Int)
-
-REALM_TABLE_2(TestTableDate, first, OldDateTime, second, Int)
-
-REALM_TABLE_2(TestTableFloatDouble, first, Float, second, Double)
-
-
-} // anonymous namespace
-
-
 TEST(TableView_Json)
 {
     Table table;
@@ -99,25 +85,6 @@ TEST(TableView_Json)
     CHECK_EQUAL("[{\"first\":2},{\"first\":3}]", json);
 }
 
-
-TEST(TableView_DateMaxMin)
-{
-    TestTableDate ttd;
-
-    ttd.add(OldDateTime(2014, 7, 10), 1);
-    ttd.add(OldDateTime(2013, 7, 10), 1);
-    ttd.add(OldDateTime(2015, 8, 10), 1);
-    ttd.add(OldDateTime(2015, 7, 10), 1);
-
-    TestTableDate::View v = ttd.column().second.find_all(1);
-    size_t ndx = not_found;
-
-    CHECK_EQUAL(OldDateTime(2015, 8, 10), v.column().first.maximum(&ndx));
-    CHECK_EQUAL(2, ndx);
-
-    CHECK_EQUAL(OldDateTime(2013, 7, 10), v.column().first.minimum(&ndx));
-    CHECK_EQUAL(1, ndx);
-}
 
 TEST(TableView_TimestampMaxMinCount)
 {
@@ -181,36 +148,36 @@ TEST(TableView_TimestampGetSet)
 
 TEST(TableView_GetSetInteger)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "1");
 
-    table.add(1);
-    table.add(2);
-    table.add(3);
-    table.add(1);
-    table.add(2);
+    add(table, 1);
+    add(table, 2);
+    add(table, 3);
+    add(table, 1);
+    add(table, 2);
 
-    TestTableInt::View v;                 // Test empty construction
-    v = table.column().first.find_all(2); // Test assignment
+    TableView v;                 // Test empty construction
+    v = table.find_all_int(0, 2); // Test assignment
 
     CHECK_EQUAL(2, v.size());
 
     // Test of Get
-    CHECK_EQUAL(2, v[0].first);
-    CHECK_EQUAL(2, v[1].first);
+    CHECK_EQUAL(2, v[0].get_int(0));
+    CHECK_EQUAL(2, v[1].get_int(0));
 
     // Test of Set
-    v[0].first = 123;
-    CHECK_EQUAL(123, v[0].first);
+    v[0].set_int(0, 123);
+    CHECK_EQUAL(123, v[0].get_int(0));
 }
 
-
-namespace {
-REALM_TABLE_3(TableFloats, col_float, Float, col_double, Double, col_int, Int)
-}
 
 TEST(TableView_FloatsGetSet)
 {
-    TableFloats table;
+    TestTable table;
+    table.add_column(type_Float, "1");
+    table.add_column(type_Double, "2");
+    table.add_column(type_Int, "3");
 
     float f_val[] = {1.1f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f};
     double d_val[] = {1.2, 2.2, 3.2, -1.2, 2.3, 0.0};
@@ -219,192 +186,202 @@ TEST(TableView_FloatsGetSet)
 
     // Test add(?,?) with parameters
     for (size_t i = 0; i < 5; ++i)
-        table.add(f_val[i], d_val[i], i);
-    table.add();
+        add(table, f_val[i], d_val[i], int64_t(i));
+
+    table.add_empty_row();
+
     CHECK_EQUAL(6, table.size());
     for (size_t i = 0; i < 6; ++i) {
-        CHECK_EQUAL(f_val[i], table.column().col_float[i]);
-        CHECK_EQUAL(d_val[i], table.column().col_double[i]);
+        CHECK_EQUAL(f_val[i], table.get_float(0, i));
+        CHECK_EQUAL(d_val[i], table.get_double(1, i));
     }
 
-    TableFloats::View v;                         // Test empty construction
-    v = table.column().col_float.find_all(2.1f); // Test assignment
+    TableView v;                         // Test empty construction
+    v = table.find_all_float(0, 2.1f); // Test assignment
     CHECK_EQUAL(2, v.size());
 
-    TableFloats::View v2(v);
+    TableView v2(v);
 
 
     // Test of Get
-    CHECK_EQUAL(2.1f, v[0].col_float);
-    CHECK_EQUAL(2.1f, v[1].col_float);
-    CHECK_EQUAL(2.2, v[0].col_double);
-    CHECK_EQUAL(2.3, v[1].col_double);
+    CHECK_EQUAL(2.1f, v[0].get_float(0));
+    CHECK_EQUAL(2.1f, v[1].get_float(0));
+    CHECK_EQUAL(2.2, v[0].get_double(1));
+    CHECK_EQUAL(2.3, v[1].get_double(1));
 
     // Test of Set
-    v[0].col_float = 123.321f;
-    CHECK_EQUAL(123.321f, v[0].col_float);
-    v[0].col_double = 123.3219;
-    CHECK_EQUAL(123.3219, v[0].col_double);
+    v[0].set_float(0, 123.321f);
+    CHECK_EQUAL(123.321f, v[0].get_float(0));
+    v[0].set_double(1, 123.3219);
+    CHECK_EQUAL(123.3219, v[0].get_double(1));
 }
 
 TEST(TableView_FloatsFindAndAggregations)
 {
-    TableFloats table;
+    TestTable table;
+    table.add_column(type_Float, "1");
+    table.add_column(type_Double, "2");
+    table.add_column(type_Int, "3");
+
     float f_val[] = {1.2f, 2.1f, 3.1f, -1.1f, 2.1f, 0.0f};
     double d_val[] = {-1.2, 2.2, 3.2, -1.2, 2.3, 0.0};
     // v_some =       ^^^^            ^^^^
     double sum_f = 0.0;
     double sum_d = 0.0;
     for (size_t i = 0; i < 6; ++i) {
-        table.add(f_val[i], d_val[i], 1);
+        add(table, f_val[i], d_val[i], 1);
         sum_d += d_val[i];
         sum_f += f_val[i];
     }
 
     // Test find_all()
-    TableFloats::View v_all = table.column().col_int.find_all(1);
+    TableView v_all = table.find_all_int(2, 1);
     CHECK_EQUAL(6, v_all.size());
 
-    TableFloats::View v_some = table.column().col_double.find_all(-1.2);
+    TableView v_some = table.find_all_double(1, -1.2);
     CHECK_EQUAL(2, v_some.size());
     CHECK_EQUAL(0, v_some.get_source_ndx(0));
     CHECK_EQUAL(3, v_some.get_source_ndx(1));
 
     // Test find_first
-    CHECK_EQUAL(0, v_all.column().col_double.find_first(-1.2));
-    CHECK_EQUAL(5, v_all.column().col_double.find_first(0.0));
-    CHECK_EQUAL(2, v_all.column().col_double.find_first(3.2));
+    CHECK_EQUAL(0, v_all.find_first_double(1, -1.2));
+    CHECK_EQUAL(5, v_all.find_first_double(1, 0.0));
+    CHECK_EQUAL(2, v_all.find_first_double(1, 3.2));
 
-    CHECK_EQUAL(1, v_all.column().col_float.find_first(2.1f));
-    CHECK_EQUAL(5, v_all.column().col_float.find_first(0.0f));
-    CHECK_EQUAL(2, v_all.column().col_float.find_first(3.1f));
+    CHECK_EQUAL(1, v_all.find_first_float(0, 2.1f));
+    CHECK_EQUAL(5, v_all.find_first_float(0, 0.0f));
+    CHECK_EQUAL(2, v_all.find_first_float(0, 3.1f));
 
     // TODO: add for float as well
 
     double epsilon = std::numeric_limits<double>::epsilon();
 
     // Test sum
-    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.column().col_double.sum(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.column().col_float.sum(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.column().col_double.sum(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.column().col_float.sum(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d, v_all.sum_double(1), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f, v_all.sum_float(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(-1.2 + -1.2, v_some.sum_double(1), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(1.2f) + double(-1.1f), v_some.sum_float(0), 10 * epsilon);
 
     size_t ndx = not_found;
 
     // Test max
-    CHECK_EQUAL(3.2, v_all.column().col_double.maximum(&ndx));
+    CHECK_EQUAL(3.2, v_all.maximum_double(1, &ndx));
     CHECK_EQUAL(2, ndx);
 
-    CHECK_EQUAL(-1.2, v_some.column().col_double.maximum(&ndx));
+    CHECK_EQUAL(-1.2, v_some.maximum_double(1, &ndx));
     CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(3.1f, v_all.column().col_float.maximum(&ndx));
+    CHECK_EQUAL(3.1f, v_all.maximum_float(0, &ndx));
     CHECK_EQUAL(2, ndx);
 
-    CHECK_EQUAL(1.2f, v_some.column().col_float.maximum(&ndx));
+    CHECK_EQUAL(1.2f, v_some.maximum_float(0, &ndx));
     CHECK_EQUAL(0, ndx);
 
     // Max without ret_index
-    CHECK_EQUAL(3.2, v_all.column().col_double.maximum());
-    CHECK_EQUAL(-1.2, v_some.column().col_double.maximum());
-    CHECK_EQUAL(3.1f, v_all.column().col_float.maximum());
-    CHECK_EQUAL(1.2f, v_some.column().col_float.maximum());
+    CHECK_EQUAL(3.2, v_all.maximum_double(1));
+    CHECK_EQUAL(-1.2, v_some.maximum_double(1));
+    CHECK_EQUAL(3.1f, v_all.maximum_float(0));
+    CHECK_EQUAL(1.2f, v_some.maximum_float(0));
 
     // Test min
-    CHECK_EQUAL(-1.2, v_all.column().col_double.minimum());
-    CHECK_EQUAL(-1.2, v_some.column().col_double.minimum());
-    CHECK_EQUAL(-1.1f, v_all.column().col_float.minimum());
-    CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum());
+    CHECK_EQUAL(-1.2, v_all.minimum_double(1));
+    CHECK_EQUAL(-1.2, v_some.minimum_double(1));
+    CHECK_EQUAL(-1.1f, v_all.minimum_float(0));
+    CHECK_EQUAL(-1.1f, v_some.minimum_float(0));
 
     // min with ret_ndx
-    CHECK_EQUAL(-1.2, v_all.column().col_double.minimum(&ndx));
+    CHECK_EQUAL(-1.2, v_all.minimum_double(1, &ndx));
     CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(-1.2, v_some.column().col_double.minimum(&ndx));
+    CHECK_EQUAL(-1.2, v_some.minimum_double(1, &ndx));
     CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(-1.1f, v_all.column().col_float.minimum(&ndx));
+    CHECK_EQUAL(-1.1f, v_all.minimum_float(0, &ndx));
     CHECK_EQUAL(3, ndx);
 
-    CHECK_EQUAL(-1.1f, v_some.column().col_float.minimum(&ndx));
+    CHECK_EQUAL(-1.1f, v_some.minimum_float(0, &ndx));
     CHECK_EQUAL(1, ndx);
 
     // Test avg
-    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.column().col_double.average(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.column().col_double.average(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.column().col_float.average(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.column().col_float.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_d / 6.0, v_all.average_double(1), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL((-1.2 + -1.2) / 2.0, v_some.average_double(1), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum_f / 6.0, v_all.average_float(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL((double(1.2f) + double(-1.1f)) / 2, v_some.average_float(0), 10 * epsilon);
 
-    CHECK_EQUAL(1, v_some.column().col_float.count(1.2f));
-    CHECK_EQUAL(2, v_some.column().col_double.count(-1.2));
-    CHECK_EQUAL(2, v_some.column().col_int.count(1));
+    CHECK_EQUAL(1, v_some.count_float(0, 1.2f));
+    CHECK_EQUAL(2, v_some.count_double(1, -1.2));
+    CHECK_EQUAL(2, v_some.count_int(2, 1));
 
-    CHECK_EQUAL(2, v_all.column().col_float.count(2.1f));
-    CHECK_EQUAL(2, v_all.column().col_double.count(-1.2));
-    CHECK_EQUAL(6, v_all.column().col_int.count(1));
+    CHECK_EQUAL(2, v_all.count_float(0, 2.1f));
+    CHECK_EQUAL(2, v_all.count_double(1, -1.2));
+    CHECK_EQUAL(6, v_all.count_int(2, 1));
 }
 
 TEST(TableView_Sum)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "1");
 
-    table.add(2);
-    table.add(2);
-    table.add(2);
-    table.add(2);
-    table.add(2);
+    add(table, 2);
+    add(table, 2);
+    add(table, 2);
+    add(table, 2);
+    add(table, 2);
 
-    TestTableInt::View v = table.column().first.find_all(2);
+    TableView v = table.find_all_int(0, 2);
     CHECK_EQUAL(5, v.size());
 
-    int64_t sum = v.column().first.sum();
+    int64_t sum = v.sum_int(0);
     CHECK_EQUAL(10, sum);
 }
 
 TEST(TableView_Average)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "1");
 
-    table.add(2);
-    table.add(2);
-    table.add(2);
-    table.add(2);
-    table.add(2);
+    add(table, 2);
+    add(table, 2);
+    add(table, 2);
+    add(table, 2);
+    add(table, 2);
 
-    TestTableInt::View v = table.column().first.find_all(2);
+    TableView v = table.find_all_int(0, 2);
     CHECK_EQUAL(5, v.size());
 
-    double sum = v.column().first.average();
+    double sum = v.average_int(0);
     CHECK_APPROXIMATELY_EQUAL(2., sum, 0.00001);
 }
 
 TEST(TableView_SumNegative)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "1");
 
-    table.add(0);
-    table.add(0);
-    table.add(0);
+    add(table, 0);
+    add(table, 0);
+    add(table, 0);
 
-    TestTableInt::View v = table.column().first.find_all(0);
-    v[0].first = 11;
-    v[2].first = -20;
+    TableView v = table.find_all_int(0, 0);
+    v[0].set_int(0, 11);
+    v[2].set_int(0, -20);
 
-    int64_t sum = v.column().first.sum();
+    int64_t sum = v.sum_int(0);
     CHECK_EQUAL(-9, sum);
 }
 
 TEST(TableView_IsAttached)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "1");
 
-    table.add(0);
-    table.add(0);
-    table.add(0);
+    add(table, 0);
+    add(table, 0);
+    add(table, 0);
 
-    TestTableInt::View v = table.column().first.find_all(0);
-    TestTableInt::View v2 = table.column().first.find_all(0);
-    v[0].first = 11;
+    TableView v = table.find_all_int(0, 0);
+    TableView v2 = table.find_all_int(0, 0);
+    v[0].set_int(0, 11);
     CHECK_EQUAL(true, v.is_attached());
     CHECK_EQUAL(true, v2.is_attached());
     v.remove_last();
@@ -418,79 +395,83 @@ TEST(TableView_IsAttached)
 
 TEST(TableView_Max)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "1");
 
-    table.add(0);
-    table.add(0);
-    table.add(0);
+    add(table, 0);
+    add(table, 0);
+    add(table, 0);
 
-    TestTableInt::View v = table.column().first.find_all(0);
-    v[0].first = -1;
-    v[1].first = 2;
-    v[2].first = 1;
+    TableView v = table.find_all_int(0, 0);
+    v[0].set_int(0, -1);
+    v[1].set_int(0, 2);
+    v[2].set_int(0, 1);
 
-    int64_t max = v.column().first.maximum();
+    int64_t max = v.maximum_int(0);
     CHECK_EQUAL(2, max);
 }
 
 TEST(TableView_Max2)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "1");
 
-    table.add(0);
-    table.add(0);
-    table.add(0);
+    add(table, 0);
+    add(table, 0);
+    add(table, 0);
 
-    TestTableInt::View v = table.column().first.find_all(0);
-    v[0].first = -1;
-    v[1].first = -2;
-    v[2].first = -3;
+    TableView v = table.find_all_int(0, 0);
+    v[0].set_int(0, -1);
+    v[1].set_int(0, -2);
+    v[2].set_int(0, -3);
 
-    int64_t max = v.column().first.maximum();
+    int64_t max = v.maximum_int(0, 0);
     CHECK_EQUAL(-1, max);
 }
 
 
 TEST(TableView_Min)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "first");
 
-    table.add(0);
-    table.add(0);
-    table.add(0);
+    add(table, 0);
+    add(table, 0);
+    add(table, 0);
 
-    TestTableInt::View v = table.column().first.find_all(0);
-    v[0].first = -1;
-    v[1].first = 2;
-    v[2].first = 1;
+    TableView v = table.find_all_int(0, 0);
+    v[0].set_int(0, -1);
+    v[1].set_int(0, 2);
+    v[2].set_int(0, 1);
 
-    int64_t min = v.column().first.minimum();
+    int64_t min = v.minimum_int(0);
     CHECK_EQUAL(-1, min);
 
     size_t ndx = not_found;
-    min = v.column().first.minimum(&ndx);
+    min = v.minimum_int(0, &ndx);
     CHECK_EQUAL(-1, min);
     CHECK_EQUAL(0, ndx);
 }
 
 TEST(TableView_Min2)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "first");
 
-    table.add(0);
-    table.add(0);
-    table.add(0);
+    add(table, 0);
+    add(table, 0);
+    add(table, 0);
 
-    TestTableInt::View v = table.column().first.find_all(0);
-    v[0].first = -1;
-    v[1].first = -2;
-    v[2].first = -3;
+    TableView v = table.find_all_int(0, 0);
+    v[0].set_int(0, -1);
+    v[1].set_int(0, -2);
+    v[2].set_int(0, -3);
 
-    int64_t min = v.column().first.minimum();
+    int64_t min = v.minimum_int(0);
     CHECK_EQUAL(-3, min);
 
     size_t ndx = not_found;
-    min = v.column().first.minimum(&ndx);
+    min = v.minimum_int(0 ,&ndx);
     CHECK_EQUAL(-3, min);
     CHECK_EQUAL(2, ndx);
 }
@@ -498,18 +479,19 @@ TEST(TableView_Min2)
 
 TEST(TableView_Find)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "first");
 
-    table.add(0);
-    table.add(0);
-    table.add(0);
+    add(table, 0);
+    add(table, 0);
+    add(table, 0);
 
-    TestTableInt::View v = table.column().first.find_all(0);
-    v[0].first = 5;
-    v[1].first = 4;
-    v[2].first = 4;
+    TableView v = table.find_all_int(0, 0);
+    v[0].set_int(0, 5);
+    v[1].set_int(0, 4);
+    v[2].set_int(0, 4);
 
-    size_t r = v.column().first.find_first(4);
+    size_t r = v.find_first_int(0, 4);
     CHECK_EQUAL(1, r);
 }
 
@@ -619,46 +601,43 @@ TEST(TableView_SyncAfterCopy)
 
 TEST(TableView_FindAll)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "first");
 
-    table.add(0);
-    table.add(0);
-    table.add(0);
+    add(table, 0);
+    add(table, 0);
+    add(table, 0);
 
-    TestTableInt::View v = table.column().first.find_all(0);
+    TableView v = table.find_all_int(0, 0);
     CHECK_EQUAL(3, v.size());
-    v[0].first = 5;
-    v[1].first = 4; // match
-    v[2].first = 4; // match
+    v[0].set_int(0, 5);
+    v[1].set_int(0, 4); // match
+    v[2].set_int(0, 4); // match
 
     // todo, add creation to wrapper function in table.h
-    TestTableInt::View v2 = v.column().first.find_all(4);
+    TableView v2 = v.find_all_int(0, 4);
     CHECK_EQUAL(2, v2.size());
     CHECK_EQUAL(1, v2.get_source_ndx(0));
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
 
-namespace {
-
-REALM_TABLE_1(TestTableString, first, String)
-
-} // anonymous namespace
 
 TEST(TableView_FindAllString)
 {
-    TestTableString table;
+    TestTable table;
+    table.add_column(type_String, "1");
 
-    table.add("a");
-    table.add("a");
-    table.add("a");
+    add(table, "a");
+    add(table, "a");
+    add(table, "a");
 
-    TestTableString::View v = table.column().first.find_all("a");
-    v[0].first = "foo";
-    v[1].first = "bar"; // match
-    v[2].first = "bar"; // match
+    TableView v = table.find_all_string(0, "a");
+    v[0].set_string(0, "foo");
+    v[1].set_string(0, "bar"); // match
+    v[2].set_string(0, "bar"); // match
 
     // todo, add creation to wrapper function in table.h
-    TestTableString::View v2 = v.column().first.find_all("bar");
+    TableView v2 = v.find_all_string(0, "bar");
     CHECK_EQUAL(1, v2.get_source_ndx(0));
     CHECK_EQUAL(2, v2.get_source_ndx(1));
 }
@@ -670,35 +649,36 @@ NONCONCURRENT_TEST(TableView_StringSort)
     // takes length in count when sorting ("b" comes before "aaaa"). Bug is not present in Windows 7.
 
     // Test of handling of unicode takes place in test_utf8.cpp
-    TestTableString table;
+    TestTable table;
+    table.add_column(type_String, "1");
 
-    table.add("alpha");
-    table.add("zebra");
-    table.add("ALPHA");
-    table.add("ZEBRA");
+    add(table, "alpha");
+    add(table, "zebra");
+    add(table, "ALPHA");
+    add(table, "ZEBRA");
 
     // Core-only is default comparer
-    TestTableString::View v = table.where().find_all();
-    v.column().first.sort();
-    CHECK_EQUAL("alpha", v[0].first);
-    CHECK_EQUAL("ALPHA", v[1].first);
-    CHECK_EQUAL("zebra", v[2].first);
-    CHECK_EQUAL("ZEBRA", v[3].first);
+    TableView v = table.where().find_all();
+    v.sort(0);
+    CHECK_EQUAL("alpha", v[0].get_string(0));
+    CHECK_EQUAL("ALPHA", v[1].get_string(0));
+    CHECK_EQUAL("zebra", v[2].get_string(0));
+    CHECK_EQUAL("ZEBRA", v[3].get_string(0));
 
     // Should be exactly the same as above because 0 was default already
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
-    v.column().first.sort();
-    CHECK_EQUAL("alpha", v[0].first);
-    CHECK_EQUAL("ALPHA", v[1].first);
-    CHECK_EQUAL("zebra", v[2].first);
-    CHECK_EQUAL("ZEBRA", v[3].first);
+    v.sort(0);
+    CHECK_EQUAL("alpha", v[0].get_string(0));
+    CHECK_EQUAL("ALPHA", v[1].get_string(0));
+    CHECK_EQUAL("zebra", v[2].get_string(0));
+    CHECK_EQUAL("ZEBRA", v[3].get_string(0));
 
     // Test descending mode
-    v.column().first.sort(false);
-    CHECK_EQUAL("alpha", v[3].first);
-    CHECK_EQUAL("ALPHA", v[2].first);
-    CHECK_EQUAL("zebra", v[1].first);
-    CHECK_EQUAL("ZEBRA", v[0].first);
+    v.sort(0, false);
+    CHECK_EQUAL("alpha", v[3].get_string(0));
+    CHECK_EQUAL("ALPHA", v[2].get_string(0));
+    CHECK_EQUAL("zebra", v[1].get_string(0));
+    CHECK_EQUAL("ZEBRA", v[0].get_string(0));
 
     // primitive C locale comparer. But that's OK since all we want to test is
     // if the callback is invoked
@@ -710,11 +690,11 @@ NONCONCURRENT_TEST(TableView_StringSort)
 
     // Test if callback comparer works. Our callback is a primitive dummy-comparer
     set_string_compare_method(STRING_COMPARE_CALLBACK, comparer);
-    v.column().first.sort();
-    CHECK_EQUAL("ALPHA", v[0].first);
-    CHECK_EQUAL("ZEBRA", v[1].first);
-    CHECK_EQUAL("alpha", v[2].first);
-    CHECK_EQUAL("zebra", v[3].first);
+    v.sort(0);
+    CHECK_EQUAL("ALPHA", v[0].get_string(0));
+    CHECK_EQUAL("ZEBRA", v[1].get_string(0));
+    CHECK_EQUAL("alpha", v[2].get_string(0));
+    CHECK_EQUAL("zebra", v[3].get_string(0));
     CHECK_EQUAL(true, got_called);
 
 #ifdef _MSC_VER
@@ -723,11 +703,11 @@ NONCONCURRENT_TEST(TableView_StringSort)
     got_called = false;
     bool available = set_string_compare_method(STRING_COMPARE_CPP11, nullptr);
     if (available) {
-        v.column().first.sort();
-        CHECK_EQUAL("alpha", v[0].first);
-        CHECK_EQUAL("ALPHA", v[1].first);
-        CHECK_EQUAL("zebra", v[2].first);
-        CHECK_EQUAL("ZEBRA", v[3].first);
+        v.sort(0);
+        CHECK_EQUAL("alpha", v[0].get_string(0));
+        CHECK_EQUAL("ALPHA", v[1].get_string(0));
+        CHECK_EQUAL("zebra", v[2].get_string(0));
+        CHECK_EQUAL("ZEBRA", v[3].get_string(0));
         CHECK_EQUAL(false, got_called);
     }
 #endif
@@ -739,32 +719,36 @@ NONCONCURRENT_TEST(TableView_StringSort)
 
 TEST(TableView_FloatDoubleSort)
 {
-    TestTableFloatDouble t;
+    TestTable t;
+    t.add_column(type_Float, "1");
+    t.add_column(type_Double, "2");
 
-    t.add(1.0f, 10.0);
-    t.add(3.0f, 30.0);
-    t.add(2.0f, 20.0);
-    t.add(0.0f, 5.0);
+    add(t, 1.0f, 10.0);
+    add(t, 3.0f, 30.0);
+    add(t, 2.0f, 20.0);
+    add(t, 0.0f, 5.0);
 
-    TestTableFloatDouble::View tv = t.where().find_all();
-    tv.column().first.sort();
+    TableView tv = t.where().find_all();
+    tv.sort(0);
 
-    CHECK_EQUAL(0.0f, tv[0].first);
-    CHECK_EQUAL(1.0f, tv[1].first);
-    CHECK_EQUAL(2.0f, tv[2].first);
-    CHECK_EQUAL(3.0f, tv[3].first);
+    CHECK_EQUAL(0.0f, tv[0].get_float(0));
+    CHECK_EQUAL(1.0f, tv[1].get_float(0));
+    CHECK_EQUAL(2.0f, tv[2].get_float(0));
+    CHECK_EQUAL(3.0f, tv[3].get_float(0));
 
-    tv.column().second.sort();
-    CHECK_EQUAL(5.0f, tv[0].second);
-    CHECK_EQUAL(10.0f, tv[1].second);
-    CHECK_EQUAL(20.0f, tv[2].second);
-    CHECK_EQUAL(30.0f, tv[3].second);
+    tv.sort(1);
+    CHECK_EQUAL(5.0f, tv[0].get_double(1));
+    CHECK_EQUAL(10.0f, tv[1].get_double(1));
+    CHECK_EQUAL(20.0f, tv[2].get_double(1));
+    CHECK_EQUAL(30.0f, tv[3].get_double(1));
 }
 
 TEST(TableView_DoubleSortPrecision)
 {
     // Detect if sorting algorithm accidentially casts doubles to float somewhere so that precision gets lost
-    TestTableFloatDouble t;
+    TestTable t;
+    t.add_column(type_Float, "1");
+    t.add_column(type_Double, "2");
 
     double d1 = 100000000000.0;
     double d2 = 100000000001.0;
@@ -779,22 +763,22 @@ TEST(TableView_DoubleSortPrecision)
     // First verify that our unit is guaranteed to find such a bug; that is, test if such a cast is guaranteed to give
     // bad sorting order. This is not granted, because an unstable sorting algorithm could *by chance* give the
     // correct sorting order. Fortunatly we use std::stable_sort which must maintain order on draws.
-    t.add(f2, d2);
-    t.add(f1, d1);
+    add(t, f2, d2);
+    add(t, f1, d1);
 
-    TestTableFloatDouble::View tv = t.where().find_all();
-    tv.column().first.sort();
+    TableView tv = t.where().find_all();
+    tv.sort(0);
 
     // Sort should be stable
-    CHECK_EQUAL(f2, tv[0].first);
-    CHECK_EQUAL(f1, tv[1].first);
+    CHECK_EQUAL(f2, tv[0].get_float(0));
+    CHECK_EQUAL(f1, tv[1].get_float(0));
 
     // If sort is stable, and compare makes a draw because the doubles are accidentially casted to float in Realm,
     // then
     // original order would be maintained. Check that it's not maintained:
-    tv.column().second.sort();
-    CHECK_EQUAL(d1, tv[0].second);
-    CHECK_EQUAL(d2, tv[1].second);
+    tv.sort(1);
+    CHECK_EQUAL(d1, tv[0].get_double(1));
+    CHECK_EQUAL(d2, tv[1].get_double(1));
 }
 
 TEST(TableView_SortNullString)
@@ -837,15 +821,16 @@ TEST(TableView_SortNullString)
 
 TEST(TableView_Delete)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "first");
 
-    table.add(1);
-    table.add(2);
-    table.add(1);
-    table.add(3);
-    table.add(1);
+    add(table, 1);
+    add(table, 2);
+    add(table, 1);
+    add(table, 3);
+    add(table, 1);
 
-    TestTableInt::View v = table.column().first.find_all(1);
+    TableView v = table.find_all_int(0, 1);
     CHECK_EQUAL(3, v.size());
 
     v.remove(1);
@@ -854,47 +839,48 @@ TEST(TableView_Delete)
     CHECK_EQUAL(3, v.get_source_ndx(1));
 
     CHECK_EQUAL(4, table.size());
-    CHECK_EQUAL(1, table[0].first);
-    CHECK_EQUAL(2, table[1].first);
-    CHECK_EQUAL(3, table[2].first);
-    CHECK_EQUAL(1, table[3].first);
+    CHECK_EQUAL(1, table[0].get_int(0));
+    CHECK_EQUAL(2, table[1].get_int(0));
+    CHECK_EQUAL(3, table[2].get_int(0));
+    CHECK_EQUAL(1, table[3].get_int(0));
 
     v.remove(0);
     CHECK_EQUAL(1, v.size());
     CHECK_EQUAL(2, v.get_source_ndx(0));
 
     CHECK_EQUAL(3, table.size());
-    CHECK_EQUAL(2, table[0].first);
-    CHECK_EQUAL(3, table[1].first);
-    CHECK_EQUAL(1, table[2].first);
+    CHECK_EQUAL(2, table[0].get_int(0));
+    CHECK_EQUAL(3, table[1].get_int(0));
+    CHECK_EQUAL(1, table[2].get_int(0));
 
     v.remove(0);
     CHECK_EQUAL(0, v.size());
 
     CHECK_EQUAL(2, table.size());
-    CHECK_EQUAL(2, table[0].first);
-    CHECK_EQUAL(3, table[1].first);
+    CHECK_EQUAL(2, table[0].get_int(0));
+    CHECK_EQUAL(3, table[1].get_int(0));
 }
 
 TEST(TableView_Clear)
 {
-    TestTableInt table;
+    TestTable table;
+    table.add_column(type_Int, "first");
 
-    table.add(1);
-    table.add(2);
-    table.add(1);
-    table.add(3);
-    table.add(1);
+    add(table, 1);
+    add(table, 2);
+    add(table, 1);
+    add(table, 3);
+    add(table, 1);
 
-    TestTableInt::View v = table.column().first.find_all(1);
+    TableView v = table.find_all_int(0, 1);
     CHECK_EQUAL(3, v.size());
 
     v.clear();
     CHECK_EQUAL(0, v.size());
 
     CHECK_EQUAL(2, table.size());
-    CHECK_EQUAL(2, table[0].first);
-    CHECK_EQUAL(3, table[1].first);
+    CHECK_EQUAL(2, table[0].get_int(0));
+    CHECK_EQUAL(3, table[1].get_int(0));
 }
 
 
@@ -949,33 +935,35 @@ TEST(TableView_Stacked)
 
 TEST(TableView_ClearNone)
 {
-    TestTableInt table;
+    Table table;
+    table.add_column(type_Int, "first");
 
-    TestTableInt::View v = table.column().first.find_all(1);
+    TableView v = table.find_all_int(0, 1);
     CHECK_EQUAL(0, v.size());
 
     v.clear();
 }
 
-
 TEST(TableView_FindAllStacked)
 {
-    TestTableInt2 table;
+    TestTable table;
+    table.add_column(type_Int, "1");
+    table.add_column(type_Int, "2");	
 
-    table.add(0, 1);
-    table.add(0, 2);
-    table.add(0, 3);
-    table.add(1, 1);
-    table.add(1, 2);
-    table.add(1, 3);
+    add(table, 0, 1);
+    add(table, 0, 2);
+    add(table, 0, 3);
+    add(table, 1, 1);
+    add(table, 1, 2);
+    add(table, 1, 3);
 
-    TestTableInt2::View v = table.column().first.find_all(0);
+    TableView v = table.find_all_int(0, 0);
     CHECK_EQUAL(3, v.size());
 
-    TestTableInt2::View v2 = v.column().second.find_all(2);
+    TableView v2 = v.find_all_int(1, 2);
     CHECK_EQUAL(1, v2.size());
-    CHECK_EQUAL(0, v2[0].first);
-    CHECK_EQUAL(2, v2[0].second);
+    CHECK_EQUAL(0, v2[0].get_int(0));
+    CHECK_EQUAL(2, v2[0].get_int(1));
     CHECK_EQUAL(1, v2.get_source_ndx(0));
 }
 
@@ -1183,35 +1171,33 @@ TEST(TableView_LowLevelSubtables)
 }
 
 
-namespace {
-
-REALM_TABLE_1(MyTable1, val, Int)
-
-REALM_TABLE_2(MyTable2, val, Int, subtab, Subtable<MyTable1>)
-
-REALM_TABLE_2(MyTable3, val, Int, subtab, Subtable<MyTable2>)
-
-} // anonymous namespace
-
 TEST(TableView_HighLevelSubtables)
 {
-    MyTable3 t;
-    const MyTable3& ct = t;
+    Table t;
+    t.add_column(type_Int, "val");
+    DescriptorRef sub;
+    t.add_column(type_Table, "subtab", &sub);
+    sub->add_column(type_Int, "val");
+    DescriptorRef subsub;
+    sub->add_column(type_Table, "subtab", &subsub);
+    subsub->add_column(type_Int, "value");
 
-    t.add();
-    MyTable3::View v = t.column().val.find_all(0);
-    MyTable3::ConstView cv = ct.column().val.find_all(0);
+    const Table& ct = t;
+
+    t.add_empty_row();
+    TableView v = t.find_all_int(0, 0);
+    ConstTableView cv = ct.find_all_int(0, 0);
 
     {
-        MyTable3::View v2 = v.column().val.find_all(0);
-        MyTable3::ConstView cv2 = cv.column().val.find_all(0);
+        TableView v2 = v.find_all_int(0, 0);
+        ConstTableView cv2 = cv.find_all_int(0, 0);
 
-        MyTable3::ConstView cv3 = t.column().val.find_all(0);
-        MyTable3::ConstView cv4 = v.column().val.find_all(0);
+        ConstTableView cv3 = t.find_all_int(0, 0);
+        ConstTableView cv4 = v.find_all_int(0, 0);
 
         // Also test assigment that converts to const
-        cv3 = t.column().val.find_all(0);
-        cv4 = v.column().val.find_all(0);
+        cv3 = t.find_all_int(0, 0);
+        cv4 = v.find_all_int(0, 0);
 
         static_cast<void>(v2);
         static_cast<void>(cv2);
@@ -1219,112 +1205,30 @@ TEST(TableView_HighLevelSubtables)
         static_cast<void>(cv4);
     }
 
-    {
-        MyTable2::Ref s1 = v[0].subtab;
-        MyTable2::ConstRef s2 = v[0].subtab;
-        MyTable2::Ref s3 = v[0].subtab->get_table_ref();
-        MyTable2::ConstRef s4 = v[0].subtab->get_table_ref();
-        MyTable2::Ref s5 = v.column().subtab[0];
-        MyTable2::ConstRef s6 = v.column().subtab[0];
-        MyTable2::Ref s7 = v.column().subtab[0]->get_table_ref();
-        MyTable2::ConstRef s8 = v.column().subtab[0]->get_table_ref();
-        MyTable2::ConstRef cs1 = cv[0].subtab;
-        MyTable2::ConstRef cs2 = cv[0].subtab->get_table_ref();
-        MyTable2::ConstRef cs3 = cv.column().subtab[0];
-        MyTable2::ConstRef cs4 = cv.column().subtab[0]->get_table_ref();
-        static_cast<void>(s1);
-        static_cast<void>(s2);
-        static_cast<void>(s3);
-        static_cast<void>(s4);
-        static_cast<void>(s5);
-        static_cast<void>(s6);
-        static_cast<void>(s7);
-        static_cast<void>(s8);
-        static_cast<void>(cs1);
-        static_cast<void>(cs2);
-        static_cast<void>(cs3);
-        static_cast<void>(cs4);
-    }
+    v[0].get_subtable(1).get()->add_empty_row();
+    v[0].get_subtable(1).get()->get_subtable(1, 0).get()->add_empty_row();
 
-    t[0].subtab->add();
-    {
-        MyTable1::Ref s1 = v[0].subtab[0].subtab;
-        MyTable1::ConstRef s2 = v[0].subtab[0].subtab;
-        MyTable1::Ref s3 = v[0].subtab[0].subtab->get_table_ref();
-        MyTable1::ConstRef s4 = v[0].subtab[0].subtab->get_table_ref();
-        MyTable1::Ref s5 = v.column().subtab[0]->column().subtab[0];
-        MyTable1::ConstRef s6 = v.column().subtab[0]->column().subtab[0];
-        MyTable1::Ref s7 = v.column().subtab[0]->column().subtab[0]->get_table_ref();
-        MyTable1::ConstRef s8 = v.column().subtab[0]->column().subtab[0]->get_table_ref();
-        MyTable1::ConstRef cs1 = cv[0].subtab[0].subtab;
-        MyTable1::ConstRef cs2 = cv[0].subtab[0].subtab->get_table_ref();
-        MyTable1::ConstRef cs3 = cv.column().subtab[0]->column().subtab[0];
-        MyTable1::ConstRef cs4 = cv.column().subtab[0]->column().subtab[0]->get_table_ref();
-        static_cast<void>(s1);
-        static_cast<void>(s2);
-        static_cast<void>(s3);
-        static_cast<void>(s4);
-        static_cast<void>(s5);
-        static_cast<void>(s6);
-        static_cast<void>(s7);
-        static_cast<void>(s8);
-        static_cast<void>(cs1);
-        static_cast<void>(cs2);
-        static_cast<void>(cs3);
-        static_cast<void>(cs4);
-    }
+    v[0].get_subtable(1).get()->set_int(0, 0, 1);
+    v[0].get_subtable(1).get()->get_subtable(1, 0).get()->set_int(0, 0, 2);
 
-    v[0].subtab[0].val = 1;
-    CHECK_EQUAL(v[0].subtab[0].val, 1);
-    CHECK_EQUAL(v.column().subtab[0]->column().val[0], 1);
-    CHECK_EQUAL(v[0].subtab->column().val[0], 1);
-    CHECK_EQUAL(v.column().subtab[0][0].val, 1);
+    CHECK_EQUAL(v[0].get_subtable(1).get()->get_int(0, 0), 1);
+    CHECK_EQUAL(v.get_subtable(1, 0).get()->get_subtable(1, 0).get()->get_int(0, 0), 2);
 
-    v.column().subtab[0]->column().val[0] = 2;
-    CHECK_EQUAL(v[0].subtab[0].val, 2);
-    CHECK_EQUAL(v.column().subtab[0]->column().val[0], 2);
-    CHECK_EQUAL(v[0].subtab->column().val[0], 2);
-    CHECK_EQUAL(v.column().subtab[0][0].val, 2);
-
-    v[0].subtab->column().val[0] = 3;
-    CHECK_EQUAL(v[0].subtab[0].val, 3);
-    CHECK_EQUAL(v.column().subtab[0]->column().val[0], 3);
-    CHECK_EQUAL(v[0].subtab->column().val[0], 3);
-    CHECK_EQUAL(v.column().subtab[0][0].val, 3);
-
-    v.column().subtab[0][0].val = 4;
-    CHECK_EQUAL(v[0].subtab[0].val, 4);
-    CHECK_EQUAL(v.column().subtab[0]->column().val[0], 4);
-    CHECK_EQUAL(v[0].subtab->column().val[0], 4);
-    CHECK_EQUAL(v.column().subtab[0][0].val, 4);
-    CHECK_EQUAL(cv[0].subtab[0].val, 4);
-    CHECK_EQUAL(cv.column().subtab[0]->column().val[0], 4);
-    CHECK_EQUAL(cv[0].subtab->column().val[0], 4);
-    CHECK_EQUAL(cv.column().subtab[0][0].val, 4);
-
-    v[0].subtab[0].subtab->add();
-    v[0].subtab[0].subtab[0].val = 5;
-    CHECK_EQUAL(v[0].subtab[0].subtab[0].val, 5);
-    CHECK_EQUAL(v.column().subtab[0]->column().subtab[0]->column().val[0], 5);
-    CHECK_EQUAL(cv[0].subtab[0].subtab[0].val, 5);
-    CHECK_EQUAL(cv.column().subtab[0]->column().subtab[0]->column().val[0], 5);
-
-    v.column().subtab[0]->column().subtab[0]->column().val[0] = 6;
-    CHECK_EQUAL(v[0].subtab[0].subtab[0].val, 6);
-    CHECK_EQUAL(v.column().subtab[0]->column().subtab[0]->column().val[0], 6);
-    CHECK_EQUAL(cv[0].subtab[0].subtab[0].val, 6);
-    CHECK_EQUAL(cv.column().subtab[0]->column().subtab[0]->column().val[0], 6);
+    CHECK_EQUAL(cv[0].get_subtable(1).get()->get_int(0, 0), 1);
+    CHECK_EQUAL(cv.get_subtable(1, 0).get()->get_subtable(1, 0).get()->get_int(0, 0), 2);
 }
 
 
 TEST(TableView_ToString)
 {
-    TestTableInt2 tbl;
+    TestTable tbl;
+    tbl.add_column(type_Int, "first");
+    tbl.add_column(type_Int, "second");	
 
-    tbl.add(2, 123456);
-    tbl.add(4, 1234567);
-    tbl.add(6, 12345678);
-    tbl.add(4, 12345678);
+    add(tbl, 2, 123456);
+    add(tbl, 4, 1234567);
+    add(tbl, 6, 12345678);
+    add(tbl, 4, 12345678);
 
     std::string s = "    first    second\n";
     std::string s0 = "0:      2    123456\n";
@@ -1334,13 +1238,13 @@ TEST(TableView_ToString)
 
     // Test full view
     std::stringstream ss;
-    TestTableInt2::View tv = tbl.where().find_all();
+    TableView tv = tbl.where().find_all();
     tv.to_string(ss);
     CHECK_EQUAL(s + s0 + s1 + s2 + s3, ss.str());
 
     // Find partial view: row 1+3
     std::stringstream ss2;
-    tv = tbl.where().first.equal(4).find_all();
+    tv = tbl.where().equal(0, 4).find_all();
     tv.to_string(ss2);
     CHECK_EQUAL(s + s1 + s3, ss2.str());
 
@@ -1996,31 +1900,31 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     t.add_empty_row(7);
     t.set_string(0, 0, StringData(""));
     t.set_int(1, 0, 100);
-    t.set_float(2, 0, 100.);
+    t.set_float(2, 0, 100.f);
 
     t.set_string(0, 1, realm::null());
     t.set_int(1, 1, 200);
-    t.set_float(2, 1, 200.);
+    t.set_float(2, 1, 200.f);
 
     t.set_string(0, 2, StringData(""));
     t.set_int(1, 2, 100);
-    t.set_float(2, 2, 100.);
+    t.set_float(2, 2, 100.f);
 
     t.set_string(0, 3, realm::null());
     t.set_int(1, 3, 200);
-    t.set_float(2, 3, 200.);
+    t.set_float(2, 3, 200.f);
 
     t.set_string(0, 4, "foo");
     t.set_int(1, 4, 300);
-    t.set_float(2, 4, 300.);
+    t.set_float(2, 4, 300.f);
 
     t.set_string(0, 5, "foo");
     t.set_int(1, 5, 400);
-    t.set_float(2, 5, 400.);
+    t.set_float(2, 5, 400.f);
 
     t.set_string(0, 6, "bar");
     t.set_int(1, 6, 500);
-    t.set_float(2, 6, 500.);
+    t.set_float(2, 6, 500.f);
 
     origin->add_empty_row(t.size());
     for (size_t i = 0; i < t.size(); ++i)
@@ -2246,7 +2150,8 @@ TEST(TableView_IsInTableOrder)
 
 NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
 {
-    TestTableString table;
+    TestTable table;
+    table.add_column(type_String, "1");
 
     // This tests the expected sorting order with STRING_COMPARE_CORE_SIMILAR. See utf8_compare() in unicode.cpp. Only
     // characters
@@ -2276,538 +2181,538 @@ NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
 
     set_string_compare_method(STRING_COMPARE_CORE_SIMILAR, nullptr);
 
-    table.add(" ");
-    table.add("!");
-    table.add("\"");
-    table.add("#");
-    table.add("%");
-    table.add("&");
-    table.add("'");
-    table.add("(");
-    table.add(")");
-    table.add("*");
-    table.add("+");
-    table.add(",");
-    table.add("-");
-    table.add(".");
-    table.add("/");
-    table.add(":");
-    table.add(";");
-    table.add("<");
-    table.add("=");
-    table.add(">");
-    table.add("?");
-    table.add("@");
-    table.add("[");
-    table.add("\\");
-    table.add("]");
-    table.add("^");
-    table.add("_");
-    table.add("`");
-    table.add("{");
-    table.add("|");
-    table.add("}");
-    table.add("~");
-    table.add(" ");
-    table.add("¡");
-    table.add("¦");
-    table.add("§");
-    table.add("¨");
-    table.add("©");
-    table.add("«");
-    table.add("¬");
-    table.add("®");
-    table.add("¯");
-    table.add("°");
-    table.add("±");
-    table.add("´");
-    table.add("¶");
-    table.add("·");
-    table.add("¸");
-    table.add("»");
-    table.add("¿");
-    table.add("×");
-    table.add("÷");
-    table.add("¤");
-    table.add("¢");
-    table.add("$");
-    table.add("£");
-    table.add("¥");
-    table.add("0");
-    table.add("1");
-    table.add("¹");
-    table.add("½");
-    table.add("¼");
-    table.add("2");
-    table.add("²");
-    table.add("3");
-    table.add("³");
-    table.add("¾");
-    table.add("4");
-    table.add("5");
-    table.add("6");
-    table.add("7");
-    table.add("8");
-    table.add("9");
-    table.add("a");
-    table.add("A");
-    table.add("ª");
-    table.add("á");
-    table.add("Á");
-    table.add("à");
-    table.add("À");
-    table.add("ă");
-    table.add("Ă");
-    table.add("â");
-    table.add("Â");
-    table.add("ǎ");
-    table.add("Ǎ");
-    table.add("å");
-    table.add("Å");
-    table.add("ǻ");
-    table.add("Ǻ");
-    table.add("ä");
-    table.add("Ä");
-    table.add("ǟ");
-    table.add("Ǟ");
-    table.add("ã");
-    table.add("Ã");
-    table.add("ȧ");
-    table.add("Ȧ");
-    table.add("ǡ");
-    table.add("Ǡ");
-    table.add("ą");
-    table.add("Ą");
-    table.add("ā");
-    table.add("Ā");
-    table.add("ȁ");
-    table.add("Ȁ");
-    table.add("ȃ");
-    table.add("Ȃ");
-    table.add("æ");
-    table.add("Æ");
-    table.add("ǽ");
-    table.add("Ǽ");
-    table.add("ǣ");
-    table.add("Ǣ");
-    table.add("Ⱥ");
-    table.add("b");
-    table.add("B");
-    table.add("ƀ");
-    table.add("Ƀ");
-    table.add("Ɓ");
-    table.add("ƃ");
-    table.add("Ƃ");
-    table.add("c");
-    table.add("C");
-    table.add("ć");
-    table.add("Ć");
-    table.add("ĉ");
-    table.add("Ĉ");
-    table.add("č");
-    table.add("Č");
-    table.add("ċ");
-    table.add("Ċ");
-    table.add("ç");
-    table.add("Ç");
-    table.add("ȼ");
-    table.add("Ȼ");
-    table.add("ƈ");
-    table.add("Ƈ");
-    table.add("d");
-    table.add("D");
-    table.add("ď");
-    table.add("Ď");
-    table.add("đ");
-    table.add("Đ");
-    table.add("ð");
-    table.add("Ð");
-    table.add("ȸ");
-    table.add("ǳ");
-    table.add("ǲ");
-    table.add("Ǳ");
-    table.add("ǆ");
-    table.add("ǅ");
-    table.add("Ǆ");
-    table.add("Ɖ");
-    table.add("Ɗ");
-    table.add("ƌ");
-    table.add("Ƌ");
-    table.add("ȡ");
-    table.add("e");
-    table.add("E");
-    table.add("é");
-    table.add("É");
-    table.add("è");
-    table.add("È");
-    table.add("ĕ");
-    table.add("Ĕ");
-    table.add("ê");
-    table.add("Ê");
-    table.add("ě");
-    table.add("Ě");
-    table.add("ë");
-    table.add("Ë");
-    table.add("ė");
-    table.add("Ė");
-    table.add("ȩ");
-    table.add("Ȩ");
-    table.add("ę");
-    table.add("Ę");
-    table.add("ē");
-    table.add("Ē");
-    table.add("ȅ");
-    table.add("Ȅ");
-    table.add("ȇ");
-    table.add("Ȇ");
-    table.add("ɇ");
-    table.add("Ɇ");
-    table.add("ǝ");
-    table.add("Ǝ");
-    table.add("Ə");
-    table.add("Ɛ");
-    table.add("f");
-    table.add("F");
-    table.add("ƒ");
-    table.add("Ƒ");
-    table.add("g");
-    table.add("G");
-    table.add("ǵ");
-    table.add("Ǵ");
-    table.add("ğ");
-    table.add("Ğ");
-    table.add("ĝ");
-    table.add("Ĝ");
-    table.add("ǧ");
-    table.add("Ǧ");
-    table.add("ġ");
-    table.add("Ġ");
-    table.add("ģ");
-    table.add("Ģ");
-    table.add("ǥ");
-    table.add("Ǥ");
-    table.add("Ɠ");
-    table.add("Ɣ");
-    table.add("ƣ");
-    table.add("Ƣ");
-    table.add("h");
-    table.add("H");
-    table.add("ĥ");
-    table.add("Ĥ");
-    table.add("ȟ");
-    table.add("Ȟ");
-    table.add("ħ");
-    table.add("Ħ");
-    table.add("ƕ");
-    table.add("Ƕ");
-    table.add("i");
-    table.add("I");
-    table.add("í");
-    table.add("Í");
-    table.add("ì");
-    table.add("Ì");
-    table.add("ĭ");
-    table.add("Ĭ");
-    table.add("î");
-    table.add("Î");
-    table.add("ǐ");
-    table.add("Ǐ");
-    table.add("ï");
-    table.add("Ï");
-    table.add("ĩ");
-    table.add("Ĩ");
-    table.add("İ");
-    table.add("į");
-    table.add("Į");
-    table.add("ī");
-    table.add("Ī");
-    table.add("ȉ");
-    table.add("Ȉ");
-    table.add("ȋ");
-    table.add("Ȋ");
-    table.add("ĳ");
-    table.add("Ĳ");
-    table.add("ı");
-    table.add("Ɨ");
-    table.add("Ɩ");
-    table.add("j");
-    table.add("J");
-    table.add("ĵ");
-    table.add("Ĵ");
-    table.add("ǰ");
-    table.add("ȷ");
-    table.add("ɉ");
-    table.add("Ɉ");
-    table.add("k");
-    table.add("K");
-    table.add("ǩ");
-    table.add("Ǩ");
-    table.add("ķ");
-    table.add("Ķ");
-    table.add("ƙ");
-    table.add("Ƙ");
-    table.add("ĺ");
-    table.add("Ĺ");
-    table.add("ľ");
-    table.add("Ľ");
-    table.add("ļ");
-    table.add("Ļ");
-    table.add("ł");
-    table.add("Ł");
-    table.add("ŀ");
-    table.add("l");
-    table.add("Ŀ");
-    table.add("L");
-    table.add("ǉ");
-    table.add("ǈ");
-    table.add("Ǉ");
-    table.add("ƚ");
-    table.add("Ƚ");
-    table.add("ȴ");
-    table.add("ƛ");
-    table.add("m");
-    table.add("M");
-    table.add("n");
-    table.add("N");
-    table.add("ń");
-    table.add("Ń");
-    table.add("ǹ");
-    table.add("Ǹ");
-    table.add("ň");
-    table.add("Ň");
-    table.add("ñ");
-    table.add("Ñ");
-    table.add("ņ");
-    table.add("Ņ");
-    table.add("ǌ");
-    table.add("ǋ");
-    table.add("Ǌ");
-    table.add("Ɲ");
-    table.add("ƞ");
-    table.add("Ƞ");
-    table.add("ȵ");
-    table.add("ŋ");
-    table.add("Ŋ");
-    table.add("o");
-    table.add("O");
-    table.add("º");
-    table.add("ó");
-    table.add("Ó");
-    table.add("ò");
-    table.add("Ò");
-    table.add("ŏ");
-    table.add("Ŏ");
-    table.add("ô");
-    table.add("Ô");
-    table.add("ǒ");
-    table.add("Ǒ");
-    table.add("ö");
-    table.add("Ö");
-    table.add("ȫ");
-    table.add("Ȫ");
-    table.add("ő");
-    table.add("Ő");
-    table.add("õ");
-    table.add("Õ");
-    table.add("ȭ");
-    table.add("Ȭ");
-    table.add("ȯ");
-    table.add("Ȯ");
-    table.add("ȱ");
-    table.add("Ȱ");
-    table.add("ø");
-    table.add("Ø");
-    table.add("ǿ");
-    table.add("Ǿ");
-    table.add("ǫ");
-    table.add("Ǫ");
-    table.add("ǭ");
-    table.add("Ǭ");
-    table.add("ō");
-    table.add("Ō");
-    table.add("ȍ");
-    table.add("Ȍ");
-    table.add("ȏ");
-    table.add("Ȏ");
-    table.add("ơ");
-    table.add("Ơ");
-    table.add("œ");
-    table.add("Œ");
-    table.add("Ɔ");
-    table.add("Ɵ");
-    table.add("ȣ");
-    table.add("Ȣ");
-    table.add("p");
-    table.add("P");
-    table.add("ƥ");
-    table.add("Ƥ");
-    table.add("q");
-    table.add("Q");
-    table.add("ȹ");
-    table.add("ɋ");
-    table.add("Ɋ");
-    table.add("ĸ");
-    table.add("r");
-    table.add("R");
-    table.add("ŕ");
-    table.add("Ŕ");
-    table.add("ř");
-    table.add("Ř");
-    table.add("ŗ");
-    table.add("Ŗ");
-    table.add("ȑ");
-    table.add("Ȑ");
-    table.add("ȓ");
-    table.add("Ȓ");
-    table.add("Ʀ");
-    table.add("ɍ");
-    table.add("Ɍ");
-    table.add("s");
-    table.add("S");
-    table.add("ś");
-    table.add("Ś");
-    table.add("ŝ");
-    table.add("Ŝ");
-    table.add("š");
-    table.add("Š");
-    table.add("ş");
-    table.add("Ş");
-    table.add("ș");
-    table.add("Ș");
-    table.add("ſ");
-    table.add("ß");
-    table.add("ȿ");
-    table.add("Ʃ");
-    table.add("ƪ");
-    table.add("t");
-    table.add("T");
-    table.add("ť");
-    table.add("Ť");
-    table.add("ţ");
-    table.add("Ţ");
-    table.add("ț");
-    table.add("Ț");
-    table.add("ƾ");
-    table.add("ŧ");
-    table.add("Ŧ");
-    table.add("Ⱦ");
-    table.add("ƫ");
-    table.add("ƭ");
-    table.add("Ƭ");
-    table.add("Ʈ");
-    table.add("ȶ");
-    table.add("u");
-    table.add("U");
-    table.add("ú");
-    table.add("Ú");
-    table.add("ù");
-    table.add("Ù");
-    table.add("ŭ");
-    table.add("Ŭ");
-    table.add("û");
-    table.add("Û");
-    table.add("ǔ");
-    table.add("Ǔ");
-    table.add("ů");
-    table.add("Ů");
-    table.add("ü");
-    table.add("Ü");
-    table.add("ǘ");
-    table.add("Ǘ");
-    table.add("ǜ");
-    table.add("Ǜ");
-    table.add("ǚ");
-    table.add("Ǚ");
-    table.add("ǖ");
-    table.add("Ǖ");
-    table.add("ű");
-    table.add("Ű");
-    table.add("ũ");
-    table.add("Ũ");
-    table.add("ų");
-    table.add("Ų");
-    table.add("ū");
-    table.add("Ū");
-    table.add("ȕ");
-    table.add("Ȕ");
-    table.add("ȗ");
-    table.add("Ȗ");
-    table.add("ư");
-    table.add("Ư");
-    table.add("Ʉ");
-    table.add("Ɯ");
-    table.add("Ʊ");
-    table.add("v");
-    table.add("V");
-    table.add("Ʋ");
-    table.add("Ʌ");
-    table.add("w");
-    table.add("W");
-    table.add("ŵ");
-    table.add("Ŵ");
-    table.add("x");
-    table.add("X");
-    table.add("y");
-    table.add("Y");
-    table.add("ý");
-    table.add("Ý");
-    table.add("ŷ");
-    table.add("Ŷ");
-    table.add("ÿ");
-    table.add("Ÿ");
-    table.add("ȳ");
-    table.add("Ȳ");
-    table.add("ɏ");
-    table.add("Ɏ");
-    table.add("ƴ");
-    table.add("Ƴ");
-    table.add("ȝ");
-    table.add("Ȝ");
-    table.add("z");
-    table.add("Z");
-    table.add("ź");
-    table.add("Ź");
-    table.add("ž");
-    table.add("Ž");
-    table.add("ż");
-    table.add("Ż");
-    table.add("ƍ");
-    table.add("ƶ");
-    table.add("Ƶ");
-    table.add("ȥ");
-    table.add("Ȥ");
-    table.add("ɀ");
-    table.add("Ʒ");
-    table.add("ǯ");
-    table.add("Ǯ");
-    table.add("ƹ");
-    table.add("Ƹ");
-    table.add("ƺ");
-    table.add("þ");
-    table.add("Þ");
-    table.add("ƿ");
-    table.add("Ƿ");
-    table.add("ƻ");
-    table.add("ƨ");
-    table.add("Ƨ");
-    table.add("ƽ");
-    table.add("Ƽ");
-    table.add("ƅ");
-    table.add("Ƅ");
-    table.add("ɂ");
-    table.add("Ɂ");
-    table.add("ŉ");
-    table.add("ǀ");
-    table.add("ǁ");
-    table.add("ǂ");
-    table.add("ǃ");
-    table.add("µ");
+    add(table, " ");
+    add(table, "!");
+    add(table, "\"");
+    add(table, "#");
+    add(table, "%");
+    add(table, "&");
+    add(table, "'");
+    add(table, "(");
+    add(table, ")");
+    add(table, "*");
+    add(table, "+");
+    add(table, ",");
+    add(table, "-");
+    add(table, ".");
+    add(table, "/");
+    add(table, ":");
+    add(table, ";");
+    add(table, "<");
+    add(table, "=");
+    add(table, ">");
+    add(table, "?");
+    add(table, "@");
+    add(table, "[");
+    add(table, "\\");
+    add(table, "]");
+    add(table, "^");
+    add(table, "_");
+    add(table, "`");
+    add(table, "{");
+    add(table, "|");
+    add(table, "}");
+    add(table, "~");
+    add(table, " ");
+    add(table, "¡");
+    add(table, "¦");
+    add(table, "§");
+    add(table, "¨");
+    add(table, "©");
+    add(table, "«");
+    add(table, "¬");
+    add(table, "®");
+    add(table, "¯");
+    add(table, "°");
+    add(table, "±");
+    add(table, "´");
+    add(table, "¶");
+    add(table, "·");
+    add(table, "¸");
+    add(table, "»");
+    add(table, "¿");
+    add(table, "×");
+    add(table, "÷");
+    add(table, "¤");
+    add(table, "¢");
+    add(table, "$");
+    add(table, "£");
+    add(table, "¥");
+    add(table, "0");
+    add(table, "1");
+    add(table, "¹");
+    add(table, "½");
+    add(table, "¼");
+    add(table, "2");
+    add(table, "²");
+    add(table, "3");
+    add(table, "³");
+    add(table, "¾");
+    add(table, "4");
+    add(table, "5");
+    add(table, "6");
+    add(table, "7");
+    add(table, "8");
+    add(table, "9");
+    add(table, "a");
+    add(table, "A");
+    add(table, "ª");
+    add(table, "á");
+    add(table, "Á");
+    add(table, "à");
+    add(table, "À");
+    add(table, "ă");
+    add(table, "Ă");
+    add(table, "â");
+    add(table, "Â");
+    add(table, "ǎ");
+    add(table, "Ǎ");
+    add(table, "å");
+    add(table, "Å");
+    add(table, "ǻ");
+    add(table, "Ǻ");
+    add(table, "ä");
+    add(table, "Ä");
+    add(table, "ǟ");
+    add(table, "Ǟ");
+    add(table, "ã");
+    add(table, "Ã");
+    add(table, "ȧ");
+    add(table, "Ȧ");
+    add(table, "ǡ");
+    add(table, "Ǡ");
+    add(table, "ą");
+    add(table, "Ą");
+    add(table, "ā");
+    add(table, "Ā");
+    add(table, "ȁ");
+    add(table, "Ȁ");
+    add(table, "ȃ");
+    add(table, "Ȃ");
+    add(table, "æ");
+    add(table, "Æ");
+    add(table, "ǽ");
+    add(table, "Ǽ");
+    add(table, "ǣ");
+    add(table, "Ǣ");
+    add(table, "Ⱥ");
+    add(table, "b");
+    add(table, "B");
+    add(table, "ƀ");
+    add(table, "Ƀ");
+    add(table, "Ɓ");
+    add(table, "ƃ");
+    add(table, "Ƃ");
+    add(table, "c");
+    add(table, "C");
+    add(table, "ć");
+    add(table, "Ć");
+    add(table, "ĉ");
+    add(table, "Ĉ");
+    add(table, "č");
+    add(table, "Č");
+    add(table, "ċ");
+    add(table, "Ċ");
+    add(table, "ç");
+    add(table, "Ç");
+    add(table, "ȼ");
+    add(table, "Ȼ");
+    add(table, "ƈ");
+    add(table, "Ƈ");
+    add(table, "d");
+    add(table, "D");
+    add(table, "ď");
+    add(table, "Ď");
+    add(table, "đ");
+    add(table, "Đ");
+    add(table, "ð");
+    add(table, "Ð");
+    add(table, "ȸ");
+    add(table, "ǳ");
+    add(table, "ǲ");
+    add(table, "Ǳ");
+    add(table, "ǆ");
+    add(table, "ǅ");
+    add(table, "Ǆ");
+    add(table, "Ɖ");
+    add(table, "Ɗ");
+    add(table, "ƌ");
+    add(table, "Ƌ");
+    add(table, "ȡ");
+    add(table, "e");
+    add(table, "E");
+    add(table, "é");
+    add(table, "É");
+    add(table, "è");
+    add(table, "È");
+    add(table, "ĕ");
+    add(table, "Ĕ");
+    add(table, "ê");
+    add(table, "Ê");
+    add(table, "ě");
+    add(table, "Ě");
+    add(table, "ë");
+    add(table, "Ë");
+    add(table, "ė");
+    add(table, "Ė");
+    add(table, "ȩ");
+    add(table, "Ȩ");
+    add(table, "ę");
+    add(table, "Ę");
+    add(table, "ē");
+    add(table, "Ē");
+    add(table, "ȅ");
+    add(table, "Ȅ");
+    add(table, "ȇ");
+    add(table, "Ȇ");
+    add(table, "ɇ");
+    add(table, "Ɇ");
+    add(table, "ǝ");
+    add(table, "Ǝ");
+    add(table, "Ə");
+    add(table, "Ɛ");
+    add(table, "f");
+    add(table, "F");
+    add(table, "ƒ");
+    add(table, "Ƒ");
+    add(table, "g");
+    add(table, "G");
+    add(table, "ǵ");
+    add(table, "Ǵ");
+    add(table, "ğ");
+    add(table, "Ğ");
+    add(table, "ĝ");
+    add(table, "Ĝ");
+    add(table, "ǧ");
+    add(table, "Ǧ");
+    add(table, "ġ");
+    add(table, "Ġ");
+    add(table, "ģ");
+    add(table, "Ģ");
+    add(table, "ǥ");
+    add(table, "Ǥ");
+    add(table, "Ɠ");
+    add(table, "Ɣ");
+    add(table, "ƣ");
+    add(table, "Ƣ");
+    add(table, "h");
+    add(table, "H");
+    add(table, "ĥ");
+    add(table, "Ĥ");
+    add(table, "ȟ");
+    add(table, "Ȟ");
+    add(table, "ħ");
+    add(table, "Ħ");
+    add(table, "ƕ");
+    add(table, "Ƕ");
+    add(table, "i");
+    add(table, "I");
+    add(table, "í");
+    add(table, "Í");
+    add(table, "ì");
+    add(table, "Ì");
+    add(table, "ĭ");
+    add(table, "Ĭ");
+    add(table, "î");
+    add(table, "Î");
+    add(table, "ǐ");
+    add(table, "Ǐ");
+    add(table, "ï");
+    add(table, "Ï");
+    add(table, "ĩ");
+    add(table, "Ĩ");
+    add(table, "İ");
+    add(table, "į");
+    add(table, "Į");
+    add(table, "ī");
+    add(table, "Ī");
+    add(table, "ȉ");
+    add(table, "Ȉ");
+    add(table, "ȋ");
+    add(table, "Ȋ");
+    add(table, "ĳ");
+    add(table, "Ĳ");
+    add(table, "ı");
+    add(table, "Ɨ");
+    add(table, "Ɩ");
+    add(table, "j");
+    add(table, "J");
+    add(table, "ĵ");
+    add(table, "Ĵ");
+    add(table, "ǰ");
+    add(table, "ȷ");
+    add(table, "ɉ");
+    add(table, "Ɉ");
+    add(table, "k");
+    add(table, "K");
+    add(table, "ǩ");
+    add(table, "Ǩ");
+    add(table, "ķ");
+    add(table, "Ķ");
+    add(table, "ƙ");
+    add(table, "Ƙ");
+    add(table, "ĺ");
+    add(table, "Ĺ");
+    add(table, "ľ");
+    add(table, "Ľ");
+    add(table, "ļ");
+    add(table, "Ļ");
+    add(table, "ł");
+    add(table, "Ł");
+    add(table, "ŀ");
+    add(table, "l");
+    add(table, "Ŀ");
+    add(table, "L");
+    add(table, "ǉ");
+    add(table, "ǈ");
+    add(table, "Ǉ");
+    add(table, "ƚ");
+    add(table, "Ƚ");
+    add(table, "ȴ");
+    add(table, "ƛ");
+    add(table, "m");
+    add(table, "M");
+    add(table, "n");
+    add(table, "N");
+    add(table, "ń");
+    add(table, "Ń");
+    add(table, "ǹ");
+    add(table, "Ǹ");
+    add(table, "ň");
+    add(table, "Ň");
+    add(table, "ñ");
+    add(table, "Ñ");
+    add(table, "ņ");
+    add(table, "Ņ");
+    add(table, "ǌ");
+    add(table, "ǋ");
+    add(table, "Ǌ");
+    add(table, "Ɲ");
+    add(table, "ƞ");
+    add(table, "Ƞ");
+    add(table, "ȵ");
+    add(table, "ŋ");
+    add(table, "Ŋ");
+    add(table, "o");
+    add(table, "O");
+    add(table, "º");
+    add(table, "ó");
+    add(table, "Ó");
+    add(table, "ò");
+    add(table, "Ò");
+    add(table, "ŏ");
+    add(table, "Ŏ");
+    add(table, "ô");
+    add(table, "Ô");
+    add(table, "ǒ");
+    add(table, "Ǒ");
+    add(table, "ö");
+    add(table, "Ö");
+    add(table, "ȫ");
+    add(table, "Ȫ");
+    add(table, "ő");
+    add(table, "Ő");
+    add(table, "õ");
+    add(table, "Õ");
+    add(table, "ȭ");
+    add(table, "Ȭ");
+    add(table, "ȯ");
+    add(table, "Ȯ");
+    add(table, "ȱ");
+    add(table, "Ȱ");
+    add(table, "ø");
+    add(table, "Ø");
+    add(table, "ǿ");
+    add(table, "Ǿ");
+    add(table, "ǫ");
+    add(table, "Ǫ");
+    add(table, "ǭ");
+    add(table, "Ǭ");
+    add(table, "ō");
+    add(table, "Ō");
+    add(table, "ȍ");
+    add(table, "Ȍ");
+    add(table, "ȏ");
+    add(table, "Ȏ");
+    add(table, "ơ");
+    add(table, "Ơ");
+    add(table, "œ");
+    add(table, "Œ");
+    add(table, "Ɔ");
+    add(table, "Ɵ");
+    add(table, "ȣ");
+    add(table, "Ȣ");
+    add(table, "p");
+    add(table, "P");
+    add(table, "ƥ");
+    add(table, "Ƥ");
+    add(table, "q");
+    add(table, "Q");
+    add(table, "ȹ");
+    add(table, "ɋ");
+    add(table, "Ɋ");
+    add(table, "ĸ");
+    add(table, "r");
+    add(table, "R");
+    add(table, "ŕ");
+    add(table, "Ŕ");
+    add(table, "ř");
+    add(table, "Ř");
+    add(table, "ŗ");
+    add(table, "Ŗ");
+    add(table, "ȑ");
+    add(table, "Ȑ");
+    add(table, "ȓ");
+    add(table, "Ȓ");
+    add(table, "Ʀ");
+    add(table, "ɍ");
+    add(table, "Ɍ");
+    add(table, "s");
+    add(table, "S");
+    add(table, "ś");
+    add(table, "Ś");
+    add(table, "ŝ");
+    add(table, "Ŝ");
+    add(table, "š");
+    add(table, "Š");
+    add(table, "ş");
+    add(table, "Ş");
+    add(table, "ș");
+    add(table, "Ș");
+    add(table, "ſ");
+    add(table, "ß");
+    add(table, "ȿ");
+    add(table, "Ʃ");
+    add(table, "ƪ");
+    add(table, "t");
+    add(table, "T");
+    add(table, "ť");
+    add(table, "Ť");
+    add(table, "ţ");
+    add(table, "Ţ");
+    add(table, "ț");
+    add(table, "Ț");
+    add(table, "ƾ");
+    add(table, "ŧ");
+    add(table, "Ŧ");
+    add(table, "Ⱦ");
+    add(table, "ƫ");
+    add(table, "ƭ");
+    add(table, "Ƭ");
+    add(table, "Ʈ");
+    add(table, "ȶ");
+    add(table, "u");
+    add(table, "U");
+    add(table, "ú");
+    add(table, "Ú");
+    add(table, "ù");
+    add(table, "Ù");
+    add(table, "ŭ");
+    add(table, "Ŭ");
+    add(table, "û");
+    add(table, "Û");
+    add(table, "ǔ");
+    add(table, "Ǔ");
+    add(table, "ů");
+    add(table, "Ů");
+    add(table, "ü");
+    add(table, "Ü");
+    add(table, "ǘ");
+    add(table, "Ǘ");
+    add(table, "ǜ");
+    add(table, "Ǜ");
+    add(table, "ǚ");
+    add(table, "Ǚ");
+    add(table, "ǖ");
+    add(table, "Ǖ");
+    add(table, "ű");
+    add(table, "Ű");
+    add(table, "ũ");
+    add(table, "Ũ");
+    add(table, "ų");
+    add(table, "Ų");
+    add(table, "ū");
+    add(table, "Ū");
+    add(table, "ȕ");
+    add(table, "Ȕ");
+    add(table, "ȗ");
+    add(table, "Ȗ");
+    add(table, "ư");
+    add(table, "Ư");
+    add(table, "Ʉ");
+    add(table, "Ɯ");
+    add(table, "Ʊ");
+    add(table, "v");
+    add(table, "V");
+    add(table, "Ʋ");
+    add(table, "Ʌ");
+    add(table, "w");
+    add(table, "W");
+    add(table, "ŵ");
+    add(table, "Ŵ");
+    add(table, "x");
+    add(table, "X");
+    add(table, "y");
+    add(table, "Y");
+    add(table, "ý");
+    add(table, "Ý");
+    add(table, "ŷ");
+    add(table, "Ŷ");
+    add(table, "ÿ");
+    add(table, "Ÿ");
+    add(table, "ȳ");
+    add(table, "Ȳ");
+    add(table, "ɏ");
+    add(table, "Ɏ");
+    add(table, "ƴ");
+    add(table, "Ƴ");
+    add(table, "ȝ");
+    add(table, "Ȝ");
+    add(table, "z");
+    add(table, "Z");
+    add(table, "ź");
+    add(table, "Ź");
+    add(table, "ž");
+    add(table, "Ž");
+    add(table, "ż");
+    add(table, "Ż");
+    add(table, "ƍ");
+    add(table, "ƶ");
+    add(table, "Ƶ");
+    add(table, "ȥ");
+    add(table, "Ȥ");
+    add(table, "ɀ");
+    add(table, "Ʒ");
+    add(table, "ǯ");
+    add(table, "Ǯ");
+    add(table, "ƹ");
+    add(table, "Ƹ");
+    add(table, "ƺ");
+    add(table, "þ");
+    add(table, "Þ");
+    add(table, "ƿ");
+    add(table, "Ƿ");
+    add(table, "ƻ");
+    add(table, "ƨ");
+    add(table, "Ƨ");
+    add(table, "ƽ");
+    add(table, "Ƽ");
+    add(table, "ƅ");
+    add(table, "Ƅ");
+    add(table, "ɂ");
+    add(table, "Ɂ");
+    add(table, "ŉ");
+    add(table, "ǀ");
+    add(table, "ǁ");
+    add(table, "ǂ");
+    add(table, "ǃ");
+    add(table, "µ");
 
     // Core-only is default comparer
-    TestTableString::View v1 = table.where().find_all();
-    TestTableString::View v2 = table.where().find_all();
+    TableView v1 = table.where().find_all();
+    TableView v2 = table.where().find_all();
 
-    v2.column().first.sort();
+    v2.sort(0);
 
     for (size_t t = 0; t < v1.size(); t++) {
         CHECK_EQUAL(v1.get_source_ndx(t), v2.get_source_ndx(t));
@@ -2820,7 +2725,8 @@ NONCONCURRENT_TEST(TableView_SortOrder_Similiar)
 
 NONCONCURRENT_TEST(TableView_SortOrder_Core)
 {
-    TestTableString table;
+    TestTable table;
+    table.add_column(type_String, "1");
 
     // This tests the expected sorting order with STRING_COMPARE_CORE. See utf8_compare() in unicode.cpp. Only
     // characters
@@ -2831,537 +2737,537 @@ NONCONCURRENT_TEST(TableView_SortOrder_Core)
 
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
 
-    table.add("'");
-    table.add("-");
-    table.add(" ");
-    table.add(" ");
-    table.add("!");
-    table.add("\"");
-    table.add("#");
-    table.add("$");
-    table.add("%");
-    table.add("&");
-    table.add("(");
-    table.add(")");
-    table.add("*");
-    table.add(",");
-    table.add(".");
-    table.add("/");
-    table.add(":");
-    table.add(";");
-    table.add("?");
-    table.add("@");
-    table.add("[");
-    table.add("\\");
-    table.add("^");
-    table.add("_");
-    table.add("`");
-    table.add("{");
-    table.add("|");
-    table.add("}");
-    table.add("~");
-    table.add("¡");
-    table.add("¦");
-    table.add("¨");
-    table.add("¯");
-    table.add("´");
-    table.add("¸");
-    table.add("¿");
-    table.add("ǃ");
-    table.add("¢");
-    table.add("£");
-    table.add("¤");
-    table.add("¥");
-    table.add("+");
-    table.add("<");
-    table.add("=");
-    table.add(">");
-    table.add("±");
-    table.add("«");
-    table.add("»");
-    table.add("×");
-    table.add("÷");
-    table.add("ǀ");
-    table.add("ǁ");
-    table.add("ǂ");
-    table.add("§");
-    table.add("©");
-    table.add("¬");
-    table.add("®");
-    table.add("°");
-    table.add("µ");
-    table.add("¶");
-    table.add("·");
-    table.add("0");
-    table.add("¼");
-    table.add("½");
-    table.add("¾");
-    table.add("1");
-    table.add("¹");
-    table.add("2");
-    table.add("ƻ");
-    table.add("²");
-    table.add("3");
-    table.add("³");
-    table.add("4");
-    table.add("5");
-    table.add("ƽ");
-    table.add("Ƽ");
-    table.add("6");
-    table.add("7");
-    table.add("8");
-    table.add("9");
-    table.add("a");
-    table.add("A");
-    table.add("ª");
-    table.add("á");
-    table.add("Á");
-    table.add("à");
-    table.add("À");
-    table.add("ȧ");
-    table.add("Ȧ");
-    table.add("â");
-    table.add("Â");
-    table.add("ǎ");
-    table.add("Ǎ");
-    table.add("ă");
-    table.add("Ă");
-    table.add("ā");
-    table.add("Ā");
-    table.add("ã");
-    table.add("Ã");
-    table.add("ą");
-    table.add("Ą");
-    table.add("Ⱥ");
-    table.add("ǡ");
-    table.add("Ǡ");
-    table.add("ǻ");
-    table.add("Ǻ");
-    table.add("ǟ");
-    table.add("Ǟ");
-    table.add("ȁ");
-    table.add("Ȁ");
-    table.add("ȃ");
-    table.add("Ȃ");
-    table.add("ǽ");
-    table.add("Ǽ");
-    table.add("b");
-    table.add("B");
-    table.add("ƀ");
-    table.add("Ƀ");
-    table.add("Ɓ");
-    table.add("ƃ");
-    table.add("Ƃ");
-    table.add("ƅ");
-    table.add("Ƅ");
-    table.add("c");
-    table.add("C");
-    table.add("ć");
-    table.add("Ć");
-    table.add("ċ");
-    table.add("Ċ");
-    table.add("ĉ");
-    table.add("Ĉ");
-    table.add("č");
-    table.add("Č");
-    table.add("ç");
-    table.add("Ç");
-    table.add("ȼ");
-    table.add("Ȼ");
-    table.add("ƈ");
-    table.add("Ƈ");
-    table.add("Ɔ");
-    table.add("d");
-    table.add("D");
-    table.add("ď");
-    table.add("Ď");
-    table.add("đ");
-    table.add("Đ");
-    table.add("ƌ");
-    table.add("Ƌ");
-    table.add("Ɗ");
-    table.add("ð");
-    table.add("Ð");
-    table.add("ƍ");
-    table.add("ȸ");
-    table.add("ǳ");
-    table.add("ǲ");
-    table.add("Ǳ");
-    table.add("ǆ");
-    table.add("ǅ");
-    table.add("Ǆ");
-    table.add("Ɖ");
-    table.add("ȡ");
-    table.add("e");
-    table.add("E");
-    table.add("é");
-    table.add("É");
-    table.add("è");
-    table.add("È");
-    table.add("ė");
-    table.add("Ė");
-    table.add("ê");
-    table.add("Ê");
-    table.add("ë");
-    table.add("Ë");
-    table.add("ě");
-    table.add("Ě");
-    table.add("ĕ");
-    table.add("Ĕ");
-    table.add("ē");
-    table.add("Ē");
-    table.add("ę");
-    table.add("Ę");
-    table.add("ȩ");
-    table.add("Ȩ");
-    table.add("ɇ");
-    table.add("Ɇ");
-    table.add("ȅ");
-    table.add("Ȅ");
-    table.add("ȇ");
-    table.add("Ȇ");
-    table.add("ǝ");
-    table.add("Ǝ");
-    table.add("Ə");
-    table.add("Ɛ");
-    table.add("ȝ");
-    table.add("Ȝ");
-    table.add("f");
-    table.add("F");
-    table.add("ƒ");
-    table.add("Ƒ");
-    table.add("g");
-    table.add("G");
-    table.add("ǵ");
-    table.add("Ǵ");
-    table.add("ġ");
-    table.add("Ġ");
-    table.add("ĝ");
-    table.add("Ĝ");
-    table.add("ǧ");
-    table.add("Ǧ");
-    table.add("ğ");
-    table.add("Ğ");
-    table.add("ģ");
-    table.add("Ģ");
-    table.add("ǥ");
-    table.add("Ǥ");
-    table.add("Ɠ");
-    table.add("Ɣ");
-    table.add("h");
-    table.add("H");
-    table.add("ĥ");
-    table.add("Ĥ");
-    table.add("ȟ");
-    table.add("Ȟ");
-    table.add("ħ");
-    table.add("Ħ");
-    table.add("ƕ");
-    table.add("Ƕ");
-    table.add("i");
-    table.add("I");
-    table.add("ı");
-    table.add("í");
-    table.add("Í");
-    table.add("ì");
-    table.add("Ì");
-    table.add("İ");
-    table.add("î");
-    table.add("Î");
-    table.add("ï");
-    table.add("Ï");
-    table.add("ǐ");
-    table.add("Ǐ");
-    table.add("ĭ");
-    table.add("Ĭ");
-    table.add("ī");
-    table.add("Ī");
-    table.add("ĩ");
-    table.add("Ĩ");
-    table.add("į");
-    table.add("Į");
-    table.add("Ɨ");
-    table.add("ȉ");
-    table.add("Ȉ");
-    table.add("ȋ");
-    table.add("Ȋ");
-    table.add("Ɩ");
-    table.add("ĳ");
-    table.add("Ĳ");
-    table.add("j");
-    table.add("J");
-    table.add("ȷ");
-    table.add("ĵ");
-    table.add("Ĵ");
-    table.add("ǰ");
-    table.add("ɉ");
-    table.add("Ɉ");
-    table.add("k");
-    table.add("K");
-    table.add("ǩ");
-    table.add("Ǩ");
-    table.add("ķ");
-    table.add("Ķ");
-    table.add("ƙ");
-    table.add("Ƙ");
-    table.add("l");
-    table.add("L");
-    table.add("ĺ");
-    table.add("Ĺ");
-    table.add("ŀ");
-    table.add("Ŀ");
-    table.add("ľ");
-    table.add("Ľ");
-    table.add("ļ");
-    table.add("Ļ");
-    table.add("ƚ");
-    table.add("Ƚ");
-    table.add("ł");
-    table.add("Ł");
-    table.add("ƛ");
-    table.add("ǉ");
-    table.add("ǈ");
-    table.add("Ǉ");
-    table.add("ȴ");
-    table.add("m");
-    table.add("M");
-    table.add("Ɯ");
-    table.add("n");
-    table.add("N");
-    table.add("ń");
-    table.add("Ń");
-    table.add("ǹ");
-    table.add("Ǹ");
-    table.add("ň");
-    table.add("Ň");
-    table.add("ñ");
-    table.add("Ñ");
-    table.add("ņ");
-    table.add("Ņ");
-    table.add("Ɲ");
-    table.add("ŉ");
-    table.add("ƞ");
-    table.add("Ƞ");
-    table.add("ǌ");
-    table.add("ǋ");
-    table.add("Ǌ");
-    table.add("ȵ");
-    table.add("ŋ");
-    table.add("Ŋ");
-    table.add("o");
-    table.add("O");
-    table.add("º");
-    table.add("ó");
-    table.add("Ó");
-    table.add("ò");
-    table.add("Ò");
-    table.add("ȯ");
-    table.add("Ȯ");
-    table.add("ô");
-    table.add("Ô");
-    table.add("ǒ");
-    table.add("Ǒ");
-    table.add("ŏ");
-    table.add("Ŏ");
-    table.add("ō");
-    table.add("Ō");
-    table.add("õ");
-    table.add("Õ");
-    table.add("ǫ");
-    table.add("Ǫ");
-    table.add("Ɵ");
-    table.add("ȱ");
-    table.add("Ȱ");
-    table.add("ȫ");
-    table.add("Ȫ");
-    table.add("ǿ");
-    table.add("Ǿ");
-    table.add("ȭ");
-    table.add("Ȭ");
-    table.add("ǭ");
-    table.add("Ǭ");
-    table.add("ȍ");
-    table.add("Ȍ");
-    table.add("ȏ");
-    table.add("Ȏ");
-    table.add("ơ");
-    table.add("Ơ");
-    table.add("ƣ");
-    table.add("Ƣ");
-    table.add("œ");
-    table.add("Œ");
-    table.add("ȣ");
-    table.add("Ȣ");
-    table.add("p");
-    table.add("P");
-    table.add("ƥ");
-    table.add("Ƥ");
-    table.add("q");
-    table.add("Q");
-    table.add("ĸ");
-    table.add("ɋ");
-    table.add("Ɋ");
-    table.add("ȹ");
-    table.add("r");
-    table.add("R");
-    table.add("Ʀ");
-    table.add("ŕ");
-    table.add("Ŕ");
-    table.add("ř");
-    table.add("Ř");
-    table.add("ŗ");
-    table.add("Ŗ");
-    table.add("ɍ");
-    table.add("Ɍ");
-    table.add("ȑ");
-    table.add("Ȑ");
-    table.add("ȓ");
-    table.add("Ȓ");
-    table.add("s");
-    table.add("S");
-    table.add("ś");
-    table.add("Ś");
-    table.add("ŝ");
-    table.add("Ŝ");
-    table.add("š");
-    table.add("Š");
-    table.add("ş");
-    table.add("Ş");
-    table.add("ș");
-    table.add("Ș");
-    table.add("ȿ");
-    table.add("Ʃ");
-    table.add("ƨ");
-    table.add("Ƨ");
-    table.add("ƪ");
-    table.add("ß");
-    table.add("ſ");
-    table.add("t");
-    table.add("T");
-    table.add("ť");
-    table.add("Ť");
-    table.add("ţ");
-    table.add("Ţ");
-    table.add("ƭ");
-    table.add("Ƭ");
-    table.add("ƫ");
-    table.add("Ʈ");
-    table.add("ț");
-    table.add("Ț");
-    table.add("Ⱦ");
-    table.add("ȶ");
-    table.add("þ");
-    table.add("Þ");
-    table.add("ŧ");
-    table.add("Ŧ");
-    table.add("u");
-    table.add("U");
-    table.add("ú");
-    table.add("Ú");
-    table.add("ù");
-    table.add("Ù");
-    table.add("û");
-    table.add("Û");
-    table.add("ǔ");
-    table.add("Ǔ");
-    table.add("ŭ");
-    table.add("Ŭ");
-    table.add("ū");
-    table.add("Ū");
-    table.add("ũ");
-    table.add("Ũ");
-    table.add("ů");
-    table.add("Ů");
-    table.add("ų");
-    table.add("Ų");
-    table.add("Ʉ");
-    table.add("ǘ");
-    table.add("Ǘ");
-    table.add("ǜ");
-    table.add("Ǜ");
-    table.add("ǚ");
-    table.add("Ǚ");
-    table.add("ǖ");
-    table.add("Ǖ");
-    table.add("ȕ");
-    table.add("Ȕ");
-    table.add("ȗ");
-    table.add("Ȗ");
-    table.add("ư");
-    table.add("Ư");
-    table.add("Ʊ");
-    table.add("v");
-    table.add("V");
-    table.add("Ʋ");
-    table.add("Ʌ");
-    table.add("w");
-    table.add("W");
-    table.add("ŵ");
-    table.add("Ŵ");
-    table.add("ƿ");
-    table.add("Ƿ");
-    table.add("x");
-    table.add("X");
-    table.add("y");
-    table.add("Y");
-    table.add("ý");
-    table.add("Ý");
-    table.add("ŷ");
-    table.add("Ŷ");
-    table.add("ÿ");
-    table.add("Ÿ");
-    table.add("ȳ");
-    table.add("Ȳ");
-    table.add("ű");
-    table.add("Ű");
-    table.add("ɏ");
-    table.add("Ɏ");
-    table.add("ƴ");
-    table.add("Ƴ");
-    table.add("ü");
-    table.add("Ü");
-    table.add("z");
-    table.add("Z");
-    table.add("ź");
-    table.add("Ź");
-    table.add("ż");
-    table.add("Ż");
-    table.add("ž");
-    table.add("Ž");
-    table.add("ƶ");
-    table.add("Ƶ");
-    table.add("ȥ");
-    table.add("Ȥ");
-    table.add("ɀ");
-    table.add("æ");
-    table.add("Æ");
-    table.add("Ʒ");
-    table.add("ǣ");
-    table.add("Ǣ");
-    table.add("ä");
-    table.add("Ä");
-    table.add("ǯ");
-    table.add("Ǯ");
-    table.add("ƹ");
-    table.add("Ƹ");
-    table.add("ƺ");
-    table.add("ø");
-    table.add("Ø");
-    table.add("ö");
-    table.add("Ö");
-    table.add("ő");
-    table.add("Ő");
-    table.add("å");
-    table.add("Å");
-    table.add("ƾ");
-    table.add("ɂ");
-    table.add("Ɂ");
+    add(table, "'");
+    add(table, "-");
+    add(table, " ");
+    add(table, " ");
+    add(table, "!");
+    add(table, "\"");
+    add(table, "#");
+    add(table, "$");
+    add(table, "%");
+    add(table, "&");
+    add(table, "(");
+    add(table, ")");
+    add(table, "*");
+    add(table, ",");
+    add(table, ".");
+    add(table, "/");
+    add(table, ":");
+    add(table, ";");
+    add(table, "?");
+    add(table, "@");
+    add(table, "[");
+    add(table, "\\");
+    add(table, "^");
+    add(table, "_");
+    add(table, "`");
+    add(table, "{");
+    add(table, "|");
+    add(table, "}");
+    add(table, "~");
+    add(table, "¡");
+    add(table, "¦");
+    add(table, "¨");
+    add(table, "¯");
+    add(table, "´");
+    add(table, "¸");
+    add(table, "¿");
+    add(table, "ǃ");
+    add(table, "¢");
+    add(table, "£");
+    add(table, "¤");
+    add(table, "¥");
+    add(table, "+");
+    add(table, "<");
+    add(table, "=");
+    add(table, ">");
+    add(table, "±");
+    add(table, "«");
+    add(table, "»");
+    add(table, "×");
+    add(table, "÷");
+    add(table, "ǀ");
+    add(table, "ǁ");
+    add(table, "ǂ");
+    add(table, "§");
+    add(table, "©");
+    add(table, "¬");
+    add(table, "®");
+    add(table, "°");
+    add(table, "µ");
+    add(table, "¶");
+    add(table, "·");
+    add(table, "0");
+    add(table, "¼");
+    add(table, "½");
+    add(table, "¾");
+    add(table, "1");
+    add(table, "¹");
+    add(table, "2");
+    add(table, "ƻ");
+    add(table, "²");
+    add(table, "3");
+    add(table, "³");
+    add(table, "4");
+    add(table, "5");
+    add(table, "ƽ");
+    add(table, "Ƽ");
+    add(table, "6");
+    add(table, "7");
+    add(table, "8");
+    add(table, "9");
+    add(table, "a");
+    add(table, "A");
+    add(table, "ª");
+    add(table, "á");
+    add(table, "Á");
+    add(table, "à");
+    add(table, "À");
+    add(table, "ȧ");
+    add(table, "Ȧ");
+    add(table, "â");
+    add(table, "Â");
+    add(table, "ǎ");
+    add(table, "Ǎ");
+    add(table, "ă");
+    add(table, "Ă");
+    add(table, "ā");
+    add(table, "Ā");
+    add(table, "ã");
+    add(table, "Ã");
+    add(table, "ą");
+    add(table, "Ą");
+    add(table, "Ⱥ");
+    add(table, "ǡ");
+    add(table, "Ǡ");
+    add(table, "ǻ");
+    add(table, "Ǻ");
+    add(table, "ǟ");
+    add(table, "Ǟ");
+    add(table, "ȁ");
+    add(table, "Ȁ");
+    add(table, "ȃ");
+    add(table, "Ȃ");
+    add(table, "ǽ");
+    add(table, "Ǽ");
+    add(table, "b");
+    add(table, "B");
+    add(table, "ƀ");
+    add(table, "Ƀ");
+    add(table, "Ɓ");
+    add(table, "ƃ");
+    add(table, "Ƃ");
+    add(table, "ƅ");
+    add(table, "Ƅ");
+    add(table, "c");
+    add(table, "C");
+    add(table, "ć");
+    add(table, "Ć");
+    add(table, "ċ");
+    add(table, "Ċ");
+    add(table, "ĉ");
+    add(table, "Ĉ");
+    add(table, "č");
+    add(table, "Č");
+    add(table, "ç");
+    add(table, "Ç");
+    add(table, "ȼ");
+    add(table, "Ȼ");
+    add(table, "ƈ");
+    add(table, "Ƈ");
+    add(table, "Ɔ");
+    add(table, "d");
+    add(table, "D");
+    add(table, "ď");
+    add(table, "Ď");
+    add(table, "đ");
+    add(table, "Đ");
+    add(table, "ƌ");
+    add(table, "Ƌ");
+    add(table, "Ɗ");
+    add(table, "ð");
+    add(table, "Ð");
+    add(table, "ƍ");
+    add(table, "ȸ");
+    add(table, "ǳ");
+    add(table, "ǲ");
+    add(table, "Ǳ");
+    add(table, "ǆ");
+    add(table, "ǅ");
+    add(table, "Ǆ");
+    add(table, "Ɖ");
+    add(table, "ȡ");
+    add(table, "e");
+    add(table, "E");
+    add(table, "é");
+    add(table, "É");
+    add(table, "è");
+    add(table, "È");
+    add(table, "ė");
+    add(table, "Ė");
+    add(table, "ê");
+    add(table, "Ê");
+    add(table, "ë");
+    add(table, "Ë");
+    add(table, "ě");
+    add(table, "Ě");
+    add(table, "ĕ");
+    add(table, "Ĕ");
+    add(table, "ē");
+    add(table, "Ē");
+    add(table, "ę");
+    add(table, "Ę");
+    add(table, "ȩ");
+    add(table, "Ȩ");
+    add(table, "ɇ");
+    add(table, "Ɇ");
+    add(table, "ȅ");
+    add(table, "Ȅ");
+    add(table, "ȇ");
+    add(table, "Ȇ");
+    add(table, "ǝ");
+    add(table, "Ǝ");
+    add(table, "Ə");
+    add(table, "Ɛ");
+    add(table, "ȝ");
+    add(table, "Ȝ");
+    add(table, "f");
+    add(table, "F");
+    add(table, "ƒ");
+    add(table, "Ƒ");
+    add(table, "g");
+    add(table, "G");
+    add(table, "ǵ");
+    add(table, "Ǵ");
+    add(table, "ġ");
+    add(table, "Ġ");
+    add(table, "ĝ");
+    add(table, "Ĝ");
+    add(table, "ǧ");
+    add(table, "Ǧ");
+    add(table, "ğ");
+    add(table, "Ğ");
+    add(table, "ģ");
+    add(table, "Ģ");
+    add(table, "ǥ");
+    add(table, "Ǥ");
+    add(table, "Ɠ");
+    add(table, "Ɣ");
+    add(table, "h");
+    add(table, "H");
+    add(table, "ĥ");
+    add(table, "Ĥ");
+    add(table, "ȟ");
+    add(table, "Ȟ");
+    add(table, "ħ");
+    add(table, "Ħ");
+    add(table, "ƕ");
+    add(table, "Ƕ");
+    add(table, "i");
+    add(table, "I");
+    add(table, "ı");
+    add(table, "í");
+    add(table, "Í");
+    add(table, "ì");
+    add(table, "Ì");
+    add(table, "İ");
+    add(table, "î");
+    add(table, "Î");
+    add(table, "ï");
+    add(table, "Ï");
+    add(table, "ǐ");
+    add(table, "Ǐ");
+    add(table, "ĭ");
+    add(table, "Ĭ");
+    add(table, "ī");
+    add(table, "Ī");
+    add(table, "ĩ");
+    add(table, "Ĩ");
+    add(table, "į");
+    add(table, "Į");
+    add(table, "Ɨ");
+    add(table, "ȉ");
+    add(table, "Ȉ");
+    add(table, "ȋ");
+    add(table, "Ȋ");
+    add(table, "Ɩ");
+    add(table, "ĳ");
+    add(table, "Ĳ");
+    add(table, "j");
+    add(table, "J");
+    add(table, "ȷ");
+    add(table, "ĵ");
+    add(table, "Ĵ");
+    add(table, "ǰ");
+    add(table, "ɉ");
+    add(table, "Ɉ");
+    add(table, "k");
+    add(table, "K");
+    add(table, "ǩ");
+    add(table, "Ǩ");
+    add(table, "ķ");
+    add(table, "Ķ");
+    add(table, "ƙ");
+    add(table, "Ƙ");
+    add(table, "l");
+    add(table, "L");
+    add(table, "ĺ");
+    add(table, "Ĺ");
+    add(table, "ŀ");
+    add(table, "Ŀ");
+    add(table, "ľ");
+    add(table, "Ľ");
+    add(table, "ļ");
+    add(table, "Ļ");
+    add(table, "ƚ");
+    add(table, "Ƚ");
+    add(table, "ł");
+    add(table, "Ł");
+    add(table, "ƛ");
+    add(table, "ǉ");
+    add(table, "ǈ");
+    add(table, "Ǉ");
+    add(table, "ȴ");
+    add(table, "m");
+    add(table, "M");
+    add(table, "Ɯ");
+    add(table, "n");
+    add(table, "N");
+    add(table, "ń");
+    add(table, "Ń");
+    add(table, "ǹ");
+    add(table, "Ǹ");
+    add(table, "ň");
+    add(table, "Ň");
+    add(table, "ñ");
+    add(table, "Ñ");
+    add(table, "ņ");
+    add(table, "Ņ");
+    add(table, "Ɲ");
+    add(table, "ŉ");
+    add(table, "ƞ");
+    add(table, "Ƞ");
+    add(table, "ǌ");
+    add(table, "ǋ");
+    add(table, "Ǌ");
+    add(table, "ȵ");
+    add(table, "ŋ");
+    add(table, "Ŋ");
+    add(table, "o");
+    add(table, "O");
+    add(table, "º");
+    add(table, "ó");
+    add(table, "Ó");
+    add(table, "ò");
+    add(table, "Ò");
+    add(table, "ȯ");
+    add(table, "Ȯ");
+    add(table, "ô");
+    add(table, "Ô");
+    add(table, "ǒ");
+    add(table, "Ǒ");
+    add(table, "ŏ");
+    add(table, "Ŏ");
+    add(table, "ō");
+    add(table, "Ō");
+    add(table, "õ");
+    add(table, "Õ");
+    add(table, "ǫ");
+    add(table, "Ǫ");
+    add(table, "Ɵ");
+    add(table, "ȱ");
+    add(table, "Ȱ");
+    add(table, "ȫ");
+    add(table, "Ȫ");
+    add(table, "ǿ");
+    add(table, "Ǿ");
+    add(table, "ȭ");
+    add(table, "Ȭ");
+    add(table, "ǭ");
+    add(table, "Ǭ");
+    add(table, "ȍ");
+    add(table, "Ȍ");
+    add(table, "ȏ");
+    add(table, "Ȏ");
+    add(table, "ơ");
+    add(table, "Ơ");
+    add(table, "ƣ");
+    add(table, "Ƣ");
+    add(table, "œ");
+    add(table, "Œ");
+    add(table, "ȣ");
+    add(table, "Ȣ");
+    add(table, "p");
+    add(table, "P");
+    add(table, "ƥ");
+    add(table, "Ƥ");
+    add(table, "q");
+    add(table, "Q");
+    add(table, "ĸ");
+    add(table, "ɋ");
+    add(table, "Ɋ");
+    add(table, "ȹ");
+    add(table, "r");
+    add(table, "R");
+    add(table, "Ʀ");
+    add(table, "ŕ");
+    add(table, "Ŕ");
+    add(table, "ř");
+    add(table, "Ř");
+    add(table, "ŗ");
+    add(table, "Ŗ");
+    add(table, "ɍ");
+    add(table, "Ɍ");
+    add(table, "ȑ");
+    add(table, "Ȑ");
+    add(table, "ȓ");
+    add(table, "Ȓ");
+    add(table, "s");
+    add(table, "S");
+    add(table, "ś");
+    add(table, "Ś");
+    add(table, "ŝ");
+    add(table, "Ŝ");
+    add(table, "š");
+    add(table, "Š");
+    add(table, "ş");
+    add(table, "Ş");
+    add(table, "ș");
+    add(table, "Ș");
+    add(table, "ȿ");
+    add(table, "Ʃ");
+    add(table, "ƨ");
+    add(table, "Ƨ");
+    add(table, "ƪ");
+    add(table, "ß");
+    add(table, "ſ");
+    add(table, "t");
+    add(table, "T");
+    add(table, "ť");
+    add(table, "Ť");
+    add(table, "ţ");
+    add(table, "Ţ");
+    add(table, "ƭ");
+    add(table, "Ƭ");
+    add(table, "ƫ");
+    add(table, "Ʈ");
+    add(table, "ț");
+    add(table, "Ț");
+    add(table, "Ⱦ");
+    add(table, "ȶ");
+    add(table, "þ");
+    add(table, "Þ");
+    add(table, "ŧ");
+    add(table, "Ŧ");
+    add(table, "u");
+    add(table, "U");
+    add(table, "ú");
+    add(table, "Ú");
+    add(table, "ù");
+    add(table, "Ù");
+    add(table, "û");
+    add(table, "Û");
+    add(table, "ǔ");
+    add(table, "Ǔ");
+    add(table, "ŭ");
+    add(table, "Ŭ");
+    add(table, "ū");
+    add(table, "Ū");
+    add(table, "ũ");
+    add(table, "Ũ");
+    add(table, "ů");
+    add(table, "Ů");
+    add(table, "ų");
+    add(table, "Ų");
+    add(table, "Ʉ");
+    add(table, "ǘ");
+    add(table, "Ǘ");
+    add(table, "ǜ");
+    add(table, "Ǜ");
+    add(table, "ǚ");
+    add(table, "Ǚ");
+    add(table, "ǖ");
+    add(table, "Ǖ");
+    add(table, "ȕ");
+    add(table, "Ȕ");
+    add(table, "ȗ");
+    add(table, "Ȗ");
+    add(table, "ư");
+    add(table, "Ư");
+    add(table, "Ʊ");
+    add(table, "v");
+    add(table, "V");
+    add(table, "Ʋ");
+    add(table, "Ʌ");
+    add(table, "w");
+    add(table, "W");
+    add(table, "ŵ");
+    add(table, "Ŵ");
+    add(table, "ƿ");
+    add(table, "Ƿ");
+    add(table, "x");
+    add(table, "X");
+    add(table, "y");
+    add(table, "Y");
+    add(table, "ý");
+    add(table, "Ý");
+    add(table, "ŷ");
+    add(table, "Ŷ");
+    add(table, "ÿ");
+    add(table, "Ÿ");
+    add(table, "ȳ");
+    add(table, "Ȳ");
+    add(table, "ű");
+    add(table, "Ű");
+    add(table, "ɏ");
+    add(table, "Ɏ");
+    add(table, "ƴ");
+    add(table, "Ƴ");
+    add(table, "ü");
+    add(table, "Ü");
+    add(table, "z");
+    add(table, "Z");
+    add(table, "ź");
+    add(table, "Ź");
+    add(table, "ż");
+    add(table, "Ż");
+    add(table, "ž");
+    add(table, "Ž");
+    add(table, "ƶ");
+    add(table, "Ƶ");
+    add(table, "ȥ");
+    add(table, "Ȥ");
+    add(table, "ɀ");
+    add(table, "æ");
+    add(table, "Æ");
+    add(table, "Ʒ");
+    add(table, "ǣ");
+    add(table, "Ǣ");
+    add(table, "ä");
+    add(table, "Ä");
+    add(table, "ǯ");
+    add(table, "Ǯ");
+    add(table, "ƹ");
+    add(table, "Ƹ");
+    add(table, "ƺ");
+    add(table, "ø");
+    add(table, "Ø");
+    add(table, "ö");
+    add(table, "Ö");
+    add(table, "ő");
+    add(table, "Ő");
+    add(table, "å");
+    add(table, "Å");
+    add(table, "ƾ");
+    add(table, "ɂ");
+    add(table, "Ɂ");
 
     // Core-only is default comparer
-    TestTableString::View v1 = table.where().find_all();
-    TestTableString::View v2 = table.where().find_all();
+    TableView v1 = table.where().find_all();
+    TableView v2 = table.where().find_all();
 
-    v2.column().first.sort();
+    v2.sort(0);
 
     for (size_t t = 0; t < v1.size(); t++) {
         CHECK_EQUAL(v1.get_source_ndx(t), v2.get_source_ndx(t));
@@ -3445,12 +3351,12 @@ TEST(TableView_TimestampMaxRemoveRow)
     CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(9, 0));
 
     table.move_last_over(9);
-    CHECK_EQUAL(tv.size(), 10); // not changed since sync_if_needed hasn't been called
+    CHECK_EQUAL(tv.size(), 10);                            // not changed since sync_if_needed hasn't been called
     CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0)); // but aggregate functions skip removed rows
 
     tv.sync_if_needed();
     CHECK_EQUAL(tv.size(), 9);
-    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0));    
+    CHECK_EQUAL(tv.maximum_timestamp(0), Timestamp(8, 0));
 }
 
 #endif // TEST_TABLE_VIEW

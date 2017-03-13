@@ -16,29 +16,21 @@
  *
  **************************************************************************/
 
-#ifndef REALM_TABLE_BASIC_FWD_HPP
-#define REALM_TABLE_BASIC_FWD_HPP
+#include <realm.hpp>
 
-namespace realm {
+namespace compatibility {
 
-
-template <class Spec>
-class BasicTable;
-
-template <class T>
-struct IsBasicTable {
-    static const bool value = false;
-};
-template <class Spec>
-struct IsBasicTable<BasicTable<Spec>> {
-    static const bool value = true;
-};
-template <class Spec>
-struct IsBasicTable<const BasicTable<Spec>> {
-    static const bool value = true;
+/// This shadows SharedGroupOptions::Durability
+/// The indirection is necessary because old versions
+/// of core should still be able to compile with this
+/// benchmark test.
+enum class RealmDurability {
+    Full,
+    MemOnly,
+    Async
 };
 
+realm::SharedGroup* create_new_shared_group(std::string path, RealmDurability level, const char* key);
 
-} // namespace realm
+} // end namespace compatibility
 
-#endif // REALM_TABLE_BASIC_FWD_HPP

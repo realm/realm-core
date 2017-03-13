@@ -1,4 +1,4 @@
-/*************************************************************************
+﻿/*************************************************************************
  *
  * Copyright 2016 Realm Inc.
  *
@@ -261,7 +261,7 @@ protected:
     /// Bump the global version counter. This method should be called when
     /// version bumping is initiated. Then following calls to should_propagate_version()
     /// can be used to prune the version bumping.
-    uint_fast64_t bump_global_version() noexcept;
+    void bump_global_version() noexcept;
 
     /// Determine if the "local_version" is out of sync, so that it should
     /// be updated. In that case: also update it. Called from Table::bump_version
@@ -272,10 +272,9 @@ protected:
     friend class Group;
 };
 
-inline uint_fast64_t Allocator::bump_global_version() noexcept
+inline void Allocator::bump_global_version() noexcept
 {
-    ++m_table_versioning_counter;
-    return m_table_versioning_counter;
+    m_table_versioning_counter += 1;
 }
 
 
@@ -312,9 +311,9 @@ inline ref_type to_ref(int_fast64_t v) noexcept
 
     // C++11 standard, paragraph 4.7.2 [conv.integral]:
     // If the destination type is unsigned, the resulting value is the least unsigned integer congruent to the source
-    // integer (modulo 2n where n is the number of bits used to represent the unsigned type). [ Note: In a two’s
+    // integer (modulo 2n where n is the number of bits used to represent the unsigned type). [ Note: In a two's
     // complement representation, this conversion is conceptual and there is no change in the bit pattern (if there is
-    // no truncation). — end note ]
+    // no truncation). - end note ]
     static_assert(std::is_unsigned<ref_type>::value,
                   "If ref_type changes, from_ref and to_ref should probably be updated");
     return ref_type(v);

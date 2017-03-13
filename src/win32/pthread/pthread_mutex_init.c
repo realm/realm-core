@@ -39,6 +39,10 @@
 #include <Objbase.h>
 #include <assert.h>
 
+#if REALM_UWP
+int _getpid(void);
+#endif
+
 int
 pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
 {
@@ -77,7 +81,7 @@ pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
               return EAGAIN;
 
           mutex->cached_handle = h;
-          mutex->cached_pid = getpid();
+          mutex->cached_pid = _getpid();
           mutex->cached_windows_pid = GetCurrentProcessId();
 
           return 0;

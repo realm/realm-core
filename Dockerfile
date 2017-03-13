@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     ninja-build \
     pandoc \
+    python-cheetah \
+    python-matplotlib \
     python-pip \
     pkg-config \
     s3cmd \

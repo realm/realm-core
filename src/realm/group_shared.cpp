@@ -70,7 +70,9 @@ const uint16_t relaxed_sync_threshold = 50;
 //         changing `daemon_started` and `daemon_ready` from 1-bit to 8-bit
 //         fields.
 // 8       Placing the commitlog history inside the Realm file.
-const uint_fast16_t g_shared_info_version = 8;
+// 9       Fair write transactions requires an additional condition variable,
+//         `write_fairness`
+const uint_fast16_t g_shared_info_version = 9;
 
 // The following functions are carefully designed for minimal overhead
 // in case of contention among read transactions. In case of contention,
@@ -495,6 +497,9 @@ struct alignas(8) SharedGroup::SharedInfo {
     InterprocessCondVar::SharedPart work_to_do;
     InterprocessCondVar::SharedPart daemon_becomes_ready;
     InterprocessCondVar::SharedPart new_commit_available;
+    InterprocessCondVar::SharedPart pick_next_writer;
+    std::atomic<uint32_t> next_ticket;
+    uint32_t next_served = 0;
 #endif
 
     // IMPORTANT: The ringbuffer MUST be the last field in SharedInfo - see above.
@@ -537,6 +542,8 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
     history_type = ht;
 #ifndef _WIN32
     InterprocessCondVar::init_shared_part(new_commit_available); // Throws
+    InterprocessCondVar::init_shared_part(pick_next_writer); // Throws
+    next_ticket = 0;
 #ifdef REALM_ASYNC_DAEMON
     InterprocessCondVar::init_shared_part(room_to_write);        // Throws
     InterprocessCondVar::init_shared_part(work_to_do);           // Throws
@@ -612,15 +619,16 @@ void spawn_daemon(const std::string& file)
         int i;
         for (i = m - 1; i >= 0; --i)
             close(i);
-        i = ::open("/dev/null", O_RDWR);
 #ifdef REALM_ENABLE_LOGFILE
         // FIXME: Do we want to always open the log file? Should it be configurable?
         i = ::open((file + ".log").c_str(), O_RDWR | O_CREAT | O_APPEND | O_SYNC, S_IRWXU);
 #else
-        i = dup(i);
+        i = ::open("/dev/null", O_RDWR);
 #endif
-        i = dup(i);
-        static_cast<void>(i);
+        if (i >= 0) {
+            int j = dup(i);
+            static_cast<void>(j);
+        }
 #ifdef REALM_ENABLE_LOGFILE
         std::cerr << "Detaching" << std::endl;
 #endif
@@ -1047,14 +1055,15 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 #ifndef _WIN32
             m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit",
                                                    options.temp_dir);
+            m_pick_next_writer.set_shared_part(info->pick_next_writer, m_lockfile_prefix, "pick_writer",
+                                                   options.temp_dir);
 #ifdef REALM_ASYNC_DAEMON
             if (options.durability == Durability::Async) {
-                m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix,
-                                                       "daemon_ready", options.temp_dir);
-                m_work_to_do.set_shared_part(info->work_to_do, m_lockfile_prefix,
-                                             "work_ready", options.temp_dir);
-                m_room_to_write.set_shared_part(info->room_to_write, m_lockfile_prefix,
-                                                "allow_write", options.temp_dir);
+                m_daemon_becomes_ready.set_shared_part(info->daemon_becomes_ready, m_lockfile_prefix, "daemon_ready",
+                                                       options.temp_dir);
+                m_work_to_do.set_shared_part(info->work_to_do, m_lockfile_prefix, "work_ready", options.temp_dir);
+                m_room_to_write.set_shared_part(info->room_to_write, m_lockfile_prefix, "allow_write",
+                                                options.temp_dir);
                 // In async mode, we need to make sure the daemon is running and ready:
                 if (!is_backend) {
                     while (info->daemon_ready == 0) {
@@ -1276,6 +1285,7 @@ void SharedGroup::close() noexcept
     m_daemon_becomes_ready.close();
 #endif
     m_new_commit_available.close();
+    m_pick_next_writer.close();
 #endif
     // On Windows it is important that we unmap before unlocking, else a SetEndOfFile() call from another thread may
     // interleave which is not permitted on Windows. It is permitted on *nix.
@@ -1713,10 +1723,64 @@ void SharedGroup::do_end_read() noexcept
 void SharedGroup::do_begin_write()
 {
     SharedInfo* info = m_file_map.get_addr();
-    // Get write lock
-    // Note that this will not get released until we call
-    // commit() or rollback()
+    // Get write lock - the write lock is held until do_end_write().
+    // 
+    // We use a ticketing scheme to ensure fairness wrt performing write transactions.
+    // (But cannot do that on Windows until we have interprocess condition variables there)
+#ifndef _WIN32
+    uint_fast32_t my_ticket = info->next_ticket.fetch_add(1, std::memory_order_relaxed);
+#endif
     m_writemutex.lock(); // Throws
+#ifndef _WIN32
+    // allow for comparison even after wrap around of ticket numbering:
+    int32_t diff = int32_t(my_ticket - info->next_served);
+    bool should_yield = diff > 0; // ticket is in the future
+    // a) the above comparison is only guaranteed to be correct, if the distance
+    //    between my_ticket and info->next_served is less than 2^30. This will
+    //    be the case since the distance will be bounded by the number of threads
+    //    and each thread cannot ever hold more than one ticket.
+    // b) we could use 64 bit counters instead, but it is unclear if all platforms
+    //    have support for interprocess atomics for 64 bit values.
+
+    timespec time_limit;  // only compute the time limit if we're going to use it:
+    if (should_yield) {
+        // This clock is not monotonic, so time can move backwards. This can lead
+        // to a wrong time limit, but the only effect of a wrong time limit is that
+        // we momentarily lose fairness, so we accept it.
+        timeval tv;
+        gettimeofday(&tv, nullptr);
+        time_limit.tv_sec = tv.tv_sec;
+        time_limit.tv_nsec = tv.tv_usec * 1000;
+        time_limit.tv_nsec += 500000000;        // 500 msec wait
+        if (time_limit.tv_nsec >= 1000000000) { // overflow
+            time_limit.tv_nsec -= 1000000000;
+            time_limit.tv_sec += 1;
+        }
+    }
+
+    while (should_yield) {
+
+        m_pick_next_writer.wait(m_writemutex, &time_limit);
+        timeval tv;
+        gettimeofday(&tv, nullptr);
+        if (time_limit.tv_sec < tv.tv_sec
+            || (time_limit.tv_sec == tv.tv_sec && time_limit.tv_nsec < tv.tv_usec * 1000)) {
+            // Timeout!
+            break;
+        }
+        diff = int32_t(my_ticket - info->next_served);
+        should_yield = diff > 0; // ticket is in the future, so yield to someone else
+    }
+
+    // we may get here because a) it's our turn, b) we timed out
+    // we don't distinguish, satisfied that event b) should be rare.
+    // In case b), we have to *make* it our turn. Failure to do so could leave us
+    // with 'next_served' permanently trailing 'next_ticket'.
+    //
+    // In doing so, we may bypass other waiters, hence the condition for yielding
+    // should take this situation into account by comparing with '>' instead of '!='
+    info->next_served = my_ticket;
+#endif
 
     if (info->commit_in_critical_phase) {
         m_writemutex.unlock();
@@ -1739,12 +1803,17 @@ void SharedGroup::do_begin_write()
         info->free_write_slots--;
         m_balancemutex.unlock();
     }
-#endif // _WIN32
+#endif // REALM_ASYNC_DAEMON
 }
 
 
 void SharedGroup::do_end_write() noexcept
 {
+#ifndef _WIN32
+    SharedInfo* info = m_file_map.get_addr();
+    info->next_served++;
+    m_pick_next_writer.notify_all();
+#endif
     m_writemutex.unlock();
 }
 

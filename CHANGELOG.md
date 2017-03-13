@@ -2,11 +2,7 @@
 
 ### Bugfixes
 
-* Fix a hang in LIKE queries that could occur if the pattern required
-  backtracking.
-* Bug fixed in `GroupWriter::write_group()` where the maximum size of the top
-  array was calculated incorrectly. This bug had the potential to cause
-  corruption in Realm files.
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -14,14 +10,73 @@
 
 ### Enhancements
 
-* Use only a single file descriptor in our emulation of interprocess condition variables
-  on most platforms rather than two. PR [#2460](https://github.com/realm/realm-core/pull/2460). Fixes Cocoa issue [#4676](https://github.com/realm/realm-cocoa/issues/4676).
+* Lorem ipsum.
 
 -----------
 
 ### Internals
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 2.4.0 Release notes
+
+### Bugfixes
+
+* Fixes a bug in chuncked binary column returning null value. 
+  PR [#2416](https://github.com/realm/realm-core/pull/2416).
+  Fixes issue [#2418](https://github.com/realm/realm-core/issues/2418).
+* Possibly fixed some cases of extreme file size growth, by preventing starvation
+  when trying to start a write transaction, while simultaneously pinning an older
+  version.
+  PR [#2395](https://github.com/realm/realm-core/pull/2395).
+* Fixed a bug when deleting a column used in a query.
+  PR [#2408](https://github.com/realm/realm-core/pull/2408).
+* Fixed a crash that occurred if you tried to override a binary with a size close
+  to the limit.
+  PR [#2416](https://github.com/realm/realm-core/pull/2416).
+* `seekpos()` and `seekoff()` in `realm::util::MemoryInputStreambuf` now behave
+  correctly when argument is out of range.
+  PR [#2472](https://github.com/realm/realm-core/pull/2472).
+
+### Breaking changes
+
+* The table macros, supporting the typed interface, has been removed.
+  PR [#2392](https://github.com/realm/realm-core/pull/2392).
+* Layout and version change for the .lock file required in order to prevent
+  starvation when waiting to start a write transaction (see above).
+  PR [#2395](https://github.com/realm/realm-core/pull/2395).
+
+### Enhancements
+
+* Now supports case insensitive queries for UWP.
+  PR [#2389](https://github.com/realm/realm-core/pull/2389).
+* Upgraded Visual Studio project to version 2017.
+  PR [#2389](https://github.com/realm/realm-core/pull/2389).
+* Support handover of TableViews and Queries based on SubTables.
+  PR [#2470](https://github.com/realm/realm-core/pull/2470).
+* Enable reading and writing of big blobs via Table interface.
+  Only to be used by Sync. The old interface still has a check on 
+  the size of the binary blob.
+  PR [#2416](https://github.com/realm/realm-core/pull/2416).
+
+----------------------------------------------
+
+# 2.3.3 Release notes
+
+### Bugfixes
+
+* Fix a hang in LIKE queries that could occur if the pattern required
+  backtracking. PR [#2477](https://github.com/realm/realm-core/pull/2477).
+* Bug fixed in `GroupWriter::write_group()` where the maximum size of the top
+  array was calculated incorrectly. This bug had the potential to cause
+  corruption in Realm files. PR [#2480](https://github.com/realm/realm-core/pull/2480).
+
+### Enhancements
+
+* Use only a single file descriptor in our emulation of interprocess condition variables
+  on most platforms rather than two. PR [#2460](https://github.com/realm/realm-core/pull/2460). Fixes Cocoa issue [#4676](https://github.com/realm/realm-cocoa/issues/4676).
 
 ----------------------------------------------
 
@@ -1341,7 +1396,7 @@ versions [0.97.0].**
 ### Bugfixes:
 
 * Corrected a bug which caused handover of a query with a restricting
-  view to loose the restricting view.
+  view to lose the restricting view.
 
 ----------------------------------------------
 

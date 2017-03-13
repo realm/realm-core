@@ -30,6 +30,7 @@
 #endif
 
 #include <realm.hpp>
+#include <realm/query_expression.hpp>
 #include <realm/util/to_string.hpp>
 #include <realm/util/file.hpp>
 #include <realm/version.hpp>
@@ -72,7 +73,7 @@ using namespace realm::util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-TEST(Upgrade_Database_2_3)
+TEST_IF(Upgrade_Database_2_3, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
@@ -282,7 +283,7 @@ TEST(Upgrade_Database_2_3)
 
 // Same as above test, just with different string lengths to get better coverage of the different String array types
 // that all have been modified by null support
-TEST(Upgrade_Database_2_Backwards_Compatible)
+TEST_IF(Upgrade_Database_2_Backwards_Compatible, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
@@ -422,7 +423,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible)
 
 
 // Same as above test, but upgrading through WriteTransaction instead of ReadTransaction
-TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
+TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_2.realm";
@@ -562,7 +563,7 @@ TEST(Upgrade_Database_2_Backwards_Compatible_WriteTransaction)
 
 
 // Test reading/writing of old version 2 BinaryColumn.
-TEST(Upgrade_Database_Binary)
+TEST_IF(Upgrade_Database_Binary, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_3.realm";
@@ -647,7 +648,7 @@ TEST(Upgrade_Database_Binary)
 
 
 // Test upgrading a database with single column containing strings with embedded NULs
-TEST(Upgrade_Database_Strings_With_NUL)
+TEST_IF(Upgrade_Database_Strings_With_NUL, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_4.realm";
@@ -723,7 +724,7 @@ TEST(Upgrade_Database_Strings_With_NUL)
 }
 
 #if TEST_READ_UPGRADE_MODE
-TEST(Upgrade_Database_2_3_Writes_New_File_Format)
+TEST_IF(Upgrade_Database_2_3_Writes_New_File_Format, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_1.realm";
@@ -736,7 +737,7 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format)
     CHECK_EQUAL(sgf::get_file_format_version(sg1), sgf::get_file_format_version(sg2));
 }
 
-TEST(Upgrade_Database_2_3_Writes_New_File_Format_new)
+TEST_IF(Upgrade_Database_2_3_Writes_New_File_Format_new, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     // The method `inline void SharedGroup::upgrade_file_format()` will first have a fast non-threadsafe
     // test for seeing if the file needs to be upgraded. Then it will make a slower thread-safe check inside a
@@ -764,7 +765,7 @@ TEST(Upgrade_Database_2_3_Writes_New_File_Format_new)
 #endif
 
 
-TEST(Upgrade_InRealmHistory)
+TEST_IF(Upgrade_InRealmHistory, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     // When requesting a in-Realm history, an upgrade to at least file format
     // version 4 is necessary.
@@ -803,7 +804,7 @@ TEST(Upgrade_InRealmHistory)
     }
 }
 
-TEST(Upgrade_DatabaseWithCallback)
+TEST_IF(Upgrade_DatabaseWithCallback, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
@@ -840,7 +841,7 @@ TEST(Upgrade_DatabaseWithCallback)
     CHECK(new_version >= 5);
 }
 
-TEST(Upgrade_DatabaseWithCallbackWithException)
+TEST_IF(Upgrade_DatabaseWithCallbackWithException, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
@@ -898,7 +899,7 @@ TEST(Upgrade_DatabaseWithCallbackWithException)
 
 // Open an existing database-file-format-version 4 file and check that it automatically upgrades to version 5.
 // The upgrade will change all OldDateTime columns into TimeStamp columns.
-TEST(Upgrade_Database_4_5_DateTime1)
+TEST_IF(Upgrade_Database_4_5_DateTime1, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_4_to_5_datetime1.realm";
@@ -1001,7 +1002,7 @@ TEST(Upgrade_Database_4_5_DateTime1)
 
 // Open an existing database-file-format-version 5 file and
 // check that it automatically upgrades to version 6.
-TEST(Upgrade_Database_5_6_StringIndex)
+TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
 {
     std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
                        util::to_string(REALM_MAX_BPNODE_SIZE) + "_5_to_6_stringindex.realm";

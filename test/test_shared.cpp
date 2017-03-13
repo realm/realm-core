@@ -49,6 +49,7 @@
 #include "fuzz_group.hpp"
 
 #include "test.hpp"
+#include "test_table_helper.hpp"
 
 extern unsigned int unit_test_random_seed;
 
@@ -107,9 +108,18 @@ bool allow_async = true;
 #endif
 
 
-REALM_TABLE_4(TestTableShared, first, Int, second, Int, third, Bool, fourth, String)
+namespace {
 
-REALM_TABLE_5(TestTableSharedTimestamp, first, Int, second, Int, third, Bool, fourth, String, fifth, Timestamp)
+void test_table_add_columns(TableRef t)
+{
+    t->add_column(type_Int, "first");
+    t->add_column(type_Int, "second");
+    t->add_column(type_Bool, "third");
+    t->add_column(type_String, "fourth");
+    t->add_column(type_Timestamp, "fifth");
+}
+}
+
 
 void writer(std::string path, int id)
 {
@@ -121,10 +131,10 @@ void writer(std::string path, int id)
         for (int i = 0; !done; ++i) {
             // std::cerr << "       - " << getpid() << std::endl;
             WriteTransaction wt(sg);
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            done = t1[id].third;
+            auto t1 = wt.get_table("test");
+            done = t1->get_bool(2, id);
             if (i & 1) {
-                t1[id].first = 1 + t1[id].first;
+                t1->add_int(0, id, 1);
             }
             sched_yield(); // increase chance of signal arriving in the middle of a transaction
             wt.commit();
@@ -154,8 +164,8 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
                 thing += random();
             ReadTransaction rt(sg);
             rt.get_group().verify();
-            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-            done = 10 < t1[id].first;
+            auto t1 = rt.get_table("test");
+            done = 10 < t1->get_int(0, id);
         } while (!done);
     }
     kill(pid, 9);
@@ -180,8 +190,8 @@ void killer(TestContext& test_context, int pid, std::string path, int id)
         SharedGroup sg(path, true);
         ReadTransaction rt(sg);
         rt.get_group().verify();
-        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-        CHECK(10 < t1[id].first);
+        auto t1 = rt.get_table("test");
+        CHECK(10 < t1->get_int(0, id));
     }
 }
 #endif
@@ -209,9 +219,10 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
         SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
         // Create table entries
         WriteTransaction wt(sg);
-        TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
+        auto t1 = wt.add_table("test");
+        test_table_add_columns(t1);
         for (int i = 0; i < num_processes; ++i) {
-            t1->add(0, i, false, "test");
+            add(t1, 0, i, false, "test");
         }
         wt.commit();
     }
@@ -256,9 +267,10 @@ TEST(Shared_CompactingOnTheFly)
         // Create table entries
         {
             WriteTransaction wt(sg);
-            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
+            auto t1 = wt.add_table("test");
+            test_table_add_columns(t1);
             for (int i = 0; i < 100; ++i) {
-                t1->add(0, i, false, "test");
+                add(t1, 0, i, false, "test");
             }
             wt.commit();
         }
@@ -270,9 +282,9 @@ TEST(Shared_CompactingOnTheFly)
             while (waiting) {
                 sched_yield();
                 ReadTransaction rt(sg);
-                TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
-                waiting = t1[41].first == 0;
-                // std::cerr << t1[41].first << std::endl;
+                auto t1 = rt.get_table("test");
+                waiting = t1->get_int(0, 41) == 0;
+                // std::cerr << t1->get_int(0, 41) << std::endl;
             }
 
             // since the writer is running, we cannot compact:
@@ -281,8 +293,8 @@ TEST(Shared_CompactingOnTheFly)
         {
             // make the writer thread terminate:
             WriteTransaction wt(sg);
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1[41].third = true;
+            auto t1 = wt.get_table("test");
+            t1->set_bool(2, 41, true);
             wt.commit();
         }
     }
@@ -296,7 +308,7 @@ TEST(Shared_CompactingOnTheFly)
         CHECK_EQUAL(true, sg2.compact());
 
         ReadTransaction rt2(sg2);
-        TestTableShared::ConstRef table = rt2.get_table<TestTableShared>("test");
+        auto table = rt2.get_table("test");
         CHECK(table);
         CHECK_EQUAL(table->size(), 100);
         rt2.get_group().verify();
@@ -305,7 +317,7 @@ TEST(Shared_CompactingOnTheFly)
     {
         SharedGroup sg2(path, true, SharedGroupOptions(crypt_key()));
         ReadTransaction rt2(sg2);
-        TestTableShared::ConstRef table = rt2.get_table<TestTableShared>("test");
+        auto table = rt2.get_table("test");
         CHECK(table);
         CHECK_EQUAL(table->size(), 100);
         rt2.get_group().verify();
@@ -409,8 +421,9 @@ TEST(Shared_Initial2)
             {
                 WriteTransaction wt(sg2);
                 wt.get_group().verify();
-                TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-                t1->add(1, 2, false, "test");
+                auto t1 = wt.add_table("test");
+                test_table_add_columns(t1);
+                add(t1, 1, 2, false, "test");
                 wt.commit();
             }
         }
@@ -419,12 +432,12 @@ TEST(Shared_Initial2)
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
-            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+            auto t1 = rt.get_table("test");
             CHECK_EQUAL(1, t1->size());
-            CHECK_EQUAL(1, t1[0].first);
-            CHECK_EQUAL(2, t1[0].second);
-            CHECK_EQUAL(false, t1[0].third);
-            CHECK_EQUAL("test", t1[0].fourth);
+            CHECK_EQUAL(1, t1->get_int(0, 0));
+            CHECK_EQUAL(2, t1->get_int(1, 0));
+            CHECK_EQUAL(false, t1->get_bool(2, 0));
+            CHECK_EQUAL("test", t1->get_string(3, 0));
         }
     }
 }
@@ -452,8 +465,9 @@ TEST(Shared_Initial2_Mem)
             {
                 WriteTransaction wt(sg2);
                 wt.get_group().verify();
-                TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-                t1->add(1, 2, false, "test");
+                auto t1 = wt.add_table("test");
+                test_table_add_columns(t1);
+                add(t1, 1, 2, false, "test");
                 wt.commit();
             }
         }
@@ -462,12 +476,12 @@ TEST(Shared_Initial2_Mem)
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
-            TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+            auto t1 = rt.get_table("test");
             CHECK_EQUAL(1, t1->size());
-            CHECK_EQUAL(1, t1[0].first);
-            CHECK_EQUAL(2, t1[0].second);
-            CHECK_EQUAL(false, t1[0].third);
-            CHECK_EQUAL("test", t1[0].fourth);
+            CHECK_EQUAL(1, t1->get_int(0, 0));
+            CHECK_EQUAL(2, t1->get_int(1, 0));
+            CHECK_EQUAL(false, t1->get_bool(2, 0));
+            CHECK_EQUAL("test", t1->get_string(3, 0));
         }
     }
 }
@@ -485,8 +499,9 @@ TEST(Shared_1)
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TestTableSharedTimestamp::Ref t1 = wt.add_table<TestTableSharedTimestamp>("test");
-            t1->add(1, 2, false, "test", Timestamp{1, 1});
+            auto t1 = wt.add_table("test");
+            test_table_add_columns(t1);
+            add(t1, 1, 2, false, "test", Timestamp{1, 1});
             wt.commit();
         }
 
@@ -497,75 +512,75 @@ TEST(Shared_1)
             rt.get_group().verify();
 
             // Verify that last set of changes are commited
-            TestTableSharedTimestamp::ConstRef t2 = rt.get_table<TestTableSharedTimestamp>("test");
+            auto t2 = rt.get_table("test");
             CHECK(t2->size() == 1);
-            CHECK_EQUAL(1, t2[0].first);
-            CHECK_EQUAL(2, t2[0].second);
-            CHECK_EQUAL(false, t2[0].third);
-            CHECK_EQUAL("test", t2[0].fourth);
-            CHECK_EQUAL(first_timestamp_value, t2[0].fifth);
+            CHECK_EQUAL(1, t2->get_int(0, 0));
+            CHECK_EQUAL(2, t2->get_int(1, 0));
+            CHECK_EQUAL(false, t2->get_bool(2, 0));
+            CHECK_EQUAL("test", t2->get_string(3, 0));
+            CHECK_EQUAL(first_timestamp_value, t2->get_timestamp(4, 0));
 
             // Do a new change while stil having current read transaction open
             {
                 WriteTransaction wt(sg);
                 wt.get_group().verify();
-                TestTableSharedTimestamp::Ref t1 = wt.get_table<TestTableSharedTimestamp>("test");
-                t1->add(2, 3, true, "more test", Timestamp{2, 2});
+                auto t1 = wt.get_table("test");
+                add(t1, 2, 3, true, "more test", Timestamp{2, 2});
                 wt.commit();
             }
 
             // Verify that that the read transaction does not see
             // the change yet (is isolated)
             CHECK(t2->size() == 1);
-            CHECK_EQUAL(1, t2[0].first);
-            CHECK_EQUAL(2, t2[0].second);
-            CHECK_EQUAL(false, t2[0].third);
-            CHECK_EQUAL("test", t2[0].fourth);
-            CHECK_EQUAL(first_timestamp_value, t2[0].fifth);
+            CHECK_EQUAL(1, t2->get_int(0, 0));
+            CHECK_EQUAL(2, t2->get_int(1, 0));
+            CHECK_EQUAL(false, t2->get_bool(2, 0));
+            CHECK_EQUAL("test", t2->get_string(3, 0));
+            CHECK_EQUAL(first_timestamp_value, t2->get_timestamp(4, 0));
             // Do one more new change while stil having current read transaction open
             // so we know that it does not overwrite data held by
             {
                 WriteTransaction wt(sg);
                 wt.get_group().verify();
-                TestTableSharedTimestamp::Ref t1 = wt.get_table<TestTableSharedTimestamp>("test");
-                t1->add(0, 1, false, "even more test", Timestamp{3, 3});
+                auto t1 = wt.get_table("test");
+                add(t1, 0, 1, false, "even more test", Timestamp{3, 3});
                 wt.commit();
             }
 
             // Verify that that the read transaction does still not see
             // the change yet (is isolated)
             CHECK(t2->size() == 1);
-            CHECK_EQUAL(1, t2[0].first);
-            CHECK_EQUAL(2, t2[0].second);
-            CHECK_EQUAL(false, t2[0].third);
-            CHECK_EQUAL("test", t2[0].fourth);
-            CHECK_EQUAL(first_timestamp_value, t2[0].fifth);
+            CHECK_EQUAL(1, t2->get_int(0, 0));
+            CHECK_EQUAL(2, t2->get_int(1, 0));
+            CHECK_EQUAL(false, t2->get_bool(2, 0));
+            CHECK_EQUAL("test", t2->get_string(3, 0));
+            CHECK_EQUAL(first_timestamp_value, t2->get_timestamp(4, 0));
         }
 
         // Start a new read transaction and verify that it can now see the changes
         {
             ReadTransaction rt(sg2);
             rt.get_group().verify();
-            TestTableSharedTimestamp::ConstRef t3 = rt.get_table<TestTableSharedTimestamp>("test");
+            auto t3 = rt.get_table("test");
 
             CHECK(t3->size() == 3);
-            CHECK_EQUAL(1, t3[0].first);
-            CHECK_EQUAL(2, t3[0].second);
-            CHECK_EQUAL(false, t3[0].third);
-            CHECK_EQUAL("test", t3[0].fourth);
-            CHECK_EQUAL(first_timestamp_value, t3[0].fifth);
-            CHECK_EQUAL(2, t3[1].first);
-            CHECK_EQUAL(3, t3[1].second);
-            CHECK_EQUAL(true, t3[1].third);
-            CHECK_EQUAL("more test", t3[1].fourth);
+            CHECK_EQUAL(1, t3->get_int(0, 0));
+            CHECK_EQUAL(2, t3->get_int(1, 0));
+            CHECK_EQUAL(false, t3->get_bool(2, 0));
+            CHECK_EQUAL("test", t3->get_string(3, 0));
+            CHECK_EQUAL(first_timestamp_value, t3->get_timestamp(4, 0));
+            CHECK_EQUAL(2, t3->get_int(0, 1));
+            CHECK_EQUAL(3, t3->get_int(1, 1));
+            CHECK_EQUAL(true, t3->get_bool(2, 1));
+            CHECK_EQUAL("more test", t3->get_string(3, 1));
             Timestamp second_timestamp_value{2, 2};
-            CHECK_EQUAL(second_timestamp_value, t3[1].fifth);
-            CHECK_EQUAL(0, t3[2].first);
-            CHECK_EQUAL(1, t3[2].second);
-            CHECK_EQUAL(false, t3[2].third);
-            CHECK_EQUAL("even more test", t3[2].fourth);
+            CHECK_EQUAL(second_timestamp_value, t3->get_timestamp(4, 1));
+            CHECK_EQUAL(0, t3->get_int(0, 2));
+            CHECK_EQUAL(1, t3->get_int(1, 2));
+            CHECK_EQUAL(false, t3->get_bool(2, 2));
+            CHECK_EQUAL("even more test", t3->get_string(3, 2));
             Timestamp third_timestamp_value{3, 3};
-            CHECK_EQUAL(third_timestamp_value, t3[2].fifth);
+            CHECK_EQUAL(third_timestamp_value, t3->get_timestamp(4, 2));
         }
     }
 }
@@ -582,8 +597,9 @@ TEST(Shared_Rollback)
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-            t1->add(1, 2, false, "test");
+            auto t1 = wt.add_table("test");
+            test_table_add_columns(t1);
+            add(t1, 1, 2, false, "test");
             // Note: Implicit rollback
         }
 
@@ -598,8 +614,9 @@ TEST(Shared_Rollback)
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-            t1->add(1, 2, false, "test");
+            auto t1 = wt.add_table("test");
+            test_table_add_columns(t1);
+            add(t1, 1, 2, false, "test");
             wt.commit();
         }
 
@@ -607,20 +624,20 @@ TEST(Shared_Rollback)
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
-            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
+            auto t = rt.get_table("test");
             CHECK(t->size() == 1);
-            CHECK_EQUAL(1, t[0].first);
-            CHECK_EQUAL(2, t[0].second);
-            CHECK_EQUAL(false, t[0].third);
-            CHECK_EQUAL("test", t[0].fourth);
+            CHECK_EQUAL(1, t->get_int(0, 0));
+            CHECK_EQUAL(2, t->get_int(1, 0));
+            CHECK_EQUAL(false, t->get_bool(2, 0));
+            CHECK_EQUAL("test", t->get_string(3, 0));
         }
 
         // Greate more changes (but rollback)
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1->add(0, 0, true, "more test");
+            auto t1 = wt.get_table("test");
+            add(t1, 0, 0, true, "more test");
             // Note: Implicit rollback
         }
 
@@ -628,12 +645,12 @@ TEST(Shared_Rollback)
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
-            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
+            auto t = rt.get_table("test");
             CHECK(t->size() == 1);
-            CHECK_EQUAL(1, t[0].first);
-            CHECK_EQUAL(2, t[0].second);
-            CHECK_EQUAL(false, t[0].third);
-            CHECK_EQUAL("test", t[0].fourth);
+            CHECK_EQUAL(1, t->get_int(0, 0));
+            CHECK_EQUAL(2, t->get_int(1, 0));
+            CHECK_EQUAL(false, t->get_bool(2, 0));
+            CHECK_EQUAL("test", t->get_string(3, 0));
         }
     }
 }
@@ -650,8 +667,9 @@ TEST(Shared_Writes)
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-            t1->add(0, 2, false, "test");
+            auto t1 = wt.add_table("test");
+            test_table_add_columns(t1);
+            add(t1, 0, 2, false, "test");
             wt.commit();
         }
 
@@ -659,8 +677,8 @@ TEST(Shared_Writes)
         for (size_t i = 0; i < 100; ++i) {
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1[0].first += 1;
+            auto t1 = wt.get_table("test");
+            t1->add_int(0, 0, 1);
             wt.commit();
         }
 
@@ -668,8 +686,8 @@ TEST(Shared_Writes)
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
-            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
-            const int64_t v = t[0].first;
+            auto t = rt.get_table("test");
+            const int64_t v = t->get_int(0, 0);
             CHECK_EQUAL(100, v);
         }
     }
@@ -836,12 +854,17 @@ TEST(Shared_ManyReaders)
         {
             WriteTransaction wt(root_sg);
             wt.get_group().verify();
-            TableRef test_1 = wt.get_or_add_table("test_1");
-            test_1->add_column(type_Int, "i");
+            bool was_added = false;
+            TableRef test_1 = wt.get_or_add_table("test_1", &was_added);
+            if (was_added) {
+                test_1->add_column(type_Int, "i");
+            }
             test_1->insert_empty_row(0);
             test_1->set_int(0, 0, 0);
-            TableRef test_2 = wt.get_or_add_table("test_2");
-            test_2->add_column(type_Binary, "b");
+            TableRef test_2 = wt.get_or_add_table("test_2", &was_added);
+            if (was_added) {
+                test_2->add_column(type_Binary, "b");
+            }
             wt.commit();
         }
 
@@ -1091,11 +1114,6 @@ TEST(Many_ConcurrentReaders)
 }
 
 
-namespace {
-
-REALM_TABLE_1(MyTable_SpecialOrder, first, Int)
-
-} // anonymous namespace
 
 TEST(Shared_WritesSpecialOrder)
 {
@@ -1109,9 +1127,10 @@ TEST(Shared_WritesSpecialOrder)
     {
         WriteTransaction wt(sg);
         wt.get_group().verify();
-        MyTable_SpecialOrder::Ref table = wt.add_table<MyTable_SpecialOrder>("test");
+        auto table = wt.add_table("test");
+        table->add_column(type_Int, "first");
         for (int i = 0; i < num_rows; ++i) {
-            table->add(0);
+            add(table, 0);
         }
         wt.commit();
     }
@@ -1121,9 +1140,9 @@ TEST(Shared_WritesSpecialOrder)
             {
                 WriteTransaction wt(sg);
                 wt.get_group().verify();
-                MyTable_SpecialOrder::Ref table = wt.get_table<MyTable_SpecialOrder>("test");
-                CHECK_EQUAL(j, table[i].first);
-                ++table[i].first;
+                auto table = wt.get_table("test");
+                CHECK_EQUAL(j, table->get_int(0, i));
+                table->add_int(0, i, 1);
                 wt.commit();
             }
         }
@@ -1132,9 +1151,9 @@ TEST(Shared_WritesSpecialOrder)
     {
         ReadTransaction rt(sg);
         rt.get_group().verify();
-        MyTable_SpecialOrder::ConstRef table = rt.get_table<MyTable_SpecialOrder>("test");
+        auto table = rt.get_table("test");
         for (int i = 0; i < num_rows; ++i) {
-            CHECK_EQUAL(num_reps, table[i].first);
+            CHECK_EQUAL(num_reps, table->get_int(0, i));
         }
     }
 }
@@ -1151,8 +1170,8 @@ void writer_threads_thread(TestContext& test_context, std::string path, size_t r
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1[row_ndx].first += 1;
+            auto t1 = wt.get_table("test");
+            t1->add_int(0, row_ndx, 1);
             // FIXME: For some reason this takes ages when running
             // inside valgrind, it is probably due to the "extreme
             // overallocation" bug. The 1000 transactions performed
@@ -1167,9 +1186,9 @@ void writer_threads_thread(TestContext& test_context, std::string path, size_t r
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
-            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
+            auto t = rt.get_table("test");
 
-            int64_t v = t[row_ndx].first;
+            int64_t v = t->get_int(0, row_ndx);
             int64_t expected = i + 1;
             CHECK_EQUAL(expected, v);
         }
@@ -1190,9 +1209,10 @@ TEST(Shared_WriterThreads)
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
+            auto t1 = wt.add_table("test");
+            test_table_add_columns(t1);
             for (size_t i = 0; i < thread_count; ++i)
-                t1->add(0, 2, false, "test");
+                add(t1, 0, 2, false, "test");
             wt.commit();
         }
 
@@ -1210,10 +1230,10 @@ TEST(Shared_WriterThreads)
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
-            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
+            auto t = rt.get_table("test");
 
             for (size_t i = 0; i < thread_count; ++i) {
-                int64_t v = t[i].first;
+                int64_t v = t->get_int(0, i);
                 CHECK_EQUAL(100, v);
             }
         }
@@ -1437,14 +1457,6 @@ TEST(Shared_FormerErrorCase1)
 }
 
 
-namespace {
-
-REALM_TABLE_1(FormerErrorCase2_Subtable, value, Int)
-
-REALM_TABLE_1(FormerErrorCase2_Table, bar, Subtable<FormerErrorCase2_Subtable>)
-
-} // namespace
-
 TEST(Shared_FormerErrorCase2)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -1452,24 +1464,23 @@ TEST(Shared_FormerErrorCase2)
         SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.get_group().verify();
-        FormerErrorCase2_Table::Ref table = wt.get_or_add_table<FormerErrorCase2_Table>("table");
-        table->add();
-        table->add();
-        table->add();
-        table->add();
-        table->add();
+        auto table = wt.get_or_add_table("table");
+        if (table->is_empty()) {
+            DescriptorRef subdesc;
+            table->add_column(type_Table, "bar", &subdesc);
+            subdesc->add_column(type_Int, "value");
+        }
+        table->add_empty_row();
+        table->add_empty_row();
+        table->add_empty_row();
+        table->add_empty_row();
+        table->add_empty_row();
         table->clear();
-        table->add();
-        table[0].bar->add();
+        table->add_empty_row();
+        table->get_subtable(0, 0)->add_empty_row();
         wt.commit();
     }
 }
-
-namespace {
-
-REALM_TABLE_1(OverAllocTable, text, String)
-
-} // namespace
 
 TEST(Shared_SpaceOveruse)
 {
@@ -1489,9 +1500,11 @@ TEST(Shared_SpaceOveruse)
     for (int i = 0; i != n_outer; ++i) {
         WriteTransaction wt(sg);
         wt.get_group().verify();
-        OverAllocTable::Ref table = wt.get_or_add_table<OverAllocTable>("my_table");
+        auto table = wt.get_or_add_table("my_table");
+        if (table->is_empty())
+            table->add_column(type_String, "text");
         for (int j = 0; j != n_inner; ++j)
-            table->add("x");
+            add(table, "x");
         wt.commit();
     }
 
@@ -1499,13 +1512,13 @@ TEST(Shared_SpaceOveruse)
     {
         ReadTransaction rt(sg);
         rt.get_group().verify();
-        OverAllocTable::ConstRef table = rt.get_table<OverAllocTable>("my_table");
+        auto table = rt.get_table("my_table");
 
         size_t n = table->size();
         CHECK_EQUAL(n_outer * n_inner, n);
 
         for (size_t i = 0; i != n; ++i)
-            CHECK_EQUAL("x", table[i].text);
+            CHECK_EQUAL("x", table->get_string(0, i));
 
         table->verify();
     }
@@ -1538,8 +1551,9 @@ TEST(Shared_Notifications)
         {
             WriteTransaction wt(sg2);
             wt.get_group().verify();
-            TestTableShared::Ref t1 = wt.add_table<TestTableShared>("test");
-            t1->add(1, 2, false, "test");
+            auto t1 = wt.add_table("test");
+            test_table_add_columns(t1);
+            add(t1, 1, 2, false, "test");
             wt.commit();
         }
     }
@@ -1551,12 +1565,12 @@ TEST(Shared_Notifications)
     {
         ReadTransaction rt(sg);
         rt.get_group().verify();
-        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+        auto t1 = rt.get_table("test");
         CHECK_EQUAL(1, t1->size());
-        CHECK_EQUAL(1, t1[0].first);
-        CHECK_EQUAL(2, t1[0].second);
-        CHECK_EQUAL(false, t1[0].third);
-        CHECK_EQUAL("test", t1[0].fourth);
+        CHECK_EQUAL(1, t1->get_int(0, 0));
+        CHECK_EQUAL(2, t1->get_int(1, 0));
+        CHECK_EQUAL(false, t1->get_bool(2, 0));
+        CHECK_EQUAL("test", t1->get_string(3, 0));
     }
 
     // No other instance have changed db since last transaction
@@ -1571,8 +1585,9 @@ TEST(Shared_FromSerialized)
     // Create new group and serialize to disk
     {
         Group g1;
-        TestTableShared::Ref t1 = g1.add_table<TestTableShared>("test");
-        t1->add(1, 2, false, "test");
+        auto t1 = g1.add_table("test");
+        test_table_add_columns(t1);
+        add(t1, 1, 2, false, "test");
         g1.write(path, crypt_key());
     }
 
@@ -1583,12 +1598,12 @@ TEST(Shared_FromSerialized)
     {
         ReadTransaction rt(sg);
         rt.get_group().verify();
-        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+        auto t1 = rt.get_table("test");
         CHECK_EQUAL(1, t1->size());
-        CHECK_EQUAL(1, t1[0].first);
-        CHECK_EQUAL(2, t1[0].second);
-        CHECK_EQUAL(false, t1[0].third);
-        CHECK_EQUAL("test", t1[0].fourth);
+        CHECK_EQUAL(1, t1->get_int(0, 0));
+        CHECK_EQUAL(2, t1->get_int(1, 0));
+        CHECK_EQUAL(false, t1->get_bool(2, 0));
+        CHECK_EQUAL("test", t1->get_string(3, 0));
     }
 }
 
@@ -1739,8 +1754,12 @@ TEST_IF(Shared_Async, allow_async)
             //            std::cout << "t "<<n<<"\n";
             WriteTransaction wt(db);
             wt.get_group().verify();
-            TestTableShared::Ref t1 = wt.get_or_add_table<TestTableShared>("test");
-            t1->add(1, i, false, "test");
+            auto t1 = wt.get_or_add_table("test");
+            if (t1->is_empty()) {
+                test_table_add_columns(t1);
+            }
+
+            add(t1, 1, i, false, "test");
             wt.commit();
         }
     }
@@ -1755,7 +1774,7 @@ TEST_IF(Shared_Async, allow_async)
 
         ReadTransaction rt(db);
         rt.get_group().verify();
-        TestTableShared::ConstRef t1 = rt.get_table<TestTableShared>("test");
+        auto t1 = rt.get_table("test");
         CHECK_EQUAL(100, t1->size());
     }
 }
@@ -1777,8 +1796,8 @@ void multiprocess_thread(TestContext& test_context, std::string path, size_t row
 
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
-            t1[row_ndx].first += 1;
+            auto t1 = wt.get_table("test");
+            t1->add_int(0, row_ndx, 1);
             // FIXME: For some reason this takes ages when running
             // inside valgrind, it is probably due to the "extreme
             // overallocation" bug. The 1000 transactions performed
@@ -1792,9 +1811,9 @@ void multiprocess_thread(TestContext& test_context, std::string path, size_t row
         {
             ReadTransaction rt(sg);
             rt.get_group().verify();
-            TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
+            auto t = rt.get_table("test");
 
-            int64_t v = t[row_ndx].first;
+            int64_t v = t->get_int(0, row_ndx);
             int64_t expected = i + 1;
             CHECK_EQUAL(expected, v);
         }
@@ -1821,13 +1840,13 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
         {
         }
         WriteTransaction wt(sgw);
-        TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+        auto t1 = wt.get_table("test");
         for (size_t i = 0; i < rows; ++i) {
-            t1->add(0, 2, false, "test");
+            add(t1, 0, 2, false, "test");
         }
         wt.commit();
         WriteTransaction wt2(sgw);
-        TestTableShared::Ref t2 = wt2.get_table<TestTableShared>("test");
+        auto t2 = wt2.get_table("test");
         for (size_t i = 0; i < rows; ++i) {
             t2->add(0, 2, false, "test");
         }
@@ -1838,9 +1857,9 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
     {
         SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg);
-        TestTableShared::Ref t1 = wt.get_table<TestTableShared>("test");
+        auto t1 = wt.get_table("test");
         for (size_t i = 0; i < rows; ++i) {
-            t1->add(0, 2, false, "test");
+            add(t1, 0, 2, false, "test");
         }
         wt.commit();
     }
@@ -1849,9 +1868,12 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
         bool no_create = false;
         SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
         WriteTransaction wt(sg);
-        TestTableShared::Ref t1 = wt.get_or_add_table<TestTableShared>("test");
+        auto t1 = wt.get_or_add_table("test");
+        if (t1->is_empty()) {
+            test_table_add_columns(t1);
+        }
         for (size_t i = 0; i < rows; ++i) {
-            t1->add(0, 2, false, "test");
+            add(t1, 0, 2, false, "test");
         }
         wt.commit();
     }
@@ -1863,9 +1885,9 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
 #else
     {
         Group g(alone_path, Group::mode_ReadWrite);
-        TestTableShared::Ref t1 = g.get_table<TestTableShared>("test");
+        auto t1 = g.get_table("test");
         for (size_t i = 0; i < rows; ++i)
-            t1->add(0, 2, false, "test");
+            add(t1, 0, 2, false, "test");
         printf("Writing db\n");
         g.commit();
     }
@@ -1900,10 +1922,10 @@ void multiprocess_threaded(TestContext& test_context, std::string path, size_t n
         SharedGroup sg(path, no_create, SharedGroupOptions(SharedGroupOptions::Durability::Async));
         ReadTransaction rt(sg);
         rt.get_group().verify();
-        TestTableShared::ConstRef t = rt.get_table<TestTableShared>("test");
+        auto t = rt.get_table("test");
 
         for (size_t i = 0; i != num_threads; ++i) {
-            int64_t v = t[i + base].first;
+            int64_t v = t->get_int(0, i + base);
             CHECK_EQUAL(multiprocess_increments, v);
         }
     }
@@ -1922,11 +1944,11 @@ void multiprocess_validate_and_clear(TestContext& test_context, std::string path
         SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
         WriteTransaction wt(sg);
         wt.get_group().verify();
-        TestTableShared::Ref t = wt.get_table<TestTableShared>("test");
+        auto t = wt.get_table("test");
 
         for (size_t i = 0; i != rows; ++i) {
-            int64_t v = t[i].first;
-            t[i].first = 0;
+            int64_t v = t->get_int(0, i);
+            t->set_int(0, i, 0);
             CHECK_EQUAL(result, v);
         }
         wt.commit();
@@ -2374,7 +2396,9 @@ TEST(Shared_ReserveDiskSpace)
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            wt.add_table<TestTableShared>("table_1")->add_empty_row(2000);
+            auto t = wt.add_table("table_1");
+            test_table_add_columns(t);
+            t->add_empty_row(2000);
             wt.commit();
         }
         orig_file_size = size_t(File(path).get_size());
@@ -2385,13 +2409,17 @@ TEST(Shared_ReserveDiskSpace)
         {
             WriteTransaction wt(sg);
             wt.get_group().verify();
-            wt.add_table<TestTableShared>("table_2")->add_empty_row(2000);
+            auto t = wt.add_table("table_2");
+            test_table_add_columns(t);
+            t->add_empty_row(2000);
             orig_file_size = size_t(File(path).get_size());
             size_t reserve_size_5 = orig_file_size + 333;
             sg.reserve(reserve_size_5);
             size_t new_file_size_5 = size_t(File(path).get_size());
             CHECK(new_file_size_5 >= reserve_size_5);
-            wt.add_table<TestTableShared>("table_3")->add_empty_row(2000);
+            t = wt.add_table("table_3");
+            test_table_add_columns(t);
+            t->add_empty_row(2000);
             wt.commit();
         }
         orig_file_size = size_t(File(path).get_size());

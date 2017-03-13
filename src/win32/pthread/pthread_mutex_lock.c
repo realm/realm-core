@@ -50,7 +50,7 @@ pthread_mutex_lock (pthread_mutex_t * mutex)
   if (mutex->is_shared) {
     DWORD d;
     HANDLE h;
-    int pid = getpid();
+    int pid = _getpid();
 
     if(mutex->cached_pid != pid)
         h = OpenMutexA(MUTEX_ALL_ACCESS, 1, mutex->shared_name);

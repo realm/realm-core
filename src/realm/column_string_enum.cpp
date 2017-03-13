@@ -313,12 +313,6 @@ StringData StringEnumColumn::get_index_data(size_t ndx, StringIndex::StringConve
 }
 
 
-void StringEnumColumn::set_search_index_allow_duplicate_values(bool allow) noexcept
-{
-    m_search_index->set_allow_duplicate_values(allow);
-}
-
-
 void StringEnumColumn::install_search_index(std::unique_ptr<StringIndex> index) noexcept
 {
     REALM_ASSERT(!m_search_index);

@@ -177,6 +177,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
         if (log) {
             *log << "// Test case generated in " REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
+            *log << "// REALM_MAX_BPNODE_SIZE is " << REALM_MAX_BPNODE_SIZE << "\n";
             *log << "// ----------------------------------------------------------------------\n";
             std::string printable_key;
             if (key == nullptr) {
@@ -452,12 +453,26 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             t->set_string(col_ndx, row_ndx, str);
                         }
                         else if (type == type_Binary) {
-                            std::string str = create_string(get_next(s));
-                            if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_binary(" << col_ndx << ", " << row_ndx
-                                     << ", BinaryData{\"" << str << "\", " << str.size() << "});\n";
+                            bool insert_big_blob = get_next(s) % 2 == 0;
+                            if (insert_big_blob) {
+                                size_t rand_char = get_next(s);
+                                size_t blob_size = get_next(s) + ArrayBlob::max_binary_size;
+                                std::string blob(blob_size, static_cast<unsigned char>(rand_char));
+                                if (log) {
+                                    *log << "{\n\tstd::string data(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n\t"
+                                    << "g.get_table(" << table_ndx << ")->set_binary_big(" << col_ndx << ", " << row_ndx
+                                    << ", BinaryData(data.data(), " << blob_size << "));\n}\n";
+                                }
+                                t->set_binary_big(col_ndx, row_ndx, BinaryData(blob.data(), blob_size));
                             }
-                            t->set_binary(col_ndx, row_ndx, BinaryData(str));
+                            else {
+                                std::string str = create_string(get_next(s));
+                                if (log) {
+                                    *log << "g.get_table(" << table_ndx << ")->set_binary(" << col_ndx << ", " << row_ndx
+                                    << ", BinaryData{\"" << str << "\", " << str.size() << "});\n";
+                                }
+                                t->set_binary(col_ndx, row_ndx, BinaryData(str));
+                            }
                         }
                         else if (type == type_Int) {
                             int64_t value = get_int64(s);
