@@ -399,6 +399,8 @@ size_t IndexArray::index_string<index_FindAll_ins>(StringData value, IntegerColu
             // E.g. keys for string segments with 4 chars will have 16 permutations.
             // Keys for string segments with just a single character will only have
             // 2 permutations, that must be selected from the upper byte.
+            // For a key tail of 2 bytes, the following 2^2 permutation values will be generated:
+            // 0b0000, 0b0100, 0b1000, 0b1100
             const size_t tail_size = std::min(value.size() - item.string_offset, sizeof(key_type));
             const int num_permutations = 1 << tail_size;
             for (int i = 0; i < num_permutations; ++i) {
