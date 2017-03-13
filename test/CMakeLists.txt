@@ -105,7 +105,7 @@ target_include_directories(realm-tests PUBLIC ${EXTRA_TEST_CFLAGS})
 
 add_test(NAME RealmTests COMMAND realm-tests)
 
-add_executable(realm-benchmark-common-tasks benchmark-common-tasks/main.cpp)
+add_executable(realm-benchmark-common-tasks benchmark-common-tasks/main.cpp benchmark-common-tasks/compatibility.cpp)
 target_link_libraries(realm-benchmark-common-tasks ${PLATFORM_LIBRARIES} test-util)
 add_test(RealmBenchmarkCommonTasks realm-benchmark-common-tasks)
 
