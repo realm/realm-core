@@ -26,6 +26,8 @@
 #include <fstream>
 #include <iostream>
 
+#include "util/test_path.hpp"
+
 using namespace realm;
 using namespace realm::util;
 
@@ -862,53 +864,12 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
     }
 }
 
-struct RealmPathGuard {
-RealmPathGuard(const std::string& path) : m_path(path)
-{
-    cleanup();
-}
-~RealmPathGuard() noexcept
-{
-    cleanup();
-}
-operator std::string()
-{
-    return m_path;
-}
-private:
-std::string m_path;
-void cleanup() const noexcept
-{
-    try {
-        File::try_remove(m_path);
-        do_clean_dir(m_path + ".management", ".management");
-        if (File::is_dir(m_path + ".management"))
-            remove_dir(m_path + ".management");
-        File::try_remove(m_path + ".lock");
-    }
-    catch (...) {
-        // Exception deliberately ignored
-    }
-}
-void do_clean_dir(const std::string& path, const std::string& guard_string) const
-{
-    DirScanner ds(path, true);
-    std::string name;
-    while (ds.next(name)) {
-        std::string subpath = File::resolve(name, path);
-        if (File::is_dir(subpath)) {
-            do_clean_dir(subpath, guard_string);
-            remove_dir(subpath);
-        }
-        else {
-            if (subpath.find(guard_string) == std::string::npos)
-                throw std::runtime_error("Bad test dir path");
-            File::remove(subpath);
-        }
-    }
-}
+// This is an adapter class which replaces dragging in the whole test framework
+// by implementing the `get_test_name()` method from the TestContext class.
+struct RealmPathInfo {
+    std::string m_path;
+    std::string get_test_name() const { return m_path; }
 };
-
 
 void usage(const char* argv[])
 {
@@ -952,7 +913,9 @@ int run_fuzzy(int argc, const char* argv[])
     }
 
     disable_sync_to_disk();
-    RealmPathGuard path(name + ".realm");
+
+    RealmPathInfo test_context { name };
+    SHARED_GROUP_TEST_PATH(path);
 
     std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
     parse_and_apply_instructions(contents, path, log);
