@@ -123,7 +123,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     spec.hpp
     string_data.hpp
     table.hpp
-    table_accessors.hpp
     table_basic.hpp
     table_basic_fwd.hpp
     table_ref.hpp
@@ -165,7 +164,6 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/terminate.hpp
     util/thread.hpp
     util/to_string.hpp
-    util/tuple.hpp
     util/type_list.hpp
     util/type_traits.hpp
     util/utf8.hpp
