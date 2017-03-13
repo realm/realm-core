@@ -2,7 +2,11 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Properly refresh table accessors connected by backlinks to a row that has had
+  a `merge_rows` instruction applied and then rolled back. This could have
+  caused corruption if this scenario was triggered but since sync does not use
+  the `merge_rows` instruction in this way, this is a preventative fix.
+  PR [#2503](https://github.com/realm/realm-core/pull/2503)
 
 ### Breaking changes
 
