@@ -2434,9 +2434,14 @@ public:
 
     bool merge_rows(size_t row_ndx, size_t new_row_ndx)
     {
-        static_cast<void>(row_ndx);
-        static_cast<void>(new_row_ndx);
         // There is no instruction we can generate here to change back.
+        // However, we do need to refresh accessors for any tables
+        // connected through backlinks, so we generate updates on each
+        // affected row by merging to itself.
+        m_encoder.merge_rows(row_ndx, row_ndx);
+        append_instruction();
+        m_encoder.merge_rows(new_row_ndx, new_row_ndx);
+        append_instruction();
         return true;
     }
 
