@@ -471,7 +471,7 @@ def doBuildAndroid(def isPublishingRun) {
           }
         }
 
-        node('android-hub') {
+        node('fastlinux') {
             sh 'rm -rf *'
             unstash 'android'
 
