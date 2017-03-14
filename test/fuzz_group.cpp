@@ -161,35 +161,35 @@ Mixed construct_mixed(State& s, util::Optional<std::ostream&> log)
         case 0: {
             bool b = get_next(s) % 2;
             if (log) {
-                *log << "Mixed mixed(" << (b ? "true" : "false") << ");";
+                *log << "Mixed mixed(" << (b ? "true" : "false") << ");\n";
             }
             return Mixed(b);
         }
         case 1: {
             int64_t value = get_int64(s);
             if (log) {
-                *log << "Mixed mixed((int64_t)(" << value << "));";
+                *log << "Mixed mixed((int64_t)(" << value << "));\n";
             }
             return Mixed(value);
         }
         case 2: {
             float value = get_next(s);
             if (log) {
-                *log << "Mixed mixed((float)(" << value << "));";
+                *log << "Mixed mixed((float)(" << value << "));\n";
             }
             return Mixed(value);
         }
         case 3: {
             double value = get_next(s);
             if (log) {
-                *log << "Mixed mixed((double)(" << value << "));";
+                *log << "Mixed mixed((double)(" << value << "));\n";
             }
             return Mixed(value);
         }
         case 4: {
             std::string str = create_string(get_next(s));
             if (log) {
-                *log << "Mixed mixed(StringData(\"" << str << "\"));";
+                *log << "Mixed mixed(StringData(\"" << str << "\"));\n";
             }
             return Mixed(StringData(str));
         }
@@ -199,21 +199,21 @@ Mixed construct_mixed(State& s, util::Optional<std::ostream&> log)
             std::string blob(blob_size, static_cast<unsigned char>(rand_char));
             if (log) {
                 *log << "std::string blob(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n"
-                     << "Mixed mixed(BinaryData(blob));";
+                     << "Mixed mixed(BinaryData(blob));\n";
             }
             return Mixed(BinaryData(blob));
         }
         case 6: {
             int64_t time = get_int64(s);
             if (log) {
-                *log << "Mixed mixed(OldDateTime(" << time << "));";
+                *log << "Mixed mixed(OldDateTime(" << time << "));\n";
             }
             return Mixed(OldDateTime(time));
         }
         case 7: {
             std::pair<int64_t, int32_t> values = get_timestamp_values(s);
             if (log) {
-                *log << "Mixed mixed(Timestamp{" << values.first << ", " << values.second << "});";
+                *log << "Mixed mixed(Timestamp{" << values.first << ", " << values.second << "});\n";
             }
             return Mixed(Timestamp{values.first, values.second});
         }
@@ -674,7 +674,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             }
                             Mixed mixed = construct_mixed(s, log);
                             if (log) {
-                                *log << "\ng.get_table(" << table_ndx << ")->set_mixed(" << col_ndx << ", "
+                                *log << "g.get_table(" << table_ndx << ")->set_mixed(" << col_ndx << ", "
                                      << row_ndx << ", mixed);\n}\n";
                             }
                             t->set_mixed(col_ndx, row_ndx, mixed);
@@ -709,7 +709,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             if (!t->get_linklist(col_ndx, row_ndx2)->is_empty()) {
                                 if (log) {
                                     *log << "g.get_table(" << table_ndx << ")->get_linklist("
-                                    << col_ndx << ", " << row_ndx2 << ")->clear();";
+                                    << col_ndx << ", " << row_ndx2 << ")->clear();\n";
                                 }
                                 t->get_linklist(col_ndx, row_ndx2)->clear();
                             }
