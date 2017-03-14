@@ -173,7 +173,7 @@ set(REALM_OTHER_UTIL_HEADERS
 
 add_library(realm-objects OBJECT ${REALM_SOURCES})
 set_target_properties(realm-objects PROPERTIES POSITION_INDEPENDENT_CODE true)
-target_compile_definitions(realm-objects PUBLIC PIC "$<$<CXX:COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>")
+target_compile_definitions(realm-objects PUBLIC PIC "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>")
 
 if(COMMAND set_target_xcode_attributes)
     set_target_xcode_attributes(realm-objects)
