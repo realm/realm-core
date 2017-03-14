@@ -848,13 +848,13 @@ size_t StringColumn::find_first(StringData value, size_t begin, size_t end) cons
 }
 
 
-void StringColumn::find_all(IntegerColumn& result, StringData value, size_t begin, size_t end) const
+void StringColumn::find_all(IntegerColumn& result, StringData value, size_t begin, size_t end, bool case_insensitive) const
 {
     REALM_ASSERT_3(begin, <=, size());
     REALM_ASSERT(end == npos || (begin <= end && end <= size()));
 
     if (m_search_index && begin == 0 && end == npos) {
-        m_search_index->find_all(result, value); // Throws
+        m_search_index->find_all(result, value, case_insensitive); // Throws
         return;
     }
 

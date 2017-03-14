@@ -23,7 +23,8 @@
 
 ### Internals
 
-* Lorem ipsum.
+* `StringIndex` now supports case insensitive searches.
+  PR [#2475](https://github.com/realm/realm-core/pull/2475).
 
 ----------------------------------------------
 
