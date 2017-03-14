@@ -47,8 +47,8 @@ set(REALM_SOURCES
     util/encrypted_file_mapping.cpp
     util/file.cpp
     util/file_mapper.cpp
-    util/interprocess_condvar.cpp
-    util/interprocess_mutex.cpp
+    # util/interprocess_condvar.cpp
+    # util/interprocess_mutex.cpp
     util/logger.cpp
     util/memory_stream.cpp
     util/misc_errors.cpp
@@ -145,8 +145,8 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/file_mapper.hpp
     util/hex_dump.hpp
     util/inspect.hpp
-    util/interprocess_condvar.hpp
-    util/interprocess_mutex.hpp
+    # util/interprocess_condvar.hpp
+    # util/interprocess_mutex.hpp
     util/logger.hpp
     util/memory_stream.hpp
     util/meta.hpp
@@ -170,6 +170,11 @@ set(REALM_OTHER_UTIL_HEADERS
     util/aes_cryptor.hpp
     util/errno.hpp
 ) # REALM_OTHER_UTIL_HEADERS
+
+if(NOT MSVC)
+    list(APPEND REALM_SOURCES util/interprocess_condvar.cpp util/interprocess_mutex.cpp)
+    list(APPEND REALM_INSTALL_UTIL_HEADERS util/interprocess_condvar.hpp util/interprocess_mutex.hpp)
+endif()
 
 add_library(realm-objects OBJECT ${REALM_SOURCES})
 set_target_properties(realm-objects PROPERTIES POSITION_INDEPENDENT_CODE true)
