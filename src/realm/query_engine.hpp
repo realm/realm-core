@@ -1349,7 +1349,7 @@ public:
 
     void deallocate() noexcept
     {
-        // Must be called after each query execution too free temporary resources used by the execution. Run in
+        // Must be called after each query execution to free temporary resources used by the execution. Run in
         // destructor, but also in Init because a user could define a query once and execute it multiple times.
         clear_leaf_state();
 
