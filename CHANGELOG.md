@@ -17,7 +17,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Support setting Mixed(Timestamp) through the transaction logs.
+* Implement comparison of Mixed objects containing Timestamp types.
 
 -----------
 
