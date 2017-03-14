@@ -769,14 +769,10 @@ void run_benchmark(BenchmarkResults& results)
                  << (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
         std::string ident = ident_ss.str();
 
-        realm::test_util::unit_test::TestDetails test_details;
-        test_details.suite_name = "BenchmarkCommonTasks";
-        test_details.test_name = ident.c_str();
-        test_details.file_name = __FILE__;
-        test_details.line_number = __LINE__;
+        realm::test_util::RealmPathInfo test_context { ident.c_str() };
 
         // Open a SharedGroup:
-        SharedGroupTestPathGuard realm_path("benchmark_common_tasks" + ident);
+        realm::test_util::SharedGroupTestPathGuard realm_path("benchmark_common_tasks" + ident);
         std::unique_ptr<SharedGroup> group;
         group.reset(create_new_shared_group(realm_path, level, key));
         benchmark.before_all(*group);
@@ -821,7 +817,7 @@ extern "C" int benchmark_common_tasks_main();
 
 int benchmark_common_tasks_main()
 {
-    std::string results_file_stem = test_util::get_test_path_prefix() + "results";
+    std::string results_file_stem = realm::test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
 
 #define BENCH(B) run_benchmark<B>(results)

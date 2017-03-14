@@ -864,12 +864,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
     }
 }
 
-// This is an adapter class which replaces dragging in the whole test framework
-// by implementing the `get_test_name()` method from the TestContext class.
-struct RealmPathInfo {
-    std::string m_path;
-    std::string get_test_name() const { return m_path; }
-};
 
 void usage(const char* argv[])
 {
@@ -914,7 +908,7 @@ int run_fuzzy(int argc, const char* argv[])
 
     disable_sync_to_disk();
 
-    RealmPathInfo test_context { name };
+    realm::test_util::RealmPathInfo test_context { name };
     SHARED_GROUP_TEST_PATH(path);
 
     std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));

@@ -75,6 +75,16 @@ std::string get_test_resource_path();
 void set_test_resource_path(const std::string&);
 
 
+// This is an adapter class which replaces dragging in the whole test framework
+// by implementing the `get_test_name()` method from the TestContext class.
+// It allows use of TestPathGuard and friends outside of a unit test:
+// RealmPathInfo test_context { path };
+struct RealmPathInfo {
+    std::string m_path;
+    std::string get_test_name() const { return m_path; }
+};
+
+
 /// Constructor and destructor removes file if it exists.
 class TestPathGuard {
 public:
