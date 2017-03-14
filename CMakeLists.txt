@@ -27,6 +27,7 @@ else()
     # TODO: Remove this when fixed
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-maybe-uninitialized")
+        set_source_files_properties(test/test_priority_queue.cpp PROPERTIES COMPILE_FLAGS -Wno-uninitialized)
     elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wunreachable-code -Wshorten-64-to-32 -Wold-style-cast -Wconditional-uninitialized -Wextra-semi -Wno-nested-anon-types")
     endif()
