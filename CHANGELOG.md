@@ -2,6 +2,11 @@
 
 ### Bugfixes
 
+* Properly refresh table accessors connected by backlinks to a row that has had
+  a `merge_rows` instruction applied and then rolled back. This could have
+  caused corruption if this scenario was triggered but since sync does not use
+  the `merge_rows` instruction in this way, this is a preventative fix.
+  PR [#2503](https://github.com/realm/realm-core/pull/2503)
 * Fixed an assertion on a corner case of reallocation on large arrays.
   PR [#2500](https://github.com/realm/realm-core/pull/2500).
   Fixes issue [#2451](https://github.com/realm/realm-core/issues/2451).
@@ -1398,7 +1403,7 @@ versions [0.97.0].**
 ### Bugfixes:
 
 * Corrected a bug which caused handover of a query with a restricting
-  view to loose the restricting view.
+  view to lose the restricting view.
 
 ----------------------------------------------
 
