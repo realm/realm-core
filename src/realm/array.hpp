@@ -101,7 +101,8 @@ inline T no0(T v)
 const size_t npos = size_t(-1);
 
 // Maximum number of bytes that the payload of an array can be
-const size_t max_array_payload = 0x00ffffffL;
+const size_t max_array_payload         = 0x00ffffffL;
+const size_t max_array_payload_aligned = 0x00fffff8L;
 
 /// Alias for realm::npos.
 const size_t not_found = npos;
