@@ -6,7 +6,7 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Disable copying of various classes to prevent incorrect use at compile time.
 
 ### Enhancements
 

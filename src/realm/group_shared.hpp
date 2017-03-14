@@ -171,6 +171,11 @@ public:
 
     ~SharedGroup() noexcept;
 
+    // Disable copying to prevent accessor errors. If you really want another
+    // instance, open another SharedGroup object on the same file.
+    SharedGroup(const SharedGroup&) = delete;
+    SharedGroup& operator=(const SharedGroup&) = delete;
+
     /// Attach this SharedGroup instance to the specified database file.
     ///
     /// While at least one instance of SharedGroup exists for a specific
