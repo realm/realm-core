@@ -1717,9 +1717,9 @@ void Array::alloc(size_t init_size, size_t width)
             // field in the header.
             size_t new_capacity_bytes = capacity_bytes * 2;
             if (new_capacity_bytes < capacity_bytes) // overflow detected, clamp to max
-                new_capacity_bytes = max_array_payload;
-            if (new_capacity_bytes > max_array_payload) // cap at max allowed allocation
-                new_capacity_bytes = max_array_payload;
+                new_capacity_bytes = max_array_payload_aligned;
+            if (new_capacity_bytes > max_array_payload_aligned) // cap at max allowed allocation
+                new_capacity_bytes = max_array_payload_aligned;
             capacity_bytes = new_capacity_bytes;
 
             // If doubling is not enough, expand enough to fit

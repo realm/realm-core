@@ -12946,6 +12946,32 @@ TEST(LangBindHelper_MixedStringRollback)
 }
 
 
+TEST(LangBindHelper_BinaryReallocOverMax)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    g.add_table("table");
+    g.get_table(0)->add_column(type_Binary, "binary_col", false);
+    g.get_table(0)->insert_empty_row(0, 1);
+
+    // The sizes of these binaries were found with AFL. Essentially we must hit
+    // the case where doubling the allocated memory goes above max_array_payload
+    // and hits the condition to clamp to the maximum.
+    std::string blob1(8877637, static_cast<unsigned char>(133));
+    std::string blob2(15994373, static_cast<unsigned char>(133));
+    BinaryData dataAlloc(blob1);
+    BinaryData dataRealloc(blob2);
+
+    g.get_table(0)->set_binary(0, 0, dataAlloc);
+    g.get_table(0)->set_binary(0, 0, dataRealloc);
+    g.verify();
+}
+
+
 TEST(LangBindHelper_RollbackMergeRowsWithBacklinks)
 {
     SHARED_GROUP_TEST_PATH(path);
