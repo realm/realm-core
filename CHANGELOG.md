@@ -25,6 +25,13 @@
 
 * `StringIndex` now supports case insensitive searches.
   PR [#2475](https://github.com/realm/realm-core/pull/2475).
+* `AppendBuffer` gained support for move construction/assignment, and had its
+  growth factor reduced to 1.5.
+* Methods on the `Replication` interface were made virtual to allow override.
+* The order of emission for some instructions in the transaction log was changed
+  with respect to carrying out the effect of the instruction on the database, to
+  allow implementors of the `Replication` interface a semi-consistent view of
+  the database.
 
 ----------------------------------------------
 
