@@ -772,8 +772,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 if (log) {
                                     *log << "try { g.get_table(" << table_ndx << ")->set_null_unique(" << col_ndx
                                          << ", " << row_ndx
-                                         << "); } catch (const LogicError& le) { CHECK(le.kind() == "
-                                            "LogicError::illegal_combination); }\n";
+                                         << "); } catch (const LogicError& le) "
+                                            "{ CHECK(le.kind() == LogicError::illegal_combination); }\n";
                                 }
                                 try {
                                     t->set_null_unique(col_ndx, row_ndx);
@@ -789,8 +789,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                                 if (log) {
                                     *log << "try { g.get_table(" << table_ndx << ")->set_int_unique(" << col_ndx
                                          << ", " << row_ndx << ", " << value
-                                         << "); } catch (const LogicError& le) { CHECK(le.kind() == "
-                                            "LogicError::illegal_combination); }\n";
+                                         << "); } catch (const LogicError& le) "
+                                            "{ CHECK(le.kind() == LogicError::illegal_combination); }\n";
                                 }
                                 try {
                                     t->set_int_unique(col_ndx, row_ndx, value);
@@ -808,10 +808,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             bool set_null = t->is_nullable(col_ndx) ? get_next(s) % 2 == 0 : false;
                             if (set_null) {
                                 if (log) {
-                                    *log << "try { g.get_table(" << table_ndx << ")->set_string_unique("
-                                         << col_ndx << ", " << row_ndx
-                                         << ", null{}); } catch (const LogicError& le) { CHECK(le.kind() == "
-                                            "LogicError::illegal_combination); }\n";
+                                    *log << "try { g.get_table(" << table_ndx << ")->set_string_unique(" << col_ndx
+                                         << ", " << row_ndx << ", null{}); } catch (const LogicError& le) "
+                                            "{ CHECK(le.kind() == LogicError::illegal_combination); }\n";
                                 }
                                 try {
                                     t->set_string_unique(col_ndx, row_ndx, null{});
@@ -825,10 +824,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             else {
                                 std::string str = create_string(get_next(s));
                                 if (log) {
-                                    *log << "try { g.get_table(" << table_ndx << ")->set_string_unique("
-                                         << col_ndx << ", " << row_ndx << ", \"" << str
-                                         << "\"); } catch (const LogicError& le) { CHECK(le.kind() == "
-                                            "LogicError::illegal_combination); }\n";
+                                    *log << "try { g.get_table(" << table_ndx << ")->set_string_unique(" << col_ndx
+                                         << ", " << row_ndx << ", \"" << str << "\"); } catch (const LogicError& le) "
+                                            "{ CHECK(le.kind() == LogicError::illegal_combination); }\n";
                                 }
                                 try {
                                     t->set_string_unique(col_ndx, row_ndx, str);
