@@ -370,7 +370,6 @@ void Table::remove_backlink_broken_rows(const CascadeState& cascade_state)
         typedef _impl::GroupFriend gf;
         bool is_move_last_over = (i->is_ordered_removal == 0);
         Table& table = gf::get_table(group, i->table_ndx);
-        size_t prior_num_rows = table.size();
 
         bool broken_reciprocal_backlinks = true;
         if (is_move_last_over) {
