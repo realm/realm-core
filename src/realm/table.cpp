@@ -2309,6 +2309,18 @@ void Table::do_remove(size_t row_ndx, bool broken_reciprocal_backlinks)
     size_t num_cols = m_spec.get_column_count();
     size_t num_public_cols = m_spec.get_public_column_count();
 
+    // We must start with backlink columns in case the corresponding link
+    // columns are in the same table so that the link columns are not updated
+    // twice. Backlink columns will nullify the rows in connected link columns
+    // first so by the time we get to the link column in this loop, the rows to
+    // be removed have already been nullified.
+    //
+    // This phase also generates replication instructions documenting the side-
+    // effects of deleting the object (i.e. link nullifications). These instructions
+    // must come before the actual deletion of the object, but at the same time
+    // the Replication object may need a consistent view of the row (not including
+    // link columns). Therefore we first delete the row in backlink columns, then
+    // generate the instruction, and then delete the row in the remaining columns.
     for (size_t col_ndx = num_cols; col_ndx > num_public_cols; --col_ndx) {
         ColumnBase& col = get_column_base(col_ndx - 1);
         size_t prior_num_rows = m_size;
