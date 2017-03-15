@@ -155,15 +155,25 @@ static void compare(ObjectSchema const& existing_schema,
 std::vector<SchemaChange> Schema::compare(Schema const& target_schema) const
 {
     std::vector<SchemaChange> changes;
-    for (auto &object_schema : target_schema) {
-        auto matching_schema = find(object_schema);
-        if (matching_schema == end()) {
-            changes.emplace_back(schema_change::AddTable{&object_schema});
-            continue;
+    size_t i = 0, j = 0;
+    while (i < target_schema.size() && j < size()) {
+        auto& object_schema = target_schema[i];
+        auto& matching_schema = operator[](j);
+        int cmp = object_schema.name.compare(matching_schema.name);
+        if (cmp == 0) {
+            ::compare(matching_schema, object_schema, changes);
+            ++i, ++j;
         }
-
-        ::compare(*matching_schema, object_schema, changes);
+        else if (cmp < 0) { // table in target but not current
+            changes.emplace_back(schema_change::AddTable{&object_schema});
+            ++i;
+        }
+        else { // table in current but not target
+            ++j;
+        }
     }
+    for (; i < target_schema.size(); ++i)
+            changes.emplace_back(schema_change::AddTable{&target_schema[i]});
     return changes;
 }
 
