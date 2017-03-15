@@ -188,6 +188,12 @@ public:
                        MigrationFunction migration_function=nullptr,
                        bool in_transaction=false);
 
+    // Set the schema used for this Realm, but do not update the file's schema
+    // if it is not compatible (and instead throw an error).
+    // Cannot be called multiple times on a single Realm instance or an instance
+    // which has already had update_schema() called on it.
+    void set_schema_subset(Schema schema);
+
     // Read the schema version from the file specified by the given config, or
     // ObjectStore::NotVersioned if it does not exist
     static uint64_t get_schema_version(Config const& config);

@@ -330,6 +330,34 @@ Schema Realm::get_full_schema()
     return actual_schema;
 }
 
+void Realm::set_schema_subset(Schema schema)
+{
+    REALM_ASSERT(m_dynamic_schema);
+    REALM_ASSERT(m_schema_version != ObjectStore::NotVersioned);
+
+    std::vector<SchemaChange> changes = m_schema.compare(schema);
+    switch (m_config.schema_mode) {
+        case SchemaMode::Automatic:
+        case SchemaMode::ResetFile:
+            ObjectStore::verify_no_migration_required(changes);
+            break;
+
+        case SchemaMode::ReadOnly:
+            ObjectStore::verify_compatible_for_read_only(changes);
+            break;
+
+        case SchemaMode::Additive:
+            ObjectStore::verify_valid_additive_changes(changes);
+            break;
+
+        case SchemaMode::Manual:
+            ObjectStore::verify_no_changes_required(changes);
+            break;
+    }
+
+    set_schema(m_schema, std::move(schema));
+}
+
 void Realm::update_schema(Schema schema, uint64_t version,
                           MigrationFunction migration_function, bool in_transaction)
 {
