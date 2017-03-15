@@ -4,7 +4,7 @@
 
 show_usage () {
   cat <<EOF
-Usage: $0 [-h|--help]
+Usage: $0 [-h|--help] [base branch]
 EOF
 }
 
@@ -21,6 +21,10 @@ the benchmarks of that revision are already found in the results folder.
 The results are then combined by function using a script to generate a
 graph per benchmark function which shows performance across revisions.
 
+If the optional [base branch] is specified this script will also try
+to find the last common commit and benchmark that for comparison.
+For example "master", "develop", or a PR that you intend to merge into.
+
 EOF
 }
 
@@ -36,19 +40,35 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ $# -gt 0 ]; then
+if [ $# -gt 1 ]; then
   show_usage
   exit 1
+elif [ $# -eq 1 ]; then
+  destination=$1
+  forked=$(git merge-base "${destination}" HEAD)
+  ret=$?
+  if [ $ret -gt 0 ]; then
+      echo "Error: could not find where this branch forked from ${destination} continuing."
+      forked=""
+  fi
 fi
 
 # start fresh list of csv files written in this run. Each file
 # written by gen_bench.sh will append a line to this file
 rm recent_results.txt
 
-while read -r p; do
+grep -v -e "^ *#" -e "^ *$" revs_to_benchmark.txt | while read -r p; do
   echo "$p"
   sh gen_bench.sh "$p"
-done <revs_to_benchmark.txt
+done
+
+if [ -n "${forked}" ]; then
+  echo "${forked}"
+  sh gen_bench.sh "${forked}"
+fi
+
+echo "HEAD"
+sh gen_bench.sh HEAD
 
 # remove csv files not generated in this run, namely other
 # HEAD versions. This means we only keep files noted in
