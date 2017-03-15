@@ -54,9 +54,10 @@ struct IncompatibleLockFile : std::runtime_error {
     }
 };
 
-/// Thrown by SharedGroup::open() if the realm database was generated with
-/// a format for Realm Mobile Platform but is being opened as a Realm
-/// Mobile Database or vice versa.
+/// Thrown by SharedGroup::open() if the realm database was generated with a
+/// format for Realm Mobile Platform but is being opened as a Realm Mobile
+/// Database or vice versa, or of the history schema in the Realm file could not
+/// be upgraded to the needed version.
 struct IncompatibleHistories : util::File::AccessError {
     IncompatibleHistories(const std::string& msg, const std::string& path)
         : util::File::AccessError("Incompatible histories. " + msg, path)
@@ -621,7 +622,9 @@ private:
 
     void do_async_commits();
 
-    void upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version);
+    /// Upgrade file format and/or history schema
+    void upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version,
+                             int current_hist_schema_version, int target_hist_schema_version);
 
     //@{
     /// See LangBindHelper.

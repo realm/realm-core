@@ -97,6 +97,22 @@ public:
         return hist_None;
     }
 
+    int get_history_schema_version() const noexcept override
+    {
+        return 0;
+    }
+
+    bool is_upgradable_history_schema(int) const noexcept override
+    {
+        REALM_ASSERT(false);
+        return false;
+    }
+
+    void upgrade_history_schema(int) override
+    {
+        REALM_ASSERT(false);
+    }
+
     _impl::History* get_history() override
     {
         return nullptr;
