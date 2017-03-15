@@ -2251,12 +2251,10 @@ void Table::batch_erase_rows(const IntegerColumn& row_indexes, bool is_move_last
         rows.erase(unique(rows.begin(), rows.end()), rows.end());
         // Remove in reverse order to prevent invalidation of recorded row
         // indexes.
-        Replication* repl = get_repl();
         auto rend = rows.rend();
         for (auto i = rows.rbegin(); i != rend; ++i) {
             size_t row_ndx = *i;
             bool broken_reciprocal_backlinks = false;
-            size_t prior_num_rows = m_size;
             if (is_move_last_over) {
                 do_move_last_over(row_ndx, broken_reciprocal_backlinks); // Throws
             }
