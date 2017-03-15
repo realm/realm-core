@@ -227,13 +227,7 @@ GroupWriter::GroupWriter(Group& group)
     }
 }
 
-GroupWriter::~GroupWriter()
-{
-    for (auto& window : m_map_windows) {
-        delete window;
-    }
-    m_map_windows.clear();
-}
+GroupWriter::~GroupWriter() = default;
 
 size_t GroupWriter::get_file_size() const noexcept
 {
@@ -253,28 +247,22 @@ void GroupWriter::sync_all_mappings()
 // used policy. Entries in the cache are kept in MRU order.
 GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 {
-    MapWindow* found_window = nullptr;
-    for (unsigned int i = 0; i < m_map_windows.size(); ++i) {
-        if (m_map_windows[i]->matches(start_ref, size) ||
-            m_map_windows[i]->extends_to_match(m_alloc.get_file(), start_ref, size)) {
-            found_window = m_map_windows[i];
-            // move matching window to top (to keep LRU order):
-            for (int k = i; k; --k)
-                m_map_windows[k] = m_map_windows[k - 1];
-            m_map_windows[0] = found_window;
-            return found_window;
-        }
+    auto match = std::find_if(m_map_windows.begin(), m_map_windows.end(), [=](auto& window) {
+        return window->matches(start_ref, size) || window->extends_to_match(m_alloc.get_file(), start_ref, size);
+    });
+    if (match != m_map_windows.end()) {
+        // move matching window to top (to keep LRU order)
+        std::rotate(m_map_windows.begin(), match, match + 1);
+        return m_map_windows[0].get();
     }
     // no window found, make room for a new one at the top
     if (m_map_windows.size() == num_map_windows) {
-        MapWindow* last_window = m_map_windows.back();
-        last_window->sync();
-        delete last_window;
+        m_map_windows.back()->sync();
         m_map_windows.pop_back();
     }
-    MapWindow* new_window = new MapWindow(m_alloc.get_file(), start_ref, size);
-    m_map_windows.insert(m_map_windows.begin(), new_window);
-    return new_window;
+    auto new_window = std::make_unique<MapWindow>(m_alloc.get_file(), start_ref, size);
+    m_map_windows.insert(m_map_windows.begin(), std::move(new_window));
+    return m_map_windows[0].get();
 }
 
 ref_type GroupWriter::write_group()
@@ -353,11 +341,9 @@ ref_type GroupWriter::write_group()
     max_free_list_size += 80;
 
     int num_free_lists = is_shared ? 3 : 2;
-    int max_top_size = 3 + num_free_lists;
-    if (is_shared)
-        ++max_top_size; // database version (a.k.a. transaction number)
     size_t max_free_space_needed =
-        Array::get_max_byte_size(max_top_size) + num_free_lists * Array::get_max_byte_size(max_free_list_size);
+        Array::get_max_byte_size(top.size()) +
+        num_free_lists * Array::get_max_byte_size(max_free_list_size);
 
     // Reserve space for remaining arrays. We ask for one extra byte beyond the
     // maximum number that is required. This ensures that even if we end up
@@ -485,8 +471,9 @@ ref_type GroupWriter::write_group()
 size_t GroupWriter::get_free_space() {
     if (m_free_lengths.is_attached()) {
         size_t sum = 0;
-        for (size_t j=0; j<m_free_lengths.size(); ++j)
-            sum += m_free_lengths.get(j);
+        for (size_t j = 0; j < m_free_lengths.size(); ++j) {
+            sum += to_size_t(m_free_lengths.get(j));
+        }
         return sum;
     } else {
         return 0;
@@ -734,7 +721,7 @@ void GroupWriter::write(const char* data, size_t size)
     MapWindow* window = get_window(pos, size);
     char* dest_addr = window->translate(pos);
     window->encryption_read_barrier(dest_addr, size);
-    std::copy_n(data, size, dest_addr);
+    realm::safe_copy_n(data, size, dest_addr);
     window->encryption_write_barrier(dest_addr, size);
 }
 

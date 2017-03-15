@@ -74,21 +74,16 @@ void ArrayString::set(size_t ndx, StringData value)
     REALM_ASSERT_3(ndx, <, m_size);
     REALM_ASSERT_3(value.size(), <, max_width); // otherwise we have to use another column type
 
-    // Check if we need to copy before modifying
-    copy_on_write(); // Throws
+    // if m_width == 0 and m_nullable == true, then entire array contains only null entries
+    // if m_width == 0 and m_nullable == false, then entire array contains only "" entries
+    if ((m_nullable ? value.is_null() : value.size() == 0) && m_width == 0) {
+        return; // existing element in array already equals the value we want to set it to
+    }
 
     // Make room for the new value plus a zero-termination
     if (m_width <= value.size()) {
-        // if m_width == 0 and m_nullable == true, then entire array contains only null entries
-        // if m_width == 0 and m_nullable == false, then entire array contains only "" entries
-        if ((m_nullable ? value.is_null() : value.size() == 0) && m_width == 0) {
-            return; // existing element in array already equals the value we want to set it to
-        }
-
         // Calc min column width
         size_t new_width = ::round_up(value.size() + 1);
-
-        // FIXME: Should we try to avoid double copying when realloc fails to preserve the address?
         alloc(m_size, new_width); // Throws
 
         char* base = m_data;
@@ -129,13 +124,18 @@ void ArrayString::set(size_t ndx, StringData value)
 
         m_width = uint_least8_t(new_width);
     }
+    else if (is_read_only()) {
+        if (get(ndx) == value)
+            return;
+        copy_on_write();
+    }
 
     REALM_ASSERT_3(0, <, m_width);
 
     // Set the value
     char* begin = m_data + (ndx * m_width);
     char* end = begin + (m_width - 1);
-    begin = std::copy_n(value.data(), value.size(), begin);
+    begin = realm::safe_copy_n(value.data(), value.size(), begin);
     std::fill(begin, end, 0); // Pad with zero bytes
     static_assert(max_width <= max_width, "Padding size must fit in 7-bits");
 
@@ -155,12 +155,9 @@ void ArrayString::insert(size_t ndx, StringData value)
     REALM_ASSERT_3(ndx, <=, m_size);
     REALM_ASSERT(value.size() < max_width); // otherwise we have to use another column type
 
-    // Check if we need to copy before modifying
-    copy_on_write(); // Throws
-
-    // Todo: Below code will perform up to 3 memcpy() operations in worst case. Todo, if we improve the
-    // allocator to make a gap for the new value for us, we can have just 1. We can also have 2 by merging
-    // memmove() and set(), but it's a bit complex. May be done after support of realm::null() is completed.
+    // FIXME: this performs up to 2 memcpy() operations. This could be improved
+    // by making the allocator make a gap for the new value for us, but it's a
+    // bit complex.
 
     // Allocate room for the new value
     alloc(m_size + 1, m_width); // Throws
@@ -187,7 +184,7 @@ void ArrayString::erase(size_t ndx)
         char* new_begin = m_data + ndx * m_width;
         char* old_begin = new_begin + m_width;
         char* old_end = m_data + m_size * m_width;
-        std::copy_n(old_begin, old_end - old_begin, new_begin);
+        realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
     }
 
     --m_size;

@@ -171,6 +171,11 @@ public:
 
     ~SharedGroup() noexcept;
 
+    // Disable copying to prevent accessor errors. If you really want another
+    // instance, open another SharedGroup object on the same file.
+    SharedGroup(const SharedGroup&) = delete;
+    SharedGroup& operator=(const SharedGroup&) = delete;
+
     /// Attach this SharedGroup instance to the specified database file.
     ///
     /// While at least one instance of SharedGroup exists for a specific
@@ -555,6 +560,7 @@ private:
     util::InterprocessCondVar m_daemon_becomes_ready;
 #endif
     util::InterprocessCondVar m_new_commit_available;
+    util::InterprocessCondVar m_pick_next_writer;
 #endif
     std::function<void(int, int)> m_upgrade_callback;
 
@@ -678,12 +684,6 @@ public:
         return get_group().get_table(name); // Throws
     }
 
-    template <class T>
-    BasicTableRef<const T> get_table(StringData name) const
-    {
-        return get_group().get_table<T>(name); // Throws
-    }
-
     const Group& get_group() const noexcept;
 
     /// Get the version of the snapshot to which this read transaction is bound.
@@ -731,24 +731,6 @@ public:
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return get_group().get_or_add_table(name, was_added); // Throws
-    }
-
-    template <class T>
-    BasicTableRef<T> get_table(StringData name) const
-    {
-        return get_group().get_table<T>(name); // Throws
-    }
-
-    template <class T>
-    BasicTableRef<T> add_table(StringData name, bool require_unique_name = true) const
-    {
-        return get_group().add_table<T>(name, require_unique_name); // Throws
-    }
-
-    template <class T>
-    BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr) const
-    {
-        return get_group().get_or_add_table<T>(name, was_added); // Throws
     }
 
     Group& get_group() const noexcept;
@@ -1039,6 +1021,11 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
         version_type new_version = new_read_lock.m_version;
         size_t new_file_size = new_read_lock.m_file_size;
         ref_type new_top_ref = new_read_lock.m_top_ref;
+
+        // Synchronize readers view of the file
+        SlabAlloc& alloc = m_group.m_alloc;
+        alloc.update_reader_view(new_file_size);
+
         hist.update_early_from_top_ref(new_version, new_file_size, new_top_ref); // Throws
     }
 

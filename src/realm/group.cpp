@@ -267,9 +267,7 @@ Group::~Group() noexcept
 
 void Group::remap(size_t new_file_size)
 {
-    size_t old_baseline = m_alloc.get_baseline();
-    if (new_file_size > old_baseline)
-        m_alloc.remap(new_file_size); // Throws
+    m_alloc.update_reader_view(new_file_size); // Throws
 }
 
 
@@ -277,11 +275,7 @@ void Group::remap_and_update_refs(ref_type new_top_ref, size_t new_file_size)
 {
     size_t old_baseline = m_alloc.get_baseline();
 
-    if (new_file_size > old_baseline) {
-        m_alloc.remap(new_file_size); // Throws
-    }
-
-    m_alloc.invalidate_cache();
+    m_alloc.update_reader_view(new_file_size); // Throws
     update_refs(new_top_ref, old_baseline);
 }
 
@@ -346,9 +340,8 @@ void Group::attach_shared(ref_type new_top_ref, size_t new_file_size, bool writa
     // available free-space.
     reset_free_space_tracking(); // Throws
 
-    // Update memory mapping if database file has grown
-    if (new_file_size > m_alloc.get_baseline())
-        m_alloc.remap(new_file_size); // Throws
+    // update readers view of memory
+    m_alloc.update_reader_view(new_file_size); // Throws
 
     // When `new_top_ref` is null, ask attach() to create a new node structure
     // for an empty group, but only during the initiation of write
@@ -958,11 +951,9 @@ void Group::commit()
 
     size_t old_baseline = m_alloc.get_baseline();
 
-    // Remap file if it has grown
+    // Update view of the file
     size_t new_file_size = out.get_file_size();
-    if (new_file_size > old_baseline) {
-        m_alloc.remap(new_file_size); // Throws
-    }
+    m_alloc.update_reader_view(new_file_size); // Throws
 
     out.commit(top_ref); // Throws
 
@@ -1258,7 +1249,7 @@ public:
                 begin = m_group.m_table_accessors.begin() + from_table_ndx;
                 end = m_group.m_table_accessors.begin() + to_table_ndx + 1;
                 Table* table = begin[0];
-                std::copy_n(begin + 1, to_table_ndx - from_table_ndx, begin);
+                realm::safe_copy_n(begin + 1, to_table_ndx - from_table_ndx, begin);
                 end[-1] = table;
             }
             else { // from_table_ndx > to_table_ndx
@@ -1850,18 +1841,15 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
     // the the per-table accessor dirty flags (Table::m_dirty) to prune the
     // traversal to the set of accessors that were touched by the changes in the
     // transaction logs.
+    // Update memory mapping if database file has grown
+
+    m_alloc.update_reader_view(new_file_size); // Throws
 
     bool schema_changed = false;
     _impl::TransactLogParser parser; // Throws
     TransactAdvancer advancer(*this, schema_changed);
     parser.parse(in, advancer); // Throws
 
-    // Update memory mapping if database file has grown
-    if (new_file_size > m_alloc.get_baseline()) {
-        m_alloc.remap(new_file_size); // Throws
-    }
-
-    m_alloc.invalidate_cache();
     m_top.detach();                                 // Soft detach
     bool create_group_when_missing = false;         // See Group::attach_shared().
     attach(new_top_ref, create_group_when_missing); // Throws

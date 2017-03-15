@@ -2,11 +2,18 @@
 
 ### Bugfixes
 
-* Fixed a bug in handover of detached linked lists. (issue #2378).
+* Properly refresh table accessors connected by backlinks to a row that has had
+  a `merge_rows` instruction applied and then rolled back. This could have
+  caused corruption if this scenario was triggered but since sync does not use
+  the `merge_rows` instruction in this way, this is a preventative fix.
+  PR [#2503](https://github.com/realm/realm-core/pull/2503)
+* Fixed an assertion on a corner case of reallocation on large arrays.
+  PR [#2500](https://github.com/realm/realm-core/pull/2500).
+  Fixes issue [#2451](https://github.com/realm/realm-core/issues/2451).
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Disable copying of various classes to prevent incorrect use at compile time.
 
 ### Enhancements
 
@@ -16,7 +23,122 @@
 
 ### Internals
 
-* Lorem ipsum.
+* `StringIndex` now supports case insensitive searches.
+  PR [#2475](https://github.com/realm/realm-core/pull/2475).
+
+----------------------------------------------
+
+# 2.4.0 Release notes
+
+### Bugfixes
+
+* Fixes a bug in chuncked binary column returning null value. 
+  PR [#2416](https://github.com/realm/realm-core/pull/2416).
+  Fixes issue [#2418](https://github.com/realm/realm-core/issues/2418).
+* Possibly fixed some cases of extreme file size growth, by preventing starvation
+  when trying to start a write transaction, while simultaneously pinning an older
+  version.
+  PR [#2395](https://github.com/realm/realm-core/pull/2395).
+* Fixed a bug when deleting a column used in a query.
+  PR [#2408](https://github.com/realm/realm-core/pull/2408).
+* Fixed a crash that occurred if you tried to override a binary with a size close
+  to the limit.
+  PR [#2416](https://github.com/realm/realm-core/pull/2416).
+* `seekpos()` and `seekoff()` in `realm::util::MemoryInputStreambuf` now behave
+  correctly when argument is out of range.
+  PR [#2472](https://github.com/realm/realm-core/pull/2472).
+
+### Breaking changes
+
+* The table macros, supporting the typed interface, has been removed.
+  PR [#2392](https://github.com/realm/realm-core/pull/2392).
+* Layout and version change for the .lock file required in order to prevent
+  starvation when waiting to start a write transaction (see above).
+  PR [#2395](https://github.com/realm/realm-core/pull/2395).
+
+### Enhancements
+
+* Now supports case insensitive queries for UWP.
+  PR [#2389](https://github.com/realm/realm-core/pull/2389).
+* Upgraded Visual Studio project to version 2017.
+  PR [#2389](https://github.com/realm/realm-core/pull/2389).
+* Support handover of TableViews and Queries based on SubTables.
+  PR [#2470](https://github.com/realm/realm-core/pull/2470).
+* Enable reading and writing of big blobs via Table interface.
+  Only to be used by Sync. The old interface still has a check on 
+  the size of the binary blob.
+  PR [#2416](https://github.com/realm/realm-core/pull/2416).
+
+----------------------------------------------
+
+# 2.3.3 Release notes
+
+### Bugfixes
+
+* Fix a hang in LIKE queries that could occur if the pattern required
+  backtracking. PR [#2477](https://github.com/realm/realm-core/pull/2477).
+* Bug fixed in `GroupWriter::write_group()` where the maximum size of the top
+  array was calculated incorrectly. This bug had the potential to cause
+  corruption in Realm files. PR [#2480](https://github.com/realm/realm-core/pull/2480).
+
+### Enhancements
+
+* Use only a single file descriptor in our emulation of interprocess condition variables
+  on most platforms rather than two. PR [#2460](https://github.com/realm/realm-core/pull/2460). Fixes Cocoa issue [#4676](https://github.com/realm/realm-cocoa/issues/4676).
+
+----------------------------------------------
+
+# 2.3.2 Release notes
+
+### Bugfixes
+* Fixed race condition bug that could cause crashes and corrupted data
+  under rare circumstances with heavy load from multiple threads accessing
+  encrypted data. (sometimes pieces of data from earlier commits could be seen).
+  PR [#2465](https://github.com/realm/realm-core/pull/2465). Fixes issue [#2383](https://github.com/realm/realm-core/issues/2383).
+* Added SharedGroupOptions::set_sys_tmp_dir() and
+  SharedGroupOptions::set_sys_tmp_dir() to solve crash when compacting a Realm
+  file on Android external storage which is caused by invalid default sys_tmp_dir.
+  PR [#2445](https://github.com/realm/realm-core/pull/2445). Fixes Java issue [#4140](https://github.com/realm/realm-java/issues/4140).
+
+-----------
+
+### Internals
+
+* Remove the BinaryData constructor taking a temporary object to prevent some
+  errors in unit tests at compile time. PR [#2446](https://github.com/realm/realm-core/pull/2446).
+* Avoid assertions in aggregate functions for the timestamp type. PR [#2466](https://github.com/realm/realm-core/pull/2466).
+
+----------------------------------------------
+
+# 2.3.1 Release notes
+
+### Bugfixes
+
+* Fixed a bug in handover of detached linked lists. (issue #2378).
+* Fixed a bug in advance_read(): The memory mappings need to be updated and
+  the translation cache in the slab allocator must be invalidated prior to
+  traversing the transaction history. This bug could be reported as corruption
+  in general, or more likely as corruption of the transaction log. It is much
+  more likely to trigger if encryption is enabled. (issue #2383).
+
+### Enhancements
+
+* Avoid copying copy-on-write data structures when the write does not actually
+  change the existing value.
+* Improve performance of deleting all rows in a TableView.
+* Allow the `add_int()` API to be called on a `Row`
+* Don't open the notification pipes on platforms which support the async commit
+  daemon when async commits are not enabled
+
+-----------
+
+### Internals
+
+* Updated OpenSSL to 1.0.2k.
+* Setting environment variable `UNITTEST_XML` to a nonempty value will no longer
+  disable the normal console output while running the test suite. Instead, in
+  that case, reporting will happen both to the console and to the JUnit XML
+  file.
 
 ----------------------------------------------
 
@@ -1282,7 +1404,7 @@ versions [0.97.0].**
 ### Bugfixes:
 
 * Corrected a bug which caused handover of a query with a restricting
-  view to loose the restricting view.
+  view to lose the restricting view.
 
 ----------------------------------------------
 

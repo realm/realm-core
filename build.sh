@@ -220,7 +220,7 @@ download_openssl()
     fi
 
     echo 'Downloading OpenSSL...'
-    openssl_ver='1.0.2j'
+    openssl_ver='1.0.2k'
     curl -L -s "http://www.openssl.org/source/openssl-${openssl_ver}.tar.gz" -o openssl.tar.gz || return 1
     tar -xzf openssl.tar.gz || return 1
     mv openssl-$openssl_ver openssl || return 1
@@ -367,7 +367,7 @@ build_cocoa()
         ln -sf librealm-macosx-dbg.a "$tmpdir/$dir_basename"/librealm-dbg.a
     fi
 
-    cp tools/LICENSE "$tmpdir/$dir_basename" || exit 1
+    cp LICENSE "$tmpdir/$dir_basename" || exit 1
     if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
         command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
         pandoc -f markdown -t plain -o "$tmpdir/$dir_basename/CHANGELOG.txt" CHANGELOG.md || exit 1
@@ -460,6 +460,7 @@ find_android_ndk()
 }
 
 CONFIG_MK="src/config.mk"
+CONFIG_TMP="src/config.tmp"
 
 require_config()
 {
@@ -690,7 +691,7 @@ case "$MODE" in
             android_ndk_home="$(find_android_ndk)" || android_ndk_home="none"
         fi
 
-        cat >"$CONFIG_MK" <<EOF
+        cat >"$CONFIG_TMP" <<EOF
 CONFIG_VERSION        = ${CONFIG_VERSION}
 REALM_VERSION         = $realm_version
 INSTALL_PREFIX        = $install_prefix
@@ -716,8 +717,14 @@ TVOS_SDKS             = ${tvos_sdks:-none}
 TVOS_SDKS_AVAIL       = $tvos_sdks_avail
 ANDROID_NDK_HOME      = $android_ndk_home
 EOF
+        CONFIG_STATUS="Existing"
+        if ! [ -e $CONFIG_MK ] || [ "$(diff $CONFIG_TMP $CONFIG_MK)" ]; then
+            cp $CONFIG_TMP $CONFIG_MK
+            CONFIG_STATUS="New"
+        fi
+        rm $CONFIG_TMP
         if ! [ "$INTERACTIVE" ]; then
-            echo "New configuration in $CONFIG_MK:"
+            echo "$CONFIG_STATUS configuration in $CONFIG_MK:"
             cat "$CONFIG_MK" | sed 's/^/    /' || exit 1
             echo "Done configuring"
         fi
@@ -1088,7 +1095,7 @@ EOF
         (cd "$REALM_HOME/$node_directory/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
         rm -rf "$temp_dir" || exit 1
 
-        cp tools/LICENSE "$node_directory" || exit 1
+        cp LICENSE "$node_directory" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
             pandoc -f markdown -t plain -o "$node_directory/CHANGELOG.txt" CHANGELOG.md || exit 1

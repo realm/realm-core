@@ -42,34 +42,6 @@ using namespace realm;
 
 namespace {
 
-// clang-format off
-/*
-// Converts unicodes 0...0x6ff (up to Arabic) to their respective lower case characters using a popular
-// UnicodeData.txtfile (http://www.opensource.apple.com/source/Heimdal/Heimdal-247.9/lib/wind/UnicodeData.txt) that
-// contains case conversion information. The conversion does not take your current locale in count; it can be
-// slightly wrong in some countries! If the input is already lower case, or outside range 0...0x6ff, then input value
-// is returned untouched.
-uint32_t to_lower(uint32_t character)
-{
-    static const int16_t lowers[] = {
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0061, 0x0062, 0x0063, 0x0064, 0x0065, 0x0066, 0x0067, 0x0068, 0x0069, 0x006a, 0x006b, 0x006c, 0x006d, 0x006e, 0x006f, 0x0070, 0x0071, 0x0072, 0x0073, 0x0074, 0x0075, 0x0076, 0x0077, 0x0078, 0x0079, 0x007a, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x03bc, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x00e0, 0x00e1, 0x00e2, 0x00e3, 0x00e4, 0x00e5, 0x00e6, 0x00e7, 0x00e8, 0x00e9, 0x00ea, 0x00eb, 0x00ec, 0x00ed, 0x00ee, 0x00ef, 0x00f0, 0x00f1, 0x00f2, 0x00f3, 0x00f4, 0x00f5, 0x00f6, 0, 0x00f8, 0x00f9, 0x00fa, 0x00fb, 0x00fc, 0x00fd, 0x00fe, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0101, 0, 0x0103, 0, 0x0105, 0, 0x0107, 0, 0x0109, 0, 0x010b, 0, 0x010d, 0, 0x010f, 0, 0x0111, 0, 0x0113, 0, 0x0115, 0, 0x0117, 0, 0x0119, 0, 0x011b, 0, 0x011d, 0, 0x011f, 0,
-        0x0121, 0, 0x0123, 0, 0x0125, 0, 0x0127, 0, 0x0129, 0, 0x012b, 0, 0x012d, 0, 0x012f, 0, 0, 0, 0x0133, 0, 0x0135, 0, 0x0137, 0, 0, 0x013a, 0, 0x013c, 0, 0x013e, 0, 0x0140, 0, 0x0142, 0, 0x0144, 0, 0x0146, 0, 0x0148, 0, 0, 0x014b, 0, 0x014d, 0, 0x014f, 0, 0x0151, 0, 0x0153, 0, 0x0155, 0, 0x0157, 0, 0x0159, 0, 0x015b, 0, 0x015d, 0, 0x015f, 0, 0x0161, 0, 0x0163, 0, 0x0165, 0, 0x0167, 0, 0x0169, 0, 0x016b, 0, 0x016d, 0, 0x016f, 0, 0x0171, 0, 0x0173, 0, 0x0175, 0, 0x0177, 0, 0x00ff, 0x017a, 0, 0x017c, 0, 0x017e, 0, 0x0073, 0, 0x0253, 0x0183, 0, 0x0185, 0, 0x0254, 0x0188, 0, 0x0256, 0x0257, 0x018c, 0, 0, 0x01dd, 0x0259, 0x025b, 0x0192, 0, 0x0260, 0x0263, 0, 0x0269, 0x0268, 0x0199, 0, 0, 0, 0x026f, 0x0272, 0, 0x0275, 0x01a1, 0, 0x01a3, 0, 0x01a5, 0, 0x0280, 0x01a8, 0, 0x0283, 0, 0, 0x01ad, 0, 0x0288, 0x01b0, 0, 0x028a, 0x028b, 0x01b4, 0, 0x01b6, 0, 0x0292, 0x01b9, 0, 0, 0, 0x01bd, 0, 0, 0, 0, 0, 0, 0, 0x01c6, 0x01c6, 0, 0x01c9, 0x01c9, 0, 0x01cc, 0x01cc, 0, 0x01ce, 0, 0x01d0, 0, 0x01d2, 0, 0x01d4, 0, 0x01d6, 0, 0x01d8, 0, 0x01da, 0, 0x01dc, 0, 0, 0x01df, 0, 0x01e1, 0, 0x01e3, 0, 0x01e5, 0, 0x01e7, 0, 0x01e9, 0, 0x01eb, 0, 0x01ed, 0, 0x01ef, 0, 0, 0x01f3, 0x01f3, 0, 0x01f5, 0, 0x0195, 0x01bf, 0x01f9, 0, 0x01fb, 0, 0x01fd, 0, 0x01ff, 0, 0x0201, 0, 0x0203, 0, 0x0205, 0, 0x0207, 0, 0x0209, 0, 0x020b, 0, 0x020d, 0, 0x020f, 0, 0x0211, 0, 0x0213, 0, 0x0215, 0, 0x0217, 0, 0x0219, 0, 0x021b, 0, 0x021d, 0, 0x021f, 0,
-        0x019e, 0, 0x0223, 0, 0x0225, 0, 0x0227, 0, 0x0229, 0, 0x022b, 0, 0x022d, 0, 0x022f, 0, 0x0231, 0, 0x0233, 0, 0, 0, 0, 0, 0, 0, 0x2c65, 0x023c, 0, 0x019a, 0x2c66, 0, 0, 0x0242, 0, 0x0180, 0x0289, 0x028c, 0x0247, 0, 0x0249, 0, 0x024b, 0, 0x024d, 0, 0x024f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x03b9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0371, 0, 0x0373, 0, 0, 0, 0x0377, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x03ac, 0, 0x03ad, 0x03ae, 0x03af, 0, 0x03cc, 0, 0x03cd, 0x03ce, 0, 0x03b1, 0x03b2, 0x03b3, 0x03b4, 0x03b5, 0x03b6, 0x03b7, 0x03b8, 0x03b9, 0x03ba, 0x03bb, 0x03bc, 0x03bd, 0x03be, 0x03bf,
-        0x03c0, 0x03c1, 0, 0x03c3, 0x03c4, 0x03c5, 0x03c6, 0x03c7, 0x03c8, 0x03c9, 0x03ca, 0x03cb, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x03c3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x03d7, 0x03b2, 0x03b8, 0, 0, 0, 0x03c6, 0x03c0, 0, 0x03d9, 0, 0x03db, 0, 0x03dd, 0, 0x03df, 0, 0x03e1, 0, 0x03e3, 0, 0x03e5, 0, 0x03e7, 0, 0x03e9, 0, 0x03eb, 0, 0x03ed, 0, 0x03ef, 0, 0x03ba, 0x03c1, 0, 0, 0x03b8, 0x03b5, 0, 0x03f8, 0, 0x03f2, 0x03fb, 0, 0, 0x037b, 0x037c, 0x037d, 0x0450, 0x0451, 0x0452, 0x0453, 0x0454, 0x0455, 0x0456, 0x0457, 0x0458, 0x0459, 0x045a, 0x045b, 0x045c, 0x045d, 0x045e, 0x045f, 0x0430, 0x0431, 0x0432, 0x0433, 0x0434, 0x0435, 0x0436, 0x0437, 0x0438, 0x0439, 0x043a, 0x043b, 0x043c, 0x043d, 0x043e, 0x043f, 0x0440, 0x0441, 0x0442, 0x0443, 0x0444, 0x0445, 0x0446, 0x0447, 0x0448, 0x0449, 0x044a, 0x044b, 0x044c, 0x044d, 0x044e, 0x044f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0461, 0, 0x0463, 0, 0x0465, 0, 0x0467, 0, 0x0469, 0, 0x046b, 0, 0x046d, 0, 0x046f, 0, 0x0471, 0, 0x0473, 0, 0x0475, 0, 0x0477, 0, 0x0479, 0, 0x047b, 0, 0x047d, 0, 0x047f, 0, 0x0481, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x048b, 0, 0x048d, 0, 0x048f, 0, 0x0491, 0, 0x0493, 0, 0x0495, 0, 0x0497, 0, 0x0499, 0, 0x049b, 0, 0x049d, 0, 0x049f, 0, 0x04a1, 0, 0x04a3, 0, 0x04a5, 0, 0x04a7, 0, 0x04a9, 0, 0x04ab,
-        0, 0x04ad, 0, 0x04af, 0, 0x04b1, 0, 0x04b3, 0, 0x04b5, 0, 0x04b7, 0, 0x04b9, 0, 0x04bb, 0, 0x04bd, 0, 0x04bf, 0, 0x04cf, 0x04c2, 0, 0x04c4, 0, 0x04c6, 0, 0x04c8, 0, 0x04ca, 0, 0x04cc, 0, 0x04ce, 0, 0, 0x04d1, 0, 0x04d3, 0, 0x04d5, 0, 0x04d7, 0, 0x04d9, 0, 0x04db, 0, 0x04dd, 0, 0x04df, 0, 0x04e1, 0, 0x04e3, 0, 0x04e5, 0, 0x04e7, 0, 0x04e9, 0, 0x04eb, 0, 0x04ed, 0, 0x04ef, 0, 0x04f1, 0, 0x04f3, 0, 0x04f5, 0, 0x04f7, 0, 0x04f9, 0, 0x04fb, 0, 0x04fd, 0, 0x04ff, 0, 0x0501, 0, 0x0503, 0, 0x0505, 0, 0x0507, 0, 0x0509, 0, 0x050b, 0, 0x050d, 0, 0x050f, 0, 0x0511, 0, 0x0513, 0, 0x0515, 0, 0x0517, 0, 0x0519, 0, 0x051b, 0, 0x051d, 0, 0x051f, 0, 0x0521, 0, 0x0523, 0, 0x0525, 0, 0x0527, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0561, 0x0562, 0x0563, 0x0564, 0x0565, 0x0566, 0x0567, 0x0568, 0x0569, 0x056a, 0x056b, 0x056c, 0x056d, 0x056e, 0x056f, 0x0570, 0x0571, 0x0572, 0x0573, 0x0574, 0x0575, 0x0576, 0x0577, 0x0578, 0x0579, 0x057a, 0x057b, 0x057c, 0x057d, 0x057e, 0x057f, 0x0580, 0x0581, 0x0582, 0x0583, 0x0584, 0x0585, 0x0586 };
-
-    uint32_t ret;
-
-    if (character > sizeof(lowers) / sizeof(*lowers))
-        ret = character;
-    else
-        ret = lowers[character] == 0 ? character : lowers[character];
-
-    return ret;
-}
-*/
-// clang-format on
-
 std::wstring utf8_to_wstring(StringData str)
 {
 #if defined(_MSC_VER)
@@ -91,6 +63,39 @@ std::wstring utf8_to_wstring(StringData str)
 
 
 namespace realm {
+
+// Highest character currently supported for *sorting* strings in Realm, when using STRING_COMPARE_CPP11.
+constexpr size_t last_latin_extended_2_unicode = 591;
+
+#if REALM_UWP
+// last_greek_unicode contains the highest character currently supported for *case insensitive search/queries*
+// in Windows 10 UWP. For other platforms, see case_map(). It's currently (jan 2017): iOS/Android: It looks like
+// only unicodes 0...127 are supported. Classical win32: Many unicodes for many countries; The Windows API methods 
+// CharLowerW() and CharUpperW() are used there, but they are not documented very well. But they seem
+// to work for many countries.
+constexpr size_t last_greek_unicode = 1023;     
+
+unsigned int unicode_case_convert(unsigned int unicode, bool upper)
+{
+    // This source code line is auto-generated by the C++ program in /src/realm/tools/unicode_table_generator.cpp. NOTE:
+	// Make sure all values fit in a uint16_t or change it to uint32_t.
+	// clang-format off
+	static const uint16_t upper_lower[last_greek_unicode + 1][2] = { { 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0x0061 },{ 0, 0x0062 },{ 0, 0x0063 },{ 0, 0x0064 },{ 0, 0x0065 },{ 0, 0x0066 },{ 0, 0x0067 },{ 0, 0x0068 },{ 0, 0x0069 },{ 0, 0x006A },{ 0, 0x006B },{ 0, 0x006C },{ 0, 0x006D },{ 0, 0x006E },{ 0, 0x006F },{ 0, 0x0070 },{ 0, 0x0071 },{ 0, 0x0072 },{ 0, 0x0073 },{ 0, 0x0074 },{ 0, 0x0075 },{ 0, 0x0076 },{ 0, 0x0077 },{ 0, 0x0078 },{ 0, 0x0079 },{ 0, 0x007A },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0x0041, 0 },{ 0x0042, 0 },{ 0x0043, 0 },{ 0x0044, 0 },{ 0x0045, 0 },{ 0x0046, 0 },{ 0x0047, 0 },{ 0x0048, 0 },{ 0x0049, 0 },{ 0x004A, 0 },{ 0x004B, 0 },{ 0x004C, 0 },{ 0x004D, 0 },{ 0x004E, 0 },{ 0x004F, 0 },{ 0x0050, 0 },{ 0x0051, 0 },{ 0x0052, 0 },{ 0x0053, 0 },{ 0x0054, 0 },{ 0x0055, 0 },{ 0x0056, 0 },{ 0x0057, 0 },{ 0x0058, 0 },{ 0x0059, 0 },{ 0x005A, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0x039C, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0x00E0 },{ 0, 0x00E1 },{ 0, 0x00E2 },{ 0, 0x00E3 },{ 0, 0x00E4 },{ 0, 0x00E5 },{ 0, 0x00E6 },{ 0, 0x00E7 },{ 0, 0x00E8 },{ 0, 0x00E9 },{ 0, 0x00EA },{ 0, 0x00EB },{ 0, 0x00EC },{ 0, 0x00ED },{ 0, 0x00EE },{ 0, 0x00EF },{ 0, 0x00F0 },{ 0, 0x00F1 },{ 0, 0x00F2 },{ 0, 0x00F3 },{ 0, 0x00F4 },{ 0, 0x00F5 },{ 0, 0x00F6 },{ 0, 0 },{ 0, 0x00F8 },{ 0, 0x00F9 },{ 0, 0x00FA },{ 0, 0x00FB },{ 0, 0x00FC },{ 0, 0x00FD },{ 0, 0x00FE },{ 0, 0 },{ 0x00C0, 0 },{ 0x00C1, 0 },{ 0x00C2, 0 },{ 0x00C3, 0 },{ 0x00C4, 0 },{ 0x00C5, 0 },{ 0x00C6, 0 },{ 0x00C7, 0 },{ 0x00C8, 0 },{ 0x00C9, 0 },{ 0x00CA, 0 },{ 0x00CB, 0 },{ 0x00CC, 0 },{ 0x00CD, 0 },{ 0x00CE, 0 },{ 0x00CF, 0 },{ 0x00D0, 0 },{ 0x00D1, 0 },{ 0x00D2, 0 },{ 0x00D3, 0 },{ 0x00D4, 0 },{ 0x00D5, 0 },{ 0x00D6, 0 },{ 0, 0 },{ 0x00D8, 0 },{ 0x00D9, 0 },{ 0x00DA, 0 },{ 0x00DB, 0 },{ 0x00DC, 0 },{ 0x00DD, 0 },{ 0x00DE, 0 },{ 0x0178, 0 },{ 0, 0x0101 },{ 0x0100, 0 },{ 0, 0x0103 },{ 0x0102, 0 },{ 0, 0x0105 },{ 0x0104, 0 },{ 0, 0x0107 },{ 0x0106, 0 },{ 0, 0x0109 },{ 0x0108, 0 },{ 0, 0x010B },{ 0x010A, 0 },{ 0, 0x010D },{ 0x010C, 0 },{ 0, 0x010F },{ 0x010E, 0 },{ 0, 0x0111 },{ 0x0110, 0 },{ 0, 0x0113 },{ 0x0112, 0 },{ 0, 0x0115 },{ 0x0114, 0 },{ 0, 0x0117 },{ 0x0116, 0 },{ 0, 0x0119 },{ 0x0118, 0 },{ 0, 0x011B },{ 0x011A, 0 },{ 0, 0x011D },{ 0x011C, 0 },{ 0, 0x011F },{ 0x011E, 0 },{ 0, 0x0121 },{ 0x0120, 0 },{ 0, 0x0123 },{ 0x0122, 0 },{ 0, 0x0125 },{ 0x0124, 0 },{ 0, 0x0127 },{ 0x0126, 0 },{ 0, 0x0129 },{ 0x0128, 0 },{ 0, 0x012B },{ 0x012A, 0 },{ 0, 0x012D },{ 0x012C, 0 },{ 0, 0x012F },{ 0x012E, 0 },{ 0, 0x0069 },{ 0x0049, 0 },{ 0, 0x0133 },{ 0x0132, 0 },{ 0, 0x0135 },{ 0x0134, 0 },{ 0, 0x0137 },{ 0x0136, 0 },{ 0, 0 },{ 0, 0x013A },{ 0x0139, 0 },{ 0, 0x013C },{ 0x013B, 0 },{ 0, 0x013E },{ 0x013D, 0 },{ 0, 0x0140 },{ 0x013F, 0 },{ 0, 0x0142 },{ 0x0141, 0 },{ 0, 0x0144 },{ 0x0143, 0 },{ 0, 0x0146 },{ 0x0145, 0 },{ 0, 0x0148 },{ 0x0147, 0 },{ 0, 0 },{ 0, 0x014B },{ 0x014A, 0 },{ 0, 0x014D },{ 0x014C, 0 },{ 0, 0x014F },{ 0x014E, 0 },{ 0, 0x0151 },{ 0x0150, 0 },{ 0, 0x0153 },{ 0x0152, 0 },{ 0, 0x0155 },{ 0x0154, 0 },{ 0, 0x0157 },{ 0x0156, 0 },{ 0, 0x0159 },{ 0x0158, 0 },{ 0, 0x015B },{ 0x015A, 0 },{ 0, 0x015D },{ 0x015C, 0 },{ 0, 0x015F },{ 0x015E, 0 },{ 0, 0x0161 },{ 0x0160, 0 },{ 0, 0x0163 },{ 0x0162, 0 },{ 0, 0x0165 },{ 0x0164, 0 },{ 0, 0x0167 },{ 0x0166, 0 },{ 0, 0x0169 },{ 0x0168, 0 },{ 0, 0x016B },{ 0x016A, 0 },{ 0, 0x016D },{ 0x016C, 0 },{ 0, 0x016F },{ 0x016E, 0 },{ 0, 0x0171 },{ 0x0170, 0 },{ 0, 0x0173 },{ 0x0172, 0 },{ 0, 0x0175 },{ 0x0174, 0 },{ 0, 0x0177 },{ 0x0176, 0 },{ 0, 0x00FF },{ 0, 0x017A },{ 0x0179, 0 },{ 0, 0x017C },{ 0x017B, 0 },{ 0, 0x017E },{ 0x017D, 0 },{ 0x0053, 0 },{ 0, 0 },{ 0, 0x0253 },{ 0, 0x0183 },{ 0x0182, 0 },{ 0, 0x0185 },{ 0x0184, 0 },{ 0, 0x0254 },{ 0, 0x0188 },{ 0x0187, 0 },{ 0, 0x0256 },{ 0, 0x0257 },{ 0, 0x018C },{ 0x018B, 0 },{ 0, 0 },{ 0, 0x01DD },{ 0, 0x0259 },{ 0, 0x025B },{ 0, 0x0192 },{ 0x0191, 0 },{ 0, 0x0260 },{ 0, 0x0263 },{ 0x01F6, 0 },{ 0, 0x0269 },{ 0, 0x0268 },{ 0, 0x0199 },{ 0x0198, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0x026F },{ 0, 0x0272 },{ 0x0220, 0 },{ 0, 0x0275 },{ 0, 0x01A1 },{ 0x01A0, 0 },{ 0, 0x01A3 },{ 0x01A2, 0 },{ 0, 0x01A5 },{ 0x01A4, 0 },{ 0, 0x0280 },{ 0, 0x01A8 },{ 0x01A7, 0 },{ 0, 0x0283 },{ 0, 0 },{ 0, 0 },{ 0, 0x01AD },{ 0x01AC, 0 },{ 0, 0x0288 },{ 0, 0x01B0 },{ 0x01AF, 0 },{ 0, 0x028A },{ 0, 0x028B },{ 0, 0x01B4 },{ 0x01B3, 0 },{ 0, 0x01B6 },{ 0x01B5, 0 },{ 0, 0x0292 },{ 0, 0x01B9 },{ 0x01B8, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0x01BD },{ 0x01BC, 0 },{ 0, 0 },{ 0x01F7, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0x01C6 },{ 0x01C4, 0x01C6 },{ 0x01C4, 0 },{ 0, 0x01C9 },{ 0x01C7, 0x01C9 },{ 0x01C7, 0 },{ 0, 0x01CC },{ 0x01CA, 0x01CC },{ 0x01CA, 0 },{ 0, 0x01CE },{ 0x01CD, 0 },{ 0, 0x01D0 },{ 0x01CF, 0 },{ 0, 0x01D2 },{ 0x01D1, 0 },{ 0, 0x01D4 },{ 0x01D3, 0 },{ 0, 0x01D6 },{ 0x01D5, 0 },{ 0, 0x01D8 },{ 0x01D7, 0 },{ 0, 0x01DA },{ 0x01D9, 0 },{ 0, 0x01DC },{ 0x01DB, 0 },{ 0x018E, 0 },{ 0, 0x01DF },{ 0x01DE, 0 },{ 0, 0x01E1 },{ 0x01E0, 0 },{ 0, 0x01E3 },{ 0x01E2, 0 },{ 0, 0x01E5 },{ 0x01E4, 0 },{ 0, 0x01E7 },{ 0x01E6, 0 },{ 0, 0x01E9 },{ 0x01E8, 0 },{ 0, 0x01EB },{ 0x01EA, 0 },{ 0, 0x01ED },{ 0x01EC, 0 },{ 0, 0x01EF },{ 0x01EE, 0 },{ 0, 0 },{ 0, 0x01F3 },{ 0x01F1, 0x01F3 },{ 0x01F1, 0 },{ 0, 0x01F5 },{ 0x01F4, 0 },{ 0, 0x0195 },{ 0, 0x01BF },{ 0, 0x01F9 },{ 0x01F8, 0 },{ 0, 0x01FB },{ 0x01FA, 0 },{ 0, 0x01FD },{ 0x01FC, 0 },{ 0, 0x01FF },{ 0x01FE, 0 },{ 0, 0x0201 },{ 0x0200, 0 },{ 0, 0x0203 },{ 0x0202, 0 },{ 0, 0x0205 },{ 0x0204, 0 },{ 0, 0x0207 },{ 0x0206, 0 },{ 0, 0x0209 },{ 0x0208, 0 },{ 0, 0x020B },{ 0x020A, 0 },{ 0, 0x020D },{ 0x020C, 0 },{ 0, 0x020F },{ 0x020E, 0 },{ 0, 0x0211 },{ 0x0210, 0 },{ 0, 0x0213 },{ 0x0212, 0 },{ 0, 0x0215 },{ 0x0214, 0 },{ 0, 0x0217 },{ 0x0216, 0 },{ 0, 0x0219 },{ 0x0218, 0 },{ 0, 0x021B },{ 0x021A, 0 },{ 0, 0x021D },{ 0x021C, 0 },{ 0, 0x021F },{ 0x021E, 0 },{ 0, 0x019E },{ 0, 0 },{ 0, 0x0223 },{ 0x0222, 0 },{ 0, 0x0225 },{ 0x0224, 0 },{ 0, 0x0227 },{ 0x0226, 0 },{ 0, 0x0229 },{ 0x0228, 0 },{ 0, 0x022B },{ 0x022A, 0 },{ 0, 0x022D },{ 0x022C, 0 },{ 0, 0x022F },{ 0x022E, 0 },{ 0, 0x0231 },{ 0x0230, 0 },{ 0, 0x0233 },{ 0x0232, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0x0181, 0 },{ 0x0186, 0 },{ 0, 0 },{ 0x0189, 0 },{ 0x018A, 0 },{ 0, 0 },{ 0x018F, 0 },{ 0, 0 },{ 0x0190, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0x0193, 0 },{ 0, 0 },{ 0, 0 },{ 0x0194, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0x0197, 0 },{ 0x0196, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0x019C, 0 },{ 0, 0 },{ 0, 0 },{ 0x019D, 0 },{ 0, 0 },{ 0, 0 },{ 0x019F, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0x01A6, 0 },{ 0, 0 },{ 0, 0 },{ 0x01A9, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0x01AE, 0 },{ 0, 0 },{ 0x01B1, 0 },{ 0x01B2, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0x01B7, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0x0399, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0x03AC },{ 0, 0 },{ 0, 0x03AD },{ 0, 0x03AE },{ 0, 0x03AF },{ 0, 0 },{ 0, 0x03CC },{ 0, 0 },{ 0, 0x03CD },{ 0, 0x03CE },{ 0, 0 },{ 0, 0x03B1 },{ 0, 0x03B2 },{ 0, 0x03B3 },{ 0, 0x03B4 },{ 0, 0x03B5 },{ 0, 0x03B6 },{ 0, 0x03B7 },{ 0, 0x03B8 },{ 0, 0x03B9 },{ 0, 0x03BA },{ 0, 0x03BB },{ 0, 0x03BC },{ 0, 0x03BD },{ 0, 0x03BE },{ 0, 0x03BF },{ 0, 0x03C0 },{ 0, 0x03C1 },{ 0, 0 },{ 0, 0x03C3 },{ 0, 0x03C4 },{ 0, 0x03C5 },{ 0, 0x03C6 },{ 0, 0x03C7 },{ 0, 0x03C8 },{ 0, 0x03C9 },{ 0, 0x03CA },{ 0, 0x03CB },{ 0x0386, 0 },{ 0x0388, 0 },{ 0x0389, 0 },{ 0x038A, 0 },{ 0, 0 },{ 0x0391, 0 },{ 0x0392, 0 },{ 0x0393, 0 },{ 0x0394, 0 },{ 0x0395, 0 },{ 0x0396, 0 },{ 0x0397, 0 },{ 0x0398, 0 },{ 0x0399, 0 },{ 0x039A, 0 },{ 0x039B, 0 },{ 0x039C, 0 },{ 0x039D, 0 },{ 0x039E, 0 },{ 0x039F, 0 },{ 0x03A0, 0 },{ 0x03A1, 0 },{ 0x03A3, 0 },{ 0x03A3, 0 },{ 0x03A4, 0 },{ 0x03A5, 0 },{ 0x03A6, 0 },{ 0x03A7, 0 },{ 0x03A8, 0 },{ 0x03A9, 0 },{ 0x03AA, 0 },{ 0x03AB, 0 },{ 0x038C, 0 },{ 0x038E, 0 },{ 0x038F, 0 },{ 0, 0 },{ 0x0392, 0 },{ 0x0398, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0x03A6, 0 },{ 0x03A0, 0 },{ 0, 0 },{ 0, 0x03D9 },{ 0x03D8, 0 },{ 0, 0x03DB },{ 0x03DA, 0 },{ 0, 0x03DD },{ 0x03DC, 0 },{ 0, 0x03DF },{ 0x03DE, 0 },{ 0, 0x03E1 },{ 0x03E0, 0 },{ 0, 0x03E3 },{ 0x03E2, 0 },{ 0, 0x03E5 },{ 0x03E4, 0 },{ 0, 0x03E7 },{ 0x03E6, 0 },{ 0, 0x03E9 },{ 0x03E8, 0 },{ 0, 0x03EB },{ 0x03EA, 0 },{ 0, 0x03ED },{ 0x03EC, 0 },{ 0, 0x03EF },{ 0x03EE, 0 },{ 0x039A, 0 },{ 0x03A1, 0 },{ 0x03F9, 0 },{ 0, 0 },{ 0, 0x03B8 },{ 0x0395, 0 },{ 0, 0 },{ 0, 0x03F8 },{ 0x03F7, 0 },{ 0, 0x03F2 },{ 0, 0x03FB },{ 0x03FA, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 },{ 0, 0 } };
+    // clang-format on
+
+    unsigned int ret;
+
+    if (unicode > last_greek_unicode) {
+        ret = unicode;
+    }
+    else {
+        unsigned int converted = upper_lower[unicode][upper ? 0 : 1];
+        ret = converted == 0 ? unicode : converted;
+    }
+
+    return ret;
+}
+#endif
 
 bool set_string_compare_method(string_compare_method_t method, StringCompareCallback callback)
 {
@@ -194,8 +199,6 @@ bool utf8_compare(StringData string1, StringData string2)
     // It groups all characters that look visually identical, that is, it puts `a, ‡, Â` together and before
     // `¯, o, ˆ`. Note that this sorting method is wrong in some countries, such as Denmark where `Â` must
     // come last. NOTE: This is a limitation of STRING_COMPARE_CORE until we get better such 'locale' support.
-
-    constexpr size_t last_latin_extended_2_unicode = 591;
 
     // clang-format off
     static const uint32_t collation_order_core_similar[last_latin_extended_2_unicode + 1] = {
@@ -379,7 +382,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
     std::string result;
     result.resize(source.size());
 
-#if defined(_WIN32) && !REALM_UWP
+#if defined(_WIN32)
     const char* begin = source.data();
     const char* end = begin + source.size();
     auto output = result.begin();
@@ -400,10 +403,14 @@ util::Optional<std::string> case_map(StringData source, bool upper)
         // Note: If tmp[0] == 0, it is because the string contains a
         // null-chacarcter, which is perfectly fine.
 
+#if REALM_UWP
+        tmp[0] = unicode_case_convert(tmp[0], upper);
+#else
         if (upper)
             CharUpperW(static_cast<LPWSTR>(tmp));
         else
             CharLowerW(static_cast<LPWSTR>(tmp));
+#endif
 
         // FIXME: The intention is to use flag 'WC_ERR_INVALID_CHARS'
         // to catch invalid UTF-8. Even though the documentation says
@@ -416,7 +423,7 @@ util::Optional<std::string> case_map(StringData source, bool upper)
             return util::none;
 
         if (n3 != n) {
-            std::copy_n(begin, n, output); // Cannot handle different size, copy source
+            realm::safe_copy_n(begin, n, output); // Cannot handle different size, copy source
         }
 
         begin += n;
@@ -535,84 +542,13 @@ bool contains_ins(StringData haystack, const char* needle_upper, const char* nee
     return false;
 }
 
-// pre-declaration
-bool matchlike_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower) noexcept;
-
-bool matchlike_ins(const StringData& text, const StringData& pattern_upper, const StringData& pattern_lower) noexcept
-{
-    std::vector<size_t> textpos;
-    std::vector<size_t> patternpos;
-    size_t p1 = 0; // position in text (haystack)
-    size_t p2 = 0; // position in pattern (needle)
-
-    while (true) {
-        if (p1 == text.size()) {
-            if (p2 == pattern_lower.size())
-                return true;
-            if (p2 == pattern_lower.size() - 1 && pattern_lower[p2] == '*')
-                return true;
-            goto no_match;
-        }
-        if (p2 == pattern_lower.size())
-            goto no_match;
-
-        if (pattern_lower[p2] == '*') {
-            textpos.push_back(p1);
-            patternpos.push_back(++p2);
-            continue;
-        }
-        if (pattern_lower[p2] == '?') {
-            // utf-8 encoded characters may take up multiple bytes
-            if ((text[p1] & 0x80) == 0) {
-                ++p1;
-                ++p2;
-                continue;
-            }
-            else {
-                size_t p = 1;
-                while (p1 + p != text.size() && (text[p1 + p] & 0xc0) == 0x80)
-                    ++p;
-                p1 += p;
-                ++p2;
-                continue;
-            }
-        }
-
-        if (pattern_lower[p2] == text[p1] || pattern_upper[p2] == text[p1]) {
-            ++p1;
-            ++p2;
-            continue;
-        }
-
-    no_match:
-        if (textpos.empty())
-            return false;
-        else {
-            if (p1 == text.size()) {
-                textpos.pop_back();
-                patternpos.pop_back();
-
-                if (textpos.empty())
-                    return false;
-
-                p1 = textpos.back();
-            }
-            else {
-                p1 = textpos.back();
-                textpos.back() = ++p1;
-            }
-            p2 = patternpos.back();
-        }
-    }
-}
-
 bool string_like_ins(StringData text, StringData upper, StringData lower) noexcept
 {
     if (text.is_null() || lower.is_null()) {
         return (text.is_null() && lower.is_null());
     }
 
-    return matchlike_ins(text, lower, upper);
+    return StringData::matchlike_ins(text, lower, upper);
 }
 
 bool string_like_ins(StringData text, StringData pattern) noexcept
@@ -624,7 +560,7 @@ bool string_like_ins(StringData text, StringData pattern) noexcept
     std::string upper = case_map(pattern, true, IgnoreErrors);
     std::string lower = case_map(pattern, false, IgnoreErrors);
 
-    return matchlike_ins(text, lower.c_str(), upper.c_str());
+    return StringData::matchlike_ins(text, lower.c_str(), upper.c_str());
 }
 
 } // namespace realm

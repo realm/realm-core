@@ -37,7 +37,6 @@
 #include "pthread.h"
 #include "implement.h"
 
-
 int
 pthread_setspecific (pthread_key_t key, const void *value)
      /*

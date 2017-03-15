@@ -361,12 +361,10 @@ void ColumnBaseWithIndex::destroy_search_index() noexcept
     m_search_index.reset();
 }
 
-void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
-                                               bool allow_duplicate_valaues)
+void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index.reset(
-        new StringIndex(ref, parent, ndx_in_parent, this, !allow_duplicate_valaues, get_alloc())); // Throws
+    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, get_alloc())); // Throws
 }
 
 

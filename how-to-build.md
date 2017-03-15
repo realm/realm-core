@@ -183,9 +183,10 @@ These are the available variables:
  - Set `UNITTEST_KEEP_FILES` to a non-empty value to disable automatic removal
    of test files.
 
- - Set `UNITTEST_XML` to a non-empty value to dump the test results to an XML
-   file. For details, see `realm::test_util::unit_test::create_xml_reporter()`
-   in `test/util/unit_test.hpp`.
+ - Set `UNITTEST_XML` to a non-empty value to dump the test results to a JUnit
+   XML file. For details, see
+   `realm::test_util::unit_test::create_junit_reporter()` in
+   `test/util/unit_test.hpp`.
 
  - Set `UNITTEST_LOG_LEVEL` to adjust the log level threshold for custom intra
    test logging. Valid values are `all`, `trace`, `debug`, `info`, `warn`,

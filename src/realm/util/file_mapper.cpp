@@ -20,7 +20,7 @@
 
 #ifndef _WIN32
 
-#include "file_mapper.hpp"
+#include <realm/util/file_mapper.hpp>
 
 #include <cerrno>
 #include <sys/mman.h>
@@ -31,8 +31,8 @@
 
 #if REALM_ENABLE_ENCRYPTION
 
-#include "encrypted_file_mapping.hpp"
-#include "aes_cryptor.hpp"
+#include <realm/util/encrypted_file_mapping.hpp>
+#include <realm/util/aes_cryptor.hpp>
 
 #include <memory>
 #include <csignal>
@@ -282,10 +282,11 @@ void munmap(void* addr, size_t size) noexcept
     }
 }
 
-void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size)
+void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a,
+             size_t new_size, const char* encryption_key)
 {
 #if REALM_ENABLE_ENCRYPTION
-    {
+    if (encryption_key) {
         LockGuard lock(mapping_mutex);
         size_t rounded_old_size = round_up_to_page_size(old_size);
         if (mapping_and_addr* m = find_mapping_for_addr(old_addr, rounded_old_size)) {
@@ -304,7 +305,14 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::
             }
             return new_addr;
         }
+        // If we are using encryption, we must have used mmap and the mapping
+        // must have been added to the cache therefore find_mapping_for_addr()
+        // will succeed. Otherwise we would continue to mmap it below without
+        // the encryption key which is an error.
+        REALM_UNREACHABLE();
     }
+#else
+    static_cast<void>(encryption_key);
 #endif
 
 #ifdef _GNU_SOURCE

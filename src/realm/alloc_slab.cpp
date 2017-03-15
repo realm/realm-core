@@ -74,6 +74,9 @@ struct SlabAlloc::MappedFile {
     /// Indicates if attaching to the file was succesfull
     bool m_success = false;
 
+    MappedFile() {}
+    MappedFile(const MappedFile&) = delete;
+    MappedFile& operator=(const MappedFile&) = delete;
     ~MappedFile()
     {
         m_file.close();
@@ -189,7 +192,7 @@ void SlabAlloc::detach() noexcept
         default:
             REALM_UNREACHABLE();
     }
-    invalidate_cache();
+    internal_invalidate_cache();
 
     // Release all allocated memory - this forces us to create new
     // slabs after re-attaching thereby ensuring that the slabs are
@@ -519,7 +522,7 @@ MemRef SlabAlloc::do_realloc(size_t ref, const char* addr, size_t old_size, size
 
     // Copy existing segment
     char* new_addr = new_mem.get_addr();
-    std::copy_n(addr, old_size, new_addr);
+    realm::safe_copy_n(addr, old_size, new_addr);
 
     // Add old segment to freelist
     do_free(ref, addr);
@@ -1005,7 +1008,7 @@ size_t SlabAlloc::get_total_size() const noexcept
 
 void SlabAlloc::reset_free_space_tracking()
 {
-    invalidate_cache();
+    internal_invalidate_cache();
     if (is_free_space_clean())
         return;
 
@@ -1032,12 +1035,15 @@ void SlabAlloc::reset_free_space_tracking()
 }
 
 
-void SlabAlloc::remap(size_t file_size)
+void SlabAlloc::update_reader_view(size_t file_size)
 {
+    internal_invalidate_cache();
+    if (file_size <= m_baseline) {
+        return;
+    }
     REALM_ASSERT(file_size % 8 == 0); // 8-byte alignment required
     REALM_ASSERT(m_attach_mode == attach_SharedFile || m_attach_mode == attach_UnsharedFile);
     REALM_ASSERT_DEBUG(is_free_space_clean());
-    REALM_ASSERT(m_baseline <= file_size);
 
     // Extend mapping by adding sections
     REALM_ASSERT_DEBUG(matches_section_boundary(file_size));

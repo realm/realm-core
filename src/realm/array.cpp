@@ -20,6 +20,7 @@
 #include <cstring> // std::memcpy
 #include <iomanip>
 #include <limits>
+#include <tuple>
 
 #ifdef REALM_DEBUG
 #include <iostream>
@@ -31,7 +32,6 @@
 #pragma warning(disable : 4127) // Condition is constant warning
 #endif
 
-#include <realm/util/tuple.hpp>
 #include <realm/utilities.hpp>
 #include <realm/array.hpp>
 #include <realm/array_basic.hpp>
@@ -219,8 +219,7 @@ void Array::init_from_mem(MemRef mem) noexcept
     m_size = get_size_from_header(header);
 
     // Capacity is how many items there are room for
-    bool is_read_only = m_alloc.is_read_only(mem.get_ref());
-    if (is_read_only) {
+    if (m_alloc.is_read_only(mem.get_ref())) {
         m_capacity = m_size;
     }
     else {
@@ -446,7 +445,7 @@ void Array::move(size_t begin, size_t end, size_t dest_begin)
     const char* begin_2 = m_data + begin * bytes_per_elem;
     const char* end_2 = m_data + end * bytes_per_elem;
     char* dest_begin_2 = m_data + dest_begin * bytes_per_elem;
-    std::copy_n(begin_2, end_2 - begin_2, dest_begin_2);
+    realm::safe_copy_n(begin_2, end_2 - begin_2, dest_begin_2);
 }
 
 void Array::move_backward(size_t begin, size_t end, size_t dest_end)
@@ -560,6 +559,8 @@ void Array::add_to_column(IntegerColumn* column, int64_t value)
 void Array::set(size_t ndx, int64_t value)
 {
     REALM_ASSERT_3(ndx, <, m_size);
+    if ((this->*(m_vtable->getter))(ndx) == value)
+        return;
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -601,8 +602,6 @@ void Array::insert(size_t ndx, int_fast64_t value)
 {
     REALM_ASSERT_DEBUG(ndx <= m_size);
 
-    // Check if we need to copy before modifying
-    copy_on_write(); // Throws
 
     Getter old_getter = m_getter; // Save old getter before potential width expansion
 
@@ -671,6 +670,9 @@ void Array::truncate(size_t new_size)
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
 
+    if (new_size == m_size)
+        return;
+
     copy_on_write(); // Throws
 
     // Update size in accessor and in header. This leaves the capacity
@@ -697,6 +699,9 @@ void Array::truncate_and_destroy_children(size_t new_size)
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayFloat*>(this));
     REALM_ASSERT_DEBUG(!dynamic_cast<ArrayDouble*>(this));
 
+    if (new_size == m_size)
+        return;
+
     copy_on_write(); // Throws
 
     if (m_has_refs) {
@@ -719,13 +724,8 @@ void Array::truncate_and_destroy_children(size_t new_size)
 }
 
 
-void Array::ensure_minimum_width(int_fast64_t value)
+void Array::do_ensure_minimum_width(int_fast64_t value)
 {
-    if (value >= m_lbound && value <= m_ubound)
-        return;
-
-    // Check if we need to copy before modifying
-    copy_on_write(); // Throws
 
     // Make room for the new value
     size_t width = bit_width(value);
@@ -746,6 +746,9 @@ void Array::ensure_minimum_width(int_fast64_t value)
 
 void Array::set_all_to_zero()
 {
+    if (m_size == 0 || m_width == 0)
+        return;
+
     copy_on_write(); // Throws
 
     m_capacity = calc_item_count(get_capacity_from_header(), 0);
@@ -758,9 +761,6 @@ void Array::set_all_to_zero()
 void Array::adjust_ge(int_fast64_t limit, int_fast64_t diff)
 {
     if (diff != 0) {
-        // Check if we need to copy before modifying
-        copy_on_write(); // Throws
-
         for (size_t i = 0, n = size(); i != n;) {
             REALM_TEMPEX(i = adjust_ge, m_width, (i, n, limit, diff))
         }
@@ -781,6 +781,7 @@ size_t Array::adjust_ge(size_t start, size_t end, int_fast64_t limit, int_fast64
             // the width, return the current position to the caller so that it
             // can switch to the appropriate specialization for the new width.
             ensure_minimum_width(shifted); // Throws
+            copy_on_write();               // Throws
             if (m_width != w)
                 return i;
 
@@ -1558,7 +1559,7 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
         const char* src_begin = header;
         const char* src_end = header + size;
         char* dst_begin = clone_header;
-        std::copy_n(src_begin, src_end - src_begin, dst_begin);
+        realm::safe_copy_n(src_begin, src_end - src_begin, dst_begin);
 
         // Update with correct capacity
         set_header_capacity(size, clone_header);
@@ -1605,57 +1606,49 @@ MemRef Array::clone(MemRef mem, Allocator& alloc, Allocator& target_alloc)
     return new_array.get_mem();
 }
 
-void Array::copy_on_write()
+void Array::do_copy_on_write(size_t minimum_size)
 {
-#if REALM_ENABLE_MEMDEBUG
-    // We want to relocate this array regardless if there is a need or not, in order to catch use-after-free bugs.
-    // Only exception is inside GroupWriter::write_group() (see explanation at the definition of the m_no_relocation
-    // member)
-    if (!m_no_relocation) {
-#else
-    if (m_alloc.is_read_only(m_ref)) {
-#endif
-        // Calculate size in bytes (plus a bit of matchcount room for expansion)
-        size_t array_size = calc_byte_len(m_size, m_width);
-        size_t rest = (~array_size & 0x7) + 1;
-        if (rest < 8)
-            array_size += rest; // 64bit blocks
-        size_t new_size = array_size + 64;
+    // Calculate size in bytes
+    size_t array_size = calc_byte_len(m_size, m_width);
+    size_t new_size = std::max(array_size, minimum_size);
+    new_size = (new_size + 0x7) & ~size_t(0x7); // 64bit blocks
+    // Plus a bit of matchcount room for expansion
+    if (new_size < max_array_payload - 64)
+        new_size += 64;
 
-        // Create new copy of array
-        MemRef mref = m_alloc.alloc(new_size); // Throws
-        const char* old_begin = get_header_from_data(m_data);
-        const char* old_end = get_header_from_data(m_data) + array_size;
-        char* new_begin = mref.get_addr();
-        std::copy_n(old_begin, old_end - old_begin, new_begin);
+    // Create new copy of array
+    MemRef mref = m_alloc.alloc(new_size); // Throws
+    const char* old_begin = get_header_from_data(m_data);
+    const char* old_end = get_header_from_data(m_data) + array_size;
+    char* new_begin = mref.get_addr();
+    realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
 
-        ref_type old_ref = m_ref;
+    ref_type old_ref = m_ref;
 
-        // Update internal data
-        m_ref = mref.get_ref();
-        m_data = get_data_from_header(new_begin);
-        m_capacity = calc_item_count(new_size, m_width);
-        REALM_ASSERT_DEBUG(m_capacity > 0);
+    // Update internal data
+    m_ref = mref.get_ref();
+    m_data = get_data_from_header(new_begin);
+    m_capacity = calc_item_count(new_size, m_width);
+    REALM_ASSERT_DEBUG(m_capacity > 0);
 
-        // Update capacity in header. Uses m_data to find header, so
-        // m_data must be initialized correctly first.
-        set_header_capacity(new_size);
+    // Update capacity in header. Uses m_data to find header, so
+    // m_data must be initialized correctly first.
+    set_header_capacity(new_size);
 
-        update_parent();
+    update_parent();
 
 #if REALM_ENABLE_MEMDEBUG
-        if (!m_alloc.is_read_only(old_ref)) {
-            // Overwrite free'd array with 0x77. We cannot overwrite the header because free_() needs to know the size
-            // of the allocated block in order to free it. This size is computed from the width and size header
-            // fields.
-            memset(const_cast<char*>(old_begin) + header_size, 0x77, old_end - old_begin - header_size);
-        }
-#endif
-
-        // Mark original as deleted, so that the space can be reclaimed in
-        // future commits, when no versions are using it anymore
-        m_alloc.free_(old_ref, old_begin);
+    if (!m_alloc.is_read_only(old_ref)) {
+        // Overwrite free'd array with 0x77. We cannot overwrite the header because free_() needs to know the size
+        // of the allocated block in order to free it. This size is computed from the width and size header
+        // fields.
+        memset(const_cast<char*>(old_begin) + header_size, 0x77, old_end - old_begin - header_size);
     }
+#endif
+
+    // Mark original as deleted, so that the space can be reclaimed in
+    // future commits, when no versions are using it anymore
+    m_alloc.free_(old_ref, old_begin);
 }
 
 MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t size, int_fast64_t value,
@@ -1700,21 +1693,21 @@ MemRef Array::create(Type type, bool context_flag, WidthType width_type, size_t 
     return mem;
 }
 
-
-// FIXME: It may be worth trying to combine this with copy_on_write()
-// to avoid two copies.
 void Array::alloc(size_t init_size, size_t width)
 {
     REALM_ASSERT(is_attached());
+
+    size_t needed_bytes = calc_byte_len(init_size, width);
+    // this method is not public and callers must (and currently do) ensure that
+    // needed_bytes are never larger than max_array_payload.
+    REALM_ASSERT_3(needed_bytes, <=, max_array_payload);
+
+    if (is_read_only())
+        do_copy_on_write(needed_bytes);
+
     REALM_ASSERT(!m_alloc.is_read_only(m_ref));
     REALM_ASSERT_3(m_capacity, >, 0);
     if (m_capacity < init_size || width != m_width) {
-        size_t needed_bytes = calc_byte_len(init_size, width);
-
-        // this method is not public and callers must (and currently do) ensure that
-        // needed_bytes are never larger than max_array_payload.
-        REALM_ASSERT_3(needed_bytes, <=, max_array_payload);
-
         size_t orig_capacity_bytes = get_capacity_from_header();
         size_t capacity_bytes = orig_capacity_bytes;
 
@@ -1724,9 +1717,9 @@ void Array::alloc(size_t init_size, size_t width)
             // field in the header.
             size_t new_capacity_bytes = capacity_bytes * 2;
             if (new_capacity_bytes < capacity_bytes) // overflow detected, clamp to max
-                new_capacity_bytes = max_array_payload;
-            if (new_capacity_bytes > max_array_payload) // cap at max allowed allocation
-                new_capacity_bytes = max_array_payload;
+                new_capacity_bytes = max_array_payload_aligned;
+            if (new_capacity_bytes > max_array_payload_aligned) // cap at max allowed allocation
+                new_capacity_bytes = max_array_payload_aligned;
             capacity_bytes = new_capacity_bytes;
 
             // If doubling is not enough, expand enough to fit
@@ -2021,7 +2014,7 @@ std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, MemStats sta
 
 namespace {
 
-typedef Tuple<TypeCons<size_t, TypeCons<int, TypeCons<bool, void>>>> VerifyBptreeResult;
+typedef std::tuple<size_t, int, bool> VerifyBptreeResult;
 
 // Returns (num_elems, leaf-level, general_form)
 VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_verifier)
@@ -2073,10 +2066,10 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
             Array child(alloc);
             child.init_from_ref(child_ref);
             VerifyBptreeResult r = verify_bptree(child, leaf_verifier);
-            elems_in_child = at<0>(r);
-            leaf_level_of_child = at<1>(r);
+            elems_in_child = std::get<0>(r);
+            leaf_level_of_child = std::get<1>(r);
             // Verify invar:bptree-node-form
-            bool child_on_general_form = at<2>(r);
+            bool child_on_general_form = std::get<2>(r);
             REALM_ASSERT(general_form || !child_on_general_form);
         }
         if (i == 0)
@@ -2106,7 +2099,7 @@ VerifyBptreeResult verify_bptree(const Array& node, Array::LeafVerifier leaf_ver
         REALM_ASSERT(!int_cast_with_overflow_detect(last_value / 2, total_elems));
         REALM_ASSERT_3(num_elems, ==, total_elems);
     }
-    return realm::util::tuple(num_elems, 1 + leaf_level_of_children, general_form);
+    return std::make_tuple(num_elems, 1 + leaf_level_of_children, general_form);
 }
 
 } // anonymous namespace

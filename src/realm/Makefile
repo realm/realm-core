@@ -5,7 +5,6 @@ util/inspect.hpp \
 util/assert.hpp \
 util/terminate.hpp \
 util/type_list.hpp \
-util/tuple.hpp \
 util/type_traits.hpp \
 util/safe_int_ops.hpp \
 util/bind_ptr.hpp \
@@ -59,12 +58,7 @@ owned_data.hpp \
 timestamp.hpp \
 table.hpp \
 table_ref.hpp \
-table_basic_fwd.hpp \
-table_accessors.hpp \
-table_basic.hpp \
 table_view.hpp \
-table_view_basic.hpp \
-table_macros.hpp \
 row.hpp \
 descriptor_fwd.hpp \
 descriptor.hpp \
@@ -123,7 +117,7 @@ query_expression.hpp
 lib_LIBRARIES    = librealm.a
 libexec_PROGRAMS = realmd
 bin_PROGRAMS     = realm-import realm-schema-dump
-DEV_PROGRAMS     = realm-config
+DEV_PROGRAMS     = realm-config realm-trawler
 
 librealm_a_SOURCES = \
 util/encrypted_file_mapping.cpp \
@@ -176,6 +170,7 @@ query.cpp \
 query_engine.cpp \
 row.cpp \
 spec.cpp \
+string_data.cpp \
 table.cpp \
 table_view.cpp \
 unicode.cpp \
@@ -208,6 +203,8 @@ disable_sync_to_disk.cpp
 librealm_a_VERSION = 9:0:0
 
 realm_config_SOURCES = config_tool.cpp
+
+realm_trawler_SOURCES = realm_trawler.cpp
 
 realmd_SOURCES = realmd.cpp
 realmd_LIBS = librealm.a

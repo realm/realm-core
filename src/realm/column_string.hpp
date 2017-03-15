@@ -72,7 +72,7 @@ public:
 
     size_t count(StringData value) const;
     size_t find_first(StringData value, size_t begin = 0, size_t end = npos) const;
-    void find_all(IntegerColumn& result, StringData value, size_t begin = 0, size_t end = npos) const;
+    void find_all(IntegerColumn& result, StringData value, size_t begin = 0, size_t end = npos, bool case_insensitive = false) const;
     FindRes find_all_no_copy(StringData value, InternalFindResult& result) const;
 
     int compare_values(size_t, size_t) const noexcept override;
@@ -92,8 +92,7 @@ public:
     // Search index
     StringData get_index_data(size_t ndx, StringIndex::StringConversionBuffer& buffer) const noexcept final;
     bool has_search_index() const noexcept override;
-    void set_search_index_ref(ref_type, ArrayParent*, size_t, bool) override;
-    void set_search_index_allow_duplicate_values(bool) noexcept override;
+    void set_search_index_ref(ref_type, ArrayParent*, size_t) override;
     StringIndex* get_search_index() noexcept override;
     const StringIndex* get_search_index() const noexcept override;
     std::unique_ptr<StringIndex> release_search_index() noexcept;

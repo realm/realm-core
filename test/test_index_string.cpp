@@ -23,6 +23,7 @@
 #include <realm/index_string.hpp>
 #include <realm/column_linklist.hpp>
 #include <realm/column_string.hpp>
+#include <realm/query_expression.hpp>
 #include <realm/util/to_string.hpp>
 #include <set>
 #include "test.hpp"
@@ -1382,53 +1383,6 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     col.destroy();
 }
 
-TEST(StringIndex_Deny_Duplicates)
-{
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), ref, true);
-    StringData duplicate("duplicate");
-    // create subindex of repeated elements on a leaf
-    size_t num_repeats = 100;
-    for (size_t i = 0; i < num_repeats; ++i) {
-        col.add(duplicate);
-    }
-
-    // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
-
-    CHECK(ndx.has_duplicate_values());
-
-    col.set_search_index_allow_duplicate_values(false);
-    CHECK(ndx.has_duplicate_values());
-
-    size_t ndx_count = ndx.count(duplicate);
-    CHECK_THROW(col.add(duplicate), realm::LogicError);
-    CHECK(ndx_count == ndx.count(duplicate));
-
-    col.clear();
-    CHECK(!ndx.has_duplicate_values());
-
-    col.add(duplicate);
-    CHECK_THROW(col.add(duplicate), realm::LogicError);
-    CHECK(!ndx.has_duplicate_values());
-
-    col.clear();
-    col.set_search_index_allow_duplicate_values(true);
-    CHECK(!ndx.has_duplicate_values());
-
-    // Populate tree with duplicates through insert() at back
-    for (size_t i = 0; i < num_repeats; ++i) {
-        col.insert(col.size(), duplicate);
-    }
-    CHECK(ndx.has_duplicate_values());
-    CHECK(col.get(0) == duplicate);
-    CHECK(col.get(col.size() - 1) == duplicate);
-    CHECK(col.count(duplicate) == num_repeats);
-
-    col.destroy();
-}
-
-
 TEST(StringIndex_MaxBytes)
 {
     std::string std_max(StringIndex::s_max_offset, 'a');
@@ -1730,6 +1684,288 @@ TEST(StringIndex_Fuzzy)
             t.get()->swap_rows(r1, r2);
         }
     }
+}
+
+
+TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    // Create a column with string values
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+
+    const char* strings[] = {
+        "john", "John", "jOhn", "JOhn", "joHn", "JoHn", "jOHn", "JOHn", "johN", "JohN", "jOhN", "JOhN", "joHN", "JoHN", "jOHN", "JOHN", "john" /* yes, an extra to test the "bucket" case as well */,
+        "hans", "Hansapark", "george", "billion dollar startup",
+        "abcde", "abcdE", "Abcde", "AbcdE",
+        "common", "common"
+    };
+
+    for (const char* string : strings) {
+        col.add(string);
+    }
+
+    // Generate 255 strings with 1..255 'a' chars
+    for (int i = 1; i < 256; ++i) {
+        col.add(std::string(i, 'a').c_str());
+    }
+
+    // Create a new index on column
+    const StringIndex& ndx = *col.create_search_index();
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+    {
+        // case sensitive
+        ndx.find_all(results, strings[0]);
+        CHECK_EQUAL(2, results.size());
+        CHECK_EQUAL(col.get(results.get(0)), strings[0]);
+        CHECK_EQUAL(col.get(results.get(1)), strings[0]);
+        results.clear();
+    }
+
+    {
+        constexpr bool case_insensitive = true;
+        const char* needle = "john";
+        auto upper_needle = case_map(needle, true);
+        ndx.find_all(results, needle, case_insensitive);
+        CHECK_EQUAL(17, results.size());
+        for (size_t i = 0; i < results.size(); ++i) {
+            auto upper_result = case_map(col.get(results.get(i)), true);
+            CHECK_EQUAL(upper_result, upper_needle);
+
+        }
+        results.clear();
+    }
+
+
+    {
+        struct TestData {
+            const bool case_insensitive;
+            const char* const needle;
+            const size_t result_size;
+        };
+
+        TestData td[] = {
+            {true, "Hans", 1},
+            {true, "Geor", 0},
+            {true, "George", 1},
+            {true, "geoRge", 1},
+            {true, "Billion Dollar Startup", 1},
+            {true, "ABCDE", 4},
+            {true, "commON", 2},
+        };
+
+        for (const TestData& t : td) {
+            ndx.find_all(results, t.needle, t.case_insensitive);
+            CHECK_EQUAL(t.result_size, results.size());
+            results.clear();
+        }
+    }
+
+    // Test generated 'a'-strings
+    for (int i = 1; i < 256; ++i) {
+        const std::string str = std::string(i, 'A');
+        ndx.find_all(results, str.c_str(), false);
+        CHECK_EQUAL(0, results.size());
+        ndx.find_all(results, str.c_str(), true);
+        CHECK_EQUAL(1, results.size());
+        results.clear();
+    }
+
+    // Clean up
+    results.destroy();
+    col.destroy();
+}
+
+
+/* Disabled until we have better support for case mapping unicode characters
+
+TEST_TYPES(StringIndex_Insensitive_Unicode, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    // Create a column with string values
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+
+    const char* strings[] = {
+        "æøå", "ÆØÅ",
+    };
+
+    for (const char* string : strings) {
+        col.add(string);
+    }
+
+    // Create a new index on column
+    const StringIndex& ndx = *col.create_search_index();
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+
+    {
+        struct TestData {
+            const bool case_insensitive;
+            const char* const needle;
+            const size_t result_size;
+        };
+
+        TestData td[] = {
+            {false, "æøå", 1},
+            {false, "ÆØÅ", 1},
+            {true, "æøå", 2},
+            {true, "Æøå", 2},
+            {true, "æØå", 2},
+            {true, "ÆØå", 2},
+            {true, "æøÅ", 2},
+            {true, "ÆøÅ", 2},
+            {true, "æØÅ", 2},
+            {true, "ÆØÅ", 2},
+        };
+
+        for (const TestData& t : td) {
+            ndx.find_all(results, t.needle, t.case_insensitive);
+            CHECK_EQUAL(t.result_size, results.size());
+            results.clear();
+        }
+    }
+
+    // Clean up
+    results.destroy();
+    col.destroy();
+}
+
+*/
+
+
+TEST_TYPES(StringIndex_45, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+    col.create_search_index();
+    std::string a4 = std::string(4, 'a');
+    std::string A5 = std::string(5, 'A');
+
+    col.add(a4);
+    col.add(a4);
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn res(Allocator::get_default(), results_ref);
+
+    col.find_all(res, A5, 0, realm::npos, true);
+    CHECK_EQUAL(res.size(), 0);
+
+    res.destroy();
+    col.destroy();
+}
+
+
+namespace {
+
+std::string create_random_a_string(size_t max_len) {
+    std::string s;
+    size_t len = fastrand(max_len);
+    for (size_t p = 0; p < len; p++) {
+        s += fastrand(1) == 0 ? 'a' : 'A';
+    }
+    return s;
+}
+
+}
+
+
+TEST_TYPES(StringIndex_Insensitive_Fuzz, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    const size_t max_str_len = 9;
+    const size_t iters = 10;
+
+    for (size_t iter = 0; iter < iters; iter++) {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn col(Allocator::get_default(), ref, nullable);
+
+        size_t rows = fastrand(2 * REALM_MAX_BPNODE_SIZE - 1);
+
+        // Add 'rows' number of rows in the column
+        for (size_t t = 0; t < rows; t++) {
+            std::string str = create_random_a_string(max_str_len);
+            col.add(str);
+        }
+
+        col.create_search_index();
+
+        for (size_t t = 0; t < 1000; t++) {
+            std::string needle = create_random_a_string(max_str_len);
+
+            ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+            IntegerColumn res(Allocator::get_default(), results_ref);
+
+            col.find_all(res, needle, 0, realm::npos, true);
+
+            // Check that all items in 'res' point at a match in 'col'
+            auto needle_upper = case_map(needle, true);
+            for (size_t res_ndx = 0; res_ndx < res.size(); res_ndx++) {
+                auto res_upper = case_map(col.get(to_size_t(res.get(res_ndx))), true);
+                CHECK_EQUAL(res_upper, needle_upper);
+            }
+
+            // Check that all matches in 'col' exist in 'res'
+            for (size_t col_ndx = 0; col_ndx < col.size(); col_ndx++) {
+                auto str_upper = case_map(col.get(col_ndx), true);
+                if (str_upper == needle_upper) {
+                    CHECK(res.find_first(col_ndx) != npos);
+                }
+            }
+            res.destroy();
+        }
+        col.destroy();
+    }
+}
+
+
+// Exercise the StringIndex case insensitive search for strings with very long, common prefixes
+// to cover the special case code paths where different strings are stored in a list.
+TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+    const StringIndex& ndx = *col.create_search_index();
+
+    std::string long1 = std::string(StringIndex::s_max_offset + 10, 'a');
+    std::string long2 = long1 + "b";
+    std::string long3 = long1 + "c";
+
+    // Add the strings in a "random" order
+    col.add(long1);
+    col.add(long2);
+    col.add(long2);
+    col.add(long1);
+    col.add(long3);
+    col.add(long2);
+    col.add(long1);
+    col.add(long1);
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+
+    col.find_all(results, long1, 0, realm::npos, true);
+    CHECK_EQUAL(results.size(), 4);
+    results.clear();
+    ndx.find_all(results, long2.c_str(), true);
+    CHECK_EQUAL(results.size(), 3);
+    results.clear();
+    ndx.find_all(results, long3.c_str(), true);
+    CHECK_EQUAL(results.size(), 1);
+    results.clear();
+
+    results.destroy();
+    col.destroy();
 }
 
 

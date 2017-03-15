@@ -189,15 +189,21 @@ std::string make_temp_dir()
 
 #else // POSIX.1-2008 version
 
-    StringBuffer buffer;
 #if REALM_ANDROID
-    buffer.append_c_str("/data/local/tmp/realm_XXXXXX");
-#else
-    buffer.append_c_str(P_tmpdir "/realm_XXXXXX");
-#endif
-    if (mkdtemp(buffer.c_str()) == 0)
+    char buffer[] = "/data/local/tmp/realm_XXXXXX";
+    if (mkdtemp(buffer) == 0) {
         throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
-    return buffer.str();
+    }
+    return std::string(buffer);
+#else
+    std::string tmp = std::string(P_tmpdir) + std::string("/realm_XXXXXX") + std::string("\0", 1);
+    std::unique_ptr<char[]> buffer = std::make_unique<char[]>(tmp.size()); // Throws
+    memcpy(buffer.get(), tmp.c_str(), tmp.size());
+    if (mkdtemp(buffer.get()) == 0) {
+        throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
+    }
+    return std::string(buffer.get()); 
+#endif
 
 #endif
 }
@@ -894,7 +900,7 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
     return new_addr;
 #else
     static_cast<void>(map_flags);
-    return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size);
+    return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size, m_encryption_key.get());
 #endif
 }
 

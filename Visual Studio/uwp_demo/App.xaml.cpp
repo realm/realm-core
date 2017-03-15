@@ -41,7 +41,6 @@ App::App()
 /// <param name="e">Details about the launch request and process.</param>
 void App::OnLaunched(Windows::ApplicationModel::Activation::LaunchActivatedEventArgs^ e)
 {
-
 	using namespace realm;
 	using namespace std;
 
@@ -52,6 +51,8 @@ void App::OnLaunched(Windows::ApplicationModel::Activation::LaunchActivatedEvent
 		t.set_int(0, 0, 123);
 		int64_t i = t.get_int(0, 0);
 	}
+
+    // For ARM, only Release mode is currently configured. Build Core in ARM Release mode too.
 
 	// Enable when you have specified a valid tempdir for the target machine, else it will crash
 	/*

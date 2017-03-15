@@ -18,7 +18,7 @@
 
 #include <algorithm>
 
-#include "column_link.hpp"
+#include <realm/column_link.hpp>
 
 #include <realm/group.hpp>
 

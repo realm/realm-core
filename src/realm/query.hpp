@@ -338,8 +338,6 @@ private:
     void handle_pending_not();
     void set_table(TableRef tr);
 
-    static bool comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b);
-
 public:
     using HandoverPatch = QueryHandoverPatch;
 

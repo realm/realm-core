@@ -39,7 +39,7 @@ TransactLogConvenientEncoder::TransactLogConvenientEncoder(TransactLogStream& st
 bool TransactLogEncoder::select_table(size_t group_level_ndx, size_t levels, const size_t* path)
 {
     const size_t* path_end = path + (levels * 2);
-    append_variable_size_instr(instr_SelectTable, util::tuple(levels, group_level_ndx), path, path_end); // Throws
+    append_simple_instr(instr_SelectTable, levels, group_level_ndx, std::make_tuple(path, path_end)); // Throws
     return true;
 }
 
@@ -118,7 +118,7 @@ void TransactLogConvenientEncoder::do_select_desc(const Descriptor& desc)
 
 bool TransactLogEncoder::select_link_list(size_t col_ndx, size_t row_ndx, size_t link_target_group_level_ndx)
 {
-    append_simple_instr(instr_SelectLinkList, util::tuple(col_ndx, row_ndx, link_target_group_level_ndx)); // Throws
+    append_simple_instr(instr_SelectLinkList, col_ndx, row_ndx, link_target_group_level_ndx); // Throws
     return true;
 }
 
