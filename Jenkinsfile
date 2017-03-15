@@ -305,12 +305,12 @@ def buildPerformance() {
           sh 'unzip core-benchmarks.zip -d test/bench/'
           sh 'rm core-benchmarks.zip'
 
-          sh '''
+          sh """
             cd test/bench
             mkdir -p core-benchmarks results
-            ./gen_bench_hist.sh
+            ./gen_bench_hist.sh ${env.BRANCH_NAME}
             ./parse_bench_hist.py --local-html results/ core-benchmarks/
-          '''
+          """
           zip dir: 'test/bench', glob: 'core-benchmarks/**/*', zipFile: 'core-benchmarks.zip'
           withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
             sh 's3cmd -c $s3cfg_config_file put core-benchmarks.zip s3://static.realm.io/downloads/core/'
