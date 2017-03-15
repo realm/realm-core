@@ -65,7 +65,7 @@ try {
         buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
         buildAndroid: doBuildAndroid(isPublishingRun),
         buildWindows: doBuildWindows(version, isPublishingRun),
-        buildOsxDylibs: doBuildOsxDylibs(isPublishingRun, isPublishingLatestRun),
+        buildOsxDylibs: doBuildOsxDylibs(version, isPublishingRun, isPublishingLatestRun),
         addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
         //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
       ]
@@ -389,11 +389,10 @@ def doBuildNodeInOsx(def isPublishingRun, def isPublishingLatestRun) {
   }
 }
 
-def doBuildOsxDylibs(def isPublishingRun, def isPublishingLatestRun) {
+def doBuildOsxDylibs(def version, def isPublishingRun, def isPublishingLatestRun) {
   return {
     node('macos || osx_vegas') {
-      getSourceArchive()
-      def version = get_version()
+      getArchive()
 
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes', 'UNITTEST_SHUFFLE=1',
         'UNITTEST_XML=1', 'UNITTEST_THREADS=1']
@@ -471,7 +470,7 @@ def doBuildAndroid(def isPublishingRun) {
           }
         }
 
-        node('fastlinux') {
+        node('android-hub') {
             sh 'rm -rf *'
             unstash 'android'
 
