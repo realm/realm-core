@@ -229,9 +229,13 @@ public:
         /// (_impl::InRealmHistory).
         hist_InRealm = 2,
 
-        /// In-Realm history supporting continuous transactions and inter-client
-        /// synchronization (_impl::SyncHistory).
-        hist_Sync = 3
+        /// In-Realm history supporting continuous transactions and client-side
+        /// synchronization protocol (realm::sync::ClientHistory).
+        hist_SyncClient = 3,
+
+        /// In-Realm history supporting continuous transactions and server-side
+        /// synchronization protocol (realm::_impl::ServerHistory).
+        hist_SyncServer = 4
     };
 
     /// Returns the type of history maintained by this Replication
@@ -302,13 +306,16 @@ public:
     /// remains in the Realm file, there are practical complications, and for
     /// that reason, such switching shall not be supported.
     ///
-    /// The \ref hist_Sync history type can only be used if the stored history
-    /// type is also \ref hist_Sync, or when there is no top array
-    /// yet. Additionally, when the stored history type is \ref hist_Sync, then
-    /// all subsequent sesssions must have the same type. These restrictions
-    /// apply because such a history needs to be maintained persistently across
-    /// sessions. That is, the contents of such a history is not obsolete at the
-    /// end of the session, and is in general needed during subsequent sessions.
+    /// The \ref hist_SyncClient history type can only be used if the stored
+    /// history type is also \ref hist_SyncClient, or when there is no top array
+    /// yet. Likewise, the \ref hist_SyncServer history type can only be used if
+    /// the stored history type is also \ref hist_SyncServer, or when there is
+    /// no top array yet. Additionally, when the stored history type is \ref
+    /// hist_SyncClient or \ref hist_SyncServer, then all subsequent sessions
+    /// must have the same type. These restrictions apply because such a history
+    /// needs to be maintained persistently across sessions. That is, the
+    /// contents of such a history is not obsolete at the end of the session,
+    /// and is in general needed during subsequent sessions.
     ///
     /// In general, if there is no stored history type (no top array) at the
     /// beginning of a new session, or if the stored type disagrees with what is
@@ -343,7 +350,8 @@ public:
     ///   hist_None          hist_None        hist_None, hist_OutOfRealm, hist_InRealm
     ///   hist_OutOfRealm    hist_None        hist_None, hist_OutOfRealm, hist_InRealm
     ///   hist_InRealm       hist_InRealm     hist_InRealm
-    ///   hist_Sync          hist_Sync        hist_Sync
+    ///   hist_SyncClient    hist_SyncClient  hist_SyncClient
+    ///   hist_SyncServer    hist_SyncServer  hist_SyncServer
     ///
     /// </pre>
     ///
