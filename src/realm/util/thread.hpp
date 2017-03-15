@@ -63,6 +63,8 @@ public:
     Thread(const Thread&) = delete;
     Thread& operator=(const Thread&) = delete;
 
+    Thread(Thread&&);
+
     /// This method is an extension of the API provided by
     /// std::thread. This method exists because proper move semantics
     /// is unavailable in C++03. If move semantics had been available,
@@ -343,6 +345,13 @@ inline Thread::Thread(F func)
     std::unique_ptr<F> func2(new F(func));       // Throws
     start(&Thread::entry_point<F>, func2.get()); // Throws
     func2.release();
+}
+
+inline Thread::Thread(Thread&& thread)
+{
+    m_id = thread.m_id;
+    m_joinable = thread.m_joinable;
+    thread.m_joinable = false;
 }
 
 template <class F>
