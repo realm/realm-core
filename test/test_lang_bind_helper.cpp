@@ -12974,4 +12974,45 @@ TEST(LangBindHelper_RollbackMergeRowsWithBacklinks)
 }
 
 
+TEST(LangBindHelper_MixedTimestampTransaction)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_w(hist);
+    SharedGroup sg_r(hist);
+
+    // the seconds part is constructed to test 64 bit integer reads
+    Timestamp time(68451041280, 29);
+    // also check that a negative time comes through the transaction intact
+    Timestamp neg_time(-57, -23);
+
+    ReadTransaction rt(sg_r);
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.add_table("table");
+        target->add_column(type_Mixed, "mixed_col");
+        target->add_empty_row(2);
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg_r);
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.get_table("table");
+        target->set_mixed(0, 0, Mixed(time));
+        target->set_mixed(0, 1, Mixed(neg_time));
+        group.verify();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg_r);
+    const Group& g = rt.get_group();
+    g.verify();
+    ConstTableRef t = g.get_table("table");
+    CHECK(t->get_mixed(0, 0) == time);
+    CHECK(t->get_mixed(0, 1) == neg_time);
+}
+
+
 #endif
