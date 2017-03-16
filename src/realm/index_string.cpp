@@ -114,8 +114,8 @@ size_t IndexArray::from_list<index_Count>(StringData value, IntegerColumn& resul
     return cnt;
 }
 
-size_t IndexArray::from_list_all(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                                 const IntegerColumn& rows, ColumnBase* column) const
+void IndexArray::from_list_all(StringData value, IntegerColumn& result,InternalFindResult& result_ref,
+                               const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result_ref);
 
@@ -124,7 +124,7 @@ size_t IndexArray::from_list_all(StringData value, IntegerColumn& result, Intern
     IntegerColumn::const_iterator it_end = rows.cend();
     IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
     if (lower == it_end)
-        return size_t(FindRes_not_found);
+        return;
 
     const size_t first_row_ndx = to_size_t(*lower);
 
@@ -132,7 +132,7 @@ size_t IndexArray::from_list_all(StringData value, IntegerColumn& result, Intern
     StringIndex::StringConversionBuffer buffer;
     StringData str = column->get_index_data(first_row_ndx, buffer);
     if (str != value)
-        return size_t(FindRes_not_found);
+        return;
 
     IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value, slc);
 
@@ -142,7 +142,7 @@ size_t IndexArray::from_list_all(StringData value, IntegerColumn& result, Intern
         result.add(cur_row_ndx);
     }
 
-    return size_t(FindRes_column);
+    return;
 }
 
 template <>
@@ -233,8 +233,8 @@ size_t IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& resu
 }
 
 
-size_t IndexArray::index_string_all(StringData value, IntegerColumn& result,
-                                    InternalFindResult& result_ref, ColumnBase* column) const
+void IndexArray::index_string_all(StringData value, IntegerColumn& result,
+                                  InternalFindResult& result_ref, ColumnBase* column) const
 {
     const char* data = m_data;
     const char* header;
@@ -258,7 +258,7 @@ size_t IndexArray::index_string_all(StringData value, IntegerColumn& result,
 
         // If key is outside range, we know there can be no match
         if (pos == offsets_size)
-            return size_t(FindRes_not_found);
+            return;
 
         // Get entry under key
         size_t pos_refs = pos + 1; // first entry in refs points to offsets
@@ -276,7 +276,7 @@ size_t IndexArray::index_string_all(StringData value, IntegerColumn& result,
         key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
 
         if (stored_key != key)
-            return size_t(FindRes_not_found);
+            return;
 
         // Literal row index (tagged)
         if (ref & 1) {
@@ -288,9 +288,9 @@ size_t IndexArray::index_string_all(StringData value, IntegerColumn& result,
             if (str == value) {
                 result_ref.payload = row_ndx;
                 result.add(row_ndx);
-                return FindRes_single;
+                return;
             }
-            return size_t(FindRes_not_found);
+            return;
         }
 
         const char* sub_header = m_alloc.translate(to_ref(ref));
