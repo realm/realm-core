@@ -84,21 +84,18 @@ private:
     size_t from_list(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
                      const IntegerColumn& rows, ColumnBase* column) const;
 
-    void from_list_all(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                       const IntegerColumn& rows, ColumnBase* column) const;
+    void from_list_all(StringData value, IntegerColumn& result, const IntegerColumn& rows, ColumnBase* column) const;
 
-    void from_list_all_ins(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                           const IntegerColumn& rows, ColumnBase* column) const;
+    void from_list_all_ins(StringData value, IntegerColumn& result, const IntegerColumn& rows,
+                           ColumnBase* column) const;
 
     template <IndexMethod method>
     size_t index_string(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
                         ColumnBase* column) const;
 
-    void index_string_all(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                          ColumnBase* column) const;
+    void index_string_all(StringData value, IntegerColumn& result, ColumnBase* column) const;
 
-    void index_string_all_ins(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                              ColumnBase* column) const;
+    void index_string_all_ins(StringData value, IntegerColumn& result, ColumnBase* column) const;
 };
 
 

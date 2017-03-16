@@ -114,11 +114,9 @@ size_t IndexArray::from_list<index_Count>(StringData value, IntegerColumn& resul
     return cnt;
 }
 
-void IndexArray::from_list_all(StringData value, IntegerColumn& result,InternalFindResult& result_ref,
-                               const IntegerColumn& rows, ColumnBase* column) const
+void IndexArray::from_list_all(StringData value, IntegerColumn& result, const IntegerColumn& rows,
+                               ColumnBase* column) const
 {
-    static_cast<void>(result_ref);
-
     SortedListComparator slc(*column);
 
     IntegerColumn::const_iterator it_end = rows.cend();
@@ -197,8 +195,8 @@ size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, IntegerColu
 }
 
 
-void IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result, InternalFindResult& /*result_ref*/,
-                                   const IntegerColumn& rows, ColumnBase* column) const
+void IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result, const IntegerColumn& rows,
+                                   ColumnBase* column) const
 {
     // The buffer is needed when for when this is an integer index.
     StringIndex::StringConversionBuffer buffer;
@@ -233,8 +231,7 @@ void IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result
 }
 
 
-void IndexArray::index_string_all(StringData value, IntegerColumn& result,
-                                  InternalFindResult& result_ref, ColumnBase* column) const
+void IndexArray::index_string_all(StringData value, IntegerColumn& result, ColumnBase* column) const
 {
     const char* data = m_data;
     const char* header;
@@ -286,7 +283,6 @@ void IndexArray::index_string_all(StringData value, IntegerColumn& result,
             StringIndex::StringConversionBuffer buffer;
             StringData str = column->get_index_data(row_ndx, buffer);
             if (str == value) {
-                result_ref.payload = row_ndx;
                 result.add(row_ndx);
                 return;
             }
@@ -299,7 +295,7 @@ void IndexArray::index_string_all(StringData value, IntegerColumn& result,
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
             const IntegerColumn sub(m_alloc, to_ref(ref));
-            return from_list_all(value, result, result_ref, sub, column);
+            return from_list_all(value, result, sub, column);
         }
 
         // Recurse into sub-index;
@@ -446,8 +442,8 @@ key_type generate_key(key_type upper, key_type lower, int permutation) {
 }
 
 
-void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result,
-                                      InternalFindResult& result_ref, ColumnBase* column) const {
+void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, ColumnBase* column) const
+{
     using key_type = StringIndex::key_type;
     struct WorkItem {
         const char* header;
@@ -542,7 +538,7 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result,
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
             const IntegerColumn sub(m_alloc, to_ref(ref));
-            from_list_all_ins(upper_value, result, result_ref, sub, column);
+            from_list_all_ins(upper_value, result, sub, column);
             continue;
         }
 
@@ -565,11 +561,10 @@ size_t IndexArray::index_string_find_first(StringData value, ColumnBase* column)
 
 void IndexArray::index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column, bool case_insensitive) const
 {
-    InternalFindResult dummy;
     if (case_insensitive) {
-        index_string_all_ins(value, result, dummy, column);
+        index_string_all_ins(value, result, column);
     } else {
-        index_string_all(value, result, dummy, column);
+        index_string_all(value, result, column);
     }
 }
 
