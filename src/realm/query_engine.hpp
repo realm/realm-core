@@ -913,8 +913,6 @@ protected:
 template <class ColType, class TConditionFunction>
 class SizeNode : public ParentNode {
 public:
-    using TConditionValue = typename ColType::value_type;
-
     SizeNode(int64_t v, size_t column)
         : m_value(v)
     {
@@ -957,6 +955,8 @@ public:
     }
 
 private:
+    using TConditionValue = typename ColType::value_type;
+
     int64_t m_value;
     const ColType* m_condition_column = nullptr;
     Size<TConditionValue> m_size_operator;

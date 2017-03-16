@@ -1841,6 +1841,7 @@ TEST(Query_size)
     Columns<Binary> binaries = table1->column<Binary>(1);
     Columns<SubTable> intlist = table1->column<SubTable>(2);
     Columns<LinkList> linklist = table1->column<LinkList>(3);
+    Columns<Int> integers = table2->column<Int>(0);
 
     table1->add_empty_row(10);
     table2->add_empty_row(10);
@@ -1894,6 +1895,10 @@ TEST(Query_size)
     Query q1;
     size_t match;
     TableView tv;
+
+    q = integers.size() == 1;
+    tv = q.find_all();
+    CHECK_EQUAL(10, tv.size());
 
     q = strings.size() == 5;
     q1 = table1->where().size_equal(0, 5);
