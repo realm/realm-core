@@ -197,8 +197,8 @@ size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, IntegerColu
 }
 
 
-size_t IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result, InternalFindResult& /*result_ref*/,
-                                     const IntegerColumn& rows, ColumnBase* column) const
+void IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result, InternalFindResult& /*result_ref*/,
+                                   const IntegerColumn& rows, ColumnBase* column) const
 {
     // The buffer is needed when for when this is an integer index.
     StringIndex::StringConversionBuffer buffer;
@@ -209,14 +209,14 @@ size_t IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& resu
     if (first_str == last_str) {
         auto first_str_upper = case_map(first_str, true);
         if (first_str_upper != upper_value) {
-            return size_t(FindRes_not_found); // is ignored
+            return;
         }
 
         for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
             const size_t row_ndx = to_size_t(*it);
             result.add(row_ndx);
         }
-        return size_t(FindRes_column); // is ignored
+        return;
     }
 
     // special case for very long strings, where they might have a common prefix and end up in the
@@ -229,7 +229,7 @@ size_t IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& resu
             result.add(row_ndx);
     }
 
-    return size_t(FindRes_column); // is ignored
+    return;
 }
 
 
@@ -446,8 +446,8 @@ key_type generate_key(key_type upper, key_type lower, int permutation) {
 }
 
 
-size_t IndexArray::index_string_all_ins(StringData value, IntegerColumn& result,
-                                        InternalFindResult& result_ref, ColumnBase* column) const {
+void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result,
+                                      InternalFindResult& result_ref, ColumnBase* column) const {
     using key_type = StringIndex::key_type;
     struct WorkItem {
         const char* header;
@@ -549,16 +549,6 @@ size_t IndexArray::index_string_all_ins(StringData value, IntegerColumn& result,
         // Recurse into sub-index;
         const size_t sub_string_offset = string_offset + 4;
         work_list.push_back({sub_header, sub_string_offset, -1});
-    }
-
-    switch (result.size()) {
-        case 0:
-            return FindRes_not_found;
-        case 1:
-            result_ref.payload = to_size_t(result.get(0)); // unsure if this is necessary
-            return FindRes_single;
-        default:
-            return FindRes_column;
     }
 }
 
