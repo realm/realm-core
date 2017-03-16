@@ -234,9 +234,8 @@ size_t IndexArray::from_list<index_FindAll_ins>(StringData upper_value, IntegerC
 }
 
 
-template <>
-size_t IndexArray::index_string<index_FindAll>(StringData value, IntegerColumn& result,
-                                               InternalFindResult& result_ref, ColumnBase* column) const
+size_t IndexArray::index_string_all(StringData value, IntegerColumn& result,
+                                    InternalFindResult& result_ref, ColumnBase* column) const
 {
     const char* data = m_data;
     const char* header;
@@ -582,7 +581,7 @@ void IndexArray::index_string_find_all(IntegerColumn& result, StringData value, 
     if (case_insensitive) {
         index_string<index_FindAll_ins>(value, result, dummy, column);
     } else {
-        index_string<index_FindAll>(value, result, dummy, column);
+        index_string_all(value, result, dummy, column);
     }
 }
 

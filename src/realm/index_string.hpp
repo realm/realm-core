@@ -90,6 +90,9 @@ private:
     template <IndexMethod method>
     size_t index_string(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
                         ColumnBase* column) const;
+
+    size_t index_string_all(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+                            ColumnBase* column) const;
 };
 
 
