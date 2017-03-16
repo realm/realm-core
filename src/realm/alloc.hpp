@@ -80,8 +80,6 @@ private:
 /// \sa SlabAlloc
 class Allocator {
 public:
-    static constexpr int CURRENT_FILE_FORMAT_VERSION = 6;
-
     /// The specified size must be divisible by 8, and must not be
     /// zero.
     ///
@@ -121,6 +119,10 @@ public:
 
     virtual ~Allocator() noexcept;
 
+    // Disable copying. Copying an allocator can produce double frees.
+    Allocator(const Allocator&) = delete;
+    Allocator& operator=(const Allocator&) = delete;
+
     virtual void verify() const = 0;
 
 #ifdef REALM_DEBUG
@@ -137,14 +139,14 @@ public:
 
     Replication* get_replication() noexcept;
 
-    /// \brief The version of the format of the the node structure (in file or
-    /// in memory) in use by Realm objects associated with this allocator.
+    /// \brief The version of the format of the node structure (in file or in
+    /// memory) in use by Realm objects associated with this allocator.
     ///
     /// Every allocator contains a file format version field, which is returned
     /// by this function. In some cases (as mentioned below) the file format can
     /// change.
     ///
-    /// A value of zero means the the file format is not yet decided. This is
+    /// A value of zero means that the file format is not yet decided. This is
     /// only possible for empty Realms where top-ref is zero.
     ///
     /// For the default allocator (get_default()), the file format version field
@@ -201,6 +203,8 @@ public:
     ///     logs into the Realm file. Changes to the transaction log format
     ///     including reshuffling instructions. This is the format used in
     ///     milestone 2.0.0.
+    ///
+    ///   7 Introduced "history schema version" as 10th entry in top array.
     ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in AllocSlab::validate_buffer(), the file

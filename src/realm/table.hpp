@@ -997,7 +997,7 @@ private:
     /// assign() would not check for spec compatibility. This would
     /// make it ideal as a basis for implementing operator=() for
     /// typed tables.
-    Table& operator=(const Table&);
+    Table& operator=(const Table&) = delete;
 
     /// Used when constructing an accessor whose lifetime is going to be managed
     /// by reference counting. The lifetime of accessors of free-standing tables

@@ -75,7 +75,7 @@ public:
     }
 
     size_t index_string_find_first(StringData value, ColumnBase* column) const;
-    void index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const;
+    void index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column, bool case_insensitive = false) const;
     FindRes index_string_find_all_no_copy(StringData value, ColumnBase* column, InternalFindResult& result) const;
     size_t index_string_count(StringData value, ColumnBase* column) const;
 
@@ -135,7 +135,7 @@ public:
     template <class T>
     size_t find_first(T value) const;
     template <class T>
-    void find_all(IntegerColumn& result, T value) const;
+    void find_all(IntegerColumn& result, T value, bool case_insensitive = false) const;
     template <class T>
     FindRes find_all_no_copy(T value, InternalFindResult& result) const;
     template <class T>
@@ -519,11 +519,11 @@ size_t StringIndex::find_first(T value) const
 }
 
 template <class T>
-void StringIndex::find_all(IntegerColumn& result, T value) const
+void StringIndex::find_all(IntegerColumn& result, T value, bool case_insensitive) const
 {
     // Use direct access method
     StringConversionBuffer buffer;
-    return m_array->index_string_find_all(result, to_str(value, buffer), m_target_column);
+    return m_array->index_string_find_all(result, to_str(value, buffer), m_target_column, case_insensitive);
 }
 
 template <class T>
