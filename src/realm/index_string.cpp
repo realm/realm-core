@@ -446,9 +446,8 @@ key_type generate_key(key_type upper, key_type lower, int permutation) {
 }
 
 
-template<>
-size_t IndexArray::index_string<index_FindAll_ins>(StringData value, IntegerColumn& result,
-                                                   InternalFindResult& result_ref, ColumnBase* column) const {
+size_t IndexArray::index_string_all_ins(StringData value, IntegerColumn& result,
+                                        InternalFindResult& result_ref, ColumnBase* column) const {
     using key_type = StringIndex::key_type;
     struct WorkItem {
         const char* header;
@@ -578,7 +577,7 @@ void IndexArray::index_string_find_all(IntegerColumn& result, StringData value, 
 {
     InternalFindResult dummy;
     if (case_insensitive) {
-        index_string<index_FindAll_ins>(value, result, dummy, column);
+        index_string_all_ins(value, result, dummy, column);
     } else {
         index_string_all(value, result, dummy, column);
     }

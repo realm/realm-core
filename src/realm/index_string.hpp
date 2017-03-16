@@ -96,6 +96,9 @@ private:
 
     size_t index_string_all(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
                             ColumnBase* column) const;
+
+    size_t index_string_all_ins(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+                                ColumnBase* column) const;
 };
 
 
