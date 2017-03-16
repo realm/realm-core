@@ -234,6 +234,92 @@ size_t IndexArray::from_list<index_FindAll_ins>(StringData upper_value, IntegerC
     return size_t(FindRes_column); // is ignored
 }
 
+
+template <>
+size_t IndexArray::index_string<index_FindAll>(StringData value, IntegerColumn& result,
+                                               InternalFindResult& result_ref, ColumnBase* column) const
+{
+    const char* data = m_data;
+    const char* header;
+    uint_least8_t width = m_width;
+    bool is_inner_node = m_is_inner_bptree_node;
+    typedef StringIndex::key_type key_type;
+    size_t stringoffset = 0;
+
+    // Create 4 byte index key
+    key_type key = StringIndex::create_key(value, stringoffset);
+
+    for (;;) {
+        // Get subnode table
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+
+        // Find the position matching the key
+        const char* offsets_header = m_alloc.translate(offsets_ref);
+        const char* offsets_data = get_data_from_header(offsets_header);
+        size_t offsets_size = get_size_from_header(offsets_header);
+        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
+
+        // If key is outside range, we know there can be no match
+        if (pos == offsets_size)
+            return size_t(FindRes_not_found);
+
+        // Get entry under key
+        size_t pos_refs = pos + 1; // first entry in refs points to offsets
+        int64_t ref = get_direct(data, width, pos_refs);
+
+        if (is_inner_node) {
+            // Set vars for next iteration
+            header = m_alloc.translate(to_ref(ref));
+            data = get_data_from_header(header);
+            width = get_width_from_header(header);
+            is_inner_node = get_is_inner_bptree_node_from_header(header);
+            continue;
+        }
+
+        key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
+
+        if (stored_key != key)
+            return size_t(FindRes_not_found);
+
+        // Literal row index (tagged)
+        if (ref & 1) {
+            size_t row_ndx = size_t(uint64_t(ref) >> 1);
+
+            // The buffer is needed when for when this is an integer index.
+            StringIndex::StringConversionBuffer buffer;
+            StringData str = column->get_index_data(row_ndx, buffer);
+            if (str == value) {
+                result_ref.payload = row_ndx;
+                result.add(row_ndx);
+                return FindRes_single;
+            }
+            return size_t(FindRes_not_found);
+        }
+
+        const char* sub_header = m_alloc.translate(to_ref(ref));
+        const bool sub_isindex = get_context_flag_from_header(sub_header);
+
+        // List of row indices with common prefix up to this point, in sorted order.
+        if (!sub_isindex) {
+            const IntegerColumn sub(m_alloc, to_ref(ref));
+            return from_list<index_FindAll>(value, result, result_ref, sub, column);
+        }
+
+        // Recurse into sub-index;
+        header = sub_header;
+        data = get_data_from_header(header);
+        width = get_width_from_header(header);
+        is_inner_node = get_is_inner_bptree_node_from_header(header);
+
+        // Go to next key part of the string. If the offset exceeds the string length, the key will be 0
+        stringoffset += 4;
+
+        // Update 4 byte index key
+        key = StringIndex::create_key(value, stringoffset);
+    }
+}
+
+
 template <IndexMethod method>
 size_t IndexArray::index_string(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
                                 ColumnBase* column) const
@@ -242,13 +328,6 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
     constexpr bool first(method == index_FindFirst);
     // Return 0, or the number of items that match the specified `value`
     constexpr bool get_count(method == index_Count);
-    // Place all row indexes containing `value` into `result`
-    // Returns one of FindRes_not_found[==0] if no matches found
-    // Returns FindRes_single, if one match found: the result row literal is
-    // both placed in `result_ref.payload` and added to `column`
-    // Returns FindRes_column, if more than one match found: the matching row
-    // literals are copied into `column`
-    constexpr bool all(method == index_FindAll);
     // Same as `index_FindAll` but does not copy matching rows into `column`
     // returns FindRes_not_found if there are no matches
     // returns FindRes_single and the row index (literal) in result_ref.payload
@@ -256,7 +335,7 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
     // result_ref.result with the results in the bounds start_ndx, and end_ndx
     constexpr bool allnocopy(method == index_FindAll_nocopy);
 
-    constexpr size_t local_not_found = (allnocopy || all) ? size_t(FindRes_not_found) : first ? not_found : 0;
+    constexpr size_t local_not_found = allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
 
     const char* data = m_data;
     const char* header;
@@ -309,9 +388,6 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
             StringData str = column->get_index_data(row_ndx, buffer);
             if (str == value) {
                 result_ref.payload = row_ndx;
-                if (all)
-                    result.add(row_ndx);
-
                 return first ? row_ndx : get_count ? 1 : FindRes_single;
             }
             return local_not_found;
