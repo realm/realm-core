@@ -1621,7 +1621,7 @@ void Table::upgrade_file_format(size_t target_file_format_version)
                 // Indices are not support on these column types
                 break;
             case col_type_Timestamp: {
-                if (target_file_format_version == 6) {
+                if (target_file_format_version == 6 || target_file_format_version == 7) {
                     TimestampColumn& col = get_column_timestamp(col_ndx);
                     col.get_search_index()->clear();
                     col.populate_search_index();

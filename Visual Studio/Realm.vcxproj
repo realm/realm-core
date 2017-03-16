@@ -1503,7 +1503,6 @@
     <ClCompile Include="..\src\realm\group.cpp" />
     <ClCompile Include="..\src\realm\group_shared.cpp" />
     <ClCompile Include="..\src\realm\group_writer.cpp" />
-    <ClCompile Include="..\src\realm\impl\continuous_transactions_history.cpp" />
     <ClCompile Include="..\src\realm\index_string.cpp" />
     <ClCompile Include="..\src\realm\query.cpp" />
     <ClCompile Include="..\src\realm\spec.cpp" />

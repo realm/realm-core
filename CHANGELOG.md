@@ -14,10 +14,23 @@
 ### Breaking changes
 
 * Disable copying of various classes to prevent incorrect use at compile time.
+* History type enumeration value `Replication::hist_Sync` renamed to
+  `Replication::hist_SyncClient`.
+* Bumps file format version from 6 to 7 due to addition of a 10th element into
+  `Group::m_top`. The new element is the history schema version, which is
+  crucial for managing the schema upgrade process of sync-type histories in a
+  way that is independent of core's Realm file format. The bump is necessary due
+  to lack of forwards compatibility. The changes are backwards compatible, and
+  automatic upgrade is implemented.
+* New pure virtual methods `get_history_schema_version()`,
+  `is_upgradable_history_schema()`, and `upgrade_history_schema()` in
+  `Replication` interface.
 
 ### Enhancements
 
-* Lorem ipsum.
+* New history type enumeration value `Replication::hist_SyncServer`. This allows
+  for the sync server to start using the same kind of in-Realm history scheme as
+  is currently used by clients.
 
 -----------
 
@@ -32,6 +45,14 @@
   with respect to carrying out the effect of the instruction on the database, to
   allow implementors of the `Replication` interface a semi-consistent view of
   the database.
+* Lock file format bumped from version 9 to 10 due to introduction of
+  `SharedInfo::history_schema_version`.
+* Removal of obsolete logic and semantics relating to obsolete history type
+  `Replication::hist_OutOfRealm`.
+* Code specific to history type `Replication::hist_InRealm` (class
+  `_impl::InRealmHistory` in particular) was moved from
+  `realm/impl/continuous_transactions_history.hpp` and
+  `realm/impl/continuous_transactions_history.cpp` to `realm/sync/history.cpp`.
 
 ----------------------------------------------
 
