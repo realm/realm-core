@@ -555,7 +555,7 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
     REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_type)>(ht + 0));
     REALM_ASSERT(!util::int_cast_has_overflow<decltype(history_schema_version)>(hsv));
     history_type = ht;
-    history_schema_version = hsv;
+    history_schema_version = static_cast<uint16_t>(hsv);
 #ifndef _WIN32
     InterprocessCondVar::init_shared_part(new_commit_available); // Throws
     InterprocessCondVar::init_shared_part(pick_next_writer); // Throws
