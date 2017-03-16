@@ -197,9 +197,8 @@ size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, IntegerColu
 }
 
 
-template <>
-size_t IndexArray::from_list<index_FindAll_ins>(StringData upper_value, IntegerColumn& result, InternalFindResult& /*result_ref*/,
-                                                const IntegerColumn& rows, ColumnBase* column) const
+size_t IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result, InternalFindResult& /*result_ref*/,
+                                     const IntegerColumn& rows, ColumnBase* column) const
 {
     // The buffer is needed when for when this is an integer index.
     StringIndex::StringConversionBuffer buffer;
@@ -544,7 +543,7 @@ size_t IndexArray::index_string<index_FindAll_ins>(StringData value, IntegerColu
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
             const IntegerColumn sub(m_alloc, to_ref(ref));
-            from_list<index_FindAll_ins>(upper_value, result, result_ref, sub, column);
+            from_list_all_ins(upper_value, result, result_ref, sub, column);
             continue;
         }
 
