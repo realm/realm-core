@@ -139,6 +139,8 @@ public:
 
 private:
     Realm::Config m_config;
+
+    mutable std::mutex m_schema_cache_mutex;
     util::Optional<Schema> m_cached_schema;
     uint64_t m_schema_version = -1;
     uint64_t m_schema_transaction_version_min = 0;

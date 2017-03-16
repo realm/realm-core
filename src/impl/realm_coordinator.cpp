@@ -237,6 +237,7 @@ std::shared_ptr<Realm> RealmCoordinator::get_realm()
 bool RealmCoordinator::get_cached_schema(Schema& schema, uint64_t& schema_version,
                                          uint64_t& transaction) const noexcept
 {
+    std::lock_guard<std::mutex> lock(m_schema_cache_mutex);
     if (!m_cached_schema)
         return false;
     schema = *m_cached_schema;
@@ -248,6 +249,7 @@ bool RealmCoordinator::get_cached_schema(Schema& schema, uint64_t& schema_versio
 void RealmCoordinator::cache_schema(Schema const& new_schema, uint64_t new_schema_version,
                                     uint64_t transaction_version)
 {
+    std::lock_guard<std::mutex> lock(m_schema_cache_mutex);
     if (transaction_version < m_schema_transaction_version_max)
         return;
     if (new_schema.empty() || new_schema_version == ObjectStore::NotVersioned)
@@ -261,12 +263,14 @@ void RealmCoordinator::cache_schema(Schema const& new_schema, uint64_t new_schem
 
 void RealmCoordinator::clear_schema_cache_and_set_schema_version(uint64_t new_schema_version)
 {
+    std::lock_guard<std::mutex> lock(m_schema_cache_mutex);
     m_cached_schema = util::none;
     m_schema_version = new_schema_version;
 }
 
 void RealmCoordinator::advance_schema_cache(uint64_t previous, uint64_t next)
 {
+    std::lock_guard<std::mutex> lock(m_schema_cache_mutex);
     if (!m_cached_schema)
         return;
     REALM_ASSERT(previous <= m_schema_transaction_version_max);
