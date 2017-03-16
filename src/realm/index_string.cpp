@@ -543,8 +543,8 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
 
 size_t IndexArray::index_string_find_first(StringData value, ColumnBase* column) const
 {
-    InternalFindResult dummy;
-    return index_string<index_FindFirst>(value, dummy, column);
+    InternalFindResult unused;
+    return index_string<index_FindFirst>(value, unused, column);
 }
 
 
@@ -565,8 +565,8 @@ FindRes IndexArray::index_string_find_all_no_copy(StringData value, ColumnBase* 
 
 size_t IndexArray::index_string_count(StringData value, ColumnBase* column) const
 {
-    InternalFindResult dummy2;
-    return index_string<index_Count>(value, dummy2, column);
+    InternalFindResult unused;
+    return index_string<index_Count>(value, unused, column);
 }
 
 IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
