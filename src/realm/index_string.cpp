@@ -62,12 +62,9 @@ StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIn
 }
 
 template <>
-size_t IndexArray::from_list<index_FindFirst>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+size_t IndexArray::from_list<index_FindFirst>(StringData value, InternalFindResult& /* result_ref */,
                                               const IntegerColumn& rows, ColumnBase* column) const
 {
-    static_cast<void>(result);
-    static_cast<void>(result_ref);
-
     SortedListComparator slc(*column);
 
     IntegerColumn::const_iterator it_end = rows.cend();
@@ -87,12 +84,9 @@ size_t IndexArray::from_list<index_FindFirst>(StringData value, IntegerColumn& r
 }
 
 template <>
-size_t IndexArray::from_list<index_Count>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+size_t IndexArray::from_list<index_Count>(StringData value, InternalFindResult& /* result_ref */,
                                           const IntegerColumn& rows, ColumnBase* column) const
 {
-    static_cast<void>(result);
-    static_cast<void>(result_ref);
-
     SortedListComparator slc(*column);
 
     IntegerColumn::const_iterator it_end = rows.cend();
@@ -115,44 +109,9 @@ size_t IndexArray::from_list<index_Count>(StringData value, IntegerColumn& resul
 }
 
 template <>
-size_t IndexArray::from_list<index_FindAll>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                                            const IntegerColumn& rows, ColumnBase* column) const
+size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFindResult& result_ref,
+                                                   const IntegerColumn& rows, ColumnBase* column) const
 {
-    static_cast<void>(result_ref);
-
-    SortedListComparator slc(*column);
-
-    IntegerColumn::const_iterator it_end = rows.cend();
-    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
-    if (lower == it_end)
-        return size_t(FindRes_not_found);
-
-    const size_t first_row_ndx = to_size_t(*lower);
-
-    // The buffer is needed when for when this is an integer index.
-    StringIndex::StringConversionBuffer buffer;
-    StringData str = column->get_index_data(first_row_ndx, buffer);
-    if (str != value)
-        return size_t(FindRes_not_found);
-
-    IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value, slc);
-
-    // Copy all matches into result column
-    for (IntegerColumn::const_iterator it = lower; it != upper; ++it) {
-        const size_t cur_row_ndx = to_size_t(*it);
-        result.add(cur_row_ndx);
-    }
-
-    return size_t(FindRes_column);
-}
-
-template <>
-size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& result,
-                                                   InternalFindResult& result_ref, const IntegerColumn& rows,
-                                                   ColumnBase* column) const
-{
-    static_cast<void>(result);
-
     SortedListComparator slc(*column);
     IntegerColumn::const_iterator it_end = rows.cend();
     IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
@@ -198,57 +157,13 @@ size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, IntegerColu
 }
 
 
-template <>
-size_t IndexArray::from_list<index_FindAll_ins>(StringData upper_value, IntegerColumn& result, InternalFindResult& /*result_ref*/,
-                                                const IntegerColumn& rows, ColumnBase* column) const
-{
-    // The buffer is needed when for when this is an integer index.
-    StringIndex::StringConversionBuffer buffer;
-
-    // optimization for the most common case, where all the strings under a given subindex are equal
-    StringData first_str = column->get_index_data(to_size_t(*rows.cbegin()), buffer);
-    StringData last_str = column->get_index_data(to_size_t(*(rows.cend() - 1)), buffer);
-    if (first_str == last_str) {
-        auto first_str_upper = case_map(first_str, true);
-        if (first_str_upper != upper_value) {
-            return size_t(FindRes_not_found); // is ignored
-        }
-
-        for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
-            const size_t row_ndx = to_size_t(*it);
-            result.add(row_ndx);
-        }
-        return size_t(FindRes_column); // is ignored
-    }
-
-    // special case for very long strings, where they might have a common prefix and end up in the
-    // same subindex column, but still not be identical
-    for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
-        const size_t row_ndx = to_size_t(*it);
-        StringData str = column->get_index_data(row_ndx, buffer);
-        auto upper_str = case_map(str, true);
-        if (upper_str == upper_value)
-            result.add(row_ndx);
-    }
-
-    return size_t(FindRes_column); // is ignored
-}
-
 template <IndexMethod method>
-size_t IndexArray::index_string(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                                ColumnBase* column) const
+size_t IndexArray::index_string(StringData value, InternalFindResult& result_ref, ColumnBase* column) const
 {
     // Return`realm::not_found`, or an index to the (any) match
     constexpr bool first(method == index_FindFirst);
     // Return 0, or the number of items that match the specified `value`
     constexpr bool get_count(method == index_Count);
-    // Place all row indexes containing `value` into `result`
-    // Returns one of FindRes_not_found[==0] if no matches found
-    // Returns FindRes_single, if one match found: the result row literal is
-    // both placed in `result_ref.payload` and added to `column`
-    // Returns FindRes_column, if more than one match found: the matching row
-    // literals are copied into `column`
-    constexpr bool all(method == index_FindAll);
     // Same as `index_FindAll` but does not copy matching rows into `column`
     // returns FindRes_not_found if there are no matches
     // returns FindRes_single and the row index (literal) in result_ref.payload
@@ -256,7 +171,7 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
     // result_ref.result with the results in the bounds start_ndx, and end_ndx
     constexpr bool allnocopy(method == index_FindAll_nocopy);
 
-    constexpr size_t local_not_found = (allnocopy || all) ? size_t(FindRes_not_found) : first ? not_found : 0;
+    constexpr size_t local_not_found = allnocopy ? size_t(FindRes_not_found) : first ? not_found : 0;
 
     const char* data = m_data;
     const char* header;
@@ -309,9 +224,6 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
             StringData str = column->get_index_data(row_ndx, buffer);
             if (str == value) {
                 result_ref.payload = row_ndx;
-                if (all)
-                    result.add(row_ndx);
-
                 return first ? row_ndx : get_count ? 1 : FindRes_single;
             }
             return local_not_found;
@@ -323,7 +235,7 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
             const IntegerColumn sub(m_alloc, to_ref(ref));
-            return from_list<method>(value, result, result_ref, sub, column);
+            return from_list<method>(value, result_ref, sub, column);
         }
 
         // Recurse into sub-index;
@@ -338,6 +250,72 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
         // Update 4 byte index key
         key = StringIndex::create_key(value, stringoffset);
     }
+}
+
+
+void IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result, const IntegerColumn& rows,
+                                   ColumnBase* column) const
+{
+    // The buffer is needed when for when this is an integer index.
+    StringIndex::StringConversionBuffer buffer;
+
+    // optimization for the most common case, where all the strings under a given subindex are equal
+    StringData first_str = column->get_index_data(to_size_t(*rows.cbegin()), buffer);
+    StringData last_str = column->get_index_data(to_size_t(*(rows.cend() - 1)), buffer);
+    if (first_str == last_str) {
+        auto first_str_upper = case_map(first_str, true);
+        if (first_str_upper != upper_value) {
+            return;
+        }
+
+        for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
+            const size_t row_ndx = to_size_t(*it);
+            result.add(row_ndx);
+        }
+        return;
+    }
+
+    // special case for very long strings, where they might have a common prefix and end up in the
+    // same subindex column, but still not be identical
+    for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
+        const size_t row_ndx = to_size_t(*it);
+        StringData str = column->get_index_data(row_ndx, buffer);
+        auto upper_str = case_map(str, true);
+        if (upper_str == upper_value)
+            result.add(row_ndx);
+    }
+
+    return;
+}
+
+
+void IndexArray::from_list_all(StringData value, IntegerColumn& result, const IntegerColumn& rows,
+                               ColumnBase* column) const
+{
+    SortedListComparator slc(*column);
+
+    IntegerColumn::const_iterator it_end = rows.cend();
+    IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
+    if (lower == it_end)
+        return;
+
+    const size_t first_row_ndx = to_size_t(*lower);
+
+    // The buffer is needed when for when this is an integer index.
+    StringIndex::StringConversionBuffer buffer;
+    StringData str = column->get_index_data(first_row_ndx, buffer);
+    if (str != value)
+        return;
+
+    IntegerColumn::const_iterator upper = std::upper_bound(lower, it_end, value, slc);
+
+    // Copy all matches into result column
+    for (IntegerColumn::const_iterator it = lower; it != upper; ++it) {
+        const size_t cur_row_ndx = to_size_t(*it);
+        result.add(cur_row_ndx);
+    }
+
+    return;
 }
 
 
@@ -373,9 +351,8 @@ key_type generate_key(key_type upper, key_type lower, int permutation) {
 }
 
 
-template<>
-size_t IndexArray::index_string<index_FindAll_ins>(StringData value, IntegerColumn& result,
-                                                   InternalFindResult& result_ref, ColumnBase* column) const {
+void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, ColumnBase* column) const
+{
     using key_type = StringIndex::key_type;
     struct WorkItem {
         const char* header;
@@ -470,7 +447,7 @@ size_t IndexArray::index_string<index_FindAll_ins>(StringData value, IntegerColu
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
             const IntegerColumn sub(m_alloc, to_ref(ref));
-            from_list<index_FindAll_ins>(upper_value, result, result_ref, sub, column);
+            from_list_all_ins(upper_value, result, sub, column);
             continue;
         }
 
@@ -478,15 +455,87 @@ size_t IndexArray::index_string<index_FindAll_ins>(StringData value, IntegerColu
         const size_t sub_string_offset = string_offset + 4;
         work_list.push_back({sub_header, sub_string_offset, -1});
     }
+}
 
-    switch (result.size()) {
-        case 0:
-            return FindRes_not_found;
-        case 1:
-            result_ref.payload = to_size_t(result.get(0)); // unsure if this is necessary
-            return FindRes_single;
-        default:
-            return FindRes_column;
+
+void IndexArray::index_string_all(StringData value, IntegerColumn& result, ColumnBase* column) const
+{
+    const char* data = m_data;
+    const char* header;
+    uint_least8_t width = m_width;
+    bool is_inner_node = m_is_inner_bptree_node;
+    typedef StringIndex::key_type key_type;
+    size_t stringoffset = 0;
+
+    // Create 4 byte index key
+    key_type key = StringIndex::create_key(value, stringoffset);
+
+    for (;;) {
+        // Get subnode table
+        ref_type offsets_ref = to_ref(get_direct(data, width, 0));
+
+        // Find the position matching the key
+        const char* offsets_header = m_alloc.translate(offsets_ref);
+        const char* offsets_data = get_data_from_header(offsets_header);
+        size_t offsets_size = get_size_from_header(offsets_header);
+        size_t pos = ::lower_bound<32>(offsets_data, offsets_size, key); // keys are always 32 bits wide
+
+        // If key is outside range, we know there can be no match
+        if (pos == offsets_size)
+            return;
+
+        // Get entry under key
+        size_t pos_refs = pos + 1; // first entry in refs points to offsets
+        int64_t ref = get_direct(data, width, pos_refs);
+
+        if (is_inner_node) {
+            // Set vars for next iteration
+            header = m_alloc.translate(to_ref(ref));
+            data = get_data_from_header(header);
+            width = get_width_from_header(header);
+            is_inner_node = get_is_inner_bptree_node_from_header(header);
+            continue;
+        }
+
+        key_type stored_key = key_type(get_direct<32>(offsets_data, pos));
+
+        if (stored_key != key)
+            return;
+
+        // Literal row index (tagged)
+        if (ref & 1) {
+            size_t row_ndx = size_t(uint64_t(ref) >> 1);
+
+            // The buffer is needed when for when this is an integer index.
+            StringIndex::StringConversionBuffer buffer;
+            StringData str = column->get_index_data(row_ndx, buffer);
+            if (str == value) {
+                result.add(row_ndx);
+                return;
+            }
+            return;
+        }
+
+        const char* sub_header = m_alloc.translate(to_ref(ref));
+        const bool sub_isindex = get_context_flag_from_header(sub_header);
+
+        // List of row indices with common prefix up to this point, in sorted order.
+        if (!sub_isindex) {
+            const IntegerColumn sub(m_alloc, to_ref(ref));
+            return from_list_all(value, result, sub, column);
+        }
+
+        // Recurse into sub-index;
+        header = sub_header;
+        data = get_data_from_header(header);
+        width = get_width_from_header(header);
+        is_inner_node = get_is_inner_bptree_node_from_header(header);
+
+        // Go to next key part of the string. If the offset exceeds the string length, the key will be 0
+        stringoffset += 4;
+
+        // Update 4 byte index key
+        key = StringIndex::create_key(value, stringoffset);
     }
 }
 
@@ -495,34 +544,30 @@ size_t IndexArray::index_string<index_FindAll_ins>(StringData value, IntegerColu
 
 size_t IndexArray::index_string_find_first(StringData value, ColumnBase* column) const
 {
-    InternalFindResult dummy;
-    IntegerColumn dummycol;
-    return index_string<index_FindFirst>(value, dummycol, dummy, column);
+    InternalFindResult unused;
+    return index_string<index_FindFirst>(value, unused, column);
 }
 
 
 void IndexArray::index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column, bool case_insensitive) const
 {
-    InternalFindResult dummy;
     if (case_insensitive) {
-        index_string<index_FindAll_ins>(value, result, dummy, column);
+        index_string_all_ins(value, result, column);
     } else {
-        index_string<index_FindAll>(value, result, dummy, column);
+        index_string_all(value, result, column);
     }
 }
 
 FindRes IndexArray::index_string_find_all_no_copy(StringData value, ColumnBase* column,
                                                   InternalFindResult& result) const
 {
-    IntegerColumn dummy;
-    return static_cast<FindRes>(index_string<index_FindAll_nocopy>(value, dummy, result, column));
+    return static_cast<FindRes>(index_string<index_FindAll_nocopy>(value, result, column));
 }
 
 size_t IndexArray::index_string_count(StringData value, ColumnBase* column) const
 {
-    IntegerColumn dummy1;
-    InternalFindResult dummy2;
-    return index_string<index_Count>(value, dummy1, dummy2, column);
+    InternalFindResult unused;
+    return index_string<index_Count>(value, unused, column);
 }
 
 IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
