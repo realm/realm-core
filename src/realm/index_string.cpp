@@ -62,11 +62,9 @@ StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIn
 }
 
 template <>
-size_t IndexArray::from_list<index_FindFirst>(StringData value, InternalFindResult& result_ref,
+size_t IndexArray::from_list<index_FindFirst>(StringData value, InternalFindResult& /* result_ref */,
                                               const IntegerColumn& rows, ColumnBase* column) const
 {
-    static_cast<void>(result_ref);
-
     SortedListComparator slc(*column);
 
     IntegerColumn::const_iterator it_end = rows.cend();
@@ -86,11 +84,9 @@ size_t IndexArray::from_list<index_FindFirst>(StringData value, InternalFindResu
 }
 
 template <>
-size_t IndexArray::from_list<index_Count>(StringData value, InternalFindResult& result_ref, const IntegerColumn& rows,
-                                          ColumnBase* column) const
+size_t IndexArray::from_list<index_Count>(StringData value, InternalFindResult& /* result_ref */,
+                                          const IntegerColumn& rows, ColumnBase* column) const
 {
-    static_cast<void>(result_ref);
-
     SortedListComparator slc(*column);
 
     IntegerColumn::const_iterator it_end = rows.cend();
