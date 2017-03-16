@@ -62,10 +62,9 @@ StringData GetIndexData<Timestamp>::get_index_data(const Timestamp& dt, StringIn
 }
 
 template <>
-size_t IndexArray::from_list<index_FindFirst>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+size_t IndexArray::from_list<index_FindFirst>(StringData value, InternalFindResult& result_ref,
                                               const IntegerColumn& rows, ColumnBase* column) const
 {
-    static_cast<void>(result);
     static_cast<void>(result_ref);
 
     SortedListComparator slc(*column);
@@ -87,10 +86,9 @@ size_t IndexArray::from_list<index_FindFirst>(StringData value, IntegerColumn& r
 }
 
 template <>
-size_t IndexArray::from_list<index_Count>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                                          const IntegerColumn& rows, ColumnBase* column) const
+size_t IndexArray::from_list<index_Count>(StringData value, InternalFindResult& result_ref, const IntegerColumn& rows,
+                                          ColumnBase* column) const
 {
-    static_cast<void>(result);
     static_cast<void>(result_ref);
 
     SortedListComparator slc(*column);
@@ -144,12 +142,9 @@ void IndexArray::from_list_all(StringData value, IntegerColumn& result, const In
 }
 
 template <>
-size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, IntegerColumn& result,
-                                                   InternalFindResult& result_ref, const IntegerColumn& rows,
-                                                   ColumnBase* column) const
+size_t IndexArray::from_list<index_FindAll_nocopy>(StringData value, InternalFindResult& result_ref,
+                                                   const IntegerColumn& rows, ColumnBase* column) const
 {
-    static_cast<void>(result);
-
     SortedListComparator slc(*column);
     IntegerColumn::const_iterator it_end = rows.cend();
     IntegerColumn::const_iterator lower = std::lower_bound(rows.cbegin(), it_end, value, slc);
@@ -314,8 +309,7 @@ void IndexArray::index_string_all(StringData value, IntegerColumn& result, Colum
 
 
 template <IndexMethod method>
-size_t IndexArray::index_string(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                                ColumnBase* column) const
+size_t IndexArray::index_string(StringData value, InternalFindResult& result_ref, ColumnBase* column) const
 {
     // Return`realm::not_found`, or an index to the (any) match
     constexpr bool first(method == index_FindFirst);
@@ -392,7 +386,7 @@ size_t IndexArray::index_string(StringData value, IntegerColumn& result, Interna
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
             const IntegerColumn sub(m_alloc, to_ref(ref));
-            return from_list<method>(value, result, result_ref, sub, column);
+            return from_list<method>(value, result_ref, sub, column);
         }
 
         // Recurse into sub-index;
@@ -554,8 +548,7 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
 size_t IndexArray::index_string_find_first(StringData value, ColumnBase* column) const
 {
     InternalFindResult dummy;
-    IntegerColumn dummycol;
-    return index_string<index_FindFirst>(value, dummycol, dummy, column);
+    return index_string<index_FindFirst>(value, dummy, column);
 }
 
 
@@ -571,15 +564,13 @@ void IndexArray::index_string_find_all(IntegerColumn& result, StringData value, 
 FindRes IndexArray::index_string_find_all_no_copy(StringData value, ColumnBase* column,
                                                   InternalFindResult& result) const
 {
-    IntegerColumn dummy;
-    return static_cast<FindRes>(index_string<index_FindAll_nocopy>(value, dummy, result, column));
+    return static_cast<FindRes>(index_string<index_FindAll_nocopy>(value, result, column));
 }
 
 size_t IndexArray::index_string_count(StringData value, ColumnBase* column) const
 {
-    IntegerColumn dummy1;
     InternalFindResult dummy2;
-    return index_string<index_Count>(value, dummy1, dummy2, column);
+    return index_string<index_Count>(value, dummy2, column);
 }
 
 IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
