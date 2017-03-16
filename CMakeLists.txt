@@ -2,7 +2,16 @@ cmake_minimum_required(VERSION 3.4)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake")
 
-project(realm VERSION 2.4.0)
+file(STRINGS "${CMAKE_SOURCE_DIR}/dependencies.list" DEPENDENCIES)
+message("Dependencies: ${DEPENDENCIES}")
+foreach(LINE IN LISTS DEPENDENCIES)
+    string(REGEX MATCHALL "([^=]+)" KEY_VALUE ${LINE})
+    list(GET KEY_VALUE 0 KEY)
+    list(GET KEY_VALUE 1 VALUE)
+    set(DEP_${KEY} ${VALUE})
+endforeach()
+
+project(realm VERSION ${DEP_VERSION})
 
 # Include general CMake modules
 include(GNUInstallDirs)
