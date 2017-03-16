@@ -1305,6 +1305,7 @@ EOF
     "lldb"|"lldb-debug"|\
     "lldb-testcase"|"lldb-testcase-debug"|\
     "performance"|"benchmark"|"benchmark-"*|\
+    "fuzz"|"fuzz-debug"|\
     "check-cover"|"check-cover-norun"|"lcov"|"gcovr")
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"

@@ -470,6 +470,8 @@ public:
                               const char* exception_cond_text);
     void throw_any_failed(const char* file, long line, const char* expr_text);
 
+    std::string get_test_name() const;
+
     TestContext(const TestContext&) = delete;
     TestContext& operator=(const TestContext&) = delete;
 

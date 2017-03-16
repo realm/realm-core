@@ -20,11 +20,13 @@
 #include <realm/link_view.hpp>
 #include <realm/lang_bind_helper.hpp>
 #include <realm/history.hpp>
-#include "test.hpp"
 
 #include <ctime>
 #include <cstdio>
 #include <fstream>
+#include <iostream>
+
+#include "util/test_path.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -116,6 +118,16 @@ unsigned char get_next(State& s)
     return byte;
 }
 
+const char* get_encryption_key()
+{
+#if REALM_ENABLE_ENCRYPTION
+    return "1234567890123456789012345678901123456789012345678901234567890123";
+#else
+    return nullptr;
+#endif
+
+}
+
 int64_t get_int64(State& s)
 {
     int64_t v = 0;
@@ -198,7 +210,6 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
     // Max number of rows in a table. Overridden only by add_empty_row_max() and only in the case where
     // max_rows is not exceeded *prior* to executing add_empty_row.
     const size_t max_rows = 100000;
-    using realm::test_util::crypt_key;
 
     try {
         State s;
@@ -206,7 +217,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         s.pos = 0;
 
         const bool use_encryption = get_next(s) % 2 == 0;
-        const char* key = use_encryption ? crypt_key(true) : nullptr;
+        const char* key = use_encryption ? get_encryption_key() : nullptr;
 
         if (log) {
             *log << "// Test case generated in " REALM_VER_CHUNK " on " << get_current_time_stamp() << ".\n";
@@ -907,7 +918,9 @@ int run_fuzzy(int argc, const char* argv[])
     }
 
     disable_sync_to_disk();
-    realm::test_util::SharedGroupTestPathGuard path(name + ".realm");
+
+    realm::test_util::RealmPathInfo test_context { name };
+    SHARED_GROUP_TEST_PATH(path);
 
     std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
     parse_and_apply_instructions(contents, path, log);
