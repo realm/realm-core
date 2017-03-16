@@ -285,9 +285,6 @@
 		48A048311C7F7A55000FFD12 /* continuous_transactions_history.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 48A048301C7F7A55000FFD12 /* continuous_transactions_history.hpp */; };
 		48A048321C7F7A55000FFD12 /* continuous_transactions_history.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 48A048301C7F7A55000FFD12 /* continuous_transactions_history.hpp */; };
 		48A048331C7F7A55000FFD12 /* continuous_transactions_history.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 48A048301C7F7A55000FFD12 /* continuous_transactions_history.hpp */; };
-		48A048351C7F7A6B000FFD12 /* continuous_transactions_history.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48A048341C7F7A6B000FFD12 /* continuous_transactions_history.cpp */; };
-		48A048361C7F7A6B000FFD12 /* continuous_transactions_history.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48A048341C7F7A6B000FFD12 /* continuous_transactions_history.cpp */; };
-		48A048371C7F7A6B000FFD12 /* continuous_transactions_history.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48A048341C7F7A6B000FFD12 /* continuous_transactions_history.cpp */; };
 		48B1D2381C749D750066A961 /* crypt_key.hpp in Headers */ = {isa = PBXBuildFile; fileRef = 48B1D2371C749D750066A961 /* crypt_key.hpp */; };
 		48B1D23A1C749D850066A961 /* crypt_key.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48B1D2391C749D850066A961 /* crypt_key.cpp */; };
 		48B1D23B1C749DF00066A961 /* crypt_key.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 48B1D2391C749D850066A961 /* crypt_key.cpp */; };
@@ -832,7 +829,6 @@
 		485231211B2E9484003C72AF /* history.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = history.hpp; path = realm/history.hpp; sourceTree = "<group>"; };
 		48A0482C1C7F79C4000FFD12 /* history.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = history.cpp; path = realm/history.cpp; sourceTree = "<group>"; };
 		48A048301C7F7A55000FFD12 /* continuous_transactions_history.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = continuous_transactions_history.hpp; sourceTree = "<group>"; };
-		48A048341C7F7A6B000FFD12 /* continuous_transactions_history.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = continuous_transactions_history.cpp; sourceTree = "<group>"; };
 		48B1D2371C749D750066A961 /* crypt_key.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = crypt_key.hpp; sourceTree = "<group>"; };
 		48B1D2391C749D850066A961 /* crypt_key.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = crypt_key.cpp; sourceTree = "<group>"; };
 		4B07BA961D64860100A6D7E0 /* test_destructor_thread_safety.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = test_destructor_thread_safety.cpp; sourceTree = "<group>"; };
@@ -1130,7 +1126,6 @@
 			isa = PBXGroup;
 			children = (
 				65D3F7A31AA74EA000F27CBD /* array_writer.hpp */,
-				48A048341C7F7A6B000FFD12 /* continuous_transactions_history.cpp */,
 				48A048301C7F7A55000FFD12 /* continuous_transactions_history.hpp */,
 				3620DF0418B6CA7B003AD498 /* destroy_guard.hpp */,
 				F44D4CE51B381D27009ADAB9 /* input_stream.hpp */,
@@ -2183,7 +2178,6 @@
 				365CCE4B157CC37D00172BF8 /* column_string_enum.cpp in Sources */,
 				365CCE4F157CC37D00172BF8 /* column_table.cpp in Sources */,
 				65033A761C7DD3B80019E9F2 /* column_timestamp.cpp in Sources */,
-				48A048351C7F7A6B000FFD12 /* continuous_transactions_history.cpp in Sources */,
 				5267884B189AB4B8009CDE7D /* descriptor.cpp in Sources */,
 				6579EEB91B4E89B6004DE3D8 /* disable_sync_to_disk.cpp in Sources */,
 				3FC68FDA1A0AD3FE005F3103 /* encrypted_file_mapping.cpp in Sources */,
@@ -2323,7 +2317,6 @@
 				4142C9441623478700B3B902 /* column_string_enum.cpp in Sources */,
 				4142C9461623478700B3B902 /* column_table.cpp in Sources */,
 				65033A781C7DD3F30019E9F2 /* column_timestamp.cpp in Sources */,
-				48A048361C7F7A6B000FFD12 /* continuous_transactions_history.cpp in Sources */,
 				F4D0FC881B00F62C0040956A /* descriptor.cpp in Sources */,
 				6579EEBA1B4E89B7004DE3D8 /* disable_sync_to_disk.cpp in Sources */,
 				F4D0FC7B1B00F62C0040956A /* encrypted_file_mapping.cpp in Sources */,
@@ -2414,7 +2407,6 @@
 				C008FF451B67F02F0042669E /* column_string_enum.cpp in Sources */,
 				C008FF461B67F02F0042669E /* column_table.cpp in Sources */,
 				65033A7A1C7DD3F40019E9F2 /* column_timestamp.cpp in Sources */,
-				48A048371C7F7A6B000FFD12 /* continuous_transactions_history.cpp in Sources */,
 				C008FF481B67F02F0042669E /* descriptor.cpp in Sources */,
 				C008FF4E1B67F02F0042669E /* disable_sync_to_disk.cpp in Sources */,
 				C008FF491B67F02F0042669E /* encrypted_file_mapping.cpp in Sources */,
