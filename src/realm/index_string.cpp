@@ -114,9 +114,8 @@ size_t IndexArray::from_list<index_Count>(StringData value, IntegerColumn& resul
     return cnt;
 }
 
-template <>
-size_t IndexArray::from_list<index_FindAll>(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                                            const IntegerColumn& rows, ColumnBase* column) const
+size_t IndexArray::from_list_all(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
+                                 const IntegerColumn& rows, ColumnBase* column) const
 {
     static_cast<void>(result_ref);
 
@@ -302,7 +301,7 @@ size_t IndexArray::index_string<index_FindAll>(StringData value, IntegerColumn& 
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
             const IntegerColumn sub(m_alloc, to_ref(ref));
-            return from_list<index_FindAll>(value, result, result_ref, sub, column);
+            return from_list_all(value, result, result_ref, sub, column);
         }
 
         // Recurse into sub-index;
