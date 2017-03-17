@@ -252,14 +252,9 @@ struct Pow {
     typedef T type;
 };
 
+// This is not supported in the general case
 template <class T>
-struct Size {
-    int64_t operator()(T) const
-    {
-        return 1;
-    }
-    typedef T type;
-};
+struct Size;
 
 template <>
 struct Size<StringData> {
@@ -2275,19 +2270,20 @@ public:
     // destination = operator(left)
     void evaluate(size_t index, ValueBase& destination) override
     {
-        Value<Int>* d = dynamic_cast<Value<Int>*>(&destination);
+        REALM_ASSERT_DEBUG(dynamic_cast<Value<Int>*>(&destination) != nullptr);
+        Value<Int>* d = static_cast<Value<Int>*>(&destination);
         REALM_ASSERT(d);
 
-        Value<T> left;
-        m_expr->evaluate(index, left);
+        Value<T> v;
+        m_expr->evaluate(index, v);
 
-        size_t sz = left.m_values;
-        d->init(left.m_from_link_list, sz);
+        size_t sz = v.m_values;
+        d->init(v.m_from_link_list, sz);
 
         for (size_t i = 0; i < sz; i++) {
-            auto elem = left.m_storage.get(i);
+            auto elem = v.m_storage.get(i);
             if (!elem) {
-                d->m_storage.set(i, util::none);
+                d->m_storage.set_null(i);
             }
             else {
                 d->m_storage.set(i, oper()(*elem));
@@ -2443,50 +2439,31 @@ public:
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return make_subexpr<Columns<Link>>(*this, patches);
+        return std::unique_ptr<Subexpr>(new Columns<Link>(*this, patches));
     }
 
-    void evaluate(size_t index, ValueBase& destination) override
-    {
-        std::vector<size_t> links = m_link_map.get_links(index);
-        Value<RowIndex> v = make_value_for_link<RowIndex>(m_link_map.only_unary_links(), links.size());
+    void evaluate(size_t index, ValueBase& destination) override;
 
-        for (size_t t = 0; t < links.size(); t++) {
-            v.m_storage.set(t, RowIndex(links[t]));
-        }
-        destination.import(v);
-    }
-
-    Columns(const Columns& other, QueryNodeHandoverPatches* patches)
-        : Subexpr2<Link>(other)
-        , m_link_map(other.m_link_map, patches)
-    {
-    }
 
 private:
+    LinkMap m_link_map;
+    friend class Table;
+
     Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {})
         : m_link_map(table, links)
     {
         static_cast<void>(column_ndx);
     }
-
-    LinkMap m_link_map;
-    friend class Table;
+    Columns(const Columns& other, QueryNodeHandoverPatches* patches)
+        : Subexpr2<Link>(other)
+        , m_link_map(other.m_link_map, patches)
+    {
+    }
 };
 
 template <>
 class Columns<SubTable> : public Subexpr2<SubTable> {
 public:
-    Columns(const Columns& other, QueryNodeHandoverPatches* patches)
-        : Subexpr2<SubTable>(other)
-        , m_link_map(other.m_link_map, patches)
-        , m_column_ndx(other.m_column_ndx)
-        , m_column(other.m_column)
-    {
-        if (m_column && patches)
-            m_column_ndx = m_column->get_column_index();
-    }
-
     const Table* get_base_table() const override
     {
         return m_link_map.base_table();
@@ -2506,45 +2483,10 @@ public:
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return make_subexpr<Columns<SubTable>>(*this, patches);
+        return std::unique_ptr<Subexpr>(new Columns<SubTable>(*this, patches));
     }
 
-    void evaluate(size_t index, ValueBase& destination) override
-    {
-        Value<ConstTableRef>* d = dynamic_cast<Value<ConstTableRef>*>(&destination);
-        REALM_ASSERT(d);
-
-        if (m_link_map.m_link_columns.size() > 0) {
-            std::vector<size_t> links = m_link_map.get_links(index);
-            auto sz = links.size();
-
-            if (m_link_map.only_unary_links()) {
-                ConstTableRef val;
-                if (sz == 1) {
-                    val = ConstTableRef(m_column->get_subtable_ptr(links[0]));
-                }
-                d->init(false, 1, val);
-            }
-            else {
-                d->init(true, sz);
-                for (size_t t = 0; t < sz; t++) {
-                    const Table* table = m_column->get_subtable_ptr(links[t]);
-                    d->m_storage.set(t, ConstTableRef(table));
-                }
-            }
-        }
-        else {
-            // Adding zero to ValueBase::default_size to avoid taking the address
-            size_t rows = std::min(m_column->size() - index, ValueBase::default_size + 0);
-
-            d->init(false, rows);
-
-            for (size_t t = 0; t < rows; t++) {
-                const Table* table = m_column->get_subtable_ptr(index + t);
-                d->m_storage.set(t, ConstTableRef(table));
-            }
-        }
-    }
+    void evaluate(size_t index, ValueBase& destination) override;
 
     SizeOperator<Size<ConstTableRef>> size()
     {
@@ -2552,6 +2494,11 @@ public:
     }
 
 private:
+    LinkMap m_link_map;
+    size_t m_column_ndx;
+    const SubtableColumn* m_column = nullptr;
+    friend class Table;
+
     Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {})
         : m_link_map(table, links)
         , m_column_ndx(column_ndx)
@@ -2559,10 +2506,15 @@ private:
     {
     }
 
-    LinkMap m_link_map;
-    size_t m_column_ndx;
-    const SubtableColumn* m_column = nullptr;
-    friend class Table;
+    Columns(const Columns<SubTable>& other, QueryNodeHandoverPatches* patches)
+        : Subexpr2<SubTable>(other)
+        , m_link_map(other.m_link_map, patches)
+        , m_column_ndx(other.m_column_ndx)
+        , m_column(other.m_column)
+    {
+        if (m_column && patches)
+            m_column_ndx = m_column->get_column_index();
+    }
 };
 
 template <class Operator>
@@ -2823,11 +2775,6 @@ public:
     size_t column_ndx() const noexcept
     {
         return m_sg ? get_column_base().get_column_index() : m_column_ndx;
-    }
-
-    SizeOperator<Size<T>> size()
-    {
-        return SizeOperator<Size<T>>(this->clone(nullptr));
     }
 
 private:
