@@ -23,4 +23,4 @@ cmake3 -DREALM_ENABLE_ENCRYPTION=1 \
       -GNinja ..
 ninja-build
 ninja-build install/strip
-cpack3 -D CPACK_GENERATOR="RPM" -B /out -R ${VERSION}-${ITERATION}
+cpack3 -D CPACK_GENERATOR="RPM" -B /out -R "${VERSION}-${ITERATION}"

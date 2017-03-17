@@ -22,4 +22,4 @@ cmake -DREALM_ENABLE_ENCRYPTION=1 \
       -GNinja ..
 ninja
 ninja install/strip
-cpack -D CPACK_GENERATOR="DEB" -B /out -R ${VERSION}-${ITERATION}
+cpack -D CPACK_GENERATOR="DEB" -B /out -R "${VERSION}-${ITERATION}"

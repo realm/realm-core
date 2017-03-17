@@ -22,9 +22,9 @@ mkdir build-dir
 cd build-dir
 cmake -DREALM_ENABLE_ENCRYPTION=1 \
       -DREALM_BUILD_LIB_ONLY=1 \
-      -DCMAKE_INSTALL_PREFIX=/dest/${name} \
+      -DCMAKE_INSTALL_PREFIX="/dest/${name}" \
       -DCMAKE_BUILD_TYPE=Release \
       -GNinja ..
 ninja
 ninja install/strip
-cpack -D CPACK_GENERATOR="TGZ" -B /out -R ${VERSION}-${ITERATION}
+cpack -D CPACK_GENERATOR="TGZ" -B /out -R "${VERSION}-${ITERATION}"
