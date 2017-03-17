@@ -48,7 +48,7 @@ elif [ $# -eq 1 ]; then
   forked=$(git merge-base "${destination}" HEAD)
   ret=$?
   if [ $ret -gt 0 ]; then
-      echo "Error: could not find where this branch forked from ${destination} continuing."
+      echo "Error: could not find where this branch forked from ${destination}. Continuing."
       forked=""
   fi
 fi
