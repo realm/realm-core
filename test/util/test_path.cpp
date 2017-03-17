@@ -16,12 +16,15 @@
  *
  **************************************************************************/
 
+#include <algorithm>
+#include <sstream>
+#include <string>
+
 #include <realm/util/file.hpp>
 
 #include "test_path.hpp"
 
 using namespace realm::util;
-using namespace realm::test_util::unit_test;
 
 namespace {
 
@@ -61,13 +64,11 @@ void keep_test_files()
     keep_files = true;
 }
 
-std::string get_test_path(const TestContext& context, const std::string& suffix)
+std::string get_test_path(const std::string& test_name, const std::string& suffix)
 {
-    std::string test_name = context.test_details.test_name;
-    int recurrence_index = context.recurrence_index;
     std::ostringstream out;
     out.imbue(locale_classic);
-    out << path_prefix << sanitize_for_file_name(test_name) << '.' << (recurrence_index + 1) << suffix;
+    out << path_prefix << sanitize_for_file_name(test_name) << suffix;
     return out.str();
 }
 

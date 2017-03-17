@@ -910,6 +910,58 @@ protected:
     SequentialGetter<ColType> m_condition_column;
 };
 
+template <class ColType, class TConditionFunction>
+class SizeNode : public ParentNode {
+public:
+    SizeNode(int64_t v, size_t column)
+        : m_value(v)
+    {
+        m_condition_column_idx = column;
+    }
+
+    void table_changed() override
+    {
+        m_condition_column = &get_column<ColType>(m_condition_column_idx);
+    }
+
+    void verify_column() const override
+    {
+        do_verify_column(m_condition_column);
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        for (size_t s = start; s < end; ++s) {
+            TConditionValue v = m_condition_column->get(s);
+            int64_t sz = m_size_operator(v);
+            if (TConditionFunction()(sz, m_value, !bool(v)))
+                return s;
+        }
+        return not_found;
+    }
+
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return std::unique_ptr<ParentNode>(new SizeNode(*this, patches));
+    }
+
+    SizeNode(const SizeNode& from, QueryNodeHandoverPatches* patches)
+        : ParentNode(from, patches)
+        , m_value(from.m_value)
+        , m_condition_column(from.m_condition_column)
+    {
+        if (m_condition_column && patches)
+            m_condition_column_idx = m_condition_column->get_column_index();
+    }
+
+private:
+    using TConditionValue = typename ColType::value_type;
+
+    int64_t m_value;
+    const ColType* m_condition_column = nullptr;
+    Size<TConditionValue> m_size_operator;
+};
+
 
 template <class TConditionFunction>
 class BinaryNode : public ParentNode {

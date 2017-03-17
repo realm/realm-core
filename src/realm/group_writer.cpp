@@ -166,6 +166,8 @@ GroupWriter::GroupWriter(Group& group)
     m_free_lengths.set_parent(&top, 4);
     m_free_versions.set_parent(&top, 5);
 
+    // Expand top array from 3 to 5 elements. Only Realms written using
+    // Group::write() are allowed to have less than 5 elements.
     if (top.size() < 5) {
         REALM_ASSERT(top.size() == 3);
         // m_free_positions
@@ -197,6 +199,8 @@ GroupWriter::GroupWriter(Group& group)
     if (is_shared) {
         SharedGroup::version_type initial_version = 0;
 
+        // Expand top array from 5 to 7 elements. Only nonshared Realms are
+        // allowed to have less than 7 elements.
         if (top.size() < 7) {
             REALM_ASSERT(top.size() == 5);
             // m_free_versions
@@ -290,7 +294,7 @@ ref_type GroupWriter::write_group()
     top.set(1, value_2); // Throws
 
     if (top.size() >= 8) {
-        REALM_ASSERT(top.size() >= 9);
+        REALM_ASSERT(top.size() >= 10);
         if (ref_type history_ref = top.get_as_ref(8)) {
             Allocator& alloc = top.get_alloc();
             ref_type new_history_ref = Array::write(history_ref, alloc, *this, only_if_modified); // Throws
