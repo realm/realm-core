@@ -1550,6 +1550,200 @@ private:
     size_t m_last_start;
 };
 
+
+// Specialization for EqualIns condition on Strings - we specialize because we can utilize indexes (if they exist) for
+// EqualIns.
+template <>
+class StringNode<EqualIns> : public StringNodeBase {
+public:
+    StringNode(StringData v, size_t column)
+    : StringNodeBase(v, column)
+    {
+        auto upper = case_map(v, true);
+        auto lower = case_map(v, false);
+        if (!upper || !lower) {
+            error_code = "Malformed UTF-8: " + std::string(v);
+        }
+        else {
+            m_ucase = std::move(*upper);
+            m_lcase = std::move(*lower);
+        }
+    }
+
+    ~StringNode() noexcept override
+    {
+        deallocate();
+    }
+
+    void deallocate() noexcept
+    {
+        // Must be called after each query execution too free temporary resources used by the execution. Run in
+        // destructor, but also in Init because a user could define a query once and execute it multiple times.
+        clear_leaf_state();
+
+        if (m_index_matches_destroy)
+            m_index_matches->destroy();
+
+        m_index_matches_destroy = false;
+        m_index_matches.reset();
+        m_index_getter.reset();
+    }
+
+    void init() override
+    {
+        deallocate();
+        m_dD = 10.0;
+        StringNodeBase::init();
+
+        if (m_column_type == col_type_StringEnum) {
+            m_dT = 1.0;
+            m_key_ndx = static_cast<const StringEnumColumn*>(m_condition_column)->get_key_ndx(m_value);
+        }
+        else if (m_condition_column->has_search_index()) {
+            m_dT = 0.0;
+        }
+        else {
+            m_dT = 10.0;
+        }
+
+        if (m_condition_column->has_search_index()) {
+
+            if (m_column_type == col_type_StringEnum) {
+                REALM_ASSERT_RELEASE(false && "Case insensitive searches in StringEnum columns is not yet implemented.");
+                //FindRes fr;
+                InternalFindResult res;
+                /*fr = */ static_cast<const StringEnumColumn*>(m_condition_column)->find_all_no_copy(m_value, res);
+            }
+            else {
+                m_index_matches.reset(
+                    new IntegerColumn(IntegerColumn::unattached_root_tag(), Allocator::get_default())); // Throws
+                m_index_matches->get_root_array()->create(Array::type_Normal);                          // Throws
+                //m_index_matches->add(res.payload);
+                StringData needle(m_value);
+                m_condition_column->get_search_index()->find_all(*m_index_matches, needle);
+            }
+
+            m_index_matches_destroy = true; // we own m_index_matches, so we must destroy it
+            m_results_start = 0;
+            m_results_end = m_index_matches->size();
+
+            if (m_index_matches) {
+                m_index_getter.reset(new SequentialGetter<IntegerColumn>(m_index_matches.get()));
+            }
+        }
+        else if (m_column_type != col_type_String) {
+            REALM_ASSERT_DEBUG(dynamic_cast<const StringEnumColumn*>(m_condition_column));
+            m_cse.init(static_cast<const StringEnumColumn*>(m_condition_column));
+        }
+
+        if (m_child)
+            m_child->init();
+    }
+
+    size_t find_first_local(size_t start, size_t end) override
+    {
+        REALM_ASSERT(m_table);
+
+        if (m_condition_column->has_search_index()) {
+            // Indexed string column
+            if (!m_index_getter)
+                return not_found; // no matches in the index
+
+            if (m_last_start > start)
+                m_last_indexed = m_results_start;
+            m_last_start = start;
+
+            while (m_last_indexed < m_results_end) {
+                m_index_getter->cache_next(m_last_indexed);
+                size_t f = m_index_getter->m_leaf_ptr->find_gte(start, m_last_indexed - m_index_getter->m_leaf_start,
+                                                                m_results_end - m_index_getter->m_leaf_start);
+
+                if (f == not_found) {
+                    // Not found in this leaf - move on to next
+                    m_last_indexed = m_index_getter->m_leaf_end;
+                }
+                else if (f >= (m_results_end - m_index_getter->m_leaf_start)) {
+                    // Found outside valid range
+                    return not_found;
+                }
+                else {
+                    size_t found_index = to_size_t(m_index_getter->m_leaf_ptr->get(f));
+                    if (found_index >= end)
+                        return not_found;
+                    else {
+                        m_last_indexed = f + m_index_getter->m_leaf_start;
+                        return found_index;
+                    }
+                }
+            }
+            return not_found;
+        }
+
+        if (m_column_type != col_type_String) {
+            // Enum string column
+            if (m_key_ndx == not_found)
+                return not_found; // not in key set
+
+            for (size_t s = start; s < end; ++s) {
+                m_cse.cache_next(s);
+                s = m_cse.m_leaf_ptr->find_first(m_key_ndx, s - m_cse.m_leaf_start, m_cse.local_end(end));
+                if (s == not_found)
+                    s = m_cse.m_leaf_end - 1;
+                else
+                    return s + m_cse.m_leaf_start;
+            }
+
+            return not_found;
+        }
+
+        // Normal string column, with long or short leaf
+        EqualIns cond;
+        for (size_t s = start; s < end; ++s) {
+            StringData t = get_string(s);
+
+            if (cond(StringData(m_value), m_ucase.data(), m_lcase.data(), t))
+                return s;
+        }
+
+        return not_found;
+    }
+
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return std::unique_ptr<ParentNode>(new StringNode(*this, patches));
+    }
+
+    StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
+    : StringNodeBase(from, patches)
+        , m_ucase(from.m_ucase)
+        , m_lcase(from.m_lcase)
+    {
+    }
+
+private:
+    inline BinaryData str_to_bin(const StringData& s) noexcept
+    {
+        return BinaryData(s.data(), s.size());
+    }
+
+    size_t m_key_ndx = not_found;
+    size_t m_last_indexed;
+
+    // Used for linear scan through enum-string
+    SequentialGetter<StringEnumColumn> m_cse;
+
+    // Used for index lookup
+    std::unique_ptr<IntegerColumn> m_index_matches;
+    bool m_index_matches_destroy = false;
+    std::unique_ptr<SequentialGetter<IntegerColumn>> m_index_getter;
+    size_t m_results_start;
+    size_t m_results_end;
+    size_t m_last_start;
+    std::string m_ucase;
+    std::string m_lcase;
+};
+
+
 // OR node contains at least two node pointers: Two or more conditions to OR
 // together in m_conditions, and the next AND condition (if any) in m_child.
 //
