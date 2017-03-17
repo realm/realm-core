@@ -2234,8 +2234,9 @@ inline StringData TransactLogParser::read_string(util::StringBuffer& buf)
 
 inline Timestamp TransactLogParser::read_timestamp()
 {
-    REALM_ASSERT(false);
-    return Timestamp{};
+    int64_t seconds = read_int<int64_t>();     // Throws
+    int32_t nanoseconds = read_int<int32_t>(); // Throws
+    return Timestamp(seconds, nanoseconds);
 }
 
 

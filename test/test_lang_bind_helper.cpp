@@ -12935,6 +12935,33 @@ TEST(LangBindHelper_CopyOnWriteOverflow)
 }
 
 
+TEST(LangBindHelper_MixedStringRollback)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    TableRef t = g.add_table("table");
+    t->add_column(type_Mixed, "mixed_column", false);
+    t->add_empty_row();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    // try with string
+    LangBindHelper::promote_to_write(sg_w);
+    t->set_mixed(0, 0, StringData("any string data"));
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+
+    // do the same with binary data
+    LangBindHelper::promote_to_write(sg_w);
+    t->set_mixed(0, 0, BinaryData("any binary data"));
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+}
+
+
 TEST(LangBindHelper_BinaryReallocOverMax)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -12987,6 +13014,47 @@ TEST(LangBindHelper_RollbackMergeRowsWithBacklinks)
     LangBindHelper::rollback_and_continue_as_read(sg_w);
 
     g.verify();
+}
+
+
+TEST(LangBindHelper_MixedTimestampTransaction)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_w(hist);
+    SharedGroup sg_r(hist);
+
+    // the seconds part is constructed to test 64 bit integer reads
+    Timestamp time(68451041280, 29);
+    // also check that a negative time comes through the transaction intact
+    Timestamp neg_time(-57, -23);
+
+    ReadTransaction rt(sg_r);
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.add_table("table");
+        target->add_column(type_Mixed, "mixed_col");
+        target->add_empty_row(2);
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg_r);
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.get_table("table");
+        target->set_mixed(0, 0, Mixed(time));
+        target->set_mixed(0, 1, Mixed(neg_time));
+        group.verify();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg_r);
+    const Group& g = rt.get_group();
+    g.verify();
+    ConstTableRef t = g.get_table("table");
+    CHECK(t->get_mixed(0, 0) == time);
+    CHECK(t->get_mixed(0, 1) == neg_time);
 }
 
 
