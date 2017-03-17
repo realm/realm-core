@@ -5457,12 +5457,24 @@ TEST(Query_CaseSensitivity)
 
     add(ttt, 1, "BLAAbaergroed");
     add(ttt, 1, "BLAAbaergroedandMORE");
-    add(ttt, 1, "BLAAbaergroed2");
+    add(ttt, 1, "BLAAbaergroedZ");
+    add(ttt, 1, "BLAAbaergroedZ");
+    add(ttt, 1, "BLAAbaergroedZ");
 
     Query q1 = ttt.where().equal(1, "blaabaerGROED", false);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
+
+    Query q2 = ttt.where().equal(1, "blaabaerGROEDz", false);
+    TableView tv2 = q2.find_all();
+    CHECK_EQUAL(3, tv2.size());
+
+    ttt.add_search_index(1);
+
+    Query q3 = ttt.where().equal(1, "blaabaerGROEDz", false);
+    TableView tv3 = q3.find_all();
+    CHECK_EQUAL(3, tv3.size());
 }
 
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
