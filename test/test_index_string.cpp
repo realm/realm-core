@@ -1845,7 +1845,7 @@ TEST_TYPES(StringIndex_45, non_nullable, nullable)
 
     ref_type ref = StringColumn::create(Allocator::get_default());
     StringColumn col(Allocator::get_default(), ref, nullable);
-    col.create_search_index();
+    const StringIndex& ndx = *col.create_search_index();
     std::string a4 = std::string(4, 'a');
     std::string A5 = std::string(5, 'A');
 
@@ -1855,7 +1855,7 @@ TEST_TYPES(StringIndex_45, non_nullable, nullable)
     ref_type results_ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn res(Allocator::get_default(), results_ref);
 
-    col.find_all(res, A5, 0, realm::npos, true);
+    ndx.find_all(res, A5.c_str(), true);
     CHECK_EQUAL(res.size(), 0);
 
     res.destroy();
@@ -1896,7 +1896,7 @@ TEST_TYPES(StringIndex_Insensitive_Fuzz, non_nullable, nullable)
             col.add(str);
         }
 
-        col.create_search_index();
+        const StringIndex& ndx = *col.create_search_index();
 
         for (size_t t = 0; t < 1000; t++) {
             std::string needle = create_random_a_string(max_str_len);
@@ -1904,7 +1904,7 @@ TEST_TYPES(StringIndex_Insensitive_Fuzz, non_nullable, nullable)
             ref_type results_ref = IntegerColumn::create(Allocator::get_default());
             IntegerColumn res(Allocator::get_default(), results_ref);
 
-            col.find_all(res, needle, 0, realm::npos, true);
+            ndx.find_all(res, needle.c_str(), true);
 
             // Check that all items in 'res' point at a match in 'col'
             auto needle_upper = case_map(needle, true);
@@ -1954,7 +1954,7 @@ TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, non_nullable, nullable)
     ref_type results_ref = IntegerColumn::create(Allocator::get_default());
     IntegerColumn results(Allocator::get_default(), results_ref);
 
-    col.find_all(results, long1, 0, realm::npos, true);
+    ndx.find_all(results, long1.c_str(), true);
     CHECK_EQUAL(results.size(), 4);
     results.clear();
     ndx.find_all(results, long2.c_str(), true);
