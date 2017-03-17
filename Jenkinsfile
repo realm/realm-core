@@ -502,7 +502,7 @@ def doPublishLocalArtifacts() {
     return {
         node('aws') {
             deleteDir()
-            for(def i = 0; i < publishingStashes.length(); i++) {
+            for(def i = 0; i < publishingStashes.size(); i++) {
                 unstash name: publishingStashes[i]
             }
 
