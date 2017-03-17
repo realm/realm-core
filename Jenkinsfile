@@ -491,7 +491,7 @@ def doPublishGeneric() {
             getArchive()
 
             withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-                sh 'find . -type f -name "*.tar.gz" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core'
+                sh 'find . -type f -name "*.tar.gz" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
             }
         }
     }
