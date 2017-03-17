@@ -78,5 +78,6 @@ if [[ ! -z $COPY ]]; then
     cp -R core "${DESTINATION}"
 fi
 
-rm -f "realm-core-cocoa-$(git describe).tar.xz"
-tar -cJvf "realm-core-cocoa-$(git describe).tar.xz" core
+v=$(git describe --tags)
+rm -f "realm-core-cocoa-${v}.tar.xz"
+tar -cJvf "realm-core-cocoa-${v}.tar.xz" core

@@ -52,5 +52,6 @@ for bt in "${BUILD_TYPES[@]}"; do
     done
 done
 
-rm -f "realm-core-android-$(git describe).tar.gz"
-tar -czvf "realm-core-android-$(git describe).tar.gz" -C core-android .
+v=$(git describe --tags)
+rm -f "realm-core-android-${v}.tar.gz"
+tar -czvf "realm-core-android-${v}.tar.gz" -C core-android .
