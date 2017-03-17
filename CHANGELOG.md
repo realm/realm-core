@@ -28,6 +28,9 @@
 
 ### Enhancements
 
+* Allow query for size of strings, binaries, linklists and subtables:
+  Query q = table->where().size_equal(2, 5);
+  Query q = table1->column<SubTable>(2).size() == 5;
 * New history type enumeration value `Replication::hist_SyncServer`. This allows
   for the sync server to start using the same kind of in-Realm history scheme as
   is currently used by clients.

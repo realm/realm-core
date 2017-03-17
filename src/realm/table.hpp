@@ -57,6 +57,8 @@ template <class>
 class SubQuery;
 struct LinkTargetInfo;
 
+struct SubTable {
+};
 struct Link {
 };
 typedef Link LinkList;
@@ -1452,7 +1454,6 @@ private:
     friend class LinkView;
     friend class Group;
 };
-
 
 class Table::Parent : public ArrayParent {
 public:

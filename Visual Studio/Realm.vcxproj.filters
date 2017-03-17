@@ -29,6 +29,7 @@
     <ClCompile Include="..\src\realm\impl\transact_log.cpp" />
     <ClCompile Include="..\src\realm\link_view.cpp" />
     <ClCompile Include="..\src\realm\query_engine.cpp" />
+    <ClCompile Include="..\src\realm\query_expression.cpp" />
     <ClCompile Include="..\src\realm\replication.cpp" />
     <ClCompile Include="..\src\realm\schema_dumper.cpp" />
     <ClCompile Include="..\src\realm\unicode.cpp" />
