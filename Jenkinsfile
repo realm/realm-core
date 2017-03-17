@@ -2,6 +2,7 @@
 
 cocoaStashes = []
 androidStashes = []
+publishingStashes = []
 
 timeout(time: 1, unit: 'HOURS') {
     stage('gather-info') {
@@ -14,7 +15,7 @@ timeout(time: 1, unit: 'HOURS') {
 
             gitTag = readGitTag()
             gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
-            gitDescribeVersion = sh(returnStdout: true, script: 'git describe').trim()
+            gitDescribeVersion = sh(returnStdout: true, script: 'git describe --tags').trim()
             version = gitTag ? "${dependencies.VERSION}-g${gitSha}" : dependencies.VERSION
 
             echo "tag: ${gitTag}"
@@ -101,6 +102,11 @@ timeout(time: 1, unit: 'HOURS') {
                     }
                     sh 'tools/build-cocoa.sh'
                     archiveArtifacts('realm-core-cocoa*.tar.xz')
+                    if(isPublishingRun) {
+                        def stashName = "pub-cocoa"
+                        stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
+                        publishingStashes << stashName
+                    }
                 }
             },
           android: {
@@ -111,6 +117,11 @@ timeout(time: 1, unit: 'HOURS') {
                     }
                     sh 'tools/build-android.sh'
                     archiveArtifacts('realm-core-android*.tar.gz')
+                    if(isPublishingRun) {
+                        def stashName = "pub-android"
+                        stash includes: 'realm-core-android*.tar.gz', name: stashName
+                        publishingStashes << stashName
+                    }
                 }
             }
         )
@@ -253,6 +264,11 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
                     cpack -C ${buildType} -D CPACK_GENERATOR=TGZ
                 """
                 archiveArtifacts('*.tar.gz')
+                if (isPublishingRun) {
+                    def stashName = "pub-windows-${arch}-{isUWP?'uwp':'nouwp'}"
+                    stash includes:'*.tar.gz', name:stashName
+                    publishingStashes << stashName
+                }
             }
         }
     }
@@ -472,35 +488,11 @@ def doPublish(distribution, fileType, distroName, distroVersion) {
 def doPublishGeneric() {
     return {
         node {
-            getSourceArchive()
-            def version = getVersion()
-            def topdir = pwd()
-            dir('packaging/out') {
-                unstash "packages-generic"
-            }
-            dir("core/v${version}/linux") {
-                sh "mv ${topdir}/packaging/out/generic/realm-core-*.tgz ./realm-core-${version}.tgz"
-            }
+            getArchive()
 
-            step([
-                   $class                              : 'S3BucketPublisher',
-                  dontWaitForConcurrentBuildCompletion: false,
-                  entries                             : [[
-                           bucket                 : 'realm-ci-artifacts',
-                                                          excludedFile           : '',
-                                                          flatten                : false,
-                                                          gzipFiles              : false,
-                                                          managedArtifacts       : false,
-                                                          noUploadOnFailure      : true,
-                                                          selectedRegion         : 'us-east-1',
-                                                          sourceFile             : "core/v${version}/linux/*.tgz",
-                                                          storageClass           : 'STANDARD',
-                                                          uploadFromSlave        : false,
-                                                          useServerSideEncryption: false
-                             ]],
-                  profileName                         : 'hub-jenkins-user',
-                  userMetadata                        : []
-                     ])
+            withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+                sh 'find . -type f -name "*.tar.gz" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core'
+            }
         }
     }
 }
@@ -510,12 +502,9 @@ def doPublishLocalArtifacts() {
     return {
         node('aws') {
             deleteDir()
-            unstash 'cocoa-package'
-            unstash 'node-linux-package'
-            unstash 'node-cocoa-package'
-            unstash 'android-package'
-            unstash 'dylib-osx-package'
-            unstash 'windows-package'
+            for(def i = 0; i < publishingStashes.length(); i++) {
+                unstash name: publishingStashes[i]
+            }
 
             withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
                 sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
