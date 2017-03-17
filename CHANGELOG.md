@@ -2,6 +2,9 @@
 
 ### Bugfixes
 
+* Fixed a crash when rolling back a transaction which set binary or string data
+  inside a Mixed type.
+  PR [#2501](https://github.com/realm/realm-core/pull/2501).
 * Properly refresh table accessors connected by backlinks to a row that has had
   a `merge_rows` instruction applied and then rolled back. This could have
   caused corruption if this scenario was triggered but since sync does not use

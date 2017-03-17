@@ -12919,6 +12919,33 @@ TEST(LangBindHelper_CopyOnWriteOverflow)
 }
 
 
+TEST(LangBindHelper_MixedStringRollback)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    TableRef t = g.add_table("table");
+    t->add_column(type_Mixed, "mixed_column", false);
+    t->add_empty_row();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    // try with string
+    LangBindHelper::promote_to_write(sg_w);
+    t->set_mixed(0, 0, StringData("any string data"));
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+
+    // do the same with binary data
+    LangBindHelper::promote_to_write(sg_w);
+    t->set_mixed(0, 0, BinaryData("any binary data"));
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+}
+
+
 TEST(LangBindHelper_BinaryReallocOverMax)
 {
     SHARED_GROUP_TEST_PATH(path);
