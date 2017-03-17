@@ -5449,11 +5449,13 @@ TEST(Query_Enums)
 #define ua "\x0c3\x0a5"       // danish lower case a with ring above (as in blaabaergroed)
 #define uad "\x061\x0cc\x08a" // decomposed form (a (41) followed by ring)
 
-TEST(Query_CaseSensitivity)
+TEST_TYPES(Query_CaseSensitivity, std::true_type, std::false_type)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     TestTable ttt;
     ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    ttt.add_column(type_String, "2", nullable);
 
     add(ttt, 1, "BLAAbaergroed");
     add(ttt, 1, "BLAAbaergroedandMORE");
