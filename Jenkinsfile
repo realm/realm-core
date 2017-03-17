@@ -265,7 +265,7 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
                 """
                 archiveArtifacts('*.tar.gz')
                 if (isPublishingRun) {
-                    def stashName = "pub-windows-${arch}-{isUWP?'uwp':'nouwp'}"
+                    def stashName = "pub-windows-${arch}-${isUWP?'uwp':'nouwp'}"
                     stash includes:'*.tar.gz', name:stashName
                     publishingStashes << stashName
                 }
