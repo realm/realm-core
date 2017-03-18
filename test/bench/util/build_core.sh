@@ -85,6 +85,50 @@ checkout () {
   fi
 
   git checkout "${remoteref}"
+  build_system="shell"
+  if [ -e "CMakeLists.txt" ] && [ ! -e "build.sh" ]; then
+    build_system="cmake"
+  fi
+}
+
+clean () {
+  if [ "$build_system" == "cmake" ]; then
+    mkdir -p build
+    pushd build
+    cmake ..
+    make clean
+    popd
+  elif [ "$build_system" == "shell" ]; then
+    sh build.sh clean
+  else
+    echo "Unknown build system!"
+    exit 1
+  fi
+}
+
+configure () {
+  if [ "$build_system" == "cmake" ]; then
+    : # this was taken care of by cmake
+  elif [ "$build_system" == "shell" ]; then
+    sh build.sh config "${basedir}"
+  else
+    echo "Unknown build system!"
+    exit 1
+  fi
+}
+
+build () {
+  if [ "$build_system" == "cmake" ]; then
+    mkdir -p build
+    pushd build
+    make
+    popd
+  elif [ "$build_system" == "shell" ]; then
+    sh build.sh build
+  else
+    echo "Unknown build system!"
+    exit 1
+  fi
 }
 
 if [ ! -d "${srcdir}" ]; then
@@ -95,13 +139,13 @@ if [ ! -d "${srcdir}" ]; then
   fi
   cd "${srcdir}"
   checkout
-  sh build.sh clean
-  sh build.sh config "${basedir}"
+  clean
+  configure
 else
   cd "${srcdir}"
   git fetch
   checkout
 fi
 
-sh build.sh build
-sh build.sh install
+build
+
