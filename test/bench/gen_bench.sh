@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# See ./util/gen_bench.sh --help for documentation.
+# See ./gen_bench.sh --help for documentation.
 
 
 #The first line of the file "benchmark_version" holds the
@@ -84,7 +84,6 @@ if [ $ret -gt 0 ]; then
 fi
 unixtime=$(git show -s --format=%at ${remoteref})
 
-
 if [ -z "$REALM_BENCH_DIR" ]; then
     REALM_BENCH_DIR=~/.realm/core/benchmarks
 fi
@@ -104,6 +103,7 @@ if [ -f "${outputfile}" ]; then
     echo "found results, skipping ${outputfile}"
 else
     headref=$(git rev-parse HEAD)
+    build_bench_script=$(pwd)/util/build_benchmarks.sh
     if [ "${headref}" = "${remoteref}" ]; then
         echo "building HEAD"
         cd ../..
@@ -133,14 +133,14 @@ else
         cp benchmark_results.hpp benchmark_results.cpp "../bench/core-builds/${remoteref}/src/test/util/"
         cd "../bench/core-builds/${remoteref}/src/"
     fi
-    sh build.sh benchmark-common-tasks
-    sh build.sh benchmark-crud
+    # input 1: path to top level of checkout to build, input 2: destination for results
+    sh "${build_bench_script}" . bench_results
     echo "writing results to ${outputfile}"
     # print common header
-    head -n 1 "test/benchmark-common-tasks/results.latest.csv" > "${outputfile}"
+    head -n 1 "bench_results/benchmark-common-tasks/results.latest.csv" > "${outputfile}"
     # print contents, add _EncryptionOff tag to names without encryption (backwards compatibility)
-    tail -n +2 "test/benchmark-common-tasks/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> "${outputfile}"
-    tail -n +2 "test/benchmark-crud/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> "${outputfile}"
+    tail -n +2 "bench_results/benchmark-common-tasks/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> "${outputfile}"
+    tail -n +2 "bench_results/benchmark-crud/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> "${outputfile}"
 
     if [ "${headref}" != "${remoteref}" ]; then
         cd ../..
