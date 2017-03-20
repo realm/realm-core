@@ -22,3 +22,6 @@
 
 # Jenkins unit test reports
 /unit-test-report.xml
+
+# Temporary unit test files
+/*.path.realm*
