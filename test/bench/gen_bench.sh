@@ -109,7 +109,7 @@ else
         cd ../..
     else
         rootdir=$(git rev-parse --show-toplevel)
-        sh ./util/build_core.sh "${remoteref}" "${rootdir}"
+        REALM_BENCH_CHECKOUT_ONLY=1 sh ./util/build_core.sh "${remoteref}" "${rootdir}"
         if [ ! -d "core-builds/${remoteref}" ]; then
             echo "fatal error: core checkout failed on ref: ${remoteref}"
             ls -lah
@@ -135,6 +135,11 @@ else
     fi
     # input 1: path to top level of checkout to build, input 2: destination for results
     sh "${build_bench_script}" . bench_results
+    ret=$?
+    if [ $ret -gt 0 ]; then
+        echo "Error building benchmarks! Exiting."
+        exit 1
+    fi
     echo "writing results to ${outputfile}"
     # print common header
     head -n 1 "bench_results/benchmark-common-tasks/results.latest.csv" > "${outputfile}"

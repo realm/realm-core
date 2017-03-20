@@ -71,16 +71,17 @@ if [ "$build_system" == "cmake" ]; then
   cmake ..
   make realm-benchmark-common-tasks
   # -x flag checks if the file exists and is executable
-  if [ -x test/benchmark-common-tasks/realm-benchmark-common-tasks ]; then
+  if [ -x ./test/benchmark-common-tasks/realm-benchmark-common-tasks ]; then
     pushd test/benchmark-common-tasks
     ./realm-benchmark-common-tasks
     popd
   else
     echo "Could not run benchmark-common-tasks!"
+    pwd
     exit 1
   fi
   make realm-benchmark-crud
-  if [ -x test/benchmark-crud/realm-benchmark-crud ]; then
+  if [ -x ./test/benchmark-crud/realm-benchmark-crud ]; then
     pushd test/benchmark-crud
     ./realm-benchmark-crud
     popd

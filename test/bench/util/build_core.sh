@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# See ./util/build-core.sh --help for documentation.
+# See ./util/build_core.sh --help for documentation.
 
 builddir=./core-builds
 
@@ -15,7 +15,7 @@ showHelp () {
   showUsage
   echo ""
   cat <<EOF
-./util/build-core.sh
+./util/build_core.sh
 
 This script builds the given version of core (branch, commit, or tag) in a
 dedicated ${builddir} directory. This enables, for instance, comparing the
@@ -27,12 +27,15 @@ existing repository as an alternate will require fewer objects to be
 copied from the repository being cloned, reducing network and local
 storage costs.
 
+You can set the environment variable REALM_BENCH_CHECKOUT_ONLY if you 
+just want the checkout and don't want to actually build all of core.
+
 Examples:
 
-$ ./util/build-core.sh master # master is assumed by default.
-$ ./util/build-core.sh tags/v0.97.3 # Tags must be prefixed with "tags/".
-$ ./util/build-core.sh ea310804 # Can be a short commit ID.
-$ ./util/build-core.sh 32b3b79d2ab90e784ad5f14f201d682be9746781
+$ ./util/build_core.sh master # master is assumed by default.
+$ ./util/build_core.sh tags/v0.97.3 # Tags must be prefixed with "tags/".
+$ ./util/build_core.sh ea310804 # Can be a short commit ID.
+$ ./util/build_core.sh 32b3b79d2ab90e784ad5f14f201d682be9746781
 
 This results in directories:
 
@@ -147,5 +150,7 @@ else
   checkout
 fi
 
-build
+if [ -z "$REALM_BENCH_CHECKOUT_ONLY" ]; then
+  build
+fi
 
