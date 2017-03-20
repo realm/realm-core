@@ -315,7 +315,7 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
             REALM_ASSERT_EX(top_size == 3 || top_size == 5 || top_size == 7, top_size);
         }
         else {
-            REALM_ASSERT_EX(top_size == 10, top_size);
+            REALM_ASSERT_EX(top_size == 9 || top_size == 10, top_size);
         }
 
         m_table_names.init_from_parent();
