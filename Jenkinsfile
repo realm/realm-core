@@ -86,6 +86,7 @@ timeout(time: 1, unit: 'HOURS') {
 
         if (env.CHANGE_TARGET) {
             parallelExecutors['diffCoverage'] = buildDiffCoverage()
+            parallelExecutors['performance'] = buildPerformance()
         }
 
         parallel parallelExecutors
@@ -306,6 +307,56 @@ def buildDiffCoverage() {
             }
         }
     }
+}
+
+def buildPerformance() {
+  return {
+    // Select docker-cph-X.  We want docker, metal (brix) and only one executor
+    // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
+    node('docker && brix && exclusive') {
+      getSourceArchive()
+
+      def gitTag = readGitTag()
+      def gitSha = readGitSha()
+
+      if (gitTag == "") {
+        setBuildName(gitSha)
+      } else {
+        setBuildName("Tag ${gitTag}")
+      }
+
+      def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
+      // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
+      // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
+      // MPLCONFIGDIR gives the python matplotlib library a config directory, otherwise it will try to make one on the user home dir which fails in docker
+      buildEnv.inside {
+        withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks", "REALM_BENCH_MACHID=docker-brix","MPLCONFIGDIR=${env.WORKSPACE}/test/bench/config"]) {
+          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+              sh 's3cmd -c $s3cfg_config_file get s3://static.realm.io/downloads/core/core-benchmarks.zip core-benchmarks.zip'
+          }
+          sh 'unzip core-benchmarks.zip -d test/bench/'
+          sh 'rm core-benchmarks.zip'
+
+          sh '''
+            cd test/bench
+            mkdir -p core-benchmarks results
+            ./gen_bench_hist.sh
+            ./parse_bench_hist.py --local-html results/ core-benchmarks/
+          '''
+          zip dir: 'test/bench', glob: 'core-benchmarks/**/*', zipFile: 'core-benchmarks.zip'
+          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+            sh 's3cmd -c $s3cfg_config_file put core-benchmarks.zip s3://static.realm.io/downloads/core/'
+          }
+          publishHTML(target: [allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test/bench/results', reportFiles: 'report.html', reportName: 'Performance Report'])
+          withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
+              sh "curl -H \"Authorization: token ${env.githubToken}\" " +
+                 "-d '{ \"body\": \"Check the performance result here: ${env.BUILD_URL}Performance_Report\"}' " +
+                 "\"https://api.github.com/repos/realm/realm-core/issues/${env.CHANGE_ID}/comments\""
+          }
+        }
+      }
+    }
+  }
 }
 
 def doBuildMacOs(String buildType) {
