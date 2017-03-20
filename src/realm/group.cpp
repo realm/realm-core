@@ -619,6 +619,10 @@ void Group::remove_table(size_t table_ndx)
     for (size_t i = n; i > 0; --i)
         table->remove_column(i - 1);
 
+    size_t prior_num_tables = m_tables.size();
+    if (Replication* repl = m_alloc.get_replication())
+        repl->erase_group_level_table(table_ndx, prior_num_tables); // Throws
+
     int64_t ref_64 = m_tables.get(table_ndx);
     REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));
     ref_type ref = ref_type(ref_64);
@@ -646,10 +650,6 @@ void Group::remove_table(size_t table_ndx)
 
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
-
-    size_t prior_num_tables = m_tables.size() + 1;
-    if (Replication* repl = m_alloc.get_replication())
-        repl->erase_group_level_table(table_ndx, prior_num_tables); // Throws
 }
 
 
