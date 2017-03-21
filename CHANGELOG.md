@@ -19,16 +19,19 @@
 * Disable copying of various classes to prevent incorrect use at compile time.
   PR [#2468](https://github.com/realm/realm-core/pull/2468).
 * History type enumeration value `Replication::hist_Sync` renamed to
-  `Replication::hist_SyncClient`. PR [#2482](https://github.com/realm/realm-core/pull/2482).
+  `Replication::hist_SyncClient`.
+  PR [#2482](https://github.com/realm/realm-core/pull/2482).
 * Bumps file format version from 6 to 7 due to addition of a 10th element into
   `Group::m_top`. The new element is the history schema version, which is
   crucial for managing the schema upgrade process of sync-type histories in a
   way that is independent of core's Realm file format. The bump is necessary due
   to lack of forwards compatibility. The changes are backwards compatible, and
-  automatic upgrade is implemented. PR [#2481](https://github.com/realm/realm-core/pull/2481).
+  automatic upgrade is implemented.
+  PR [#2481](https://github.com/realm/realm-core/pull/2481).
 * New pure virtual methods `get_history_schema_version()`,
   `is_upgradable_history_schema()`, and `upgrade_history_schema()` in
-  `Replication` interface. PR [#2481](https://github.com/realm/realm-core/pull/2481).
+  `Replication` interface.
+  PR [#2481](https://github.com/realm/realm-core/pull/2481).
 
 ### Enhancements
 
@@ -42,7 +45,8 @@
   PR [#2504](https://github.com/realm/realm-core/pull/2504).
 * New history type enumeration value `Replication::hist_SyncServer`. This allows
   for the sync server to start using the same kind of in-Realm history scheme as
-  is currently used by clients. PR [2482](https://github.com/realm/realm-core/pull/2482).
+  is currently used by clients.
+  PR [#2482](https://github.com/realm/realm-core/pull/2482).
 
 -----------
 
