@@ -142,6 +142,7 @@
     <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'" Label="Configuration">
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
@@ -152,6 +153,7 @@
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'" Label="Configuration">
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
@@ -274,6 +276,7 @@
     <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'" Label="Configuration">
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
@@ -284,6 +287,7 @@
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|ARM'" Label="Configuration">
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
@@ -294,6 +298,7 @@
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'" Label="Configuration">
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
@@ -307,6 +312,7 @@
     <Optimization>MaxSpeed</Optimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|ARM'" Label="Configuration">
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
@@ -757,7 +763,7 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>/DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION /DWINAPI_FAMILY=WINAPI_FAMILY_APP %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <CompileAsWinRT>false</CompileAsWinRT>
     </ClCompile>
