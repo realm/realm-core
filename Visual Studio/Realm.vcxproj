@@ -763,7 +763,7 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>/DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION /DWINAPI_FAMILY=WINAPI_FAMILY_APP %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <CompileAsWinRT>false</CompileAsWinRT>
     </ClCompile>
