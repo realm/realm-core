@@ -45,7 +45,7 @@ bool validate_user_in_vector(std::vector<std::shared_ptr<SyncUser>> vector,
 
 }
 
-TEST_CASE("sync_manager: basic property APIs", "[sync]") {
+TEST_CASE("sync_manager: basic properties and APIs", "[sync]") {
     auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     reset_test_directory(base_path);
     SyncManager::shared().configure_file_system(base_path, SyncManager::MetadataMode::NoMetadata);
@@ -69,6 +69,10 @@ TEST_CASE("sync_manager: basic property APIs", "[sync]") {
         REQUIRE(SyncManager::shared().client_should_validate_ssl());
         SyncManager::shared().set_client_should_validate_ssl(false);
         REQUIRE(!SyncManager::shared().client_should_validate_ssl());
+    }
+    
+    SECTION("should not crash on 'reconnect()'") {
+        SyncManager::shared().reconnect();
     }
 }
 
