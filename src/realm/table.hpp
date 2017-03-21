@@ -480,7 +480,7 @@ public:
     ///
     /// String level modifications performed via insert_substring() and
     /// remove_substring() are mergable and subject to operational
-    /// trsnaformation. That is, the effect of two causally unrelated
+    /// transformation. That is, the effect of two causally unrelated
     /// modifications will in general both be retained during synchronization.
 
     static const size_t max_string_size = 0xFFFFF8 - Array::header_size - 1;
