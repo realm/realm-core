@@ -1968,6 +1968,7 @@ TEST(Query_SubtableExpression)
     subdescr->add_column(type_Int, "list");
     table->add_column(type_Table, "strings", &subdescr);
     subdescr->add_column(type_String, "list", nullptr, true);
+    table->add_column(type_String, "other");
 
     table->add_empty_row(4);
 
@@ -2000,6 +2001,9 @@ TEST(Query_SubtableExpression)
     set_string_list(table->get_subtable(1, 0), std::vector<Int>({0, 1}));
     set_string_list(table->get_subtable(1, 1), std::vector<Int>({2, 3, 4, 5}));
     set_string_list(table->get_subtable(1, 2), std::vector<Int>({6, 7, 100, 8, 9}));
+    table->set_string(2, 0, StringData("foo"));
+    table->set_string(2, 1, StringData("str"));
+    table->set_string(2, 2, StringData("baa"));
 
     Query q;
     TableView tv;
@@ -2011,6 +2015,19 @@ TEST(Query_SubtableExpression)
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_source_ndx(0), 1);
+
+    q = table->column<SubTable>(1).list<String>().begins_with(StringData("Str"));
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
+    q = table->column<SubTable>(1).list<String>().ends_with(StringData("_8"));
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 2);
+    q = table->column<SubTable>(1).list<String>().begins_with(table->column<String>(2), false);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 1);
+
     q = table->column<SubTable>(0).list<Int>().min() >= 2;
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);

@@ -155,54 +155,55 @@ T minimum(T a, T b)
 
 #ifdef REALM_OLDQUERY_FALLBACK
 // Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify only_numeric somehow
-namespace {
+namespace _hack {
+
 template <class T, class U>
-T only_numeric(U in)
+inline T only_numeric(U in)
 {
     return static_cast<T>(util::unwrap(in));
 }
 
 template <class T>
-int only_numeric(const StringData&)
+inline int only_numeric(const StringData&)
 {
     REALM_ASSERT(false);
     return 0;
 }
 
 template <class T>
-int only_numeric(const BinaryData&)
+inline int only_numeric(const BinaryData&)
 {
     REALM_ASSERT(false);
     return 0;
 }
 
 template <class T>
-StringData only_string(T in)
+inline StringData only_string(T in)
 {
     REALM_ASSERT(false);
     static_cast<void>(in);
     return StringData();
 }
 
-StringData only_string(StringData in)
+inline StringData only_string(StringData in)
 {
     return in;
 }
 
 template <class T, class U>
-T no_timestamp(U in)
+inline T no_timestamp(U in)
 {
     return static_cast<T>(util::unwrap(in));
 }
 
 template <class T>
-int no_timestamp(const Timestamp&)
+inline int no_timestamp(const Timestamp&)
 {
     REALM_ASSERT(false);
     return 0;
 }
 
-} // anonymous namespace
+} // namespace _hack
 
 #endif // REALM_OLDQUERY_FALLBACK
 
@@ -494,37 +495,37 @@ Query create(L left, const Subexpr2<R>& right)
         Query q = Query(*t);
 
         if (std::is_same<Cond, Less>::value)
-            q.greater(column->column_ndx(), only_numeric<R>(left));
+            q.greater(column->column_ndx(), _hack::only_numeric<R>(left));
         else if (std::is_same<Cond, Greater>::value)
-            q.less(column->column_ndx(), only_numeric<R>(left));
+            q.less(column->column_ndx(), _hack::only_numeric<R>(left));
         else if (std::is_same<Cond, Equal>::value)
             q.equal(column->column_ndx(), left);
         else if (std::is_same<Cond, NotEqual>::value)
             q.not_equal(column->column_ndx(), left);
         else if (std::is_same<Cond, LessEqual>::value)
-            q.greater_equal(column->column_ndx(), only_numeric<R>(left));
+            q.greater_equal(column->column_ndx(), _hack::only_numeric<R>(left));
         else if (std::is_same<Cond, GreaterEqual>::value)
-            q.less_equal(column->column_ndx(), only_numeric<R>(left));
+            q.less_equal(column->column_ndx(), _hack::only_numeric<R>(left));
         else if (std::is_same<Cond, EqualIns>::value)
-            q.equal(column->column_ndx(), only_string(left), false);
+            q.equal(column->column_ndx(), _hack::only_string(left), false);
         else if (std::is_same<Cond, NotEqualIns>::value)
-            q.not_equal(column->column_ndx(), only_string(left), false);
+            q.not_equal(column->column_ndx(), _hack::only_string(left), false);
         else if (std::is_same<Cond, BeginsWith>::value)
-            q.begins_with(column->column_ndx(), only_string(left));
+            q.begins_with(column->column_ndx(), _hack::only_string(left));
         else if (std::is_same<Cond, BeginsWithIns>::value)
-            q.begins_with(column->column_ndx(), only_string(left), false);
+            q.begins_with(column->column_ndx(), _hack::only_string(left), false);
         else if (std::is_same<Cond, EndsWith>::value)
-            q.ends_with(column->column_ndx(), only_string(left));
+            q.ends_with(column->column_ndx(), _hack::only_string(left));
         else if (std::is_same<Cond, EndsWithIns>::value)
-            q.ends_with(column->column_ndx(), only_string(left), false);
+            q.ends_with(column->column_ndx(), _hack::only_string(left), false);
         else if (std::is_same<Cond, Contains>::value)
-            q.contains(column->column_ndx(), only_string(left));
+            q.contains(column->column_ndx(), _hack::only_string(left));
         else if (std::is_same<Cond, ContainsIns>::value)
-            q.contains(column->column_ndx(), only_string(left), false);
+            q.contains(column->column_ndx(), _hack::only_string(left), false);
         else if (std::is_same<Cond, Like>::value)
-            q.like(column->column_ndx(), only_string(left));
+            q.like(column->column_ndx(), _hack::only_string(left));
         else if (std::is_same<Cond, LikeIns>::value)
-            q.like(column->column_ndx(), only_string(left), false);
+            q.like(column->column_ndx(), _hack::only_string(left), false);
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
             // fallback to using use 'return new Compare<>' instead.
@@ -1849,9 +1850,9 @@ private:
 };
 
 template <class T, class S, class I>
-Query string_compare(const Columns<StringData>& left, T right, bool case_insensitive);
+Query string_compare(const Subexpr2<StringData>& left, T right, bool case_insensitive);
 template <class S, class I>
-Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_insensitive);
+Query string_compare(const Subexpr2<StringData>& left, const Subexpr2<StringData>& right, bool case_insensitive);
 
 template <class T>
 Value<T> make_value_for_link(bool only_unary_links, size_t size)
@@ -1989,75 +1990,57 @@ class Columns<BinaryData> : public SimpleQuerySupport<BinaryData> {
     using SimpleQuerySupport::SimpleQuerySupport;
 };
 
+class StringCompare {
+public:
+    explicit StringCompare(const Subexpr2<StringData>& source)
+        : m_source(source)
+    {
+
+    }
+
+    StringCompare(const StringCompare&) = delete;
+
+    Query equal(StringData sd, bool case_sensitive = true);
+    Query equal(const Columns<StringData>& col, bool case_sensitive = true);
+    Query not_equal(StringData sd, bool case_sensitive = true);
+    Query not_equal(const Columns<StringData>& col, bool case_sensitive = true);
+    Query begins_with(StringData sd, bool case_sensitive = true);
+    Query begins_with(const Columns<StringData>& col, bool case_sensitive = true);
+    Query ends_with(StringData sd, bool case_sensitive = true);
+    Query ends_with(const Columns<StringData>& col, bool case_sensitive = true);
+    Query contains(StringData sd, bool case_sensitive = true);
+    Query contains(const Columns<StringData>& col, bool case_sensitive = true);
+    Query like(StringData sd, bool case_sensitive = true);
+    Query like(const Columns<StringData>& col, bool case_sensitive = true);
+
+private:
+    const Subexpr2<StringData>& m_source;
+};
 
 template <>
-class Columns<StringData> : public SimpleQuerySupport<StringData> {
+class Columns<StringData> : public SimpleQuerySupport<StringData>, public StringCompare {
 public:
-    using SimpleQuerySupport::SimpleQuerySupport;
-
-    Query equal(StringData sd, bool case_sensitive = true)
+    Columns(size_t column, const Table* table, std::vector<size_t> links = {})
+        : SimpleQuerySupport(column, table, links)
+        , StringCompare(*(static_cast<Subexpr2<StringData>*>(this)))
     {
-        return string_compare<StringData, Equal, EqualIns>(*this, sd, case_sensitive);
     }
 
-    Query equal(const Columns<StringData>& col, bool case_sensitive = true)
+    Columns(Columns const& other, QueryNodeHandoverPatches* patches = nullptr)
+        : SimpleQuerySupport(other, patches)
+        , StringCompare(*(static_cast<Subexpr2<StringData>*>(this)))
     {
-        return string_compare<Equal, EqualIns>(*this, col, case_sensitive);
     }
 
-    Query not_equal(StringData sd, bool case_sensitive = true)
+    Columns(Columns&& other)
+        : SimpleQuerySupport(other)
+        , StringCompare(*(static_cast<Subexpr2<StringData>*>(this)))
     {
-        return string_compare<StringData, NotEqual, NotEqualIns>(*this, sd, case_sensitive);
-    }
-
-    Query not_equal(const Columns<StringData>& col, bool case_sensitive = true)
-    {
-        return string_compare<NotEqual, NotEqualIns>(*this, col, case_sensitive);
-    }
-
-    Query begins_with(StringData sd, bool case_sensitive = true)
-    {
-        return string_compare<StringData, BeginsWith, BeginsWithIns>(*this, sd, case_sensitive);
-    }
-
-    Query begins_with(const Columns<StringData>& col, bool case_sensitive = true)
-    {
-        return string_compare<BeginsWith, BeginsWithIns>(*this, col, case_sensitive);
-    }
-
-    Query ends_with(StringData sd, bool case_sensitive = true)
-    {
-        return string_compare<StringData, EndsWith, EndsWithIns>(*this, sd, case_sensitive);
-    }
-
-    Query ends_with(const Columns<StringData>& col, bool case_sensitive = true)
-    {
-        return string_compare<EndsWith, EndsWithIns>(*this, col, case_sensitive);
-    }
-
-    Query contains(StringData sd, bool case_sensitive = true)
-    {
-        return string_compare<StringData, Contains, ContainsIns>(*this, sd, case_sensitive);
-    }
-
-    Query contains(const Columns<StringData>& col, bool case_sensitive = true)
-    {
-        return string_compare<Contains, ContainsIns>(*this, col, case_sensitive);
-    }
-
-    Query like(StringData sd, bool case_sensitive = true)
-    {
-        return string_compare<StringData, Like, LikeIns>(*this, sd, case_sensitive);
-    }
-
-    Query like(const Columns<StringData>& col, bool case_sensitive = true)
-    {
-        return string_compare<Like, LikeIns>(*this, col, case_sensitive);
     }
 };
 
 template <class T, class S, class I>
-Query string_compare(const Columns<StringData>& left, T right, bool case_sensitive)
+Query string_compare(const Subexpr2<StringData>& left, T right, bool case_sensitive)
 {
     StringData sd(right);
     if (case_sensitive)
@@ -2067,7 +2050,7 @@ Query string_compare(const Columns<StringData>& left, T right, bool case_sensiti
 }
 
 template <class S, class I>
-Query string_compare(const Columns<StringData>& left, const Columns<StringData>& right, bool case_sensitive)
+Query string_compare(const Subexpr2<StringData>& left, const Subexpr2<StringData>& right, bool case_sensitive)
 {
     if (case_sensitive)
         return make_expression<Compare<S, StringData>>(right.clone(), left.clone());
@@ -2483,6 +2466,7 @@ public:
     {
         return m_link_map.base_table();
     }
+
     void set_base_table(const Table* table) override
     {
         m_link_map.set_base_table(table);
@@ -2495,7 +2479,6 @@ public:
         m_link_map.target_table()->verify_column(m_column_ndx, m_column);
     }
 
-
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
         return std::unique_ptr<Subexpr>(new Columns<SubTable>(*this, patches));
@@ -2505,6 +2488,7 @@ public:
     {
         evaluate_internal(index, destination, ValueBase::default_size);
     }
+
     void evaluate_internal(size_t index, ValueBase& destination, size_t nb_elements);
 
     template <typename T>
@@ -2530,7 +2514,7 @@ private:
     const SubtableColumn* m_column = nullptr;
     friend class Table;
     template <class T>
-    friend class ListColumns;
+    friend class ListColumnsBase;
     template <class T, class U>
     friend class ListColumnAggregate;
 
@@ -2553,15 +2537,15 @@ private:
 };
 
 template <typename T>
-class ListColumns : public Subexpr2<T> {
+class ListColumnsBase : public Subexpr2<T> {
 public:
-    ListColumns(size_t column_ndx, Columns<SubTable> column)
+    ListColumnsBase(size_t column_ndx, Columns<SubTable> column)
         : m_column_ndx(column_ndx)
         , m_subtable_column(std::move(column))
     {
     }
 
-    ListColumns(const ListColumns& other, QueryNodeHandoverPatches* patches)
+    ListColumnsBase(const ListColumnsBase& other, QueryNodeHandoverPatches* patches)
         : m_column_ndx(other.m_column_ndx)
         , m_subtable_column(other.m_subtable_column, patches)
     {
@@ -2569,7 +2553,7 @@ public:
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return make_subexpr<ListColumns>(*this, patches);
+        return make_subexpr<ListColumns<T>>(*this, patches);
     }
 
     const Table* get_base_table() const override
@@ -2635,8 +2619,38 @@ public:
 
 
 private:
+    // Storing the column index here could be a potential problem if the column
+    // changes id due to insertion/deletion.
     size_t m_column_ndx;
     Columns<SubTable> m_subtable_column;
+};
+
+template <class T>
+class ListColumns : public ListColumnsBase<T> {
+public:
+    using ListColumnsBase<T>::ListColumnsBase;
+};
+
+template <>
+class ListColumns<StringData> : public ListColumnsBase<StringData>, public StringCompare {
+public:
+    ListColumns(size_t column_ndx, Columns<SubTable> column)
+        : ListColumnsBase(column_ndx, column)
+        , StringCompare(*(static_cast<Subexpr2<StringData>*>(this)))
+    {
+    }
+
+    ListColumns(const ListColumnsBase& other, QueryNodeHandoverPatches* patches)
+        : ListColumnsBase(other, patches)
+        , StringCompare(*(static_cast<Subexpr2<StringData>*>(this)))
+    {
+    }
+
+    ListColumns(ListColumns&& other)
+        : ListColumnsBase(other)
+        , StringCompare(*(static_cast<Subexpr2<StringData>*>(this)))
+    {
+    }
 };
 
 template <typename T, typename Operation>
