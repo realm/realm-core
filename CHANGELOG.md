@@ -56,20 +56,25 @@
   PR [#2475](https://github.com/realm/realm-core/pull/2475).
 * `AppendBuffer` gained support for move construction/assignment, and had its
   growth factor reduced to 1.5.
+  PR [#2462](https://github.com/realm/realm-core/pull/2462).
 * Methods on the `Replication` interface were made virtual to allow override.
   PR [#2462](https://github.com/realm/realm-core/pull/2462).
 * The order of emission for some instructions in the transaction log was changed
   with respect to carrying out the effect of the instruction on the database, to
   allow implementors of the `Replication` interface a semi-consistent view of
   the database.
+  PR [#2462](https://github.com/realm/realm-core/pull/2462).
 * Lock file format bumped from version 9 to 10 due to introduction of
   `SharedInfo::history_schema_version`.
+  PR [#2481](https://github.com/realm/realm-core/pull/2481).
 * Removal of obsolete logic and semantics relating to obsolete history type
   `Replication::hist_OutOfRealm`.
+  PR [#2481](https://github.com/realm/realm-core/pull/2481).
 * Code specific to history type `Replication::hist_InRealm` (class
   `_impl::InRealmHistory` in particular) was moved from
   `realm/impl/continuous_transactions_history.hpp` and
   `realm/impl/continuous_transactions_history.cpp` to `realm/sync/history.cpp`.
+  PR [#2481](https://github.com/realm/realm-core/pull/2481).
 
 ----------------------------------------------
 
