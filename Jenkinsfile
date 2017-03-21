@@ -316,15 +316,6 @@ def buildPerformance() {
     node('docker && brix && exclusive') {
       getSourceArchive()
 
-      def gitTag = readGitTag()
-      def gitSha = readGitSha()
-
-      if (gitTag == "") {
-        setBuildName(gitSha)
-      } else {
-        setBuildName("Tag ${gitTag}")
-      }
-
       def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
       // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
