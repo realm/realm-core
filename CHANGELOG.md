@@ -9,25 +9,72 @@
   a `merge_rows` instruction applied and then rolled back. This could have
   caused corruption if this scenario was triggered but since sync does not use
   the `merge_rows` instruction in this way, this is a preventative fix.
-  PR [#2503](https://github.com/realm/realm-core/pull/2503)
+  PR [#2503](https://github.com/realm/realm-core/pull/2503).
 * Fixed an assertion on a corner case of reallocation on large arrays.
   PR [#2500](https://github.com/realm/realm-core/pull/2500).
   Fixes issue [#2451](https://github.com/realm/realm-core/issues/2451).
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Disable copying of various classes to prevent incorrect use at compile time.
+  PR [#2468](https://github.com/realm/realm-core/pull/2468).
+* History type enumeration value `Replication::hist_Sync` renamed to
+  `Replication::hist_SyncClient`.
+  PR [#2482](https://github.com/realm/realm-core/pull/2482).
+* Bumps file format version from 6 to 7 due to addition of a 10th element into
+  `Group::m_top`. The new element is the history schema version, which is
+  crucial for managing the schema upgrade process of sync-type histories in a
+  way that is independent of core's Realm file format. The bump is necessary due
+  to lack of forwards compatibility. The changes are backwards compatible, and
+  automatic upgrade is implemented.
+  PR [#2481](https://github.com/realm/realm-core/pull/2481).
+* New pure virtual methods `get_history_schema_version()`,
+  `is_upgradable_history_schema()`, and `upgrade_history_schema()` in
+  `Replication` interface.
+  PR [#2481](https://github.com/realm/realm-core/pull/2481).
 
 ### Enhancements
 
 * Support setting Mixed(Timestamp) through the transaction logs.
+  PR [#2507](https://github.com/realm/realm-core/pull/2507).
 * Implement comparison of Mixed objects containing Timestamp types.
+  PR [#2507](https://github.com/realm/realm-core/pull/2507).
+* Allow query for size of strings, binaries, linklists and subtables:
+  Query q = table->where().size_equal(2, 5);
+  Query q = table1->column<SubTable>(2).size() == 5;
+  PR [#2504](https://github.com/realm/realm-core/pull/2504).
+* New history type enumeration value `Replication::hist_SyncServer`. This allows
+  for the sync server to start using the same kind of in-Realm history scheme as
+  is currently used by clients.
+  PR [#2482](https://github.com/realm/realm-core/pull/2482).
 
 -----------
 
 ### Internals
 
-* Lorem ipsum.
+* `StringIndex` now supports case insensitive searches.
+  PR [#2475](https://github.com/realm/realm-core/pull/2475).
+* `AppendBuffer` gained support for move construction/assignment, and had its
+  growth factor reduced to 1.5.
+  PR [#2462](https://github.com/realm/realm-core/pull/2462).
+* Methods on the `Replication` interface were made virtual to allow override.
+  PR [#2462](https://github.com/realm/realm-core/pull/2462).
+* The order of emission for some instructions in the transaction log was changed
+  with respect to carrying out the effect of the instruction on the database, to
+  allow implementors of the `Replication` interface a semi-consistent view of
+  the database.
+  PR [#2462](https://github.com/realm/realm-core/pull/2462).
+* Lock file format bumped from version 9 to 10 due to introduction of
+  `SharedInfo::history_schema_version`.
+  PR [#2481](https://github.com/realm/realm-core/pull/2481).
+* Removal of obsolete logic and semantics relating to obsolete history type
+  `Replication::hist_OutOfRealm`.
+  PR [#2481](https://github.com/realm/realm-core/pull/2481).
+* Code specific to history type `Replication::hist_InRealm` (class
+  `_impl::InRealmHistory` in particular) was moved from
+  `realm/impl/continuous_transactions_history.hpp` and
+  `realm/impl/continuous_transactions_history.cpp` to `realm/sync/history.cpp`.
+  PR [#2481](https://github.com/realm/realm-core/pull/2481).
 
 ----------------------------------------------
 

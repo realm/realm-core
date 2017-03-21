@@ -1448,6 +1448,7 @@
     <ClCompile Include="..\src\realm\impl\transact_log.cpp" />
     <ClCompile Include="..\src\realm\link_view.cpp" />
     <ClCompile Include="..\src\realm\query_engine.cpp" />
+    <ClCompile Include="..\src\realm\query_expression.cpp" />
     <ClCompile Include="..\src\realm\replication.cpp" />
     <ClCompile Include="..\src\realm\schema_dumper.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -1511,7 +1512,6 @@
     <ClCompile Include="..\src\realm\group.cpp" />
     <ClCompile Include="..\src\realm\group_shared.cpp" />
     <ClCompile Include="..\src\realm\group_writer.cpp" />
-    <ClCompile Include="..\src\realm\impl\continuous_transactions_history.cpp" />
     <ClCompile Include="..\src\realm\index_string.cpp" />
     <ClCompile Include="..\src\realm\query.cpp" />
     <ClCompile Include="..\src\realm\spec.cpp" />

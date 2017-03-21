@@ -468,57 +468,57 @@ private:
 
 class TransactLogConvenientEncoder {
 public:
-    void insert_group_level_table(size_t table_ndx, size_t num_tables, StringData name);
-    void erase_group_level_table(size_t table_ndx, size_t num_tables);
-    void rename_group_level_table(size_t table_ndx, StringData new_name);
-    void move_group_level_table(size_t from_table_ndx, size_t to_table_ndx);
-    void insert_column(const Descriptor&, size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
-                       bool nullable = false);
-    void erase_column(const Descriptor&, size_t col_ndx);
-    void rename_column(const Descriptor&, size_t col_ndx, StringData name);
-    void move_column(const Descriptor&, size_t from, size_t to);
+    virtual void insert_group_level_table(size_t table_ndx, size_t num_tables, StringData name);
+    virtual void erase_group_level_table(size_t table_ndx, size_t num_tables);
+    virtual void rename_group_level_table(size_t table_ndx, StringData new_name);
+    virtual void move_group_level_table(size_t from_table_ndx, size_t to_table_ndx);
+    virtual void insert_column(const Descriptor&, size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link,
+                               bool nullable = false);
+    virtual void erase_column(const Descriptor&, size_t col_ndx);
+    virtual void rename_column(const Descriptor&, size_t col_ndx, StringData name);
+    virtual void move_column(const Descriptor&, size_t from, size_t to);
 
-    void set_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value, Instruction variant = instr_Set);
-    void add_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value);
-    void set_bool(const Table*, size_t col_ndx, size_t ndx, bool value, Instruction variant = instr_Set);
-    void set_float(const Table*, size_t col_ndx, size_t ndx, float value, Instruction variant = instr_Set);
-    void set_double(const Table*, size_t col_ndx, size_t ndx, double value, Instruction variant = instr_Set);
-    void set_string(const Table*, size_t col_ndx, size_t ndx, StringData value, Instruction variant = instr_Set);
-    void set_binary(const Table*, size_t col_ndx, size_t ndx, BinaryData value, Instruction variant = instr_Set);
-    void set_olddatetime(const Table*, size_t col_ndx, size_t ndx, OldDateTime value,
-                         Instruction variant = instr_Set);
-    void set_timestamp(const Table*, size_t col_ndx, size_t ndx, Timestamp value, Instruction variant = instr_Set);
-    void set_table(const Table*, size_t col_ndx, size_t ndx, Instruction variant = instr_Set);
-    void set_mixed(const Table*, size_t col_ndx, size_t ndx, const Mixed& value, Instruction variant = instr_Set);
-    void set_link(const Table*, size_t col_ndx, size_t ndx, size_t value, Instruction variant = instr_Set);
-    void set_null(const Table*, size_t col_ndx, size_t ndx, Instruction variant = instr_Set);
-    void set_link_list(const LinkView&, const IntegerColumn& values);
-    void insert_substring(const Table*, size_t col_ndx, size_t row_ndx, size_t pos, StringData);
-    void erase_substring(const Table*, size_t col_ndx, size_t row_ndx, size_t pos, size_t size);
-
-    /// \param prior_num_rows The number of rows in the table prior to the
-    /// modification.
-    void insert_empty_rows(const Table*, size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows);
+    virtual void set_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value, Instruction variant = instr_Set);
+    virtual void add_int(const Table*, size_t col_ndx, size_t ndx, int_fast64_t value);
+    virtual void set_bool(const Table*, size_t col_ndx, size_t ndx, bool value, Instruction variant = instr_Set);
+    virtual void set_float(const Table*, size_t col_ndx, size_t ndx, float value, Instruction variant = instr_Set);
+    virtual void set_double(const Table*, size_t col_ndx, size_t ndx, double value, Instruction variant = instr_Set);
+    virtual void set_string(const Table*, size_t col_ndx, size_t ndx, StringData value, Instruction variant = instr_Set);
+    virtual void set_binary(const Table*, size_t col_ndx, size_t ndx, BinaryData value, Instruction variant = instr_Set);
+    virtual void set_olddatetime(const Table*, size_t col_ndx, size_t ndx, OldDateTime value,
+                                 Instruction variant = instr_Set);
+    virtual void set_timestamp(const Table*, size_t col_ndx, size_t ndx, Timestamp value, Instruction variant = instr_Set);
+    virtual void set_table(const Table*, size_t col_ndx, size_t ndx, Instruction variant = instr_Set);
+    virtual void set_mixed(const Table*, size_t col_ndx, size_t ndx, const Mixed& value, Instruction variant = instr_Set);
+    virtual void set_link(const Table*, size_t col_ndx, size_t ndx, size_t value, Instruction variant = instr_Set);
+    virtual void set_null(const Table*, size_t col_ndx, size_t ndx, Instruction variant = instr_Set);
+    virtual void set_link_list(const LinkView&, const IntegerColumn& values);
+    virtual void insert_substring(const Table*, size_t col_ndx, size_t row_ndx, size_t pos, StringData);
+    virtual void erase_substring(const Table*, size_t col_ndx, size_t row_ndx, size_t pos, size_t size);
 
     /// \param prior_num_rows The number of rows in the table prior to the
     /// modification.
-    void erase_rows(const Table*, size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
-                    bool is_move_last_over);
+    virtual void insert_empty_rows(const Table*, size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows);
 
-    void swap_rows(const Table*, size_t row_ndx_1, size_t row_ndx_2);
-    void merge_rows(const Table*, size_t row_ndx, size_t new_row_ndx);
-    void add_search_index(const Table*, size_t col_ndx);
-    void remove_search_index(const Table*, size_t col_ndx);
-    void set_link_type(const Table*, size_t col_ndx, LinkType);
-    void clear_table(const Table*);
-    void optimize_table(const Table*);
+    /// \param prior_num_rows The number of rows in the table prior to the
+    /// modification.
+    virtual void erase_rows(const Table*, size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
+                            bool is_move_last_over);
 
-    void link_list_set(const LinkView&, size_t link_ndx, size_t value);
-    void link_list_insert(const LinkView&, size_t link_ndx, size_t value);
-    void link_list_move(const LinkView&, size_t from_link_ndx, size_t to_link_ndx);
-    void link_list_swap(const LinkView&, size_t link_ndx_1, size_t link_ndx_2);
-    void link_list_erase(const LinkView&, size_t link_ndx);
-    void link_list_clear(const LinkView&);
+    virtual void swap_rows(const Table*, size_t row_ndx_1, size_t row_ndx_2);
+    virtual void merge_rows(const Table*, size_t row_ndx, size_t new_row_ndx);
+    virtual void add_search_index(const Table*, size_t col_ndx);
+    virtual void remove_search_index(const Table*, size_t col_ndx);
+    virtual void set_link_type(const Table*, size_t col_ndx, LinkType);
+    virtual void clear_table(const Table*);
+    virtual void optimize_table(const Table*);
+
+    virtual void link_list_set(const LinkView&, size_t link_ndx, size_t value);
+    virtual void link_list_insert(const LinkView&, size_t link_ndx, size_t value);
+    virtual void link_list_move(const LinkView&, size_t from_link_ndx, size_t to_link_ndx);
+    virtual void link_list_swap(const LinkView&, size_t link_ndx_1, size_t link_ndx_2);
+    virtual void link_list_erase(const LinkView&, size_t link_ndx);
+    virtual void link_list_clear(const LinkView&);
 
     //@{
 
@@ -529,8 +529,8 @@ public:
     /// (reactor pattern) to be explicitly notified about the implicit
     /// nullifications.
 
-    void nullify_link(const Table*, size_t col_ndx, size_t ndx);
-    void link_list_nullify(const LinkView&, size_t link_ndx);
+    virtual void nullify_link(const Table*, size_t col_ndx, size_t ndx);
+    virtual void link_list_nullify(const LinkView&, size_t link_ndx);
 
     //@}
 

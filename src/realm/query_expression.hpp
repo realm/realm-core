@@ -133,6 +133,7 @@ The Columns class encapsulates all this into a simple class that, for any type T
 #include <realm/link_view.hpp>
 #include <realm/util/optional.hpp>
 #include <realm/impl/sequential_getter.hpp>
+#include <realm/column_table.hpp>
 
 #include <numeric>
 
@@ -249,6 +250,46 @@ struct Pow {
         return v * v;
     }
     typedef T type;
+};
+
+// This is not supported in the general case
+template <class T>
+struct Size;
+
+template <>
+struct Size<StringData> {
+    int64_t operator()(StringData v) const
+    {
+        return v.size();
+    }
+    typedef StringData type;
+};
+
+template <>
+struct Size<BinaryData> {
+    int64_t operator()(BinaryData v) const
+    {
+        return v.size();
+    }
+    typedef BinaryData type;
+};
+
+template <>
+struct Size<ConstTableRef> {
+    int64_t operator()(ConstTableRef v) const
+    {
+        return v->size();
+    }
+    typedef ConstTableRef type;
+};
+
+template <>
+struct Size<ConstLinkViewRef> {
+    int64_t operator()(ConstLinkViewRef v) const
+    {
+        return v->size();
+    }
+    typedef ConstLinkViewRef type;
 };
 
 // Finds a common type for T1 and T2 according to C++ conversion/promotion in arithmetic (float + int => float, etc)
@@ -418,6 +459,8 @@ template <class oper, class TLeft = Subexpr, class TRight = Subexpr>
 class Operator;
 template <class oper, class TLeft = Subexpr>
 class UnaryOperator;
+template <class oper, class TLeft = Subexpr>
+class SizeOperator;
 template <class TCond, class T, class TLeft = Subexpr, class TRight = Subexpr>
 class Compare;
 template <bool has_links>
@@ -437,6 +480,8 @@ Query create(L left, const Subexpr2<R>& right)
 
 #ifdef REALM_OLDQUERY_FALLBACK // if not defined, then never fallback to query_engine.hpp; always use query_expression
     const Columns<R>* column = dynamic_cast<const Columns<R>*>(&right);
+    // TODO: recognize size operator expressions
+    // auto size_operator = dynamic_cast<const SizeOperator<Size<StringData>, Subexpr>*>(&right);
 
     if (column && ((std::numeric_limits<L>::is_integer && std::numeric_limits<R>::is_integer) ||
                    (std::is_same<L, double>::value && std::is_same<R, double>::value) ||
@@ -825,14 +870,13 @@ struct NullableVector {
     }
 
     template <typename Type = T>
-    typename std::enable_if<
-        realm::is_any<Type, float, double, OldDateTime, BinaryData, StringData, RowIndex, Timestamp, null>::value,
-        void>::type
+    typename std::enable_if<realm::is_any<Type, float, double, OldDateTime, BinaryData, StringData, RowIndex,
+                                          Timestamp, ConstTableRef, null>::value,
+                            void>::type
     set(size_t index, t_storage value)
     {
         m_first[index] = value;
     }
-
 
     inline util::Optional<T> get(size_t index) const
     {
@@ -1010,6 +1054,17 @@ inline void NullableVector<Timestamp>::set_null(size_t index)
     m_first[index] = Timestamp{};
 }
 
+// ConstTableRef
+template <>
+inline bool NullableVector<ConstTableRef>::is_null(size_t index) const
+{
+    return !bool(m_first[index]);
+}
+template <>
+inline void NullableVector<ConstTableRef>::set_null(size_t index)
+{
+    m_first[index].reset();
+}
 
 template <typename Operator>
 struct OperatorOptionalAdapter {
@@ -1554,7 +1609,6 @@ UnaryOperator<Pow<T>> power(const Subexpr2<T>& left)
     return {left.clone()};
 }
 
-
 // Classes used for LinkMap (see below).
 struct LinkMapFunction {
     // Your consume() method is given row index of the linked-to table as argument, and you must return whether or
@@ -1912,6 +1966,11 @@ public:
         return m_column->get_column_index();
     }
 
+    SizeOperator<Size<T>> size()
+    {
+        return SizeOperator<Size<T>>(this->clone(nullptr));
+    }
+
 private:
     // Column index of payload column of m_table
     mutable size_t m_column_ndx;
@@ -1996,7 +2055,6 @@ public:
         return string_compare<Like, LikeIns>(*this, col, case_sensitive);
     }
 };
-
 
 template <class T, class S, class I>
 Query string_compare(const Columns<StringData>& left, T right, bool case_sensitive)
@@ -2183,6 +2241,76 @@ private:
     LinkMap m_link_map;
 };
 
+template <class oper, class TExpr>
+class SizeOperator : public Subexpr2<Int> {
+public:
+    SizeOperator(std::unique_ptr<TExpr> left)
+        : m_expr(std::move(left))
+    {
+    }
+
+    // See comment in base class
+    void set_base_table(const Table* table) override
+    {
+        m_expr->set_base_table(table);
+    }
+
+    void verify_column() const override
+    {
+        m_expr->verify_column();
+    }
+
+    // Recursively fetch tables of columns in expression tree. Used when user first builds a stand-alone expression
+    // and binds it to a Query at a later time
+    const Table* get_base_table() const override
+    {
+        return m_expr->get_base_table();
+    }
+
+    // destination = operator(left)
+    void evaluate(size_t index, ValueBase& destination) override
+    {
+        REALM_ASSERT_DEBUG(dynamic_cast<Value<Int>*>(&destination) != nullptr);
+        Value<Int>* d = static_cast<Value<Int>*>(&destination);
+        REALM_ASSERT(d);
+
+        Value<T> v;
+        m_expr->evaluate(index, v);
+
+        size_t sz = v.m_values;
+        d->init(v.m_from_link_list, sz);
+
+        for (size_t i = 0; i < sz; i++) {
+            auto elem = v.m_storage.get(i);
+            if (!elem) {
+                d->m_storage.set_null(i);
+            }
+            else {
+                d->m_storage.set(i, oper()(*elem));
+            }
+        }
+    }
+
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return std::unique_ptr<Subexpr>(new SizeOperator(*this, patches));
+    }
+
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
+    {
+        m_expr->apply_handover_patch(patches, group);
+    }
+
+private:
+    SizeOperator(const SizeOperator& other, QueryNodeHandoverPatches* patches)
+        : m_expr(other.m_expr->clone(patches))
+    {
+    }
+
+    typedef typename oper::type T;
+    std::unique_ptr<TExpr> m_expr;
+};
+
 struct ConstantRowValueHandoverPatch : public QueryNodeHandoverPatch {
     std::unique_ptr<RowBaseHandoverPatch> row_patch;
 };
@@ -2279,6 +2407,11 @@ public:
         return LinkCount(m_link_map);
     }
 
+    LinkCount size() const
+    {
+        return LinkCount(m_link_map);
+    }
+
     template <typename C>
     SubColumns<C> column(size_t column_ndx) const
     {
@@ -2306,37 +2439,83 @@ public:
 
     std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
     {
-        return make_subexpr<Columns<Link>>(*this, patches);
+        return std::unique_ptr<Subexpr>(new Columns<Link>(*this, patches));
     }
 
-    void evaluate(size_t index, ValueBase& destination) override
-    {
-        std::vector<size_t> links = m_link_map.get_links(index);
-        Value<RowIndex> v = make_value_for_link<RowIndex>(m_link_map.only_unary_links(), links.size());
+    void evaluate(size_t index, ValueBase& destination) override;
 
-        for (size_t t = 0; t < links.size(); t++) {
-            v.m_storage.set(t, RowIndex(links[t]));
-        }
-        destination.import(v);
-    }
-
-    Columns(const Columns& other, QueryNodeHandoverPatches* patches)
-        : Subexpr2<Link>(other)
-        , m_link_map(other.m_link_map, patches)
-    {
-    }
 
 private:
+    LinkMap m_link_map;
+    friend class Table;
+
     Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {})
         : m_link_map(table, links)
     {
         static_cast<void>(column_ndx);
     }
-
-    LinkMap m_link_map;
-    friend class Table;
+    Columns(const Columns& other, QueryNodeHandoverPatches* patches)
+        : Subexpr2<Link>(other)
+        , m_link_map(other.m_link_map, patches)
+    {
+    }
 };
 
+template <>
+class Columns<SubTable> : public Subexpr2<SubTable> {
+public:
+    const Table* get_base_table() const override
+    {
+        return m_link_map.base_table();
+    }
+    void set_base_table(const Table* table) override
+    {
+        m_link_map.set_base_table(table);
+        m_column = &m_link_map.target_table()->get_column_table(m_column_ndx);
+    }
+
+    void verify_column() const override
+    {
+        m_link_map.verify_columns();
+        m_link_map.target_table()->verify_column(m_column_ndx, m_column);
+    }
+
+
+    std::unique_ptr<Subexpr> clone(QueryNodeHandoverPatches* patches) const override
+    {
+        return std::unique_ptr<Subexpr>(new Columns<SubTable>(*this, patches));
+    }
+
+    void evaluate(size_t index, ValueBase& destination) override;
+
+    SizeOperator<Size<ConstTableRef>> size()
+    {
+        return SizeOperator<Size<ConstTableRef>>(this->clone(nullptr));
+    }
+
+private:
+    LinkMap m_link_map;
+    size_t m_column_ndx;
+    const SubtableColumn* m_column = nullptr;
+    friend class Table;
+
+    Columns(size_t column_ndx, const Table* table, const std::vector<size_t>& links = {})
+        : m_link_map(table, links)
+        , m_column_ndx(column_ndx)
+        , m_column(&m_link_map.target_table()->get_column_table(column_ndx))
+    {
+    }
+
+    Columns(const Columns<SubTable>& other, QueryNodeHandoverPatches* patches)
+        : Subexpr2<SubTable>(other)
+        , m_link_map(other.m_link_map, patches)
+        , m_column_ndx(other.m_column_ndx)
+        , m_column(other.m_column)
+    {
+        if (m_column && patches)
+            m_column_ndx = m_column->get_column_index();
+    }
+};
 
 template <class Operator>
 Query compare(const Subexpr2<Link>& left, const ConstRow& row)

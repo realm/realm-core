@@ -53,8 +53,13 @@ endif
 
 PROJECT_CFLAGS_DEBUG = -DREALM_DEBUG
 PROJECT_CFLAGS_COVER = -DREALM_DEBUG -DREALM_COVER \
-                       -fno-inline -fno-inline-small-functions \
-                       -fno-default-inline -fno-elide-constructors
+                       -fno-elide-constructors
+
+ifeq ($(COMPILER_IS),gcc)
+  PROJECT_CFLAGS_COVER += -fno-inline \
+                          -fno-inline-small-functions \
+                          -fno-default-inline
+endif
 
 # Load dynamic configuration
 ifneq ($(REALM_HAVE_CONFIG),)

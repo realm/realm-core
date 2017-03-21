@@ -23,10 +23,8 @@
 
 #include <realm/util/features.h>
 
-#include "unit_test.hpp"
-
 #define TEST_PATH_HELPER(class_name, var_name, suffix)                                                               \
-    class_name var_name(realm::test_util::get_test_path(test_context, "." #var_name "." suffix))
+    class_name var_name(realm::test_util::get_test_path(test_context.get_test_name(), "." #var_name "." suffix))
 
 #define TEST_PATH(var_name) TEST_PATH_HELPER(realm::test_util::TestPathGuard, var_name, "test");
 
@@ -53,7 +51,7 @@ std::string get_test_path_prefix();
 
 /// This function is thread-safe as long as there are no concurrent invocations
 /// of set_test_path_prefix().
-std::string get_test_path(const unit_test::TestContext&, const std::string& suffix);
+std::string get_test_path(const std::string& path, const std::string& suffix);
 
 /// By default, test files are placed in the current working
 /// directory. Use this function to set a path prefix. The specified
@@ -75,6 +73,16 @@ std::string get_test_resource_path();
 /// This function is **not** thread-safe. If you call it, be sure to call it
 /// prior to any invocation of get_test_resource_path().
 void set_test_resource_path(const std::string&);
+
+
+// This is an adapter class which replaces dragging in the whole test framework
+// by implementing the `get_test_name()` method from the TestContext class.
+// It allows use of TestPathGuard and friends outside of a unit test:
+// RealmPathInfo test_context { path };
+struct RealmPathInfo {
+    std::string m_path;
+    std::string get_test_name() const { return m_path; }
+};
 
 
 /// Constructor and destructor removes file if it exists.
