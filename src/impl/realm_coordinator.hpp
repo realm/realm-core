@@ -69,7 +69,7 @@ public:
     // of any Realm instances managed by this coordinator, as individual Realms
     // may only be using a subset of it.
 
-    // Get the latest cached schema and the transaction version which is applies
+    // Get the latest cached schema and the transaction version which it applies
     // to. Returns false if there is no cached schema.
     bool get_cached_schema(Schema& schema, uint64_t& schema_version, uint64_t& transaction) const noexcept;
 
