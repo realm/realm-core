@@ -968,8 +968,11 @@ TEST_CASE("migration: ResetFile") {
         }},
     };
 
-    auto get_fileid = [&] {
+// To verify that the file has actually be deleted and recreated, on
+// non-Windows we need to hold an open file handle to the old file to force
+// using a new inode, but on Windows we *can't*
 #ifdef _WIN32
+    auto get_fileid = [&] {
         // this is wrong for non-ascii but it's what core does
         std::wstring ws(config.path.begin(), config.path.end());
         HANDLE handle = CreateFile2(ws.c_str(), GENERIC_READ,
@@ -981,12 +984,15 @@ TEST_CASE("migration: ResetFile") {
         BY_HANDLE_FILE_INFORMATION info{};
         REQUIRE(GetFileInformationByHandle(handle, &info));
         return (DWORDLONG)info.nFileIndexHigh + (DWORDLONG)info.nFileIndexLow;
+    };
 #else
+    auto get_fileid = [&] {
         util::File::UniqueID id;
         util::File::get_unique_id(config.path, id);
         return id.inode;
-#endif
     };
+    File holder(config.path, File::mode_Write);
+#endif
 
     {
         auto realm = Realm::get_shared_realm(config);
