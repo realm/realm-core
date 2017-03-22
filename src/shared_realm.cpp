@@ -745,12 +745,8 @@ uint64_t Realm::get_schema_version(const Realm::Config &config)
 
 void Realm::close()
 {
-    // Order matters here: if we're the last Realm instance for this path, we
-    // need to tear down the coordinator before destroying our shared group
-    // to maintain the coordinator's invariant that there be a continuous session
     if (m_coordinator) {
         m_coordinator->unregister_realm(this);
-        m_coordinator = nullptr;
     }
 
     m_group = nullptr;
@@ -758,6 +754,7 @@ void Realm::close()
     m_history = nullptr;
     m_read_only_group = nullptr;
     m_binding_context = nullptr;
+    m_coordinator = nullptr;
 }
 
 util::Optional<int> Realm::file_format_upgraded_from_version() const
