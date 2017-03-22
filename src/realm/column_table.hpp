@@ -209,9 +209,16 @@ public:
     /// wrapped in some instantiation of BasicTableRef<>.
     Table* get_subtable_ptr(size_t subtable_ndx);
 
+    /// This is to be used by the query system that does not need to
+    /// modify the subtable. Will return a ref object containing a
+    /// nullptr if there is no table object yet.
     ConstTableRef get(size_t subtable_ndx) const
     {
-        return ConstTableRef(get_subtable_ptr(subtable_ndx));
+        int64_t ref = IntegerColumn::get(subtable_ndx);
+        if (ref)
+            return ConstTableRef(get_subtable_ptr(subtable_ndx));
+        else
+            return {};
     }
 
     const Table* get_subtable_ptr(size_t subtable_ndx) const;
