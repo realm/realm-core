@@ -67,10 +67,12 @@ enum INS {
     INSERT_ROW,
     ADD_EMPTY_ROW,
     INSERT_COLUMN,
+    RENAME_COLUMN,
     ADD_COLUMN,
     REMOVE_COLUMN,
     SET,
     REMOVE_ROW,
+    MERGE_ROWS,
     ADD_COLUMN_LINK,
     ADD_COLUMN_LINK_LIST,
     CLEAR_TABLE,
@@ -146,6 +148,88 @@ int32_t get_int32(State& s)
         *(reinterpret_cast<signed char*>(&v) + t) = c;
     }
     return v;
+}
+
+std::pair<int64_t, int32_t> get_timestamp_values(State& s) {
+    int64_t seconds = get_int64(s);
+    int32_t nanoseconds = get_int32(s) % 1000000000;
+    // Make sure the values form a sensible Timestamp
+    const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
+    const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
+    const bool correct_timestamp = both_non_negative || both_non_positive;
+    if (!correct_timestamp) {
+        nanoseconds = -nanoseconds;
+    }
+    return {seconds, nanoseconds};
+}
+
+Mixed construct_mixed(State& s, util::Optional<std::ostream&> log)
+{
+    // Mixed type has 8 constructors supporting different types.
+    unsigned char type = get_next(s) % 8;
+
+    switch (type) {
+        default:
+        case 0: {
+            bool b = get_next(s) % 2;
+            if (log) {
+                *log << "Mixed mixed(" << (b ? "true" : "false") << ");\n";
+            }
+            return Mixed(b);
+        }
+        case 1: {
+            int64_t value = get_int64(s);
+            if (log) {
+                *log << "Mixed mixed((int64_t)(" << value << "));\n";
+            }
+            return Mixed(value);
+        }
+        case 2: {
+            float value = get_next(s);
+            if (log) {
+                *log << "Mixed mixed((float)(" << value << "));\n";
+            }
+            return Mixed(value);
+        }
+        case 3: {
+            double value = get_next(s);
+            if (log) {
+                *log << "Mixed mixed((double)(" << value << "));\n";
+            }
+            return Mixed(value);
+        }
+        case 4: {
+            std::string str = create_string(get_next(s));
+            if (log) {
+                *log << "Mixed mixed(StringData(\"" << str << "\"));\n";
+            }
+            return Mixed(StringData(str));
+        }
+        case 5: {
+            size_t rand_char = get_next(s);
+            size_t blob_size = get_int64(s) % ArrayBlob::max_binary_size;
+            std::string blob(blob_size, static_cast<unsigned char>(rand_char));
+            if (log) {
+                *log << "std::string blob(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n"
+                     << "Mixed mixed(BinaryData(blob));\n";
+            }
+            return Mixed(BinaryData(blob));
+        }
+        case 6: {
+            int64_t time = get_int64(s);
+            if (log) {
+                *log << "Mixed mixed(OldDateTime(" << time << "));\n";
+            }
+            return Mixed(OldDateTime(time));
+        }
+        case 7: {
+            std::pair<int64_t, int32_t> values = get_timestamp_values(s);
+            if (log) {
+                *log << "Mixed mixed(Timestamp{" << values.first << ", " << values.second << "});\n";
+            }
+            return Mixed(Timestamp{values.first, values.second});
+        }
+    }
 }
 
 std::string create_column_name(State& s)
@@ -381,6 +465,19 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     t->remove_column(col_ndx);
                 }
             }
+            else if (instr == RENAME_COLUMN && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->get_column_count() > 0) {
+                    size_t col_ndx = get_next(s) % t->get_column_count();
+                    std::string name = create_column_name(s);
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->rename_column("
+                             << col_ndx << ", \"" << name << "\");\n";
+                    }
+                    t->rename_column(col_ndx, name);
+                }
+            }
             else if (instr == MOVE_COLUMN && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 TableRef t = g.get_table(table_ndx);
@@ -519,12 +616,32 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             }
                         }
                         else if (type == type_Int) {
+                            bool add_int = get_next(s) % 2 == 0;
                             int64_t value = get_int64(s);
-                            if (log) {
-                                *log << "g.get_table(" << table_ndx << ")->set_int(" << col_ndx << ", " << row_ndx
-                                     << ", " << value << ");\n";
+                            if (add_int) {
+                                if (log) {
+                                    *log << "try { g.get_table(" << table_ndx << ")->add_int(" << col_ndx
+                                    << ", " << row_ndx << ", " << value
+                                    << "); } catch (const LogicError& le) { CHECK(le.kind() == "
+                                    "LogicError::illegal_combination); }\n";
+                                }
+                                try {
+                                    t->add_int(col_ndx, row_ndx, value);
+                                }
+                                catch (const LogicError& le) {
+                                    if (le.kind() != LogicError::illegal_combination) {
+                                        throw;
+                                    }
+                                }
                             }
-                            t->set_int(col_ndx, row_ndx, get_next(s));
+                            else {
+                                if (log) {
+                                    *log << "g.get_table(" << table_ndx << ")->set_int(" << col_ndx << ", " << row_ndx
+                                    << ", " << value << ");\n";
+                                }
+                                t->set_int(col_ndx, row_ndx, get_next(s));
+                            }
+
                         }
                         else if (type == type_Bool) {
                             bool value = get_next(s) % 2 == 0;
@@ -587,21 +704,24 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             }
                         }
                         else if (type == type_Timestamp) {
-                            int64_t seconds = get_int64(s);
-                            int32_t nanoseconds = get_int32(s) % 1000000000;
-                            // Make sure the values form a sensible Timestamp
-                            const bool both_non_negative = seconds >= 0 && nanoseconds >= 0;
-                            const bool both_non_positive = seconds <= 0 && nanoseconds <= 0;
-                            const bool correct_timestamp = both_non_negative || both_non_positive;
-                            if (!correct_timestamp) {
-                                nanoseconds = -nanoseconds;
-                            }
-                            Timestamp value{seconds, nanoseconds};
+                            std::pair<int64_t, int32_t> values = get_timestamp_values(s);
+                            Timestamp value{values.first, values.second};
                             if (log) {
                                 *log << "g.get_table(" << table_ndx << ")->set_timestamp(" << col_ndx << ", "
                                      << row_ndx << ", " << value << ");\n";
                             }
                             t->set_timestamp(col_ndx, row_ndx, value);
+                        }
+                        else if (type == type_Mixed) {
+                            if (log) {
+                                *log << "{\n";
+                            }
+                            Mixed mixed = construct_mixed(s, log);
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->set_mixed(" << col_ndx << ", "
+                                     << row_ndx << ", mixed);\n}\n";
+                            }
+                            t->set_mixed(col_ndx, row_ndx, mixed);
                         }
                     }
                 }
@@ -615,6 +735,34 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         *log << "g.get_table(" << table_ndx << ")->remove(" << row_ndx << ");\n";
                     }
                     t->remove(row_ndx);
+                }
+            }
+            else if (instr == MERGE_ROWS && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef t = g.get_table(table_ndx);
+                if (t->size() > 1) {
+                    size_t row_ndx1 = get_next(s) % t->size();
+                    size_t row_ndx2 = get_next(s) % t->size();
+                    if (row_ndx1 == row_ndx2) {
+                        row_ndx2 = (row_ndx2 + 1) % t->size();
+                    }
+                    // A restriction of merge_rows is that any linklists in the
+                    // "to" row must be empty because merging lists is not defined.
+                    for (size_t col_ndx = 0; col_ndx != t->get_column_count(); ++col_ndx) {
+                        if (t->get_column_type(col_ndx) == DataType::type_LinkList) {
+                            if (!t->get_linklist(col_ndx, row_ndx2)->is_empty()) {
+                                if (log) {
+                                    *log << "g.get_table(" << table_ndx << ")->get_linklist("
+                                    << col_ndx << ", " << row_ndx2 << ")->clear();\n";
+                                }
+                                t->get_linklist(col_ndx, row_ndx2)->clear();
+                            }
+                        }
+                    }
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->merge_rows(" << row_ndx1 << ", " << row_ndx2 << ");\n";
+                    }
+                    t->merge_rows(row_ndx1, row_ndx2);
                 }
             }
             else if (instr == MOVE_LAST_OVER && g.size() > 0) {

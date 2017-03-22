@@ -1816,6 +1816,146 @@ TEST(Query_StrIndexCrash)
     }
 }
 
+TEST(Query_size)
+{
+    Group g;
+
+    TableRef table1 = g.add_table("primary");
+    TableRef table2 = g.add_table("secondary");
+    TableRef table3 = g.add_table("top");
+
+    table1->add_column(type_String, "strings");
+    table1->add_column(type_Binary, "binaries", true);
+    DescriptorRef subdesc;
+    table1->add_column(type_Table, "intlist", false, &subdesc);
+    subdesc->add_column(type_Int, "list", nullptr, true);
+    table1->add_column_link(type_LinkList, "linklist", *table2);
+
+    table2->add_column(type_Int, "integers");
+
+    table3->add_column_link(type_Link, "link", *table1);
+    table3->add_column_link(type_LinkList, "linklist", *table1);
+    table3->add_empty_row(10);
+
+    Columns<String> strings = table1->column<String>(0);
+    Columns<Binary> binaries = table1->column<Binary>(1);
+    Columns<SubTable> intlist = table1->column<SubTable>(2);
+    Columns<LinkList> linklist = table1->column<LinkList>(3);
+
+    table1->add_empty_row(10);
+    table2->add_empty_row(10);
+
+    for (size_t i = 0; i < 10; i++) {
+        table2->set_int(0, i, i);
+    }
+
+    // Leave the last one null
+    for (unsigned i = 0; i < 9; i++) {
+        table3->set_link(0, i, i % 4);
+    }
+
+    for (unsigned i = 0; i < 10; i++) {
+        auto lv = table3->get_linklist(1, i);
+        for (unsigned j = 0; j < i % 5; j++) {
+            lv->add(j);
+        }
+    }
+
+    table1->set_string(0, 0, StringData("Hi"));
+    table1->set_string(0, 1, StringData("world"));
+
+    std::string bin1(100, 'a');
+    std::string bin2(500, '5');
+    table1->set_binary(1, 0, BinaryData(bin1));
+    table1->set_binary(1, 1, BinaryData(bin2));
+
+    auto set_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
+        size_t sz = value_list.size();
+        subtable->clear();
+        subtable->add_empty_row(sz);
+        for (size_t i = 0; i < sz; i++) {
+            subtable->set_int(0, i, value_list[i]);
+        }
+    };
+    set_list(table1->get_subtable(2, 0), std::vector<Int>({100, 200, 300, 400, 500}));
+    set_list(table1->get_subtable(2, 1), std::vector<Int>({1, 2, 3}));
+    set_list(table1->get_subtable(2, 2), std::vector<Int>({1, 2, 3, 4, 5}));
+    set_list(table1->get_subtable(2, 3), std::vector<Int>({1, 2, 3, 4, 5, 6, 7, 8, 9}));
+
+    auto set_links = [](LinkViewRef lv, const std::vector<int64_t>& value_list) {
+        for (auto v : value_list) {
+            lv->add(v);
+        }
+    };
+    set_links(table1->get_linklist(3, 0), std::vector<Int>({0, 1, 2, 3, 4, 5}));
+    set_links(table1->get_linklist(3, 1), std::vector<Int>({6, 7, 8, 9}));
+
+    Query q;
+    Query q1;
+    size_t match;
+    TableView tv;
+
+    q = strings.size() == 5;
+    q1 = table1->where().size_equal(0, 5);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q1.find();
+    CHECK_EQUAL(1, match);
+
+    // Check that the null values are handled correctly
+    q = binaries.size() == realm::null();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 8);
+    CHECK_EQUAL(tv.get_source_ndx(0), 2);
+
+    // Here the null values should not be included in the search
+    q = binaries.size() < 500;
+    q1 = table1->where().size_less(1, 500);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = q1.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    q = intlist.size() > 3;
+    q1 = table1->where().size_greater(2, 3);
+    tv = q.find_all();
+    CHECK_EQUAL(3, tv.size());
+    tv = q1.find_all();
+    CHECK_EQUAL(3, tv.size());
+    q1 = table1->where().size_between(2, 3, 7);
+    tv = q1.find_all();
+    CHECK_EQUAL(3, tv.size());
+
+    q = intlist.size() == 3;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+
+    q = linklist.size() != 6;
+    q1 = table1->where().size_not_equal(3, 6);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q1.find();
+    CHECK_EQUAL(1, match);
+    q = linklist.size() == 4;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+
+    q = linklist.size() > strings.size();
+    tv = q.find_all();
+    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    // Single links
+    q = table3->link(0).column<SubTable>(2).size() == 5;
+    tv = q.find_all();
+    CHECK_EQUAL(5, tv.size());
+
+    // Multiple links
+    q = table3->link(1).column<SubTable>(2).size() == 3;
+    tv = q.find_all();
+    CHECK_EQUAL(6, tv.size());
+}
+
 TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
 {
     Group group;
@@ -9575,8 +9715,10 @@ TEST(Query_TableInitialization)
     size_t col_table = table.add_column(type_Table, "table", &subdesc);
     subdesc->add_column(type_Int, "col");
 
+    std::string str(5, 'z');
     table.add_empty_row(20);
     for (size_t i = 0; i < 10; ++i) {
+        table.set_binary(col_binary, i, BinaryData(str), false);
         table.set_link(col_link, i, i);
         table.get_linklist(col_list, i)->add(i);
         table.get_subtable(col_table, i)->add_empty_row();
@@ -9786,6 +9928,7 @@ TEST(Query_TableInitialization)
         auto binary_col = [&] { return get_table().template column<Binary>(col_binary); };
         helper([&](Query&, auto&& test) { test(binary_col() == BinaryData()); });
         helper([&](Query&, auto&& test) { test(binary_col() != BinaryData()); });
+        helper([&](Query&, auto&& test) { test(binary_col().size() != 0); });
 
         auto link_col = [&] { return get_table().template column<Link>(col_link); };
         auto list_col = [&] { return get_table().template column<Link>(col_list); };
@@ -9801,10 +9944,14 @@ TEST(Query_TableInitialization)
         }
 
         helper([&](Query&, auto&& test) { test(list_col().count() == 1); });
+        helper([&](Query&, auto&& test) { test(list_col().size() == 1); });
         helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).max() > 0); });
         helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).min() > 0); });
         helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).sum() > 0); });
         helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).average() > 0); });
+
+        auto list_table = [&] { return get_table().template column<SubTable>(col_table); };
+        helper([&](Query&, auto&& test) { test(list_table().size() == 1); });
     };
 
     // Test all of the query expressions directly, over a link, over a backlink
