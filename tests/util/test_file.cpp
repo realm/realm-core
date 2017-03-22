@@ -95,9 +95,10 @@ SyncTestFile::SyncTestFile(const SyncConfig& sync_config)
     schema_mode = SchemaMode::Additive;
 }
 
-SyncTestFile::SyncTestFile(SyncServer& server)
+SyncTestFile::SyncTestFile(SyncServer& server, std::string name)
 {
-    auto name = path.substr(path.rfind('/') + 1);
+    if (name.empty())
+        name = path.substr(path.rfind('/') + 1);
     auto url = server.url_for_realm(name);
 
     sync_config = std::make_shared<SyncConfig>(SyncConfig{
@@ -151,15 +152,20 @@ SyncServer::SyncServer(bool start_immediately)
 
 SyncServer::~SyncServer()
 {
-    m_server.stop();
-    if (m_thread.joinable())
-        m_thread.join();
+    stop();
 }
 
 void SyncServer::start()
 {
     REALM_ASSERT(!m_thread.joinable());
     m_thread = std::thread([this]{ m_server.run(); });
+}
+
+void SyncServer::stop()
+{
+    m_server.stop();
+    if (m_thread.joinable())
+        m_thread.join();
 }
 
 std::string SyncServer::url_for_realm(StringData realm_name) const

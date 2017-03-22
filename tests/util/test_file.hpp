@@ -74,6 +74,7 @@ public:
     ~SyncServer();
 
     void start();
+    void stop();
 
     std::string url_for_realm(realm::StringData realm_name) const;
     std::string base_url() const { return m_url; }
@@ -86,7 +87,7 @@ private:
 
 struct SyncTestFile : TestFile {
     SyncTestFile(const realm::SyncConfig&);
-    SyncTestFile(SyncServer& server);
+    SyncTestFile(SyncServer& server, std::string name="");
 };
 
 #endif // REALM_ENABLE_SYNC

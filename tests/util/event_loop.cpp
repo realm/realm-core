@@ -187,7 +187,7 @@ void EventLoop::Impl::run_until(std::function<bool()> predicate)
     ctx.info = &predicate;
     auto observer = adoptCF(CFRunLoopObserverCreate(kCFAllocatorDefault, kCFRunLoopAllActivities,
                                                     true, 0, callback, &ctx));
-    auto timer = adoptCF(CFRunLoopTimerCreateWithHandler(kCFAllocatorDefault, CFAbsoluteTimeGetCurrent(), 0.05, 0, 0,
+    auto timer = adoptCF(CFRunLoopTimerCreateWithHandler(kCFAllocatorDefault, CFAbsoluteTimeGetCurrent(), 0.0005, 0, 0,
                                                          ^(CFRunLoopTimerRef){
         // Do nothing. The timer firing is sufficient to cause our runloop observer to run.
     }));

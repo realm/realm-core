@@ -25,9 +25,28 @@
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "property.hpp"
+#include "results.hpp"
 #include "schema.hpp"
 
+#include "impl/realm_coordinator.hpp"
+
 #include <realm/group.hpp>
+
+namespace realm {
+class TestHelper {
+public:
+    static const std::unique_ptr<SharedGroup> &get_shared_group(SharedRealm &shared_realm) {
+        Realm &realm = *(shared_realm.get());
+        return realm::Realm::Internal::get_shared_group(realm);
+    }
+
+    static void begin_read(SharedRealm &shared_realm, VersionID version) {
+        Realm::Internal::begin_read(*shared_realm, version);
+    }
+
+
+};
+}
 
 using namespace realm;
 
@@ -180,6 +199,42 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         REQUIRE(it->persisted_properties[0].table_column == 0);
     }
 
+    SECTION("should read the proper schema from the file if a custom version is supplied") {
+        Realm::get_shared_realm(config);
+
+        config.schema = util::none;
+        config.cache = false;
+        config.schema_mode = SchemaMode::Additive;
+        config.schema_version = 0;
+
+        auto realm = Realm::get_shared_realm(config);
+        REQUIRE(realm->schema().size() == 1);
+
+        auto &shared_group = TestHelper::get_shared_group(realm);
+        shared_group->begin_read();
+        shared_group->pin_version();
+        realm::VersionID old_version = shared_group->get_version_of_current_transaction();
+        realm->close();
+
+        config.schema = Schema{
+            {"object", {
+                {"value", PropertyType::Int, "", "", false, false, false}
+            }},
+            {"object1", {
+                {"value", PropertyType::Int, "", "", false, false, false}
+            }},
+        };
+        config.schema_version = 1;
+        realm = Realm::get_shared_realm(config);
+        REQUIRE(realm->schema().size() == 2);
+
+        auto old_realm = Realm::get_shared_realm(config);
+        old_realm->invalidate();
+
+        TestHelper::begin_read(old_realm, old_version);
+        REQUIRE(old_realm->schema().size() == 1);
+    }
+
     SECTION("should sensibly handle opening an uninitialized file without a schema specified") {
         SECTION("cached") { }
         SECTION("uncached") { config.cache = false; }
@@ -267,6 +322,13 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             auto realm2 = Realm::get_shared_realm(config);
             REQUIRE(realm1 == realm2);
         }).join();
+    }
+
+    SECTION("should not modify the schema when fetching from the cache") {
+        auto realm = Realm::get_shared_realm(config);
+        auto object_schema = &*realm->schema().find("object");
+        Realm::get_shared_realm(config);
+        REQUIRE(object_schema == &*realm->schema().find("object"));
     }
 }
 
@@ -469,5 +531,80 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
         config3.path = "";
         config3.encryption_key = {'a'};
         REQUIRE_THROWS(Realm::get_shared_realm(config3)); // both buffer and encryption
+    }
+}
+
+TEST_CASE("ShareRealm: realm closed in did_change callback") {
+    TestFile config;
+    config.schema_version = 1;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int, "", "", false, false, false}
+        }},
+    };
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    auto r1 = Realm::get_shared_realm(config);
+
+    r1->begin_transaction();
+    auto table = r1->read_group().get_table("class_object");
+    auto row_idx = table->add_empty_row(1);
+    auto table_idx = table->get_index_in_group();
+    r1->commit_transaction();
+
+    // Cannot be a member var of Context since Realm.close will free the context.
+    static SharedRealm* shared_realm;
+    shared_realm = &r1;
+    struct Context : public BindingContext {
+        void did_change(std::vector<ObserverState> const&, std::vector<void*> const&, bool) override
+        {
+            (*shared_realm)->close();
+            (*shared_realm).reset();
+        }
+    };
+
+    SECTION("did_change") {
+        r1->m_binding_context.reset(new Context());
+        r1->invalidate();
+
+        auto r2 = Realm::get_shared_realm(config);
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->add_empty_row(1);
+        r2->commit_transaction();
+        r2.reset();
+
+        r1->notify();
+    }
+
+    SECTION("did_change with async results") {
+        r1->m_binding_context.reset(new Context());
+        Results results(r1, table->where());
+        auto token = results.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+            // Should not be called.
+            REQUIRE(false);
+        });
+
+        auto r2 = Realm::get_shared_realm(config);
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->add_empty_row(1);
+        r2->commit_transaction();
+        r2.reset();
+
+        auto coordinator = _impl::RealmCoordinator::get_existing_coordinator(config.path);
+        coordinator->on_change();
+
+        r1->notify();
+    }
+
+    SECTION("refresh") {
+        r1->m_binding_context.reset(new Context());
+
+        auto r2 = Realm::get_shared_realm(config);
+        r2->begin_transaction();
+        r2->read_group().get_table("class_object")->add_empty_row(1);
+        r2->commit_transaction();
+        r2.reset();
+
+        REQUIRE_FALSE(r1->refresh());
     }
 }

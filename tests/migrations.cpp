@@ -31,24 +31,7 @@
 
 using namespace realm;
 
-#define VERIFY_SCHEMA(r) do { \
-    for (auto&& object_schema : (r).schema()) { \
-        auto table = ObjectStore::table_for_object_type((r).read_group(), object_schema.name); \
-        REQUIRE(table); \
-        CAPTURE(object_schema.name) \
-        std::string primary_key = ObjectStore::get_primary_key_for_object((r).read_group(), object_schema.name); \
-        REQUIRE(primary_key == object_schema.primary_key); \
-        for (auto&& prop : object_schema.persisted_properties) { \
-            size_t col = table->get_column_index(prop.name); \
-            CAPTURE(prop.name) \
-            REQUIRE(col != npos); \
-            REQUIRE(col == prop.table_column); \
-            REQUIRE(table->get_column_type(col) == static_cast<int>(prop.type)); \
-            REQUIRE(table->has_search_index(col) == prop.requires_index()); \
-            REQUIRE(prop.is_primary == (prop.name == primary_key)); \
-        } \
-    } \
-} while (0)
+#define VERIFY_SCHEMA(r) verify_schema((r), __LINE__)
 
 #define REQUIRE_UPDATE_SUCCEEDS(r, s, version) do { \
     REQUIRE_NOTHROW((r).update_schema(s, version)); \
@@ -69,6 +52,27 @@ using namespace realm;
 } while (0)
 
 namespace {
+void verify_schema(Realm& r, int line)
+{
+    CAPTURE(line);
+    for (auto&& object_schema : r.schema()) {
+        auto table = ObjectStore::table_for_object_type(r.read_group(), object_schema.name);
+        REQUIRE(table);
+        CAPTURE(object_schema.name)
+        std::string primary_key = ObjectStore::get_primary_key_for_object(r.read_group(), object_schema.name);
+        REQUIRE(primary_key == object_schema.primary_key);
+        for (auto&& prop : object_schema.persisted_properties) {
+            size_t col = table->get_column_index(prop.name);
+            CAPTURE(prop.name)
+            REQUIRE(col != npos);
+            REQUIRE(col == prop.table_column);
+            REQUIRE(table->get_column_type(col) == static_cast<int>(prop.type));
+            REQUIRE(table->has_search_index(col) == prop.requires_index());
+            REQUIRE(prop.is_primary == (prop.name == primary_key));
+        }
+    }
+}
+
 // Helper functions for modifying Schema objects, mostly for the sake of making
 // it clear what exactly is different about the 2+ schema objects used in
 // various tests
@@ -1132,6 +1136,39 @@ TEST_CASE("migration: Additive") {
         auto realm3 = Realm::get_shared_realm(config);
         REQUIRE(realm3->schema().find("object")->persisted_properties[0].table_column == 1);
         REQUIRE(realm3->schema().find("object")->persisted_properties[1].table_column == 2);
+    }
+
+    SECTION("increasing schema version without modifying schema properly leaves the schema untouched") {
+        TestFile config1;
+        config1.schema = schema;
+        config1.schema_mode = SchemaMode::Additive;
+        config1.schema_version = 0;
+
+        auto realm1 = Realm::get_shared_realm(config1);
+        REQUIRE(realm1->schema().size() == 1);
+        Schema schema1 = realm1->schema();
+        realm1->close();
+
+        auto config2 = config1;
+        config2.schema_version = 1;
+        auto realm2 = Realm::get_shared_realm(config2);
+        REQUIRE(realm2->schema() == schema1);
+    }
+
+    SECTION("update_schema() does not begin a write transaction when extra columns are present") {
+        realm->begin_transaction();
+
+        auto realm2 = Realm::get_shared_realm(config);
+        // will deadlock if it tries to start a write transaction
+        realm2->update_schema(remove_property(schema, "object", "value"));
+    }
+
+    SECTION("update_schema() does not begin a write transaction when indexes are changed without bumping schema version") {
+        realm->begin_transaction();
+
+        auto realm2 = Realm::get_shared_realm(config);
+        // will deadlock if it tries to start a write transaction
+        realm->update_schema(set_indexed(schema, "object", "value 2", true));
     }
 }
 

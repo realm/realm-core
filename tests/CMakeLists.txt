@@ -1,6 +1,7 @@
 include_directories(../external/catch/single_include .)
 
 set(HEADERS
+    util/any.hpp
     util/event_loop.hpp
     util/index_helpers.hpp
     util/test_file.hpp
@@ -28,11 +29,14 @@ set(SOURCES
 if(REALM_ENABLE_SYNC)
     list(APPEND HEADERS
         sync/sync_test_utils.hpp
+        sync/session/session_util.hpp
     )
     list(APPEND SOURCES 
         sync/file.cpp
         sync/metadata.cpp
-        sync/session.cpp
+        sync/session/session.cpp
+        sync/session/progress_notifications.cpp
+        sync/session/wait_for_completion.cpp
         sync/sync_manager.cpp
         sync/sync_test_utils.cpp
         sync/user.cpp

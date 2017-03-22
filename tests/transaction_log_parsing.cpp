@@ -55,7 +55,7 @@ public:
         m_realm->commit_transaction();
 
         _impl::CollectionChangeBuilder c;
-        _impl::TransactionChangeInfo info;
+        _impl::TransactionChangeInfo info{};
         info.lists.push_back({m_table_ndx, 0, 0, &c});
         info.table_modifications_needed.resize(m_group.size(), true);
         info.table_moves_needed.resize(m_group.size(), true);
@@ -256,7 +256,7 @@ TEST_CASE("Transaction log parsing: schema change reporting") {
         f();
         r->commit_transaction();
 
-        _impl::TransactionChangeInfo info;
+        _impl::TransactionChangeInfo info{};
         info.table_modifications_needed.resize(10, true);
         _impl::transaction::advance(sg, info);
 
@@ -408,7 +408,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             f();
             r->commit_transaction();
 
-            _impl::TransactionChangeInfo info;
+            _impl::TransactionChangeInfo info{};
             info.table_modifications_needed = tables_needed;
             info.table_moves_needed = tables_needed;
             _impl::transaction::advance(sg, info);
@@ -1273,7 +1273,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 }
             }
 
-            bool modified(size_t index, size_t col) const
+            bool modified(size_t index, size_t col) const noexcept
             {
                 auto it = std::find_if(begin(m_result), end(m_result),
                                        [=](auto&& change) { return (void *)(uintptr_t)index == change.info; });
@@ -1282,12 +1282,12 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 return it->changes[col].kind != BindingContext::ColumnInfo::Kind::None;
             }
 
-            bool invalidated(size_t index) const
+            bool invalidated(size_t index) const noexcept
             {
                 return std::find(begin(m_invalidated), end(m_invalidated), (void *)(uintptr_t)index) != end(m_invalidated);
             }
 
-            bool has_array_change(size_t index, size_t col, ColumnInfo::Kind kind, IndexSet values) const
+            bool has_array_change(size_t index, size_t col, ColumnInfo::Kind kind, IndexSet values) const noexcept
             {
                 auto& changes = m_result[index].changes;
                 if (changes.size() <= col)
@@ -1297,7 +1297,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                                                          values.as_indexes().begin(), values.as_indexes().end());
             }
 
-            size_t initial_column_index(size_t index, size_t col) const
+            size_t initial_column_index(size_t index, size_t col) const noexcept
             {
                 auto it = std::find_if(begin(m_result), end(m_result),
                                        [=](auto&& change) { return (void *)(uintptr_t)index == change.info; });
@@ -1325,8 +1325,8 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
 
         auto observe = [&](std::initializer_list<Row> rows, auto&& fn) {
             auto history = make_in_realm_history(config.path);
-            SharedGroup sg(*history, config.options());
-            auto& group = sg.begin_read();
+            auto sg = std::make_unique<SharedGroup>(*history, config.options());
+            auto& group = sg->begin_read();
 
             Context observer(rows);
             observer.realm = realm;
@@ -1910,7 +1910,8 @@ TEST_CASE("DeepChangeChecker") {
     r->update_schema({
         {"table", {
             {"int", PropertyType::Int},
-            {"link", PropertyType::Object, "table", "", false, false, true},
+            {"link1", PropertyType::Object, "table", "", false, false, true},
+            {"link2", PropertyType::Object, "table", "", false, false, true},
             {"array", PropertyType::Array, "table"}
         }},
     });
@@ -1931,7 +1932,7 @@ TEST_CASE("DeepChangeChecker") {
         f();
         r->commit_transaction();
 
-        _impl::TransactionChangeInfo info;
+        _impl::TransactionChangeInfo info{};
         info.table_modifications_needed.resize(g.size(), true);
         info.table_moves_needed.resize(g.size(), true);
         _impl::transaction::advance(sg, info);
@@ -1952,22 +1953,50 @@ TEST_CASE("DeepChangeChecker") {
     }
 
     SECTION("changes over links are tracked") {
-        r->begin_transaction();
-        for (int i = 0; i < 9; ++i)
-            table->set_link(1, i, i + 1);
-        r->commit_transaction();
+        SECTION("first link set") {
+            r->begin_transaction();
+            for (int i = 0; i < 8; ++i)
+                table->set_link(1, i, i + 1 + (i == 7));
+            r->commit_transaction();
+        }
+        SECTION("second link set") {
+            r->begin_transaction();
+            for (int i = 0; i < 8; ++i)
+                table->set_link(2, i, i + 1 + (i == 7));
+            r->commit_transaction();
+        }
+        SECTION("both set") {
+            r->begin_transaction();
+            for (int i = 0; i < 8; ++i) {
+                table->set_link(1, i, 8);
+                table->set_link(2, i, i + 1 + (i == 7));
+            }
+            r->commit_transaction();
+        }
+        SECTION("circular link") {
+            r->begin_transaction();
+            for (int i = 0; i < 8; ++i) {
+                table->set_link(1, i, i);
+                table->set_link(2, i, i + 1 + (i == 7));
+            }
+            r->commit_transaction();
+        }
 
         auto info = track_changes([&] {
             table->set_int(0, 9, 10);
         });
 
+        // link chain should cascade to all but #8 being marked as modified
         REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(8));
     }
 
     SECTION("changes over linklists are tracked") {
         r->begin_transaction();
-        for (int i = 0; i < 9; ++i)
-            table->get_linklist(2, i)->add(i + 1);
+        for (int i = 0; i < 8; ++i) {
+            table->get_linklist(3, i)->add(i);
+            table->get_linklist(3, i)->add(i + 1 + (i == 7));
+        }
         r->commit_transaction();
 
         auto info = track_changes([&] {
@@ -1975,6 +2004,7 @@ TEST_CASE("DeepChangeChecker") {
         });
 
         REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
+        REQUIRE_FALSE(_impl::DeepChangeChecker(info, *table, tables)(8));
     }
 
     SECTION("cycles over links do not loop forever") {
@@ -1990,7 +2020,7 @@ TEST_CASE("DeepChangeChecker") {
 
     SECTION("cycles over linklists do not loop forever") {
         r->begin_transaction();
-        table->get_linklist(2, 0)->add(0);
+        table->get_linklist(3, 0)->add(0);
         r->commit_transaction();
 
         auto info = track_changes([&] {
@@ -2027,17 +2057,17 @@ TEST_CASE("DeepChangeChecker") {
         CHECK(checker2(19));
 
         _impl::DeepChangeChecker checker3(info, *table, tables);
-        CHECK(checker2(4));
-        CHECK_FALSE(checker2(3));
-        CHECK_FALSE(checker2(2));
-        CHECK(checker2(18));
-        CHECK(checker2(19));
+        CHECK(checker3(4));
+        CHECK_FALSE(checker3(3));
+        CHECK_FALSE(checker3(2));
+        CHECK(checker3(18));
+        CHECK(checker3(19));
     }
 
     SECTION("targets moving is not a change") {
         r->begin_transaction();
         table->set_link(1, 0, 9);
-        table->get_linklist(2, 0)->add(9);
+        table->get_linklist(3, 0)->add(9);
         r->commit_transaction();
 
         auto info = track_changes([&] {
@@ -2058,7 +2088,7 @@ TEST_CASE("DeepChangeChecker") {
         REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
 
         r->begin_transaction();
-        table->get_linklist(2, 0)->add(8);
+        table->get_linklist(3, 0)->add(8);
         r->commit_transaction();
 
         info = track_changes([&] {
@@ -2080,7 +2110,7 @@ TEST_CASE("DeepChangeChecker") {
         REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
 
         r->begin_transaction();
-        table->get_linklist(2, 0)->add(8);
+        table->get_linklist(3, 0)->add(8);
         r->commit_transaction();
 
         info = track_changes([&] {

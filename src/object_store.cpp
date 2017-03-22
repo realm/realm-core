@@ -415,20 +415,24 @@ void ObjectStore::verify_no_migration_required(std::vector<SchemaChange> const& 
     verify_no_errors<SchemaMismatchException>(verifier, changes);
 }
 
-void ObjectStore::verify_valid_additive_changes(std::vector<SchemaChange> const& changes)
+bool ObjectStore::verify_valid_additive_changes(std::vector<SchemaChange> const& changes, bool update_indexes)
 {
     using namespace schema_change;
     struct Verifier : SchemaDifferenceExplainer {
         using SchemaDifferenceExplainer::operator();
 
+        bool index_changes = false;
+        bool other_changes = false;
+
         // Additive mode allows adding things, extra columns, and adding/removing indexes
-        void operator()(AddTable) { }
-        void operator()(AddProperty) { }
+        void operator()(AddTable) { other_changes = true; }
+        void operator()(AddProperty) { other_changes = true; }
         void operator()(RemoveProperty) { }
-        void operator()(AddIndex) { }
-        void operator()(RemoveIndex) { }
+        void operator()(AddIndex) { index_changes = true; }
+        void operator()(RemoveIndex) { index_changes = true; }
     } verifier;
     verify_no_errors<InvalidSchemaChangeException>(verifier, changes);
+    return verifier.other_changes || (verifier.index_changes && update_indexes);
 }
 
 static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> const& changes)
@@ -488,7 +492,8 @@ static void apply_additive_changes(Group& group, std::vector<SchemaChange> const
 {
     using namespace schema_change;
     struct Applier {
-        Applier(Group& group, bool update_indexes) : group{group}, table{group}, update_indexes{update_indexes} { }
+        Applier(Group& group, bool update_indexes)
+        : group{group}, table{group}, update_indexes{update_indexes} { }
         Group& group;
         TableHelper table;
         bool update_indexes;
@@ -525,7 +530,7 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         void operator()(ChangePropertyType op) { replace_column(group, table(op.object), *op.old_property, *op.new_property); }
         void operator()(MakePropertyNullable op) { make_property_optional(group, table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
-        void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? op.property->name : ""); }
+        void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name.c_str(), op.property ? op.property->name.c_str() : ""); }
         void operator()(AddIndex op) { add_index(table(op.object), op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
     } applier{group};

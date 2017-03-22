@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2016 Realm Inc.
+// Copyright 2017 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,25 +16,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_EXTERNAL_COMMIT_HELPER_HPP
-#define REALM_EXTERNAL_COMMIT_HELPER_HPP
+#include "binding_callback_thread_observer.hpp"
 
-#include <realm/util/features.h>
-
-#if (defined(REALM_HAVE_EPOLL) && REALM_HAVE_EPOLL) || REALM_ANDROID || (defined(REALM_PLATFORM_NODE) && REALM_PLATFORM_NODE && !REALM_PLATFORM_APPLE && !WIN32)
-#define REALM_USE_EPOLL 1
-#else
-#define REALM_USE_EPOLL 0
-#endif
-
-#if REALM_PLATFORM_APPLE
-#include "impl/apple/external_commit_helper.hpp"
-#elif REALM_USE_EPOLL
-#include "impl/epoll/external_commit_helper.hpp"
-#elif WIN32
-#include "impl/windows/external_commit_helper.hpp"
-#else
-#include "impl/generic/external_commit_helper.hpp"
-#endif
-
-#endif // REALM_EXTERNAL_COMMIT_HELPER_HPP
+namespace realm {
+BindingCallbackThreadObserver* g_binding_callback_thread_observer = nullptr;
+}
