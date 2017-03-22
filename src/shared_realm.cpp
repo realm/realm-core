@@ -373,28 +373,21 @@ void Realm::update_schema(Schema schema, uint64_t version,
     // Either the schema version has changed or we need to do non-migration changes
 
     if (!in_transaction) {
-        auto old_version = m_shared_group->get_version_of_current_transaction();
         transaction::begin_without_validation(*m_shared_group);
 
         // Beginning the write transaction may have advanced the version and left
         // us with nothing to do if someone else initialized the schema on disk
         if (m_new_schema) {
-            actual_schema = std::move(*m_new_schema);
-            m_new_schema = util::none;
-            m_coordinator->cache_schema(actual_schema, m_schema_version,
-                                        m_shared_group->get_version_of_current_transaction().version);
+            actual_schema = *m_new_schema;
             required_changes = actual_schema.compare(schema);
-
             if (!schema_change_needs_write_transaction(schema, required_changes, version)) {
                 cancel_transaction();
+                cache_new_schema();
                 set_schema(actual_schema, std::move(schema));
                 return;
             }
         }
-        else if (old_version != m_shared_group->get_version_of_current_transaction()) {
-            m_coordinator->advance_schema_cache(old_version.version,
-                                                m_shared_group->get_version_of_current_transaction().version);
-        }
+        cache_new_schema();
     }
 
     // Cancel the write transaction if we exit this function before committing it
