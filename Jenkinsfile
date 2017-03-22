@@ -224,7 +224,7 @@ def doBuildWindows(boolean isUniversal, String version, boolean isPublishingRun)
         }
         zip dir:'packaging-tmp', zipFile:"realm-core-${packageName}-${version}.zip", archive:true
         if (isPublishingRun) {
-          stash includes:"realm-core-${packageName}-${version}.zip", name:'${packageName}-package'
+          stash includes:"realm-core-${packageName}-${version}.zip", name:"${packageName}-package"
         }
       } finally {
         collectCompilerWarnings('msbuild', false)
