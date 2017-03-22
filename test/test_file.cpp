@@ -71,8 +71,7 @@ TEST(File_ExistsAndRemove)
     CHECK(!File::try_remove(path));
 }
 
-// FIXME: Not yet supported on Windows 10 UWP
-#if !REALM_UWP
+#if !REALM_UWP // Not implementable on UWP
 TEST(File_IsSame)
 {
     TEST_PATH(path_1);
@@ -403,7 +402,7 @@ TEST(File_Move)
     CHECK_NOT(file_2.is_attached());
 }
 
-#ifndef _WIN32
+#if !REALM_UWP // Not implementable on UWP
 TEST(File_GetUniqueID)
 {
     TEST_PATH(path_1);
@@ -446,6 +445,6 @@ TEST(File_GetUniqueID)
     CHECK_NOT(uid4_1 < uid4_2);
     CHECK_NOT(uid4_2 < uid4_1);
 }
-#endif
+#endif // !REALM_UWP
 
 #endif // TEST_FILE

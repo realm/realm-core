@@ -1064,64 +1064,47 @@ bool File::is_same_file(const File& f) const
 {
     REALM_ASSERT_RELEASE(is_attached());
     REALM_ASSERT_RELEASE(f.is_attached());
-
-#if REALM_UWP
-    static_cast<void>(f);
-    throw std::runtime_error("Not yet supported");
-#elif defined(_WIN32) // Windows version
-    // FIXME: This version does not work on ReFS.
-    BY_HANDLE_FILE_INFORMATION file_info;
-    if (GetFileInformationByHandle(m_handle, &file_info)) {
-        DWORD vol_serial_num = file_info.dwVolumeSerialNumber;
-        DWORD file_ndx_high = file_info.nFileIndexHigh;
-        DWORD file_ndx_low = file_info.nFileIndexLow;
-        if (GetFileInformationByHandle(f.m_handle, &file_info)) {
-            return vol_serial_num == file_info.dwVolumeSerialNumber && file_ndx_high == file_info.nFileIndexHigh &&
-                   file_ndx_low == file_info.nFileIndexLow;
-        }
-    }
-
-    DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    std::string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
-    throw std::runtime_error(msg);
-
-#else // POSIX version
-
-    struct stat statbuf;
-    if (::fstat(m_fd, &statbuf) == 0) {
-        dev_t device_id = statbuf.st_dev;
-        ino_t inode_num = statbuf.st_ino;
-        if (::fstat(f.m_fd, &statbuf) == 0)
-            return device_id == statbuf.st_dev && inode_num == statbuf.st_ino;
-    }
-    int err = errno; // Eliminate any risk of clobbering
-    std::string msg = get_errno_msg("fstat() failed: ", err);
-    throw std::runtime_error(msg);
-
-#endif
-
-    /*
-    FIXME: Here is how to do it on Windows Server 2012 and onwards. This new
-    solution correctly handles file identification on ReFS.
-
-    FILE_ID_INFO file_id_info;
-    if (GetFileInformationByHandleEx(m_handle, FileIdInfo, &file_id_info, sizeof file_id_info)) {
-        ULONGLONG vol_serial_num = file_id_info.VolumeSerialNumber;
-        EXT_FILE_ID_128 file_id     = file_id_info.FileId;
-        if (GetFileInformationByHandleEx(f.m_handle, FileIdInfo, &file_id_info,
-                                         sizeof file_id_info)) {
-            return vol_serial_num == file_id_info.VolumeSerialNumber &&
-                file_id == file_id_info.FileId;
-        }
-    }
-    */
+    return f.get_unique_id() == get_unique_id();
 }
 
 File::UniqueID File::get_unique_id() const
 {
     REALM_ASSERT_RELEASE(is_attached());
-#ifdef _WIN32 // Windows version
-    throw std::runtime_error("Not yet supported");
+#if REALM_UWP
+    // UWP does not support GetFileInformationByHandleEx(FileIdInfo) or
+    // GetFileInformationByHandle() and does not expose the same information
+    // in any other way.
+    throw std::runtime_error("Not supported");
+#elif defined(_WIN32) // Windows version
+    // First try the Windows Server 2012 version
+    FILE_ID_INFO file_id_info;
+    if (GetFileInformationByHandleEx(m_handle, FileIdInfo, &file_id_info, sizeof file_id_info)) {
+        UniqueID id{file_id_info.VolumeSerialNumber};
+        memcpy(&id.inode[0], file_id_info.FileId.Identifier, sizeof(file_id_info.FileId.Identifier));
+        return id;
+    }
+
+    DWORD err = GetLastError(); // Eliminate any risk of clobbering
+    if (err != ERROR_INVALID_PARAMETER) {
+        std::string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
+        throw std::runtime_error(msg);
+    }
+
+    // Fall back to the older function on other versions of Windows
+    BY_HANDLE_FILE_INFORMATION file_info;
+    if (!GetFileInformationByHandle(m_handle, &file_info)) {
+        DWORD err = GetLastError(); // Eliminate any risk of clobbering
+        std::string msg = get_last_error_msg("GetFileInformationByHandle() failed: ", err);
+        throw std::runtime_error(msg);
+    }
+
+    UniqueID id{file_info.dwVolumeSerialNumber};
+    memcpy(&id.inode[0],
+           &file_info.nFileIndexHigh, sizeof(file_info.nFileIndexHigh));
+    memcpy(&id.inode[sizeof(file_info.nFileIndexHigh)],
+           &file_info.nFileIndexLow, sizeof(file_info.nFileIndexLow));
+    // Leave the last 8 bytes of the inode zeroed
+    return id;
 #else // POSIX version
     struct stat statbuf;
     if (::fstat(m_fd, &statbuf) == 0) {
@@ -1136,7 +1119,14 @@ File::UniqueID File::get_unique_id() const
 bool File::get_unique_id(const std::string& path, File::UniqueID& uid)
 {
 #ifdef _WIN32 // Windows version
-    throw std::runtime_error("Not yet supported");
+    File file;
+    bool did_open = false;
+    file.open_internal(path, access_ReadOnly, create_Never, 0, &did_open);
+    if (did_open) {
+        uid = file.get_unique_id();
+        return true;
+    }
+    return false;
 #else // POSIX version
     struct stat statbuf;
     if (::stat(path.c_str(), &statbuf) == 0) {
