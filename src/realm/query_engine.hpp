@@ -1678,7 +1678,7 @@ public:
                 m_index_matches->get_root_array()->create(Array::type_Normal);                          // Throws
                 //m_index_matches->add(res.payload);
                 StringData needle(m_value);
-                m_condition_column->get_search_index()->find_all(*m_index_matches, needle);
+                m_condition_column->get_search_index()->find_all(*m_index_matches, needle, true);
             }
 
             m_index_matches_destroy = true; // we own m_index_matches, so we must destroy it
