@@ -44,15 +44,14 @@ void Columns<SubTable>::evaluate_internal(size_t index, ValueBase& destination, 
         if (m_link_map.only_unary_links()) {
             ConstTableRef val;
             if (sz == 1) {
-                val = ConstTableRef(m_column->get_subtable_ptr(links[0]));
+                val = m_column->get(links[0]);
             }
             d->init(false, 1, val);
         }
         else {
             d->init(true, sz);
             for (size_t t = 0; t < sz; t++) {
-                const Table* table = m_column->get_subtable_ptr(links[t]);
-                d->m_storage.set(t, ConstTableRef(table));
+                d->m_storage.set(t, m_column->get(links[t]));
             }
         }
     }
@@ -62,8 +61,7 @@ void Columns<SubTable>::evaluate_internal(size_t index, ValueBase& destination, 
         d->init(false, rows);
 
         for (size_t t = 0; t < rows; t++) {
-            const Table* table = m_column->get_subtable_ptr(index + t);
-            d->m_storage.set(t, ConstTableRef(table));
+            d->m_storage.set(t, m_column->get(index + t));
         }
     }
 }

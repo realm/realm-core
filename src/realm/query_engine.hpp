@@ -939,9 +939,11 @@ public:
     {
         for (size_t s = start; s < end; ++s) {
             TConditionValue v = m_condition_column->get(s);
-            int64_t sz = m_size_operator(v);
-            if (TConditionFunction()(sz, m_value, !bool(v)))
-                return s;
+            if (v) {
+                int64_t sz = m_size_operator(v);
+                if (TConditionFunction()(sz, m_value))
+                    return s;
+            }
         }
         return not_found;
     }

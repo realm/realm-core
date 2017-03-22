@@ -2139,9 +2139,6 @@ public:
     size_t find_first(size_t start, size_t end) const override
     {
         for (; start < end;) {
-            std::vector<size_t> l = m_link_map.get_links(start);
-            // We have found a Link which is NULL, or LinkList with 0 entries. Return it as match.
-
             FindNullLinks fnl;
             m_link_map.map_links(start, fnl);
             if (fnl.m_has_link == has_links)
@@ -2914,9 +2911,7 @@ public:
                 REALM_ASSERT_3(ValueBase::default_size, ==, 8);
 
                 auto sgc_2 = static_cast<SequentialGetter<ColType>*>(m_sg.get());
-                sgc_2->m_leaf_ptr->get_chunk(
-                    index - sgc->m_leaf_start,
-                    static_cast<Value<int64_t>*>(static_cast<ValueBase*>(&v))->m_storage.m_first);
+                sgc_2->m_leaf_ptr->get_chunk(index - sgc->m_leaf_start, v.m_storage.m_first);
 
                 destination.import(v);
             }
