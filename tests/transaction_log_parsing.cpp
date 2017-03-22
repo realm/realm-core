@@ -564,7 +564,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         }
 
         SECTION("merge_rows() to a new row followed by move_last_over() produces no net change") {
-            size_t new_row;
             auto info = track_changes({false, false, true}, [&] {
                 size_t new_row = table.add_empty_row();
                 table.merge_rows(5, new_row);

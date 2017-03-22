@@ -37,6 +37,18 @@ static const std::string s_test_token = "eyJpZGVudGl0eSI6InRlc3QiLCAiYWNjZXNzIjo
 
 #endif
 
+class JoiningThread {
+public:
+    template<typename... Args>
+    JoiningThread(Args&&... args) : m_thread(std::forward<Args>(args)...) { }
+    ~JoiningThread() { if (m_thread.joinable()) m_thread.join(); }
+    void join() { m_thread.join(); }
+
+private:
+    std::thread m_thread;
+};
+
+
 struct TestFile : realm::Realm::Config {
     TestFile();
     ~TestFile();
