@@ -1,5 +1,8 @@
 add_subdirectory(util)
 add_subdirectory(fuzzy)
+add_subdirectory(benchmark-common-tasks)
+add_subdirectory(benchmark-crud)
+# FIXME: Add other benchmarks
 
 set(NORMAL_TESTS
     test_all.cpp
@@ -105,12 +108,3 @@ target_include_directories(realm-tests PUBLIC ${EXTRA_TEST_CFLAGS})
 
 add_test(NAME RealmTests COMMAND realm-tests)
 
-add_executable(realm-benchmark-common-tasks benchmark-common-tasks/main.cpp benchmark-common-tasks/compatibility.cpp)
-target_link_libraries(realm-benchmark-common-tasks ${PLATFORM_LIBRARIES} test-util)
-add_test(RealmBenchmarkCommonTasks realm-benchmark-common-tasks)
-
-add_executable(realm-benchmark-crud benchmark-crud/main.cpp)
-target_link_libraries(realm-benchmark-crud ${PLATFORM_LIBRARIES} test-util)
-add_test(RealmBenchmarkCrud realm-benchmark-crud)
-
-# FIXME: Add other benchmarks
