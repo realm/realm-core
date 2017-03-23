@@ -290,6 +290,7 @@ def buildDiffCoverage() {
 
 def buildPerformance() {
   return {
+    getArchive()
     // Select docker-cph-X.  We want docker, metal (brix) and only one executor
     // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
     node('docker && brix && exclusive') {
