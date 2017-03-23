@@ -1002,7 +1002,7 @@ inline ref_type Group::get_history_ref(const Array& top) noexcept
 inline int Group::get_history_schema_version(const Array& top) noexcept
 {
     if (top.is_attached()) {
-        if (top.size() >= 8) {
+        if (top.size() >= 9) {
             REALM_ASSERT(top.size() >= 10);
             return int(top.get_as_ref_or_tagged(9).get_as_int());
         }

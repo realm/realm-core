@@ -995,6 +995,7 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
         // Allocator::get_file_format_version() for information about the
         // individual file format verions.
         switch (file_format_version) {
+            case 6:
             case 7:
                 bad_file_format = false;
         }

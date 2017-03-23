@@ -10,7 +10,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Restore support for opening version 6 files in read-only mode.
 
 -----------
 
