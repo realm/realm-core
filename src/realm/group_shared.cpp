@@ -1902,6 +1902,7 @@ bool SharedGroup::do_begin_write(bool must_wait)
         // In doing so, we may bypass other waiters, hence the condition for yielding
         // should take this situation into account by comparing with '>' instead of '!='
         info->next_served = my_ticket;
+#endif
     }
     else { // non-blocking
         // In the non-blocking case, we will only succeed if there is no contention for
@@ -1910,7 +1911,6 @@ bool SharedGroup::do_begin_write(bool must_wait)
         bool got_the_lock = m_writemutex.try_lock();
         if (!got_the_lock) return false;
     }
-#endif
 
     if (info->commit_in_critical_phase) {
         m_writemutex.unlock();
