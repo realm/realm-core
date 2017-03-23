@@ -2,107 +2,104 @@
 
 @Library('realm-ci') _
 
-try {
-  def gitTag
-  def gitSha
-  def version
-  def dependencies
-  def isPublishingRun
-  def isPublishingLatestRun
 
-    stage('gather-info') {
-      node {
-        checkout([
-          $class: 'GitSCM',
-          branches: scm.branches,
-          gitTool: 'native git',
-          extensions: scm.extensions + [[$class: 'CleanCheckout']],
-          userRemoteConfigs: scm.userRemoteConfigs
-        ])
-        stash includes: '**', name: 'core-source'
+def gitTag
+def gitSha
+def version
+def dependencies
+def isPublishingRun
+def isPublishingLatestRun
 
-        dependencies = readProperties file: 'dependencies.list'
-        echo "VERSION: ${dependencies.VERSION}"
+  stage('gather-info') {
+    node {
+      checkout([
+        $class: 'GitSCM',
+        branches: scm.branches,
+        gitTool: 'native git',
+        extensions: scm.extensions + [[$class: 'CleanCheckout']],
+        userRemoteConfigs: scm.userRemoteConfigs
+      ])
+      stash includes: '**', name: 'core-source'
 
-        gitTag = readGitTag()
-        gitSha = readGitSha()
-        version = get_version()
-        echo "tag: ${gitTag}"
-        if (gitTag == "") {
-          echo "No tag given for this build"
-          setBuildName(gitSha)
+      dependencies = readProperties file: 'dependencies.list'
+      echo "VERSION: ${dependencies.VERSION}"
+
+      gitTag = readGitTag()
+      gitSha = readGitSha()
+      version = get_version()
+      echo "tag: ${gitTag}"
+      if (gitTag == "") {
+        echo "No tag given for this build"
+        setBuildName(gitSha)
+      } else {
+        if (gitTag != "v${dependencies.VERSION}") {
+          error "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
         } else {
-          if (gitTag != "v${dependencies.VERSION}") {
-            error "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
-          } else {
-            echo "Building release: '${gitTag}'"
-            setBuildName("Tag ${gitTag}")
-          }
+          echo "Building release: '${gitTag}'"
+          setBuildName("Tag ${gitTag}")
         }
       }
-
-      isPublishingRun = gitTag != ""
-      echo "Publishing Run: ${isPublishingRun}"
-
-      isPublishingLatestRun = ['master'].contains(env.BRANCH_NAME)
-
-      rpmVersion = dependencies.VERSION.replaceAll("-", "_")
-      echo "rpm version: ${rpmVersion}"
-
-      if (['master'].contains(env.BRANCH_NAME)) {
-        // If we're on master, instruct the docker image builds to push to the
-        // cache registry
-        env.DOCKER_PUSH = "1"
-      }
     }
 
-    stage('check') {
-      parallelExecutors = [
-        checkLinuxRelease: doBuildInDocker('check'),
-        checkLinuxDebug: doBuildInDocker('check-debug'),
-        buildCocoa: doBuildCocoa(isPublishingRun, isPublishingLatestRun),
-        buildNodeLinux: doBuildNodeInDocker(isPublishingRun, isPublishingLatestRun),
-        buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
-        buildAndroid: doBuildAndroid(isPublishingRun),
-        buildWindows: doBuildWindows(false, version, isPublishingRun),
-        buildWindowsUniversal: doBuildWindows(true, version, isPublishingRun),
-        buildOsxDylibs: doBuildOsxDylibs(version, isPublishingRun, isPublishingLatestRun),
-        addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
-        //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
-      ]
+    isPublishingRun = gitTag != ""
+    echo "Publishing Run: ${isPublishingRun}"
 
-      if (env.CHANGE_TARGET) {
-        parallelExecutors['diffCoverage'] = buildDiffCoverage()
-        parallelExecutors['performance'] = buildPerformance()
-      }
+    isPublishingLatestRun = ['master'].contains(env.BRANCH_NAME)
 
-      parallel parallelExecutors
+    rpmVersion = dependencies.VERSION.replaceAll("-", "_")
+    echo "rpm version: ${rpmVersion}"
+
+    if (['master'].contains(env.BRANCH_NAME)) {
+      // If we're on master, instruct the docker image builds to push to the
+      // cache registry
+      env.DOCKER_PUSH = "1"
+    }
+  }
+
+  stage('check') {
+    parallelExecutors = [
+      checkLinuxRelease: doBuildInDocker('check'),
+      checkLinuxDebug: doBuildInDocker('check-debug'),
+      buildCocoa: doBuildCocoa(isPublishingRun, isPublishingLatestRun),
+      buildNodeLinux: doBuildNodeInDocker(isPublishingRun, isPublishingLatestRun),
+      buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
+      buildAndroid: doBuildAndroid(isPublishingRun),
+      buildWindows: doBuildWindows(false, version, isPublishingRun),
+      buildWindowsUniversal: doBuildWindows(true, version, isPublishingRun),
+      buildOsxDylibs: doBuildOsxDylibs(version, isPublishingRun, isPublishingLatestRun),
+      addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
+      //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
+    ]
+
+    if (env.CHANGE_TARGET) {
+      parallelExecutors['diffCoverage'] = buildDiffCoverage()
+      parallelExecutors['performance'] = buildPerformance()
     }
 
-    stage('build-packages') {
+    parallel parallelExecutors
+  }
+
+  stage('build-packages') {
+    parallel(
+      generic: doBuildPackage('generic', 'tgz'),
+      centos7: doBuildPackage('centos-7', 'rpm'),
+      centos6: doBuildPackage('centos-6', 'rpm'),
+      ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
+    )
+  }
+
+  if (isPublishingRun) {
+    stage('publish-packages') {
       parallel(
-        generic: doBuildPackage('generic', 'tgz'),
-        centos7: doBuildPackage('centos-7', 'rpm'),
-        centos6: doBuildPackage('centos-6', 'rpm'),
-        ubuntu1604: doBuildPackage('ubuntu-1604', 'deb')
+        generic: doPublishGeneric(),
+        centos7: doPublish('centos-7', 'rpm', 'el', 7),
+        centos6: doPublish('centos-6', 'rpm', 'el', 6),
+        ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
+        others: doPublishLocalArtifacts()
       )
     }
+  }
 
-    if (isPublishingRun) {
-      stage('publish-packages') {
-        parallel(
-          generic: doPublishGeneric(),
-          centos7: doPublish('centos-7', 'rpm', 'el', 7),
-          centos6: doPublish('centos-6', 'rpm', 'el', 6),
-          ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
-          others: doPublishLocalArtifacts()
-        )
-      }
-    }
-} catch(Exception e) {
-  e.printStackTrace()
-  throw e
-}
 
 def buildDockerEnv(name) {
   docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
