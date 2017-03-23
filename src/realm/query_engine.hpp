@@ -1682,6 +1682,7 @@ public:
             }
 
             m_index_matches_destroy = true; // we own m_index_matches, so we must destroy it
+            m_last_start = size_t(-1);
             m_results_start = 0;
             m_results_end = m_index_matches->size();
 
