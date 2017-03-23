@@ -356,6 +356,11 @@ public:
     const Group& begin_read(VersionID version = VersionID());
     void end_read() noexcept;
     Group& begin_write();
+    // Return true (and take the write lock) if there is no other write
+    // in progress. In case of contention return false immediately.
+    // If the write lock is obtained, also provide the Group associated
+    // with the SharedGroup for further operations.
+    bool try_begin_write(Group*& group);
     version_type commit();
     void rollback() noexcept;
     // report statistics of last commit done on THIS shared group.
@@ -600,7 +605,11 @@ private:
 
     void do_begin_read(VersionID, bool writable);
     void do_end_read() noexcept;
-    void do_begin_write();
+    /// return true if write transaction can commence, false otherwise.
+    /// If must_wait is set, block if another transaction is in progress, return true.
+    /// If must_wait is clear, don't block and only return true
+    /// if there is no conflicting transaction.
+    bool do_begin_write(bool must_wait = true);
     version_type do_commit();
     void do_end_write() noexcept;
 

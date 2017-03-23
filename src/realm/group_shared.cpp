@@ -1720,6 +1720,37 @@ Group& SharedGroup::begin_write()
     return m_group;
 }
 
+bool SharedGroup::try_begin_write(Group* &group)
+{
+    if (m_transact_stage != transact_Ready)
+        throw LogicError(LogicError::wrong_transact_state);
+
+    bool success = do_begin_write(false); // Throws
+    if (!success) return false;
+    try {
+        // We can be sure that do_begin_read() will bind to the latest snapshot,
+        // since no other write transaction can be initated while we hold the
+        // write mutex.
+        VersionID version_id = VersionID(); // Latest available snapshot
+        bool writable = true;
+        do_begin_read(version_id, writable); // Throws
+
+        if (Replication* repl = m_group.get_replication()) {
+            version_type current_version = m_read_lock.m_version;
+            bool history_updated = false;
+            repl->initiate_transact(current_version, history_updated); // Throws
+        }
+    }
+    catch (...) {
+        do_end_write();
+        throw;
+    }
+
+    m_transact_stage = transact_Writing;
+    group = &m_group;
+    return true;
+}
+
 
 SharedGroup::version_type SharedGroup::commit()
 {
@@ -1809,66 +1840,76 @@ void SharedGroup::do_end_read() noexcept
 }
 
 
-void SharedGroup::do_begin_write()
+bool SharedGroup::do_begin_write(bool must_wait)
 {
     SharedInfo* info = m_file_map.get_addr();
-    // Get write lock - the write lock is held until do_end_write().
-    //
-    // We use a ticketing scheme to ensure fairness wrt performing write transactions.
-    // (But cannot do that on Windows until we have interprocess condition variables there)
+
+    if (must_wait) {
+        // Get write lock - the write lock is held until do_end_write().
+        //
+        // We use a ticketing scheme to ensure fairness wrt performing write transactions.
+        // (But cannot do that on Windows until we have interprocess condition variables there)
 #ifndef _WIN32
-    uint_fast32_t my_ticket = info->next_ticket.fetch_add(1, std::memory_order_relaxed);
+        uint_fast32_t my_ticket = info->next_ticket.fetch_add(1, std::memory_order_relaxed);
 #endif
-    m_writemutex.lock(); // Throws
+        m_writemutex.lock(); // Throws
 #ifndef _WIN32
-    // allow for comparison even after wrap around of ticket numbering:
-    int32_t diff = int32_t(my_ticket - info->next_served);
-    bool should_yield = diff > 0; // ticket is in the future
-    // a) the above comparison is only guaranteed to be correct, if the distance
-    //    between my_ticket and info->next_served is less than 2^30. This will
-    //    be the case since the distance will be bounded by the number of threads
-    //    and each thread cannot ever hold more than one ticket.
-    // b) we could use 64 bit counters instead, but it is unclear if all platforms
-    //    have support for interprocess atomics for 64 bit values.
+        // allow for comparison even after wrap around of ticket numbering:
+        int32_t diff = int32_t(my_ticket - info->next_served);
+        bool should_yield = diff > 0; // ticket is in the future
+        // a) the above comparison is only guaranteed to be correct, if the distance
+        //    between my_ticket and info->next_served is less than 2^30. This will
+        //    be the case since the distance will be bounded by the number of threads
+        //    and each thread cannot ever hold more than one ticket.
+        // b) we could use 64 bit counters instead, but it is unclear if all platforms
+        //    have support for interprocess atomics for 64 bit values.
 
-    timespec time_limit;  // only compute the time limit if we're going to use it:
-    if (should_yield) {
-        // This clock is not monotonic, so time can move backwards. This can lead
-        // to a wrong time limit, but the only effect of a wrong time limit is that
-        // we momentarily lose fairness, so we accept it.
-        timeval tv;
-        gettimeofday(&tv, nullptr);
-        time_limit.tv_sec = tv.tv_sec;
-        time_limit.tv_nsec = tv.tv_usec * 1000;
-        time_limit.tv_nsec += 500000000;        // 500 msec wait
-        if (time_limit.tv_nsec >= 1000000000) { // overflow
-            time_limit.tv_nsec -= 1000000000;
-            time_limit.tv_sec += 1;
+        timespec time_limit;  // only compute the time limit if we're going to use it:
+        if (should_yield) {
+            // This clock is not monotonic, so time can move backwards. This can lead
+            // to a wrong time limit, but the only effect of a wrong time limit is that
+            // we momentarily lose fairness, so we accept it.
+            timeval tv;
+            gettimeofday(&tv, nullptr);
+            time_limit.tv_sec = tv.tv_sec;
+            time_limit.tv_nsec = tv.tv_usec * 1000;
+            time_limit.tv_nsec += 500000000;        // 500 msec wait
+            if (time_limit.tv_nsec >= 1000000000) { // overflow
+                time_limit.tv_nsec -= 1000000000;
+                time_limit.tv_sec += 1;
+            }
         }
-    }
 
-    while (should_yield) {
+        while (should_yield) {
 
-        m_pick_next_writer.wait(m_writemutex, &time_limit);
-        timeval tv;
-        gettimeofday(&tv, nullptr);
-        if (time_limit.tv_sec < tv.tv_sec
-            || (time_limit.tv_sec == tv.tv_sec && time_limit.tv_nsec < tv.tv_usec * 1000)) {
-            // Timeout!
-            break;
+            m_pick_next_writer.wait(m_writemutex, &time_limit);
+            timeval tv;
+            gettimeofday(&tv, nullptr);
+            if (time_limit.tv_sec < tv.tv_sec
+                || (time_limit.tv_sec == tv.tv_sec && time_limit.tv_nsec < tv.tv_usec * 1000)) {
+                // Timeout!
+                break;
+            }
+            diff = int32_t(my_ticket - info->next_served);
+            should_yield = diff > 0; // ticket is in the future, so yield to someone else
         }
-        diff = int32_t(my_ticket - info->next_served);
-        should_yield = diff > 0; // ticket is in the future, so yield to someone else
-    }
 
-    // we may get here because a) it's our turn, b) we timed out
-    // we don't distinguish, satisfied that event b) should be rare.
-    // In case b), we have to *make* it our turn. Failure to do so could leave us
-    // with 'next_served' permanently trailing 'next_ticket'.
-    //
-    // In doing so, we may bypass other waiters, hence the condition for yielding
-    // should take this situation into account by comparing with '>' instead of '!='
-    info->next_served = my_ticket;
+        // we may get here because a) it's our turn, b) we timed out
+        // we don't distinguish, satisfied that event b) should be rare.
+        // In case b), we have to *make* it our turn. Failure to do so could leave us
+        // with 'next_served' permanently trailing 'next_ticket'.
+        //
+        // In doing so, we may bypass other waiters, hence the condition for yielding
+        // should take this situation into account by comparing with '>' instead of '!='
+        info->next_served = my_ticket;
+    }
+    else { // non-blocking
+        // In the non-blocking case, we will only succeed if there is no contention for
+        // the write mutex. For this case we are trivially fair and can ignore the
+        // fairness machinery.
+        bool got_the_lock = m_writemutex.try_lock();
+        if (!got_the_lock) return false;
+    }
 #endif
 
     if (info->commit_in_critical_phase) {
@@ -1893,6 +1934,7 @@ void SharedGroup::do_begin_write()
         m_balancemutex.unlock();
     }
 #endif // REALM_ASYNC_DAEMON
+    return true;
 }
 
 
