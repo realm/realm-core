@@ -28,7 +28,7 @@
 
 ### Enhancements
 
-* Allow query for size of strings, binaries, linklists and subtables:
+* Allow query for size of strings, binaries and subtables:
   Query q = table->where().size_equal(2, 5);
   Query q = table->column<SubTable>(2).size() == 5;
 * Enhanced support for query in subtables:

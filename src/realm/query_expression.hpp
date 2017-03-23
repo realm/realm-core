@@ -2390,11 +2390,6 @@ public:
         return LinkCount(m_link_map);
     }
 
-    LinkCount size() const
-    {
-        return LinkCount(m_link_map);
-    }
-
     template <typename C>
     SubColumns<C> column(size_t column_ndx) const
     {

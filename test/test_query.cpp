@@ -1930,19 +1930,13 @@ TEST(Query_size)
     match = q.find();
     CHECK_EQUAL(1, match);
 
-    q = linklist.size() != 6;
     q1 = table1->where().size_not_equal(3, 6);
-    match = q.find();
-    CHECK_EQUAL(1, match);
     match = q1.find();
     CHECK_EQUAL(1, match);
-    q = linklist.size() == 4;
-    match = q.find();
-    CHECK_EQUAL(1, match);
 
-    q = linklist.size() > strings.size();
+    q = intlist.size() > strings.size();
     tv = q.find_all();
-    CHECK_EQUAL(1, tv.size());
+    CHECK_EQUAL(3, tv.size());
     CHECK_EQUAL(0, tv.get_source_ndx(0));
 
     // Single links
@@ -10051,7 +10045,6 @@ TEST(Query_TableInitialization)
         }
 
         helper([&](Query&, auto&& test) { test(list_col().count() == 1); });
-        helper([&](Query&, auto&& test) { test(list_col().size() == 1); });
         helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).max() > 0); });
         helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).min() > 0); });
         helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).sum() > 0); });
