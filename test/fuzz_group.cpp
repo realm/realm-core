@@ -163,7 +163,7 @@ std::pair<int64_t, int32_t> get_timestamp_values(State& s) {
     return {seconds, nanoseconds};
 }
 
-Mixed construct_mixed(State& s, util::Optional<std::ostream&> log)
+Mixed construct_mixed(State& s, util::Optional<std::ostream&> log, std::string& buffer)
 {
     // Mixed type has 8 constructors supporting different types.
     unsigned char type = get_next(s) % 8;
@@ -199,21 +199,21 @@ Mixed construct_mixed(State& s, util::Optional<std::ostream&> log)
             return Mixed(value);
         }
         case 4: {
-            std::string str = create_string(get_next(s));
+            buffer = create_string(get_next(s));
             if (log) {
-                *log << "Mixed mixed(StringData(\"" << str << "\"));\n";
+                *log << "Mixed mixed(StringData(\"" << buffer << "\"));\n";
             }
-            return Mixed(StringData(str));
+            return Mixed(StringData(buffer));
         }
         case 5: {
             size_t rand_char = get_next(s);
             size_t blob_size = get_int64(s) % ArrayBlob::max_binary_size;
-            std::string blob(blob_size, static_cast<unsigned char>(rand_char));
+            buffer = std::string(blob_size, static_cast<unsigned char>(rand_char));
             if (log) {
                 *log << "std::string blob(" << blob_size << ", static_cast<unsigned char>(" << rand_char << "));\n"
                      << "Mixed mixed(BinaryData(blob));\n";
             }
-            return Mixed(BinaryData(blob));
+            return Mixed(BinaryData(buffer));
         }
         case 6: {
             int64_t time = get_int64(s);
@@ -716,7 +716,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             if (log) {
                                 *log << "{\n";
                             }
-                            Mixed mixed = construct_mixed(s, log);
+                            std::string buffer;
+                            Mixed mixed = construct_mixed(s, log, buffer);
                             if (log) {
                                 *log << "g.get_table(" << table_ndx << ")->set_mixed(" << col_ndx << ", "
                                      << row_ndx << ", mixed);\n}\n";
