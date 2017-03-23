@@ -1950,7 +1950,6 @@ TEST(Query_size)
     CHECK_EQUAL(6, tv.size());
 }
 
-
 TEST(Query_SubtableExpression)
 {
     Group g;

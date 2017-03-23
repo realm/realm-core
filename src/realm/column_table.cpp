@@ -359,6 +359,14 @@ void SubtableColumn::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t
     SubtableColumnBase::erase_rows(row_ndx, num_rows_to_erase, prior_num_rows, broken_reciprocal_backlinks); // Throws
 }
 
+void SubtableColumn::set_null(size_t row_ndx)
+{
+    REALM_ASSERT_DEBUG(row_ndx < size());
+    destroy_subtable(row_ndx);
+    SubtableColumnBase::set(row_ndx, 0); // Throws
+    m_subtable_map.adj_set_null(row_ndx);
+}
+
 
 void SubtableColumn::move_last_row_over(size_t row_ndx, size_t prior_num_rows, bool broken_reciprocal_backlinks)
 {

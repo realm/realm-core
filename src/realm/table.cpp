@@ -1416,11 +1416,11 @@ ColumnBase* Table::create_column_accessor(ColumnType col_type, size_t col_ndx, s
 
     bool nullable = is_nullable(col_ndx);
 
-    REALM_ASSERT_DEBUG(
-        !(nullable && (col_type != col_type_String && col_type != col_type_StringEnum &&
-                       col_type != col_type_Binary && col_type != col_type_Int && col_type != col_type_Float &&
-                       col_type != col_type_Double && col_type != col_type_OldDateTime &&
-                       col_type != col_type_Timestamp && col_type != col_type_Bool && col_type != col_type_Link)));
+    REALM_ASSERT_DEBUG(!(
+        nullable && (col_type != col_type_String && col_type != col_type_StringEnum && col_type != col_type_Binary &&
+                     col_type != col_type_Int && col_type != col_type_Float && col_type != col_type_Double &&
+                     col_type != col_type_OldDateTime && col_type != col_type_Timestamp &&
+                     col_type != col_type_Bool && col_type != col_type_Link && col_type != col_type_Table)));
 
     switch (col_type) {
         case col_type_Int:

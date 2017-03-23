@@ -15,6 +15,9 @@
   Query q = table->column<SubTable>(0).list<Int>() == 5;
   Query q = table->column<SubTable>(0).list<Int>().min() >= 2;
   Query q = table->column<SubTable>(1).list<String>().begins_with("Bar");
+* Subtable column can now be nullable. You can use `is_null()` and `set_null()`
+  on a subtable element.
+  PR [#2560](https://github.com/realm/realm-core/pull/2560)
 
 -----------
 

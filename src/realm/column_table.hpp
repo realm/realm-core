@@ -62,6 +62,10 @@ public:
     {
         return nullptr;
     }
+    bool is_null(size_t ndx) const noexcept override
+    {
+        return get(ndx) == 0;
+    }
 
     void verify() const override;
     void verify(const Table&, size_t) const override;
@@ -103,6 +107,7 @@ protected:
         bool adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
         template <bool fix_ndx_in_parent>
         void adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+        void adj_set_null(size_t row_ndx) noexcept;
 
         void update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
@@ -226,6 +231,7 @@ public:
     void insert(size_t ndx, const Table* value = nullptr);
     void set(size_t ndx, const Table*);
     void clear_table(size_t ndx);
+    void set_null(size_t ndx) override;
 
     using SubtableColumnBase::insert;
 
@@ -257,12 +263,10 @@ private:
 // Implementation
 
 // Overriding virtual method of Column.
-inline void SubtableColumnBase::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
-                                            bool insert_nulls)
+inline void SubtableColumnBase::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
-    REALM_ASSERT(!insert_nulls);
 
     size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     int_fast64_t value = 0;
@@ -497,6 +501,13 @@ void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row
                 tf::set_ndx_in_parent(*(entry.m_table), entry.m_subtable_ndx);
         }
     }
+}
+
+inline void SubtableColumnBase::SubtableMap::adj_set_null(size_t row_ndx) noexcept
+{
+    Table* table = find(row_ndx);
+    if (table)
+        _impl::TableFriend::refresh_accessor_tree(*table);
 }
 
 inline SubtableColumnBase::SubtableColumnBase(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
