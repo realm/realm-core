@@ -222,6 +222,9 @@ public:
     template <class Func>
     void lock(Func recover_func);
 
+    template <class Func>
+    bool try_lock(Func recover_func);
+
     void unlock() noexcept;
 
     /// Low-level locking of robust mutex.
@@ -240,6 +243,27 @@ public:
     /// robust_lock() that returns false and the corresponding call to
     /// unlock().
     bool low_level_lock();
+
+    /// Low-level try-lock of robust mutex
+    ///
+    /// If the present platform does not support robust mutexes, this
+    /// function always returns 0 or 1. Otherwise it returns -1 if,
+    /// and only if a thread has died while holding a lock.
+    ///
+    /// Returns 1 if the lock is succesfully optained.
+    /// Returns 0 if the lock is held by somebody else (not obtained)
+    /// Returns -1 if a thread has died while holding a lock.
+    ///
+    /// \note Most application should never call this function
+    /// directly. It is called automatically when using the ordinary
+    /// lock() function.
+    ///
+    /// \throw NotRecoverable If this mutex has entered the "not
+    /// recoverable" state. It enters this state if
+    /// mark_as_consistent() is not called between a call to
+    /// robust_lock() that returns false and the corresponding call to
+    /// unlock().
+    int try_low_level_lock();
 
     /// Pull this mutex out of the 'inconsistent' state.
     ///
@@ -532,6 +556,33 @@ inline void RobustMutex::lock(Func recover_func)
         unlock();
         throw;
     }
+}
+
+template <class Func>
+inline bool RobustMutex::try_lock(Func recover_func)
+{
+    int lock_result = low_level_lock(); // Throws
+    if (lock_result == 0) return false;
+    bool no_thread_has_died = lock_result == 1;
+    if (REALM_LIKELY(no_thread_has_died))
+        return true;
+    try {
+        recover_func(); // Throws
+        mark_as_consistent();
+        // If we get this far, the protected memory has been
+        // brought back into a consistent state, and the mutex has
+        // been notified aboit this. This means that we can safely
+        // enter the applications critical section.
+    }
+    catch (...) {
+        // Unlocking without first calling mark_as_consistent()
+        // means that the mutex enters the "not recoverable"
+        // state, which will cause all future attempts at locking
+        // to fail.
+        unlock();
+        throw;
+    }
+    return true;
 }
 
 inline void RobustMutex::unlock() noexcept
