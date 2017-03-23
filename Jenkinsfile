@@ -24,9 +24,7 @@ timeout(time: 5, unit: 'HOURS') {
                 setBuildName(gitSha)
             } else {
                 if (gitTag != "v${dependencies.VERSION}") {
-                    def message = "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
-                    echo message
-                    throw new IllegalStateException(message)
+                    error "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
                 } else {
                     echo "Building release: '${gitTag}'"
                     setBuildName("Tag ${gitTag}")
@@ -131,12 +129,12 @@ timeout(time: 5, unit: 'HOURS') {
     if (isPublishingRun) {
         stage('publish-packages') {
             parallel(
-              generic: doPublishGeneric(),
-                     centos7: doPublish('centos-7', 'rpm', 'el', 7),
-                     centos6: doPublish('centos-6', 'rpm', 'el', 6),
-                     ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
-                     others: doPublishLocalArtifacts()
-                )
+                generic: doPublishGeneric(),
+                centos7: doPublish('centos-7', 'rpm', 'el', 7),
+                centos6: doPublish('centos-6', 'rpm', 'el', 6),
+                ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
+                others: doPublishLocalArtifacts()
+            )
         }
     }
 }
@@ -144,14 +142,13 @@ timeout(time: 5, unit: 'HOURS') {
 def buildDockerEnv(name) {
     docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
         env.DOCKER_REGISTRY = '012067661104.dkr.ecr.eu-west-1.amazonaws.com'
-        sh "./packaging/docker_build.sh $name ."
+        sh "./packaging/docker_build.sh ${name} ."
     }
 
     return docker.image(name)
 }
 
 def doBuildInDocker(String buildType) {
-    def suffix = buildType == 'Release' ? '' : '-dbg'
     return {
         node('docker') {
             getArchive()
@@ -187,7 +184,6 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             getArchive()
             def stashName = "android-${abi}-${buildType}"
             def buildDir = "build-${stashName}"
-
             def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
             def environment = environment()
             withEnv(environment) {
@@ -455,19 +451,19 @@ def collectCompilerWarnings(compiler, fail) {
         parserName = 'MSBuild'
     }
     step([
-           $class                 : 'WarningsPublisher',
-          canComputeNew          : false,
-          canRunOnFailed         : true,
-          canResolveRelativePaths: false,
-          consoleParsers         : [[parserName: parserName]],
-          defaultEncoding        : '',
-          excludePattern         : '',
-          unstableTotalAll       : fail ? '0' : '',
-          healthy                : '',
-          includePattern         : '',
-          messagesPattern        : '',
-          unHealthy              : ''
-             ])
+        $class                 : 'WarningsPublisher',
+        canComputeNew          : false,
+        canRunOnFailed         : true,
+        canResolveRelativePaths: false,
+        consoleParsers         : [[parserName: parserName]],
+        defaultEncoding        : '',
+        excludePattern         : '',
+        unstableTotalAll       : fail ? '0' : '',
+        healthy                : '',
+        includePattern         : '',
+        messagesPattern        : '',
+        unHealthy              : ''
+    ])
 }
 
 def environment() {
