@@ -2493,6 +2493,7 @@
     <ClInclude Include="..\src\realm\util\memory_stream.hpp" />
     <ClInclude Include="..\src\realm\util\misc_errors.hpp" />
     <ClInclude Include="..\src\realm\util\optional.hpp" />
+    <ClInclude Include="..\src\realm\util\overload.hpp" />
     <ClInclude Include="..\src\realm\util\priority_queue.hpp" />
     <ClInclude Include="..\src\realm\util\shared_ptr.hpp" />
     <ClInclude Include="..\src\realm\util\terminate.hpp" />
