@@ -1199,8 +1199,8 @@ TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZ
     }
 
 #else  // test write mode
-    // NOTE: This code must be executed from an old file-format-version 5
-    // core in order to create a file-format-version 5 test file!
+    // NOTE: This code must be executed from an old file-format-version 6
+    // core in order to create a file-format-version 6 test file!
 
     Group g;
     TableRef t = g.add_table("table");
