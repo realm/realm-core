@@ -155,7 +155,7 @@ T minimum(T a, T b)
 
 #ifdef REALM_OLDQUERY_FALLBACK
 // Hack to avoid template instantiation errors. See create(). Todo, see if we can simplify only_numeric somehow
-namespace _hack {
+namespace _help {
 
 template <class T, class U>
 inline T only_numeric(U in)
@@ -203,7 +203,7 @@ inline int no_timestamp(const Timestamp&)
     return 0;
 }
 
-} // namespace _hack
+} // namespace _help
 
 #endif // REALM_OLDQUERY_FALLBACK
 
@@ -495,37 +495,37 @@ Query create(L left, const Subexpr2<R>& right)
         Query q = Query(*t);
 
         if (std::is_same<Cond, Less>::value)
-            q.greater(column->column_ndx(), _hack::only_numeric<R>(left));
+            q.greater(column->column_ndx(), _help::only_numeric<R>(left));
         else if (std::is_same<Cond, Greater>::value)
-            q.less(column->column_ndx(), _hack::only_numeric<R>(left));
+            q.less(column->column_ndx(), _help::only_numeric<R>(left));
         else if (std::is_same<Cond, Equal>::value)
             q.equal(column->column_ndx(), left);
         else if (std::is_same<Cond, NotEqual>::value)
             q.not_equal(column->column_ndx(), left);
         else if (std::is_same<Cond, LessEqual>::value)
-            q.greater_equal(column->column_ndx(), _hack::only_numeric<R>(left));
+            q.greater_equal(column->column_ndx(), _help::only_numeric<R>(left));
         else if (std::is_same<Cond, GreaterEqual>::value)
-            q.less_equal(column->column_ndx(), _hack::only_numeric<R>(left));
+            q.less_equal(column->column_ndx(), _help::only_numeric<R>(left));
         else if (std::is_same<Cond, EqualIns>::value)
-            q.equal(column->column_ndx(), _hack::only_string(left), false);
+            q.equal(column->column_ndx(), _help::only_string(left), false);
         else if (std::is_same<Cond, NotEqualIns>::value)
-            q.not_equal(column->column_ndx(), _hack::only_string(left), false);
+            q.not_equal(column->column_ndx(), _help::only_string(left), false);
         else if (std::is_same<Cond, BeginsWith>::value)
-            q.begins_with(column->column_ndx(), _hack::only_string(left));
+            q.begins_with(column->column_ndx(), _help::only_string(left));
         else if (std::is_same<Cond, BeginsWithIns>::value)
-            q.begins_with(column->column_ndx(), _hack::only_string(left), false);
+            q.begins_with(column->column_ndx(), _help::only_string(left), false);
         else if (std::is_same<Cond, EndsWith>::value)
-            q.ends_with(column->column_ndx(), _hack::only_string(left));
+            q.ends_with(column->column_ndx(), _help::only_string(left));
         else if (std::is_same<Cond, EndsWithIns>::value)
-            q.ends_with(column->column_ndx(), _hack::only_string(left), false);
+            q.ends_with(column->column_ndx(), _help::only_string(left), false);
         else if (std::is_same<Cond, Contains>::value)
-            q.contains(column->column_ndx(), _hack::only_string(left));
+            q.contains(column->column_ndx(), _help::only_string(left));
         else if (std::is_same<Cond, ContainsIns>::value)
-            q.contains(column->column_ndx(), _hack::only_string(left), false);
+            q.contains(column->column_ndx(), _help::only_string(left), false);
         else if (std::is_same<Cond, Like>::value)
-            q.like(column->column_ndx(), _hack::only_string(left));
+            q.like(column->column_ndx(), _help::only_string(left));
         else if (std::is_same<Cond, LikeIns>::value)
-            q.like(column->column_ndx(), _hack::only_string(left), false);
+            q.like(column->column_ndx(), _help::only_string(left), false);
         else {
             // query_engine.hpp does not support this Cond. Please either add support for it in query_engine.hpp or
             // fallback to using use 'return new Compare<>' instead.
@@ -1992,10 +1992,10 @@ class Columns<BinaryData> : public SimpleQuerySupport<BinaryData> {
 
 class StringCompare {
 public:
-    explicit StringCompare(const Subexpr2<StringData>& source)
+    explicit StringCompare(const Subexpr2<StringData>* source)
         : m_source(source)
     {
-
+        REALM_ASSERT_DEBUG(m_source);
     }
 
     StringCompare(const StringCompare&) = delete;
@@ -2014,7 +2014,7 @@ public:
     Query like(const Columns<StringData>& col, bool case_sensitive = true);
 
 private:
-    const Subexpr2<StringData>& m_source;
+    const Subexpr2<StringData>* m_source;
 };
 
 template <>
@@ -2022,19 +2022,19 @@ class Columns<StringData> : public SimpleQuerySupport<StringData>, public String
 public:
     Columns(size_t column, const Table* table, std::vector<size_t> links = {})
         : SimpleQuerySupport(column, table, links)
-        , StringCompare(*(static_cast<Subexpr2<StringData>*>(this)))
+        , StringCompare(this)
     {
     }
 
     Columns(Columns const& other, QueryNodeHandoverPatches* patches = nullptr)
         : SimpleQuerySupport(other, patches)
-        , StringCompare(*(static_cast<Subexpr2<StringData>*>(this)))
+        , StringCompare(this)
     {
     }
 
     Columns(Columns&& other)
         : SimpleQuerySupport(other)
-        , StringCompare(*(static_cast<Subexpr2<StringData>*>(this)))
+        , StringCompare(this)
     {
     }
 };
@@ -2631,19 +2631,19 @@ class ListColumns<StringData> : public ListColumnsBase<StringData>, public Strin
 public:
     ListColumns(size_t column_ndx, Columns<SubTable> column)
         : ListColumnsBase(column_ndx, column)
-        , StringCompare(*(static_cast<Subexpr2<StringData>*>(this)))
+        , StringCompare(this)
     {
     }
 
     ListColumns(const ListColumnsBase& other, QueryNodeHandoverPatches* patches)
         : ListColumnsBase(other, patches)
-        , StringCompare(*(static_cast<Subexpr2<StringData>*>(this)))
+        , StringCompare(this)
     {
     }
 
     ListColumns(ListColumns&& other)
         : ListColumnsBase(other)
-        , StringCompare(*(static_cast<Subexpr2<StringData>*>(this)))
+        , StringCompare(this)
     {
     }
 };
