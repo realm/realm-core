@@ -558,11 +558,14 @@ private:
     /// are present, and the size of `m_top` is 5. In files updated by way of a
     /// transaction (SharedGroup::commit()), the 4th, 5th, 6th, and 7th entry
     /// are present, and the size of `m_top` is 7. In files that contain a
-    /// changeset history, the 8th, 9th, and 10th entry are present.
+    /// changeset history, the 8th, 9th, and 10th entry are present, except that
+    /// if the file was opened in nonshared mode (via Group::open()), and the
+    /// file format remains at 6 (not previously upgraded to 7 or later), then
+    /// the 10th entry will be absent.
     ///
     /// When a group accessor is attached to a newly created file or an empty
     /// memory buffer where there is no top array yet, `m_top`, `m_tables`, and
-    /// `m_table_names` with be left in the detached state until the initiation
+    /// `m_table_names` will be left in the detached state until the initiation
     /// of the first write transaction. In particular, they will remain in the
     /// detached state during read transactions that precede the first write
     /// transaction.
@@ -990,28 +993,29 @@ inline void Group::get_version_and_history_info(const Array& top, _impl::History
 
 inline ref_type Group::get_history_ref(const Array& top) noexcept
 {
-    if (top.is_attached()) {
-        if (top.size() >= 8) {
-            REALM_ASSERT(top.size() >= 10);
-            return top.get_as_ref(8);
-        }
+    bool has_history = (top.is_attached() && top.size() >= 8);
+    if (has_history) {
+        // This function is only used is shared mode (from SharedGroup)
+        REALM_ASSERT(top.size() >= 10);
+        return top.get_as_ref(8);
     }
     return 0;
 }
 
 inline int Group::get_history_schema_version(const Array& top) noexcept
 {
-    if (top.is_attached()) {
-        if (top.size() >= 9) {
-            REALM_ASSERT(top.size() >= 10);
-            return int(top.get_as_ref_or_tagged(9).get_as_int());
-        }
+    bool has_history = (top.is_attached() && top.size() >= 8);
+    if (has_history) {
+        // This function is only used is shared mode (from SharedGroup)
+        REALM_ASSERT(top.size() >= 10);
+        return int(top.get_as_ref_or_tagged(9).get_as_int());
     }
     return 0;
 }
 
 inline void Group::set_history_schema_version(int version)
 {
+    // This function is only used is shared mode (from SharedGroup)
     REALM_ASSERT(m_top.size() >= 10);
     m_top.set(9, RefOrTagged::make_tagged(unsigned(version))); // Throws
 }
