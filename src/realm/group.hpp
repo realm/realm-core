@@ -972,8 +972,10 @@ inline void Group::get_version_and_history_info(const Array& top, _impl::History
             version_2 = version_type(top.get_as_ref_or_tagged(6).get_as_int());
         }
         if (top.size() >= 8) {
-            REALM_ASSERT(top.size() >= 10);
+            REALM_ASSERT(top.size() >= 9);
             history_type_2           = int(top.get_as_ref_or_tagged(7).get_as_int());
+        }
+        if (top.size() >= 10) {
             history_schema_version_2 = int(top.get_as_ref_or_tagged(9).get_as_int());
         }
     }

@@ -18,6 +18,7 @@ util/basic_system_errors.hpp \
 util/thread.hpp \
 util/file.hpp \
 util/optional.hpp \
+util/overload.hpp \
 util/utf8.hpp \
 util/priority_queue.hpp \
 util/interprocess_condvar.hpp \

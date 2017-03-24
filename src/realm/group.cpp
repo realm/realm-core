@@ -315,7 +315,7 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
             REALM_ASSERT_EX(top_size == 3 || top_size == 5 || top_size == 7, top_size);
         }
         else {
-            REALM_ASSERT_EX(top_size == 10, top_size);
+            REALM_ASSERT_EX(top_size == 9 || top_size == 10, top_size);
         }
 
         m_table_names.init_from_parent();
@@ -619,6 +619,10 @@ void Group::remove_table(size_t table_ndx)
     for (size_t i = n; i > 0; --i)
         table->remove_column(i - 1);
 
+    size_t prior_num_tables = m_tables.size();
+    if (Replication* repl = m_alloc.get_replication())
+        repl->erase_group_level_table(table_ndx, prior_num_tables); // Throws
+
     int64_t ref_64 = m_tables.get(table_ndx);
     REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));
     ref_type ref = ref_type(ref_64);
@@ -646,10 +650,6 @@ void Group::remove_table(size_t table_ndx)
 
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
-
-    size_t prior_num_tables = m_tables.size() + 1;
-    if (Replication* repl = m_alloc.get_replication())
-        repl->erase_group_level_table(table_ndx, prior_num_tables); // Throws
 }
 
 
