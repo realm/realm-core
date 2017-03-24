@@ -27,7 +27,6 @@ set(REALM_SOURCES
     group_shared.cpp
     group_writer.cpp
     history.cpp
-    impl/continuous_transactions_history.cpp
     impl/output_stream.cpp
     impl/simulated_failure.cpp
     impl/transact_log.cpp
@@ -36,6 +35,7 @@ set(REALM_SOURCES
     link_view.cpp
     query.cpp
     query_engine.cpp
+    query_expression.cpp
     replication.cpp
     row.cpp
     spec.cpp
