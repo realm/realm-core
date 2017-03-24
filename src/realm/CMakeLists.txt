@@ -102,9 +102,6 @@ set(REALM_INSTALL_GENERAL_HEADERS
     group_writer.hpp
     handover_defs.hpp
     history.hpp
-    impl/continuous_transactions_history.hpp
-    impl/input_stream.hpp
-    impl/transact_log.hpp
     index_string.hpp
     lang_bind_helper.hpp
     link_view.hpp
@@ -131,6 +128,12 @@ set(REALM_INSTALL_GENERAL_HEADERS
     version_id.hpp
     views.hpp
 ) # REALM_INSTALL_GENERAL_HEADERS
+
+set(REALM_INSTALL_IMPL_HEADERS
+    impl/continuous_transactions_history.hpp
+    impl/input_stream.hpp
+    impl/transact_log.hpp
+)
 
 set(REALM_INSTALL_UTIL_HEADERS
     util/assert.hpp
@@ -269,6 +272,9 @@ install(TARGETS realm
 
 install(FILES ${REALM_INSTALL_GENERAL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm
+        COMPONENT devel)
+install(FILES ${REALM_INSTALL_IMPL_HEADERS}
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/impl
         COMPONENT devel)
 install(FILES ${REALM_INSTALL_UTIL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util
