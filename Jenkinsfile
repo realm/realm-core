@@ -1,5 +1,7 @@
 #!groovy
 
+@Library('realm-ci') _
+
 cocoaStashes = []
 androidStashes = []
 publishingStashes = []
@@ -162,12 +164,13 @@ def doBuildInDocker(String buildType) {
                            mkdir build-dir
                            cd build-dir
                            cmake -D CMAKE_BUILD_TYPE=${buildType} -G Ninja ..
-                           ninja
-                           cd test
+                        """
+                        runAndCollectWarnings(script: "cd build-dir && ninja")
+                        sh """
+                           cd build-dir/test
                            ./realm-tests
                         """
                     } finally {
-                        collectCompilerWarnings('gcc', true)
                         recordTests("Linux-${buildType}")
                     }
                 }
@@ -189,30 +192,22 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
             withEnv(environment) {
                 if(!runTestsInEmulator) {
                     buildEnv.inside {
-                        try {
-                            sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
+                        runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
+                        dir(buildDir) {
+                            archiveArtifacts('*.tar.gz')
+                        }
+                        stash includes:"${buildDir}/*.tar.gz", name:stashName
+                        androidStashes << stashName
+                    }
+                } else {
+                    docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
+                        buildEnv.inside("--link ${emulator.id}:emulator") {
+                            runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
                             dir(buildDir) {
                                 archiveArtifacts('*.tar.gz')
                             }
                             stash includes:"${buildDir}/*.tar.gz", name:stashName
                             androidStashes << stashName
-                        } finally {
-                            collectCompilerWarnings('gcc', true )
-                        }
-                    }
-                } else {
-                    docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
-                        buildEnv.inside("--link ${emulator.id}:emulator") {
-                            try {
-                                sh "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}"
-                                dir(buildDir) {
-                                    archiveArtifacts('*.tar.gz')
-                                }
-                                stash includes:"${buildDir}/*.tar.gz", name:stashName
-                                androidStashes << stashName
-                            } finally {
-                                collectCompilerWarnings('gcc', true )
-                            }
                             try {
                                 sh '''
                                    cd $(find . -type d -maxdepth 1 -name build-android*)
@@ -255,11 +250,11 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
             getArchive()
 
             dir('build-dir') {
-                bat """
+                runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: """
                     cmake ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015${archSuffix}\" -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${arch} -D CMAKE_BUILD_TYPE=${buildType} -D REALM_ENABLE_ENCRYPTION=OFF ..
                     cmake --build . --config ${buildType}
                     cpack -C ${buildType} -D CPACK_GENERATOR=TGZ
-                """
+                """)
                 archiveArtifacts('*.tar.gz')
                 if (isPublishingRun) {
                     def stashName = "pub-windows-${arch}-${isUWP?'uwp':'nouwp'}"
@@ -368,39 +363,35 @@ def doBuildMacOs(String buildType) {
         node('macos || osx_vegas') {
             getArchive()
 
-            try {
-                dir("build-macos-${buildType}") {
-                    withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
-                        // This is a dirty trick to work around a bug in xcode
-                        // It will hang if launched on the same project (cmake trying the compiler out)
-                        // in parallel.
-                        retry(3) {
-                            timeout(time: 2, unit: 'MINUTES') {
-                                sh """
+            dir("build-macos-${buildType}") {
+                withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
+                    // This is a dirty trick to work around a bug in xcode
+                    // It will hang if launched on the same project (cmake trying the compiler out)
+                    // in parallel.
+                    retry(3) {
+                        timeout(time: 2, unit: 'MINUTES') {
+                            sh """
                                     rm -rf *
                                     cmake -D CMAKE_TOOLCHAIN_FILE=../tools/cmake/macos.toolchain.cmake \\
                                           -D CMAKE_BUILD_TYPE=${buildType} \\
                                           -D REALM_VERSION=${gitDescribeVersion} \\
                                           -G Xcode ..
                                 """
-                            }
                         }
+                    }
 
-                        sh """
+                    runAndCollectWarnings(parser: 'clang', script: """
                             xcodebuild -sdk macosx \\
                                        -configuration ${buildType} \\
                                        -target package \\
                                        ONLY_ACTIVE_ARCH=NO
-                            """
-                    }
+                            """)
                 }
-                archiveArtifacts("build-macos-${buildType}/*.tar.xz")
-
-                stash includes:"build-macos-${buildType}/*.tar.xz", name:"macos-${buildType}"
-                cocoaStashes << "macos-${buildType}"
-            } finally {
-                collectCompilerWarnings('clang', true)
             }
+            archiveArtifacts("build-macos-${buildType}/*.tar.xz")
+
+            stash includes:"build-macos-${buildType}/*.tar.xz", name:"macos-${buildType}"
+            cocoaStashes << "macos-${buildType}"
         }
     }
 }
@@ -410,23 +401,19 @@ def doBuildAppleDevice(String sdk, String buildType) {
         node('macos || osx_vegas') {
             getArchive()
 
-            try {
-                withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
-                    retry(3) {
-                        timeout(time: 15, unit: 'MINUTES') {
-                            sh """
+            withEnv(['DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/']) {
+                retry(3) {
+                    timeout(time: 15, unit: 'MINUTES') {
+                        runAndCollectWarnings(parser:'clang', script: """
                                 rm -rf build-*
                                 tools/cross_compile.sh -o ${sdk} -t ${buildType} -v ${gitDescribeVersion}
-                            """
-                        }
+                            """)
                     }
                 }
-                archiveArtifacts("build-${sdk}-${buildType}/*.tar.xz")
-                stash includes:"build-${sdk}-${buildType}/*.tar.xz", name:"cocoa-${sdk}-${buildType}"
-                cocoaStashes << "cocoa-${sdk}-${buildType}"
-            } finally {
-                collectCompilerWarnings('clang', true)
             }
+            archiveArtifacts("build-${sdk}-${buildType}/*.tar.xz")
+            stash includes:"build-${sdk}-${buildType}/*.tar.xz", name:"cocoa-${sdk}-${buildType}"
+            cocoaStashes << "cocoa-${sdk}-${buildType}"
         }
     }
 }
@@ -439,31 +426,6 @@ def recordTests(tag) {
     def modifiedTests = tests.replaceAll('realm-core-tests', tag)
     writeFile file: 'build-dir/test/modified-test-report.xml', text: modifiedTests
     junit 'build-dir/test/modified-test-report.xml'
-}
-
-def collectCompilerWarnings(compiler, fail) {
-    def parserName
-    if (compiler == 'gcc') {
-        parserName = 'GNU Make + GNU C Compiler (gcc)'
-    } else if (compiler == 'clang') {
-        parserName = 'Clang (LLVM based)'
-    } else if (compiler == 'msbuild') {
-        parserName = 'MSBuild'
-    }
-    step([
-        $class                 : 'WarningsPublisher',
-        canComputeNew          : false,
-        canRunOnFailed         : true,
-        canResolveRelativePaths: false,
-        consoleParsers         : [[parserName: parserName]],
-        defaultEncoding        : '',
-        excludePattern         : '',
-        unstableTotalAll       : fail ? '0' : '',
-        healthy                : '',
-        includePattern         : '',
-        messagesPattern        : '',
-        unHealthy              : ''
-    ])
 }
 
 def environment() {
