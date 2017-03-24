@@ -75,18 +75,26 @@ public:
     }
 
     size_t index_string_find_first(StringData value, ColumnBase* column) const;
-    void index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column) const;
+    void index_string_find_all(IntegerColumn& result, StringData value, ColumnBase* column, bool case_insensitive = false) const;
     FindRes index_string_find_all_no_copy(StringData value, ColumnBase* column, InternalFindResult& result) const;
     size_t index_string_count(StringData value, ColumnBase* column) const;
 
 private:
     template <IndexMethod>
-    size_t from_list(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                     const IntegerColumn& rows, ColumnBase* column) const;
+    size_t from_list(StringData value, InternalFindResult& result_ref, const IntegerColumn& rows,
+                     ColumnBase* column) const;
+
+    void from_list_all(StringData value, IntegerColumn& result, const IntegerColumn& rows, ColumnBase* column) const;
+
+    void from_list_all_ins(StringData value, IntegerColumn& result, const IntegerColumn& rows,
+                           ColumnBase* column) const;
 
     template <IndexMethod method>
-    size_t index_string(StringData value, IntegerColumn& result, InternalFindResult& result_ref,
-                        ColumnBase* column) const;
+    size_t index_string(StringData value, InternalFindResult& result_ref, ColumnBase* column) const;
+
+    void index_string_all(StringData value, IntegerColumn& result, ColumnBase* column) const;
+
+    void index_string_all_ins(StringData value, IntegerColumn& result, ColumnBase* column) const;
 };
 
 
@@ -135,7 +143,7 @@ public:
     template <class T>
     size_t find_first(T value) const;
     template <class T>
-    void find_all(IntegerColumn& result, T value) const;
+    void find_all(IntegerColumn& result, T value, bool case_insensitive = false) const;
     template <class T>
     FindRes find_all_no_copy(T value, InternalFindResult& result) const;
     template <class T>
@@ -519,11 +527,11 @@ size_t StringIndex::find_first(T value) const
 }
 
 template <class T>
-void StringIndex::find_all(IntegerColumn& result, T value) const
+void StringIndex::find_all(IntegerColumn& result, T value, bool case_insensitive) const
 {
     // Use direct access method
     StringConversionBuffer buffer;
-    return m_array->index_string_find_all(result, to_str(value, buffer), m_target_column);
+    return m_array->index_string_find_all(result, to_str(value, buffer), m_target_column, case_insensitive);
 }
 
 template <class T>

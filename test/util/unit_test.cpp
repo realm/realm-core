@@ -823,6 +823,18 @@ void TestContext::throw_any_failed(const char* file, long line, const char* expr
     check_failed(file, line, out.str());
 }
 
+namespace {
+std::locale locale_classic = std::locale::classic();
+}
+
+std::string TestContext::get_test_name() const
+{
+    std::ostringstream out;
+    out.imbue(locale_classic);
+    out << test_details.test_name << '.' << (recurrence_index + 1);
+    return out.str();
+}
+
 
 void Reporter::thread_begin(const ThreadContext&)
 {

@@ -96,7 +96,8 @@ int Group::get_committed_file_format_version() const noexcept
 int Group::get_target_file_format_version_for_session(int current_file_format_version,
                                                       int requested_history_type) noexcept
 {
-    Replication::HistoryType requested_history_type_2 = Replication::HistoryType(requested_history_type);
+    Replication::HistoryType requested_history_type_2 =
+        Replication::HistoryType(requested_history_type);
 
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
@@ -112,9 +113,12 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // that the file format it is not yet decided (only possible for empty
     // Realms where top-ref is zero).
 
+    // Please see Allocator::get_file_format_version() for information about the
+    // individual file format versions.
+
     static_cast<void>(current_file_format_version);
     static_cast<void>(requested_history_type_2);
-    return Allocator::CURRENT_FILE_FORMAT_VERSION;
+    return 7;
 }
 
 
@@ -125,7 +129,7 @@ void Group::upgrade_file_format(int target_file_format_version)
     // Be sure to revisit the following upgrade logic when a new file foprmat
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 6, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 7, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -134,8 +138,8 @@ void Group::upgrade_file_format(int target_file_format_version)
     // following upgrade logic when SlabAlloc::validate_buffer() is changed (or
     // vice versa).
     REALM_ASSERT_EX(current_file_format_version == 2 || current_file_format_version == 3 ||
-                        current_file_format_version == 4 || current_file_format_version == 5,
-                    current_file_format_version);
+                    current_file_format_version == 4 || current_file_format_version == 5 ||
+                    current_file_format_version == 6, current_file_format_version);
 
     // Upgrade from 2 to 3
     if (current_file_format_version <= 2 && target_file_format_version >= 3) {
@@ -163,6 +167,18 @@ void Group::upgrade_file_format(int target_file_format_version)
         for (size_t t = 0; t < m_tables.size(); t++) {
             TableRef table = get_table(t);
             table->upgrade_file_format(target_file_format_version);
+        }
+    }
+
+    // Upgrade from 6 to 7 (new history schema version in top array)
+    if (current_file_format_version <= 6 && target_file_format_version >= 7) {
+        // If top array size is 9, then add the missing 10th element containing
+        // the history schema version.
+        std::size_t top_size = m_top.size();
+        REALM_ASSERT(top_size <= 9);
+        if (top_size == 9) {
+            int initial_history_schema_version = 0;
+            m_top.add(initial_history_schema_version); // Throws
         }
     }
 
@@ -296,10 +312,10 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
         static_cast<void>(top_size);
 
         if (top_size < 8) {
-            REALM_ASSERT_11(top_size, ==, 3, ||, top_size, ==, 5, ||, top_size, ==, 7);
+            REALM_ASSERT_EX(top_size == 3 || top_size == 5 || top_size == 7, top_size);
         }
         else {
-            REALM_ASSERT_3(top_size, ==, 9);
+            REALM_ASSERT_EX(top_size == 9 || top_size == 10, top_size);
         }
 
         m_table_names.init_from_parent();
@@ -603,6 +619,10 @@ void Group::remove_table(size_t table_ndx)
     for (size_t i = n; i > 0; --i)
         table->remove_column(i - 1);
 
+    size_t prior_num_tables = m_tables.size();
+    if (Replication* repl = m_alloc.get_replication())
+        repl->erase_group_level_table(table_ndx, prior_num_tables); // Throws
+
     int64_t ref_64 = m_tables.get(table_ndx);
     REALM_ASSERT(!int_cast_has_overflow<ref_type>(ref_64));
     ref_type ref = ref_type(ref_64);
@@ -630,10 +650,6 @@ void Group::remove_table(size_t table_ndx)
 
     // Destroy underlying node structure
     Array::destroy_deep(ref, m_alloc);
-
-    size_t prior_num_tables = m_tables.size() + 1;
-    if (Replication* repl = m_alloc.get_replication())
-        repl->erase_group_level_table(table_ndx, prior_num_tables); // Throws
 }
 
 
@@ -1860,6 +1876,34 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
 }
 
 
+void Group::prepare_history_parent(Array& history_root, int history_type,
+                                   int history_schema_version)
+{
+    REALM_ASSERT(m_alloc.get_file_format_version() >= 7);
+    if (m_top.size() < 10) {
+        REALM_ASSERT(m_top.size() <= 7);
+        while (m_top.size() < 7) {
+            m_top.add(0); // Throws
+        }
+        ref_type history_ref = 0; // No history yet
+        m_top.add(RefOrTagged::make_tagged(history_type)); // Throws
+        m_top.add(RefOrTagged::make_ref(history_ref)); // Throws
+        m_top.add(RefOrTagged::make_tagged(history_schema_version)); // Throws
+    }
+    else {
+        int stored_history_type = int(m_top.get_as_ref_or_tagged(7).get_as_int());
+        int stored_history_schema_version = int(m_top.get_as_ref_or_tagged(9).get_as_int());
+        if (stored_history_type != Replication::hist_None) {
+            REALM_ASSERT(stored_history_type == history_type);
+            REALM_ASSERT(stored_history_schema_version == history_schema_version);
+        }
+        m_top.set(7, RefOrTagged::make_tagged(history_type)); // Throws
+        m_top.set(9, RefOrTagged::make_tagged(history_schema_version)); // Throws
+    }
+    set_history_parent(history_root);
+}
+
+
 #ifdef REALM_DEBUG // LCOV_EXCL_START ignore debug functions
 
 namespace {
@@ -1994,7 +2038,9 @@ void Group::verify() const
         if (_impl::History* hist = repl->get_history()) {
             _impl::History::version_type version = 0;
             int history_type = 0;
-            get_version_and_history_type(m_top, version, history_type);
+            int history_schema_version = 0;
+            get_version_and_history_info(m_top, version, history_type, history_schema_version);
+            REALM_ASSERT(history_type != Replication::hist_None || history_schema_version == 0);
             hist->update_from_parent(version);
             hist->verify();
         }
@@ -2015,8 +2061,8 @@ void Group::verify() const
     // marked as free before the file was opened.
     MemUsageVerifier mem_usage_2(ref_begin, immutable_ref_end, mutable_ref_end, baseline);
     {
-        REALM_ASSERT(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 ||
-                     (get_file_format_version() >= 4 && m_top.size() == 9));
+        REALM_ASSERT_EX(m_top.size() == 3 || m_top.size() == 5 || m_top.size() == 7 ||
+                        m_top.size() == 10, m_top.size());
         Allocator& alloc = m_top.get_alloc();
         ArrayInteger pos(alloc), len(alloc), ver(alloc);
         size_t pos_ndx = 3, len_ndx = 4, ver_ndx = 5;

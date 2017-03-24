@@ -159,7 +159,6 @@ exceptions.cpp \
 group.cpp \
 group_shared.cpp \
 group_writer.cpp \
-impl/continuous_transactions_history.cpp \
 impl/output_stream.cpp \
 impl/transact_log.cpp \
 impl/simulated_failure.cpp \
@@ -168,6 +167,7 @@ lang_bind_helper.cpp \
 link_view.cpp \
 query.cpp \
 query_engine.cpp \
+query_expression.cpp \
 row.cpp \
 spec.cpp \
 string_data.cpp \

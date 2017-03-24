@@ -27,6 +27,7 @@
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
 #include "../util/test_path.hpp"
+#include "../util/unit_test.hpp"
 #if REALM_ENABLE_ENCRYPTION
 #include "../util/crypt_key.hpp"
 #endif
@@ -776,7 +777,7 @@ void run_benchmark(BenchmarkResults& results)
         test_details.line_number = __LINE__;
 
         // Open a SharedGroup:
-        SharedGroupTestPathGuard realm_path("benchmark_common_tasks" + ident);
+        realm::test_util::SharedGroupTestPathGuard realm_path("benchmark_common_tasks" + ident);
         std::unique_ptr<SharedGroup> group;
         group.reset(create_new_shared_group(realm_path, level, key));
         benchmark.before_all(*group);
@@ -821,7 +822,7 @@ extern "C" int benchmark_common_tasks_main();
 
 int benchmark_common_tasks_main()
 {
-    std::string results_file_stem = test_util::get_test_path_prefix() + "results";
+    std::string results_file_stem = realm::test_util::get_test_path_prefix() + "results";
     BenchmarkResults results(40, results_file_stem.c_str());
 
 #define BENCH(B) run_benchmark<B>(results)

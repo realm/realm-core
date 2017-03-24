@@ -178,12 +178,28 @@ public:
 
     HistoryType get_history_type() const noexcept override
     {
-        return hist_OutOfRealm;
+        return hist_InRealm;
     }
 
     _impl::History* get_history() override
     {
         return this;
+    }
+
+    int get_history_schema_version() const noexcept override
+    {
+        return 0;
+    }
+
+    bool is_upgradable_history_schema(int) const noexcept override
+    {
+        REALM_ASSERT(false);
+        return false;
+    }
+
+    void upgrade_history_schema(int) override
+    {
+        REALM_ASSERT(false);
     }
 
     void update_early_from_top_ref(version_type, size_t, ref_type) override
@@ -12917,5 +12933,129 @@ TEST(LangBindHelper_CopyOnWriteOverflow)
         wt.commit();
     }
 }
+
+
+TEST(LangBindHelper_MixedStringRollback)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    TableRef t = g.add_table("table");
+    t->add_column(type_Mixed, "mixed_column", false);
+    t->add_empty_row();
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    // try with string
+    LangBindHelper::promote_to_write(sg_w);
+    t->set_mixed(0, 0, StringData("any string data"));
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+
+    // do the same with binary data
+    LangBindHelper::promote_to_write(sg_w);
+    t->set_mixed(0, 0, BinaryData("any binary data"));
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+    g.verify();
+}
+
+
+TEST(LangBindHelper_BinaryReallocOverMax)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    g.add_table("table");
+    g.get_table(0)->add_column(type_Binary, "binary_col", false);
+    g.get_table(0)->insert_empty_row(0, 1);
+
+    // The sizes of these binaries were found with AFL. Essentially we must hit
+    // the case where doubling the allocated memory goes above max_array_payload
+    // and hits the condition to clamp to the maximum.
+    std::string blob1(8877637, static_cast<unsigned char>(133));
+    std::string blob2(15994373, static_cast<unsigned char>(133));
+    BinaryData dataAlloc(blob1);
+    BinaryData dataRealloc(blob2);
+
+    g.get_table(0)->set_binary(0, 0, dataAlloc);
+    g.get_table(0)->set_binary(0, 0, dataRealloc);
+    g.verify();
+}
+
+
+TEST(LangBindHelper_RollbackMergeRowsWithBacklinks)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    g.add_table("table1");
+    g.get_table(0)->add_column(type_Int, "int_col");
+    g.get_table(0)->add_empty_row(2);
+
+    g.add_table("table2");
+    g.get_table(1)->add_column_link(type_Link, "link_col", *g.get_table(0));
+    g.get_table(1)->add_empty_row(1);
+    g.get_table(1)->set_link(0, 0, 1);
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+
+    g.verify();
+    LangBindHelper::promote_to_write(sg_w);
+    g.get_table(0)->merge_rows(0, 1);
+    g.verify();
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+
+    g.verify();
+}
+
+
+TEST(LangBindHelper_MixedTimestampTransaction)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_w(hist);
+    SharedGroup sg_r(hist);
+
+    // the seconds part is constructed to test 64 bit integer reads
+    Timestamp time(68451041280, 29);
+    // also check that a negative time comes through the transaction intact
+    Timestamp neg_time(-57, -23);
+
+    ReadTransaction rt(sg_r);
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.add_table("table");
+        target->add_column(type_Mixed, "mixed_col");
+        target->add_empty_row(2);
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg_r);
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef target = group.get_table("table");
+        target->set_mixed(0, 0, Mixed(time));
+        target->set_mixed(0, 1, Mixed(neg_time));
+        group.verify();
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg_r);
+    const Group& g = rt.get_group();
+    g.verify();
+    ConstTableRef t = g.get_table("table");
+    CHECK(t->get_mixed(0, 0) == time);
+    CHECK(t->get_mixed(0, 1) == neg_time);
+}
+
 
 #endif

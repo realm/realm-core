@@ -41,9 +41,10 @@ echo "Building..."
 cd "${DIR}/../.." || exit
 rm -rf "${BUILD_DIR}"
 mkdir "${BUILD_DIR}"
-cd "${BUILD_DIR}"
+cd "${BUILD_DIR}" || exit
+RAND_NODE_SIZE=$(python -c "import random; print (random.randint(4,999), 1000)[bool(random.randint(0,1))]")
 cmake -D REALM_AFL=ON \
-      -D REALM_MAX_BPNODE_SIZE=4 \
+      -D REALM_MAX_BPNODE_SIZE="${RAND_NODE_SIZE}" \
       -D REALM_ENABLE_ENCRYPTION=ON \
       -G Ninja \
       ..

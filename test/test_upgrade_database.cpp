@@ -297,7 +297,7 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible, REALM_MAX_BPNODE_SIZE == 4 || R
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
-    CHECK_EQUAL(6, sgf::get_file_format_version(g));
+    CHECK_EQUAL(7, sgf::get_file_format_version(g));
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -438,7 +438,7 @@ TEST_IF(Upgrade_Database_2_Backwards_Compatible_WriteTransaction, REALM_MAX_BPNO
     SharedGroup g(temp_copy, 0);
 
     using sgf = _impl::SharedGroupFriend;
-    CHECK_EQUAL(6, sgf::get_file_format_version(g));
+    CHECK_EQUAL(7, sgf::get_file_format_version(g));
 
     // First table is non-indexed for all columns, second is indexed for all columns
     for (size_t tbl = 0; tbl < 2; tbl++) {
@@ -793,7 +793,7 @@ TEST_IF(Upgrade_InRealmHistory, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_S
         {
             SharedGroup sg(temp_path, no_create);
             using sgf = _impl::SharedGroupFriend;
-            CHECK_EQUAL(6, sgf::get_file_format_version(sg));
+            CHECK_EQUAL(7, sgf::get_file_format_version(sg));
         }
         {
             std::unique_ptr<Replication> hist = make_in_realm_history(temp_path);
