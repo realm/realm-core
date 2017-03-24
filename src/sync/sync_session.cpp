@@ -423,6 +423,7 @@ void SyncSession::handle_error(SyncError error)
             case ProtocolError::reuse_of_session_ident:
             case ProtocolError::bound_in_other_session:
             case ProtocolError::bad_message_order:
+            case ProtocolError::pong_timeout:
                 break;
             // Session errors
             case ProtocolError::session_closed:
