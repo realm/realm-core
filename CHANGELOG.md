@@ -10,7 +10,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Restore support for opening version 6 files in read-only mode.
+  PR [#2549](https://github.com/realm/realm-core/pull/2549).
 
 -----------
 
