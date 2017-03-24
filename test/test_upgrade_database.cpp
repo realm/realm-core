@@ -1154,4 +1154,61 @@ TEST_IF(Upgrade_Database_5_6_StringIndex, REALM_MAX_BPNODE_SIZE == 4 || REALM_MA
 #endif // TEST_READ_UPGRADE_MODE
 }
 
+TEST_IF(Upgrade_Database_6_7, REALM_MAX_BPNODE_SIZE == 4 || REALM_MAX_BPNODE_SIZE == 1000)
+{
+    std::string path = test_util::get_test_resource_path() + "test_upgrade_database_" +
+                       util::to_string(REALM_MAX_BPNODE_SIZE) + "_6_to_7.realm";
+
+#if TEST_READ_UPGRADE_MODE
+
+    // Automatic upgrade from SharedGroup
+    {
+        CHECK_OR_RETURN(File::exists(path));
+        SHARED_GROUP_TEST_PATH(temp_copy);
+
+        // Make a copy of the version 6 database so that we keep the
+        // original file intact and unmodified
+        File::copy(path, temp_copy);
+
+        // Constructing this SharedGroup will trigger an upgrade
+        auto hist = make_in_realm_history(temp_copy);
+        SharedGroup sg(*hist);
+
+        ReadTransaction rt(sg);
+        CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(rt.get_group()),
+                    hist->get_history_schema_version());
+
+        ConstTableRef t = rt.get_table("table");
+        CHECK(t);
+        CHECK_EQUAL(t->size(), 1);
+        CHECK_EQUAL(t->get_int(0, 0), 123);
+    }
+
+    // Opening old file with Group
+    {
+        CHECK_OR_RETURN(File::exists(path));
+
+        // Opening in read-only mode, so it doesn't upgrade
+        Group g(path);
+        CHECK_EQUAL(_impl::GroupFriend::get_history_schema_version(g), 0);
+
+        ConstTableRef t = g.get_table("table");
+        CHECK(t);
+        CHECK_EQUAL(t->size(), 1);
+        CHECK_EQUAL(t->get_int(0, 0), 123);
+    }
+
+#else  // test write mode
+    // NOTE: This code must be executed from an old file-format-version 6
+    // core in order to create a file-format-version 6 test file!
+
+    Group g;
+    TableRef t = g.add_table("table");
+    size_t col = t->add_column(type_Int, "value");
+    size_t row = t->add_empty_row();
+    t->set_int(col, row, 123);
+    g.write(path);
+#endif // TEST_READ_UPGRADE_MODE
+}
+
 #endif // TEST_GROUP

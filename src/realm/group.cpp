@@ -96,18 +96,10 @@ int Group::get_committed_file_format_version() const noexcept
 int Group::get_target_file_format_version_for_session(int current_file_format_version,
                                                       int requested_history_type) noexcept
 {
-    Replication::HistoryType requested_history_type_2 =
-        Replication::HistoryType(requested_history_type);
-
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
     // `current_file_format_version`, it will trigger a file format upgrade
     // process.
-
-    // Note: Previously it was necessary to base the decision on the current
-    // (original) file format and the selected type of history (of
-    // changesets). At the present time, however (since the introduction of file
-    // format version 5), all files need to use the latest file format.
 
     // Note: `current_file_format_version` may be zero at this time, which means
     // that the file format it is not yet decided (only possible for empty
@@ -116,8 +108,9 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // Please see Allocator::get_file_format_version() for information about the
     // individual file format versions.
 
-    static_cast<void>(current_file_format_version);
-    static_cast<void>(requested_history_type_2);
+    if (requested_history_type == Replication::hist_None && current_file_format_version == 6)
+        return 6;
+
     return 7;
 }
 
