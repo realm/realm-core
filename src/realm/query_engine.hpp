@@ -929,6 +929,12 @@ public:
         do_verify_column(m_condition_column);
     }
 
+    void init() override
+    {
+        ParentNode::init();
+        m_dD = 10.0;
+    }
+
     size_t find_first_local(size_t start, size_t end) override
     {
         for (size_t s = start; s < end; ++s) {

@@ -40,8 +40,6 @@
 #include <Windows.h>
 #include <fibersapi.h>
 
-DWORD WINAPI FlsAlloc(_In_ PFLS_CALLBACK_FUNCTION lpCallback);
-
 /* TLS_OUT_OF_INDEXES not defined on WinCE */
 #if !defined(TLS_OUT_OF_INDEXES)
 #define TLS_OUT_OF_INDEXES 0xffffffff

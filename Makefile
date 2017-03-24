@@ -83,7 +83,7 @@ fuzz-debug: check-debug-norun/subdir/src
 .PHONY: lcov
 lcov: check-cover
 	lcov --capture --directory . --output-file /tmp/realm.lcov
-	lcov --extract /tmp/realm.lcov '$(abspath .)/src/*' --output-file /tmp/realm-clean.lcov
+	lcov --extract /tmp/realm.lcov '$(abspath .)/src/*' --extract /tmp/realm.lcov '$(abspath .)/test/fuzz_group*' --output-file /tmp/realm-clean.lcov
 	rm -fr cover_html
 	genhtml --prefix $(abspath .) --output-directory cover_html /tmp/realm-clean.lcov
 

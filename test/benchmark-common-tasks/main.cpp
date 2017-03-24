@@ -27,6 +27,7 @@
 #include "../util/random.hpp"
 #include "../util/benchmark_results.hpp"
 #include "../util/test_path.hpp"
+#include "../util/unit_test.hpp"
 #if REALM_ENABLE_ENCRYPTION
 #include "../util/crypt_key.hpp"
 #endif
@@ -769,7 +770,11 @@ void run_benchmark(BenchmarkResults& results)
                  << (key == nullptr ? "_EncryptionOff" : "_EncryptionOn");
         std::string ident = ident_ss.str();
 
-        realm::test_util::RealmPathInfo test_context { ident.c_str() };
+        realm::test_util::unit_test::TestDetails test_details;
+        test_details.suite_name = "BenchmarkCommonTasks";
+        test_details.test_name = ident.c_str();
+        test_details.file_name = __FILE__;
+        test_details.line_number = __LINE__;
 
         // Open a SharedGroup:
         realm::test_util::SharedGroupTestPathGuard realm_path("benchmark_common_tasks" + ident);
