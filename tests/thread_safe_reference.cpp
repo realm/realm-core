@@ -188,6 +188,23 @@ TEST_CASE("thread safe reference") {
             r->refresh();
             REQUIRE(num.row().get_int(0) == 11);
         }
+        SECTION("resolve at newer version when schema is specified") {
+            r->close();
+            config.schema = util::Optional<Schema>({foo_object, string_object, int_object, int_array_object});
+            SharedRealm r = Realm::get_shared_realm(config);
+            r->begin_transaction();
+            Object num = create_object(r, int_object);
+            num.row().set_int(0, 7);
+            r->commit_transaction();
+
+            auto ref = r->obtain_thread_safe_reference(num);
+
+            r->begin_transaction();
+            num.row().set_int(0, 9);
+            r->commit_transaction();
+
+            REQUIRE_NOTHROW(r->resolve_thread_safe_reference(std::move(ref)));
+        }
         SECTION("resolve references at multiple versions") {
             auto commit_new_num = [&](int value) -> Object {
                 r->begin_transaction();
