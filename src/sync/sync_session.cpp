@@ -501,6 +501,7 @@ void SyncSession::handle_error(SyncError error)
             case ClientError::bad_request_ident:
             case ClientError::bad_error_code:
             case ClientError::bad_compression:
+            case ClientError::bad_client_version:
                 // Don't do anything special for these errors.
                 // Future functionality may require special-case handling for existing
                 // errors, or newly introduced error codes.

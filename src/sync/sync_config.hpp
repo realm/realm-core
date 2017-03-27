@@ -36,7 +36,7 @@ namespace realm {
 class SyncUser;
 class SyncSession;
 
-using ChangesetTransformer = sync::SyncHistory::ChangesetCooker;
+using ChangesetTransformer = sync::ClientHistory::ChangesetCooker;
 
 enum class SyncSessionStopPolicy;
 
