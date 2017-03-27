@@ -392,6 +392,7 @@ def doBuildMacOs(String buildType) {
 
             stash includes:"build-macos-${buildType}/*.tar.xz", name:"macos-${buildType}"
             cocoaStashes << "macos-${buildType}"
+            publishingStashes << "macos-${buildType}"
         }
     }
 }
