@@ -105,6 +105,7 @@ struct SyncConfig {
     std::function<SyncBindSessionHandler> bind_session_handler;
     std::function<SyncSessionErrorHandler> error_handler;
     std::shared_ptr<ChangesetTransformer> transformer;
+    util::Optional<std::array<char, 64>> realm_encryption_key;
 };
 
 } // namespace realm

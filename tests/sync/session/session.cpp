@@ -506,3 +506,64 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
         CHECK(!error_handler_invoked);
     }
 }
+
+TEST_CASE("sync: encrypt local realm file", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    SyncServer server;
+    // Disable file-related functionality and metadata functionality for testing purposes.
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+
+    std::array<char, 64> encryption_key;
+    encryption_key.fill(12);
+
+    SECTION("open a session with realm file encryption and then open the same file directly") {
+        SyncTestFile config(server, "encrypted_realm");
+        std::copy_n(encryption_key.begin(), encryption_key.size(), std::back_inserter(config.encryption_key));
+        config.sync_config->realm_encryption_key = encryption_key;
+
+        // open a session and wait for it to fully download to its local realm file
+        {
+            std::atomic<bool> handler_called(false);
+            auto session = SyncManager::shared().get_session(config.path, *config.sync_config);
+            EventLoop::main().run_until([&] { return sessions_are_active(*session); });
+            CHECK(session->wait_for_download_completion([&](auto) {
+                handler_called = true;
+            }));
+            EventLoop::main().run_until([&] { return handler_called == true; });
+            session->close();
+            EventLoop::main().run_until([&] { return sessions_are_inactive(*session); });
+        }
+
+        // open a Realm with the same config, if the session didn't use the encryption key this should fail
+        {
+            Realm::get_shared_realm(config);
+        }
+    }
+
+    SECTION("errors if encryption keys are different") {
+        {
+            SyncTestFile config(server, "encrypted_realm");
+            config.sync_config->realm_encryption_key = encryption_key;
+
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+
+        {
+            SyncTestFile config(server, "encrypted_realm");
+            std::copy_n(encryption_key.begin(), encryption_key.size(), std::back_inserter(config.encryption_key));
+
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+
+        {
+            SyncTestFile config(server, "encrypted_realm");
+            config.sync_config->realm_encryption_key = encryption_key;
+            config.encryption_key.push_back(9);
+
+            REQUIRE_THROWS(Realm::get_shared_realm(config));
+        }
+    }
+}

@@ -81,6 +81,16 @@ void RealmCoordinator::create_sync_session()
     if (m_sync_session)
         return;
 
+    if (!m_config.encryption_key.empty() && !m_config.sync_config->realm_encryption_key) {
+        throw std::logic_error("A realm encryption key was specified in Realm::Config but not in SyncConfig");
+    } else if (m_config.sync_config->realm_encryption_key && m_config.encryption_key.empty()) {
+        throw std::logic_error("A realm encryption key was specified in SyncConfig but not in Realm::Config");
+    } else if (m_config.sync_config->realm_encryption_key &&
+               !std::equal(m_config.sync_config->realm_encryption_key->begin(), m_config.sync_config->realm_encryption_key->end(),
+                           m_config.encryption_key.begin(), m_config.encryption_key.end())) {
+        throw std::logic_error("The realm encryption key specified in SyncConfig does not match the one in Realm::Config");
+    }
+
     m_sync_session = SyncManager::shared().get_session(m_config.path, *m_config.sync_config);
 
     std::weak_ptr<RealmCoordinator> weak_self = shared_from_this();
@@ -156,6 +166,9 @@ void RealmCoordinator::set_config(const Realm::Config& config)
             }
             if (m_config.sync_config->transformer != config.sync_config->transformer) {
                 throw MismatchedConfigException("Realm at path '%1' already opened with different transformer.", config.path);
+            }
+            if (m_config.sync_config->realm_encryption_key != config.sync_config->realm_encryption_key) {
+                throw MismatchedConfigException("Realm at path '%1' already opened with sync session encryption key.", config.path);
             }
         }
 #endif
