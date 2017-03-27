@@ -102,9 +102,9 @@ void GlobalNotifier::calculate()
         auto config = realm.config();
         config.cache = false;
         auto realm2 = Realm::make_shared_realm(config);
+        Realm::Internal::begin_read(*realm2, sg->get_version_of_current_transaction());
         auto& sg2 = Realm::Internal::get_shared_group(*realm2);
-
-        Group const& g = sg2->begin_read(sg->get_version_of_current_transaction());
+        Group const& g = realm2->read_group();
 
         std::unordered_map<std::string, CollectionChangeSet> changes;
         if (!m_transformer) {
