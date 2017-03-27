@@ -1997,7 +1997,7 @@ TEST(Query_SubtableExpression)
     set_string_list(table->get_subtable(1, 2), std::vector<Int>({6, 7, 100, 8, 9}));
     table->set_string(2, 0, StringData("foo"));
     table->set_string(2, 1, StringData("str"));
-    table->set_string(2, 2, StringData("baa"));
+    table->set_string(2, 2, StringData("str_9_baa"));
 
     Query q;
     TableView tv;
@@ -2005,15 +2005,15 @@ TEST(Query_SubtableExpression)
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_source_ndx(0), 1);
-    q = table->column<SubTable>(1).list<String>() == StringData("Str_5");
+    q = table->column<SubTable>(1).list<String>() == "Str_5";
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_source_ndx(0), 1);
 
-    q = table->column<SubTable>(1).list<String>().begins_with(StringData("Str"));
+    q = table->column<SubTable>(1).list<String>().begins_with("Str");
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 3);
-    q = table->column<SubTable>(1).list<String>().ends_with(StringData("_8"));
+    q = table->column<SubTable>(1).list<String>().ends_with("_8");
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_source_ndx(0), 2);
@@ -2021,6 +2021,10 @@ TEST(Query_SubtableExpression)
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_source_ndx(0), 1);
+    q = table->column<String>(2).begins_with(table->column<SubTable>(1).list<String>(), false);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 2);
 
     q = table->column<SubTable>(0).list<Int>().min() >= 2;
     tv = q.find_all();
@@ -2060,7 +2064,7 @@ TEST(Query_SubtableExpression)
     CHECK_EQUAL(tv.size(), 1);
     CHECK_EQUAL(tv.get_source_ndx(0), 0);
 
-    q = baa->link(1).column<SubTable>(1).list<String>() == StringData("Str_5");
+    q = baa->link(1).column<SubTable>(1).list<String>() == "Str_5";
     tv = q.find_all();
     CHECK_EQUAL(tv.size(), 2);
 

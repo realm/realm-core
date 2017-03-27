@@ -68,63 +68,63 @@ void Columns<SubTable>::evaluate_internal(size_t index, ValueBase& destination, 
     }
 }
 
-Query StringCompare::equal(StringData sd, bool case_sensitive)
+Query Subexpr2<StringData>::equal(StringData sd, bool case_sensitive)
 {
-    return string_compare<StringData, Equal, EqualIns>(*m_source, sd, case_sensitive);
+    return string_compare<StringData, Equal, EqualIns>(*this, sd, case_sensitive);
 }
 
-Query StringCompare::equal(const Columns<StringData>& col, bool case_sensitive)
+Query Subexpr2<StringData>::equal(const Subexpr2<StringData>& col, bool case_sensitive)
 {
-    return string_compare<Equal, EqualIns>(*m_source, col, case_sensitive);
+    return string_compare<Equal, EqualIns>(*this, col, case_sensitive);
 }
 
-Query StringCompare::not_equal(StringData sd, bool case_sensitive)
+Query Subexpr2<StringData>::not_equal(StringData sd, bool case_sensitive)
 {
-    return string_compare<StringData, NotEqual, NotEqualIns>(*m_source, sd, case_sensitive);
+    return string_compare<StringData, NotEqual, NotEqualIns>(*this, sd, case_sensitive);
 }
 
-Query StringCompare::not_equal(const Columns<StringData>& col, bool case_sensitive)
+Query Subexpr2<StringData>::not_equal(const Subexpr2<StringData>& col, bool case_sensitive)
 {
-    return string_compare<NotEqual, NotEqualIns>(*m_source, col, case_sensitive);
+    return string_compare<NotEqual, NotEqualIns>(*this, col, case_sensitive);
 }
 
-Query StringCompare::begins_with(StringData sd, bool case_sensitive)
+Query Subexpr2<StringData>::begins_with(StringData sd, bool case_sensitive)
 {
-    return string_compare<StringData, BeginsWith, BeginsWithIns>(*m_source, sd, case_sensitive);
+    return string_compare<StringData, BeginsWith, BeginsWithIns>(*this, sd, case_sensitive);
 }
 
-Query StringCompare::begins_with(const Columns<StringData>& col, bool case_sensitive)
+Query Subexpr2<StringData>::begins_with(const Subexpr2<StringData>& col, bool case_sensitive)
 {
-    return string_compare<BeginsWith, BeginsWithIns>(*m_source, col, case_sensitive);
+    return string_compare<BeginsWith, BeginsWithIns>(*this, col, case_sensitive);
 }
 
-Query StringCompare::ends_with(StringData sd, bool case_sensitive)
+Query Subexpr2<StringData>::ends_with(StringData sd, bool case_sensitive)
 {
-    return string_compare<StringData, EndsWith, EndsWithIns>(*m_source, sd, case_sensitive);
+    return string_compare<StringData, EndsWith, EndsWithIns>(*this, sd, case_sensitive);
 }
 
-Query StringCompare::ends_with(const Columns<StringData>& col, bool case_sensitive)
+Query Subexpr2<StringData>::ends_with(const Subexpr2<StringData>& col, bool case_sensitive)
 {
-    return string_compare<EndsWith, EndsWithIns>(*m_source, col, case_sensitive);
+    return string_compare<EndsWith, EndsWithIns>(*this, col, case_sensitive);
 }
 
-Query StringCompare::contains(StringData sd, bool case_sensitive)
+Query Subexpr2<StringData>::contains(StringData sd, bool case_sensitive)
 {
-    return string_compare<StringData, Contains, ContainsIns>(*m_source, sd, case_sensitive);
+    return string_compare<StringData, Contains, ContainsIns>(*this, sd, case_sensitive);
 }
 
-Query StringCompare::contains(const Columns<StringData>& col, bool case_sensitive)
+Query Subexpr2<StringData>::contains(const Subexpr2<StringData>& col, bool case_sensitive)
 {
-    return string_compare<Contains, ContainsIns>(*m_source, col, case_sensitive);
+    return string_compare<Contains, ContainsIns>(*this, col, case_sensitive);
 }
 
-Query StringCompare::like(StringData sd, bool case_sensitive)
+Query Subexpr2<StringData>::like(StringData sd, bool case_sensitive)
 {
-    return string_compare<StringData, Like, LikeIns>(*m_source, sd, case_sensitive);
+    return string_compare<StringData, Like, LikeIns>(*this, sd, case_sensitive);
 }
 
-Query StringCompare::like(const Columns<StringData>& col, bool case_sensitive)
+Query Subexpr2<StringData>::like(const Subexpr2<StringData>& col, bool case_sensitive)
 {
-    return string_compare<Like, LikeIns>(*m_source, col, case_sensitive);
+    return string_compare<Like, LikeIns>(*this, col, case_sensitive);
 }
 }

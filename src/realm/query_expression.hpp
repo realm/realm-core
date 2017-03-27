@@ -773,6 +773,22 @@ template <>
 class Subexpr2<Link> : public Subexpr {
 };
 
+template <>
+class Subexpr2<StringData> : public Subexpr, public Overloads<StringData, StringData> {
+public:
+    Query equal(StringData sd, bool case_sensitive = true);
+    Query equal(const Subexpr2<StringData>& col, bool case_sensitive = true);
+    Query not_equal(StringData sd, bool case_sensitive = true);
+    Query not_equal(const Subexpr2<StringData>& col, bool case_sensitive = true);
+    Query begins_with(StringData sd, bool case_sensitive = true);
+    Query begins_with(const Subexpr2<StringData>& col, bool case_sensitive = true);
+    Query ends_with(StringData sd, bool case_sensitive = true);
+    Query ends_with(const Subexpr2<StringData>& col, bool case_sensitive = true);
+    Query contains(StringData sd, bool case_sensitive = true);
+    Query contains(const Subexpr2<StringData>& col, bool case_sensitive = true);
+    Query like(StringData sd, bool case_sensitive = true);
+    Query like(const Subexpr2<StringData>& col, bool case_sensitive = true);
+};
 
 /*
 This class is used to store N values of type T = {int64_t, bool, OldDateTime or StringData}, and allows an entry
@@ -1990,51 +2006,21 @@ class Columns<BinaryData> : public SimpleQuerySupport<BinaryData> {
     using SimpleQuerySupport::SimpleQuerySupport;
 };
 
-class StringCompare {
-public:
-    explicit StringCompare(const Subexpr2<StringData>* source)
-        : m_source(source)
-    {
-        REALM_ASSERT_DEBUG(m_source);
-    }
-
-    StringCompare(const StringCompare&) = delete;
-
-    Query equal(StringData sd, bool case_sensitive = true);
-    Query equal(const Columns<StringData>& col, bool case_sensitive = true);
-    Query not_equal(StringData sd, bool case_sensitive = true);
-    Query not_equal(const Columns<StringData>& col, bool case_sensitive = true);
-    Query begins_with(StringData sd, bool case_sensitive = true);
-    Query begins_with(const Columns<StringData>& col, bool case_sensitive = true);
-    Query ends_with(StringData sd, bool case_sensitive = true);
-    Query ends_with(const Columns<StringData>& col, bool case_sensitive = true);
-    Query contains(StringData sd, bool case_sensitive = true);
-    Query contains(const Columns<StringData>& col, bool case_sensitive = true);
-    Query like(StringData sd, bool case_sensitive = true);
-    Query like(const Columns<StringData>& col, bool case_sensitive = true);
-
-private:
-    const Subexpr2<StringData>* m_source;
-};
-
 template <>
-class Columns<StringData> : public SimpleQuerySupport<StringData>, public StringCompare {
+class Columns<StringData> : public SimpleQuerySupport<StringData> {
 public:
     Columns(size_t column, const Table* table, std::vector<size_t> links = {})
         : SimpleQuerySupport(column, table, links)
-        , StringCompare(this)
     {
     }
 
     Columns(Columns const& other, QueryNodeHandoverPatches* patches = nullptr)
         : SimpleQuerySupport(other, patches)
-        , StringCompare(this)
     {
     }
 
     Columns(Columns&& other)
         : SimpleQuerySupport(other)
-        , StringCompare(this)
     {
     }
 };
@@ -2627,23 +2613,20 @@ public:
 };
 
 template <>
-class ListColumns<StringData> : public ListColumnsBase<StringData>, public StringCompare {
+class ListColumns<StringData> : public ListColumnsBase<StringData> {
 public:
     ListColumns(size_t column_ndx, Columns<SubTable> column)
         : ListColumnsBase(column_ndx, column)
-        , StringCompare(this)
     {
     }
 
     ListColumns(const ListColumnsBase& other, QueryNodeHandoverPatches* patches)
         : ListColumnsBase(other, patches)
-        , StringCompare(this)
     {
     }
 
     ListColumns(ListColumns&& other)
         : ListColumnsBase(other)
-        , StringCompare(this)
     {
     }
 };
