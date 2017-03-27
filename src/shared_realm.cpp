@@ -138,7 +138,7 @@ void Realm::open_with_config(const Config& config,
             bool server_synchronization_mode = bool(config.sync_config) || config.force_sync_history;
             if (server_synchronization_mode) {
 #if REALM_ENABLE_SYNC
-                history = realm::sync::make_sync_history(config.path);
+                history = realm::sync::make_client_history(config.path);
 #else
                 REALM_TERMINATE("Realm was not built with sync enabled");
 #endif
