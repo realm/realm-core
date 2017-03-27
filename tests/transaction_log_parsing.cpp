@@ -1899,6 +1899,17 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             });
             REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {12, 13}));
         }
+
+        SECTION("array: deleting the containing row after making changes discards the changes") {
+            Row r = origin->get(0);
+            auto changes = observe({r}, [&] {
+                lv->insert(4, 0);
+                lv->insert(2, 0);
+                lv->insert(8, 0);
+                r.move_last_over();
+            });
+            REQUIRE(changes.has_array_change(0, 2, Kind::None, {}));
+        }
     }
 }
 
