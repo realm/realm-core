@@ -194,9 +194,9 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                     buildEnv.inside {
                         runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
                         dir(buildDir) {
-                            archiveArtifacts('*.tar.gz')
+                            archiveArtifacts('realm-*.tar.gz')
                         }
-                        stash includes:"${buildDir}/*.tar.gz", name:stashName
+                        stash includes:"${buildDir}/realm-*.tar.gz", name:stashName
                         androidStashes << stashName
                     }
                 } else {
@@ -204,9 +204,9 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                         buildEnv.inside("--link ${emulator.id}:emulator") {
                             runAndCollectWarnings(script: "tools/cross_compile.sh -o android -a ${abi} -t ${buildType} -v ${gitDescribeVersion}")
                             dir(buildDir) {
-                                archiveArtifacts('*.tar.gz')
+                                archiveArtifacts('realm-*.tar.gz')
                             }
-                            stash includes:"${buildDir}/*.tar.gz", name:stashName
+                            stash includes:"${buildDir}/realm-*.tar.gz", name:stashName
                             androidStashes << stashName
                             try {
                                 sh '''
