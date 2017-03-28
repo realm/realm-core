@@ -108,9 +108,7 @@ Table* SubtableColumn::get_subtable_ptr(size_t subtable_ndx)
         return subtable;
 
     typedef _impl::TableFriend tf;
-    const Spec& spec = tf::get_spec(*m_table);
-    size_t subspec_ndx = get_subspec_ndx();
-    ConstSubspecRef shared_subspec = spec.get_subspec_by_ndx(subspec_ndx);
+    Spec* shared_subspec = get_subtable_spec();
     SubtableColumn* parent = this;
     std::unique_ptr<Table> subtable(tf::create_accessor(shared_subspec, parent, subtable_ndx)); // Throws
     // FIXME: Note that if the following map insertion fails, then the
@@ -151,7 +149,6 @@ Table* SubtableColumnBase::get_parent_table(size_t* column_ndx_out) noexcept
         *column_ndx_out = get_column_index();
     return m_table;
 }
-
 
 Table* SubtableColumnBase::SubtableMap::find(size_t subtable_ndx) const noexcept
 {
@@ -248,7 +245,7 @@ void SubtableColumnBase::SubtableMap::recursive_mark() noexcept
 }
 
 
-void SubtableColumnBase::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_parent)
+void SubtableColumnBase::SubtableMap::refresh_accessor_tree()
 {
     // iterate backwards by index because entries may be removed during iteration
     for (size_t i = m_entries.size(); i > 0; --i) {
@@ -256,12 +253,14 @@ void SubtableColumnBase::SubtableMap::refresh_accessor_tree(size_t spec_ndx_in_p
         // Must hold a counted reference while refreshing
         TableRef table(entry.m_table);
         typedef _impl::TableFriend tf;
-        tf::set_shared_subspec_ndx_in_parent(*table, spec_ndx_in_parent);
         tf::set_ndx_in_parent(*table, entry.m_subtable_ndx);
         if (tf::is_marked(*table)) {
             tf::refresh_accessor_tree(*table);
             bool bump_global = false;
             tf::bump_version(*table, bump_global);
+        }
+        else {
+            tf::refresh_spec_accessor(*table);
         }
     }
 }

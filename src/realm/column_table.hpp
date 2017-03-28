@@ -107,7 +107,7 @@ protected:
         void update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
         void recursive_mark() noexcept;
-        void refresh_accessor_tree(size_t spec_ndx_in_parent);
+        void refresh_accessor_tree();
 
     private:
         struct SubtableEntry {
@@ -199,6 +199,9 @@ public:
     ~SubtableColumn() noexcept override
     {
     }
+
+    // Overriding method in Table::Parent
+    Spec* get_subtable_spec() noexcept override;
 
     size_t get_subtable_size(size_t ndx) const noexcept;
 
@@ -588,17 +591,22 @@ inline void SubtableColumn::refresh_accessor_tree(size_t col_ndx, const Spec& sp
 {
     SubtableColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
     m_subspec_ndx = spec.get_subspec_ndx(col_ndx);
-    m_subtable_map.refresh_accessor_tree(m_subspec_ndx); // Throws
+    m_subtable_map.refresh_accessor_tree(); // Throws
 }
 
 inline size_t SubtableColumn::get_subspec_ndx() const noexcept
 {
     if (REALM_UNLIKELY(m_subspec_ndx == realm::npos)) {
         typedef _impl::TableFriend tf;
-        const Spec& spec = tf::get_spec(*m_table);
-        m_subspec_ndx = spec.get_subspec_ndx(get_column_index());
+        m_subspec_ndx = tf::get_spec(*m_table).get_subspec_ndx(get_column_index());
     }
     return m_subspec_ndx;
+}
+
+inline Spec* SubtableColumn::get_subtable_spec() noexcept
+{
+    typedef _impl::TableFriend tf;
+    return tf::get_spec(*m_table).get_subtable_spec(get_column_index());
 }
 
 

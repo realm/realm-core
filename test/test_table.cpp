@@ -6880,6 +6880,46 @@ TEST(Table_MultipleLinkColumnsMoveTablesCrossLinks)
 }
 
 
+TEST(Table_MoveSubtables)
+{
+    Group g;
+    TableRef t = g.add_table("A");
+    TableRef t2 = g.add_table("B");
+    {
+        DescriptorRef subdesc;
+
+        t->add_column(type_Table, "sub1", &subdesc);
+        subdesc->add_column(type_Int, "integers");
+
+        t->add_column_link(type_Link, "link", *t2);
+
+        t->add_column(type_Table, "sub2", &subdesc);
+        subdesc->add_column(type_String, "strings");
+    }
+
+    {
+        DescriptorRef sub1 = t->get_subdescriptor(0);
+        DescriptorRef sub2 = t->get_subdescriptor(2);
+        CHECK_EQUAL(sub1->get_column_name(0), "integers");
+        CHECK_EQUAL(sub2->get_column_name(0), "strings");
+    }
+    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 2);
+    {
+        DescriptorRef sub1 = t->get_subdescriptor(2);
+        DescriptorRef sub2 = t->get_subdescriptor(1);
+        CHECK_EQUAL(sub1->get_column_name(0), "integers");
+        CHECK_EQUAL(sub2->get_column_name(0), "strings");
+    }
+    _impl::TableFriend::move_column(*t->get_descriptor(), 2, 0);
+    {
+        DescriptorRef sub1 = t->get_subdescriptor(0);
+        DescriptorRef sub2 = t->get_subdescriptor(2);
+        CHECK_EQUAL(sub1->get_column_name(0), "integers");
+        CHECK_EQUAL(sub2->get_column_name(0), "strings");
+    }
+}
+
+
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
