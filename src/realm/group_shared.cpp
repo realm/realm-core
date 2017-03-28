@@ -822,11 +822,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         // macOS has a bug which can cause a hang waiting to obtain a lock, even
         // if the lock is already open in shared mode, so we work around it by
         // busy waiting. This should occur only briefly during session initialization.
-        for (;;) {
-            bool got_lock = m_file.try_lock_shared();
-            if (got_lock) {
-                break;
-            }
+        while (!m_file.try_lock_shared()) {
             sched_yield();
         }
 #else
