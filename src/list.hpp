@@ -38,6 +38,10 @@ class Results;
 class SortDescriptor;
 template <typename T> class ThreadSafeReference;
 
+namespace _impl {
+class ListNotifier;
+}
+
 class List {
 public:
     List() noexcept;
@@ -113,7 +117,7 @@ private:
     std::shared_ptr<Realm> m_realm;
     mutable const ObjectSchema* m_object_schema = nullptr;
     LinkViewRef m_link_view;
-    _impl::CollectionNotifier::Handle<_impl::CollectionNotifier> m_notifier;
+    _impl::CollectionNotifier::Handle<_impl::ListNotifier> m_notifier;
 
     void verify_valid_row(size_t row_ndx, bool insertion = false) const;
 
