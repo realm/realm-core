@@ -818,8 +818,16 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         }
 
         // We hold the shared lock from here until we close the file!
+#if REALM_PLATFORM_APPLE
+        // macOS has a bug which can cause a hang waiting to obtain a lock, even
+        // if the lock is already open in shared mode, so we work around it by
+        // busy waiting. This should occur only briefly during session initialization.
+        while (!m_file.try_lock_shared()) {
+            sched_yield();
+        }
+#else
         m_file.lock_shared(); // Throws
-
+#endif
         // If the file is not completely initialized at this point in time, the
         // preceeding initialization attempt must have failed. We know that an
         // initialization process was in progress, because this thread (or
