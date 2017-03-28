@@ -125,6 +125,19 @@ def doWindowsBuild() {
   }
 }
 
+def doWindowsUniversalBuild() {
+  return {
+    node('windows') {
+      getSourceArchive()
+
+      bat """
+        "${tool 'cmake'}" . -DCMAKE_SYSTEM_NAME="WindowsStore" -DCMAKE_SYSTEM_VERSION="10.0"
+        "${tool 'cmake'}" --build . --config Release --target realm-object-store
+      """
+    }
+  }
+}
+
 def setBuildName(newBuildName) {
   currentBuild.displayName = "${currentBuild.displayName} - ${newBuildName}"
 }
@@ -159,7 +172,8 @@ stage('unit-tests') {
     android: doAndroidDockerBuild(),
     macos: doBuild('osx', 'macOS', false),
     macos_sync: doBuild('osx', 'macOS', true),
-    win32: doWindowsBuild()
+    win32: doWindowsBuild(),
+    windows_universal: doWindowsUniversalBuild()
   )
   currentBuild.result = 'SUCCESS'
 }

@@ -564,7 +564,6 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         }
 
         SECTION("merge_rows() to a new row followed by move_last_over() produces no net change") {
-            size_t new_row;
             auto info = track_changes({false, false, true}, [&] {
                 size_t new_row = table.add_empty_row();
                 table.merge_rows(5, new_row);
@@ -1899,6 +1898,17 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 lv->add(0);
             });
             REQUIRE(changes.has_array_change(0, 2, Kind::Insert, {12, 13}));
+        }
+
+        SECTION("array: deleting the containing row after making changes discards the changes") {
+            Row r = origin->get(0);
+            auto changes = observe({r}, [&] {
+                lv->insert(4, 0);
+                lv->insert(2, 0);
+                lv->insert(8, 0);
+                r.move_last_over();
+            });
+            REQUIRE(changes.has_array_change(0, 2, Kind::None, {}));
         }
     }
 }
