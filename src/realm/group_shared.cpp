@@ -818,8 +818,8 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         }
 
         // We hold the shared lock from here until we close the file!
-#if REALM_IOS
-        // iOS has a bug which can cause a hang waiting to obtain a lock, even
+#if REALM_PLATFORM_APPLE
+        // macOS has a bug which can cause a hang waiting to obtain a lock, even
         // if the lock is already open in shared mode, so we work around it by
         // busy waiting. This should occur only briefly during session initialization.
         for (;;) {
