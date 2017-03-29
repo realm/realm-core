@@ -145,8 +145,9 @@ TEST_CASE("sync_manager: user state management", "[sync]") {
     }
 
     SECTION("should contain admin-token users if such users are created.") {
+        // FIXME: once we refactor how admin-token users they should no longer be persisted.
         SyncManager::shared().get_user(identity_2, token_2, url_2);
-        SyncManager::shared().get_user(identity_3, token_3, none, true);
+        SyncManager::shared().get_user(identity_3, token_3, none, SyncUser::TokenType::Admin);
         auto users = SyncManager::shared().all_logged_in_users();
         REQUIRE(users.size() == 2);
         CHECK(validate_user_in_vector(users, identity_2, url_2, token_2));

@@ -18,6 +18,10 @@
 
 #include "sync_test_utils.hpp"
 
+#include "object_schema.hpp"
+#include "property.hpp"
+#include "schema.hpp"
+
 #include <realm/util/file.hpp>
 #include <realm/util/scope_exit.hpp>
 
@@ -29,6 +33,69 @@ using SyncAction = SyncFileActionMetadata::Action;
 static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_metadata/";
 static const std::string metadata_path = base_path + "/metadata.realm";
 
+namespace {
+
+Property make_nullable_string_property(const char* name)
+{
+    Property p = {name, PropertyType::String};
+    p.is_nullable = true;
+    return p;
+}
+
+Property make_primary_key_property(const char* name)
+{
+    Property p = {name, PropertyType::String};
+    p.is_indexed = true;
+    p.is_primary = true;
+    return p;
+}
+
+}
+
+TEST_CASE("sync_metadata: migration", "[sync") {
+    reset_test_directory(base_path);
+    const auto identity = "migrationtestuser";
+
+    const Schema v0_schema{
+        {"UserMetadata", {
+            make_primary_key_property("identity"),
+            {"marked_for_removal", PropertyType::Bool},
+            make_nullable_string_property("auth_server_url"),
+            make_nullable_string_property("user_token"),
+        }},
+        {"FileActionMetadata", {
+            make_primary_key_property("original_name"),
+            {"action", PropertyType::Int},
+            make_nullable_string_property("new_name"),
+            {"url", PropertyType::String},
+            {"identity", PropertyType::String},
+        }},
+    };
+
+    SECTION("properly upgrades from v0 to v1") {
+        // Open v0 metadata (create a Realm directly)
+        {
+            Realm::Config config;
+            config.path = metadata_path;
+            config.schema = v0_schema;
+            config.schema_version = 0;
+            config.schema_mode = SchemaMode::Additive;
+            auto realm = Realm::get_shared_realm(std::move(config));
+            REQUIRE(realm);
+        }
+        // Open v1 metadata
+        {
+            SyncMetadataManager manager(metadata_path, false, none);
+            auto user_metadata = SyncUserMetadata(manager, identity);
+            REQUIRE(user_metadata.is_valid());
+            CHECK(user_metadata.identity() == identity);
+            CHECK(!user_metadata.is_admin());
+            user_metadata.set_is_admin(true);
+            CHECK(user_metadata.is_admin());
+        }
+    }
+}
+
 TEST_CASE("sync_metadata: user metadata", "[sync]") {
     reset_test_directory(base_path);
     SyncMetadataManager manager(metadata_path, false);
@@ -39,6 +106,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         REQUIRE(user_metadata.identity() == identity);
         REQUIRE(user_metadata.server_url() == none);
         REQUIRE(user_metadata.user_token() == none);
+        REQUIRE(!user_metadata.is_admin());
     }
 
     SECTION("properly reflects setting state") {
@@ -50,6 +118,8 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         REQUIRE(user_metadata.identity() == identity);
         REQUIRE(user_metadata.server_url() == sample_url);
         REQUIRE(user_metadata.user_token() == sample_token);
+        user_metadata.set_is_admin(true);
+        REQUIRE(user_metadata.is_admin());
     }
 
     SECTION("can be properly re-retrieved from the same manager") {
@@ -59,7 +129,7 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         auto first = SyncUserMetadata(manager, identity);
         first.set_state(sample_url, sample_token);
         // Get a second instance of the user metadata for the same identity.
-        auto second = SyncUserMetadata(manager, identity);
+        auto second = SyncUserMetadata(manager, identity, false);
         REQUIRE(second.identity() == identity);
         REQUIRE(second.server_url() == sample_url);
         REQUIRE(second.user_token() == sample_token);
@@ -71,13 +141,16 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         const std::string sample_token_1 = "this_is_a_user_token";
         auto first = SyncUserMetadata(manager, identity);
         auto second = SyncUserMetadata(manager, identity);
+        CHECK(!first.is_admin());
         first.set_state(sample_url_1, sample_token_1);
         REQUIRE(first.identity() == identity);
         REQUIRE(first.server_url() == sample_url_1);
         REQUIRE(first.user_token() == sample_token_1);
+        CHECK(!first.is_admin());
         REQUIRE(second.identity() == identity);
         REQUIRE(second.server_url() == sample_url_1);
         REQUIRE(second.user_token() == sample_token_1);
+        CHECK(!second.is_admin());
         // Set the state again.
         const std::string sample_url_2 = "https://foobar.example.org";
         const std::string sample_token_2 = "this_is_another_user_token";
@@ -109,13 +182,14 @@ TEST_CASE("sync_metadata: user metadata", "[sync]") {
         }
         SECTION("with valid prior metadata for the identifier") {
             const auto identity = "testcase1g2";
-            auto first = SyncUserMetadata(manager, identity);
+            auto first = SyncUserMetadata(manager, identity, true);
             first.set_state(sample_url, sample_token);
             auto second = SyncUserMetadata(manager, identity, false);
             REQUIRE(second.is_valid());
             REQUIRE(second.identity() == identity);
             REQUIRE(second.server_url() == sample_url);
             REQUIRE(second.user_token() == sample_token);
+            REQUIRE(!second.is_admin());
         }
         SECTION("with invalid prior metadata for the identifier") {
             const auto identity = "testcase1g3";
@@ -279,14 +353,17 @@ TEST_CASE("sync_metadata: persistence across metadata manager instances", "[sync
         SyncMetadataManager first_manager(metadata_path, false);
         auto first = SyncUserMetadata(first_manager, identity);
         first.set_state(sample_url, sample_token);
+        first.set_is_admin(true);
         REQUIRE(first.identity() == identity);
         REQUIRE(first.server_url() == sample_url);
         REQUIRE(first.user_token() == sample_token);
+        REQUIRE(first.is_admin());
         SyncMetadataManager second_manager(metadata_path, false);
-        auto second = SyncUserMetadata(second_manager, identity);
+        auto second = SyncUserMetadata(second_manager, identity, false);
         REQUIRE(second.identity() == identity);
         REQUIRE(second.server_url() == sample_url);
         REQUIRE(second.user_token() == sample_token);
+        REQUIRE(second.is_admin());
     }
 }
 

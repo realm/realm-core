@@ -48,8 +48,8 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
         REQUIRE(user->state() == SyncUser::State::Active);
     }
 
-    SECTION("properly creates a new admin user") {
-        auto user = SyncManager::shared().get_user(identity, token, server_url, true);
+    SECTION("properly creates a new wraps-admin-token user") {
+        auto user = SyncManager::shared().get_user(identity, token, server_url, SyncUser::TokenType::Admin);
         REQUIRE(user);
         // The expected state for a newly created user:
         REQUIRE(user->is_admin());
@@ -57,6 +57,14 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
         REQUIRE(user->server_url() == server_url);
         REQUIRE(user->refresh_token() == token);
         REQUIRE(user->state() == SyncUser::State::Active);
+    }
+
+    SECTION("properly creates a new user marked as an admin") {
+        auto user = SyncManager::shared().get_user(identity, token, server_url);
+        REQUIRE(user);
+        REQUIRE(!user->is_admin());
+        user->set_is_admin(true);
+        REQUIRE(user->is_admin());
     }
 
     SECTION("properly retrieves a previously created user, updating fields as necessary") {
@@ -70,15 +78,6 @@ TEST_CASE("sync_user: SyncManager `get_user()` API", "[sync]") {
         REQUIRE(second == first);
         REQUIRE(second->identity() == identity);
         REQUIRE(second->refresh_token() == second_token);
-    }
-
-    SECTION("properly rejects retrieving an existing user with the wrong admin user status") {
-        auto first = SyncManager::shared().get_user(identity, token, server_url, true);
-        REQUIRE_THROWS(SyncManager::shared().get_user(identity, token, server_url, false));
-        // Also try it the other way around.
-        const std::string identity_2 = "sync_second_identity";
-        auto second = SyncManager::shared().get_user(identity_2, token, server_url, false);
-        REQUIRE_THROWS(SyncManager::shared().get_user(identity_2, token, server_url, true));
     }
 
     SECTION("properly resurrects a logged-out user") {
@@ -158,18 +157,20 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         const std::string token = "token-1";
         const std::string server_url = "https://realm.example.org/1/";
         auto user = SyncManager::shared().get_user(identity, token, server_url);
+        user->set_is_admin(true);
         // Now try to pull the user out of the shadow manager directly.
         auto metadata = SyncUserMetadata(manager, identity, false);
         REQUIRE(metadata.is_valid());
         REQUIRE(metadata.server_url() == server_url);
         REQUIRE(metadata.user_token() == token);
+        REQUIRE(metadata.is_admin());
     }
 
-    SECTION("does not persist admin users upon creation") {
+    SECTION("does not persist wraps-admin-token users upon creation") {
         const std::string identity = "test_identity_1a";
         const std::string token = "token-1a";
         const std::string server_url = "https://realm.example.org/1a/";
-        auto user = SyncManager::shared().get_user(identity, token, server_url, true);
+        auto user = SyncManager::shared().get_user(identity, token, server_url, SyncUser::TokenType::Admin);
         // Now try to pull the user out of the shadow manager directly.
         auto metadata = SyncUserMetadata(manager, identity, false);
         REQUIRE(!metadata.is_valid());
@@ -181,15 +182,19 @@ TEST_CASE("sync_user: user persistence", "[sync]") {
         const std::string server_url = "https://realm.example.org/2/";
         // Create the user and validate it.
         auto first = SyncManager::shared().get_user(identity, token, server_url);
+        first->set_is_admin(true);
         auto first_metadata = SyncUserMetadata(manager, identity, false);
         REQUIRE(first_metadata.is_valid());
         REQUIRE(first_metadata.user_token() == token);
+        REQUIRE(first_metadata.is_admin());
         const std::string token_2 = "token-2b";
         // Update the user.
         auto second = SyncManager::shared().get_user(identity, token_2, server_url);
         auto second_metadata = SyncUserMetadata(manager, identity, false);
+        second->set_is_admin(false);
         REQUIRE(second_metadata.is_valid());
         REQUIRE(second_metadata.user_token() == token_2);
+        REQUIRE(!second_metadata.is_admin());
     }
 
     SECTION("properly marks a user when the user is logged out") {
