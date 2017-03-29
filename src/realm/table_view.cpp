@@ -16,15 +16,14 @@
  *
  **************************************************************************/
 
-#include <unordered_set>
-
 #include <realm/table_view.hpp>
+
 #include <realm/column.hpp>
+#include <realm/column_timestamp.hpp>
 #include <realm/column_tpl.hpp>
 #include <realm/impl/sequential_getter.hpp>
-#include <realm/index_string.hpp>
-#include <realm/query_conditions.hpp>
-#include <realm/util/utf8.hpp>
+
+#include <unordered_set>
 
 using namespace realm;
 
