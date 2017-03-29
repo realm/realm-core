@@ -107,7 +107,6 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/query_conditions.hpp>
 #include <realm/query_operators.hpp>
 #include <realm/table.hpp>
-#include <realm/table_view.hpp>
 #include <realm/unicode.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/shared_ptr.hpp>
