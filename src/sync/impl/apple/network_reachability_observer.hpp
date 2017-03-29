@@ -25,6 +25,8 @@
 #include <realm/util/cf_ptr.hpp>
 #include <realm/util/optional.hpp>
 
+#if !TARGET_OS_WATCH
+
 #include <SystemConfiguration/SystemConfiguration.h>
 
 namespace realm {
@@ -58,5 +60,7 @@ private:
 };
 
 }
+
+#endif // !TARGET_OS_WATCH
 
 #endif // REALM_OS_NETWORK_REACHABILITY_OBSERVER_HPP

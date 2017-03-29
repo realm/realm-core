@@ -18,6 +18,8 @@
 
 #include "sync/impl/apple/network_reachability_observer.hpp"
 
+#if !TARGET_OS_WATCH
+
 using namespace realm;
 
 namespace {
@@ -125,3 +127,5 @@ void NetworkReachabilityObserver::reachability_changed()
         m_previous_status = current_status;
     }
 }
+
+#endif

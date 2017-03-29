@@ -26,7 +26,7 @@
 
 #include <thread>
 
-#if REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE && !TARGET_OS_WATCH
 #include "sync/impl/apple/network_reachability_observer.hpp"
 #endif
 
@@ -54,7 +54,7 @@ struct SyncClient {
 
         client.run(); // Throws
     }) // Throws
-#if REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE && !TARGET_OS_WATCH
     , m_reachability_observer(none, [=](const NetworkReachabilityStatus status) {
         if (status != NotReachable) {
             cancel_reconnect_delay();
@@ -98,7 +98,7 @@ private:
 
     const std::unique_ptr<util::Logger> m_logger;
     std::thread m_thread;
-#if REALM_PLATFORM_APPLE
+#if REALM_PLATFORM_APPLE && !TARGET_OS_WATCH
     NetworkReachabilityObserver m_reachability_observer;
 #endif
 };
