@@ -2520,7 +2520,6 @@
     <ClInclude Include="..\src\realm\group_writer.hpp" />
     <ClInclude Include="..\src\realm\index_string.hpp" />
     <ClInclude Include="..\src\realm\lang_bind_helper.hpp" />
-    <ClInclude Include="..\src\realm\util\meta.hpp" />
     <ClInclude Include="..\src\realm\util\type_traits.hpp" />
     <ClInclude Include="..\src\realm\mixed.hpp" />
     <ClInclude Include="..\src\realm\overflow.hpp" />

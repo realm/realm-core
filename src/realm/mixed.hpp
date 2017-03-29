@@ -25,7 +25,6 @@
 #include <cstring>
 
 #include <realm/util/assert.hpp>
-#include <realm/util/meta.hpp>
 #include <realm/utilities.hpp>
 #include <realm/data_type.hpp>
 #include <realm/olddatetime.hpp>

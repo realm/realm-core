@@ -1,6 +1,5 @@
 nobase_subinclude_HEADERS = \
 util/features.h \
-util/meta.hpp \
 util/inspect.hpp \
 util/assert.hpp \
 util/terminate.hpp \

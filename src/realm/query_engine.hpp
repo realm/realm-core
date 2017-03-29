@@ -89,7 +89,6 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <string>
 #include <array>
 
-#include <realm/util/meta.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/shared_ptr.hpp>
 #include <realm/utilities.hpp>
