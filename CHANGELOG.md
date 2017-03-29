@@ -12,7 +12,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* New file system utility functions: `util::remove_dir_recursive()` and
+  `util::File::for_each()`.
 
 -----------
 
