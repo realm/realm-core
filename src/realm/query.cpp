@@ -16,16 +16,18 @@
  *
  **************************************************************************/
 
-#include <cstdio>
-#include <algorithm>
+#include <realm/query.hpp>
 
 #include <realm/array.hpp>
 #include <realm/column_fwd.hpp>
-#include <realm/query.hpp>
-#include <realm/query_engine.hpp>
 #include <realm/descriptor.hpp>
-#include <realm/table_view.hpp>
+#include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
+#include <realm/query_engine.hpp>
+#include <realm/table_view.hpp>
+
+#include <algorithm>
+
 
 using namespace realm;
 
