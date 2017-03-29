@@ -99,6 +99,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     exceptions.hpp
     group.hpp
     group_shared.hpp
+    group_shared_options.hpp
     group_writer.hpp
     handover_defs.hpp
     history.hpp
@@ -130,8 +131,13 @@ set(REALM_INSTALL_GENERAL_HEADERS
 ) # REALM_INSTALL_GENERAL_HEADERS
 
 set(REALM_INSTALL_IMPL_HEADERS
+    impl/array_writer.hpp
     impl/continuous_transactions_history.hpp
+    impl/destroy_guard.hpp
     impl/input_stream.hpp
+    impl/output_stream.hpp
+    impl/sequential_getter.hpp
+    impl/simulated_failure.hpp
     impl/transact_log.hpp
 )
 
@@ -277,6 +283,9 @@ install(FILES ${REALM_INSTALL_IMPL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/impl
         COMPONENT devel)
 install(FILES ${REALM_INSTALL_UTIL_HEADERS}
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util
+        COMPONENT devel)
+install(FILES ${REALM_OTHER_UTIL_HEADERS}
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/realm/util
         COMPONENT devel)
 install(FILES ${PROJECT_BINARY_DIR}/src/realm/version.hpp
