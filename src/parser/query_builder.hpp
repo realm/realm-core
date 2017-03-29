@@ -19,21 +19,31 @@
 #ifndef REALM_QUERY_BUILDER_HPP
 #define REALM_QUERY_BUILDER_HPP
 
-#include "parser.hpp"
-#include "object_accessor.hpp"
+#include <string>
+#include <memory>
+#include <vector>
+
+#include <realm/null.hpp>
+#include <realm/timestamp.hpp>
 
 namespace realm {
 class Query;
+class Realm;
 class Schema;
+
+namespace parser {
+    struct Predicate;
+}
 
 namespace query_builder {
 class Arguments;
 
-void apply_predicate(Query &query, const parser::Predicate &predicate, Arguments &arguments,
-                     const Schema &schema, const std::string &objectType);
+void apply_predicate(Query& query, const parser::Predicate& predicate,
+                     Arguments& arguments, const Schema& schema,
+                     const std::string& objectType);
 
 class Arguments {
-  public:
+public:
     virtual bool bool_for_argument(size_t argument_index) = 0;
     virtual long long long_for_argument(size_t argument_index) = 0;
     virtual float float_for_argument(size_t argument_index) = 0;
@@ -47,31 +57,34 @@ class Arguments {
 
 template<typename ValueType, typename ContextType>
 class ArgumentConverter : public Arguments {
-  public:
-    ArgumentConverter(ContextType context, SharedRealm realm, std::vector<ValueType> arguments)
-        : m_arguments(arguments), m_ctx(context), m_realm(std::move(realm)) {}
+public:
+    ArgumentConverter(ContextType& context, std::shared_ptr<Realm> realm, std::vector<ValueType> arguments)
+    : m_arguments(std::move(arguments))
+    , m_ctx(context)
+    , m_realm(std::move(realm))
+    {}
 
-    using Accessor = realm::NativeAccessor<ValueType, ContextType>;
-    virtual bool bool_for_argument(size_t argument_index) { return Accessor::to_bool(m_ctx, argument_at(argument_index)); }
-    virtual long long long_for_argument(size_t argument_index) { return Accessor::to_long(m_ctx, argument_at(argument_index)); }
-    virtual float float_for_argument(size_t argument_index) { return Accessor::to_float(m_ctx, argument_at(argument_index)); }
-    virtual double double_for_argument(size_t argument_index) { return Accessor::to_double(m_ctx, argument_at(argument_index)); }
-    virtual std::string string_for_argument(size_t argument_index) { return Accessor::to_string(m_ctx, argument_at(argument_index)); }
-    virtual std::string binary_for_argument(size_t argument_index) { return Accessor::to_binary(m_ctx, argument_at(argument_index)); }
-    virtual Timestamp timestamp_for_argument(size_t argument_index) { return Accessor::to_timestamp(m_ctx, argument_at(argument_index)); }
-    virtual size_t object_index_for_argument(size_t argument_index) { return Accessor::to_existing_object_index(m_ctx, m_realm, argument_at(argument_index)); }
-    virtual bool is_argument_null(size_t argument_index) { return Accessor::is_null(m_ctx, argument_at(argument_index)); }
+    virtual bool bool_for_argument(size_t argument_index) { return m_ctx.to_bool(argument_at(argument_index)); }
+    virtual long long long_for_argument(size_t argument_index) { return m_ctx.to_long(argument_at(argument_index)); }
+    virtual float float_for_argument(size_t argument_index) { return m_ctx.to_float(argument_at(argument_index)); }
+    virtual double double_for_argument(size_t argument_index) { return m_ctx.to_double(argument_at(argument_index)); }
+    virtual std::string string_for_argument(size_t argument_index) { return m_ctx.to_string(argument_at(argument_index)); }
+    virtual std::string binary_for_argument(size_t argument_index) { return m_ctx.to_binary(argument_at(argument_index)); }
+    virtual Timestamp timestamp_for_argument(size_t argument_index) { return m_ctx.to_timestamp(argument_at(argument_index)); }
+    virtual size_t object_index_for_argument(size_t argument_index) { return m_ctx.to_existing_object_index(m_realm, argument_at(argument_index)); }
+    virtual bool is_argument_null(size_t argument_index) { return m_ctx.is_null(argument_at(argument_index)); }
 
-  private:
+private:
     std::vector<ValueType> m_arguments;
-    ContextType m_ctx;
-    SharedRealm m_realm;
+    ContextType& m_ctx;
+    std::shared_ptr<Realm> m_realm;
 
-    ValueType &argument_at(size_t index) {
+    ValueType& argument_at(size_t index) const
+    {
         return m_arguments.at(index);
     }
 };
-}
-}
+} // namespace query_builder
+} // namespace realm
 
 #endif // REALM_QUERY_BUILDER_HPP

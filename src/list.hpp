@@ -99,13 +99,13 @@ public:
 
     // These are implemented in object_accessor.hpp
     template <typename ValueType, typename ContextType>
-    void add(ContextType ctx, ValueType value);
+    void add(ContextType& ctx, ValueType value);
 
     template <typename ValueType, typename ContextType>
-    void insert(ContextType ctx, ValueType value, size_t list_ndx);
+    void insert(ContextType& ctx, ValueType value, size_t list_ndx);
 
     template <typename ValueType, typename ContextType>
-    void set(ContextType ctx, ValueType value, size_t list_ndx);
+    void set(ContextType& ctx, ValueType value, size_t list_ndx);
 
     // The List object has been invalidated (due to the Realm being invalidated,
     // or the containing object being deleted)

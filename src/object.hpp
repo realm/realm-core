@@ -46,20 +46,20 @@ public:
 
     // property getter/setter
     template<typename ValueType, typename ContextType>
-    void set_property_value(ContextType ctx, std::string prop_name,
+    void set_property_value(ContextType& ctx, std::string prop_name,
                             ValueType value, bool try_update);
 
     template<typename ValueType, typename ContextType>
-    ValueType get_property_value(ContextType ctx, std::string prop_name);
+    ValueType get_property_value(ContextType& ctx, std::string prop_name);
 
     // create an Object from a native representation
     template<typename ValueType, typename ContextType>
-    static Object create(ContextType ctx, SharedRealm realm,
+    static Object create(ContextType& ctx, SharedRealm realm,
                          const ObjectSchema &object_schema, ValueType value,
                          bool try_update);
 
     template<typename ValueType, typename ContextType>
-    static Object get_for_primary_key(ContextType ctx, SharedRealm realm,
+    static Object get_for_primary_key(ContextType& ctx, SharedRealm realm,
                                       const ObjectSchema &object_schema,
                                       ValueType primary_value);
 
@@ -79,12 +79,12 @@ private:
 
 
     template<typename ValueType, typename ContextType>
-    void set_property_value_impl(ContextType ctx, const Property &property, ValueType value, bool try_update, bool is_default=false);
+    void set_property_value_impl(ContextType& ctx, const Property &property, ValueType value, bool try_update, bool is_default=false);
     template<typename ValueType, typename ContextType>
-    ValueType get_property_value_impl(ContextType ctx, const Property &property);
+    ValueType get_property_value_impl(ContextType& ctx, const Property &property);
 
     template<typename ValueType, typename ContextType>
-    static size_t get_for_primary_key_impl(ContextType ctx, Table const& table,
+    static size_t get_for_primary_key_impl(ContextType& ctx, Table const& table,
                                            const Property &primary_prop, ValueType primary_value);
 
     void verify_attached() const;
