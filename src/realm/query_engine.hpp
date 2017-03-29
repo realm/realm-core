@@ -89,9 +89,6 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <string>
 #include <array>
 
-#include <realm/util/miscellaneous.hpp>
-#include <realm/util/shared_ptr.hpp>
-#include <realm/utilities.hpp>
 #include <realm/array_basic.hpp>
 #include <realm/array_string.hpp>
 #include <realm/column_binary.hpp>
@@ -105,12 +102,16 @@ AggregateState      State of the aggregate - contains a state variable that stor
 #include <realm/column_timestamp.hpp>
 #include <realm/column_type_traits.hpp>
 #include <realm/column_type_traits.hpp>
+#include <realm/impl/sequential_getter.hpp>
 #include <realm/link_view.hpp>
 #include <realm/query_conditions.hpp>
-#include <realm/query_expression.hpp>
+#include <realm/query_operators.hpp>
 #include <realm/table.hpp>
 #include <realm/table_view.hpp>
 #include <realm/unicode.hpp>
+#include <realm/util/miscellaneous.hpp>
+#include <realm/util/shared_ptr.hpp>
+#include <realm/utilities.hpp>
 
 #include <map>
 
@@ -1965,45 +1966,18 @@ private:
 class ExpressionNode : public ParentNode {
 
 public:
-    ExpressionNode(std::unique_ptr<Expression> expression)
-        : m_expression(std::move(expression))
-    {
-        m_dD = 10.0;
-        m_dT = 50.0;
-    }
+    ExpressionNode(std::unique_ptr<Expression>);
 
-    void table_changed() override
-    {
-        m_expression->set_base_table(m_table.get());
-    }
+    size_t find_first_local(size_t start, size_t end) override;
 
-    void verify_column() const override
-    {
-        m_expression->verify_column();
-    }
+    void table_changed() override;
+    void verify_column() const override;
 
-    size_t find_first_local(size_t start, size_t end) override
-    {
-        return m_expression->find_first(start, end);
-    }
-
-    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override
-    {
-        return std::unique_ptr<ParentNode>(new ExpressionNode(*this, patches));
-    }
-
-    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override
-    {
-        m_expression->apply_handover_patch(patches, group);
-        ParentNode::apply_handover_patch(patches, group);
-    }
+    std::unique_ptr<ParentNode> clone(QueryNodeHandoverPatches* patches) const override;
+    void apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group) override;
 
 private:
-    ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatches* patches)
-        : ParentNode(from, patches)
-        , m_expression(from.m_expression->clone(patches))
-    {
-    }
+    ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatches* patches);
 
     std::unique_ptr<Expression> m_expression;
 };

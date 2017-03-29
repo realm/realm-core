@@ -18,6 +18,8 @@
 
 #include <realm/query_engine.hpp>
 
+#include <realm/query_expression.hpp>
+
 using namespace realm;
 
 size_t ParentNode::find_first(size_t start, size_t end)
@@ -306,4 +308,43 @@ size_t NotNode::find_first_no_overlap(size_t start, size_t end)
         update_known(start, end, result);
     }
     return result;
+}
+
+ExpressionNode::ExpressionNode(std::unique_ptr<Expression> expression)
+: m_expression(std::move(expression))
+{
+    m_dD = 10.0;
+    m_dT = 50.0;
+}
+
+void ExpressionNode::table_changed()
+{
+    m_expression->set_base_table(m_table.get());
+}
+
+void ExpressionNode::verify_column() const
+{
+    m_expression->verify_column();
+}
+
+size_t ExpressionNode::find_first_local(size_t start, size_t end)
+{
+    return m_expression->find_first(start, end);
+}
+
+std::unique_ptr<ParentNode> ExpressionNode::clone(QueryNodeHandoverPatches* patches) const
+{
+    return std::unique_ptr<ParentNode>(new ExpressionNode(*this, patches));
+}
+
+void ExpressionNode::apply_handover_patch(QueryNodeHandoverPatches& patches, Group& group)
+{
+    m_expression->apply_handover_patch(patches, group);
+    ParentNode::apply_handover_patch(patches, group);
+}
+
+ExpressionNode::ExpressionNode(const ExpressionNode& from, QueryNodeHandoverPatches* patches)
+: ParentNode(from, patches)
+, m_expression(from.m_expression->clone(patches))
+{
 }

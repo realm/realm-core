@@ -167,6 +167,7 @@
     <ClInclude Include="..\src\realm\link_view_fwd.hpp" />
     <ClInclude Include="..\src\realm\null.hpp" />
     <ClInclude Include="..\src\realm\query_expression.hpp" />
+    <ClInclude Include="..\src\realm\query_operators.hpp" />
     <ClInclude Include="..\src\realm\string_data.hpp" />
     <ClInclude Include="..\src\realm\timestamp.hpp" />
     <ClInclude Include="..\src\realm\unicode.hpp" />

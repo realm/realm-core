@@ -112,7 +112,8 @@ column_type_traits.hpp \
 group_writer.hpp \
 index_string.hpp \
 query_engine.hpp \
-query_expression.hpp
+query_expression.hpp \
+query_operators.hpp
 
 lib_LIBRARIES    = librealm.a
 libexec_PROGRAMS = realmd

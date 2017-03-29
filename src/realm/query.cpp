@@ -24,6 +24,7 @@
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 #include <realm/query_engine.hpp>
+#include <realm/query_expression.hpp>
 #include <realm/table_view.hpp>
 
 #include <algorithm>
