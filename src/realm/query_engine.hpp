@@ -1390,17 +1390,17 @@ protected:
     std::string m_lcase;
 };
 
-class StringNodeEqual : public StringNodeBase {
+class StringNodeEqualBase : public StringNodeBase {
 public:
-    StringNodeEqual(StringData v, size_t column)
+    StringNodeEqualBase(StringData v, size_t column)
         : StringNodeBase(v, column)
     {
     }
-    StringNodeEqual(const StringNodeEqual& from, QueryNodeHandoverPatches* patches)
+    StringNodeEqualBase(const StringNodeEqualBase& from, QueryNodeHandoverPatches* patches)
         : StringNodeBase(from, patches)
     {
     }
-    ~StringNodeEqual() noexcept override
+    ~StringNodeEqualBase() noexcept override
     {
         deallocate();
     }
@@ -1439,9 +1439,9 @@ protected:
 // Equal.
 // Future optimization: make specialization for greater, notequal, etc
 template <>
-class StringNode<Equal> : public StringNodeEqual {
+class StringNode<Equal> : public StringNodeEqualBase {
 public:
-    using StringNodeEqual::StringNodeEqual;
+    using StringNodeEqualBase::StringNodeEqualBase;
 
     void _search_index_init() override;
 
@@ -1458,10 +1458,10 @@ private:
 // Specialization for EqualIns condition on Strings - we specialize because we can utilize indexes (if they exist) for
 // EqualIns.
 template <>
-class StringNode<EqualIns> : public StringNodeEqual {
+class StringNode<EqualIns> : public StringNodeEqualBase {
 public:
     StringNode(StringData v, size_t column)
-        : StringNodeEqual(v, column)
+        : StringNodeEqualBase(v, column)
     {
         auto upper = case_map(v, true);
         auto lower = case_map(v, false);
@@ -1482,7 +1482,7 @@ public:
     }
 
     StringNode(const StringNode& from, QueryNodeHandoverPatches* patches)
-        : StringNodeEqual(from, patches)
+        : StringNodeEqualBase(from, patches)
         , m_ucase(from.m_ucase)
         , m_lcase(from.m_lcase)
     {

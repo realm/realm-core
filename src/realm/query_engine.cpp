@@ -175,7 +175,7 @@ size_t ParentNode::aggregate_local(QueryStateBase* st, size_t start, size_t end,
     }
 }
 
-void StringNodeEqual::deallocate() noexcept
+void StringNodeEqualBase::deallocate() noexcept
 {
     // Must be called after each query execution to free temporary resources used by the execution. Run in
     // destructor, but also in Init because a user could define a query once and execute it multiple times.
@@ -189,7 +189,7 @@ void StringNodeEqual::deallocate() noexcept
     m_index_getter.reset();
 }
 
-void StringNodeEqual::init()
+void StringNodeEqualBase::init()
 {
     deallocate();
     m_dD = 10.0;
@@ -223,7 +223,7 @@ void StringNodeEqual::init()
     }
 }
 
-size_t StringNodeEqual::find_first_local(size_t start, size_t end)
+size_t StringNodeEqualBase::find_first_local(size_t start, size_t end)
 {
     REALM_ASSERT(m_table);
 
