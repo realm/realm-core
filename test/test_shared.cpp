@@ -2307,6 +2307,26 @@ TEST(Shared_MixedWithNonShared)
 #endif
 }
 
+
+#if REALM_ENABLE_ENCRYPTION
+// verify that even though different threads share the same encrypted pages,
+// a thread will not get access without the key.
+TEST(Shared_EncryptionKeyCheck)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    bool ok = false;
+    try {
+        SharedGroup sg_2(path, false, SharedGroupOptions());
+    } catch (std::runtime_error&) {
+        ok = true;
+    }
+    CHECK(ok);
+    SharedGroup sg3(path, false, SharedGroupOptions(crypt_key()));
+}
+
+#endif
+
 TEST(Shared_VersionCount)
 {
     SHARED_GROUP_TEST_PATH(path);
