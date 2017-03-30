@@ -4,7 +4,6 @@ FROM ubuntu:16.04
 # This should help avoiding duplicates and make the file easier to update.
 RUN apt-get update && apt-get install -y \
     build-essential \
-    cmake \
     curl \
     gcovr \
     git \
@@ -18,10 +17,18 @@ RUN apt-get update && apt-get install -y \
     python-pip \
     pkg-config \
     s3cmd \
+    tar \
     unzip \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install diff_cover
+
+RUN cd /opt \
+    && wget https://cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz \
+    && tar zxvf https://cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz
+
+ENV PATH "$PATH:/opt/cmake-3.7.2-Linux-x86_64/bin"
 
 VOLUME /source
 VOLUME /out

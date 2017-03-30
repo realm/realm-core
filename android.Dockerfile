@@ -19,7 +19,6 @@ RUN DEBIAN_FRONTEND=noninteractive dpkg --add-architecture i386 \
     && apt-get install -y adb \
                           bsdmainutils \
                           build-essential \
-                          cmake \
                           curl \
                           file \
                           git \
@@ -34,9 +33,16 @@ RUN DEBIAN_FRONTEND=noninteractive dpkg --add-architecture i386 \
                           s3cmd \
                           unzip \
                           xutils-dev \
+                          tar \
                           wget \
                           zip \
     && apt-get clean
+
+RUN cd /opt \
+    && wget https://cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz \
+    && tar zxvf https://cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz
+
+ENV PATH "$PATH:/opt/cmake-3.7.2-Linux-x86_64/bin"
 
 # Install the NDK
 RUN mkdir /opt/android-ndk-tmp && \
