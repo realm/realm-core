@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.6)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/tools/cmake")
 
@@ -121,6 +121,7 @@ set(CPACK_RPM_COMPONENT_INSTALL ON)
 set(CPACK_DEBIAN_POST_INSTALL_SCRIPT_FILE "${CMAKE_SOURCE_DIR}/tools/cmake/run_ldconfig.sh")
 set(CPACK_DEBIAN_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_SOURCE_DIR}/tools/cmake/run_ldconfig.sh")
 set(CPACK_DEB_COMPONENT_INSTALL ON)
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 include(CPack)
 cpack_add_component(runtime DEPENDS runtime)
