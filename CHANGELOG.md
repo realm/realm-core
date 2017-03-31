@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Work around a bug in macOS which could cause a deadlock when trying to obtain a shared lock
+  using flock(). PR [#2552](https://github.com/realm/realm-core/pull/2552),
+  issue [#2434](https://github.com/realm/realm-core/issues/2434).
 
 ### Breaking changes
 
@@ -17,6 +19,15 @@
 ### Internals
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 2.5.1 Release notes
+
+### Enhancements
+
+* Restore support for opening version 6 files in read-only mode.
+  PR [#2549](https://github.com/realm/realm-core/pull/2549).
 
 ----------------------------------------------
 
