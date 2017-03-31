@@ -57,8 +57,9 @@ timeout(time: 5, unit: 'HOURS') {
                              packageGeneric      : doBuildPackage('generic', 'tar.gz'),
                              packageCentos7      : doBuildPackage('centos-7', 'rpm'),
                              packageCentos6      : doBuildPackage('centos-6', 'rpm'),
-                             packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb')
-                             //buildUwpArmRelease: doBuildWindows('Release', true, 'arm')
+                             packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
+                             buildUwpArmRelease  : doBuildWindows('Release', true, 'arm'),
+                             buildUwpArmRelease  : doBuildWindows('Release', false, 'arm')
                              //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
             ]
 
