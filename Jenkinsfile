@@ -13,15 +13,15 @@ timeout(time: 5, unit: 'HOURS') {
             stash includes: '**', name: 'core-source', useDefaultExcludes: false
 
             dependencies = readProperties file: 'dependencies.list'
-            echo "VERSION: ${dependencies.VERSION}"
+            echo "Version in dependencies.list: ${dependencies.VERSION}"
 
             gitTag = readGitTag()
             gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
             gitDescribeVersion = sh(returnStdout: true, script: 'git describe --tags').trim()
             version = gitTag ? "${dependencies.VERSION}-g${gitSha}" : dependencies.VERSION
 
-            echo "tag: ${gitTag}"
-            if (gitTag == "") {
+            echo "Git tag: ${gitTag ?: 'none'}"
+            if (!gitTag) {
                 echo "No tag given for this build"
                 setBuildName(gitSha)
             } else {
@@ -34,8 +34,7 @@ timeout(time: 5, unit: 'HOURS') {
             }
         }
 
-        isPublishingRun = gitTag != ''
-        echo "Publishing Run: ${isPublishingRun}"
+        echo "Publishing Run: ${gitTag ? 'yes' : 'no'}"
 
         if (['master'].contains(env.BRANCH_NAME)) {
             // If we're on master, instruct the docker image builds to push to the
@@ -103,7 +102,7 @@ timeout(time: 5, unit: 'HOURS') {
                     }
                     sh 'tools/build-cocoa.sh'
                     archiveArtifacts('realm-core-cocoa*.tar.xz')
-                    if(isPublishingRun) {
+                    if(gitTag) {
                         def stashName = "pub-cocoa"
                         stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
                         publishingStashes << stashName
@@ -118,7 +117,7 @@ timeout(time: 5, unit: 'HOURS') {
                     }
                     sh 'tools/build-android.sh'
                     archiveArtifacts('realm-core-android*.tar.gz')
-                    if(isPublishingRun) {
+                    if(gitTag) {
                         def stashName = "pub-android"
                         stash includes: 'realm-core-android*.tar.gz', name: stashName
                         publishingStashes << stashName
@@ -128,7 +127,7 @@ timeout(time: 5, unit: 'HOURS') {
         )
     }
 
-    if (isPublishingRun) {
+    if (gitTag) {
         stage('publish-packages') {
             parallel(
                 generic: doPublishGeneric(),
@@ -256,7 +255,7 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
                     cpack -C ${buildType} -D CPACK_GENERATOR=TGZ
                 """)
                 archiveArtifacts('*.tar.gz')
-                if (isPublishingRun) {
+                if (gitTag) {
                     def stashName = "pub-windows-${arch}-${isUWP?'uwp':'nouwp'}"
                     stash includes:'*.tar.gz', name:stashName
                     publishingStashes << stashName
@@ -442,12 +441,10 @@ def environment() {
 def readGitTag() {
     def command = 'git describe --exact-match --tags HEAD'
     def returnStatus = sh(returnStatus: true, script: command)
-    if (returnStatus == 0) {
-        def tag = sh(returnStdout: true, script: command).trim()
-        return tag
-    } else {
-        return ''
+    if (returnStatus != 0) {
+        return null
     }
+    return sh(returnStdout: true, script: command).trim()
 }
 
 def doBuildPackage(distribution, fileType) {
