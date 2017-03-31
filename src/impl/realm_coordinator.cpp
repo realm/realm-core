@@ -496,6 +496,7 @@ void RealmCoordinator::clean_up_dead_notifiers()
         if (m_notifiers.empty() && m_notifier_sg) {
             REALM_ASSERT_3(m_notifier_sg->get_transact_stage(), ==, SharedGroup::transact_Reading);
             m_notifier_sg->end_read();
+            m_notifier_skip_version = {0, 0};
         }
     }
     if (swap_remove(m_new_notifiers) && m_advancer_sg) {
@@ -693,6 +694,7 @@ void RealmCoordinator::run_async_notifiers()
     lock.unlock();
 
     if (skip_version.version) {
+        REALM_ASSERT(!notifiers.empty());
         REALM_ASSERT(version >= skip_version);
         IncrementalChangeInfo change_info(*m_notifier_sg, notifiers);
         for (auto& notifier : notifiers)

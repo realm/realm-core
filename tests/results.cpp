@@ -834,6 +834,27 @@ TEST_CASE("notifications: skip") {
         advance_and_notify(*r);
         REQUIRE(calls1 == 2);
     }
+
+    SECTION("removing skipped notifier before it gets the chance to run") {
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 1);
+
+        // Set the skip version
+        make_local_change(token1);
+        // Advance the file to a version after the skip version
+        make_remote_change();
+        REQUIRE(calls1 == 1);
+
+        // Remove the skipped notifier and add an entirely new notifier, so that
+        // notifications need to run but the skip logic shouldn't be used
+        token1 = {};
+        results = {};
+        Results results2(r, table->where());
+        auto token2 = add_callback(results2, calls1, changes1);
+
+        advance_and_notify(*r);
+        REQUIRE(calls1 == 2);
+    }
 }
 
 #if REALM_PLATFORM_APPLE
