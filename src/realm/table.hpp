@@ -220,21 +220,22 @@ public:
     /// added to the specified column. Rather than throwing, it returns false if
     /// the table accessor is detached or the specified index is out of range.
     ///
-    /// add_search_index() adds a search index to the specified column of this
+    /// add_search_index() adds a search index to the specified column of the
     /// table. It has no effect if a search index has already been added to the
     /// specified column (idempotency).
     ///
     /// remove_search_index() removes the search index from the specified column
-    /// of this table. It has no effect if the specified column has no search
+    /// of the table. It has no effect if the specified column has no search
     /// index. The search index cannot be removed from the primary key of a
     /// table.
     ///
     /// This table must be a root table; that is, it must have an independent
     /// descriptor. Freestanding tables, group-level tables, and subtables in a
     /// column of type 'mixed' are all examples of root tables. See add_column()
-    /// for more on this.
+    /// for more on this. If you want to manipulate subtable indexes, you must use
+    /// the Descriptor interface.
     ///
-    /// \param column_ndx The index of a column of this table.
+    /// \param column_ndx The index of a column of the table.
 
     bool has_search_index(size_t column_ndx) const noexcept;
     void add_search_index(size_t column_ndx);
@@ -1022,6 +1023,9 @@ private:
     template <class ColType, class T>
     size_t do_set_unique(ColType& column, size_t row_ndx, T&& value, bool& conflict);
 
+    void _add_search_index(size_t column_ndx);
+    void _remove_search_index(size_t column_ndx);
+
     void upgrade_file_format(size_t target_file_format_version);
 
     // Upgrades OldDateTime columns to Timestamp columns
@@ -1079,6 +1083,9 @@ private:
     static void do_erase_column(Descriptor&, size_t col_ndx);
     static void do_rename_column(Descriptor&, size_t col_ndx, StringData name);
     static void do_move_column(Descriptor&, size_t col_ndx_1, size_t col_ndx_2);
+
+    static void do_add_search_index(Descriptor&, size_t col_ndx);
+    static void do_remove_search_index(Descriptor&, size_t col_ndx);
 
     struct InsertSubtableColumns;
     struct EraseSubtableColumns;
@@ -2315,6 +2322,16 @@ public:
     static void rename_column(Descriptor& desc, size_t column_ndx, StringData name)
     {
         Table::do_rename_column(desc, column_ndx, name); // Throws
+    }
+
+    static void add_search_index(Descriptor& desc, size_t column_ndx)
+    {
+        Table::do_add_search_index(desc, column_ndx); // Throws
+    }
+
+    static void remove_search_index(Descriptor& desc, size_t column_ndx)
+    {
+        Table::do_remove_search_index(desc, column_ndx); // Throws
     }
 
     static void move_column(Descriptor& desc, size_t col_ndx_1, size_t col_ndx_2)

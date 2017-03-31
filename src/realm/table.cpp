@@ -823,6 +823,112 @@ void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
         repl->rename_column(desc, col_ndx, name); // Throws
 }
 
+void Table::do_add_search_index(Descriptor& descr, size_t column_ndx)
+{
+    typedef _impl::DescriptorFriend df;
+    auto spec = descr.get_spec();
+
+    if (REALM_UNLIKELY(column_ndx >= spec->get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
+    // Early-out of already indexed
+    if (descr.has_search_index(column_ndx))
+        return;
+
+    typedef _impl::DescriptorFriend df;
+    Table& root_table = df::get_root_table(descr);
+    int attr = spec->get_column_attr(column_ndx);
+
+    if (descr.is_root()) {
+        root_table._add_search_index(column_ndx);
+    }
+    else {
+        // Find the root table column index that contains the search index
+        size_t parent_col;
+        size_t* res = df::record_subdesc_path(descr, &parent_col, &parent_col + 1);
+        if (!res) {
+            throw LogicError(LogicError::subtable_of_subtable_index);
+        }
+
+        // Iterate through all rows of the root table and create an instance of each subtable. We have a special
+        // problem though: All subtables share the same common instance of attributes, however while we successively
+        // create indexes, we have some subtables that will match the index flag and some that will not, which
+        // is an inchoherent state of the database. We rely on the fact that all method calls and operations in the
+        // for-loop are safe to call despite of this.
+
+        size_t sz = root_table.size();
+        for (size_t r = 0; r < sz; r++) {
+            // Clear index bit from shared spec because we're now going to operate on the next subtable
+            // object which has no index yet (because various method calls may crash if attributes are
+            // wrong)
+            spec->set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+
+            TableRef sub = root_table.get_subtable(parent_col, r);
+            sub->_add_search_index(column_ndx);
+        }
+    }
+
+    // Set shared attributes here also, in case there was no rows to iterate through in the for-loop
+    // above
+    spec->set_column_attr(column_ndx, ColumnAttr(attr | col_attr_Indexed)); // Throws
+
+    if (Replication* repl = root_table.get_repl())
+        repl->add_search_index(descr, column_ndx); // Throws
+}
+
+void Table::do_remove_search_index(Descriptor& descr, size_t column_ndx)
+{
+    typedef _impl::DescriptorFriend df;
+    auto spec = descr.get_spec();
+
+    if (REALM_UNLIKELY(column_ndx >= spec->get_column_count()))
+        throw LogicError(LogicError::column_index_out_of_range);
+
+    // Early-out of non-indexed
+    if (!descr.has_search_index(column_ndx))
+        return;
+
+    typedef _impl::DescriptorFriend df;
+    Table& root_table = df::get_root_table(descr);
+    int attr = spec->get_column_attr(column_ndx);
+
+    if (descr.is_root()) {
+        root_table._remove_search_index(column_ndx);
+    }
+    else {
+        size_t parent_col;
+        size_t* res = df::record_subdesc_path(descr, &parent_col, &parent_col + 1);
+        if (!res) {
+            throw LogicError(LogicError::subtable_of_subtable_index);
+        }
+
+        // Iterate through all rows of the root table and create an instance of each subtable. We have a special
+        // problem though: All subtables share the same common instance of attributes, however while we successively
+        // remove indexes, we have some subtables that will match the index flag and some that will not, which
+        // is an inchoherent state of the database. We rely on the fact that all method calls and operations in the
+        // for-loop are safe to call despite of this.
+        size_t sz = root_table.size();
+        for (size_t r = 0; r < sz; r++) {
+            // Set index bit from shared spec because we're now going to operate on the next subtable
+            // object which still has an index (because various method calls may crash if attributes are
+            // wrong)
+            spec->set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+
+            // Destroy search index. This will update shared attributes in case refresh_column_accessors()
+            // should depend on them being correct
+            TableRef sub = root_table.get_subtable(parent_col, r);
+            sub->_remove_search_index(column_ndx);
+        }
+    }
+
+    // Set shared attributes here also, in case there was no rows to iterate through in the for-loop
+    // above
+    spec->set_column_attr(column_ndx, ColumnAttr(attr & ~col_attr_Indexed)); // Throws
+
+    if (Replication* repl = root_table.get_repl())
+        repl->remove_search_index(descr, column_ndx); // Throws
+}
+
 void Table::insert_root_column(size_t col_ndx, DataType type, StringData name, LinkTargetInfo& link_target,
                                bool nullable)
 {
@@ -1293,14 +1399,18 @@ void Table::create_degen_subtab_columns()
     size_t num_cols = m_spec->get_column_count();
     for (size_t i = 0; i < num_cols; ++i) {
         ColumnType type = m_spec->get_column_type(i);
-        bool nullable = (m_spec->get_column_attr(i) & col_attr_Nullable) != 0;
+        int attr = m_spec->get_column_attr(i);
+        bool nullable = (attr & col_attr_Nullable) != 0;
+        // Must be 0, else there's no way to create search index for it statically
         size_t init_size = 0;
         ref_type ref = create_column(type, init_size, nullable, alloc); // Throws
         m_columns.add(int_fast64_t(ref));                               // Throws
 
-        // So far, only root tables can have search indexes, and this is not a
-        // root table.
-        REALM_ASSERT_3(m_spec->get_column_attr(i) & ~col_attr_Nullable, ==, col_attr_None);
+        // Create empty search index if required and add it to m_columns
+        if (attr & col_attr_Indexed) {
+            m_columns.add(StringIndex::create_empty(get_alloc()));
+            m_spec->set_column_attr(i, ColumnAttr(attr & col_attr_Indexed));
+        }
     }
 
     m_cols.resize(num_cols);
@@ -1566,6 +1676,11 @@ Table::~Table() noexcept
 
 bool Table::has_search_index(size_t col_ndx) const noexcept
 {
+    if (has_shared_type()) {
+        return get_descriptor()->has_search_index(col_ndx);
+    }
+
+    // Check column of `this` which is a root table
     // Utilize the guarantee that m_cols.size() == 0 for a detached table accessor.
     if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
         return false;
@@ -1695,12 +1810,24 @@ void Table::add_search_index(size_t col_ndx)
     if (REALM_UNLIKELY(has_shared_type()))
         throw LogicError(LogicError::wrong_kind_of_table);
 
-    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
-        throw LogicError(LogicError::column_index_out_of_range);
+    get_descriptor()->add_search_index(col_ndx);
+}
 
-    if (has_search_index(col_ndx))
-        return;
 
+void Table::remove_search_index(size_t col_ndx)
+{
+    if (REALM_UNLIKELY(!is_attached()))
+        throw LogicError(LogicError::detached_accessor);
+
+    if (REALM_UNLIKELY(has_shared_type()))
+        throw LogicError(LogicError::wrong_kind_of_table);
+
+    get_descriptor()->remove_search_index(col_ndx);
+}
+
+
+void Table::_add_search_index(size_t col_ndx)
+{
     ColumnBase& col = get_column_base(col_ndx);
 
     if (!col.supports_search_index())
@@ -1726,26 +1853,11 @@ void Table::add_search_index(size_t col_ndx)
     // Update column accessors for all columns after the one we just added an
     // index for, as their position in `m_columns` has changed
     refresh_column_accessors(col_ndx + 1); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->add_search_index(this, col_ndx); // Throws
 }
 
 
-void Table::remove_search_index(size_t col_ndx)
+void Table::_remove_search_index(size_t col_ndx)
 {
-    if (REALM_UNLIKELY(!is_attached()))
-        throw LogicError(LogicError::detached_accessor);
-
-    if (REALM_UNLIKELY(has_shared_type()))
-        throw LogicError(LogicError::wrong_kind_of_table);
-
-    if (REALM_UNLIKELY(col_ndx >= m_cols.size()))
-        throw LogicError(LogicError::column_index_out_of_range);
-
-    if (!has_search_index(col_ndx))
-        return;
-
     // Destroy and remove the index column
     ColumnBase& col = get_column_base(col_ndx);
     col.get_search_index()->destroy();
@@ -1764,9 +1876,6 @@ void Table::remove_search_index(size_t col_ndx)
     // Update column accessors for all columns after the one we just removed the
     // index for, as their position in `m_columns` has changed
     refresh_column_accessors(col_ndx + 1); // Throws
-
-    if (Replication* repl = get_repl())
-        repl->remove_search_index(this, col_ndx); // Throws
 }
 
 
@@ -6137,6 +6246,9 @@ void Table::to_dot_internal(std::ostream& out) const
         const ColumnBase& col = get_column_base(i);
         StringData name = get_column_name(i);
         col.to_dot(out, name);
+        if (has_search_index(i)) {
+            col.get_search_index()->to_dot_2(out, "");
+        }
     }
 }
 

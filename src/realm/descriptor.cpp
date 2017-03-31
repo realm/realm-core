@@ -25,6 +25,26 @@
 using namespace realm;
 using namespace realm::util;
 
+bool Descriptor::has_search_index(size_t column_ndx) const noexcept
+{
+    if (REALM_UNLIKELY(column_ndx >= m_spec->get_column_count()))
+        return false;
+
+    int attr = m_spec->get_column_attr(column_ndx);
+    return attr & col_attr_Indexed;
+}
+
+void Descriptor::add_search_index(size_t column_ndx)
+{
+    typedef _impl::TableFriend tf;
+    tf::add_search_index(*this, column_ndx); // Throws
+}
+
+void Descriptor::remove_search_index(size_t column_ndx)
+{
+    typedef _impl::TableFriend tf;
+    tf::remove_search_index(*this, column_ndx); // Throws
+}
 
 DescriptorRef Descriptor::get_subdescriptor(size_t column_ndx)
 {

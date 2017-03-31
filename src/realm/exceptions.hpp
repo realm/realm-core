@@ -208,7 +208,10 @@ public:
         table_has_no_columns,
 
         /// Referring to a column that has been deleted.
-        column_does_not_exist
+        column_does_not_exist,
+
+        /// You can not add index on a subtable of a subtable
+        subtable_of_subtable_index
     };
 
     LogicError(ErrorKind message);

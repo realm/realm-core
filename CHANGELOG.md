@@ -8,6 +8,8 @@
 
 * Support for size query on LinkedList removed. This is perhaps not so 
   breaking after all since it is probably not used.
+* Replication interface changed. The search index functions now operate
+  on a descriptor and not a table.
 
 ### Enhancements
 
@@ -15,6 +17,13 @@
   Query q = table->column<SubTable>(0).list<Int>() == 5;
   Query q = table->column<SubTable>(0).list<Int>().min() >= 2;
   Query q = table->column<SubTable>(1).list<String>().begins_with("Bar");
+* Support for search index on subtable columns. Only one level of subtables
+  are currently supported, that is, you cannot create a search index in a
+  subtable of a subtable (will throw exception). NOTE: Core versions prior to
+  this version will not be able to open .realm files of this Core version if
+  this Core version has added such indexes. Adding or removing an index will
+  take place for *all* subtables in a subtable column. There is no way to add
+  or remove it form single individual subtables.
 
 -----------
 
