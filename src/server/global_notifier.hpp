@@ -45,7 +45,7 @@ class GlobalNotifier : public std::enable_shared_from_this<GlobalNotifier>  {
 public:
     class Callback;
 
-    using ChangesetTransformer = sync::SyncHistory::ChangesetCooker;
+    using ChangesetTransformer = sync::ClientHistory::ChangesetCooker;
     static std::shared_ptr<GlobalNotifier> shared_notifier(std::unique_ptr<Callback> callback, std::string local_root_dir,
                                                            std::string server_base_url, std::shared_ptr<SyncUser> user,
                                                            std::shared_ptr<ChangesetTransformer> transformer = nullptr);
@@ -109,7 +109,7 @@ public:
         SharedRealm m_realm;
         std::unordered_map<std::string, CollectionChangeSet> m_changes;
 
-        ChangeNotification(GlobalNotifier::RealmInfo, VersionID old_version, VersionID new_version, 
+        ChangeNotification(GlobalNotifier::RealmInfo, VersionID old_version, VersionID new_version,
                            SharedRealm, std::unordered_map<std::string, CollectionChangeSet>);
         ChangeNotification() = default;
 
@@ -126,7 +126,7 @@ private:
                    std::shared_ptr<ChangesetTransformer> transformer);
 
     AdminRealmListener m_admin;
-    const std::unique_ptr<Callback> m_target;    
+    const std::unique_ptr<Callback> m_target;
     const std::string m_server_base_url;
     std::shared_ptr<SyncUser> m_user;
     std::string m_regular_realms_dir;

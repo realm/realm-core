@@ -69,9 +69,9 @@ public:
 
     bool m_last_is_collapsable = false;
 
-    void add_instruction(Adapter::InstructionType type, 
-                         nlohmann::json &&inst = {}, bool 
-                         collasable = false, 
+    void add_instruction(Adapter::InstructionType type,
+                         nlohmann::json &&inst = {}, bool
+                         collasable = false,
                          util::Optional<std::string> object_type = util::none) {
         inst["type"] = Adapter::instruction_type_string(type);
         inst["object_type"] = object_type ? *object_type : m_selected_object_schema->name;
@@ -110,15 +110,15 @@ public:
         if (m_json_instructions.size()) {
             nlohmann::json &last = m_json_instructions.back();
             if (last["object_type"].get<std::string>() == object_type && (
-                last["type"].get<std::string>() == "ADD_TYPE" || 
-                last["type"].get<std::string>() == "ADD_PROPERTIES")) 
+                last["type"].get<std::string>() == "ADD_TYPE" ||
+                last["type"].get<std::string>() == "ADD_PROPERTIES"))
             {
                 last["properties"][prop_name] = prop;
                 return;
             }
         }
 
-        add_instruction(Adapter::InstructionType::AddProperties, {{"properties", 
+        add_instruction(Adapter::InstructionType::AddProperties, {{"properties",
             {{prop_name, prop}}
         }}, false, object_type);
     }
@@ -140,15 +140,15 @@ public:
                         return get_primary(primary_key->table_column, mapping->second);
                     }
                 }
-                return get_primary(primary_key->table_column, row); 
+                return get_primary(primary_key->table_column, row);
             };
 
             if (primary_key->type == PropertyType::Int)
-                return get_or_lookup_primary(m_int_primaries, [&](auto column, auto row) { 
+                return get_or_lookup_primary(m_int_primaries, [&](auto column, auto row) {
                     return table->get_int(column, row); } );
 
             if (primary_key->type == PropertyType::String)
-                return get_or_lookup_primary(m_string_primaries, [&](auto column, auto row) { 
+                return get_or_lookup_primary(m_string_primaries, [&](auto column, auto row) {
                     return (std::string)table->get_string(column, row); } );
         }
         return row;
@@ -301,7 +301,7 @@ public:
     }
     bool merge_rows(size_t, size_t)
     {
-        // It's ok to ignore this instruction because it only happens as a result of 
+        // It's ok to ignore this instruction because it only happens as a result of
         // resolving a PK conflict, but for tables with primary keys we use the PK
         // instead of the row index for the identity
         if (m_selected_object_schema) {
@@ -365,7 +365,7 @@ public:
         if (m_selected_object_schema) {
             if (m_selected_primary && m_selected_primary->table_column == column_index) {
                 m_string_primaries[m_selected_table_index][row_index] = value;
-  
+
                 auto &last = m_json_instructions.back();
                 REALM_ASSERT(last["type"].get<std::string>() == "INSERT");
                 last["identity"] = value;
@@ -473,7 +473,7 @@ public:
         if (object_type.size()) {
             add_column_instruction(object_type, prop_name, {
                 {"type", string_for_property_type((PropertyType)data_type)},
-                {"nullable", nullable}            
+                {"nullable", nullable}
             });
         }
         return true;
@@ -485,12 +485,12 @@ public:
     }
     bool erase_column(size_t)
     {
-        REALM_ASSERT(0);    
+        REALM_ASSERT(0);
         return true;
     }
     bool rename_column(size_t, StringData)
     {
-        REALM_ASSERT(0);    
+        REALM_ASSERT(0);
         return true;
     }
     bool move_column(size_t from, size_t to)
@@ -507,7 +507,7 @@ public:
     }
     bool set_link_type(size_t, LinkType)
     {
-        REALM_ASSERT(0);    
+        REALM_ASSERT(0);
         return true;
     }
 
@@ -520,8 +520,8 @@ public:
                 {"property", m_list_property->name},
                 {"list_index", list_index},
                 {"object_identity", get_identity(m_list_target_index, m_list_target_table, m_list_target_primary)}
-            }); 
-        } 
+            });
+        }
         return true;
     }
     bool link_list_insert(size_t list_index, size_t m_list_target_index, size_t prior_size)
@@ -532,8 +532,8 @@ public:
                 {"property", m_list_property->name},
                 {"list_index", list_index},
                 {"object_identity", get_identity(m_list_target_index, m_list_target_table, m_list_target_primary)}
-            }); 
-        } 
+            });
+        }
         return true;
     }
     bool link_list_move(size_t from_index, size_t to_index)
@@ -557,8 +557,8 @@ public:
                 {"identity", m_list_parent_identity},
                 {"property", m_list_property->name},
                 {"list_index", list_index},
-            }); 
-        } 
+            });
+        }
         return true;
     }
     bool link_list_nullify(size_t list_index, size_t prior_size)
@@ -568,8 +568,8 @@ public:
                 {"identity", m_list_parent_identity},
                 {"property", m_list_property->name},
                 {"list_index", list_index},
-            }); 
-        } 
+            });
+        }
         return true;
     }
     bool link_list_clear(size_t prior_size)
@@ -578,8 +578,8 @@ public:
             add_instruction(Adapter::InstructionType::ListClear, {
                 {"identity", m_list_parent_identity},
                 {"property", m_list_property->name},
-            }); 
-        } 
+            });
+        }
         return true;
     }
 
@@ -597,7 +597,7 @@ public:
     }
 };
 
-class ChangesetCooker: public realm::sync::SyncHistory::ChangesetCooker {
+class ChangesetCooker: public realm::sync::ClientHistory::ChangesetCooker {
 public:
     bool cook_changeset(const Group& group, const char* changeset,
                         std::size_t changeset_size,
@@ -619,7 +619,7 @@ Adapter::Adapter(std::function<void(std::string)> realm_changed,
                  std::shared_ptr<SyncUser> user)
 : m_global_notifier(GlobalNotifier::shared_notifier(
     std::make_unique<Adapter::Callback>([=](auto info) { realm_changed(info.second); }),
-                                        local_root_dir, server_base_url, user, 
+                                        local_root_dir, server_base_url, user,
                                         std::make_shared<ChangesetCooker>()))
 {
     m_global_notifier->start();
@@ -642,8 +642,8 @@ void Adapter::Callback::realm_changed(GlobalNotifier::ChangeNotification changes
 util::Optional<Adapter::ChangeSet> Adapter::current(std::string realm_path) {
     auto realm = realm::Realm::get_shared_realm(m_global_notifier->get_config(realm_path));
 
-    REALM_ASSERT(dynamic_cast<sync::SyncHistory *>(realm->history()));
-    auto sync_history = static_cast<sync::SyncHistory *>(realm->history());
+    REALM_ASSERT(dynamic_cast<sync::ClientHistory *>(realm->history()));
+    auto sync_history = static_cast<sync::ClientHistory *>(realm->history());
     auto progress = sync_history->get_cooked_progress();
 
     if (progress.changeset_index >= sync_history->get_num_cooked_changesets()) {
@@ -657,7 +657,7 @@ util::Optional<Adapter::ChangeSet> Adapter::current(std::string realm_path) {
 
 void Adapter::advance(std::string realm_path) {
     auto realm = realm::Realm::get_shared_realm(m_global_notifier->get_config(realm_path));
-    auto sync_history = static_cast<sync::SyncHistory *>(realm->history());
+    auto sync_history = static_cast<sync::ClientHistory *>(realm->history());
     auto progress = sync_history->get_cooked_progress();
     if (progress.changeset_index < sync_history->get_num_cooked_changesets()) {
         progress.changeset_index++;
