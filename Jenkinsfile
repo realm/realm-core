@@ -184,7 +184,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
     return {
         node('docker') {
             getArchive()
-            def stashName = "android-${abi}-${buildType}"
+            def stashName = "android/${abi}/${buildType}"
             def buildDir = "build-${stashName}"
             def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
             def environment = environment()
@@ -197,6 +197,9 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
                         }
                         stash includes:"${buildDir}/realm-*.tar.gz", name:stashName
                         androidStashes << stashName
+                        if (gitTag) {
+                            publishingStashes << stashName
+                        }
                     }
                 } else {
                     docker.image('tracer0tong/android-emulator').withRun('-e ARCH=armeabi-v7a') { emulator ->
@@ -256,7 +259,7 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
                 """)
                 archiveArtifacts('*.tar.gz')
                 if (gitTag) {
-                    def stashName = "pub-windows-${arch}-${isUWP?'uwp':'nouwp'}"
+                    def stashName = "windows/${arch}/${isUWP?'uwp':'nouwp'}/${buildType}"
                     stash includes:'*.tar.gz', name:stashName
                     publishingStashes << stashName
                 }
@@ -389,9 +392,10 @@ def doBuildMacOs(String buildType) {
             }
             archiveArtifacts("build-macos-${buildType}/*.tar.xz")
 
-            stash includes:"build-macos-${buildType}/*.tar.xz", name:"macos-${buildType}"
-            cocoaStashes << "macos-${buildType}"
-            publishingStashes << "macos-${buildType}"
+            def stashName = "macos/${buildType}"
+            stash includes:"build-macos-${buildType}/*.tar.xz", name:stashName
+            cocoaStashes << stashName
+            publishingStashes << stashName
         }
     }
 }
@@ -412,10 +416,12 @@ def doBuildAppleDevice(String sdk, String buildType) {
                 }
             }
             archiveArtifacts("build-${sdk}-${buildType}/*.tar.xz")
-            stash includes:"build-${sdk}-${buildType}/*.tar.xz", name:"cocoa-${sdk}-${buildType}"
-            cocoaStashes << "cocoa-${sdk}-${buildType}"
-        }
-    }
+            def stashName = "${sdk}/${buildType}"
+            stash includes:"build-${sdk}-${buildType}/*.tar.xz", name:stashName
+            cocoaStashes << stashName
+            if(gitTag) {
+                publishingStashes << stashName
+            }
 }
 
 /**
@@ -487,10 +493,14 @@ def doPublishGeneric() {
     return {
         node {
             getArchive()
-
-            withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-                sh 'find . -type f -name "*.tar.gz" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
+            dir('packaging/out') {
+                unstash 'packages-generic'
+                withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+                    sh 'find . -type f -name "*.tar.gz" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
+                    sh "find . -type f -name \"*.tar.gz\" -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/${gitDescribeVersion}/linux \\;"
+                }
             }
+
         }
     }
 }
@@ -502,6 +512,13 @@ def doPublishLocalArtifacts() {
             deleteDir()
             for(def i = 0; i < publishingStashes.size(); i++) {
                 unstash name: publishingStashes[i]
+                dir('temp') {
+                    unstash name: publishingStashes[i]
+                    withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+                        sh "find . -type f -name \"*\" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/${gitDescribeVersion}/${publishingStashes[i]} \\;"
+                    }
+                }
+                deleteDir('temp')
             }
 
             withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
