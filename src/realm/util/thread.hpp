@@ -23,6 +23,7 @@
 
 #ifdef _WIN32
 #include <win32/pthread/pthread.h>
+#include <Windows.h>
 #else
 #include <pthread.h>
 #endif
@@ -324,6 +325,11 @@ public:
 private:
     pthread_cond_t m_impl;
 
+#ifdef _WIN32
+    size_t m_waiting = 0;
+    HANDLE m_semaphore = nullptr;
+#endif
+
     REALM_NORETURN static void init_failed(int);
     REALM_NORETURN static void attr_init_failed(int);
     REALM_NORETURN static void destroy_failed(int) noexcept;
@@ -552,10 +558,26 @@ inline CondVar::~CondVar() noexcept
     int r = pthread_cond_destroy(&m_impl);
     if (REALM_UNLIKELY(r != 0))
         destroy_failed(r);
+
+#ifdef _WIN32
+    if (m_semaphore) {
+        // CondVar was created with process_shared_tag
+        CloseHandle(m_semaphore);
+    }
+#endif
 }
 
 inline void CondVar::wait(LockGuard& l) noexcept
 {
+#ifdef _WIN32
+    if (m_semaphore) {
+        l.m_mutex.unlock();
+        m_waiting++;
+        l.m_mutex.lock();
+        WaitForSingleObject(m_semaphore, -1);
+        return;
+    }
+#endif
     int r = pthread_cond_wait(&m_impl, &l.m_mutex.m_impl);
     if (REALM_UNLIKELY(r != 0))
         REALM_TERMINATE("pthread_cond_wait() failed");
@@ -564,6 +586,31 @@ inline void CondVar::wait(LockGuard& l) noexcept
 template <class Func>
 inline void CondVar::wait(RobustMutex& m, Func recover_func, const struct timespec* tp)
 {
+#ifdef _WIN32
+    if (m_semaphore) {
+        // CondVar was created with process_shared_tag
+        m.unlock();
+        m_waiting++;
+        m.lock(recover_func);
+
+        timeval tp2;
+        gettimeofday(&tp2, nullptr);
+        int64_t wait_milliseconds = (((tp->tv_sec - tp2.tv_sec) * 1000000) +
+            (tp->tv_nsec / 1000 - tp2.tv_usec)) / 1000;
+
+        if (wait_milliseconds < 0)
+            wait_milliseconds = 0;
+
+        DWORD ret = WaitForSingleObject(m_semaphore, DWORD(wait_milliseconds));
+        if (ret == WAIT_TIMEOUT) {
+            return;
+        }
+        else {
+            return;
+        }
+    }
+#endif
+
     int r;
 
     if (!tp) {

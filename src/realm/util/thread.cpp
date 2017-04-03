@@ -276,6 +276,14 @@ void RobustMutex::mark_as_consistent() noexcept
 CondVar::CondVar(process_shared_tag)
 {
 #ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
+#ifdef _WIN32
+    // Create named semaphore with random string as name. Length is 33 chars + 1 zero termination
+    char name[33 + 1];
+    GUID guid;
+    CoCreateGuid(&guid);
+    sprintf_s(name, sizeof(name), "Global\\%08X%04X%04X%02X%02X%02X%02X%02X", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4]);
+    m_semaphore = CreateSemaphoreA(nullptr, 0, LONG_MAX, name);
+#else
     pthread_condattr_t attr;
     int r = pthread_condattr_init(&attr);
     if (REALM_UNLIKELY(r != 0))
@@ -287,7 +295,8 @@ CondVar::CondVar(process_shared_tag)
     REALM_ASSERT(r2 == 0);
     if (REALM_UNLIKELY(r != 0))
         init_failed(r);
-#else // !REALM_HAVE_PTHREAD_PROCESS_SHARED
+#endif
+#else
     throw std::runtime_error("No support for process-shared condition variables");
 #endif
 }

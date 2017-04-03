@@ -28,13 +28,14 @@
 #ifndef _WIN32
 #include <unistd.h>
 #include <sys/time.h>
+#include <realm/utilities.hpp> // gettimeofday()
 #endif
 
 #include <realm/group_shared_options.hpp>
 #include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
-#ifndef _WIN32
+#if 1//ndef _WIN32
 #include <realm/util/interprocess_condvar.hpp>
 #endif
 #include <realm/util/interprocess_mutex.hpp>
@@ -529,7 +530,7 @@ TEST(Thread_CondVar)
     }
 }
 
-#ifndef _WIN32 // interprocess condvars not suported in Windows yet
+#if 1 //ndef _WIN32 // interprocess condvars not suported in Windows yet
 
 // Detect and flag trivial implementations of condvars.
 namespace {
@@ -664,7 +665,7 @@ NONCONCURRENT_TEST(Thread_CondvarIsStateless)
 
 
 // this test hangs, if timeout doesn't work.
-NONCONCURRENT_TEST(Thread_CondvarTimeout)
+ONLY(Thread_CondvarTimeout)
 {
     InterprocessMutex mutex;
     InterprocessMutex::SharedPart mutex_part;
