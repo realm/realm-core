@@ -18,7 +18,6 @@ timeout(time: 5, unit: 'HOURS') {
             gitTag = readGitTag()
             gitSha = sh(returnStdout: true, script: 'git rev-parse HEAD').trim().take(8)
             gitDescribeVersion = sh(returnStdout: true, script: 'git describe --tags').trim()
-            version = gitTag ? "${dependencies.VERSION}-g${gitSha}" : dependencies.VERSION
 
             echo "Git tag: ${gitTag ?: 'none'}"
             if (!gitTag) {
