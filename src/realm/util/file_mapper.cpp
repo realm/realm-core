@@ -18,12 +18,15 @@
 
 #include <realm/util/features.h>
 
-#ifndef _WIN32
-
 #include <realm/util/file_mapper.hpp>
 
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <cerrno>
 #include <sys/mman.h>
+#include <unistd.h>
+#endif
 
 #include <realm/util/errno.hpp>
 #include <realm/util/to_string.hpp>
@@ -37,10 +40,10 @@
 #include <memory>
 #include <csignal>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <cstring>
 #include <atomic>
 
+#include <realm/util/file.hpp>
 #include <realm/util/errno.hpp>
 #include <realm/util/shared_ptr.hpp>
 #include <realm/util/terminate.hpp>
@@ -78,8 +81,12 @@ namespace util {
 
 // A list of all of the active encrypted mappings for a single file
 struct mappings_for_file {
+#ifdef _WIN32
+    HANDLE handle;
+#else
     dev_t device;
     ino_t inode;
+#endif
     SharedPtr<SharedFileInfo> info;
 };
 
@@ -109,24 +116,33 @@ mapping_and_addr* find_mapping_for_addr(void* addr, size_t size)
     return 0;
 }
 
-EncryptedFileMapping* add_mapping(void* addr, size_t size, int fd, size_t file_offset, File::AccessMode access,
+EncryptedFileMapping* add_mapping(void* addr, size_t size, FileDesc fd, size_t file_offset, File::AccessMode access,
                                   const char* encryption_key)
 {
+#ifndef _WIN32
     struct stat st;
+
     if (fstat(fd, &st)) {
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("fstat() failed: ", err));
     }
+#endif        
 
-    if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size())
+    size_t fs = to_size_t(File::get_size_static(fd));
+    if (fs > 0 && fs < page_size())
         throw DecryptionFailed();
 
     LockGuard lock(mapping_mutex);
 
     std::vector<mappings_for_file>::iterator it;
     for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
+#ifdef _WIN32
+        if (File::is_same_file_static(it->handle, fd))
+            break;
+#else
         if (it->inode == st.st_ino && it->device == st.st_dev)
             break;
+#endif
     }
 
     // Get the potential memory allocation out of the way so that mappings_by_addr.push_back can't throw
@@ -135,20 +151,38 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, int fd, size_t file_o
     if (it == mappings_by_file.end()) {
         mappings_by_file.reserve(mappings_by_file.size() + 1);
 
+#ifdef _WIN32 
+        FileDesc fd2;
+        if (!DuplicateHandle(GetCurrentProcess(), fd, GetCurrentProcess(), &fd2, 0, FALSE, DUPLICATE_SAME_ACCESS))
+            throw std::runtime_error(get_errno_msg("DuplicateHandle() failed: ", GetLastError()));
+        fd = fd2;
+#else
         fd = dup(fd);
+      
         if (fd == -1) {
             int err = errno; // Eliminate any risk of clobbering
             throw std::runtime_error(get_errno_msg("dup() failed: ", err));
         }
-
+#endif
         mappings_for_file f;
+
+#ifdef _WIN32
+        f.handle = fd;
+#else
         f.device = st.st_dev;
         f.inode = st.st_ino;
+#endif        
+        
         try {
             f.info = new SharedFileInfo(reinterpret_cast<const uint8_t*>(encryption_key), fd);
+
         }
         catch (...) {
+#ifdef _WIN32
+            CloseHandle(fd);
+#else
             ::close(fd);
+#endif
             throw;
         }
 
@@ -167,7 +201,11 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, int fd, size_t file_o
     }
     catch (...) {
         if (it->info->mappings.empty()) {
+#ifdef _WIN32
+            CloseHandle(it->info->fd);
+#else
             ::close(it->info->fd);
+#endif            
             mappings_by_file.erase(it);
         }
         throw;
@@ -186,11 +224,17 @@ void remove_mapping(void* addr, size_t size)
 
     for (std::vector<mappings_for_file>::iterator it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->info->mappings.empty()) {
+#ifdef _WIN32
+            if(!CloseHandle(it->info->fd))
+                throw std::runtime_error(get_errno_msg("CloseHandle() failed: ", GetLastError()));
+        
+#else
             if (::close(it->info->fd) != 0) {
                 int err = errno;                // Eliminate any risk of clobbering
                 if (err == EBADF || err == EIO) // FIXME: how do we handle EINTR?
                     throw std::runtime_error(get_errno_msg("close() failed: ", err));
-            }
+        }
+#endif      
             mappings_by_file.erase(it);
             break;
         }
@@ -199,6 +243,17 @@ void remove_mapping(void* addr, size_t size)
 
 void* mmap_anon(size_t size)
 {
+#ifdef _WIN32
+    HANDLE hMapFile;
+    LPCTSTR pBuf;
+
+    hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, size, nullptr);
+    pBuf = (LPTSTR)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, size);
+    if(pBuf == nullptr)
+        throw std::runtime_error(get_errno_msg("MapViewOfFile() failed: ", GetLastError()));
+
+    return (void*)pBuf;
+#else
     void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
     if (addr == MAP_FAILED) {
         int err = errno; // Eliminate any risk of clobbering
@@ -209,6 +264,7 @@ void* mmap_anon(size_t size)
                                  "offset is 0");
     }
     return addr;
+#endif
 }
 
 size_t round_up_to_page_size(size_t size) noexcept
@@ -216,7 +272,7 @@ size_t round_up_to_page_size(size_t size) noexcept
     return (size + page_size() - 1) & ~(page_size() - 1);
 }
 
-void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key,
+void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key,
            EncryptedFileMapping*& mapping)
 {
     if (encryption_key) {
@@ -234,7 +290,7 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
 #endif // enable encryption
 
 
-void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key)
+void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key)
 {
 #if REALM_ENABLE_ENCRYPTION
     if (encryption_key) {
@@ -248,69 +304,124 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
     REALM_ASSERT(!encryption_key);
 #endif
     {
+
+#ifndef _WIN32        
         int prot = PROT_READ;
         switch (access) {
-            case File::access_ReadWrite:
-                prot |= PROT_WRITE;
-                break;
-            case File::access_ReadOnly:
-                break;
+        case File::access_ReadWrite:
+            prot |= PROT_WRITE;
+            break;
+        case File::access_ReadOnly:
+            break;
         }
 
         void* addr = ::mmap(nullptr, size, prot, MAP_SHARED, fd, offset);
         if (addr != MAP_FAILED)
             return addr;
-    }
 
-    int err = errno; // Eliminate any risk of clobbering
-    if (is_mmap_memory_error(err)) {
-        throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err) + " size: " + util::to_string(size) +
-                                    " offset: " + util::to_string(offset));
+        int err = errno; // Eliminate any risk of clobbering
+        if (is_mmap_memory_error(err)) {
+            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err) + " size: " + util::to_string(size) +
+                " offset: " + util::to_string(offset));
+        }
+
+        throw std::runtime_error(get_errno_msg("mmap() failed: ", err) + "size: " + util::to_string(size) + "offset: " +
+            util::to_string(offset));
+
+#else
+        // FIXME: Is there anything that we must do on Windows to honor map_NoSync?
+
+        DWORD protect = PAGE_READONLY;
+        DWORD desired_access = FILE_MAP_READ;
+        switch (access) {
+        case File::access_ReadOnly:
+            break;
+        case File::access_ReadWrite:
+            protect = PAGE_READWRITE;
+            desired_access = FILE_MAP_WRITE;
+            break;
+        }
+        LARGE_INTEGER large_int;
+        if (int_cast_with_overflow_detect(offset + size, large_int.QuadPart))
+            throw std::runtime_error("Map size is too large");
+        HANDLE map_handle = CreateFileMappingFromApp(fd, 0, protect, offset + size, nullptr);
+        if (!map_handle)
+            throw std::runtime_error("CreateFileMapping() failed");
+
+        if (int_cast_with_overflow_detect(offset, large_int.QuadPart))
+            throw std::runtime_error("Map offset is too large");
+
+        SIZE_T _size = size;
+        void* addr = MapViewOfFileFromApp(map_handle, desired_access, offset, _size);
+        BOOL r = CloseHandle(map_handle);
+        REALM_ASSERT_RELEASE(r);
+        if (!addr)
+            throw std::runtime_error("MapViewOfFile() failed");
+
+        return addr;
+#endif
     }
-    throw std::runtime_error(get_errno_msg("mmap() failed: ", err) + "size: " + util::to_string(size) + "offset: " +
-                             util::to_string(offset));
 }
 
+#ifdef _MSC_VER
+#pragma warning (disable: 4297) // throw in noexcept
+#endif
 void munmap(void* addr, size_t size) noexcept
 {
 #if REALM_ENABLE_ENCRYPTION
     remove_mapping(addr, size);
 #endif
+
+#ifdef _WIN32
+    if (!UnmapViewOfFile(addr))
+        throw std::runtime_error(get_errno_msg("UnmapViewOfFile failed: ", GetLastError()));
+
+#else
     if (::munmap(addr, size) != 0) {
         int err = errno;
         throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
     }
+#endif
 }
+#ifdef _MSC_VER
+#pragma warning (default: 4297)
+#endif
 
-void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a,
-             size_t new_size, const char* encryption_key)
+void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size, const char* encryption_key)
 {
 #if REALM_ENABLE_ENCRYPTION
-    if (encryption_key) {
-        LockGuard lock(mapping_mutex);
-        size_t rounded_old_size = round_up_to_page_size(old_size);
-        if (mapping_and_addr* m = find_mapping_for_addr(old_addr, rounded_old_size)) {
-            size_t rounded_new_size = round_up_to_page_size(new_size);
-            if (rounded_old_size == rounded_new_size)
-                return old_addr;
+	if (encryption_key) {
+		LockGuard lock(mapping_mutex);
+		size_t rounded_old_size = round_up_to_page_size(old_size);
+		if (mapping_and_addr* m = find_mapping_for_addr(old_addr, rounded_old_size)) {
+			size_t rounded_new_size = round_up_to_page_size(new_size);
+			if (rounded_old_size == rounded_new_size)
+				return old_addr;
 
-            void* new_addr = mmap_anon(rounded_new_size);
-            m->mapping->set(new_addr, rounded_new_size, file_offset);
-            int i = ::munmap(old_addr, rounded_old_size);
-            m->addr = new_addr;
-            m->size = rounded_new_size;
-            if (i != 0) {
-                int err = errno;
-                throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
-            }
-            return new_addr;
-        }
-        // If we are using encryption, we must have used mmap and the mapping
-        // must have been added to the cache therefore find_mapping_for_addr()
-        // will succeed. Otherwise we would continue to mmap it below without
-        // the encryption key which is an error.
-        REALM_UNREACHABLE();
-    }
+			void* new_addr = mmap_anon(rounded_new_size);
+			m->mapping->set(new_addr, rounded_new_size, file_offset);
+
+#ifdef _WIN32
+			if (!UnmapViewOfFile(old_addr))
+				throw std::runtime_error(get_errno_msg("UnmapViewOfFile failed: ", GetLastError()));
+#else
+			int i = ::munmap(old_addr, rounded_old_size);
+
+			m->addr = new_addr;
+			m->size = rounded_new_size;
+			if (i != 0) {
+				int err = errno;
+				throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+			}
+#endif
+			return new_addr;
+		}
+		// If we are using encryption, we must have used mmap and the mapping
+		// must have been added to the cache therefore find_mapping_for_addr()
+		// will succeed. Otherwise we would continue to mmap it below without
+		// the encryption key which is an error.
+		REALM_UNREACHABLE();
+	}
 #else
     static_cast<void>(encryption_key);
 #endif
@@ -336,10 +447,16 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::
 #endif
 
     void* new_addr = mmap(fd, new_size, a, file_offset, nullptr);
+
+#ifdef _WIN32
+    UnmapViewOfFile(old_addr);
+#else
     if (::munmap(old_addr, old_size) != 0) {
         int err = errno;
         throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
     }
+#endif
+    
     return new_addr;
 }
 
@@ -368,12 +485,15 @@ void msync(void* addr, size_t size)
     // See also
     // https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/CoreData/Articles/cdPersistentStores.html
     // for a discussion of this related to core data.
+
+#ifdef _WIN32
+    
+#else
     if (::msync(addr, size, MS_SYNC) != 0) {
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("msync() failed: ", err));
     }
+#endif
 }
 }
 }
-
-#endif // _WIN32
