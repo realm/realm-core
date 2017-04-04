@@ -84,7 +84,7 @@ Schema make_schema()
 
 }
 
-#pragma mark - Sync metadata manager
+// MARK: - Sync metadata manager
 
 SyncMetadataManager::SyncMetadataManager(std::string path,
                                          bool should_encrypt,
@@ -172,7 +172,7 @@ SyncFileActionMetadataResults SyncMetadataManager::all_pending_actions() const
     return SyncFileActionMetadataResults(std::move(results), std::move(realm), m_file_action_schema);
 }
 
-#pragma mark - Sync user metadata
+// MARK: - Sync user metadata
 
 SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, RowExpr row)
 : m_invalid(row.get_bool(schema.idx_marked_for_removal))
@@ -304,7 +304,7 @@ void SyncUserMetadata::remove()
     m_realm = nullptr;
 }
 
-#pragma mark - File action metadata
+// MARK: - File action metadata
 
 util::Optional<SyncFileActionMetadata> SyncFileActionMetadata::metadata_for_path(const std::string& original_name, const SyncMetadataManager& manager)
 {
