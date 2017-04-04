@@ -28,7 +28,7 @@
 #include <realm/lang_bind_helper.hpp>
 #include <realm/column.hpp>
 #include <realm/history.hpp>
-#include <realm/query_engine.hpp>
+#include <realm/query_expression.hpp>
 
 #include "test.hpp"
 #include "test_table_helper.hpp"

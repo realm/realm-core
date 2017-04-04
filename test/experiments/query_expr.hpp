@@ -22,7 +22,6 @@
 #include <ostream>
 
 #include <realm/util/assert.hpp>
-#include <realm/util/meta.hpp>
 #include <realm/util/tuple.hpp>
 
 
