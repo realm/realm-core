@@ -26,9 +26,8 @@ namespace {
 
 static NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFlags flags)
 {
-    if (!(flags & kSCNetworkReachabilityFlagsReachable)) {
+    if (!(flags & kSCNetworkReachabilityFlagsReachable))
         return NotReachable;
-    }
 
     NetworkReachabilityStatus status = NotReachable;
 
