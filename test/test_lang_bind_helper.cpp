@@ -10479,7 +10479,7 @@ TEST(Query_ListOfPrimitivesHandover)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroup sg(*hist);
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     auto& group = sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
