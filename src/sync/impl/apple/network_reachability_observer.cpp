@@ -29,16 +29,14 @@ static NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabi
     if (!(flags & kSCNetworkReachabilityFlagsReachable))
         return NotReachable;
 
-    NetworkReachabilityStatus status = NotReachable;
-
-    if (!(flags & kSCNetworkReachabilityFlagsConnectionRequired)) {
-        status = ReachableViaWiFi;
+    if (flags & kSCNetworkReachabilityFlagsConnectionRequired) {
+        if (!(flags & kSCNetworkReachabilityFlagsConnectionOnTraffic) ||
+            (flags & kSCNetworkReachabilityFlagsInterventionRequired)) {
+            return NotReachable;
+        }
     }
 
-    if ((flags & kSCNetworkReachabilityFlagsConnectionOnTraffic) &&
-        !(flags & kSCNetworkReachabilityFlagsInterventionRequired)) {
-        status = ReachableViaWiFi;
-    }
+    NetworkReachabilityStatus status = ReachableViaWiFi;
 
 #if TARGET_OS_IPHONE
     if (flags & kSCNetworkReachabilityFlagsIsWWAN) {
