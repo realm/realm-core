@@ -1392,6 +1392,35 @@ TEST(Table_MoveAllTypes)
     }
 }
 
+TEST(Table_SubtableNull)
+{
+    Table parent;
+
+    {
+        DescriptorRef subdescr;
+        parent.add_column(type_Table, "integers", true, &subdescr);
+        subdescr->add_column(type_Int, "list");
+    }
+
+    parent.add_empty_row(2);
+    CHECK(parent.is_null(0, 0));
+    parent.get_subtable(0, 0)->add_empty_row(0);
+    TableRef table = parent.get_subtable(0, 1); // Preserve accessor
+    CHECK(table->is_attached());
+    CHECK(table->is_degenerate());
+    table->add_empty_row(0);
+    CHECK(!table->is_degenerate());
+    CHECK(!parent.is_null(0, 0));
+    CHECK(!parent.is_null(0, 1));
+    CHECK(table->is_attached());
+    parent.set_null(0, 0);
+    parent.set_null(0, 1);
+    CHECK(parent.is_null(0, 0));
+    CHECK(parent.is_null(0, 1));
+    CHECK(table->is_attached());
+    CHECK(table->is_degenerate());
+}
+
 
 TEST(Table_DegenerateSubtableSearchAndAggregate)
 {
