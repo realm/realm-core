@@ -330,8 +330,7 @@ void SubtableColumn::set(size_t row_ndx, const Table* subtable)
     if (subtable && !subtable->is_empty())
         columns_ref = clone_table_columns(subtable); // Throws
 
-    int_fast64_t value = int_fast64_t(columns_ref);
-    IntegerColumn::set(row_ndx, value); // Throws
+    set_as_ref(row_ndx, columns_ref); // Throws
 
     // Refresh the accessors, if present
     if (Table* table = m_subtable_map.find(row_ndx)) {
@@ -363,7 +362,7 @@ void SubtableColumn::set_null(size_t row_ndx)
 {
     REALM_ASSERT_DEBUG(row_ndx < size());
     destroy_subtable(row_ndx);
-    SubtableColumnBase::set(row_ndx, 0); // Throws
+    set_as_ref(row_ndx, 0); // Throws
     m_subtable_map.adj_set_null(row_ndx);
 }
 

@@ -64,7 +64,7 @@ public:
     }
     bool is_null(size_t ndx) const noexcept override
     {
-        return get(ndx) == 0;
+        return get_as_ref(ndx) == 0;
     }
 
     void verify() const override;
@@ -518,7 +518,7 @@ inline SubtableColumnBase::SubtableColumnBase(Allocator& alloc, ref_type ref, Ta
 
 inline void SubtableColumnBase::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
-    set(child_ndx, new_ref);
+    set_as_ref(child_ndx, new_ref);
 }
 
 inline ref_type SubtableColumnBase::get_child_ref(size_t child_ndx) const noexcept
