@@ -112,6 +112,10 @@ void NetworkReachabilityObserver::stop_observing()
 {
     SCNetworkReachabilitySetDispatchQueue(m_reachability_ref.get(), nullptr);
     SCNetworkReachabilitySetCallback(m_reachability_ref.get(), nullptr, nullptr);
+    
+    // Wait for all previously-enqueued blocks to execute to guarantee that
+    // no callback will be called after returning from this method
+    dispatch_sync(m_callback_queue, ^{});
 }
 
 void NetworkReachabilityObserver::reachability_changed()
