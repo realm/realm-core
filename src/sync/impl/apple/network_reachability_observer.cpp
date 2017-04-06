@@ -18,7 +18,7 @@
 
 #include "sync/impl/apple/network_reachability_observer.hpp"
 
-#if !TARGET_OS_WATCH
+#if NETWORK_REACHABILITY_AVAILABLE
 
 using namespace realm;
 

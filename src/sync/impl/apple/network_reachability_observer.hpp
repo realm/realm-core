@@ -25,7 +25,9 @@
 #include <realm/util/cf_ptr.hpp>
 #include <realm/util/optional.hpp>
 
-#if !TARGET_OS_WATCH
+#include "sync/impl/network_reachability.hpp"
+
+#if NETWORK_REACHABILITY_AVAILABLE
 
 #include <SystemConfiguration/SystemConfiguration.h>
 
