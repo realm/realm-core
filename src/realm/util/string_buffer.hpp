@@ -36,6 +36,7 @@ namespace util {
 class StringBuffer {
 public:
     StringBuffer() noexcept;
+    StringBuffer(StringBuffer&&) noexcept = default;
     ~StringBuffer() noexcept
     {
     }
