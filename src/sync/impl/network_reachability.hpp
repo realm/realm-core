@@ -27,6 +27,10 @@
 #include "sync/impl/apple/network_reachability_observer.hpp"
 #endif
 
+#else
+
+#define NETWORK_REACHABILITY_AVAILABLE 0
+
 #endif // REALM_PLATFORM_APPLE
 
 #endif // REALM_OS_NETWORK_REACHABILITY_HPP
