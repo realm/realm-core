@@ -31,9 +31,8 @@ static NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabi
 
     if (flags & kSCNetworkReachabilityFlagsConnectionRequired) {
         if (!(flags & kSCNetworkReachabilityFlagsConnectionOnTraffic) ||
-            (flags & kSCNetworkReachabilityFlagsInterventionRequired)) {
+            (flags & kSCNetworkReachabilityFlagsInterventionRequired))
             return NotReachable;
-        }
     }
 
     NetworkReachabilityStatus status = ReachableViaWiFi;
