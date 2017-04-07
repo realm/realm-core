@@ -224,7 +224,7 @@ inline Spec* Spec::get_subtable_spec(size_t column_ndx) noexcept
 
 inline const Spec* Spec::get_subtable_spec(size_t column_ndx) const noexcept
 {
-    return get_subtable_spec(column_ndx);
+    return const_cast<Spec*>(this)->get_subtable_spec(column_ndx);
 }
 
 inline const Spec* Spec::get_subspec_by_ndx(size_t subspec_ndx) const noexcept

@@ -831,7 +831,7 @@ public:
     /// where it takes up a minimal amout of space. This function returns true
     /// if, and only if the table accessor is attached to such a subtable. This
     /// function is mainly intended for debugging purposes.
-    bool is_degenerate() const noexcept;
+    bool is_degenerate() const;
 
     // Debug
     void verify() const;
@@ -2029,7 +2029,7 @@ inline bool Table::operator!=(const Table& t) const
     return !(*this == t); // Throws
 }
 
-inline bool Table::is_degenerate() const noexcept
+inline bool Table::is_degenerate() const
 {
     if (!is_attached()) {
         throw LogicError{LogicError::detached_accessor};
