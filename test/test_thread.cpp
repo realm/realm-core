@@ -529,6 +529,115 @@ TEST(Thread_CondVar)
     }
 }
 
+TEST(Thread_MutexTryLock)
+{
+    Thread thread;
+    Mutex base_mutex;
+    std::unique_lock<Mutex> m(base_mutex, std::defer_lock);
+
+    // basic same thread try_lock
+    CHECK(m.try_lock());
+    CHECK(m.owns_lock());
+    CHECK_THROW(m.try_lock(), std::system_error); // already locked: Resource deadlock avoided
+    m.unlock();
+
+    bool init_done = false;
+    auto do_async = [&]() {
+        std::unique_lock<Mutex> mutex2(base_mutex, std::defer_lock);
+        CHECK(!mutex2.owns_lock());
+        CHECK(!mutex2.try_lock());
+        init_done = true;
+        while(!mutex2.try_lock()) { millisleep(1); }
+        CHECK(mutex2.owns_lock());
+        mutex2.unlock();
+    };
+
+    // Check basic locking across threads.
+    CHECK(!m.owns_lock());
+    CHECK(m.try_lock());
+    CHECK(m.owns_lock());
+    thread.start(do_async);
+    while (!init_done) { millisleep(1); }
+    m.unlock();
+    thread.join();
+}
+
+TEST(Thread_RobustMutexTryLock)
+{
+    // Abort if robust mutexes are not supported on the current
+    // platform. Otherwise we would probably get into a dead-lock.
+    if (!RobustMutex::is_robust_on_this_platform())
+        return;
+
+    Thread thread;
+    RobustMutex m;
+    int times_recover_function_was_called = 0;
+
+    auto recover_function = [&]() {
+        ++times_recover_function_was_called;
+    };
+    // basic same thread try_lock
+    CHECK(m.try_lock(recover_function));
+    CHECK(!m.try_lock(recover_function));
+    m.unlock();
+    CHECK(times_recover_function_was_called == 0);
+
+    bool init_done = false;
+    auto do_async = [&]() {
+        CHECK(!m.try_lock(recover_function));
+        init_done = true;
+        while(!m.try_lock(recover_function)) { millisleep(1); }
+        // exit the thread with the lock held to check robustness
+    };
+
+    // Check basic locking across threads.
+    CHECK(m.try_lock(recover_function));
+    thread.start(do_async);
+    while (!init_done) { millisleep(1); }
+    m.unlock();
+    thread.join();
+    CHECK(times_recover_function_was_called == 0);
+    // at this point the thread that obtained the mutex is dead with the lock
+    CHECK(m.try_lock(recover_function));
+    CHECK(times_recover_function_was_called == 1);
+    m.unlock();
+}
+
+TEST(Thread_InterprocessMutexTryLock)
+{
+    Thread thread;
+    InterprocessMutex::SharedPart mutex_part;
+
+    InterprocessMutex m;
+    std::string mutex_file_name = "Test_Thread_InterprocessMutexTryLock";
+    m.set_shared_part(mutex_part, "", mutex_file_name);
+
+    // basic same thread try_lock
+    CHECK(m.try_lock());
+    CHECK(!m.try_lock()); // already locked but shouldn't deadlock
+    m.unlock();
+
+    bool init_done = false;
+    auto do_async = [&]() {
+        InterprocessMutex m2;
+        m2.set_shared_part(mutex_part, "", mutex_file_name);
+
+        CHECK(!m2.try_lock());
+        init_done = true;
+        while(!m2.try_lock()) { millisleep(1); }
+        m2.unlock();
+    };
+
+    // Check basic locking across threads.
+    CHECK(m.try_lock());
+    thread.start(do_async);
+    while (!init_done) { millisleep(1); }
+    m.unlock();
+    thread.join();
+    m.release_shared_part();
+}
+
+
 #ifndef _WIN32 // interprocess condvars not suported in Windows yet
 
 // Detect and flag trivial implementations of condvars.
