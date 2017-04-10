@@ -603,14 +603,15 @@ TEST(Thread_RobustMutexTryLock)
     m.unlock();
 }
 
-TEST(Thread_InterprocessMutexTryLock)
+NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
 {
     Thread thread;
     InterprocessMutex::SharedPart mutex_part;
 
     InterprocessMutex m;
+    TEST_PATH(path);
     std::string mutex_file_name = "Test_Thread_InterprocessMutexTryLock";
-    m.set_shared_part(mutex_part, "", mutex_file_name);
+    m.set_shared_part(mutex_part, path, mutex_file_name);
 
     // basic same thread try_lock
     CHECK(m.try_lock());
