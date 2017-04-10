@@ -251,7 +251,7 @@ public:
     /// function always returns 0 or 1. Otherwise it returns -1 if,
     /// and only if a thread has died while holding a lock.
     ///
-    /// Returns 1 if the lock is succesfully optained.
+    /// Returns 1 if the lock is succesfully obtained.
     /// Returns 0 if the lock is held by somebody else (not obtained)
     /// Returns -1 if a thread has died while holding a lock.
     ///
@@ -558,7 +558,7 @@ inline void RobustMutex::lock(Func recover_func)
         mark_as_consistent();
         // If we get this far, the protected memory has been
         // brought back into a consistent state, and the mutex has
-        // been notified aboit this. This means that we can safely
+        // been notified about this. This means that we can safely
         // enter the applications critical section.
     }
     catch (...) {
