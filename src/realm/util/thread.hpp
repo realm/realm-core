@@ -130,6 +130,7 @@ public:
     friend class UniqueLock;
 
     void lock() noexcept;
+    bool try_lock() noexcept;
     void unlock() noexcept;
 
 protected:
@@ -455,6 +456,18 @@ inline void Mutex::lock() noexcept
     lock_failed(r);
 }
 
+inline bool Mutex::try_lock() noexcept
+{
+    int r = pthread_mutex_trylock(&m_impl);
+    if (r == EBUSY) {
+        return false;
+    }
+    else if (r == 0) {
+        return true;
+    }
+    lock_failed(r);
+}
+
 inline void Mutex::unlock() noexcept
 {
     int r = pthread_mutex_unlock(&m_impl);
@@ -561,7 +574,7 @@ inline void RobustMutex::lock(Func recover_func)
 template <class Func>
 inline bool RobustMutex::try_lock(Func recover_func)
 {
-    int lock_result = low_level_lock(); // Throws
+    int lock_result = try_low_level_lock(); // Throws
     if (lock_result == 0) return false;
     bool no_thread_has_died = lock_result == 1;
     if (REALM_LIKELY(no_thread_has_died))
