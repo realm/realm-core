@@ -1847,13 +1847,10 @@ bool SharedGroup::do_try_begin_write()
     // the write mutex. For this case we are trivially fair and can ignore the
     // fairness machinery.
     bool got_the_lock = m_writemutex.try_lock();
-    if (!got_the_lock) {
-        return false;
-    }
-    else {
+    if (got_the_lock) {
         finish_begin_write();
-        return true;
     }
+    return got_the_lock;
 }
 
 
