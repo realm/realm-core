@@ -606,10 +606,8 @@ private:
     void do_begin_read(VersionID, bool writable);
     void do_end_read() noexcept;
     /// return true if write transaction can commence, false otherwise.
-    /// If must_wait is set, block if another transaction is in progress, return true.
-    /// If must_wait is clear, don't block and only return true
-    /// if there is no conflicting transaction.
-    bool do_begin_write(bool must_wait = true);
+    bool do_try_begin_write();
+    void do_begin_write();
     version_type do_commit();
     void do_end_write() noexcept;
 
@@ -657,6 +655,9 @@ private:
     _impl::History* get_history();
 
     int get_file_format_version() const noexcept;
+
+    /// finish up the process of starting a write transaction. Internal use only.
+    void finish_begin_write();
 
     friend class _impl::SharedGroupFriend;
 };
