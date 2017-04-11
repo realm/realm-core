@@ -38,7 +38,6 @@
 #include <realm/util/assert.hpp>
 #include <realm/util/terminate.hpp>
 #include <memory>
-#include <realm/util/meta.hpp>
 
 #include <atomic>
 
