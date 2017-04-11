@@ -14,6 +14,8 @@
 
 * New file system utility functions: `util::remove_dir_recursive()` and
   `util::File::for_each()`.
+* Made case insensitive queries use the new index based case insensitive search.
+  PR [#2486](https://github.com/realm/realm-core/pull/2486)
 
 -----------
 

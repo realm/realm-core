@@ -5449,20 +5449,34 @@ TEST(Query_Enums)
 #define ua "\x0c3\x0a5"       // danish lower case a with ring above (as in blaabaergroed)
 #define uad "\x061\x0cc\x08a" // decomposed form (a (41) followed by ring)
 
-TEST(Query_CaseSensitivity)
+TEST_TYPES(Query_CaseSensitivity, std::true_type, std::false_type)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     TestTable ttt;
     ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    ttt.add_column(type_String, "2", nullable);
 
     add(ttt, 1, "BLAAbaergroed");
     add(ttt, 1, "BLAAbaergroedandMORE");
-    add(ttt, 1, "BLAAbaergroed2");
+    add(ttt, 1, "BLAAbaergroedZ");
+    add(ttt, 1, "BLAAbaergroedZ");
+    add(ttt, 1, "BLAAbaergroedZ");
 
     Query q1 = ttt.where().equal(1, "blaabaerGROED", false);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
+
+    Query q2 = ttt.where().equal(1, "blaabaerGROEDz", false);
+    TableView tv2 = q2.find_all();
+    CHECK_EQUAL(3, tv2.size());
+
+    ttt.add_search_index(1);
+
+    Query q3 = ttt.where().equal(1, "blaabaerGROEDz", false);
+    TableView tv3 = q3.find_all();
+    CHECK_EQUAL(3, tv3.size());
 }
 
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
