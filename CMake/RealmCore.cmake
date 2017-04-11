@@ -35,27 +35,22 @@ endforeach()
 if(APPLE)
     find_library(FOUNDATION_FRAMEWORK Foundation)
     find_library(SECURITY_FRAMEWORK Security)
-    find_library(SYSTEM_CONFIGURATION_FRAMEWORK SystemConfiguration)
 
     set(CRYPTO_LIBRARIES "")
     set(SSL_LIBRARIES ${FOUNDATION_FRAMEWORK} ${SECURITY_FRAMEWORK})
-    set(REACHABILITY_LIBRARIES ${SYSTEM_CONFIGURATION_FRAMEWORK})
 elseif(REALM_PLATFORM STREQUAL "Android")
     # The Android core and sync libraries include the necessary portions of OpenSSL.
     set(CRYPTO_LIBRARIES "")
     set(SSL_LIBRARIES "")
-    set(REACHABILITY_LIBRARIES "")
 elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     # Windows doesn't do crypto right now, but that is subject to change
     set(CRYPTO_LIBRARIES "")
     set(SSL_LIBRARIES "")
-    set(REACHABILITY_LIBRARIES "")
 else()
     find_package(OpenSSL REQUIRED)
 
     set(CRYPTO_LIBRARIES OpenSSL::Crypto)
     set(SSL_LIBRARIES OpenSSL::SSL)
-    set(REACHABILITY_LIBRARIES "")
 endif()
 
 
@@ -374,7 +369,7 @@ macro(build_realm_sync)
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION_RELEASE ${sync_library_release})
     set_property(TARGET realm-sync PROPERTY IMPORTED_LOCATION ${sync_library_release})
 
-    set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES} ${REACHABILITY_LIBRARIES})
+    set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES})
 
     # Sync server library is built as part of the sync library build
     set(sync_server_library_debug ${sync_library_directory}/librealm-server${platform}-dbg.a)
