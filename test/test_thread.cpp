@@ -621,7 +621,7 @@ NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
     bool init_done = false;
     auto do_async = [&]() {
         InterprocessMutex m2;
-        m2.set_shared_part(mutex_part, "", mutex_file_name);
+        m2.set_shared_part(mutex_part, path, mutex_file_name);
 
         CHECK(!m2.try_lock());
         init_done = true;
