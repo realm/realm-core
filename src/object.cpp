@@ -62,7 +62,7 @@ Object::Object(Object&&) = default;
 Object& Object::operator=(Object const&) = default;
 Object& Object::operator=(Object&&) = default;
 
-NotificationToken Object::add_notification_block(CollectionChangeCallback callback) &
+NotificationToken Object::add_notification_callback(CollectionChangeCallback callback) &
 {
     if (!m_notifier)
         m_notifier = std::make_shared<_impl::ObjectNotifier>(m_row, m_realm);

@@ -29,88 +29,11 @@
 #include "schema.hpp"
 
 #include "impl/realm_coordinator.hpp"
+#include "impl/object_accessor_impl.hpp"
 
 #include <realm/group_shared.hpp>
 
 using namespace realm;
-
-namespace {
-using AnyDict = std::map<std::string, util::Any>;
-using AnyVec = std::vector<util::Any>;
-using Defaults = std::map<std::string, AnyDict>;
-}
-
-namespace realm {
-template<>
-class NativeAccessor<util::Any, Defaults*> {
-public:
-    static bool dict_has_value_for_key(Defaults*, util::Any dict, const std::string &prop_name)
-    {
-        return any_cast<AnyDict>(dict).count(prop_name) != 0;
-    }
-
-    static util::Any dict_value_for_key(Defaults*, util::Any dict, const std::string &prop_name)
-    {
-        return any_cast<AnyDict>(dict).at(prop_name);
-    }
-
-    static size_t list_size(Defaults*, util::Any& v) { return any_cast<AnyVec>(v).size(); }
-    static util::Any list_value_at_index(Defaults*, util::Any& v, size_t index)
-    {
-        return any_cast<AnyVec>(v)[index];
-    }
-
-    static bool has_default_value_for_property(Defaults* def, Realm*, ObjectSchema const& object, std::string const& prop)
-    {
-        auto it = def->find(object.name);
-        if (it != def->end())
-            return it->second.count(prop);
-        return false;
-    }
-
-    static util::Any default_value_for_property(Defaults* def, Realm*, ObjectSchema const& object, std::string const& prop)
-    {
-        return def->at(object.name).at(prop);
-    }
-
-    static Timestamp to_timestamp(Defaults*, util::Any& v) { return any_cast<Timestamp>(v); }
-    static bool to_bool(Defaults*, util::Any& v) { return any_cast<bool>(v); }
-    static double to_double(Defaults*, util::Any& v) { return any_cast<double>(v); }
-    static float to_float(Defaults*, util::Any& v) { return any_cast<float>(v); }
-    static long long to_long(Defaults*, util::Any& v) { return any_cast<long long>(v); }
-    static std::string to_binary(Defaults*, util::Any& v) { return any_cast<std::string>(v); }
-    static std::string to_string(Defaults*, util::Any& v) { return any_cast<std::string>(v); }
-    static Mixed to_mixed(Defaults*, util::Any&) { throw std::logic_error("'Any' type is unsupported"); }
-
-    static util::Any from_binary(Defaults*, BinaryData v) { return std::string(v); }
-    static util::Any from_bool(Defaults*, bool v) { return v; }
-    static util::Any from_double(Defaults*, double v) { return v; }
-    static util::Any from_float(Defaults*, float v) { return v; }
-    static util::Any from_long(Defaults*, long long v) { return v; }
-    static util::Any from_string(Defaults*, StringData v) { return std::string(v); }
-    static util::Any from_timestamp(Defaults*, Timestamp v) { return v; }
-    static util::Any from_list(Defaults*, List v) { return v; }
-    static util::Any from_results(Defaults*, Results v) { return v; }
-    static util::Any from_object(Defaults*, Object v) { return v; }
-
-    static bool is_null(Defaults*, util::Any& v) { return !v.has_value(); }
-    static util::Any null_value(Defaults*) { return {}; }
-
-    static size_t to_existing_object_index(Defaults*, SharedRealm, util::Any &)
-    {
-        REALM_TERMINATE("not implemented");
-    }
-    static size_t to_object_index(Defaults* d, SharedRealm realm, util::Any& value, std::string const& object_type, bool update)
-    {
-        if (auto object = any_cast<Object>(&value)) {
-            return object->row().get_index();
-        }
-
-        return Object::create(d, realm, *realm->schema().find(object_type), value, update).row().get_index();
-    }
-};
-}
-
 
 TEST_CASE("object") {
     using namespace std::string_literals;
@@ -156,7 +79,7 @@ TEST_CASE("object") {
     auto r = Realm::get_shared_realm(config);
     auto& coordinator = *_impl::RealmCoordinator::get_existing_coordinator(config.path);
 
-    SECTION("add_notification_block()") {
+    SECTION("add_notification_callback()") {
         auto table = r->read_group().get_table("class_table");
         r->begin_transaction();
 
@@ -180,7 +103,7 @@ TEST_CASE("object") {
         };
 
         auto require_change = [&] {
-            auto token = object.add_notification_block([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token = object.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 change = c;
             });
             advance_and_notify(*r);
@@ -189,7 +112,7 @@ TEST_CASE("object") {
 
         auto require_no_change = [&] {
             bool first = true;
-            auto token = object.add_notification_block([&](CollectionChangeSet, std::exception_ptr) {
+            auto token = object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
                 REQUIRE(first);
                 first = false;
             });
@@ -281,10 +204,10 @@ TEST_CASE("object") {
         }
     }
 
-    Defaults d;
+    CppContext context;
     auto create = [&](util::Any&& value, bool update) {
         r->begin_transaction();
-        auto obj = Object::create(&d, r, *r->schema().find("all types"), value, update);
+        auto obj = Object::create(&context, r, *r->schema().find("all types"), value, update);
         r->commit_transaction();
         return obj;
     };
@@ -300,7 +223,7 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"value", 10LL}}},
-            {"array", AnyVec{AnyDict{{"value", 20LL}}}},
+            {"array", AnyVector{AnyDict{{"value", 20LL}}}},
         }, false);
 
         auto row = obj.row();
@@ -323,7 +246,7 @@ TEST_CASE("object") {
     }
 
     SECTION("create uses defaults for missing values") {
-        d["all types"] = {
+        context.defaults["all types"] = {
             {"bool", true},
             {"int", 5LL},
             {"float", 2.2f},
@@ -332,7 +255,7 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"value", 10LL}}},
-            {"array", AnyVec{AnyDict{{"value", 20LL}}}},
+            {"array", AnyVector{AnyDict{{"value", 20LL}}}},
         };
 
         auto obj = create(AnyDict{
@@ -360,15 +283,15 @@ TEST_CASE("object") {
 
     SECTION("create always sets the PK first") {
         AnyDict value{
-            {"array 1", AnyVec{AnyDict{{"value", 1LL}}}},
-            {"array 2", AnyVec{AnyDict{{"value", 2LL}}}},
+            {"array 1", AnyVector{AnyDict{{"value", 1LL}}}},
+            {"array 2", AnyVector{AnyDict{{"value", 2LL}}}},
             {"int 1", 0LL},
             {"int 2", 0LL},
             {"pk", 7LL},
         };
         // Core will throw if the list is populated before the PK is set
         r->begin_transaction();
-        REQUIRE_NOTHROW(Object::create(&d, r, *r->schema().find("pk after list"), util::Any(value), false));
+        REQUIRE_NOTHROW(Object::create(&context, r, *r->schema().find("pk after list"), util::Any(value), false));
     }
 
     SECTION("create with update") {
@@ -382,7 +305,7 @@ TEST_CASE("object") {
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
             {"object", AnyDict{{"value", 10LL}}},
-            {"array", AnyVec{AnyDict{{"value", 20LL}}}},
+            {"array", AnyVector{AnyDict{{"value", 20LL}}}},
         }, false);
         create(AnyDict{
             {"pk", 1LL},
@@ -412,41 +335,41 @@ TEST_CASE("object") {
         link_table.add_empty_row();
         Object linkobj(r, *r->schema().find("link target"), link_table[0]);
 
-        obj.set_property_value(&d, "bool", util::Any(true), false);
-        REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(&d, "bool")) == true);
+        obj.set_property_value(&context, "bool", util::Any(true), false);
+        REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(&context, "bool")) == true);
 
-        obj.set_property_value(&d, "int", util::Any(5LL), false);
-        REQUIRE(any_cast<long long>(obj.get_property_value<util::Any>(&d, "int")) == 5);
+        obj.set_property_value(&context, "int", util::Any(5LL), false);
+        REQUIRE(any_cast<long long>(obj.get_property_value<util::Any>(&context, "int")) == 5);
 
-        obj.set_property_value(&d, "float", util::Any(1.23f), false);
-        REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(&d, "float")) == 1.23f);
+        obj.set_property_value(&context, "float", util::Any(1.23f), false);
+        REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(&context, "float")) == 1.23f);
 
-        obj.set_property_value(&d, "double", util::Any(1.23), false);
-        REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(&d, "double")) == 1.23);
+        obj.set_property_value(&context, "double", util::Any(1.23), false);
+        REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(&context, "double")) == 1.23);
 
-        obj.set_property_value(&d, "string", util::Any("abc"s), false);
-        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(&d, "string")) == "abc");
+        obj.set_property_value(&context, "string", util::Any("abc"s), false);
+        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(&context, "string")) == "abc");
 
-        obj.set_property_value(&d, "data", util::Any("abc"s), false);
-        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(&d, "data")) == "abc");
+        obj.set_property_value(&context, "data", util::Any("abc"s), false);
+        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(&context, "data")) == "abc");
 
-        obj.set_property_value(&d, "date", util::Any(Timestamp(1, 2)), false);
-        REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(&d, "date")) == Timestamp(1, 2));
+        obj.set_property_value(&context, "date", util::Any(Timestamp(1, 2)), false);
+        REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(&context, "date")) == Timestamp(1, 2));
 
-        REQUIRE_FALSE(obj.get_property_value<util::Any>(&d, "object").has_value());
-        obj.set_property_value(&d, "object", util::Any(linkobj), false);
-        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(&d, "object")).row().get_index() == linkobj.row().get_index());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(&context, "object").has_value());
+        obj.set_property_value(&context, "object", util::Any(linkobj), false);
+        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(&context, "object")).row().get_index() == linkobj.row().get_index());
 
-        auto linking = any_cast<Results>(linkobj.get_property_value<util::Any>(&d, "origin"));
+        auto linking = any_cast<Results>(linkobj.get_property_value<util::Any>(&context, "origin"));
         REQUIRE(linking.size() == 1);
 
-        REQUIRE_THROWS(obj.set_property_value(&d, "pk", util::Any(5LL), false));
-        REQUIRE_THROWS(obj.set_property_value(&d, "not a property", util::Any(5LL), false));
+        REQUIRE_THROWS(obj.set_property_value(&context, "pk", util::Any(5LL), false));
+        REQUIRE_THROWS(obj.set_property_value(&context, "not a property", util::Any(5LL), false));
 
         r->commit_transaction();
 
-        REQUIRE_THROWS(obj.get_property_value<util::Any>(&d, "not a property"));
-        REQUIRE_THROWS(obj.set_property_value(&d, "int", util::Any(5LL), false));
+        REQUIRE_THROWS(obj.get_property_value<util::Any>(&context, "not a property"));
+        REQUIRE_THROWS(obj.set_property_value(&context, "int", util::Any(5LL), false));
     }
 
 #if REALM_ENABLE_SYNC
@@ -460,14 +383,14 @@ TEST_CASE("object") {
     config2.schema = config.schema;
 
     SECTION("defaults do not override values explicitly passed to create()") {
-        d["pk after list"] = {
+        context.defaults["pk after list"] = {
             {"int 1", 10LL},
             {"int 2", 10LL},
         };
         AnyDict v1{
             {"pk", 7LL},
-            {"array 1", AnyVec{AnyDict{{"value", 1LL}}}},
-            {"array 2", AnyVec{AnyDict{{"value", 2LL}}}},
+            {"array 1", AnyVector{AnyDict{{"value", 1LL}}}},
+            {"array 2", AnyVector{AnyDict{{"value", 2LL}}}},
         };
         auto v2 = v1;
         v1["int 1"] = 1LL;
@@ -478,8 +401,8 @@ TEST_CASE("object") {
 
         r1->begin_transaction();
         r2->begin_transaction();
-        auto obj = Object::create(&d, r1, *r1->schema().find("pk after list"), util::Any(v1), false);
-        Object::create(&d, r2, *r2->schema().find("pk after list"), util::Any(v2), false);
+        auto obj = Object::create(&context, r1, *r1->schema().find("pk after list"), util::Any(v1), false);
+        Object::create(&context, r2, *r2->schema().find("pk after list"), util::Any(v2), false);
         r2->commit_transaction();
         r1->commit_transaction();
 

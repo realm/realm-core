@@ -69,7 +69,7 @@ public:
 
     bool is_valid() const { return m_row.is_attached(); }
 
-    NotificationToken add_notification_block(CollectionChangeCallback callback) &;
+    NotificationToken add_notification_callback(CollectionChangeCallback callback) &;
 
 private:
     SharedRealm m_realm;

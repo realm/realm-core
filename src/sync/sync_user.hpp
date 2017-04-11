@@ -104,10 +104,17 @@ public:
     // A registered session will be bound at the earliest opportunity: either
     // immediately, or upon the user becoming Active.
     // Note that this is called by the SyncManager, and should not be directly called.
-    void register_session(std::shared_ptr<SyncSession> session);
+    void register_session(std::shared_ptr<SyncSession>);
+
+    // Internal APIs. Do not call.
+    void register_management_session(const std::string&);
+    void register_permission_session(const std::string&);
 
 private:
     State m_state;
+
+    std::weak_ptr<SyncSession> m_management_session;
+    std::weak_ptr<SyncSession> m_permission_session;
 
     // The auth server URL. Bindings should set this appropriately when they retrieve
     // instances of `SyncUser`s.

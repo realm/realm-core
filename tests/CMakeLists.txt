@@ -1,13 +1,13 @@
 include_directories(../external/catch/single_include .)
 
 set(HEADERS
-    util/any.hpp
     util/event_loop.hpp
     util/index_helpers.hpp
     util/test_file.hpp
 )
 
 set(SOURCES
+    any.cpp
     collection_change_indices.cpp
     thread_safe_reference.cpp
     index_set.cpp
@@ -21,6 +21,7 @@ set(SOURCES
     results.cpp
     schema.cpp
     transaction_log_parsing.cpp
+    uuid.cpp
     util/event_loop.cpp
     util/test_file.cpp
 )
