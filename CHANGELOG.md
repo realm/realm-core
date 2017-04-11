@@ -12,7 +12,10 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Add support for `SharedGroup::try_begin_write()` and corresponding `try_lock()`
+  functionality in low level Mutex classes.
+  PR [#2547](https://github.com/realm/realm-core/pull/2547/files)
+  Fixes issue [#2538](https://github.com/realm/realm-core/issues/2538)
 
 -----------
 
