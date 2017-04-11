@@ -948,6 +948,11 @@ private:
         {
             return m_p != nullptr;
         }
+        bool is_managed() const
+        {
+            return m_is_managed;
+        }
+
     private:
         Spec* m_p = nullptr;
         bool m_is_managed = false;

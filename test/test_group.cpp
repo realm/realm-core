@@ -1723,6 +1723,15 @@ TEST(Group_CommitSubtable)
     subtable = table->get_subtable(0, 0);
     subtable->add_empty_row();
     group.commit();
+    group.verify();
+
+    TableRef table1 = group.add_table("other");
+    table1->add_column_link(type_LinkList, "linkList", *table);
+    group.commit();
+    group.verify();
+    table->insert_column_link(0, type_Link, "link", *table);
+    group.commit();
+    group.verify();
 }
 
 

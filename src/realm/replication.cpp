@@ -384,7 +384,7 @@ public:
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
             if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
-                log("table->remove_search_index(%1);", col_ndx); // Throws
+                log("desc->remove_search_index(%1);", col_ndx); // Throws
                 using tf = _impl::TableFriend;
                 tf::remove_search_index(*m_desc, col_ndx); // Throws
                 return true;

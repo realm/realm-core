@@ -27,7 +27,7 @@ using namespace realm::util;
 
 bool Descriptor::has_search_index(size_t column_ndx) const noexcept
 {
-    if (REALM_UNLIKELY(column_ndx >= m_spec->get_column_count()))
+    if (REALM_UNLIKELY(column_ndx >= m_spec->get_public_column_count()))
         return false;
 
     int attr = m_spec->get_column_attr(column_ndx);

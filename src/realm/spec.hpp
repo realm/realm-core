@@ -57,7 +57,6 @@ public:
     // parent Spec object (this) is kept alive for at least as long as
     // the new Spec object.
     Spec* get_subtable_spec(size_t column_ndx) noexcept;
-    const Spec* get_subtable_spec(size_t column_ndx) const noexcept;
     //@}
 
     // Column info
@@ -131,7 +130,19 @@ private:
     ArrayInteger m_attr;  // 3rd slot in m_top
     Array m_subspecs;     // 4th slot in m_top (optional)
     Array m_enumkeys;     // 5th slot in m_top (optional)
-    using SubspecPtrs = std::vector<std::unique_ptr<Spec>>;
+    struct SubspecPtr {
+        SubspecPtr()
+            : m_is_spec_ptr(false)
+        {
+        }
+        SubspecPtr(bool is_spec_ptr)
+            : m_is_spec_ptr(is_spec_ptr)
+        {
+        }
+        std::unique_ptr<Spec> m_spec;
+        bool m_is_spec_ptr;
+    };
+    using SubspecPtrs = std::vector<SubspecPtr>;
     SubspecPtrs m_subspec_ptrs;
     bool m_has_strong_link_columns;
 
@@ -140,6 +151,7 @@ private:
     void init(ref_type) noexcept;
     void init(MemRef) noexcept;
     void update_has_strong_link_columns() noexcept;
+    void update_subspec_ptrs();
 
     // Similar in function to Array::init_from_parent().
     void init_from_parent() noexcept;
@@ -220,11 +232,6 @@ inline Spec* Spec::get_subtable_spec(size_t column_ndx) noexcept
     REALM_ASSERT(get_column_type(column_ndx) == col_type_Table);
     size_t subspec_ndx = get_subspec_ndx(column_ndx);
     return get_subspec_by_ndx(subspec_ndx);
-}
-
-inline const Spec* Spec::get_subtable_spec(size_t column_ndx) const noexcept
-{
-    return const_cast<Spec*>(this)->get_subtable_spec(column_ndx);
 }
 
 inline const Spec* Spec::get_subspec_by_ndx(size_t subspec_ndx) const noexcept

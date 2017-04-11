@@ -57,6 +57,7 @@ void Spec::init(MemRef mem) noexcept
         ref_type ref = m_top.get_as_ref(3);
         m_subspecs.init_from_ref(ref);
         m_subspecs.set_parent(&m_top, 3);
+        update_subspec_ptrs();
         m_subspec_ptrs.resize(m_subspecs.size());
     }
 
@@ -71,13 +72,15 @@ void Spec::init(MemRef mem) noexcept
 
 Spec* Spec::get_subspec_by_ndx(size_t subspec_ndx) noexcept
 {
-    if (!m_subspec_ptrs[subspec_ndx]) {
+    REALM_ASSERT(subspec_ndx < m_subspec_ptrs.size());
+    REALM_ASSERT(m_subspec_ptrs[subspec_ndx].m_is_spec_ptr);
+    if (!m_subspec_ptrs[subspec_ndx].m_spec) {
         Spec* spec = new Spec(get_alloc());
         spec->set_parent(&m_subspecs, subspec_ndx);
         spec->init_from_parent();
-        m_subspec_ptrs[subspec_ndx] = std::unique_ptr<Spec>(spec);
+        m_subspec_ptrs[subspec_ndx].m_spec = std::unique_ptr<Spec>(spec);
     }
-    return m_subspec_ptrs[subspec_ndx].get();
+    return m_subspec_ptrs[subspec_ndx].m_spec.get();
 }
 
 
@@ -93,6 +96,20 @@ void Spec::update_has_strong_link_columns() noexcept
     m_has_strong_link_columns = false;
 }
 
+void Spec::update_subspec_ptrs()
+{
+    size_t n = m_subspecs.size();
+    m_subspec_ptrs.resize(n);
+    size_t m = m_types.size();
+    for (size_t i = 0; i < m; ++i) {
+        if (ColumnType(m_types.get(i)) == col_type_Table) {
+            size_t subspec_ndx = get_subspec_ndx(i);
+            REALM_ASSERT(subspec_ndx < n);
+            m_subspec_ptrs[subspec_ndx].m_is_spec_ptr = true;
+        }
+    }
+}
+
 
 void Spec::update_from_parent(size_t old_baseline) noexcept
 {
@@ -102,9 +119,12 @@ void Spec::update_from_parent(size_t old_baseline) noexcept
     m_types.update_from_parent(old_baseline);
     m_names.update_from_parent(old_baseline);
     m_attr.update_from_parent(old_baseline);
+    m_subspec_ptrs.clear();
 
-    if (has_subspec())
+    if (has_subspec()) {
         m_subspecs.update_from_parent(old_baseline);
+        update_subspec_ptrs();
+    }
 
     if (m_top.size() > 4)
         m_enumkeys.update_from_parent(old_baseline);
@@ -193,7 +213,7 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
             int_fast64_t v(from_ref(subspec_mem.get_ref()));
             m_subspecs.insert(subspec_ndx, v); // Throws
-            m_subspec_ptrs.insert(m_subspec_ptrs.begin() + subspec_ndx, std::unique_ptr<Spec>());
+            m_subspec_ptrs.insert(m_subspec_ptrs.begin() + subspec_ndx, SubspecPtr(true));
             dg.release();
         }
         else if (type == col_type_Link || type == col_type_LinkList) {
@@ -202,7 +222,7 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
             // don't know it yet we just store zero (null ref).
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
             m_subspecs.insert(subspec_ndx, 0); // Throws
-            m_subspec_ptrs.insert(m_subspec_ptrs.begin() + subspec_ndx, std::unique_ptr<Spec>());
+            m_subspec_ptrs.insert(m_subspec_ptrs.begin() + subspec_ndx, SubspecPtr(false));
         }
         else if (type == col_type_BackLink) {
             // Store group-level table index of origin table and index of origin
@@ -212,8 +232,8 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
             size_t subspec_ndx = get_subspec_ndx(column_ndx);
             m_subspecs.insert(subspec_ndx, 0); // Throws
             m_subspecs.insert(subspec_ndx, 1); // Throws
-            m_subspec_ptrs.insert(m_subspec_ptrs.begin() + subspec_ndx, std::unique_ptr<Spec>());
-            m_subspec_ptrs.insert(m_subspec_ptrs.begin() + subspec_ndx, std::unique_ptr<Spec>());
+            m_subspec_ptrs.insert(m_subspec_ptrs.begin() + subspec_ndx, SubspecPtr(false));
+            m_subspec_ptrs.insert(m_subspec_ptrs.begin() + subspec_ndx, SubspecPtr(false));
         }
     }
 

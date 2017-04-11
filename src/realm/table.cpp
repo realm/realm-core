@@ -828,7 +828,7 @@ void Table::do_add_search_index(Descriptor& descr, size_t column_ndx)
     typedef _impl::DescriptorFriend df;
     auto spec = descr.get_spec();
 
-    if (REALM_UNLIKELY(column_ndx >= spec->get_column_count()))
+    if (REALM_UNLIKELY(column_ndx >= spec->get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
 
     // Early-out of already indexed
@@ -881,7 +881,7 @@ void Table::do_remove_search_index(Descriptor& descr, size_t column_ndx)
     typedef _impl::DescriptorFriend df;
     auto spec = descr.get_spec();
 
-    if (REALM_UNLIKELY(column_ndx >= spec->get_column_count()))
+    if (REALM_UNLIKELY(column_ndx >= spec->get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
 
     // Early-out of non-indexed
@@ -4752,6 +4752,7 @@ public:
         // write it to the output stream
         ref_type spec_ref;
         {
+            REALM_ASSERT(m_table.m_spec.is_managed());
             MemRef mem = m_table.m_spec->m_top.clone_deep(alloc); // Throws
             Spec spec(alloc);
             spec.init(mem); // Throws
@@ -4847,9 +4848,12 @@ void Table::update_from_parent(size_t old_baseline) noexcept
     if (m_top.is_attached()) {
         if (!m_top.update_from_parent(old_baseline))
             return;
-    }
 
-    m_spec->update_from_parent(old_baseline);
+        m_spec->update_from_parent(old_baseline);
+    }
+    else {
+        refresh_spec_accessor();
+    }
 
     if (!m_columns.is_attached())
         return; // Degenerate subtable
