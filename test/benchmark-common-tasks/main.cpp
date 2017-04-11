@@ -16,10 +16,13 @@
  *
  **************************************************************************/
 
+#include <cctype>
 #include <iostream>
 #include <sstream>
 
 #include <realm.hpp>
+#include <realm/query_expression.hpp>
+#include <realm/string_data.hpp>
 #include <realm/util/file.hpp>
 
 #include "compatibility.hpp"
@@ -593,6 +596,95 @@ struct BenchmarkQueryLongString : BenchmarkWithStrings {
     }
 };
 
+struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
+    const char* name() const
+    {
+        return "QueryInsensitiveString";
+    }
+
+    std::string gen_random_case_string(size_t length)
+    {
+        std::stringstream ss;
+        for (size_t c = 0; c < length; ++c) {
+            bool lowercase = (rand() % 2) == 0;
+            // choose characters from a-z or A-Z
+            ss << (rand() % 26) + (lowercase ? 97 : 65);
+        }
+        return ss.str();
+    }
+
+    std::string shuffle_case(std::string input)
+    {
+        for (size_t i = 0; i < input.size(); ++i) {
+            bool upper = (rand() % 2) == 0;
+            int c = input[i];
+            if (upper) {
+                c = std::toupper(c);
+            }
+            else {
+                c = std::tolower(c);
+            }
+            if (c > 0) {
+                input[i] = c;
+            }
+        }
+        return input;
+    }
+
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkWithStringsTable::before_all(group);
+
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("StringOnly");
+        t->add_empty_row(BASE_SIZE * 4);
+        const size_t max_chars_in_string = 100;
+
+        for (size_t i = 0; i < BASE_SIZE * 4; ++i) {
+            size_t num_chars = rand() % max_chars_in_string;
+            std::string randomly_cased_string = gen_random_case_string(num_chars);
+            t->set_string(0, i, randomly_cased_string);
+        }
+        tr.commit();
+    }
+    std::string needle;
+    bool successful = false;
+
+    void before_each(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        size_t target_row = rand() % table->size();
+        StringData target_str = table->get_string(0, target_row);
+        needle = shuffle_case(target_str.data());
+    }
+
+    void operator()(SharedGroup& group)
+    {
+        ReadTransaction tr(group);
+        ConstTableRef table = tr.get_table("StringOnly");
+        StringData str(needle);
+        Query q = table->where().equal(0, str, false);
+        TableView res = q.find_all();
+        successful = res.size() > 0;
+    }
+};
+
+struct BenchmarkQueryInsensitiveIndexedString  : BenchmarkQueryInsensitiveString {
+    const char* name() const
+    {
+        return "BenchmarkQueryInsensitiveIndexedString";
+    }
+    void before_all(SharedGroup& group)
+    {
+        BenchmarkQueryInsensitiveString::before_all(group);
+        WriteTransaction tr(group);
+        TableRef t = tr.get_table("StringOnly");
+        t->add_search_index(0);
+        tr.commit();
+    }
+};
+
 struct BenchmarkSetLongString : BenchmarkWithLongStrings {
     const char* name() const
     {
@@ -851,6 +943,8 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkQueryLongString);
     BENCH(BenchmarkSetLongString);
     BENCH(BenchmarkGetLinkList);
+    BENCH(BenchmarkQueryInsensitiveString);
+    BENCH(BenchmarkQueryInsensitiveIndexedString);
 
 #undef BENCH
     return 0;

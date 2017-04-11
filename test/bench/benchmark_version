@@ -1,4 +1,4 @@
-v3
+v4
 
 The first line of this file describes the current benchmarking tool version.
 It is used as a folder prefix to handle storing multiple versions of performance results.
