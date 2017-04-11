@@ -13,7 +13,7 @@
   PR [#2547](https://github.com/realm/realm-core/pull/2547/files)
   Fixes issue [#2538](https://github.com/realm/realm-core/issues/2538)
 * New file system utility functions: `util::remove_dir_recursive()` and
-  `util::File::for_each()`.
+  `util::File::for_each()`. PR [#2556](https://github.com/realm/realm-core/pull/2556).
 * Made case insensitive queries use the new index based case insensitive search.
   PR [#2486](https://github.com/realm/realm-core/pull/2486)
 
