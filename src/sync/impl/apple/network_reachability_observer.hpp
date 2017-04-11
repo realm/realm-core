@@ -29,7 +29,7 @@
 
 #if NETWORK_REACHABILITY_AVAILABLE
 
-#include <SystemConfiguration/SystemConfiguration.h>
+#include "sync/impl/apple/system_configuration.hpp"
 
 namespace realm {
 
@@ -63,6 +63,6 @@ private:
 
 }
 
-#endif // !TARGET_OS_WATCH
+#endif // NETWORK_REACHABILITY_AVAILABLE
 
 #endif // REALM_OS_NETWORK_REACHABILITY_OBSERVER_HPP

@@ -61,13 +61,15 @@ NetworkReachabilityObserver::NetworkReachabilityObserver(util::Optional<std::str
 , m_change_handler(std::move(handler))
 {
     if (hostname) {
-        m_reachability_ref = util::adoptCF(SCNetworkReachabilityCreateWithName(nullptr, hostname->c_str()));
+        m_reachability_ref = util::adoptCF(SystemConfiguration::shared().network_reachability_create_with_name(nullptr,
+                                                                                                               hostname->c_str()));
     } else {
         struct sockaddr zeroAddress = {};
         zeroAddress.sa_len = sizeof(zeroAddress);
         zeroAddress.sa_family = AF_INET;
 
-        m_reachability_ref = util::adoptCF(SCNetworkReachabilityCreateWithAddress(nullptr, &zeroAddress));
+        m_reachability_ref = util::adoptCF(SystemConfiguration::shared().network_reachability_create_with_address(nullptr,
+                                                                                                                  &zeroAddress));
     }
 }
 
@@ -81,7 +83,7 @@ NetworkReachabilityStatus NetworkReachabilityObserver::reachability_status() con
 {
     SCNetworkReachabilityFlags flags;
 
-    if (SCNetworkReachabilityGetFlags(m_reachability_ref.get(), &flags)) {
+    if (SystemConfiguration::shared().network_reachability_get_flags(m_reachability_ref.get(), &flags)) {
         return reachability_status_for_flags(flags);
     }
 
@@ -94,11 +96,11 @@ bool NetworkReachabilityObserver::start_observing()
 
     SCNetworkReachabilityContext context = {0, &m_reachability_callback, nullptr, nullptr, nullptr};
 
-    if (!SCNetworkReachabilitySetCallback(m_reachability_ref.get(), reachability_callback, &context)) {
+    if (!SystemConfiguration::shared().network_reachability_set_callback(m_reachability_ref.get(), reachability_callback, &context)) {
         return false;
     }
 
-    if (!SCNetworkReachabilitySetDispatchQueue(m_reachability_ref.get(), m_callback_queue)) {
+    if (!SystemConfiguration::shared().network_reachability_set_dispatch_queue(m_reachability_ref.get(), m_callback_queue)) {
         return false;
     }
 
@@ -107,9 +109,9 @@ bool NetworkReachabilityObserver::start_observing()
 
 void NetworkReachabilityObserver::stop_observing()
 {
-    SCNetworkReachabilitySetDispatchQueue(m_reachability_ref.get(), nullptr);
-    SCNetworkReachabilitySetCallback(m_reachability_ref.get(), nullptr, nullptr);
-    
+    SystemConfiguration::shared().network_reachability_set_dispatch_queue(m_reachability_ref.get(), nullptr);
+    SystemConfiguration::shared().network_reachability_set_callback(m_reachability_ref.get(), nullptr, nullptr);
+
     // Wait for all previously-enqueued blocks to execute to guarantee that
     // no callback will be called after returning from this method
     dispatch_sync(m_callback_queue, ^{});

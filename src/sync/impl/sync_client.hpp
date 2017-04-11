@@ -28,6 +28,10 @@
 
 #include "sync/impl/network_reachability.hpp"
 
+#if NETWORK_REACHABILITY_AVAILABLE
+#include "sync/impl/apple/network_reachability_observer.hpp"
+#endif
+
 namespace realm {
 namespace _impl {
 
