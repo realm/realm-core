@@ -1,14 +1,10 @@
-# NEXT RELEASE
+# 2.6.0 Release notes
 
 ### Bugfixes
 
 * Work around a bug in macOS which could cause a deadlock when trying to obtain a shared lock
   using flock(). PR [#2552](https://github.com/realm/realm-core/pull/2552),
   issue [#2434](https://github.com/realm/realm-core/issues/2434).
-
-### Breaking changes
-
-* Lorem ipsum.
 
 ### Enhancements
 
@@ -20,12 +16,6 @@
   `util::File::for_each()`.
 * Made case insensitive queries use the new index based case insensitive search.
   PR [#2486](https://github.com/realm/realm-core/pull/2486)
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
