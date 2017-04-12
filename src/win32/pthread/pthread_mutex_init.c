@@ -75,7 +75,12 @@ pthread_mutex_init (pthread_mutex_t * mutex, const pthread_mutexattr_t * attr)
           // Create unique and random mutex name. UuidCreate() needs linking with Rpcrt4.lib, so we use CoCreateGuid() 
           // instead. That way end-user won't need to mess with Visual Studio project settings
           CoCreateGuid(&guid);
-          sprintf_s(mutex->shared_name, sizeof(mutex->shared_name), "Global\\%08X%04X%04X%02X%02X%02X%02X%02X", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4]);
+#if REALM_UWP
+#define MUTEX_NAMESPACE "Local\\"
+#else
+#define MUTEX_NAMESPACE "Global\\"
+#endif
+          sprintf_s(mutex->shared_name, sizeof(mutex->shared_name), MUTEX_NAMESPACE"%08X%04X%04X%02X%02X%02X%02X%02X", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4]);
           h = CreateMutexA(NULL, 0, mutex->shared_name);
           if(h == NULL)
               return EAGAIN;
