@@ -686,15 +686,15 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // from the earlier mapping.
     if (m_file_mappings->m_success) {
         // check that encryption keys match if they're used:
-        const char* used_key = m_file_mappings->m_file.get_encryption_key();
-        if (used_key != nullptr || cfg.encryption_key != nullptr) {
-            if (used_key == nullptr && cfg.encryption_key != nullptr) {
-                throw std::runtime_error("Missing encryption key, but file already opened with encryption key");
-            }
-            if (used_key != nullptr && cfg.encryption_key == nullptr) {
+        const char* earlier_used_key = m_file_mappings->m_file.get_encryption_key();
+        if (earlier_used_key != nullptr || cfg.encryption_key != nullptr) {
+            if (earlier_used_key == nullptr && cfg.encryption_key != nullptr) {
                 throw std::runtime_error("Encryption key provided, but file already opened as non-encrypted");
             }
-            if (memcmp(used_key, cfg.encryption_key, 64)) {
+            if (earlier_used_key != nullptr && cfg.encryption_key == nullptr) {
+                throw std::runtime_error("Missing encryption key, but file already opened with encryption key");
+            }
+            if (memcmp(earlier_used_key, cfg.encryption_key, 64)) {
                 throw std::runtime_error("Encryption key mismatch");
             }
         }
