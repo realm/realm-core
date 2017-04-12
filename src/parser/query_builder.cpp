@@ -25,6 +25,7 @@
 #include "util/format.hpp"
 
 #include <realm.hpp>
+#include <realm/query_expression.hpp>
 #include <assert.h>
 #include <sstream>
 
