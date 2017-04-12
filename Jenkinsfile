@@ -422,6 +422,8 @@ def doBuildAppleDevice(String sdk, String buildType) {
             if(gitTag) {
                 publishingStashes << stashName
             }
+        }
+    }
 }
 
 /**
