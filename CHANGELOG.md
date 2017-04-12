@@ -13,7 +13,7 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Add a templated version of Table::set() to go with Table::get().
 
 -----------
 
