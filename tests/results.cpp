@@ -33,6 +33,7 @@
 #include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
 #include <realm/query_engine.hpp>
+#include <realm/query_expression.hpp>
 
 #if REALM_ENABLE_SYNC
 #include "sync/sync_manager.hpp"
