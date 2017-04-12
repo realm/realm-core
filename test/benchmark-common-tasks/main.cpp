@@ -21,7 +21,7 @@
 #include <sstream>
 
 #include <realm.hpp>
-#include <realm/query_expression.hpp>
+#include <realm/query_expression.hpp> // only needed to compile on v2.6.0
 #include <realm/string_data.hpp>
 #include <realm/util/file.hpp>
 
@@ -670,10 +670,10 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
     }
 };
 
-struct BenchmarkQueryInsensitiveIndexedString  : BenchmarkQueryInsensitiveString {
+struct BenchmarkQueryInsensitiveStringIndexed : BenchmarkQueryInsensitiveString {
     const char* name() const
     {
-        return "BenchmarkQueryInsensitiveIndexedString";
+        return "QueryInsensitiveStringIndexed";
     }
     void before_all(SharedGroup& group)
     {
@@ -944,7 +944,7 @@ int benchmark_common_tasks_main()
     BENCH(BenchmarkSetLongString);
     BENCH(BenchmarkGetLinkList);
     BENCH(BenchmarkQueryInsensitiveString);
-    BENCH(BenchmarkQueryInsensitiveIndexedString);
+    BENCH(BenchmarkQueryInsensitiveStringIndexed);
 
 #undef BENCH
     return 0;
