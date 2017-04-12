@@ -47,7 +47,6 @@ Searching: The main finding function is:
 
 #include <cstdint> // unint8_t etc
 
-#include <realm/util/meta.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/util/file_mapper.hpp>
 #include <realm/utilities.hpp>
