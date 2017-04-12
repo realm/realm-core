@@ -334,11 +334,6 @@ public:
     //@}
 
     //@{
-    /// Returns the contained spec.
-    Spec* get_spec() const;
-    //@}
-
-    //@{
     /// Get the table associated with the root descriptor.
     ///
     /// \sa get_parent()
@@ -691,11 +686,6 @@ inline DescriptorRef Descriptor::get_parent() noexcept
 inline ConstDescriptorRef Descriptor::get_parent() const noexcept
 {
     return const_cast<Descriptor*>(this)->get_parent();
-}
-
-inline Spec* Descriptor::get_spec() const
-{
-    return m_spec;
 }
 
 inline TableRef Descriptor::get_root_table() noexcept

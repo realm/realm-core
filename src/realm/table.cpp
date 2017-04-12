@@ -826,18 +826,17 @@ void Table::do_rename_column(Descriptor& desc, size_t col_ndx, StringData name)
 void Table::do_add_search_index(Descriptor& descr, size_t column_ndx)
 {
     typedef _impl::DescriptorFriend df;
-    auto spec = descr.get_spec();
+    Spec& spec = df::get_spec(descr);
 
-    if (REALM_UNLIKELY(column_ndx >= spec->get_public_column_count()))
+    if (REALM_UNLIKELY(column_ndx >= spec.get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
 
     // Early-out of already indexed
     if (descr.has_search_index(column_ndx))
         return;
 
-    typedef _impl::DescriptorFriend df;
     Table& root_table = df::get_root_table(descr);
-    int attr = spec->get_column_attr(column_ndx);
+    int attr = spec.get_column_attr(column_ndx);
 
     if (descr.is_root()) {
         root_table._add_search_index(column_ndx);
@@ -861,7 +860,7 @@ void Table::do_add_search_index(Descriptor& descr, size_t column_ndx)
             // Clear index bit from shared spec because we're now going to operate on the next subtable
             // object which has no index yet (because various method calls may crash if attributes are
             // wrong)
-            spec->set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+            spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
 
             TableRef sub = root_table.get_subtable(parent_col, r);
             sub->_add_search_index(column_ndx);
@@ -870,7 +869,7 @@ void Table::do_add_search_index(Descriptor& descr, size_t column_ndx)
 
     // Set shared attributes here also, in case there was no rows to iterate through in the for-loop
     // above
-    spec->set_column_attr(column_ndx, ColumnAttr(attr | col_attr_Indexed)); // Throws
+    spec.set_column_attr(column_ndx, ColumnAttr(attr | col_attr_Indexed)); // Throws
 
     if (Replication* repl = root_table.get_repl())
         repl->add_search_index(descr, column_ndx); // Throws
@@ -879,18 +878,17 @@ void Table::do_add_search_index(Descriptor& descr, size_t column_ndx)
 void Table::do_remove_search_index(Descriptor& descr, size_t column_ndx)
 {
     typedef _impl::DescriptorFriend df;
-    auto spec = descr.get_spec();
+    Spec& spec = df::get_spec(descr);
 
-    if (REALM_UNLIKELY(column_ndx >= spec->get_public_column_count()))
+    if (REALM_UNLIKELY(column_ndx >= spec.get_public_column_count()))
         throw LogicError(LogicError::column_index_out_of_range);
 
     // Early-out of non-indexed
     if (!descr.has_search_index(column_ndx))
         return;
 
-    typedef _impl::DescriptorFriend df;
     Table& root_table = df::get_root_table(descr);
-    int attr = spec->get_column_attr(column_ndx);
+    int attr = spec.get_column_attr(column_ndx);
 
     if (descr.is_root()) {
         root_table._remove_search_index(column_ndx);
@@ -912,7 +910,7 @@ void Table::do_remove_search_index(Descriptor& descr, size_t column_ndx)
             // Set index bit from shared spec because we're now going to operate on the next subtable
             // object which still has an index (because various method calls may crash if attributes are
             // wrong)
-            spec->set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+            spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
 
             // Destroy search index. This will update shared attributes in case refresh_column_accessors()
             // should depend on them being correct
@@ -923,7 +921,7 @@ void Table::do_remove_search_index(Descriptor& descr, size_t column_ndx)
 
     // Set shared attributes here also, in case there was no rows to iterate through in the for-loop
     // above
-    spec->set_column_attr(column_ndx, ColumnAttr(attr & ~col_attr_Indexed)); // Throws
+    spec.set_column_attr(column_ndx, ColumnAttr(attr & ~col_attr_Indexed)); // Throws
 
     if (Replication* repl = root_table.get_repl())
         repl->remove_search_index(descr, column_ndx); // Throws
@@ -1845,10 +1843,9 @@ void Table::_add_search_index(size_t col_ndx)
     m_columns.insert(index_pos, index->get_ref()); // Throws
 
     // Mark the column as having an index
-    Spec* spec = get_descriptor()->get_spec();
-    int attr = spec->get_column_attr(col_ndx);
+    int attr = m_spec->get_column_attr(col_ndx);
     attr |= col_attr_Indexed;
-    spec->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
+    m_spec->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
     // Update column accessors for all columns after the one we just added an
     // index for, as their position in `m_columns` has changed
@@ -1868,10 +1865,9 @@ void Table::_remove_search_index(size_t col_ndx)
     m_columns.erase(index_pos);
 
     // Mark the column as no longer having an index
-    Spec* spec = get_descriptor()->get_spec();
-    int attr = spec->get_column_attr(col_ndx);
+    int attr = m_spec->get_column_attr(col_ndx);
     attr &= ~col_attr_Indexed;
-    spec->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
+    m_spec->set_column_attr(col_ndx, ColumnAttr(attr)); // Throws
 
     // Update column accessors for all columns after the one we just removed the
     // index for, as their position in `m_columns` has changed
