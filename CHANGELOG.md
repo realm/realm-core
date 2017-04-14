@@ -14,6 +14,8 @@
 ### Enhancements
 
 * Add a templated version of Table::set() to go with Table::get().
+* Add TableView::find_first_timestamp().
+* Add TableView::find_first<T>()/
 
 -----------
 
