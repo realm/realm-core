@@ -15,7 +15,8 @@
 
 * Add a templated version of Table::set() to go with Table::get().
 * Add TableView::find_first_timestamp().
-* Add TableView::find_first<T>()/
+* Add TableView::find_first<T>().
+* Make Table::find_first<T>() public and add support for most column types.
 
 -----------
 

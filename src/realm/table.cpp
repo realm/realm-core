@@ -3862,6 +3862,7 @@ T upgrade_optional_int(T value)
 } // anonymous namespace
 
 
+namespace realm {
 template <class T>
 size_t Table::find_first(size_t col_ndx, T value) const
 {
@@ -3876,6 +3877,49 @@ size_t Table::find_first(size_t col_ndx, T value) const
     const ColType& column_type = get_column<ColType, type_traits::column_id>(col_ndx);
     return column_type.find_first(upgrade_optional_int(value));
 }
+
+template <>
+size_t Table::find_first(size_t col_ndx, Timestamp value) const
+{
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Timestamp);
+
+    if (!m_columns.is_attached())
+        return not_found;
+
+    const TimestampColumn& col = get_column_timestamp(col_ndx);
+    return col.find<realm::Equal>(value, 0, col.size());
+}
+
+template <>
+size_t Table::find_first(size_t col_ndx, StringData value) const
+{
+    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
+    if (!m_columns.is_attached())
+        return not_found;
+
+    ColumnType type = get_real_column_type(col_ndx);
+    if (type == col_type_String) {
+        const StringColumn& col = get_column_string(col_ndx);
+        return col.find_first(value);
+    }
+    REALM_ASSERT_3(type, ==, col_type_StringEnum);
+    const StringEnumColumn& col = get_column_string_enum(col_ndx);
+    return col.find_first(value);
+}
+
+template <>
+size_t Table::find_first(size_t col_ndx, util::Optional<float> value) const
+{
+    return value ? find_first(col_ndx, *value) : find_first_null(col_ndx);
+}
+
+template <>
+size_t Table::find_first(size_t col_ndx, util::Optional<double> value) const
+{
+    return value ? find_first(col_ndx, *value) : find_first_null(col_ndx);
+}
+} // namespace realm
 
 size_t Table::find_first_link(size_t target_row_index) const
 {
@@ -3911,14 +3955,7 @@ size_t Table::find_first_olddatetime(size_t col_ndx, OldDateTime value) const
 
 size_t Table::find_first_timestamp(size_t col_ndx, Timestamp value) const
 {
-    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Timestamp);
-
-    if (!m_columns.is_attached())
-        return not_found;
-
-    const TimestampColumn& col = get_column_timestamp(col_ndx);
-    return col.find<realm::Equal>(value, 0, col.size());
+    return find_first(col_ndx, value);
 }
 
 size_t Table::find_first_float(size_t col_ndx, float value) const
@@ -3933,18 +3970,7 @@ size_t Table::find_first_double(size_t col_ndx, double value) const
 
 size_t Table::find_first_string(size_t col_ndx, StringData value) const
 {
-    REALM_ASSERT(!m_columns.is_attached() || col_ndx < m_columns.size());
-    if (!m_columns.is_attached())
-        return not_found;
-
-    ColumnType type = get_real_column_type(col_ndx);
-    if (type == col_type_String) {
-        const StringColumn& col = get_column_string(col_ndx);
-        return col.find_first(value);
-    }
-    REALM_ASSERT_3(type, ==, col_type_StringEnum);
-    const StringEnumColumn& col = get_column_string_enum(col_ndx);
-    return col.find_first(value);
+    return find_first(col_ndx, value);
 }
 
 size_t Table::find_first_binary(size_t col_ndx, BinaryData value) const

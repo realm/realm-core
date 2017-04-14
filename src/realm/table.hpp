@@ -610,6 +610,9 @@ public:
     double average_double(size_t column_ndx, size_t* value_count = nullptr) const;
 
     // Searching
+    template <class T>
+    size_t find_first(size_t column_ndx, T value) const;
+
     size_t find_first_link(size_t target_row_index) const;
     size_t find_first_int(size_t column_ndx, int64_t value) const;
     size_t find_first_bool(size_t column_ndx, bool value) const;
@@ -681,8 +684,6 @@ public:
     uint_fast64_t get_version_counter() const noexcept;
 
 private:
-    template <class T>
-    size_t find_first(size_t column_ndx, T value) const; // called by above methods
     template <class T>
     TableView find_all(size_t column_ndx, T value);
 
