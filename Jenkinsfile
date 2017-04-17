@@ -1,5 +1,6 @@
 #!groovy
 def getSourceArchive() {
+  deleteDir()
   unstash 'source'
 }
 

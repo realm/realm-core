@@ -1061,3 +1061,44 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
         REQUIRE(cache_schema.find("object 2") != cache_schema.end());
     }
 }
+
+#if !WIN32
+TEST_CASE("SharedRealm: compact on launch") {
+    // Make compactable Realm
+    TestFile config;
+    config.cache = false;
+    config.automatic_change_notifications = false;
+    int num_opens = 0;
+    config.should_compact_on_launch_function = [&](size_t total_bytes, size_t used_bytes) {
+        REQUIRE(total_bytes > used_bytes);
+        num_opens++;
+        return num_opens != 2;
+    };
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::String, "", "", false, false, false}
+        }},
+    };
+    auto r = Realm::get_shared_realm(config);
+    r->begin_transaction();
+    auto table = r->read_group().get_table("class_object");
+    int count = 1000;
+    table->add_empty_row(count);
+    for (int i = 0; i < count; ++i)
+        table->set_string(0, i, util::format("Foo_%1", i % 10).c_str());
+    r->commit_transaction();
+    REQUIRE(table->size() == count);
+    r->close();
+
+    // Confirm expected sizes before and after opening the Realm
+    size_t size_before = size_t(File(config.path).get_size());
+    r = Realm::get_shared_realm(config);
+    r->close();
+    REQUIRE(size_t(File(config.path).get_size()) == size_before); // File size after returning false
+    r = Realm::get_shared_realm(config);
+    REQUIRE(size_t(File(config.path).get_size()) < size_before); // File size after returning true
+
+    // Validate that the file still contains what it should
+    REQUIRE(r->read_group().get_table("class_object")->size() == count);
+}
+#endif
