@@ -117,7 +117,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     int ret = mkfifo(m_resource_path.c_str(), 0600);
     if (ret == -1) {
         int err = errno;
-        if (err == ENOTSUP || err == EACCES || err == EPERM) {
+        if (err == ENOTSUP || err == EACCES || err == EPERM || err == EINVAL) {
             // Filesystem doesn't support named pipes, so try putting it in tmp instead
             // Hash collisions are okay here because they just result in doing
             // extra work, as opposed to correctness problems
