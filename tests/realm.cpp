@@ -1062,6 +1062,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     }
 }
 
+#if !WIN32
 TEST_CASE("SharedRealm: compact on launch") {
     // Make compactable Realm
     TestFile config;
@@ -1100,3 +1101,4 @@ TEST_CASE("SharedRealm: compact on launch") {
     // Validate that the file still contains what it should
     REQUIRE(r->read_group().get_table("class_object")->size() == count);
 }
+#endif
