@@ -2,7 +2,9 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* `mkfifo` on external storage fails with `EINVAL` on some devices with Android 7.x, which caused crash when opening Realm.
+  PR[#2574](https://github.com/realm/realm-core/pull/2574),
+  Issue [#4461](https://github.com/realm/realm-java/issues/4461).
 
 ### Breaking changes
 
