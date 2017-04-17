@@ -202,6 +202,17 @@ TEST_CASE("object") {
             });
             REQUIRE_INDICES(change.modifications, 0);
         }
+
+        SECTION("add notification callback, remove it, then add another notification callback") {
+            {
+                auto token = object.add_notification_callback([&](CollectionChangeSet, std::exception_ptr) {
+                    FAIL("This should never happen");
+                });
+            }
+            auto token = require_change();
+            write([&] { row.move_last_over(); });
+            REQUIRE_INDICES(change.deletions, 0);
+        }
     }
 
     CppContext context;
