@@ -93,10 +93,22 @@ public:
         return m_results.async(std::move(target));
     }
 
-    // Create a new instance by further filtering or sorting this instance.
+    // Create a new instance by further filtering this instance.
     PermissionResults filter(Query&& q) const
     {
         return PermissionResults(m_results.filter(std::move(q)));
+    }
+
+    // Create a new instance by sorting this instance.
+    PermissionResults sort(SortDescriptor&& s) const
+    {
+        return PermissionResults(m_results.sort(std::move(s)));
+    }
+
+    // Get the results.
+    Results& results()
+    {
+        return m_results;
     }
 
     // Don't use this constructor directly. Publicly exposed so `make_unique` can see it.
