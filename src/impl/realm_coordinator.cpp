@@ -774,8 +774,21 @@ void RealmCoordinator::advance_to_ready(Realm& realm)
     auto& sg = Realm::Internal::get_shared_group(realm);
     if (notifiers) {
         auto version = notifiers.version();
-        if (version && *version <= sg->get_version_of_current_transaction())
-            return;
+        if (version) {
+            auto current_version = sg->get_version_of_current_transaction();
+            // Notifications are out of date, so just discard
+            // This should only happen if begin_read() was used to change the
+            // read version outside of our control
+            if (*version < current_version)
+                return;
+            // While there is a newer version, notifications are for the current
+            // version so just deliver them without advancing
+            if (*version == current_version) {
+                notifiers.deliver(*sg);
+                notifiers.after_advance();
+                return;
+            }
+        }
     }
 
     transaction::advance(sg, realm.m_binding_context.get(), notifiers);
