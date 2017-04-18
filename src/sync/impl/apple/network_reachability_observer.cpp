@@ -24,7 +24,7 @@ using namespace realm;
 
 namespace {
 
-static NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFlags flags)
+NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFlags flags)
 {
     if (!(flags & kSCNetworkReachabilityFlagsReachable))
         return NotReachable;
@@ -46,7 +46,7 @@ static NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabi
     return status;
 }
 
-static void reachability_callback(SCNetworkReachabilityRef, SCNetworkReachabilityFlags, void* info)
+void reachability_callback(SCNetworkReachabilityRef, SCNetworkReachabilityFlags, void* info)
 {
     auto callback = reinterpret_cast<std::function<void ()> *>(info);
     (*callback)();
