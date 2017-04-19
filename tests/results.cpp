@@ -175,6 +175,14 @@ TEST_CASE("notifications: async delivery") {
                 r->cancel_transaction();
             }
         }
+
+        SECTION("is delivered by notify() even if there are later versions") {
+            REQUIRE(notification_calls == 0);
+            coordinator->on_change();
+            make_remote_change();
+            r->notify();
+            REQUIRE(notification_calls == 1);
+        }
     }
 
     advance_and_notify(*r);
