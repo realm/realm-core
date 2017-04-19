@@ -486,10 +486,9 @@ void EncryptedFileMapping::sync() noexcept
 void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 {
     REALM_ASSERT(m_access == File::access_ReadWrite);
-    REALM_ASSERT_EX(addr >= m_addr, addr, m_addr);
-    size_t first_accessed_local_page = ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr)) >> m_page_shift);
-    size_t num_pages = get_num_pages_for_size(size);
-    size_t last_accessed_local_page = first_accessed_local_page + num_pages;
+
+    size_t first_accessed_local_page = get_local_index_of_address(addr);
+    size_t last_accessed_local_page = get_local_index_of_address(addr, size == 0 ? 0 : size - 1);
     size_t up_to_date_pages_size = m_up_to_date_pages.size();
 
     for (size_t idx = first_accessed_local_page; idx <= last_accessed_local_page && idx < up_to_date_pages_size; ++idx) {
@@ -512,7 +511,7 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     m_addr = new_addr;
 
     m_first_page = new_file_offset >> m_page_shift;
-    size_t num_pages = get_num_pages_for_size(new_size);
+    size_t num_pages = new_size >> m_page_shift;
 
     m_up_to_date_pages.clear();
     m_dirty_pages.clear();

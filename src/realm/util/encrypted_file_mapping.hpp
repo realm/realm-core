@@ -65,7 +65,7 @@ public:
     void set(void* new_addr, size_t new_size, size_t new_file_offset);
 
     bool contains_page(size_t page_in_file) const;
-    size_t get_num_pages_for_size(size_t size) const;
+    size_t get_local_index_of_address(const void* addr, size_t offset = 0) const;
 
 private:
     SharedFileInfo& m_file;
@@ -97,24 +97,13 @@ private:
     void validate() noexcept;
 };
 
-
-inline size_t EncryptedFileMapping::get_num_pages_for_size(size_t size) const
+inline size_t EncryptedFileMapping::get_local_index_of_address(const void* addr, size_t offset) const
 {
-    if (size == 0) {
-        // If size is zero just refresh 1 page. This is also an early out
-        // to avoid subtraction wrapping under zero for (size - 1).
-        return 1;
-    } else if (size % (1 << m_page_shift) == 0) {
-        // When the size is a multiple of the page size a shift is sufficient.
-        return size >> m_page_shift;
-    } else {
-        // In the normal case (size > 0 and not a multiple of the page size),
-        // the size is midway through a page. In this case we must add 1 page
-        // to the result becuase we must still read that whole page but the
-        // shift (division) returns the floor of the result.
-        // Use (size - 1) before the shift because we start reading at byte 0.
-        return ((size - 1) >> m_page_shift) + 1;
-    }
+    REALM_ASSERT_EX(addr >= m_addr, addr, m_addr);
+
+    size_t local_ndx = ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr) + offset) >> m_page_shift);
+    REALM_ASSERT_EX(local_ndx < m_up_to_date_pages.size(), local_ndx, m_up_to_date_pages.size());
+    return local_ndx;
 }
 
 inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
@@ -127,8 +116,7 @@ inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
 inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, UniqueLock& lock,
                                                Header_to_size header_to_size)
 {
-    REALM_ASSERT_EX(addr >= m_addr, addr, m_addr);
-    size_t first_accessed_local_page = ((reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<uintptr_t>(m_addr)) >> m_page_shift);
+    size_t first_accessed_local_page = get_local_index_of_address(addr);
 
     // make sure the first page is available
     // Checking before taking the lock is important to performance.
@@ -148,8 +136,7 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Un
         size = header_to_size(static_cast<const char*>(addr));
     }
 
-    size_t num_pages = get_num_pages_for_size(size);
-    size_t last_idx = first_accessed_local_page + num_pages;
+    size_t last_idx = get_local_index_of_address(addr, size == 0 ? 0 : size - 1);
     size_t up_to_date_pages_size = m_up_to_date_pages.size();
 
     // We already checked first_accessed_local_page above, so we start the loop
