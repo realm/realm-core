@@ -5,6 +5,7 @@ import matplotlib as mpl
 # will be run from docker. It must be configured before importing pyplot
 mpl.use('Agg')
 import matplotlib.pyplot as plt
+import matplotlib.transforms as mtransforms
 from matplotlib.mlab import csv2rec
 from matplotlib.cbook import get_sample_data
 from matplotlib.ticker import Formatter, MultipleLocator
@@ -65,6 +66,16 @@ def writeReport(outputDirectory, summary):
 
     with open(outputDirectory + str('report.html'), 'w+') as reportFile:
         reportFile.write(html)
+
+def autoscale_based_on(ax, lines):
+    ax.dataLim = mtransforms.Bbox.unit()
+    # call once with ignore=True to escape being limited to the unit bounding box
+    fxy = np.vstack(lines[0].get_data()).T
+    ax.dataLim.update_from_data_xy(fxy, ignore=True)
+    for line in lines:
+        xy = np.vstack(line.get_data()).T
+        ax.dataLim.update_from_data_xy(xy, ignore=False)
+    ax.autoscale_view()
 
 def getThreshold(points):
     # assumes that data has 2 or more points
@@ -135,11 +146,15 @@ def generateReport(outputDirectory, csvFiles):
         tick_spacing = 1
         ax.xaxis.set_major_locator(MultipleLocator(tick_spacing))
 
+        lines_to_scale_to = []
         plt.grid(True)
         for rank, column in enumerate(metrics):
             line, = plt.plot(bench_data[column], lw=2.5, color=colors[column])
             line.set_label(column)
+            if column != "max":
+                lines_to_scale_to.append(line)
 
+        autoscale_based_on(ax, lines_to_scale_to)
         plt.legend(loc='upper left', fancybox=True, framealpha=0.7)
         plt.xlabel('Build')
         plt.ylabel('Seconds')
