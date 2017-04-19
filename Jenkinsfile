@@ -184,7 +184,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
     return {
         node('docker') {
             getArchive()
-            def stashName = "android/${abi}/${buildType}"
+            def stashName = "android___${abi}___${buildType}"
             def buildDir = "build-${stashName}"
             def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
             def environment = environment()
@@ -392,7 +392,7 @@ def doBuildMacOs(String buildType) {
             }
             archiveArtifacts("build-macos-${buildType}/*.tar.xz")
 
-            def stashName = "macos/${buildType}"
+            def stashName = "macos___${buildType}"
             stash includes:"build-macos-${buildType}/*.tar.xz", name:stashName
             cocoaStashes << stashName
             publishingStashes << stashName
@@ -416,7 +416,7 @@ def doBuildAppleDevice(String sdk, String buildType) {
                 }
             }
             archiveArtifacts("build-${sdk}-${buildType}/*.tar.xz")
-            def stashName = "${sdk}/${buildType}"
+            def stashName = "${sdk}___${buildType}"
             stash includes:"build-${sdk}-${buildType}/*.tar.xz", name:stashName
             cocoaStashes << stashName
             if(gitTag) {
@@ -516,6 +516,7 @@ def doPublishLocalArtifacts() {
                 unstash name: publishingStashes[i]
                 dir('temp') {
                     unstash name: publishingStashes[i]
+                    def path = publishingStashes[i].replaceAll('___', '/')
                     withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
                         sh "find . -type f -name \"*\" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/${gitDescribeVersion}/${publishingStashes[i]} \\;"
                     }
