@@ -631,9 +631,17 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
         return input;
     }
 
+    size_t rand() {
+        return seeded_rand.draw_int<size_t>();
+    }
+
     void before_all(SharedGroup& group)
     {
         BenchmarkWithStringsTable::before_all(group);
+
+        // chosen by fair dice roll, guaranteed to be random
+        static const unsigned long seed = 4;
+        seeded_rand.seed(seed);
 
         WriteTransaction tr(group);
         TableRef t = tr.get_table("StringOnly");
@@ -649,6 +657,7 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
     }
     std::string needle;
     bool successful = false;
+    Random seeded_rand;
 
     void before_each(SharedGroup& group)
     {
