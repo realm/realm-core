@@ -16,7 +16,6 @@
  *
  **************************************************************************/
 
-#include <cctype>
 #include <iostream>
 #include <sstream>
 
@@ -613,22 +612,17 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
         return ss.str();
     }
 
-    std::string shuffle_case(std::string input)
+    std::string shuffle_case(std::string str)
     {
-        for (size_t i = 0; i < input.size(); ++i) {
-            bool upper = (rand() % 2) == 0;
-            int c = input[i];
-            if (upper) {
-                c = std::toupper(c);
+        for (size_t i = 0; i < str.size(); ++i) {
+            char c = str[i];
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+                bool change_case = (rand() % 2) == 0;
+                c ^= change_case ? 0x20 : 0;
             }
-            else {
-                c = std::tolower(c);
-            }
-            if (c > 0) {
-                input[i] = c;
-            }
+            str[i] = c;
         }
-        return input;
+        return str;
     }
 
     size_t rand() {
