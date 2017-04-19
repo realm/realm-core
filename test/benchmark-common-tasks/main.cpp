@@ -608,7 +608,7 @@ struct BenchmarkQueryInsensitiveString : BenchmarkWithStringsTable {
         for (size_t c = 0; c < length; ++c) {
             bool lowercase = (rand() % 2) == 0;
             // choose characters from a-z or A-Z
-            ss << (rand() % 26) + (lowercase ? 97 : 65);
+            ss << char((rand() % 26) + (lowercase ? 97 : 65));
         }
         return ss.str();
     }
