@@ -185,7 +185,7 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
         node('docker') {
             getArchive()
             def stashName = "android___${abi}___${buildType}"
-            def buildDir = "build-${stashName}".replaceAll('___', '/')
+            def buildDir = "build-${stashName}".replaceAll('___', '-')
             def buildEnv = docker.build('realm-core-android:snapshot', '-f android.Dockerfile .')
             def environment = environment()
             withEnv(environment) {
