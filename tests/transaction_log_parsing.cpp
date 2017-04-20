@@ -2129,4 +2129,23 @@ TEST_CASE("DeepChangeChecker") {
         });
         REQUIRE(_impl::DeepChangeChecker(info, *table, tables)(0));
     }
+
+    SECTION("changes made in the 3rd elements in the link list") {
+        r->begin_transaction();
+        table->get_linklist(3, 0)->add(1);
+        table->get_linklist(3, 0)->add(2);
+        table->get_linklist(3, 0)->add(3);
+        table->set_link(1, 1, 0);
+        table->set_link(1, 2, 0);
+        table->set_link(1, 3, 0);
+        r->commit_transaction();
+
+        auto info = track_changes([&] {
+            table->set_int(0, 3, 42);
+        });
+        _impl::DeepChangeChecker checker(info, *table, tables);
+        REQUIRE(checker(1));
+        REQUIRE(checker(2));
+        REQUIRE(checker(3));
+    }
 }
