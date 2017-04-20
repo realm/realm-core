@@ -32,6 +32,7 @@
 #include <realm/link_view.hpp>
 #include <realm/util/assert.hpp>
 #include <realm/table_view.hpp>
+#include <realm/sync/object.hpp>
 
 #include <string>
 
@@ -246,23 +247,24 @@ Object Object::create(ContextType ctx, SharedRealm realm, const ObjectSchema &ob
         row_index = get_for_primary_key_impl(ctx, *table, *primary_prop, primary_value);
 
         if (row_index == realm::not_found) {
-            row_index = table->add_empty_row();
             created = true;
-            if (primary_prop->type == PropertyType::Int)
-                table->set_int_unique(primary_prop->table_column, row_index, Accessor::to_long(ctx, primary_value));
+            if (primary_prop->type == PropertyType::Int) {
+                row_index = sync::create_object_with_primary_key(realm->read_group(), *table, Accessor::to_long(ctx, primary_value));
+            }
             else if (primary_prop->type == PropertyType::String) {
                 auto value = Accessor::to_string(ctx, primary_value);
-                table->set_string_unique(primary_prop->table_column, row_index, value);
+                row_index = sync::create_object_with_primary_key(realm->read_group(), *table, value);
             }
-            else
-                REALM_UNREACHABLE();
+            else {
+                REALM_TERMINATE("Unsupported primary key type.");
+            }
         }
         else if (!try_update) {
             throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value.", object_schema.name));
         }
     }
     else {
-        row_index = table->add_empty_row();
+        row_index = sync::create_object(realm->read_group(), *table);
         created = true;
     }
 
