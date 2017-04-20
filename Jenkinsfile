@@ -340,7 +340,7 @@ def buildPerformance() {
           sh """
             cd test/bench
             mkdir -p core-benchmarks results
-            ./gen_bench_hist.sh ${env.BRANCH_NAME}
+            ./gen_bench_hist.sh origin/${env.CHANGE_TARGET}
             ./parse_bench_hist.py --local-html results/ core-benchmarks/
           """
           zip dir: 'test/bench', glob: 'core-benchmarks/**/*', zipFile: 'core-benchmarks.zip'
