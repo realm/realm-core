@@ -1706,7 +1706,7 @@ void Table::add_search_index(size_t col_ndx)
         throw LogicError(LogicError::illegal_combination);
 
     // Create the index
-    StringIndex* index = col.create_search_index(); // Throws
+    SearchIndex* index = col.create_search_index(); // Throws
     if (!index) {
         throw LogicError(LogicError::illegal_combination);
     }

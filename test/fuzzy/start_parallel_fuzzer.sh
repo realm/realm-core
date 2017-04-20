@@ -49,7 +49,7 @@ rm -rf findings/*
 
 # see also stop_parallel_fuzzer.sh
 time_out="1000" # ms
-memory="150" # MB
+memory="200" # MB
 
 echo "Starting $num_fuzzers fuzzers in parallel"
 

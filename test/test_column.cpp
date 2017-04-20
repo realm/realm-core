@@ -893,8 +893,8 @@ TEST(Column_IndexCrash)
     col.insert_rows(0, 1, 0, true);
     col.set(0, 0);
 
-    StringIndex& ndx = *col.get_search_index();
-    CHECK_EQUAL(ndx.count(int64_t(0)), 1);
+    auto ndx = col.get_search_index();
+    CHECK_EQUAL(ndx->count(int64_t(0)), 1);
 
     col.destroy();
 }

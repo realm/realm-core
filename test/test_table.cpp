@@ -2315,8 +2315,8 @@ TEST(Table_DistinctBool)
     TableView view = table.get_distinct_view(0);
 
     CHECK_EQUAL(2, view.size());
-    CHECK_EQUAL(0, view.get_source_ndx(1));
-    CHECK_EQUAL(1, view.get_source_ndx(0));
+    CHECK_EQUAL(0, view.get_source_ndx(0));
+    CHECK_EQUAL(1, view.get_source_ndx(1));
 }
 
 
@@ -3092,7 +3092,7 @@ TEST(Table_SpecMoveColumnsWithIndexes)
     foo->add_column(type_Int, "a");
     foo->add_search_index(0);
     foo->add_column(type_Int, "b");
-    StringIndex* a_index = tf::get_column(*foo, 0).get_search_index();
+    auto a_index = tf::get_column(*foo, 0).get_search_index();
     CHECK_EQUAL(1, a_index->get_ndx_in_parent());
 
     df::move_column(*desc, 0, 1);
@@ -3108,7 +3108,7 @@ TEST(Table_SpecMoveColumnsWithIndexes)
 
     foo->add_column(type_Int, "c");
     foo->add_search_index(0);
-    StringIndex* b_index = tf::get_column(*foo, 0).get_search_index();
+    auto b_index = tf::get_column(*foo, 0).get_search_index();
     CHECK_EQUAL(1, b_index->get_ndx_in_parent());
     CHECK_EQUAL(3, a_index->get_ndx_in_parent());
 

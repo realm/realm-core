@@ -570,6 +570,10 @@ size_t IndexArray::index_string_count(StringData value, ColumnBase* column) cons
     return index_string<index_Count>(value, unused, column);
 }
 
+SearchIndex::~SearchIndex()
+{
+}
+
 IndexArray* StringIndex::create_node(Allocator& alloc, bool is_leaf)
 {
     Array::Type type = is_leaf ? Array::type_HasRefs : Array::type_InnerBptreeNode;

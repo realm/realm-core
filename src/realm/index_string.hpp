@@ -24,6 +24,7 @@
 #include <array>
 
 #include <realm/array.hpp>
+#include <realm/array_integer.hpp>
 #include <realm/column_fwd.hpp>
 
 /*
@@ -97,8 +98,52 @@ private:
     void index_string_all_ins(StringData value, IntegerColumn& result, ColumnBase* column) const;
 };
 
+class SearchIndex {
+public:
+    // 12 is the biggest element size of any non-string/binary Realm type
+    static const size_t string_conversion_buffer_size = 12;
+    using StringConversionBuffer = std::array<char, string_conversion_buffer_size>;
 
-class StringIndex {
+    void set_top(Array* top)
+    {
+        m_arr = top;
+    }
+    virtual ~SearchIndex();
+
+    ref_type get_ref() const noexcept
+    {
+        return m_arr->get_ref();
+    }
+    bool is_attached() const noexcept
+    {
+        return m_arr->is_attached();
+    }
+    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
+    {
+        m_arr->set_parent(parent, ndx_in_parent);
+    }
+    size_t get_ndx_in_parent() const noexcept
+    {
+        return m_arr->get_ndx_in_parent();
+    }
+    void set_ndx_in_parent(size_t ndx_in_parent) noexcept
+    {
+        m_arr->set_ndx_in_parent(ndx_in_parent);
+    }
+    void destroy() noexcept
+    {
+        m_arr->destroy_deep();
+    }
+    virtual void update_from_parent(size_t old_baseline) noexcept = 0;
+    virtual void refresh_accessor_tree(size_t, const Spec&) = 0;
+    virtual void clear() = 0;
+    virtual void distinct(IntegerColumn& result) const = 0;
+
+private:
+    Array* m_arr = nullptr;
+};
+
+class StringIndex : public SearchIndex {
 public:
     StringIndex(ColumnBase* target_column, Allocator&);
     StringIndex(ref_type, ArrayParent*, size_t ndx_in_parent, ColumnBase* target_column, Allocator&);
@@ -109,21 +154,12 @@ public:
 
     // Accessor concept:
     Allocator& get_alloc() const noexcept;
-    void destroy() noexcept;
     void detach();
-    bool is_attached() const noexcept;
-    void set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept;
-    size_t get_ndx_in_parent() const noexcept;
-    void set_ndx_in_parent(size_t ndx_in_parent) noexcept;
-    void update_from_parent(size_t old_baseline) noexcept;
-    void refresh_accessor_tree(size_t, const Spec&);
-    ref_type get_ref() const noexcept;
+    void update_from_parent(size_t old_baseline) noexcept override;
+    void refresh_accessor_tree(size_t, const Spec&) override;
 
     // StringIndex interface:
 
-    // 12 is the biggest element size of any non-string/binary Realm type
-    static const size_t string_conversion_buffer_size = 12;
-    using StringConversionBuffer = std::array<char, string_conversion_buffer_size>;
 
     bool is_empty() const;
 
@@ -151,9 +187,9 @@ public:
     template <class T>
     void update_ref(T value, size_t old_row_ndx, size_t new_row_ndx);
 
-    void clear();
+    void clear() override;
 
-    void distinct(IntegerColumn& result) const;
+    void distinct(IntegerColumn& result) const override;
     bool has_duplicate_values() const noexcept;
 
     void verify() const;
@@ -258,18 +294,6 @@ private:
 #endif
 };
 
-
-class SortedListComparator {
-public:
-    SortedListComparator(ColumnBase& column_values);
-    bool operator()(int64_t ndx, StringData needle);
-    bool operator()(StringData needle, int64_t ndx);
-
-private:
-    ColumnBase& values;
-};
-
-
 // Implementation:
 
 template <class T>
@@ -350,6 +374,7 @@ inline StringIndex::StringIndex(ColumnBase* target_column, Allocator& alloc)
     : m_array(create_node(alloc, true)) // Throws
     , m_target_column(target_column)
 {
+    set_top(m_array.get());
 }
 
 inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in_parent, ColumnBase* target_column,
@@ -359,13 +384,16 @@ inline StringIndex::StringIndex(ref_type ref, ArrayParent* parent, size_t ndx_in
 {
     REALM_ASSERT_EX(Array::get_context_flag_from_header(alloc.translate(ref)), ref, size_t(alloc.translate(ref)));
     m_array->init_from_ref(ref);
+    set_top(m_array.get());
     set_parent(parent, ndx_in_parent);
+    set_top(m_array.get());
 }
 
 inline StringIndex::StringIndex(inner_node_tag, Allocator& alloc)
     : m_array(create_node(alloc, false)) // Throws
     , m_target_column(nullptr)
 {
+    set_top(m_array.get());
 }
 
 // Byte order of the key is *reversed*, so that for the integer index, the least significant
@@ -557,39 +585,9 @@ void StringIndex::update_ref(T value, size_t old_row_ndx, size_t new_row_ndx)
     do_update_ref(to_str(value, buffer), old_row_ndx, new_row_ndx, 0);
 }
 
-inline void StringIndex::destroy() noexcept
-{
-    return m_array->destroy_deep();
-}
-
-inline bool StringIndex::is_attached() const noexcept
-{
-    return m_array->is_attached();
-}
-
 inline void StringIndex::refresh_accessor_tree(size_t, const Spec&)
 {
     m_array->init_from_parent();
-}
-
-inline ref_type StringIndex::get_ref() const noexcept
-{
-    return m_array->get_ref();
-}
-
-inline void StringIndex::set_parent(ArrayParent* parent, size_t ndx_in_parent) noexcept
-{
-    m_array->set_parent(parent, ndx_in_parent);
-}
-
-inline size_t StringIndex::get_ndx_in_parent() const noexcept
-{
-    return m_array->get_ndx_in_parent();
-}
-
-inline void StringIndex::set_ndx_in_parent(size_t ndx_in_parent) noexcept
-{
-    m_array->set_ndx_in_parent(ndx_in_parent);
 }
 
 inline void StringIndex::update_from_parent(size_t old_baseline) noexcept

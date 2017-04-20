@@ -163,6 +163,7 @@ group_writer.cpp \
 impl/output_stream.cpp \
 impl/transact_log.cpp \
 impl/simulated_failure.cpp \
+index_integer.cpp \
 index_string.cpp \
 lang_bind_helper.cpp \
 link_view.cpp \

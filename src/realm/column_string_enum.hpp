@@ -115,7 +115,7 @@ public:
     {
         return true;
     }
-    StringIndex* create_search_index() override;
+    SearchIndex* create_search_index() override;
     void install_search_index(std::unique_ptr<StringIndex>) noexcept;
     void destroy_search_index() noexcept override;
 
@@ -146,6 +146,7 @@ public:
 private:
     // Member variables
     StringColumn m_keys;
+    std::unique_ptr<StringIndex> m_string_index;
     bool m_nullable;
 
     /// If you are appending and have the size of the column readily available,
