@@ -178,7 +178,6 @@ def doBuildInDocker(String buildType) {
     }
 }
 
-
 def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmulator) {
     def cores = 4
     return {
