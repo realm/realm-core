@@ -27,7 +27,10 @@
 #include <realm/table.hpp>
 #include <realm/table_view.hpp>
 #include <realm/util/assert.hpp>
+
+#if REALM_ENABLE_SYNC
 #include <realm/sync/object.hpp>
+#endif // REALM_ENABLE_SYNC
 
 #include <string.h>
 
@@ -56,22 +59,34 @@ void create_metadata_tables(Group& group) {
     // further investigation is required.
     // See https://github.com/realm/realm-java/issues/3651
 
-    TableRef table = sync::create_table(group, c_metadataTableName);
+#if REALM_ENABLE_SYNC
+    TableRef metadata_table = sync::create_table(group, c_metadataTableName);
+    TableRef pk_table = sync::create_table(group, c_primaryKeyTableName);
     const size_t empty_table_size = (sync::has_object_ids(group) ? 1 : 0);
-    if (table->get_column_count() == empty_table_size) {
-        table->insert_column(c_versionColumnIndex, type_Int, c_versionColumnName);
+#else
+    TableRef metadata_table = group.get_or_add_table(c_metadataTableName);
+    TableRef pk_table = group.get_or_add_table(c_primaryKeyTableName);
+    const size_t empty_table_size = 0;
+#endif // REALM_ENABLE_SYNC
+
+    if (metadata_table->get_column_count() == empty_table_size) {
+        metadata_table->insert_column(c_versionColumnIndex, type_Int, c_versionColumnName);
+
+#if REALM_ENABLE_SYNC
+        sync::create_object(group, *metadata_table);
+#else
+        metadata_table->add_empty_row();
+#endif // REALM_ENABLE_SYNC
 
         // set initial version
-        sync::create_object(group, *table);
-        table->set_int(c_versionColumnIndex, c_zeroRowIndex, ObjectStore::NotVersioned);
+        metadata_table->set_int(c_versionColumnIndex, c_zeroRowIndex, ObjectStore::NotVersioned);
     }
 
-    table = sync::create_table(group, c_primaryKeyTableName);
-    if (table->get_column_count() == empty_table_size) {
-        table->insert_column(c_primaryKeyObjectClassColumnIndex, type_String, c_primaryKeyObjectClassColumnName);
-        table->insert_column(c_primaryKeyPropertyNameColumnIndex, type_String, c_primaryKeyPropertyNameColumnName);
+    if (pk_table->get_column_count() == empty_table_size) {
+        pk_table->insert_column(c_primaryKeyObjectClassColumnIndex, type_String, c_primaryKeyObjectClassColumnName);
+        pk_table->insert_column(c_primaryKeyPropertyNameColumnIndex, type_String, c_primaryKeyPropertyNameColumnName);
     }
-    table->add_search_index(c_primaryKeyObjectClassColumnIndex);
+    pk_table->add_search_index(c_primaryKeyObjectClassColumnIndex);
 }
 
 void set_schema_version(Group& group, uint64_t version) {
@@ -108,7 +123,11 @@ void insert_column(Group& group, Table& table, Property const& property, size_t 
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
         if (!link_table) {
+#if REALM_ENABLE_SYNC
             link_table = sync::create_table(group, target_name);
+#else
+            link_table = group.add_table(target_name);
+#endif // REALM_ENABLE_SYNC
         }
         table.insert_column_link(col_ndx, DataType(property.type), property.name, *link_table);
     }
@@ -133,8 +152,15 @@ void replace_column(Group& group, Table& table, Property const& old_property, Pr
 TableRef create_table(Group& group, ObjectSchema const& object_schema)
 {
     auto name = ObjectStore::table_name_for_object_type(object_schema.name);
+
+#if REALM_ENABLE_SYNC
     TableRef table = sync::create_table(group, name);
     const size_t empty_table_column_count = sync::has_object_ids(group) ? 1 : 0;
+#else
+    TableRef table = group.get_or_add_table(name);
+    const size_t empty_table_column_count = 0;
+#endif // REALM_ENABLE_SYNC
+
     if (table->get_column_count() > empty_table_column_count) {
         return table;
     }
@@ -227,7 +253,11 @@ void ObjectStore::set_schema_version(Group& group, uint64_t version) {
 
 uint64_t ObjectStore::get_schema_version(Group const& group) {
     ConstTableRef table = group.get_table(c_metadataTableName);
+#if REALM_ENABLE_SYNC
     const size_t empty_table_size = (sync::has_object_ids(group) ? 1 : 0);
+#else
+    const size_t empty_table_size = 0;
+#endif // REALM_ENABLE_SYNC
     if (!table || table->get_column_count() == empty_table_size) {
         return ObjectStore::NotVersioned;
     }
@@ -252,13 +282,21 @@ void ObjectStore::set_primary_key_for_object(Group& group, StringData object_typ
     // get row or create if new object and populate
     size_t row = table->find_first_string(c_primaryKeyObjectClassColumnIndex, object_type);
     if (row == not_found && primary_key.size()) {
+#if REALM_ENABLE_SYNC
         row = sync::create_object_with_primary_key(group, *table, object_type);
+#else
+        row = table->add_empty_row();
+        table->set_string_unique(c_primaryKeyObjectClassColumnIndex, row, object_type);
+#endif // REALM_ENABLE_SYNC
         table->set_string(c_primaryKeyPropertyNameColumnIndex, row, primary_key);
         return;
     }
 
     // set if changing, or remove if setting to nil
+#if REALM_ENABLE_SYNC
     REALM_ASSERT(row == realm::npos || !sync::has_object_ids(group)); // Destructive schema changes not allowed
+#endif // REALM_ENABLE_SYNC
+
     if (primary_key.size() == 0) {
         if (row != not_found) {
             table->move_last_over(row);
