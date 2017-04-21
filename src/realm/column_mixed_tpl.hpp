@@ -500,8 +500,7 @@ inline void MixedColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 inline void MixedColumn::RefsColumn::refresh_accessor_tree(size_t col_ndx, const Spec& spec)
 {
     SubtableColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
-    size_t spec_ndx_in_parent = 0;                            // Ignored because these are root tables
-    m_subtable_map.refresh_accessor_tree(spec_ndx_in_parent); // Throws
+    m_subtable_map.refresh_accessor_tree();                   // Throws
 }
 
 } // namespace realm

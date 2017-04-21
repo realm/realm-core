@@ -507,8 +507,8 @@ public:
 
     virtual void swap_rows(const Table*, size_t row_ndx_1, size_t row_ndx_2);
     virtual void merge_rows(const Table*, size_t row_ndx, size_t new_row_ndx);
-    virtual void add_search_index(const Table*, size_t col_ndx);
-    virtual void remove_search_index(const Table*, size_t col_ndx);
+    virtual void add_search_index(const Descriptor&, size_t col_ndx);
+    virtual void remove_search_index(const Descriptor&, size_t col_ndx);
     virtual void set_link_type(const Table*, size_t col_ndx, LinkType);
     virtual void clear_table(const Table*);
     virtual void optimize_table(const Table*);
@@ -1508,9 +1508,9 @@ inline bool TransactLogEncoder::add_search_index(size_t col_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::add_search_index(const Table* t, size_t col_ndx)
+inline void TransactLogConvenientEncoder::add_search_index(const Descriptor& desc, size_t col_ndx)
 {
-    select_table(t);                     // Throws
+    select_desc(desc);                   // Throws
     m_encoder.add_search_index(col_ndx); // Throws
 }
 
@@ -1521,9 +1521,9 @@ inline bool TransactLogEncoder::remove_search_index(size_t col_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::remove_search_index(const Table* t, size_t col_ndx)
+inline void TransactLogConvenientEncoder::remove_search_index(const Descriptor& desc, size_t col_ndx)
 {
-    select_table(t);                        // Throws
+    select_desc(desc);                      // Throws
     m_encoder.remove_search_index(col_ndx); // Throws
 }
 
