@@ -34,40 +34,43 @@ Spec::~Spec() noexcept
 
 void Spec::init(MemRef mem) noexcept
 {
-    m_top.init_from_mem(mem);
-    size_t top_size = m_top.size();
-    REALM_ASSERT(top_size >= 3 && top_size <= 5);
+    if (m_top.m_data != mem.get_addr()) {
 
-    m_types.init_from_ref(m_top.get_as_ref(0));
-    m_types.set_parent(&m_top, 0);
-    m_names.init_from_ref(m_top.get_as_ref(1));
-    m_names.set_parent(&m_top, 1);
-    m_attr.init_from_ref(m_top.get_as_ref(2));
-    m_attr.set_parent(&m_top, 2);
+        m_top.init_from_mem(mem);
+        size_t top_size = m_top.size();
+        REALM_ASSERT(top_size >= 3 && top_size <= 5);
 
-    // Reset optional subarrays in the case of moving
-    // from initialized children to uninitialized
-    m_subspecs.detach();
-    m_enumkeys.detach();
-    m_subspec_ptrs.clear();
+        m_types.init_from_ref(m_top.get_as_ref(0));
+        m_types.set_parent(&m_top, 0);
+        m_names.init_from_ref(m_top.get_as_ref(1));
+        m_names.set_parent(&m_top, 1);
+        m_attr.init_from_ref(m_top.get_as_ref(2));
+        m_attr.set_parent(&m_top, 2);
 
-    // Subspecs array is only there and valid when there are subtables
-    // if there are enumkey, but no subtables yet it will be a zero-ref
-    if (has_subspec()) {
-        ref_type ref = m_top.get_as_ref(3);
-        m_subspecs.init_from_ref(ref);
-        m_subspecs.set_parent(&m_top, 3);
-        update_subspec_ptrs();
-        m_subspec_ptrs.resize(m_subspecs.size());
+        // Reset optional subarrays in the case of moving
+        // from initialized children to uninitialized
+        m_subspecs.detach();
+        m_enumkeys.detach();
+        m_subspec_ptrs.clear();
+
+        // Subspecs array is only there and valid when there are subtables
+        // if there are enumkey, but no subtables yet it will be a zero-ref
+        if (has_subspec()) {
+            ref_type ref = m_top.get_as_ref(3);
+            m_subspecs.init_from_ref(ref);
+            m_subspecs.set_parent(&m_top, 3);
+            update_subspec_ptrs();
+            m_subspec_ptrs.resize(m_subspecs.size());
+        }
+
+        // Enumkeys array is only there when there are StringEnum columns
+        if (top_size >= 5) {
+            m_enumkeys.init_from_ref(m_top.get_as_ref(4));
+            m_enumkeys.set_parent(&m_top, 4);
+        }
+
+        update_has_strong_link_columns();
     }
-
-    // Enumkeys array is only there when there are StringEnum columns
-    if (top_size >= 5) {
-        m_enumkeys.init_from_ref(m_top.get_as_ref(4));
-        m_enumkeys.set_parent(&m_top, 4);
-    }
-
-    update_has_strong_link_columns();
 }
 
 Spec* Spec::get_subspec_by_ndx(size_t subspec_ndx) noexcept
