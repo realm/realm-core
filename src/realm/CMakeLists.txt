@@ -115,6 +115,7 @@ set(REALM_INSTALL_GENERAL_HEADERS
     query_conditions.hpp
     query_engine.hpp
     query_expression.hpp
+    query_operators.hpp
     realm_nmmintrin.h
     replication.hpp
     row.hpp
@@ -158,6 +159,7 @@ set(REALM_INSTALL_UTIL_HEADERS
     # util/interprocess_mutex.hpp
     util/logger.hpp
     util/memory_stream.hpp
+    util/meta.hpp
     util/misc_errors.hpp
     util/miscellaneous.hpp
     util/optional.hpp
