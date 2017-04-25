@@ -31,16 +31,11 @@ SystemConfiguration::SystemConfiguration()
     m_framework_handle = dlopen("/System/Library/Frameworks/SystemConfiguration.framework/SystemConfiguration", RTLD_LAZY);
 
     if (m_framework_handle) {
-        m_network_reachability_create_with_name = (network_reachability_create_with_name_t)dlsym(m_framework_handle,
-                                                                                                 "SCNetworkReachabilityCreateWithName");
-        m_network_reachability_create_with_address = (network_reachability_create_with_address_t)dlsym(m_framework_handle,
-                                                                                                       "SCNetworkReachabilityCreateWithAddress");
-        m_network_reachability_set_dispatch_queue = (network_reachability_set_dispatch_queue_t)dlsym(m_framework_handle,
-                                                                                                     "SCNetworkReachabilitySetDispatchQueue");
-        m_network_reachability_set_callback = (network_reachability_set_callback_t)dlsym(m_framework_handle,
-                                                                                         "SCNetworkReachabilitySetCallback");
-        m_network_reachability_get_flags = (network_reachability_get_flags_t)dlsym(m_framework_handle,
-                                                                                   "SCNetworkReachabilityGetFlags");
+        m_create_with_name = (create_with_name_t)dlsym(m_framework_handle, "SCNetworkReachabilityCreateWithName");
+        m_create_with_address = (create_with_address_t)dlsym(m_framework_handle, "SCNetworkReachabilityCreateWithAddress");
+        m_set_dispatch_queue = (set_dispatch_queue_t)dlsym(m_framework_handle, "SCNetworkReachabilitySetDispatchQueue");
+        m_set_callback = (set_callback_t)dlsym(m_framework_handle, "SCNetworkReachabilitySetCallback");
+        m_get_flags = (get_flags_t)dlsym(m_framework_handle, "SCNetworkReachabilityGetFlags");
     } else {
         asl_log(nullptr, nullptr, ASL_LEVEL_WARNING, "network reachability is not available");
     }
@@ -56,8 +51,8 @@ SystemConfiguration& SystemConfiguration::shared()
 SCNetworkReachabilityRef SystemConfiguration::network_reachability_create_with_name(CFAllocatorRef allocator,
                                                                                     const char *hostname)
 {
-    if (m_network_reachability_create_with_name)
-        return m_network_reachability_create_with_name(allocator, hostname);
+    if (m_create_with_name)
+        return m_create_with_name(allocator, hostname);
 
     return nullptr;
 }
@@ -65,16 +60,16 @@ SCNetworkReachabilityRef SystemConfiguration::network_reachability_create_with_n
 SCNetworkReachabilityRef SystemConfiguration::network_reachability_create_with_address(CFAllocatorRef allocator,
                                                                                        const sockaddr *address)
 {
-    if (m_network_reachability_create_with_address)
-        return m_network_reachability_create_with_address(allocator, address);
+    if (m_create_with_address)
+        return m_create_with_address(allocator, address);
     
     return nullptr;
 }
 
 bool SystemConfiguration::network_reachability_set_dispatch_queue(SCNetworkReachabilityRef target, dispatch_queue_t queue)
 {
-    if (m_network_reachability_set_dispatch_queue)
-        return m_network_reachability_set_dispatch_queue(target, queue);
+    if (m_set_dispatch_queue)
+        return m_set_dispatch_queue(target, queue);
 
     return false;
 }
@@ -83,16 +78,16 @@ bool SystemConfiguration::network_reachability_set_callback(SCNetworkReachabilit
                                                             SCNetworkReachabilityCallBack callback,
                                                             SCNetworkReachabilityContext *context)
 {
-    if (m_network_reachability_set_callback)
-        return m_network_reachability_set_callback(target, callback, context);
+    if (m_set_callback)
+        return m_set_callback(target, callback, context);
 
     return false;
 }
 
 bool SystemConfiguration::network_reachability_get_flags(SCNetworkReachabilityRef target, SCNetworkReachabilityFlags *flags)
 {
-    if (m_network_reachability_get_flags)
-        return m_network_reachability_get_flags(target, flags);
+    if (m_get_flags)
+        return m_get_flags(target, flags);
 
     return false;
 }

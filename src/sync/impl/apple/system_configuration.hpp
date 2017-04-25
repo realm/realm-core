@@ -45,23 +45,23 @@ public:
                                         SCNetworkReachabilityFlags *flags);
 
 private:
-    using network_reachability_create_with_name_t = SCNetworkReachabilityRef(*)(CFAllocatorRef, const char*);
-    using network_reachability_create_with_address_t = SCNetworkReachabilityRef(*)(CFAllocatorRef, const sockaddr*);
-    using network_reachability_set_dispatch_queue_t = bool(*)(SCNetworkReachabilityRef, dispatch_queue_t);
-    using network_reachability_set_callback_t = bool(*)(SCNetworkReachabilityRef,
-                                                        SCNetworkReachabilityCallBack,
-                                                        SCNetworkReachabilityContext*);
-    using network_reachability_get_flags_t = bool(*)(SCNetworkReachabilityRef, SCNetworkReachabilityFlags*);
+    using create_with_name_t = SCNetworkReachabilityRef(*)(CFAllocatorRef, const char*);
+    using create_with_address_t = SCNetworkReachabilityRef(*)(CFAllocatorRef, const sockaddr*);
+    using set_dispatch_queue_t = bool(*)(SCNetworkReachabilityRef, dispatch_queue_t);
+    using set_callback_t = bool(*)(SCNetworkReachabilityRef,
+                                   SCNetworkReachabilityCallBack,
+                                   SCNetworkReachabilityContext*);
+    using get_flags_t = bool(*)(SCNetworkReachabilityRef, SCNetworkReachabilityFlags*);
 
     SystemConfiguration();
 
     void* m_framework_handle;
 
-    network_reachability_create_with_name_t m_network_reachability_create_with_name = nullptr;
-    network_reachability_create_with_address_t m_network_reachability_create_with_address = nullptr;
-    network_reachability_set_dispatch_queue_t m_network_reachability_set_dispatch_queue = nullptr;
-    network_reachability_set_callback_t m_network_reachability_set_callback = nullptr;
-    network_reachability_get_flags_t m_network_reachability_get_flags = nullptr;
+    create_with_name_t m_create_with_name = nullptr;
+    create_with_address_t m_create_with_address = nullptr;
+    set_dispatch_queue_t m_set_dispatch_queue = nullptr;
+    set_callback_t m_set_callback = nullptr;
+    get_flags_t m_get_flags = nullptr;
 };
 
 } // namespace _impl
