@@ -58,14 +58,12 @@ struct SyncClient {
     }) // Throws
 #if NETWORK_REACHABILITY_AVAILABLE
     , m_reachability_observer(none, [=](const NetworkReachabilityStatus status) {
-        if (status != NotReachable) {
+        if (status != NotReachable)
             cancel_reconnect_delay();
-        }
     })
     {
-        if (!m_reachability_observer.start_observing()) {
+        if (!m_reachability_observer.start_observing())
             m_logger->error("Failed to set up network reachability observer");
-        }
     }
 #else
     {

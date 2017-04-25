@@ -56,9 +56,8 @@ SystemConfiguration& SystemConfiguration::shared()
 SCNetworkReachabilityRef SystemConfiguration::network_reachability_create_with_name(CFAllocatorRef allocator,
                                                                                     const char *hostname)
 {
-    if (m_network_reachability_create_with_name) {
+    if (m_network_reachability_create_with_name)
         return m_network_reachability_create_with_name(allocator, hostname);
-    }
 
     return nullptr;
 }
@@ -66,18 +65,16 @@ SCNetworkReachabilityRef SystemConfiguration::network_reachability_create_with_n
 SCNetworkReachabilityRef SystemConfiguration::network_reachability_create_with_address(CFAllocatorRef allocator,
                                                                                        const sockaddr *address)
 {
-    if (m_network_reachability_create_with_address) {
+    if (m_network_reachability_create_with_address)
         return m_network_reachability_create_with_address(allocator, address);
-    }
     
     return nullptr;
 }
 
 bool SystemConfiguration::network_reachability_set_dispatch_queue(SCNetworkReachabilityRef target, dispatch_queue_t queue)
 {
-    if (m_network_reachability_set_dispatch_queue) {
+    if (m_network_reachability_set_dispatch_queue)
         return m_network_reachability_set_dispatch_queue(target, queue);
-    }
 
     return false;
 }
@@ -86,18 +83,16 @@ bool SystemConfiguration::network_reachability_set_callback(SCNetworkReachabilit
                                                             SCNetworkReachabilityCallBack callback,
                                                             SCNetworkReachabilityContext *context)
 {
-    if (m_network_reachability_set_callback) {
+    if (m_network_reachability_set_callback)
         return m_network_reachability_set_callback(target, callback, context);
-    }
 
     return false;
 }
 
 bool SystemConfiguration::network_reachability_get_flags(SCNetworkReachabilityRef target, SCNetworkReachabilityFlags *flags)
 {
-    if (m_network_reachability_get_flags) {
+    if (m_network_reachability_get_flags)
         return m_network_reachability_get_flags(target, flags);
-    }
 
     return false;
 }

@@ -39,9 +39,8 @@ NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFla
     NetworkReachabilityStatus status = ReachableViaWiFi;
 
 #if TARGET_OS_IPHONE
-    if (flags & kSCNetworkReachabilityFlagsIsWWAN) {
+    if (flags & kSCNetworkReachabilityFlagsIsWWAN)
         status = ReachableViaWWAN;
-    }
 #endif
 
     return status;
@@ -84,9 +83,8 @@ NetworkReachabilityStatus NetworkReachabilityObserver::reachability_status() con
 {
     SCNetworkReachabilityFlags flags;
 
-    if (SystemConfiguration::shared().network_reachability_get_flags(m_reachability_ref.get(), &flags)) {
+    if (SystemConfiguration::shared().network_reachability_get_flags(m_reachability_ref.get(), &flags))
         return reachability_status_for_flags(flags);
-    }
 
     return NotReachable;
 }
@@ -97,13 +95,11 @@ bool NetworkReachabilityObserver::start_observing()
 
     SCNetworkReachabilityContext context = {0, &m_reachability_callback, nullptr, nullptr, nullptr};
 
-    if (!SystemConfiguration::shared().network_reachability_set_callback(m_reachability_ref.get(), reachability_callback, &context)) {
+    if (!SystemConfiguration::shared().network_reachability_set_callback(m_reachability_ref.get(), reachability_callback, &context))
         return false;
-    }
 
-    if (!SystemConfiguration::shared().network_reachability_set_dispatch_queue(m_reachability_ref.get(), m_callback_queue)) {
+    if (!SystemConfiguration::shared().network_reachability_set_dispatch_queue(m_reachability_ref.get(), m_callback_queue))
         return false;
-    }
 
     return true;
 }
