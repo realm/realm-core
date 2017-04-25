@@ -26,6 +26,7 @@
 #include <SystemConfiguration/SystemConfiguration.h>
 
 namespace realm {
+namespace _impl {
 
 class SystemConfiguration {
 public:
@@ -63,6 +64,7 @@ private:
     network_reachability_get_flags_t m_network_reachability_get_flags = nullptr;
 };
 
+} // namespace _impl
 } // namespace realm
 
 #endif // NETWORK_REACHABILITY_AVAILABLE

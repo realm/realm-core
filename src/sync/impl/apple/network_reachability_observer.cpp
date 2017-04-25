@@ -21,6 +21,7 @@
 #if NETWORK_REACHABILITY_AVAILABLE
 
 using namespace realm;
+using namespace realm::_impl;
 
 namespace {
 

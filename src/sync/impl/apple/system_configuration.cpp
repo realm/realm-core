@@ -24,6 +24,7 @@
 #include "dlfcn.h"
 
 using namespace realm;
+using namespace realm::_impl;
 
 SystemConfiguration::SystemConfiguration()
 {

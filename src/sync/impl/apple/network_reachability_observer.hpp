@@ -32,6 +32,7 @@
 #include "sync/impl/apple/system_configuration.hpp"
 
 namespace realm {
+namespace _impl {
 
 enum NetworkReachabilityStatus {
     NotReachable,
@@ -61,7 +62,8 @@ private:
     std::function<void (const NetworkReachabilityStatus)> m_change_handler;
 };
 
-}
+} // namespace _impl
+} // namespace realm
 
 #endif // NETWORK_REACHABILITY_AVAILABLE
 
