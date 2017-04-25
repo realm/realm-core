@@ -64,7 +64,7 @@ struct SyncClient {
     })
     {
         if (!m_reachability_observer.start_observing()) {
-            m_logger->error("Failed to setup network reachability observer");
+            m_logger->error("Failed to set up network reachability observer");
         }
     }
 #else
