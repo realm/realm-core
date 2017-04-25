@@ -20,7 +20,7 @@
 
 #if NETWORK_REACHABILITY_AVAILABLE
 
-#include <asl.h>
+#include <os/log.h>
 #include "dlfcn.h"
 
 using namespace realm;
@@ -37,7 +37,7 @@ SystemConfiguration::SystemConfiguration()
         m_set_callback = (set_callback_t)dlsym(m_framework_handle, "SCNetworkReachabilitySetCallback");
         m_get_flags = (get_flags_t)dlsym(m_framework_handle, "SCNetworkReachabilityGetFlags");
     } else {
-        asl_log(nullptr, nullptr, ASL_LEVEL_WARNING, "network reachability is not available");
+        os_log_info(OS_LOG_DEFAULT, "network reachability is not available");
     }
 }
 
