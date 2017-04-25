@@ -46,18 +46,11 @@ NetworkReachabilityStatus reachability_status_for_flags(SCNetworkReachabilityFla
     return status;
 }
 
-void reachability_callback(SCNetworkReachabilityRef, SCNetworkReachabilityFlags, void* info)
-{
-    auto callback = reinterpret_cast<std::function<void ()> *>(info);
-    (*callback)();
-}
-
 } // (anonymous namespace)
 
 NetworkReachabilityObserver::NetworkReachabilityObserver(util::Optional<std::string> hostname,
                                                          std::function<void (const NetworkReachabilityStatus)> handler)
 : m_callback_queue(dispatch_queue_create("io.realm.sync.reachability", DISPATCH_QUEUE_SERIAL))
-, m_reachability_callback([=]() { reachability_changed(); })
 , m_change_handler(std::move(handler))
 {
     if (hostname) {
@@ -93,9 +86,13 @@ bool NetworkReachabilityObserver::start_observing()
 {
     m_previous_status = reachability_status();
 
-    SCNetworkReachabilityContext context = {0, &m_reachability_callback, nullptr, nullptr, nullptr};
+    auto callback = [](SCNetworkReachabilityRef, SCNetworkReachabilityFlags, void* self) {
+        static_cast<NetworkReachabilityObserver*>(self)->reachability_changed();
+    };
 
-    if (!SystemConfiguration::shared().network_reachability_set_callback(m_reachability_ref.get(), reachability_callback, &context))
+    SCNetworkReachabilityContext context = {0, this, nullptr, nullptr, nullptr};
+
+    if (!SystemConfiguration::shared().network_reachability_set_callback(m_reachability_ref.get(), callback, &context))
         return false;
 
     if (!SystemConfiguration::shared().network_reachability_set_dispatch_queue(m_reachability_ref.get(), m_callback_queue))

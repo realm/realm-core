@@ -58,7 +58,6 @@ private:
     util::CFPtr<SCNetworkReachabilityRef> m_reachability_ref;
     NetworkReachabilityStatus m_previous_status;
     dispatch_queue_t m_callback_queue;
-    std::function<void ()> m_reachability_callback;
     std::function<void (const NetworkReachabilityStatus)> m_change_handler;
 };
 
