@@ -1764,41 +1764,43 @@ void Group::update_table_indices(F&& map_function)
     // Update any link columns.
     for (size_t i = 0; i < m_tables.size(); ++i) {
         Array table_top{m_alloc};
-        table_top.set_parent(&m_tables, i);
-        table_top.init_from_parent();
-        Spec spec{m_alloc};
-        size_t spec_ndx_in_parent = 0;
-        spec.set_parent(&table_top, spec_ndx_in_parent);
-        spec.init_from_parent();
+        Spec dummy_spec{m_alloc};
+        Spec* spec = &dummy_spec;
 
-        size_t num_cols = spec.get_column_count();
+        // Ensure that we use spec objects in potential table accessors
+        Table* table = m_table_accessors.empty() ? nullptr : m_table_accessors[i];
+        if (table) {
+            spec = &tf::get_spec(*table);
+            table->set_ndx_in_parent(i);
+        }
+        else {
+            table_top.set_parent(&m_tables, i);
+            table_top.init_from_parent();
+            dummy_spec.set_parent(&table_top, 0); // Spec has index 0 in table top
+            dummy_spec.init_from_parent();
+        }
+
+        size_t num_cols = spec->get_column_count();
         bool spec_changed = false;
         for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
-            ColumnType type = spec.get_column_type(col_ndx);
+            ColumnType type = spec->get_column_type(col_ndx);
             if (tf::is_link_type(type) || type == col_type_BackLink) {
-                size_t table_ndx = spec.get_opposite_link_table_ndx(col_ndx);
+                size_t table_ndx = spec->get_opposite_link_table_ndx(col_ndx);
                 size_t new_table_ndx = map_function(table_ndx);
                 if (new_table_ndx != table_ndx) {
-                    spec.set_opposite_link_table_ndx(col_ndx, new_table_ndx); // Throws
+                    spec->set_opposite_link_table_ndx(col_ndx, new_table_ndx); // Throws
                     spec_changed = true;
                 }
             }
         }
 
-        if (spec_changed && !m_table_accessors.empty() && m_table_accessors[i] != nullptr) {
-            tf::mark(*m_table_accessors[i]);
+        if (spec_changed && table) {
+            tf::mark(*table);
         }
     }
 
     // Update accessors.
     refresh_dirty_accessors(); // Throws
-
-    // Table's specs might have changed, so they need to be reinitialized.
-    for (const auto& table_accessor : m_table_accessors) {
-        if (Table* t = table_accessor) {
-            tf::get_spec(*t).init_from_parent();
-        }
-    }
 }
 
 

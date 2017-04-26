@@ -239,12 +239,6 @@ inline const Spec* Spec::get_subspec_by_ndx(size_t subspec_ndx) const noexcept
     return const_cast<Spec*>(this)->get_subspec_by_ndx(subspec_ndx);
 }
 
-inline void Spec::init(ref_type ref) noexcept
-{
-    MemRef mem(ref, get_alloc());
-    init(mem);
-}
-
 inline void Spec::init_from_parent() noexcept
 {
     ref_type ref = m_top.get_ref_from_parent();
