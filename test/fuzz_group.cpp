@@ -87,6 +87,7 @@ enum INS {
     CLOSE_AND_REOPEN,
     GET_ALL_COLUMN_NAMES,
     CREATE_TABLE_VIEW,
+    CREATE_SUBTABLE_VIEW,
     COMPACT,
     SWAP_ROWS,
     MOVE_COLUMN,
@@ -327,6 +328,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
             *log << "Group& g = const_cast<Group&>(sg_w.begin_write());\n";
             *log << "Group& g_r = const_cast<Group&>(sg_r.begin_read());\n";
             *log << "std::vector<TableView> table_views;\n";
+            *log << "std::vector<TableRef> subtable_refs;\n";
 
             *log << "\n";
         }
@@ -339,6 +341,7 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
         Group& g = const_cast<Group&>(sg_w.begin_write());
         Group& g_r = const_cast<Group&>(sg_r.begin_read());
         std::vector<TableView> table_views;
+        std::vector<TableRef> subtable_refs;
 
         for (;;) {
             char instr = get_next(s) % COUNT;
@@ -434,25 +437,59 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 size_t table_ndx = get_next(s) % g.size();
                 DataType type = get_type(get_next(s));
                 std::string name = create_column_name(s);
-                // Mixed and Subtable cannot be nullable. For other types, chose nullability randomly
-                bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
-                if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \"" << name
-                         << "\", " << (nullable ? "true" : "false") << ");\n";
+                // Mixed cannot be nullable. For other types, chose nullability randomly
+                bool nullable = (type == type_Mixed) ? false : (get_next(s) % 2 == 0);
+                if (type != type_Table) {
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->add_column(DataType(" << int(type) << "), \""
+                             << name << "\", " << (nullable ? "true" : "false") << ");\n";
+                    }
+                    g.get_table(table_ndx)->add_column(type, name, nullable);
                 }
-                g.get_table(table_ndx)->add_column(type, name, nullable);
+                else {
+                    bool subnullable = (get_next(s) % 2 == 0);
+                    if (log) {
+                        *log << "{\n"
+                             << "DescriptorRef subdescr;\n"
+                             << "g.get_table(" << table_ndx << ")->add_column(type_Table, \"" << name << "\", "
+                             << (nullable ? "true" : "false") << ", &subdescr);\n"
+                             << "subdescr->add_column(type_Int, \"integers\", nullptr, "
+                             << (subnullable ? "true" : "false") << ");\n"
+                             << "}\n";
+                    }
+                    DescriptorRef subdescr;
+                    g.get_table(table_ndx)->add_column(type, name, subnullable, &subdescr);
+                    subdescr->add_column(type_Int, "integers", nullptr, subnullable);
+                }
             }
             else if (instr == INSERT_COLUMN && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
                 size_t col_ndx = get_next(s) % (g.get_table(table_ndx)->get_column_count() + 1);
                 DataType type = get_type(get_next(s));
                 std::string name = create_column_name(s);
-                bool nullable = (type == type_Mixed || type == type_Table) ? false : (get_next(s) % 2 == 0);
-                if (log) {
-                    *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType("
-                         << int(type) << "), \"" << name << "\", " << (nullable ? "true" : "false") << ");\n";
+                bool nullable = (type == type_Mixed) ? false : (get_next(s) % 2 == 0);
+                if (type != type_Table) {
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", DataType("
+                             << int(type) << "), \"" << name << "\", " << (nullable ? "true" : "false") << ");\n";
+                    }
+                    g.get_table(table_ndx)->insert_column(col_ndx, type, name, nullable);
                 }
-                g.get_table(table_ndx)->insert_column(col_ndx, type, name, nullable);
+                else {
+                    bool subnullable = (get_next(s) % 2 == 0);
+                    if (log) {
+                        *log << "{\n"
+                             << "DescriptorRef subdescr;\n"
+                             << "g.get_table(" << table_ndx << ")->insert_column(" << col_ndx << ", type_Table, "
+                             << "\"" << name << "\", " << (nullable ? "true" : "false") << ", &subdescr);\n"
+                             << "subdescr->add_column(type_Int, \"integers\", nullptr, "
+                             << (subnullable ? "true" : "false") << ");\n"
+                             << "}\n";
+                    }
+                    DescriptorRef subdescr;
+                    g.get_table(table_ndx)->insert_column(col_ndx, type, name, subnullable, &subdescr);
+                    subdescr->add_column(type_Int, "integers", nullptr, subnullable);
+                }
             }
             else if (instr == REMOVE_COLUMN && g.size() > 0) {
                 size_t table_ndx = get_next(s) % g.size();
@@ -498,13 +535,25 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 TableRef t = g.get_table(table_ndx);
                 if (t->get_column_count() > 0) {
                     size_t col_ndx = get_next(s) % t->get_column_count();
-                    bool supports_search_index = _impl::TableFriend::get_column(*t, col_ndx).supports_search_index();
+                    DataType typ = t->get_column_type(col_ndx);
 
-                    if (supports_search_index) {
+                    if (typ == type_Table) {
                         if (log) {
-                            *log << "g.get_table(" << table_ndx << ")->add_search_index(" << col_ndx << ");\n";
+                            *log << "g.get_table(" << table_ndx << ")->get_subdescriptor(" << col_ndx
+                                 << ")->add_search_index(0);\n";
                         }
-                        t->add_search_index(col_ndx);
+                        t->get_subdescriptor(col_ndx)->add_search_index(0);
+                    }
+                    else {
+                        bool supports_search_index =
+                            _impl::TableFriend::get_column(*t, col_ndx).supports_search_index();
+
+                        if (supports_search_index) {
+                            if (log) {
+                                *log << "g.get_table(" << table_ndx << ")->add_search_index(" << col_ndx << ");\n";
+                            }
+                            t->add_search_index(col_ndx);
+                        }
                     }
                 }
             }
@@ -516,10 +565,21 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     // We don't need to check if the column is of a type that is indexable or if it has index on or
                     // off
                     // because Realm will just do a no-op at worst (no exception or assert).
-                    if (log) {
-                        *log << "g.get_table(" << table_ndx << ")->remove_search_index(" << col_ndx << ");\n";
+                    DataType typ = t->get_column_type(col_ndx);
+
+                    if (typ == type_Table) {
+                        if (log) {
+                            *log << "g.get_table(" << table_ndx << ")->get_subdescriptor(" << col_ndx
+                                 << ")->remove_search_index(0);\n";
+                        }
+                        t->get_subdescriptor(col_ndx)->remove_search_index(0);
                     }
-                    t->remove_search_index(col_ndx);
+                    else {
+                        if (log) {
+                            *log << "g.get_table(" << table_ndx << ")->remove_search_index(" << col_ndx << ");\n";
+                        }
+                        t->remove_search_index(col_ndx);
+                    }
                 }
             }
             else if (instr == ADD_COLUMN_LINK && g.size() >= 1) {
@@ -724,6 +784,48 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             }
                             t->set_mixed(col_ndx, row_ndx, mixed);
                         }
+                        else if (type == type_Table) {
+                            if (log) {
+                                *log << "{\n"
+                                     << "TableRef sub = g.get_table(" << table_ndx << ")->get_subtable(" << col_ndx
+                                     << ", " << row_ndx << ");\n";
+                            }
+                            TableRef sub = t->get_subtable(col_ndx, row_ndx);
+                            size_t sz = sub->size();
+                            REALM_ASSERT(sz == t->get_subtable_size(col_ndx, row_ndx));
+                            if (sz == 0 || get_next(s) % 4 == 0) {
+                                // In 25 % of the cases assign all new values
+                                int nb_values = get_next(s) % 10;
+                                std::vector<int64_t> values;
+                                for (int i = 0; i < nb_values; i++) {
+                                    values.push_back(int(get_next(s)));
+                                }
+                                if (log) {
+                                    *log << "sub->clear();\n"
+                                         << "sub->add_empty_row(" << nb_values << ");\n";
+                                    for (int i = 0; i < nb_values; i++) {
+                                        *log << "sub->set_int(0, " << i << ", " << values[i] << ", false);\n";
+                                    }
+                                }
+                                sub->clear();
+                                sub->add_empty_row(nb_values);
+                                for (int i = 0; i < nb_values; i++) {
+                                    sub->set_int(0, i, values[i], false);
+                                }
+                            }
+                            else {
+                                size_t row = get_next(s) % sz;
+                                int64_t value = get_int64(s);
+                                if (log) {
+                                    *log << "sub->set_int(0, " << row << ", " << value << ", false);\n";
+                                }
+                                sub->set_int(0, row, value, false);
+                            }
+                            if (log) {
+                                *log << "subtable_refs.push_back(sub);\n}\n";
+                            }
+                            subtable_refs.push_back(sub);
+                        }
                     }
                 }
             }
@@ -872,6 +974,23 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 TableView tv = t->where().find_all();
                 table_views.push_back(tv);
+            }
+            else if (instr == CREATE_SUBTABLE_VIEW && subtable_refs.size() > 0) {
+                size_t idx = get_next(s) % subtable_refs.size();
+                size_t sz = subtable_refs[idx]->size();
+                if (subtable_refs[idx]->is_attached() && sz) {
+                    size_t find_ndx = get_next(s) % sz;
+                    if (log) {
+                        *log << "{\n"
+                             << "int64_t val = subtable_refs[" << idx << "]->get_int(0, " << find_ndx << ");\n"
+                             << "TableView tv = subtable_refs[" << idx << "]->where().equal(0, val).find_all();\n"
+                             << "table_views.push_back(tv);\n"
+                             << "}\n";
+                    }
+                    int64_t val = subtable_refs[idx]->get_int(0, find_ndx);
+                    TableView tv = subtable_refs[idx]->where().equal(0, val).find_all();
+                    table_views.push_back(tv);
+                }
             }
             else if (instr == COMPACT) {
                 if (log) {
