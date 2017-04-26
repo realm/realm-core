@@ -193,14 +193,17 @@ private:
 template <class T>
 class BasicRowExpr : public RowFuncs<T, BasicRowExpr<T>> {
 public:
-    BasicRowExpr() noexcept;
+    BasicRowExpr() noexcept = default;
 
     template <class U>
     BasicRowExpr(const BasicRowExpr<U>&) noexcept;
 
+    template <class U>
+    BasicRowExpr(const BasicRow<U>&) noexcept;
+
 private:
-    T* m_table;       // nullptr if detached.
-    size_t m_row_ndx; // Undefined if detached.
+    T* m_table = nullptr;       // nullptr if detached.
+    size_t m_row_ndx = 0; // Undefined if detached.
 
     BasicRowExpr(T*, size_t init_row_ndx) noexcept;
 
@@ -212,12 +215,12 @@ private:
     // from RowFuncs.
     friend class RowFuncs<T, BasicRowExpr<T>>;
 
-    // Make m_table and m_col_ndx accessible from BasicRowExpr(const
+    // Make m_table and m_row_ndx accessible from BasicRowExpr(const
     // BasicRowExpr<U>&) for any U.
     template <class>
     friend class BasicRowExpr;
 
-    // Make m_table and m_col_ndx accessible from
+    // Make m_table and m_row_ndx accessible from
     // BasicRow::BaicRow(BasicRowExpr<U>) for any U.
     template <class>
     friend class BasicRow;
@@ -320,10 +323,15 @@ private:
     // from RowFuncs.
     friend class RowFuncs<T, BasicRow<T>>;
 
-    // Make m_table and m_col_ndx accessible from BasicRow(const BasicRow<U>&)
+    // Make m_table and m_row_ndx accessible from BasicRow(const BasicRow<U>&)
     // for any U.
     template <class>
     friend class BasicRow;
+
+    // Make m_table and m_row_ndx accessible from BasicRowExpr(const
+    // BasicRow<U>&) for any U.
+    template <class>
+    friend class BasicRowExpr;
 
 public:
     std::unique_ptr<BasicRow<T>> clone_for_handover(std::unique_ptr<HandoverPatch>& patch) const
@@ -730,17 +738,18 @@ inline size_t RowFuncs<T, R>::row_ndx() const noexcept
 
 
 template <class T>
-inline BasicRowExpr<T>::BasicRowExpr() noexcept
-    : m_table(0)
-    , m_row_ndx(0)
+template <class U>
+inline BasicRowExpr<T>::BasicRowExpr(const BasicRowExpr<U>& expr) noexcept
+    : m_table(expr.m_table)
+    , m_row_ndx(expr.m_row_ndx)
 {
 }
 
 template <class T>
 template <class U>
-inline BasicRowExpr<T>::BasicRowExpr(const BasicRowExpr<U>& expr) noexcept
-    : m_table(expr.m_table)
-    , m_row_ndx(expr.m_row_ndx)
+inline BasicRowExpr<T>::BasicRowExpr(const BasicRow<U>& row) noexcept
+    : m_table(row.m_table.get())
+    , m_row_ndx(row.m_row_ndx)
 {
 }
 
