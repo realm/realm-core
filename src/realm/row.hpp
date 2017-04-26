@@ -91,6 +91,7 @@ public:
     size_t get_link_count(size_t col_ndx) const noexcept;
     Mixed get_mixed(size_t col_ndx) const noexcept;
     DataType get_mixed_type(size_t col_ndx) const noexcept;
+
     template <typename U>
     U get(size_t col_ndx) const noexcept;
 
@@ -112,6 +113,12 @@ public:
     void set_mixed_subtable(size_t col_ndx, const Table* value);
     void set_null(size_t col_ndx);
     void set_null_unique(size_t col_ndx);
+
+    template <typename U>
+    void set(size_t col_ndx, U&& value, bool is_default = false);
+
+    template <typename U>
+    void set_unique(size_t col_ndx, U&& value);
 
     void insert_substring(size_t col_ndx, size_t pos, StringData);
     void remove_substring(size_t col_ndx, size_t pos, size_t size);
@@ -590,6 +597,20 @@ template <class T, class R>
 inline void RowFuncs<T, R>::set_null_unique(size_t col_ndx)
 {
     table()->set_null_unique(col_ndx, row_ndx()); // Throws
+}
+
+template <class T, class R>
+template <class U>
+inline void RowFuncs<T, R>::set(size_t col_ndx, U&& value, bool is_default)
+{
+    table()->set(col_ndx, row_ndx(), std::forward<U>(value), is_default); // Throws
+}
+
+template <class T, class R>
+template <class U>
+inline void RowFuncs<T, R>::set_unique(size_t col_ndx, U&& value)
+{
+    table()->set_unique(col_ndx, row_ndx(), std::forward<U>(value)); // Throws
 }
 
 template <class T, class R>
