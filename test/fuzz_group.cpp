@@ -1160,12 +1160,20 @@ int run_fuzzy(int argc, const char* argv[])
 {
     util::Optional<std::ostream&> log;
     std::string name = "fuzz-test";
+    std::string prefix = "./";
+    bool file_names_from_stdin = false;
 
     size_t file_arg = size_t(-1);
     for (size_t i = 1; i < size_t(argc); ++i) {
         std::string arg = argv[i];
         if (arg == "--log") {
             log = util::some<std::ostream&>(std::cout);
+        }
+        else if (arg == "--") {
+            file_names_from_stdin = true;
+        }
+        else if (arg == "--prefix") {
+            prefix = argv[++i];
         }
         else if (arg == "--name") {
             name = argv[++i];
@@ -1175,23 +1183,46 @@ int run_fuzzy(int argc, const char* argv[])
         }
     }
 
-    if (file_arg == size_t(-1)) {
+    if (!file_names_from_stdin && file_arg == size_t(-1)) {
         usage(argv);
-    }
-
-    std::ifstream in(argv[file_arg], std::ios::in | std::ios::binary);
-    if (!in.is_open()) {
-        std::cerr << "Could not open file for reading: " << argv[file_arg] << "\n";
-        exit(1);
     }
 
     disable_sync_to_disk();
 
-    realm::test_util::RealmPathInfo test_context { name };
-    SHARED_GROUP_TEST_PATH(path);
+    if (file_names_from_stdin) {
+        std::string file_name;
 
-    std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
-    parse_and_apply_instructions(contents, path, log);
+        std::cin >> file_name;
+        while (std::cin) {
+            std::ifstream in(prefix + file_name, std::ios::in | std::ios::binary);
+            if (!in.is_open()) {
+                std::cerr << "Could not open file for reading: " << (prefix + file_name) << std::endl;
+            }
+            else {
+                std::cout << file_name << std::endl;
+                realm::test_util::RealmPathInfo test_context{name};
+                SHARED_GROUP_TEST_PATH(path);
+
+                std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
+                parse_and_apply_instructions(contents, path, log);
+            }
+
+            std::cin >> file_name;
+        }
+    }
+    else {
+        std::ifstream in(argv[file_arg], std::ios::in | std::ios::binary);
+        if (!in.is_open()) {
+            std::cerr << "Could not open file for reading: " << argv[file_arg] << "\n";
+            exit(1);
+        }
+
+        realm::test_util::RealmPathInfo test_context{name};
+        SHARED_GROUP_TEST_PATH(path);
+
+        std::string contents((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
+        parse_and_apply_instructions(contents, path, log);
+    }
 
     return 0;
 }
