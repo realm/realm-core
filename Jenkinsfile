@@ -103,7 +103,7 @@ timeout(time: 5, unit: 'HOURS') {
                     sh 'tools/build-cocoa.sh'
                     archiveArtifacts('realm-core-cocoa*.tar.xz')
                     if(gitTag) {
-                        def stashName = "pub-cocoa"
+                        def stashName = 'cocoa'
                         stash includes: 'realm-core-cocoa*.tar.xz', name: stashName
                         publishingStashes << stashName
                     }
@@ -118,7 +118,7 @@ timeout(time: 5, unit: 'HOURS') {
                     sh 'tools/build-android.sh'
                     archiveArtifacts('realm-core-android*.tar.gz')
                     if(gitTag) {
-                        def stashName = "pub-android"
+                        def stashName = 'android'
                         stash includes: 'realm-core-android*.tar.gz', name: stashName
                         publishingStashes << stashName
                     }
@@ -517,7 +517,7 @@ def doPublishLocalArtifacts() {
                     unstash name: publishingStashes[i]
                     def path = publishingStashes[i].replaceAll('___', '/')
                     withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-                        sh "find . -type f -name \"*\" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/${gitDescribeVersion}/${publishingStashes[i]} \\;"
+                        sh "find . -type f -name \"*\" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/${gitDescribeVersion}/${path}/ \\;"
                         sh 'find . -type f -name "*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
                     }
                     deleteDir()
