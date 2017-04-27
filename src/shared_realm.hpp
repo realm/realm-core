@@ -127,7 +127,7 @@ public:
     // functions which take a Schema from within the migration function.
     using MigrationFunction = std::function<void (SharedRealm old_realm, SharedRealm realm, Schema&)>;
 
-#if !WIN32
+#ifndef _WIN32
     // A callback function called when opening a SharedRealm when no cached
     // version of this Realm exists. It is passed the total bytes allocated for
     // the file (file size) and the total bytes used by data in the file.
@@ -156,7 +156,7 @@ public:
         uint64_t schema_version = -1;
         MigrationFunction migration_function;
 
-#if !WIN32
+#ifndef _WIN32
         // A callback function called when opening a SharedRealm when no cached
         // version of this Realm exists. It is passed the total bytes allocated for
         // the file (file size) and the total bytes used by data in the file.
