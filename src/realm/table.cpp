@@ -2722,14 +2722,20 @@ bool Table::get(size_t col_ndx, size_t ndx) const noexcept
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
     REALM_ASSERT_3(ndx, <, m_size);
 
-    if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column_int_null(col_ndx);
-        return col.get(ndx).value_or(0) != 0;
-    }
-    else {
-        const IntegerColumn& col = get_column(col_ndx);
-        return col.get(ndx) != 0;
-    }
+    const IntegerColumn& col = get_column(col_ndx);
+    return col.get(ndx) != 0;
+}
+
+template <>
+util::Optional<bool> Table::get(size_t col_ndx, size_t ndx) const noexcept
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Bool);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const IntNullColumn& col = get_column_int_null(col_ndx);
+    auto value = col.get(ndx);
+    return value ? util::some<bool>(*value != 0) : util::none;
 }
 
 template <>
@@ -2739,14 +2745,19 @@ int64_t Table::get(size_t col_ndx, size_t ndx) const noexcept
     REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Int);
     REALM_ASSERT_3(ndx, <, m_size);
 
-    if (is_nullable(col_ndx)) {
-        const IntNullColumn& col = get_column<IntNullColumn, col_type_Int>(col_ndx);
-        return col.get(ndx).value_or(0);
-    }
-    else {
-        const IntegerColumn& col = get_column<IntegerColumn, col_type_Int>(col_ndx);
-        return col.get(ndx);
-    }
+    const IntegerColumn& col = get_column<IntegerColumn, col_type_Int>(col_ndx);
+    return col.get(ndx);
+}
+
+template <>
+util::Optional<int64_t> Table::get(size_t col_ndx, size_t ndx) const noexcept
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Int);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const IntNullColumn& col = get_column<IntNullColumn, col_type_Int>(col_ndx);
+    return col.get(ndx);
 }
 
 template <>
@@ -2774,11 +2785,19 @@ float Table::get(size_t col_ndx, size_t ndx) const noexcept
     REALM_ASSERT_3(ndx, <, m_size);
 
     const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
+    return col.get(ndx);
+}
+
+template <>
+util::Optional<float> Table::get(size_t col_ndx, size_t ndx) const noexcept
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Float);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const FloatColumn& col = get_column<FloatColumn, col_type_Float>(col_ndx);
     float f = col.get(ndx);
-    if (null::is_null_float(f))
-        return 0.0f;
-    else
-        return f;
+    return null::is_null_float(f) ? util::none : util::make_optional(f);
 }
 
 template <>
@@ -2789,11 +2808,19 @@ double Table::get(size_t col_ndx, size_t ndx) const noexcept
     REALM_ASSERT_3(ndx, <, m_size);
 
     const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
+    return col.get(ndx);
+}
+
+template <>
+util::Optional<double> Table::get(size_t col_ndx, size_t ndx) const noexcept
+{
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(get_real_column_type(col_ndx), ==, col_type_Double);
+    REALM_ASSERT_3(ndx, <, m_size);
+
+    const DoubleColumn& col = get_column<DoubleColumn, col_type_Double>(col_ndx);
     double d = col.get(ndx);
-    if (null::is_null_float(d))
-        return 0.0;
-    else
-        return d;
+    return null::is_null_float(d) ? util::none : util::make_optional(d);
 }
 
 template <>
@@ -2876,6 +2903,14 @@ Mixed Table::get(size_t col_ndx, size_t ndx) const noexcept
     }
     REALM_ASSERT(false);
     return Mixed(int64_t(0));
+}
+
+template<>
+Table::RowExpr Table::get(size_t col_ndx, size_t row_ndx) const noexcept
+{
+    REALM_ASSERT_3(row_ndx, <, m_size);
+    const LinkColumn& col = get_column_link(col_ndx);
+    return RowExpr(&col.get_target_table(), col.get_link(row_ndx));
 }
 
 template <>

@@ -2050,9 +2050,13 @@ inline void Table::set_ndx_in_parent(size_t ndx_in_parent) noexcept
 // Declare our explicit specializations so that the inline wrappers don't try
 // to instantiate them
 template<> int64_t Table::get<int64_t>(size_t, size_t) const noexcept;
+template<> util::Optional<int64_t> Table::get<util::Optional<int64_t>>(size_t, size_t) const noexcept;
 template<> bool Table::get<bool>(size_t, size_t) const noexcept;
+template<> Optional<bool> Table::get<Optional<bool>>(size_t, size_t) const noexcept;
 template<> float Table::get<float>(size_t, size_t) const noexcept;
+template<> util::Optional<float> Table::get<util::Optional<float>>(size_t, size_t) const noexcept;
 template<> double Table::get<double>(size_t, size_t) const noexcept;
+template<> util::Optional<double> Table::get<util::Optional<double>>(size_t, size_t) const noexcept;
 template<> OldDateTime Table::get<OldDateTime>(size_t, size_t) const noexcept;
 template<> Timestamp Table::get<Timestamp>(size_t, size_t) const noexcept;
 template<> StringData Table::get<StringData>(size_t, size_t) const noexcept;
@@ -2074,9 +2078,13 @@ template<> size_t Table::set_unique<int64_t>(size_t, size_t, int64_t);
 template<> size_t Table::set_unique<StringData>(size_t, size_t, StringData);
 template<> size_t Table::set_unique<null>(size_t, size_t, null);
 
+
 inline int64_t Table::get_int(size_t col_ndx, size_t ndx) const noexcept
 {
-    return get<int64_t>(col_ndx, ndx);
+    if (is_nullable(col_ndx))
+        return get<util::Optional<int64_t>>(col_ndx, ndx).value_or(0);
+    else
+        return get<int64_t>(col_ndx, ndx);
 }
 
 inline size_t Table::set_int_unique(size_t col_ndx, size_t ndx, int_fast64_t value)
@@ -2101,7 +2109,10 @@ inline void Table::set_timestamp(size_t col_ndx, size_t ndx, Timestamp value, bo
 
 inline bool Table::get_bool(size_t col_ndx, size_t ndx) const noexcept
 {
-    return get<bool>(col_ndx, ndx);
+    if (is_nullable(col_ndx))
+        return get<util::Optional<bool>>(col_ndx, ndx).value_or(false);
+    else
+        return get<bool>(col_ndx, ndx);
 }
 
 inline void Table::set_bool(size_t col_ndx, size_t ndx, bool value, bool is_default)
@@ -2121,7 +2132,8 @@ inline void Table::set_olddatetime(size_t col_ndx, size_t ndx, OldDateTime value
 
 inline float Table::get_float(size_t col_ndx, size_t ndx) const noexcept
 {
-    return get<float>(col_ndx, ndx);
+    float f = get<float>(col_ndx, ndx);
+    return null::is_null_float(f) ? 0.0f : f;
 }
 
 inline void Table::set_float(size_t col_ndx, size_t ndx, float value, bool is_default)
@@ -2131,7 +2143,8 @@ inline void Table::set_float(size_t col_ndx, size_t ndx, float value, bool is_de
 
 inline double Table::get_double(size_t col_ndx, size_t ndx) const noexcept
 {
-    return get<double>(col_ndx, ndx);
+    double d = get<double>(col_ndx, ndx);
+    return null::is_null_float(d) ? 0.0f : d;
 }
 
 inline void Table::set_double(size_t col_ndx, size_t ndx, double value, bool is_default)
