@@ -18,7 +18,6 @@
 
 #include <cstdio>
 #include <iomanip>
-#include <set>
 
 #ifdef REALM_DEBUG
 #include <iostream>
@@ -366,17 +365,21 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
     const util::Optional<std::string> upper_value = case_map(value, true);
     const util::Optional<std::string> lower_value = case_map(value, false);
 
-    auto generate_search_keys = [&work_list, &upper_value, &lower_value](const char* header,
-                                                                         size_t string_offset) -> void {
-        std::set<key_type> keys_seen;
-        constexpr int num_permutations = 1 << sizeof(key_type); // 4 bytes gives up to 16 search keys
+    std::vector<key_type> keys_seen;
+    constexpr int num_permutations = 1 << sizeof(key_type); // 4 bytes gives up to 16 search keys
+    keys_seen.reserve(num_permutations);
+
+    auto generate_search_keys = [&work_list, &upper_value, &lower_value, &keys_seen](const char* header,
+                                                                                     size_t string_offset) -> void {
+        keys_seen.clear();
         const key_type upper_key = StringIndex::create_key(upper_value, string_offset);
         const key_type lower_key = StringIndex::create_key(lower_value, string_offset);
         for (int p = 0; p < num_permutations; ++p) {
             // this might still be incorrect due to unicode characters crossing the 4 byte key size
             const key_type key = generate_key(upper_key, lower_key, p);
-            const bool new_key = keys_seen.insert(key).second;
+            const bool new_key = std::find(keys_seen.cbegin(), keys_seen.cend(), key) == keys_seen.cend();
             if (new_key) {
+                keys_seen.push_back(key);
                 work_list.push_back({header, string_offset, key});
             }
         }
