@@ -18,6 +18,7 @@
 
 #include <cstdio>
 #include <iomanip>
+#include <set>
 
 #ifdef REALM_DEBUG
 #include <iostream>
@@ -372,17 +373,19 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
         WorkItem item = work_list.back();
         work_list.pop_back();
         if (item.permutation == -1) {
-            // Generate work items for each unique permutation for this specific key
-            // E.g. keys for string segments with 4 chars will have 16 permutations.
-            // Keys for string segments with just a single character will only have
-            // 2 permutations, that must be selected from the upper byte.
-            // For a key tail of 2 bytes, the following 2^2 permutation values will be generated:
-            // 0b0000, 0b0100, 0b1000, 0b1100
-            const size_t tail_size = std::min(value.size() - item.string_offset, sizeof(key_type));
-            const int num_permutations = 1 << tail_size;
-            for (int i = 0; i < num_permutations; ++i) {
-                item.permutation = i << (4 - tail_size);
-                work_list.push_back(item);
+            std::set<key_type> keys_seen;
+            // Generate work items for each permutation that generates a unique key
+            constexpr int num_permutations = 16;
+            const key_type upper_key = StringIndex::create_key(upper_value, item.string_offset);
+            const key_type lower_key = StringIndex::create_key(lower_value, item.string_offset);
+            for (int p = 0; p < num_permutations; ++p) {
+                // this is almost definitely incorrect due to unicode characters crossing the 4 byte key size
+                key_type key = generate_key(upper_key, lower_key, p);
+                bool new_key = keys_seen.insert(key).second;
+                if (new_key) {
+                    item.permutation = p;
+                    work_list.push_back(item);
+                }
             }
             continue;
         }
