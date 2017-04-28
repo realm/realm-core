@@ -315,7 +315,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     }
 
 // The ExternalCommitHelper implementation on Windows doesn't rely on files
-#if !WIN32
+#ifndef _WIN32
     SECTION("should throw when creating the notification pipe fails") {
         util::try_make_dir(config.path + ".note");
         REQUIRE_THROWS(Realm::get_shared_realm(config));
@@ -1062,7 +1062,7 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     }
 }
 
-#if !WIN32
+#ifndef _WIN32
 TEST_CASE("SharedRealm: compact on launch") {
     // Make compactable Realm
     TestFile config;

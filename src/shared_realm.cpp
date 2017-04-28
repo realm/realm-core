@@ -161,7 +161,7 @@ void Realm::open_with_config(const Config& config,
             };
             shared_group = std::make_unique<SharedGroup>(*history, options);
 
-#if !WIN32
+#ifndef _WIN32
             if (config.should_compact_on_launch_function) {
                 size_t free_space = -1;
                 size_t used_space = -1;
