@@ -163,7 +163,7 @@ private:
     /// note that this works only for non-transactional commits. Table
     /// accessors obtained during a transaction are always detached
     /// when the transaction ends.
-    void update_from_parent(size_t old_baseline) noexcept;
+    bool update_from_parent(size_t old_baseline) noexcept;
 
     void set_parent(ArrayParent*, size_t ndx_in_parent) noexcept;
 

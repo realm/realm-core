@@ -772,6 +772,11 @@ public:
         desc.detach();
     }
 
+    static void detach_subdesc_accessors(Descriptor& desc) noexcept
+    {
+        desc.detach_subdesc_accessors();
+    }
+
     static Table& get_root_table(Descriptor& desc) noexcept
     {
         return *desc.m_root_table;

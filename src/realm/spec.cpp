@@ -56,7 +56,6 @@ void Spec::init(MemRef mem) noexcept
     // from initialized children to uninitialized
     m_subspecs.detach();
     m_enumkeys.detach();
-    m_subspec_ptrs.clear();
 
     // Subspecs array is only there and valid when there are subtables
     // if there are enumkey, but no subtables yet it will be a zero-ref
@@ -65,7 +64,9 @@ void Spec::init(MemRef mem) noexcept
         m_subspecs.init_from_ref(ref);
         m_subspecs.set_parent(&m_top, 3);
         update_subspec_ptrs();
-        m_subspec_ptrs.resize(m_subspecs.size());
+    }
+    else {
+        m_subspec_ptrs.clear();
     }
 
     // Enumkeys array is only there when there are StringEnum columns
@@ -106,6 +107,7 @@ void Spec::update_has_strong_link_columns() noexcept
 void Spec::update_subspec_ptrs()
 {
     size_t n = m_subspecs.size();
+    m_subspec_ptrs.clear();
     m_subspec_ptrs.resize(n);
     size_t m = m_types.size();
     for (size_t i = 0; i < m; ++i) {
@@ -118,23 +120,28 @@ void Spec::update_subspec_ptrs()
 }
 
 
-void Spec::update_from_parent(size_t old_baseline) noexcept
+bool Spec::update_from_parent(size_t old_baseline) noexcept
 {
     if (!m_top.update_from_parent(old_baseline))
-        return;
+        return false;
 
     m_types.update_from_parent(old_baseline);
     m_names.update_from_parent(old_baseline);
     m_attr.update_from_parent(old_baseline);
-    m_subspec_ptrs.clear();
 
     if (has_subspec()) {
-        m_subspecs.update_from_parent(old_baseline);
-        update_subspec_ptrs();
+        if (m_subspecs.update_from_parent(old_baseline)) {
+            update_subspec_ptrs();
+        }
+    }
+    else {
+        m_subspec_ptrs.clear();
     }
 
     if (m_top.size() > 4)
         m_enumkeys.update_from_parent(old_baseline);
+
+    return true;
 }
 
 
