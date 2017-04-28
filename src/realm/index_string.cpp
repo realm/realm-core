@@ -321,7 +321,7 @@ void IndexArray::from_list_all(StringData value, IntegerColumn& result, const In
 
 namespace {
 
-// Helper functions for index_string<index_FindAll_ins> for generating permutations of index keys
+// Helper functions for index_string_all_ins for generating permutations of index keys
 
 // replicates the 4 least significant bits each times 8
 // eg: abcd -> aaaaaaaabbbbbbbbccccccccdddddddd
@@ -375,7 +375,8 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
         const key_type upper_key = StringIndex::create_key(upper_value, string_offset);
         const key_type lower_key = StringIndex::create_key(lower_value, string_offset);
         for (int p = 0; p < num_permutations; ++p) {
-            // this might still be incorrect due to unicode characters crossing the 4 byte key size
+            // this might still be incorrect due to multi-byte unicode characters (crossing the 4 byte key size)
+            // being combined incorrectly.
             const key_type key = generate_key(upper_key, lower_key, p);
             const bool new_key = std::find(keys_seen.cbegin(), keys_seen.cend(), key) == keys_seen.cend();
             if (new_key) {
