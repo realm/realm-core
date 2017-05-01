@@ -321,7 +321,7 @@ void IndexArray::from_list_all(StringData value, IntegerColumn& result, const In
 
 namespace {
 
-// Helper functions for index_string<index_FindAll_ins> for generating permutations of index keys
+// Helper functions for SearchList (index_string_all_ins) for generating permutations of index keys
 
 // replicates the 4 least significant bits each times 8
 // eg: abcd -> aaaaaaaabbbbbbbbccccccccdddddddd
@@ -348,55 +348,93 @@ key_type generate_key(key_type upper, key_type lower, int permutation) {
     return select_from_mask(upper, lower, replicate_4_lsb_x8(permutation));
 }
 
-}
+
+// Helper structure for IndexArray::index_string_all_ins to generate and keep track of search key permutations,
+// when traversing the trees.
+struct SearchList {
+    struct Item {
+        const char* header;
+        size_t string_offset;
+        key_type key;
+    };
+
+    SearchList(const util::Optional<std::string>& upper_value, const util::Optional<std::string>& lower_value)
+        : m_upper_value(upper_value)
+        , m_lower_value(lower_value)
+    {
+        m_keys_seen.reserve(num_permutations);
+    }
+
+    // Add all unique keys for this level to the internal work stack
+    void add_all_for_level(const char* header, size_t string_offset)
+    {
+        m_keys_seen.clear();
+        const key_type upper_key = StringIndex::create_key(m_upper_value, string_offset);
+        const key_type lower_key = StringIndex::create_key(m_lower_value, string_offset);
+        for (int p = 0; p < num_permutations; ++p) {
+            // FIXME: This might still be incorrect due to multi-byte unicode characters (crossing the 4 byte key
+            // size) being combined incorrectly.
+            const key_type key = generate_key(upper_key, lower_key, p);
+            const bool new_key = std::find(m_keys_seen.cbegin(), m_keys_seen.cend(), key) == m_keys_seen.cend();
+            if (new_key) {
+                m_keys_seen.push_back(key);
+                add_next(header, string_offset, key);
+            }
+        }
+    }
+
+    bool empty() const
+    {
+        return m_items.empty();
+    }
+
+    Item get_next()
+    {
+        Item item = m_items.back();
+        m_items.pop_back();
+        return item;
+    }
+
+    // Add a single entry to the internal work stack. Used to traverse the inner trees (same key)
+    void add_next(const char* header, size_t string_offset, key_type key)
+    {
+        m_items.push_back({header, string_offset, key});
+    }
+
+private:
+    static constexpr int num_permutations = 1 << sizeof(key_type); // 4 bytes gives up to 16 search keys
+
+    std::vector<Item> m_items;
+
+    const util::Optional<std::string> m_upper_value;
+    const util::Optional<std::string> m_lower_value;
+
+    std::vector<key_type> m_keys_seen;
+};
+
+
+} // namespace
 
 
 void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, ColumnBase* column) const
 {
-    using key_type = StringIndex::key_type;
-    struct WorkItem {
-        const char* header;
-        size_t string_offset;
-        int permutation; // -1 == unexpanded, otherwise 0-15
-    };
-    using WorkList = std::vector<WorkItem>;
-    WorkList work_list;
-
-    const char* top_header = get_header_from_data(m_data);
-    work_list.push_back({top_header, 0, -1});
 
     const util::Optional<std::string> upper_value = case_map(value, true);
     const util::Optional<std::string> lower_value = case_map(value, false);
+    SearchList search_list(upper_value, lower_value);
 
-    while (!work_list.empty()) {
-        WorkItem item = work_list.back();
-        work_list.pop_back();
-        if (item.permutation == -1) {
-            // Generate work items for each unique permutation for this specific key
-            // E.g. keys for string segments with 4 chars will have 16 permutations.
-            // Keys for string segments with just a single character will only have
-            // 2 permutations, that must be selected from the upper byte.
-            // For a key tail of 2 bytes, the following 2^2 permutation values will be generated:
-            // 0b0000, 0b0100, 0b1000, 0b1100
-            const size_t tail_size = std::min(value.size() - item.string_offset, sizeof(key_type));
-            const int num_permutations = 1 << tail_size;
-            for (int i = 0; i < num_permutations; ++i) {
-                item.permutation = i << (4 - tail_size);
-                work_list.push_back(item);
-            }
-            continue;
-        }
+    const char* top_header = get_header_from_data(m_data);
+    search_list.add_all_for_level(top_header, 0);
+
+    while (!search_list.empty()) {
+        SearchList::Item item = search_list.get_next();
 
         const char* const header = item.header;
         const size_t string_offset = item.string_offset;
-        const int permutation = item.permutation;
+        const key_type key = item.key;
         const char* const data = get_data_from_header(header);
         const uint_least8_t width = get_width_from_header(header);
         const bool is_inner_node = get_is_inner_bptree_node_from_header(header);
-        key_type upper_key = StringIndex::create_key(upper_value, string_offset);
-        key_type lower_key = StringIndex::create_key(lower_value, string_offset);
-        // this is almost definitely incorrect due to unicode characters crossing the 4 byte key size
-        key_type key = generate_key(upper_key, lower_key, permutation);
 
         // Get subnode table
         ref_type offsets_ref = to_ref(get_direct(data, width, 0));
@@ -418,7 +456,7 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
         if (is_inner_node) {
             // Set vars for next iteration
             const char* const inner_header = m_alloc.translate(to_ref(ref));
-            work_list.push_back({inner_header, string_offset, permutation});
+            search_list.add_next(inner_header, string_offset, key);
             continue;
         }
 
@@ -452,8 +490,7 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
         }
 
         // Recurse into sub-index;
-        const size_t sub_string_offset = string_offset + 4;
-        work_list.push_back({sub_header, sub_string_offset, -1});
+        search_list.add_all_for_level(sub_header, string_offset + 4);
     }
 }
 

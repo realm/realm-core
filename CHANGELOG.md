@@ -2,7 +2,10 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix for incorrect, redundant string index tree traversal for case insensitive searches
+  for strings with some characters being identical in upper and lower case (e.g. numbers).
+  PR [#2578](https://github.com/realm/realm-core/pull/2578),
+  Cocoa issue [#4895](https://github.com/realm/realm-cocoa/issues/4895)
 
 ### Breaking changes
 
