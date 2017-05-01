@@ -1,4 +1,4 @@
-FROM alanfranz/fwd-ubuntu-xenial:latest
+FROM ubuntu:16.04
 
 ARG PACKAGECLOUD_URL
 
