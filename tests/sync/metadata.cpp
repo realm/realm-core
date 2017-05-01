@@ -52,7 +52,7 @@ Property make_primary_key_property(const char* name)
 
 }
 
-TEST_CASE("sync_metadata: migration", "[sync") {
+TEST_CASE("sync_metadata: migration", "[sync]") {
     reset_test_directory(base_path);
     const auto identity = "migrationtestuser";
 

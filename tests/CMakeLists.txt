@@ -35,6 +35,7 @@ if(REALM_ENABLE_SYNC)
     list(APPEND SOURCES 
         sync/file.cpp
         sync/metadata.cpp
+        sync/permission.cpp
         sync/session/session.cpp
         sync/session/progress_notifications.cpp
         sync/session/wait_for_completion.cpp
