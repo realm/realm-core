@@ -3,9 +3,8 @@ FROM ubuntu:16.04
 ARG PACKAGECLOUD_URL
 
 RUN apt-get update -y && apt-get install -y \
+    build-essential \
     curl \
-    gcc \
-    make \
     ruby \
     ruby-dev \
     && gem install fpm
