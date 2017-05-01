@@ -312,7 +312,10 @@ endif()
 
 if(NOT APPLE AND NOT ANDROID AND NOT REALM_BUILD_LIB_ONLY)
     add_executable(realm-config config_tool.cpp)
+    set_target_properties(realm-config PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
+
     add_executable(realm-importer importer_tool.cpp importer.cpp importer.hpp)
+    set_target_properties(realm-importer PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
     target_link_libraries(realm-importer realm)
 
     install(TARGETS realm-config realm-importer
@@ -320,6 +323,7 @@ if(NOT APPLE AND NOT ANDROID AND NOT REALM_BUILD_LIB_ONLY)
             DESTINATION ${CMAKE_INSTALL_BINDIR})
 
     add_executable(realmd realmd.cpp)
+    set_target_properties(realmd PROPERTIES DEBUG_POSTFIX ${CMAKE_DEBUG_POSTFIX})
     target_link_libraries(realmd realm)
     install(TARGETS realmd
             COMPONENT runtime
