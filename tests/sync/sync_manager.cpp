@@ -64,13 +64,6 @@ TEST_CASE("sync_manager: basic properties and APIs", "[sync]") {
         REQUIRE(!SyncManager::shared().client_should_reconnect_immediately());
     }
 
-    SECTION("should work for 'should validate SSL'") {
-        SyncManager::shared().set_client_should_validate_ssl(true);
-        REQUIRE(SyncManager::shared().client_should_validate_ssl());
-        SyncManager::shared().set_client_should_validate_ssl(false);
-        REQUIRE(!SyncManager::shared().client_should_validate_ssl());
-    }
-    
     SECTION("should not crash on 'reconnect()'") {
         SyncManager::shared().reconnect();
     }
