@@ -348,51 +348,82 @@ key_type generate_key(key_type upper, key_type lower, int permutation) {
     return select_from_mask(upper, lower, replicate_4_lsb_x8(permutation));
 }
 
+
+struct WorkList {
+    struct Item {
+        const char* header;
+        size_t string_offset;
+        key_type key;
+    };
+
+    WorkList(const util::Optional<std::string>& upper_value, const util::Optional<std::string>& lower_value)
+        : m_upper_value(upper_value)
+        , m_lower_value(lower_value)
+    {
+        m_keys_seen.reserve(num_permutations);
+    }
+
+    void add_all_for_level(const char* header, size_t string_offset)
+    {
+        m_keys_seen.clear();
+        const key_type upper_key = StringIndex::create_key(m_upper_value, string_offset);
+        const key_type lower_key = StringIndex::create_key(m_lower_value, string_offset);
+        for (int p = 0; p < num_permutations; ++p) {
+            // FIXME: This might still be incorrect due to multi-byte unicode characters (crossing the 4 byte key
+            // size) being combined incorrectly.
+            const key_type key = generate_key(upper_key, lower_key, p);
+            const bool new_key = std::find(m_keys_seen.cbegin(), m_keys_seen.cend(), key) == m_keys_seen.cend();
+            if (new_key) {
+                m_keys_seen.push_back(key);
+                add_next(header, string_offset, key);
+            }
+        }
+    }
+
+    bool empty() const
+    {
+        return m_items.empty();
+    }
+
+    Item get_next()
+    {
+        Item item = m_items.back();
+        m_items.pop_back();
+        return item;
+    }
+
+    void add_next(const char* header, size_t string_offset, key_type key)
+    {
+        m_items.push_back({header, string_offset, key});
+    }
+
+private:
+    static constexpr int num_permutations = 1 << sizeof(key_type); // 4 bytes gives up to 16 search keys
+
+    std::vector<Item> m_items;
+
+    const util::Optional<std::string> m_upper_value;
+    const util::Optional<std::string> m_lower_value;
+
+    std::vector<key_type> m_keys_seen;
+};
+
+
 } // namespace
 
 
 void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, ColumnBase* column) const
 {
-    using key_type = StringIndex::key_type;
-    struct WorkItem {
-        const char* header;
-        size_t string_offset;
-        key_type key;
-    };
-    using WorkList = std::vector<WorkItem>;
-    WorkList work_list;
 
     const util::Optional<std::string> upper_value = case_map(value, true);
     const util::Optional<std::string> lower_value = case_map(value, false);
-
-    std::vector<key_type> keys_seen;
-    constexpr int num_permutations = 1 << sizeof(key_type); // 4 bytes gives up to 16 search keys
-    keys_seen.reserve(num_permutations);
-
-    auto generate_search_keys = [&work_list, &upper_value, &lower_value, &keys_seen](const char* header,
-                                                                                     size_t string_offset) -> void {
-        keys_seen.clear();
-        const key_type upper_key = StringIndex::create_key(upper_value, string_offset);
-        const key_type lower_key = StringIndex::create_key(lower_value, string_offset);
-        for (int p = 0; p < num_permutations; ++p) {
-            // this might still be incorrect due to multi-byte unicode characters (crossing the 4 byte key size)
-            // being combined incorrectly.
-            const key_type key = generate_key(upper_key, lower_key, p);
-            const bool new_key = std::find(keys_seen.cbegin(), keys_seen.cend(), key) == keys_seen.cend();
-            if (new_key) {
-                keys_seen.push_back(key);
-                work_list.push_back({header, string_offset, key});
-            }
-        }
-    };
-
+    WorkList work_list(upper_value, lower_value);
 
     const char* top_header = get_header_from_data(m_data);
-    generate_search_keys(top_header, 0);
+    work_list.add_all_for_level(top_header, 0);
 
     while (!work_list.empty()) {
-        WorkItem item = work_list.back();
-        work_list.pop_back();
+        WorkList::Item item = work_list.get_next();
 
         const char* const header = item.header;
         const size_t string_offset = item.string_offset;
@@ -421,7 +452,7 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
         if (is_inner_node) {
             // Set vars for next iteration
             const char* const inner_header = m_alloc.translate(to_ref(ref));
-            work_list.push_back({inner_header, string_offset, key});
+            work_list.add_next(inner_header, string_offset, key);
             continue;
         }
 
@@ -455,7 +486,7 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
         }
 
         // Recurse into sub-index;
-        generate_search_keys(sub_header, string_offset + 4);
+        work_list.add_all_for_level(sub_header, string_offset + 4);
     }
 }
 
