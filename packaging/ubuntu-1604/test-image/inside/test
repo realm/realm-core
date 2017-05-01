@@ -8,7 +8,7 @@ set -e
 trap 'chown -R --reference /inside/test /test-logs/' EXIT
 
 apt-get update
-apt-get install -y /out/*.deb
+apt-get install -y -f /out/*.deb
 
 # include build test here to ensure that everything is properly installed
 packages=(realm-core-release-runtime realm-core-release-devel)
