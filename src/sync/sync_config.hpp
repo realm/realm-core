@@ -106,7 +106,7 @@ struct SyncConfig {
     std::function<SyncSessionErrorHandler> error_handler;
     std::shared_ptr<ChangesetTransformer> transformer;
     util::Optional<std::array<char, 64>> realm_encryption_key;
-    bool client_validate_ssl;
+    bool client_validate_ssl = true;
     util::Optional<std::string> ssl_trust_certificate_path;
 #if __GNUC__ < 5
     // GCC 4.9 does not support C++14 braced-init
