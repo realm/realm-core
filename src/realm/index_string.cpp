@@ -321,7 +321,7 @@ void IndexArray::from_list_all(StringData value, IntegerColumn& result, const In
 
 namespace {
 
-// Helper functions for index_string_all_ins for generating permutations of index keys
+// Helper functions for SearchList (index_string_all_ins) for generating permutations of index keys
 
 // replicates the 4 least significant bits each times 8
 // eg: abcd -> aaaaaaaabbbbbbbbccccccccdddddddd
@@ -349,6 +349,8 @@ key_type generate_key(key_type upper, key_type lower, int permutation) {
 }
 
 
+// Helper structure for IndexArray::index_string_all_ins to generate and keep track of search key permutations,
+// when traversing the trees.
 struct SearchList {
     struct Item {
         const char* header;
@@ -363,6 +365,7 @@ struct SearchList {
         m_keys_seen.reserve(num_permutations);
     }
 
+    // Add all unique keys for this level to the internal work stack
     void add_all_for_level(const char* header, size_t string_offset)
     {
         m_keys_seen.clear();
@@ -392,6 +395,7 @@ struct SearchList {
         return item;
     }
 
+    // Add a single entry to the internal work stack. Used to traverse the inner trees (same key)
     void add_next(const char* header, size_t string_offset, key_type key)
     {
         m_items.push_back({header, string_offset, key});
