@@ -349,14 +349,14 @@ key_type generate_key(key_type upper, key_type lower, int permutation) {
 }
 
 
-struct WorkList {
+struct SearchList {
     struct Item {
         const char* header;
         size_t string_offset;
         key_type key;
     };
 
-    WorkList(const util::Optional<std::string>& upper_value, const util::Optional<std::string>& lower_value)
+    SearchList(const util::Optional<std::string>& upper_value, const util::Optional<std::string>& lower_value)
         : m_upper_value(upper_value)
         , m_lower_value(lower_value)
     {
@@ -417,13 +417,13 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
 
     const util::Optional<std::string> upper_value = case_map(value, true);
     const util::Optional<std::string> lower_value = case_map(value, false);
-    WorkList work_list(upper_value, lower_value);
+    SearchList search_list(upper_value, lower_value);
 
     const char* top_header = get_header_from_data(m_data);
-    work_list.add_all_for_level(top_header, 0);
+    search_list.add_all_for_level(top_header, 0);
 
-    while (!work_list.empty()) {
-        WorkList::Item item = work_list.get_next();
+    while (!search_list.empty()) {
+        SearchList::Item item = search_list.get_next();
 
         const char* const header = item.header;
         const size_t string_offset = item.string_offset;
@@ -452,7 +452,7 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
         if (is_inner_node) {
             // Set vars for next iteration
             const char* const inner_header = m_alloc.translate(to_ref(ref));
-            work_list.add_next(inner_header, string_offset, key);
+            search_list.add_next(inner_header, string_offset, key);
             continue;
         }
 
@@ -486,7 +486,7 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
         }
 
         // Recurse into sub-index;
-        work_list.add_all_for_level(sub_header, string_offset + 4);
+        search_list.add_all_for_level(sub_header, string_offset + 4);
     }
 }
 
