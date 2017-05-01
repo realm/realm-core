@@ -28,3 +28,13 @@ cmake -DREALM_ENABLE_ENCRYPTION=1 \
 ninja
 ninja install/strip
 cpack -D CPACK_GENERATOR="TGZ" -B /out -R "${VERSION}"
+
+rm -rf -- *
+cmake -DREALM_ENABLE_ENCRYPTION=1 \
+      -DREALM_BUILD_LIB_ONLY=1 \
+      -DCMAKE_INSTALL_PREFIX="/dest/${name}" \
+      -DCMAKE_BUILD_TYPE=Debug \
+      -GNinja ..
+ninja
+ninja install
+cpack -D CPACK_GENERATOR="TGZ" -B /out -R "${VERSION}"

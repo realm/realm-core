@@ -23,3 +23,13 @@ cmake3 -DREALM_ENABLE_ENCRYPTION=1 \
 ninja
 ninja install/strip
 cpack3 -D CPACK_GENERATOR="RPM" -B /out -R "${VERSION}"
+
+rm -rf -- *
+cmake3 -DREALM_ENABLE_ENCRYPTION=1 \
+       -DREALM_NO_TESTS=1 \
+       -DCMAKE_INSTALL_PREFIX=/prod \
+       -DCMAKE_BUILD_TYPE=Debug \
+       -GNinja ..
+ninja
+ninja install
+cpack3 -D CPACK_GENERATOR="RPM" -B /out -R "${VERSION}"
