@@ -8,10 +8,12 @@ set -ex
 trap 'chown -R --reference /inside/test /test-logs/' EXIT
 
 apt-get update
-apt-get install -y -f /out/*.deb
+# TODO: remove the need of the force-overwrite
+find /out -maxdepth 1 -name "*.deb" -exec dpkg --force-overwrite -i {} \;
+
 
 # include build test here to ensure that everything is properly installed
-packages=(realm-core-release-runtime realm-core-release-devel)
+packages=(realm-core-release-runtime realm-core-release-devel realm-core-debug-runtime realm-core-debug-devel)
 
 for x in "${packages[@]}"; do
   echo "--- querying $x ---"
