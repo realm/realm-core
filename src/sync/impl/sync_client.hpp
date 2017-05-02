@@ -26,6 +26,12 @@
 
 #include <thread>
 
+#include "sync/impl/network_reachability.hpp"
+
+#if NETWORK_REACHABILITY_AVAILABLE
+#include "sync/impl/apple/network_reachability_observer.hpp"
+#endif
+
 namespace realm {
 namespace _impl {
 
@@ -35,9 +41,8 @@ struct SyncClient {
     sync::Client client;
 
     SyncClient(std::unique_ptr<util::Logger> logger,
-               ReconnectMode reconnect_mode = ReconnectMode::normal,
-               bool verify_ssl = true)
-    : client(make_client(*logger, reconnect_mode, verify_ssl)) // Throws
+               ReconnectMode reconnect_mode = ReconnectMode::normal)
+    : client(make_client(*logger, reconnect_mode)) // Throws
     , m_logger(std::move(logger))
     , m_thread([this] {
         if (g_binding_callback_thread_observer)
@@ -50,9 +55,20 @@ struct SyncClient {
 
         client.run(); // Throws
     }) // Throws
+#if NETWORK_REACHABILITY_AVAILABLE
+    , m_reachability_observer(none, [=](const NetworkReachabilityStatus status) {
+        if (status != NotReachable)
+            cancel_reconnect_delay();
+    })
+    {
+        if (!m_reachability_observer.start_observing())
+            m_logger->error("Failed to set up network reachability observer");
+    }
+#else
     {
     }
-    
+#endif
+
     void cancel_reconnect_delay() {
         client.cancel_reconnect_delay();
     }
@@ -70,17 +86,19 @@ struct SyncClient {
     }
 
 private:
-    static sync::Client make_client(util::Logger& logger, ReconnectMode reconnect_mode, bool verify_ssl)
+    static sync::Client make_client(util::Logger& logger, ReconnectMode reconnect_mode)
     {
         sync::Client::Config config;
         config.logger = &logger;
         config.reconnect_mode = std::move(reconnect_mode);
-        config.verify_servers_ssl_certificate = verify_ssl;
         return sync::Client(std::move(config)); // Throws
     }
 
     const std::unique_ptr<util::Logger> m_logger;
     std::thread m_thread;
+#if NETWORK_REACHABILITY_AVAILABLE
+    NetworkReachabilityObserver m_reachability_observer;
+#endif
 };
 
 }

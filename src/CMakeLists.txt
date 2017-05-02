@@ -113,6 +113,11 @@ if(REALM_ENABLE_SYNC)
         sync/sync_user.cpp
         sync/impl/sync_file.cpp
         sync/impl/sync_metadata.cpp)
+    if(APPLE)
+        list(APPEND SOURCES
+            sync/impl/apple/network_reachability_observer.cpp
+            sync/impl/apple/system_configuration.cpp)
+    endif()
     find_package(ZLIB REQUIRED)
     list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
 endif()

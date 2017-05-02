@@ -234,7 +234,6 @@ void SyncManager::reset_for_testing()
         m_log_level = util::Logger::Level::info;
         m_logger_factory = nullptr;
         m_client_reconnect_mode = ReconnectMode::normal;
-        m_client_validate_ssl = true;
     }
 }
 
@@ -260,18 +259,6 @@ bool SyncManager::client_should_reconnect_immediately() const noexcept
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     return m_client_reconnect_mode == ReconnectMode::immediate;
-}
-
-void SyncManager::set_client_should_validate_ssl(bool validate_ssl)
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    m_client_validate_ssl = validate_ssl;
-}
-
-bool SyncManager::client_should_validate_ssl() const noexcept
-{
-    std::lock_guard<std::mutex> lock(m_mutex);
-    return m_client_validate_ssl;
 }
 
 void SyncManager::reconnect()
@@ -468,6 +455,5 @@ std::unique_ptr<SyncClient> SyncManager::create_sync_client() const
         logger = std::move(stderr_logger);
     }
     return std::make_unique<SyncClient>(std::move(logger),
-                                        m_client_reconnect_mode,
-                                        m_client_validate_ssl);
+                                        m_client_reconnect_mode);
 }

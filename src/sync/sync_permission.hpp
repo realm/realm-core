@@ -45,6 +45,18 @@ struct Permission {
     };
     AccessLevel access;
 
+    // Return the string description of an `AccessLevel`.
+    static std::string description_for_access_level(AccessLevel level);
+
+    // Return whether two paths are equivalent: either because they are exactly
+    // equal, or because user ID subtitution of one tilde-delimited path results
+    // in a path identical to the other path.
+    // Warning: this method does NOT strip or add leading or trailing slashes or whitespace.
+    // For example: "/~/foo" is equivalent to "/~/foo"; "/1/foo" is equivalent to "/1/foo".
+    // "/~/foo" is equivalent to "/1/foo" for a user ID of 1.
+    static bool paths_are_equivalent(std::string path_1, std::string path_2,
+                                     const std::string& user_id_1, const std::string& user_id_2);
+
     // Condition is a userId or a KeyValue pair
     // Other conditions may be supported in the future
     struct Condition {

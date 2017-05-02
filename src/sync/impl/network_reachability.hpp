@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////
 //
-// Copyright 2016 Realm Inc.
+// Copyright 2017 Realm Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,25 +16,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_EXTERNAL_COMMIT_HELPER_HPP
-#define REALM_EXTERNAL_COMMIT_HELPER_HPP
+#ifndef REALM_OS_NETWORK_REACHABILITY_HPP
+#define REALM_OS_NETWORK_REACHABILITY_HPP
 
 #include <realm/util/features.h>
 
-#if (defined(REALM_HAVE_EPOLL) && REALM_HAVE_EPOLL) || REALM_ANDROID || (defined(REALM_PLATFORM_NODE) && REALM_PLATFORM_NODE && !REALM_PLATFORM_APPLE && !defined(_WIN32))
-#define REALM_USE_EPOLL 1
-#else
-#define REALM_USE_EPOLL 0
-#endif
-
 #if REALM_PLATFORM_APPLE
-#include "impl/apple/external_commit_helper.hpp"
-#elif REALM_USE_EPOLL
-#include "impl/epoll/external_commit_helper.hpp"
-#elif defined(_WIN32)
-#include "impl/windows/external_commit_helper.hpp"
+#define NETWORK_REACHABILITY_AVAILABLE !REALM_WATCHOS
 #else
-#include "impl/generic/external_commit_helper.hpp"
+#define NETWORK_REACHABILITY_AVAILABLE 0
 #endif
 
-#endif // REALM_EXTERNAL_COMMIT_HELPER_HPP
+#endif // REALM_OS_NETWORK_REACHABILITY_HPP
