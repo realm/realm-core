@@ -83,6 +83,8 @@ struct Permission {
         { }
     };
     Condition condition;
+
+    Timestamp updated_at;
 };
 
 class PermissionResults {
