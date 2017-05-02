@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 # we should always set proper ownership before exiting, otherwise
 # the created logs will have root:root ownership and we'll be unable
@@ -15,5 +15,5 @@ packages=(realm-core-release-runtime realm-core-release-devel)
 
 for x in "${packages[@]}"; do
   echo "--- querying $x ---"
-  dpkg-query -s $x
+  dpkg-query -s "$x"
 done
