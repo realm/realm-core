@@ -59,30 +59,21 @@ void create_metadata_tables(Group& group) {
     // further investigation is required.
     // See https://github.com/realm/realm-java/issues/3651
 
-#if REALM_ENABLE_SYNC
-    TableRef metadata_table = sync::create_table(group, c_metadataTableName);
-    TableRef pk_table = sync::create_table(group, c_primaryKeyTableName);
-    const size_t empty_table_size = (sync::has_object_ids(group) ? 1 : 0);
-#else
-    TableRef metadata_table = group.get_or_add_table(c_metadataTableName);
+    // The tables 'pk' and 'metadata' are treated specially by Sync. The 'pk' table
+    // is populated by `sync::create_table` and friends, while the 'metadata' table
+    // is simply ignored.
     TableRef pk_table = group.get_or_add_table(c_primaryKeyTableName);
+    TableRef metadata_table = group.get_or_add_table(c_metadataTableName);
     const size_t empty_table_size = 0;
-#endif // REALM_ENABLE_SYNC
 
     if (metadata_table->get_column_count() == empty_table_size) {
         metadata_table->insert_column(c_versionColumnIndex, type_Int, c_versionColumnName);
-
-#if REALM_ENABLE_SYNC
-        sync::create_object(group, *metadata_table);
-#else
         metadata_table->add_empty_row();
-#endif // REALM_ENABLE_SYNC
-
         // set initial version
         metadata_table->set_int(c_versionColumnIndex, c_zeroRowIndex, ObjectStore::NotVersioned);
     }
 
-    if (pk_table->get_column_count() == empty_table_size) {
+    if (pk_table->get_column_count() == 0) {
         pk_table->insert_column(c_primaryKeyObjectClassColumnIndex, type_String, c_primaryKeyObjectClassColumnName);
         pk_table->insert_column(c_primaryKeyPropertyNameColumnIndex, type_String, c_primaryKeyPropertyNameColumnName);
     }
@@ -122,13 +113,7 @@ void insert_column(Group& group, Table& table, Property const& property, size_t 
     if (property.type == PropertyType::Object || property.type == PropertyType::Array) {
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
-        if (!link_table) {
-#if REALM_ENABLE_SYNC
-            link_table = sync::create_table(group, target_name);
-#else
-            link_table = group.add_table(target_name);
-#endif // REALM_ENABLE_SYNC
-        }
+        REALM_ASSERT(link_table);
         table.insert_column_link(col_ndx, DataType(property.type), property.name, *link_table);
     }
     else {
@@ -153,25 +138,38 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
 {
     auto name = ObjectStore::table_name_for_object_type(object_schema.name);
 
+    TableRef table;
 #if REALM_ENABLE_SYNC
-    TableRef table = sync::create_table(group, name);
-    const size_t empty_table_column_count = sync::has_object_ids(group) ? 1 : 0;
+    if (object_schema.primary_key.size()) {
+        const Property* pk_property = object_schema.primary_key_property();
+        table = sync::create_table_with_primary_key(group, name, DataType(pk_property->type), pk_property->name);
+    }
+    else {
+        table = sync::create_table(group, name);
+    }
 #else
-    TableRef table = group.get_or_add_table(name);
-    const size_t empty_table_column_count = 0;
+    table = group.get_or_add_table(name);
 #endif // REALM_ENABLE_SYNC
-
-    if (table->get_column_count() > empty_table_column_count) {
-        return table;
-    }
-
-    for (auto const& prop : object_schema.persisted_properties) {
-        add_column(group, *table, prop);
-    }
 
     ObjectStore::set_primary_key_for_object(group, object_schema.name, object_schema.primary_key);
 
     return table;
+}
+
+void add_initial_columns(Group& group, ObjectSchema const& object_schema)
+{
+    auto name = ObjectStore::table_name_for_object_type(object_schema.name);
+    TableRef table = group.get_table(name);
+
+    for (auto const& prop : object_schema.persisted_properties) {
+#if REALM_ENABLE_SYNC
+        // The sync::create_table* functions create the PK column for us.
+        if (object_schema.primary_key.size() && prop.name == object_schema.primary_key) {
+            continue;
+        }
+#endif // REALM_ENABLE_SYNC
+        add_column(group, *table, prop);
+    }
 }
 
 void copy_property_values(Property const& prop, Table& table)
@@ -279,24 +277,23 @@ StringData ObjectStore::get_primary_key_for_object(Group const& group, StringDat
 void ObjectStore::set_primary_key_for_object(Group& group, StringData object_type, StringData primary_key) {
     TableRef table = group.get_table(c_primaryKeyTableName);
 
-    // get row or create if new object and populate
     size_t row = table->find_first_string(c_primaryKeyObjectClassColumnIndex, object_type);
-    if (row == not_found && primary_key.size()) {
+
 #if REALM_ENABLE_SYNC
-        row = sync::create_object_with_primary_key(group, *table, object_type);
-#else
+    // sync::create_table* functions should have already updated the pk table.
+    if (primary_key.size() && sync::has_object_ids(group)) {
+      REALM_ASSERT(row != not_found);
+      REALM_ASSERT(table->get_string(c_primaryKeyPropertyNameColumnIndex, row) == primary_key);
+    }
+#endif // REALM_ENABLE_SYNC
+
+    if (row == not_found && primary_key.size()) {
         row = table->add_empty_row();
         table->set_string_unique(c_primaryKeyObjectClassColumnIndex, row, object_type);
-#endif // REALM_ENABLE_SYNC
         table->set_string(c_primaryKeyPropertyNameColumnIndex, row, primary_key);
         return;
     }
-
     // set if changing, or remove if setting to nil
-#if REALM_ENABLE_SYNC
-    REALM_ASSERT(row == realm::npos || !sync::has_object_ids(group)); // Destructive schema changes not allowed
-#endif // REALM_ENABLE_SYNC
-
     if (primary_key.size() == 0) {
         if (row != not_found) {
             table->move_last_over(row);
@@ -335,6 +332,11 @@ struct SchemaDifferenceExplainer {
     void operator()(schema_change::AddTable op)
     {
         errors.emplace_back("Class '%1' has been added.", op.object->name);
+    }
+
+    void operator()(schema_change::AddInitialProperties)
+    {
+        // Nothing. Always preceded by AddTable.
     }
 
     void operator()(schema_change::AddProperty op)
@@ -428,6 +430,7 @@ bool ObjectStore::needs_migration(std::vector<SchemaChange> const& changes)
     using namespace schema_change;
     struct Visitor {
         bool operator()(AddIndex) { return false; }
+        bool operator()(AddInitialProperties) { return false; }
         bool operator()(AddProperty) { return true; }
         bool operator()(AddTable) { return false; }
         bool operator()(ChangePrimaryKey) { return true; }
@@ -456,6 +459,7 @@ void ObjectStore::verify_no_migration_required(std::vector<SchemaChange> const& 
         // Adding a table or adding/removing indexes can be done automatically.
         // All other changes require migrations.
         void operator()(AddTable) { }
+        void operator()(AddInitialProperties) { }
         void operator()(AddIndex) { }
         void operator()(RemoveIndex) { }
     } verifier;
@@ -473,6 +477,7 @@ bool ObjectStore::verify_valid_additive_changes(std::vector<SchemaChange> const&
 
         // Additive mode allows adding things, extra columns, and adding/removing indexes
         void operator()(AddTable) { other_changes = true; }
+        void operator()(AddInitialProperties) { other_changes = true; }
         void operator()(AddProperty) { other_changes = true; }
         void operator()(RemoveProperty) { }
         void operator()(AddIndex) { index_changes = true; }
@@ -490,6 +495,7 @@ void ObjectStore::verify_valid_external_changes(std::vector<SchemaChange> const&
 
         // Adding new things is fine
         void operator()(AddTable) { }
+        void operator()(AddInitialProperties) { }
         void operator()(AddProperty) { }
         void operator()(AddIndex) { }
         void operator()(RemoveIndex) { }
@@ -504,6 +510,7 @@ void ObjectStore::verify_compatible_for_read_only(std::vector<SchemaChange> cons
         using SchemaDifferenceExplainer::operator();
 
         void operator()(AddTable) { }
+        void operator()(AddInitialProperties) { }
         void operator()(RemoveProperty) { }
         void operator()(AddIndex) { }
         void operator()(RemoveIndex) { }
@@ -524,6 +531,7 @@ static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> 
         using SchemaDifferenceExplainer::operator();
 
         void operator()(AddTable op) { create_table(group, *op.object); }
+        void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
         void operator()(AddIndex op) { add_index(table(op.object), op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
     } applier{group};
@@ -539,6 +547,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         TableHelper table;
 
         void operator()(AddTable op) { create_table(group, *op.object); }
+        void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
 
         // Note that in normal operation none of these will be hit, as if we're
         // creating the initial tables there shouldn't be anything to update.
@@ -546,7 +555,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // not-quite-correct files produced by other things and has no obvious
         // downside.
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
-        void operator()(RemoveProperty op) { table(op.object).remove_column(op.property->table_column); }
+        void operator()(RemoveProperty) { }
         void operator()(MakePropertyNullable op) { make_property_optional(group, table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
         void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? StringData{op.property->name} : ""); }
@@ -575,6 +584,7 @@ static void apply_additive_changes(Group& group, std::vector<SchemaChange> const
         bool update_indexes;
 
         void operator()(AddTable op) { create_table(group, *op.object); }
+        void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
         void operator()(AddIndex op) { if (update_indexes) add_index(table(op.object), op.property->table_column); }
         void operator()(RemoveIndex op) { if (update_indexes) table(op.object).remove_search_index(op.property->table_column); }
@@ -601,6 +611,7 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         TableHelper table;
 
         void operator()(AddTable op) { create_table(group, *op.object); }
+        void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
         void operator()(RemoveProperty) { /* delayed until after the migration */ }
         void operator()(ChangePropertyType op) { replace_column(group, table(op.object), *op.old_property, *op.new_property); }
@@ -641,6 +652,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
         }
 
         void operator()(AddTable op) { create_table(group, *op.object); }
+        void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
         void operator()(AddIndex op) { add_index(table(op.object), op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
 
