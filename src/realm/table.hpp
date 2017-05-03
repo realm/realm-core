@@ -832,6 +832,14 @@ public:
     /// function is mainly intended for debugging purposes.
     bool is_degenerate() const noexcept;
 
+    /// Compute the sum of the sizes in number of bytes of all the array nodes
+    /// that currently make up this table. See also
+    /// Group::compute_aggregate_byte_size().
+    ///
+    /// If this table accessor is the detached state, this function returns
+    /// zero.
+    std::size_t compute_aggregated_byte_size() const noexcept;
+
     // Debug
     void verify() const;
 #ifdef REALM_DEBUG
@@ -1965,6 +1973,16 @@ inline bool Table::operator!=(const Table& t) const
 inline bool Table::is_degenerate() const noexcept
 {
     return !m_columns.is_attached();
+}
+
+inline std::size_t Table::compute_aggregated_byte_size() const noexcept
+{
+    if (!is_attached())
+        return 0;
+    const Array& real_top = (m_top.is_attached() ? m_top : m_columns);
+    MemStats stats_2;
+    real_top.stats(stats_2);
+    return stats_2.allocated;
 }
 
 inline void Table::set_into_mixed(Table* parent, size_t col_ndx, size_t row_ndx) const
