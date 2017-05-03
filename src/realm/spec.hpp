@@ -151,7 +151,8 @@ private:
     void init(ref_type) noexcept;
     void init(MemRef) noexcept;
     void update_has_strong_link_columns() noexcept;
-    void update_subspec_ptrs();
+    void reset_subspec_ptrs();
+    void adj_subspec_ptrs();
 
     // Similar in function to Array::init_from_parent().
     void init_from_parent() noexcept;

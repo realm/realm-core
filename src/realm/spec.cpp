@@ -63,7 +63,7 @@ void Spec::init(MemRef mem) noexcept
         ref_type ref = m_top.get_as_ref(3);
         m_subspecs.init_from_ref(ref);
         m_subspecs.set_parent(&m_top, 3);
-        update_subspec_ptrs();
+        reset_subspec_ptrs();
     }
     else {
         m_subspec_ptrs.clear();
@@ -104,7 +104,7 @@ void Spec::update_has_strong_link_columns() noexcept
     m_has_strong_link_columns = false;
 }
 
-void Spec::update_subspec_ptrs()
+void Spec::reset_subspec_ptrs()
 {
     size_t n = m_subspecs.size();
     m_subspec_ptrs.clear();
@@ -119,6 +119,15 @@ void Spec::update_subspec_ptrs()
     }
 }
 
+void Spec::adj_subspec_ptrs()
+{
+    size_t n = m_subspecs.size();
+    for (size_t i = 0; i < n; ++i) {
+        if (m_subspec_ptrs[i].m_spec != nullptr) {
+            m_subspec_ptrs[i].m_spec->set_ndx_in_parent(i);
+        }
+    }
+}
 
 bool Spec::update_from_parent(size_t old_baseline) noexcept
 {
@@ -131,7 +140,7 @@ bool Spec::update_from_parent(size_t old_baseline) noexcept
 
     if (has_subspec()) {
         if (m_subspecs.update_from_parent(old_baseline)) {
-            update_subspec_ptrs();
+            reset_subspec_ptrs();
         }
     }
     else {
@@ -249,6 +258,7 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
             m_subspec_ptrs.insert(m_subspec_ptrs.begin() + subspec_ndx, SubspecPtr(false));
             m_subspec_ptrs.insert(m_subspec_ptrs.begin() + subspec_ndx, SubspecPtr(false));
         }
+        adj_subspec_ptrs();
     }
 
     update_has_strong_link_columns();
@@ -271,11 +281,13 @@ void Spec::erase_column(size_t column_ndx)
         subspec_top.destroy_deep();    // recursively delete entire subspec
         m_subspecs.erase(subspec_ndx); // Throws
         m_subspec_ptrs.erase(m_subspec_ptrs.begin() + subspec_ndx);
+        adj_subspec_ptrs();
     }
     else if (tf::is_link_type(type)) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
         m_subspecs.erase(subspec_ndx); // origin table index  : Throws
         m_subspec_ptrs.erase(m_subspec_ptrs.begin() + subspec_ndx);
+        adj_subspec_ptrs();
     }
     else if (type == col_type_BackLink) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
@@ -283,6 +295,7 @@ void Spec::erase_column(size_t column_ndx)
         m_subspecs.erase(subspec_ndx); // origin column index : Throws
         m_subspec_ptrs.erase(m_subspec_ptrs.begin() + subspec_ndx);
         m_subspec_ptrs.erase(m_subspec_ptrs.begin() + subspec_ndx);
+        adj_subspec_ptrs();
     }
     else if (type == col_type_StringEnum) {
         // Enum columns do also have a separate key list
@@ -352,6 +365,7 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
                 last = middle + 1;
             }
             std::rotate(first, middle, last);
+            adj_subspec_ptrs();
         }
     }
 

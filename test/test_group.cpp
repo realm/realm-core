@@ -952,6 +952,31 @@ TEST(Group_SubtableDescriptors)
     table->get_subdescriptor(0)->remove_search_index(0);
 }
 
+TEST(Group_UpdateSubtableDescriptorsAccessors)
+{
+    GROUP_TEST_PATH(path);
+    Group g(path, crypt_key(), Group::mode_ReadWrite);
+
+    TableRef table = g.add_table("first");
+
+    {
+        DescriptorRef subdescr;
+        table->add_column(type_Table, "sub1", true, &subdescr);
+        subdescr->add_column(type_Int, "integers", nullptr, false);
+    }
+
+    {
+        DescriptorRef subdescr;
+        table->add_column(type_Table, "sub2", true, &subdescr);
+        subdescr->add_column(type_Int, "integers", nullptr, false);
+    }
+
+    g.commit();
+
+    table->get_subdescriptor(1)->remove_search_index(0);
+    table->remove_column(0);
+    table->get_subdescriptor(0)->add_search_index(0);
+}
 
 TEST(Group_Invalid1)
 {
