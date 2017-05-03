@@ -176,6 +176,12 @@
     <ClCompile Include="..\src\win32\openssl\crypto\sha\sha256.c">
       <Filter>openssl</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\win32\sha-2-master\sha256k.cpp">
+      <Filter>kalven-sha</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\sha-2-master\sha224k.cpp">
+      <Filter>kalven-sha</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\realm.hpp" />
@@ -291,6 +297,13 @@
     <ClInclude Include="..\src\win32\openssl\crypto\aes\aes_locl.h">
       <Filter>openssl</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\realm\util\overload.hpp" />
+    <ClInclude Include="..\src\win32\sha-2-master\sha256.hpp">
+      <Filter>kalven-sha</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\win32\sha-2-master\sha224.hpp">
+      <Filter>kalven-sha</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
@@ -302,6 +315,9 @@
     </Filter>
     <Filter Include="openssl">
       <UniqueIdentifier>{d09dec58-f027-4e46-b110-18eaf21e33e3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="kalven-sha">
+      <UniqueIdentifier>{de971110-9a85-4fe6-b2c8-d4442a57e2eb}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

@@ -10302,6 +10302,8 @@ TEST(LangBindHelper_RacingAttachers)
     }
 }
 
+
+/*
 // Run this as "x64 / Unit tests Debug"
 ONLY(LangBindHelper_HandoverBetweenThreads)
 {
@@ -10324,7 +10326,7 @@ ONLY(LangBindHelper_HandoverBetweenThreads)
     querier.join();
     verifier.join();
 }
-
+*/
 
 TEST(LangBindHelper_HandoverDependentViews)
 {

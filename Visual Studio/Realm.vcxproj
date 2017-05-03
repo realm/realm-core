@@ -1628,6 +1628,8 @@
       <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">false</CompileAsWinRT>
       <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">false</CompileAsWinRT>
     </ClCompile>
+    <ClCompile Include="..\src\win32\sha-2-master\sha224k.cpp" />
+    <ClCompile Include="..\src\win32\sha-2-master\sha256k.cpp" />
     <ClCompile Include="..\test\fuzzy\afl.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'">true</ExcludedFromBuild>
@@ -2621,6 +2623,8 @@
     <ClInclude Include="..\src\win32\getopt.h" />
     <ClInclude Include="..\src\win32\openssl\crypto\aes\aes_locl.h" />
     <ClInclude Include="..\src\win32\pthread\pthread.h" />
+    <ClInclude Include="..\src\win32\sha-2-master\sha224.hpp" />
+    <ClInclude Include="..\src\win32\sha-2-master\sha256.hpp" />
     <ClInclude Include="..\test\fuzz_group.hpp" />
     <ClInclude Include="..\test\test.hpp" />
     <ClInclude Include="..\test\util\jsmn.hpp" />

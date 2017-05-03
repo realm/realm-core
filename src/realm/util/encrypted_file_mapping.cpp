@@ -37,6 +37,7 @@
 #include <unistd.h>
 #else
 #include <Windows.h>
+#include <win32/sha-2-master/sha224.hpp>
 #endif
 
 #include <realm/util/encrypted_file_mapping.hpp>
@@ -318,6 +319,18 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
     memset(opad + 32, 0x5C, 32);
 
     // Full hmac operation is sha224(opad + sha224(ipad + data))
+#ifdef _WIN32
+    sha224_state s;
+    sha_init(s);
+    sha_process(s, ipad, 64);
+    sha_process(s, static_cast<const uint8_t*>(src), len);
+    sha_done(s, dst);
+
+    sha_init(s);
+    sha_process(s, opad, 64);
+    sha_process(s, dst, SHA224_DIGEST_LENGTH);
+    sha_done(s, dst);
+#else
     SHA224_Init(&ctx);
     SHA256_Update(&ctx, ipad, 64);
     SHA256_Update(&ctx, static_cast<const uint8_t*>(src), len);
@@ -327,6 +340,8 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
     SHA256_Update(&ctx, opad, 64);
     SHA256_Update(&ctx, dst, SHA224_DIGEST_LENGTH);
     SHA256_Final(dst, &ctx);
+#endif
+
 #endif
 }
 
