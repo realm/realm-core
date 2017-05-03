@@ -2,9 +2,7 @@
 
 ### Bugfixes
 
-* Work around a bug in macOS which could cause a deadlock when trying to obtain a shared lock
-  using flock(). PR [#2552](https://github.com/realm/realm-core/pull/2552),
-  issue [#2434](https://github.com/realm/realm-core/issues/2434).
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -12,14 +10,56 @@
 
 ### Enhancements
 
-* New file system utility functions: `util::remove_dir_recursive()` and
-  `util::File::for_each()`.
+* Lorem ipsum.
 
 -----------
 
 ### Internals
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 2.6.2 Release notes
+
+### Bugfixes
+
+* Fix for incorrect, redundant string index tree traversal for case insensitive searches
+  for strings with some characters being identical in upper and lower case (e.g. numbers).
+  PR [#2578](https://github.com/realm/realm-core/pull/2578),
+  Cocoa issue [#4895](https://github.com/realm/realm-cocoa/issues/4895)
+
+----------------------------------------------
+
+# 2.6.1 Release notes
+
+### Bugfixes
+
+* `mkfifo` on external storage fails with `EINVAL` on some devices with Android 7.x,
+  which caused crash when opening Realm.
+  PR[#2574](https://github.com/realm/realm-core/pull/2574),
+  Issue [#4461](https://github.com/realm/realm-java/issues/4461).
+
+----------------------------------------------
+
+# 2.6.0 Release notes
+
+### Bugfixes
+
+* Work around a bug in macOS which could cause a deadlock when trying to obtain a shared lock
+  using flock(). PR [#2552](https://github.com/realm/realm-core/pull/2552),
+  issue [#2434](https://github.com/realm/realm-core/issues/2434).
+
+### Enhancements
+
+* Add support for `SharedGroup::try_begin_write()` and corresponding `try_lock()`
+  functionality in low level Mutex classes.
+  PR [#2547](https://github.com/realm/realm-core/pull/2547/files)
+  Fixes issue [#2538](https://github.com/realm/realm-core/issues/2538)
+* New file system utility functions: `util::remove_dir_recursive()` and
+  `util::File::for_each()`. PR [#2556](https://github.com/realm/realm-core/pull/2556).
+* Made case insensitive queries use the new index based case insensitive search.
+  PR [#2486](https://github.com/realm/realm-core/pull/2486)
 
 ----------------------------------------------
 
