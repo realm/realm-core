@@ -2144,7 +2144,7 @@ inline void Table::set_float(size_t col_ndx, size_t ndx, float value, bool is_de
 inline double Table::get_double(size_t col_ndx, size_t ndx) const noexcept
 {
     double d = get<double>(col_ndx, ndx);
-    return null::is_null_float(d) ? 0.0f : d;
+    return null::is_null_float(d) ? 0.0 : d;
 }
 
 inline void Table::set_double(size_t col_ndx, size_t ndx, double value, bool is_default)
