@@ -20,12 +20,12 @@
 #define REALM_OS_OBJECT_HPP
 
 #include "impl/collection_notifier.hpp"
-#include "shared_realm.hpp"
 
 #include <realm/row.hpp>
 
 namespace realm {
 class ObjectSchema;
+struct Property;
 using RowExpr = BasicRowExpr<Table>;
 
 namespace _impl {
@@ -35,7 +35,7 @@ namespace _impl {
 class Object {
 public:
     Object();
-    Object(SharedRealm r, ObjectSchema const& s, RowExpr const& o);
+    Object(std::shared_ptr<Realm> r, ObjectSchema const& s, RowExpr const& o);
 
     Object(Object const&);
     Object(Object&&);
@@ -54,16 +54,17 @@ public:
 
     // create an Object from a native representation
     template<typename ValueType, typename ContextType>
-    static Object create(ContextType& ctx, SharedRealm realm,
+    static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                          const ObjectSchema &object_schema, ValueType value,
                          bool try_update, Row* = nullptr);
 
     template<typename ValueType, typename ContextType>
-    static Object get_for_primary_key(ContextType& ctx, SharedRealm realm,
+    static Object get_for_primary_key(ContextType& ctx,
+                                      std::shared_ptr<Realm> const& realm,
                                       const ObjectSchema &object_schema,
                                       ValueType primary_value);
 
-    SharedRealm const& realm() const { return m_realm; }
+    std::shared_ptr<Realm> const& realm() const { return m_realm; }
     ObjectSchema const& get_object_schema() const { return *m_object_schema; }
     RowExpr row() const { return m_row; }
 
@@ -72,7 +73,7 @@ public:
     NotificationToken add_notification_callback(CollectionChangeCallback callback) &;
 
 private:
-    SharedRealm m_realm;
+    std::shared_ptr<Realm> m_realm;
     const ObjectSchema *m_object_schema;
     Row m_row;
     _impl::CollectionNotifier::Handle<_impl::ObjectNotifier> m_notifier;

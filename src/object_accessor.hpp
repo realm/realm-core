@@ -162,7 +162,7 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
 }
 
 template<typename ValueType, typename ContextType>
-Object Object::create(ContextType& ctx, SharedRealm realm,
+Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                       ObjectSchema const& object_schema, ValueType value,
                       bool try_update, Row* out_row)
 {
@@ -243,7 +243,7 @@ Object Object::create(ContextType& ctx, SharedRealm realm,
 }
 
 template<typename ValueType, typename ContextType>
-Object Object::get_for_primary_key(ContextType& ctx, SharedRealm realm,
+Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                                    const ObjectSchema &object_schema,
                                    ValueType primary_value)
 {
