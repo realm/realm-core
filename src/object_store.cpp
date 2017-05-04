@@ -251,12 +251,7 @@ void ObjectStore::set_schema_version(Group& group, uint64_t version) {
 
 uint64_t ObjectStore::get_schema_version(Group const& group) {
     ConstTableRef table = group.get_table(c_metadataTableName);
-#if REALM_ENABLE_SYNC
-    const size_t empty_table_size = (sync::has_object_ids(group) ? 1 : 0);
-#else
-    const size_t empty_table_size = 0;
-#endif // REALM_ENABLE_SYNC
-    if (!table || table->get_column_count() == empty_table_size) {
+    if (!table || table->get_column_count() == 0) {
         return ObjectStore::NotVersioned;
     }
     return table->get_int(c_versionColumnIndex, c_zeroRowIndex);
