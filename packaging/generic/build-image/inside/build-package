@@ -21,20 +21,21 @@ rm -rf build-dir
 mkdir build-dir
 cd build-dir
 cmake -DREALM_ENABLE_ENCRYPTION=1 \
-      -DREALM_BUILD_LIB_ONLY=1 \
+      -DREALM_NO_TESTS=1 \
       -DCMAKE_INSTALL_PREFIX="/dest/${name}" \
       -DCMAKE_BUILD_TYPE=Release \
       -GNinja ..
 ninja
 ninja install/strip
-cpack -D CPACK_GENERATOR="TGZ" -B /out -R "${VERSION}"
 
 rm -rf -- *
 cmake -DREALM_ENABLE_ENCRYPTION=1 \
-      -DREALM_BUILD_LIB_ONLY=1 \
+      -DREALM_NO_TESTS=1 \
       -DCMAKE_INSTALL_PREFIX="/dest/${name}" \
       -DCMAKE_BUILD_TYPE=Debug \
       -GNinja ..
 ninja
 ninja install
-cpack -D CPACK_GENERATOR="TGZ" -B /out -R "${VERSION}"
+
+cd /dest
+tar -zcf "/out/${name}.tgz" "${name}"

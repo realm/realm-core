@@ -22,9 +22,69 @@ cmake -DREALM_ENABLE_ENCRYPTION=1 \
       -GNinja ..
 ninja
 ninja install/strip
-cpack -D CPACK_GENERATOR="DEB" -B /out -R "${VERSION}"
 
-rm -rf -- *
+echo "ldconfig" > /tmp/post-ldconf
+echo "echo >/dev/null" >> /tmp/post-ldconf
+
+(
+cd /out
+
+fpm \
+    -t deb \
+    -s dir \
+    -n librealm \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
+    --url "https://realm.io" \
+    --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Realm <help@realm.io>" \
+    --after-install "/tmp/post-ldconf" \
+    --after-remove "/tmp/post-ldconf" \
+    -d "libssl1.0.0" \
+    -C "/prod" \
+    lib/librealm.so=/usr/lib/librealm.so \
+    libexec=/usr
+
+fpm \
+    -t deb \
+    -s dir \
+    -n librealm-dev \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
+    --url "https://realm.io" \
+    --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Realm <help@realm.io>" \
+    -d "librealm = ${VERSION}-${ITERATION}" \
+    -d "libssl-dev" \
+    -C "/prod" \
+    /include=/usr \
+    /lib/librealm.a=/usr/lib/librealm.a \
+    /bin/realm-config=/usr/bin/realm-config
+
+fpm \
+    -t deb \
+    -s dir \
+    -n realm-utils \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
+    --url "https://realm.io" \
+    --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Realm <help@realm.io>" \
+    -d "librealm" \
+    -C "/prod" \
+    /bin/realm-importer=/usr/bin/realm-importer
+)
+
+rm -rf -- * /prod/*
 cmake -DREALM_ENABLE_ENCRYPTION=1 \
       -DREALM_NO_TESTS=1 \
       -DCMAKE_INSTALL_PREFIX=/prod \
@@ -32,4 +92,41 @@ cmake -DREALM_ENABLE_ENCRYPTION=1 \
       -GNinja ..
 ninja
 ninja install
-cpack -D CPACK_GENERATOR="DEB" -B /out -R "${VERSION}"
+
+cd /out
+
+fpm \
+    -t deb \
+    -s dir \
+    -n librealm-dbg \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
+    --url "https://realm.io" \
+    --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Realm <help@realm.io>" \
+    --after-install "/tmp/post-ldconf" \
+    --after-remove "/tmp/post-ldconf" \
+    -d "libssl1.0.0" \
+    -C "/prod" \
+    lib/librealm-dbg.so=/usr/lib/librealm-dbg.so \
+    libexec=/usr
+
+fpm \
+    -t deb \
+    -s dir \
+    -n librealm-dev-dbg \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
+    --url "https://realm.io" \
+    --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Realm <help@realm.io>" \
+    -d "librealm-dev = ${VERSION}-${ITERATION}" \
+    -d "libssl-dev" \
+    -C "/prod" \
+    lib/librealm-dbg.so=/usr/lib/librealm-dbg.a
