@@ -10,13 +10,15 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Add `Group::compute_aggregated_byte_size()` and
+  `Table::compute_aggregated_byte_size()` for debugging/diagnostics purposes.
 
 -----------
 
 ### Internals
 
-* Lorem ipsum.
+* Make `Array::stats()` available in release mode builds (not just in debug mode
+  builds).
 
 ----------------------------------------------
 

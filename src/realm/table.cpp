@@ -5289,6 +5289,17 @@ void Table::to_string_row(size_t row_ndx, std::ostream& out, const std::vector<s
 }
 
 
+size_t Table::compute_aggregated_byte_size() const noexcept
+{
+    if (!is_attached())
+        return 0;
+    const Array& real_top = (m_top.is_attached() ? m_top : m_columns);
+    MemStats stats_2;
+    real_top.stats(stats_2);
+    return stats_2.allocated;
+}
+
+
 bool Table::compare_rows(const Table& t) const
 {
     // Table accessors attached to degenerate subtables have no column
