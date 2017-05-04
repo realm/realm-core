@@ -734,9 +734,8 @@ TEST_CASE("list") {
     }
 
     SECTION("add(Context)") {
-        CppContext ctx(r);
         List list(r, lv);
-        ctx.object_schema = &list.get_object_schema();
+        CppContext ctx(r, &list.get_object_schema());
         r->begin_transaction();
 
         SECTION("adds boxed RowExpr") {

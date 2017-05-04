@@ -180,7 +180,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         auto primary_value = ctx.value_for_property(value, primary_prop->name,
                                                     primary_prop - &object_schema.persisted_properties[0]);
         if (!primary_value)
-            primary_value = ctx.default_value_for_property(realm.get(), object_schema, primary_prop->name);
+            primary_value = ctx.default_value_for_property(object_schema, primary_prop->name);
         if (!primary_value) {
             if (!primary_prop->is_nullable)
                 throw MissingPropertyValueException(object_schema.name, primary_prop->name);
@@ -229,7 +229,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
 
         bool is_default = false;
         if (!v) {
-            v = ctx.default_value_for_property(realm.get(), object_schema, prop.name);
+            v = ctx.default_value_for_property(object_schema, prop.name);
             is_default = true;
         }
         if ((!v || ctx.is_null(*v)) && !prop.is_nullable && prop.type != PropertyType::Array) {

@@ -27,60 +27,111 @@ namespace realm {
 using AnyDict = std::map<std::string, util::Any>;
 using AnyVector = std::vector<util::Any>;
 
-struct CppContext {
-    std::shared_ptr<Realm> realm;
-    const ObjectSchema* object_schema;
-
-    CppContext() = default;
-    CppContext(std::shared_ptr<Realm> realm) : realm(std::move(realm)) { }
-    CppContext(CppContext& c, realm::Property const& prop)
+// An object accessor context which can be used to create and access objects
+// using util::Any as the type-erased value type. In addition, this serves as
+// the reference implementation of an accessor context that must be implemented
+// by each binding.
+class CppContext {
+public:
+    // This constructor is the only one used by the object accessor code, and is
+    // used when recurring into a link or array property during object creation
+    // (i.e. prop.type will always be Object or Array).
+    CppContext(CppContext& c, Property const& prop)
     : realm(c.realm)
     , object_schema(&*realm->schema().find(prop.object_type))
     { }
 
+    CppContext() = default;
+    CppContext(std::shared_ptr<Realm> realm, const ObjectSchema* os=nullptr)
+    : realm(std::move(realm)), object_schema(os) { }
+
+    // The use of util::Optional for the following two functions is not a hard
+    // requirement; only that it be some type which can be evaluated in a
+    // boolean context to determine if it contains a value, and if it does
+    // contain a value it must be dereferencable to obtain that value.
+
+    // Get the value for a property in an input object, or `util::none` if no
+    // value present. The property is identified both by the name of the
+    // property and its index within the ObjectScehma's persisted_properties
+    // array.
     util::Optional<util::Any> value_for_property(util::Any& dict,
-                                                 const std::string &prop_name, size_t) const
+                                                 std::string const& prop_name,
+                                                 size_t /* property_index */) const
     {
         auto const& v = any_cast<AnyDict&>(dict);
         auto it = v.find(prop_name);
         return it == v.end() ? util::none : util::make_optional(it->second);
     }
 
+    // Get the default value for the given property in the given object schema,
+    // or `util::none` if there is none (which is distinct from the default
+    // being `null`).
+    //
+    // This implementation does not support default values; see the default
+    // value tests for an example of one which does.
+    util::Optional<util::Any>
+    default_value_for_property(ObjectSchema const&, std::string const&) const
+    {
+        return util::none;
+    }
+
+    // Invoke `fn` with each of the values from an enumerable type
     template<typename Func>
     void enumerate_list(util::Any& value, Func&& fn) {
         for (auto&& v : any_cast<AnyVector&>(value))
             fn(v);
     }
 
-    util::Optional<util::Any>
-    default_value_for_property(Realm*, ObjectSchema const&, std::string const&) const
-    {
-        return util::none;
-    }
+    // Convert from core types to the boxed type
+    util::Any box(BinaryData v) const { return std::string(v); }
+    util::Any box(List v) const { return v; }
+    util::Any box(Object v) const { return v; }
+    util::Any box(Results v) const { return v; }
+    util::Any box(StringData v) const { return std::string(v); }
+    util::Any box(Timestamp v) const { return v; }
+    util::Any box(bool v) const { return v; }
+    util::Any box(double v) const { return v; }
+    util::Any box(float v) const { return v; }
+    util::Any box(long long v) const { return v; }
 
+    // Any properties are only supported by the Cocoa binding to enable reading
+    // old Realm files that may have used them. Other bindings can safely not
+    // implement this.
+    util::Any box(Mixed) const { REALM_TERMINATE("not supported"); }
+
+    // Convert from the boxed type to core types. This needs to be implemented
+    // for all of the types which `box()` can take, plus `RowExpr` and optional
+    // versions of the numeric types, minus `List` and `Results`.
+    //
+    // `create` and `update` are only applicable to `unbox<RowExpr>`. If
+    // `create` is false then when given something which is not a managed Realm
+    // object `unbox()` should simply return a detached row expr, while if it's
+    // true then `unbox()` should create a new object in the context's Realm
+    // using the provided value. If `update` is true then upsert semantics
+    // should be used for this.
     template<typename T>
-    T unbox(util::Any& v, bool = false, bool = false) const { return any_cast<T>(v); }
-
-    util::Any box(BinaryData v) { return std::string(v); }
-    util::Any box(bool v) { return v; }
-    util::Any box(double v) { return v; }
-    util::Any box(float v) { return v; }
-    util::Any box(long long v) { return v; }
-    util::Any box(StringData v) { return std::string(v); }
-    util::Any box(Timestamp v) { return v; }
-    util::Any box(List v) { return v; }
-    util::Any box(TableRef v) { return v; }
-    util::Any box(Results v) { return v; }
-    util::Any box(Object v) { return v; }
-    util::Any box(Mixed) { REALM_TERMINATE("not supported"); }
+    T unbox(util::Any& v, bool /*create*/= false, bool /*update*/= false) const { return any_cast<T>(v); }
 
     bool is_null(util::Any const& v) const noexcept { return !v.has_value(); }
     util::Any null_value() const noexcept { return {}; }
 
+    // KVO hooks which will be called before and after modying a property from
+    // within Object::create().
     void will_change(Object const&, Property const&) {}
     void did_change() {}
+
+    // Get a string representation of the given value for use in error messages.
     std::string print(util::Any const&) const { return "not implemented"; }
+
+    // Cocoa allows supplying fewer values than there are properties when
+    // creating objects using an array of values. Other bindings should not
+    // mimick this behavior so just return false here.
     bool allow_missing(util::Any const&) const { return false; }
+
+private:
+    std::shared_ptr<Realm> realm;
+    const ObjectSchema* object_schema = nullptr;
+
 };
 
 template<>
@@ -111,6 +162,7 @@ inline RowExpr CppContext::unbox(util::Any& v, bool create, bool update) const
     if (!create)
         return RowExpr();
 
+    REALM_ASSERT(object_schema);
     return Object::create(const_cast<CppContext&>(*this), realm, *object_schema, v, update).row();
 }
 
@@ -145,4 +197,4 @@ inline Mixed CppContext::unbox(util::Any&, bool, bool) const
 }
 }
 
-#endif /* REALM_OS_OBJECT_ACCESSOR_IMPL_HPP */
+#endif // REALM_OS_OBJECT_ACCESSOR_IMPL_HPP

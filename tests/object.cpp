@@ -51,7 +51,7 @@ struct TestContext : CppContext {
     { }
 
     util::Optional<util::Any>
-    default_value_for_property(Realm*, ObjectSchema const& object, std::string const& prop)
+    default_value_for_property(ObjectSchema const& object, std::string const& prop)
     {
         auto obj_it = defaults.find(object.name);
         if (obj_it == defaults.end())

@@ -44,6 +44,20 @@ public:
 
     ~Object();
 
+    std::shared_ptr<Realm> const& realm() const { return m_realm; }
+    ObjectSchema const& get_object_schema() const { return *m_object_schema; }
+    RowExpr row() const { return m_row; }
+
+    bool is_valid() const { return m_row.is_attached(); }
+
+    NotificationToken add_notification_callback(CollectionChangeCallback callback) &;
+
+    // The following functions require an accessor context which converts from
+    // the binding's native data types to the core data types. See CppContext
+    // for a reference implementation of such a context.
+    //
+    // The actual definitions of these tempated functions is in object_accessor.hpp
+
     // property getter/setter
     template<typename ValueType, typename ContextType>
     void set_property_value(ContextType& ctx, StringData prop_name,
@@ -63,14 +77,6 @@ public:
                                       std::shared_ptr<Realm> const& realm,
                                       const ObjectSchema &object_schema,
                                       ValueType primary_value);
-
-    std::shared_ptr<Realm> const& realm() const { return m_realm; }
-    ObjectSchema const& get_object_schema() const { return *m_object_schema; }
-    RowExpr row() const { return m_row; }
-
-    bool is_valid() const { return m_row.is_attached(); }
-
-    NotificationToken add_notification_callback(CollectionChangeCallback callback) &;
 
 private:
     std::shared_ptr<Realm> m_realm;
