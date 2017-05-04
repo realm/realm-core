@@ -53,7 +53,7 @@ timeout(time: 5, unit: 'HOURS') {
                              buildWin32Debug     : doBuildWindows('Debug', false, 'win32'),
                              buildUwpWin32Debug  : doBuildWindows('Debug', true, 'win32'),
                              buildUwpWin64Debug  : doBuildWindows('Debug', true, 'win64'),
-                             packageGeneric      : doBuildPackage('generic', 'tar.gz'),
+                             packageGeneric      : doBuildPackage('generic', 'tgz'),
                              packageCentos7      : doBuildPackage('centos-7', 'rpm'),
                              packageCentos6      : doBuildPackage('centos-6', 'rpm'),
                              packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
