@@ -93,6 +93,7 @@ public:
     util::Any box(double v) const { return v; }
     util::Any box(float v) const { return v; }
     util::Any box(long long v) const { return v; }
+    util::Any box(RowExpr) const;
 
     // Any properties are only supported by the Cocoa binding to enable reading
     // old Realm files that may have used them. Other bindings can safely not
@@ -114,6 +115,7 @@ public:
 
     bool is_null(util::Any const& v) const noexcept { return !v.has_value(); }
     util::Any null_value() const noexcept { return {}; }
+    util::Optional<util::Any> no_value() const noexcept { return {}; }
 
     // KVO hooks which will be called before and after modying a property from
     // within Object::create().
@@ -133,6 +135,11 @@ private:
     const ObjectSchema* object_schema = nullptr;
 
 };
+
+inline util::Any CppContext::box(RowExpr row) const
+{
+    return Object(realm, *object_schema, row);
+}
 
 template<>
 inline StringData CppContext::unbox(util::Any& v, bool, bool) const

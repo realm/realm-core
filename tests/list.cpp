@@ -768,8 +768,8 @@ TEST_CASE("list") {
     }
 
     SECTION("find(Context)") {
-        CppContext ctx(r);
         List list(r, lv);
+        CppContext ctx(r, &list.get_object_schema());
 
         SECTION("returns index in list for boxed RowExpr") {
             REQUIRE(list.find(ctx, util::Any(target->get(5))) == 5);
@@ -788,5 +788,15 @@ TEST_CASE("list") {
         SECTION("throws for object in wrong table") {
             REQUIRE_THROWS(list.find(ctx, util::Any(origin->get(0))));
         }
+    }
+
+    SECTION("get(Context)") {
+        List list(r, lv);
+        CppContext ctx(r, &list.get_object_schema());
+
+        Object obj;
+        REQUIRE_NOTHROW(obj = any_cast<Object&&>(list.get(ctx, 1)));
+        REQUIRE(obj.is_valid());
+        REQUIRE(obj.row().get_index() == 1);
     }
 }

@@ -135,10 +135,9 @@ size_t List::get_unchecked(size_t row_ndx) const noexcept
 size_t List::find(ConstRow const& row) const
 {
     verify_attached();
-
-    if (!row.is_attached() || row.get_table() != &m_link_view->get_target_table()) {
+    if (!row.is_attached())
         return not_found;
-    }
+    validate(row);
 
     return m_link_view->find(row.get_index());
 }
