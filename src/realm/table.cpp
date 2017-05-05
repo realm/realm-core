@@ -2997,6 +2997,40 @@ size_t Table::set_unique(size_t col_ndx, size_t ndx, StringData value)
 }
 
 template<>
+size_t Table::set_unique(size_t col_ndx, size_t row_ndx, null)
+{
+    if (!is_nullable(col_ndx)) {
+        throw LogicError{LogicError::column_not_nullable};
+    }
+    REALM_ASSERT(!is_link_type(m_spec.get_column_type(col_ndx))); // Use nullify_link().
+    REALM_ASSERT_3(col_ndx, <, get_column_count());
+    REALM_ASSERT_3(row_ndx, <, m_size);
+
+    if (!has_search_index(col_ndx)) {
+        throw LogicError{LogicError::no_search_index};
+    }
+
+    // FIXME: See the definition of check_lists_are_empty() for an explanation
+    // of why this is needed.
+    check_lists_are_empty(row_ndx); // Throws
+
+    bump_version();
+
+    bool conflict = false;
+
+    // Only valid for int columns; use `set_string_unique` to set null strings
+    auto& col = get_column_int_null(col_ndx);
+    row_ndx = do_set_unique_null(col, row_ndx, conflict); // Throws
+
+    if (!conflict) {
+        if (Replication* repl = get_repl())
+            repl->set_null(this, col_ndx, row_ndx, _impl::instr_SetUnique); // Throws
+    }
+
+    return row_ndx;
+}
+
+template<>
 void Table::set(size_t col_ndx, size_t ndx, int_fast64_t value, bool is_default)
 {
     REALM_ASSERT_3(col_ndx, <, get_column_count());
@@ -3197,40 +3231,6 @@ void Table::set(size_t col_ndx, size_t ndx, Mixed value, bool is_default)
 
     if (Replication* repl = get_repl())
         repl->set_mixed(this, col_ndx, ndx, value, is_default ? _impl::instr_SetDefault : _impl::instr_Set); // Throws
-}
-
-template<>
-size_t Table::set_unique(size_t col_ndx, size_t row_ndx, null)
-{
-    if (!is_nullable(col_ndx)) {
-        throw LogicError{LogicError::column_not_nullable};
-    }
-    REALM_ASSERT(!is_link_type(m_spec.get_column_type(col_ndx))); // Use nullify_link().
-    REALM_ASSERT_3(col_ndx, <, get_column_count());
-    REALM_ASSERT_3(row_ndx, <, m_size);
-
-    if (!has_search_index(col_ndx)) {
-        throw LogicError{LogicError::no_search_index};
-    }
-
-    // FIXME: See the definition of check_lists_are_empty() for an explanation
-    // of why this is needed.
-    check_lists_are_empty(row_ndx); // Throws
-
-    bump_version();
-
-    bool conflict = false;
-
-    // Only valid for int columns; use `set_string_unique` to set null strings
-    auto& col = get_column_int_null(col_ndx);
-    row_ndx = do_set_unique_null(col, row_ndx, conflict); // Throws
-
-    if (!conflict) {
-        if (Replication* repl = get_repl())
-            repl->set_null(this, col_ndx, row_ndx, _impl::instr_SetUnique); // Throws
-    }
-
-    return row_ndx;
 }
 
 template<>
