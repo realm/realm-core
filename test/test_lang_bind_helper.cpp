@@ -10303,9 +10303,8 @@ TEST(LangBindHelper_RacingAttachers)
 }
 
 
-/*
 // Run this as "x64 / Unit tests Debug"
-ONLY(LangBindHelper_HandoverBetweenThreads)
+TEST(LangBindHelper_HandoverBetweenThreads)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
@@ -10326,7 +10325,7 @@ ONLY(LangBindHelper_HandoverBetweenThreads)
     querier.join();
     verifier.join();
 }
-*/
+
 
 TEST(LangBindHelper_HandoverDependentViews)
 {

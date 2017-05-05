@@ -32,6 +32,13 @@
 #include <openssl/sha.h>
 #endif
 
+#ifdef _WIN32
+#include <windows.h>
+#include <stdio.h>
+#include <bcrypt.h>
+#pragma comment(lib, "bcrypt.lib")
+#endif
+
 namespace realm {
 namespace util {
 
@@ -62,6 +69,8 @@ private:
 #if REALM_PLATFORM_APPLE
     CCCryptorRef m_encr;
     CCCryptorRef m_decr;
+#elif defined(_WIN32)
+    BCRYPT_KEY_HANDLE m_aes_key_handle;
 #else
     AES_KEY m_ectx;
     AES_KEY m_dctx;

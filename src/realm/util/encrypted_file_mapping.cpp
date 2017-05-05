@@ -38,6 +38,7 @@
 #else
 #include <Windows.h>
 #include <win32/sha-2-master/sha224.hpp>
+#include <bcrypt.h>
 #endif
 
 #include <realm/util/encrypted_file_mapping.hpp>
@@ -143,6 +144,12 @@ AESCryptor::AESCryptor(const uint8_t* key)
 #if REALM_PLATFORM_APPLE
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
+#elif defined(_WIN32)
+    BCRYPT_ALG_HANDLE hAesAlg = NULL;
+    int er;
+    er = BCryptOpenAlgorithmProvider(&hAesAlg, BCRYPT_AES_ALGORITHM, NULL, 0);
+    er = BCryptSetProperty(hAesAlg, BCRYPT_CHAINING_MODE, (PBYTE)BCRYPT_CHAIN_MODE_CBC, sizeof(BCRYPT_CHAIN_MODE_CBC), 0);
+    er = BCryptGenerateSymmetricKey(hAesAlg, &m_aes_key_handle, nullptr, 0, (PBYTE)key, 32, 0);
 #else
     AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
     AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
@@ -295,6 +302,40 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
     CCCryptorStatus err = CCCryptorUpdate(cryptor, src, block_size, dst, block_size, &bytesEncrypted);
     REALM_ASSERT(err == kCCSuccess);
     REALM_ASSERT(bytesEncrypted == block_size);
+#elif defined(_WIN32)
+    ULONG cbData;
+    int i;
+    
+    if (mode == mode_Encrypt) {
+        i = BCryptEncrypt(
+            m_aes_key_handle,
+            (PUCHAR)src,
+            block_size,
+            nullptr,
+            (PUCHAR)iv,
+            sizeof(iv),
+            (PUCHAR)dst,
+            block_size,
+            &cbData,
+            0);
+    }
+    else if(mode == mode_Decrypt) {
+        i = BCryptDecrypt(
+            m_aes_key_handle,
+            (PUCHAR)src,
+            block_size,
+            nullptr,
+            (PUCHAR)iv,
+            sizeof(iv),
+            (PUCHAR)dst,
+            block_size,
+            &cbData,
+            0);
+    }
+    else {
+        REALM_ASSERT_RELEASE(false);
+    }
+
 #else
     AES_cbc_encrypt(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<uint8_t*>(dst), block_size,
                     mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);

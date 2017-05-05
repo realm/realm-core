@@ -852,6 +852,7 @@
       <SubSystem>Console</SubSystem>
       <TargetMachine>MachineX64</TargetMachine>
       <AdditionalLibraryDirectories>C:\Program Files (x86)\Visual Leak Detector\lib\Win64;%(AdditionalLibraryDirectories);$(UniversalCRT_LibraryPath_x64)</AdditionalLibraryDirectories>
+      <AdditionalOptions>bcrypt.lib %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
@@ -1577,28 +1578,6 @@
     <ClCompile Include="..\src\realm\impl\output_stream.cpp" />
     <ClCompile Include="..\src\realm\views.cpp" />
     <ClCompile Include="..\src\win32\getopt.cpp" />
-    <ClCompile Include="..\src\win32\openssl\crypto\aes\aes_cbc.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\aes\aes_cfb.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\aes\aes_core.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\aes\aes_ecb.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\aes\aes_misc.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\aes\aes_ofb.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\cryptlib.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="..\src\win32\openssl\crypto\mem_clr.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\modes\cbc128.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\modes\ccm128.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\modes\cfb128.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\modes\ctr128.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\modes\cts128.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\modes\ofb128.c" />
-    <ClCompile Include="..\src\win32\openssl\crypto\modes\wrap128.c">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">true</ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="..\src\win32\openssl\crypto\sha\sha256.c">
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.10586.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\includeffff;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-    </ClCompile>
     <ClCompile Include="..\src\win32\pthread\pthread.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">CompileAsC</CompileAs>
@@ -2621,7 +2600,6 @@
     <ClInclude Include="..\src\realm\version.hpp" />
     <ClInclude Include="..\src\realm\views.hpp" />
     <ClInclude Include="..\src\win32\getopt.h" />
-    <ClInclude Include="..\src\win32\openssl\crypto\aes\aes_locl.h" />
     <ClInclude Include="..\src\win32\pthread\pthread.h" />
     <ClInclude Include="..\src\win32\sha-2-master\sha224.hpp" />
     <ClInclude Include="..\src\win32\sha-2-master\sha256.hpp" />
