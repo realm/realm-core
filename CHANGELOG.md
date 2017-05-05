@@ -2,10 +2,7 @@
 
 ### Bugfixes
 
-* Fix for incorrect, redundant string index tree traversal for case insensitive searches
-  for strings with some characters being identical in upper and lower case (e.g. numbers).
-  PR [#2578](https://github.com/realm/realm-core/pull/2578),
-  Cocoa issue [#4895](https://github.com/realm/realm-cocoa/issues/4895)
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -13,6 +10,8 @@
 
 ### Enhancements
 
+* Add `Group::compute_aggregated_byte_size()` and
+  `Table::compute_aggregated_byte_size()` for debugging/diagnostics purposes.
 * Add a templated version of Table::set() to go with Table::get().
 * Add TableView::find_first_timestamp().
 * Add TableView::find_first<T>().
@@ -24,7 +23,19 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Make `Array::stats()` available in release mode builds (not just in debug mode
+  builds).
+
+----------------------------------------------
+
+# 2.6.2 Release notes
+
+### Bugfixes
+
+* Fix for incorrect, redundant string index tree traversal for case insensitive searches
+  for strings with some characters being identical in upper and lower case (e.g. numbers).
+  PR [#2578](https://github.com/realm/realm-core/pull/2578),
+  Cocoa issue [#4895](https://github.com/realm/realm-cocoa/issues/4895)
 
 ----------------------------------------------
 

@@ -1971,6 +1971,106 @@ std::pair<ref_type, size_t> Array::get_to_dot_parent(size_t ndx_in_parent) const
     return std::make_pair(get_ref(), ndx_in_parent);
 }
 
+
+#ifdef REALM_DEBUG
+template <class C, class T>
+std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, MemStats stats)
+{
+    std::ostringstream out_2;
+    out_2.setf(std::ios::fixed);
+    out_2.precision(1);
+    double used_percent = 100.0 * stats.used / stats.allocated;
+    out_2 << "allocated = " << stats.allocated << ", used = " << stats.used << " (" << used_percent << "%), "
+          << "array_count = " << stats.array_count;
+    out << out_2.str();
+    return out;
+}
+#endif
+
+
+namespace {
+
+class MemStatsHandler : public Array::MemUsageHandler {
+public:
+    MemStatsHandler(MemStats& stats) noexcept
+        : m_stats(stats)
+    {
+    }
+    void handle(ref_type, size_t allocated, size_t used) noexcept override
+    {
+        m_stats.allocated += allocated;
+        m_stats.used += used;
+        m_stats.array_count += 1;
+    }
+
+private:
+    MemStats& m_stats;
+};
+
+} // anonymous namespace
+
+
+void Array::stats(MemStats& stats_dest) const noexcept
+{
+    MemStatsHandler handler(stats_dest);
+    report_memory_usage(handler);
+}
+
+
+void Array::report_memory_usage(MemUsageHandler& handler) const
+{
+    if (m_has_refs)
+        report_memory_usage_2(handler); // Throws
+
+    size_t used = get_byte_size();
+    size_t allocated;
+    if (m_alloc.is_read_only(m_ref)) {
+        allocated = used;
+    }
+    else {
+        char* header = get_header_from_data(m_data);
+        allocated = get_capacity_from_header(header);
+    }
+    handler.handle(m_ref, allocated, used); // Throws
+}
+
+
+void Array::report_memory_usage_2(MemUsageHandler& handler) const
+{
+    Array subarray(m_alloc);
+    for (size_t i = 0; i < m_size; ++i) {
+        int_fast64_t value = get(i);
+        // Skip null refs and values that are not refs. Values are not refs when
+        // the least significant bit is set.
+        if (value == 0 || (value & 1) == 1)
+            continue;
+
+        size_t used;
+        ref_type ref = to_ref(value);
+        char* header = m_alloc.translate(ref);
+        bool array_has_refs = get_hasrefs_from_header(header);
+        if (array_has_refs) {
+            MemRef mem(header, ref, m_alloc);
+            subarray.init_from_mem(mem);
+            subarray.report_memory_usage_2(handler); // Throws
+            used = subarray.get_byte_size();
+        }
+        else {
+            used = get_byte_size_from_header(header);
+        }
+
+        size_t allocated;
+        if (m_alloc.is_read_only(ref)) {
+            allocated = used;
+        }
+        else {
+            allocated = get_capacity_from_header(header);
+        }
+        handler.handle(ref, allocated, used); // Throws
+    }
+}
+
+
 #ifdef REALM_DEBUG
 
 void Array::print() const
@@ -1997,19 +2097,6 @@ void Array::verify() const
     // Check that parent is set correctly
     ref_type ref_in_parent = m_parent->get_child_ref(m_ndx_in_parent);
     REALM_ASSERT_3(ref_in_parent, ==, m_ref);
-}
-
-template <class C, class T>
-std::basic_ostream<C, T>& operator<<(std::basic_ostream<C, T>& out, MemStats stats)
-{
-    std::ostringstream out_2;
-    out_2.setf(std::ios::fixed);
-    out_2.precision(1);
-    double used_percent = 100.0 * stats.used / stats.allocated;
-    out_2 << "allocated = " << stats.allocated << ", used = " << stats.used << " (" << used_percent << "%), "
-          << "array_count = " << stats.array_count;
-    out << out_2.str();
-    return out;
 }
 
 namespace {
@@ -2257,89 +2344,6 @@ void Array::to_dot_parent_edge(std::ostream& out) const
         size_t ndx_in_real_parent = p.second;
         out << "n" << std::hex << real_parent_ref << std::dec << ":" << ndx_in_real_parent << " -> n" << std::hex
             << get_ref() << std::dec << std::endl;
-    }
-}
-
-
-namespace {
-
-class MemStatsHandler : public Array::MemUsageHandler {
-public:
-    MemStatsHandler(MemStats& stats)
-        : m_stats(stats)
-    {
-    }
-    void handle(ref_type, size_t allocated, size_t used) override
-    {
-        m_stats.allocated += allocated;
-        m_stats.used += used;
-        m_stats.array_count += 1;
-    }
-
-private:
-    MemStats& m_stats;
-};
-
-} // anonymous namespace
-
-
-void Array::stats(MemStats& stats_dest) const
-{
-    MemStatsHandler handler(stats_dest);
-    report_memory_usage(handler);
-}
-
-
-void Array::report_memory_usage(MemUsageHandler& handler) const
-{
-    if (m_has_refs)
-        report_memory_usage_2(handler);
-
-    size_t used = get_byte_size();
-    size_t allocated;
-    if (m_alloc.is_read_only(m_ref)) {
-        allocated = used;
-    }
-    else {
-        char* header = get_header_from_data(m_data);
-        allocated = get_capacity_from_header(header);
-    }
-    handler.handle(m_ref, allocated, used);
-}
-
-
-void Array::report_memory_usage_2(MemUsageHandler& handler) const
-{
-    Array subarray(m_alloc);
-    for (size_t i = 0; i < m_size; ++i) {
-        int_fast64_t value = get(i);
-        // Skip null refs and values that are not refs. Values are not refs when
-        // the least significant bit is set.
-        if (value == 0 || (value & 1) == 1)
-            continue;
-
-        size_t used;
-        ref_type ref = to_ref(value);
-        char* header = m_alloc.translate(ref);
-        bool array_has_refs = get_hasrefs_from_header(header);
-        if (array_has_refs) {
-            MemRef mem(header, ref, m_alloc);
-            subarray.init_from_mem(mem);
-            subarray.report_memory_usage_2(handler);
-            used = subarray.get_byte_size();
-        }
-        else {
-            used = get_byte_size_from_header(header);
-        }
-
-        size_t allocated;
-        if (m_alloc.is_read_only(ref)) {
-            allocated = used;
-        }
-        else {
-            allocated = get_capacity_from_header(header);
-        }
-        handler.handle(ref, allocated, used);
     }
 }
 
