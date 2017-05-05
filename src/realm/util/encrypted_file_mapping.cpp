@@ -346,7 +346,7 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 {
 #if REALM_PLATFORM_APPLE
     CCHmac(kCCHmacAlgSHA224, key, 32, src, len, dst);
-#else
+#elif !defined(_WIN32)
     SHA256_CTX ctx;
 
     uint8_t ipad[64];

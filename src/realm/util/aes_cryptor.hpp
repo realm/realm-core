@@ -27,7 +27,7 @@
 
 #if REALM_PLATFORM_APPLE
 #include <CommonCrypto/CommonCrypto.h>
-#else
+#elif !defined(_WIN32)
 #include <openssl/aes.h>
 #include <openssl/sha.h>
 #endif
@@ -60,6 +60,9 @@ private:
 #if REALM_PLATFORM_APPLE
         mode_Encrypt = kCCEncrypt,
         mode_Decrypt = kCCDecrypt
+#elif defined(_WIN32)
+        mode_Encrypt = 0,
+        mode_Decrypt = 1
 #else
         mode_Encrypt = AES_ENCRYPT,
         mode_Decrypt = AES_DECRYPT
