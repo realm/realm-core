@@ -346,9 +346,7 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 {
 #if REALM_PLATFORM_APPLE
     CCHmac(kCCHmacAlgSHA224, key, 32, src, len, dst);
-#elif !defined(_WIN32)
-    SHA256_CTX ctx;
-
+#else
     uint8_t ipad[64];
     for (size_t i = 0; i < 32; ++i)
         ipad[i] = key[i] ^ 0x36;
@@ -369,9 +367,10 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 
     sha_init(s);
     sha_process(s, opad, 64);
-    sha_process(s, dst, SHA224_DIGEST_LENGTH);
+    sha_process(s, dst, 28); // 28 == SHA224_DIGEST_LENGTH
     sha_done(s, dst);
 #else
+    SHA256_CTX ctx;
     SHA224_Init(&ctx);
     SHA256_Update(&ctx, ipad, 64);
     SHA256_Update(&ctx, static_cast<const uint8_t*>(src), len);
