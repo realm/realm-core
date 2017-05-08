@@ -37,7 +37,9 @@
 #include <unistd.h>
 #else
 #include <Windows.h>
-#include <win32/sha-2-master/sha224.hpp>
+// 224-bit AES-2 from https://github.com/kalven/sha-2 - Public Domain. Native API
+// does not exist for 224 bits (only 128, 256, etc).
+#include <win32/kalven-sha2/sha224.hpp>
 #include <bcrypt.h>
 #endif
 

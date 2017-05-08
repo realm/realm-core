@@ -128,10 +128,10 @@
     <ClCompile Include="..\test\util\timer.cpp" />
     <ClCompile Include="..\test\util\unit_test.cpp" />
     <ClCompile Include="..\test\util\wildcard.cpp" />
-    <ClCompile Include="..\src\win32\sha-2-master\sha256k.cpp">
+    <ClCompile Include="..\src\win32\kalven-sha2\sha224k.cpp">
       <Filter>kalven-sha</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\win32\sha-2-master\sha224k.cpp">
+    <ClCompile Include="..\src\win32\kalven-sha2\sha256k.cpp">
       <Filter>kalven-sha</Filter>
     </ClCompile>
   </ItemGroup>
@@ -247,13 +247,13 @@
     <ClInclude Include="..\test\pthread_test.hpp" />
     <ClInclude Include="..\test\testsettings.hpp" />
     <ClInclude Include="..\src\realm\util\overload.hpp" />
-    <ClInclude Include="..\src\win32\sha-2-master\sha256.hpp">
-      <Filter>kalven-sha</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\win32\sha-2-master\sha224.hpp">
-      <Filter>kalven-sha</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\realm\util\aes_cryptor.hpp" />
+    <ClInclude Include="..\src\win32\kalven-sha2\sha224.hpp">
+      <Filter>kalven-sha</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\win32\kalven-sha2\sha256.hpp">
+      <Filter>kalven-sha</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
