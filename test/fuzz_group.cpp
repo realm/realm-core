@@ -793,8 +793,8 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                             TableRef sub = t->get_subtable(col_ndx, row_ndx);
                             size_t sz = sub->size();
                             REALM_ASSERT(sz == t->get_subtable_size(col_ndx, row_ndx));
-                            if (sz == 0 || get_next(s) % 4 == 0) {
-                                // In 25 % of the cases assign all new values
+                            // New values or just update (new values if empty)
+                            if (sz == 0 || get_next(s) % 2 == 0) {
                                 int nb_values = get_next(s) % 10;
                                 std::vector<int64_t> values;
                                 for (int i = 0; i < nb_values; i++) {
@@ -1146,11 +1146,14 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
 
 void usage(const char* argv[])
 {
-    fprintf(stderr, "Usage: %s FILE [--log] [--name NAME]\n"
+    fprintf(stderr, "Usage: %s {FILE | --} [--log] [--name NAME] [--prefix PATH]\n"
                     "Where FILE is a instruction file that will be replayed.\n"
+                    "Pass -- without argument to read filenames from stdin\n"
                     "Pass --log to have code printed to stdout producing the same instructions.\n"
                     "Pass --name NAME with distinct values when running on multiple threads,\n"
-                    "                 to make sure the test don't use the same Realm file\n",
+                    "                 to make sure the test don't use the same Realm file\n"
+                    "Pass --prefix PATH to supply a path that should be prepended to all filenames\n"
+                    "                 read from stdin.\n",
             argv[0]);
     exit(1);
 }
