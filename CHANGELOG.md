@@ -10,13 +10,21 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Add `Group::compute_aggregated_byte_size()` and
+  `Table::compute_aggregated_byte_size()` for debugging/diagnostics purposes.
+* Add a templated version of Table::set() to go with Table::get().
+* Add TableView::find_first_timestamp().
+* Add TableView::find_first<T>().
+* Make Table::find_first<T>() public and add support for most column types.
+* Add wrappers for Table::set<T>() to Row.
+* Add support for all column types in Table::get<T>().
 
 -----------
 
 ### Internals
 
-* Lorem ipsum.
+* Make `Array::stats()` available in release mode builds (not just in debug mode
+  builds).
 
 ----------------------------------------------
 

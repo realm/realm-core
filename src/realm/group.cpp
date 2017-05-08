@@ -1027,6 +1027,16 @@ bool Group::operator==(const Group& g) const
 }
 
 
+size_t Group::compute_aggregated_byte_size() const noexcept
+{
+    if (!is_attached())
+        return 0;
+    MemStats stats_2;
+    m_top.stats(stats_2);
+    return stats_2.allocated;
+}
+
+
 void Group::to_string(std::ostream& out) const
 {
     // Calculate widths
