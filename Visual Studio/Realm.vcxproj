@@ -2538,6 +2538,7 @@
     <ClInclude Include="..\src\realm\string_data.hpp" />
     <ClInclude Include="..\src\realm\timestamp.hpp" />
     <ClInclude Include="..\src\realm\unicode.hpp" />
+    <ClInclude Include="..\src\realm\util\aes_cryptor.hpp" />
     <ClInclude Include="..\src\realm\util\assert.hpp" />
     <ClInclude Include="..\src\realm\util\basic_system_errors.hpp" />
     <ClInclude Include="..\src\realm\util\buffer.hpp" />

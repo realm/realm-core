@@ -253,6 +253,7 @@
     <ClInclude Include="..\src\win32\sha-2-master\sha224.hpp">
       <Filter>kalven-sha</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\realm\util\aes_cryptor.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
