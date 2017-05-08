@@ -98,7 +98,7 @@ Int real_offset(Int pos)
     REALM_ASSERT(pos >= 0);
     const size_t index = static_cast<size_t>(pos) / block_size;
     const size_t metadata_page_count = index / blocks_per_metadata_block + 1;
-    return pos + metadata_page_count * block_size;
+    return Int(pos + metadata_page_count * block_size);
 }
 
 // map a location in the file to the offset in the data
@@ -118,7 +118,7 @@ off_t iv_table_pos(off_t pos)
     const size_t index = static_cast<size_t>(pos) / block_size;
     const size_t metadata_block = index / blocks_per_metadata_block;
     const size_t metadata_index = index & (blocks_per_metadata_block - 1);
-    return metadata_block * (blocks_per_metadata_block + 1) * block_size + metadata_index * metadata_size;
+    return off_t(metadata_block * (blocks_per_metadata_block + 1) * block_size + metadata_index * metadata_size);
 }
 
 void check_write(FileDesc fd, off_t pos, const void* data, size_t len)
@@ -194,7 +194,7 @@ iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos) noexcept
     m_iv_buffer.resize(new_block_count * blocks_per_metadata_block);
 
     for (size_t i = old_size; i < new_block_count * blocks_per_metadata_block; i += blocks_per_metadata_block) {
-        size_t bytes = check_read(fd, iv_table_pos(i * block_size), &m_iv_buffer[i], block_size);
+        size_t bytes = check_read(fd, iv_table_pos(off_t(i * block_size)), &m_iv_buffer[i], block_size);
         if (bytes < block_size)
             break; // rest is zero-filled by resize()
     }
@@ -373,7 +373,7 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
     sha224_state s;
     sha_init(s);
     sha_process(s, ipad, 64);
-    sha_process(s, static_cast<const uint8_t*>(src), len);
+    sha_process(s, static_cast<const uint8_t*>(src), uint32_t(len));
     sha_done(s, dst);
 
     sha_init(s);
@@ -400,10 +400,10 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
                                            File::AccessMode access)
     : m_file(file)
     , m_page_shift(log2(realm::util::page_size()))
-    , m_blocks_per_page((1 << m_page_shift) / block_size)
+    , m_blocks_per_page((1ULL << m_page_shift) / block_size)
     , m_access(access)
 #ifdef REALM_DEBUG
-    , m_validate_buffer(new char[1 << m_page_shift])
+    , m_validate_buffer(new char[1ULL << m_page_shift])
 #endif
 {
     REALM_ASSERT(m_blocks_per_page * block_size == (1ULL << m_page_shift));
@@ -457,7 +457,7 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t page) noexcept
             continue;
 
         if (m->m_up_to_date_pages[page]) {
-            memcpy(page_addr(page), m->page_addr(page), 1 << m_page_shift);
+            memcpy(page_addr(page), m->page_addr(page), 1ULL << m_page_shift);
             return true;
         }
     }
@@ -469,7 +469,7 @@ void EncryptedFileMapping::refresh_page(size_t i)
     char* addr = page_addr(i);
 
     if (!copy_up_to_date_page(i))
-        m_file.cryptor.read(m_file.fd, i << m_page_shift, addr, 1 << m_page_shift);
+        m_file.cryptor.read(m_file.fd, off_t(i << m_page_shift), addr, 1ULL << m_page_shift);
 
     m_up_to_date_pages[i] = true;
 }
@@ -496,18 +496,18 @@ void EncryptedFileMapping::validate_page(size_t page) noexcept
     if (!m_up_to_date_pages[page])
         return;
 
-    if (!m_file.cryptor.read(m_file.fd, page << m_page_shift, m_validate_buffer.get(), 1 << m_page_shift))
+    if (!m_file.cryptor.read(m_file.fd, off_t(page << m_page_shift), m_validate_buffer.get(), 1ULL << m_page_shift))
         return;
 
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
         if (m != this && page < m->m_page_count && m->m_dirty_pages[page]) {
-            memcpy(m_validate_buffer.get(), m->page_addr(page), 1 << m_page_shift);
+            memcpy(m_validate_buffer.get(), m->page_addr(page), 1ULL << m_page_shift);
             break;
         }
     }
 
-    if (memcmp(m_validate_buffer.get(), page_addr(page), 1 << m_page_shift)) {
+    if (memcmp(m_validate_buffer.get(), page_addr(page), 1ULL << m_page_shift)) {
         std::cerr << "mismatch " << this << ": fd(" << m_file.fd << ") page(" << page << "/" << m_page_count << ") "
                   << m_validate_buffer.get() << " " << page_addr(page) << std::endl;
         REALM_TERMINATE("");
@@ -533,7 +533,7 @@ void EncryptedFileMapping::flush() noexcept
             continue;
         }
 
-        m_file.cryptor.write(m_file.fd, i << m_page_shift, page_addr(i), 1 << m_page_shift);
+        m_file.cryptor.write(m_file.fd, off_t(i << m_page_shift), page_addr(i), 1ULL << m_page_shift);
         m_dirty_pages[i] = false;
     }
 
@@ -586,11 +586,11 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 
 void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_offset)
 {
-    REALM_ASSERT(new_file_offset % (1 << m_page_shift) == 0);
-    REALM_ASSERT(new_size % (1 << m_page_shift) == 0);
+    REALM_ASSERT(new_file_offset % (1ULL << m_page_shift) == 0);
+    REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
     REALM_ASSERT(new_size > 0);
 
-    m_file.cryptor.set_file_size(new_size + new_file_offset);
+    m_file.cryptor.set_file_size(off_t(new_size + new_file_offset));
 
     flush();
     m_addr = new_addr;
