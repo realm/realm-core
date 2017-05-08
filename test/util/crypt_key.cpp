@@ -45,13 +45,13 @@ const char* crypt_key(bool always)
 
 bool is_always_encrypt_enabled()
 {
-	return g_always_encrypt;
+    return g_always_encrypt;
 }
 
 
 void enable_always_encrypt()
 {
-	g_always_encrypt = true;
+    g_always_encrypt = true;
 }
 
 } // namespace test_util

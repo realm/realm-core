@@ -1121,7 +1121,7 @@ bool File::is_same_file_static(FileDesc f1, FileDesc f2)
 	FILE_ID_INFO fi2;
     if (GetFileInformationByHandleEx(f1, FILE_INFO_BY_HANDLE_CLASS::FileIdInfo, &fi1, sizeof(fi1))) {
         if (GetFileInformationByHandleEx(f2, FILE_INFO_BY_HANDLE_CLASS::FileIdInfo, &fi2, sizeof(fi2))) {
-			return memcmp(&fi1.FileId, &fi2.FileId, sizeof(FILE_ID_INFO)) == 0 && fi1.VolumeSerialNumber == fi2.VolumeSerialNumber;
+			return memcmp(&fi1.FileId, &fi2.FileId, sizeof(fi1.FileId)) == 0 && fi1.VolumeSerialNumber == fi2.VolumeSerialNumber;
         }
     }
     DWORD err = GetLastError(); // Eliminate any risk of clobbering

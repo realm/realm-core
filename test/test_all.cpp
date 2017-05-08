@@ -217,8 +217,10 @@ void set_random_seed()
 
 void set_always_encrypt()
 {
-	enable_always_encrypt();
-
+    const char* str = getenv("UNITTEST_ENCRYPT_ALL");
+    enable_always_encrypt();
+    if (str && strlen(str) != 0)       
+        enable_always_encrypt();
 }
 
 void display_build_config()
@@ -438,7 +440,7 @@ bool run_tests(util::Logger* logger)
     config.reporter = reporters.back().get();
 
     // Set up filter
-	const char* filter_str = "LangBindHelper*";// getenv("UNITTEST_FILTER");
+    const char* filter_str = getenv("UNITTEST_FILTER");
     const char* test_only = get_test_only();
     if (test_only)
         filter_str = test_only;
