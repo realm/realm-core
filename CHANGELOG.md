@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fix for creating process-shared mutex objects in the wrong kernel object namespace on UWP.
+  PR [#2579](https://github.com/realm/realm-core/pull/2579)
 
 ### Breaking changes
 
