@@ -146,10 +146,15 @@ AESCryptor::AESCryptor(const uint8_t* key)
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
 #elif defined(_WIN32)
     BCRYPT_ALG_HANDLE hAesAlg = NULL;
-    int er;
-    er = BCryptOpenAlgorithmProvider(&hAesAlg, BCRYPT_AES_ALGORITHM, NULL, 0);
-    er = BCryptSetProperty(hAesAlg, BCRYPT_CHAINING_MODE, (PBYTE)BCRYPT_CHAIN_MODE_CBC, sizeof(BCRYPT_CHAIN_MODE_CBC), 0);
-    er = BCryptGenerateSymmetricKey(hAesAlg, &m_aes_key_handle, nullptr, 0, (PBYTE)key, 32, 0);
+    int ret;
+    ret = BCryptOpenAlgorithmProvider(&hAesAlg, BCRYPT_AES_ALGORITHM, NULL, 0);
+    REALM_ASSERT_RELEASE_EX(ret == 0 && "BCryptOpenAlgorithmProvider()", ret);
+
+    ret = BCryptSetProperty(hAesAlg, BCRYPT_CHAINING_MODE, (PBYTE)BCRYPT_CHAIN_MODE_CBC, sizeof(BCRYPT_CHAIN_MODE_CBC), 0);
+    REALM_ASSERT_RELEASE_EX(ret == 0 && "BCryptSetProperty()", ret);
+
+    ret = BCryptGenerateSymmetricKey(hAesAlg, &m_aes_key_handle, nullptr, 0, (PBYTE)key, 32, 0);
+    REALM_ASSERT_RELEASE_EX(ret == 0 && "BCryptGenerateSymmetricKey()", ret);
 #else
     AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
     AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
@@ -318,6 +323,8 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
             block_size,
             &cbData,
             0);
+        REALM_ASSERT_RELEASE_EX(i == 0 && "BCryptEncrypt()", i);
+        REALM_ASSERT_RELEASE_EX(cbData == block_size && "BCryptEncrypt()" , cbData);
     }
     else if(mode == mode_Decrypt) {
         i = BCryptDecrypt(
@@ -331,9 +338,11 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
             block_size,
             &cbData,
             0);
+        REALM_ASSERT_RELEASE_EX(i == 0 && "BCryptDecrypt()", i);
+        REALM_ASSERT_RELEASE_EX(cbData == block_size && "BCryptDecrypt()", cbData);
     }
     else {
-        REALM_ASSERT_RELEASE(false);
+        REALM_UNREACHABLE();
     }
 
 #else
