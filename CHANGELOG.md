@@ -9,7 +9,7 @@
 * Lorem ipsum.
 
 ### Enhancements
-
+* Support for encryption on Windows (win32 + UWP)
 * Add `Group::compute_aggregated_byte_size()` and
   `Table::compute_aggregated_byte_size()` for debugging/diagnostics purposes.
 * Add a templated version of Table::set() to go with Table::get().
