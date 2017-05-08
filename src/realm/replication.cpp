@@ -275,6 +275,15 @@ public:
         return true;
     }
 
+    bool add_row_with_key(size_t key_col_ndx, int64_t key)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
+            return false;
+        log("table->add_row_with_key(%1, %2);", key_col_ndx, key); // Throws
+        m_table->add_row_with_key(key_col_ndx, key);               // Throws
+        return true;
+    }
+
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool unordered)
     {
         static_cast<void>(num_rows_to_erase);

@@ -3519,6 +3519,38 @@ TEST(Replication_SetUnique)
 }
 
 
+TEST(Replication_AddRowWithKey)
+{
+    SHARED_GROUP_TEST_PATH(path_1);
+    SHARED_GROUP_TEST_PATH(path_2);
+
+    util::Logger& replay_logger = test_context.logger;
+
+    MyTrivialReplication repl(path_1);
+    SharedGroup sg_1(repl);
+    SharedGroup sg_2(path_2);
+
+    {
+        WriteTransaction wt(sg_1);
+        TableRef table1 = wt.add_table("table");
+        table1->add_column(type_Int, "c1");
+        table1->add_search_index(0);
+        table1->add_row_with_key(0, 123);
+        table1->add_row_with_key(0, 456);
+        CHECK_EQUAL(table1->size(), 2);
+        wt.commit();
+    }
+    repl.replay_transacts(sg_2, replay_logger);
+    {
+        ReadTransaction rt(sg_2);
+        ConstTableRef table2 = rt.get_table("table");
+
+        CHECK_EQUAL(table2->find_first_int(0, 123), 0);
+        CHECK_EQUAL(table2->find_first_int(0, 456), 1);
+    }
+}
+
+
 TEST(Replication_RenameGroupLevelTable_MoveGroupLevelTable_RenameColumn_MoveColumn)
 {
     SHARED_GROUP_TEST_PATH(path_1);

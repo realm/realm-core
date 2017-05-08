@@ -2631,9 +2631,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Int, "a");
         parent_w->add_search_index(0);
-        parent_w->add_empty_row(2);
-        parent_w->set_int(0, 0, 27);
-        parent_w->set_int(0, 1, 227);
+        parent_w->add_row_with_key(0, 27);
+        parent_w->add_row_with_key(0, 227);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2654,9 +2653,9 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     {
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.get_table("parent");
-        parent_w->insert_empty_row(1); // Between
-        parent_w->add_empty_row();     // After
-        parent_w->insert_empty_row(0); // Before
+        parent_w->insert_empty_row(1);       // Between
+        parent_w->add_row_with_key(0, 2227); // After
+        parent_w->insert_empty_row(0);       // Before
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -7746,6 +7745,10 @@ public:
     {
         return false;
     }
+    bool add_row_with_key(size_t, uint64_t)
+    {
+        return false;
+    }
     bool erase_rows(size_t, size_t, size_t, bool)
     {
         return false;
@@ -8324,6 +8327,7 @@ TEST(LangBindHelper_RollbackAndContinueAsReadColumnAdd)
         t->set_int(1, 0, 44);
         CHECK_EQUAL(2, t->get_descriptor()->get_column_count());
         group->verify();
+        t->add_row_with_key(0, 88);
         LangBindHelper::rollback_and_continue_as_read(sg);
         group->verify();
         CHECK_EQUAL(1, t->get_descriptor()->get_column_count());
