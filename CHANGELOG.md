@@ -3,6 +3,10 @@
 ### Bugfixes
 
 * Lorem ipsum.
+### Internals
+
+* Implemented inter-process CondVars on Windows (Win32 + UWP). They should be fair and
+  robust.
 
 ### Breaking changes
 

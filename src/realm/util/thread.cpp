@@ -303,7 +303,7 @@ CondVar::CondVar(process_shared_tag)
     REALM_ASSERT(r2 == 0);
     if (REALM_UNLIKELY(r != 0))
         init_failed(r);
-#else // !REALM_HAVE_PTHREAD_PROCESS_SHARED
+#else
     throw std::runtime_error("No support for process-shared condition variables");
 #endif
 }

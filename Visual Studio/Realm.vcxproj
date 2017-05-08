@@ -199,7 +199,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>false</WholeProgramOptimization>
     <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
@@ -221,7 +221,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static library, release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>
     </WholeProgramOptimization>
     <TargetPlatformVersion>8.1</TargetPlatformVersion>
@@ -2490,6 +2490,7 @@
     <ClInclude Include="..\src\realm\util\file.hpp" />
     <ClInclude Include="..\src\realm\util\file_mapper.hpp" />
     <ClInclude Include="..\src\realm\util\inspect.hpp" />
+    <ClInclude Include="..\src\realm\util\interprocess_condvar.hpp" />
     <ClInclude Include="..\src\realm\util\logger.hpp" />
     <ClInclude Include="..\src\realm\util\memory_stream.hpp" />
     <ClInclude Include="..\src\realm\util\misc_errors.hpp" />

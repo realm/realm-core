@@ -27,9 +27,7 @@
 #include <limits>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
-#ifndef _WIN32
 #include <realm/util/interprocess_condvar.hpp>
-#endif
 #include <realm/util/interprocess_mutex.hpp>
 #include <realm/group.hpp>
 #include <realm/group_shared_options.hpp>
@@ -559,7 +557,6 @@ private:
     util::InterprocessMutex m_balancemutex;
 #endif
     util::InterprocessMutex m_controlmutex;
-#ifndef _WIN32
 #ifdef REALM_ASYNC_DAEMON
     util::InterprocessCondVar m_room_to_write;
     util::InterprocessCondVar m_work_to_do;
@@ -567,7 +564,6 @@ private:
 #endif
     util::InterprocessCondVar m_new_commit_available;
     util::InterprocessCondVar m_pick_next_writer;
-#endif
     std::function<void(int, int)> m_upgrade_callback;
 
     void do_open(const std::string& file, bool no_create, bool is_backend, const SharedGroupOptions options);
