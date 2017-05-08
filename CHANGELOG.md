@@ -12,6 +12,7 @@
 * Replication interface changed. The search index functions now operate
   on a descriptor and not a table.
   PR [#2561](https://github.com/realm/realm-core/pull/2561).
+* New replication instruction: instr_AddRowWithKey
 
 ### Enhancements
 
@@ -31,7 +32,10 @@
   take place for *all* subtables in a subtable column. There is no way to add
   or remove it from single individual subtables.
   PR [#2561](https://github.com/realm/realm-core/pull/2561).
-
+* Add Table::add_row_with_key(). Adds a row and fills an integer column with
+  a value in one operation.
+  PR [#2596](https://github.com/realm/realm-core/pull/2596)
+  Issue [#2585](https://github.com/realm/realm-core/issues/2585)
 -----------
 
 ### Internals
