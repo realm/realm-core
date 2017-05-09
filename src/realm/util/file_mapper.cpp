@@ -247,7 +247,7 @@ void* mmap_anon(size_t size)
     HANDLE hMapFile;
     LPCTSTR pBuf;
 
-    hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, size, nullptr);
+    hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, DWORD(size), nullptr);
     pBuf = (LPTSTR)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, size);
     if(pBuf == nullptr)
         throw std::runtime_error(get_errno_msg("MapViewOfFile() failed: ", GetLastError()));
