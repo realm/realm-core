@@ -11,7 +11,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Enable encryption on watchOS.
+  Cocoa issue [#2876](https://github.com/realm/realm-cocoa/issues/2876).
 
 -----------
 
