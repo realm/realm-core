@@ -440,12 +440,12 @@ inline void Mutex::unlock() noexcept
 inline LockGuard::LockGuard(Mutex& m) noexcept
     : m_mutex(m)
 {
-    m_mutex.lock();
+    //m_mutex.lock();
 }
 
 inline LockGuard::~LockGuard() noexcept
 {
-    m_mutex.unlock();
+    //m_mutex.unlock();
 }
 
 
@@ -494,7 +494,7 @@ inline RobustLockGuard::RobustLockGuard(RobustMutex& m, TFunc func)
 
 inline RobustLockGuard::~RobustLockGuard() noexcept
 {
-    m_mutex.unlock();
+    //m_mutex.unlock();
 }
 
 
