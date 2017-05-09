@@ -605,6 +605,7 @@ TEST(Shared_try_begin_write)
         t->add_empty_row(1000);
         thread_obtains_write_lock.lock();
         sg2.commit();
+        thread_obtains_write_lock.unlock();
     };
 
     thread_obtains_write_lock.lock();
