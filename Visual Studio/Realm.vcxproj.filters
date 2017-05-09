@@ -291,6 +291,7 @@
     <ClInclude Include="..\src\win32\openssl\crypto\aes\aes_locl.h">
       <Filter>openssl</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\realm\util\overload.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
