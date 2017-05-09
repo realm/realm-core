@@ -23,7 +23,7 @@
 -----------
 
 ### Internals
-
+* win32+UWP: Switched from pthread-win32 to native API
 * Make `Array::stats()` available in release mode builds (not just in debug mode
   builds).
 
