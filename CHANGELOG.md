@@ -1,13 +1,9 @@
-# NEXT RELEASE
+# 2.7.0 Release notes
 
 ### Bugfixes
 
 * Fix for creating process-shared mutex objects in the wrong kernel object namespace on UWP.
   PR [#2579](https://github.com/realm/realm-core/pull/2579).
-
-### Breaking changes
-
-* Lorem ipsum.
 
 ### Enhancements
 
