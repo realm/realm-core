@@ -1,23 +1,22 @@
 /*************************************************************************
- *
- * Copyright 2016 Realm Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- **************************************************************************/
+*
+* Copyright 2016 Realm Inc.
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+* http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+*
+**************************************************************************/
 
 // All unit tests here suddenly broke on Windows, maybe after encryption was added
-
 
 #include <map>
 #include <sstream>
@@ -138,116 +137,116 @@ TEST(LangBindHelper_LinkView)
 
 namespace {
 
-class ShortCircuitHistory : public TrivialReplication, public _impl::History {
-public:
-    using version_type = _impl::History::version_type;
+    class ShortCircuitHistory : public TrivialReplication, public _impl::History {
+    public:
+        using version_type = _impl::History::version_type;
 
-    ShortCircuitHistory(const std::string& database_file)
-        : TrivialReplication(database_file)
-    {
-    }
-
-    void initiate_session(version_type) override
-    {
-        // No-op
-    }
-
-    void terminate_session() noexcept override
-    {
-        // No-op
-    }
-
-    version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
-    {
-        m_incoming_changeset = Buffer<char>(size); // Throws
-        std::copy(data, data + size, m_incoming_changeset.data());
-        version_type new_version = orig_version + 1;
-        m_incoming_version = new_version;
-        // Allocate space for the new changeset in m_changesets such that we can
-        // be sure no exception will be thrown whan adding the changeset in
-        // finalize_changeset().
-        m_changesets[new_version]; // Throws
-        return new_version;
-    }
-
-    void finalize_changeset() noexcept override
-    {
-        // The following operation will not throw due to the space reservation
-        // carried out in prepare_new_changeset().
-        m_changesets[m_incoming_version] = std::move(m_incoming_changeset);
-    }
-
-    HistoryType get_history_type() const noexcept override
-    {
-        return hist_InRealm;
-    }
-
-    _impl::History* get_history() override
-    {
-        return this;
-    }
-
-    int get_history_schema_version() const noexcept override
-    {
-        return 0;
-    }
-
-    bool is_upgradable_history_schema(int) const noexcept override
-    {
-        REALM_ASSERT(false);
-        return false;
-    }
-
-    void upgrade_history_schema(int) override
-    {
-        REALM_ASSERT(false);
-    }
-
-    void update_early_from_top_ref(version_type, size_t, ref_type) override
-    {
-        // No-op
-    }
-
-    void update_from_parent(version_type) override
-    {
-        // No-op
-    }
-
-    void get_changesets(version_type begin_version, version_type end_version, BinaryIterator* buffer) const
-        noexcept override
-    {
-        size_t n = size_t(end_version - begin_version);
-        for (size_t i = 0; i < n; ++i) {
-            uint_fast64_t version = begin_version + i + 1;
-            auto j = m_changesets.find(version);
-            REALM_ASSERT(j != m_changesets.end());
-            const Buffer<char>& changeset = j->second;
-            REALM_ASSERT(changeset); // Must have been finalized
-            buffer[i] = BinaryData(changeset.data(), changeset.size());
+        ShortCircuitHistory(const std::string& database_file)
+            : TrivialReplication(database_file)
+        {
         }
-    }
 
-    void set_oldest_bound_version(version_type) override
-    {
-        // No-op
-    }
+        void initiate_session(version_type) override
+        {
+            // No-op
+        }
 
-    BinaryData get_uncommitted_changes() noexcept override
-    {
-        REALM_ASSERT(false);
-        return BinaryData(); // FIXME: Not yet implemented
-    }
+        void terminate_session() noexcept override
+        {
+            // No-op
+        }
 
-    void verify() const override
-    {
-        // No-op
-    }
+        version_type prepare_changeset(const char* data, size_t size, version_type orig_version) override
+        {
+            m_incoming_changeset = Buffer<char>(size); // Throws
+            std::copy(data, data + size, m_incoming_changeset.data());
+            version_type new_version = orig_version + 1;
+            m_incoming_version = new_version;
+            // Allocate space for the new changeset in m_changesets such that we can
+            // be sure no exception will be thrown whan adding the changeset in
+            // finalize_changeset().
+            m_changesets[new_version]; // Throws
+            return new_version;
+        }
 
-private:
-    Buffer<char> m_incoming_changeset;
-    version_type m_incoming_version;
-    std::map<uint_fast64_t, Buffer<char>> m_changesets;
-};
+        void finalize_changeset() noexcept override
+        {
+            // The following operation will not throw due to the space reservation
+            // carried out in prepare_new_changeset().
+            m_changesets[m_incoming_version] = std::move(m_incoming_changeset);
+        }
+
+        HistoryType get_history_type() const noexcept override
+        {
+            return hist_InRealm;
+        }
+
+        _impl::History* get_history() override
+        {
+            return this;
+        }
+
+        int get_history_schema_version() const noexcept override
+        {
+            return 0;
+        }
+
+        bool is_upgradable_history_schema(int) const noexcept override
+        {
+            REALM_ASSERT(false);
+            return false;
+        }
+
+        void upgrade_history_schema(int) override
+        {
+            REALM_ASSERT(false);
+        }
+
+        void update_early_from_top_ref(version_type, size_t, ref_type) override
+        {
+            // No-op
+        }
+
+        void update_from_parent(version_type) override
+        {
+            // No-op
+        }
+
+        void get_changesets(version_type begin_version, version_type end_version, BinaryIterator* buffer) const
+            noexcept override
+        {
+            size_t n = size_t(end_version - begin_version);
+            for (size_t i = 0; i < n; ++i) {
+                uint_fast64_t version = begin_version + i + 1;
+                auto j = m_changesets.find(version);
+                REALM_ASSERT(j != m_changesets.end());
+                const Buffer<char>& changeset = j->second;
+                REALM_ASSERT(changeset); // Must have been finalized
+                buffer[i] = BinaryData(changeset.data(), changeset.size());
+            }
+        }
+
+        void set_oldest_bound_version(version_type) override
+        {
+            // No-op
+        }
+
+        BinaryData get_uncommitted_changes() noexcept override
+        {
+            REALM_ASSERT(false);
+            return BinaryData(); // FIXME: Not yet implemented
+        }
+
+        void verify() const override
+        {
+            // No-op
+        }
+
+    private:
+        Buffer<char> m_incoming_changeset;
+        version_type m_incoming_version;
+        std::map<uint_fast64_t, Buffer<char>> m_changesets;
+    };
 
 } // anonymous namespace
 
@@ -813,24 +812,24 @@ TEST(LangBindHelper_AdvanceReadTransact_ColumnRootTypeChange)
     struct Step { size_t m_str_size, m_num_rows; };
     Step steps[] = {
         // 1->max->1
-        { 1,    1 }, { 8191, 1 }, { 1,    1 },
+        { 1,    1 },{ 8191, 1 },{ 1,    1 },
         // rising, falling
-        { 3,    1 }, { 7,    1 }, { 11,   1 }, { 15,   1 }, { 23,   1 }, { 31,   1 }, { 47,   1 },
-        { 63,   1 }, { 95,   1 }, { 127,  1 }, { 191,  1 }, { 255,  1 }, { 383,  1 }, { 511,  1 },
-        { 767,  1 }, { 1023, 1 }, { 1535, 1 }, { 2047, 1 }, { 3071, 1 }, { 4095, 1 }, { 6143, 1 },
-        { 8191, 1 }, { 6143, 1 }, { 4095, 1 }, { 3071, 1 }, { 2047, 1 }, { 1535, 1 }, { 1023, 1 },
-        { 767,  1 }, { 511,  1 }, { 383,  1 }, { 255,  1 }, { 191,  1 }, { 127,  1 }, { 95,   1 },
-        { 63,   1 }, { 47,   1 }, { 31,   1 }, { 23,   1 }, { 15,   1 }, { 11,   1 }, { 7,    1 },
-        { 3,    1 }, { 1,    1 },
+        { 3,    1 },{ 7,    1 },{ 11,   1 },{ 15,   1 },{ 23,   1 },{ 31,   1 },{ 47,   1 },
+        { 63,   1 },{ 95,   1 },{ 127,  1 },{ 191,  1 },{ 255,  1 },{ 383,  1 },{ 511,  1 },
+        { 767,  1 },{ 1023, 1 },{ 1535, 1 },{ 2047, 1 },{ 3071, 1 },{ 4095, 1 },{ 6143, 1 },
+        { 8191, 1 },{ 6143, 1 },{ 4095, 1 },{ 3071, 1 },{ 2047, 1 },{ 1535, 1 },{ 1023, 1 },
+        { 767,  1 },{ 511,  1 },{ 383,  1 },{ 255,  1 },{ 191,  1 },{ 127,  1 },{ 95,   1 },
+        { 63,   1 },{ 47,   1 },{ 31,   1 },{ 23,   1 },{ 15,   1 },{ 11,   1 },{ 7,    1 },
+        { 3,    1 },{ 1,    1 },
         // rising -> inner node -> rising
-        { 0, leaf_x4 }, { 3,    1 }, { 0, leaf_x4 }, { 7,    1 }, { 0, leaf_x4 }, { 11,   1 },
-        { 0, leaf_x4 }, { 15,   1 }, { 0, leaf_x4 }, { 23,   1 }, { 0, leaf_x4 }, { 31,   1 },
-        { 0, leaf_x4 }, { 47,   1 }, { 0, leaf_x4 }, { 63,   1 }, { 0, leaf_x4 }, { 95,   1 },
-        { 0, leaf_x4 }, { 127,  1 }, { 0, leaf_x4 }, { 191,  1 }, { 0, leaf_x4 }, { 255,  1 },
-        { 0, leaf_x4 }, { 383,  1 }, { 0, leaf_x4 }, { 511,  1 }, { 0, leaf_x4 }, { 767,  1 },
-        { 0, leaf_x4 }, { 1023, 1 }, { 0, leaf_x4 }, { 1535, 1 }, { 0, leaf_x4 }, { 2047, 1 },
-        { 0, leaf_x4 }, { 3071, 1 }, { 0, leaf_x4 }, { 4095, 1 }, { 0, leaf_x4 }, { 6143, 1 },
-        { 0, leaf_x4 }, { 8191, 1 }
+        { 0, leaf_x4 },{ 3,    1 },{ 0, leaf_x4 },{ 7,    1 },{ 0, leaf_x4 },{ 11,   1 },
+        { 0, leaf_x4 },{ 15,   1 },{ 0, leaf_x4 },{ 23,   1 },{ 0, leaf_x4 },{ 31,   1 },
+        { 0, leaf_x4 },{ 47,   1 },{ 0, leaf_x4 },{ 63,   1 },{ 0, leaf_x4 },{ 95,   1 },
+        { 0, leaf_x4 },{ 127,  1 },{ 0, leaf_x4 },{ 191,  1 },{ 0, leaf_x4 },{ 255,  1 },
+        { 0, leaf_x4 },{ 383,  1 },{ 0, leaf_x4 },{ 511,  1 },{ 0, leaf_x4 },{ 767,  1 },
+        { 0, leaf_x4 },{ 1023, 1 },{ 0, leaf_x4 },{ 1535, 1 },{ 0, leaf_x4 },{ 2047, 1 },
+        { 0, leaf_x4 },{ 3071, 1 },{ 0, leaf_x4 },{ 4095, 1 },{ 0, leaf_x4 },{ 6143, 1 },
+        { 0, leaf_x4 },{ 8191, 1 }
     };
     // clang-format on
     std::ostringstream out;
@@ -1000,11 +999,11 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     auto check_subtab = [this](ConstTableRef table_r, size_t col_ndx, size_t row_ndx, int_type value) {
         ConstTableRef subtab = table_r->get_subtable(col_ndx, row_ndx);
         return CHECK_EQUAL(1, subtab->get_column_count()) && CHECK_EQUAL(type_Int, subtab->get_column_type(0)) &&
-               CHECK_EQUAL(1, subtab->size()) && CHECK_EQUAL(value, subtab->get_int(0, 0));
+            CHECK_EQUAL(1, subtab->size()) && CHECK_EQUAL(value, subtab->get_int(0, 0));
     };
 
     // Change value types (round 1 of 2)
-    char bin_1[] = {'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i'};
+    char bin_1[] = { 'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i' };
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
@@ -1035,7 +1034,7 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedColumn)
     CHECK_EQUAL(type_Int, table->get_mixed_type(2, 2)) && CHECK_EQUAL(0, table->get_mixed(2, 2).get_int());
 
     // Change value types (round 2 of 2)
-    char bin_2[] = {'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i'};
+    char bin_2[] = { 'M', 'i', 'n', 'k', 'o', 'w', 's', 'k', 'i' };
     {
         WriteTransaction wt(sg_w);
         TableRef table_w = wt.get_table("t");
@@ -2199,8 +2198,8 @@ TEST(LangBindHelper_AdvanceReadTransact_MixedSubtables)
         parent_w->insert_column(2, type_Int, "dummy_2");
         parent_w->insert_empty_row(2);
         parent_w->set_mixed(3, 2, "Lopadotemachoselachogaleokranioleipsanodrimhypotrimmatosilphio"
-                                  "paraomelitokatakechy­menokichlepikossyphophattoperisteralektryonopte"
-                                  "kephalliokigklopeleiolagoiosiraiobaphetraganopterygon");
+            "paraomelitokatakechy­menokichlepikossyphophattoperisteralektryonopte"
+            "kephalliokigklopeleiolagoiosiraiobaphetraganopterygon");
         TableRef subtab_0_0_w = parent_w->get_subtable(1, 1);
         TableRef subtab_1_1_w = parent_w->get_subtable(3, 3);
         subtab_0_0_w->set_int(0, 0, 10002);
@@ -3587,9 +3586,9 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
         origin_->set_int(0, 3, 42); // for later tracking of this entry
         CHECK_EQUAL(origin_->get_linklist(1, 0)->size(), 1);
         origin_->set_int_unique(0, 2, 1); // deletes row 2
-        // origin[2] is set to same pk as origin[0]. Origin[2] wins so
-        // origin[0] is lost. This then causes a move last over
-        // of origin[3] into origin[0].
+                                          // origin[2] is set to same pk as origin[0]. Origin[2] wins so
+                                          // origin[0] is lost. This then causes a move last over
+                                          // of origin[3] into origin[0].
         CHECK_EQUAL(origin_->size(), 3);
         CHECK_EQUAL(origin_->get_int(0, 0), 1);
         CHECK_EQUAL(origin_->get_int(0, 1), 2);
@@ -3635,9 +3634,9 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
         CHECK_EQUAL(origin->get_linklist(1, 0)->size(), 2);
         CHECK_EQUAL(origin->get_linklist(1, 1)->size(), 1);
         origin->set_int_unique(0, 3, 2); // deletes row 2, row 1 unchanged
-        // origin[3] is set to same pk as origin[1]. Origin[1] wins so
-        // origin[3] is lost. This causes a move last over
-        // of origin[4] to origin[3]
+                                         // origin[3] is set to same pk as origin[1]. Origin[1] wins so
+                                         // origin[3] is lost. This causes a move last over
+                                         // of origin[4] to origin[3]
         CHECK_EQUAL(origin->size(), 4);
 
         // since origin[1] won, it should get the links from the loser
@@ -3673,87 +3672,87 @@ TEST(LangBindHelper_AdvanceReadTransact_LinkView)
 
 namespace {
 
-template <typename T>
-class ConcurrentQueue {
-public:
-    ConcurrentQueue(size_t size)
-        : sz(size)
-    {
-        data.reset(new T[sz]);
-    }
-    inline bool is_full()
-    {
-        return writer - reader == sz;
-    }
-    inline bool is_empty()
-    {
-        return writer - reader == 0;
-    }
-    void put(T& e)
-    {
-        std::unique_lock<std::mutex> lock(mutex);
-        while (is_full())
-            not_full.wait(lock);
-        if (is_empty())
+    template <typename T>
+    class ConcurrentQueue {
+    public:
+        ConcurrentQueue(size_t size)
+            : sz(size)
+        {
+            data.reset(new T[sz]);
+        }
+        inline bool is_full()
+        {
+            return writer - reader == sz;
+        }
+        inline bool is_empty()
+        {
+            return writer - reader == 0;
+        }
+        void put(T& e)
+        {
+            std::unique_lock<std::mutex> lock(mutex);
+            while (is_full())
+                not_full.wait(lock);
+            if (is_empty())
+                not_empty_or_closed.notify_all();
+            data[writer++ % sz] = e;
+        }
+
+        bool get(T& e)
+        {
+            std::unique_lock<std::mutex> lock(mutex);
+            while (is_empty() && !closed)
+                not_empty_or_closed.wait(lock);
+            if (closed)
+                return false;
+            if (is_full())
+                not_full.notify_all();
+            e = std::move(data[reader++ % sz]);
+            return true;
+        }
+
+        void reopen()
+        {
+            // no concurrent access allowed here
+            closed = false;
+        }
+
+        void close()
+        {
+            std::unique_lock<std::mutex> lock(mutex);
+            closed = true;
             not_empty_or_closed.notify_all();
-        data[writer++ % sz] = e;
-    }
+        }
 
-    bool get(T& e)
+    private:
+        std::mutex mutex;
+        std::condition_variable not_full;
+        std::condition_variable not_empty_or_closed;
+        size_t reader = 0;
+        size_t writer = 0;
+        bool closed = false;
+        size_t sz;
+        std::unique_ptr<T[]> data;
+    };
+
+    // Background thread for test below.
+    void deleter_thread(ConcurrentQueue<LinkViewRef>& queue)
     {
-        std::unique_lock<std::mutex> lock(mutex);
-        while (is_empty() && !closed)
-            not_empty_or_closed.wait(lock);
-        if (closed)
-            return false;
-        if (is_full())
-            not_full.notify_all();
-        e = std::move(data[reader++ % sz]);
-        return true;
+        Random random(random_int<unsigned long>());
+        bool closed = false;
+        while (!closed) {
+            LinkViewRef r;
+            // prevent the compiler from eliminating a loop:
+            volatile int delay = random.draw_int_mod(10000);
+            closed = !queue.get(r);
+            // random delay goes *after* get(), so that it comes
+            // after the potentially synchronizing locking
+            // operation inside queue.get()
+            while (delay > 0)
+                delay--;
+            // just let 'r' die
+        }
     }
-
-    void reopen()
-    {
-        // no concurrent access allowed here
-        closed = false;
-    }
-
-    void close()
-    {
-        std::unique_lock<std::mutex> lock(mutex);
-        closed = true;
-        not_empty_or_closed.notify_all();
-    }
-
-private:
-    std::mutex mutex;
-    std::condition_variable not_full;
-    std::condition_variable not_empty_or_closed;
-    size_t reader = 0;
-    size_t writer = 0;
-    bool closed = false;
-    size_t sz;
-    std::unique_ptr<T[]> data;
-};
-
-// Background thread for test below.
-void deleter_thread(ConcurrentQueue<LinkViewRef>& queue)
-{
-    Random random(random_int<unsigned long>());
-    bool closed = false;
-    while (!closed) {
-        LinkViewRef r;
-        // prevent the compiler from eliminating a loop:
-        volatile int delay = random.draw_int_mod(10000);
-        closed = !queue.get(r);
-        // random delay goes *after* get(), so that it comes
-        // after the potentially synchronizing locking
-        // operation inside queue.get()
-        while (delay > 0)
-            delay--;
-        // just let 'r' die
-    }
-}
 }
 
 TEST(LangBindHelper_ConcurrentLinkViewDeletes)
@@ -3775,9 +3774,9 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
     // database during the test.
     const int change_frequency_per_mill = 50000; // 5pct changes
 
-    // Number of references that may be buffered for communication
-    // between main thread and deleter thread. Should be large enough
-    // to allow considerable overlap.
+                                                 // Number of references that may be buffered for communication
+                                                 // between main thread and deleter thread. Should be large enough
+                                                 // to allow considerable overlap.
     const int buffer_size = 2000;
 
     Random random(random_int<unsigned long>());
@@ -3819,18 +3818,18 @@ TEST(LangBindHelper_ConcurrentLinkViewDeletes)
         if (will_modify) {
             int modification_type = random.draw_int_mod(2);
             switch (modification_type) {
-                case 0: {
-                    LangBindHelper::promote_to_write(sg);
-                    lw->add(ndx);
-                    LangBindHelper::commit_and_continue_as_read(sg);
-                    break;
-                }
-                case 1: {
-                    LangBindHelper::promote_to_write(sg);
-                    origin->move_last_over(random.draw_int_mod(table_size));
-                    origin->add_empty_row();
-                    LangBindHelper::commit_and_continue_as_read(sg);
-                }
+            case 0: {
+                LangBindHelper::promote_to_write(sg);
+                lw->add(ndx);
+                LangBindHelper::commit_and_continue_as_read(sg);
+                break;
+            }
+            case 1: {
+                LangBindHelper::promote_to_write(sg);
+                origin->move_last_over(random.draw_int_mod(table_size));
+                origin->add_empty_row();
+                LangBindHelper::commit_and_continue_as_read(sg);
+            }
             }
         }
         queue.put(lw);
@@ -4214,8 +4213,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_1_w->set_link(0, 2, 1);  // null -> non-null
         origin_2_w->nullify_link(0, 2); // non-null -> null
         origin_2_w->set_link(4, 2, 1);  // non-null -> non-null
-        // Removes O_2_L_2[2] -> T_1[1]  and  O_2_L_4[2] -> T_2[0]
-        // Adds    O_1_L_3[2] -> T_1[1]  and  O_2_L_4[2] -> T_2[1]
+                                        // Removes O_2_L_2[2] -> T_1[1]  and  O_2_L_4[2] -> T_2[0]
+                                        // Adds    O_1_L_3[2] -> T_1[1]  and  O_2_L_4[2] -> T_2[1]
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -4601,9 +4600,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         TableRef origin_2_w = wt.get_table("origin_2");
         origin_1_w->move_last_over(0); // [ 0, 1, 2 ] -> [ 2, 1 ]
         origin_2_w->move_last_over(2); // [ 0, 1, 2 ] -> [ 0, 1 ]
-        // Removes  O_1_L_4[0]  -> T_2[0]  and  O_1_L_3[2]  -> T_1[1]  and
-        //          O_2_LL_3[2] -> T_2[0]  and  O_2_LL_3[2] -> T_2[1]  and  O_2_L_4[2] -> T_2[1]
-        // Adds     O_1_L_3[0]  -> T_1[1]
+                                       // Removes  O_1_L_4[0]  -> T_2[0]  and  O_1_L_3[2]  -> T_1[1]  and
+                                       //          O_2_LL_3[2] -> T_2[0]  and  O_2_LL_3[2] -> T_2[1]  and  O_2_L_4[2] -> T_2[1]
+                                       // Adds     O_1_L_3[0]  -> T_1[1]
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -4669,9 +4668,9 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_1_w->add_empty_row(); // [ 2, 1 ] -> [ 2, 1, 3 ]
         origin_1_w->set_link(2, 2, 0);
         origin_2_w->move_last_over(0); // [ 0, 1 ] -> [ 1 ]
-        // Removes  O_2_L_2[0]  -> T_1[1]  and  O_2_LL_3[1] -> T_2[0]  and
-        //          O_2_LL_3[1] -> T_2[1]  and  O_2_L_4[0]  -> T_2[1]  and  O_2_L_4[1] -> T_2[0]
-        // Adds     O_1_L_4[2]  -> T_2[0]  and  O_2_LL_3[0] -> T_2[0]  and  O_2_L_4[0] -> T_2[0]
+                                       // Removes  O_2_L_2[0]  -> T_1[1]  and  O_2_LL_3[1] -> T_2[0]  and
+                                       //          O_2_LL_3[1] -> T_2[1]  and  O_2_L_4[0]  -> T_2[1]  and  O_2_L_4[1] -> T_2[0]
+                                       // Adds     O_1_L_4[2]  -> T_2[0]  and  O_2_LL_3[0] -> T_2[0]  and  O_2_L_4[0] -> T_2[0]
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -4733,10 +4732,10 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         TableRef origin_2_w = wt.get_table("origin_2");
         origin_1_w->move_last_over(1); // [ 2, 1, 3 ] -> [ 2, 3 ]
         origin_2_w->move_last_over(0); // [ 1 ] -> []
-        // Removes  O_1_L_3[1]  -> T_1[0]  and  O_1_L_4[1]  -> T_2[1]  and
-        //          O_1_LL_1[1] -> T_1[0]  and  O_1_L_4[2]  -> T_2[0]  and
-        //          O_2_LL_3[0] -> T_2[0]  and  O_2_LL_3[0] -> T_2[1]  and  O_2_L_4[0]  -> T_2[0]
-        // Adds     O_1_L_4[1]  -> T_2[0]
+                                       // Removes  O_1_L_3[1]  -> T_1[0]  and  O_1_L_4[1]  -> T_2[1]  and
+                                       //          O_1_LL_1[1] -> T_1[0]  and  O_1_L_4[2]  -> T_2[0]  and
+                                       //          O_2_LL_3[0] -> T_2[0]  and  O_2_LL_3[0] -> T_2[1]  and  O_2_L_4[0]  -> T_2[0]
+                                       // Adds     O_1_L_4[1]  -> T_2[0]
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -4783,7 +4782,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         TableRef origin_1_w = wt.get_table("origin_1");
         TableRef origin_2_w = wt.get_table("origin_2");
         origin_1_w->move_last_over(1); // [ 2, 3 ] -> [ 2 ]
-        // Removes  O_1_L_4[1] -> T_2[0]
+                                       // Removes  O_1_L_4[1] -> T_2[0]
         origin_2_w->add_empty_row(3);           // [] -> [ 3, 4, 5 ]
         origin_2_w->set_link(0, 0, 0);          // O_2_L_2[0]  -> T_1[0]
         origin_2_w->set_link(0, 2, 1);          // O_2_L_2[2]  -> T_1[1]
@@ -5019,8 +5018,8 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         TableRef target_2_w = wt.get_table("target_2");
         target_1_w->move_last_over(0); // [ 0, 1, 2 ] -> [ 2, 1 ]
         target_2_w->move_last_over(2); // [ 0, 1, 2 ] -> [ 0, 1 ]
-        // Removes  O_1_L_3[2] -> T_1[0]  and  O_1_LL_1[1] -> T_1[2]  and
-        //          O_2_L_2[0] -> T_1[0]  and  O_2_LL_3[2] -> T_2[2]  and  O_2_L_4[0] -> T_2[2]
+                                       // Removes  O_1_L_3[2] -> T_1[0]  and  O_1_LL_1[1] -> T_1[2]  and
+                                       //          O_2_L_2[0] -> T_1[0]  and  O_2_LL_3[2] -> T_2[2]  and  O_2_L_4[0] -> T_2[2]
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -5097,11 +5096,11 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         origin_1_w->get_linklist(4, 1)->add(2); // O_1_LL_1[1] -> T_1[2]
         origin_2_w->set_link(0, 0, 2);          // O_2_L_2[0]  -> T_1[2]
         target_2_w->move_last_over(0);          // [ 0, 1 ] -> [ 1 ]
-        // Removes  O_1_L_4[0]  -> T_2[1]  and  O_1_L_4[2]  -> T_2[0]  and
-        //          O_2_LL_3[0] -> T_2[1]  and  O_2_LL_3[1] -> T_2[1]  and
-        //          O_2_LL_3[2] -> T_2[1]  and  O_2_L_4[2]  -> T_2[0]
-        // Adds     O_1_L_4[0]  -> T_2[0]  and  O_2_LL_3[0] -> T_2[0]  and
-        //          O_2_LL_3[2] -> T_2[0]
+                                                // Removes  O_1_L_4[0]  -> T_2[1]  and  O_1_L_4[2]  -> T_2[0]  and
+                                                //          O_2_LL_3[0] -> T_2[1]  and  O_2_LL_3[1] -> T_2[1]  and
+                                                //          O_2_LL_3[2] -> T_2[1]  and  O_2_L_4[2]  -> T_2[0]
+                                                // Adds     O_1_L_4[0]  -> T_2[0]  and  O_2_LL_3[0] -> T_2[0]  and
+                                                //          O_2_LL_3[2] -> T_2[0]
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -5173,13 +5172,13 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         TableRef target_2_w = wt.get_table("target_2");
         target_1_w->move_last_over(1); // [ 2, 1, 3 ] -> [ 2, 3 ]
         target_2_w->move_last_over(0); // [ 1 ] -> []
-        // Removes  O_1_L_3[0]  -> T_1[1]  and  O_1_L_3[2]  -> T_1[2]  and
-        //          O_1_L_4[0]  -> T_2[0]  and  O_1_LL_1[1] -> T_1[2]  and
-        //          O_1_LL_1[2] -> T_1[1]  and  O_2_L_2[0]  -> T_1[2]  and
-        //          O_2_L_2[2]  -> T_1[1]  and  O_2_LL_3[0] -> T_2[0]  and
-        //          O_2_LL_3[1] -> T_2[0]  and  O_2_LL_3[2] -> T_2[0]
-        // Adds     O_1_L_3[2]  -> T_1[1]  and  O_1_LL_1[1] -> T_1[1]  and
-        //          O_2_L_2[0]  -> T_1[1]
+                                       // Removes  O_1_L_3[0]  -> T_1[1]  and  O_1_L_3[2]  -> T_1[2]  and
+                                       //          O_1_L_4[0]  -> T_2[0]  and  O_1_LL_1[1] -> T_1[2]  and
+                                       //          O_1_LL_1[2] -> T_1[1]  and  O_2_L_2[0]  -> T_1[2]  and
+                                       //          O_2_L_2[2]  -> T_1[1]  and  O_2_LL_3[0] -> T_2[0]  and
+                                       //          O_2_LL_3[1] -> T_2[0]  and  O_2_LL_3[2] -> T_2[0]
+                                       // Adds     O_1_L_3[2]  -> T_1[1]  and  O_1_LL_1[1] -> T_1[1]  and
+                                       //          O_2_L_2[0]  -> T_1[1]
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -5242,7 +5241,7 @@ TEST(LangBindHelper_AdvanceReadTransact_Links)
         TableRef target_1_w = wt.get_table("target_1");
         TableRef target_2_w = wt.get_table("target_2");
         target_1_w->move_last_over(1); // [ 2, 3 ] -> [ 2 ]
-        // Removes  O_1_L_3[2] -> T_1[1]  and  O_1_LL_1[1] -> T_1[1]  and  O_2_L_2[0] -> T_1[1]
+                                       // Removes  O_1_L_3[2] -> T_1[1]  and  O_1_LL_1[1] -> T_1[1]  and  O_2_L_2[0] -> T_1[1]
         target_2_w->add_empty_row(3);           // [] -> [ 3, 4, 5 ]
         origin_1_w->set_link(2, 0, 1);          // O_1_L_4[0]  -> T_2[1]
         origin_1_w->set_link(2, 2, 0);          // O_1_L_4[2]  -> T_2[0]
@@ -7630,253 +7629,253 @@ TEST(LangBindHelper_AdvanceReadTransact_UnorderedTableViewClear)
 }
 
 namespace {
-// A base class for transaction log parsers so that tests which want to test
-// just a single part of the transaction log handling don't have to implement
-// the entire interface
-class NoOpTransactionLogParser {
-public:
-    NoOpTransactionLogParser(TestContext& context)
-        : test_context(context)
-    {
-    }
+    // A base class for transaction log parsers so that tests which want to test
+    // just a single part of the transaction log handling don't have to implement
+    // the entire interface
+    class NoOpTransactionLogParser {
+    public:
+        NoOpTransactionLogParser(TestContext& context)
+            : test_context(context)
+        {
+        }
 
-    size_t get_current_table() const
-    {
-        return m_current_table;
-    }
+        size_t get_current_table() const
+        {
+            return m_current_table;
+        }
 
-    std::pair<size_t, size_t> get_current_linkview() const
-    {
-        return {m_current_linkview_col, m_current_linkview_row};
-    }
+        std::pair<size_t, size_t> get_current_linkview() const
+        {
+            return { m_current_linkview_col, m_current_linkview_row };
+        }
 
-protected:
-    TestContext& test_context;
+    protected:
+        TestContext& test_context;
 
-private:
-    size_t m_current_table = realm::npos;
-    size_t m_current_linkview_col = realm::npos;
-    size_t m_current_linkview_row = realm::npos;
+    private:
+        size_t m_current_table = realm::npos;
+        size_t m_current_linkview_col = realm::npos;
+        size_t m_current_linkview_row = realm::npos;
 
-public:
-    void parse_complete()
-    {
-    }
+    public:
+        void parse_complete()
+        {
+        }
 
-    bool select_table(size_t group_level_ndx, int, const size_t*)
-    {
-        m_current_table = group_level_ndx;
-        return true;
-    }
+        bool select_table(size_t group_level_ndx, int, const size_t*)
+        {
+            m_current_table = group_level_ndx;
+            return true;
+        }
 
-    bool select_link_list(size_t col_ndx, size_t row_ndx, size_t)
-    {
-        m_current_linkview_col = col_ndx;
-        m_current_linkview_row = row_ndx;
-        return true;
-    }
+        bool select_link_list(size_t col_ndx, size_t row_ndx, size_t)
+        {
+            m_current_linkview_col = col_ndx;
+            m_current_linkview_row = row_ndx;
+            return true;
+        }
 
-    // subtables not supported
-    bool select_descriptor(int, const size_t*)
-    {
-        return false;
-    }
+        // subtables not supported
+        bool select_descriptor(int, const size_t*)
+        {
+            return false;
+        }
 
-    // Default no-op implmentations of all of the mutation instructions
-    bool insert_group_level_table(size_t, size_t, StringData)
-    {
-        return false;
-    }
-    bool erase_group_level_table(size_t, size_t)
-    {
-        return false;
-    }
-    bool rename_group_level_table(size_t, StringData)
-    {
-        return false;
-    }
-    bool move_group_level_table(size_t, size_t)
-    {
-        return false;
-    }
-    bool insert_column(size_t, DataType, StringData, bool)
-    {
-        return false;
-    }
-    bool insert_link_column(size_t, DataType, StringData, size_t, size_t)
-    {
-        return false;
-    }
-    bool erase_column(size_t)
-    {
-        return false;
-    }
-    bool erase_link_column(size_t, size_t, size_t)
-    {
-        return false;
-    }
-    bool rename_column(size_t, StringData)
-    {
-        return false;
-    }
-    bool move_column(size_t, size_t)
-    {
-        return false;
-    }
-    bool add_search_index(size_t)
-    {
-        return false;
-    }
-    bool remove_search_index(size_t)
-    {
-        return false;
-    }
-    bool add_primary_key(size_t)
-    {
-        return false;
-    }
-    bool remove_primary_key()
-    {
-        return false;
-    }
-    bool set_link_type(size_t, LinkType)
-    {
-        return false;
-    }
-    bool insert_empty_rows(size_t, size_t, size_t, bool)
-    {
-        return false;
-    }
-    bool erase_rows(size_t, size_t, size_t, bool)
-    {
-        return false;
-    }
-    bool swap_rows(size_t, size_t)
-    {
-        return false;
-    }
-    bool merge_rows(size_t, size_t)
-    {
-        return false;
-    }
-    bool clear_table() noexcept
-    {
-        return false;
-    }
-    bool link_list_set(size_t, size_t, size_t)
-    {
-        return false;
-    }
-    bool link_list_insert(size_t, size_t, size_t)
-    {
-        return false;
-    }
-    bool link_list_erase(size_t, size_t)
-    {
-        return false;
-    }
-    bool link_list_nullify(size_t, size_t)
-    {
-        return false;
-    }
-    bool link_list_clear(size_t)
-    {
-        return false;
-    }
-    bool link_list_move(size_t, size_t)
-    {
-        return false;
-    }
-    bool link_list_swap(size_t, size_t)
-    {
-        return false;
-    }
-    bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t)
-    {
-        return false;
-    }
-    bool add_int(size_t, size_t, int_fast64_t)
-    {
-        return false;
-    }
-    bool set_bool(size_t, size_t, bool, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_float(size_t, size_t, float, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_double(size_t, size_t, double, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t)
-    {
-        return false;
-    }
-    bool set_binary(size_t, size_t, BinaryData, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_table(size_t, size_t, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_mixed(size_t, size_t, const Mixed&, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_link(size_t, size_t, size_t, size_t, _impl::Instruction)
-    {
-        return false;
-    }
-    bool set_null(size_t, size_t, _impl::Instruction, size_t)
-    {
-        return false;
-    }
-    bool nullify_link(size_t, size_t, size_t)
-    {
-        return false;
-    }
-    bool insert_substring(size_t, size_t, size_t, StringData)
-    {
-        return false;
-    }
-    bool erase_substring(size_t, size_t, size_t, size_t)
-    {
-        return false;
-    }
-    bool optimize_table()
-    {
-        return false;
-    }
-};
+        // Default no-op implmentations of all of the mutation instructions
+        bool insert_group_level_table(size_t, size_t, StringData)
+        {
+            return false;
+        }
+        bool erase_group_level_table(size_t, size_t)
+        {
+            return false;
+        }
+        bool rename_group_level_table(size_t, StringData)
+        {
+            return false;
+        }
+        bool move_group_level_table(size_t, size_t)
+        {
+            return false;
+        }
+        bool insert_column(size_t, DataType, StringData, bool)
+        {
+            return false;
+        }
+        bool insert_link_column(size_t, DataType, StringData, size_t, size_t)
+        {
+            return false;
+        }
+        bool erase_column(size_t)
+        {
+            return false;
+        }
+        bool erase_link_column(size_t, size_t, size_t)
+        {
+            return false;
+        }
+        bool rename_column(size_t, StringData)
+        {
+            return false;
+        }
+        bool move_column(size_t, size_t)
+        {
+            return false;
+        }
+        bool add_search_index(size_t)
+        {
+            return false;
+        }
+        bool remove_search_index(size_t)
+        {
+            return false;
+        }
+        bool add_primary_key(size_t)
+        {
+            return false;
+        }
+        bool remove_primary_key()
+        {
+            return false;
+        }
+        bool set_link_type(size_t, LinkType)
+        {
+            return false;
+        }
+        bool insert_empty_rows(size_t, size_t, size_t, bool)
+        {
+            return false;
+        }
+        bool erase_rows(size_t, size_t, size_t, bool)
+        {
+            return false;
+        }
+        bool swap_rows(size_t, size_t)
+        {
+            return false;
+        }
+        bool merge_rows(size_t, size_t)
+        {
+            return false;
+        }
+        bool clear_table() noexcept
+        {
+            return false;
+        }
+        bool link_list_set(size_t, size_t, size_t)
+        {
+            return false;
+        }
+        bool link_list_insert(size_t, size_t, size_t)
+        {
+            return false;
+        }
+        bool link_list_erase(size_t, size_t)
+        {
+            return false;
+        }
+        bool link_list_nullify(size_t, size_t)
+        {
+            return false;
+        }
+        bool link_list_clear(size_t)
+        {
+            return false;
+        }
+        bool link_list_move(size_t, size_t)
+        {
+            return false;
+        }
+        bool link_list_swap(size_t, size_t)
+        {
+            return false;
+        }
+        bool set_int(size_t, size_t, int_fast64_t, _impl::Instruction, size_t)
+        {
+            return false;
+        }
+        bool add_int(size_t, size_t, int_fast64_t)
+        {
+            return false;
+        }
+        bool set_bool(size_t, size_t, bool, _impl::Instruction)
+        {
+            return false;
+        }
+        bool set_float(size_t, size_t, float, _impl::Instruction)
+        {
+            return false;
+        }
+        bool set_double(size_t, size_t, double, _impl::Instruction)
+        {
+            return false;
+        }
+        bool set_string(size_t, size_t, StringData, _impl::Instruction, size_t)
+        {
+            return false;
+        }
+        bool set_binary(size_t, size_t, BinaryData, _impl::Instruction)
+        {
+            return false;
+        }
+        bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction)
+        {
+            return false;
+        }
+        bool set_timestamp(size_t, size_t, Timestamp, _impl::Instruction)
+        {
+            return false;
+        }
+        bool set_table(size_t, size_t, _impl::Instruction)
+        {
+            return false;
+        }
+        bool set_mixed(size_t, size_t, const Mixed&, _impl::Instruction)
+        {
+            return false;
+        }
+        bool set_link(size_t, size_t, size_t, size_t, _impl::Instruction)
+        {
+            return false;
+        }
+        bool set_null(size_t, size_t, _impl::Instruction, size_t)
+        {
+            return false;
+        }
+        bool nullify_link(size_t, size_t, size_t)
+        {
+            return false;
+        }
+        bool insert_substring(size_t, size_t, size_t, StringData)
+        {
+            return false;
+        }
+        bool erase_substring(size_t, size_t, size_t, size_t)
+        {
+            return false;
+        }
+        bool optimize_table()
+        {
+            return false;
+        }
+    };
 
-struct AdvanceReadTransact {
-    template <typename Func>
-    static void call(SharedGroup& sg, Func&& func)
-    {
-        LangBindHelper::advance_read(sg, std::forward<Func&&>(func));
-    }
-};
+    struct AdvanceReadTransact {
+        template <typename Func>
+        static void call(SharedGroup& sg, Func&& func)
+        {
+            LangBindHelper::advance_read(sg, std::forward<Func&&>(func));
+        }
+    };
 
-struct PromoteThenRollback {
-    template <typename Func>
-    static void call(SharedGroup& sg, Func&& func)
-    {
-        LangBindHelper::promote_to_write(sg, std::forward<Func&&>(func));
-        LangBindHelper::rollback_and_continue_as_read(sg);
-    }
-};
+    struct PromoteThenRollback {
+        template <typename Func>
+        static void call(SharedGroup& sg, Func&& func)
+        {
+            LangBindHelper::promote_to_write(sg, std::forward<Func&&>(func));
+            LangBindHelper::rollback_and_continue_as_read(sg);
+        }
+    };
 
 } // unnamed namespace
 
@@ -9113,59 +9112,59 @@ TEST(LangBindHelper_ImplicitTransactions_StringIndex)
 
 namespace {
 
-void multiple_trackers_writer_thread(std::string path)
-{
-    // Insert up to 10 rows at random positions through 10 separate
-    // transactions, then quit. No waiting.
-    Random random(random_int<unsigned long>());
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-    for (int i = 0; i < 10; ++i) {
-        WriteTransaction wt(sg);
-        auto tr = wt.get_table("table");
-        size_t idx = 1 + random.draw_int_mod(tr->size() - 1);
+    void multiple_trackers_writer_thread(std::string path)
+    {
+        // Insert up to 10 rows at random positions through 10 separate
+        // transactions, then quit. No waiting.
+        Random random(random_int<unsigned long>());
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+        for (int i = 0; i < 10; ++i) {
+            WriteTransaction wt(sg);
+            auto tr = wt.get_table("table");
+            size_t idx = 1 + random.draw_int_mod(tr->size() - 1);
 
-        if (tr->get_int(0, idx) == 42) {
-            // do nothing
-        }
-        else {
-            insert(tr, idx, 0);
-        }
-        wt.commit();
-        sched_yield();
-    }
-}
-
-void multiple_trackers_reader_thread(TestContext& test_context, std::string path)
-{
-    Random random(random_int<unsigned long>());
-
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-    Group& g = const_cast<Group&>(sg.begin_read());
-    TableRef tr = g.get_table("table");
-    Query q = tr->where().equal(0, 42);
-    size_t row_ndx = q.find();
-    Row row = tr->get(row_ndx);
-    TableView tv = q.find_all();
-    LangBindHelper::promote_to_write(sg);
-    tr->set_int(0, 0, 1 + tr->get_int(0, 0));
-    LangBindHelper::commit_and_continue_as_read(sg);
-    for (;;) {
-        int_fast64_t val = row.get_int(0);
-        tv.sync_if_needed();
-        if (val == 43)
-            break;
-        CHECK_EQUAL(42, val);
-        CHECK_EQUAL(1, tv.size());
-        CHECK_EQUAL(42, tv.get_int(0, 0));
-        while (!sg.has_changed())
+            if (tr->get_int(0, idx) == 42) {
+                // do nothing
+            }
+            else {
+                insert(tr, idx, 0);
+            }
+            wt.commit();
             sched_yield();
-        LangBindHelper::advance_read(sg);
+        }
     }
-    CHECK_EQUAL(0, tv.size());
-    sg.end_read();
-}
+
+    void multiple_trackers_reader_thread(TestContext& test_context, std::string path)
+    {
+        Random random(random_int<unsigned long>());
+
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+        Group& g = const_cast<Group&>(sg.begin_read());
+        TableRef tr = g.get_table("table");
+        Query q = tr->where().equal(0, 42);
+        size_t row_ndx = q.find();
+        Row row = tr->get(row_ndx);
+        TableView tv = q.find_all();
+        LangBindHelper::promote_to_write(sg);
+        tr->set_int(0, 0, 1 + tr->get_int(0, 0));
+        LangBindHelper::commit_and_continue_as_read(sg);
+        for (;;) {
+            int_fast64_t val = row.get_int(0);
+            tv.sync_if_needed();
+            if (val == 43)
+                break;
+            CHECK_EQUAL(42, val);
+            CHECK_EQUAL(1, tv.size());
+            CHECK_EQUAL(42, tv.get_int(0, 0));
+            while (!sg.has_changed())
+                sched_yield();
+            LangBindHelper::advance_read(sg);
+        }
+        CHECK_EQUAL(0, tv.size());
+        sg.end_read();
+    }
 
 } // anonymous namespace
 
@@ -9344,8 +9343,8 @@ TEST(LangBindHelper_ImplicitTransactions_NoExtremeFileSpaceLeaks)
         sg.end_read();
     }
 
-// the miminum filesize (after a commit) is one or two pages, depending on the
-// page size.
+    // the miminum filesize (after a commit) is one or two pages, depending on the
+    // page size.
 #if REALM_ENABLE_ENCRYPTION
     if (crypt_key())
         // Encrypted files are always at least a 4096 byte header plus payload
@@ -9518,7 +9517,7 @@ TEST(LangBindHelper_ImplicitTransactions_UpdateAccessorsOnChangeLinkTargets)
 {
     SHARED_GROUP_TEST_PATH(path);
 
-    std::unique_ptr<Replication> hist{make_in_realm_history(path)};
+    std::unique_ptr<Replication> hist{ make_in_realm_history(path) };
     SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     const Group& group = sg.begin_read();
 
@@ -9759,7 +9758,7 @@ TEST(LangBindHelper_SubqueryHandoverQueryCreatedFromDeletedLinkView)
 
             CHECK(tv.is_in_sync());
             CHECK(tv.is_attached());
-            CHECK_EQUAL(0, tv.size()); 
+            CHECK_EQUAL(0, tv.size());
         }
     }
 }
@@ -10096,213 +10095,212 @@ TEST(LangBindHelper_HandoverAccessors)
 }
 
 namespace {
-// support threads for handover test. The setup is as follows:
-// thread A writes a stream of updates to the database,
-// thread B listens and continously does advance_read to see the updates.
-// thread B also has a table view, which it continuosly keeps in sync in response
-// to the updates. It then hands over the result to thread C.
-// thread C continuously recieves copies of the results obtained in thead B and
-// verifies them (by comparing with its own local, but identical query)
+    // support threads for handover test. The setup is as follows:
+    // thread A writes a stream of updates to the database,
+    // thread B listens and continously does advance_read to see the updates.
+    // thread B also has a table view, which it continuosly keeps in sync in response
+    // to the updates. It then hands over the result to thread C.
+    // thread C continuously recieves copies of the results obtained in thead B and
+    // verifies them (by comparing with its own local, but identical query)
 
-template <typename T>
-struct HandoverControl {
-    Mutex m_lock;
-    CondVar m_changed;
-    SharedGroup::VersionID m_version;
-    std::unique_ptr<T> m_handover;
-    bool m_has_feedback = false;
-    void put(std::unique_ptr<T> h, SharedGroup::VersionID v)
-    {
-        LockGuard lg(m_lock);
-        // std::cout << "put " << h << std::endl;
-        while (m_handover != nullptr)
-            m_changed.wait(lg);
-        // std::cout << " -- put " << h << std::endl;
-        m_handover = move(h);
-        m_version = v;
-        m_changed.notify_all();
-    }
-    void get(std::unique_ptr<T>& h, SharedGroup::VersionID& v)
-    {
-        LockGuard lg(m_lock);
-        // std::cout << "get " << std::endl;
-        while (m_handover == nullptr)
-            m_changed.wait(lg);
-        // std::cout << " -- get " << m_handover << std::endl;
-        h = move(m_handover);
-        v = m_version;
-        m_handover = nullptr;
-        m_changed.notify_all();
-    }
-    bool try_get(std::unique_ptr<T>& h, SharedGroup::VersionID& v)
-    {
-        LockGuard lg(m_lock);
-        if (m_handover == nullptr)
-            return false;
-        h = move(m_handover);
-        v = m_version;
-        m_handover = nullptr;
-        m_changed.notify_all();
-        return true;
-    }
-    void signal_feedback()
-    {
-        LockGuard lg(m_lock);
-        m_has_feedback = true;
-        m_changed.notify_all();
-    }
-    void wait_feedback()
-    {
-        LockGuard lg(m_lock);
-        while (!m_has_feedback)
-            m_changed.wait(lg);
-        m_has_feedback = false;
-    }
-    HandoverControl(const HandoverControl&) = delete;
-    HandoverControl()
-    {
-    }
-};
-
-void handover_writer(std::string path)
-{
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-    Group& g = const_cast<Group&>(sg.begin_read());
-    auto table = g.get_table("table");
-    Random random(random_int<unsigned long>());
-    for (int i = 1; i < 5000; ++i) {
-        LangBindHelper::promote_to_write(sg);
-        // table holds random numbers >= 1, until the writing process
-        // finishes, after which table[0] is set to 0 to signal termination
-        add(table, 1 + random.draw_int_mod(100));
-        LangBindHelper::commit_and_continue_as_read(sg);
-        // improve chance of consumers running concurrently with
-        // new writes:
-        for (int n = 0; n < 10; ++n)
-            sched_yield();
-    }
-    LangBindHelper::promote_to_write(sg);
-    table->set_int(0, 0, 0); // <---- signals other threads to stop
-    LangBindHelper::commit_and_continue_as_read(sg);
-    sg.end_read();
-}
-
-
-void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control, TestContext& test_context,
-                      std::string path)
-{
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-    // We need to ensure that the initial version observed is *before* the final
-    // one written by the writer thread. We do this (simplisticly) by locking on
-    // to the initial version before even starting the writer.
-    Group& g = const_cast<Group&>(sg.begin_read());
-    Thread writer;
-    writer.start([&] { handover_writer(path); });
-    TableRef table = g.get_table("table");
-    TableView tv = table->where().greater(0, 50).find_all();
-    for (;;) {
-        // wait here for writer to change the database. Kind of wasteful, but wait_for_change()
-        // is not available on osx.
-        if (!sg.has_changed()) {
-            sched_yield();
-            continue;
+    template <typename T>
+    struct HandoverControl {
+        Mutex m_lock;
+        CondVar m_changed;
+        SharedGroup::VersionID m_version;
+        std::unique_ptr<T> m_handover;
+        bool m_has_feedback = false;
+        void put(std::unique_ptr<T> h, SharedGroup::VersionID v)
+        {
+            LockGuard lg(m_lock);
+            // std::cout << "put " << h << std::endl;
+            while (m_handover != nullptr)
+                m_changed.wait(lg);
+            // std::cout << " -- put " << h << std::endl;
+            m_handover = move(h);
+            m_version = v;
+            m_changed.notify_all();
         }
-        LangBindHelper::advance_read(sg);
-        CHECK(!tv.is_in_sync());
-        tv.sync_if_needed();
-        CHECK(tv.is_in_sync());
-        control->put(sg.export_for_handover(tv, MutableSourcePayload::Move), sg.get_version_of_current_transaction());
+        void get(std::unique_ptr<T>& h, SharedGroup::VersionID& v)
+        {
+            LockGuard lg(m_lock);
+            // std::cout << "get " << std::endl;
+            while (m_handover == nullptr)
+                m_changed.wait(lg);
+            // std::cout << " -- get " << m_handover << std::endl;
+            h = move(m_handover);
+            v = m_version;
+            m_handover = nullptr;
+            m_changed.notify_all();
+        }
+        bool try_get(std::unique_ptr<T>& h, SharedGroup::VersionID& v)
+        {
+            LockGuard lg(m_lock);
+            if (m_handover == nullptr)
+                return false;
+            h = move(m_handover);
+            v = m_version;
+            m_handover = nullptr;
+            m_changed.notify_all();
+            return true;
+        }
+        void signal_feedback()
+        {
+            LockGuard lg(m_lock);
+            m_has_feedback = true;
+            m_changed.notify_all();
+        }
+        void wait_feedback()
+        {
+            LockGuard lg(m_lock);
+            while (!m_has_feedback)
+                m_changed.wait(lg);
+            m_has_feedback = false;
+        }
+        HandoverControl(const HandoverControl&) = delete;
+        HandoverControl()
+        {
+        }
+    };
 
-        // here we need to allow the reciever to get hold on the proper version before
-        // we go through the loop again and advance_read().
-        control->wait_feedback();
-        sched_yield();
+    void handover_writer(std::string path)
+    {
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+        Group& g = const_cast<Group&>(sg.begin_read());
+        auto table = g.get_table("table");
 
-        if (table->size() > 0 && table->get_int(0, 0) == 0)
-            break;
-    }
-    sg.end_read();
-    writer.join();
-}
 
-void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* control, TestContext& test_context,
-                       std::string path)
-{
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-    for (;;) {
-        std::unique_ptr<SharedGroup::Handover<TableView>> handover;
-        SharedGroup::VersionID version;
-        control->get(handover, version);
-        CHECK_EQUAL(version.version, handover->version.version);
-        CHECK(version == handover->version);
-        Group& g = const_cast<Group&>(sg.begin_read(version));
-        CHECK_EQUAL(version.version, sg.get_version_of_current_transaction().version);
-        CHECK(version == sg.get_version_of_current_transaction());
-        control->signal_feedback();
-        TableRef table = g.get_table("table");
-        TableView tv = table->where().greater(0, 50).find_all();
-        CHECK(tv.is_in_sync());
-        std::unique_ptr<TableView> tv2 = sg.import_from_handover(move(handover));
-        CHECK(tv.is_in_sync());
-        CHECK(tv2->is_in_sync());
-        CHECK_EQUAL(tv.size(), tv2->size());
-        for (size_t k = 0; k < tv.size(); ++k)
-            CHECK_EQUAL(tv.get_int(0, k), tv2->get_int(0, k));
-        if (table->size() > 0 && table->get_int(0, 0) == 0)
-            break;
+        Random random(random_int<unsigned long>());
+
+        LangBindHelper::promote_to_write(sg);
+        for (int i = 0; i < 8000; i++)
+            add(table, 1 + random.draw_int_mod(100));
+        LangBindHelper::commit_and_continue_as_read(sg);
+
+
+        for (int i = 1; i < 5000; ++i) {
+            LangBindHelper::promote_to_write(sg);
+            // table holds random numbers >= 1, until the writing process
+            // finishes, after which table[0] is set to 0 to signal termination
+            add(table, 1 + random.draw_int_mod(100));
+            LangBindHelper::commit_and_continue_as_read(sg);
+            // improve chance of consumers running concurrently with
+            // new writes:
+            for (int n = 0; n < 10; ++n)
+                sched_yield();
+        }
+        LangBindHelper::promote_to_write(sg);
+        table->set_int(0, 0, 0); // <---- signals other threads to stop
+        LangBindHelper::commit_and_continue_as_read(sg);
         sg.end_read();
     }
-}
+
+
+    void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control, TestContext& test_context,
+        std::string path)
+    {
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+        // We need to ensure that the initial version observed is *before* the final
+        // one written by the writer thread. We do this (simplisticly) by locking on
+        // to the initial version before even starting the writer.
+        Group& g = const_cast<Group&>(sg.begin_read());
+        Thread writer;
+        writer.start([&] { handover_writer(path); });
+        TableRef table = g.get_table("table");
+        TableView tv = table->where().greater(0, 50).find_all();
+        for (;;) {
+            // wait here for writer to change the database. Kind of wasteful, but wait_for_change()
+            // is not available on osx.
+            if (!sg.has_changed()) {
+                sched_yield();
+                continue;
+            }
+            LangBindHelper::advance_read(sg);
+            CHECK(!tv.is_in_sync());
+            tv.sync_if_needed();
+            CHECK(tv.is_in_sync());
+            control->put(sg.export_for_handover(tv, MutableSourcePayload::Move), sg.get_version_of_current_transaction());
+
+            // here we need to allow the reciever to get hold on the proper version before
+            // we go through the loop again and advance_read().
+            control->wait_feedback();
+            sched_yield();
+
+            if (table->size() > 0 && table->get_int(0, 0) == 0)
+                break;
+        }
+        sg.end_read();
+        writer.join();
+    }
+
+    void handover_verifier(HandoverControl<SharedGroup::Handover<TableView>>* control, TestContext& test_context,
+        std::string path)
+    {
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+        int iter = 0;
+        for (;;) {
+            iter++;
+            std::unique_ptr<SharedGroup::Handover<TableView>> handover;
+            SharedGroup::VersionID version;
+            control->get(handover, version);
+            CHECK_EQUAL(version.version, handover->version.version);
+            CHECK(version == handover->version);
+            Group& g = const_cast<Group&>(sg.begin_read(version));
+            CHECK_EQUAL(version.version, sg.get_version_of_current_transaction().version);
+            CHECK(version == sg.get_version_of_current_transaction());
+            control->signal_feedback();
+            TableRef table = g.get_table("table");
+            TableView tv = table->where().greater(0, 50).find_all();
+            CHECK(tv.is_in_sync());
+            std::unique_ptr<TableView> tv2 = sg.import_from_handover(move(handover));
+            CHECK(tv.is_in_sync());
+            CHECK(tv2->is_in_sync());
+            CHECK_EQUAL(tv.size(), tv2->size());
+
+
+            for (int o = 0; o < table->size(); o++) {
+
+            volatile int64_t hh = table->get_int(0, table->size() - o - 1);
+             //   sched_yield();
+  
+             
+                       }
+
+            for (size_t k = 0; k < tv.size(); ++k)
+                CHECK_EQUAL(tv.get_int(0, tv.size() - k - 1), tv2->get_int(0, tv.size() - k - 1));
+
+
+            if (table->size() > 0 && table->get_int(0, 0) == 0)
+                break;
+            sg.end_read();
+        }
+    }
 
 } // anonymous namespace
 
 
 namespace {
 
-void attacher(std::string path)
-{
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-    for (int i = 0; i < 100; ++i) {
-        Group& g = const_cast<Group&>(sg.begin_read());
-        g.verify();
-        auto table = g.get_table("table");
-        LangBindHelper::promote_to_write(sg);
-        table->set_int(0, i, 1 + table->get_int(0, i * 10));
-        LangBindHelper::commit_and_continue_as_read(sg);
-        g.verify();
-        sg.end_read();
-    }
-}
-} // anonymous namespace
-
-
-TEST(LangBindHelper_RacingAttachers)
-{
-    const int num_attachers = 2;
-    SHARED_GROUP_TEST_PATH(path);
+    void attacher(std::string path)
     {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
         SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
-        Group& g = sg.begin_write();
-        auto table = g.add_table("table");
-        table->add_column(type_Int, "first");
-        table->add_empty_row(10000);
-        sg.commit();
+        for (int i = 0; i < 100; ++i) {
+            Group& g = const_cast<Group&>(sg.begin_read());
+            g.verify();
+            auto table = g.get_table("table");
+            LangBindHelper::promote_to_write(sg);
+            table->set_int(0, i, 1 + table->get_int(0, i * 10));
+            LangBindHelper::commit_and_continue_as_read(sg);
+            g.verify();
+            sg.end_read();
+        }
     }
-    Thread attachers[num_attachers];
-    for (int i = 0; i < num_attachers; ++i) {
-        attachers[i].start([&] { attacher(path); });
-    }
-    for (int i = 0; i < num_attachers; ++i) {
-        attachers[i].join();
-    }
-}
+} // anonymous namespace
 
-// Run this as "x64 / Unit tests Debug"
 ONLY(LangBindHelper_HandoverBetweenThreads)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -10508,9 +10506,9 @@ TEST(Query_ListOfPrimitivesHandover)
             }
         };
 
-        set_list(t->get_subtable(int_col, 0), std::vector<int64_t>({1, 2, 3}));
-        set_list(t->get_subtable(int_col, 1), std::vector<int64_t>({1, 3, 5, 7}));
-        set_list(t->get_subtable(int_col, 2), std::vector<int64_t>({100, 400, 200, 500, 300}));
+        set_list(t->get_subtable(int_col, 0), std::vector<int64_t>({ 1, 2, 3 }));
+        set_list(t->get_subtable(int_col, 1), std::vector<int64_t>({ 1, 3, 5, 7 }));
+        set_list(t->get_subtable(int_col, 2), std::vector<int64_t>({ 100, 400, 200, 500, 300 }));
 
         auto query = t->get_subtable(int_col, 2)->column<Int>(0) > 225;
         auto tv = query.find_all();
@@ -10673,10 +10671,10 @@ TEST(LangBindHelper_HandoverLinkView)
     {
         LangBindHelper::advance_read(sg, vid);
         LinkViewRef lvr = sg.import_linkview_from_handover(move(handover)); // <-- import lvr
-        // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
+                                                                            // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
 
-        // q.m_table = table1
-        // q.m_view = lvr
+                                                                            // q.m_table = table1
+                                                                            // q.m_view = lvr
         TableRef table1 = group.get_table("table1");
         Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
 
@@ -10698,10 +10696,10 @@ TEST(LangBindHelper_HandoverLinkView)
     }
     {
         LinkViewRef lvr = sg.import_linkview_from_handover(move(handover2)); // <-- import lvr
-        // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
+                                                                             // Return all rows of table1 (the linked-to-table) that match the criteria and is in the LinkList
 
-        // q.m_table = table1
-        // q.m_view = lvr
+                                                                             // q.m_table = table1
+                                                                             // q.m_view = lvr
         TableRef table1 = group.get_table("table1");
         Query q = table1->where(lvr).and_query(table1->column<Int>(0) > 100);
 
@@ -11515,7 +11513,7 @@ TEST(LangBindHelper_Compact)
     }
 }
 
-/*
+
 TEST(LangBindHelper_CompactLargeEncryptedFile)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -11554,7 +11552,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
         sg.close();
     }
 }
-*/
+
 
 TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 {
@@ -12290,8 +12288,8 @@ TEST(LangBindHelper_StaleLinkIndexOnTableClear)
     t2->set_link(1, 0, 1);
     t2->remove_column(0); // after this call LinkColumnBase::m_column_ndx was incorrect
 
-    // which would cause an index out of bounds assertion failure triggered
-    // from a table clear() (assert in Spec::get_opposite_link_table_ndx)
+                          // which would cause an index out of bounds assertion failure triggered
+                          // from a table clear() (assert in Spec::get_opposite_link_table_ndx)
     t->clear();
 
     CHECK_EQUAL(t->size(), 0);
@@ -12347,7 +12345,7 @@ TEST(LangBindHelper_RollBackAfterRemovalOfTable)
 TEST(LangBindHelper_RollbackInsertZeroRows)
 {
     SHARED_GROUP_TEST_PATH(shared_path)
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(shared_path));
+        std::unique_ptr<Replication> hist_w(make_in_realm_history(shared_path));
     SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
@@ -12459,7 +12457,7 @@ TEST(LangBindHelper_IsRowAttachedAfterClear)
 TEST(LangBindHelper_RollbackRemoveZeroRows)
 {
     SHARED_GROUP_TEST_PATH(path)
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+        std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
     Group& g = const_cast<Group&>(sg_w.begin_read());
     LangBindHelper::promote_to_write(sg_w);
@@ -12632,7 +12630,7 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     g.add_table("pknglaqnckqbffehqfgjnrepcfohoedkhiqsiedlotmaqitm");
     g.get_table(0)->add_column(type_Double, "ggotpkoshbrcrmmqbagbfjetajlrrlbpjhhqrngfgdteilmj", true);
     g.get_table(1)->add_column_link(type_LinkList, "dtkiipajqdsfglbptieibknaoeeohqdlhftqmlriphobspjr",
-                                    *g.get_table(0));
+        *g.get_table(0));
     g.get_table(0)->add_empty_row(375);
     g.add_table("pnsidlijqeddnsgaesiijrrqedkdktmfekftogjccerhpeil");
     sg_r.close();
@@ -12929,7 +12927,7 @@ TEST(LangBindHelper_CopyOnWriteOverflow)
     {
         WriteTransaction wt(sg_w);
         Group& group = wt.get_group();
-        group.get_table(0)->set_binary(0, 0, BinaryData{"Hello", 5});
+        group.get_table(0)->set_binary(0, 0, BinaryData{ "Hello", 5 });
         group.verify();
         wt.commit();
     }
@@ -13057,6 +13055,7 @@ TEST(LangBindHelper_MixedTimestampTransaction)
     CHECK(t->get_mixed(0, 0) == time);
     CHECK(t->get_mixed(0, 1) == neg_time);
 }
+
 
 
 #endif

@@ -190,6 +190,7 @@ iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos) noexcept
 bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) const
 {
     uint8_t buffer[224 / 8];
+    sched_yield();
     calc_hmac(src, len, buffer, m_hmacKey);
 
     // Constant-time memcmp to avoid timing attacks
