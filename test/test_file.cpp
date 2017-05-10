@@ -238,7 +238,7 @@ TEST(File_Offset)
 
 TEST(File_MultipleWriters)
 {
-    const size_t count = 4096 / sizeof(size_t) * 256 * 2;
+    const size_t count = 128 / sizeof(size_t) * 256 * 2;
 
     TEST_PATH(path);
 

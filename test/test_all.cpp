@@ -217,9 +217,8 @@ void set_random_seed()
 
 void set_always_encrypt()
 {
-    const char* str = getenv("UNITTEST_ENCRYPT_ALL");
-    if (str && strlen(str) != 0)
-        enable_always_encrypt();
+	enable_always_encrypt();
+
 }
 
 void display_build_config()
@@ -376,7 +375,7 @@ bool run_tests(util::Logger* logger)
 
     // Set number of threads
     {
-        const char* str = getenv("UNITTEST_THREADS");
+        const char* str = "20";// getenv("UNITTEST_THREADS");
         if (str && strlen(str) != 0) {
             std::istringstream in(str);
             in.imbue(std::locale::classic());
@@ -392,7 +391,7 @@ bool run_tests(util::Logger* logger)
 
     // Set number of repetitions
     {
-        const char* str = getenv("UNITTEST_REPEAT");
+        const char* str = "20";// getenv("UNITTEST_REPEAT");
         if (str && strlen(str) != 0) {
             std::istringstream in(str);
             in.imbue(std::locale::classic());
@@ -422,7 +421,7 @@ bool run_tests(util::Logger* logger)
 #endif
     std::vector<std::unique_ptr<Reporter>> reporters;
     {
-        const char* str = getenv("UNITTEST_PROGRESS");
+        const char* str = "1";// getenv("UNITTEST_PROGRESS");
         bool report_progress = str && strlen(str) != 0;
         std::unique_ptr<Reporter> reporter = std::make_unique<CustomReporter>(report_progress);
         reporters.push_back(std::move(reporter));
@@ -439,7 +438,7 @@ bool run_tests(util::Logger* logger)
     config.reporter = reporters.back().get();
 
     // Set up filter
-    const char* filter_str = getenv("UNITTEST_FILTER");
+	const char* filter_str = "LangBindHelper*";// getenv("UNITTEST_FILTER");
     const char* test_only = get_test_only();
     if (test_only)
         filter_str = test_only;

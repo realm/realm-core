@@ -31,8 +31,13 @@
 
 #include <cstring>
 #include <pthread.h>
+
+#ifndef _WIN32
 #include <sys/mman.h>
 #include <unistd.h>
+#else
+#include <Windows.h>
+#endif
 
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/terminate.hpp>
@@ -40,7 +45,7 @@
 namespace realm {
 namespace util {
 
-SharedFileInfo::SharedFileInfo(const uint8_t* key, int file_descriptor)
+SharedFileInfo::SharedFileInfo(const uint8_t* key, FileDesc file_descriptor)
     : fd(file_descriptor)
     , cryptor(key)
 {
@@ -112,17 +117,21 @@ off_t iv_table_pos(off_t pos)
     return metadata_block * (blocks_per_metadata_block + 1) * block_size + metadata_index * metadata_size;
 }
 
-void check_write(int fd, off_t pos, const void* data, size_t len)
+void check_write(FileDesc fd, off_t pos, const void* data, size_t len)
 {
-    ssize_t ret = pwrite(fd, data, len, pos);
-    REALM_ASSERT(ret >= 0 && static_cast<size_t>(ret) == len);
+	uint64_t orig = File::get_file_pos(fd);
+	File::seek_static(fd, pos);
+	File::write_static(fd, (char*)data, len);
+	File::seek_static(fd, orig);
 }
 
-size_t check_read(int fd, off_t pos, void* dst, size_t len)
+size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
 {
-    ssize_t ret = pread(fd, dst, len, pos);
-    REALM_ASSERT(ret >= 0);
-    return ret < 0 ? 0 : static_cast<size_t>(ret);
+	uint64_t orig = File::get_file_pos(fd);
+	File::seek_static(fd, pos);
+	size_t ret = File::read_static(fd, (char*)dst, len);
+	File::seek_static(fd, orig);
+	return ret;
 }
 
 } // anonymous namespace
@@ -156,7 +165,7 @@ void AESCryptor::set_file_size(off_t new_size)
     m_iv_buffer.reserve((block_count + blocks_per_metadata_block - 1) & ~(blocks_per_metadata_block - 1));
 }
 
-iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) noexcept
+iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos) noexcept
 {
     REALM_ASSERT(!int_cast_has_overflow<size_t>(data_pos));
     size_t data_pos_casted = size_t(data_pos);
@@ -190,7 +199,7 @@ bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) co
     return result == 0;
 }
 
-bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size)
+bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
 {
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
@@ -242,7 +251,7 @@ bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size)
     return true;
 }
 
-void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) noexcept
+void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept
 {
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
@@ -338,8 +347,10 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
 
 EncryptedFileMapping::~EncryptedFileMapping()
 {
-    flush();
-    sync();
+	if (m_access & File::access_ReadWrite) {
+		flush();
+		sync();
+	}
     m_file.mappings.erase(remove(m_file.mappings.begin(), m_file.mappings.end(), this));
 }
 
@@ -353,20 +364,25 @@ void EncryptedFileMapping::mark_outdated(size_t i) noexcept
     if (i >= m_page_count)
         return;
 
+  //  m_mutex.lock();
     if (m_dirty_pages[i])
         flush();
-
     if (m_up_to_date_pages[i]) {
         m_up_to_date_pages[i] = false;
     }
+    m_mutex.unlock();
+
 }
 
 void EncryptedFileMapping::mark_up_to_date(size_t i) noexcept
 {
-    if (i >= m_up_to_date_pages.size() || m_up_to_date_pages[i])
+    m_mutex.lock();
+    if (i >= m_up_to_date_pages.size() || m_up_to_date_pages[i]) {
+        m_mutex.unlock();
         return;
-
+    }
     m_up_to_date_pages[i] = true;
+    m_mutex.unlock();
 }
 
 bool EncryptedFileMapping::copy_up_to_date_page(size_t page) noexcept
@@ -379,10 +395,13 @@ bool EncryptedFileMapping::copy_up_to_date_page(size_t page) noexcept
         if (m == this || page >= m->m_page_count)
             continue;
 
+        m_mutex.lock();
         if (m->m_up_to_date_pages[page]) {
             memcpy(page_addr(page), m->page_addr(page), 1 << m_page_shift);
+            m_mutex.unlock();
             return true;
         }
+        m_mutex.unlock();
     }
     return false;
 }
@@ -394,7 +413,9 @@ void EncryptedFileMapping::refresh_page(size_t i)
     if (!copy_up_to_date_page(i))
         m_file.cryptor.read(m_file.fd, i << m_page_shift, addr, 1 << m_page_shift);
 
+    m_mutex.lock();
     m_up_to_date_pages[i] = true;
+    m_mutex.unlock();
 }
 
 void EncryptedFileMapping::write_page(size_t page) noexcept
@@ -410,24 +431,32 @@ void EncryptedFileMapping::write_page(size_t page) noexcept
         }
     }
 
+    m_mutex.lock();
     m_dirty_pages[page] = true;
+    m_mutex.unlock();
 }
 
 void EncryptedFileMapping::validate_page(size_t page) noexcept
 {
 #ifdef REALM_DEBUG
-    if (!m_up_to_date_pages[page])
+    m_mutex.lock();
+    if (!m_up_to_date_pages[page]) {
+        m_mutex.unlock();
         return;
+    }
+    m_mutex.unlock();
 
     if (!m_file.cryptor.read(m_file.fd, page << m_page_shift, m_validate_buffer.get(), 1 << m_page_shift))
         return;
 
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
+        m_mutex.lock();
         if (m != this && page < m->m_page_count && m->m_dirty_pages[page]) {
             memcpy(m_validate_buffer.get(), m->page_addr(page), 1 << m_page_shift);
             break;
         }
+        m_mutex.unlock();
     }
 
     if (memcmp(m_validate_buffer.get(), page_addr(page), 1 << m_page_shift)) {
@@ -451,20 +480,33 @@ void EncryptedFileMapping::validate() noexcept
 void EncryptedFileMapping::flush() noexcept
 {
     for (size_t i = 0; i < m_page_count; ++i) {
+        m_mutex.lock();
         if (!m_dirty_pages[i]) {
             validate_page(i);
             continue;
         }
+        m_mutex.unlock();
 
         m_file.cryptor.write(m_file.fd, i << m_page_shift, page_addr(i), 1 << m_page_shift);
+
+        m_mutex.lock();
         m_dirty_pages[i] = false;
+        m_mutex.unlock();
     }
 
     validate();
 }
 
+#ifdef _MSC_VER
+#pragma warning (disable: 4297) // throw in noexcept
+#endif
 void EncryptedFileMapping::sync() noexcept
 {
+#ifdef _WIN32
+    if (FlushFileBuffers(m_file.fd))
+        return;
+    throw std::runtime_error("FlushFileBuffers() failed");
+#else
     fsync(m_file.fd);
     // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.
     // Consider adding fcntl(F_FULLFSYNC). This most likely also applies to msync.
@@ -475,8 +517,11 @@ void EncryptedFileMapping::sync() noexcept
     // See also
     // https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/CoreData/Articles/cdPersistentStores.html
     // for a discussion of this related to core data.
+#endif
 }
-
+#ifdef _MSC_VER
+#pragma warning (default: 4297)
+#endif
 
 void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 {
@@ -511,11 +556,12 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     m_first_page = (reinterpret_cast<uintptr_t>(m_addr) - m_file_offset) >> m_page_shift;
     m_page_count = (new_size + m_file_offset) >> m_page_shift;
 
+    //m_mutex.lock();
     m_up_to_date_pages.clear();
     m_dirty_pages.clear();
-
     m_up_to_date_pages.resize(m_page_count, false);
     m_dirty_pages.resize(m_page_count, false);
+    //m_mutex.unlock();
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept

@@ -31,6 +31,7 @@
 #include <dirent.h> // POSIX.1-2001
 #endif
 
+#include <realm/utilities.hpp>
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -185,6 +186,7 @@ public:
     /// Calling this function on an instance, that is not currently
     /// attached to an open file, has undefined behavior.
     size_t read(char* data, size_t size);
+    static size_t read_static(FileDesc fd, char* data, size_t size);
 
     /// Write the specified data to this file.
     ///
@@ -194,6 +196,10 @@ public:
     /// Calling this function on an instance, that was opened in
     /// read-only mode, has undefined behavior.
     void write(const char* data, size_t size);
+    static void write_static(FileDesc fd, const char* data, size_t size);
+
+    // Tells current file pointer of fd
+    static uint64_t get_file_pos(FileDesc fd);
 
     /// Calls write(s.data(), s.size()).
     void write(const std::string& s)
@@ -221,6 +227,7 @@ public:
     /// Calling this function on an instance that is not attached to
     /// an open file has undefined behavior.
     SizeType get_size() const;
+    static SizeType get_size_static(FileDesc fd);
 
     /// If this causes the file to grow, then the new section will
     /// have undefined contents. Setting the size with this function
@@ -277,6 +284,7 @@ public:
     /// instance. Distinct File instances have separate independent
     /// offsets, as long as the cucrrent process is not forked.
     void seek(SizeType);
+    static void seek_static(FileDesc, SizeType);
 
     /// Flush in-kernel buffers to disk. This blocks the caller until the
     /// synchronization operation is complete. On POSIX systems this function
@@ -449,6 +457,7 @@ public:
     /// Both instances have to be attached to open files. If they are
     /// not, this function has undefined behavior.
     bool is_same_file(const File&) const;
+    static bool is_same_file_static(FileDesc f1, FileDesc f2);
 
     // FIXME: Get rid of this method
     bool is_removed() const;
@@ -539,12 +548,9 @@ private:
 #ifdef _WIN32
     void* m_handle;
     bool m_have_lock; // Only valid when m_handle is not null
-
-    SizeType get_file_position(); // POSIX version not needed because it's only used by Windows version of resize().
 #else
     int m_fd;
 #endif
-
     std::unique_ptr<const char[]> m_encryption_key;
 
     bool lock(bool exclusive, bool non_blocking);
@@ -562,8 +568,8 @@ private:
         MapBase(const MapBase&) = delete;
         MapBase& operator=(const MapBase&) = delete;
 
-        void map(const File&, AccessMode, size_t size, int map_flags, size_t offset = 0);
-        void remap(const File&, AccessMode, size_t size, int map_flags);
+        void map(File&, AccessMode, size_t size, int map_flags, size_t offset = 0);
+        void remap(File&, AccessMode, size_t size, int map_flags);
         void unmap() noexcept;
         void sync();
 #if REALM_ENABLE_ENCRYPTION
@@ -640,9 +646,9 @@ template <class T>
 class File::Map : private MapBase {
 public:
     /// Equivalent to calling map() on a default constructed instance.
-    explicit Map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0);
+    explicit Map(File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0);
 
-    explicit Map(const File&, size_t offset, AccessMode = access_ReadOnly, size_t size = sizeof(T),
+    explicit Map(File&, size_t offset, AccessMode = access_ReadOnly, size_t size = sizeof(T),
                  int map_flags = 0);
 
     /// Create an instance that is not initially attached to a memory
@@ -678,7 +684,7 @@ public:
     /// attached to a memory mapped file has undefined behavior. The
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
-    T* map(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0, size_t offset = 0);
+    T* map(File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0, size_t offset = 0);
 
     /// See File::unmap(). This function is idempotent, that is, it is
     /// valid to call it regardless of whether this instance is
@@ -691,7 +697,7 @@ public:
     /// attached to a memory mapped file has undefined behavior. The
     /// returned pointer is the same as what will subsequently be
     /// returned by get_addr().
-    T* remap(const File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0);
+    T* remap(File&, AccessMode = access_ReadOnly, size_t size = sizeof(T), int map_flags = 0);
 
     /// See File::sync_map().
     ///
@@ -1031,7 +1037,7 @@ inline File::MapBase::~MapBase() noexcept
     unmap();
 }
 
-inline void File::MapBase::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset)
+inline void File::MapBase::map(File& f, AccessMode a, size_t size, int map_flags, size_t offset)
 {
     REALM_ASSERT(!m_addr);
 #if REALM_ENABLE_ENCRYPTION
@@ -1053,7 +1059,7 @@ inline void File::MapBase::unmap() noexcept
 #endif
 }
 
-inline void File::MapBase::remap(const File& f, AccessMode a, size_t size, int map_flags)
+inline void File::MapBase::remap(File& f, AccessMode a, size_t size, int map_flags)
 {
     REALM_ASSERT(m_addr);
 
@@ -1069,13 +1075,13 @@ inline void File::MapBase::sync()
 }
 
 template <class T>
-inline File::Map<T>::Map(const File& f, AccessMode a, size_t size, int map_flags)
+inline File::Map<T>::Map(File& f, AccessMode a, size_t size, int map_flags)
 {
     map(f, a, size, map_flags);
 }
 
 template <class T>
-inline File::Map<T>::Map(const File& f, size_t offset, AccessMode a, size_t size, int map_flags)
+inline File::Map<T>::Map(File& f, size_t offset, AccessMode a, size_t size, int map_flags)
 {
     map(f, a, size, map_flags, offset);
 }
@@ -1091,7 +1097,7 @@ inline File::Map<T>::~Map() noexcept
 }
 
 template <class T>
-inline T* File::Map<T>::map(const File& f, AccessMode a, size_t size, int map_flags, size_t offset)
+inline T* File::Map<T>::map(File& f, AccessMode a, size_t size, int map_flags, size_t offset)
 {
     MapBase::map(f, a, size, map_flags, offset);
     return static_cast<T*>(m_addr);
@@ -1104,7 +1110,7 @@ inline void File::Map<T>::unmap() noexcept
 }
 
 template <class T>
-inline T* File::Map<T>::remap(const File& f, AccessMode a, size_t size, int map_flags)
+inline T* File::Map<T>::remap(File& f, AccessMode a, size_t size, int map_flags)
 {
     MapBase::remap(f, a, size, map_flags);
     return static_cast<T*>(m_addr);

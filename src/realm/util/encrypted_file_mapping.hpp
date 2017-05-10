@@ -79,6 +79,8 @@ private:
     std::vector<char> m_up_to_date_pages;
     std::vector<bool> m_dirty_pages;
 
+    Mutex m_mutex;
+
     File::AccessMode m_access;
 
 #ifdef REALM_DEBUG
@@ -108,6 +110,7 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Un
 
     // make sure the first page is available
     // Checking before taking the lock is important to performance.
+    m_mutex.lock();
     if (!m_up_to_date_pages[first_idx]) {
         if (!lock.holds_lock())
             lock.lock();
@@ -116,6 +119,7 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Un
         if (!m_up_to_date_pages[first_idx])
             refresh_page(first_idx);
     }
+    m_mutex.unlock();
 
     if (header_to_size) {
 
@@ -127,14 +131,17 @@ inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, Un
     size_t last_idx = last_accessed_page - m_first_page;
 
     for (size_t idx = first_idx + 1; idx <= last_idx; ++idx) {
+        m_mutex.lock();
         if (!m_up_to_date_pages[idx]) {
             if (!lock.holds_lock())
                 lock.lock();
             // after taking the lock, we must repeat the check so that we never
             // call refresh_page() on a page which is already up to date.
+
             if (!m_up_to_date_pages[idx])
                 refresh_page(idx);
         }
+        m_mutex.unlock();
     }
 }
 }
