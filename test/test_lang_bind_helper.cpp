@@ -13065,7 +13065,6 @@ TEST(LangBindHelper_GetBacklinkTable)
     TableRef table_a = group.add_table("A");
     TableRef table_b = group.add_table("B");
 
-    size_t col_str_a = table_a->add_column(type_String, "str_a");
     size_t col_lnk_a = table_a->add_column_link(type_LinkList, "link_a", *table_b);
 
     table_b->add_column(type_String, "str_b");
