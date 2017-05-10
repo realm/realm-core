@@ -213,8 +213,8 @@ def doBuildWindows(boolean isUniversal, String version, boolean isPublishingRun)
             isWindows: true,
             failOnWarning: false,
             script: """
-              \"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Debug static lib\" /p:Platform=${platform}
-              \"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Release static lib\" /p:Platform=${platform}
+              \"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Debug static lib\" /p:Platform=${platform} 2>&1
+              \"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Release static lib\" /p:Platform=${platform} 2>&1
             """
           )
         }
