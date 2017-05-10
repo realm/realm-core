@@ -20,6 +20,7 @@
 
 #include "util/event_loop.hpp"
 #include "util/test_file.hpp"
+#include "util/templated_test_case.hpp"
 
 #include "binding_context.hpp"
 #include "object_schema.hpp"
@@ -1143,101 +1144,64 @@ TEST_CASE("SharedRealm: compact on launch") {
 }
 #endif
 
-TEST_CASE("SharedRealm: update_schema with initialization_function") {
+struct ModeAutomatic {
+    static SchemaMode mode() { return SchemaMode::Automatic; }
+    static bool should_call_init_on_version_bump() { return false; }
+};
+struct ModeAdditive {
+    static SchemaMode mode() { return SchemaMode::Additive; }
+    static bool should_call_init_on_version_bump() { return false; }
+};
+struct ModeManual {
+    static SchemaMode mode() { return SchemaMode::Manual; }
+    static bool should_call_init_on_version_bump() { return false; }
+};
+struct ModeResetFile {
+    static SchemaMode mode() { return SchemaMode::ResetFile; }
+    static bool should_call_init_on_version_bump() { return false; }
+};
+
+TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
+                   ModeAutomatic, ModeAdditive, ModeManual, ModeResetFile) {
     TestFile config;
-    config.schema_version = 0;
-    config.schema = Schema{
-        {"object", {{"value", PropertyType::String, "", "", false, false, false}}},
-    };
+    config.schema_mode = TestType::mode();
     bool initialization_function_called = false;
-    Realm::DataInitializationFunction initialization_function = [&initialization_function_called](auto shared_realm) {
+    auto initialization_function = [&initialization_function_called](auto shared_realm) {
         REQUIRE(shared_realm->is_in_transaction());
         initialization_function_called = true;
     };
 
-#define REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(new_schema_mode, should_be_called) do { \
-        config.schema_mode = new_schema_mode; \
-        Realm::get_shared_realm(config); \
-        REQUIRE(initialization_function_called == should_be_called); \
-        } while (false)
+    Schema schema{
+        {"object", {
+            {"value", PropertyType::String, "", "", false, false, false}
+        }},
+    };
 
-#define REQUIRE_INIT_FUNC_CALLED_WITH_UPDATE_SCHEMA(new_schema_mode) do { \
-        config.schema_mode = new_schema_mode; \
-        auto realm = Realm::get_shared_realm(config); \
-        REQUIRE_FALSE(initialization_function_called); \
-        Realm::get_shared_realm(config); \
-        realm->update_schema(schema, 0, nullptr, initialization_function); \
-        REQUIRE(initialization_function_called); \
-        } while (false)
+    SECTION("call initialization function directly by update_schema") {
+        // Open in dynamic mode with no schema specified
+        auto realm = Realm::get_shared_realm(config);
+        REQUIRE_FALSE(initialization_function_called);
 
-    SECTION("Initialization function should be called for unversioned realm") {
-        config.initialization_function = initialization_function;
-        SECTION("Automatic mode") {
-            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::Automatic, true);
-        }
-
-        SECTION("Additive mode") {
-            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::Additive, true);
-        }
-
-        SECTION("Manual mode") {
-            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::Manual, true);
-        }
-
-        SECTION("Reset file mode") {
-            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::ResetFile, true);
-        }
+        realm->update_schema(schema, 0, nullptr, initialization_function);
+        REQUIRE(initialization_function_called);
     }
 
-    SECTION("Initialization function for versioned realm") {
+    config.schema_version = 0;
+    config.schema = schema;
+
+    SECTION("initialization function should be called for unversioned realm") {
+        config.initialization_function = initialization_function;
+        Realm::get_shared_realm(config);
+        REQUIRE(initialization_function_called == true);
+    }
+
+    SECTION("initialization function for versioned realm") {
         // Initialize v0
         Realm::get_shared_realm(config);
-        config.schema = Schema{
-            {"object",
-             {{"value", PropertyType::String, "", "", false, false, false}},
-             {{"newValue", PropertyType::String, "", "", false, false, false}}},
-        };
+
         config.schema_version = 1;
         config.initialization_function = initialization_function;
-
-        SECTION("Automatic mode") {
-            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::Automatic, false);
-        }
-
-        SECTION("Additive mode") {
-            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::Additive, false);
-        }
-
-        SECTION("Manual mode") {
-            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::Manual, false);
-        }
-
-        SECTION("Reset file mode") {
-            // When the migration is needed, the initialization function should only be called
-            // if it is in ResetFile mode.
-            REQUIRE_INIT_FUNC_CALLED_OR_NOT_WITH_GET_SHARED_REALM(SchemaMode::ResetFile, true);
-        }
-    }
-
-    SECTION("Call initialization function directly by update_schema") {
-        config.schema_version = ObjectStore::NotVersioned;
-        auto schema = *config.schema;
-        config.schema = util::none;
-
-        SECTION("Automatic mode") {
-            REQUIRE_INIT_FUNC_CALLED_WITH_UPDATE_SCHEMA(SchemaMode::Automatic);
-        }
-
-        SECTION("Additive mode") {
-            REQUIRE_INIT_FUNC_CALLED_WITH_UPDATE_SCHEMA(SchemaMode::Additive);
-        }
-
-        SECTION("Manual mode") {
-            REQUIRE_INIT_FUNC_CALLED_WITH_UPDATE_SCHEMA(SchemaMode::Manual);
-        }
-
-        SECTION("Reset file mode") {
-            REQUIRE_INIT_FUNC_CALLED_WITH_UPDATE_SCHEMA(SchemaMode::ResetFile);
-        }
+        Realm::get_shared_realm(config);
+        REQUIRE(initialization_function_called == TestType::should_call_init_on_version_bump());
     }
 }
