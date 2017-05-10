@@ -2313,18 +2313,16 @@ TEST(Shared_MixedWithNonShared)
 // a thread will not get access without the key.
 TEST(Shared_EncryptionKeyCheck)
 {
-    if (crypt_key() != nullptr) { // only test if encryption is actually in use
-        SHARED_GROUP_TEST_PATH(path);
-        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
-        bool ok = false;
-        try {
-            SharedGroup sg_2(path, false, SharedGroupOptions());
-        } catch (std::runtime_error&) {
-            ok = true;
-        }
-        CHECK(ok);
-        SharedGroup sg3(path, false, SharedGroupOptions(crypt_key()));
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroupOptions(crypt_key(true)));
+    bool ok = false;
+    try {
+        SharedGroup sg_2(path, false, SharedGroupOptions());
+    } catch (std::runtime_error&) {
+        ok = true;
     }
+    CHECK(ok);
+    SharedGroup sg3(path, false, SharedGroupOptions(crypt_key(true)));
 }
 
 #endif
