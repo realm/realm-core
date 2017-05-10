@@ -2055,15 +2055,15 @@ TEST(Backlink_Query_IsNull)
     table->add_column(type_String, "string", true);
     table->add_column_link(type_Link, "link", *table);
 
-    auto add_row = [&](Table& table, StringData value) {
-        size_t row = table.add_empty_row();
-        table.set_string(0, row, value);
-        table.set_link(1, row, row);
+    auto add_row = [&table](StringData value) {
+        size_t row = table->add_empty_row();
+        table->set_string(0, row, value);
+        table->set_link(1, row, row);
     };
 
-    add_row(*table, "hello");
-    add_row(*table, realm::null());
-    add_row(*table, "world");
+    add_row("hello");
+    add_row(realm::null());
+    add_row("world");
 
     auto tableview = (table->backlink(*table, 1).column<String>(0) == realm::null()).find_all();
     CHECK_EQUAL(1, tableview.size());
