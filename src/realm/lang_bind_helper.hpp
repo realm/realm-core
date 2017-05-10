@@ -100,8 +100,6 @@ public:
     static const LinkViewRef& get_linklist_ptr(Row&, size_t col_ndx);
     static void unbind_linklist_ptr(const LinkViewRef&);
 
-    static Table& get_backlink_table(const Table*, size_t col_ndx);
-
     using VersionID = SharedGroup::VersionID;
 
     /// \defgroup lang_bind_helper_transactions Continuous Transactions
@@ -375,11 +373,6 @@ inline SharedGroup::version_type LangBindHelper::get_version_of_latest_snapshot(
 {
     using sgf = _impl::SharedGroupFriend;
     return sgf::get_version_of_latest_snapshot(sg); // Throws
-}
-
-inline Table& LangBindHelper::get_backlink_table(const Table* t, size_t col_ndx)
-{
-    return t->get_column_backlink(col_ndx).get_origin_table();
 }
 
 } // namespace realm
