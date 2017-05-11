@@ -603,6 +603,8 @@ TEST(Thread_RobustMutexTryLock)
     m.unlock();
 }
 
+#ifndef _WIN32 // trylock on process-shared mutexes not supported on Windows
+
 NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
 {
     Thread thread;
@@ -638,6 +640,7 @@ NONCONCURRENT_TEST(Thread_InterprocessMutexTryLock)
     m.release_shared_part();
 }
 
+#endif
 
 #ifndef _WIN32 // interprocess condvars not suported in Windows yet
 
