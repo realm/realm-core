@@ -21,16 +21,15 @@
 #include <realm/util/features.h>
 #include <cstdint>
 #include <vector>
+#include <realm/util/file.hpp>
 
 #if REALM_ENABLE_ENCRYPTION
 
 #if REALM_PLATFORM_APPLE
 #include <CommonCrypto/CommonCrypto.h>
-#elif !defined(_WIN32)
+#else
 #include <openssl/aes.h>
 #include <openssl/sha.h>
-#else
-#error Encryption is not yet implemented for this platform.
 #endif
 
 namespace realm {
@@ -46,8 +45,8 @@ public:
 
     void set_file_size(off_t new_size);
 
-    bool read(int fd, off_t pos, char* dst, size_t size);
-    void write(int fd, off_t pos, const char* src, size_t size) noexcept;
+    bool read(FileDesc fd, off_t pos, char* dst, size_t size);
+    void write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept;
 
 private:
     enum EncryptionMode {
@@ -75,15 +74,15 @@ private:
     void calc_hmac(const void* src, size_t len, uint8_t* dst, const uint8_t* key) const;
     bool check_hmac(const void* data, size_t len, const uint8_t* hmac) const;
     void crypt(EncryptionMode mode, off_t pos, char* dst, const char* src, const char* stored_iv) noexcept;
-    iv_table& get_iv_table(int fd, off_t data_pos) noexcept;
+    iv_table& get_iv_table(FileDesc fd, off_t data_pos) noexcept;
 };
 
 struct SharedFileInfo {
-    int fd;
+    FileDesc fd;
     AESCryptor cryptor;
     std::vector<EncryptedFileMapping*> mappings;
 
-    SharedFileInfo(const uint8_t* key, int file_descriptor);
+    SharedFileInfo(const uint8_t* key, FileDesc file_descriptor);
 };
 }
 }

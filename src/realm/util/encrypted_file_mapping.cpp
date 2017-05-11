@@ -31,8 +31,13 @@
 
 #include <cstring>
 #include <pthread.h>
+
+#ifndef _WIN32
 #include <sys/mman.h>
 #include <unistd.h>
+#else
+#include <Windows.h>
+#endif
 
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/terminate.hpp>
@@ -40,7 +45,7 @@
 namespace realm {
 namespace util {
 
-SharedFileInfo::SharedFileInfo(const uint8_t* key, int file_descriptor)
+SharedFileInfo::SharedFileInfo(const uint8_t* key, FileDesc file_descriptor)
     : fd(file_descriptor)
     , cryptor(key)
 {
@@ -112,17 +117,21 @@ off_t iv_table_pos(off_t pos)
     return metadata_block * (blocks_per_metadata_block + 1) * block_size + metadata_index * metadata_size;
 }
 
-void check_write(int fd, off_t pos, const void* data, size_t len)
+void check_write(FileDesc fd, off_t pos, const void* data, size_t len)
 {
-    ssize_t ret = pwrite(fd, data, len, pos);
-    REALM_ASSERT(ret >= 0 && static_cast<size_t>(ret) == len);
+	uint64_t orig = File::get_file_pos(fd);
+	File::seek_static(fd, pos);
+	File::write_static(fd, (char*)data, len);
+	File::seek_static(fd, orig);
 }
 
-size_t check_read(int fd, off_t pos, void* dst, size_t len)
+size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
 {
-    ssize_t ret = pread(fd, dst, len, pos);
-    REALM_ASSERT(ret >= 0);
-    return ret < 0 ? 0 : static_cast<size_t>(ret);
+	uint64_t orig = File::get_file_pos(fd);
+	File::seek_static(fd, pos);
+	size_t ret = File::read_static(fd, (char*)dst, len);
+	File::seek_static(fd, orig);
+	return ret;
 }
 
 } // anonymous namespace
@@ -156,7 +165,7 @@ void AESCryptor::set_file_size(off_t new_size)
     m_iv_buffer.reserve((block_count + blocks_per_metadata_block - 1) & ~(blocks_per_metadata_block - 1));
 }
 
-iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) noexcept
+iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos) noexcept
 {
     REALM_ASSERT(!int_cast_has_overflow<size_t>(data_pos));
     size_t data_pos_casted = size_t(data_pos);
@@ -181,6 +190,7 @@ iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) noexcept
 bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) const
 {
     uint8_t buffer[224 / 8];
+    sched_yield();
     calc_hmac(src, len, buffer, m_hmacKey);
 
     // Constant-time memcmp to avoid timing attacks
@@ -190,7 +200,7 @@ bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) co
     return result == 0;
 }
 
-bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size)
+bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
 {
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
@@ -242,7 +252,7 @@ bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size)
     return true;
 }
 
-void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) noexcept
+void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept
 {
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
@@ -338,8 +348,10 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
 
 EncryptedFileMapping::~EncryptedFileMapping()
 {
-    flush();
-    sync();
+	if (m_access & File::access_ReadWrite) {
+		flush();
+		sync();
+	}
     m_file.mappings.erase(remove(m_file.mappings.begin(), m_file.mappings.end(), this));
 }
 
@@ -463,8 +475,16 @@ void EncryptedFileMapping::flush() noexcept
     validate();
 }
 
+#ifdef _MSC_VER
+#pragma warning (disable: 4297) // throw in noexcept
+#endif
 void EncryptedFileMapping::sync() noexcept
 {
+#ifdef _WIN32
+    if (FlushFileBuffers(m_file.fd))
+        return;
+    throw std::runtime_error("FlushFileBuffers() failed");
+#else
     fsync(m_file.fd);
     // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.
     // Consider adding fcntl(F_FULLFSYNC). This most likely also applies to msync.
@@ -475,8 +495,11 @@ void EncryptedFileMapping::sync() noexcept
     // See also
     // https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/CoreData/Articles/cdPersistentStores.html
     // for a discussion of this related to core data.
+#endif
 }
-
+#ifdef _MSC_VER
+#pragma warning (default: 4297)
+#endif
 
 void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 {

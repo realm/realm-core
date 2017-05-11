@@ -128,6 +128,54 @@
     <ClCompile Include="..\test\util\timer.cpp" />
     <ClCompile Include="..\test\util\unit_test.cpp" />
     <ClCompile Include="..\test\util\wildcard.cpp" />
+    <ClCompile Include="..\src\win32\openssl\crypto\aes\aes_cbc.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\aes\aes_cfb.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\aes\aes_core.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\aes\aes_ecb.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\aes\aes_misc.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\aes\aes_ofb.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\modes\cbc128.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\modes\ccm128.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\modes\cfb128.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\modes\ctr128.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\modes\cts128.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\modes\ofb128.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\modes\wrap128.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\cryptlib.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\mem_clr.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\win32\openssl\crypto\sha\sha256.c">
+      <Filter>openssl</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\realm.hpp" />
@@ -240,6 +288,10 @@
     <ClInclude Include="..\test\util\verified_string.hpp" />
     <ClInclude Include="..\test\pthread_test.hpp" />
     <ClInclude Include="..\test\testsettings.hpp" />
+    <ClInclude Include="..\src\win32\openssl\crypto\aes\aes_locl.h">
+      <Filter>openssl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\realm\util\overload.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />
@@ -248,6 +300,9 @@
   <ItemGroup>
     <Filter Include="Reader">
       <UniqueIdentifier>{072bfcbc-e613-4e20-bf35-7be6c594c168}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="openssl">
+      <UniqueIdentifier>{d09dec58-f027-4e46-b110-18eaf21e33e3}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
