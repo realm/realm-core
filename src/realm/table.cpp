@@ -4903,7 +4903,15 @@ void Table::update_from_parent(size_t old_baseline) noexcept
         if (!m_top.update_from_parent(old_baseline))
             return;
 
-        m_spec->update_from_parent(old_baseline);
+        // subspecs may be deleted here ...
+        if (m_spec->update_from_parent(old_baseline)) {
+            // ... so get rid of cached entries here
+            DescriptorRef desc = m_descriptor.lock();
+            if (desc) {
+                using df = _impl::DescriptorFriend;
+                df::detach_subdesc_accessors(*desc);
+            }
+        }
     }
     else {
         refresh_spec_accessor();

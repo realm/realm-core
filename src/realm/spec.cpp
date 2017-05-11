@@ -31,6 +31,15 @@ Spec::~Spec() noexcept
     }
 }
 
+void Spec::init(ref_type ref) noexcept
+{
+    // Needs only initialization if not previously initialized
+    // or if the ref has changed
+    if (!m_top.is_attached() || m_top.get_ref() != ref) {
+        MemRef mem(ref, get_alloc());
+        init(mem);
+    }
+}
 
 void Spec::init(MemRef mem) noexcept
 {
@@ -49,7 +58,6 @@ void Spec::init(MemRef mem) noexcept
     // from initialized children to uninitialized
     m_subspecs.detach();
     m_enumkeys.detach();
-    m_subspec_ptrs.clear();
 
     // Subspecs array is only there and valid when there are subtables
     // if there are enumkey, but no subtables yet it will be a zero-ref
@@ -57,8 +65,10 @@ void Spec::init(MemRef mem) noexcept
         ref_type ref = m_top.get_as_ref(3);
         m_subspecs.init_from_ref(ref);
         m_subspecs.set_parent(&m_top, 3);
-        update_subspec_ptrs();
-        m_subspec_ptrs.resize(m_subspecs.size());
+        reset_subspec_ptrs();
+    }
+    else {
+        m_subspec_ptrs.clear();
     }
 
     // Enumkeys array is only there when there are StringEnum columns
@@ -96,9 +106,10 @@ void Spec::update_has_strong_link_columns() noexcept
     m_has_strong_link_columns = false;
 }
 
-void Spec::update_subspec_ptrs()
+void Spec::reset_subspec_ptrs()
 {
     size_t n = m_subspecs.size();
+    m_subspec_ptrs.clear();
     m_subspec_ptrs.resize(n);
     size_t m = m_types.size();
     for (size_t i = 0; i < m; ++i) {
@@ -110,24 +121,38 @@ void Spec::update_subspec_ptrs()
     }
 }
 
+void Spec::adj_subspec_ptrs()
+{
+    size_t n = m_subspecs.size();
+    for (size_t i = 0; i < n; ++i) {
+        if (m_subspec_ptrs[i].m_spec != nullptr) {
+            m_subspec_ptrs[i].m_spec->set_ndx_in_parent(i);
+        }
+    }
+}
 
-void Spec::update_from_parent(size_t old_baseline) noexcept
+bool Spec::update_from_parent(size_t old_baseline) noexcept
 {
     if (!m_top.update_from_parent(old_baseline))
-        return;
+        return false;
 
     m_types.update_from_parent(old_baseline);
     m_names.update_from_parent(old_baseline);
     m_attr.update_from_parent(old_baseline);
-    m_subspec_ptrs.clear();
 
     if (has_subspec()) {
-        m_subspecs.update_from_parent(old_baseline);
-        update_subspec_ptrs();
+        if (m_subspecs.update_from_parent(old_baseline)) {
+            reset_subspec_ptrs();
+        }
+    }
+    else {
+        m_subspec_ptrs.clear();
     }
 
     if (m_top.size() > 4)
         m_enumkeys.update_from_parent(old_baseline);
+
+    return true;
 }
 
 
@@ -235,6 +260,7 @@ void Spec::insert_column(size_t column_ndx, ColumnType type, StringData name, Co
             m_subspec_ptrs.insert(m_subspec_ptrs.begin() + subspec_ndx, SubspecPtr(false));
             m_subspec_ptrs.insert(m_subspec_ptrs.begin() + subspec_ndx, SubspecPtr(false));
         }
+        adj_subspec_ptrs();
     }
 
     update_has_strong_link_columns();
@@ -257,11 +283,13 @@ void Spec::erase_column(size_t column_ndx)
         subspec_top.destroy_deep();    // recursively delete entire subspec
         m_subspecs.erase(subspec_ndx); // Throws
         m_subspec_ptrs.erase(m_subspec_ptrs.begin() + subspec_ndx);
+        adj_subspec_ptrs();
     }
     else if (tf::is_link_type(type)) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
         m_subspecs.erase(subspec_ndx); // origin table index  : Throws
         m_subspec_ptrs.erase(m_subspec_ptrs.begin() + subspec_ndx);
+        adj_subspec_ptrs();
     }
     else if (type == col_type_BackLink) {
         size_t subspec_ndx = get_subspec_ndx(column_ndx);
@@ -269,6 +297,7 @@ void Spec::erase_column(size_t column_ndx)
         m_subspecs.erase(subspec_ndx); // origin column index : Throws
         m_subspec_ptrs.erase(m_subspec_ptrs.begin() + subspec_ndx);
         m_subspec_ptrs.erase(m_subspec_ptrs.begin() + subspec_ndx);
+        adj_subspec_ptrs();
     }
     else if (type == col_type_StringEnum) {
         // Enum columns do also have a separate key list
@@ -338,6 +367,7 @@ void Spec::move_column(size_t from_ndx, size_t to_ndx)
                 last = middle + 1;
             }
             std::rotate(first, middle, last);
+            adj_subspec_ptrs();
         }
     }
 

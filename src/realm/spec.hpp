@@ -151,7 +151,8 @@ private:
     void init(ref_type) noexcept;
     void init(MemRef) noexcept;
     void update_has_strong_link_columns() noexcept;
-    void update_subspec_ptrs();
+    void reset_subspec_ptrs();
+    void adj_subspec_ptrs();
 
     // Similar in function to Array::init_from_parent().
     void init_from_parent() noexcept;
@@ -163,7 +164,7 @@ private:
     /// note that this works only for non-transactional commits. Table
     /// accessors obtained during a transaction are always detached
     /// when the transaction ends.
-    void update_from_parent(size_t old_baseline) noexcept;
+    bool update_from_parent(size_t old_baseline) noexcept;
 
     void set_parent(ArrayParent*, size_t ndx_in_parent) noexcept;
 
@@ -237,12 +238,6 @@ inline Spec* Spec::get_subtable_spec(size_t column_ndx) noexcept
 inline const Spec* Spec::get_subspec_by_ndx(size_t subspec_ndx) const noexcept
 {
     return const_cast<Spec*>(this)->get_subspec_by_ndx(subspec_ndx);
-}
-
-inline void Spec::init(ref_type ref) noexcept
-{
-    MemRef mem(ref, get_alloc());
-    init(mem);
 }
 
 inline void Spec::init_from_parent() noexcept

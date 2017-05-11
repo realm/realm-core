@@ -1564,6 +1564,30 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, res);
 }
 
+TEST(Table_SpecUpdateWhenInsertingTable)
+{
+    Group g;
+
+    TableRef table_first = g.add_table("first");
+    TableRef table_second = g.add_table("second");
+
+    DescriptorRef subdescr;
+    table_first->add_column(type_Table, "subtables", true, &subdescr);
+    subdescr->add_column(type_Int, "integers", nullptr, false);
+    table_first->add_empty_row(5);
+
+    table_second->add_column_link(type_Link, "links", *table_first);
+
+    TableRef sub = table_first->get_subtable(0, 2);
+    sub->clear();
+    sub->add_empty_row(1);
+
+    g.insert_table(0, "third");
+    sub->set_int(0, 0, 1, false);
+
+    g.verify();
+}
+
 TEST(Table_Range)
 {
     Table table;

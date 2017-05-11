@@ -2013,8 +2013,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             StringData name = read_string(m_string_buffer); // Throws
             bool nullable = (Instruction(instr) == instr_InsertNullableColumn);
-            if (REALM_UNLIKELY(nullable && (type == type_Table || type == type_Mixed))) {
-                // Nullability not supported for Table and Mixed columns.
+            if (REALM_UNLIKELY(nullable && (type == type_Mixed))) {
+                // Nullability not supported for Mixed columns.
                 parser_error();
             }
             if (!handler.insert_column(col_ndx, DataType(type), name, nullable)) // Throws
