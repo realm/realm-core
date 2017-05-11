@@ -10,14 +10,36 @@
 
 ### Enhancements
 * Support for encryption on Windows (win32 + UWP)
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
+
+----------------------------------------------
+
+# 2.7.0 Release notes
+
+### Bugfixes
+
+* Fix for creating process-shared mutex objects in the wrong kernel object namespace on UWP.
+  PR [#2579](https://github.com/realm/realm-core/pull/2579).
+
+### Enhancements
+
 * Add `Group::compute_aggregated_byte_size()` and
   `Table::compute_aggregated_byte_size()` for debugging/diagnostics purposes.
-* Add a templated version of Table::set() to go with Table::get().
-* Add TableView::find_first_timestamp().
-* Add TableView::find_first<T>().
-* Make Table::find_first<T>() public and add support for most column types.
-* Add wrappers for Table::set<T>() to Row.
-* Add support for all column types in Table::get<T>().
+  PR [#2591](https://github.com/realm/realm-core/pull/2591).
+* `Table` and `TableView` refactoring and improvements.
+  PR [#2571](https://github.com/realm/realm-core/pull/2571).
+  * Add a templated version of `Table::set()` to go with `Table::get()`.
+  * Add `TableView::find_first_timestamp()`.
+  * Add `TableView::find_first<T>()`.
+  * Make `Table::find_first<T>()` public and add support for most column types.
+  * Add wrappers for `Table::set<T>()` to `Row`.
+  * Add support for all column types in `Table::get<T>()`.
 
 -----------
 
@@ -25,6 +47,7 @@
 
 * Make `Array::stats()` available in release mode builds (not just in debug mode
   builds).
+  PR [#2591](https://github.com/realm/realm-core/pull/2591).
 
 ----------------------------------------------
 
