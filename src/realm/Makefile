@@ -1,6 +1,5 @@
 nobase_subinclude_HEADERS = \
 util/features.h \
-util/meta.hpp \
 util/inspect.hpp \
 util/assert.hpp \
 util/terminate.hpp \
@@ -18,6 +17,7 @@ util/basic_system_errors.hpp \
 util/thread.hpp \
 util/file.hpp \
 util/optional.hpp \
+util/overload.hpp \
 util/utf8.hpp \
 util/priority_queue.hpp \
 util/interprocess_condvar.hpp \
@@ -112,7 +112,8 @@ column_type_traits.hpp \
 group_writer.hpp \
 index_string.hpp \
 query_engine.hpp \
-query_expression.hpp
+query_expression.hpp \
+query_operators.hpp
 
 lib_LIBRARIES    = librealm.a
 libexec_PROGRAMS = realmd
