@@ -28,7 +28,7 @@
 #include <realm/lang_bind_helper.hpp>
 #include <realm/column.hpp>
 #include <realm/history.hpp>
-#include <realm/query_engine.hpp>
+#include <realm/query_expression.hpp>
 
 #include "test.hpp"
 #include "test_table_helper.hpp"
@@ -5565,20 +5565,34 @@ TEST(Query_Enums)
 #define ua "\x0c3\x0a5"       // danish lower case a with ring above (as in blaabaergroed)
 #define uad "\x061\x0cc\x08a" // decomposed form (a (41) followed by ring)
 
-TEST(Query_CaseSensitivity)
+TEST_TYPES(Query_CaseSensitivity, std::true_type, std::false_type)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     TestTable ttt;
     ttt.add_column(type_Int, "1");
-    ttt.add_column(type_String, "2");
+    ttt.add_column(type_String, "2", nullable);
 
     add(ttt, 1, "BLAAbaergroed");
     add(ttt, 1, "BLAAbaergroedandMORE");
-    add(ttt, 1, "BLAAbaergroed2");
+    add(ttt, 1, "BLAAbaergroedZ");
+    add(ttt, 1, "BLAAbaergroedZ");
+    add(ttt, 1, "BLAAbaergroedZ");
 
     Query q1 = ttt.where().equal(1, "blaabaerGROED", false);
     TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
+
+    Query q2 = ttt.where().equal(1, "blaabaerGROEDz", false);
+    TableView tv2 = q2.find_all();
+    CHECK_EQUAL(3, tv2.size());
+
+    ttt.add_search_index(1);
+
+    Query q3 = ttt.where().equal(1, "blaabaerGROEDz", false);
+    TableView tv3 = q3.find_all();
+    CHECK_EQUAL(3, tv3.size());
 }
 
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
@@ -10366,5 +10380,24 @@ TEST(Query_ColumnDeletionLinks)
     foo->remove_column(0);
     CHECK_LOGIC_ERROR(q3.count(), LogicError::column_does_not_exist);
 }
+
+
+TEST(Query_CaseInsensitiveIndexEquality_CommonNumericPrefix)
+{
+    Table table;
+    size_t col_ndx = table.add_column(type_String, "id");
+    table.add_search_index(col_ndx);
+
+    table.add_empty_row(2);
+    table.set_string(col_ndx, 0, "111111111111111111111111");
+    table.set_string(col_ndx, 1, "111111111111111111111112");
+
+    Query q = table.where().equal(col_ndx, "111111111111111111111111", false);
+    CHECK_EQUAL(q.count(), 1);
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv[0].get_index(), 0);
+}
+
 
 #endif // TEST_QUERY

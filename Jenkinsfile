@@ -135,8 +135,8 @@ def doBuildCocoa(def isPublishingRun, def isPublishingLatestRun) {
             runAndCollectWarnings(
                 parser: 'clang',
                 script: '''
-                   sh build.sh build-cocoa
-                   sh build.sh check-debug
+                   sh build.sh build-cocoa 2>&1
+                   sh build.sh check-debug 2>&1
                 '''
             )
 
@@ -190,7 +190,7 @@ def doBuildInDocker(String command) {
         buildEnv.inside {
           sh 'sh build.sh config'
           try {
-            runAndCollectWarnings(script: "sh build.sh ${command}")
+            runAndCollectWarnings(script: "sh build.sh ${command} 2>&1")
           } finally {
             recordTests(command)
           }
@@ -213,8 +213,8 @@ def doBuildWindows(boolean isUniversal, String version, boolean isPublishingRun)
             isWindows: true,
             failOnWarning: false,
             script: """
-              \"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Debug static lib\" /p:Platform=${platform}
-              \"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Release static lib\" /p:Platform=${platform}
+              \"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Debug static lib\" /p:Platform=${platform} 2>&1
+              \"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Release static lib\" /p:Platform=${platform} 2>&1
             """
           )
         }
@@ -309,7 +309,7 @@ def buildPerformance() {
           sh """
             cd test/bench
             mkdir -p core-benchmarks results
-            ./gen_bench_hist.sh ${env.BRANCH_NAME}
+            ./gen_bench_hist.sh origin/${env.CHANGE_TARGET}
             ./parse_bench_hist.py --local-html results/ core-benchmarks/
           """
           zip dir: 'test/bench', glob: 'core-benchmarks/**/*', zipFile: 'core-benchmarks.zip'
@@ -338,7 +338,7 @@ def doBuildNodeInDocker(def isPublishingRun, def isPublishingLatestRun) {
       withEnv(environment) {
         buildEnv.inside {
           sh 'sh build.sh config'
-          runAndCollectWarnings(script: 'sh build.sh build-node-package')
+          runAndCollectWarnings(script: 'sh build.sh build-node-package 2>&1')
           sh 'cp realm-core-node-*.tar.gz realm-core-node-linux-latest.tar.gz'
           if (isPublishingRun) {
             stash includes: '*realm-core-node-linux-*.*.*.tar.gz', name: 'node-linux-package'
@@ -363,7 +363,7 @@ def doBuildNodeInOsx(def isPublishingRun, def isPublishingLatestRun) {
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
       withEnv(environment) {
         sh 'sh build.sh config'
-        runAndCollectWarnings(parser: 'clang', script: 'sh build.sh build-node-package')
+        runAndCollectWarnings(parser: 'clang', script: 'sh build.sh build-node-package 2>&1')
         sh 'cp realm-core-node-*.tar.gz realm-core-node-osx-latest.tar.gz'
         if (isPublishingRun) {
           stash includes: '*realm-core-node-osx-*.*.*.tar.gz', name: 'node-cocoa-package'
@@ -392,8 +392,8 @@ def doBuildOsxDylibs(def version, def isPublishingRun, def isPublishingLatestRun
       withEnv(environment) {
         sh 'sh build.sh config'
         runAndCollectWarnings(parser: 'clang', script: '''
-          sh build.sh build
-          sh build.sh check-debug
+          sh build.sh build 2>&1
+          sh build.sh check-debug 2>&1
         ''')
 
         dir('src/realm') {
@@ -435,7 +435,7 @@ def doBuildAndroid(def isPublishingRun) {
 
             withEnv(environment) {
               sh "sh build.sh config '${pwd()}/install'"
-              runAndCollectWarnings(script: "sh build.sh ${target}")
+              runAndCollectWarnings(script: "sh build.sh ${target} 2>&1")
             }
             if (isPublishingRun) {
               stash includes: 'realm-core-android-*.tar.gz', name: 'android-package'
