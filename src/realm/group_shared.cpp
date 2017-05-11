@@ -774,6 +774,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         opener_is_sync_agent = repl->is_sync_agent();
     }
 
+    int current_file_format_version;
     int target_file_format_version;
     int stored_hist_schema_version;
 
@@ -988,7 +989,31 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             // Determine target file format version for session (upgrade
             // required if greater than file format version of attached file).
             using gf = _impl::GroupFriend;
-            int current_file_format_version = gf::get_file_format_version(m_group);
+            current_file_format_version = alloc.get_committed_file_format_version();
+
+            bool file_format_ok = false;
+            // In shared mode (Realm file opened via a SharedGroup instance) this
+            // version of the core library is able to open Realms using file format
+            // versions 2, 3, 4, 5, 6, and 7. Version 2, 3, 4, 5, and 6 files need
+            // to be upgraded. Please see Allocator::get_file_format_version() for
+            // information about the individual file format verions.
+            switch (current_file_format_version) {
+                case 0:
+                    file_format_ok = (top_ref == 0);
+                    break;
+                case 2:
+                case 3:
+                case 4:
+                case 5:
+                case 6:
+                case 7:
+                    file_format_ok = true;
+                    break;
+            }
+
+            if (REALM_UNLIKELY(!file_format_ok))
+                throw InvalidDatabase("Unsupported Realm file format version", path);
+
             target_file_format_version =
                 gf::get_target_file_format_version_for_session(current_file_format_version,
                                                                openers_hist_type);
@@ -1027,8 +1052,9 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                         good_history_type = ((stored_hist_type == Replication::hist_SyncServer) ||
                                              (stored_hist_type == Replication::hist_None && top_ref == 0));
                         if (!good_history_type)
-                            throw IncompatibleHistories("Expected a Realm containining "
-                                                        "a server-side history", path);
+                            throw IncompatibleHistories("Expected a Realm containing "
+                                                        "a server-side history",
+                                                        path);
                         break;
                 }
 
@@ -1193,7 +1219,6 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     // Upgrade file format and/or history schema
     try {
         using gf = _impl::GroupFriend;
-        int current_file_format_version = gf::get_file_format_version(m_group);
         if (current_file_format_version == 0) {
             // If the current file format is still undecided, no upgrade is
             // necessary, but we still need to make the chosen file format
@@ -1206,6 +1231,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             gf::set_file_format_version(m_group, target_file_format_version);
         }
         else {
+            gf::set_file_format_version(m_group, current_file_format_version);
             upgrade_file_format(options.allow_file_format_upgrade, target_file_format_version,
                                 stored_hist_schema_version, openers_hist_schema_version); // Throws
         }

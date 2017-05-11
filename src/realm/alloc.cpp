@@ -60,15 +60,6 @@ public:
     DefaultAllocator()
     {
         m_baseline = 1; // Zero is not available
-
-        // Please see Allocator::get_file_format_version() for information about
-        // the following determination of the file format version.
-        int current_file_format_version = 0; // Undecided
-        int history_type = Replication::hist_None;
-        using gf = _impl::GroupFriend;
-        m_file_format_version =
-            gf::get_target_file_format_version_for_session(current_file_format_version,
-                                                           history_type);
     }
 
     MemRef do_alloc(const size_t size) override
