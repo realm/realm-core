@@ -55,8 +55,18 @@ public:
 private:
     struct Treetop;
     struct TreeLeaf : private Array {
+        class Condenser : public Array {
+        public:
+            using Array::Array;
+            uint16_t* get_writable_data(int i)
+            {
+                copy_on_write();
+                return reinterpret_cast<uint16_t*>(m_data) + i;
+            }
+        };
+
         IntegerIndex* m_index;
-        Array m_condenser;
+        Condenser m_condenser;
         Array m_values;
 
         TreeLeaf(Allocator&, IntegerIndex* = nullptr);
@@ -92,7 +102,7 @@ private:
         }
 
         bool insert(Treetop* treeTop, uint64_t hash, int64_t key, int64_t& value);
-        void erase(Treetop* treeTop, uint64_t hash, int idx, int64_t value);
+        void erase(Treetop* treeTop, uint64_t hash, unsigned idx, int64_t value);
         void update_ref(Treetop* treeTop, uint64_t hash, int i, size_t old_row_ndx, size_t new_row_ndx);
 
         int find(uint64_t hash, int64_t key) const;
@@ -111,7 +121,9 @@ private:
         int m_levels;
 
         Treetop(Allocator& alloc);
+        Treetop(ref_type ref, Allocator& alloc);
         Treetop(Treetop&& other);
+        void init();
         void init(size_t capacity);
         void clear(IntegerIndex::TreeLeaf& leaf);
         size_t get_count() const noexcept;
@@ -134,7 +146,7 @@ private:
     mutable TreeLeaf m_current_leaf;
 
     int64_t get_key_value(size_t row);
-    int64_t get_leaf_index(int64_t value, uint64_t* hash = nullptr) const;
+    int get_leaf_index(int64_t value, uint64_t* hash = nullptr) const;
     void do_delete(size_t row_ndx, int64_t value);
     void grow_tree();
 };

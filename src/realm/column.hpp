@@ -892,7 +892,7 @@ void Column<T>::set(size_t ndx, T value)
 {
     REALM_ASSERT_DEBUG(ndx < size());
     if (has_search_index()) {
-        bool is_append = ndx == size() - 1;
+        bool is_append = true;
         m_search_index->erase(ndx, is_append);
         m_tree.set(ndx, value);
         m_search_index->insert(ndx, std::move(value), 1, is_append);
@@ -910,7 +910,7 @@ void Column<T>::set_null(size_t ndx)
         throw LogicError{LogicError::column_not_nullable};
     }
     if (has_search_index()) {
-        bool is_last = (ndx == (size() - 1));
+        bool is_last = true;
         m_search_index->erase(ndx, is_last);
         m_tree.set_null(ndx);
         m_search_index->insert_null(ndx, 1, is_last);

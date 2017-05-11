@@ -13061,5 +13061,66 @@ TEST(LangBindHelper_MixedTimestampTransaction)
     CHECK(t->get_mixed(0, 1) == neg_time);
 }
 
+TEST(LangBindHelper_CuckooIndex)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ShortCircuitHistory hist(path);
+    SharedGroup sg_w(hist);
+    SharedGroup sg_r(hist);
+
+    ReadTransaction rt(sg_r);
+    const Group& g = rt.get_group();
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        group.add_table("t1")->add_column(type_Int, "integers");
+        wt.commit();
+    }
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        group.get_table(0)->add_search_index(0);
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg_r);
+    g.verify();
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef table = group.get_table(0);
+        table->add_empty_row(1000);
+        for (unsigned i = 0; i < 1000; i++) {
+            table->set_int(0, i, i);
+        }
+        wt.commit();
+    }
+
+    {
+        LangBindHelper::advance_read(sg_r);
+        g.verify();
+        ConstTableRef table = g.get_table(0);
+        size_t n = table->find_first_int(0, 100);
+        CHECK_EQUAL(n, 100);
+    }
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef table = group.get_table(0);
+        table->move_last_over(100);
+        wt.commit();
+    }
+
+    {
+        LangBindHelper::advance_read(sg_r);
+        g.verify();
+        ConstTableRef table = g.get_table(0);
+        size_t n = table->find_first_int(0, 100);
+        CHECK_EQUAL(n, realm::not_found);
+    }
+}
 
 #endif
