@@ -1969,4 +1969,30 @@ TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, non_nullable, nullable)
 }
 
 
+// Bug with case insensitive search on numbers that gives duplicate results
+TEST_TYPES(StringIndex_Insensitive_Numbers, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+    const StringIndex& ndx = *col.create_search_index();
+
+    constexpr const char* number_string_16 = "1111111111111111";
+    constexpr const char* number_string_17 = "11111111111111111";
+
+    col.add(number_string_16);
+    col.add(number_string_17);
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+
+    ndx.find_all(results, number_string_16, true);
+    CHECK_EQUAL(results.size(), 1);
+
+    results.destroy();
+    col.destroy();
+}
+
+
 #endif // TEST_INDEX_STRING

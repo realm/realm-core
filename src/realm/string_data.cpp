@@ -18,6 +18,8 @@
 
 #include "string_data.hpp"
 
+#include <vector>
+
 using namespace realm;
 
 namespace {

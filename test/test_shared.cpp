@@ -585,6 +585,80 @@ TEST(Shared_1)
     }
 }
 
+TEST(Shared_try_begin_write)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    // Create a new shared db
+    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    std::mutex thread_obtains_write_lock;
+    bool init_complete = false;
+
+    auto do_async = [&]() {
+        SharedGroup sg2(path, false, SharedGroupOptions(crypt_key()));
+        Group* gw = nullptr;
+        bool success = sg2.try_begin_write(gw);
+        CHECK(success);
+        CHECK(gw != nullptr);
+        init_complete = true;
+        TableRef t = gw->add_table(StringData("table"));
+        t->insert_column(0, type_String, StringData("string_col"));
+        t->add_empty_row(1000);
+        thread_obtains_write_lock.lock();
+        sg2.commit();
+        thread_obtains_write_lock.unlock();
+    };
+
+    thread_obtains_write_lock.lock();
+    Thread async_writer;
+    async_writer.start(do_async);
+
+    // wait for the thread to start a write transaction
+    while (!init_complete) { millisleep(1); }
+
+    // Try to also obtain a write lock. This should fail but not block.
+    Group* g = nullptr;
+    bool success = sg.try_begin_write(g);
+    CHECK(!success);
+    CHECK(g == nullptr);
+
+    // Let the async thread finish its write transaction.
+    thread_obtains_write_lock.unlock();
+    async_writer.join();
+
+    {
+        // Verify that the thread transaction commit succeeded.
+        ReadTransaction rt(sg);
+        const Group& gr = rt.get_group();
+        ConstTableRef t = gr.get_table(0);
+        CHECK(t->get_name() == StringData("table"));
+        CHECK(t->get_column_name(0) == StringData("string_col"));
+        CHECK(t->size() == 1000);
+    }
+
+    // Now try to start a transaction without any contenders.
+    success = sg.try_begin_write(g);
+    CHECK(success);
+    CHECK(g != nullptr);
+
+    {
+        // make sure we still get a useful error message when trying to
+        // obtain two write locks on the same thread
+        CHECK_LOGIC_ERROR(sg.try_begin_write(g), LogicError::wrong_transact_state);
+    }
+
+    // Add some data and finish the transaction.
+    g->add_table(StringData("table 2"));
+    sg.commit();
+
+    {
+        // Verify that the main thread transaction now succeeded.
+        ReadTransaction rt(sg);
+        const Group& gr = rt.get_group();
+        CHECK(gr.size() == 2);
+        CHECK(gr.get_table(1)->get_name() == StringData("table 2"));
+    }
+}
+
 
 TEST(Shared_Rollback)
 {

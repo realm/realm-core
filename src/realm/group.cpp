@@ -66,9 +66,7 @@ Group::Group()
 {
     init_array_parents();
     m_alloc.attach_empty(); // Throws
-    Replication::HistoryType history_type = Replication::hist_None;
-    int file_format_version = get_target_file_format_version_for_session(0, history_type);
-    m_alloc.set_file_format_version(file_format_version);
+    m_file_format_version = get_target_file_format_version_for_session(0, Replication::hist_None);
     ref_type top_ref = 0; // Instantiate a new empty group
     bool create_group_when_missing = true;
     attach(top_ref, create_group_when_missing); // Throws
@@ -77,13 +75,13 @@ Group::Group()
 
 int Group::get_file_format_version() const noexcept
 {
-    return m_alloc.get_file_format_version();
+    return m_file_format_version;
 }
 
 
 void Group::set_file_format_version(int file_format) noexcept
 {
-    m_alloc.set_file_format_version(file_format);
+    m_file_format_version = file_format;
 }
 
 
@@ -96,18 +94,10 @@ int Group::get_committed_file_format_version() const noexcept
 int Group::get_target_file_format_version_for_session(int current_file_format_version,
                                                       int requested_history_type) noexcept
 {
-    Replication::HistoryType requested_history_type_2 =
-        Replication::HistoryType(requested_history_type);
-
     // Note: This function is responsible for choosing the target file format
     // for a sessions. If it selects a file format that is different from
     // `current_file_format_version`, it will trigger a file format upgrade
     // process.
-
-    // Note: Previously it was necessary to base the decision on the current
-    // (original) file format and the selected type of history (of
-    // changesets). At the present time, however (since the introduction of file
-    // format version 5), all files need to use the latest file format.
 
     // Note: `current_file_format_version` may be zero at this time, which means
     // that the file format it is not yet decided (only possible for empty
@@ -116,8 +106,9 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // Please see Allocator::get_file_format_version() for information about the
     // individual file format versions.
 
-    static_cast<void>(current_file_format_version);
-    static_cast<void>(requested_history_type_2);
+    if (requested_history_type == Replication::hist_None && current_file_format_version == 6)
+        return 6;
+
     return 7;
 }
 
@@ -134,8 +125,8 @@ void Group::upgrade_file_format(int target_file_format_version)
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
 
-    // SlabAlloc::validate_buffer() must ensure this. Be sure to revisit the
-    // following upgrade logic when SlabAlloc::validate_buffer() is changed (or
+    // SharedGroup::do_open() must ensure this. Be sure to revisit the
+    // following upgrade logic when SharedGroup::do_open() is changed (or
     // vice versa).
     REALM_ASSERT_EX(current_file_format_version == 2 || current_file_format_version == 3 ||
                     current_file_format_version == 4 || current_file_format_version == 5 ||
@@ -184,9 +175,55 @@ void Group::upgrade_file_format(int target_file_format_version)
 
     // NOTE: Additional future upgrade steps go here.
 
-    set_file_format_version(target_file_format_version);
+    m_file_format_version = target_file_format_version;
 }
 
+void Group::open(ref_type top_ref, const std::string& file_path)
+{
+    SlabAlloc::DetachGuard dg(m_alloc);
+
+    // Select file format if it is still undecided.
+    m_file_format_version = m_alloc.get_committed_file_format_version();
+
+    bool file_format_ok = false;
+    // In non-shared mode (Realm file opened via a Group instance) this version
+    // of the core library is only able to open Realms using file format version
+    // 6 or 7. Since a Realm file cannot be upgraded when opened in this mode
+    // (we may be unable to write to the file), no earlier versions can be opened.
+    // Please see Group::get_file_format_version() for information about the
+    // individual file format versions.
+    switch (m_file_format_version) {
+        case 0:
+            file_format_ok = (top_ref == 0);
+            break;
+        case 6:
+        case 7:
+            file_format_ok = true;
+            break;
+    }
+    if (REALM_UNLIKELY(!file_format_ok))
+        throw InvalidDatabase("Unsupported Realm file format version", file_path);
+
+    Replication::HistoryType history_type = Replication::hist_None;
+    int target_file_format_version = get_target_file_format_version_for_session(m_file_format_version, history_type);
+    if (m_file_format_version == 0) {
+        set_file_format_version(target_file_format_version);
+    }
+    else {
+        // From a technical point of view, we could upgrade the Realm file
+        // format in memory here, but since upgrading can be expensive, it is
+        // currently disallowed.
+        REALM_ASSERT(target_file_format_version == m_file_format_version);
+    }
+
+    // Make all dynamically allocated memory (space beyond the attached file) as
+    // available free-space.
+    reset_free_space_tracking(); // Throws
+
+    bool create_group_when_missing = true;
+    attach(top_ref, create_group_when_missing); // Throws
+    dg.release();                               // Do not detach after all
+}
 
 void Group::open(const std::string& file_path, const char* encryption_key, OpenMode mode)
 {
@@ -198,30 +235,8 @@ void Group::open(const std::string& file_path, const char* encryption_key, OpenM
     cfg.no_create = mode == mode_ReadWriteNoCreate;
     cfg.encryption_key = encryption_key;
     ref_type top_ref = m_alloc.attach_file(file_path, cfg); // Throws
-    SlabAlloc::DetachGuard dg(m_alloc);
 
-    // Select file format if it is still undecided.
-    int current_file_format_version = get_file_format_version();
-    Replication::HistoryType history_type = Replication::hist_None;
-    int target_file_format_version =
-        get_target_file_format_version_for_session(current_file_format_version, history_type);
-    if (current_file_format_version == 0) {
-        set_file_format_version(target_file_format_version);
-    }
-    else {
-        // From a technical point of view, we could upgrade the Realm file
-        // format in memory here, but since upgrading can be expensive, it is
-        // currently disallowed by the SlabAlloc::validate_buffer().
-        REALM_ASSERT(target_file_format_version == current_file_format_version);
-    }
-
-    // Make all dynamically allocated memory (space beyond the attached file) as
-    // available free-space.
-    reset_free_space_tracking(); // Throws
-
-    bool create_group_when_missing = true;
-    attach(top_ref, create_group_when_missing); // Throws
-    dg.release();                               // Do not detach after all
+    open(top_ref, file_path);
 }
 
 
@@ -233,30 +248,8 @@ void Group::open(BinaryData buffer, bool take_ownership)
         throw LogicError(LogicError::wrong_group_state);
 
     ref_type top_ref = m_alloc.attach_buffer(buffer.data(), buffer.size()); // Throws
-    SlabAlloc::DetachGuard dg(m_alloc);
 
-    // Select file format if it is still undecided.
-    int current_file_format_version = get_file_format_version();
-    Replication::HistoryType history_type = Replication::hist_None;
-    int target_file_format_version =
-        get_target_file_format_version_for_session(current_file_format_version, history_type);
-    if (current_file_format_version == 0) {
-        set_file_format_version(target_file_format_version);
-    }
-    else {
-        // From a technical point of view, we could upgrade the Realm file
-        // format in memory here, but since upgrading can be expensive, it is
-        // currently disallowed by the SlabAlloc::validate_buffer().
-        REALM_ASSERT(target_file_format_version == current_file_format_version);
-    }
-
-    // Make all dynamically allocated memory (space beyond the attached file) as
-    // available free-space.
-    reset_free_space_tracking(); // Throws
-
-    bool create_group_when_missing = true;
-    attach(top_ref, create_group_when_missing); // Throws
-    dg.release();                               // Do not detach after all
+    open(top_ref, {});
 
     if (take_ownership)
         m_alloc.own_buffer();
@@ -782,7 +775,7 @@ void Group::write(std::ostream& out, bool pad_for_encryption, uint_fast64_t vers
     REALM_ASSERT(is_attached());
     DefaultTableWriter table_writer(*this);
     bool no_top_array = !m_top.is_attached();
-    write(out, m_alloc, table_writer, no_top_array, pad_for_encryption, version_number); // Throws
+    write(out, m_file_format_version, table_writer, no_top_array, pad_for_encryption, version_number); // Throws
 }
 
 void Group::write(const std::string& path, const char* encryption_key) const
@@ -835,14 +828,20 @@ BinaryData Group::write_to_mem() const
 }
 
 
-void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_writer, bool no_top_array,
+void Group::write(std::ostream& out, int file_format_version, TableWriter& table_writer, bool no_top_array,
                   bool pad_for_encryption, uint_fast64_t version_number)
 {
     _impl::OutputStream out_2(out);
 
     // Write the file header
     SlabAlloc::Header streaming_header;
-    int file_format_version = (no_top_array ? 0 : alloc.get_file_format_version());
+    if (no_top_array) {
+        file_format_version = 0;
+    }
+    else if (file_format_version == 0) {
+        // Use current file format version
+        file_format_version = get_target_file_format_version_for_session(0, Replication::hist_None);
+    }
     SlabAlloc::init_streaming_header(&streaming_header, file_format_version);
     out_2.write(reinterpret_cast<const char*>(&streaming_header), sizeof streaming_header);
 
@@ -866,7 +865,6 @@ void Group::write(std::ostream& out, const Allocator& alloc, TableWriter& table_
         ref_type tables_ref = table_writer.write_tables(out_2); // Throws
         SlabAlloc new_alloc;
         new_alloc.attach_empty(); // Throws
-        new_alloc.set_file_format_version(alloc.get_file_format_version());
         Array top(new_alloc);
         top.create(Array::type_HasRefs); // Throws
         _impl::ShallowArrayDestroyGuard dg_top(&top);
@@ -1031,6 +1029,16 @@ bool Group::operator==(const Group& g) const
             return false;
     }
     return true;
+}
+
+
+size_t Group::compute_aggregated_byte_size() const noexcept
+{
+    if (!is_attached())
+        return 0;
+    MemStats stats_2;
+    m_top.stats(stats_2);
+    return stats_2.allocated;
 }
 
 
@@ -1879,7 +1887,7 @@ void Group::advance_transact(ref_type new_top_ref, size_t new_file_size, _impl::
 void Group::prepare_history_parent(Array& history_root, int history_type,
                                    int history_schema_version)
 {
-    REALM_ASSERT(m_alloc.get_file_format_version() >= 7);
+    REALM_ASSERT(m_file_format_version >= 7);
     if (m_top.size() < 10) {
         REALM_ASSERT(m_top.size() <= 7);
         while (m_top.size() < 7) {

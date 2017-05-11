@@ -25,6 +25,7 @@
 #include <ostream>
 #include <cwchar>
 
+#include <realm/group_shared.hpp>
 #include <realm/table_view.hpp>
 #include <realm/query_expression.hpp>
 
