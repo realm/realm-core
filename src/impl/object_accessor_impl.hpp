@@ -92,7 +92,7 @@ public:
     util::Any box(bool v) const { return v; }
     util::Any box(double v) const { return v; }
     util::Any box(float v) const { return v; }
-    util::Any box(long long v) const { return v; }
+    util::Any box(int64_t v) const { return v; }
     util::Any box(RowExpr) const;
 
     // Any properties are only supported by the Cocoa binding to enable reading
