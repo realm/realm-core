@@ -30,9 +30,7 @@ ListNotifier::ListNotifier(LinkViewRef lv, std::shared_ptr<Realm> realm)
 , m_prev_size(lv->size())
 {
     set_table(lv->get_target_table());
-
-    auto& sg = Realm::Internal::get_shared_group(*get_realm());
-    m_lv_handover = sg->export_linkview_for_handover(lv);
+    m_lv_handover = source_shared_group().export_linkview_for_handover(lv);
 }
 
 void ListNotifier::release_data() noexcept

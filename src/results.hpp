@@ -21,8 +21,8 @@
 
 #include "collection_notifications.hpp"
 #include "descriptor_ordering.hpp"
-#include "shared_realm.hpp"
 #include "impl/collection_notifier.hpp"
+#include "property.hpp"
 
 #include <realm/table_view.hpp>
 #include <realm/util/optional.hpp>
@@ -43,10 +43,10 @@ public:
     // or a wrapper around a query and a sort order which creates and updates
     // the tableview as needed
     Results();
-    Results(SharedRealm r, Table& table);
-    Results(SharedRealm r, Query q, DescriptorOrdering o = {});
-    Results(SharedRealm r, TableView tv, DescriptorOrdering o = {});
-    Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q = {}, SortDescriptor s = {});
+    Results(std::shared_ptr<Realm> r, Table& table);
+    Results(std::shared_ptr<Realm> r, Query q, DescriptorOrdering o = {});
+    Results(std::shared_ptr<Realm> r, TableView tv, DescriptorOrdering o = {});
+    Results(std::shared_ptr<Realm> r, LinkViewRef lv, util::Optional<Query> q = {}, SortDescriptor s = {});
     ~Results();
 
     // Results is copyable and moveable
@@ -56,7 +56,7 @@ public:
     Results& operator=(const Results&);
 
     // Get the Realm
-    SharedRealm get_realm() const { return m_realm; }
+    std::shared_ptr<Realm> get_realm() const { return m_realm; }
 
     // Object schema describing the vendored object type
     const ObjectSchema &get_object_schema() const;
@@ -74,6 +74,9 @@ public:
     // Get the object type which will be returned by get()
     StringData get_object_type() const noexcept;
 
+    PropertyType get_type() const;
+    bool is_optional() const noexcept;
+
     // Get the LinkView this Results is derived from, if any
     LinkViewRef get_linkview() const { return m_link_view; }
 
@@ -83,7 +86,8 @@ public:
 
     // Get the row accessor for the given index
     // Throws OutOfBoundsIndexException if index >= size()
-    RowExpr get(size_t index);
+    template<typename T = RowExpr>
+    T get(size_t index);
 
     // Get the boxed row accessor for the given index
     // Throws OutOfBoundsIndexException if index >= size()
@@ -92,24 +96,19 @@ public:
 
     // Get a row accessor for the first/last row, or none if the results are empty
     // More efficient than calling size()+get()
-    util::Optional<RowExpr> first();
-    util::Optional<RowExpr> last();
-
-    template<typename Context>
-    auto first(Context&);
-    template<typename Context>
-    auto last(Context&);
-
-    // Get the first index of the given row in this results, or not_found
-    // Throws DetachedAccessorException if row is not attached
-    // Throws IncorrectTableException if row belongs to a different table
-    size_t index_of(size_t row_ndx);
-    size_t index_of(Row const& row);
-    template<typename Context, typename T>
-    size_t index_of(Context&, T&& value);
+    template<typename T = RowExpr>
+    util::Optional<T> first();
+    template<typename T = RowExpr>
+    util::Optional<T> last();
 
     // Get the index of the first row matching the query in this table
     size_t index_of(Query&& q);
+
+    // Get the first index of the given value in this results, or not_found
+    // Throws DetachedAccessorException if row is not attached
+    // Throws IncorrectTableException if row belongs to a different table
+    template<typename T>
+    size_t index_of(T const& value);
 
     // Delete all of the rows in this Results from the Realm
     // size() will always be zero afterwards
@@ -133,10 +132,10 @@ public:
     // sum() returns 0, except for when it returns none
     // Throws UnsupportedColumnTypeException for sum/average on timestamp or non-numeric column
     // Throws OutOfBoundsIndexException for an out-of-bounds column
-    util::Optional<Mixed> max(size_t column);
-    util::Optional<Mixed> min(size_t column);
-    util::Optional<double> average(size_t column);
-    util::Optional<Mixed> sum(size_t column);
+    util::Optional<Mixed> max(size_t column=0);
+    util::Optional<Mixed> min(size_t column=0);
+    util::Optional<double> average(size_t column=0);
+    util::Optional<Mixed> sum(size_t column=0);
 
     enum class Mode {
         Empty, // Backed by nothing (for missing tables)
@@ -206,13 +205,19 @@ public:
         static void set_table_view(Results& results, TableView&& tv);
     };
 
+    template<typename Context> auto first(Context&);
+    template<typename Context> auto last(Context&);
+
+    template<typename Context, typename T>
+    size_t index_of(Context&, T value);
+
 private:
     enum class UpdatePolicy {
         Auto,  // Update automatically to reflect changes in the underlying data.
         Never, // Never update.
     };
 
-    SharedRealm m_realm;
+    std::shared_ptr<Realm> m_realm;
     mutable const ObjectSchema *m_object_schema = nullptr;
     Query m_query;
     TableView m_table_view;
@@ -235,7 +240,8 @@ private:
 
     void prepare_async();
 
-    util::Optional<RowExpr> try_get(size_t);
+    template<typename T>
+    util::Optional<T> try_get(size_t);
 
     template<typename Int, typename Float, typename Double, typename Timestamp>
     util::Optional<Mixed> aggregate(size_t column,
@@ -245,34 +251,10 @@ private:
     void prepare_for_aggregate(size_t column, const char* name);
 
     void set_table_view(TableView&& tv);
+
+    template<typename Fn>
+    auto dispatch(Fn&&) const;
 };
-
-template<typename ContextType, typename ValueType>
-size_t Results::index_of(ContextType& ctx, ValueType&& value)
-{
-    validate_read();
-    return index_of(ctx.template unbox<RowExpr>(value));
-}
-
-template<typename Context>
-auto Results::get(Context& ctx, size_t row_ndx)
-{
-    return ctx.box(get(row_ndx));
-}
-
-template<typename Context>
-auto Results::first(Context& ctx)
-{
-    auto row = first();
-    return row ? ctx.box(*row) : ctx.no_value();
-}
-
-template<typename Context>
-auto Results::last(Context& ctx)
-{
-    auto row = last();
-    return row ? ctx.box(*row) : ctx.no_value();
-}
 
 template<typename Func>
 NotificationToken Results::async(Func&& target)
@@ -281,6 +263,53 @@ NotificationToken Results::async(Func&& target)
         target(e);
     });
 }
+
+template<typename Fn>
+auto Results::dispatch(Fn&& fn) const
+{
+    using Type = PropertyType;
+    switch (get_type()) {
+        case Type::Int:    return is_optional() ? fn((util::Optional<int64_t>*)0) : fn((int64_t*)0);
+        case Type::Bool:   return is_optional() ? fn((util::Optional<bool>*)0)    : fn((bool*)0);
+        case Type::Float:  return is_optional() ? fn((util::Optional<float>*)0)   : fn((float*)0);
+        case Type::Double: return is_optional() ? fn((util::Optional<double>*)0)  : fn((double*)0);
+        case Type::String: return fn((StringData*)0);
+        case Type::Data:   return fn((BinaryData*)0);
+        case Type::Object: return fn((RowExpr*)0);
+        case Type::Date:   return fn((Timestamp*)0);
+        default: REALM_COMPILER_HINT_UNREACHABLE();
+    }
 }
 
-#endif /* REALM_RESULTS_HPP */
+template<typename Context>
+auto Results::get(Context& ctx, size_t row_ndx)
+{
+    return dispatch([&](auto t) { return ctx.box(get<std::decay_t<decltype(*t)>>(row_ndx)); });
+}
+
+template<typename Context>
+auto Results::first(Context& ctx)
+{
+    return dispatch([&](auto t) {
+        auto value = first<std::decay_t<decltype(*t)>>();
+        return value ? static_cast<decltype(ctx.no_value())>(ctx.box(*value)) : ctx.no_value();
+    });
+}
+
+template<typename Context>
+auto Results::last(Context& ctx)
+{
+    return dispatch([&](auto t) {
+        auto value = last<std::decay_t<decltype(*t)>>();
+        return value ? static_cast<decltype(ctx.no_value())>(ctx.box(*value)) : ctx.no_value();
+    });
+}
+
+template<typename Context, typename T>
+size_t Results::index_of(Context& ctx, T value)
+{
+    return dispatch([&](auto t) { return index_of(ctx.template unbox<std::decay_t<decltype(*t)>>(value)); });
+}
+} // namespace realm
+
+#endif // REALM_RESULTS_HPP

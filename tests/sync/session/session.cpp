@@ -42,7 +42,6 @@ TEST_CASE("SyncSession: management by SyncUser", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     const std::string dummy_auth_url = "https://realm.example.org";
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
@@ -187,7 +186,6 @@ TEST_CASE("sync: log-in", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     const std::string dummy_auth_url = "https://realm.example.org";
     // Disable file-related functionality and metadata functionality for testing purposes.
@@ -227,7 +225,6 @@ TEST_CASE("sync: token refreshing", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     const std::string dummy_auth_url = "https://realm.example.org";
     // Disable file-related functionality and metadata functionality for testing purposes.
@@ -273,7 +270,6 @@ TEST_CASE("sync: token refreshing", "[sync]") {
 
 TEST_CASE("SyncSession: close() API", "[sync]") {
     using PublicState = realm::SyncSession::PublicState;
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
 
     auto user = SyncManager::shared().get_user({ "close-api-tests-user", "https://realm.example.org" }, "not_a_real_token");
@@ -326,7 +322,6 @@ TEST_CASE("SyncSession: close() API", "[sync]") {
 
 TEST_CASE("sync: error handling", "[sync]") {
     using ProtocolError = realm::sync::ProtocolError;
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
 
@@ -406,7 +401,6 @@ TEST_CASE("sync: stop policy behavior", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     // Server is initially stopped so we can control when the session exits the dying state.
     SyncServer server(false);
     auto schema = Schema{
@@ -518,7 +512,6 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
@@ -579,7 +572,6 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
     if (!EventLoop::has_implementation())
         return;
 
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
@@ -588,18 +580,6 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
         auto& user = *realm.config().sync_config->user;
         REQUIRE(user.state() != SyncUser::State::Error);
         return user.session_for_on_disk_path(realm.config().path);
-    };
-
-    auto wait_for_upload_completion = [=](Realm& realm) {
-        std::atomic<bool> complete{false};
-        session_for_realm(realm)->wait_for_upload_completion([&](std::error_code) { complete = true; });
-        EventLoop::main().run_until([&] { return complete == true; });
-    };
-
-    auto wait_for_download_completion = [=](Realm& realm) {
-        std::atomic<bool> complete{false};
-        session_for_realm(realm)->wait_for_download_completion([&](std::error_code) { complete = true; });
-        EventLoop::main().run_until([&] { return complete == true; });
     };
 
     // Create a synced Realm containing a class with two properties.
@@ -614,7 +594,7 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
         };
 
         auto realm1 = Realm::get_shared_realm(config1);
-        wait_for_upload_completion(*realm1);
+        wait_for_upload(*realm1);
     }
 
     // Download the existing Realm into a second local file without specifying a schema,
@@ -623,7 +603,7 @@ TEST_CASE("sync: non-synced metadata table doesn't result in non-additive schema
     config2.schema_version = 1;
     {
         auto realm2 = Realm::get_shared_realm(config2);
-        wait_for_download_completion(*realm2);
+        wait_for_download(*realm2);
     }
 
     // Open the just-downloaded Realm while specifying a schema that contains a class with
@@ -649,7 +629,6 @@ TEST_CASE("sync: stable IDs", "[sync]") {
     if (!EventLoop::has_implementation())
         return;
 
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);

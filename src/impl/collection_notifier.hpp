@@ -192,6 +192,7 @@ protected:
     void add_changes(CollectionChangeBuilder change);
     void set_table(Table const& table);
     std::unique_lock<std::mutex> lock_target();
+    SharedGroup& source_shared_group();
 
     std::function<bool (size_t)> get_modification_checker(TransactionChangeInfo const&, Table const&);
 

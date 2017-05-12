@@ -46,7 +46,6 @@ TEST_CASE("progress notification", "[sync]") {
 
     const std::string dummy_auth_url = "https://realm.example.org";
 
-    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
     SyncServer server;
     // Disable file-related functionality and metadata functionality for testing purposes.
     SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);

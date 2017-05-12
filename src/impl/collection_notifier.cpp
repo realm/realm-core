@@ -51,6 +51,8 @@ CollectionNotifier::get_modification_checker(TransactionChangeInfo const& info,
 void DeepChangeChecker::find_related_tables(std::vector<RelatedTable>& out, Table const& table)
 {
     auto table_ndx = table.get_index_in_group();
+    if (table_ndx == npos)
+        return;
     if (any_of(begin(out), end(out), [=](auto& tbl) { return tbl.table_ndx == table_ndx; }))
         return;
 
@@ -393,6 +395,11 @@ void CollectionNotifier::detach()
     REALM_ASSERT(m_sg);
     do_detach_from(*m_sg);
     m_sg = nullptr;
+}
+
+SharedGroup& CollectionNotifier::source_shared_group()
+{
+    return *Realm::Internal::get_shared_group(*m_realm);
 }
 
 void CollectionNotifier::add_changes(CollectionChangeBuilder change)

@@ -1,4 +1,3 @@
-
 ////////////////////////////////////////////////////////////////////////////
 //
 // Copyright 2016 Realm Inc.
@@ -28,6 +27,7 @@
 #include "object_store.hpp"
 #include "results.hpp"
 #include "schema.hpp"
+#include "shared_realm.hpp"
 #include "util/format.hpp"
 
 #include <realm/link_view.hpp>
@@ -88,9 +88,8 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
     if (is_array(property.type)) {
         if (property.type == PropertyType::LinkingObjects)
             throw ReadOnlyPropertyException(m_object_schema->name, property.name);
-        REALM_ASSERT(property.type == PropertyType::Object);
 
-        List list(m_realm, m_row.get_linklist(col));
+        List list(m_realm, *m_row.get_table(), col, m_row.get_index());
         list.remove_all();
         if (!ctx.is_null(value)) {
             ContextType child_ctx(ctx, property);
@@ -102,7 +101,13 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
         return;
     }
 
-    switch (property.type & ~PropertyType::Flags) {
+    switch (property.type & ~PropertyType::Nullable) {
+        case PropertyType::Object: {
+            ContextType child_ctx(ctx, property);
+            auto link = child_ctx.template unbox<RowExpr>(value, true, try_update);
+            table.set_link(col, row, link.get_index(), is_default);
+            break;
+        }
         case PropertyType::Bool:
             table.set(col, row, ctx.template unbox<bool>(value), is_default);
             break;
@@ -126,12 +131,6 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
         case PropertyType::Date:
             table.set(col, row, ctx.template unbox<Timestamp>(value), is_default);
             break;
-        case PropertyType::Object: {
-            ContextType child_ctx(ctx, property);
-            auto link = child_ctx.template unbox<RowExpr>(value, true, try_update);
-            table.set_link(col, row, link.get_index(), is_default);
-            break;
-        }
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
@@ -144,14 +143,10 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
     verify_attached();
 
     size_t column = property.table_column;
-    if (is_nullable(property.type) && m_row.is_null(column)) {
+    if (is_nullable(property.type) && m_row.is_null(column))
         return ctx.null_value();
-    }
-
-    if (is_array(property.type) && property.type != PropertyType::LinkingObjects) {
-        REALM_ASSERT(property.type == PropertyType::Object);
-        return ctx.box(List(m_realm, m_row.get_linklist(column)));
-    }
+    if (is_array(property.type) && property.type != PropertyType::LinkingObjects)
+        return ctx.box(List(m_realm, *m_row.get_table(), column, m_row.get_index()));
 
     switch (property.type & ~PropertyType::Flags) {
         case PropertyType::Bool:   return ctx.box(m_row.get_bool(column));

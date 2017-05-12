@@ -168,19 +168,32 @@ StringData Results::get_object_type() const noexcept
     return ObjectStore::object_type_for_table_name(m_table->get_name());
 }
 
-util::Optional<RowExpr> Results::try_get(size_t row_ndx)
+template<typename T>
+auto get(Table& table, size_t row)
+{
+    return table.get<T>(0, row);
+}
+
+template<>
+auto get<RowExpr>(Table& table, size_t row)
+{
+    return table.get(row);
+}
+
+template<typename T>
+util::Optional<T> Results::try_get(size_t row_ndx)
 {
     validate_read();
     switch (m_mode) {
         case Mode::Empty: break;
         case Mode::Table:
             if (row_ndx < m_table->size())
-                return m_table->get(row_ndx);
+                return ::get<T>(*m_table, row_ndx);
             break;
         case Mode::LinkView:
             if (update_linkview()) {
                 if (row_ndx < m_link_view->size())
-                    return m_link_view->get(row_ndx);
+                    return ::get<T>(*m_table, m_link_view->get(row_ndx).get_index());
                 break;
             }
             REALM_FALLTHROUGH;
@@ -190,30 +203,33 @@ util::Optional<RowExpr> Results::try_get(size_t row_ndx)
             if (row_ndx >= m_table_view.size())
                 break;
             if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(row_ndx))
-                return RowExpr();
-            return m_table_view.get(row_ndx);
+                return T{};
+            return ::get<T>(*m_table, m_table_view.get(row_ndx).get_index());
     }
     return util::none;
 }
 
-RowExpr Results::get(size_t row_ndx)
+template<typename T>
+T Results::get(size_t row_ndx)
 {
-    if (auto row = try_get(row_ndx))
+    if (auto row = try_get<T>(row_ndx))
         return *row;
     throw OutOfBoundsIndexException{row_ndx, size()};
 }
 
-util::Optional<RowExpr> Results::first()
+template<typename T>
+util::Optional<T> Results::first()
 {
-    return try_get(0);
+    return try_get<T>(0);
 }
 
-util::Optional<RowExpr> Results::last()
+template<typename T>
+util::Optional<T> Results::last()
 {
     validate_read();
     if (m_mode == Mode::Query)
         update_tableview(); // avoid running the query twice (for size() and for get())
-    return try_get(size() - 1);
+    return try_get<T>(size() - 1);
 }
 
 bool Results::update_linkview()
@@ -268,7 +284,8 @@ void Results::update_tableview(bool wants_notifications)
     }
 }
 
-size_t Results::index_of(Row const& row)
+template<>
+size_t Results::index_of(RowExpr const& row)
 {
     validate_read();
     if (!row) {
@@ -281,43 +298,53 @@ size_t Results::index_of(Row const& row)
             "Attempting to get the index of a Row of the wrong type"
         );
     }
-    return index_of(row.get_index());
+
+    switch (m_mode) {
+        case Mode::Empty:
+            return not_found;
+        case Mode::Table:
+            return row.get_index();
+        case Mode::LinkView:
+            if (update_linkview())
+                return m_link_view->find(row.get_index());
+            REALM_FALLTHROUGH;
+        case Mode::Query:
+        case Mode::TableView:
+            update_tableview();
+            return m_table_view.find_by_source_ndx(row.get_index());
+    }
+    REALM_UNREACHABLE();
 }
 
-size_t Results::index_of(size_t row_ndx)
+template<typename T>
+size_t Results::index_of(T const& value)
 {
     validate_read();
     switch (m_mode) {
         case Mode::Empty:
             return not_found;
         case Mode::Table:
-            return row_ndx;
+            return m_table->find_first(0, value);
         case Mode::LinkView:
-            if (update_linkview())
-                return m_link_view->find(row_ndx);
-            REALM_FALLTHROUGH;
+            REALM_UNREACHABLE();
         case Mode::Query:
         case Mode::TableView:
             update_tableview();
-            return m_table_view.find_by_source_ndx(row_ndx);
+            return m_table_view.find_first(0, value);
     }
-    REALM_UNREACHABLE();
 }
 
 size_t Results::index_of(Query&& q)
 {
-    size_t row;
-    if (!m_descriptor_ordering.will_apply_sort()) {
-        auto query = get_query().and_query(std::move(q));
-        query.sync_view_if_needed();
-        row = query.find();
-    }
-    else {
+    if (m_descriptor_ordering.will_apply_sort()) {
         auto first = filter(std::move(q)).first();
-        row = first ? first->get_index() : realm::not_found;
+        return first ? index_of(*first) : not_found;
     }
 
-    return row != realm::not_found ? index_of(row) : row;
+    auto query = get_query().and_query(std::move(q));
+    query.sync_view_if_needed();
+    size_t row = query.find();
+    return row != realm::not_found ? index_of(m_table->get(row)) : row;
 }
 
 void Results::prepare_for_aggregate(size_t column, const char* name)
@@ -444,6 +471,27 @@ void Results::clear()
     }
 }
 
+PropertyType Results::get_type() const
+{
+    validate_read();
+    switch (m_mode) {
+        case Mode::Empty:
+        case Mode::LinkView:
+            return PropertyType::Object;
+        case Mode::Query:
+        case Mode::TableView:
+        case Mode::Table:
+            if (m_table->get_index_in_group() != realm::npos)
+                return PropertyType::Object;
+            return ObjectSchema::from_core_type(*m_table->get_descriptor(), 0);
+    }
+}
+
+bool Results::is_optional() const noexcept
+{
+    return m_table && m_table->is_attached() && m_table->is_nullable(0);
+}
+
 Query Results::get_query() const
 {
     validate_read();
@@ -539,6 +587,11 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
 {
     if (keypaths.empty())
         return *this;
+    if (get_type() != PropertyType::Object) {
+        if (keypaths.size() != 1 || keypaths[0].first != "self")
+            throw std::invalid_argument("bad");
+        return sort({*m_table, {{0}}, {keypaths[0].second}});
+    }
 
     std::vector<std::vector<size_t>> column_indices;
     std::vector<bool> ascending;
@@ -554,6 +607,8 @@ Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths)
 
 Results Results::sort(realm::SortDescriptor&& sort) const
 {
+    if (m_mode == Mode::LinkView)
+        return Results(m_realm, m_link_view, util::none, std::move(sort));
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.append_sort(std::move(sort));
     return Results(m_realm, get_query(), std::move(new_order));
@@ -659,8 +714,34 @@ void Results::Internal::set_table_view(Results& results, realm::TableView &&tv)
     REALM_ASSERT(results.m_table_view.is_attached());
 }
 
+namespace realm {
+#define REALM_RESULTS_TYPE(T) \
+    template T Results::get<T>(size_t); \
+    template util::Optional<T> Results::first<T>(); \
+    template util::Optional<T> Results::last<T>(); \
+    template size_t Results::index_of<T>(T const&);
+
+template RowExpr Results::get<RowExpr>(size_t);
+template util::Optional<RowExpr> Results::first<RowExpr>();
+template util::Optional<RowExpr> Results::last<RowExpr>();
+
+REALM_RESULTS_TYPE(bool)
+REALM_RESULTS_TYPE(int64_t)
+REALM_RESULTS_TYPE(float)
+REALM_RESULTS_TYPE(double)
+REALM_RESULTS_TYPE(StringData)
+REALM_RESULTS_TYPE(BinaryData)
+REALM_RESULTS_TYPE(Timestamp)
+REALM_RESULTS_TYPE(util::Optional<bool>)
+REALM_RESULTS_TYPE(util::Optional<int64_t>)
+REALM_RESULTS_TYPE(util::Optional<float>)
+REALM_RESULTS_TYPE(util::Optional<double>)
+
+#undef REALM_RESULTS_TYPE
+}
+
 Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c)
-: std::out_of_range(util::format("Requested index %1 greater than max %2", r, c))
+: std::out_of_range(util::format("Requested index %1 greater than max %2", r, c - 1))
 , requested(r), valid_count(c) {}
 
 Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(size_t column, const Table* table, const char* operation)

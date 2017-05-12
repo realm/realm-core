@@ -410,11 +410,10 @@ public:
     {
         TransactLogValidationMixin::select_table(group_level_ndx, len, path);
         m_active_table = nullptr;
-        m_active_descriptor = nullptr;
         m_is_top_level_table = true;
 
-        if (len > 0) {
-            // ignore changes to subtables for now
+        // Nested subtables currently not supported
+        if (len > 1) {
             m_is_top_level_table = false;
             return true;
         }
@@ -429,6 +428,19 @@ public:
             m_info.tables.resize(std::max(m_info.tables.size() * 2, tbl_ndx + 1));
         m_active_table = &m_info.tables[tbl_ndx];
 
+        if (len == 1) {
+            // Mark the cell containing the subtable as modified since selecting
+            // a table is always followed by a modification of some sort
+            size_t row = path[0];
+            size_t col = path[1];
+            mark_dirty(row, col);
+
+            if (auto table = find_list(current_table(), col, row)) {
+                m_active_table = table;
+                m_need_move_info = true;
+                m_is_top_level_table = false;
+            }
+        }
         return true;
     }
 

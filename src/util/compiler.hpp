@@ -41,4 +41,11 @@
 #define REALM_COMPILER_HINT_UNREACHABLE abort
 #endif
 
+#if __GNUC__ < 5 && !defined(__clang__)
+#define REALM_NO_BRACED_INIT 1
+#else
+#define REALM_NO_BRACED_INIT 0
+#endif
+
+
 #endif // REALM_UTIL_COMPILER_HPP
