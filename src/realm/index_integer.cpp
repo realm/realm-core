@@ -165,7 +165,7 @@ int IntegerIndex::TreeLeaf::find(uint64_t hash, int64_t key) const
     return -1;
 }
 
-int IntegerIndex::TreeLeaf::find_empty(uint64_t hash, int64_t key) const
+int IntegerIndex::TreeLeaf::find_empty_or_equal(uint64_t hash, int64_t key) const
 {
     int subhash = hash & 0xFF; // cut off all above one byte
     int subhash_limit = subhash + 4;
@@ -183,16 +183,28 @@ int IntegerIndex::TreeLeaf::find_empty(uint64_t hash, int64_t key) const
     return -1;
 }
 
-bool IntegerIndex::TreeLeaf::insert(Treetop* treeTop, uint64_t hash, int64_t key, int64_t& value)
+int IntegerIndex::TreeLeaf::find_empty(uint64_t hash) const
 {
-    bool conflict = false;
+    int subhash = hash & 0xFF; // cut off all above one byte
+    int subhash_limit = subhash + 4;
+    uint16_t* data = reinterpret_cast<uint16_t*>(m_condenser.m_data);
+    while (subhash != subhash_limit) {
+        if (data[subhash & 0xFF] == 0 && m_values.size() < 255)
+            return subhash & 0xFF;
+        subhash++;
+    }
+    return -1;
+}
+
+bool IntegerIndex::TreeLeaf::insert_1(Treetop* treeTop, uint64_t hash, int64_t key, int64_t value)
+{
     try {
-        uint16_t quick_key = (key << 8) & 0xFF00;
-        int subhash = find_empty(hash, key);
+        int subhash = find_empty_or_equal(hash, key);
         if (subhash < 0) {
-            conflict = true;
-            subhash = hash & 0xffULL;
+            return false;
         }
+
+        // we're adding a new key:
 
         REALM_ASSERT(!has_parent());
         uint16_t* data;
@@ -204,23 +216,13 @@ bool IntegerIndex::TreeLeaf::insert(Treetop* treeTop, uint64_t hash, int64_t key
             data = reinterpret_cast<uint16_t*>(m_condenser.m_data) + subhash;
         }
 
-        if (conflict) { // we're reusing the spot of an old key:
-            uint16_t digest = *data;
-            uint8_t idx = digest & 0xFF;
-            digest = quick_key + idx;
-            --idx;
-            int64_t old_value = m_values.get(idx);
-            *data = digest;
-            m_values.set(idx, value);
-            value = old_value;
-        }
-        else { // we're adding a new key:
-            uint8_t idx = m_values.size();
-            *data = quick_key + idx + 1;
-            m_values.add(value);
-        }
+        uint8_t idx = m_values.size();
+        uint16_t quick_key = (key << 8) & 0xFF00;
+        *data = quick_key + idx + 1;
+        m_values.add(value);
     }
     catch (const unsigned& found) {
+        // key already at position 'found'
         int_fast64_t slot_value = m_values.get(found);
 
         // Single match (lowest bit set indicates literal row_ndx)
@@ -244,11 +246,51 @@ bool IntegerIndex::TreeLeaf::insert(Treetop* treeTop, uint64_t hash, int64_t key
         }
     }
 
-    if (!conflict) {
-        treeTop->incr_count();
+    treeTop->incr_count();
+
+    return true;
+}
+
+bool IntegerIndex::TreeLeaf::insert_2(Treetop* treeTop, uint64_t hash, int64_t key, int64_t& value)
+{
+    bool conflict = false;
+    uint16_t quick_key = (key << 8) & 0xFF00;
+    int subhash = find_empty(hash);
+    if (subhash < 0) {
+        conflict = true;
+        subhash = hash & 0xffULL;
     }
 
-    return conflict;
+    REALM_ASSERT(!has_parent());
+    uint16_t* data;
+    if (is_read_only()) {
+        data = m_condenser.get_writable_data(subhash);
+        treeTop->cow_path(hash, get_ref());
+    }
+    else {
+        data = reinterpret_cast<uint16_t*>(m_condenser.m_data) + subhash;
+    }
+
+    if (conflict) { // we're reusing the spot of an old key:
+        uint16_t digest = *data;
+        uint8_t idx = digest & 0xFF;
+        digest = quick_key + idx;
+        --idx;
+        int64_t old_value = m_values.get(idx);
+        *data = digest;
+        m_values.set(idx, value);
+        value = old_value;
+
+        return false;
+    }
+    else { // we're adding a new key:
+        uint8_t idx = m_values.size();
+        *data = quick_key + idx + 1;
+        m_values.add(value);
+        treeTop->incr_count();
+
+        return true;
+    }
 }
 
 void IntegerIndex::TreeLeaf::erase(Treetop* treeTop, uint64_t hash, unsigned index, int64_t value)
@@ -262,8 +304,9 @@ void IntegerIndex::TreeLeaf::erase(Treetop* treeTop, uint64_t hash, unsigned ind
         REALM_ASSERT(slot_value == value);
         // Move last over
         unsigned last_index = m_values.size() - 1;
+        REALM_ASSERT(index <= last_index);
         int steps = 1;
-        if (last_index != index) {
+        if (index < last_index) {
             int64_t last_value = m_values.get(last_index);
             m_values.set(index, last_value);
             steps = 2;
@@ -272,22 +315,23 @@ void IntegerIndex::TreeLeaf::erase(Treetop* treeTop, uint64_t hash, unsigned ind
 
         uint16_t* data = m_condenser.get_writable_data(0);
         unsigned i = 0;
-        while (steps > 0 && i < 256) {
+        do {
+            while (data[i] == 0) {
+                i++;
+                REALM_ASSERT_DEBUG(i < 256);
+            }
             uint16_t digest = data[i];
-            if (digest != 0) {
-                uint8_t idx = digest - 1;
-                if (idx == index) {
-                    data[i] = 0;
-                    steps--;
-                }
-                else if (idx == last_index) {
-                    data[i] = (digest & 0xFF00) + index + 1;
-                    steps--;
-                }
+            uint8_t idx = digest - 1;
+            if (idx == index) {
+                data[i] = 0;
+                steps--;
+            }
+            else if (idx == last_index) {
+                data[i] = (digest & 0xFF00) + index + 1;
+                steps--;
             }
             i++;
-        }
-        REALM_ASSERT_DEBUG(steps == 0);
+        } while (steps > 0);
     }
     else {
         size_t row_ndx = to_size_t(value >> 1);
@@ -665,36 +709,40 @@ void IntegerIndex::insert(size_t row_ndx, int64_t key, size_t num_rows, bool is_
     while (num_rows--) {
         uint64_t hash = m_top.m_mask + 1;
         int64_t shifted = int64_t((uint64_t(row_ndx) << 1) + 1); // shift to indicate literal
+        uint64_t h_1;
+        uint64_t h_2;
+        hash128(key, h_1, h_2, m_top.m_mask);
+        hash = h_1;
+        m_top.lookup_or_create(hash, m_current_leaf);
+        if (!m_current_leaf.insert_1(&m_top, hash, key, shifted)) {
+            int collision_count = 0;
+            while (collision_count < max_collisions) {
+                hash = (hash != h_1) ? h_1 : h_2;
 
-        int collision_count = 1;
-        while (collision_count < max_collisions) {
-            uint64_t h_1;
-            uint64_t h_2;
-            hash128(key, h_1, h_2, m_top.m_mask);
-            hash = (hash != h_1) ? h_1 : h_2;
-            m_top.lookup_or_create(hash, m_current_leaf);
-            // insert, potentially update 'key' with value to move
-            // uint64_t old_key = key;
-            bool conflict = m_current_leaf.insert(&m_top, hash, key, shifted);
-            if (!conflict) {
-                break;
-            }
-            // `shifted` is now updated
-            if (shifted & 1) {
-                key = get_key_value(shifted >> 1);
-            }
-            else {
-                Array arr(m_top.get_alloc());
-                arr.init_from_ref(to_ref(shifted));
-                key = get_key_value(arr.get(0));
-            }
+                m_top.lookup_or_create(hash, m_current_leaf);
+                if (m_current_leaf.insert_2(&m_top, hash, key, shifted)) {
+                    break;
+                }
+                // `shifted` is now updated
+                if (shifted & 1) {
+                    key = get_key_value(shifted >> 1);
+                }
+                else {
+                    Array arr(m_top.get_alloc());
+                    arr.init_from_ref(to_ref(shifted));
+                    key = get_key_value(arr.get(0));
+                }
 
-            ++collision_count;
-            if (collision_count == max_collisions) {
-                grow_tree();
-                collision_count = 1;
+                hash128(key, h_1, h_2, m_top.m_mask);
+
+                ++collision_count;
+                if (collision_count == max_collisions) {
+                    grow_tree();
+                    collision_count = 0;
+                }
             }
         }
+
         if (m_top.ready_to_grow()) {
             grow_tree();
         }
@@ -848,7 +896,7 @@ void IntegerIndex::do_delete(size_t row_ndx, int64_t key)
 void IntegerIndex::grow_tree()
 {
     // make a backup and set up new tree:
-    uint64_t new_size = 1 + 2 * m_top.m_mask;
+    uint64_t new_size = 4 * (m_top.m_mask + 1) - 1;
     Treetop old_top(std::move(m_top));
 
     m_top.init(new_size);

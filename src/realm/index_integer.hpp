@@ -101,12 +101,14 @@ private:
             Array::detach();
         }
 
-        bool insert(Treetop* treeTop, uint64_t hash, int64_t key, int64_t& value);
+        bool insert_1(Treetop* treeTop, uint64_t hash, int64_t key, int64_t value);
+        bool insert_2(Treetop* treeTop, uint64_t hash, int64_t key, int64_t& value);
         void erase(Treetop* treeTop, uint64_t hash, unsigned idx, int64_t value);
         void update_ref(Treetop* treeTop, uint64_t hash, int i, size_t old_row_ndx, size_t new_row_ndx);
 
         int find(uint64_t hash, int64_t key) const;
-        int find_empty(uint64_t hash, int64_t key) const;
+        int find_empty_or_equal(uint64_t hash, int64_t key) const;
+        int find_empty(uint64_t hash) const;
         size_t count(int i) const;
         int64_t get_first_value(int i) const;
         void get_all_values(int i, std::vector<int64_t>& values) const;
