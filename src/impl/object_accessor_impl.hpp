@@ -146,7 +146,7 @@ inline StringData CppContext::unbox(util::Any& v, bool, bool) const
 {
     if (!v.has_value())
         return StringData();
-    auto value = any_cast<std::string&>(v);
+    auto& value = any_cast<std::string&>(v);
     return StringData(value.c_str(), value.size());
 }
 
@@ -155,7 +155,7 @@ inline BinaryData CppContext::unbox(util::Any& v, bool, bool) const
 {
     if (!v.has_value())
         return BinaryData();
-    auto value = any_cast<std::string&>(v);
+    auto& value = any_cast<std::string&>(v);
     return BinaryData(value.c_str(), value.size());
 }
 
