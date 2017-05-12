@@ -752,7 +752,7 @@ TEST_CASE("list") {
         }
 
         SECTION("creates new object for dictionary") {
-            list.add(ctx, util::Any(AnyDict{{"value", 20LL}}));
+            list.add(ctx, util::Any(AnyDict{{"value", INT64_C(20)}}));
             REQUIRE(list.size() == 11);
             REQUIRE(target->size() == 11);
             REQUIRE(list.get(10).get_int(0) == 20);
@@ -781,7 +781,7 @@ TEST_CASE("list") {
         }
 
         SECTION("does not insert new objects for dictionaries") {
-            REQUIRE(list.find(ctx, util::Any(AnyDict{{"value", 20LL}})) == npos);
+            REQUIRE(list.find(ctx, util::Any(AnyDict{{"value", INT64_C(20)}})) == npos);
             REQUIRE(target->size() == 10);
         }
 
