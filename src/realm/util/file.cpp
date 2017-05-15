@@ -1238,16 +1238,7 @@ void File::set_encryption_key(const char* key)
 
 const char* File::get_encryption_key()
 {
-#if REALM_ENABLE_ENCRYPTION
-    if (m_encryption_key) {
-        return m_encryption_key.get();
-    }
-    else {
-        return nullptr;
-    }
-#else
-    return nullptr;
-#endif
+    return m_encryption_key.get();
 }
 
 
