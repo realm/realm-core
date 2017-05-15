@@ -2325,6 +2325,22 @@ TEST(Shared_EncryptionKeyCheck)
     SharedGroup sg3(path, false, SharedGroupOptions(crypt_key(true)));
 }
 
+// opposite - if opened unencrypted, attempt to share it encrypted
+// will throw an error.
+TEST(Shared_EncryptionKeyCheck_2)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroupOptions());
+    bool ok = false;
+    try {
+        SharedGroup sg_2(path, false, SharedGroupOptions(crypt_key(true)));
+    } catch (std::runtime_error&) {
+        ok = true;
+    }
+    CHECK(ok);
+    SharedGroup sg3(path, false, SharedGroupOptions());
+}
+
 #endif
 
 TEST(Shared_VersionCount)
