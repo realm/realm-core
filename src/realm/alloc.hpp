@@ -26,7 +26,6 @@
 #include <realm/util/features.h>
 #include <realm/util/terminate.hpp>
 #include <realm/util/assert.hpp>
-#include <realm/util/safe_int_ops.hpp>
 
 namespace realm {
 
