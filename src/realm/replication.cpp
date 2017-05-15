@@ -275,7 +275,7 @@ public:
         return true;
     }
 
-    bool add_row_with_key(size_t key_col_ndx, int64_t key)
+    bool add_row_with_key(size_t, size_t, size_t key_col_ndx, int64_t key)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;

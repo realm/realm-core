@@ -2284,7 +2284,7 @@ size_t Table::add_row_with_key(size_t key_col_ndx, int64_t key)
 
     for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
         if (col_ndx == key_col_ndx) {
-            auto& col = get_column(key_col_ndx);
+            IntegerColumn& col = get_column(key_col_ndx);
             col.insert(row_ndx, key, 1);
         }
         else {
@@ -2293,12 +2293,11 @@ size_t Table::add_row_with_key(size_t key_col_ndx, int64_t key)
             col.insert_rows(row_ndx, 1, m_size, insert_nulls); // Throws
         }
     }
-    if (row_ndx < m_size)
-        adj_row_acc_insert_rows(row_ndx, 1);
     m_size++;
 
     if (Replication* repl = get_repl()) {
-        repl->add_row_with_key(this, key_col_ndx, key); // Throws
+        size_t prior_num_rows = m_size - 1;
+        repl->add_row_with_key(this, row_ndx, prior_num_rows, key_col_ndx, key); // Throws
     }
 
     return row_ndx;

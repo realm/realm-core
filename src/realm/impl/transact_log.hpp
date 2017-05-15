@@ -157,7 +157,7 @@ public:
     {
         return true;
     }
-    bool add_row_with_key(size_t, uint64_t)
+    bool add_row_with_key(size_t, size_t, size_t, int64_t)
     {
         return true;
     }
@@ -339,7 +339,7 @@ public:
 
     /// Must have table selected.
     bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool unordered);
-    bool add_row_with_key(size_t key_col_ndx, int64_t key);
+    bool add_row_with_key(size_t row_ndx, size_t prior_num_rows, size_t key_col_ndx, int64_t key);
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool unordered);
     bool swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     bool merge_rows(size_t row_ndx, size_t new_row_ndx);
@@ -505,7 +505,8 @@ public:
     /// \param prior_num_rows The number of rows in the table prior to the
     /// modification.
     virtual void insert_empty_rows(const Table*, size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows);
-    virtual void add_row_with_key(const Table* t, size_t key_col_ndx, int64_t key);
+    virtual void add_row_with_key(const Table* t, size_t row_ndx, size_t prior_num_rows, size_t key_col_ndx,
+                                  int64_t key);
 
     /// \param prior_num_rows The number of rows in the table prior to the
     /// modification.
@@ -1468,16 +1469,18 @@ inline void TransactLogConvenientEncoder::insert_empty_rows(const Table* t, size
     m_encoder.insert_empty_rows(row_ndx, num_rows_to_insert, prior_num_rows, unordered); // Throws
 }
 
-inline bool TransactLogEncoder::add_row_with_key(size_t key_col_ndx, int64_t key)
+inline bool TransactLogEncoder::add_row_with_key(size_t row_ndx, size_t prior_num_rows, size_t key_col_ndx,
+                                                 int64_t key)
 {
-    append_simple_instr(instr_AddRowWithKey, key_col_ndx, key); // Throws
+    append_simple_instr(instr_AddRowWithKey, row_ndx, prior_num_rows, key_col_ndx, key); // Throws
     return true;
 }
 
-inline void TransactLogConvenientEncoder::add_row_with_key(const Table* t, size_t key_col_ndx, int64_t key)
+inline void TransactLogConvenientEncoder::add_row_with_key(const Table* t, size_t row_ndx, size_t prior_num_rows,
+                                                           size_t key_col_ndx, int64_t key)
 {
     select_table(t);                                          // Throws
-    m_encoder.add_row_with_key(key_col_ndx, key);             // Throws
+    m_encoder.add_row_with_key(row_ndx, prior_num_rows, key_col_ndx, key); // Throws
 }
 
 inline bool TransactLogEncoder::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
@@ -1889,9 +1892,11 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
             return;
         }
         case instr_AddRowWithKey: {
+            size_t row_ndx = read_int<size_t>();                         // Throws
+            size_t prior_num_rows = read_int<size_t>();                  // Throws
             size_t key_col_ndx = read_int<size_t>();                     // Throws
             int64_t key = read_int<int64_t>();                           // Throws
-            if (!handler.add_row_with_key(key_col_ndx, key))             // Throws
+            if (!handler.add_row_with_key(row_ndx, prior_num_rows, key_col_ndx, key)) // Throws
                 parser_error();
             return;
         }
@@ -2442,9 +2447,10 @@ public:
         return true;
     }
 
-    bool add_row_with_key(size_t key_col_ndx, int64_t key)
+    bool add_row_with_key(size_t row_ndx, size_t prior_num_rows, size_t, int64_t)
     {
-        m_encoder.add_row_with_key(key_col_ndx, key); // Throws
+        bool unordered = true;
+        m_encoder.erase_rows(row_ndx, 1, prior_num_rows + 1, unordered); // Throws
         append_instruction();
         return true;
     }

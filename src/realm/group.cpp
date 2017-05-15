@@ -1339,7 +1339,7 @@ public:
         return true;
     }
 
-    bool add_row_with_key(size_t, int64_t) noexcept
+    bool add_row_with_key(size_t, size_t, size_t, int64_t) noexcept
     {
         return true;
     }
