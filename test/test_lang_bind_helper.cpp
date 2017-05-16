@@ -10479,7 +10479,7 @@ TEST(Query_ListOfPrimitivesHandover)
 {
     SHARED_GROUP_TEST_PATH(path);
     std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroup sg(*hist);
+    SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
     auto& group = sg.begin_read();
 
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
@@ -11837,7 +11837,7 @@ TEST(LangBindHelper_SessionHistoryConsistency)
     // session participants must still agree
     {
         // No history
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
 
         // Out-of-Realm history
         std::unique_ptr<Replication> hist = realm::make_in_realm_history(path);
@@ -12258,7 +12258,7 @@ TEST(LangBindHelper_InRealmHistory_SessionConsistency)
     // session participants must still agree
     {
         // No history
-        SharedGroup sg(path);
+        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
 
         // In-Realm history
         std::unique_ptr<Replication> hist = make_in_realm_history(path);
@@ -12638,7 +12638,7 @@ TEST(LangbindHelper_GroupWriter_EdgeCaseAssert)
     sg_w.commit();
     REALM_ASSERT_RELEASE(sg_w.compact());
     sg_w.begin_write();
-    sg_r.open(path);
+    sg_r.open(path, true, SharedGroupOptions(crypt_key()));
     sg_r.begin_read();
     g_r.verify();
     g.add_table("citdgiaclkfbbksfaqegcfiqcserceaqmttkilnlbknoadtb");

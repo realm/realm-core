@@ -1728,6 +1728,37 @@ Group& SharedGroup::begin_write()
     return m_group;
 }
 
+bool SharedGroup::try_begin_write(Group* &group)
+{
+    if (m_transact_stage != transact_Ready)
+        throw LogicError(LogicError::wrong_transact_state);
+
+    bool success = do_try_begin_write(); // Throws
+    if (!success) return false;
+    try {
+        // We can be sure that do_begin_read() will bind to the latest snapshot,
+        // since no other write transaction can be initated while we hold the
+        // write mutex.
+        VersionID version_id = VersionID(); // Latest available snapshot
+        bool writable = true;
+        do_begin_read(version_id, writable); // Throws
+
+        if (Replication* repl = m_group.get_replication()) {
+            version_type current_version = m_read_lock.m_version;
+            bool history_updated = false;
+            repl->initiate_transact(current_version, history_updated); // Throws
+        }
+    }
+    catch (...) {
+        do_end_write();
+        throw;
+    }
+
+    m_transact_stage = transact_Writing;
+    group = &m_group;
+    return true;
+}
+
 
 SharedGroup::version_type SharedGroup::commit()
 {
@@ -1823,9 +1854,24 @@ void SharedGroup::do_end_read() noexcept
 }
 
 
+
+bool SharedGroup::do_try_begin_write()
+{
+    // In the non-blocking case, we will only succeed if there is no contention for
+    // the write mutex. For this case we are trivially fair and can ignore the
+    // fairness machinery.
+    bool got_the_lock = m_writemutex.try_lock();
+    if (got_the_lock) {
+        finish_begin_write();
+    }
+    return got_the_lock;
+}
+
+
 void SharedGroup::do_begin_write()
 {
     SharedInfo* info = m_file_map.get_addr();
+
     // Get write lock - the write lock is held until do_end_write().
     //
     // We use a ticketing scheme to ensure fairness wrt performing write transactions.
@@ -1884,7 +1930,12 @@ void SharedGroup::do_begin_write()
     // should take this situation into account by comparing with '>' instead of '!='
     info->next_served = my_ticket;
 #endif
+    finish_begin_write();
+}
 
+void SharedGroup::finish_begin_write()
+{
+    SharedInfo* info = m_file_map.get_addr();
     if (info->commit_in_critical_phase) {
         m_writemutex.unlock();
         throw std::runtime_error("Crash of other process detected, session restart required");

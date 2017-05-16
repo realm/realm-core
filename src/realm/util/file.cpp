@@ -93,6 +93,26 @@ size_t get_page_size()
 // It could also have been a static local variable, but Valgrind/Helgrind gives a false error on that.
 size_t cached_page_size = get_page_size();
 
+bool for_each_helper(const std::string& path, const std::string& dir, File::ForEachHandler& handler)
+{
+    DirScanner ds{path}; // Throws
+    std::string name;
+    while (ds.next(name)) { // Throws
+        std::string subpath = File::resolve(name, path); // Throws
+        bool go_on;
+        if (File::is_dir(subpath)) { // Throws
+            std::string subdir = File::resolve(name, dir); // Throws
+            go_on = for_each_helper(subpath, subdir, handler); // Throws
+        }
+        else {
+            go_on = handler(name, dir); // Throws
+        }
+        if (!go_on)
+            return false;
+    }
+    return true;
+}
+
 } // anonymous namespace
 
 
@@ -156,6 +176,25 @@ void remove_dir(const std::string& path)
         default:
             throw File::AccessError(msg, path); // LCOV_EXCL_LINE
     }
+}
+
+
+void remove_dir_recursive(const std::string& path)
+{
+    {
+        DirScanner ds{path}; // Throws
+        std::string name;
+        while (ds.next(name)) { // Throws
+            std::string subpath = File::resolve(name, path); // Throws
+            if (File::is_dir(subpath)) { // Throws
+                remove_dir_recursive(subpath); // Throws
+            }
+            else {
+                File::remove(subpath); // Throws
+            }
+        }
+    }
+    remove_dir(path); // Throws
 }
 
 
@@ -1218,6 +1257,12 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 }
 
 
+bool File::for_each(const std::string& dir_path, ForEachHandler handler)
+{
+    return for_each_helper(dir_path, "", handler); // Throws
+}
+
+
 void File::set_encryption_key(const char* key)
 {
 #if REALM_ENABLE_ENCRYPTION
@@ -1234,6 +1279,11 @@ void File::set_encryption_key(const char* key)
         throw std::runtime_error("Encryption not enabled");
     }
 #endif
+}
+
+const char* File::get_encryption_key()
+{
+    return m_encryption_key.get();
 }
 
 

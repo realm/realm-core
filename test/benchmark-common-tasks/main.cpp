@@ -20,6 +20,7 @@
 #include <sstream>
 
 #include <realm.hpp>
+#include <realm/query_expression.hpp> // only needed to compile on v2.6.0
 #include <realm/util/file.hpp>
 
 #include "compatibility.hpp"
