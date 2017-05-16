@@ -125,7 +125,7 @@ void check_write(FileDesc fd, off_t pos, const void* data, size_t len)
 {
     uint64_t orig = File::get_file_pos(fd);
     File::seek_static(fd, pos);
-    File::write_static(fd, (char*)data, len);
+    File::write_static(fd, static_cast<const char*>(data), len);
     File::seek_static(fd, orig);
 }
 
@@ -133,7 +133,7 @@ size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
 {
     uint64_t orig = File::get_file_pos(fd);
     File::seek_static(fd, pos);
-    size_t ret = File::read_static(fd, (char*)dst, len);
+    size_t ret = File::read_static(fd, static_cast<char*>(dst), len);
     File::seek_static(fd, orig);
     return ret;
 }
