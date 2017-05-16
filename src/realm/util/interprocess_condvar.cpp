@@ -241,7 +241,7 @@ void InterprocessCondVar::init_shared_part(SharedPart& shared_part)
 
 void InterprocessCondVar::release_shared_part()
 {
-#ifdef REALM_CONDVAR_EMULATION 
+#ifdef REALM_CONDVAR_EMULATION
 #ifndef _WIN32
     File::try_remove(m_resource_path);
 #endif
