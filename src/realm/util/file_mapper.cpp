@@ -346,7 +346,8 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
             throw std::runtime_error("Map size is too large");
         HANDLE map_handle = CreateFileMappingFromApp(fd, 0, protect, offset + size, nullptr);
         if (!map_handle)
-            throw std::runtime_error("CreateFileMapping() failed");
+            throw AddressSpaceExhausted(get_errno_msg("CreateFileMapping() failed: ", GetLastError()) + " size: " + util::to_string(size) +
+                " offset: " + util::to_string(offset));
 
         if (int_cast_with_overflow_detect(offset, large_int.QuadPart))
             throw std::runtime_error("Map offset is too large");
@@ -356,8 +357,9 @@ void* mmap(FileDesc fd, size_t size, File::AccessMode access, size_t offset, con
         BOOL r = CloseHandle(map_handle);
         REALM_ASSERT_RELEASE(r);
         if (!addr)
-            throw std::runtime_error("MapViewOfFile() failed");
-
+            throw AddressSpaceExhausted(get_errno_msg("MapViewOfFileFromApp() failed: ", GetLastError()) + " size: " + util::to_string(_size) +
+                " offset: " + util::to_string(offset));
+        
         return addr;
 #endif
     }
