@@ -11516,7 +11516,7 @@ TEST(LangBindHelper_Compact)
     }
 }
 
-/*
+
 TEST(LangBindHelper_CompactLargeEncryptedFile)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -11555,7 +11555,7 @@ TEST(LangBindHelper_CompactLargeEncryptedFile)
         sg.close();
     }
 }
-*/
+
 
 TEST(LangBindHelper_TableViewAggregateAfterAdvanceRead)
 {

@@ -218,8 +218,7 @@ void set_random_seed()
 void set_always_encrypt()
 {
     const char* str = getenv("UNITTEST_ENCRYPT_ALL");
-    enable_always_encrypt();
-    if (str && strlen(str) != 0)       
+    if (str && strlen(str) != 0)
         enable_always_encrypt();
 }
 
