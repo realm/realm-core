@@ -93,9 +93,9 @@ void InterprocessCondVar::close() noexcept
         m_fd_write = -1;
     }
 #endif
+#endif
     // we don't do anything to the shared part, other CondVars may share it
     m_shared_part = nullptr;
-#endif
 }
 
 
