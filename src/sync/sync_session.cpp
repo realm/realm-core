@@ -184,7 +184,7 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
     bool revive_if_needed(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
         session.m_deferred_close = false;
-        return false;
+        return true;
     }
 
     void nonsync_transact_notify(std::unique_lock<std::mutex>&,
