@@ -390,38 +390,36 @@ void munmap(void* addr, size_t size) noexcept
 void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, File::AccessMode a, size_t new_size, const char* encryption_key)
 {
 #if REALM_ENABLE_ENCRYPTION
-	if (encryption_key) {
-		LockGuard lock(mapping_mutex);
-		size_t rounded_old_size = round_up_to_page_size(old_size);
-		if (mapping_and_addr* m = find_mapping_for_addr(old_addr, rounded_old_size)) {
-			size_t rounded_new_size = round_up_to_page_size(new_size);
-			if (rounded_old_size == rounded_new_size)
-				return old_addr;
+    if (encryption_key) {
+        LockGuard lock(mapping_mutex);
+        size_t rounded_old_size = round_up_to_page_size(old_size);
+        if (mapping_and_addr* m = find_mapping_for_addr(old_addr, rounded_old_size)) {
+            size_t rounded_new_size = round_up_to_page_size(new_size);
+            if (rounded_old_size == rounded_new_size)
+                return old_addr;
 
-			void* new_addr = mmap_anon(rounded_new_size);
-			m->mapping->set(new_addr, rounded_new_size, file_offset);
-
+            void* new_addr = mmap_anon(rounded_new_size);
+            m->mapping->set(new_addr, rounded_new_size, file_offset);
+            m->addr = new_addr;
+            m->size = rounded_new_size;
 #ifdef _WIN32
-			if (!UnmapViewOfFile(old_addr))
-				throw std::runtime_error(get_errno_msg("UnmapViewOfFile failed: ", GetLastError()));
+            if (!UnmapViewOfFile(old_addr))
+                throw std::runtime_error(get_errno_msg("UnmapViewOfFile failed: ", GetLastError()));
 #else
-			int i = ::munmap(old_addr, rounded_old_size);
-
-			m->addr = new_addr;
-			m->size = rounded_new_size;
-			if (i != 0) {
-				int err = errno;
-				throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
-			}
+            int i = ::munmap(old_addr, rounded_old_size);
+            if (i != 0) {
+                int err = errno;
+                throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
+            }
 #endif
-			return new_addr;
-		}
-		// If we are using encryption, we must have used mmap and the mapping
-		// must have been added to the cache therefore find_mapping_for_addr()
-		// will succeed. Otherwise we would continue to mmap it below without
-		// the encryption key which is an error.
-		REALM_UNREACHABLE();
-	}
+            return new_addr;
+        }
+        // If we are using encryption, we must have used mmap and the mapping
+        // must have been added to the cache therefore find_mapping_for_addr()
+        // will succeed. Otherwise we would continue to mmap it below without
+        // the encryption key which is an error.
+        REALM_UNREACHABLE();
+    }
 #else
     static_cast<void>(encryption_key);
 #endif
