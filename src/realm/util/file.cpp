@@ -1117,7 +1117,7 @@ bool File::compare(const std::string& path_1, const std::string& path_2)
 bool File::is_same_file_static(FileDesc f1, FileDesc f2)
 {
 #if defined(_WIN32) // Windows version
-	FILE_ID_INFO fi1;
+    FILE_ID_INFO fi1;
 	FILE_ID_INFO fi2;
     if (GetFileInformationByHandleEx(f1, FILE_INFO_BY_HANDLE_CLASS::FileIdInfo, &fi1, sizeof(fi1))) {
         if (GetFileInformationByHandleEx(f2, FILE_INFO_BY_HANDLE_CLASS::FileIdInfo, &fi2, sizeof(fi2))) {
