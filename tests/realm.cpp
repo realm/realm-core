@@ -1062,6 +1062,35 @@ TEST_CASE("SharedRealm: coordinator schema cache") {
     }
 }
 
+TEST_CASE("SharedRealm: dynamic schema mode doesn't invalidate object schema pointers when schema hasn't changed") {
+    TestFile config;
+    config.cache = false;
+
+    // Prepopulate the Realm with the schema.
+    Realm::Config config_with_schema = config;
+    config_with_schema.schema_version = 1;
+    config_with_schema.schema_mode = SchemaMode::Automatic;
+    config_with_schema.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int, "", "", true, false, false},
+            {"value 2", PropertyType::Int, "", "", false, true, false},
+        }}
+    };
+    auto r1 = Realm::get_shared_realm(config_with_schema);
+
+    // Retrieve the object schema in dynamic mode.
+    auto r2 = Realm::get_shared_realm(config);
+    auto* object_schema = &*r2->schema().find("object");
+
+    // Perform an empty write to create a new version, resulting in the other Realm needing to re-read the schema.
+    r1->begin_transaction();
+    r1->commit_transaction();
+
+    // Advance to the latest version, and verify the object schema is at the same location in memory.
+    r2->read_group();
+    REQUIRE(object_schema == &*r2->schema().find("object"));
+}
+
 #ifndef _WIN32
 TEST_CASE("SharedRealm: compact on launch") {
     // Make compactable Realm
