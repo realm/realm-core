@@ -621,7 +621,7 @@ void SyncSession::create_sync_session()
     // Set up the wrapped progress handler callback
     auto wrapped_progress_handler = [this, weak_self](uint_fast64_t downloaded, uint_fast64_t downloadable,
                                                       uint_fast64_t uploaded, uint_fast64_t uploadable,
-                                                      bool is_fresh) {
+                                                      bool is_fresh, uint_fast64_t /*snapshot_version*/) {
         if (auto self = weak_self.lock()) {
             handle_progress_update(downloaded, downloadable, uploaded, uploadable, is_fresh);
         }
