@@ -297,7 +297,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
     HANDLE handle =
         CreateFile2(ws.c_str(), desired_access, share_mode, creation_disposition, nullptr);
     if (handle != INVALID_HANDLE_VALUE) {
-        m_handle = handle;
+        m_fd = handle;
         m_have_lock = false;
         if (success)
             *success = true;
@@ -392,14 +392,14 @@ void File::close() noexcept
 {
 #ifdef _WIN32 // Windows version
 
-    if (!m_handle)
+    if (!m_fd)
         return;
     if (m_have_lock)
         unlock();
 
-    BOOL r = CloseHandle(m_handle);
+    BOOL r = CloseHandle(m_fd);
     REALM_ASSERT_RELEASE(r);
-    m_handle = nullptr;
+    m_fd = nullptr;
 
 #else // POSIX version
 
@@ -468,35 +468,19 @@ size_t File::read(char* data, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
     if (m_encryption_key) {
-        uint64_t pos_original = File::get_file_pos(m_handle);
+        uint64_t pos_original = File::get_file_pos(m_fd);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
         Map<char> read_map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
         realm::util::encryption_read_barrier(read_map, pos, size);
         memcpy(data, read_map.get_addr() + pos, size);
-		uint64_t cur = File::get_file_pos(m_handle);
-        seek_static(m_handle, cur + size);        
-        return read_map.get_size() - pos;
-    }
-
-    return read_static(m_handle, data, size);
-#else // POSIX version
-
-    if (m_encryption_key) {
-        off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
-        REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
-        size_t pos = size_t(pos_original);
-        Map<char> read_map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
-        realm::util::encryption_read_barrier(read_map, pos, size);
-        memcpy(data, read_map.get_addr() + pos, size);
-        lseek(m_fd, size, SEEK_CUR);
+		uint64_t cur = File::get_file_pos(m_fd);
+        seek_static(m_fd, cur + size);
         return read_map.get_size() - pos;
     }
 
     return read_static(m_fd, data, size);
-#endif
 }
 
 void File::write_static(FileDesc fd, const char* data, size_t size)
@@ -547,39 +531,20 @@ void File::write(const char* data, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
     if (m_encryption_key) {        
-		uint64_t pos_original = get_file_pos(m_handle);
+		uint64_t pos_original = get_file_pos(m_fd);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
         Map<char> write_map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
         realm::util::encryption_read_barrier(write_map, pos, size);
         memcpy(write_map.get_addr() + pos, data, size);
         realm::util::encryption_write_barrier(write_map, pos, size);
-		uint64_t cur = get_file_pos(m_handle);
+		uint64_t cur = get_file_pos(m_fd);
         seek(cur + size);
         return;
     }
 
-    write_static(m_handle, data, size);
-
-#else // POSIX version
-
-    if (m_encryption_key) {
-        off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
-        REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
-        size_t pos = size_t(pos_original);
-        Map<char> write_map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
-        realm::util::encryption_read_barrier(write_map, pos, size);
-        memcpy(write_map.get_addr() + pos, data, size);
-        realm::util::encryption_write_barrier(write_map, pos, size);
-        lseek(m_fd, size, SEEK_CUR);
-        return;
-    }
-
     write_static(m_fd, data, size);
-
-#endif
 }
 
 uint64_t File::get_file_pos(FileDesc fd)
@@ -630,11 +595,7 @@ File::SizeType File::get_size_static(FileDesc fd)
 File::SizeType File::get_size() const
 {
     REALM_ASSERT_RELEASE(is_attached());
-#ifdef _WIN32 // Windows version
-    File::SizeType size = get_size_static(m_handle);
-#else
     File::SizeType size = get_size_static(m_fd);
-#endif
 
     if (m_encryption_key)
         return encrypted_size_to_data_size(size);
@@ -650,13 +611,13 @@ void File::resize(SizeType size)
 #ifdef _WIN32 // Windows version
 
     // Save file position
-    SizeType p = get_file_pos(m_handle);
+    SizeType p = get_file_pos(m_fd);
 
 	if (m_encryption_key)
 		size = data_size_to_encrypted_size(size);
 
     seek(size);
-    if (!SetEndOfFile(m_handle))
+    if (!SetEndOfFile(m_fd))
         throw std::runtime_error("SetEndOfFile() failed");
 
     // Restore file position
@@ -754,7 +715,7 @@ void File::seek(SizeType position)
 {
     REALM_ASSERT_RELEASE(is_attached());
 #ifdef _WIN32
-    seek_static(m_handle, position);
+    seek_static(m_fd, position);
 #else
     seek_static(m_fd, position);
 #endif
@@ -794,7 +755,7 @@ void File::sync()
 
 #if defined _WIN32 // Windows version
 
-    if (FlushFileBuffers(m_handle))
+    if (FlushFileBuffers(m_fd))
         return;
     throw std::runtime_error("FlushFileBuffers() failed");
 
@@ -836,7 +797,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     memset(&overlapped, 0, sizeof overlapped);
     overlapped.Offset = 0;     // Just for clarity
     overlapped.OffsetHigh = 0; // Just for clarity
-    if (LockFileEx(m_handle, flags, 0, 1, 0, &overlapped)) {
+    if (LockFileEx(m_fd, flags, 0, 1, 0, &overlapped)) {
         m_have_lock = true;
         return true;
     }
@@ -895,7 +856,7 @@ void File::unlock() noexcept
     overlapped.OffsetHigh = 0;
     overlapped.Offset = 0;
     overlapped.Pointer = 0;
-    BOOL r = UnlockFileEx(m_handle, 0, 1, 0, &overlapped);
+    BOOL r = UnlockFileEx(m_fd, 0, 1, 0, &overlapped);
 
     REALM_ASSERT_RELEASE(r);
     m_have_lock = false;
@@ -919,7 +880,7 @@ void File::unlock() noexcept
 void* File::map(AccessMode a, size_t size, int map_flags, size_t offset) const
 {
 #ifdef _WIN32
-    return realm::util::mmap(m_handle, size, a, offset, m_encryption_key.get());
+    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get());
 #else
     // FIXME: On FreeeBSB and other systems that support it, we should
     // honor map_NoSync by specifying MAP_NOSYNC, but how do we
@@ -934,7 +895,7 @@ void* File::map(AccessMode a, size_t size, int map_flags, size_t offset) const
 void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int map_flags, size_t offset) const
 {
 #ifdef _WIN32
-    return realm::util::mmap(m_handle, size, a, offset, m_encryption_key.get(), mapping);
+    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
 #else
     static_cast<void>(map_flags);
     return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
@@ -953,7 +914,7 @@ void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size
 {
 	static_cast<void>(map_flags);
 #ifdef _WIN32
-	return realm::util::mremap(m_handle, file_offset, old_addr, old_size, a, new_size, m_encryption_key.get());
+	return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size, m_encryption_key.get());
 #else
     return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size, m_encryption_key.get());
 #endif
@@ -1148,11 +1109,7 @@ bool File::is_same_file(const File& f) const
 {
     REALM_ASSERT_RELEASE(is_attached());
     REALM_ASSERT_RELEASE(f.is_attached());
-#ifdef _WIN32
-    return is_same_file_static(m_handle, f.m_handle);
-#else
     return is_same_file_static(m_fd, f.m_fd);
-#endif
 }
 
 File::UniqueID File::get_unique_id() const

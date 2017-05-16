@@ -546,8 +546,8 @@ public:
 
 private:
 #ifdef _WIN32
-    void* m_handle;
-    bool m_have_lock; // Only valid when m_handle is not null
+    void* m_fd;
+    bool m_have_lock; // Only valid when m_fd is not null
 #else
     int m_fd;
 #endif
@@ -902,7 +902,7 @@ private:
 inline File::File(const std::string& path, Mode m)
 {
 #ifdef _WIN32
-    m_handle = nullptr;
+    m_fd = nullptr;
 #else
     m_fd = -1;
 #endif
@@ -913,7 +913,7 @@ inline File::File(const std::string& path, Mode m)
 inline File::File() noexcept
 {
 #ifdef _WIN32
-    m_handle = nullptr;
+    m_fd = nullptr;
 #else
     m_fd = -1;
 #endif
@@ -927,9 +927,9 @@ inline File::~File() noexcept
 inline File::File(File&& f) noexcept
 {
 #ifdef _WIN32
-    m_handle = f.m_handle;
+    m_fd = f.m_fd;
     m_have_lock = f.m_have_lock;
-    f.m_handle = nullptr;
+    f.m_fd = nullptr;
 #else
     m_fd = f.m_fd;
     f.m_fd = -1;
@@ -941,9 +941,9 @@ inline File& File::operator=(File&& f) noexcept
 {
     close();
 #ifdef _WIN32
-    m_handle = f.m_handle;
+    m_fd = f.m_fd;
     m_have_lock = f.m_have_lock;
-    f.m_handle = nullptr;
+    f.m_fd = nullptr;
 #else
     m_fd = f.m_fd;
     f.m_fd = -1;
@@ -1001,7 +1001,7 @@ inline void File::open(const std::string& path, bool& was_created)
 inline bool File::is_attached() const noexcept
 {
 #ifdef _WIN32
-    return (m_handle != nullptr);
+    return (m_fd != nullptr);
 #else
     return 0 <= m_fd;
 #endif
