@@ -16,34 +16,117 @@
  *
  **************************************************************************/
 
-#include <cstring>
-#include <typeinfo>
-#include <limits>
-#include <vector>
-#include <map>
-#include <sstream>
-#include <fstream>
-#include <iostream>
-
-#include <unistd.h>
-#include <sys/wait.h>
-
-#include <realm.hpp>
-#include <realm/impl/destroy_guard.hpp>
-#include <realm/impl/simulated_failure.hpp>
-#include <realm/column_string.hpp>
-#include <realm/column_string_enum.hpp>
-#include <realm/column_mixed.hpp>
-#include <realm/array_binary.hpp>
-#include <realm/array_string_long.hpp>
-#include <realm/lang_bind_helper.hpp>
-#include <realm/replication.hpp>
-#include <realm/commit_log.hpp>
-
+#include "realm.hpp"
 #include "../test.hpp"
-#include "../util/demangle.hpp"
 
+#include <iostream>
+#include <set>
+#include <chrono>
+
+using namespace std::chrono;
 using namespace realm;
-using namespace realm::util;
-using namespace realm::test_util;
-using namespace realm::_impl;
+
+int _index_performance(unsigned nb_rows)
+{
+    Table table;
+    table.add_column(type_Int, "keys");
+    table.add_search_index(0);
+
+    auto t1 = steady_clock::now();
+
+    for (unsigned i = 0; i < nb_rows; i++) {
+        table.add_row_with_key(0, i);
+    }
+
+    auto t2 = steady_clock::now();
+
+    for (unsigned i = 0; i < nb_rows; i++) {
+        if (table.find_first_int(0, i) != i) {
+            std::cout << "*** ERROR ***" << std::endl;
+            return 0;
+        }
+    }
+
+    auto t3 = steady_clock::now();
+
+    std::cout << nb_rows << " rows" << std::endl;
+    std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+              << std::endl;
+    std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t3 - t2).count() / nb_rows << " ns/key"
+              << std::endl;
+
+    return 0;
+}
+
+int index_performance(unsigned nb_rows)
+{
+    Table table;
+    table.add_column(type_Int, "keys");
+    table.add_search_index(0);
+    std::set<int> numbers;
+    std::set<int> numbers_1;
+
+    for (unsigned i = 0; i < nb_rows; i++) {
+        while (true) {
+            auto res = numbers.insert(rand());
+            if (res.second)
+                break;
+        }
+    }
+    for (unsigned i = 0; i < nb_rows; i++) {
+        while (true) {
+            auto x = rand();
+            if (numbers.count(x) == 0) {
+                auto res = numbers_1.insert(x);
+                if (res.second)
+                    break;
+            }
+        }
+    }
+
+    auto t1 = steady_clock::now();
+
+    for (auto n : numbers) {
+        table.add_row_with_key(0, n);
+    }
+
+    auto t2 = steady_clock::now();
+
+    unsigned i = 0;
+    for (auto n : numbers) {
+        if (table.find_first_int(0, n) != i) {
+            std::cout << "*** ERROR ***" << std::endl;
+            return 0;
+        }
+        i++;
+    }
+
+    auto t3 = steady_clock::now();
+
+    for (auto n : numbers_1) {
+        size_t x = rand() % nb_rows;
+        table.move_last_over(x);
+        table.add_row_with_key(0, n);
+    }
+
+    auto t4 = steady_clock::now();
+
+    std::cout << nb_rows << " rows" << std::endl;
+    std::cout << "   total time    : " << duration_cast<microseconds>(t3 - t1).count() << " us" << std::endl;
+    std::cout << "   insertion time: " << duration_cast<nanoseconds>(t2 - t1).count() / nb_rows << " ns/key"
+              << std::endl;
+    std::cout << "   lookup time   : " << duration_cast<nanoseconds>(t3 - t2).count() / nb_rows << " ns/key"
+              << std::endl;
+    std::cout << "   replace time  : " << duration_cast<nanoseconds>(t4 - t3).count() / nb_rows << " ns/key"
+              << std::endl;
+
+    return 0;
+}
+
+TEST(Cuckoo_performance)
+{
+    index_performance(100);
+    index_performance(1000);
+    index_performance(10000);
+    index_performance(100000);
+}
