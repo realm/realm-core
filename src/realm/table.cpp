@@ -4775,7 +4775,8 @@ void Table::write(std::ostream& out, size_t offset, size_t slice_size, StringDat
     bool no_top_array = false;
     bool pad_for_encryption = false;
     uint_fast64_t version_number = 0;
-    Group::write(out, get_alloc(), writer, no_top_array, pad_for_encryption, version_number); // Throws
+    int file_format_version = 0;
+    Group::write(out, file_format_version, writer, no_top_array, pad_for_encryption, version_number); // Throws
 }
 
 

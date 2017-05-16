@@ -2497,6 +2497,61 @@ TEST(Shared_MixedWithNonShared)
 #endif
 }
 
+
+#if REALM_ENABLE_ENCRYPTION
+// verify that even though different threads share the same encrypted pages,
+// a thread will not get access without the key.
+TEST(Shared_EncryptionKeyCheck)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroupOptions(crypt_key(true)));
+    bool ok = false;
+    try {
+        SharedGroup sg_2(path, false, SharedGroupOptions());
+    } catch (std::runtime_error&) {
+        ok = true;
+    }
+    CHECK(ok);
+    SharedGroup sg3(path, false, SharedGroupOptions(crypt_key(true)));
+}
+
+// opposite - if opened unencrypted, attempt to share it encrypted
+// will throw an error.
+TEST(Shared_EncryptionKeyCheck_2)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroupOptions());
+    bool ok = false;
+    try {
+        SharedGroup sg_2(path, false, SharedGroupOptions(crypt_key(true)));
+    } catch (std::runtime_error&) {
+        ok = true;
+    }
+    CHECK(ok);
+    SharedGroup sg3(path, false, SharedGroupOptions());
+}
+
+// if opened by one key, it cannot be opened by a different key
+TEST(Shared_EncryptionKeyCheck_3)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* first_key = crypt_key(true);
+    char second_key[32];
+    memcpy(second_key, first_key, 32);
+    second_key[3] = ~second_key[3];
+    SharedGroup sg(path, false, SharedGroupOptions(first_key));
+    bool ok = false;
+    try {
+        SharedGroup sg_2(path, false, SharedGroupOptions(second_key));
+    } catch (std::runtime_error&) {
+        ok = true;
+    }
+    CHECK(ok);
+    SharedGroup sg3(path, false, SharedGroupOptions(first_key));
+}
+
+#endif
+
 TEST(Shared_VersionCount)
 {
     SHARED_GROUP_TEST_PATH(path);
