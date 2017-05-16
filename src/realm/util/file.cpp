@@ -475,7 +475,7 @@ size_t File::read(char* data, size_t size)
         Map<char> read_map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
         realm::util::encryption_read_barrier(read_map, pos, size);
         memcpy(data, read_map.get_addr() + pos, size);
-		uint64_t cur = File::get_file_pos(m_fd);
+        uint64_t cur = File::get_file_pos(m_fd);
         seek_static(m_fd, cur + size);
         return read_map.get_size() - pos;
     }
@@ -532,14 +532,14 @@ void File::write(const char* data, size_t size)
     REALM_ASSERT_RELEASE(is_attached());
 
     if (m_encryption_key) {        
-		uint64_t pos_original = get_file_pos(m_fd);
+        uint64_t pos_original = get_file_pos(m_fd);
         REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
         size_t pos = size_t(pos_original);
         Map<char> write_map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
         realm::util::encryption_read_barrier(write_map, pos, size);
         memcpy(write_map.get_addr() + pos, data, size);
         realm::util::encryption_write_barrier(write_map, pos, size);
-		uint64_t cur = get_file_pos(m_fd);
+        uint64_t cur = get_file_pos(m_fd);
         seek(cur + size);
         return;
     }
@@ -551,14 +551,14 @@ uint64_t File::get_file_pos(FileDesc fd)
 {
 #ifdef _WIN32
     LONG high_dword = 0;
-	LARGE_INTEGER li;
-	LARGE_INTEGER res;
-	li.QuadPart = 0;
+    LARGE_INTEGER li;
+    LARGE_INTEGER res;
+    li.QuadPart = 0;
     bool ok = SetFilePointerEx(fd, li, &res, FILE_CURRENT);
     if (!ok)
         throw std::runtime_error("SetFilePointer() failed");
 
-	return uint64_t(res.QuadPart);
+    return uint64_t(res.QuadPart);
 #else
     return lseek(fd, 0, SEEK_CUR);
 #endif
@@ -613,8 +613,8 @@ void File::resize(SizeType size)
     // Save file position
     SizeType p = get_file_pos(m_fd);
 
-	if (m_encryption_key)
-		size = data_size_to_encrypted_size(size);
+    if (m_encryption_key)
+        size = data_size_to_encrypted_size(size);
 
     seek(size);
     if (!SetEndOfFile(m_fd))
@@ -912,9 +912,9 @@ void File::unmap(void* addr, size_t size) noexcept
 void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size, int map_flags,
                   size_t file_offset) const
 {
-	static_cast<void>(map_flags);
+    static_cast<void>(map_flags);
 #ifdef _WIN32
-	return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size, m_encryption_key.get());
+    return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size, m_encryption_key.get());
 #else
     return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size, m_encryption_key.get());
 #endif
@@ -1079,10 +1079,10 @@ bool File::is_same_file_static(FileDesc f1, FileDesc f2)
 {
 #if defined(_WIN32) // Windows version
     FILE_ID_INFO fi1;
-	FILE_ID_INFO fi2;
+    FILE_ID_INFO fi2;
     if (GetFileInformationByHandleEx(f1, FILE_INFO_BY_HANDLE_CLASS::FileIdInfo, &fi1, sizeof(fi1))) {
         if (GetFileInformationByHandleEx(f2, FILE_INFO_BY_HANDLE_CLASS::FileIdInfo, &fi2, sizeof(fi2))) {
-			return memcmp(&fi1.FileId, &fi2.FileId, sizeof(fi1.FileId)) == 0 && fi1.VolumeSerialNumber == fi2.VolumeSerialNumber;
+            return memcmp(&fi1.FileId, &fi2.FileId, sizeof(fi1.FileId)) == 0 && fi1.VolumeSerialNumber == fi2.VolumeSerialNumber;
         }
     }
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
