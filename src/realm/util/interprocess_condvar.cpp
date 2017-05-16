@@ -197,7 +197,8 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     // If the named objects are alive in the Windows kernel space, then their handles are cloned and
     // you get returned a new HANDLE number (differs from that of other processes) which represents the 
     // same object. If not then they are created. When the last process that has handles to an object 
-    // terminates, the objects are destructed automatically by the kernel, providing robustness.
+    // terminates, the objects are destructed automatically by the kernel, so there will be no handle 
+    // leaks or other kinds of leak.
     std::string sem = "realm_sema_" + base_path + condvar_name;
     std::string eve = "realm_event_" + base_path + condvar_name;
 
