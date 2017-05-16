@@ -1237,6 +1237,11 @@ void File::set_encryption_key(const char* key)
 #endif
 }
 
+const char* File::get_encryption_key()
+{
+    return m_encryption_key.get();
+}
+
 
 #ifndef _WIN32
 
