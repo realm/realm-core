@@ -1046,7 +1046,7 @@ private:
     void _add_search_index(size_t column_ndx);
     void _remove_search_index(size_t column_ndx);
 
-    void upgrade_file_format(size_t target_file_format_version);
+    void rebuild_search_index(size_t current_file_format_version);
 
     // Upgrades OldDateTime columns to Timestamp columns
     void upgrade_olddatetime();

@@ -132,36 +132,23 @@ void Group::upgrade_file_format(int target_file_format_version)
                     current_file_format_version == 4 || current_file_format_version == 5 ||
                     current_file_format_version == 6, current_file_format_version);
 
-    // Upgrade from 2 to 3
-    if (current_file_format_version <= 2 && target_file_format_version >= 3) {
-        for (size_t t = 0; t < m_tables.size(); t++) {
-            TableRef table = get_table(t);
-            table->upgrade_file_format(target_file_format_version);
-        }
-    }
-
-    // Upgrade from 3 to 4
-    if (current_file_format_version <= 3 && target_file_format_version >= 4) {
-        // No-op
-    }
-
-    // Upgrade from 4 to 5 (datetime -> timestamp)
-    if (current_file_format_version <= 4 && target_file_format_version >= 5) {
+    // Upgrade from version prior to 5 (datetime -> timestamp)
+    if (current_file_format_version < 5) {
         for (size_t t = 0; t < m_tables.size(); t++) {
             TableRef table = get_table(t);
             table->upgrade_olddatetime();
         }
     }
 
-    // Upgrade from 5 to 6 (new StringIndex format)
-    if (current_file_format_version <= 5 && target_file_format_version >= 6) {
+    // Upgrade from version prior to 6 (StringIndex format changed last time)
+    if (current_file_format_version < 6) {
         for (size_t t = 0; t < m_tables.size(); t++) {
             TableRef table = get_table(t);
-            table->upgrade_file_format(target_file_format_version);
+            table->rebuild_search_index(current_file_format_version);
         }
     }
 
-    // Upgrade from 6 to 7 (new history schema version in top array)
+    // Upgrade from version prior to 7 (new history schema version in top array)
     if (current_file_format_version <= 6 && target_file_format_version >= 7) {
         // If top array size is 9, then add the missing 10th element containing
         // the history schema version.

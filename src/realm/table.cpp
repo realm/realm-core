@@ -1687,7 +1687,7 @@ bool Table::has_search_index(size_t col_ndx) const noexcept
 }
 
 
-void Table::upgrade_file_format(size_t target_file_format_version)
+void Table::rebuild_search_index(size_t current_file_format_version)
 {
     for (size_t col_ndx = 0; col_ndx < get_column_count(); col_ndx++) {
         if (!has_search_index(col_ndx)) {
@@ -1702,9 +1702,7 @@ void Table::upgrade_file_format(size_t target_file_format_version)
                 continue;
             }
             case col_type_Bool:
-            case col_type_Int:
-            case col_type_OldDateTime: {
-                // FIXME: Do upgrade of col_type_OldDateTime
+            case col_type_Int: {
                 if (is_nullable(col_ndx)) {
                     IntNullColumn& col = get_column_int_null(col_ndx);
                     col.get_search_index()->clear();
@@ -1723,6 +1721,15 @@ void Table::upgrade_file_format(size_t target_file_format_version)
                 col.populate_search_index();
                 continue;
             }
+            case col_type_Timestamp:
+                if (current_file_format_version >= 5) {
+                    // If current_file_format_version is less than 5, the index
+                    // is created in upgrade_olddatetime function
+                    TimestampColumn& col = get_column_timestamp(col_ndx);
+                    col.get_search_index()->clear();
+                    col.populate_search_index();
+                }
+                continue;
             case col_type_Binary:
             case col_type_Table:
             case col_type_Mixed:
@@ -1734,18 +1741,9 @@ void Table::upgrade_file_format(size_t target_file_format_version)
             case col_type_BackLink:
                 // Indices are not support on these column types
                 break;
-            case col_type_Timestamp: {
-                if (target_file_format_version == 6 || target_file_format_version == 7) {
-                    TimestampColumn& col = get_column_timestamp(col_ndx);
-                    col.get_search_index()->clear();
-                    col.populate_search_index();
-                    continue;
-                }
-                else {
-                    // Introduced after version 5 file format upgrade
-                    break;
-                }
-            }
+            case col_type_OldDateTime:
+                // This column type should not be found as it should have been converted to col_type_Timestamp
+                break;
         }
         REALM_ASSERT(false);
     }
