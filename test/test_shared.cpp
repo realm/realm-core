@@ -2008,7 +2008,7 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #if !defined(_WIN32)
 // this test does not work with valgrind:
-#if 0
+#if 1
 
 // This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
