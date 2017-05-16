@@ -2420,7 +2420,7 @@ TEST(Shared_EncryptionKeyCheck_3)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* first_key = crypt_key(true);
-    char* second_key = new char[32];
+    char second_key[32];
     memcpy(second_key, first_key, 32);
     second_key[3] = ~second_key[3];
     SharedGroup sg(path, false, SharedGroupOptions(first_key));
@@ -2432,7 +2432,6 @@ TEST(Shared_EncryptionKeyCheck_3)
     }
     CHECK(ok);
     SharedGroup sg3(path, false, SharedGroupOptions(first_key));
-    delete[] second_key;
 }
 
 #endif
