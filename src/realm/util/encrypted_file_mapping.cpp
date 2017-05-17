@@ -128,7 +128,8 @@ size_t check_read(int fd, off_t pos, void* dst, size_t len)
 } // anonymous namespace
 
 AESCryptor::AESCryptor(const uint8_t* key)
-    : m_rw_buffer(new char[block_size])
+    : m_rw_buffer(new char[block_size]),
+      m_dst_buffer(new char[block_size])
 {
 #if REALM_PLATFORM_APPLE
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
@@ -233,7 +234,11 @@ bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size)
             }
         }
 
-        crypt(mode_Decrypt, pos, dst, m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
+        // decrypt to a temporary buffer first because some implementations may
+        // require several iterations on a block before producing a final result
+        // and our shared mappings might be read by other readers at any time
+        crypt(mode_Decrypt, pos, m_dst_buffer.get(), m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
+        memcpy(dst, m_dst_buffer.get(), block_size);
 
         pos += block_size;
         dst += block_size;
