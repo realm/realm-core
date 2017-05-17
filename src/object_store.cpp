@@ -165,7 +165,7 @@ void add_initial_columns(Group& group, ObjectSchema const& object_schema)
     for (auto const& prop : object_schema.persisted_properties) {
 #if REALM_ENABLE_SYNC
         // The sync::create_table* functions create the PK column for us.
-        if (object_schema.primary_key.size() && prop.is_primary()) {
+        if (object_schema.primary_key.size() && prop.is_primary) {
             continue;
         }
 #endif // REALM_ENABLE_SYNC
