@@ -36,6 +36,8 @@
 #include <realm/link_view.hpp>
 #include <realm/version.hpp>
 
+#include <cstdint>
+
 using namespace realm;
 
 TEST_CASE("list") {

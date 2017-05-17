@@ -33,6 +33,8 @@
 
 #include <realm/group_shared.hpp>
 
+#include <cstdint>
+
 using namespace realm;
 
 namespace {
