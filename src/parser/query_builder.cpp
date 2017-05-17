@@ -17,16 +17,17 @@
 ////////////////////////////////////////////////////////////////////////////
 
 #include "query_builder.hpp"
-#include "parser.hpp"
 
+#include "object_schema.hpp"
 #include "object_store.hpp"
+#include "parser.hpp"
 #include "schema.hpp"
 #include "util/compiler.hpp"
 #include "util/format.hpp"
 
 #include <realm.hpp>
 #include <realm/query_expression.hpp>
-#include <assert.h>
+
 #include <sstream>
 
 using namespace realm;
@@ -174,7 +175,7 @@ void add_bool_constraint_to_query(Query &query, Predicate::Operator operatorType
 void add_string_constraint_to_query(Query &query,
                                     Predicate::Comparison cmp,
                                     Columns<String> &&column,
-                                    std::string &&value) {
+                                    StringData &&value) {
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
         case Predicate::Operator::BeginsWith:
@@ -199,7 +200,7 @@ void add_string_constraint_to_query(Query &query,
 
 void add_string_constraint_to_query(realm::Query &query,
                                     Predicate::Comparison cmp,
-                                    std::string &&value,
+                                    StringData &&value,
                                     Columns<String> &&column) {
     bool case_sensitive = (cmp.option != Predicate::OperatorOption::CaseInsensitive);
     switch (cmp.op) {
@@ -217,7 +218,7 @@ void add_string_constraint_to_query(realm::Query &query,
 void add_binary_constraint_to_query(Query &query,
                                     Predicate::Operator op,
                                     Columns<Binary> &&column,
-                                    std::string &&value) {
+                                    BinaryData &&value) {
     switch (op) {
         case Predicate::Operator::BeginsWith:
             query.begins_with(column.column_ndx(), BinaryData(value));
@@ -241,7 +242,7 @@ void add_binary_constraint_to_query(Query &query,
 
 void add_binary_constraint_to_query(realm::Query &query,
                                     Predicate::Operator op,
-                                    std::string value,
+                                    BinaryData value,
                                     Columns<Binary> &&column) {
     switch (op) {
         case Predicate::Operator::Equal:
@@ -356,7 +357,7 @@ struct ValueGetter<Int, TableGetter> {
 
 template <typename TableGetter>
 struct ValueGetter<String, TableGetter> {
-    static std::string convert(TableGetter&&, const parser::Expression & value, Arguments &args)
+    static StringData convert(TableGetter&&, const parser::Expression & value, Arguments &args)
     {
         if (value.type == parser::Expression::Type::Argument) {
             return args.string_for_argument(stot<int>(value.s));
@@ -370,7 +371,7 @@ struct ValueGetter<String, TableGetter> {
 
 template <typename TableGetter>
 struct ValueGetter<Binary, TableGetter> {
-    static std::string convert(TableGetter&&, const parser::Expression & value, Arguments &args)
+    static BinaryData convert(TableGetter&&, const parser::Expression & value, Arguments &args)
     {
         if (value.type == parser::Expression::Type::Argument) {
             return args.binary_for_argument(stot<int>(value.s));

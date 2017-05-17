@@ -20,6 +20,7 @@
 #define REALM_OS_SYNC_PERMISSION_HPP
 
 #include "results.hpp"
+#include "shared_realm.hpp"
 
 namespace realm {
 
