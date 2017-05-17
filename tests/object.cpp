@@ -422,11 +422,11 @@ TEST_CASE("object") {
             return r1->read_group().get_table("class_array target")->size() == 4;
         });
 
-        REQUIRE(obj.row().get_linklist(2)->size() == 2);
-        REQUIRE(obj.row().get_int(3) == 1); // non-default from r1
-        REQUIRE(obj.row().get_int(1) == 7); // pk
-        REQUIRE(obj.row().get_int(4) == 2); // non-default from r2
-        REQUIRE(obj.row().get_linklist(5)->size() == 2);
+        REQUIRE(obj.row().get_int(0) == 7); // pk
+        REQUIRE(obj.row().get_linklist(1)->size() == 2);
+        REQUIRE(obj.row().get_int(2) == 1); // non-default from r1
+        REQUIRE(obj.row().get_int(3) == 2); // non-default from r2
+        REQUIRE(obj.row().get_linklist(4)->size() == 2);
     }
 #endif
 }
