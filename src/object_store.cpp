@@ -142,7 +142,8 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
 #if REALM_ENABLE_SYNC
     if (object_schema.primary_key.size()) {
         const Property* pk_property = object_schema.primary_key_property();
-        table = sync::create_table_with_primary_key(group, name, DataType(pk_property->type), pk_property->name);
+        table = sync::create_table_with_primary_key(group, name, DataType(pk_property->type),
+                                                    pk_property->name, pk_property->is_nullable);
     }
     else {
         table = sync::create_table(group, name);
