@@ -234,9 +234,19 @@ bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size)
             }
         }
 
-        // decrypt to a temporary buffer first because some implementations may
-        // require several iterations on a block before producing a final result
-        // and our shared mappings might be read by other readers at any time
+        // We may expect some adress ranges of the destination buffer of
+        // AESCryptor::read() to stay unmodified, i.e. being overwritten with
+        // the same bytes as already present, and may have read-access to these
+        // from other threads while decryption is taking place.
+        //
+        // However, some implementations of AES_cbc_encrypt(), in particular
+        // OpenSSL, will put garbled bytes as an intermediate step during the
+        // operation which will lead to incorrect data being read by other
+        // readers concurrently accessing that page. Incorrect data leads to
+        // crashes.
+        //
+        // We therefore decrypt to a temporary buffer first and then copy the
+        // completely decrypted data after.
         crypt(mode_Decrypt, pos, m_dst_buffer.get(), m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
         memcpy(dst, m_dst_buffer.get(), block_size);
 
