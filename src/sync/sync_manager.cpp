@@ -271,10 +271,10 @@ void SyncManager::reconnect()
             return;
         }
     }
-    // Ask all sessions to revive.
+    // Ask all sessions to process reconnection.
     std::lock_guard<std::mutex> lock(m_session_mutex);
     for (auto& it : m_sessions) {
-        it.second->revive_if_needed();
+        it.second->handle_reconnect();
     }
 }
 
