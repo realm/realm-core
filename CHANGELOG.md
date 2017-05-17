@@ -10,6 +10,8 @@
 
 * Enable encryption on watchOS.
   Cocoa issue [#2876](https://github.com/realm/realm-cocoa/issues/2876).
+* Enforce consistent use of encryption keys across all threads.
+  PR [#2558](https://github.com/realm/realm-core/pull/2558).
 
 ----------------------------------------------
 
