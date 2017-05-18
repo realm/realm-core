@@ -278,6 +278,13 @@ void SyncManager::reconnect()
     }
 }
 
+void SyncManager::cancel_reconnect_delay()
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_sync_client)
+        m_sync_client->cancel_reconnect_delay();
+}
+
 util::Logger::Level SyncManager::log_level() const noexcept
 {
     std::lock_guard<std::mutex> lock(m_mutex);
