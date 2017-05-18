@@ -187,7 +187,7 @@ struct sync_session_states::WaitingForAccessToken : public SyncSession::State {
     bool revive_if_needed(std::unique_lock<std::mutex>&, SyncSession& session) const override
     {
         session.m_deferred_close = false;
-        return true;
+        return false;
     }
 
     void handle_reconnect(std::unique_lock<std::mutex>& lock, SyncSession& session) const override
