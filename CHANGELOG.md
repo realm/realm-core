@@ -31,6 +31,7 @@
 * Fix a race condition in encrypted files which can lead to
   crashes on devices using OpenSSL (Android).
   PR [#2616](https://github.com/realm/realm-core/pull/2616).
+* Add #include <realm/util/safe_int_ops.hpp> in alloc.hpp
 
 ### Enhancements
 
