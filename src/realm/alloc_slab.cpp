@@ -685,6 +685,19 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // If the file has already been mapped by another thread, reuse all relevant data
     // from the earlier mapping.
     if (m_file_mappings->m_success) {
+        // check that encryption keys match if they're used:
+        const char* earlier_used_key = m_file_mappings->m_file.get_encryption_key();
+        if (earlier_used_key != nullptr || cfg.encryption_key != nullptr) {
+            if (earlier_used_key == nullptr && cfg.encryption_key != nullptr) {
+                throw std::runtime_error("Encryption key provided, but file already opened as non-encrypted");
+            }
+            if (earlier_used_key != nullptr && cfg.encryption_key == nullptr) {
+                throw std::runtime_error("Missing encryption key, but file already opened with encryption key");
+            }
+            if (memcmp(earlier_used_key, cfg.encryption_key, 64)) {
+                throw std::runtime_error("Encryption key mismatch");
+            }
+        }
         m_data = m_file_mappings->m_initial_mapping.get_addr();
         m_file_format_version = get_committed_file_format_version();
         m_initial_chunk_size = m_file_mappings->m_initial_mapping.get_size();

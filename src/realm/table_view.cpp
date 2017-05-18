@@ -98,61 +98,31 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
 
 // Searching
 
-// find_*_integer() methods are used for all "kinds" of integer values (bool, int, OldDateTime)
-
-size_t TableViewBase::find_first_integer(size_t column_ndx, int64_t value) const
+template<typename T>
+size_t TableViewBase::find_first(size_t column_ndx, T value) const
 {
     check_cookie();
 
-    for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (is_row_attached(i) && get_int(column_ndx, i) == value)
+    for (size_t i = 0, num_rows = m_row_indexes.size(); i < num_rows; ++i) {
+        const int64_t real_ndx = m_row_indexes.get(i);
+        if (real_ndx != detached_ref && m_table->get<T>(column_ndx, i) == value)
             return i;
+    }
+
     return size_t(-1);
 }
 
-size_t TableViewBase::find_first_float(size_t column_ndx, float value) const
-{
-    check_cookie();
-
-    for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (is_row_attached(i) && get_float(column_ndx, i) == value)
-            return i;
-    return size_t(-1);
-}
-
-size_t TableViewBase::find_first_double(size_t column_ndx, double value) const
-{
-    check_cookie();
-
-    for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (is_row_attached(i) && get_double(column_ndx, i) == value)
-            return i;
-    return size_t(-1);
-}
-
-size_t TableViewBase::find_first_string(size_t column_ndx, StringData value) const
-{
-    check_cookie();
-
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_String);
-
-    for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (is_row_attached(i) && get_string(column_ndx, i) == value)
-            return i;
-    return size_t(-1);
-}
-
-size_t TableViewBase::find_first_binary(size_t column_ndx, BinaryData value) const
-{
-    check_cookie();
-
-    REALM_ASSERT_COLUMN_AND_TYPE(column_ndx, type_Binary);
-
-    for (size_t i = 0; i < m_row_indexes.size(); i++)
-        if (is_row_attached(i) && get_binary(column_ndx, i) == value)
-            return i;
-    return size_t(-1);
-}
+template size_t TableViewBase::find_first(size_t, int64_t) const;
+template size_t TableViewBase::find_first(size_t, util::Optional<int64_t>) const;
+template size_t TableViewBase::find_first(size_t, bool) const;
+template size_t TableViewBase::find_first(size_t, Optional<bool>) const;
+template size_t TableViewBase::find_first(size_t, float) const;
+template size_t TableViewBase::find_first(size_t, util::Optional<float>) const;
+template size_t TableViewBase::find_first(size_t, double) const;
+template size_t TableViewBase::find_first(size_t, util::Optional<double>) const;
+template size_t TableViewBase::find_first(size_t, Timestamp) const;
+template size_t TableViewBase::find_first(size_t, StringData) const;
+template size_t TableViewBase::find_first(size_t, BinaryData) const;
 
 
 // Aggregates ----------------------------------------------------
@@ -166,7 +136,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
     static_cast<void>(aggregateMethod);
     check_cookie();
     size_t non_nulls = 0;
-            
+
     if (return_ndx)
         *return_ndx = npos;
 
@@ -205,7 +175,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
     // with 'new' because it will lead to mem leak. The column keeps ownership
     // of the payload in array and will free it itself later, so we must not call destroy() on array.
     ArrType arr(column->get_alloc());
-    
+
     // FIXME: Speed optimization disabled because we need is_null() which is not available on all leaf types.
 
 /*
@@ -255,7 +225,7 @@ R TableViewBase::aggregate(R (ColType::*aggregateMethod)(size_t, size_t, size_t,
         else if (function != act_Count && !column->is_null(to_size_t(signed_row_ndx))){
             non_nulls++;
             R unpacked = static_cast<R>(util::unwrap(v));
-            
+
             if (function == act_Sum || function == act_Average) {
                 res += unpacked;
             }

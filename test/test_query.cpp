@@ -10259,4 +10259,23 @@ TEST(Query_ColumnDeletionLinks)
     CHECK_LOGIC_ERROR(q3.count(), LogicError::column_does_not_exist);
 }
 
+
+TEST(Query_CaseInsensitiveIndexEquality_CommonNumericPrefix)
+{
+    Table table;
+    size_t col_ndx = table.add_column(type_String, "id");
+    table.add_search_index(col_ndx);
+
+    table.add_empty_row(2);
+    table.set_string(col_ndx, 0, "111111111111111111111111");
+    table.set_string(col_ndx, 1, "111111111111111111111112");
+
+    Query q = table.where().equal(col_ndx, "111111111111111111111111", false);
+    CHECK_EQUAL(q.count(), 1);
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv[0].get_index(), 0);
+}
+
+
 #endif // TEST_QUERY
