@@ -2,7 +2,10 @@
 
 ### Bugfixes
 
-* Add #include <realm/util/safe_int_ops.hpp> in alloc.hpp
+* Add #include <realm/util/safe_int_ops.hpp> in alloc.hpp.
+  PR [#2622](https://github.com/realm/realm-core/pull/2622).
+* Fix crash in large (>4GB) encrypted Realm files.
+  PR [#2572](https://github.com/realm/realm-core/pull/2572).
 
 ### Breaking changes
 
