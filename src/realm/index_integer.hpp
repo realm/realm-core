@@ -43,7 +43,7 @@ public:
 
     void erase(size_t row_ndx, bool is_last);
 
-    size_t count(int64_t value) const;
+    size_t count(int64_t key) const;
 
     size_t find_first(int64_t value) const;
     size_t find_first(util::Optional<int64_t> value) const;
@@ -58,7 +58,7 @@ private:
         class Condenser : public Array {
         public:
             using Array::Array;
-            uint16_t* get_writable_data(int i)
+            uint16_t* get_writable_data(int i = 0)
             {
                 copy_on_write();
                 return reinterpret_cast<uint16_t*>(m_data) + i;
@@ -106,19 +106,17 @@ private:
         void erase(Treetop* treeTop, uint64_t hash, unsigned idx, int64_t value);
         void update_ref(Treetop* treeTop, uint64_t hash, int i, size_t old_row_ndx, size_t new_row_ndx);
 
-        int find(uint64_t hash, int64_t key) const;
+        int get_index(uint64_t hash, int64_t key) const;
+        int64_t get_row_or_ref(uint64_t hash, int64_t key) const;
         int find_empty_or_equal(uint64_t hash, int64_t key) const;
         int find_empty(uint64_t hash) const;
         size_t count(int i) const;
-        int64_t get_first_value(int i) const;
+        int64_t get_first_row(int i) const;
         void get_all_values(int i, std::vector<int64_t>& values) const;
         void adjust_row_indexes(size_t min_row_ndx, int diff);
-
-    private:
-        void ensure_writeable(Treetop* treeTop, uint64_t hash);
     };
     struct Treetop : public Array {
-        size_t m_count;
+        size_t m_count; // Number of unique keys!
         uint64_t m_mask;
         int m_levels;
 
@@ -127,7 +125,7 @@ private:
         Treetop(Treetop&& other);
         void init();
         void init(size_t capacity);
-        void clear(IntegerIndex::TreeLeaf& leaf);
+        void clear();
         size_t get_count() const noexcept;
         void incr_count();
         void decr_count();
@@ -148,7 +146,8 @@ private:
     mutable TreeLeaf m_current_leaf;
 
     int64_t get_key_value(size_t row);
-    int get_leaf_index(int64_t value, uint64_t* hash = nullptr) const;
+    int get_index_in_leaf(int64_t value, uint64_t& hash) const;
+    int64_t get_row_or_ref(int64_t key) const;
     void do_delete(size_t row_ndx, int64_t value);
     void grow_tree();
 };

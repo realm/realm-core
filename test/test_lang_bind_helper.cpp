@@ -13121,6 +13121,14 @@ TEST(LangBindHelper_CuckooIndex)
         size_t n = table->find_first_int(0, 100);
         CHECK_EQUAL(n, realm::not_found);
     }
+
+    {
+        WriteTransaction wt(sg_w);
+        Group& group = wt.get_group();
+        TableRef table = group.get_table(0);
+        table->clear();
+        wt.commit();
+    }
 }
 
 #endif

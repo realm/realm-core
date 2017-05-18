@@ -90,20 +90,55 @@ int depth(Array& arr)
     }
     return 1;
 }
+
+size_t count(Allocator& alloc, int64_t slot_value)
+{
+    // Single match (lowest bit set indicates literal row_ndx)
+    if ((slot_value & 1) != 0) {
+        return 1;
+    }
+    else {
+        MemRef mem(to_ref(slot_value), alloc); // Throws
+        return Array::get_size_from_header(mem.get_addr());
+    }
+}
+
+size_t first_row(Allocator& alloc, int64_t row_or_ref)
+{
+    // Single match (lowest bit set indicates literal row_ndx)
+    if ((row_or_ref & 1) != 0) {
+        return row_or_ref >> 1;
+    }
+    else {
+        Array sub(alloc); // Throws
+        sub.init_from_ref(to_ref(row_or_ref));
+        return sub.get(0);
+    }
+}
+
+void all_values(Allocator& alloc, int64_t slot_value, std::vector<int64_t>& values)
+{
+    // Single match (lowest bit set indicates literal row_ndx)
+    if ((slot_value & 1) != 0) {
+        size_t row_ndx = to_size_t(slot_value >> 1);
+        values.resize(1);
+        values[0] = row_ndx;
+    }
+    else {
+        Array sub(alloc); // Throws
+        sub.init_from_ref(to_ref(slot_value));
+        size_t sz = sub.size();
+        values.resize(sz);
+        for (unsigned i = 0; i < sz; i++) {
+            values[i] = sub.get(i);
+        }
+    }
+}
 }
 
 /*****************************************************************************/
 /*                           IntegerIndex::TreeLeaf                           */
 /*****************************************************************************/
-
-inline void IntegerIndex::TreeLeaf::ensure_writeable(Treetop* treeTop, uint64_t hash)
-{
-    REALM_ASSERT(!has_parent());
-    if (is_read_only()) {
-        copy_on_write();
-        treeTop->cow_path(hash, get_ref());
-    }
-}
 
 IntegerIndex::TreeLeaf::TreeLeaf(Allocator& alloc, IntegerIndex* index)
     : Array(alloc)
@@ -143,10 +178,11 @@ void IntegerIndex::TreeLeaf::init(ref_type ref)
 
 void IntegerIndex::TreeLeaf::clear()
 {
-    memset(m_condenser.m_data, 0, 256 * sizeof(uint16_t));
+    void* p = m_condenser.get_writable_data();
+    memset(p, 0, 256 * sizeof(uint16_t));
 }
 
-int IntegerIndex::TreeLeaf::find(uint64_t hash, int64_t key) const
+int IntegerIndex::TreeLeaf::get_index(uint64_t hash, int64_t key) const
 {
     int subhash = hash & 0xFF; // cut off all above one byte
     int subhash_limit = subhash + 4;
@@ -159,10 +195,31 @@ int IntegerIndex::TreeLeaf::find(uint64_t hash, int64_t key) const
             continue;
         if (digest.quick_key != quick_key)
             continue;
-        if (!m_index || m_index->get_key_value(get_first_value(digest.idx - 1)) == key)
+        if (!m_index || m_index->get_key_value(get_first_row(digest.idx - 1)) == key)
             return digest.idx - 1;
     }
     return -1;
+}
+
+int64_t IntegerIndex::TreeLeaf::get_row_or_ref(uint64_t hash, int64_t key) const
+{
+    int subhash = hash & 0xFF; // cut off all above one byte
+    int subhash_limit = subhash + 4;
+    int8_t quick_key = int8_t(key);
+    Digest* digest_arr = reinterpret_cast<Digest*>(m_condenser.m_data);
+    while (subhash != subhash_limit) {
+        Digest& digest = digest_arr[subhash & 0xFF];
+        subhash++;
+        if (digest.idx == 0)
+            continue;
+        if (digest.quick_key != quick_key)
+            continue;
+        int64_t slot_value = m_values.get(digest.idx - 1);
+        int64_t first_row = ::first_row(get_alloc(), slot_value);
+        if (!m_index || m_index->get_key_value(first_row) == key)
+            return slot_value;
+    }
+    return 0;
 }
 
 int IntegerIndex::TreeLeaf::find_empty_or_equal(uint64_t hash, int64_t key) const
@@ -177,7 +234,7 @@ int IntegerIndex::TreeLeaf::find_empty_or_equal(uint64_t hash, int64_t key) cons
             return subhash & 0xFF;
         subhash++;
         if (m_index && (digest.quick_key == quick_key) &&
-            (m_index->get_key_value(get_first_value(digest.idx - 1)) == key))
+            (m_index->get_key_value(get_first_row(digest.idx - 1)) == key))
             throw(unsigned(digest.idx - 1));
     }
     return -1;
@@ -198,6 +255,7 @@ int IntegerIndex::TreeLeaf::find_empty(uint64_t hash) const
 
 bool IntegerIndex::TreeLeaf::insert_1(Treetop* treeTop, uint64_t hash, int64_t key, int64_t value)
 {
+    ref_type old_ref = get_ref();
     try {
         int subhash = find_empty_or_equal(hash, key);
         if (subhash < 0) {
@@ -205,21 +263,14 @@ bool IntegerIndex::TreeLeaf::insert_1(Treetop* treeTop, uint64_t hash, int64_t k
         }
 
         // we're adding a new key:
-
-        REALM_ASSERT(!has_parent());
-        uint16_t* data;
-        if (is_read_only()) {
-            data = m_condenser.get_writable_data(subhash);
-            treeTop->cow_path(hash, get_ref());
-        }
-        else {
-            data = reinterpret_cast<uint16_t*>(m_condenser.m_data) + subhash;
-        }
-
         uint8_t idx = m_values.size();
         uint16_t quick_key = (key << 8) & 0xFF00;
+        // Don't use set() as it might expand array to 32 bits
+        uint16_t* data = m_condenser.get_writable_data(subhash);
         *data = quick_key + idx + 1;
         m_values.add(value);
+
+        treeTop->incr_count();
     }
     catch (const unsigned& found) {
         // key already at position 'found'
@@ -246,7 +297,10 @@ bool IntegerIndex::TreeLeaf::insert_1(Treetop* treeTop, uint64_t hash, int64_t k
         }
     }
 
-    treeTop->incr_count();
+    ref_type new_ref = get_ref();
+    if (old_ref != new_ref) {
+        treeTop->cow_path(hash, new_ref);
+    }
 
     return true;
 }
@@ -261,15 +315,8 @@ bool IntegerIndex::TreeLeaf::insert_2(Treetop* treeTop, uint64_t hash, int64_t k
         subhash = hash & 0xffULL;
     }
 
-    REALM_ASSERT(!has_parent());
-    uint16_t* data;
-    if (is_read_only()) {
-        data = m_condenser.get_writable_data(subhash);
-        treeTop->cow_path(hash, get_ref());
-    }
-    else {
-        data = reinterpret_cast<uint16_t*>(m_condenser.m_data) + subhash;
-    }
+    uint16_t* data = m_condenser.get_writable_data(subhash);
+    ref_type old_ref = get_ref();
 
     if (conflict) { // we're reusing the spot of an old key:
         uint16_t digest = *data;
@@ -280,22 +327,25 @@ bool IntegerIndex::TreeLeaf::insert_2(Treetop* treeTop, uint64_t hash, int64_t k
         *data = digest;
         m_values.set(idx, value);
         value = old_value;
-
-        return false;
     }
     else { // we're adding a new key:
         uint8_t idx = m_values.size();
         *data = quick_key + idx + 1;
         m_values.add(value);
         treeTop->incr_count();
-
-        return true;
     }
+
+    ref_type new_ref = get_ref();
+    if (old_ref != new_ref) {
+        treeTop->cow_path(hash, new_ref);
+    }
+
+    return !conflict;
 }
 
 void IntegerIndex::TreeLeaf::erase(Treetop* treeTop, uint64_t hash, unsigned index, int64_t value)
 {
-    ensure_writeable(treeTop, hash);
+    ref_type old_ref = get_ref();
 
     int_fast64_t slot_value = m_values.get(index);
 
@@ -313,7 +363,7 @@ void IntegerIndex::TreeLeaf::erase(Treetop* treeTop, uint64_t hash, unsigned ind
         }
         m_values.erase(last_index);
 
-        uint16_t* data = m_condenser.get_writable_data(0);
+        uint16_t* data = m_condenser.get_writable_data();
         unsigned i = 0;
         do {
             while (data[i] == 0) {
@@ -332,12 +382,13 @@ void IntegerIndex::TreeLeaf::erase(Treetop* treeTop, uint64_t hash, unsigned ind
             }
             i++;
         } while (steps > 0);
+        treeTop->decr_count();
     }
     else {
         size_t row_ndx = to_size_t(value >> 1);
         Array sub(get_alloc()); // Throws
         sub.set_parent(&m_values, index);
-        sub.init_from_parent();
+        sub.init_from_ref(to_ref(slot_value));
         if (sub.size() > 2) {
             size_t lower = sub.lower_bound_int(row_ndx);
             sub.erase(lower);
@@ -353,28 +404,17 @@ void IntegerIndex::TreeLeaf::erase(Treetop* treeTop, uint64_t hash, unsigned ind
             m_values.set(index, shifted);
         }
     }
-    treeTop->decr_count();
-}
 
-size_t IntegerIndex::TreeLeaf::count(int in_leaf_idx) const
-{
-    REALM_ASSERT(in_leaf_idx >= 0);
-    int64_t slot_value = m_values.get(in_leaf_idx);
-
-    // Single match (lowest bit set indicates literal row_ndx)
-    if ((slot_value & 1) != 0) {
-        return 1;
-    }
-    else {
-        MemRef mem(to_ref(slot_value), get_alloc()); // Throws
-        return Array::get_size_from_header(mem.get_addr());
+    ref_type new_ref = get_ref();
+    if (old_ref != new_ref) {
+        treeTop->cow_path(hash, new_ref);
     }
 }
 
 void IntegerIndex::TreeLeaf::update_ref(Treetop* treeTop, uint64_t hash, int in_leaf_idx, size_t old_row_ndx,
                                         size_t new_row_ndx)
 {
-    ensure_writeable(treeTop, hash);
+    ref_type old_ref = get_ref();
 
     int64_t slot_value = m_values.get(in_leaf_idx);
 
@@ -386,28 +426,27 @@ void IntegerIndex::TreeLeaf::update_ref(Treetop* treeTop, uint64_t hash, int in_
     }
     else {
         Array sub(get_alloc()); // Throws
+        sub.set_parent(&m_values, in_leaf_idx);
         sub.init_from_ref(to_ref(slot_value));
+
         size_t lower = sub.lower_bound_int(old_row_ndx);
         sub.erase(lower);
         lower = sub.lower_bound_int(new_row_ndx);
         sub.insert(lower, new_row_ndx);
     }
+
+    ref_type new_ref = get_ref();
+    if (old_ref != new_ref) {
+        treeTop->cow_path(hash, new_ref);
+    }
 }
 
-int64_t IntegerIndex::TreeLeaf::get_first_value(int in_leaf_idx) const
+int64_t IntegerIndex::TreeLeaf::get_first_row(int in_leaf_idx) const
 {
     REALM_ASSERT(in_leaf_idx >= 0);
     int64_t slot_value = m_values.get(in_leaf_idx);
 
-    // Single match (lowest bit set indicates literal row_ndx)
-    if ((slot_value & 1) != 0) {
-        return slot_value >> 1;
-    }
-    else {
-        Array sub(get_alloc()); // Throws
-        sub.init_from_ref(to_ref(slot_value));
-        return sub.get(0);
-    }
+    return ::first_row(get_alloc(), slot_value);
 }
 
 void IntegerIndex::TreeLeaf::get_all_values(int in_leaf_idx, std::vector<int64_t>& values) const
@@ -415,21 +454,7 @@ void IntegerIndex::TreeLeaf::get_all_values(int in_leaf_idx, std::vector<int64_t
     REALM_ASSERT(in_leaf_idx >= 0);
     int64_t slot_value = m_values.get(in_leaf_idx);
 
-    // Single match (lowest bit set indicates literal row_ndx)
-    if ((slot_value & 1) != 0) {
-        size_t row_ndx = to_size_t(slot_value >> 1);
-        values.resize(1);
-        values[0] = row_ndx;
-    }
-    else {
-        Array sub(get_alloc()); // Throws
-        sub.init_from_ref(to_ref(slot_value));
-        size_t sz = sub.size();
-        values.resize(sz);
-        for (unsigned i = 0; i < sz; i++) {
-            values[i] = sub.get(i);
-        }
-    }
+    ::all_values(get_alloc(), slot_value, values);
 }
 
 void IntegerIndex::TreeLeaf::adjust_row_indexes(size_t min_row_ndx, int diff)
@@ -526,9 +551,11 @@ void IntegerIndex::Treetop::init(size_t capacity)
     }
 }
 
-void IntegerIndex::Treetop::clear(IntegerIndex::TreeLeaf& leaf)
+void IntegerIndex::Treetop::clear()
 {
     if (m_levels == 1) {
+        IntegerIndex::TreeLeaf leaf(get_alloc());
+        leaf.set_parent(get_parent(), get_ndx_in_parent());
         leaf.init(get_ref());
         leaf.clear();
     }
@@ -588,6 +615,7 @@ void IntegerIndex::Treetop::cow_path(uint64_t hash, ref_type leaf_ref)
     switch (m_levels) {
         case 1:
             init_from_ref(leaf_ref);
+            update_parent();
             break;
         case 2:
             set(hash >> 8, from_ref(leaf_ref));
@@ -627,7 +655,20 @@ void IntegerIndex::Treetop::adjust_row_indexes(size_t min_row_ndx, int diff)
 
 void IntegerIndex::Treetop::for_each(std::function<void(TreeLeaf*)> func)
 {
-    for_each(*this, func);
+    if (m_levels == 1) {
+        IntegerIndex::TreeLeaf leaf(get_alloc());
+        ref_type old_ref = get_ref();
+        leaf.init(old_ref);
+        func(&leaf);
+        ref_type new_ref = leaf.get_ref();
+        if (old_ref != new_ref) {
+            init_from_ref(new_ref);
+            update_parent();
+        }
+    }
+    else {
+        for_each(*this, func);
+    }
 }
 
 void IntegerIndex::Treetop::for_each(Array& arr, std::function<void(TreeLeaf*)> func)
@@ -695,7 +736,7 @@ void IntegerIndex::refresh_accessor_tree(size_t, const Spec&)
 
 void IntegerIndex::clear()
 {
-    m_top.clear(this->m_current_leaf);
+    m_top.clear();
 }
 
 constexpr int max_collisions = 20;
@@ -768,7 +809,7 @@ void IntegerIndex::insert_null(size_t row_ndx, size_t num_rows, bool is_append)
 void IntegerIndex::update_ref(int64_t value, size_t old_row_ndx, size_t new_row_ndx)
 {
     uint64_t hash;
-    int in_leaf_idx = get_leaf_index(value, &hash);
+    int in_leaf_idx = get_index_in_leaf(value, hash);
     REALM_ASSERT(in_leaf_idx >= 0);
     m_current_leaf.update_ref(&m_top, hash, in_leaf_idx, old_row_ndx, new_row_ndx);
 }
@@ -793,20 +834,20 @@ void IntegerIndex::erase(size_t row_ndx, bool is_last)
     }
 }
 
-size_t IntegerIndex::count(int64_t value) const
+size_t IntegerIndex::count(int64_t key) const
 {
-    int in_leaf_idx = get_leaf_index(value);
-    if (in_leaf_idx >= 0) {
-        return m_current_leaf.count(in_leaf_idx);
+    int64_t val = get_row_or_ref(key);
+    if (val != 0) {
+        return ::count(m_top.get_alloc(), val);
     }
     return 0;
 }
 
-size_t IntegerIndex::find_first(int64_t value) const
+size_t IntegerIndex::find_first(int64_t key) const
 {
-    int in_leaf_idx = get_leaf_index(value);
-    if (in_leaf_idx >= 0) {
-        return m_current_leaf.get_first_value(in_leaf_idx);
+    int64_t value = get_row_or_ref(key);
+    if (value != 0) {
+        return ::first_row(m_top.get_alloc(), value);
     }
     return realm::npos;
 }
@@ -821,12 +862,12 @@ size_t IntegerIndex::find_first(util::Optional<int64_t> value) const
     }
 }
 
-void IntegerIndex::find_all(IntegerColumn& result, int64_t value) const
+void IntegerIndex::find_all(IntegerColumn& result, int64_t key) const
 {
-    int in_leaf_idx = get_leaf_index(value);
-    if (in_leaf_idx >= 0) {
+    int64_t value = get_row_or_ref(key);
+    if (value != 0) {
         std::vector<int64_t> values;
-        m_current_leaf.get_all_values(in_leaf_idx, values);
+        ::all_values(m_top.get_alloc(), value, values);
         for (auto val : values)
             result.add(val);
     }
@@ -847,7 +888,7 @@ void IntegerIndex::distinct(IntegerColumn& result) const
     auto func = [&](TreeLeaf* leaf) {
         size_t sz = leaf->size();
         for (size_t i = 0; i < sz; i++) {
-            result.add(leaf->get_first_value(i));
+            result.add(leaf->get_first_row(i));
         }
     };
     m_top.for_each(func);
@@ -863,32 +904,47 @@ int64_t IntegerIndex::get_key_value(size_t row)
         return *reinterpret_cast<const int64_t*>(value.data());
 }
 
-int IntegerIndex::get_leaf_index(int64_t key, uint64_t* hash) const
+int IntegerIndex::get_index_in_leaf(int64_t key, uint64_t& hash) const
 {
     uint64_t h_1;
     uint64_t h_2;
     hash128(key, h_1, h_2, m_top.m_mask);
     int in_leaf_idx = -1;
     if (m_top.lookup(h_1, m_current_leaf)) {
-        in_leaf_idx = m_current_leaf.find(h_1, key);
-        if (hash)
-            *hash = h_1;
+        in_leaf_idx = m_current_leaf.get_index(h_1, key);
+        hash = h_1;
     }
     if (in_leaf_idx < 0) {
         if (m_top.lookup(h_2, m_current_leaf)) {
-            in_leaf_idx = m_current_leaf.find(h_2, key);
-            if (hash)
-                *hash = h_2;
+            in_leaf_idx = m_current_leaf.get_index(h_2, key);
+            hash = h_2;
         }
     }
     return in_leaf_idx;
+}
+
+int64_t IntegerIndex::get_row_or_ref(int64_t key) const
+{
+    uint64_t h_1;
+    uint64_t h_2;
+    hash128(key, h_1, h_2, m_top.m_mask);
+    int row_or_ref = 0;
+    if (m_top.lookup(h_1, m_current_leaf)) {
+        row_or_ref = m_current_leaf.get_row_or_ref(h_1, key);
+    }
+    if (row_or_ref == 0) {
+        if (m_top.lookup(h_2, m_current_leaf)) {
+            row_or_ref = m_current_leaf.get_row_or_ref(h_2, key);
+        }
+    }
+    return row_or_ref;
 }
 
 void IntegerIndex::do_delete(size_t row_ndx, int64_t key)
 {
     int64_t shifted = int64_t((uint64_t(row_ndx) << 1) + 1); // shift to indicate literal
     uint64_t hash = 0;
-    int in_leaf_idx = get_leaf_index(key, &hash);
+    int in_leaf_idx = get_index_in_leaf(key, hash);
     REALM_ASSERT(in_leaf_idx >= 0);
     m_current_leaf.erase(&m_top, hash, unsigned(in_leaf_idx), shifted);
 }
