@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.8.0 Release notes
 
 ### Bugfixes
 
@@ -6,20 +6,13 @@
   crashes on devices using OpenSSL (Android).
   PR [#2616](https://github.com/realm/realm-core/pull/2616).
 
-### Breaking changes
-
-* Lorem ipsum.
-
 ### Enhancements
 
 * Enable encryption on watchOS.
   Cocoa issue [#2876](https://github.com/realm/realm-cocoa/issues/2876).
-
------------
-
-### Internals
-
-* Lorem ipsum.
+  PR [#2598](https://github.com/realm/realm-core/pull/2598).
+* Enforce consistent use of encryption keys across all threads.
+  PR [#2558](https://github.com/realm/realm-core/pull/2558).
 
 ----------------------------------------------
 
