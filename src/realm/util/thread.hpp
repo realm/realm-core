@@ -23,7 +23,6 @@
 
 #ifdef _WIN32
 #include <win32/pthread/pthread.h>
-#include <Windows.h>
 #else
 #include <pthread.h>
 #endif
@@ -289,7 +288,6 @@ public:
     bool is_valid() noexcept;
 
     friend class CondVar;
-    friend class InterprocessCondVar;
 };
 
 class RobustMutex::NotRecoverable : public std::exception {
@@ -354,8 +352,6 @@ private:
     REALM_NORETURN static void attr_init_failed(int);
     REALM_NORETURN static void destroy_failed(int) noexcept;
     void handle_wait_error(int error);
-
-    friend class InterprocessCondVar;
 };
 
 

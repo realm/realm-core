@@ -93,8 +93,11 @@ using unit_test::TestContext;
 
 #ifdef _WIN32
 namespace {
-    // This does NOT work like on POSIX: The child will begin execution from the unit
-    // test entry point, not from where fork() took place.
+    // NOTE: Unit tests must use NONCONCURRENT_TEST() macro if they use wínfork!
+    //
+    // NOTE: This does not work like on POSIX: The child will begin execution from
+    // the unit test entry point, not from where fork() took place.
+    //
     DWORD winfork(std::string unit_test_name)
     {
         if (getenv("REALM_FORKED"))
@@ -2123,7 +2126,7 @@ TEST(Shared_WaitForChangeAfterOwnCommit)
 }
 
 
-TEST(Shared_InterprocessWaitForChange)
+NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
 {
     // We can't use SHARED_GROUP_TEST_PATH() because it will attempt to clean up the .realm file at the end,
     // and hence throw if the other processstill has the .realm file open
@@ -2200,12 +2203,11 @@ TEST(Shared_InterprocessWaitForChange)
 
 #endif
 
-// FIXME: This test does not work with valgrind, but we still run it on Windows
+// FIXME: This test does not work with valgrind
 // This test will hang infinitely instead of failing!!!
-#ifdef _WIN32
 TEST(Shared_WaitForChange)
 {
-    const int num_threads = 1;
+    const int num_threads = 3;
     Mutex mutex;
     int shared_state[num_threads];
     SharedGroup* sgs[num_threads];
@@ -2326,8 +2328,6 @@ TEST(Shared_WaitForChange)
         sgs[j] = 0;
     }
 }
-
-#endif // _WIN32
 
 
 TEST(Shared_MultipleSharersOfStreamingFormat)
