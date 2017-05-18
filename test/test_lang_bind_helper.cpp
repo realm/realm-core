@@ -10303,7 +10303,6 @@ TEST(LangBindHelper_RacingAttachers)
 }
 
 
-#ifndef _WIN32 // FIXME: Crashes under Windows
 TEST(LangBindHelper_HandoverBetweenThreads)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -10325,7 +10324,7 @@ TEST(LangBindHelper_HandoverBetweenThreads)
     querier.join();
     verifier.join();
 }
-#endif
+
 
 TEST(LangBindHelper_HandoverDependentViews)
 {
