@@ -829,9 +829,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     sg_r.close();
                     if (log) {
-                        *log << "sg_r.open(path);\n";
+                        *log << "sg_r.open(path, true, SharedGroupOptions(key));\n";
                     }
-                    sg_r.open(path);
+                    sg_r.open(path, true, SharedGroupOptions(key));
                     if (log) {
                         *log << "sg_r.begin_read();\n";
                     }
@@ -844,9 +844,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                     }
                     sg_w.close();
                     if (log) {
-                        *log << "sg_w.open(path);\n";
+                        *log << "sg_w.open(path, true, SharedGroupOptions(key));\n";
                     }
-                    sg_w.open(path);
+                    sg_w.open(path, true, SharedGroupOptions(key));
                     if (log) {
                         *log << "sg_w.begin_write();\n";
                     }
@@ -893,9 +893,9 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                 }
                 sg_w.begin_write();
                 if (log) {
-                    *log << "sg_r.open(path);\n";
+                    *log << "sg_r.open(path, true, SharedGroupOptions(key));\n";
                 }
-                sg_r.open(path);
+                sg_r.open(path, true, SharedGroupOptions(key));
                 if (log) {
                     *log << "sg_r.begin_read();\n";
                 }
