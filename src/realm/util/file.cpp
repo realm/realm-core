@@ -93,6 +93,26 @@ size_t get_page_size()
 // It could also have been a static local variable, but Valgrind/Helgrind gives a false error on that.
 size_t cached_page_size = get_page_size();
 
+bool for_each_helper(const std::string& path, const std::string& dir, File::ForEachHandler& handler)
+{
+    DirScanner ds{path}; // Throws
+    std::string name;
+    while (ds.next(name)) { // Throws
+        std::string subpath = File::resolve(name, path); // Throws
+        bool go_on;
+        if (File::is_dir(subpath)) { // Throws
+            std::string subdir = File::resolve(name, dir); // Throws
+            go_on = for_each_helper(subpath, subdir, handler); // Throws
+        }
+        else {
+            go_on = handler(name, dir); // Throws
+        }
+        if (!go_on)
+            return false;
+    }
+    return true;
+}
+
 } // anonymous namespace
 
 
@@ -156,6 +176,25 @@ void remove_dir(const std::string& path)
         default:
             throw File::AccessError(msg, path); // LCOV_EXCL_LINE
     }
+}
+
+
+void remove_dir_recursive(const std::string& path)
+{
+    {
+        DirScanner ds{path}; // Throws
+        std::string name;
+        while (ds.next(name)) { // Throws
+            std::string subpath = File::resolve(name, path); // Throws
+            if (File::is_dir(subpath)) { // Throws
+                remove_dir_recursive(subpath); // Throws
+            }
+            else {
+                File::remove(subpath); // Throws
+            }
+        }
+    }
+    remove_dir(path); // Throws
 }
 
 
@@ -258,7 +297,7 @@ void File::open_internal(const std::string& path, AccessMode a, CreateMode c, in
     HANDLE handle =
         CreateFile2(ws.c_str(), desired_access, share_mode, creation_disposition, nullptr);
     if (handle != INVALID_HANDLE_VALUE) {
-        m_handle = handle;
+        m_fd = handle;
         m_have_lock = false;
         if (success)
             *success = true;
@@ -353,14 +392,14 @@ void File::close() noexcept
 {
 #ifdef _WIN32 // Windows version
 
-    if (!m_handle)
+    if (!m_fd)
         return;
     if (m_have_lock)
         unlock();
 
-    BOOL r = CloseHandle(m_handle);
+    BOOL r = CloseHandle(m_fd);
     REALM_ASSERT_RELEASE(r);
-    m_handle = nullptr;
+    m_fd = nullptr;
 
 #else // POSIX version
 
@@ -373,20 +412,16 @@ void File::close() noexcept
 #endif
 }
 
-
-size_t File::read(char* data, size_t size)
+size_t File::read_static(FileDesc fd, char* data, size_t size)
 {
-    REALM_ASSERT_RELEASE(is_attached());
-
 #ifdef _WIN32 // Windows version
-
     char* const data_0 = data;
     while (0 < size) {
         DWORD n = std::numeric_limits<DWORD>::max();
         if (int_less_than(size, n))
             n = static_cast<DWORD>(size);
         DWORD r = 0;
-        if (!ReadFile(m_handle, data, n, &r, 0))
+        if (!ReadFile(fd, data, n, &r, 0))
             goto error;
         if (r == 0)
             break;
@@ -403,22 +438,11 @@ error:
 
 #else // POSIX version
 
-    if (m_encryption_key) {
-        off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
-        REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
-        size_t pos = size_t(pos_original);
-        Map<char> read_map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
-        realm::util::encryption_read_barrier(read_map, pos, size);
-        memcpy(data, read_map.get_addr() + pos, size);
-        lseek(m_fd, size, SEEK_CUR);
-        return read_map.get_size() - pos;
-    }
-
     char* const data_0 = data;
     while (0 < size) {
         // POSIX requires that 'n' is less than or equal to SSIZE_MAX
         size_t n = std::min(size, size_t(SSIZE_MAX));
-        ssize_t r = ::read(m_fd, data, n);
+        ssize_t r = ::read(fd, data, n);
         if (r == 0)
             break;
         if (r < 0)
@@ -434,23 +458,40 @@ error:
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("read(): failed: ", err);
     throw std::runtime_error(msg);
-// LCOV_EXCL_STOP
+    // LCOV_EXCL_STOP
 #endif
+
 }
 
 
-void File::write(const char* data, size_t size)
+size_t File::read(char* data, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
+    if (m_encryption_key) {
+        uint64_t pos_original = File::get_file_pos(m_fd);
+        REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
+        size_t pos = size_t(pos_original);
+        Map<char> read_map(*this, access_ReadOnly, static_cast<size_t>(pos + size));
+        realm::util::encryption_read_barrier(read_map, pos, size);
+        memcpy(data, read_map.get_addr() + pos, size);
+        uint64_t cur = File::get_file_pos(m_fd);
+        seek_static(m_fd, cur + size);
+        return read_map.get_size() - pos;
+    }
 
+    return read_static(m_fd, data, size);
+}
+
+void File::write_static(FileDesc fd, const char* data, size_t size)
+{
+#ifdef _WIN32
     while (0 < size) {
         DWORD n = std::numeric_limits<DWORD>::max();
         if (int_less_than(size, n))
             n = static_cast<DWORD>(size);
         DWORD r = 0;
-        if (!WriteFile(m_handle, data, n, &r, 0))
+        if (!WriteFile(fd, data, n, &r, 0))
             goto error;
         REALM_ASSERT_RELEASE(r == n); // Partial writes are not possible.
         size -= size_t(r);
@@ -462,32 +503,18 @@ error:
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     std::string msg = get_last_error_msg("WriteFile() failed: ", err);
     throw std::runtime_error(msg);
-
-#else // POSIX version
-
-    if (m_encryption_key) {
-        off_t pos_original = lseek(m_fd, 0, SEEK_CUR);
-        REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
-        size_t pos = size_t(pos_original);
-        Map<char> write_map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
-        realm::util::encryption_read_barrier(write_map, pos, size);
-        memcpy(write_map.get_addr() + pos, data, size);
-        realm::util::encryption_write_barrier(write_map, pos, size);
-        lseek(m_fd, size, SEEK_CUR);
-        return;
-    }
-
+#else
     while (0 < size) {
         // POSIX requires that 'n' is less than or equal to SSIZE_MAX
         size_t n = std::min(size, size_t(SSIZE_MAX));
-        ssize_t r = ::write(m_fd, data, n);
+        ssize_t r = ::write(fd, data, n);
         if (r < 0)
             goto error; // LCOV_EXCL_LINE
         REALM_ASSERT_RELEASE(r != 0);
         REALM_ASSERT_RELEASE(size_t(r) <= n);
         size -= size_t(r);
         data += size_t(r);
-    }
+}
     return;
 
 error:
@@ -495,23 +522,57 @@ error:
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("write(): failed: ", err);
     throw std::runtime_error(msg);
-// LCOV_EXCL_STOP
+    // LCOV_EXCL_STOP
 
 #endif
 }
 
-
-File::SizeType File::get_size() const
+void File::write(const char* data, size_t size)
 {
     REALM_ASSERT_RELEASE(is_attached());
 
-#ifdef _WIN32 // Windows version
+    if (m_encryption_key) {        
+        uint64_t pos_original = get_file_pos(m_fd);
+        REALM_ASSERT(!int_cast_has_overflow<size_t>(pos_original));
+        size_t pos = size_t(pos_original);
+        Map<char> write_map(*this, access_ReadWrite, static_cast<size_t>(pos + size));
+        realm::util::encryption_read_barrier(write_map, pos, size);
+        memcpy(write_map.get_addr() + pos, data, size);
+        realm::util::encryption_write_barrier(write_map, pos, size);
+        uint64_t cur = get_file_pos(m_fd);
+        seek(cur + size);
+        return;
+    }
 
+    write_static(m_fd, data, size);
+}
+
+uint64_t File::get_file_pos(FileDesc fd)
+{
+#ifdef _WIN32
+    LONG high_dword = 0;
+    LARGE_INTEGER li;
+    LARGE_INTEGER res;
+    li.QuadPart = 0;
+    bool ok = SetFilePointerEx(fd, li, &res, FILE_CURRENT);
+    if (!ok)
+        throw std::runtime_error("SetFilePointer() failed");
+
+    return uint64_t(res.QuadPart);
+#else
+    return lseek(fd, 0, SEEK_CUR);
+#endif
+}
+
+File::SizeType File::get_size_static(FileDesc fd)
+{
+#ifdef _WIN32
     LARGE_INTEGER large_int;
-    if (GetFileSizeEx(m_handle, &large_int)) {
-        SizeType size;
+    if (GetFileSizeEx(fd, &large_int)) {
+        File::SizeType size;
         if (int_cast_with_overflow_detect(large_int.QuadPart, size))
             throw std::runtime_error("File size overflow");
+
         return size;
     }
     throw std::runtime_error("GetFileSizeEx() failed");
@@ -519,17 +580,27 @@ File::SizeType File::get_size() const
 #else // POSIX version
 
     struct stat statbuf;
-    if (::fstat(m_fd, &statbuf) == 0) {
+    if (::fstat(fd, &statbuf) == 0) {
         SizeType size;
         if (int_cast_with_overflow_detect(statbuf.st_size, size))
             throw std::runtime_error("File size overflow");
-        if (m_encryption_key)
-            return encrypted_size_to_data_size(size);
+
         return size;
     }
     throw std::runtime_error("fstat() failed");
 
 #endif
+}
+
+File::SizeType File::get_size() const
+{
+    REALM_ASSERT_RELEASE(is_attached());
+    File::SizeType size = get_size_static(m_fd);
+
+    if (m_encryption_key)
+        return encrypted_size_to_data_size(size);
+    else
+        return size;
 }
 
 
@@ -540,10 +611,13 @@ void File::resize(SizeType size)
 #ifdef _WIN32 // Windows version
 
     // Save file position
-    SizeType p = get_file_position();
+    SizeType p = get_file_pos(m_fd);
+
+    if (m_encryption_key)
+        size = data_size_to_encrypted_size(size);
 
     seek(size);
-    if (!SetEndOfFile(m_handle))
+    if (!SetEndOfFile(m_fd))
         throw std::runtime_error("SetEndOfFile() failed");
 
     // Restore file position
@@ -637,18 +711,25 @@ bool File::is_prealloc_supported()
 #endif
 }
 
-
 void File::seek(SizeType position)
 {
     REALM_ASSERT_RELEASE(is_attached());
+#ifdef _WIN32
+    seek_static(m_fd, position);
+#else
+    seek_static(m_fd, position);
+#endif
+}
 
+void File::seek_static(FileDesc fd, SizeType position)
+{
 #ifdef _WIN32 // Windows version
 
     LARGE_INTEGER large_int;
     if (int_cast_with_overflow_detect(position, large_int.QuadPart))
         throw std::runtime_error("File position overflow");
 
-    if (!SetFilePointerEx(m_handle, large_int, 0, FILE_BEGIN))
+    if (!SetFilePointerEx(fd, large_int, 0, FILE_BEGIN))
         throw std::runtime_error("SetFilePointerEx() failed");
 
 #else // POSIX version
@@ -657,29 +738,12 @@ void File::seek(SizeType position)
     if (int_cast_with_overflow_detect(position, position2))
         throw std::runtime_error("File position overflow");
 
-    if (0 <= ::lseek(m_fd, position2, SEEK_SET))
+    if (0 <= ::lseek(fd, position2, SEEK_SET))
         return;
     throw std::runtime_error("lseek() failed");
 
 #endif
 }
-
-
-// We might be able to use lseek() with offset=0 as cross platform method, because we fortunatly
-// do not require to operate on files larger than 4 GB on 32-bit platforms
-#ifdef _WIN32 // Windows version
-File::SizeType File::get_file_position()
-{
-    REALM_ASSERT_RELEASE(is_attached());
-
-    LARGE_INTEGER liOfs = {0};
-    LARGE_INTEGER liNew = {0};
-    if (!SetFilePointerEx(m_handle, liOfs, &liNew, FILE_CURRENT))
-        throw std::runtime_error("SetFilePointerEx() failed");
-    return liNew.QuadPart;
-}
-#endif
-
 
 // FIXME: The current implementation may not guarantee that data is
 // actually written to disk. POSIX is rather vague on what fsync() has
@@ -691,7 +755,7 @@ void File::sync()
 
 #if defined _WIN32 // Windows version
 
-    if (FlushFileBuffers(m_handle))
+    if (FlushFileBuffers(m_fd))
         return;
     throw std::runtime_error("FlushFileBuffers() failed");
 
@@ -733,7 +797,7 @@ bool File::lock(bool exclusive, bool non_blocking)
     memset(&overlapped, 0, sizeof overlapped);
     overlapped.Offset = 0;     // Just for clarity
     overlapped.OffsetHigh = 0; // Just for clarity
-    if (LockFileEx(m_handle, flags, 0, 1, 0, &overlapped)) {
+    if (LockFileEx(m_fd, flags, 0, 1, 0, &overlapped)) {
         m_have_lock = true;
         return true;
     }
@@ -792,7 +856,7 @@ void File::unlock() noexcept
     overlapped.OffsetHigh = 0;
     overlapped.Offset = 0;
     overlapped.Pointer = 0;
-    BOOL r = UnlockFileEx(m_handle, 0, 1, 0, &overlapped);
+    BOOL r = UnlockFileEx(m_fd, 0, 1, 0, &overlapped);
 
     REALM_ASSERT_RELEASE(r);
     m_have_lock = false;
@@ -815,91 +879,43 @@ void File::unlock() noexcept
 
 void* File::map(AccessMode a, size_t size, int map_flags, size_t offset) const
 {
-#ifdef _WIN32 // Windows version
-
-    // FIXME: Is there anything that we must do on Windows to honor map_NoSync?
-    static_cast<void>(map_flags);
-
-    DWORD protect = PAGE_READONLY;
-    DWORD desired_access = FILE_MAP_READ;
-    switch (a) {
-        case access_ReadOnly:
-            break;
-        case access_ReadWrite:
-            protect = PAGE_READWRITE;
-            desired_access = FILE_MAP_WRITE;
-            break;
-    }
-    LARGE_INTEGER large_int;
-    if (int_cast_with_overflow_detect(offset + size, large_int.QuadPart))
-        throw std::runtime_error("Map size is too large");
-    HANDLE map_handle = CreateFileMappingFromApp(m_handle, 0, protect, offset + size, nullptr);
-    if (REALM_UNLIKELY(!map_handle))
-        throw std::runtime_error("CreateFileMapping() failed");
-    if (int_cast_with_overflow_detect(offset, large_int.QuadPart))
-        throw std::runtime_error("Map offset is too large");
-    SIZE_T _size = size;
-    void* addr = MapViewOfFileFromApp(map_handle, desired_access, offset, _size);
-    {
-        BOOL r = CloseHandle(map_handle);
-        REALM_ASSERT_RELEASE(r);
-    }
-    if (REALM_LIKELY(addr))
-        return addr;
-    DWORD err = GetLastError(); // Eliminate any risk of clobbering
-    std::string msg = get_last_error_msg("MapViewOfFile() failed: ", err);
-    throw std::runtime_error(msg);
-
-#else // POSIX version
-
+#ifdef _WIN32
+    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get());
+#else
     // FIXME: On FreeeBSB and other systems that support it, we should
     // honor map_NoSync by specifying MAP_NOSYNC, but how do we
     // reliably detect these systems?
     static_cast<void>(map_flags);
 
     return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get());
-
 #endif
 }
 
 #if REALM_ENABLE_ENCRYPTION
-#ifdef _WIN32
-#error "Encryption is not supported on Windows"
-#else
 void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int map_flags, size_t offset) const
 {
-    static_cast<void>(map_flags);
-
+#ifdef _WIN32
     return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
-}
+#else
+    static_cast<void>(map_flags);
+    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
 #endif
+}
 #endif
 
 void File::unmap(void* addr, size_t size) noexcept
 {
-#ifdef _WIN32 // Windows version
-
-    static_cast<void>(size);
-    BOOL r = UnmapViewOfFile(addr);
-    REALM_ASSERT_RELEASE(r);
-
-#else // POSIX version
-
     realm::util::munmap(addr, size);
-
-#endif
 }
 
 
 void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size, int map_flags,
                   size_t file_offset) const
 {
-#ifdef _WIN32
-    void* new_addr = map(a, new_size, map_flags);
-    unmap(old_addr, old_size);
-    return new_addr;
-#else
     static_cast<void>(map_flags);
+#ifdef _WIN32
+    return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size, m_encryption_key.get());
+#else
     return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size, m_encryption_key.get());
 #endif
 }
@@ -1059,28 +1075,16 @@ bool File::compare(const std::string& path_1, const std::string& path_2)
     return true;
 }
 
-
-bool File::is_same_file(const File& f) const
+bool File::is_same_file_static(FileDesc f1, FileDesc f2)
 {
-    REALM_ASSERT_RELEASE(is_attached());
-    REALM_ASSERT_RELEASE(f.is_attached());
-
-#if REALM_UWP
-    static_cast<void>(f);
-    throw std::runtime_error("Not yet supported");
-#elif defined(_WIN32) // Windows version
-    // FIXME: This version does not work on ReFS.
-    BY_HANDLE_FILE_INFORMATION file_info;
-    if (GetFileInformationByHandle(m_handle, &file_info)) {
-        DWORD vol_serial_num = file_info.dwVolumeSerialNumber;
-        DWORD file_ndx_high = file_info.nFileIndexHigh;
-        DWORD file_ndx_low = file_info.nFileIndexLow;
-        if (GetFileInformationByHandle(f.m_handle, &file_info)) {
-            return vol_serial_num == file_info.dwVolumeSerialNumber && file_ndx_high == file_info.nFileIndexHigh &&
-                   file_ndx_low == file_info.nFileIndexLow;
+#if defined(_WIN32) // Windows version
+    FILE_ID_INFO fi1;
+    FILE_ID_INFO fi2;
+    if (GetFileInformationByHandleEx(f1, FILE_INFO_BY_HANDLE_CLASS::FileIdInfo, &fi1, sizeof(fi1))) {
+        if (GetFileInformationByHandleEx(f2, FILE_INFO_BY_HANDLE_CLASS::FileIdInfo, &fi2, sizeof(fi2))) {
+            return memcmp(&fi1.FileId, &fi2.FileId, sizeof(fi1.FileId)) == 0 && fi1.VolumeSerialNumber == fi2.VolumeSerialNumber;
         }
     }
-
     DWORD err = GetLastError(); // Eliminate any risk of clobbering
     std::string msg = get_last_error_msg("GetFileInformationByHandleEx() failed: ", err);
     throw std::runtime_error(msg);
@@ -1088,10 +1092,10 @@ bool File::is_same_file(const File& f) const
 #else // POSIX version
 
     struct stat statbuf;
-    if (::fstat(m_fd, &statbuf) == 0) {
+    if (::fstat(f1, &statbuf) == 0) {
         dev_t device_id = statbuf.st_dev;
         ino_t inode_num = statbuf.st_ino;
-        if (::fstat(f.m_fd, &statbuf) == 0)
+        if (::fstat(f2, &statbuf) == 0)
             return device_id == statbuf.st_dev && inode_num == statbuf.st_ino;
     }
     int err = errno; // Eliminate any risk of clobbering
@@ -1099,22 +1103,13 @@ bool File::is_same_file(const File& f) const
     throw std::runtime_error(msg);
 
 #endif
+}
 
-    /*
-    FIXME: Here is how to do it on Windows Server 2012 and onwards. This new
-    solution correctly handles file identification on ReFS.
-
-    FILE_ID_INFO file_id_info;
-    if (GetFileInformationByHandleEx(m_handle, FileIdInfo, &file_id_info, sizeof file_id_info)) {
-        ULONGLONG vol_serial_num = file_id_info.VolumeSerialNumber;
-        EXT_FILE_ID_128 file_id     = file_id_info.FileId;
-        if (GetFileInformationByHandleEx(f.m_handle, FileIdInfo, &file_id_info,
-                                         sizeof file_id_info)) {
-            return vol_serial_num == file_id_info.VolumeSerialNumber &&
-                file_id == file_id_info.FileId;
-        }
-    }
-    */
+bool File::is_same_file(const File& f) const
+{
+    REALM_ASSERT_RELEASE(is_attached());
+    REALM_ASSERT_RELEASE(f.is_attached());
+    return is_same_file_static(m_fd, f.m_fd);
 }
 
 File::UniqueID File::get_unique_id() const
@@ -1218,6 +1213,12 @@ std::string File::resolve(const std::string& path, const std::string& base_dir)
 }
 
 
+bool File::for_each(const std::string& dir_path, ForEachHandler handler)
+{
+    return for_each_helper(dir_path, "", handler); // Throws
+}
+
+
 void File::set_encryption_key(const char* key)
 {
 #if REALM_ENABLE_ENCRYPTION
@@ -1234,6 +1235,11 @@ void File::set_encryption_key(const char* key)
         throw std::runtime_error("Encryption not enabled");
     }
 #endif
+}
+
+const char* File::get_encryption_key()
+{
+    return m_encryption_key.get();
 }
 
 
