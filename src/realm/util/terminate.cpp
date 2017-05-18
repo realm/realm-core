@@ -89,11 +89,6 @@ void (*termination_notification_callback)(const char*) noexcept = nullptr;
 namespace realm {
 namespace util {
 
-void set_termination_notification_callback(void (*callback)(const char*) noexcept) noexcept
-{
-    termination_notification_callback = callback;
-}
-
 // LCOV_EXCL_START
 REALM_NORETURN static void terminate_internal(std::stringstream& ss) noexcept
 {

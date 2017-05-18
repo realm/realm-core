@@ -2478,6 +2478,7 @@
     <ClInclude Include="..\src\realm\link_view_fwd.hpp" />
     <ClInclude Include="..\src\realm\null.hpp" />
     <ClInclude Include="..\src\realm\query_expression.hpp" />
+    <ClInclude Include="..\src\realm\query_operators.hpp" />
     <ClInclude Include="..\src\realm\string_data.hpp" />
     <ClInclude Include="..\src\realm\timestamp.hpp" />
     <ClInclude Include="..\src\realm\unicode.hpp" />
@@ -2493,6 +2494,7 @@
     <ClInclude Include="..\src\realm\util\memory_stream.hpp" />
     <ClInclude Include="..\src\realm\util\misc_errors.hpp" />
     <ClInclude Include="..\src\realm\util\optional.hpp" />
+    <ClInclude Include="..\src\realm\util\overload.hpp" />
     <ClInclude Include="..\src\realm\util\priority_queue.hpp" />
     <ClInclude Include="..\src\realm\util\shared_ptr.hpp" />
     <ClInclude Include="..\src\realm\util\terminate.hpp" />
@@ -2519,7 +2521,6 @@
     <ClInclude Include="..\src\realm\group_writer.hpp" />
     <ClInclude Include="..\src\realm\index_string.hpp" />
     <ClInclude Include="..\src\realm\lang_bind_helper.hpp" />
-    <ClInclude Include="..\src\realm\util\meta.hpp" />
     <ClInclude Include="..\src\realm\util\type_traits.hpp" />
     <ClInclude Include="..\src\realm\mixed.hpp" />
     <ClInclude Include="..\src\realm\overflow.hpp" />

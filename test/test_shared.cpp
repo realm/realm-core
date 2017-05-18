@@ -587,6 +587,80 @@ TEST(Shared_1)
     }
 }
 
+TEST(Shared_try_begin_write)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    // Create a new shared db
+    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    std::mutex thread_obtains_write_lock;
+    bool init_complete = false;
+
+    auto do_async = [&]() {
+        SharedGroup sg2(path, false, SharedGroupOptions(crypt_key()));
+        Group* gw = nullptr;
+        bool success = sg2.try_begin_write(gw);
+        CHECK(success);
+        CHECK(gw != nullptr);
+        init_complete = true;
+        TableRef t = gw->add_table(StringData("table"));
+        t->insert_column(0, type_String, StringData("string_col"));
+        t->add_empty_row(1000);
+        thread_obtains_write_lock.lock();
+        sg2.commit();
+        thread_obtains_write_lock.unlock();
+    };
+
+    thread_obtains_write_lock.lock();
+    Thread async_writer;
+    async_writer.start(do_async);
+
+    // wait for the thread to start a write transaction
+    while (!init_complete) { millisleep(1); }
+
+    // Try to also obtain a write lock. This should fail but not block.
+    Group* g = nullptr;
+    bool success = sg.try_begin_write(g);
+    CHECK(!success);
+    CHECK(g == nullptr);
+
+    // Let the async thread finish its write transaction.
+    thread_obtains_write_lock.unlock();
+    async_writer.join();
+
+    {
+        // Verify that the thread transaction commit succeeded.
+        ReadTransaction rt(sg);
+        const Group& gr = rt.get_group();
+        ConstTableRef t = gr.get_table(0);
+        CHECK(t->get_name() == StringData("table"));
+        CHECK(t->get_column_name(0) == StringData("string_col"));
+        CHECK(t->size() == 1000);
+    }
+
+    // Now try to start a transaction without any contenders.
+    success = sg.try_begin_write(g);
+    CHECK(success);
+    CHECK(g != nullptr);
+
+    {
+        // make sure we still get a useful error message when trying to
+        // obtain two write locks on the same thread
+        CHECK_LOGIC_ERROR(sg.try_begin_write(g), LogicError::wrong_transact_state);
+    }
+
+    // Add some data and finish the transaction.
+    g->add_table(StringData("table 2"));
+    sg.commit();
+
+    {
+        // Verify that the main thread transaction now succeeded.
+        ReadTransaction rt(sg);
+        const Group& gr = rt.get_group();
+        CHECK(gr.size() == 2);
+        CHECK(gr.get_table(1)->get_name() == StringData("table 2"));
+    }
+}
+
 
 TEST(Shared_Rollback)
 {
@@ -2308,6 +2382,61 @@ TEST(Shared_MixedWithNonShared)
     }
 #endif
 }
+
+
+#if REALM_ENABLE_ENCRYPTION
+// verify that even though different threads share the same encrypted pages,
+// a thread will not get access without the key.
+TEST(Shared_EncryptionKeyCheck)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroupOptions(crypt_key(true)));
+    bool ok = false;
+    try {
+        SharedGroup sg_2(path, false, SharedGroupOptions());
+    } catch (std::runtime_error&) {
+        ok = true;
+    }
+    CHECK(ok);
+    SharedGroup sg3(path, false, SharedGroupOptions(crypt_key(true)));
+}
+
+// opposite - if opened unencrypted, attempt to share it encrypted
+// will throw an error.
+TEST(Shared_EncryptionKeyCheck_2)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroupOptions());
+    bool ok = false;
+    try {
+        SharedGroup sg_2(path, false, SharedGroupOptions(crypt_key(true)));
+    } catch (std::runtime_error&) {
+        ok = true;
+    }
+    CHECK(ok);
+    SharedGroup sg3(path, false, SharedGroupOptions());
+}
+
+// if opened by one key, it cannot be opened by a different key
+TEST(Shared_EncryptionKeyCheck_3)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* first_key = crypt_key(true);
+    char second_key[32];
+    memcpy(second_key, first_key, 32);
+    second_key[3] = ~second_key[3];
+    SharedGroup sg(path, false, SharedGroupOptions(first_key));
+    bool ok = false;
+    try {
+        SharedGroup sg_2(path, false, SharedGroupOptions(second_key));
+    } catch (std::runtime_error&) {
+        ok = true;
+    }
+    CHECK(ok);
+    SharedGroup sg3(path, false, SharedGroupOptions(first_key));
+}
+
+#endif
 
 TEST(Shared_VersionCount)
 {

@@ -246,6 +246,22 @@ bool RobustMutex::low_level_lock()
     lock_failed(r);
 }
 
+int RobustMutex::try_low_level_lock()
+{
+    int r = pthread_mutex_trylock(&m_impl);
+    if (REALM_LIKELY(r == 0))
+        return 1;
+    if (r == EBUSY)
+        return 0;
+#ifdef REALM_HAVE_ROBUST_PTHREAD_MUTEX
+    if (r == EOWNERDEAD)
+        return -1;
+    if (r == ENOTRECOVERABLE)
+        throw NotRecoverable();
+#endif
+    lock_failed(r);
+}
+
 bool RobustMutex::is_valid() noexcept
 {
     // FIXME: This check tries to lock the mutex, and only unlocks it if the
