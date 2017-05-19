@@ -26,6 +26,7 @@
 
 #include <thread>
 
+#include "sync/sync_manager.hpp"
 #include "sync/impl/network_reachability.hpp"
 
 #if NETWORK_REACHABILITY_AVAILABLE
@@ -58,7 +59,7 @@ struct SyncClient {
 #if NETWORK_REACHABILITY_AVAILABLE
     , m_reachability_observer(none, [=](const NetworkReachabilityStatus status) {
         if (status != NotReachable)
-            cancel_reconnect_delay();
+            SyncManager::shared().reconnect();
     })
     {
         if (!m_reachability_observer.start_observing())

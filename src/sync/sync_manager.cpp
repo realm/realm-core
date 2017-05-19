@@ -263,10 +263,26 @@ bool SyncManager::client_should_reconnect_immediately() const noexcept
 
 void SyncManager::reconnect()
 {
-    std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_sync_client) {
-        m_sync_client->cancel_reconnect_delay();
+    {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        if (m_sync_client) {
+            m_sync_client->cancel_reconnect_delay();
+        } else {
+            return;
+        }
     }
+    // Ask all sessions to process reconnection.
+    std::lock_guard<std::mutex> lock(m_session_mutex);
+    for (auto& it : m_sessions) {
+        it.second->handle_reconnect();
+    }
+}
+
+void SyncManager::cancel_reconnect_delay()
+{
+    std::lock_guard<std::mutex> lock(m_mutex);
+    if (m_sync_client)
+        m_sync_client->cancel_reconnect_delay();
 }
 
 util::Logger::Level SyncManager::log_level() const noexcept
