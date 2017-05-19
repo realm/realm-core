@@ -10476,6 +10476,126 @@ TEST(LangBindHelper_HandoverTableViewWithLinkView)
     }
 }
 
+
+namespace {
+
+void do_write_work(std::string path, size_t id, size_t num_rows) {
+    const size_t num_iterations = 5000000; // this makes it run for a loooong time
+    const size_t payload_length_small = 10;
+    const size_t payload_length_large = 5000; // > 4096 == page_size
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    const char* key = crypt_key(true);
+    for (size_t rep = 0; rep < num_iterations; ++rep) {
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        SharedGroup sg(*hist, SharedGroupOptions(key));
+
+        ReadTransaction rt(sg);
+        LangBindHelper::promote_to_write(sg);
+        Group& group = const_cast<Group&>(rt.get_group());
+        TableRef t = group.get_table(0);
+
+        for (size_t i = 0; i < num_rows; ++i) {
+            const size_t payload_length = i % 10 == 0 ? payload_length_large : payload_length_small;
+            const char payload_char = 'a' + static_cast<char>((id + rep + i) % 26);
+            std::string std_payload(payload_length, payload_char);
+            StringData payload(std_payload);
+
+            t->set_int(0, i, payload.size());
+            t->set_string(1, i, StringData(std_payload.c_str(), 1));
+            t->set_string(2, i, payload);
+        }
+        LangBindHelper::commit_and_continue_as_read(sg);
+    }
+}
+
+void do_read_verify(std::string path) {
+    Random random(random_int<unsigned long>()); // Seed from slow global generator
+    const char* key = crypt_key(true);
+    while (true) {
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        SharedGroup sg(*hist, SharedGroupOptions(key));
+        ReadTransaction rt(sg);
+        if (rt.get_version() <= 2) continue; // let the writers make some initial data
+        Group& group = const_cast<Group&>(rt.get_group());
+        ConstTableRef t = group.get_table(0);
+        size_t num_rows = t->size();
+        for (size_t r = 0; r < num_rows; ++r) {
+            int64_t num_chars = t->get_int(0, r);
+            StringData c = t->get_string(1, r);
+            if (c == "stop reading") {
+                return;
+            } else {
+                REALM_ASSERT_EX(c.size() == 1, c.size());
+            }
+            REALM_ASSERT_EX(t->get_name() == StringData("class_Table_Emulation_Name"), t->get_name().data());
+            REALM_ASSERT_EX(t->get_column_name(0) == StringData("count"), t->get_column_name(0).data());
+            REALM_ASSERT_EX(t->get_column_name(1) == StringData("char"), t->get_column_name(1).data());
+            REALM_ASSERT_EX(t->get_column_name(2) == StringData("payload"), t->get_column_name(2).data());
+            std::string std_validator(num_chars, c[0]);
+            StringData validator(std_validator);
+            StringData s = t->get_string(2, r);
+            REALM_ASSERT_EX(s.size() == validator.size(), r, s.size(), validator.size());
+            for (size_t i = 0; i < s.size(); ++i) {
+                REALM_ASSERT_EX(s[i] == validator[i], r, i, s[i], validator[i]);
+            }
+            REALM_ASSERT_EX(s == validator, r, s.size(), validator.size());
+        }
+    }
+}
+
+} // end anonymous namespace
+
+
+// The following test is long running to try to catch race conditions
+// in with many reader writer threads on an encrypted realm and it is
+// not suited to automated testing.
+TEST_IF(Thread_AsynchronousIODataConsistency, false)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const int num_writer_threads = 2;
+    const int num_reader_threads = 2;
+    const int num_rows = 200; //2 + REALM_MAX_BPNODE_SIZE;
+    const char* key = crypt_key(true);
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroup sg(*hist, SharedGroupOptions(key));
+    {
+        WriteTransaction wt(sg);
+        Group& group = wt.get_group();
+        TableRef t = group.add_table("class_Table_Emulation_Name");
+        // add a column for each thread to write to
+        t->add_column(type_Int, "count", true);
+        t->add_column(type_String, "char", true);
+        t->add_column(type_String, "payload", true);
+        t->add_empty_row(num_rows);
+        wt.commit();
+    }
+
+    Thread writer_threads[num_writer_threads];
+    for (int i = 0; i < num_writer_threads; ++i) {
+        writer_threads[i].start(std::bind(do_write_work, std::string(path), i, num_rows));
+    }
+    Thread reader_threads[num_reader_threads];
+    for (int i = 0; i < num_reader_threads; ++i) {
+        reader_threads[i].start(std::bind(do_read_verify, std::string(path)));
+    }
+    for (int i = 0; i < num_writer_threads; ++i) {
+        writer_threads[i].join();
+    }
+
+    {
+        WriteTransaction wt(sg);
+        Group &group = wt.get_group();
+        TableRef t = group.get_table("class_Table_Emulation_Name");
+        t->set_string(1, 0, "stop reading");
+        wt.commit();
+    }
+
+    for (int i = 0; i < num_reader_threads; ++i) {
+        reader_threads[i].join();
+    }
+}
+
+
 TEST(Query_ListOfPrimitivesHandover)
 {
     SHARED_GROUP_TEST_PATH(path);
