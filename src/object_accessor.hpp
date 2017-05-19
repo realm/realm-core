@@ -257,7 +257,7 @@ Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> cons
         return Object(realm, object_schema, RowExpr());
     auto row_index = get_for_primary_key_impl(ctx, *table, *primary_prop, primary_value);
 
-    return Object(realm, object_schema, row_index == realm::not_found ? RowExpr() : table->get(row_index));
+    return Object(realm, object_schema, row_index == realm::not_found ? Row() : Row(table->get(row_index)));
 }
 
 template<typename ValueType, typename ContextType>
