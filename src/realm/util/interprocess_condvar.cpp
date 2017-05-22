@@ -247,6 +247,7 @@ void InterprocessCondVar::release_shared_part()
     File::try_remove(m_resource_path);
 #endif
 #else
+    // For future platforms, remember to check if additional code should go here.
 #endif
 }
 
