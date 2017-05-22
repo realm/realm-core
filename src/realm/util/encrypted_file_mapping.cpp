@@ -413,7 +413,7 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
 
 EncryptedFileMapping::~EncryptedFileMapping()
 {
-    if (m_access & File::access_ReadWrite) {
+    if (m_access == File::access_ReadWrite) {
         flush();
         sync();
     }
