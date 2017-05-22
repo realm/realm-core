@@ -20,6 +20,7 @@
 #define REALM_OS_SYNC_PERMISSION_HPP
 
 #include "results.hpp"
+#include "shared_realm.hpp"
 
 namespace realm {
 
@@ -83,6 +84,8 @@ struct Permission {
         { }
     };
     Condition condition;
+
+    Timestamp updated_at;
 };
 
 class PermissionResults {

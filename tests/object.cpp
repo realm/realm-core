@@ -33,7 +33,42 @@
 
 #include <realm/group_shared.hpp>
 
+#include <cstdint>
+
 using namespace realm;
+
+namespace {
+using AnyDict = std::map<std::string, util::Any>;
+using AnyVec = std::vector<util::Any>;
+}
+
+struct TestContext : CppContext {
+    std::map<std::string, AnyDict> defaults;
+
+    using CppContext::CppContext;
+
+    TestContext(TestContext& parent, realm::Property const& prop)
+    : CppContext(parent, prop)
+    , defaults(parent.defaults)
+    { }
+
+    util::Optional<util::Any>
+    default_value_for_property(ObjectSchema const& object, std::string const& prop)
+    {
+        auto obj_it = defaults.find(object.name);
+        if (obj_it == defaults.end())
+            return util::none;
+        auto prop_it = obj_it->second.find(prop);
+        if (prop_it == obj_it->second.end())
+            return util::none;
+        return prop_it->second;
+    }
+
+    void will_change(Object const&, Property const&) {}
+    void did_change() {}
+    std::string print(util::Any) { return "not implemented"; }
+    bool allow_missing(util::Any) { return false; }
+};
 
 TEST_CASE("object") {
     using namespace std::string_literals;
@@ -73,6 +108,12 @@ TEST_CASE("object") {
             {"pk", PropertyType::Int, "", "", true},
             {"int 2", PropertyType::Int},
             {"array 2", PropertyType::Array, "array target"},
+        }},
+        {"nullable int pk", {
+            {"pk", PropertyType::Int, "", "", true, true, true},
+        }},
+        {"nullable string pk", {
+            {"pk", PropertyType::String, "", "", true, true, true},
         }},
     };
     config.schema_version = 0;
@@ -215,26 +256,26 @@ TEST_CASE("object") {
         }
     }
 
-    CppContext context;
+    TestContext d(r);
     auto create = [&](util::Any&& value, bool update) {
         r->begin_transaction();
-        auto obj = Object::create(&context, r, *r->schema().find("all types"), value, update);
+        auto obj = Object::create(d, r, *r->schema().find("all types"), value, update);
         r->commit_transaction();
         return obj;
     };
 
     SECTION("create object") {
         auto obj = create(AnyDict{
-            {"pk", 1LL},
+            {"pk", INT64_C(1)},
             {"bool", true},
-            {"int", 5LL},
+            {"int", INT64_C(5)},
             {"float", 2.2f},
             {"double", 3.3},
             {"string", "hello"s},
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"value", 10LL}}},
-            {"array", AnyVector{AnyDict{{"value", 20LL}}}},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
         }, false);
 
         auto row = obj.row();
@@ -257,20 +298,20 @@ TEST_CASE("object") {
     }
 
     SECTION("create uses defaults for missing values") {
-        context.defaults["all types"] = {
+        d.defaults["all types"] = {
             {"bool", true},
-            {"int", 5LL},
+            {"int", INT64_C(5)},
             {"float", 2.2f},
             {"double", 3.3},
             {"string", "hello"s},
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"value", 10LL}}},
-            {"array", AnyVector{AnyDict{{"value", 20LL}}}},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
         };
 
         auto obj = create(AnyDict{
-            {"pk", 1LL},
+            {"pk", INT64_C(1)},
             {"float", 6.6f},
         }, false);
 
@@ -285,42 +326,62 @@ TEST_CASE("object") {
         REQUIRE(row.get_timestamp(7) == Timestamp(10, 20));
     }
 
+    SECTION("create can use defaults for primary key") {
+        d.defaults["all types"] = {
+            {"pk", INT64_C(10)},
+        };
+        auto obj = create(AnyDict{
+            {"bool", true},
+            {"int", INT64_C(5)},
+            {"float", 2.2f},
+            {"double", 3.3},
+            {"string", "hello"s},
+            {"data", "olleh"s},
+            {"date", Timestamp(10, 20)},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
+        }, false);
+
+        auto row = obj.row();
+        REQUIRE(row.get_int(0) == 10);
+    }
+
     SECTION("create throws for missing values if there is no default") {
         REQUIRE_THROWS(create(AnyDict{
-            {"pk", 1LL},
+            {"pk", INT64_C(1)},
             {"float", 6.6f},
         }, false));
     }
 
     SECTION("create always sets the PK first") {
         AnyDict value{
-            {"array 1", AnyVector{AnyDict{{"value", 1LL}}}},
-            {"array 2", AnyVector{AnyDict{{"value", 2LL}}}},
-            {"int 1", 0LL},
-            {"int 2", 0LL},
-            {"pk", 7LL},
+            {"array 1", AnyVector{AnyDict{{"value", INT64_C(1)}}}},
+            {"array 2", AnyVector{AnyDict{{"value", INT64_C(2)}}}},
+            {"int 1", INT64_C(0)},
+            {"int 2", INT64_C(0)},
+            {"pk", INT64_C(7)},
         };
         // Core will throw if the list is populated before the PK is set
         r->begin_transaction();
-        REQUIRE_NOTHROW(Object::create(&context, r, *r->schema().find("pk after list"), util::Any(value), false));
+        REQUIRE_NOTHROW(Object::create(d, r, *r->schema().find("pk after list"), util::Any(value), false));
     }
 
     SECTION("create with update") {
         auto obj = create(AnyDict{
-            {"pk", 1LL},
+            {"pk", INT64_C(1)},
             {"bool", true},
-            {"int", 5LL},
+            {"int", INT64_C(5)},
             {"float", 2.2f},
             {"double", 3.3},
             {"string", "hello"s},
             {"data", "olleh"s},
             {"date", Timestamp(10, 20)},
-            {"object", AnyDict{{"value", 10LL}}},
-            {"array", AnyVector{AnyDict{{"value", 20LL}}}},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
         }, false);
         create(AnyDict{
-            {"pk", 1LL},
-            {"int", 6LL},
+            {"pk", INT64_C(1)},
+            {"int", INT64_C(6)},
             {"string", "a"s},
         }, true);
 
@@ -335,6 +396,58 @@ TEST_CASE("object") {
         REQUIRE(row.get_timestamp(7) == Timestamp(10, 20));
     }
 
+    SECTION("create throws for duplicate pk if update is not specified") {
+        create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"bool", true},
+            {"int", INT64_C(5)},
+            {"float", 2.2f},
+            {"double", 3.3},
+            {"string", "hello"s},
+            {"data", "olleh"s},
+            {"date", Timestamp(10, 20)},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
+        }, false);
+        REQUIRE_THROWS(create(AnyDict{
+            {"pk", INT64_C(1)},
+            {"bool", true},
+            {"int", INT64_C(5)},
+            {"float", 2.2f},
+            {"double", 3.3},
+            {"string", "hello"s},
+            {"data", "olleh"s},
+            {"date", Timestamp(10, 20)},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
+        }, false));
+    }
+
+    SECTION("create with explicit null pk does not fall back to default") {
+        d.defaults["nullable int pk"] = {
+            {"pk", INT64_C(10)},
+        };
+        d.defaults["nullable string pk"] = {
+            {"pk", "value"s},
+        };
+        auto create = [&](util::Any&& value, StringData type) {
+            r->begin_transaction();
+            auto obj = Object::create(d, r, *r->schema().find(type), value, false);
+            r->commit_transaction();
+            return obj;
+        };
+
+        auto obj = create(AnyDict{{"pk", d.null_value()}}, "nullable int pk");
+        REQUIRE(obj.row().is_null(0));
+        obj = create(AnyDict{{"pk", d.null_value()}}, "nullable string pk");
+        REQUIRE(obj.row().is_null(0));
+
+        obj = create(AnyDict{{}}, "nullable int pk");
+        REQUIRE(obj.row().get_int(0) == 10);
+        obj = create(AnyDict{{}}, "nullable string pk");
+        REQUIRE(obj.row().get_string(0) == "value");
+    }
+
     SECTION("getters and setters") {
         r->begin_transaction();
 
@@ -346,41 +459,41 @@ TEST_CASE("object") {
         link_table.add_empty_row();
         Object linkobj(r, *r->schema().find("link target"), link_table[0]);
 
-        obj.set_property_value(&context, "bool", util::Any(true), false);
-        REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(&context, "bool")) == true);
+        obj.set_property_value(d, "bool", util::Any(true), false);
+        REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(d, "bool")) == true);
 
-        obj.set_property_value(&context, "int", util::Any(5LL), false);
-        REQUIRE(any_cast<long long>(obj.get_property_value<util::Any>(&context, "int")) == 5);
+        obj.set_property_value(d, "int", util::Any(INT64_C(5)), false);
+        REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(d, "int")) == 5);
 
-        obj.set_property_value(&context, "float", util::Any(1.23f), false);
-        REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(&context, "float")) == 1.23f);
+        obj.set_property_value(d, "float", util::Any(1.23f), false);
+        REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(d, "float")) == 1.23f);
 
-        obj.set_property_value(&context, "double", util::Any(1.23), false);
-        REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(&context, "double")) == 1.23);
+        obj.set_property_value(d, "double", util::Any(1.23), false);
+        REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(d, "double")) == 1.23);
 
-        obj.set_property_value(&context, "string", util::Any("abc"s), false);
-        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(&context, "string")) == "abc");
+        obj.set_property_value(d, "string", util::Any("abc"s), false);
+        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "string")) == "abc");
 
-        obj.set_property_value(&context, "data", util::Any("abc"s), false);
-        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(&context, "data")) == "abc");
+        obj.set_property_value(d, "data", util::Any("abc"s), false);
+        REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(d, "data")) == "abc");
 
-        obj.set_property_value(&context, "date", util::Any(Timestamp(1, 2)), false);
-        REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(&context, "date")) == Timestamp(1, 2));
+        obj.set_property_value(d, "date", util::Any(Timestamp(1, 2)), false);
+        REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(d, "date")) == Timestamp(1, 2));
 
-        REQUIRE_FALSE(obj.get_property_value<util::Any>(&context, "object").has_value());
-        obj.set_property_value(&context, "object", util::Any(linkobj), false);
-        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(&context, "object")).row().get_index() == linkobj.row().get_index());
+        REQUIRE_FALSE(obj.get_property_value<util::Any>(d, "object").has_value());
+        obj.set_property_value(d, "object", util::Any(linkobj), false);
+        REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(d, "object")).row().get_index() == linkobj.row().get_index());
 
-        auto linking = any_cast<Results>(linkobj.get_property_value<util::Any>(&context, "origin"));
+        auto linking = any_cast<Results>(linkobj.get_property_value<util::Any>(d, "origin"));
         REQUIRE(linking.size() == 1);
 
-        REQUIRE_THROWS(obj.set_property_value(&context, "pk", util::Any(5LL), false));
-        REQUIRE_THROWS(obj.set_property_value(&context, "not a property", util::Any(5LL), false));
+        REQUIRE_THROWS(obj.set_property_value(d, "pk", util::Any(INT64_C(5)), false));
+        REQUIRE_THROWS(obj.set_property_value(d, "not a property", util::Any(INT64_C(5)), false));
 
         r->commit_transaction();
 
-        REQUIRE_THROWS(obj.get_property_value<util::Any>(&context, "not a property"));
-        REQUIRE_THROWS(obj.set_property_value(&context, "int", util::Any(5LL), false));
+        REQUIRE_THROWS(obj.get_property_value<util::Any>(d, "not a property"));
+        REQUIRE_THROWS(obj.set_property_value(d, "int", util::Any(INT64_C(5)), false));
     }
 
 #if REALM_ENABLE_SYNC
@@ -394,26 +507,31 @@ TEST_CASE("object") {
     config2.schema = config.schema;
 
     SECTION("defaults do not override values explicitly passed to create()") {
-        context.defaults["pk after list"] = {
-            {"int 1", 10LL},
-            {"int 2", 10LL},
-        };
         AnyDict v1{
-            {"pk", 7LL},
-            {"array 1", AnyVector{AnyDict{{"value", 1LL}}}},
-            {"array 2", AnyVector{AnyDict{{"value", 2LL}}}},
+            {"pk", INT64_C(7)},
+            {"array 1", AnyVector{AnyDict{{"value", INT64_C(1)}}}},
+            {"array 2", AnyVector{AnyDict{{"value", INT64_C(2)}}}},
         };
         auto v2 = v1;
-        v1["int 1"] = 1LL;
-        v2["int 2"] = 2LL;
+        v1["int 1"] = INT64_C(1);
+        v2["int 2"] = INT64_C(2);
 
         auto r1 = Realm::get_shared_realm(config1);
         auto r2 = Realm::get_shared_realm(config2);
 
+        TestContext c1(r1);
+        TestContext c2(r2);
+
+        c1.defaults["pk after list"] = {
+            {"int 1", INT64_C(10)},
+            {"int 2", INT64_C(10)},
+        };
+        c2.defaults = c1.defaults;
+
         r1->begin_transaction();
         r2->begin_transaction();
-        auto obj = Object::create(&context, r1, *r1->schema().find("pk after list"), util::Any(v1), false);
-        Object::create(&context, r2, *r2->schema().find("pk after list"), util::Any(v2), false);
+        auto obj = Object::create(c1, r1, *r1->schema().find("pk after list"), util::Any(v1), false);
+        Object::create(c2, r2, *r2->schema().find("pk after list"), util::Any(v2), false);
         r2->commit_transaction();
         r1->commit_transaction();
 

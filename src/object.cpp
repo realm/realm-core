@@ -49,10 +49,7 @@ ReadOnlyPropertyException::ReadOnlyPropertyException(const std::string& object_t
 : std::logic_error(util::format("Cannot modify read-only property '%1.%2'", object_type, property_name))
 , object_type(object_type), property_name(property_name) {}
 
-Object::Object(SharedRealm r, ObjectSchema const& s, BasicRowExpr<Table> const& o)
-: m_realm(std::move(r)), m_object_schema(&s), m_row(o) { }
-
-Object::Object(SharedRealm r, ObjectSchema const& s, Row const& o)
+Object::Object(SharedRealm r, ObjectSchema const& s, RowExpr const& o)
 : m_realm(std::move(r)), m_object_schema(&s), m_row(o) { }
 
 Object::Object() = default;
@@ -79,7 +76,7 @@ void Object::verify_attached() const
     }
 }
 
-Property const& Object::property_for_name(std::string const& prop_name) const
+Property const& Object::property_for_name(StringData prop_name) const
 {
     auto prop = m_object_schema->property_for_name(prop_name);
     if (!prop) {

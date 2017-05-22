@@ -45,7 +45,7 @@ static Object create_object(SharedRealm realm, const ObjectSchema &object_schema
     return Object(std::move(realm), object_schema, (*table)[table->add_empty_row()]);
 }
 
-static List get_list(const Object& object, size_t column_ndx) {
+static List get_list(Object&& object, size_t column_ndx) {
     return List(object.realm(), object.row().get_linklist(column_ndx));
 }
 

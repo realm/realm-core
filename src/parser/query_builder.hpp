@@ -19,27 +19,42 @@
 #ifndef REALM_QUERY_BUILDER_HPP
 #define REALM_QUERY_BUILDER_HPP
 
-#include "parser.hpp"
-#include "object_accessor.hpp"
+#include <string>
+#include <memory>
+#include <vector>
+
+#include <realm/binary_data.hpp>
+#include <realm/null.hpp>
+#include <realm/string_data.hpp>
+#include <realm/timestamp.hpp>
 
 namespace realm {
 class Query;
+class Realm;
 class Schema;
+class Table;
+template<typename> class BasicRowExpr;
+using RowExpr = BasicRowExpr<Table>;
+
+namespace parser {
+    struct Predicate;
+}
 
 namespace query_builder {
 class Arguments;
 
-void apply_predicate(Query &query, const parser::Predicate &predicate, Arguments &arguments,
-                     const Schema &schema, const std::string &objectType);
+void apply_predicate(Query& query, const parser::Predicate& predicate,
+                     Arguments& arguments, const Schema& schema,
+                     const std::string& objectType);
 
 class Arguments {
-  public:
+public:
     virtual bool bool_for_argument(size_t argument_index) = 0;
     virtual long long long_for_argument(size_t argument_index) = 0;
     virtual float float_for_argument(size_t argument_index) = 0;
     virtual double double_for_argument(size_t argument_index) = 0;
-    virtual std::string string_for_argument(size_t argument_index) = 0;
-    virtual std::string binary_for_argument(size_t argument_index) = 0;
+    virtual StringData string_for_argument(size_t argument_index) = 0;
+    virtual BinaryData binary_for_argument(size_t argument_index) = 0;
     virtual Timestamp timestamp_for_argument(size_t argument_index) = 0;
     virtual size_t object_index_for_argument(size_t argument_index) = 0;
     virtual bool is_argument_null(size_t argument_index) = 0;
@@ -47,31 +62,42 @@ class Arguments {
 
 template<typename ValueType, typename ContextType>
 class ArgumentConverter : public Arguments {
-  public:
-    ArgumentConverter(ContextType context, SharedRealm realm, std::vector<ValueType> arguments)
-        : m_arguments(arguments), m_ctx(context), m_realm(std::move(realm)) {}
+public:
+    ArgumentConverter(ContextType& context, const ValueType* arguments, size_t count)
+    : m_ctx(context)
+    , m_arguments(arguments)
+    , m_count(count)
+    {}
 
-    using Accessor = realm::NativeAccessor<ValueType, ContextType>;
-    virtual bool bool_for_argument(size_t argument_index) { return Accessor::to_bool(m_ctx, argument_at(argument_index)); }
-    virtual long long long_for_argument(size_t argument_index) { return Accessor::to_long(m_ctx, argument_at(argument_index)); }
-    virtual float float_for_argument(size_t argument_index) { return Accessor::to_float(m_ctx, argument_at(argument_index)); }
-    virtual double double_for_argument(size_t argument_index) { return Accessor::to_double(m_ctx, argument_at(argument_index)); }
-    virtual std::string string_for_argument(size_t argument_index) { return Accessor::to_string(m_ctx, argument_at(argument_index)); }
-    virtual std::string binary_for_argument(size_t argument_index) { return Accessor::to_binary(m_ctx, argument_at(argument_index)); }
-    virtual Timestamp timestamp_for_argument(size_t argument_index) { return Accessor::to_timestamp(m_ctx, argument_at(argument_index)); }
-    virtual size_t object_index_for_argument(size_t argument_index) { return Accessor::to_existing_object_index(m_ctx, m_realm, argument_at(argument_index)); }
-    virtual bool is_argument_null(size_t argument_index) { return Accessor::is_null(m_ctx, argument_at(argument_index)); }
+    bool bool_for_argument(size_t i) override { return get<bool>(i); }
+    long long long_for_argument(size_t i) override { return get<int64_t>(i); }
+    float float_for_argument(size_t i) override { return get<float>(i); }
+    double double_for_argument(size_t i) override { return get<double>(i); }
+    StringData string_for_argument(size_t i) override { return get<StringData>(i); }
+    BinaryData binary_for_argument(size_t i) override { return get<BinaryData>(i); }
+    Timestamp timestamp_for_argument(size_t i) override { return get<Timestamp>(i); }
+    size_t object_index_for_argument(size_t i) override { return get<RowExpr>(i).get_index(); }
+    bool is_argument_null(size_t i) override { return m_ctx.is_null(at(i)); }
 
-  private:
-    std::vector<ValueType> m_arguments;
-    ContextType m_ctx;
-    SharedRealm m_realm;
+private:
+    ContextType& m_ctx;
+    const ValueType* m_arguments;
+    size_t m_count;
 
-    ValueType &argument_at(size_t index) {
-        return m_arguments.at(index);
+    const ValueType& at(size_t index) const
+    {
+        if (index >= m_count)
+            throw std::out_of_range("vector");
+        return m_arguments[index];
+    }
+
+    template<typename T>
+    T get(size_t index) const
+    {
+        return m_ctx.template unbox<T>(at(index));
     }
 };
-}
-}
+} // namespace query_builder
+} // namespace realm
 
 #endif // REALM_QUERY_BUILDER_HPP
