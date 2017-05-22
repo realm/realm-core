@@ -410,7 +410,7 @@ void* mremap(FileDesc fd, size_t file_offset, void* old_addr, size_t old_size, F
             if (!UnmapViewOfFile(old_addr))
                 throw std::runtime_error(get_errno_msg("UnmapViewOfFile failed: ", GetLastError()));
 #else
-            if(::munmap(old_addr, rounded_old_size) {
+            if(::munmap(old_addr, rounded_old_size)) {
                 int err = errno;
                 throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
             }
