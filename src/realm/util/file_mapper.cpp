@@ -247,7 +247,9 @@ void* mmap_anon(size_t size)
     HANDLE hMapFile;
     LPCTSTR pBuf;
 
-    hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, DWORD(size), nullptr);
+    ULARGE_INTEGER s;
+    s.QuadPart = size;
+    hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, s.HighPart, s.LowPart, nullptr);
     pBuf = (LPTSTR)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, size);
     if(pBuf == nullptr)
         throw std::runtime_error(get_errno_msg("MapViewOfFile() failed: ", GetLastError()));
@@ -487,7 +489,9 @@ void msync(void* addr, size_t size)
     // for a discussion of this related to core data.
 
 #ifdef _WIN32
-    
+    if (FlushViewOfFile(addr, size))
+        return;
+    throw std::runtime_error("FlushViewOfFile() failed");
 #else
     if (::msync(addr, size, MS_SYNC) != 0) {
         int err = errno; // Eliminate any risk of clobbering
