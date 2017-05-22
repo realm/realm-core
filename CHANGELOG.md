@@ -2,7 +2,10 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Add #include <realm/util/safe_int_ops.hpp> in alloc.hpp.
+  PR [#2622](https://github.com/realm/realm-core/pull/2622).
+* Fix crash in large (>4GB) encrypted Realm files.
+  PR [#2572](https://github.com/realm/realm-core/pull/2572).
 
 ### Breaking changes
 
@@ -10,7 +13,6 @@
 
 ### Enhancements
 * Support for encryption on Windows (win32 + UWP)
-* Lorem ipsum.
 
 -----------
 
@@ -21,6 +23,24 @@
   or satellite assembly pack installed. Libraries that link against Core on Windows will have to adjust their compiler flags accordingly.
   PR [#2611](https://github.com/realm/realm-core/pull/2611)
   
+
+----------------------------------------------
+
+# 2.8.0 Release notes
+
+### Bugfixes
+
+* Fix a race condition in encrypted files which can lead to
+  crashes on devices using OpenSSL (Android).
+  PR [#2616](https://github.com/realm/realm-core/pull/2616).
+
+### Enhancements
+
+* Enable encryption on watchOS.
+  Cocoa issue [#2876](https://github.com/realm/realm-cocoa/issues/2876).
+  PR [#2598](https://github.com/realm/realm-core/pull/2598).
+* Enforce consistent use of encryption keys across all threads.
+  PR [#2558](https://github.com/realm/realm-core/pull/2558).
 
 ----------------------------------------------
 
