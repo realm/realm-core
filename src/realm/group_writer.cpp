@@ -269,6 +269,14 @@ GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
     return m_map_windows[0].get();
 }
 
+
+size_t page_align(size_t size)
+{
+    size_t mask = 4095;
+    return (size + mask) & ~mask;
+}
+
+
 ref_type GroupWriter::write_group()
 {
     merge_free_space(); // Throws
@@ -348,12 +356,13 @@ ref_type GroupWriter::write_group()
     size_t max_free_space_needed =
         Array::get_max_byte_size(top.size()) +
         num_free_lists * Array::get_max_byte_size(max_free_list_size);
-
+    max_free_space_needed = page_align(max_free_space_needed) + 3 * 4096;
+    
     // Reserve space for remaining arrays. We ask for one extra byte beyond the
     // maximum number that is required. This ensures that even if we end up
     // using the maximum size possible, we still do not end up with a zero size
     // free-space chunk as we deduct the actually used size from it.
-    std::pair<size_t, size_t> reserve = reserve_free_space(max_free_space_needed + 1); // Throws
+    std::pair<size_t, size_t> reserve = reserve_free_space(max_free_space_needed + 4096); // Throws
     size_t reserve_ndx = reserve.first;
     size_t reserve_size = reserve.second;
     // At this point we have allocated all the space we need, so we can add to
@@ -392,7 +401,9 @@ ref_type GroupWriter::write_group()
     // deduction of the actually used space from the reserved chunk,) will not
     // change the byte-size of those arrays.
     size_t reserve_pos = to_size_t(m_free_positions.get(reserve_ndx));
+    REALM_ASSERT(reserve_size == to_size_t(m_free_lengths.get(reserve_ndx)));
     REALM_ASSERT_3(reserve_size, >, max_free_space_needed);
+    REALM_ASSERT((reserve_pos % 4096) == 0);
     int_fast64_t value_4 = to_int64(reserve_pos + max_free_space_needed);
 
 #if REALM_ENABLE_MEMDEBUG
@@ -404,9 +415,9 @@ ref_type GroupWriter::write_group()
     m_free_positions.ensure_minimum_width(value_4); // Throws
 
     // Get final sizes of free-list arrays
-    size_t free_positions_size = m_free_positions.get_byte_size();
-    size_t free_sizes_size = m_free_lengths.get_byte_size();
-    size_t free_versions_size = is_shared ? m_free_versions.get_byte_size() : 0;
+    size_t free_positions_size = page_align(m_free_positions.get_byte_size());
+    size_t free_sizes_size = page_align(m_free_lengths.get_byte_size());
+    size_t free_versions_size = is_shared ? page_align(m_free_versions.get_byte_size()) : 0;
     REALM_ASSERT(!is_shared ||
                  Array::get_wtype_from_header(Array::get_header_from_data(m_free_versions.m_data)) ==
                      Array::wtype_Bits);
@@ -432,7 +443,7 @@ ref_type GroupWriter::write_group()
     }
 
     // Get final sizes
-    size_t top_byte_size = top.get_byte_size();
+    size_t top_byte_size = page_align(top.get_byte_size());
     ref_type end_ref = top_ref + top_byte_size;
     REALM_ASSERT_3(size_t(end_ref), <=, reserve_pos + max_free_space_needed);
 
@@ -443,10 +454,17 @@ ref_type GroupWriter::write_group()
     // reallocation.
     size_t rest = reserve_pos + reserve_size - size_t(end_ref);
     size_t used = size_t(end_ref) - reserve_pos;
+    REALM_ASSERT(reserve_pos + used == end_ref);
+    REALM_ASSERT(end_ref + rest > reserve_pos);
+    REALM_ASSERT(end_ref + rest == reserve_pos + reserve_size);
     REALM_ASSERT_3(rest, >, 0);
+    REALM_ASSERT((rest % 4096) == 0);
+    REALM_ASSERT((used % 4096) == 0);
     int_fast64_t value_8 = from_ref(end_ref);
     int_fast64_t value_9 = to_int64(rest);
-
+    size_t logical_file_size = to_size_t(top.get(2) / 2);
+    REALM_ASSERT(logical_file_size >= end_ref);
+    
     // value_9 is guaranteed to be smaller than the existing entry in the array and hence will not cause bit expansion
     REALM_ASSERT_3(value_8, <=, Array::ubound_for_width(m_free_positions.get_width()));
     REALM_ASSERT_3(value_9, <=, Array::ubound_for_width(m_free_lengths.get_width()));
@@ -533,15 +551,18 @@ void GroupWriter::merge_free_space()
 size_t GroupWriter::get_free_space(size_t size)
 {
     REALM_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
+    // always allocate stuff aligned to 4K
+    size = page_align(size);
 
     std::pair<size_t, size_t> p = reserve_free_space(size);
-
+    
     bool is_shared = m_group.m_is_shared;
 
     // Claim space from identified chunk
     size_t chunk_ndx = p.first;
     size_t chunk_pos = to_size_t(m_free_positions.get(chunk_ndx));
     size_t chunk_size = p.second;
+    REALM_ASSERT((chunk_pos % 4096) == 0);
     REALM_ASSERT_3(chunk_size, >=, size);
     REALM_ASSERT((chunk_size % 8) == 0);
 
@@ -584,6 +605,7 @@ inline size_t GroupWriter::split_freelist_chunk(size_t index, size_t start_pos, 
 std::pair<size_t, size_t> GroupWriter::search_free_space_in_part_of_freelist(size_t size, size_t begin, size_t end,
                                                                              bool& found)
 {
+    REALM_ASSERT((size % 4096) == 0);
     bool is_shared = m_group.m_is_shared;
     SlabAlloc& alloc = m_group.m_alloc;
     for (size_t next_start = begin; next_start < end;) {
@@ -608,7 +630,8 @@ std::pair<size_t, size_t> GroupWriter::search_free_space_in_part_of_freelist(siz
         // search through the chunk, finding a place within it,
         // where an allocation will not cross a mmap boundary
         size_t start_pos = to_size_t(m_free_positions.get(i));
-        size_t alloc_pos = alloc.find_section_in_range(start_pos, chunk_size, size);
+        size_t alloc_pos = page_align(start_pos);
+        alloc_pos = alloc.find_section_in_range(alloc_pos, chunk_size, size);
         if (alloc_pos == 0) {
             continue;
         }
@@ -631,6 +654,7 @@ std::pair<size_t, size_t> GroupWriter::search_free_space_in_part_of_freelist(siz
 
 std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 {
+    REALM_ASSERT((size % 4096) == 0);
     typedef std::pair<size_t, size_t> Chunk;
     Chunk chunk;
     bool found;
@@ -670,6 +694,7 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
 // extend_free_space may be needed, before an allocation can succeed.
 std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
 {
+    REALM_ASSERT((requested_size % 4096) == 0);
     bool is_shared = m_group.m_is_shared;
     SlabAlloc& alloc = m_group.m_alloc;
 
@@ -683,7 +708,9 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     size_t extend_size = requested_size;
     size_t new_file_size = logical_file_size + extend_size;
     if (!alloc.matches_section_boundary(new_file_size)) {
-        new_file_size = alloc.get_upper_section_boundary(new_file_size);
+        auto new_file_size_2 = alloc.get_upper_section_boundary(new_file_size);
+        REALM_ASSERT(new_file_size_2 > new_file_size);
+        new_file_size = new_file_size_2;
     }
     // The size must be a multiple of 8. This is guaranteed as long as
     // the initial size is a multiple of 8.

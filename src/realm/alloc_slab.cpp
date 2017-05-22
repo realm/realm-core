@@ -31,6 +31,8 @@
 #include <cstdlib>
 #endif
 
+#include <sys/mman.h>
+
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/miscellaneous.hpp>
 #include <realm/util/terminate.hpp>
@@ -388,6 +390,12 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     return MemRef(slab.addr, ref, *this);
 }
 
+inline size_t page_align(size_t size)
+{
+    size_t mask = 4095;
+    return (size + mask) & ~mask;
+}
+
 
 void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 {
@@ -403,6 +411,13 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
 
     // Get size from segment
     size_t size = read_only ? Array::get_byte_size_from_header(addr) : Array::get_capacity_from_header(addr);
+    if (read_only) { // size is always on 4K boundary
+        REALM_ASSERT((ref % 4096) == 0);
+        auto end = page_align(ref+size);
+        size = end-ref;
+        REALM_ASSERT((size % 4096) == 0);
+        mprotect(const_cast<char*>(addr), size, PROT_NONE);
+    }
     ref_type ref_end = ref + size;
 
 #ifdef REALM_DEBUG
@@ -676,7 +691,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         // of a shared group.
         if (cfg.session_initiator || !bool(p)) {
             p = std::make_shared<MappedFile>();
-            all_files[path] = p;
+            //all_files[path] = p;
         }
         m_file_mappings = p;
     }

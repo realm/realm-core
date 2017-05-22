@@ -1911,6 +1911,12 @@ void Group::prepare_history_parent(Array& history_root, int history_type,
 
 namespace {
 
+size_t page_align(size_t size)
+{
+    size_t mask = 4095;
+    return (size + mask) & ~mask;
+}
+
 class MemUsageVerifier : public Array::MemUsageHandler {
 public:
     MemUsageVerifier(ref_type ref_begin, ref_type immutable_ref_end, ref_type mutable_ref_end, ref_type baseline)
@@ -1922,6 +1928,7 @@ public:
     }
     void add_immutable(ref_type ref, size_t size)
     {
+        size = page_align(size+ref)-ref;
         REALM_ASSERT_3(ref % 8, ==, 0);  // 8-byte alignment
         REALM_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
         REALM_ASSERT_3(size, >, 0);
@@ -1946,6 +1953,9 @@ public:
     }
     void add(ref_type ref, size_t size)
     {
+        if (ref < m_baseline) {
+            size = page_align(size+ref)-ref;
+        }
         REALM_ASSERT_3(ref % 8, ==, 0);  // 8-byte alignment
         REALM_ASSERT_3(size % 8, ==, 0); // 8-byte alignment
         REALM_ASSERT_3(size, >, 0);
