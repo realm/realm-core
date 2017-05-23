@@ -199,11 +199,7 @@ void SlabAlloc::detach() noexcept
     // Release all allocated memory - this forces us to create new
     // slabs after re-attaching thereby ensuring that the slabs are
     // placed correctly (logically) after the end of the file.
-    for (auto& slab : m_slabs) {
-        delete[] slab.addr;
-    }
-    m_slabs.clear();
-
+    reset_free_space_tracking();
     m_attach_mode = attach_None;
 }
 
@@ -357,7 +353,8 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 #endif
 
     REALM_ASSERT(0 < new_size);
-    std::unique_ptr<char[]> mem(new char[new_size]); // Throws
+    //std::unique_ptr<char[]> mem(new char[new_size]); // Throws
+    std::unique_ptr<char[]> mem((char*)realm::util::mmap_anon(new_size));
     std::fill(mem.get(), mem.get() + new_size, 0);
 
     // Add to list of slabs
@@ -1061,7 +1058,8 @@ void SlabAlloc::reset_free_space_tracking()
 
     for (const auto& slab : m_slabs) {
         chunk.size = slab.ref_end - chunk.ref;
-        ::munmap(slab.addr, chunk.size);
+        //::munmap(slab.addr, chunk.size);
+        realm::util::munmap(slab.addr, chunk.size);
         //m_free_space.push_back(chunk); // Throws
         chunk.ref = slab.ref_end;
     }

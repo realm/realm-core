@@ -197,20 +197,6 @@ void remove_mapping(void* addr, size_t size)
     }
 }
 
-void* mmap_anon(size_t size)
-{
-    void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
-    if (addr == MAP_FAILED) {
-        int err = errno; // Eliminate any risk of clobbering
-        if (is_mmap_memory_error(err)) {
-            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err) + " size: " + util::to_string(size));
-        }
-        throw std::runtime_error(get_errno_msg("mmap() failed: ", err) + "size: " + util::to_string(size) +
-                                 "offset is 0");
-    }
-    return addr;
-}
-
 size_t round_up_to_page_size(size_t size) noexcept
 {
     return (size + page_size() - 1) & ~(page_size() - 1);
@@ -232,6 +218,21 @@ void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const ch
 }
 
 #endif // enable encryption
+
+
+void* mmap_anon(size_t size)
+{
+    void* addr = ::mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+    if (addr == MAP_FAILED) {
+        int err = errno; // Eliminate any risk of clobbering
+        if (is_mmap_memory_error(err)) {
+            throw AddressSpaceExhausted(get_errno_msg("mmap() failed: ", err) + " size: " + util::to_string(size));
+        }
+        throw std::runtime_error(get_errno_msg("mmap() failed: ", err) + "size: " + util::to_string(size) +
+                                 "offset is 0");
+    }
+    return addr;
+}
 
 
 void* mmap(int fd, size_t size, File::AccessMode access, size_t offset, const char* encryption_key)
