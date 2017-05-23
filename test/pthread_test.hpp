@@ -72,7 +72,7 @@ inline void ptf_randsleep(void)
     }
     else if (r < 800) {
         // Wake up in time slice earlier than sleep(0) on some OSes
-        sched_yield();
+        ();
     }
     else if (r < 999) {
 // Wake up in time slice according to normal OS scheduling

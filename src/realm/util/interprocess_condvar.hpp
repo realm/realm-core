@@ -26,7 +26,6 @@
 #include <cstdint>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <semaphore.h>
 #include <mutex>
 
 // Condvar Emulation is required if RobustMutex emulation is enabled

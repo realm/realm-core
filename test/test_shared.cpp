@@ -585,8 +585,7 @@ TEST(Shared_1)
     }
 }
 
-/*
-ONLY(Shared_try_begin_write)
+TEST(Shared_try_begin_write)
 {
     SHARED_GROUP_TEST_PATH(path);
     // Create a new shared db
@@ -659,7 +658,7 @@ ONLY(Shared_try_begin_write)
         CHECK(gr.get_table(1)->get_name() == StringData("table 2"));
     }
 }
-*/
+
 
 TEST(Shared_Rollback)
 {

@@ -90,13 +90,17 @@ void Thread::join()
 {
     if (!m_joinable)
         throw std::runtime_error("Thread is not joinable");
-    void** value_ptr = nullptr; // Ignore return value
-//    int r = pthread_join(m_id, value_ptr);
-//    if (REALM_UNLIKELY(r != 0))
-//        join_failed(r); // Throws
-    m_joinable = false;
 
+#ifdef _WIN32
     m_std_thread.join();
+#else
+    void** value_ptr = nullptr; // Ignore return value
+    int r = pthread_join(m_id, value_ptr);
+    if (REALM_UNLIKELY(r != 0))
+        join_failed(r); // Throws
+#endif
+
+    m_joinable = false;
 }
 
 
@@ -302,21 +306,31 @@ int RobustMutex::try_low_level_lock()
 
 bool RobustMutex::is_valid() noexcept
 {
-    return true;
-
+#ifdef _WIN32    
+    REALM_ASSERT_RELEASE(Mutex::m_is_shared);
+    HANDLE h = OpenMutexA(MUTEX_ALL_ACCESS, 1, m_shared_name);
+    if (h) {
+        CloseHandle(h);
+        return true;
+    }
+    else {
+        return false;
+    }
+#else
     // FIXME: This check tries to lock the mutex, and only unlocks it if the
     // return value is zero. If pthread_mutex_trylock() fails with EOWNERDEAD,
     // this leads to deadlock during the following propper attempt to lock. This
     // cannot be fixed by also unlocking on failure with EOWNERDEAD, because
     // that would mark the mutex as consistent again and prevent the expected
     // notification.
-    int r = 0;// pthread_mutex_trylock(&m_impl);
+    int r = pthread_mutex_trylock(&m_impl);
     if (r == 0) {
-        r = 0;// pthread_mutex_unlock(&m_impl);
+        r = pthread_mutex_unlock(&m_impl);
         REALM_ASSERT(r == 0);
         return true;
     }
     return r != EINVAL;
+#endif
 }
 
 

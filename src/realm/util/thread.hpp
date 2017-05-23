@@ -553,9 +553,9 @@ inline bool Mutex::try_lock() noexcept
             CloseHandle(h);
 
         if (d == WAIT_OBJECT_0)
-            return 0;
+            return true;
         else
-            return EBUSY; // Best probability why WaitForSingleObject would fail in this case
+            return false;
     }
 #else
     int r = pthread_mutex_trylock(&m_impl);
