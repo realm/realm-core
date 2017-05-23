@@ -431,6 +431,13 @@ TEST(BinaryColumn_SwapRows)
         CHECK_EQUAL(c.get(2), BinaryData("baz"));
         CHECK_EQUAL(c.size(), 3); // size should not change
 
+        // swap back
+        c.swap_rows(1, 2);
+
+        CHECK_EQUAL(c.get(1), BinaryData("baz"));
+        CHECK_EQUAL(c.get(2), BinaryData("quux"));
+        CHECK_EQUAL(c.size(), 3); // size should not change
+
         c.destroy();
     }
 
@@ -461,6 +468,7 @@ TEST(BinaryColumn_SwapRows)
         c.add(BinaryData("foo"));
         c.add(BinaryData("bar"));
         c.add(BinaryData());
+        c.add(BinaryData("baz"));
 
         CHECK(c.get(2).is_null());
 
@@ -468,7 +476,16 @@ TEST(BinaryColumn_SwapRows)
 
         CHECK(c.get(1).is_null());
         CHECK_EQUAL(c.get(2).data(), BinaryData("bar").data());
-        CHECK_EQUAL(c.size(), 3); // size should not change
+        CHECK_EQUAL(c.get(3).data(), BinaryData("baz").data());
+        CHECK_EQUAL(c.size(), 4); // size should not change
+
+        // swap back
+        c.swap_rows(2, 1);
+
+        CHECK(c.get(2).is_null());
+        CHECK_EQUAL(c.get(1).data(), BinaryData("bar").data());
+        CHECK_EQUAL(c.get(3).data(), BinaryData("baz").data());
+        CHECK_EQUAL(c.size(), 4); // size should not change
 
         c.destroy();
     }

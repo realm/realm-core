@@ -404,34 +404,19 @@ void BinaryColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
     REALM_ASSERT_3(row_ndx_2, <=, size());
     REALM_ASSERT_DEBUG(row_ndx_1 != row_ndx_2);
 
-    // FIXME: Do this in a way that avoids the intermediate copying.
-
     BinaryData value_1 = get(row_ndx_1);
     BinaryData value_2 = get(row_ndx_2);
 
-    if (value_1.is_null() && value_2.is_null()) {
-        return;
-    }
-
-    std::unique_ptr<char[]> buffer_1(new char[value_1.size()]); // Throws
-    std::unique_ptr<char[]> buffer_2(new char[value_2.size()]); // Throws
-    realm::safe_copy_n(value_1.data(), value_1.size(), buffer_1.get());
-    realm::safe_copy_n(value_2.data(), value_2.size(), buffer_2.get());
-
     if (value_1.is_null()) {
-        set(row_ndx_2, BinaryData());
+        if (!value_2.is_null()) {
+            set(row_ndx_1, value_2);
+            set(row_ndx_2, BinaryData());
+        }
     }
     else {
-        BinaryData copy{buffer_1.get(), value_1.size()};
-        set(row_ndx_2, copy);
-    }
-
-    if (value_2.is_null()) {
-        set(row_ndx_1, BinaryData());
-    }
-    else {
-        BinaryData copy{buffer_2.get(), value_2.size()};
-        set(row_ndx_1, copy);
+        std::string copy_of_1{value_1};
+        set(row_ndx_1, value_2);
+        set(row_ndx_2, BinaryData(copy_of_1));
     }
 }
 

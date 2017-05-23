@@ -1672,11 +1672,8 @@ TEST(StringIndex_Fuzzy)
             size_t r1 = fastrand() % t->size();
             size_t r2 = fastrand() % t->size();
 
-            std::string str1 = t->get_string(0, r2);
-            std::string str2 = t->get_string(0, r2);
-
-            t->set_string(0, r1, StringData(str1));
-            t->set_string(1, r1, StringData(str2));
+            t->set_string(0, r1, t->get_string(0, r2));
+            t->set_string(1, r1, t->get_string(0, r2));
 
             r1 = fastrand() % t->size();
             r2 = fastrand() % t->size();

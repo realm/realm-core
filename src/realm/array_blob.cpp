@@ -141,13 +141,25 @@ ref_type ArrayBlob::replace(size_t begin, size_t end, const char* data, size_t d
         if (begin != m_size) {
             const char* old_begin = m_data + end;
             const char* old_end = m_data + m_size;
+            const char* blob_end = m_data + m_size;
+
+            bool new_data_is_in_same_blob = data > modify_begin && data < blob_end;
+
             if (remove_size < add_size) { // expand gap
                 char* new_end = m_data + new_size;
                 std::copy_backward(old_begin, old_end, new_end);
+                if (new_data_is_in_same_blob) {
+                    auto adjust_data = new_end - old_end;
+                    data += adjust_data;
+                }
             }
             else if (add_size < remove_size) { // shrink gap
                 char* new_begin = modify_begin + add_size;
                 realm::safe_copy_n(old_begin, old_end - old_begin, new_begin);
+                if (new_data_is_in_same_blob) {
+                    auto adjust_data = new_begin - old_begin;
+                    data += adjust_data;
+                }
             }
         }
 
