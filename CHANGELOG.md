@@ -6,6 +6,9 @@
   PR [#2622](https://github.com/realm/realm-core/pull/2622).
 * Fix crash in large (>4GB) encrypted Realm files.
   PR [#2572](https://github.com/realm/realm-core/pull/2572).
+* Fix missing symbols for some overloads of Table::find_first
+  in some configurations.
+  PR [#2624](https://github.com/realm/realm-core/pull/2624).
 
 ### Breaking changes
 
