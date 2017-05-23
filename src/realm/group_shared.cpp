@@ -2110,7 +2110,7 @@ void SharedGroup::low_level_commit(uint_fast64_t new_version)
     REALM_ASSERT(oldest_version <= new_version);
     // info->readers.dump();
     GroupWriter out(m_group); // Throws
-    out.set_versions(new_version, oldest_version);
+    out.set_versions(new_version, 1 /* oldest_version*/);
     // Recursively write all changed arrays to end of file
     ref_type new_top_ref = out.write_group(); // Throws
     m_free_space = out.get_free_space();

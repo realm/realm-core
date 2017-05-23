@@ -416,6 +416,7 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
         auto end = page_align(ref+size);
         size = end-ref;
         REALM_ASSERT((size % 4096) == 0);
+        std::cout << "    - free: " << ref << " .. " << ref+size << "    @ " << (void*)addr << std::endl;
         mprotect(const_cast<char*>(addr), size, PROT_NONE);
     }
     ref_type ref_end = ref + size;

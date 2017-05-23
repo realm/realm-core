@@ -279,6 +279,7 @@ size_t page_align(size_t size)
 
 ref_type GroupWriter::write_group()
 {
+    std::cout << "   - commit: merge" << std::endl;
     merge_free_space(); // Throws
 
     Array& top = m_group.m_top;
@@ -292,6 +293,7 @@ ref_type GroupWriter::write_group()
     // that has been release during the current transaction (or since the last
     // commit), as that would lead to clobbering of the previous database
     // version.
+    std::cout << "   - commit: write tables" << std::endl;
     bool deep = true, only_if_modified = true;
     ref_type names_ref = m_group.m_table_names.write(*this, deep, only_if_modified); // Throws
     ref_type tables_ref = m_group.m_tables.write(*this, deep, only_if_modified);     // Throws
@@ -362,6 +364,7 @@ ref_type GroupWriter::write_group()
     // maximum number that is required. This ensures that even if we end up
     // using the maximum size possible, we still do not end up with a zero size
     // free-space chunk as we deduct the actually used size from it.
+    std::cout << "   - commit: alloc free lists" << std::endl;
     std::pair<size_t, size_t> reserve = reserve_free_space(max_free_space_needed + 4096); // Throws
     size_t reserve_ndx = reserve.first;
     size_t reserve_size = reserve.second;
@@ -371,6 +374,7 @@ ref_type GroupWriter::write_group()
     // clobering the previous database version. Note, however, that this risk
     // would only have been present in the non-transactional case where there is
     // no version tracking on the free-space chunks.
+    std::cout << "   - commit: merge new free lists" << std::endl;
     for (const auto& free_space : new_free_space) {
         ref_type ref = free_space.ref;
         size_t size = free_space.size;
@@ -487,6 +491,7 @@ ref_type GroupWriter::write_group()
     write_array_at(window, top_ref, top.get_header(), top_byte_size); // Throws
     window->encryption_write_barrier(start_addr, used);
     // Return top_ref so that it can be saved in lock file used for coordination
+    std::cout << "   - commit: done" << std::endl;
     return top_ref;
 }
 
@@ -509,7 +514,7 @@ void GroupWriter::merge_free_space()
     if (m_free_lengths.is_empty())
         return;
 
-    size_t n = m_free_lengths.size() - 1;
+    size_t n = m_free_lengths.size() - 2; // never merge into last block
     for (size_t i = 0; i < n; ++i) {
         size_t i2 = i + 1;
         size_t pos1 = to_size_t(m_free_positions.get(i));
@@ -663,6 +668,12 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
     // chunks we are likely to find them faster by skipping the first half of
     // the list.
     size_t end = m_free_lengths.size();
+
+    // Hack: We only allocate from the very last entry in the free list.
+    // by also preventing any merges into the very last entry, we can make
+    // sure that memory is never recycled.
+    chunk = search_free_space_in_part_of_freelist(size, end - 1, end, found);
+/*    
     if (size < 1024) {
         chunk = search_free_space_in_part_of_freelist(size, 0, end, found);
         if (found)
@@ -676,15 +687,18 @@ std::pair<size_t, size_t> GroupWriter::reserve_free_space(size_t size)
         if (found)
             return chunk;
     }
-
+*/
     // No free space, so we have to extend the file.
-    do {
+    while (!found) {
         extend_free_space(size);
         // extending the file will add a new entry at the end of the freelist,
         // so search that particular entry
         end = m_free_lengths.size();
         chunk = search_free_space_in_part_of_freelist(size, end - 1, end, found);
-    } while (!found);
+        end = m_free_lengths.size();
+    }
+    auto start_pos = m_free_positions.get(end-1);
+    std::cout << "    - alloc: " << start_pos << " .. " << start_pos + size << std::endl;
     return chunk;
 }
 
@@ -717,13 +731,17 @@ std::pair<size_t, size_t> GroupWriter::extend_free_space(size_t requested_size)
     REALM_ASSERT_3(new_file_size % 8, ==, 0);
     REALM_ASSERT_3(logical_file_size, <, new_file_size);
 
+    if (new_file_size > 1024*1024*1024) {
+        throw std::runtime_error("Aborting, file has become too big");
+    }
     // Note: File::prealloc() may misbehave under race conditions (see
     // documentation of File::prealloc()). Fortunately, no race conditions can
     // occur, because in transactional mode we hold a write lock at this time,
     // and in non-transactional mode it is the responsibility of the user to
     // ensure non-concurrent file mutation.
     m_alloc.resize_file(new_file_size); // Throws
-
+    std::cout << " - extending file from " << logical_file_size << "  ->  "
+              << new_file_size << std::endl;
     //    m_file_map.remap(m_alloc.get_file(), File::access_ReadWrite, new_file_size); // Throws
 
     size_t chunk_ndx = m_free_positions.size();
