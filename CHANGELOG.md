@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.8.1 Release notes
 
 ### Bugfixes
 
@@ -9,20 +9,6 @@
 * Fix missing symbols for some overloads of Table::find_first
   in some configurations.
   PR [#2624](https://github.com/realm/realm-core/pull/2624).
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
