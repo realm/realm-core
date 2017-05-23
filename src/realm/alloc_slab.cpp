@@ -264,7 +264,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
         throw InvalidFreeSpace();
 
     m_free_space_state = free_space_Dirty;
-
+#if 0
     // Do we have a free space we can reuse?
     {
         typedef chunks::reverse_iterator iter;
@@ -315,7 +315,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
             }
         }
     }
-
+#endif
 
     // Allocate new slab. To avoid wasting physical memory, we allocate a page
     size_t new_size = size > page_size() ? size : page_size();
@@ -326,6 +326,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
     else {
         // Find size of memory that has been modified (through copy-on-write) in current write transaction
         ref_type curr_ref_end = to_size_t(m_slabs.back().ref_end);
+/*
         size_t copy_on_write = curr_ref_end - m_baseline;
 
         // Allocate 20% of that (for the first few number of slabs the math below will just result in 1 page each)
@@ -333,7 +334,7 @@ MemRef SlabAlloc::do_alloc(const size_t size)
 
         if (new_size < min_size)
             new_size = min_size;
-
+*/
         ref = curr_ref_end;
     }
 
@@ -417,6 +418,9 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
         size = end-ref;
         REALM_ASSERT((size % 4096) == 0);
         std::cout << "    - free: " << ref << " .. " << ref+size << "    @ " << (void*)addr << std::endl;
+        mprotect(const_cast<char*>(addr), size, PROT_NONE);
+    }
+    else {
         mprotect(const_cast<char*>(addr), size, PROT_NONE);
     }
     ref_type ref_end = ref + size;
@@ -1057,10 +1061,12 @@ void SlabAlloc::reset_free_space_tracking()
 
     for (const auto& slab : m_slabs) {
         chunk.size = slab.ref_end - chunk.ref;
-        m_free_space.push_back(chunk); // Throws
+        ::munmap(slab.addr, chunk.size);
+        //m_free_space.push_back(chunk); // Throws
         chunk.ref = slab.ref_end;
     }
-
+    m_slabs.clear();
+    
 #ifdef REALM_DEBUG
     REALM_ASSERT_DEBUG(is_all_free());
 #endif
