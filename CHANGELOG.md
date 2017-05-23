@@ -1,8 +1,4 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* Lorem ipsum.
+# 3.0.0-rc1 Release notes
 
 ### Breaking changes
 
