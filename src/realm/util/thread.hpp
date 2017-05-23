@@ -171,11 +171,17 @@ private:
     bool m_is_shared = false;
 
 #ifdef _WIN32
-    // Handle to Windows mutex and process information of caller to init who owns that handle
+    // All below members are used for interprocess Windows-API mutexes only. Needs to be declared unconditionally
+    // because these are setup on runtime through Mutex(process_shared_tag).
+
+    // Windows-API mutexes can be addressed through string names.
+    char m_shared_name[33 + 1];
+
+    // We need to translate the name to a HANDLE in order to pass it to the Windows API. This translation is
+    // expensive, so we cache the translation for each process (each process has its own HANDLE for the same mutex)
     HANDLE m_cached_handle;
     int m_cached_pid;
     DWORD m_cached_windows_pid;
-    char m_shared_name[33 + 1];
 #endif
 
     friend class CondVar;
@@ -475,8 +481,7 @@ inline Mutex::Mutex(process_shared_tag)
 
 inline Mutex::~Mutex() noexcept
 {
-#ifdef _WIN32
-#else
+#ifndef _WIN32
     int r = pthread_mutex_destroy(&m_impl);
     if (REALM_UNLIKELY(r != 0))
         destroy_failed(r);
@@ -510,15 +515,16 @@ inline void Mutex::lock() noexcept
             h = m_cached_handle;
 
         if (h == NULL)
-            lock_failed(0);//            return EINVAL;
+            lock_failed(EINVAL);
 
         d = WaitForSingleObject(h, INFINITE);
 
         if (m_cached_pid != pid)
             CloseHandle(h);
 
+        // If WaitForSingleObject() returned any other value, it means it succeeded
         if (d == (DWORD)0xFFFFFFFF)
-            lock_failed(0); // EDEADLK;  // Highest probability why WaitForSingleObject would fail on valid mutex
+            lock_failed(EDEADLK);
     }
 #else
     int r = pthread_mutex_lock(&m_impl);

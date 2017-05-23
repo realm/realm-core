@@ -79,7 +79,9 @@ Initialization initialization;
 
 void free_threadpool()
 {
-//    pthread_cleanup();
+#ifndef _WIN32
+    pthread_cleanup();
+#endif
 }
 #endif
 
@@ -92,6 +94,7 @@ void Thread::join()
         throw std::runtime_error("Thread is not joinable");
 
 #ifdef _WIN32
+    // Returns void; error handling not possible
     m_std_thread.join();
 #else
     void** value_ptr = nullptr; // Ignore return value
@@ -173,7 +176,10 @@ void Mutex::init_as_process_shared(bool robust_if_available)
     // Create unique and random mutex name. UuidCreate() needs linking with Rpcrt4.lib, so we use CoCreateGuid() 
     // instead. That way end-user won't need to mess with Visual Studio project settings
     CoCreateGuid(&guid);
-    sprintf_s(m_shared_name, sizeof(m_shared_name), "Local\\%08X%04X%04X%02X%02X%02X%02X%02X", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4]);
+    sprintf_s(m_shared_name, sizeof(m_shared_name), "Local\\%08X%04X%04X%02X%02X%02X%02X%02X", 
+              guid.Data1, guid.Data2, guid.Data3, 
+              guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4]);
+
     h = CreateMutexA(NULL, 0, m_shared_name);
     if (h == NULL)
         REALM_ASSERT_RELEASE("CreateMutexA() failed" && false);
@@ -267,6 +273,7 @@ bool RobustMutex::low_level_lock()
 {
 #ifdef _WIN32
     REALM_ASSERT_RELEASE(Mutex::m_is_shared);
+    // Returns void. Error handling takes place inside lock()
     Mutex::lock();
     return true;
 #else
