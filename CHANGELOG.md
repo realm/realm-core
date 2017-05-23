@@ -2,13 +2,7 @@
 
 ### Bugfixes
 
-* Add #include <realm/util/safe_int_ops.hpp> in alloc.hpp.
-  PR [#2622](https://github.com/realm/realm-core/pull/2622).
-* Fix crash in large (>4GB) encrypted Realm files.
-  PR [#2572](https://github.com/realm/realm-core/pull/2572).
-* Fix missing symbols for some overloads of Table::find_first
-  in some configurations.
-  PR [#2624](https://github.com/realm/realm-core/pull/2624).
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -45,7 +39,20 @@
   or satellite assembly pack installed. Libraries that link against Core on Windows will have to adjust their compiler flags accordingly.
   PR [#2611](https://github.com/realm/realm-core/pull/2611)
   
+----------------------------------------------
 
+# 2.8.1 Release notes
+
+### Bugfixes
+
+* Add #include <realm/util/safe_int_ops.hpp> in alloc.hpp.
+  PR [#2622](https://github.com/realm/realm-core/pull/2622).
+* Fix crash in large (>4GB) encrypted Realm files.
+  PR [#2572](https://github.com/realm/realm-core/pull/2572).
+* Fix missing symbols for some overloads of Table::find_first
+  in some configurations.
+  PR [#2624](https://github.com/realm/realm-core/pull/2624).
+  
 ----------------------------------------------
 
 # 2.8.0 Release notes
