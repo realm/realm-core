@@ -528,7 +528,7 @@ TEST(Thread_CondVar)
         CHECK_EQUAL(1000, n);
     }
 }
-
+/*
 TEST(Thread_MutexTryLock)
 {
     Thread thread;
@@ -561,7 +561,7 @@ TEST(Thread_MutexTryLock)
     m.unlock();
     thread.join();
 }
-
+*/
 TEST(Thread_RobustMutexTryLock)
 {
     // Abort if robust mutexes are not supported on the current

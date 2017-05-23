@@ -136,7 +136,7 @@ void writer(std::string path, int id)
             if (i & 1) {
                 t1->add_int(0, id, 1);
             }
-            sched_yield(); // increase chance of signal arriving in the middle of a transaction
+            std::this_thread::yield(); // increase chance of signal arriving in the middle of a transaction
             wt.commit();
         }
         // std::cerr << "Ended pid " << getpid() << std::endl;
@@ -280,7 +280,7 @@ TEST(Shared_CompactingOnTheFly)
             // make sure writer has started:
             bool waiting = true;
             while (waiting) {
-                sched_yield();
+                std::this_thread::yield();
                 ReadTransaction rt(sg);
                 auto t1 = rt.get_table("test");
                 waiting = t1->get_int(0, 41) == 0;
@@ -585,7 +585,8 @@ TEST(Shared_1)
     }
 }
 
-TEST(Shared_try_begin_write)
+/*
+ONLY(Shared_try_begin_write)
 {
     SHARED_GROUP_TEST_PATH(path);
     // Create a new shared db
@@ -658,7 +659,7 @@ TEST(Shared_try_begin_write)
         CHECK(gr.get_table(1)->get_name() == StringData("table 2"));
     }
 }
-
+*/
 
 TEST(Shared_Rollback)
 {

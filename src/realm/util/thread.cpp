@@ -79,7 +79,7 @@ Initialization initialization;
 
 void free_threadpool()
 {
-    pthread_cleanup();
+//    pthread_cleanup();
 }
 #endif
 
@@ -91,10 +91,12 @@ void Thread::join()
     if (!m_joinable)
         throw std::runtime_error("Thread is not joinable");
     void** value_ptr = nullptr; // Ignore return value
-    int r = pthread_join(m_id, value_ptr);
-    if (REALM_UNLIKELY(r != 0))
-        join_failed(r); // Throws
+//    int r = pthread_join(m_id, value_ptr);
+//    if (REALM_UNLIKELY(r != 0))
+//        join_failed(r); // Throws
     m_joinable = false;
+
+    m_std_thread.join();
 }
 
 
@@ -154,6 +156,31 @@ REALM_NORETURN void Thread::join_failed(int)
 
 void Mutex::init_as_process_shared(bool robust_if_available)
 {
+    // IF YOU PAGEFAULT HERE, IT'S LIKELY CAUSED BY DATABASE RESIDING ON NETWORK SHARE (WINDOWS + *NIX). Memory 
+    // mapping is not coherent there. Note that this issue is NOT pthread related. Only reason why it happens in 
+    // this mutex->is_shared is that mutex coincidentally happens to be the first member that shared group accesses.
+    m_is_shared = true; // <-- look above!
+    // ^^^^ Look above
+
+#ifdef _WIN32
+    GUID guid;
+    HANDLE h;
+
+    // Create unique and random mutex name. UuidCreate() needs linking with Rpcrt4.lib, so we use CoCreateGuid() 
+    // instead. That way end-user won't need to mess with Visual Studio project settings
+    CoCreateGuid(&guid);
+    sprintf_s(m_shared_name, sizeof(m_shared_name), "Local\\%08X%04X%04X%02X%02X%02X%02X%02X", guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4]);
+    h = CreateMutexA(NULL, 0, m_shared_name);
+    if (h == NULL)
+        REALM_ASSERT_RELEASE("CreateMutexA() failed" && false);
+
+    m_cached_handle = h;
+    m_cached_pid = _getpid();
+    m_cached_windows_pid = GetCurrentProcessId();
+
+    return;
+#endif
+
 #ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
     pthread_mutexattr_t attr;
     int r = pthread_mutexattr_init(&attr);
@@ -234,6 +261,11 @@ bool RobustMutex::is_robust_on_this_platform() noexcept
 
 bool RobustMutex::low_level_lock()
 {
+#ifdef _WIN32
+    REALM_ASSERT_RELEASE(Mutex::m_is_shared);
+    Mutex::lock();
+    return true;
+#else
     int r = pthread_mutex_lock(&m_impl);
     if (REALM_LIKELY(r == 0))
         return true;
@@ -244,10 +276,15 @@ bool RobustMutex::low_level_lock()
         throw NotRecoverable();
 #endif
     lock_failed(r);
+#endif // _WIN32
 }
 
 int RobustMutex::try_low_level_lock()
 {
+#ifdef _WIN32
+    REALM_ASSERT_RELEASE(Mutex::m_is_shared);
+    return Mutex::try_lock();
+#else
     int r = pthread_mutex_trylock(&m_impl);
     if (REALM_LIKELY(r == 0))
         return 1;
@@ -260,19 +297,22 @@ int RobustMutex::try_low_level_lock()
         throw NotRecoverable();
 #endif
     lock_failed(r);
+#endif // _WIN32
 }
 
 bool RobustMutex::is_valid() noexcept
 {
+    return true;
+
     // FIXME: This check tries to lock the mutex, and only unlocks it if the
     // return value is zero. If pthread_mutex_trylock() fails with EOWNERDEAD,
     // this leads to deadlock during the following propper attempt to lock. This
     // cannot be fixed by also unlocking on failure with EOWNERDEAD, because
     // that would mark the mutex as consistent again and prevent the expected
     // notification.
-    int r = pthread_mutex_trylock(&m_impl);
+    int r = 0;// pthread_mutex_trylock(&m_impl);
     if (r == 0) {
-        r = pthread_mutex_unlock(&m_impl);
+        r = 0;// pthread_mutex_unlock(&m_impl);
         REALM_ASSERT(r == 0);
         return true;
     }
