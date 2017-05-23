@@ -537,6 +537,7 @@ public:
 private:
     SlabAlloc m_alloc;
 
+    int m_file_format_version;
     /// `m_top` is the root node (or top array) of the Realm, and has the
     /// following layout:
     ///
@@ -598,6 +599,8 @@ private:
 
     void init_array_parents() noexcept;
 
+    void open(ref_type top_ref, const std::string& file_path);
+
     /// If `top_ref` is not zero, attach this group accessor to the specified
     /// underlying node structure. If `top_ref` is zero and \a
     /// create_group_when_missing is true, create a new node structure that
@@ -648,8 +651,8 @@ private:
     class TableWriter;
     class DefaultTableWriter;
 
-    static void write(std::ostream&, const Allocator&, TableWriter&, bool no_top_array, bool pad_for_encryption,
-                      uint_fast64_t version_number);
+    static void write(std::ostream&, int file_format_version, TableWriter&, bool no_top_array,
+                      bool pad_for_encryption, uint_fast64_t version_number);
 
     typedef void (*DescSetter)(Table&);
     typedef bool (*DescMatcher)(const Spec&);
@@ -682,6 +685,69 @@ private:
     void refresh_dirty_accessors();
     template <class F>
     void update_table_indices(F&& map_function);
+
+    /// \brief The version of the format of the node structure (in file or in
+    /// memory) in use by Realm objects associated with this group.
+    ///
+    /// Every group contains a file format version field, which is returned
+    /// by this function. The file format version field is set to the file format
+    /// version specified by the attached file (or attached memory buffer) at the
+    /// time of attachment and the value is used to determine if a file format
+    /// upgrade is required.
+    ///
+    /// A value of zero means that the file format is not yet decided. This is
+    /// only possible for empty Realms where top-ref is zero. (When group is created
+    /// with the unattached_tag). The version number will then be determined in the
+    /// subsequent call to Group::open.
+    ///
+    /// In shared mode (when a Realm file is opened via a SharedGroup instance)
+    /// it can happen that the file format is upgraded asyncronously (via
+    /// another SharedGroup instance), and in that case the file format version
+    /// field can get out of date, but only for a short while. It is always
+    /// guaranteed to be, and remain up to date after the opening process completes
+    /// (when SharedGroup::do_open() returns).
+    ///
+    /// An empty Realm file (one whose top-ref is zero) may specify a file
+    /// format version of zero to indicate that the format is not yet
+    /// decided. In that case the file format version must be changed to a proper
+    /// before the opening process completes (Group::open() or SharedGroup::open()).
+    ///
+    /// File format versions:
+    ///
+    ///   1 Initial file format version
+    ///
+    ///   2 Various changes.
+    ///
+    ///   3 Supporting null on string columns broke the file format in following
+    ///     way: Index appends an 'X' character to all strings except the null
+    ///     string, to be able to distinguish between null and empty
+    ///     string. Bumped to 3 because of null support of String columns and
+    ///     because of new format of index.
+    ///
+    ///   4 Introduction of optional in-Realm history of changes (additional
+    ///     entries in Group::m_top). Since this change is not forward
+    ///     compatible, the file format version had to be bumped. This change is
+    ///     implemented in a way that achieves backwards compatibility with
+    ///     version 3 (and in turn with version 2).
+    ///
+    ///   5 Introduced the new Timestamp column type that replaces DateTime.
+    ///     When opening an older database file, all DateTime columns will be
+    ///     automatically upgraded Timestamp columns.
+    ///
+    ///   6 Introduced a new structure for the StringIndex. Moved the commit
+    ///     logs into the Realm file. Changes to the transaction log format
+    ///     including reshuffling instructions. This is the format used in
+    ///     milestone 2.0.0.
+    ///
+    ///   7 Introduced "history schema version" as 10th entry in top array.
+    ///
+    ///   8 Subtables can now have search index.
+    ///
+    /// IMPORTANT: When introducing a new file format version, be sure to review
+    /// the file validity checks in Group::open() and SharedGroup::do_open, the file
+    /// format selection logic in
+    /// Group::get_target_file_format_version_for_session(), and the file format
+    /// upgrade logic in Group::upgrade_file_format().
 
     int get_file_format_version() const noexcept;
     void set_file_format_version(int) noexcept;

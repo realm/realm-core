@@ -608,19 +608,23 @@ int SlabAlloc::get_committed_file_format_version() const noexcept
     return file_format_version;
 }
 
+bool SlabAlloc::is_file_on_streaming_form(const Header& header)
+{
+    int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
+    uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
+    return (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
+}
+
 ref_type SlabAlloc::get_top_ref(const char* buffer, size_t len)
 {
     const Header& header = reinterpret_cast<const Header&>(*buffer);
     int slot_selector = ((header.m_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
-    m_file_format_version = header.m_file_format[slot_selector];
-    uint_fast64_t ref = uint_fast64_t(header.m_top_ref[slot_selector]);
-    m_file_on_streaming_form = (slot_selector == 0 && ref == 0xFFFFFFFFFFFFFFFFULL);
-    if (m_file_on_streaming_form) {
+    if (is_file_on_streaming_form(header)) {
         const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(buffer + len) - 1);
         return ref_type(footer.m_top_ref);
     }
     else {
-        return ref_type(ref);
+        return to_ref(header.m_top_ref[slot_selector]);
     }
 }
 
@@ -699,11 +703,9 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             }
         }
         m_data = m_file_mappings->m_initial_mapping.get_addr();
-        m_file_format_version = get_committed_file_format_version();
         m_initial_chunk_size = m_file_mappings->m_initial_mapping.get_size();
         m_attach_mode = cfg.is_shared ? attach_SharedFile : attach_UnsharedFile;
         m_free_space_state = free_space_Invalid;
-        m_file_on_streaming_form = false;
         if (m_file_mappings->m_num_global_mappings > 0) {
             size_t mapping_index = m_file_mappings->m_num_global_mappings;
             size_t section_index = mapping_index + m_file_mappings->m_first_additional_mapping;
@@ -774,7 +776,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
 
         if (!cfg.skip_validate) {
             // Verify the data structures
-            validate_buffer(map.get_addr(), size, path, cfg.is_shared); // Throws
+            validate_buffer(map.get_addr(), size, path); // Throws
         }
 
         top_ref = get_top_ref(map.get_addr(), size);
@@ -805,8 +807,8 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // a later commit would have to do it. That would require coordination with
     // anybody concurrently joining the session, so it seems easier to do it at
     // session initialization, even if it means writing the database during open.
-    if (cfg.session_initiator && m_file_on_streaming_form) {
-        const Header& header = *reinterpret_cast<const Header*>(m_data);
+    const Header& header = *reinterpret_cast<const Header*>(m_data);
+    if (cfg.session_initiator && is_file_on_streaming_form(header)) {
         const StreamingFooter& footer = *(reinterpret_cast<const StreamingFooter*>(m_data + size) - 1);
         // Don't compare file format version fields as they are allowed to differ.
         // Also don't compare reserved fields (todo, is it correct to ignore?)
@@ -831,8 +833,9 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             realm::util::encryption_read_barrier(writable_map, 0);
             writable_header.m_flags |= flags_SelectBit;
             realm::util::encryption_write_barrier(writable_map, 0);
-            m_file_on_streaming_form = false;
             writable_map.sync();
+
+            realm::util::encryption_read_barrier(m_file_mappings->m_initial_mapping, 0, sizeof(Header));
         }
     }
 
@@ -880,6 +883,8 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
                 m_baseline = size;
                 m_initial_chunk_size = size;
                 m_file_mappings->m_first_additional_mapping = get_section_index(m_initial_chunk_size);
+
+                realm::util::encryption_read_barrier(m_file_mappings->m_initial_mapping, 0, sizeof(Header));
             }
             else {
                 // Getting here, we have a file of a size that will not work, and without being
@@ -907,8 +912,7 @@ ref_type SlabAlloc::attach_buffer(const char* data, size_t size)
 
     // Verify the data structures
     std::string path; // No path
-    bool is_shared = false;
-    validate_buffer(data, size, path, is_shared); // Throws
+    validate_buffer(data, size, path); // Throws
 
     ref_type top_ref = get_top_ref(data, size);
 
@@ -930,7 +934,6 @@ void SlabAlloc::attach_empty()
 
     REALM_ASSERT(!is_attached());
 
-    m_file_format_version = 0; // Not yet decided
     m_attach_mode = attach_OwnedBuffer;
     m_data = nullptr; // Empty buffer
 
@@ -943,7 +946,7 @@ void SlabAlloc::attach_empty()
 }
 
 
-void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string& path, bool is_shared)
+void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string& path)
 {
     // Verify that size is sane and 8-byte aligned
     if (REALM_UNLIKELY(size < sizeof(Header) || size % 8 != 0))
@@ -973,48 +976,6 @@ void SlabAlloc::validate_buffer(const char* data, size_t size, const std::string
         throw InvalidDatabase("Bad Realm file header (#2)", path);
     if (REALM_UNLIKELY(top_ref >= size))
         throw InvalidDatabase("Bad Realm file header (#3)", path);
-
-    // Check file format version. For information about the differences between
-    // particular file format versions, refer to the documentation for
-    // get_file_format_version().
-    bool bad_file_format = true;
-    int file_format_version = int(header.m_file_format[slot_selector]);
-    if (file_format_version == 0) { // Not yet decided
-        if (top_ref == 0)
-            bad_file_format = false;
-    }
-    else if (is_shared) {
-        // In shared mode (Realm file opened via a SharedGroup instance) this
-        // version of the core library is able to open Realms using file format
-        // versions 2, 3, 4, 5, 6, and 7. Version 2, 3, 4, 5, and 6 files need
-        // to be upgraded. Please see Allocator::get_file_format_version() for
-        // information about the individual file format verions.
-        switch (file_format_version) {
-            case 2:
-            case 3:
-            case 4:
-            case 5:
-            case 6:
-            case 7:
-                bad_file_format = false;
-        }
-    }
-    else {
-        // In non-shared mode (Realm file opened via a Group instance) this
-        // version of the core library is only able to open Realms using file
-        // format version 6 or 7. Since a Realm file cannot be upgraded when
-        // opened in this mode (we may be unable to write to the file), no
-        // earlier versions can be opened. Please see
-        // Allocator::get_file_format_version() for information about the
-        // individual file format verions.
-        switch (file_format_version) {
-            case 6:
-            case 7:
-                bad_file_format = false;
-        }
-    }
-    if (REALM_UNLIKELY(bad_file_format))
-        throw InvalidDatabase("Unsupported Realm file format version", path);
 }
 
 
@@ -1219,12 +1180,6 @@ void SlabAlloc::reserve_disk_space(size_t size)
     if (!disable_sync)
         m_file_mappings->m_file.sync(); // Throws
 }
-
-void SlabAlloc::set_file_format_version(int file_format_version) noexcept
-{
-    m_file_format_version = file_format_version;
-}
-
 
 void SlabAlloc::verify() const
 {
