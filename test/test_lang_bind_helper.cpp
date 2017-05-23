@@ -23,7 +23,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
-
+#include <thread>
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
 

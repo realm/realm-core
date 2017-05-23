@@ -22,6 +22,7 @@
 #include <streambuf>
 #include <fstream>
 #include <tuple>
+#include <thread>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
