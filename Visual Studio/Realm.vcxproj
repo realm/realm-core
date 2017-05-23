@@ -788,7 +788,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions) /bigobj /MP8</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions) /bigobj</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
