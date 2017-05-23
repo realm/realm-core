@@ -994,9 +994,8 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             bool file_format_ok = false;
             // In shared mode (Realm file opened via a SharedGroup instance) this
             // version of the core library is able to open Realms using file format
-            // versions 2, 3, 4, 5, 6, and 7. Version 2, 3, 4, 5, and 6 files need
-            // to be upgraded. Please see Allocator::get_file_format_version() for
-            // information about the individual file format verions.
+            // versions from 2 to 8. Please see Group::get_file_format_version() for
+            // information about the individual file format versions.
             switch (current_file_format_version) {
                 case 0:
                     file_format_ok = (top_ref == 0);
@@ -1007,6 +1006,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                 case 5:
                 case 6:
                 case 7:
+                case 8:
                     file_format_ok = true;
                     break;
             }

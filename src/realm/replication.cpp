@@ -369,13 +369,12 @@ public:
 
     bool add_search_index(size_t col_ndx)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(!m_table->has_shared_type()))) {
-                if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
-                    log("table->add_search_index(%1);", col_ndx); // Throws
-                    m_table->add_search_index(col_ndx);           // Throws
-                    return true;
-                }
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
+                log("desc->add_search_index(%1);", col_ndx); // Throws
+                using tf = _impl::TableFriend;
+                tf::add_search_index(*m_desc, col_ndx); // Throws
+                return true;
             }
         }
         return false;
@@ -383,13 +382,12 @@ public:
 
     bool remove_search_index(size_t col_ndx)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(!m_table->has_shared_type()))) {
-                if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
-                    log("table->remove_search_index(%1);", col_ndx); // Throws
-                    m_table->remove_search_index(col_ndx);           // Throws
-                    return true;
-                }
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
+                log("desc->remove_search_index(%1);", col_ndx); // Throws
+                using tf = _impl::TableFriend;
+                tf::remove_search_index(*m_desc, col_ndx); // Throws
+                return true;
             }
         }
         return false;
