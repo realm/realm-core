@@ -280,6 +280,7 @@ size_t page_align(size_t size)
 ref_type GroupWriter::write_group()
 {
     std::cout << "   - commit: merge" << std::endl;
+    m_group.m_alloc.disable_freelist_check();
     merge_free_space(); // Throws
 
     Array& top = m_group.m_top;

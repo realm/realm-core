@@ -28,6 +28,7 @@
 #include <realm/util/file.hpp>
 #include <realm/alloc.hpp>
 #include <realm/disable_sync_to_disk.hpp>
+#include <realm/array_integer.hpp>
 
 namespace realm {
 
@@ -430,6 +431,15 @@ private:
     chunks m_free_space;
     chunks m_free_read_only;
 
+    // for debugging:
+    ArrayInteger m_free_positions; // 4th slot in Group::m_top
+    ArrayInteger m_free_lengths;   // 5th slot in Group::m_top
+    ArrayInteger m_free_versions;  // 6th slot in Group::m_top
+    bool freelist_check_enabled = false;
+
+    void disable_freelist_check() { freelist_check_enabled = false; }
+    void set_top_array(Array& top);
+    
     bool m_debug_out = false;
     struct hash_entry {
         ref_type ref = 0;

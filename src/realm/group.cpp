@@ -322,7 +322,8 @@ void Group::attach(ref_type top_ref, bool create_group_when_missing)
     else if (create_group_when_missing) {
         create_empty_group(); // Throws
     }
-
+    if (top_ref)
+        m_alloc.set_top_array(m_top);
     m_attached = true;
 }
 

@@ -87,6 +87,7 @@ struct SlabAlloc::MappedFile {
 
 
 SlabAlloc::SlabAlloc()
+    : m_free_positions(*this), m_free_lengths(*this), m_free_versions(*this)
 {
     m_initial_section_size = page_size();
     m_section_shifts = log2(m_initial_section_size);
@@ -174,6 +175,24 @@ private:
     ref_type m_ref;
 };
 
+void SlabAlloc::set_top_array(Array& top)
+{
+    m_free_positions.set_parent(&top, 3);
+    m_free_lengths.set_parent(&top, 4);
+    m_free_versions.set_parent(&top, 5);
+    if (ref_type ref = m_free_positions.get_ref_from_parent()) {
+        m_free_positions.init_from_ref(ref);
+    }
+    else
+        throw std::runtime_error("no clue 1");
+    
+    if (ref_type ref = m_free_lengths.get_ref_from_parent()) {
+        m_free_lengths.init_from_ref(ref);
+    }
+    else
+        throw std::runtime_error("no clue 2");
+    freelist_check_enabled = true;
+}
 
 void SlabAlloc::detach() noexcept
 {
@@ -441,6 +460,27 @@ void SlabAlloc::do_free(ref_type ref, const char* addr) noexcept
     for (auto& c : free_space) {
         if ((ref >= c.ref && ref < (c.ref + c.size)) || (ref < c.ref && ref_end > c.ref)) {
             REALM_ASSERT(false && "Double Free");
+        }
+    }
+
+    // Check for free against in-file free lists
+    if (read_only && freelist_check_enabled) {
+        for (const auto& fs : free_space) {
+            ref_type _ref = fs.ref;
+            size_t _size = fs.size;
+            // We always want to keep the list of free space in sorted order (by
+            // ascending position) to facilitate merge of adjacent segments. We
+            // can find the correct insert postion by binary search
+            size_t ndx = m_free_positions.lower_bound_int(_ref);
+            if (ndx > 0) {
+                ref_type prev_ref = to_ref(m_free_positions.get(ndx - 1));
+                size_t prev_size = to_size_t(m_free_lengths.get(ndx - 1));
+                REALM_ASSERT_RELEASE(prev_ref + prev_size <= _ref);
+            }
+            if (ndx < m_free_positions.size()) {
+                ref_type after_ref = to_ref(m_free_positions.get(ndx));
+                REALM_ASSERT_RELEASE(_ref + _size <= after_ref);
+            }
         }
     }
 #endif
