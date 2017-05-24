@@ -572,6 +572,14 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
     // eternal constancy of this part of the layout is what ensures that a
     // joining session participant can reliably verify that the actual format is
     // as expected.
+    //
+    // offsetof() is undefined for non-pod types but often behaves correct. 
+    // Since we just use it in static_assert(), a bug is caught at compile time
+    // which isn't critical. FIXME: See if there is a way to fix this, but it
+    // might not be trivial since it contains RobustMutex members and others
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+
     static_assert(offsetof(SharedInfo, init_complete) == 0 &&
                   std::is_same<decltype(init_complete), uint8_t>::value &&
                   offsetof(SharedInfo, shared_info_version) == 6 &&
@@ -617,6 +625,7 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
                   offsetof(SharedInfo, shared_writemutex) == 48 &&
                   std::is_same<decltype(shared_writemutex), InterprocessMutex::SharedPart>::value,
                   "Caught layout change requiring SharedInfo file format bumping");
+#pragma GCC diagnostic pop
 }
 
 
@@ -864,8 +873,17 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         m_file_map.map(m_file, File::access_ReadWrite, info_size, File::map_NoSync);
         File::UnmapGuard fug_1(m_file_map);
         SharedInfo* info = m_file_map.get_addr();
+
+        // offsetof() is undefined for non-pod types but often behaves correct. 
+        // Since we just use it in static_assert(), a bug is caught at compile time
+        // which isn't critical. FIXME: See if there is a way to fix this, but it
+        // might not be trivial since it contains RobustMutex members and others
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
         static_assert(offsetof(SharedInfo, init_complete) + sizeof SharedInfo::init_complete <= 1,
                       "Unexpected position or size of SharedInfo::init_complete");
+#pragma GCC diagnostic pop
+
         if (info->init_complete == 0)
             continue;
         REALM_ASSERT(info->init_complete == 1);
