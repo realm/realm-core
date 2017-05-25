@@ -194,12 +194,25 @@ void Permissions::set_permission(std::shared_ptr<SyncUser> user,
         { "id", util::uuid_string() },
         { "createdAt", Timestamp(s_arg, ns_arg) },
         { "updatedAt", Timestamp(s_arg, ns_arg) },
+        // Always set userId as it is required but will be empty for
+        // metadata conditions
         { "userId", permission.condition.user_id },
         { "realmUrl", realm_url },
         { "mayRead", permission.access != Permission::AccessLevel::None },
         { "mayWrite", permission.access == Permission::AccessLevel::Write || permission.access == Permission::AccessLevel::Admin },
         { "mayManage", permission.access == Permission::AccessLevel::Admin },
     }, false);
+
+    // Set condition properties based on type
+    switch (permission.condition.type) {
+        case Permission::Condition::Type::KeyValue:
+            raw.set_property_value<util::Any>(&context, "metadataKey", permission.condition.key_value.first, false);
+            raw.set_property_value<util::Any>(&context, "metadataValue", permission.condition.key_value.second, false);
+            break;
+        default:
+            break;
+    }
+
     auto object = std::make_shared<NotificationWrapper<Object>>(std::move(raw));
     realm->commit_transaction();
 
@@ -260,6 +273,9 @@ SharedRealm Permissions::management_realm(std::shared_ptr<SyncUser> user, const 
             Property::make("statusCode", PropertyType::Int, PrimaryKey::no, Indexed::no, Nullable::yes),
             Property::make("statusMessage", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::yes),
             Property::make("userId", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::no),
+            Property::make("metadataKey", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::yes),
+            Property::make("metadataValue", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::yes),
+            Property::make("metadataNamespace", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::yes),
             Property::make("realmUrl", PropertyType::String, PrimaryKey::no, Indexed::no, Nullable::no),
             Property::make("mayRead", PropertyType::Bool, PrimaryKey::no, Indexed::no, Nullable::yes),
             Property::make("mayWrite", PropertyType::Bool, PrimaryKey::no, Indexed::no, Nullable::yes),
