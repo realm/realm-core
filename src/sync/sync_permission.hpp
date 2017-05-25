@@ -73,8 +73,6 @@ struct Permission {
         std::string user_id;
         std::pair<std::string, std::string> key_value;
 
-        Condition() {}
-
         Condition(std::string id)
         : type(Type::UserId)
         , user_id(std::move(id))
