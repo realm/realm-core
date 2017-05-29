@@ -47,18 +47,20 @@ timeout(time: 5, unit: 'HOURS') {
                              checkLinuxDebug     : doBuildInDocker('Debug'),
                              buildMacOsDebug     : doBuildMacOs('Debug'),
                              buildMacOsRelease   : doBuildMacOs('Release'),
-                             buildWin32Release   : doBuildWindows('Release', false, 'win32'),
-                             buildUwpWin32Release: doBuildWindows('Release', true, 'win32'),
-                             buildUwpWin64Release: doBuildWindows('Release', true, 'win64'),
-                             buildWin32Debug     : doBuildWindows('Debug', false, 'win32'),
-                             buildUwpWin32Debug  : doBuildWindows('Debug', true, 'win32'),
-                             buildUwpWin64Debug  : doBuildWindows('Debug', true, 'win64'),
+                             buildWin32Debug     : doBuildWindows('Debug', false, 'Win32'),
+                             buildWin32Release   : doBuildWindows('Release', false, 'Win32'),
+                             buildWin64Debug     : doBuildWindows('Debug', false, 'x64'),
+                             buildWin64Release   : doBuildWindows('Release', false, 'x64'),
+                             buildUwpWin32Debug  : doBuildWindows('Debug', true, 'Win32'),
+                             buildUwpWin32Release: doBuildWindows('Release', true, 'Win32'),
+                             buildUwpx64Debug    : doBuildWindows('Debug', true, 'x64'),
+                             buildUwpx64Release  : doBuildWindows('Release', true, 'x64'),
+                             buildUwpArmDebug    : doBuildWindows('Debug', true, 'ARM'),
+                             buildUwpArmRelease  : doBuildWindows('Release', true, 'ARM'),
                              packageGeneric      : doBuildPackage('generic', 'tgz'),
                              packageCentos7      : doBuildPackage('centos-7', 'rpm'),
                              packageCentos6      : doBuildPackage('centos-6', 'rpm'),
-                             packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb'),
-                             buildUwpArmRelease  : doBuildWindows('Release', true, 'arm'),
-                             buildUwpArmRelease  : doBuildWindows('Debug', true, 'arm')
+                             packageUbuntu1604   : doBuildPackage('ubuntu-1604', 'deb')
                              //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
             ]
 
@@ -237,14 +239,8 @@ def doAndroidBuildInDocker(String abi, String buildType, boolean runTestsInEmula
     }
 }
 
-def doBuildWindows(String buildType, boolean isUWP, String arch) {
+def doBuildWindows(String buildType, boolean isUWP, String platform) {
     def cmakeDefinitions = isUWP ? '-DCMAKE_SYSTEM_NAME=WindowsStore -DCMAKE_SYSTEM_VERSION=10.0' : ''
-    def archSuffix = ''
-    if (arch == 'win64') {
-        archSuffix = ' Win64'
-    } else if (arch == 'arm') {
-        archSuffix = ' ARM'
-    }
 
     return {
         node('windows') {
@@ -252,13 +248,13 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
 
             dir('build-dir') {
                 runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: """
-                    cmake.exe ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015${archSuffix}\" -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${arch} -D CMAKE_BUILD_TYPE=${buildType} -D REALM_ENABLE_ENCRYPTION=OFF ..
-                    cmake.exe --build . --config ${buildType}
-                    cpack.exe -C ${buildType} -D CPACK_GENERATOR=TGZ
+                    "${tool 'cmake'}" ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -D CMAKE_GENERATOR_PLATFORM=${platform} -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${platform} -D CMAKE_BUILD_TYPE=${buildType} -D REALM_ENABLE_ENCRYPTION=OFF ..
+                    "${tool 'cmake'}" --build . --config ${buildType}
+                    "${tool 'cmake'}\\..\\cpack.exe" -C ${buildType} -D CPACK_GENERATOR=TGZ
                 """)
                 archiveArtifacts('*.tar.gz')
                 if (gitTag) {
-                    def stashName = "windows___${arch}___${isUWP?'uwp':'nouwp'}___${buildType}"
+                    def stashName = "windows___${platform}___${isUWP?'uwp':'nouwp'}___${buildType}"
                     stash includes:'*.tar.gz', name:stashName
                     publishingStashes << stashName
                 }
