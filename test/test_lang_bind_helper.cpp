@@ -250,9 +250,6 @@ private:
 
 } // anonymous namespace
 
-
-
-
 TEST(LangBindHelper_AdvanceReadTransact_Basics)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -427,8 +424,6 @@ TEST(LangBindHelper_AdvanceReadTransact_Basics)
     CHECK_EQUAL(foo, group.get_table("foo"));
     CHECK_EQUAL(bar, group.get_table("bar"));
 }
-
-
 
 
 TEST(LangBindHelper_AdvanceReadTransact_AddTableWithFreshSharedGroup)

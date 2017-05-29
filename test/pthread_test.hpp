@@ -40,6 +40,8 @@ file
 #include <unistd.h>
 #endif
 
+#include <thread>
+
 inline unsigned int ptf_fastrand()
 {
     // Must be fast because important edge case is 0 delay. Not thread safe, but that just adds randomnes.
@@ -72,7 +74,7 @@ inline void ptf_randsleep(void)
     }
     else if (r < 800) {
         // Wake up in time slice earlier than sleep(0) on some OSes
-        ();
+        std::this_thread::yield();
     }
     else if (r < 999) {
 // Wake up in time slice according to normal OS scheduling

@@ -99,11 +99,6 @@ private:
     pthread_t m_id;
 #endif
     bool m_joinable;
-
-#ifdef _WIN32
-
-#endif
-
     typedef void* (*entry_func_type)(void*);
 
     void start(entry_func_type, void* arg);
