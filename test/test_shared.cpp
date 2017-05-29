@@ -37,6 +37,8 @@
 #include <windows.h>
 #endif
 
+#include <realm/history.hpp>
+#include <realm/lang_bind_helper.hpp>
 #include <realm.hpp>
 #include <realm/util/features.h>
 #include <realm/util/safe_int_ops.hpp>
@@ -3095,6 +3097,64 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
         }
     }
 }
+
+
+// This test checks what happens when a version is pinned and there are many
+// large write transactions that grow the file quickly. It takes a long time
+// and can make very very large files so it is not suited to automatic testing.
+TEST_IF(Shared_encrypted_pin_and_write, false)
+{
+    const size_t num_rows = 1000;
+    const size_t num_transactions = 1000000;
+    const size_t num_writer_threads = 8;
+    SHARED_GROUP_TEST_PATH(path);
+
+    { // initial table structure setup on main thread
+        SharedGroup sg(path, false, SharedGroupOptions(crypt_key(true)));
+        WriteTransaction wt(sg);
+        Group& group = wt.get_group();
+        TableRef t = group.add_table("table");
+        t->add_column(type_String, "string_col", true);
+        t->add_empty_row(num_rows);
+        wt.commit();
+    }
+
+    SharedGroup sg_reader(path, false, SharedGroupOptions(crypt_key(true)));
+    ReadTransaction rt(sg_reader); // hold first version
+
+    auto do_many_writes = [&]() {
+        SharedGroup sg(path, false, SharedGroupOptions(crypt_key(true)));
+        const size_t base_size = 100000;
+        std::string base(base_size, 'a');
+        // write many transactions to grow the file
+        // around 4.6 GB seems to be the breaking size
+        for (size_t t = 0; t < num_transactions; ++t) {
+            std::vector<std::string> rows(num_rows);
+            // change a character so there's no storage optimizations
+            for (size_t row = 0; row < num_rows; ++row) {
+                base[(t * num_rows + row)%base_size] = 'a' + (row % 52);
+                rows[row] = base;
+            }
+            WriteTransaction wt(sg);
+            Group& g = wt.get_group();
+            TableRef table = g.get_table(0);
+            for (size_t row = 0; row < num_rows; ++row) {
+                StringData c(rows[row]);
+                table->set_string(0, row, c);
+            }
+            wt.commit();
+        }
+    };
+
+    Thread threads[num_writer_threads];
+    for (size_t i = 0; i < num_writer_threads; ++i)
+        threads[i].start(do_many_writes);
+
+    for (size_t i = 0; i < num_writer_threads; ++i) {
+        threads[i].join();
+    }
+}
+
 
 // Scaled down stress test. (Use string length ~15MB for max stress)
 NONCONCURRENT_TEST(Shared_BigAllocations)

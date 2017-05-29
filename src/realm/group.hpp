@@ -741,11 +741,14 @@ private:
     ///
     ///   7 Introduced "history schema version" as 10th entry in top array.
     ///
+    ///   8 Subtables can now have search index.
+    ///
     /// IMPORTANT: When introducing a new file format version, be sure to review
     /// the file validity checks in Group::open() and SharedGroup::do_open, the file
     /// format selection logic in
     /// Group::get_target_file_format_version_for_session(), and the file format
     /// upgrade logic in Group::upgrade_file_format().
+
     int get_file_format_version() const noexcept;
     void set_file_format_version(int) noexcept;
     int get_committed_file_format_version() const noexcept;

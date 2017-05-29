@@ -871,9 +871,6 @@ R Query::aggregate(R (ColType::*aggregateMethod)(size_t start, size_t end, size_
                    size_t column_ndx, size_t* resultcount, size_t start, size_t end, size_t limit,
                    size_t* return_ndx) const
 {
-    if (!m_table->is_attached()) {
-        throw LogicError{LogicError::detached_accessor};
-    }
     if (limit == 0 || m_table->is_degenerate()) {
         if (resultcount)
             *resultcount = 0;
