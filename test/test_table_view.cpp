@@ -1879,7 +1879,7 @@ struct DistinctOverLink {
 TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
 {
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
-    // If multiple rows are indentical for the given set of distinct-columns, then only the first is kept.
+    // If multiple rows are identical for the given set of distinct-columns, then only the first is kept.
     // You can call sync_if_needed() to update the distinct view, just like you can for a sorted view.
     // Each time you call distinct() it will first fetch the full original TableView contents and then apply
     // distinct() on that. So it distinct() does not filter the result of the previous distinct().
@@ -1943,8 +1943,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     CHECK_EQUAL(h.get_source_ndx(tv, 3), 6);
 
     tv = h.find_all();
-    tv.sort(h({0}));
     tv.distinct(h({0}));
+    tv.sort(h({0}));
     CHECK_EQUAL(tv.size(), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 1);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 0);
@@ -1952,8 +1952,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     CHECK_EQUAL(h.get_source_ndx(tv, 3), 4);
 
     tv = h.find_all();
-    tv.sort(h({0}, {false}));
     tv.distinct(h({0}));
+    tv.sort(h({0}, {false}));
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 6);
     CHECK_EQUAL(h.get_source_ndx(tv, 2), 0);
@@ -1961,8 +1961,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
 
     // Note here that our stable sort will sort the two "foo"s like row {4, 5}
     tv = h.find_all();
-    tv.sort(h({0}, {false}));
     tv.distinct(h({0, 1}));
+    tv.sort(h({0}, {false}));
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
@@ -1974,8 +1974,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     // Now try distinct on string+float column. The float column has the same values as the int column
     // so the result should equal the test above
     tv = h.find_all();
-    tv.sort(h({0}, {false}));
     tv.distinct(h({0, 1}));
+    tv.sort(h({0}, {false}));
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
@@ -1987,8 +1987,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     // Same as previous test, but with string column being Enum
     t.optimize(true); // true = enforce regardless if Realm thinks it pays off or not
     tv = h.find_all();
-    tv.sort(h({0}, {false}));
     tv.distinct(h({0, 1}));
+    tv.sort(h({0}, {false}));
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
@@ -2001,20 +2001,15 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     tv = h.find_all();
     // "", null, "", null, "foo", "foo", "bar"
 
-    tv.sort(h({0}, {false}));
-    // "foo", "foo", "bar", "", "", null, null
-
-    CHECK_EQUAL(tv.size(), 7);
-    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
-    CHECK_EQUAL(h.get_string(tv, 0, 1), "foo");
-    CHECK_EQUAL(h.get_string(tv, 0, 2), "bar");
-    CHECK_EQUAL(h.get_string(tv, 0, 3), "");
-    CHECK_EQUAL(h.get_string(tv, 0, 4), "");
-    CHECK(h.get_string(tv, 0, 5).is_null());
-    CHECK(h.get_string(tv, 0, 6).is_null());
-
     tv.distinct(h({0}));
+    tv.sort(h({0}, {false}));
     // "foo", "bar", "", null
+
+    CHECK_EQUAL(tv.size(), 4);
+    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
+    CHECK_EQUAL(h.get_string(tv, 0, 1), "bar");
+    CHECK_EQUAL(h.get_string(tv, 0, 2), "");
+    CHECK(h.get_string(tv, 0, 3).is_null());
 
     // remove "bar"
     origin->remove(6);
