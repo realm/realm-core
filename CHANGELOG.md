@@ -16,7 +16,7 @@
 
 ### Internals
 
-* win32+UWP: Switched from pthread-win32 to native API (https://github.com/realm/realm-core/pull/2602)
+* win32+UWP: Switched from pthread-win32 to native API PR [#2602](https://github.com/realm/realm-core/pull/2602)
 
 ----------------------------------------------
 
