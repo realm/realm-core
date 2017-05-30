@@ -577,9 +577,10 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
     // Since we just use it in static_assert(), a bug is caught at compile time
     // which isn't critical. FIXME: See if there is a way to fix this, but it
     // might not be trivial since it contains RobustMutex members and others
+#ifndef _WIN32
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
-
+#endif
     static_assert(offsetof(SharedInfo, init_complete) == 0 &&
                   std::is_same<decltype(init_complete), uint8_t>::value &&
                   offsetof(SharedInfo, shared_info_version) == 6 &&
@@ -625,7 +626,9 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
                   offsetof(SharedInfo, shared_writemutex) == 48 &&
                   std::is_same<decltype(shared_writemutex), InterprocessMutex::SharedPart>::value,
                   "Caught layout change requiring SharedInfo file format bumping");
+#ifndef _WIN32
 #pragma GCC diagnostic pop
+#endif
 }
 
 
@@ -878,12 +881,15 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         // Since we just use it in static_assert(), a bug is caught at compile time
         // which isn't critical. FIXME: See if there is a way to fix this, but it
         // might not be trivial since it contains RobustMutex members and others
+#ifndef _WIN32
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
         static_assert(offsetof(SharedInfo, init_complete) + sizeof SharedInfo::init_complete <= 1,
                       "Unexpected position or size of SharedInfo::init_complete");
+#ifndef _WIN32
 #pragma GCC diagnostic pop
-
+#endif
         if (info->init_complete == 0)
             continue;
         REALM_ASSERT(info->init_complete == 1);
