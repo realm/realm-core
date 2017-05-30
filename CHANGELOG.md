@@ -52,7 +52,7 @@
 
 ### Internals
 * Implemented inter-process CondVars on Windows (Win32 + UWP). They should be fair and
-  robust.
+  robust. See https://github.com/realm/realm-core/pull/2497
 * The RuntimeLibrary of the Windows build is changed from MultiThreadedDLL to just MultiThreaded so as to statically link
   the Visual C++ runtime libraries, removing the onus on end-users to have the correct runtime redistributable package
   or satellite assembly pack installed. Libraries that link against Core on Windows will have to adjust their compiler flags accordingly.
