@@ -298,7 +298,9 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
     // If we're the last waiter thread during this particular broadcast then let all the other threads proceed.
     if (last_waiter) {
         // This call atomically signals the <m_waiters_done> event and waits until it can acquire the 
-        // external mutex. This is required to ensure fairness.
+        // external mutex. This is required to ensure fairness. This need to signal an event back means
+        // that we cannot take m.lock earlier and this in turn forces us to add an additional mutex, 
+        // m_waiters_countlock.
         SetEvent(m_waiters_done);
         m.lock();
     }
