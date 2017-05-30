@@ -103,13 +103,16 @@ int Group::get_target_file_format_version_for_session(int current_file_format_ve
     // that the file format it is not yet decided (only possible for empty
     // Realms where top-ref is zero).
 
-    // Please see Allocator::get_file_format_version() for information about the
+    // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
 
     if (requested_history_type == Replication::hist_None && current_file_format_version == 6)
         return 6;
 
-    return 7;
+    if (requested_history_type == Replication::hist_None && current_file_format_version == 7)
+        return 7;
+
+    return 8;
 }
 
 
@@ -117,10 +120,10 @@ void Group::upgrade_file_format(int target_file_format_version)
 {
     REALM_ASSERT(is_attached());
 
-    // Be sure to revisit the following upgrade logic when a new file foprmat
+    // Be sure to revisit the following upgrade logic when a new file format
     // version is introduced. The following assert attempt to help you not
     // forget it.
-    REALM_ASSERT_EX(target_file_format_version == 7, target_file_format_version);
+    REALM_ASSERT_EX(target_file_format_version == 8, target_file_format_version);
 
     int current_file_format_version = get_file_format_version();
     REALM_ASSERT(current_file_format_version < target_file_format_version);
@@ -128,40 +131,26 @@ void Group::upgrade_file_format(int target_file_format_version)
     // SharedGroup::do_open() must ensure this. Be sure to revisit the
     // following upgrade logic when SharedGroup::do_open() is changed (or
     // vice versa).
-    REALM_ASSERT_EX(current_file_format_version == 2 || current_file_format_version == 3 ||
-                    current_file_format_version == 4 || current_file_format_version == 5 ||
-                    current_file_format_version == 6, current_file_format_version);
+    REALM_ASSERT_EX(current_file_format_version >= 2 && current_file_format_version <= 7,
+                    current_file_format_version);
 
-    // Upgrade from 2 to 3
-    if (current_file_format_version <= 2 && target_file_format_version >= 3) {
-        for (size_t t = 0; t < m_tables.size(); t++) {
-            TableRef table = get_table(t);
-            table->upgrade_file_format(target_file_format_version);
-        }
-    }
-
-    // Upgrade from 3 to 4
-    if (current_file_format_version <= 3 && target_file_format_version >= 4) {
-        // No-op
-    }
-
-    // Upgrade from 4 to 5 (datetime -> timestamp)
-    if (current_file_format_version <= 4 && target_file_format_version >= 5) {
+    // Upgrade from version prior to 5 (datetime -> timestamp)
+    if (current_file_format_version < 5) {
         for (size_t t = 0; t < m_tables.size(); t++) {
             TableRef table = get_table(t);
             table->upgrade_olddatetime();
         }
     }
 
-    // Upgrade from 5 to 6 (new StringIndex format)
-    if (current_file_format_version <= 5 && target_file_format_version >= 6) {
+    // Upgrade from version prior to 6 (StringIndex format changed last time)
+    if (current_file_format_version < 6) {
         for (size_t t = 0; t < m_tables.size(); t++) {
             TableRef table = get_table(t);
-            table->upgrade_file_format(target_file_format_version);
+            table->rebuild_search_index(current_file_format_version);
         }
     }
 
-    // Upgrade from 6 to 7 (new history schema version in top array)
+    // Upgrade from version prior to 7 (new history schema version in top array)
     if (current_file_format_version <= 6 && target_file_format_version >= 7) {
         // If top array size is 9, then add the missing 10th element containing
         // the history schema version.
@@ -175,7 +164,7 @@ void Group::upgrade_file_format(int target_file_format_version)
 
     // NOTE: Additional future upgrade steps go here.
 
-    m_file_format_version = target_file_format_version;
+    set_file_format_version(target_file_format_version);
 }
 
 void Group::open(ref_type top_ref, const std::string& file_path)
@@ -188,7 +177,8 @@ void Group::open(ref_type top_ref, const std::string& file_path)
     bool file_format_ok = false;
     // In non-shared mode (Realm file opened via a Group instance) this version
     // of the core library is only able to open Realms using file format version
-    // 6 or 7. Since a Realm file cannot be upgraded when opened in this mode
+    // 6, 7 or 8. These versions can be read without an upgrade.
+    // Since a Realm file cannot be upgraded when opened in this mode
     // (we may be unable to write to the file), no earlier versions can be opened.
     // Please see Group::get_file_format_version() for information about the
     // individual file format versions.
@@ -198,6 +188,7 @@ void Group::open(ref_type top_ref, const std::string& file_path)
             break;
         case 6:
         case 7:
+        case 8:
             file_format_ok = true;
             break;
     }
@@ -1772,41 +1763,43 @@ void Group::update_table_indices(F&& map_function)
     // Update any link columns.
     for (size_t i = 0; i < m_tables.size(); ++i) {
         Array table_top{m_alloc};
-        table_top.set_parent(&m_tables, i);
-        table_top.init_from_parent();
-        Spec spec{m_alloc};
-        size_t spec_ndx_in_parent = 0;
-        spec.set_parent(&table_top, spec_ndx_in_parent);
-        spec.init_from_parent();
+        Spec dummy_spec{m_alloc};
+        Spec* spec = &dummy_spec;
 
-        size_t num_cols = spec.get_column_count();
+        // Ensure that we use spec objects in potential table accessors
+        Table* table = m_table_accessors.empty() ? nullptr : m_table_accessors[i];
+        if (table) {
+            spec = &tf::get_spec(*table);
+            table->set_ndx_in_parent(i);
+        }
+        else {
+            table_top.set_parent(&m_tables, i);
+            table_top.init_from_parent();
+            dummy_spec.set_parent(&table_top, 0); // Spec has index 0 in table top
+            dummy_spec.init_from_parent();
+        }
+
+        size_t num_cols = spec->get_column_count();
         bool spec_changed = false;
         for (size_t col_ndx = 0; col_ndx < num_cols; ++col_ndx) {
-            ColumnType type = spec.get_column_type(col_ndx);
+            ColumnType type = spec->get_column_type(col_ndx);
             if (tf::is_link_type(type) || type == col_type_BackLink) {
-                size_t table_ndx = spec.get_opposite_link_table_ndx(col_ndx);
+                size_t table_ndx = spec->get_opposite_link_table_ndx(col_ndx);
                 size_t new_table_ndx = map_function(table_ndx);
                 if (new_table_ndx != table_ndx) {
-                    spec.set_opposite_link_table_ndx(col_ndx, new_table_ndx); // Throws
+                    spec->set_opposite_link_table_ndx(col_ndx, new_table_ndx); // Throws
                     spec_changed = true;
                 }
             }
         }
 
-        if (spec_changed && !m_table_accessors.empty() && m_table_accessors[i] != nullptr) {
-            tf::mark(*m_table_accessors[i]);
+        if (spec_changed && table) {
+            tf::mark(*table);
         }
     }
 
     // Update accessors.
     refresh_dirty_accessors(); // Throws
-
-    // Table's specs might have changed, so they need to be reinitialized.
-    for (const auto& table_accessor : m_table_accessors) {
-        if (Table* t = table_accessor) {
-            tf::get_spec(*t).init_from_parent();
-        }
-    }
 }
 
 
