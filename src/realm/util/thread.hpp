@@ -476,7 +476,21 @@ inline Mutex::Mutex(process_shared_tag)
 
 inline Mutex::~Mutex() noexcept
 {
-#ifndef _WIN32
+#ifdef _WIN32
+    if (m_is_shared && m_cached_pid == _getpid()) {
+        CloseHandle(m_cached_handle);
+    }
+    else {
+        // We leak a handle and there's nothing we can do about it because the mutex was
+        // constructed in another process which we don't have access to. Once all processes
+        // that are accessing the mutex are terminted, it will be freed automatically by
+        // Windows, so it's not severe. Only mutexes in the .lock files are interprocess, so
+        // the handle leaks do not accumulate over time.
+        //
+        // Non-interprocess mutexes are using std::mutex which is an object member to Mutex
+        // which does not have this handle leak issue.
+    }
+#else
     int r = pthread_mutex_destroy(&m_impl);
     if (REALM_UNLIKELY(r != 0))
         destroy_failed(r);

@@ -16,7 +16,7 @@
 
 ### Internals
 
-* Lorem ipsum.
+* win32+UWP: Switched from pthread-win32 to native API (https://github.com/realm/realm-core/pull/2602)
 
 ----------------------------------------------
 
@@ -115,7 +115,6 @@
 -----------
 
 ### Internals
-* win32+UWP: Switched from pthread-win32 to native API
 * Make `Array::stats()` available in release mode builds (not just in debug mode
   builds).
   PR [#2591](https://github.com/realm/realm-core/pull/2591).
