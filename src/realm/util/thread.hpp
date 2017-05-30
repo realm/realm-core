@@ -481,8 +481,9 @@ inline Mutex::~Mutex() noexcept
         CloseHandle(m_cached_handle);
     }
     else {
-        // We leak a handle and there's nothing we can do about it because the mutex was
-        // constructed in another process which we don't have access to. Once all processes
+        // If this is a shared mutex (m_is_shared) then we leak a handle and there's nothing 
+        // we can do about it because the mutex was constructed in another process 
+        // (m_cached_pid != _getpid()) which we don't have access to. Once all processes
         // that are accessing the mutex are terminated, it will be freed automatically by
         // Windows, so it's not severe. Only mutexes in the .lock files are interprocess, so
         // the handle leaks do not accumulate over time.
