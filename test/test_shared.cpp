@@ -3160,12 +3160,11 @@ TEST_IF(Shared_encrypted_pin_and_write, false)
         // write many transactions to grow the file
         // around 4.6 GB seems to be the breaking size
         for (size_t t = 0; t < num_transactions; ++t) {
-            std::vector<std::string> rows;
-            rows.reserve(num_rows);
+            std::vector<std::string> rows(num_rows);
             // change a character so there's no storage optimizations
             for (size_t row = 0; row < num_rows; ++row) {
                 base[(t * num_rows + row)%base_size] = 'a' + (row % 52);
-                rows.push_back(base);
+                rows[row] = base;
             }
             WriteTransaction wt(sg);
             Group& g = wt.get_group();

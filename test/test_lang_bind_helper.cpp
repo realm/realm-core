@@ -1555,6 +1555,17 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     }
     LangBindHelper::advance_read(sg);
     group.verify();
+    // Check that subtable accessors are updated with respect to spec reference
+    {
+        WriteTransaction wt(sg_w);
+        TableRef parent_w = wt.get_table("parent");
+        DescriptorRef subdesc;
+        parent_w->add_column(type_Table, "c", &subdesc);
+        subdesc->add_column(type_Int, "y");
+        wt.commit();
+    }
+    LangBindHelper::advance_read(sg);
+    group.verify();
     CHECK_EQUAL(3, parent->size());
     CHECK(subtab_0_0->is_attached());
     CHECK(subtab_0_1->is_attached());
@@ -1573,6 +1584,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RegularSubtables)
     {
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.get_table("parent");
+        parent_w->remove_column(2);
         parent_w->insert_column(0, type_Table, "dummy_1");
         parent_w->insert_empty_row(0);
         TableRef subtab_0_0_w = parent_w->get_subtable(1, 1);
@@ -13177,6 +13189,5 @@ TEST(LangBindHelper_MixedTimestampTransaction)
     CHECK(t->get_mixed(0, 0) == time);
     CHECK(t->get_mixed(0, 1) == neg_time);
 }
-
 
 #endif

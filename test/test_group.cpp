@@ -916,6 +916,67 @@ TEST(Group_TableAccessorLeftBehind)
 }
 
 
+TEST(Group_SubtableDescriptors)
+{
+    // This test originally only failed when checked with valgrind as the
+    // problem was that memory was read after being freed.
+    GROUP_TEST_PATH(path);
+
+    // Create new database
+    Group g(path, crypt_key(), Group::mode_ReadWrite);
+
+    TableRef table = g.add_table("first");
+    {
+        DescriptorRef subdescr;
+        table->add_column(type_Table, "sub", false, &subdescr);
+        subdescr->add_column(type_Int, "integers", nullptr, false);
+    }
+    table->add_empty_row(125);
+
+    TableRef sub = table->get_subtable(0, 3);
+    sub->clear();
+    sub->add_empty_row(5);
+    sub->set_int(0, 0, 127, false);
+    sub->set_int(0, 1, 127, false);
+    sub->set_int(0, 2, 255, false);
+    sub->set_int(0, 3, 128, false);
+    sub->set_int(0, 4, 4, false);
+
+    // this will keep a subdescriptor alive during the commit
+    int64_t val = sub->get_int(0, 2);
+    TableView tv = sub->where().equal(0, val).find_all();
+
+    table->get_subdescriptor(0)->add_search_index(0);
+    g.commit();
+    table->get_subdescriptor(0)->remove_search_index(0);
+}
+
+TEST(Group_UpdateSubtableDescriptorsAccessors)
+{
+    GROUP_TEST_PATH(path);
+    Group g(path, crypt_key(), Group::mode_ReadWrite);
+
+    TableRef table = g.add_table("first");
+
+    {
+        DescriptorRef subdescr;
+        table->add_column(type_Table, "sub1", true, &subdescr);
+        subdescr->add_column(type_Int, "integers", nullptr, false);
+    }
+
+    {
+        DescriptorRef subdescr;
+        table->add_column(type_Table, "sub2", true, &subdescr);
+        subdescr->add_column(type_Int, "integers", nullptr, false);
+    }
+
+    g.commit();
+
+    table->get_subdescriptor(1)->remove_search_index(0);
+    table->remove_column(0);
+    table->get_subdescriptor(0)->add_search_index(0);
+}
+
 TEST(Group_Invalid1)
 {
     GROUP_TEST_PATH(path);
@@ -1722,6 +1783,15 @@ TEST(Group_CommitSubtable)
     subtable = table->get_subtable(0, 0);
     subtable->add_empty_row();
     group.commit();
+    group.verify();
+
+    TableRef table1 = group.add_table("other");
+    table1->add_column_link(type_LinkList, "linkList", *table);
+    group.commit();
+    group.verify();
+    table->insert_column_link(0, type_Link, "link", *table);
+    group.commit();
+    group.verify();
 }
 
 
