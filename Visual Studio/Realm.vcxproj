@@ -630,7 +630,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>"C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\shared\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\um\"; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt\"; $(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>
@@ -639,6 +639,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <AdditionalOptions>/DREALM_DEBUG /DREALM_ENABLE_REPLICATION  /bigobj /DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -653,7 +654,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>
@@ -662,6 +663,7 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <AdditionalOptions>/DNOMINMAX /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION  /bigobj %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -676,7 +678,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>src;src\win32;src\win32\pthread;test\UnitTest++\src;UnitTest++\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>
@@ -685,6 +687,7 @@
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB /DREALM_DEBUG %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>Debug\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -699,7 +702,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;_WIN32_WINNT=0x0602;WINVER=0x0602;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader>
@@ -707,6 +710,7 @@
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -793,6 +797,7 @@
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -821,6 +826,7 @@
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -837,7 +843,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>
@@ -850,6 +856,7 @@
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -865,7 +872,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>
@@ -878,6 +885,7 @@
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -894,7 +902,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>
@@ -906,6 +914,7 @@
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>WS2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -924,7 +933,7 @@
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>
@@ -936,6 +945,7 @@
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>WS2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -954,7 +964,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;_WIN32_WINNT=0x0602;WINVER=0x0602;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader>
@@ -965,6 +975,7 @@
       <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <AdditionalUsingDirectories>; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt"</AdditionalUsingDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -983,7 +994,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;_WIN32_WINNT=0x0602;WINVER=0x0602;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <MinimalRebuild>true</MinimalRebuild>
+      <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PrecompiledHeader>
@@ -994,6 +1005,7 @@
       <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <AdditionalUsingDirectories>; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt"</AdditionalUsingDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -1155,6 +1167,7 @@
       <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION /bigobj %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <BrowseInformation>true</BrowseInformation>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -1184,6 +1197,7 @@
       <AdditionalOptions>/D__STDC_LIMIT_MACROS /DPTW32_STATIC_LIB %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
       <BrowseInformation>true</BrowseInformation>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -1211,6 +1225,7 @@
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION </AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>
@@ -1245,6 +1260,7 @@
       <AdditionalOptions>/DNOMINMAX /DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions) /D__STDC_LIMIT_MACROS  /bigobj</AdditionalOptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -1274,6 +1290,7 @@
       <AdditionalOptions>/DNOMINMAX /DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions) /D__STDC_LIMIT_MACROS  /bigobj</AdditionalOptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -1304,6 +1321,7 @@
       <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions) /D__STDC_LIMIT_MACROS</AdditionalOptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>WS2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -1334,6 +1352,7 @@
       <AdditionalOptions>/DPTW32_STATIC_LIB %(AdditionalOptions) /D__STDC_LIMIT_MACROS</AdditionalOptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>WS2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -1365,6 +1384,7 @@
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION </AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>x64\Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -1396,6 +1416,7 @@
       <AdditionalIncludeDirectories>..\src;..\src\win32;..\src\win32\pthread;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION </AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <AdditionalDependencies>x64\Release\UnitTest++.lib;%(AdditionalDependencies)</AdditionalDependencies>
