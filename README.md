@@ -1,3 +1,5 @@
+TEXT SUCH THAT GITHUB WILL MAKE A PR (won't make PR if branch is identical)
+
 ![Realm](doc/logo.png)
 
 Realm is a mobile database that runs directly inside phones, tablets or wearables - check out [realm.io](https://realm.io). 
