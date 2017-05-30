@@ -71,6 +71,7 @@ struct TableViewHandoverPatch {
     std::unique_ptr<LinkViewHandoverPatch> linkview_patch;
     std::unique_ptr<SortDescriptorHandoverPatch> sort_patch;
     std::unique_ptr<SortDescriptorHandoverPatch> distinct_patch;
+    bool sort_before_distinct;
 };
 
 

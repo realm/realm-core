@@ -39,7 +39,9 @@ TableViewBase::TableViewBase(TableViewBase& src, HandoverPatch& patch, MutableSo
     Table::generate_patch(src.m_table.get(), patch.m_table);
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     SortDescriptor::generate_patch(src.m_sorting_predicate, patch.sort_patch);
-    SortDescriptor::generate_patch(src.m_distinct_predicate, patch.distinct_patch);
+    DistinctDescriptor::generate_patch(src.m_distinct_predicate, patch.distinct_patch);
+    patch.sort_before_distinct = src.m_sort_before_distinct;
+
     if (src.m_linked_column) {
         ConstRow::generate_patch(src.m_linked_row, patch.linked_row);
         patch.linked_col = src.m_linked_column->get_origin_column_index();
@@ -68,7 +70,8 @@ TableViewBase::TableViewBase(const TableViewBase& src, HandoverPatch& patch, Con
     }
     LinkView::generate_patch(src.m_linkview_source, patch.linkview_patch);
     SortDescriptor::generate_patch(src.m_sorting_predicate, patch.sort_patch);
-    SortDescriptor::generate_patch(src.m_distinct_predicate, patch.distinct_patch);
+    DistinctDescriptor::generate_patch(src.m_distinct_predicate, patch.distinct_patch);
+    patch.sort_before_distinct = src.m_sort_before_distinct;
 
     m_last_seen_version = 0;
     m_start = src.m_start;
@@ -83,7 +86,8 @@ void TableViewBase::apply_patch(HandoverPatch& patch, Group& group)
     m_query.apply_patch(patch.query_patch, group);
     m_linkview_source = LinkView::create_from_and_consume_patch(patch.linkview_patch, group);
     m_sorting_predicate = SortDescriptor::create_from_and_consume_patch(patch.sort_patch, *m_table);
-    m_distinct_predicate = SortDescriptor::create_from_and_consume_patch(patch.distinct_patch, *m_table);
+    m_distinct_predicate = DistinctDescriptor::create_from_and_consume_patch(patch.distinct_patch, *m_table);
+    m_sort_before_distinct = patch.sort_before_distinct;
 
     if (patch.linked_row) {
         m_linked_column = &m_table->get_column_link_base(patch.linked_col).get_backlink_column();
@@ -669,6 +673,7 @@ void TableViewBase::distinct(size_t column)
 void TableViewBase::distinct(SortDescriptor columns)
 {
     m_distinct_predicate = std::move(columns);
+    m_sort_before_distinct = bool(m_sorting_predicate);
     do_sync();
 }
 
@@ -683,7 +688,8 @@ void TableViewBase::sort(size_t column, bool ascending)
 void TableViewBase::sort(SortDescriptor order)
 {
     m_sorting_predicate = std::move(order);
-    do_sort(m_sorting_predicate, m_distinct_predicate);
+    m_sort_before_distinct = !bool(m_distinct_predicate);
+    do_sort(m_sorting_predicate, m_distinct_predicate, m_sort_before_distinct);
 }
 
 void TableViewBase::do_sync()
@@ -734,7 +740,7 @@ void TableViewBase::do_sync()
     }
     m_num_detached_refs = 0;
 
-    do_sort(m_sorting_predicate, m_distinct_predicate);
+    do_sort(m_sorting_predicate, m_distinct_predicate, m_sort_before_distinct);
 
     m_last_seen_version = outside_version();
 }

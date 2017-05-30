@@ -211,7 +211,10 @@ public:
         column_does_not_exist,
 
         /// You can not add index on a subtable of a subtable
-        subtable_of_subtable_index
+        subtable_of_subtable_index,
+
+        /// A distinct ordering was defined but should not be.
+        unsupported_order_on_distinct
     };
 
     LogicError(ErrorKind message);

@@ -96,6 +96,7 @@ class SortDescriptor::Sorter {
 public:
     Sorter(std::vector<std::vector<const ColumnBase*>> const& columns, std::vector<bool> const& ascending,
            IntegerColumn const& row_indexes);
+    Sorter() {}
 
     bool operator()(IndexPair i, IndexPair j, bool total_ordering = true) const;
 
@@ -190,7 +191,7 @@ bool SortDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
     return total_ordering ? i.index_in_view < j.index_in_view : 0;
 }
 
-void RowIndexes::do_sort(const SortDescriptor& order, const SortDescriptor& distinct)
+void RowIndexes::do_sort(const SortDescriptor& order, const SortDescriptor& distinct, bool sort_before_distinct)
 {
     if (!order && !distinct)
         return;
@@ -215,36 +216,61 @@ void RowIndexes::do_sort(const SortDescriptor& order, const SortDescriptor& dist
             ++detached_ref_count;
     }
 
+    SortDescriptor::Sorter sort_predicate;
+    if (order) {
+        sort_predicate = order.sorter(m_row_indexes);
+    }
+
+    if (order && sort_before_distinct) {
+        std::sort(v.begin(), v.end(), std::ref(sort_predicate));
+        if (distinct) {
+            const size_t v_size = v.size();
+            // Distinct must choose the winning unique elements by sorted order not
+            // by the previous tableview order, the lowest "index_in_view" wins.
+            for (size_t i = 0; i < v_size; ++i) {
+                v[i].index_in_view = i;
+            }
+        }
+    }
+
     if (distinct) {
-        auto sorting_predicate = distinct.sorter(m_row_indexes);
+        // Setting an order on the distinct descriptor is now incorrect.
+        // Distinct uses the existing order of the view, if the ordering matters
+        // then do a sort beforehand to change the results of distinct.
+        if (distinct.has_custom_order()) {
+            throw LogicError(LogicError::unsupported_order_on_distinct);
+        }
+
+        auto distinct_predicate = distinct.sorter(m_row_indexes);
 
         // Remove all rows which have a null link along the way to the distinct columns
-        if (sorting_predicate.has_links()) {
+        if (distinct_predicate.has_links()) {
             v.erase(std::remove_if(v.begin(), v.end(),
-                                   [&](auto&& index) { return sorting_predicate.any_is_null(index); }),
+                                   [&](auto&& index) { return distinct_predicate.any_is_null(index); }),
                     v.end());
         }
 
         // Sort by the columns to distinct on
-        std::sort(v.begin(), v.end(), std::ref(sorting_predicate));
+        std::sort(v.begin(), v.end(), std::ref(distinct_predicate));
 
         // Remove all duplicates
         v.erase(std::unique(v.begin(), v.end(),
                             [&](auto&& a, auto&& b) {
                                 // "not less than" is "equal" since they're sorted
-                                return !sorting_predicate(a, b, false);
+                                return !distinct_predicate(a, b, false);
                             }),
                 v.end());
 
         // Restore the original order unless we're just going to sort it again anyway
-        if (!order) {
+        if (order && sort_before_distinct) { // restore sorted order
+            std::sort(v.begin(), v.end(), std::ref(sort_predicate));
+        } else if (!order) { // restore original order
             std::sort(v.begin(), v.end(), [](auto a, auto b) { return a.index_in_view < b.index_in_view; });
         }
     }
 
-    if (order) {
-        auto sorting_predicate = order.sorter(m_row_indexes);
-        std::sort(v.begin(), v.end(), std::ref(sorting_predicate));
+    if (order && !sort_before_distinct) {
+        std::sort(v.begin(), v.end(), std::ref(sort_predicate));
     }
 
     // Apply the results

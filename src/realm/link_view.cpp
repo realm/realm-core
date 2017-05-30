@@ -316,7 +316,8 @@ void LinkView::sort(const SortDescriptor& order)
         // todo, write to the replication log that we're doing a sort
         repl->set_link_list(*this, m_row_indexes); // Throws
     }
-    do_sort(order, {});
+    bool sort_before_distinct = true;
+    do_sort(order, {}, sort_before_distinct);
 }
 
 TableView LinkView::get_sorted_view(SortDescriptor order) const

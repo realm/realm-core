@@ -56,6 +56,11 @@ public:
     {
         return !m_columns.empty();
     }
+    // returns whether this descriptor has any custom ascending/descending order
+    bool has_custom_order() const noexcept
+    {
+        return std::any_of(m_ascending.begin(), m_ascending.end(), [](bool b) { return !b; });
+    }
 
     // handover support
     using HandoverPatch = std::unique_ptr<SortDescriptorHandoverPatch>;
@@ -69,6 +74,9 @@ private:
     std::vector<std::vector<const ColumnBase*>> m_columns;
     std::vector<bool> m_ascending;
 };
+
+// Distinct uses the same syntax as sort except that the order is meaningless.
+typedef SortDescriptor DistinctDescriptor;
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
 // supports sorting and distinct.
@@ -113,7 +121,7 @@ public:
     IntegerColumn m_row_indexes;
 
 protected:
-    void do_sort(const SortDescriptor& sorting_predicate, const SortDescriptor& distinct_columns);
+    void do_sort(const SortDescriptor& sorting_predicate, const SortDescriptor& distinct_columns, bool sort_before_distinct);
 
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
     uint64_t m_debug_cookie;

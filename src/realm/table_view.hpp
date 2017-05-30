@@ -339,10 +339,10 @@ protected:
 
     // If not empty, this TableView has had TableView::distinct() called and must
     // only contain unique rows with respect to that column set of the parent table
-    SortDescriptor m_distinct_predicate;
+    DistinctDescriptor m_distinct_predicate;
 
     SortDescriptor m_sorting_predicate; // Stores sorting criterias (columns + ascending)
-
+    bool m_sort_before_distinct; // The order to apply sort and distinct
 
     // A valid query holds a reference to its table which must match our m_table.
     // hence we can use a query with a null table reference to indicate that the view
@@ -779,6 +779,7 @@ inline TableViewBase::TableViewBase(const TableViewBase& tv)
     , m_distinct_column_source(tv.m_distinct_column_source)
     , m_distinct_predicate(std::move(tv.m_distinct_predicate))
     , m_sorting_predicate(std::move(tv.m_sorting_predicate))
+    , m_sort_before_distinct(tv.m_sort_before_distinct)
     , m_query(tv.m_query)
     , m_start(tv.m_start)
     , m_end(tv.m_end)
@@ -807,6 +808,7 @@ inline TableViewBase::TableViewBase(TableViewBase&& tv) noexcept
     , m_distinct_column_source(tv.m_distinct_column_source)
     , m_distinct_predicate(std::move(tv.m_distinct_predicate))
     , m_sorting_predicate(std::move(tv.m_sorting_predicate))
+    , m_sort_before_distinct(tv.m_sort_before_distinct)
     , m_query(std::move(tv.m_query))
     , m_start(tv.m_start)
     , m_end(tv.m_end)
@@ -849,6 +851,7 @@ inline TableViewBase& TableViewBase::operator=(TableViewBase&& tv) noexcept
     m_linked_row = tv.m_linked_row;
     m_linkview_source = std::move(tv.m_linkview_source);
     m_distinct_predicate = std::move(tv.m_distinct_predicate);
+    m_sort_before_distinct = tv.m_sort_before_distinct;
     m_distinct_column_source = tv.m_distinct_column_source;
     m_sorting_predicate = std::move(tv.m_sorting_predicate);
 
@@ -885,6 +888,7 @@ inline TableViewBase& TableViewBase::operator=(const TableViewBase& tv)
     m_linked_row = tv.m_linked_row;
     m_linkview_source = tv.m_linkview_source;
     m_distinct_predicate = tv.m_distinct_predicate;
+    m_sort_before_distinct = tv.m_sort_before_distinct;
     m_distinct_column_source = tv.m_distinct_column_source;
     m_sorting_predicate = tv.m_sorting_predicate;
 
