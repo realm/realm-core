@@ -483,7 +483,7 @@ inline Mutex::~Mutex() noexcept
     else {
         // We leak a handle and there's nothing we can do about it because the mutex was
         // constructed in another process which we don't have access to. Once all processes
-        // that are accessing the mutex are terminted, it will be freed automatically by
+        // that are accessing the mutex are terminated, it will be freed automatically by
         // Windows, so it's not severe. Only mutexes in the .lock files are interprocess, so
         // the handle leaks do not accumulate over time.
         //
