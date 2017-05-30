@@ -21,44 +21,41 @@
 #include "object_schema.hpp"
 
 #include <realm/sync/changeset_cooker.hpp>
+#include <realm/sync/changeset_parser.hpp>
 #include <realm/impl/transact_log.hpp>
 #include <realm/impl/input_stream.hpp>
 
+#include <unordered_map>
+#include <unordered_set>
+
 using namespace realm;
 
-class ChangesetCookerInstructionHandler {
+using ObjectID = realm::sync::ObjectID;
+using Instruction = realm::sync::Instruction;
+
+class ChangesetCookerInstructionHandler : public sync::InstructionHandler {
 public:
     friend Adapter;
 
     ChangesetCookerInstructionHandler(const Group &group)
     : m_group(group)
-    , m_schema(ObjectStore::schema_from_group(m_group)) {
-        for (size_t i = 0; i < m_group.size(); i++) {
-            m_table_names[i] = m_group.get_table_name(i);
-        }
+    , m_schema(ObjectStore::schema_from_group(m_group))
+    {
     }
 
     const Group &m_group;
     Schema m_schema;
-    std::map<size_t, std::string> m_table_names;
 
-    // primary caches consisting of primary keys set mid-changeset
-    // these are updated to reflect inter-changeset row changes
-    std::map<size_t, std::pair<std::string, std::string>> m_primary_key_properties;
-    std::map<size_t, std::map<size_t, int64_t>> m_int_primaries;
-    std::map<size_t, std::map<size_t, std::string>> m_string_primaries;
-
-    // mapping inter-changetset rows to the index from the beginning of the changeset
-    // used for primary key lookup
-    std::map<size_t, std::map<size_t, size_t>> m_primary_key_lookup_row_mapping;
+    std::unordered_map<std::string, std::unordered_map<ObjectID, int64_t>> m_int_primaries;
+    std::unordered_map<std::string, std::unordered_map<ObjectID, std::string>> m_string_primaries;
+    std::unordered_map<std::string, std::unordered_set<ObjectID>> m_null_primaries;
 
     nlohmann::json m_json_instructions;
 
-    size_t m_selected_table_index;
+    std::string m_selected_table_name;
     ConstTableRef m_selected_table;
     ObjectSchema *m_selected_object_schema = nullptr;
     Property *m_selected_primary = nullptr;
-    bool m_selected_is_primary_key_table;
 
     Property *m_list_property = nullptr;
     nlohmann::json m_list_parent_identity;
@@ -67,34 +64,26 @@ public:
     ObjectSchema *m_list_target_object_schema = nullptr;
     Property *m_list_target_primary = nullptr;
 
-    bool m_last_is_collapsable = false;
+    bool m_last_is_collapsible = false;
 
     void add_instruction(Adapter::InstructionType type,
-                         nlohmann::json &&inst = {}, bool
-                         collasable = false,
+                         nlohmann::json &&inst = {}, bool collapsible = false,
                          util::Optional<std::string> object_type = util::none) {
         inst["type"] = Adapter::instruction_type_string(type);
         inst["object_type"] = object_type ? *object_type : m_selected_object_schema->name;
         m_json_instructions.push_back(std::move(inst));
 
-        m_last_is_collapsable = collasable;
+        m_last_is_collapsible = collapsible;
     }
 
-    void add_insert_instruction(nlohmann::json &&identity) {
-        add_instruction(Adapter::InstructionType::Insert, {
-            {"identity", std::move(identity)},
-            {"values", {}}
-        }, true);
-    }
-
-    void add_set_instruction(size_t row, size_t column, nlohmann::json &&value) {
-        nlohmann::json identity = get_identity(row, m_selected_table, m_selected_primary);
+    void add_set_instruction(ObjectID row, StringData column, nlohmann::json &&value) {
+        nlohmann::json identity = get_identity(row, *m_selected_table, m_selected_primary);
 
         // collapse values if inserting/setting values for the last object
-        if (m_last_is_collapsable) {
+        if (m_last_is_collapsible) {
             nlohmann::json &last = m_json_instructions.back();
             if (identity == last["identity"] && m_selected_object_schema->name == last["object_type"].get<std::string>()) {
-                last["values"][m_selected_table->get_column_name(column)] = value;
+                last["values"][column] = value;
                 return;
             }
         }
@@ -102,7 +91,7 @@ public:
         // if not collapsed create new
         add_instruction(Adapter::InstructionType::Set, {
             {"identity", std::move(identity)},
-            {"values", {{m_selected_table->get_column_name(column), value}}}
+            {"values", {{column, value}}}
         }, true);
     }
 
@@ -123,35 +112,48 @@ public:
         }}, false, object_type);
     }
 
-    nlohmann::json get_identity(size_t row, ConstTableRef &table, Property *primary_key) {
+    nlohmann::json get_identity(ObjectID object_id, const Table& table, Property *primary_key) {
         if (primary_key) {
-            auto get_or_lookup_primary = [&](auto realm_primaries, auto get_primary) {
-                auto primaries = realm_primaries.find(table->get_index_in_group());
-                if (primaries != realm_primaries.end()) {
-                    auto primary = primaries->second.find(row);
-                    if (primary != primaries->second.end()) {
-                        return primary->second;
-                    }
-                }
-                auto mappings = m_primary_key_lookup_row_mapping.find(table->get_index_in_group());
-                if (mappings != m_primary_key_lookup_row_mapping.end()) {
-                    auto mapping = mappings->second.find(row);
-                    if (mapping != mappings->second.end()) {
-                        return get_primary(primary_key->table_column, mapping->second);
-                    }
-                }
-                return get_primary(primary_key->table_column, row);
-            };
+            std::string table_name = table.get_name();
 
-            if (primary_key->type == PropertyType::Int)
-                return get_or_lookup_primary(m_int_primaries, [&](auto column, auto row) {
-                    return table->get_int(column, row); } );
+            if (primary_key->is_nullable) {
+                auto& null_primaries = m_null_primaries[table_name];
+                auto it = null_primaries.find(object_id);
+                if (it != null_primaries.end())
+                    return nullptr;
+            }
 
-            if (primary_key->type == PropertyType::String)
-                return get_or_lookup_primary(m_string_primaries, [&](auto column, auto row) {
-                    return (std::string)table->get_string(column, row); } );
+            if (primary_key->type == PropertyType::Int) {
+                auto& int_primaries = m_int_primaries[table_name];
+                auto it = int_primaries.find(object_id);
+                if (it != int_primaries.end()) {
+                    return it->second;
+                }
+
+                size_t row = sync::row_for_object_id(m_group, table, object_id);
+                REALM_ASSERT(row != npos);
+                if (primary_key->is_nullable && table.is_null(primary_key->table_column, row)) {
+                    return nullptr;
+                }
+                return table.get_int(primary_key->table_column, row);
+            }
+            else if (primary_key->type == PropertyType::String) {
+                auto& string_primaries = m_string_primaries[table_name];
+                auto it = string_primaries.find(object_id);
+                if (it != string_primaries.end()) {
+                    return it->second;
+                }
+
+                size_t row = sync::row_for_object_id(m_group, table, object_id);
+                REALM_ASSERT(row != npos);
+                StringData value = table.get_string(primary_key->table_column, row);
+                if (value.is_null())
+                    return nullptr;
+                return std::string(value);
+            }
         }
-        return row;
+
+        return object_id.to_string();
     }
 
     void select(std::string &name, ObjectSchema *&out_object_schema, ConstTableRef &out_table, Property *&out_primary) {
@@ -173,430 +175,301 @@ public:
         }
     }
 
+    std::unordered_map<uint32_t, sync::StringBufferRange> m_interned_strings;
+    util::StringBuffer m_string_buffer;
+
+    StringData get_string(sync::StringBufferRange range) const
+    {
+        return StringData{m_string_buffer.data() + range.offset, range.size};
+    }
+
+    StringData get_string(sync::InternString intern_string) const
+    {
+        auto it = m_interned_strings.find(intern_string.value);
+        REALM_ASSERT(it != m_interned_strings.end());
+        return get_string(it->second);
+    }
+
+    void set_intern_string(uint32_t index, sync::StringBufferRange range) override
+    {
+        m_interned_strings[index] = range;
+    }
+
+    sync::StringBufferRange add_string_range(StringData data) override
+    {
+        size_t offset = m_string_buffer.size();
+        m_string_buffer.append(data.data(), data.size());
+        return sync::StringBufferRange{uint32_t(offset), uint32_t(data.size())};
+    }
+
     // No selection needed:
-    bool select_table(size_t table_index, size_t levels, const size_t* path)
+    void operator()(const Instruction::SelectTable& instr)
     {
-        REALM_ASSERT(levels == 0);
-
-        m_selected_table_index = table_index;
-        select(m_table_names[table_index], m_selected_object_schema, m_selected_table, m_selected_primary);
-        m_selected_is_primary_key_table = !m_selected_object_schema && m_table_names[table_index] == "pk";
-
-        return true;
+        m_selected_table_name = get_string(instr.table);
+        select(m_selected_table_name, m_selected_object_schema, m_selected_table, m_selected_primary);
     }
-    bool select_descriptor(size_t levels, const size_t* path)
-    {
-        return true;
-    }
-    bool select_link_list(size_t column_index, size_t row_index, size_t group_index)
-    {
-        REALM_ASSERT(m_selected_object_schema != nullptr);
 
-        m_list_parent_identity = get_identity(row_index, m_selected_table, m_selected_primary);
+    void operator()(const Instruction::SelectLinkList& instr)
+    {
+        REALM_ASSERT(m_selected_object_schema);
 
+        m_list_parent_identity = get_identity(instr.object, *m_selected_table, m_selected_primary);
+
+        size_t column_index = m_selected_table->get_column_index(get_string(instr.field));
         m_list_property = &m_selected_object_schema->persisted_properties[column_index];
         REALM_ASSERT(m_list_property->table_column == column_index);
 
-        select(m_table_names[group_index], m_list_target_object_schema, m_list_target_table, m_list_target_primary);
+        std::string link_target_table = get_string(instr.link_target_table);
+        select(link_target_table, m_list_target_object_schema, m_list_target_table, m_list_target_primary);
+    }
 
-        return true;
-    }
-    bool insert_group_level_table(size_t table_index, size_t num_tables, StringData name)
+    void operator()(const Instruction::AddTable& instr)
     {
-        m_table_names[table_index] = name;
-        std::string object_type = ObjectStore::object_type_for_table_name(m_table_names[table_index]);
+        std::string object_type = ObjectStore::object_type_for_table_name(get_string(instr.table));
         if (object_type.size()) {
-            add_instruction(Adapter::InstructionType::AddType, {
-                {"properties", {}}
-            }, false, object_type);
+            nlohmann::json dict = {{"properties", nullptr}};
+            if (instr.has_primary_key) {
+                dict["primary_key"] = get_string(instr.primary_key_field);
+                dict["properties"][get_string(instr.primary_key_field)] = {
+                    {"nullable", instr.primary_key_nullable},
+                    {"type", string_for_property_type(PropertyType(instr.primary_key_type))}
+                };
+            }
+            add_instruction(Adapter::InstructionType::AddType, std::move(dict),
+                            false, object_type);
         }
-        return true;
     }
-    bool erase_group_level_table(size_t, size_t)
+
+    void operator()(const Instruction::EraseTable&)
     {
         REALM_ASSERT(0);
-        return true;
-    }
-    bool rename_group_level_table(size_t, StringData)
-    {
-        REALM_ASSERT(0);
-        return true;
-    }
-    bool move_group_level_table(size_t, size_t)
-    {
-        REALM_ASSERT(0);
-        return true;
     }
 
     // Must have table selected:
-    bool insert_empty_rows(size_t row_index, size_t n_rows, size_t prior_num_rows, bool unordered)
+    void operator()(const Instruction::CreateObject& instr)
     {
-        REALM_ASSERT(n_rows == 1);
-        if (m_selected_object_schema) {
-            add_insert_instruction(row_index);
-        }
-        return true;
-    }
-    bool erase_rows(size_t row_index, size_t n_rows, size_t prior_num_rows, bool move_last_over)
-    {
-        REALM_ASSERT(n_rows == 1);
-        REALM_ASSERT(move_last_over);
-        if (m_selected_object_schema) {
-            add_instruction(Adapter::InstructionType::Delete, {
-                {"identity", get_identity(row_index, m_selected_table, m_selected_primary)}
-            });
+        if (!m_selected_object_schema)
+            return; // FIXME: Support objects without schemas
 
-            // handle move_last_over
-            size_t old_row_index = prior_num_rows - 1;
-            if (m_selected_primary) {
-                auto &row_mapping = m_primary_key_lookup_row_mapping[m_selected_table_index];
-                auto &int_primaries = m_int_primaries[m_selected_table_index];
-                auto &string_primaries = m_string_primaries[m_selected_table_index];
+        nlohmann::json identity;
+        nlohmann::json values;
 
-                // invalidate caches
-                if (row_mapping.count(row_index)) row_mapping.erase(row_index);
-                if (int_primaries.count(row_index)) int_primaries.erase(row_index);
-                if (string_primaries.count(row_index)) string_primaries.erase(row_index);
-
-                // update caches for moved object
-                if (row_index < old_row_index) {
-                    auto old_row_iter = row_mapping.find(old_row_index);
-                    if (old_row_iter != row_mapping.end()) {
-                        row_mapping[row_index] = old_row_iter->second;
-                        row_mapping.erase(old_row_iter);
-                    }
-                    else {
-                        row_mapping[row_index] = old_row_index;
-                    }
-
-                    // update primary key caches
-                    if (int_primaries.count(old_row_index)) {
-                        int_primaries[row_index] = int_primaries[old_row_index];
-                        int_primaries.erase(old_row_index);
-                    }
-                    if (string_primaries.count(old_row_index)) {
-                        string_primaries[row_index] = string_primaries[old_row_index];
-                        string_primaries.erase(old_row_index);
-                    }
-                }
+        if (instr.has_primary_key) {
+            if (instr.payload.type == type_Int) {
+                identity = instr.payload.data.integer;
+                m_int_primaries[m_selected_table_name][instr.object] = instr.payload.data.integer;
+            }
+            else if (instr.payload.type == type_String) {
+                std::string value = get_string(instr.payload.data.str);
+                identity = value;
+                m_string_primaries[m_selected_table_name][instr.object] = value;
+            }
+            else if (instr.payload.is_null()) {
+                identity = nullptr;
+                m_null_primaries[m_selected_table_name].insert(instr.object);
             }
             else {
-                if (row_index < old_row_index) {
-                    // change identity for objects with no primary key
-                    add_instruction(Adapter::InstructionType::ChangeIdentity, {
-                        {"identity", old_row_index},
-                        {"new_identity", row_index}
-                    });
-                }
+                REALM_TERMINATE("Non-integer/non-string primary keys not supported by adapter.");
             }
-        }
-        return true;
-    }
-    bool swap_rows(size_t row_index_1, size_t row_index_2)
-    {
-        if (m_selected_object_schema && !m_selected_primary) {
-            add_instruction(Adapter::InstructionType::SwapIdentity, {
-                {"identity", row_index_1},
-                {"swap_identity", row_index_2}
-            });
-        }
-        return true;
-    }
-    bool merge_rows(size_t, size_t)
-    {
-        // It's ok to ignore this instruction because it only happens as a result of
-        // resolving a PK conflict, but for tables with primary keys we use the PK
-        // instead of the row index for the identity
-        if (m_selected_object_schema) {
-            REALM_ASSERT(false);
-        }
-        return true;
-    }
-    bool clear_table()
-    {
-        if (m_selected_object_schema) {
-            add_instruction(Adapter::InstructionType::Clear);
-        }
-        return true;
-    }
-    bool set_int(size_t column_index, size_t row_index, int_fast64_t value, _impl::Instruction inst, size_t)
-    {
-        if (m_selected_object_schema) {
-            // overwrite identity of last addition if this is the primary key
-            if (m_selected_primary && m_selected_primary->table_column == column_index) {
-                m_int_primaries[m_selected_table_index][row_index] = value;
 
-                auto &last = m_json_instructions.back();
-                REALM_ASSERT(last["type"].get<std::string>() == "INSERT");
-                last["identity"] = value;
-                last["values"][m_selected_table->get_column_name(column_index)] = value;
-            }
-            else {
-                add_set_instruction(row_index, column_index, value);
-            }
+            values[m_selected_primary->name] = identity;
         }
-        return true;
-    }
-    bool add_int(size_t, size_t, int_fast64_t)
-    {
-        REALM_ASSERT(0);
-        return true;
-    }
-    bool set_bool(size_t column_index, size_t row_index, bool value, _impl::Instruction inst)
-    {
-        if (m_selected_object_schema) {
-            add_set_instruction(row_index, column_index, value);
+        else {
+            identity = instr.object.to_string(); // Use the stringified Object ID
         }
-        return true;
-    }
-    bool set_float(size_t column_index, size_t row_index, float value, _impl::Instruction inst)
-    {
-        if (m_selected_object_schema) {
-            add_set_instruction(row_index, column_index, value);
-        }
-        return true;
-    }
-    bool set_double(size_t column_index, size_t row_index, double value, _impl::Instruction inst)
-    {
-        if (m_selected_object_schema) {
-            add_set_instruction(row_index, column_index, value);
-        }
-        return true;
-    }
-    bool set_string(size_t column_index, size_t row_index, StringData value, _impl::Instruction inst, size_t)
-    {
-        if (m_selected_object_schema) {
-            if (m_selected_primary && m_selected_primary->table_column == column_index) {
-                m_string_primaries[m_selected_table_index][row_index] = value;
-
-                auto &last = m_json_instructions.back();
-                REALM_ASSERT(last["type"].get<std::string>() == "INSERT");
-                last["identity"] = value;
-                last["values"][m_selected_table->get_column_name(column_index)] = value;
-            }
-            else {
-                add_set_instruction(row_index, column_index, value);
-            }
-        }
-        else if (m_selected_is_primary_key_table) {
-            auto &prop = m_primary_key_properties.emplace(std::make_pair(row_index, std::pair<std::string, std::string>())).first->second;
-            if (column_index == 0) prop.first = value;
-            else if (column_index == 1) prop.second = value;
-        }
-        return true;
-    }
-    bool set_binary(size_t column_index, size_t row_index, BinaryData value, _impl::Instruction inst)
-    {
-        if (m_selected_object_schema) {
-            add_set_instruction(row_index, column_index, {"data", value});
-        }
-        return true;
-    }
-    bool set_olddatetime(size_t, size_t, OldDateTime, _impl::Instruction inst)
-    {
-        REALM_ASSERT(0);
-        return true;
-    }
-    bool set_timestamp(size_t column_index, size_t row_index, Timestamp ts, _impl::Instruction inst)
-    {
-        if (m_selected_object_schema) {
-            int64_t value = ts.get_seconds() * 1000 + ts.get_nanoseconds() / 1000000;
-            add_set_instruction(row_index, column_index, {"date", value});
-        }
-        return true;
-    }
-    bool set_table(size_t, size_t, _impl::Instruction)
-    {
-        REALM_ASSERT(0);
-        return true;
-    }
-    bool set_mixed(size_t, size_t, const Mixed&, _impl::Instruction inst)
-    {
-        REALM_ASSERT(0);
-        return true;
-    }
-    bool set_null(size_t column_index, size_t row_index, _impl::Instruction inst, size_t)
-    {
-        if (m_selected_object_schema) {
-            add_set_instruction(row_index, column_index, nullptr);
-        }
-        return true;
-    }
-    bool set_link(size_t column_index, size_t row_index, size_t link_index, size_t target_group_level_ndx, _impl::Instruction inst)
-    {
-        if (m_selected_object_schema) {
-            ObjectSchema *target_object_schema;
-            ConstTableRef target_table;
-            Property *target_primary;
-            std::string table_name = m_group.get_table_name(target_group_level_ndx);
-            select(table_name, target_object_schema, target_table, target_primary);
-
-            nlohmann::json value = link_index == npos ? nlohmann::json(nullptr) : get_identity(link_index, target_table, target_primary);
-            add_set_instruction(row_index, column_index, std::move(value));
-        }
-        return true;
-    }
-    bool nullify_link(size_t column_index, size_t row_index, size_t target_group_level_ndx)
-    {
-        if (m_selected_object_schema) {
-            add_set_instruction(row_index, column_index, nullptr);
-        }
-        return true;
-    }
-    bool insert_substring(size_t, size_t, size_t, StringData)
-    {
-        REALM_ASSERT(0);
-        return true;
-    }
-    bool erase_substring(size_t, size_t, size_t, size_t)
-    {
-        REALM_ASSERT(0);
-        return true;
-    }
-    bool optimize_table()
-    {
-        return true;
+        add_instruction(Adapter::InstructionType::Insert, {
+            {"identity", std::move(identity)},
+            {"values", std::move(values)}
+        }, true);
     }
 
-    // Must have descriptor selected:
-    bool insert_link_column(size_t col_ndx, DataType data_type, StringData prop_name, size_t target_table_index, size_t backlink_col_ndx)
+    void operator()(const Instruction::EraseObject& instr)
     {
-        std::string object_type = ObjectStore::object_type_for_table_name(m_table_names[m_selected_table_index]);
+        if (!m_selected_object_schema)
+            return; // FIXME: Support objects without schemas
+
+        add_instruction(Adapter::InstructionType::Delete, {
+            {"identity", get_identity(instr.object, *m_selected_table, m_selected_primary)}
+        });
+
+        if (m_selected_primary) {
+            auto& int_primaries    = m_int_primaries[m_selected_table_name];
+            auto& string_primaries = m_string_primaries[m_selected_table_name];
+            auto& null_primaries   = m_null_primaries[m_selected_table_name];
+
+            // invalidate caches
+            int_primaries.erase(instr.object);
+            string_primaries.erase(instr.object);
+            null_primaries.erase(instr.object);
+        }
+    }
+
+    void operator()(const Instruction::Set& instr)
+    {
+        if (!m_selected_object_schema)
+            return; // FIXME: Support objects without schemas
+
+        StringData field = get_string(instr.field);
+
+        if (instr.payload.is_null()) {
+            return add_set_instruction(instr.object, field, nullptr);
+        }
+
+        switch (instr.payload.type) {
+            case type_Int:
+                return add_set_instruction(instr.object, field, instr.payload.data.integer);
+            case type_Bool:
+                return add_set_instruction(instr.object, field, instr.payload.data.boolean);
+            case type_Float:
+                return add_set_instruction(instr.object, field, instr.payload.data.fnum);
+            case type_Double:
+                return add_set_instruction(instr.object, field, instr.payload.data.dnum);
+            case type_String:
+                return add_set_instruction(instr.object, field, std::string(get_string(instr.payload.data.str)));
+            case type_Binary: {
+                std::string string = get_string(instr.payload.data.str);
+                return add_set_instruction(instr.object, field, {"data", string});
+            }
+            case type_Timestamp: {
+                Timestamp ts = instr.payload.data.timestamp;
+                int64_t value = ts.get_seconds() * 1000 + ts.get_nanoseconds() / 1000000;
+                return add_set_instruction(instr.object, field, {"date", value});
+            }
+            case type_Link: {
+                ObjectSchema *target_object_schema;
+                ConstTableRef target_table;
+                Property *target_primary;
+                std::string table_name = get_string(instr.payload.data.link.target_table);
+                select(table_name, target_object_schema, target_table, target_primary);
+                nlohmann::json value = get_identity(instr.payload.data.link.target, *target_table, target_primary);
+                return add_set_instruction(instr.object, field, std::move(value));
+            }
+
+
+            case type_Table:
+            case type_Mixed:
+            case type_LinkList:
+            case type_OldDateTime:
+                REALM_TERMINATE("Unsupported data type.");
+        }
+    }
+
+    void operator()(const Instruction::AddInteger& instr)
+    {
+        // FIXME
+        REALM_TERMINATE("AddInteger not supported by adapter.");
+    }
+
+    void operator()(const Instruction::InsertSubstring& instr)
+    {
+        // FIXME
+        REALM_TERMINATE("InsertSubstring not supported by adapter.");
+    }
+
+    void operator()(const Instruction::EraseSubstring& instr)
+    {
+        // FIXME
+        REALM_TERMINATE("EraseSubstring not supported by adapter.");
+    }
+
+    void operator()(const Instruction::ClearTable&)
+    {
+        add_instruction(Adapter::InstructionType::Clear);
+    }
+
+    void operator()(const Instruction::AddColumn& instr)
+    {
+        std::string object_type = ObjectStore::object_type_for_table_name(m_selected_table_name);
         if (object_type.size()) {
-            add_column_instruction(object_type, prop_name, {
-                {"type", data_type == DataType::type_Link ? "object" : "list"},
-                {"object_type", ObjectStore::object_type_for_table_name(m_table_names[target_table_index])}
-            });
+            if (instr.type == type_Link || instr.type == type_LinkList) {
+                add_column_instruction(object_type, get_string(instr.field), {
+                    {"type", (instr.type == type_Link ? "object" : "list")},
+                    {"object_type", ObjectStore::object_type_for_table_name(get_string(instr.link_target_table))}
+                });
+            }
+            else {
+                add_column_instruction(object_type, get_string(instr.field), {
+                    {"type", string_for_property_type(PropertyType(instr.type))},
+                    {"nullable", instr.nullable}
+                });
+            }
         }
-        return true;
     }
-    bool insert_column(size_t col_ndx, DataType data_type, StringData prop_name, bool nullable)
+
+    void operator()(const Instruction::EraseColumn& instr)
     {
-        std::string object_type = ObjectStore::object_type_for_table_name(m_table_names[m_selected_table_index]);
-        if (object_type.size()) {
-            add_column_instruction(object_type, prop_name, {
-                {"type", string_for_property_type((PropertyType)data_type)},
-                {"nullable", nullable}
-            });
-        }
-        return true;
-    }
-    bool erase_link_column(size_t, size_t, size_t)
-    {
-        REALM_ASSERT(0);
-        return true;
-    }
-    bool erase_column(size_t)
-    {
-        REALM_ASSERT(0);
-        return true;
-    }
-    bool rename_column(size_t, StringData)
-    {
-        REALM_ASSERT(0);
-        return true;
-    }
-    bool move_column(size_t from, size_t to)
-    {
-        return true;
-    }
-    bool add_search_index(size_t)
-    {
-        return true;
-    }
-    bool remove_search_index(size_t)
-    {
-        return true;
-    }
-    bool set_link_type(size_t, LinkType)
-    {
-        REALM_ASSERT(0);
-        return true;
+        REALM_TERMINATE("EraseColumn not supported by adapter.");
     }
 
     // Must have linklist selected:
-    bool link_list_set(size_t list_index, size_t m_list_target_index, size_t prior_size)
+    void operator()(const Instruction::LinkListSet& instr)
     {
-        if (m_list_property) {
-            add_instruction(Adapter::InstructionType::ListSet, {
-                {"identity", m_list_parent_identity},
-                {"property", m_list_property->name},
-                {"list_index", list_index},
-                {"object_identity", get_identity(m_list_target_index, m_list_target_table, m_list_target_primary)}
-            });
-        }
-        return true;
-    }
-    bool link_list_insert(size_t list_index, size_t m_list_target_index, size_t prior_size)
-    {
-        if (m_list_property) {
-            add_instruction(Adapter::InstructionType::ListInsert, {
-                {"identity", m_list_parent_identity},
-                {"property", m_list_property->name},
-                {"list_index", list_index},
-                {"object_identity", get_identity(m_list_target_index, m_list_target_table, m_list_target_primary)}
-            });
-        }
-        return true;
-    }
-    bool link_list_move(size_t from_index, size_t to_index)
-    {
-        if (m_list_property) {
-            REALM_ASSERT(0);
-        }
-        return true;
-    }
-    bool link_list_swap(size_t from_index, size_t to_index)
-    {
-        if (m_list_property) {
-            REALM_ASSERT(0);
-        }
-        return true;
-    }
-    bool link_list_erase(size_t list_index, size_t prior_size)
-    {
-        if (m_list_property) {
-            add_instruction(Adapter::InstructionType::ListErase, {
-                {"identity", m_list_parent_identity},
-                {"property", m_list_property->name},
-                {"list_index", list_index},
-            });
-        }
-        return true;
-    }
-    bool link_list_nullify(size_t list_index, size_t prior_size)
-    {
-        if (m_list_property) {
-            add_instruction(Adapter::InstructionType::ListErase, {
-                {"identity", m_list_parent_identity},
-                {"property", m_list_property->name},
-                {"list_index", list_index},
-            });
-        }
-        return true;
-    }
-    bool link_list_clear(size_t prior_size)
-    {
-        if (m_list_property) {
-            add_instruction(Adapter::InstructionType::ListClear, {
-                {"identity", m_list_parent_identity},
-                {"property", m_list_property->name},
-            });
-        }
-        return true;
+        if (!m_list_property)
+            return; // FIXME
+
+        add_instruction(Adapter::InstructionType::ListSet, {
+            {"identity", m_list_parent_identity},
+            {"property", m_list_property->name},
+            {"list_index", instr.link_ndx},
+            {"object_identity", get_identity(instr.value, *m_list_target_table, m_list_target_primary)}
+        });
     }
 
-    void append_primary_key_identifiers()
+    void operator()(const Instruction::LinkListInsert& instr)
     {
-        for (auto pk : m_primary_key_properties) {
-            for (auto &json : m_json_instructions) {
-                if (json["type"].get<std::string>() == Adapter::instruction_type_string(Adapter::InstructionType::AddType) &&
-                    json["object_type"].get<std::string>() == pk.second.first) {
-                    json["primary_key"] = pk.second.second;
-                    break;
-                }
-            }
-        }
+        if (!m_list_property)
+            return; // FIXME
+
+        add_instruction(Adapter::InstructionType::ListInsert, {
+            {"identity", m_list_parent_identity},
+            {"property", m_list_property->name},
+            {"list_index", instr.link_ndx},
+            {"object_identity", get_identity(instr.value, *m_list_target_table, m_list_target_primary)}
+        });
+    }
+
+    void operator()(const Instruction::LinkListMove&)
+    {
+        if (!m_list_property)
+            return; // FIXME
+
+        REALM_TERMINATE("LinkListMove not supported by adapter.");
+    }
+
+    void operator()(const Instruction::LinkListSwap&)
+    {
+        if (!m_list_property)
+            return; // FIXME
+
+        REALM_TERMINATE("LinkListSwap not supported by adapter.");
+    }
+
+    void operator()(const Instruction::LinkListErase& instr)
+    {
+        if (!m_list_property)
+            return; // FIXME
+
+        add_instruction(Adapter::InstructionType::ListErase, {
+            {"identity", m_list_parent_identity},
+            {"property", m_list_property->name},
+            {"list_index", instr.link_ndx},
+        });
+    }
+
+    void operator()(const Instruction::LinkListClear&)
+    {
+        if (!m_list_property)
+            return; // FIXME
+
+        add_instruction(Adapter::InstructionType::ListClear, {
+            {"identity", m_list_parent_identity},
+            {"property", m_list_property->name},
+        });
+    }
+
+    void operator()(const Instruction& instr) final override
+    {
+        instr.visit(*this);
     }
 };
 
@@ -605,11 +478,14 @@ public:
     bool cook_changeset(const Group& group, const char* changeset,
                         std::size_t changeset_size,
                         util::AppendBuffer<char>& out_buffer) override {
-        _impl::SimpleInputStream stream(changeset, changeset_size);
-        _impl::TransactLogParser parser;
+        _impl::SimpleNoCopyInputStream stream_2(changeset, changeset_size);
+        sync::Changeset c;
+        sync::parse_changeset(stream_2, c);
+
+        _impl::SimpleNoCopyInputStream stream(changeset, changeset_size);
+        sync::ChangesetParser parser;
         ChangesetCookerInstructionHandler cooker_handler(group);
         parser.parse(stream, cooker_handler);
-        cooker_handler.append_primary_key_identifiers();
         std::string out_string = cooker_handler.m_json_instructions.dump();
         out_buffer.append(out_string.c_str(), out_string.size()); // Throws
         return true;

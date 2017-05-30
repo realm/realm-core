@@ -46,8 +46,6 @@ public:
         ListClear,
         AddType,
         AddProperties,
-        ChangeIdentity,
-        SwapIdentity,
     };
 
     static std::string instruction_type_string(InstructionType type) {
@@ -62,8 +60,6 @@ public:
             case InstructionType::ListClear:        return "LIST_CLEAR";
             case InstructionType::AddType:          return "ADD_TYPE";
             case InstructionType::AddProperties:    return "ADD_PROPERTIES";
-            case InstructionType::ChangeIdentity:   return "CHANGE_IDENTITY";
-            case InstructionType::SwapIdentity:     return "SWAP_IDENTITY";
         }
     }
 
@@ -77,7 +73,7 @@ public:
     util::Optional<ChangeSet> current(std::string realm_path);
     void advance(std::string realm_path);
 
-    realm::Realm::Config get_config(std::string path, 
+    realm::Realm::Config get_config(std::string path,
                                     util::Optional<std::string> realm_id = util::none,
                                     util::Optional<Schema> schema = util::none);
 
