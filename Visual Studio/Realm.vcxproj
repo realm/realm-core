@@ -679,7 +679,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -702,7 +702,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -725,7 +725,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -748,7 +748,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static library, debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;_WIN32_WINNT=0x0603;WINVER=0x0603;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -774,7 +774,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;_WIN32_WINNT=0x0603;WINVER=0x0603;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -801,7 +801,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -830,7 +830,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -859,7 +859,7 @@
     <Midl />
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>false</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -888,7 +888,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -916,7 +916,7 @@
     <Midl />
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -945,7 +945,7 @@
     </Midl>
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -975,7 +975,7 @@
     <Midl />
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>REALM_DEBUG;WIN32;_DEBUG;_CONSOLE;_CRTDBG_MAP_ALLOC;_CRTDBG_MAP_ALLOC_NEW;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MinimalRebuild>true</MinimalRebuild>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -1014,7 +1014,7 @@
       </PrecompiledHeader>
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <AdditionalOptions>/DREALM_ENABLE_ENCRYPTION=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <AdditionalUsingDirectories>; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt"</AdditionalUsingDirectories>
@@ -1043,7 +1043,7 @@
       </PrecompiledHeader>
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <AdditionalUsingDirectories>; "C:\Program Files (x86)\Windows Kits\10\Include\10.0.14393.0\ucrt"</AdditionalUsingDirectories>
@@ -1073,7 +1073,7 @@
       </PrecompiledHeader>
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <AdditionalOptions>/DREALM_ENABLE_ENCRYPTION=1 /DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <CompileAsWinRT>false</CompileAsWinRT>
@@ -1108,7 +1108,7 @@
       </PrecompiledHeader>
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <AdditionalOptions>/DREALM_ENABLE_ENCRYPTION=1 /DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <CompileAsWinRT>false</CompileAsWinRT>
@@ -1143,7 +1143,7 @@
       </PrecompiledHeader>
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <AdditionalOptions>/DREALM_ENABLE_ENCRYPTION=1 /DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>false</SDLCheck>
@@ -1175,7 +1175,7 @@
       </PrecompiledHeader>
       <CompileAs>CompileAsCpp</CompileAs>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <AdditionalOptions>/DREALM_ENABLE_ENCRYPTION=1 /DREALM_UWP=1 /DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>false</SDLCheck>
@@ -1198,7 +1198,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -1227,7 +1227,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -1262,7 +1262,7 @@
       <PrecompiledHeader>
       </PrecompiledHeader>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <AdditionalOptions>/DREALM_ENABLE_ENCRYPTION=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION </AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
     </ClCompile>
@@ -1287,7 +1287,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -1316,7 +1316,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -1346,7 +1346,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -1376,7 +1376,7 @@
     <ClCompile>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>PTW32_STATIC_LIB;WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -1416,7 +1416,7 @@
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <AdditionalOptions>/DREALM_ENABLE_ENCRYPTION=1 /DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION </AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
     </ClCompile>
@@ -1447,7 +1447,7 @@
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories> ..\src\win32\openssl\crypto\include; ..\src\win32\openssl\include;..\src\win32\openssl;..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories> ..\src;..\src\win32;..\src\win32\pthread</AdditionalIncludeDirectories>
       <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_DEBUG /DREALM_ENABLE_REPLICATION </AdditionalOptions>
       <WarningLevel>Level3</WarningLevel>
     </ClCompile>

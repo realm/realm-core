@@ -16,9 +16,6 @@
  *
  **************************************************************************/
 
-// All unit tests here suddenly broke on Windows, maybe after encryption was added
-
-
 #include <map>
 #include <sstream>
 #include <mutex>
@@ -10294,7 +10291,7 @@ void attacher(std::string path)
 
 TEST(LangBindHelper_RacingAttachers)
 {
-    const int num_attachers = 2;
+    const int num_attachers = 10;
     SHARED_GROUP_TEST_PATH(path);
     {
         std::unique_ptr<Replication> hist(make_in_realm_history(path));
