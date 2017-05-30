@@ -345,11 +345,11 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
                 timeval tv;
                 gettimeofday(&tv, nullptr);
 
-                long milliseconds = timediff(tv, *tp);
+                int64_t milliseconds = timediff(tv, *tp);
                 if (milliseconds < 0) { // negative timeout will mean no timeout. We don't want that.
                     milliseconds = 0;
                 }
-                REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<int>(milliseconds));
+                REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<int64_t>(milliseconds));
                 int timeout = int(milliseconds);
                 r = poll(&poll_d, 1, timeout);
             }
