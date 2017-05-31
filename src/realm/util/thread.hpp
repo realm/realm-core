@@ -176,8 +176,7 @@ private:
     // We need to translate the name to a HANDLE in order to pass it to the Windows API. This translation is
     // expensive, so we cache the translation for each process (each process has its own HANDLE for the same mutex)
     HANDLE m_cached_handle;
-    int m_cached_pid;
-    DWORD m_cached_windows_pid;
+    DWORD m_cached_pid;
 #endif
 
     friend class CondVar;
@@ -478,7 +477,7 @@ inline Mutex::Mutex(process_shared_tag)
 inline Mutex::~Mutex() noexcept
 {
 #ifdef _WIN32
-    if (m_is_shared && m_cached_pid == _getpid()) {
+    if (m_is_shared && m_cached_pid == GetCurrentProcessId()) {
         CloseHandle(m_cached_handle);
     }
     else {
@@ -518,7 +517,7 @@ inline void Mutex::lock() noexcept
     else {
         DWORD d;
         HANDLE h;
-        int pid = _getpid();
+        DWORD pid = GetCurrentProcessId();
 
         if (m_cached_pid != pid)
             h = OpenMutexA(MUTEX_ALL_ACCESS, 1, m_shared_name);
@@ -554,7 +553,7 @@ inline bool Mutex::try_lock() noexcept
     else {
         DWORD d;
         HANDLE h;
-        int pid = _getpid();
+        DWORD pid = GetCurrentProcessId();
 
         if (m_cached_pid != pid)
             h = OpenMutexA(MUTEX_ALL_ACCESS, 1, m_shared_name);
@@ -596,7 +595,7 @@ inline void Mutex::unlock() noexcept
     else {
         BOOL d;
         HANDLE h;
-        int pid = _getpid();
+        DWORD pid = GetCurrentProcessId();
 
         if (m_cached_pid != pid)
             h = OpenMutexA(MUTEX_ALL_ACCESS, 1, m_shared_name);

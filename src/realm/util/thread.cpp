@@ -153,9 +153,7 @@ void Mutex::init_as_process_shared(bool robust_if_available)
         REALM_ASSERT_RELEASE("CreateMutexA() failed" && false);
 
     m_cached_handle = h;
-    m_cached_pid = _getpid();
-    m_cached_windows_pid = GetCurrentProcessId();
-
+    m_cached_pid = GetCurrentProcessId();
     return;
 #endif
 
