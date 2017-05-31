@@ -64,7 +64,6 @@
     <ClCompile Include="..\src\realm\impl\output_stream.cpp" />
     <ClCompile Include="..\src\realm\views.cpp" />
     <ClCompile Include="..\src\win32\getopt.cpp" />
-    <ClCompile Include="..\src\win32\pthread\pthread.c" />
     <ClCompile Include="..\test\fuzzy\afl.cpp" />
     <ClCompile Include="..\test\fuzz_group.cpp" />
     <ClCompile Include="..\test\large_tests\test_column_large.cpp" />
@@ -232,7 +231,6 @@
     <ClInclude Include="..\src\realm\version.hpp" />
     <ClInclude Include="..\src\realm\views.hpp" />
     <ClInclude Include="..\src\win32\getopt.h" />
-    <ClInclude Include="..\src\win32\pthread\pthread.h" />
     <ClInclude Include="..\test\fuzz_group.hpp" />
     <ClInclude Include="..\test\test.hpp" />
     <ClInclude Include="..\test\util\jsmn.hpp" />
@@ -240,6 +238,7 @@
     <ClInclude Include="..\test\util\verified_string.hpp" />
     <ClInclude Include="..\test\pthread_test.hpp" />
     <ClInclude Include="..\test\testsettings.hpp" />
+    <ClInclude Include="..\src\realm\util\overload.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="changelog.txt" />

@@ -23,7 +23,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
-
+#include <thread>
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
 
@@ -9143,7 +9143,7 @@ void multiple_trackers_writer_thread(std::string path)
             insert(tr, idx, 0);
         }
         wt.commit();
-        sched_yield();
+        std::this_thread::yield();
     }
 }
 
@@ -9171,7 +9171,7 @@ void multiple_trackers_reader_thread(TestContext& test_context, std::string path
         CHECK_EQUAL(1, tv.size());
         CHECK_EQUAL(42, tv.get_int(0, 0));
         while (!sg.has_changed())
-            sched_yield();
+            std::this_thread::yield();
         LangBindHelper::advance_read(sg);
     }
     CHECK_EQUAL(0, tv.size());
@@ -9202,7 +9202,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
     Thread threads[write_thread_count + read_thread_count];
     for (int i = 0; i < write_thread_count; ++i)
         threads[i].start([&] { multiple_trackers_writer_thread(path); });
-    sched_yield();
+    std::this_thread::yield();
     for (int i = 0; i < read_thread_count; ++i) {
         threads[write_thread_count + i].start([&] { multiple_trackers_reader_thread(test_context, path); });
     }
@@ -9217,7 +9217,7 @@ TEST(LangBindHelper_ImplicitTransactions_MultipleTrackers)
         ConstTableRef tr = rt.get_table("table");
         if (tr->get_int(0, 0) == read_thread_count)
             break;
-        sched_yield();
+        std::this_thread::yield();
     }
     // signal to all readers to complete
     {
@@ -10191,7 +10191,7 @@ void handover_writer(std::string path)
         // improve chance of consumers running concurrently with
         // new writes:
         for (int n = 0; n < 10; ++n)
-            sched_yield();
+            std::this_thread::yield();
     }
     LangBindHelper::promote_to_write(sg);
     table->set_int(0, 0, 0); // <---- signals other threads to stop
@@ -10217,7 +10217,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
         // wait here for writer to change the database. Kind of wasteful, but wait_for_change()
         // is not available on osx.
         if (!sg.has_changed()) {
-            sched_yield();
+            std::this_thread::yield();
             continue;
         }
         LangBindHelper::advance_read(sg);
@@ -10229,7 +10229,7 @@ void handover_querier(HandoverControl<SharedGroup::Handover<TableView>>* control
         // here we need to allow the reciever to get hold on the proper version before
         // we go through the loop again and advance_read().
         control->wait_feedback();
-        sched_yield();
+        std::this_thread::yield();
 
         if (table->size() > 0 && table->get_int(0, 0) == 0)
             break;

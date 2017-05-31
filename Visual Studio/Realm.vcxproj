@@ -1524,35 +1524,6 @@
     <ClCompile Include="..\src\realm\impl\output_stream.cpp" />
     <ClCompile Include="..\src\realm\views.cpp" />
     <ClCompile Include="..\src\win32\getopt.cpp" />
-    <ClCompile Include="..\src\win32\pthread\pthread.c">
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Schema dumper|x64'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Schema dumper|ARM'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='csv debug|x64'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='csv debug|ARM'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='csv importer|x64'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='csv importer|ARM'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='csv importer|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='csv debug|Win32'">CompileAsC</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Static library, debug|x64'">Default</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Static library, debug|ARM'">Default</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">Default</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|ARM'">Default</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">Default</CompileAs>
-      <CompileAs Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|ARM'">Default</CompileAs>
-      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'">false</CompileAsWinRT>
-      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|ARM'">false</CompileAsWinRT>
-      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'">false</CompileAsWinRT>
-      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|ARM'">false</CompileAsWinRT>
-      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'">false</CompileAsWinRT>
-      <CompileAsWinRT Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'">false</CompileAsWinRT>
-    </ClCompile>
     <ClCompile Include="..\test\fuzzy\afl.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Schema dumper|Win32'">true</ExcludedFromBuild>
@@ -2544,7 +2515,6 @@
     <ClInclude Include="..\src\realm\version.hpp" />
     <ClInclude Include="..\src\realm\views.hpp" />
     <ClInclude Include="..\src\win32\getopt.h" />
-    <ClInclude Include="..\src\win32\pthread\pthread.h" />
     <ClInclude Include="..\test\fuzz_group.hpp" />
     <ClInclude Include="..\test\test.hpp" />
     <ClInclude Include="..\test\util\jsmn.hpp" />
