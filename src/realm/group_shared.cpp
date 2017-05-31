@@ -1088,10 +1088,10 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                     repl->initiate_session(version); // Throws
 
                 if (options.encryption_key) {
-                    static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
 #ifdef _WIN32
                     uint64_t pid = GetCurrentProcessId();
 #else
+                    static_assert(sizeof(pid_t) <= sizeof(uint64_t), "process identifiers too large");
                     uint64_t pid = getpid();
 #endif
                     info->session_initiator_pid = pid;
