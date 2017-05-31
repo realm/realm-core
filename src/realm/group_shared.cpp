@@ -836,7 +836,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         // if the lock is already open in shared mode, so we work around it by
         // busy waiting. This should occur only briefly during session initialization.
         while (!m_file.try_lock_shared()) {
-            sched_yield();
+            Thread::yield();
         }
 #else
         m_file.lock_shared(); // Throws
