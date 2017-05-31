@@ -30,11 +30,11 @@
 #endif
 
 #include <cstring>
-#include <pthread.h>
 
 #ifndef _WIN32
 #include <sys/mman.h>
 #include <unistd.h>
+#include <pthread.h>
 #else
 #include <Windows.h>
 // 224-bit AES-2 from https://github.com/kalven/sha-2 - Public Domain. Native API
