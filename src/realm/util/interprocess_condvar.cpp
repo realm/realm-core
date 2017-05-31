@@ -291,7 +291,7 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
     m_shared_part->m_waiters_count--;
 
     // Check to see if we're the last waiter after notify_all().
-    int last_waiter = m_shared_part->m_was_broadcast && m_shared_part->m_waiters_count == 0;
+    bool last_waiter = m_shared_part->m_was_broadcast && m_shared_part->m_waiters_count == 0;
 
     m_shared_part->m_waiters_countlock.unlock();
 
@@ -425,7 +425,7 @@ void InterprocessCondVar::notify() noexcept
 #ifdef REALM_CONDVAR_EMULATION
 #ifdef _WIN32
     m_shared_part->m_waiters_countlock.lock();
-    int have_waiters = m_shared_part->m_waiters_count > 0;
+    bool have_waiters = m_shared_part->m_waiters_count > 0;
     m_shared_part->m_waiters_countlock.unlock();
 
     // If there aren't any waiters, then this is a no-op.  
@@ -457,14 +457,14 @@ void InterprocessCondVar::notify_all() noexcept
     // This is needed to ensure that <m_waiters_count> and <m_was_broadcast> are
     // consistent relative to each other.
     m_shared_part->m_waiters_countlock.lock();
-    int have_waiters = 0;
+    bool have_waiters = false;
 
     if (m_shared_part->m_waiters_count > 0) {
         // We are broadcasting, even if there is just one waiter...
         // Record that we are broadcasting, which helps optimize
         // wait() for the non-broadcast case.
         m_shared_part->m_was_broadcast = 1;
-        have_waiters = 1;
+        have_waiters = true;
     }
 
     if (have_waiters) {
