@@ -30,6 +30,7 @@
 #include "schema.hpp"
 
 #include "impl/realm_coordinator.hpp"
+#include "util/format.hpp"
 
 #include <realm/group.hpp>
 
@@ -55,7 +56,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {
-            {"value", PropertyType::Int, "", "", false, false, false}
+            {"value", PropertyType::Int}
         }},
     };
 
@@ -132,8 +133,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
             auto realm = Realm::get_shared_realm(config);
             config.schema = Schema{
                 {"object", {
-                    {"value", PropertyType::Int, "", "", false, false, false},
-                    {"value2", PropertyType::Int, "", "", false, false, false}
+                    {"value", PropertyType::Int},
+                    {"value2", PropertyType::Int}
                 }},
             };
             REQUIRE_THROWS(Realm::get_shared_realm(config));
@@ -165,8 +166,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         config.schema_version = 2;
         config.schema = Schema{
             {"object", {
-                {"value", PropertyType::Int, "", "", false, false, false},
-                {"value2", PropertyType::Int, "", "", false, false, false}
+                {"value", PropertyType::Int},
+                {"value2", PropertyType::Int}
             }},
         };
         bool migration_called = false;
@@ -185,8 +186,8 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         config.schema_version = 2;
         config.schema = Schema{
             {"object", {
-                {"value", PropertyType::Int, "", "", false, false, false},
-                {"value2", PropertyType::Int, "", "", false, false, false}
+                {"value", PropertyType::Int},
+                {"value2", PropertyType::Int}
             }},
         };
         bool migration_called = false;
@@ -235,10 +236,10 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
         config.schema = Schema{
             {"object", {
-                {"value", PropertyType::Int, "", "", false, false, false}
+                {"value", PropertyType::Int}
             }},
             {"object1", {
-                {"value", PropertyType::Int, "", "", false, false, false}
+                {"value", PropertyType::Int}
             }},
         };
         config.schema_version = 1;
@@ -292,7 +293,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
         config.schema = Schema{
             {"object 2", {
-                {"value", PropertyType::Int, "", "", false, false, false}
+                {"value", PropertyType::Int}
             }},
         };
         auto realm2 = Realm::get_shared_realm(config);
@@ -302,7 +303,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
 
         config.schema = Schema{
             {"object", {
-                {"value", PropertyType::Int, "", "", false, false, false}
+                {"value", PropertyType::Int}
             }},
         };
         auto realm4 = Realm::get_shared_realm(config);
@@ -392,7 +393,7 @@ TEST_CASE("SharedRealm: notifications") {
     config.schema_version = 0;
     config.schema = Schema{
         {"object", {
-            {"value", PropertyType::Int, "", "", false, false, false}
+            {"value", PropertyType::Int}
         }},
     };
 
@@ -521,8 +522,8 @@ TEST_CASE("SharedRealm: schema updating from external changes") {
     config.schema_mode = SchemaMode::Additive;
     config.schema = Schema{
         {"object", {
-            {"value", PropertyType::Int, "", "", true, false, false},
-            {"value 2", PropertyType::Int, "", "", false, true, false},
+            {"value", PropertyType::Int, Property::IsPrimary{true}},
+            {"value 2", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
         }},
     };
 
@@ -601,7 +602,7 @@ TEST_CASE("SharedRealm: closed realm") {
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {
-            {"value", PropertyType::Int, "", "", false, false, false}
+            {"value", PropertyType::Int}
         }},
     };
 
@@ -626,7 +627,7 @@ TEST_CASE("ShareRealm: in-memory mode from buffer") {
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {
-            {"value", PropertyType::Int, "", "", false, false, false}
+            {"value", PropertyType::Int}
         }},
     };
 
@@ -672,7 +673,7 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
     config.schema_version = 1;
     config.schema = Schema{
         {"object", {
-            {"value", PropertyType::Int, "", "", false, false, false}
+            {"value", PropertyType::Int}
         }},
     };
     config.cache = false;
@@ -1080,8 +1081,8 @@ TEST_CASE("SharedRealm: dynamic schema mode doesn't invalidate object schema poi
     config_with_schema.schema_mode = SchemaMode::Automatic;
     config_with_schema.schema = Schema{
         {"object", {
-            {"value", PropertyType::Int, "", "", true, false, false},
-            {"value 2", PropertyType::Int, "", "", false, true, false},
+            {"value", PropertyType::Int, Property::IsPrimary{true}},
+            {"value 2", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}},
         }}
     };
     auto r1 = Realm::get_shared_realm(config_with_schema);
@@ -1113,15 +1114,15 @@ TEST_CASE("SharedRealm: compact on launch") {
     };
     config.schema = Schema{
         {"object", {
-            {"value", PropertyType::String, "", "", false, false, false}
+            {"value", PropertyType::String}
         }},
     };
     auto r = Realm::get_shared_realm(config);
     r->begin_transaction();
     auto table = r->read_group().get_table("class_object");
-    int count = 1000;
+    size_t count = 1000;
     table->add_empty_row(count);
-    for (int i = 0; i < count; ++i)
+    for (size_t i = 0; i < count; ++i)
         table->set_string(0, i, util::format("Foo_%1", i % 10).c_str());
     r->commit_transaction();
     REQUIRE(table->size() == count);
@@ -1173,7 +1174,7 @@ TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
 
     Schema schema{
         {"object", {
-            {"value", PropertyType::String, "", "", false, false, false}
+            {"value", PropertyType::String}
         }},
     };
 

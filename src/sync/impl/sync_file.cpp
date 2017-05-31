@@ -106,7 +106,7 @@ void remove_nonempty_dir(const std::string& path)
     }
     // Delete the directory itself
     try {
-        util::remove_dir(path);    
+        util::remove_dir(path);
     }
     catch (File::NotFound const&) {
     }
@@ -339,7 +339,7 @@ bool SyncFileManager::copy_realm_file(const std::string& old_path, const std::st
             return false;
         }
         File::copy(old_path, new_path);
-    } 
+    }
     catch (File::NotFound const&) {
         return false;
     }

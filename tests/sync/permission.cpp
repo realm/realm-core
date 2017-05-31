@@ -41,7 +41,7 @@ TEST_CASE("`Permission` class", "[sync]") {
 		CHECK(!Permission::paths_are_equivalent("/~/foo", "/~/bar", "user1", "user1"));
 		// Different non-tilde paths.
 		CHECK(!Permission::paths_are_equivalent("/user1/foo", "/user2/bar", "user1", "user1"));
-		// Identical paths and different users for tilde-paths. 
+		// Identical paths and different users for tilde-paths.
 		CHECK(!Permission::paths_are_equivalent("/~/foo", "/~/foo", "user1", "user2"));
 		// First path cannot be turned into second path.
 		CHECK(!Permission::paths_are_equivalent("/~/foo", "/user1/foo", "user2", "user2"));

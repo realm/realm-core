@@ -430,7 +430,7 @@ void do_add_comparison_to_query(Query &query, Predicate::Comparison cmp,
             throw std::logic_error(util::format("Object type '%1' not supported", string_for_property_type(type)));
     }
 }
-  
+
 template<typename T>
 void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
@@ -446,7 +446,7 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Operator op, const
             throw std::logic_error("Only 'equal' and 'not equal' operators supported when comparing against 'null'.");
     }
 }
-    
+
 template<>
 void do_add_null_comparison_to_query<Binary>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
@@ -463,7 +463,7 @@ void do_add_null_comparison_to_query<Binary>(Query &query, Predicate::Operator o
             throw std::logic_error("Only 'equal' and 'not equal' operators supported when comparing against 'null'.");
     }
 }
-    
+
 template<>
 void do_add_null_comparison_to_query<Link>(Query &query, Predicate::Operator op, const PropertyExpression &expr)
 {
@@ -514,7 +514,7 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, co
             throw std::logic_error(util::format("Object type '%1' not supported", string_for_property_type(type)));
     }
 }
-    
+
 bool expression_is_null(const parser::Expression &expr, Arguments &args) {
     if (expr.type == parser::Expression::Type::Null) {
         return true;

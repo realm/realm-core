@@ -72,7 +72,7 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
     auto& table = *m_row.get_table();
     size_t col = property.table_column;
     size_t row = m_row.get_index();
-    if (property.is_nullable && ctx.is_null(value)) {
+    if (is_nullable(property.type) && ctx.is_null(value)) {
         if (property.type == PropertyType::Object) {
             if (!is_default)
                 table.nullify_link(col, row);
@@ -85,7 +85,22 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
         return;
     }
 
-    switch (property.type) {
+    if (is_array(property.type)) {
+        REALM_ASSERT(property.type == PropertyType::Object);
+
+        List list(m_realm, m_row.get_linklist(col));
+        list.remove_all();
+        if (!ctx.is_null(value)) {
+            ContextType child_ctx(ctx, property);
+            ctx.enumerate_list(value, [&](auto&& element) {
+                list.add(child_ctx, element, try_update);
+            });
+        }
+        ctx.did_change();
+        return;
+    }
+
+    switch (property.type & ~PropertyType::Flags) {
         case PropertyType::Bool:
             table.set(col, row, ctx.template unbox<bool>(value), is_default);
             break;
@@ -109,17 +124,6 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
         case PropertyType::Date:
             table.set(col, row, ctx.template unbox<Timestamp>(value), is_default);
             break;
-        case PropertyType::Array: {
-            List list(m_realm, m_row.get_linklist(col));
-            list.remove_all();
-            if (!ctx.is_null(value)) {
-                ContextType child_ctx(ctx, property);
-                ctx.enumerate_list(value, [&](auto&& element) {
-                    list.add(child_ctx, element, try_update);
-                });
-            }
-            break;
-        }
         case PropertyType::Object: {
             ContextType child_ctx(ctx, property);
             auto link = child_ctx.template unbox<RowExpr>(value, true, try_update);
@@ -140,11 +144,16 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
     verify_attached();
 
     size_t column = property.table_column;
-    if (property.is_nullable && m_row.is_null(column)) {
+    if (is_nullable(property.type) && m_row.is_null(column)) {
         return ctx.null_value();
     }
 
-    switch (property.type) {
+    if (is_array(property.type)) {
+        REALM_ASSERT(property.type == PropertyType::Object);
+        return ctx.box(List(m_realm, m_row.get_linklist(column)));
+    }
+
+    switch (property.type & ~PropertyType::Flags) {
         case PropertyType::Bool:   return ctx.box(m_row.get_bool(column));
         case PropertyType::Int:    return ctx.box(m_row.get_int(column));
         case PropertyType::Float:  return ctx.box(m_row.get_float(column));
@@ -152,7 +161,6 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
         case PropertyType::String: return ctx.box(m_row.get_string(column));
         case PropertyType::Data:   return ctx.box(m_row.get_binary(column));
         case PropertyType::Date:   return ctx.box(m_row.get_timestamp(column));
-        case PropertyType::Array:  return ctx.box(List(m_realm, m_row.get_linklist(column)));
         case PropertyType::Any:    return ctx.box(m_row.get_mixed(column));
         case PropertyType::Object: {
             auto linkObjectSchema = m_realm->schema().find(property.object_type);
@@ -202,7 +210,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         if (!primary_value)
             primary_value = ctx.default_value_for_property(object_schema, primary_prop->name);
         if (!primary_value) {
-            if (!primary_prop->is_nullable)
+            if (!is_nullable(primary_prop->type))
                 throw MissingPropertyValueException(object_schema.name, primary_prop->name);
             primary_value = ctx.null_value();
         }
@@ -276,7 +284,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
             v = ctx.default_value_for_property(object_schema, prop.name);
             is_default = true;
         }
-        if ((!v || ctx.is_null(*v)) && !prop.is_nullable && prop.type != PropertyType::Array) {
+        if ((!v || ctx.is_null(*v)) && !is_nullable(prop.type) && !is_array(prop.type)) {
             if (prop.is_primary || !ctx.allow_missing(value))
                 throw MissingPropertyValueException(object_schema.name, prop.name);
         }
@@ -318,13 +326,13 @@ size_t Object::get_for_primary_key_impl(ContextType& ctx, Table const& table,
                                         const Property &primary_prop,
                                         ValueType primary_value) {
     bool is_null = ctx.is_null(primary_value);
-    if (is_null && !primary_prop.is_nullable)
+    if (is_null && !is_nullable(primary_prop.type))
         throw std::logic_error("Invalid null value for non-nullable primary key.");
     if (primary_prop.type == PropertyType::String) {
         return table.find_first(primary_prop.table_column,
                                 ctx.template unbox<StringData>(primary_value));
     }
-    if (primary_prop.is_nullable)
+    if (is_nullable(primary_prop.type))
         return table.find_first(primary_prop.table_column,
                                 ctx.template unbox<util::Optional<int64_t>>(primary_value));
     return table.find_first(primary_prop.table_column,

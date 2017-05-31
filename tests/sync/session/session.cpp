@@ -337,7 +337,7 @@ TEST_CASE("sync: error handling", "[sync]") {
     auto user = SyncManager::shared().get_user({ user_id, "https://realm.example.org" }, "not_a_real_token");
     auto session = sync_session(server, user, "/test1e",
                                  [](auto&, auto&) { return s_test_token; },
-                                 [&](auto session, SyncError error) { 
+                                 [&](auto session, SyncError error) {
                                     error_handler(std::move(session), std::move(error));
                                  },
                                  SyncSessionStopPolicy::AfterChangesUploaded,
@@ -591,7 +591,7 @@ TEST_CASE("sync: stable IDs", "[sync]") {
         config.schema_version = 1;
         config.schema = Schema{
             {"object", {
-                {"value", PropertyType::Int, "", "", false, false, false}
+                {"value", PropertyType::Int}
             }},
         };
 

@@ -37,7 +37,7 @@ inline bool sessions_are_active(const SyncSession& session)
 inline bool sessions_are_inactive(const SyncSession& session)
 {
     return session.state() == SyncSession::PublicState::Inactive;
-} 
+}
 
 template <typename... S>
 bool sessions_are_active(const SyncSession& session, const S&... s)
@@ -102,7 +102,7 @@ std::shared_ptr<SyncSession> sync_session(SyncServer& server, std::shared_ptr<Sy
         [&, fetch_access_token=std::forward<FetchAccessToken>(fetch_access_token)](const auto& path, const auto& config, auto session) {
             auto token = fetch_access_token(path, config.realm_url);
             session->refresh_access_token(std::move(token), config.realm_url);
-        }, 
+        },
         std::forward<ErrorHandler>(error_handler),
         stop_policy, on_disk_path, std::move(schema), out_config);
 }

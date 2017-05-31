@@ -116,12 +116,15 @@ static void compare(ObjectSchema const& existing_schema,
             changes.emplace_back(schema_change::RemoveProperty{&existing_schema, &current_prop});
             continue;
         }
-        if (current_prop.type != target_prop->type || current_prop.object_type != target_prop->object_type) {
+        if (current_prop.type != target_prop->type ||
+            current_prop.object_type != target_prop->object_type ||
+            is_array(current_prop.type) != is_array(target_prop->type)) {
+
             changes.emplace_back(schema_change::ChangePropertyType{&existing_schema, &current_prop, target_prop});
             continue;
         }
-        if (current_prop.is_nullable != target_prop->is_nullable) {
-            if (current_prop.is_nullable)
+        if (is_nullable(current_prop.type) != is_nullable(target_prop->type)) {
+            if (is_nullable(current_prop.type))
                 changes.emplace_back(schema_change::MakePropertyRequired{&existing_schema, &current_prop});
             else
                 changes.emplace_back(schema_change::MakePropertyNullable{&existing_schema, &current_prop});

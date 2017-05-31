@@ -47,14 +47,14 @@ TEST_CASE("list") {
     auto r = Realm::get_shared_realm(config);
     r->update_schema({
         {"origin", {
-            {"pk", PropertyType::Int, "", "", true},
-            {"array", PropertyType::Array, "target"}
+            {"pk", PropertyType::Int, Property::IsPrimary{true}},
+            {"array", PropertyType::Array|PropertyType::Object, "target"}
         }},
         {"target", {
             {"value", PropertyType::Int}
         }},
         {"other_origin", {
-            {"array", PropertyType::Array, "other_target"}
+            {"array", PropertyType::Array|PropertyType::Object, "other_target"}
         }},
         {"other_target", {
             {"value", PropertyType::Int}

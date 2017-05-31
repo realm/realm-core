@@ -100,20 +100,36 @@ void add_index(Table& table, size_t col)
     }
 }
 
+DataType to_core_type(PropertyType type)
+{
+    switch (type & ~PropertyType::Flags) {
+        case PropertyType::Int:    return type_Int;
+        case PropertyType::Bool:   return type_Bool;
+        case PropertyType::Float:  return type_Float;
+        case PropertyType::Double: return type_Double;
+        case PropertyType::String: return type_String;
+        case PropertyType::Date:   return type_Timestamp;
+        case PropertyType::Data:   return type_Binary;
+        case PropertyType::Object: return type_Link;
+        default: REALM_TERMINATE("unknown type");
+    }
+}
+
 void insert_column(Group& group, Table& table, Property const& property, size_t col_ndx)
 {
     // Cannot directly insert a LinkingObjects column (a computed property).
     // LinkingObjects must be an artifact of an existing link column.
     REALM_ASSERT(property.type != PropertyType::LinkingObjects);
 
-    if (property.type == PropertyType::Object || property.type == PropertyType::Array) {
+    if (property.type == PropertyType::Object) {
         auto target_name = ObjectStore::table_name_for_object_type(property.object_type);
         TableRef link_table = group.get_table(target_name);
         REALM_ASSERT(link_table);
-        table.insert_column_link(col_ndx, DataType(property.type), property.name, *link_table);
+        table.insert_column_link(col_ndx, is_array(property.type) ? type_LinkList : type_Link,
+                                 property.name, *link_table);
     }
     else {
-        table.insert_column(col_ndx, DataType(property.type), property.name, property.is_nullable);
+        table.insert_column(col_ndx, to_core_type(property.type), property.name, is_nullable(property.type));
         if (property.requires_index())
             add_index(table, col_ndx);
     }
@@ -137,8 +153,8 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     TableRef table;
 #if REALM_HAVE_SYNC_STABLE_IDS
     if (auto* pk_property = object_schema.primary_key_property()) {
-        table = sync::create_table_with_primary_key(group, name, DataType(pk_property->type),
-                                                    pk_property->name, pk_property->is_nullable);
+        table = sync::create_table_with_primary_key(group, name, to_core_type(pk_property->type),
+                                                    pk_property->name, is_nullable(pk_property->type));
     }
     else {
         table = sync::create_table(group, name);
@@ -177,7 +193,7 @@ void copy_property_values(Property const& prop, Table& table)
         }
     };
 
-    switch (prop.type) {
+    switch (prop.type & ~PropertyType::Flags) {
         case PropertyType::Int:
             copy_property_values(&Table::get_int, &Table::set_int);
             break;
@@ -206,7 +222,7 @@ void copy_property_values(Property const& prop, Table& table)
 
 void make_property_optional(Group& group, Table& table, Property property)
 {
-    property.is_nullable = true;
+    property.type |= PropertyType::Nullable;
     insert_column(group, table, property, property.table_column);
     copy_property_values(property, table);
     table.remove_column(property.table_column + 1);
@@ -214,7 +230,7 @@ void make_property_optional(Group& group, Table& table, Property property)
 
 void make_property_required(Group& group, Table& table, Property property)
 {
-    property.is_nullable = false;
+    property.type &= ~PropertyType::Nullable;
     insert_column(group, table, property, property.table_column);
     table.remove_column(property.table_column + 1);
 }
@@ -824,7 +840,7 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
                                             object_type, old_name, new_name, old_property->type_string(), new_property->type_string()));
     }
 
-    if (old_property->is_nullable && !new_property->is_nullable) {
+    if (is_nullable(old_property->type) && !is_nullable(new_property->type)) {
         throw std::logic_error(util::format("Cannot rename property '%1.%2' to '%3' because it would change from optional to required.",
                                             object_type, old_name, new_name));
     }
@@ -842,7 +858,7 @@ void ObjectStore::rename_property(Group& group, Schema& target_schema, StringDat
     }
 
     // update nullability for column
-    if (new_property->is_nullable && !old_property->is_nullable) {
+    if (is_nullable(new_property->type) && !is_nullable(old_property->type)) {
         auto prop = *new_property;
         prop.table_column = old_property->table_column;
         make_property_optional(group, *table, prop);

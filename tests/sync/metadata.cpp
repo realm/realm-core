@@ -35,25 +35,6 @@ using SyncAction = SyncFileActionMetadata::Action;
 static const std::string base_path = tmp_dir() + "/realm_objectstore_sync_metadata/";
 static const std::string metadata_path = base_path + "/metadata.realm";
 
-namespace {
-
-Property make_nullable_string_property(const char* name)
-{
-    Property p = {name, PropertyType::String};
-    p.is_nullable = true;
-    return p;
-}
-
-Property make_primary_key_property(const char* name)
-{
-    Property p = {name, PropertyType::String};
-    p.is_indexed = true;
-    p.is_primary = true;
-    return p;
-}
-
-}
-
 TEST_CASE("sync_metadata: migration", "[sync]") {
     reset_test_directory(base_path);
     const std::string identity_1 = "id_1";
@@ -64,15 +45,15 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
 
     const Schema v0_schema{
         {"UserMetadata", {
-            make_primary_key_property("identity"),
+            {"identity", PropertyType::String, Property::IsPrimary{true}},
             {"marked_for_removal", PropertyType::Bool},
-            make_nullable_string_property("auth_server_url"),
-            make_nullable_string_property("user_token"),
+            {"auth_server_url", PropertyType::String|PropertyType::Nullable},
+            {"user_token", PropertyType::String|PropertyType::Nullable},
         }},
         {"FileActionMetadata", {
-            make_primary_key_property("original_name"),
+            {"original_name", PropertyType::String, Property::IsPrimary{true}},
             {"action", PropertyType::Int},
-            make_nullable_string_property("new_name"),
+            {"new_name", PropertyType::String|PropertyType::Nullable},
             {"url", PropertyType::String},
             {"identity", PropertyType::String},
         }},
@@ -80,16 +61,16 @@ TEST_CASE("sync_metadata: migration", "[sync]") {
 
     const Schema v1_schema{
         {"UserMetadata", {
-            make_primary_key_property("identity"),
+            {"identity", PropertyType::String, Property::IsPrimary{true}},
             {"marked_for_removal", PropertyType::Bool},
-            make_nullable_string_property("auth_server_url"),
-            make_nullable_string_property("user_token"),
+            {"auth_server_url", PropertyType::String|PropertyType::Nullable},
+            {"user_token", PropertyType::String|PropertyType::Nullable},
             {"user_is_admin", PropertyType::Bool},
         }},
         {"FileActionMetadata", {
-            make_primary_key_property("original_name"),
+            {"original_name", PropertyType::String, Property::IsPrimary{true}},
             {"action", PropertyType::Int},
-            make_nullable_string_property("new_name"),
+            {"new_name", PropertyType::String|PropertyType::Nullable},
             {"url", PropertyType::String},
             {"identity", PropertyType::String},
         }},

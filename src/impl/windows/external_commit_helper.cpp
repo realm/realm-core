@@ -72,7 +72,7 @@ void ExternalCommitHelper::listen()
     while (true) {
         DWORD wait_result = WaitForMultipleObjectsEx(handles.size(), handles.data(), false, INFINITE, false);
         switch (wait_result) {
-        case WAIT_OBJECT_0: // event signaled 
+        case WAIT_OBJECT_0: // event signaled
             m_parent.on_change();
             continue;
         case WAIT_OBJECT_0 + 1: // mutex released

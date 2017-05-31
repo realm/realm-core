@@ -33,7 +33,7 @@ extern void (*s_release_eventloop)(GenericEventLoop);
 template<typename Callback>
 class EventLoopSignal {
 public:
-    EventLoopSignal(Callback&& callback) 
+    EventLoopSignal(Callback&& callback)
     : m_callback(std::move(callback))
     , m_eventloop(s_get_eventloop())
     { }
@@ -41,7 +41,7 @@ public:
     void notify() {
         s_post_on_eventloop(m_eventloop, &on_post, this);
     }
-    
+
     ~EventLoopSignal() {
         s_release_eventloop(m_eventloop);
     }
@@ -49,7 +49,7 @@ private:
     static void on_post(const void* user_data) {
         reinterpret_cast<const EventLoopSignal<Callback>*>(user_data)->m_callback();
     }
-    
+
     const Callback m_callback;
     const GenericEventLoop m_eventloop;
 };

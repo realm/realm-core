@@ -180,7 +180,7 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
             if (!util::File::exists(original_name)) {
                 // The Realm file doesn't exist anymore.
                 return true;
-            } 
+            }
             if (new_name && !util::File::exists(*new_name) && m_file_manager->copy_realm_file(original_name, *new_name)) {
                 // We successfully copied the Realm file to the recovery directory.
                 m_file_manager->remove_realm(original_name);
@@ -385,7 +385,7 @@ std::vector<std::shared_ptr<SyncUser>> SyncManager::all_logged_in_users() const
 std::shared_ptr<SyncUser> SyncManager::get_current_user() const
 {
     std::lock_guard<std::mutex> lock(m_user_mutex);
-    
+
     auto is_active_user = [](auto& el) { return el.second->state() == SyncUser::State::Active; };
     auto it = std::find_if(m_users.begin(), m_users.end(), is_active_user);
     if (it == m_users.end())
@@ -424,7 +424,7 @@ std::string SyncManager::recovery_directory_path() const
 {
     std::lock_guard<std::mutex> lock(m_file_system_mutex);
     REALM_ASSERT(m_file_manager);
-    return m_file_manager->recovery_directory_path();        
+    return m_file_manager->recovery_directory_path();
 }
 
 std::shared_ptr<SyncSession> SyncManager::get_existing_active_session(const std::string& path) const

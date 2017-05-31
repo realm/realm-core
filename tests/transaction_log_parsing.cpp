@@ -135,7 +135,7 @@ TEST_CASE("Transaction log parsing: schema change validation") {
     r->update_schema({
         {"table", {
             {"unindexed", PropertyType::Int},
-            {"indexed", PropertyType::Int, "", "", false, true}
+            {"indexed", PropertyType::Int, Property::IsPrimary{false}, Property::IsIndexed{true}}
         }},
     });
     r->read_group();
@@ -384,7 +384,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         auto r = Realm::get_shared_realm(config);
         r->update_schema({
             {"table", {
-                {"pk", PropertyType::Int, "", "", true, true},
+                {"pk", PropertyType::Int, Property::IsPrimary{true}},
                 {"value", PropertyType::Int}
             }},
         });
@@ -608,7 +608,7 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         auto r = Realm::get_shared_realm(config);
         r->update_schema({
             {"origin", {
-                {"array", PropertyType::Array, "target"}
+                {"array", PropertyType::Array|PropertyType::Object, "target"}
             }},
             {"target", {
                 {"value", PropertyType::Int}
@@ -1256,17 +1256,17 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
         auto realm = Realm::get_shared_realm(config);
         realm->update_schema({
             {"origin", {
-                {"pk", PropertyType::Int, "", "", true, true},
-                {"link", PropertyType::Object, "target", "", false, false, true},
-                {"array", PropertyType::Array, "target"}
+                {"pk", PropertyType::Int, Property::IsPrimary{true}},
+                {"link", PropertyType::Object|PropertyType::Nullable, "target"},
+                {"array", PropertyType::Array|PropertyType::Object, "target"}
             }},
             {"origin 2", {
-                {"pk", PropertyType::Int, "", "", true, true},
-                {"link", PropertyType::Object, "target", "", false, false, true},
-                {"array", PropertyType::Array, "target"}
+                {"pk", PropertyType::Int, Property::IsPrimary{true}},
+                {"link", PropertyType::Object|PropertyType::Nullable, "target"},
+                {"array", PropertyType::Array|PropertyType::Object, "target"}
             }},
             {"target", {
-                {"pk", PropertyType::Int, "", "", true, true},
+                {"pk", PropertyType::Int, Property::IsPrimary{true}},
                 {"value 1", PropertyType::Int},
                 {"value 2", PropertyType::Int},
             }},
@@ -1987,9 +1987,9 @@ TEST_CASE("DeepChangeChecker") {
     r->update_schema({
         {"table", {
             {"int", PropertyType::Int},
-            {"link1", PropertyType::Object, "table", "", false, false, true},
-            {"link2", PropertyType::Object, "table", "", false, false, true},
-            {"array", PropertyType::Array, "table"}
+            {"link1", PropertyType::Object|PropertyType::Nullable, "table"},
+            {"link2", PropertyType::Object|PropertyType::Nullable, "table"},
+            {"array", PropertyType::Array|PropertyType::Object, "table"}
         }},
     });
     auto table = r->read_group().get_table("class_table");

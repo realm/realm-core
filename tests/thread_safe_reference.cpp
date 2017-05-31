@@ -49,11 +49,6 @@ static List get_list(Object&& object, size_t column_ndx) {
     return List(object.realm(), object.row().get_linklist(column_ndx));
 }
 
-static Property nullable(Property p) {
-    p.is_nullable = true;
-    return p;
-}
-
 TEST_CASE("thread safe reference") {
     InMemoryTestFile config;
     config.cache = false;
@@ -65,13 +60,13 @@ TEST_CASE("thread safe reference") {
         {"ignore_me", PropertyType::Int}, // Used in tests cases that don't care about the value.
     }});
     static const ObjectSchema string_object({"string_object", {
-        nullable({"value", PropertyType::String}),
+        {"value", PropertyType::String|PropertyType::Nullable},
     }});
     static const ObjectSchema int_object({"int_object", {
         {"value", PropertyType::Int},
     }});
     static const ObjectSchema int_array_object({"int_array_object", {
-        {"value", PropertyType::Array, "int_object"}
+        {"value", PropertyType::Array|PropertyType::Object, "int_object"}
     }});
     r->update_schema({foo_object, string_object, int_object, int_array_object});
 

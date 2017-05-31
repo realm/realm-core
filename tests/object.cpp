@@ -47,7 +47,6 @@ struct TestContext : CppContext {
     std::map<std::string, AnyDict> defaults;
 
     using CppContext::CppContext;
-
     TestContext(TestContext& parent, realm::Property const& prop)
     : CppContext(parent, prop)
     , defaults(parent.defaults)
@@ -84,7 +83,7 @@ TEST_CASE("object") {
             {"value 2", PropertyType::Int},
         }},
         {"all types", {
-            {"pk", PropertyType::Int, "", "", true},
+            {"pk", PropertyType::Int, Property::IsPrimary{true}},
             {"bool", PropertyType::Bool},
             {"int", PropertyType::Int},
             {"float", PropertyType::Float},
@@ -92,8 +91,8 @@ TEST_CASE("object") {
             {"string", PropertyType::String},
             {"data", PropertyType::Data},
             {"date", PropertyType::Date},
-            {"object", PropertyType::Object, "link target", "", false, false, true},
-            {"array", PropertyType::Array, "array target"},
+            {"object", PropertyType::Object|PropertyType::Nullable, "link target"},
+            {"array", PropertyType::Object|PropertyType::Array, "array target"},
         }},
         {"link target", {
             {"value", PropertyType::Int},
@@ -104,17 +103,17 @@ TEST_CASE("object") {
             {"value", PropertyType::Int},
         }},
         {"pk after list", {
-            {"array 1", PropertyType::Array, "array target"},
+            {"array 1", PropertyType::Array|PropertyType::Object, "array target"},
             {"int 1", PropertyType::Int},
-            {"pk", PropertyType::Int, "", "", true},
+            {"pk", PropertyType::Int, Property::IsPrimary{true}},
             {"int 2", PropertyType::Int},
-            {"array 2", PropertyType::Array, "array target"},
+            {"array 2", PropertyType::Array|PropertyType::Object, "array target"},
         }},
         {"nullable int pk", {
-            {"pk", PropertyType::Int, "", "", true, true, true},
+            {"pk", PropertyType::Int|PropertyType::Nullable, Property::IsPrimary{true}},
         }},
         {"nullable string pk", {
-            {"pk", PropertyType::String, "", "", true, true, true},
+            {"pk", PropertyType::String|PropertyType::Nullable, Property::IsPrimary{true}},
         }},
     };
     config.schema_version = 0;

@@ -57,7 +57,7 @@ struct Predicate
         EndsWith,
         Contains
     };
-    
+
     enum class OperatorOption
     {
         None,

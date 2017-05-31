@@ -113,8 +113,8 @@ public:
     std::string original_name() const;
 
     // The meaning of this parameter depends on the `Action` specified.
-    // For `BackUpThenDeleteRealm`, it is the absolute path where the backup copy 
-    // of the Realm file found at `original_name()` will be placed. 
+    // For `BackUpThenDeleteRealm`, it is the absolute path where the backup copy
+    // of the Realm file found at `original_name()` will be placed.
     // For all other `Action`s, it is ignored.
     util::Optional<std::string> new_name() const;
 
@@ -195,7 +195,7 @@ public:
                                                      const std::string& local_uuid,
                                                      SyncFileActionMetadata::Action action,
                                                      util::Optional<std::string> new_name=none) const;
-    
+
     /// Construct the metadata manager.
     ///
     /// If the platform supports it, setting `should_encrypt` to `true` and not specifying an encryption key will make
