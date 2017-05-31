@@ -24,6 +24,7 @@
 #include <tuple>
 #include <iostream>
 #include <fstream>
+#include <thread>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
@@ -169,7 +170,7 @@ void writer(std::string path, int id)
             if (i & 1) {
                 t1->add_int(0, id, 1);
             }
-            sched_yield(); // increase chance of signal arriving in the middle of a transaction
+            std::this_thread::yield(); // increase chance of signal arriving in the middle of a transaction
             wt.commit();
         }
         // std::cerr << "Ended pid " << getpid() << std::endl;
@@ -313,7 +314,7 @@ TEST(Shared_CompactingOnTheFly)
             // make sure writer has started:
             bool waiting = true;
             while (waiting) {
-                sched_yield();
+                std::this_thread::yield();
                 ReadTransaction rt(sg);
                 auto t1 = rt.get_table("test");
                 waiting = t1->get_int(0, 41) == 0;

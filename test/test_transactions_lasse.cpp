@@ -21,10 +21,10 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <thread>
 
 #ifdef _WIN32
 #include <windows.h> // Sleep(), sched_yield()
-#include <pthread.h> // pthread_win32_process_attach_np()
 #else
 #include <sched.h>  // sched_yield()
 #include <unistd.h> // usleep()
@@ -98,7 +98,7 @@ REALM_FORCEINLINE void rand_sleep(Random& random)
     }
     else if (r <= 252) {
         // Release current time slice but get next available
-        sched_yield();
+        std::this_thread::yield();
     }
     else if (r <= 254) {
 // Release current time slice and get time slice according to normal scheduling
@@ -187,10 +187,6 @@ TEST_IF(Transactions_Stress1, TEST_DURATION >= 3)
         table->set_int(0, 0, 0);
         wt.commit();
     }
-
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-    pthread_win32_process_attach_np();
-#endif
 
     for (int i = 0; i < READERS1; ++i)
         read_threads[i].start([&] { read_thread(test_context, path); });
@@ -360,10 +356,6 @@ TEST_IF(Transactions_Stress3, TEST_DURATION >= 3)
         wt.commit();
     }
 
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-    pthread_win32_process_attach_np();
-#endif
-
     for (int i = 0; i < WRITERS; ++i)
         write_threads[i].start(write_thread);
 
@@ -448,10 +440,6 @@ TEST_IF(Transactions_Stress4, TEST_DURATION >= 3)
         table->set_int(0, 0, 0);
         wt.commit();
     }
-
-#if defined(_WIN32) || defined(__WIN32__) || defined(_WIN64)
-    pthread_win32_process_attach_np();
-#endif
 
     for (int i = 0; i < READERS; ++i)
         read_threads[i].start(read_thread);
