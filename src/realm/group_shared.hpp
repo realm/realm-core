@@ -19,10 +19,6 @@
 #ifndef REALM_GROUP_SHARED_HPP
 #define REALM_GROUP_SHARED_HPP
 
-#ifdef REALM_DEBUG
-#include <ctime> // usleep()
-#endif
-
 #include <functional>
 #include <limits>
 #include <realm/util/features.h>
