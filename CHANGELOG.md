@@ -2,7 +2,10 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Now rejecting a Realm file specifying a history schema version that is newer
+  than the one expected by the code.
+* No longer triggering a history schema upgrade when opening an empty Realm file
+  (when `top_ref` is zero).
 
 ### Breaking changes
 
