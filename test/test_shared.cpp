@@ -114,7 +114,7 @@ namespace {
         DWORD ret = GetModuleFileNameA(NULL, buf, sizeof(buf));
         myfile << "\"" << buf << "\"\n";
         myfile.close();
-        int nRet = (int)ShellExecuteA(0, "open", "winfork.bat", 0, 0, SW_SHOWNORMAL);
+        int64_t nRet = (int64_t)ShellExecuteA(0, "open", "winfork.bat", 0, 0, SW_SHOWNORMAL);
         if (nRet <= 32) {
             return -1;
         }
