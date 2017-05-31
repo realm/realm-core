@@ -143,6 +143,7 @@
     <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|Win32'" Label="Configuration">
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
@@ -153,6 +154,7 @@
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|Win32'" Label="Configuration">
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
@@ -275,6 +277,7 @@
     <PlatformToolset>v141</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|x64'" Label="Configuration">
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
@@ -285,6 +288,7 @@
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Debug static lib|ARM'" Label="Configuration">
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
@@ -295,6 +299,7 @@
     <WindowsAppContainer>true</WindowsAppContainer>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|x64'" Label="Configuration">
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
@@ -308,6 +313,7 @@
     <Optimization>MaxSpeed</Optimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='UWP Release static lib|ARM'" Label="Configuration">
+    <DefaultLanguage>en-US</DefaultLanguage>
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v141</PlatformToolset>
     <AppContainerApplication>true</AppContainerApplication>
