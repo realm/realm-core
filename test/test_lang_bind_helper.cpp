@@ -16,8 +16,6 @@
  *
  **************************************************************************/
 
-// All unit tests here suddenly broke on Windows, maybe after encryption was added
-
 #include <map>
 #include <sstream>
 #include <mutex>

@@ -9,8 +9,7 @@
 * Lorem ipsum.
 
 ### Enhancements
-
-* Lorem ipsum.
+* Support for encryption on Windows (win32 + UWP) (https://github.com/realm/realm-core/pull/2433)
 
 -----------
 

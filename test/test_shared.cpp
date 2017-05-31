@@ -327,6 +327,38 @@ TEST(Shared_CompactingOnTheFly)
     }
 }
 
+TEST(Shared_EncryptedRemap)
+{
+    // Attempts to trigger code coverage in util::mremap() for the case where the file is encrypted.
+    // This requires a database size which is non-divisible by page_size() *and* is bigger than
+    // current allocated section. Following row count and payload seems to work on both Windows+Linux
+    const size_t rows = 12;
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+        // Create table entries
+
+        WriteTransaction wt(sg);
+        auto t1 = wt.add_table("test");
+        test_table_add_columns(t1);
+        std::string str(100000, 'a');
+        for (size_t i = 0; i < rows; ++i) {
+            add(t1, 0, i, false, str.c_str());
+        }
+        wt.commit();
+    }
+
+    SharedGroup sg2(path, true, SharedGroupOptions(crypt_key()));
+
+    CHECK_EQUAL(true, sg2.compact());
+    ReadTransaction rt2(sg2);
+    auto table = rt2.get_table("test");
+    CHECK(table);
+    CHECK_EQUAL(table->size(), rows);
+    rt2.get_group().verify();    
+}
+
+
 
 TEST(Shared_Initial)
 {
