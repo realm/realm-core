@@ -93,6 +93,12 @@ const char* LogicError::what() const noexcept
             return "Search index on a subtable of a subtable is not yet supported";
         case unsupported_order_on_distinct:
             return "Specifing order on a distinct descriptor is meaningless";
+        case descriptor_out_of_range:
+            return "Distinct or sort descriptor out of range";
+        case empty_descriptor:
+            return "Sort and distinct descriptors should not be empty";
+        case descriptor_on_degenerate_table:
+            return "Cannot sort or distinct on a degenerate table";
     }
     return "Unknown error";
 }

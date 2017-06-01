@@ -214,7 +214,16 @@ public:
         subtable_of_subtable_index,
 
         /// A distinct ordering was defined but should not be.
-        unsupported_order_on_distinct
+        unsupported_order_on_distinct,
+
+        /// An out of bounds access to a distinct or sort descriptor
+        descriptor_out_of_range,
+
+        /// Sort and distinct descriptors shouldn't be empty
+        empty_descriptor,
+
+        /// Cannot sort or distinct on a degenerate table
+        descriptor_on_degenerate_table
     };
 
     LogicError(ErrorKind message);

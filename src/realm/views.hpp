@@ -61,15 +61,13 @@ public:
     {
         return std::any_of(m_ascending.begin(), m_ascending.end(), [](bool b) { return !b; });
     }
-
-    // handover support
-    using HandoverPatch = std::unique_ptr<SortDescriptorHandoverPatch>;
-    static void generate_patch(SortDescriptor const&, HandoverPatch&);
-    static SortDescriptor create_from_and_consume_patch(HandoverPatch&, Table const&);
-
+    void merge_with(SortDescriptor&& other);
     class Sorter;
     Sorter sorter(IntegerColumn const& row_indexes) const;
 
+    // handover support
+    std::vector<std::vector<size_t>> export_column_indices() const;
+    std::vector<bool> export_order() const;
 private:
     std::vector<std::vector<const ColumnBase*>> m_columns;
     std::vector<bool> m_ascending;
@@ -77,6 +75,32 @@ private:
 
 // Distinct uses the same syntax as sort except that the order is meaningless.
 typedef SortDescriptor DistinctDescriptor;
+
+class DescriptorOrdering {
+public:
+    DescriptorOrdering() = default;
+    DescriptorOrdering(DescriptorOrdering const&) = default;
+    DescriptorOrdering(DescriptorOrdering&&) = default;
+    DescriptorOrdering& operator=(DescriptorOrdering const&) = default;
+    DescriptorOrdering& operator=(DescriptorOrdering&&) = default;
+
+    void emplace_sort(SortDescriptor&& sort);
+    void emplace_distinct(DistinctDescriptor&& distinct);
+    bool descriptor_is_sort(size_t index) const;
+    bool descriptor_is_distinct(size_t index) const;
+    bool is_empty() const { return m_descriptors.empty(); }
+    size_t size() const { return m_descriptors.size(); }
+    const SortDescriptor& operator[](size_t ndx) const;
+    bool will_apply_sort() const;
+
+    // handover support
+    using HandoverPatch = std::unique_ptr<DescriptorOrderingHandoverPatch>;
+    static void generate_patch(DescriptorOrdering const&, HandoverPatch&);
+    static DescriptorOrdering create_from_and_consume_patch(HandoverPatch&, Table const&);
+
+private:
+    std::vector<SortDescriptor> m_descriptors;
+};
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only
 // supports sorting and distinct.
@@ -121,7 +145,7 @@ public:
     IntegerColumn m_row_indexes;
 
 protected:
-    void do_sort(const SortDescriptor& sorting_predicate, const SortDescriptor& distinct_columns, bool sort_before_distinct);
+    void do_sort(const DescriptorOrdering& ordering);
 
     static const uint64_t cookie_expected = 0x7765697677777777ull; // 0x77656976 = 'view'; 0x77777777 = '7777' = alive
     uint64_t m_debug_cookie;

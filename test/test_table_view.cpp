@@ -1881,8 +1881,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     // distinct() will preserve the original order of the row pointers, also if the order is a result of sort()
     // If multiple rows are identical for the given set of distinct-columns, then only the first is kept.
     // You can call sync_if_needed() to update the distinct view, just like you can for a sorted view.
-    // Each time you call distinct() it will first fetch the full original TableView contents and then apply
-    // distinct() on that. So it distinct() does not filter the result of the previous distinct().
+    // Each time you call distinct() it will compound on the previous call.
+    // Results of distinct are affected by a previously applied sort order.
 
     // distinct() is internally based on the existing sort() method which is well tested. Hence it's not required
     // to test distinct() with all possible Realm data types.
@@ -2023,18 +2023,6 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
     CHECK_EQUAL(h.get_string(tv, 0, 1), "");
     CHECK(h.get_string(tv, 0, 2).is_null());
-
-    // Remove distinct property by providing empty column list. Now TableView should look like it
-    // did just after our last tv.sort(0, false) above, but after having executed table.remove(6)
-    tv.distinct(SortDescriptor{});
-    // "foo", "foo", "", "", null, null
-    CHECK_EQUAL(tv.size(), 6);
-    CHECK_EQUAL(h.get_string(tv, 0, 0), "foo");
-    CHECK_EQUAL(h.get_string(tv, 0, 1), "foo");
-    CHECK_EQUAL(h.get_string(tv, 0, 2), "");
-    CHECK_EQUAL(h.get_string(tv, 0, 3), "");
-    CHECK(h.get_string(tv, 0, 4).is_null());
-    CHECK(h.get_string(tv, 0, 5).is_null());
 }
 
 TEST(TableView_DistinctOverNullLink)
