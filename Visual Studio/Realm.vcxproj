@@ -788,7 +788,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <CompileAs>CompileAsCpp</CompileAs>
-      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions) /bigobj</AdditionalOptions>
+      <AdditionalOptions>/DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions) /bigobj /DREALM_ENABLE_ENCRYPTION</AdditionalOptions>
       <CompileAsManaged>false</CompileAsManaged>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
@@ -1097,6 +1097,7 @@
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <CompileAsWinRT>false</CompileAsWinRT>
       <Optimization>MaxSpeed</Optimization>
+      <CompileAsManaged>false</CompileAsManaged>
     </ClCompile>
     <Link>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
@@ -1242,7 +1243,7 @@
       <WarningLevel>Level3</WarningLevel>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <DisableSpecificWarnings>4355;4996</DisableSpecificWarnings>
-      <AdditionalOptions>/DNOMINMAX /DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions) /D__STDC_LIMIT_MACROS  /bigobj</AdditionalOptions>
+      <AdditionalOptions>/DNOMINMAX /DPTW32_STATIC_LIB /DREALM_ENABLE_REPLICATION %(AdditionalOptions) /D__STDC_LIMIT_MACROS  /bigobj /DREALM_ENABLE_ENCRYPTION=1</AdditionalOptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
