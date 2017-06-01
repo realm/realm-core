@@ -668,6 +668,7 @@ NONCONCURRENT_TEST(TableView_StringSort)
 
     // Should be exactly the same as above because 0 was default already
     set_string_compare_method(STRING_COMPARE_CORE, nullptr);
+    v = table.where().find_all();
     v.sort(0);
     CHECK_EQUAL("alpha", v[0].get_string(0));
     CHECK_EQUAL("ALPHA", v[1].get_string(0));
@@ -675,6 +676,7 @@ NONCONCURRENT_TEST(TableView_StringSort)
     CHECK_EQUAL("ZEBRA", v[3].get_string(0));
 
     // Test descending mode
+    v = table.where().find_all();
     v.sort(0, false);
     CHECK_EQUAL("alpha", v[3].get_string(0));
     CHECK_EQUAL("ALPHA", v[2].get_string(0));
@@ -691,6 +693,7 @@ NONCONCURRENT_TEST(TableView_StringSort)
 
     // Test if callback comparer works. Our callback is a primitive dummy-comparer
     set_string_compare_method(STRING_COMPARE_CALLBACK, comparer);
+    v = table.where().find_all();
     v.sort(0);
     CHECK_EQUAL("ALPHA", v[0].get_string(0));
     CHECK_EQUAL("ZEBRA", v[1].get_string(0));
@@ -704,6 +707,7 @@ NONCONCURRENT_TEST(TableView_StringSort)
     got_called = false;
     bool available = set_string_compare_method(STRING_COMPARE_CPP11, nullptr);
     if (available) {
+        v = table.where().find_all();
         v.sort(0);
         CHECK_EQUAL("alpha", v[0].get_string(0));
         CHECK_EQUAL("ALPHA", v[1].get_string(0));
@@ -1395,6 +1399,7 @@ TEST(TableView_MultiColSort)
     CHECK_EQUAL(tv.get_float(1, 2), 2.f);
 
     std::vector<bool> a_descending = {false, false};
+    tv = table.where().find_all();
     tv.sort(SortDescriptor{table, v, a_descending});
 
     CHECK_EQUAL(tv.get_float(1, 0), 2.f);
@@ -1402,6 +1407,7 @@ TEST(TableView_MultiColSort)
     CHECK_EQUAL(tv.get_float(1, 2), 0.f);
 
     std::vector<bool> a_ascdesc = {true, false};
+    tv = table.where().find_all();
     tv.sort(SortDescriptor{table, v, a_ascdesc});
 
     CHECK_EQUAL(tv.get_float(1, 0), 0.f);

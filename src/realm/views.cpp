@@ -203,8 +203,8 @@ void DescriptorOrdering::emplace_sort(SortDescriptor&& sort)
         m_descriptors.emplace_back(std::move(sort));
     }
     else if (descriptor_is_sort(orig_length - 1)) {
-        // replace the previous sort descriptor
-        m_descriptors[orig_length - 1] = std::move(sort);
+        // merge them together by appending internally
+        m_descriptors[orig_length - 1].merge_with(std::move(sort));
     }
     else { // last descriptor is distinct, just add it
         m_descriptors.emplace_back(std::move(sort));
