@@ -78,6 +78,9 @@ ObjectSchema::ObjectSchema(Group const& group, StringData name, size_t index) : 
     size_t count = table->get_column_count();
     persisted_properties.reserve(count);
     for (size_t col = 0; col < count; col++) {
+        if (table->get_column_type(col) == type_Table)
+            continue;
+
         Property property;
         property.name = table->get_column_name(col).data();
         property.type = (PropertyType)table->get_column_type(col);

@@ -559,6 +559,32 @@ TEST_CASE("migration: Automatic") {
                 ObjectStore::delete_data_for_object(realm->read_group(), "foo");
             }));
         }
+
+        SECTION("subtables columns are not modified by unrelated changes") {
+            config.in_memory = false;
+            Schema schema = {
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+            };
+
+            {
+                auto realm = Realm::get_shared_realm(config);
+                realm->update_schema(schema, 1);
+                realm->begin_transaction();
+                realm->read_group().get_table("class_object")->add_column(type_Table, "subtable");
+                realm->commit_transaction();
+            }
+            // close and reopen the Realm tu ensure it rereads the schema from
+            // the group
+
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(add_property(schema, "object", {"value 2", PropertyType::Int}), 2);
+
+            auto& table = *realm->read_group().get_table("class_object");
+            REQUIRE(table.get_column_type(1) == type_Table);
+            REQUIRE(table.get_column_count() == 3);
+        }
     }
 
     SECTION("schema correctness during migration") {
