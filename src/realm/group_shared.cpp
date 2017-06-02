@@ -1018,14 +1018,14 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                         break;
                     case Replication::hist_SyncClient:
                         good_history_type = ((stored_hist_type == Replication::hist_SyncClient) ||
-                                             (stored_hist_type == Replication::hist_None && top_ref == 0));
+                                             (top_ref == 0));
                         if (!good_history_type)
                             throw IncompatibleHistories(
                                 "Expected an empty Realm or a Realm written by Realm Mobile Platform", path);
                         break;
                     case Replication::hist_SyncServer:
                         good_history_type = ((stored_hist_type == Replication::hist_SyncServer) ||
-                                             (stored_hist_type == Replication::hist_None && top_ref == 0));
+                                             (top_ref == 0));
                         if (!good_history_type)
                             throw IncompatibleHistories("Expected a Realm containining "
                                                         "a server-side history", path);
@@ -1033,7 +1033,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                 }
 
                 REALM_ASSERT(stored_hist_schema_version <= openers_hist_schema_version);
-                if (stored_hist_schema_version < openers_hist_schema_version) {
+                if (stored_hist_schema_version > openers_hist_schema_version)
+                    throw IncompatibleHistories("Unexpected future history schema version", path);
+                bool need_hist_schema_upgrade =
+                    (stored_hist_schema_version < openers_hist_schema_version && top_ref != 0);
+                if (need_hist_schema_upgrade) {
                     Replication* repl = gf::get_replication(m_group);
                     if (!repl->is_upgradable_history_schema(stored_hist_schema_version))
                         throw IncompatibleHistories("Nonupgradable history schema", path);
