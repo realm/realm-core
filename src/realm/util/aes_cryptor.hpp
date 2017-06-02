@@ -27,16 +27,14 @@
 
 #if REALM_PLATFORM_APPLE
 #include <CommonCrypto/CommonCrypto.h>
-#elif !defined(_WIN32)
-#include <openssl/aes.h>
-#include <openssl/sha.h>
-#endif
-
-#ifdef _WIN32
+#elif defined(_WIN32)
 #include <windows.h>
 #include <stdio.h>
 #include <bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
+#else
+#include <openssl/aes.h>
+#include <openssl/sha.h>
 #endif
 
 namespace realm {
