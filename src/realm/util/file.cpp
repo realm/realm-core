@@ -876,29 +876,15 @@ void File::unlock() noexcept
 }
 
 
-void* File::map(AccessMode a, size_t size, int map_flags, size_t offset) const
+void* File::map(AccessMode a, size_t size, int /*map_flags*/, size_t offset) const
 {
-#ifdef _WIN32
     return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get());
-#else
-    // FIXME: On FreeeBSB and other systems that support it, we should
-    // honor map_NoSync by specifying MAP_NOSYNC, but how do we
-    // reliably detect these systems?
-    static_cast<void>(map_flags);
-
-    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get());
-#endif
 }
 
 #if REALM_ENABLE_ENCRYPTION
-void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int map_flags, size_t offset) const
+void* File::map(AccessMode a, size_t size, EncryptedFileMapping*& mapping, int /*map_flags*/, size_t offset) const
 {
-#ifdef _WIN32
     return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
-#else
-    static_cast<void>(map_flags);
-    return realm::util::mmap(m_fd, size, a, offset, m_encryption_key.get(), mapping);
-#endif
 }
 #endif
 
@@ -908,15 +894,10 @@ void File::unmap(void* addr, size_t size) noexcept
 }
 
 
-void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size, int map_flags,
+void* File::remap(void* old_addr, size_t old_size, AccessMode a, size_t new_size, int /*map_flags*/,
                   size_t file_offset) const
 {
-    static_cast<void>(map_flags);
-#ifdef _WIN32
     return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size, m_encryption_key.get());
-#else
-    return realm::util::mremap(m_fd, file_offset, old_addr, old_size, a, new_size, m_encryption_key.get());
-#endif
 }
 
 
