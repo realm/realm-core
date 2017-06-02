@@ -31,16 +31,16 @@
 
 #include <cstring>
 
-#ifndef _WIN32
-#include <sys/mman.h>
-#include <unistd.h>
-#include <pthread.h>
-#else
+#if defined(_WIN32)
 #include <Windows.h>
 // 224-bit AES-2 from https://github.com/kalven/sha-2 - Public Domain. Native API
 // does not exist for 224 bits (only 128, 256, etc).
 #include <win32/kalven-sha2/sha224.hpp>
 #include <bcrypt.h>
+#else
+#include <sys/mman.h>
+#include <unistd.h>
+#include <pthread.h>
 #endif
 
 #include <realm/util/encrypted_file_mapping.hpp>
