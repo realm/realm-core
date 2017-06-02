@@ -41,21 +41,26 @@ using ReconnectMode = sync::Client::ReconnectMode;
 struct SyncClient {
     sync::Client client;
 
-    SyncClient(std::unique_ptr<util::Logger> logger,
-               ReconnectMode reconnect_mode = ReconnectMode::normal)
-    : client(make_client(*logger, reconnect_mode)) // Throws
-    , m_logger(std::move(logger))
-    , m_thread([this] {
-        if (g_binding_callback_thread_observer)
-            g_binding_callback_thread_observer->did_create_thread();
-
-        auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
-            if (g_binding_callback_thread_observer)
-                g_binding_callback_thread_observer->will_destroy_thread();
-        });
-
-        client.run(); // Throws
-    }) // Throws
+    SyncClient(std::unique_ptr<util::Logger> logger, ReconnectMode reconnect_mode = ReconnectMode::normal)
+        : client(make_client(*logger, reconnect_mode)) // Throws
+        , m_logger(std::move(logger))
+        , m_thread([this] {
+            if (g_binding_callback_thread_observer) {
+                g_binding_callback_thread_observer->did_create_thread();
+                auto will_destroy_thread = util::make_scope_exit([&]() noexcept {
+                    g_binding_callback_thread_observer->will_destroy_thread();
+                });
+                try {
+                    client.run(); // Throws
+                }
+                catch (std::exception const& e) {
+                    g_binding_callback_thread_observer->handle_error(e);
+                }
+            }
+            else {
+                client.run(); // Throws
+            }
+        }) // Throws
 #if NETWORK_REACHABILITY_AVAILABLE
     , m_reachability_observer(none, [=](const NetworkReachabilityStatus status) {
         if (status != NotReachable)
