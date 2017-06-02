@@ -572,6 +572,15 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
     // eternal constancy of this part of the layout is what ensures that a
     // joining session participant can reliably verify that the actual format is
     // as expected.
+    //
+    // offsetof() is undefined for non-pod types but often behaves correct. 
+    // Since we just use it in static_assert(), a bug is caught at compile time
+    // which isn't critical. FIXME: See if there is a way to fix this, but it
+    // might not be trivial since it contains RobustMutex members and others
+#ifndef _WIN32
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
     static_assert(offsetof(SharedInfo, init_complete) == 0 &&
                   std::is_same<decltype(init_complete), uint8_t>::value &&
                   offsetof(SharedInfo, shared_info_version) == 6 &&
@@ -617,6 +626,9 @@ SharedGroup::SharedInfo::SharedInfo(Durability dura, Replication::HistoryType ht
                   offsetof(SharedInfo, shared_writemutex) == 48 &&
                   std::is_same<decltype(shared_writemutex), InterprocessMutex::SharedPart>::value,
                   "Caught layout change requiring SharedInfo file format bumping");
+#ifndef _WIN32
+#pragma GCC diagnostic pop
+#endif
 }
 
 
@@ -774,6 +786,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         opener_is_sync_agent = repl->is_sync_agent();
     }
 
+    int current_file_format_version;
     int target_file_format_version;
     int stored_hist_schema_version;
 
@@ -863,8 +876,20 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
         m_file_map.map(m_file, File::access_ReadWrite, info_size, File::map_NoSync);
         File::UnmapGuard fug_1(m_file_map);
         SharedInfo* info = m_file_map.get_addr();
+
+        // offsetof() is undefined for non-pod types but often behaves correct. 
+        // Since we just use it in static_assert(), a bug is caught at compile time
+        // which isn't critical. FIXME: See if there is a way to fix this, but it
+        // might not be trivial since it contains RobustMutex members and others
+#ifndef _WIN32
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winvalid-offsetof"
+#endif
         static_assert(offsetof(SharedInfo, init_complete) + sizeof SharedInfo::init_complete <= 1,
                       "Unexpected position or size of SharedInfo::init_complete");
+#ifndef _WIN32
+#pragma GCC diagnostic pop
+#endif
         if (info->init_complete == 0)
             continue;
         REALM_ASSERT(info->init_complete == 1);
@@ -988,7 +1013,31 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             // Determine target file format version for session (upgrade
             // required if greater than file format version of attached file).
             using gf = _impl::GroupFriend;
-            int current_file_format_version = gf::get_file_format_version(m_group);
+            current_file_format_version = alloc.get_committed_file_format_version();
+
+            bool file_format_ok = false;
+            // In shared mode (Realm file opened via a SharedGroup instance) this
+            // version of the core library is able to open Realms using file format
+            // versions from 2 to 8. Please see Group::get_file_format_version() for
+            // information about the individual file format versions.
+            switch (current_file_format_version) {
+                case 0:
+                    file_format_ok = (top_ref == 0);
+                    break;
+                case 2:
+                case 3:
+                case 4:
+                case 5:
+                case 6:
+                case 7:
+                case 8:
+                    file_format_ok = true;
+                    break;
+            }
+
+            if (REALM_UNLIKELY(!file_format_ok))
+                throw InvalidDatabase("Unsupported Realm file format version", path);
+
             target_file_format_version =
                 gf::get_target_file_format_version_for_session(current_file_format_version,
                                                                openers_hist_type);
@@ -1027,8 +1076,9 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                         good_history_type = ((stored_hist_type == Replication::hist_SyncServer) ||
                                              (top_ref == 0));
                         if (!good_history_type)
-                            throw IncompatibleHistories("Expected a Realm containining "
-                                                        "a server-side history", path);
+                            throw IncompatibleHistories("Expected a Realm containing "
+                                                        "a server-side history",
+                                                        path);
                         break;
                 }
 
@@ -1197,7 +1247,6 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     // Upgrade file format and/or history schema
     try {
         using gf = _impl::GroupFriend;
-        int current_file_format_version = gf::get_file_format_version(m_group);
         if (current_file_format_version == 0) {
             // If the current file format is still undecided, no upgrade is
             // necessary, but we still need to make the chosen file format
@@ -1210,6 +1259,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
             gf::set_file_format_version(m_group, target_file_format_version);
         }
         else {
+            gf::set_file_format_version(m_group, current_file_format_version);
             upgrade_file_format(options.allow_file_format_upgrade, target_file_format_version,
                                 stored_hist_schema_version, openers_hist_schema_version); // Throws
         }
