@@ -363,7 +363,7 @@ TEST(Shared_EncryptedRemap)
     // Attempts to trigger code coverage in util::mremap() for the case where the file is encrypted.
     // This requires a database size which is non-divisible by page_size() *and* is bigger than
     // current allocated section. Following row count and payload seems to work on both Windows+Linux
-    const size_t rows = 12;
+    const int64_t rows = 12;
     SHARED_GROUP_TEST_PATH(path);
     {
         SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
@@ -373,7 +373,7 @@ TEST(Shared_EncryptedRemap)
         auto t1 = wt.add_table("test");
         test_table_add_columns(t1);
         std::string str(100000, 'a');
-        for (size_t i = 0; i < rows; ++i) {
+        for (int64_t i = 0; i < rows; ++i) {
             add(t1, 0, i, false, str.c_str());
         }
         wt.commit();
