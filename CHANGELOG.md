@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 2.8.2 Release notes
 
 ### Bugfixes
 
@@ -8,20 +8,6 @@
 * No longer triggering a history schema upgrade when opening an empty Realm file
   (when `top_ref` is zero).
   PR [#2642](https://github.com/realm/realm-core/pull/2642).
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* Lorem ipsum.
 
 ----------------------------------------------
 
