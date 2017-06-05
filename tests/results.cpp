@@ -2095,7 +2095,8 @@ TEST_CASE("distinct") {
         {"object", {
             {"num1", PropertyType::Int},
             {"string", PropertyType::String},
-            {"num2", PropertyType::Int}
+            {"num2", PropertyType::Int},
+            {"num3", PropertyType::Int}
         }},
     });
 
@@ -2107,18 +2108,19 @@ TEST_CASE("distinct") {
         table->set_int(0, i, i % 3);
         table->set_string(1, i, util::format("Foo_%1", i % 3).c_str());
         table->set_int(2, i, N - i);
+        table->set_int(3, i, i % 2);
     }
     // table:
-    //   0, Foo_0, 10
-    //   1, Foo_1,  9
-    //   2, Foo_2,  8
-    //   0, Foo_0,  7
-    //   1, Foo_1,  6
-    //   2, Foo_2,  5
-    //   0, Foo_0,  4
-    //   1, Foo_1,  3
-    //   2, Foo_2,  2
-    //   0, Foo_0,  1
+    //   0, Foo_0, 10,  0
+    //   1, Foo_1,  9,  1
+    //   2, Foo_2,  8,  0
+    //   0, Foo_0,  7,  1
+    //   1, Foo_1,  6,  0
+    //   2, Foo_2,  5,  1
+    //   0, Foo_0,  4,  0
+    //   1, Foo_1,  3,  1
+    //   2, Foo_2,  2,  0
+    //   0, Foo_0,  1,  1
 
     r->commit_transaction();
     Results results(r, table->where());
@@ -2165,7 +2167,7 @@ TEST_CASE("distinct") {
         }
     }
 
-    // This section and next section demonstrate that sort().distinct() == distinct().sort()
+    // This section and next section demonstrate that sort().distinct() != distinct().sort()
     SECTION("Order after sort and distinct") {
         Results reverse = results.sort(SortDescriptor(results.get_tableview().get_parent(), {{2}}, {true}));
         // reverse:
@@ -2175,16 +2177,16 @@ TEST_CASE("distinct") {
         REQUIRE(reverse.first()->get_int(2) == 1);
         REQUIRE(reverse.last()->get_int(2) == 10);
 
-        // distinct() will first be applied to the table, and then sorting is reapplied
+        // distinct() will be applied to the table, after sorting
         Results unique = reverse.distinct(SortDescriptor(reverse.get_tableview().get_parent(), {{0}}));
         // unique:
-        //  2, Foo_2,  8
-        //  1, Foo_1,  9
-        //  0, Foo_0, 10
+        //  0, Foo_0,  1
+        //  2, Foo_2,  2
+        //  1, Foo_1,  3
         REQUIRE(unique.size() == 3);
-        REQUIRE(unique.get(0).get_int(2) == 8);
-        REQUIRE(unique.get(1).get_int(2) == 9);
-        REQUIRE(unique.get(2).get_int(2) == 10);
+        REQUIRE(unique.get(0).get_int(2) == 1);
+        REQUIRE(unique.get(1).get_int(2) == 2);
+        REQUIRE(unique.get(2).get_int(2) == 3);
     }
 
     SECTION("Order after distinct and sort") {
@@ -2213,9 +2215,9 @@ TEST_CASE("distinct") {
         Results first = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
         REQUIRE(first.size() == 3);
 
-        // distinct() will discard the previous applied distinct() calls
-        Results second = first.distinct(SortDescriptor(first.get_tableview().get_parent(), {{2}}));
-        REQUIRE(second.size() == N);
+        // distinct() will not discard the previous applied distinct() calls
+        Results second = first.distinct(SortDescriptor(first.get_tableview().get_parent(), {{3}}));
+        REQUIRE(second.size() == 2);
     }
 
     SECTION("Distinct is carried over to new queries") {
