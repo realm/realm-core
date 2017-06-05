@@ -92,6 +92,7 @@ public:
     size_t size() const { return m_descriptors.size(); }
     const SortDescriptor& operator[](size_t ndx) const;
     bool will_apply_sort() const;
+    bool will_apply_distinct() const;
 
     // handover support
     using HandoverPatch = std::unique_ptr<DescriptorOrderingHandoverPatch>;

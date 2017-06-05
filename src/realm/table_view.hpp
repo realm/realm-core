@@ -301,6 +301,10 @@ public:
     void distinct(size_t column);
     void distinct(SortDescriptor columns);
 
+    // Replace the order of sort and distinct operations, bypassing manually
+    // calling sort and distinct. This is a convenience method for bindings.
+    void apply_descriptor_ordering(DescriptorOrdering new_ordering);
+
     // Returns whether the rows are guaranteed to be in table order.
     // This is true only of unsorted TableViews created from either:
     // - Table::find_all()

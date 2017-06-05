@@ -673,6 +673,11 @@ void TableViewBase::distinct(SortDescriptor columns)
     do_sync();
 }
 
+void TableViewBase::apply_descriptor_ordering(DescriptorOrdering new_ordering)
+{
+    m_descriptor_ordering = new_ordering;
+    do_sync();
+}
 
 // Sort according to one column
 void TableViewBase::sort(size_t column, bool ascending)

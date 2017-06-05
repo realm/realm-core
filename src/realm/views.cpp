@@ -260,6 +260,17 @@ bool DescriptorOrdering::will_apply_sort() const
     return false;
 }
 
+bool DescriptorOrdering::will_apply_distinct() const
+{
+    size_t num_descriptors = m_descriptors.size();
+    for (size_t desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
+        if (descriptor_is_distinct(desc_ndx) && m_descriptors[desc_ndx]) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void DescriptorOrdering::generate_patch(DescriptorOrdering const& descriptors, HandoverPatch& patch)
 {
     if (!descriptors.is_empty()) {
