@@ -222,8 +222,9 @@ void DescriptorOrdering::emplace_distinct(DistinctDescriptor&& distinct)
         m_descriptors.emplace_back(std::move(distinct));
     }
     else if (descriptor_is_distinct(orig_length - 1)) {
-        // merge them together by appending internally
-        m_descriptors[orig_length - 1].merge_with(std::move(distinct));
+        // add the next distinct operation, separated by a placeholder sort
+        m_descriptors.emplace_back(SortDescriptor());
+        m_descriptors.emplace_back(std::move(distinct));
     }
     else { // last descriptor is sort, just add it
         m_descriptors.emplace_back(std::move(distinct));

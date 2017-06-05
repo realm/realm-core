@@ -4449,8 +4449,8 @@ TEST(Query_CompoundDescriptors) {
         check_across_handover(results, std::move(hp));
     }
 
-    {   // two distincts should be the same as a single distinct with both criteria
-        ResultList results = {{1, 0}, {1, 2}, {2, 3}, {2, 4}};
+    {   // two distincts are not the same as a single distinct with both criteria
+        ResultList results = {{1, 0}, {2, 3}};
         TableView tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
         tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
@@ -4462,6 +4462,7 @@ TEST(Query_CompoundDescriptors) {
         HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
         check_across_handover(results, std::move(hp));
 
+        results = {{1, 0}, {1, 2}, {2, 3}, {2, 4}};
         tv = t1->where().find_all();
         tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}, {t1_str_col}}));
         CHECK_EQUAL(tv.size(), results.size());
