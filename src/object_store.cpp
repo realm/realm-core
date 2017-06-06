@@ -625,10 +625,8 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
     if (mode == SchemaMode::Additive) {
         apply_additive_changes(group, changes, schema_version < target_schema_version);
 
-        if (schema_version < target_schema_version) {
-            schema_version = target_schema_version;
+        if (schema_version < target_schema_version)
             set_schema_version(group, target_schema_version);
-        }
 
         set_schema_columns(group, target_schema);
         return;
