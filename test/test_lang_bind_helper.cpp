@@ -13177,5 +13177,31 @@ TEST(LangBindHelper_MixedTimestampTransaction)
     CHECK(t->get_mixed(0, 1) == neg_time);
 }
 
+ONLY(Open_Encrypted)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = crypt_key();
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg(*hist_w, SharedGroupOptions(key));
+
+    LangBindHelper::advance_read(sg);
+    {
+        WriteTransaction wt(sg);
+        Group& group = wt.get_group();
+        TableRef target = group.get_table("table");
+        target->add_column(type_Int, "int");
+        target->add_empty_row();
+        wt.commit();
+    }
+
+    LangBindHelper::advance_read(sg);
+    {
+        ReadTransaction rt(sg);
+        const Group& g = rt.get_group();
+        g.verify();
+        ConstTableRef t = g.get_table("table");
+        CHECK_EQUAL(t->size(), 1);
+    }
+}
 
 #endif

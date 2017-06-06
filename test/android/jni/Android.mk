@@ -4,7 +4,7 @@ include $(CLEAR_VARS)
 
 # Copy core to here - ARM only (see APP_ABI variable in Application.mk)
 LOCAL_MODULE     := realm-android
-LOCAL_SRC_FILES  := ../../../android-lib/librealm-android-arm.a
+LOCAL_SRC_FILES  := ../../../android-lib/librealm-android-arm64.a
 include $(PREBUILT_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
