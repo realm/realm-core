@@ -13184,23 +13184,19 @@ ONLY(Open_Encrypted)
     std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
     SharedGroup sg(*hist_w, SharedGroupOptions(key));
 
-    LangBindHelper::advance_read(sg);
+    Group& group = const_cast<Group&>(sg.begin_read());
     {
-        WriteTransaction wt(sg);
-        Group& group = wt.get_group();
-        TableRef target = group.get_table("table");
-        target->add_column(type_Int, "int");
-        target->add_empty_row();
-        wt.commit();
+        LangBindHelper::promote_to_write(sg);
+        TableRef table = group.get_table("table");
+        table->add_column(type_Int, "int");
+        table->add_empty_row();
+        LangBindHelper::commit_and_continue_as_read(sg);
     }
 
     LangBindHelper::advance_read(sg);
     {
-        ReadTransaction rt(sg);
-        const Group& g = rt.get_group();
-        g.verify();
-        ConstTableRef t = g.get_table("table");
-        CHECK_EQUAL(t->size(), 1);
+        ConstTableRef table = group.get_table("table");
+        CHECK_EQUAL(table->size(), 1);
     }
 }
 
