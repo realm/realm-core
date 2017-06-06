@@ -518,7 +518,7 @@ Results Results::sort(realm::SortDescriptor&& sort) const
 {
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.emplace_sort(std::move(sort));
-    return Results(m_realm, get_query(), new_order);
+    return Results(m_realm, get_query(), std::move(new_order));
 }
 
 Results Results::filter(Query&& q) const
@@ -530,7 +530,7 @@ Results Results::distinct(realm::SortDescriptor&& uniqueness)
 {
     DescriptorOrdering new_order = m_descriptor_ordering;
     new_order.emplace_distinct(std::move(uniqueness));
-    return Results(m_realm, get_query(), new_order);
+    return Results(m_realm, get_query(), std::move(new_order));
 }
 
 Results Results::snapshot() const &
