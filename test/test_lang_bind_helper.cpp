@@ -24,6 +24,8 @@
 #include <condition_variable>
 #include <atomic>
 
+#include <android/log.h>
+
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
 
@@ -13177,7 +13179,7 @@ TEST(LangBindHelper_MixedTimestampTransaction)
     CHECK(t->get_mixed(0, 1) == neg_time);
 }
 
-ONLY(Open_Encrypted)
+TEST(Open_Encrypted)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* key = crypt_key();
@@ -13199,5 +13201,38 @@ ONLY(Open_Encrypted)
         CHECK_EQUAL(table->size(), 1);
     }
 }
+
+ONLY(Open_Old_Realm_File)
+{
+    char key[64];
+    for (size_t i = 0; i < 64; ++i) {
+        key[i] = 1;
+    }
+
+    __android_log_print(ANDROID_LOG_INFO, "native-activity", "HEST");
+
+    std::string path = test_util::get_test_resource_path() + "0.98.0-alltypes-default-encrypted.realm";
+    SHARED_GROUP_TEST_PATH(temp_copy);
+    File::copy(path, temp_copy);
+
+    __android_log_print(ANDROID_LOG_INFO, "native-activity", "FISK");
+
+    auto hist = make_in_realm_history(temp_copy);
+    SharedGroup sg(*hist, SharedGroupOptions(key));
+
+    __android_log_print(ANDROID_LOG_INFO, "native-activity", "GRIS");
+
+    Group& group = const_cast<Group&>(sg.begin_read());
+
+    __android_log_print(ANDROID_LOG_INFO, "native-activity", "GED");
+
+    LangBindHelper::advance_read(sg);
+
+    __android_log_print(ANDROID_LOG_INFO, "native-activity", "KO");
+    {
+        CHECK(group.size() > 0);
+    }
+}
+
 
 #endif
