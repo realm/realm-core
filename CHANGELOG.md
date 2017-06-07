@@ -48,6 +48,19 @@
   
 ----------------------------------------------
 
+# 2.8.2 Release notes
+
+### Bugfixes
+
+* Now rejecting a Realm file specifying a history schema version that is newer
+  than the one expected by the code.
+  PR [#2642](https://github.com/realm/realm-core/pull/2642).
+* No longer triggering a history schema upgrade when opening an empty Realm file
+  (when `top_ref` is zero).
+  PR [#2642](https://github.com/realm/realm-core/pull/2642).
+
+----------------------------------------------
+
 # 2.8.1 Release notes
 
 ### Bugfixes
