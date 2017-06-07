@@ -317,7 +317,7 @@ void LinkView::sort(SortDescriptor&& order)
         repl->set_link_list(*this, m_row_indexes); // Throws
     }
     DescriptorOrdering ordering;
-    ordering.emplace_sort(std::move(order));
+    ordering.append_sort(std::move(order));
     do_sort(ordering);
 }
 

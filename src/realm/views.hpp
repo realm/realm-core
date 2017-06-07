@@ -84,8 +84,8 @@ public:
     DescriptorOrdering& operator=(DescriptorOrdering const&) = default;
     DescriptorOrdering& operator=(DescriptorOrdering&&) = default;
 
-    void emplace_sort(SortDescriptor&& sort);
-    void emplace_distinct(DistinctDescriptor&& distinct);
+    void append_sort(SortDescriptor sort);
+    void append_distinct(DistinctDescriptor distinct);
     bool descriptor_is_sort(size_t index) const;
     bool descriptor_is_distinct(size_t index) const;
     bool is_empty() const { return m_descriptors.empty(); }

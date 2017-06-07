@@ -199,7 +199,7 @@ bool SortDescriptor::Sorter::operator()(IndexPair i, IndexPair j, bool total_ord
     return total_ordering ? i.index_in_view < j.index_in_view : 0;
 }
 
-void DescriptorOrdering::emplace_sort(SortDescriptor&& sort)
+void DescriptorOrdering::append_sort(SortDescriptor sort)
 {
     size_t orig_length = m_descriptors.size();
     if (orig_length == 0) {
@@ -214,7 +214,7 @@ void DescriptorOrdering::emplace_sort(SortDescriptor&& sort)
     }
 }
 
-void DescriptorOrdering::emplace_distinct(DistinctDescriptor&& distinct)
+void DescriptorOrdering::append_distinct(DistinctDescriptor distinct)
 {
     size_t orig_length = m_descriptors.size();
     if (orig_length == 0) {
@@ -301,10 +301,10 @@ DescriptorOrdering DescriptorOrdering::create_from_and_consume_patch(HandoverPat
             SortDescriptor desc(table, std::move(patch->columns[desc_ndx]),
                              std::move(patch->ascending[desc_ndx]));
             if (ordering.descriptor_is_sort(desc_ndx)) {
-                ordering.emplace_sort(std::move(desc));
+                ordering.append_sort(std::move(desc));
             }
             else {
-                ordering.emplace_distinct(std::move(desc));
+                ordering.append_distinct(std::move(desc));
             }
         }
         patch.reset();
