@@ -11,24 +11,6 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
-
-### Internals
-
-* win32+UWP: Switched from pthread-win32 to native API PR [#2602](https://github.com/realm/realm-core/pull/2602)
-
-----------------------------------------------
-
-# 3.0.0-rc1 Release notes
-
-### Breaking changes
-
 * Support for size query on LinkedList removed. This is perhaps not so 
   breaking after all since it is probably not used.
 * Replication interface changed. The search index functions now operate
@@ -62,6 +44,7 @@
   the Visual C++ runtime libraries, removing the onus on end-users to have the correct runtime redistributable package
   or satellite assembly pack installed. Libraries that link against Core on Windows will have to adjust their compiler flags accordingly.
   PR [#2611](https://github.com/realm/realm-core/pull/2611)
+* win32+UWP: Switched from pthread-win32 to native API PR [#2602](https://github.com/realm/realm-core/pull/2602)
   
 ----------------------------------------------
 
