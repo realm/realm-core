@@ -24,8 +24,6 @@
 #include <condition_variable>
 #include <atomic>
 
-#include <android/log.h>
-
 #include "testsettings.hpp"
 #ifdef TEST_LANG_BIND_HELPER
 
@@ -13209,26 +13207,17 @@ ONLY(Open_Old_Realm_File)
         key[i] = 1;
     }
 
-    __android_log_print(ANDROID_LOG_INFO, "native-activity", "HEST");
-
     std::string path = test_util::get_test_resource_path() + "0.98.0-alltypes-default-encrypted.realm";
     SHARED_GROUP_TEST_PATH(temp_copy);
     File::copy(path, temp_copy);
 
-    __android_log_print(ANDROID_LOG_INFO, "native-activity", "FISK");
-
     auto hist = make_in_realm_history(temp_copy);
     SharedGroup sg(*hist, SharedGroupOptions(key));
 
-    __android_log_print(ANDROID_LOG_INFO, "native-activity", "GRIS");
-
     Group& group = const_cast<Group&>(sg.begin_read());
-
-    __android_log_print(ANDROID_LOG_INFO, "native-activity", "GED");
 
     LangBindHelper::advance_read(sg);
 
-    __android_log_print(ANDROID_LOG_INFO, "native-activity", "KO");
     {
         CHECK(group.size() > 0);
     }
