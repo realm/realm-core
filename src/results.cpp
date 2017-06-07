@@ -60,7 +60,7 @@ Results::Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q, SortDes
         m_mode = Mode::Query;
     }
     if (s) {
-        m_descriptor_ordering.emplace_sort(std::move(s));
+        m_descriptor_ordering.append_sort(std::move(s));
     }
 }
 
@@ -517,7 +517,7 @@ TableView Results::get_tableview()
 Results Results::sort(realm::SortDescriptor&& sort) const
 {
     DescriptorOrdering new_order = m_descriptor_ordering;
-    new_order.emplace_sort(std::move(sort));
+    new_order.append_sort(std::move(sort));
     return Results(m_realm, get_query(), std::move(new_order));
 }
 
@@ -529,7 +529,7 @@ Results Results::filter(Query&& q) const
 Results Results::distinct(realm::SortDescriptor&& uniqueness)
 {
     DescriptorOrdering new_order = m_descriptor_ordering;
-    new_order.emplace_distinct(std::move(uniqueness));
+    new_order.append_distinct(std::move(uniqueness));
     return Results(m_realm, get_query(), std::move(new_order));
 }
 
