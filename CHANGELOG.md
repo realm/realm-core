@@ -16,7 +16,9 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Fix an assert that prevented Group::commit() from discarding history from a
+  Realm file opened in nonshared mode (via `Group::open()`, as opposed to
+  `SharedGroup::open()`).
 
 ----------------------------------------------
 
