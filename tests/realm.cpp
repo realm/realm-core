@@ -674,8 +674,7 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
 
     r1->begin_transaction();
     auto table = r1->read_group().get_table("class_object");
-    auto row_idx = table->add_empty_row(1);
-    auto table_idx = table->get_index_in_group();
+    table->add_empty_row();
     r1->commit_transaction();
 
     // Cannot be a member var of Context since Realm.close will free the context.
@@ -733,6 +732,8 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
 
         REQUIRE_FALSE(r1->refresh());
     }
+
+    shared_realm = nullptr;
 }
 
 TEST_CASE("RealmCoordinator: schema cache") {

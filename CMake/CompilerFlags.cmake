@@ -47,6 +47,9 @@ if(MSVC)
         /D_CRT_SECURE_NO_WARNINGS
         /D_SCL_SECURE_NO_WARNINGS
     )
+    add_compile_options(
+        /MP # Enable multi-processor compilation
+    )
 endif()
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
