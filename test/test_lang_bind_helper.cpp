@@ -13177,7 +13177,7 @@ TEST(LangBindHelper_MixedTimestampTransaction)
     CHECK(t->get_mixed(0, 1) == neg_time);
 }
 
-ONLY(Open_Encrypted)
+TEST(Open_Encrypted)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* key = crypt_key();
@@ -13207,7 +13207,7 @@ ONLY(Open_Encrypted)
     }
 }
 
-TEST(Open_Old_Realm_File)
+ONLY(Open_Old_Realm_File)
 {
     char key[64];
     for (size_t i = 0; i < 64; ++i) {
