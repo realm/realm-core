@@ -17,6 +17,7 @@
 ### Internals
 
 * Disabled a sleep in debug mode that was impairing external tests.
+  PR [#2651](https://github.com/realm/realm-core/pull/2651).
 
 ----------------------------------------------
 
