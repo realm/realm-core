@@ -1,22 +1,9 @@
-# NEXT RELEASE
-
-### Bugfixes
-
-* Lorem ipsum.
-
-### Breaking changes
-
-* Lorem ipsum.
-
-### Enhancements
-
-* Lorem ipsum.
-
------------
+# 2.8.3 Release notes
 
 ### Internals
 
 * Disabled a sleep in debug mode that was impairing external tests.
+  PR [#2651](https://github.com/realm/realm-core/pull/2651).
 
 ----------------------------------------------
 
