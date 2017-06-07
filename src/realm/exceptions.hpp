@@ -217,13 +217,7 @@ public:
         unsupported_order_on_distinct,
 
         /// An out of bounds access to a distinct or sort descriptor
-        descriptor_out_of_range,
-
-        /// Sort and distinct descriptors shouldn't be empty
-        empty_descriptor,
-
-        /// Cannot sort or distinct on a degenerate table
-        descriptor_on_degenerate_table
+        descriptor_out_of_range
     };
 
     LogicError(ErrorKind message);

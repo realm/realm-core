@@ -4155,6 +4155,79 @@ TEST(Query_LinkChainSortErrors)
 }
 
 
+TEST(Query_EmptyDescriptors)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+
+    t1->add_empty_row(4);
+    t1->set_int(t1_int_col, 0, 4);
+    t1->set_int(t1_int_col, 1, 3);
+    t1->set_int(t1_int_col, 2, 2);
+    t1->set_int(t1_int_col, 3, 3);
+
+    std::vector<size_t> results = {4, 3, 2, 3}; // original order
+
+    {   // Sorting with an empty sort descriptor is a no-op
+        TableView tv = t1->where().find_all();
+        tv.sort(SortDescriptor(*t1, {}));
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+    {   // Distinct with an empty descriptor is a no-op
+        TableView tv = t1->where().find_all();
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+    {   // Empty sort, empty distinct is still a no-op
+        TableView tv = t1->where().find_all();
+        tv.sort(SortDescriptor(*t1, {}));
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+    {   // Arbitrary compounded empty sort and distinct is still a no-op
+        TableView tv = t1->where().find_all();
+        tv.sort(SortDescriptor(*t1, {}));
+        tv.sort(SortDescriptor(*t1, {}));
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        tv.sort(SortDescriptor(*t1, {}));
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+    {   // Empty distinct compounded on a valid distinct is a no-op
+        TableView tv = t1->where().find_all();
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        results = {4, 3, 2};
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+    {   // Empty sort compounded on a valid sort is a no-op
+        TableView tv = t1->where().find_all();
+        tv.sort(SortDescriptor(*t1, {}));
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}));
+        tv.sort(SortDescriptor(*t1, {}));
+        results = {2, 3, 3, 4};
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+}
+
+
 TEST(Query_DistinctAndSort)
 {
     Group g;

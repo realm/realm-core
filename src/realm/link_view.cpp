@@ -312,9 +312,6 @@ void LinkView::sort(size_t column_index, bool ascending)
 
 void LinkView::sort(SortDescriptor&& order)
 {
-    if (REALM_UNLIKELY(!order)) {
-        throw LogicError(LogicError::empty_descriptor);
-    }
     if (Replication* repl = get_repl()) {
         // todo, write to the replication log that we're doing a sort
         repl->set_link_list(*this, m_row_indexes); // Throws

@@ -1453,7 +1453,7 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     // Searching:
 
     //    CHECK_EQUAL(0, degen_child->distinct(0).size()); // needs index but you cannot set index on ConstTableRef
-    CHECK_LOGIC_ERROR(degen_child->get_sorted_view(0), LogicError::descriptor_on_degenerate_table);
+    CHECK_EQUAL(0, degen_child->get_sorted_view(0).size());
 
     CHECK_EQUAL(not_found, degen_child->find_first_int(0, 0));
     CHECK_EQUAL(not_found, degen_child->find_first_bool(1, false));

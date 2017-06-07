@@ -15,9 +15,8 @@
     - The order that sort and distinct are applied can change the query result.
     - It is now an error to define an ascending order on a distinct descriptor, if the
       order is important then a sort should be applied before the distinct.
-    - It is now an error to call sort or distinct with an empty descriptor, this
+    - Applying an empty sort or distinct descriptor is now a no-op, this
       could previously be used to clear a sort or distinct operation.
-    - Trying to sort on a degenerate table will throw instead of being silently ignored.
 
 ### Enhancements
 

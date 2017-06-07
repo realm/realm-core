@@ -40,8 +40,9 @@ SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<size_
         m_ascending.resize(column_indices.size(), true);
     if (table.is_degenerate()) {
         // We need access to the column acessors and that's not available in a
-        // degenerate table, it would crash if we continued to try and access it
-        throw LogicError(LogicError::descriptor_on_degenerate_table);
+        // degenerate table. Since sorting an empty table is a noop just return.
+        m_ascending.clear(); // keep consistency with empty m_columns
+        return;
     }
     using tf = _impl::TableFriend;
     m_columns.resize(column_indices.size());
@@ -359,7 +360,9 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
         }
         else { // distinct descriptor
             REALM_ASSERT_DEBUG(ordering.descriptor_is_distinct(desc_ndx));
-            REALM_ASSERT_DEBUG(ordering[desc_ndx]); // distinct should always be valid
+
+            // an empty distinct descriptor is a no-op
+            if (!ordering[desc_ndx]) continue;
 
             // Setting an order on the distinct descriptor is now incorrect.
             // Distinct uses the order of the view. If the order matters,

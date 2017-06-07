@@ -666,9 +666,6 @@ void TableViewBase::distinct(size_t column)
 /// Will keep original sorting order so that you can both have a distinct and sorted view.
 void TableViewBase::distinct(SortDescriptor columns)
 {
-    if (REALM_UNLIKELY(!columns)) {
-        throw LogicError(LogicError::empty_descriptor);
-    }
     m_descriptor_ordering.emplace_distinct(std::move(columns));
     do_sync();
 }
@@ -688,9 +685,6 @@ void TableViewBase::sort(size_t column, bool ascending)
 // Sort according to multiple columns, user specified order on each column
 void TableViewBase::sort(SortDescriptor order)
 {
-    if (REALM_UNLIKELY(!order)) {
-        throw LogicError(LogicError::empty_descriptor);
-    }
     m_descriptor_ordering.emplace_sort(std::move(order));
     do_sort(m_descriptor_ordering);
 }
