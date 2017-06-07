@@ -16,7 +16,7 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Disabled a sleep in debug mode that was impairing external tests.
 
 ----------------------------------------------
 
