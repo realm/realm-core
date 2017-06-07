@@ -13181,13 +13181,13 @@ ONLY(Open_Encrypted)
 {
     SHARED_GROUP_TEST_PATH(path);
     const char* key = crypt_key();
-    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
-    SharedGroup sg(*hist_w, SharedGroupOptions(key));
+    std::unique_ptr<Replication> hist(make_in_realm_history(path));
+    SharedGroup sg(*hist, SharedGroupOptions(key));
 
     Group& group = const_cast<Group&>(sg.begin_read());
     {
         LangBindHelper::promote_to_write(sg);
-        TableRef table = group.get_table("table");
+        TableRef table = group.get_or_add_table("table");
         table->add_column(type_Int, "int");
         table->add_empty_row();
         LangBindHelper::commit_and_continue_as_read(sg);
