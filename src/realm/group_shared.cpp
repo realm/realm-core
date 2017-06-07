@@ -1586,7 +1586,12 @@ void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade,
 // a simple thread barrier that makes sure the threads meet here, to
 // increase the likelyhood of detecting any potential race problems.
 // See the unit test for details.
-        millisleep(200);
+//
+// NOTE: This sleep has been disabled because no problems have been found with
+// this code in a long while, and it was dramatically slowing down a unit test
+// in realm-sync.
+
+        // millisleep(200);
 #endif
 
         WriteTransaction wt(*this);

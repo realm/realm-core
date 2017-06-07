@@ -2,12 +2,7 @@
 
 ### Bugfixes
 
-* Now rejecting a Realm file specifying a history schema version that is newer
-  than the one expected by the code.
-  PR [#2642](https://github.com/realm/realm-core/pull/2642).
-* No longer triggering a history schema upgrade when opening an empty Realm file
-  (when `top_ref` is zero).
-  PR [#2642](https://github.com/realm/realm-core/pull/2642).
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -46,6 +41,28 @@
   PR [#2611](https://github.com/realm/realm-core/pull/2611)
 * win32+UWP: Switched from pthread-win32 to native API PR [#2602](https://github.com/realm/realm-core/pull/2602)
   
+----------------------------------------------
+
+# 2.8.3 Release notes
+
+### Internals
+
+* Disabled a sleep in debug mode that was impairing external tests.
+  PR [#2651](https://github.com/realm/realm-core/pull/2651).
+
+----------------------------------------------
+
+# 2.8.2 Release notes
+
+### Bugfixes
+
+* Now rejecting a Realm file specifying a history schema version that is newer
+  than the one expected by the code.
+  PR [#2642](https://github.com/realm/realm-core/pull/2642).
+* No longer triggering a history schema upgrade when opening an empty Realm file
+  (when `top_ref` is zero).
+  PR [#2642](https://github.com/realm/realm-core/pull/2642).
+
 ----------------------------------------------
 
 # 2.8.1 Release notes
