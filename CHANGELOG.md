@@ -8,8 +8,10 @@
 
 * Support for size query on LinkedList removed. This is perhaps not so 
   breaking after all since it is probably not used.
+  PR [#2532](https://github.com/realm/realm-core/pull/2532).
 * Replication interface changed. The search index functions now operate
   on a descriptor and not a table.
+  PR [#2561](https://github.com/realm/realm-core/pull/2561).
 
 ### Enhancements
 
