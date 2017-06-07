@@ -13190,7 +13190,7 @@ ONLY(Open_Encrypted)
         for (size_t i = 0; i < 100; ++i) {
             std::string table_name = "table_" + util::to_string(i);
             TableRef table = group.get_or_add_table(table_name);
-            for (size_t j = 0; i < 25; ++j) {
+            for (size_t j = 0; j < 25; ++j) {
                 std::string column_name = "column_" + util::to_string(j);
                 table->add_column(type_Int, column_name);
             }
