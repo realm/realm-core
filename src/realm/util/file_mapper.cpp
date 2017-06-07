@@ -117,8 +117,11 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, int fd, size_t file_o
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("fstat() failed: ", err));
     }
-
-    if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size())
+    File::SizeType content_size = data_size_to_encrypted_size(st.st_size);
+    File::SizeType cast_page_size;
+    bool did_overflow = int_cast_with_overflow_detect(page_size(), cast_page_size);
+    REALM_ASSERT_EX(!did_overflow, cast_page_size, page_size());
+    if (content_size > 0 && content_size < cast_page_size)
         throw DecryptionFailed();
 
     LockGuard lock(mapping_mutex);
