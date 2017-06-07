@@ -36,14 +36,16 @@
 
 ### Internals
 
-* The RuntimeLibrary of the Windows build is changed from MultiThreadedDLL to just MultiThreaded so as to statically link
-  the Visual C++ runtime libraries, removing the onus on end-users to have the correct runtime redistributable package
-  or satellite assembly pack installed. Libraries that link against Core on Windows will have to adjust their compiler flags accordingly.
+* The RuntimeLibrary of the Windows build is changed from MultiThreadedDLL to
+  just MultiThreaded so as to statically link the Visual C++ runtime libraries,
+  removing the onus on end-users to have the correct runtime redistributable
+  package or satellite assembly pack installed. Libraries that link against Core
+  on Windows will have to adjust their compiler flags accordingly.
   PR [#2611](https://github.com/realm/realm-core/pull/2611).
 * Win32+UWP: Switched from pthread-win32 to native API.
   PR [#2602](https://github.com/realm/realm-core/pull/2602).
-* Implemented inter-process CondVars on Windows (Win32 + UWP). They should be fair and
-  robust.
+* Implemented inter-process CondVars on Windows (Win32 + UWP). They should be
+  fair and robust.
   PR [#2497](https://github.com/realm/realm-core/pull/2497).
 
 ----------------------------------------------
