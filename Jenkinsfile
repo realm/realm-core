@@ -252,9 +252,9 @@ def doBuildWindows(String buildType, boolean isUWP, String arch) {
 
             dir('build-dir') {
                 runAndCollectWarnings(parser: 'msbuild', isWindows: true, script: """
-                    cmake ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015${archSuffix}\" -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${arch} -D CMAKE_BUILD_TYPE=${buildType} -D REALM_ENABLE_ENCRYPTION=OFF ..
-                    cmake --build . --config ${buildType}
-                    cpack -C ${buildType} -D CPACK_GENERATOR=TGZ
+                    cmake.exe ${cmakeDefinitions} -DREALM_BUILD_LIB_ONLY=1 -G \"Visual Studio 14 2015${archSuffix}\" -D CPACK_SYSTEM_NAME=${isUWP?'UWP':'Windows'}-${arch} -D CMAKE_BUILD_TYPE=${buildType} -D REALM_ENABLE_ENCRYPTION=OFF ..
+                    cmake.exe --build . --config ${buildType}
+                    cpack.exe -C ${buildType} -D CPACK_GENERATOR=TGZ
                 """)
                 archiveArtifacts('*.tar.gz')
                 if (gitTag) {
