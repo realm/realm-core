@@ -13189,4 +13189,39 @@ TEST(LangBindHelper_MixedTimestampTransaction)
     CHECK(t->get_mixed(0, 1) == neg_time);
 }
 
+
+TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
+{
+    // Create a Realm file with a history (history_type !=
+    // Reaplication::hist_None).
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        std::unique_ptr<Replication> history(make_in_realm_history(path));
+        SharedGroup sg{*history};
+        WriteTransaction wt{sg};
+        wt.add_table("foo");
+        wt.commit();
+    }
+
+    // Since the stored history type is now Replication::hist_InRealm, it should
+    // now be impossible to open in shared mode with no replication plugin
+    // (Replication::hist_None).
+    CHECK_THROW(SharedGroup{path}, IncompatibleHistories);
+
+    // Now modify the file in nonshared mode, which will discard the history (as
+    // nonshared mode does not understand how to update it correctly).
+    {
+        const char* crypt_key = nullptr;
+        Group group{path, crypt_key, Group::mode_ReadWriteNoCreate};
+        group.commit();
+    }
+
+    // Check the the history was actually discarded (reset to
+    // Replication::hist_None).
+    SharedGroup sg{path};
+    ReadTransaction rt{sg};
+    CHECK(rt.has_table("foo"));
+}
+
+
 #endif
