@@ -664,7 +664,7 @@ void TableViewBase::distinct(size_t column)
 
 /// Remove rows that are duplicated with respect to the column set passed as argument.
 /// Will keep original sorting order so that you can both have a distinct and sorted view.
-void TableViewBase::distinct(SortDescriptor columns)
+void TableViewBase::distinct(DistinctDescriptor columns)
 {
     m_descriptor_ordering.append_distinct(std::move(columns));
     do_sync();

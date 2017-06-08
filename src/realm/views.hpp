@@ -33,13 +33,9 @@ class RowIndexes;
 // SortDescriptor encapsulates a reference to a set of columns (possibly over links), which is
 // used to indicate the criteria columns for sort and distinct. Although the input is column
 // indices, it does not rely on those indices remaining stable as long as the columns continue to exist.
-class SortDescriptor {
+class CommonDescriptor {
 public:
-    SortDescriptor() = default;
-    SortDescriptor(SortDescriptor const&) = default;
-    SortDescriptor(SortDescriptor&&) = default;
-    SortDescriptor& operator=(SortDescriptor const&) = default;
-    SortDescriptor& operator=(SortDescriptor&&) = default;
+    virtual ~CommonDescriptor() = default;
 
     // Create a sort descriptor for the given columns on the given table.
     // Each vector in `column_indices` represents a chain of columns, where
@@ -48,40 +44,62 @@ public:
     // `column_indices` must be non-empty, and each vector within it must also
     // be non-empty. `ascending` must either be empty or have one entry for each
     // column index chain.
-    SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices,
-                   std::vector<bool> ascending = {});
+    CommonDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices);
+    virtual CommonDescriptor* clone() const;
 
     // returns whether this descriptor is valid and can be used to sort
-    explicit operator bool() const noexcept
+    bool is_valid() const noexcept
     {
         return !m_columns.empty();
     }
+
+    class Sorter;
+    virtual Sorter sorter(IntegerColumn const& row_indexes) const;
+
+    // handover support
+    std::vector<std::vector<size_t>> export_column_indices() const;
+    virtual std::vector<bool> export_order() const
+    {
+        return {};
+    }
+
+protected:
+    std::vector<std::vector<const ColumnBase*>> m_columns;
+};
+
+using DistinctDescriptor = CommonDescriptor;
+
+class SortDescriptor : public CommonDescriptor {
+public:
+    SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices,
+                   std::vector<bool> ascending = {});
+    CommonDescriptor* clone() const override;
+
     // returns whether this descriptor has any custom ascending/descending order
     bool has_custom_order() const noexcept
     {
         return std::any_of(m_ascending.begin(), m_ascending.end(), [](bool b) { return !b; });
     }
     void merge_with(SortDescriptor&& other);
-    class Sorter;
-    Sorter sorter(IntegerColumn const& row_indexes) const;
+
+    Sorter sorter(IntegerColumn const& row_indexes) const override;
 
     // handover support
-    std::vector<std::vector<size_t>> export_column_indices() const;
-    std::vector<bool> export_order() const;
+    std::vector<bool> export_order() const override;
+
 private:
-    std::vector<std::vector<const ColumnBase*>> m_columns;
     std::vector<bool> m_ascending;
 };
 
 // Distinct uses the same syntax as sort except that the order is meaningless.
-typedef SortDescriptor DistinctDescriptor;
+typedef CommonDescriptor DistinctDescriptor;
 
 class DescriptorOrdering {
 public:
     DescriptorOrdering() = default;
-    DescriptorOrdering(DescriptorOrdering const&) = default;
+    DescriptorOrdering(const DescriptorOrdering&);
     DescriptorOrdering(DescriptorOrdering&&) = default;
-    DescriptorOrdering& operator=(DescriptorOrdering const&) = default;
+    DescriptorOrdering& operator=(const DescriptorOrdering&);
     DescriptorOrdering& operator=(DescriptorOrdering&&) = default;
 
     void append_sort(SortDescriptor sort);
@@ -90,9 +108,13 @@ public:
     bool descriptor_is_distinct(size_t index) const;
     bool is_empty() const { return m_descriptors.empty(); }
     size_t size() const { return m_descriptors.size(); }
-    const SortDescriptor& operator[](size_t ndx) const;
+    const CommonDescriptor* operator[](size_t ndx) const;
     bool will_apply_sort() const;
     bool will_apply_distinct() const;
+    int last_sort() const
+    {
+        return m_last_sort;
+    }
 
     // handover support
     using HandoverPatch = std::unique_ptr<DescriptorOrderingHandoverPatch>;
@@ -100,7 +122,8 @@ public:
     static DescriptorOrdering create_from_and_consume_patch(HandoverPatch&, Table const&);
 
 private:
-    std::vector<SortDescriptor> m_descriptors;
+    std::vector<std::unique_ptr<CommonDescriptor>> m_descriptors;
+    int m_last_sort = -1;
 };
 
 // This class is for common functionality of ListView and LinkView which inherit from it. Currently it only

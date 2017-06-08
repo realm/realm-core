@@ -299,7 +299,7 @@ public:
     // You can call sync_if_needed() to update the distinct view, just like you can for a sorted view.
     // Each time you call distinct() it will compound on the previous calls
     void distinct(size_t column);
-    void distinct(SortDescriptor columns);
+    void distinct(DistinctDescriptor columns);
 
     // Replace the order of sort and distinct operations, bypassing manually
     // calling sort and distinct. This is a convenience method for bindings.
