@@ -120,7 +120,7 @@ public:
     Results sort(SortDescriptor&& sort) const;
 
     // Create a new Results by removing duplicates
-    Results distinct(SortDescriptor&& uniqueness);
+    Results distinct(DistinctDescriptor&& uniqueness);
 
     // Return a snapshot of this Results that never updates to reflect changes in the underlying data.
     Results snapshot() const &;
