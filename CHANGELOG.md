@@ -16,7 +16,10 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Fix an assert that prevented `Group::commit()` from discarding history from a
+  Realm file opened in nonshared mode (via `Group::open()`, as opposed to
+  `SharedGroup::open()`).
+  PR [#2655](https://github.com/realm/realm-core/pull/2655).
 
 ----------------------------------------------
 
@@ -26,9 +29,6 @@
 
 * Disabled a sleep in debug mode that was impairing external tests.
   PR [#2651](https://github.com/realm/realm-core/pull/2651).
-* Fix an assert that prevented `Group::commit()` from discarding history from a
-  Realm file opened in nonshared mode (via `Group::open()`, as opposed to
-  `SharedGroup::open()`).
 
 ----------------------------------------------
 
