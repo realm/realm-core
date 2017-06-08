@@ -255,7 +255,6 @@ void DescriptorOrdering::append_sort(SortDescriptor sort)
                 m_descriptors.emplace_back(new SortDescriptor(std::move(sort)));
             }
         }
-        m_last_sort = int(orig_length);
     }
 }
 
@@ -270,7 +269,7 @@ bool DescriptorOrdering::descriptor_is_sort(size_t index) const
 {
     REALM_ASSERT(index < m_descriptors.size());
     SortDescriptor* sort_descr = dynamic_cast<SortDescriptor*>(m_descriptors[index].get());
-    return (sort_descr != 0);
+    return (sort_descr != nullptr);
 }
 
 bool DescriptorOrdering::descriptor_is_distinct(size_t index) const
@@ -288,18 +287,16 @@ const CommonDescriptor* DescriptorOrdering::operator[](size_t ndx) const
 
 bool DescriptorOrdering::will_apply_sort() const
 {
-    return m_last_sort >= 0;
+    return std::any_of(m_descriptors.begin(), m_descriptors. end(), [](const std::unique_ptr<CommonDescriptor>& desc) {
+        return desc.get()->is_valid() && (dynamic_cast<SortDescriptor*>(desc.get()) != nullptr);
+    });
 }
 
 bool DescriptorOrdering::will_apply_distinct() const
 {
-    size_t num_descriptors = m_descriptors.size();
-    for (size_t desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
-        if (descriptor_is_distinct(desc_ndx)) {
-            return true;
-        }
-    }
-    return false;
+    return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<CommonDescriptor>& desc) {
+        return desc.get()->is_valid() && (dynamic_cast<SortDescriptor*>(desc.get()) == nullptr);
+    });
 }
 
 void DescriptorOrdering::generate_patch(DescriptorOrdering const& descriptors, HandoverPatch& patch)
@@ -407,8 +404,8 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
                                     return !distinct_predicate(a, b, false);
                                 }),
                     v.end());
-
-            if (desc_ndx > ordering.last_sort()) {
+            bool will_be_sorted_next = desc_ndx < num_descriptors - 1 && ordering.descriptor_is_sort(desc_ndx + 1);
+            if (!will_be_sorted_next) {
                 // Restore the original order, this is either the original
                 // tableview order or the order of the previous sort
                 std::sort(v.begin(), v.end(), [](auto a, auto b) { return a.index_in_view < b.index_in_view; });

@@ -1826,12 +1826,20 @@ struct DistinctDirect {
     {
     }
 
-    SortDescriptor operator()(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
+    SortDescriptor get_sort(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
     {
         std::vector<std::vector<size_t>> column_indices;
         for (size_t col : columns)
             column_indices.push_back({col});
         return SortDescriptor(table, column_indices, ascending);
+    }
+
+    DistinctDescriptor get_distinct(std::initializer_list<size_t> columns) const
+    {
+        std::vector<std::vector<size_t>> column_indices;
+        for (size_t col : columns)
+            column_indices.push_back({col});
+        return DistinctDescriptor(table, column_indices);
     }
 
     size_t get_source_ndx(const TableView& tv, size_t ndx) const
@@ -1857,12 +1865,20 @@ struct DistinctOverLink {
     {
     }
 
-    SortDescriptor operator()(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
+    SortDescriptor get_sort(std::initializer_list<size_t> columns, std::vector<bool> ascending = {}) const
     {
         std::vector<std::vector<size_t>> column_indices;
         for (size_t col : columns)
             column_indices.push_back({0, col});
         return SortDescriptor(table, column_indices, ascending);
+    }
+
+    DistinctDescriptor get_distinct(std::initializer_list<size_t> columns) const
+    {
+        std::vector<std::vector<size_t>> column_indices;
+        for (size_t col : columns)
+            column_indices.push_back({0, col});
+        return DistinctDescriptor(table, column_indices);
     }
 
     size_t get_source_ndx(const TableView& tv, size_t ndx) const
@@ -1941,7 +1957,7 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
 
     TableView tv;
     tv = h.find_all();
-    tv.distinct(h({0}));
+    tv.distinct(h.get_distinct({0}));
     CHECK_EQUAL(tv.size(), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 0);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 1);
@@ -1949,8 +1965,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     CHECK_EQUAL(h.get_source_ndx(tv, 3), 6);
 
     tv = h.find_all();
-    tv.distinct(h({0}));
-    tv.sort(h({0}));
+    tv.distinct(h.get_distinct({0}));
+    tv.sort(h.get_sort({0}));
     CHECK_EQUAL(tv.size(), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 1);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 0);
@@ -1958,8 +1974,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     CHECK_EQUAL(h.get_source_ndx(tv, 3), 4);
 
     tv = h.find_all();
-    tv.distinct(h({0}));
-    tv.sort(h({0}, {false}));
+    tv.distinct(h.get_distinct({0}));
+    tv.sort(h.get_sort({0}, {false}));
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 6);
     CHECK_EQUAL(h.get_source_ndx(tv, 2), 0);
@@ -1967,8 +1983,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
 
     // Note here that our stable sort will sort the two "foo"s like row {4, 5}
     tv = h.find_all();
-    tv.distinct(h({0, 1}));
-    tv.sort(h({0}, {false}));
+    tv.distinct(h.get_distinct({0, 1}));
+    tv.sort(h.get_sort({0}, {false}));
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
@@ -1980,8 +1996,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     // Now try distinct on string+float column. The float column has the same values as the int column
     // so the result should equal the test above
     tv = h.find_all();
-    tv.distinct(h({0, 1}));
-    tv.sort(h({0}, {false}));
+    tv.distinct(h.get_distinct({0, 1}));
+    tv.sort(h.get_sort({0}, {false}));
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
@@ -1993,8 +2009,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     // Same as previous test, but with string column being Enum
     t.optimize(true); // true = enforce regardless if Realm thinks it pays off or not
     tv = h.find_all();
-    tv.distinct(h({0, 1}));
-    tv.sort(h({0}, {false}));
+    tv.distinct(h.get_distinct({0, 1}));
+    tv.sort(h.get_sort({0}, {false}));
     CHECK_EQUAL(tv.size(), 5);
     CHECK_EQUAL(h.get_source_ndx(tv, 0), 4);
     CHECK_EQUAL(h.get_source_ndx(tv, 1), 5);
@@ -2007,8 +2023,8 @@ TEST_TYPES(TableView_Distinct, DistinctDirect, DistinctOverLink)
     tv = h.find_all();
     // "", null, "", null, "foo", "foo", "bar"
 
-    tv.distinct(h({0}));
-    tv.sort(h({0}, {false}));
+    tv.distinct(h.get_distinct({0}));
+    tv.sort(h.get_sort({0}, {false}));
     // "foo", "bar", "", null
 
     CHECK_EQUAL(tv.size(), 4);
@@ -2050,7 +2066,7 @@ TEST(TableView_DistinctOverNullLink)
     // 4 is null
 
     auto tv = origin->where().find_all();
-    tv.distinct(SortDescriptor(*origin, {{0, 0}}));
+    tv.distinct(DistinctDescriptor(*origin, {{0, 0}}));
     CHECK_EQUAL(tv.size(), 2);
     CHECK_EQUAL(tv.get_source_ndx(0), 0);
     CHECK_EQUAL(tv.get_source_ndx(1), 1);

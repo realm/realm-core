@@ -659,7 +659,7 @@ void TableView::clear(RemoveMode underlying_mode)
 
 void TableViewBase::distinct(size_t column)
 {
-    distinct(SortDescriptor(*m_table, {{column}}));
+    distinct(DistinctDescriptor(*m_table, {{column}}));
 }
 
 /// Remove rows that are duplicated with respect to the column set passed as argument.

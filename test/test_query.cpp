@@ -4228,6 +4228,51 @@ TEST(Query_EmptyDescriptors)
 }
 
 
+TEST(Query_DescriptorsWillApply)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_str_col = t1->add_column(type_String, "t1_str");
+    t1->add_empty_row(1);
+
+    DescriptorOrdering ordering;
+
+    CHECK(!ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+
+    ordering.append_sort(SortDescriptor());
+    CHECK(!ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+
+    ordering.append_distinct(DistinctDescriptor());
+    CHECK(!ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+
+    ordering.append_sort(SortDescriptor(*t1, {{t1_int_col}}));
+    CHECK(ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+
+    ordering.append_distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+
+    ordering.append_distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+
+    ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}));
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+
+    DescriptorOrdering ordering_copy = ordering;
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+    CHECK(ordering_copy.will_apply_sort());
+    CHECK(ordering_copy.will_apply_distinct());
+}
+
+
 TEST(Query_DistinctAndSort)
 {
     Group g;
@@ -4289,8 +4334,8 @@ TEST(Query_DistinctAndSort)
     {   // distinct on a view sorted descending retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{2, 3}, {1, 2}};
-        bool ascending = false;
-        tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}}, {ascending, ascending}));
+        tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}},
+                            {false /* descending */, false /* descending */}));
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
@@ -4301,8 +4346,7 @@ TEST(Query_DistinctAndSort)
     {   // distinct on a sorted view (different from table order) retains sorted order
         TableView tv = t1->where().find_all();
         ResultList expected = {{2, 3}, {1, 0}};
-        bool ascending = false;
-        tv.sort(t1_int_col, ascending);
+        tv.sort(t1_int_col, false /* descending */);
         tv.distinct(t1_int_col);
         CHECK_EQUAL(tv.size(), expected.size());
         for (size_t i = 0; i < tv.size(); ++i) {
@@ -4640,13 +4684,13 @@ TEST(Query_DistinctThroughLinks)
 
         // Test original funcionality through chain class
         std::vector<size_t> results1 = {0, 1, 2, 3, 4, 5};
-        tv.distinct(SortDescriptor(*t1, {{t1_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
         CHECK_EQUAL(tv.size(), results1.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
-        tv.distinct(SortDescriptor(*t1, {{t1_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // results haven't been sorted
         }
@@ -4667,7 +4711,7 @@ TEST(Query_DistinctThroughLinks)
 
         // Test basic one link chain
         std::vector<size_t> results2 = {0, 1, 2, 4};
-        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         CHECK_EQUAL(tv.size(), results2.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
@@ -4675,14 +4719,14 @@ TEST(Query_DistinctThroughLinks)
 
         std::vector<size_t> results2_sorted_link = {0, 4, 2, 1};
         tv = t1->where().less(t1_int_col, 6).find_all();
-        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
         CHECK_EQUAL(tv.size(), results2_sorted_link.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results2_sorted_link[i]);
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
-        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results2_sorted_link[results2_sorted_link.size() - 1 - i]);
@@ -4695,7 +4739,7 @@ TEST(Query_DistinctThroughLinks)
         // Test link chain through two links with nulls
         std::vector<size_t> results3 = {0, 1, 2, 5};
         tv = t1->where().less(t1_int_col, 6).find_all();
-        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         // Nullified links are excluded from distinct.
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
@@ -4704,14 +4748,14 @@ TEST(Query_DistinctThroughLinks)
 
         results3 = {1, 0, 2, 5}; // sorted order on t3_col_int { null, 3, 4, 7 }
         tv = t1->where().less(t1_int_col, 6).find_all();
-        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
         }
         tv = t1->where().less(t1_int_col, 6).find_all();
-        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {

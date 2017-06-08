@@ -13,8 +13,6 @@
     - Multiple consecutive calls to sort or distinct compound on each other
       in the order applied rather than replacing the previous one.
     - The order that sort and distinct are applied can change the query result.
-    - It is now an error to define an ascending order on a distinct descriptor, if the
-      order is important then a sort should be applied before the distinct.
     - Applying an empty sort or distinct descriptor is now a no-op, this
       could previously be used to clear a sort or distinct operation.
 
