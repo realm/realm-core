@@ -139,6 +139,15 @@ public:
     /// change the association between the Group instance and the file
     /// that was specified in the call to open().
     ///
+    /// A Realm file that contains a history (see Replication::HistoryType) may
+    /// be opened via Group::open(), as long as the application can ensure that
+    /// there is no concurrent access to the file (see below for more on
+    /// concurrency), but if the file is modified via Group::commit() the
+    /// history will be discarded. To retain the history, the application must
+    /// instead access the file in shared mode, i.e., via SharedGroup, and
+    /// supply the right kind of replication plugin (see
+    /// Replication::get_history_type()).
+    ///
     /// A file that is passed to Group::open(), may not be modified by
     /// a third party until after the Group object is
     /// destroyed. Behavior is undefined if a file is modified by a
