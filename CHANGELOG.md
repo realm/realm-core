@@ -20,6 +20,42 @@
 
 ----------------------------------------------
 
+# 2.8.3 Release notes
+
+### Internals
+
+* Disabled a sleep in debug mode that was impairing external tests.
+  PR [#2651](https://github.com/realm/realm-core/pull/2651).
+
+----------------------------------------------
+
+# 2.8.2 Release notes
+
+### Bugfixes
+
+* Now rejecting a Realm file specifying a history schema version that is newer
+  than the one expected by the code.
+  PR [#2642](https://github.com/realm/realm-core/pull/2642).
+* No longer triggering a history schema upgrade when opening an empty Realm file
+  (when `top_ref` is zero).
+  PR [#2642](https://github.com/realm/realm-core/pull/2642).
+
+----------------------------------------------
+
+# 2.8.1 Release notes
+
+### Bugfixes
+
+* Add #include <realm/util/safe_int_ops.hpp> in alloc.hpp.
+  PR [#2622](https://github.com/realm/realm-core/pull/2622).
+* Fix crash in large (>4GB) encrypted Realm files.
+  PR [#2572](https://github.com/realm/realm-core/pull/2572).
+* Fix missing symbols for some overloads of Table::find_first
+  in some configurations.
+  PR [#2624](https://github.com/realm/realm-core/pull/2624).
+
+----------------------------------------------
+
 # 2.8.0 Release notes
 
 ### Bugfixes
@@ -27,7 +63,6 @@
 * Fix a race condition in encrypted files which can lead to
   crashes on devices using OpenSSL (Android).
   PR [#2616](https://github.com/realm/realm-core/pull/2616).
-* Add #include <realm/util/safe_int_ops.hpp> in alloc.hpp
 
 ### Enhancements
 
