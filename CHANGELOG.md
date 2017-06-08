@@ -16,7 +16,11 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Improve ASAN and TSAN build modes (`sh build.sh asan` and `sh build.sh tsan`)
+  such that they do not clobber the files produced during regular builds, and
+  also do not clobber each others files. Also `UNITTEST_THREADS` and
+  `UNITTEST_PROGRESS` options are no longer hard-coded in ASAN and TSAN build
+  modes.
 
 ----------------------------------------------
 
