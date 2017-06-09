@@ -4,6 +4,9 @@
 *~
 cscope.*
 tags
+GPATH
+GRTAGS
+GTAGS
 
 /cover_html
 /gcovr.xml
