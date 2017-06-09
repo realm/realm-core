@@ -6,6 +6,4 @@
 /*.gcno
 /*.gcda
 
-/test-util.a
-/test-util-dbg.a
-/test-util-cov.a
+/test-util*.a
