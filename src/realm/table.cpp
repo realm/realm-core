@@ -3955,6 +3955,12 @@ size_t Table::find_first(size_t col_ndx, util::Optional<double> value) const
     return value ? find_first(col_ndx, *value) : find_first_null(col_ndx);
 }
 
+template <>
+size_t Table::find_first(size_t col_ndx, null) const
+{
+    return find_first_null(col_ndx);
+}
+
 // Explicitly instantiate the generic case of the template for the types we care about.
 template size_t Table::find_first(size_t col_ndx, bool) const;
 template size_t Table::find_first(size_t col_ndx, int64_t) const;
