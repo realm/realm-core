@@ -2275,10 +2275,7 @@ size_t Table::add_row_with_key(size_t key_col_ndx, int64_t key)
 
     REALM_ASSERT(is_attached());
     REALM_ASSERT_3(key_col_ndx, <, num_cols);
-
-    if (REALM_UNLIKELY(num_cols == 0)) {
-        throw LogicError(LogicError::table_has_no_columns);
-    }
+    REALM_ASSERT(!is_nullable(key_col_ndx));
 
     bump_version();
 
