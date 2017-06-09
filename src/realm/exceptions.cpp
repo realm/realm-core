@@ -91,8 +91,6 @@ const char* LogicError::what() const noexcept
             return "Column does not exist";
         case subtable_of_subtable_index:
             return "Search index on a subtable of a subtable is not yet supported";
-        case descriptor_out_of_range:
-            return "Distinct or sort descriptor out of range";
     }
     return "Unknown error";
 }

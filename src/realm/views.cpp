@@ -60,9 +60,9 @@ CommonDescriptor::CommonDescriptor(Table const& table, std::vector<std::vector<s
     }
 }
 
-CommonDescriptor* CommonDescriptor::clone() const
+std::unique_ptr<CommonDescriptor> CommonDescriptor::clone() const
 {
-    return new CommonDescriptor(*this);
+    return std::unique_ptr<CommonDescriptor>(new CommonDescriptor(*this));
 }
 
 SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices,
@@ -79,9 +79,9 @@ SortDescriptor::SortDescriptor(Table const& table, std::vector<std::vector<size_
     }
 }
 
-CommonDescriptor* SortDescriptor::clone() const
+std::unique_ptr<CommonDescriptor> SortDescriptor::clone() const
 {
-    return new SortDescriptor(*this);
+    return std::unique_ptr<CommonDescriptor>(new SortDescriptor(*this));
 }
 
 void SortDescriptor::merge_with(SortDescriptor&& other)
@@ -232,30 +232,27 @@ DescriptorOrdering::DescriptorOrdering(const DescriptorOrdering& other)
 
 DescriptorOrdering& DescriptorOrdering::operator=(const DescriptorOrdering& rhs)
 {
-    m_descriptors.clear();
-    for (const auto& d : rhs.m_descriptors) {
-        m_descriptors.emplace_back(d->clone());
+    if (&rhs != this) {
+        m_descriptors.clear();
+        for (const auto& d : rhs.m_descriptors) {
+            m_descriptors.emplace_back(d->clone());
+        }
     }
     return *this;
 }
 
 void DescriptorOrdering::append_sort(SortDescriptor sort)
 {
-    if (sort.is_valid()) {
-        size_t orig_length = m_descriptors.size();
-        if (orig_length == 0) {
-            m_descriptors.emplace_back(new SortDescriptor(std::move(sort)));
-        }
-        else {
-            SortDescriptor* sort_descr = dynamic_cast<SortDescriptor*>(m_descriptors[orig_length - 1].get());
-            if (sort_descr) {
-                sort_descr->merge_with(std::move(sort));
-            }
-            else {
-                m_descriptors.emplace_back(new SortDescriptor(std::move(sort)));
-            }
+    if (!sort.is_valid()) {
+        return;
+    }
+    if (!m_descriptors.empty()) {
+        if (SortDescriptor* previous_sort = dynamic_cast<SortDescriptor*>(m_descriptors.back().get())) {
+            previous_sort->merge_with(std::move(sort));
+            return;
         }
     }
+    m_descriptors.emplace_back(new SortDescriptor(std::move(sort)));
 }
 
 void DescriptorOrdering::append_distinct(DistinctDescriptor distinct)
@@ -279,23 +276,22 @@ bool DescriptorOrdering::descriptor_is_distinct(size_t index) const
 
 const CommonDescriptor* DescriptorOrdering::operator[](size_t ndx) const
 {
-    if (REALM_UNLIKELY(ndx >= m_descriptors.size())) {
-        throw LogicError(LogicError::descriptor_out_of_range);
-    }
-    return m_descriptors[ndx].get();
+    return m_descriptors.at(ndx).get(); // may throw std::out_of_range
 }
 
 bool DescriptorOrdering::will_apply_sort() const
 {
     return std::any_of(m_descriptors.begin(), m_descriptors. end(), [](const std::unique_ptr<CommonDescriptor>& desc) {
-        return desc.get()->is_valid() && (dynamic_cast<SortDescriptor*>(desc.get()) != nullptr);
+        REALM_ASSERT(desc.get()->is_valid());
+        return dynamic_cast<SortDescriptor*>(desc.get()) != nullptr;
     });
 }
 
 bool DescriptorOrdering::will_apply_distinct() const
 {
     return std::any_of(m_descriptors.begin(), m_descriptors.end(), [](const std::unique_ptr<CommonDescriptor>& desc) {
-        return desc.get()->is_valid() && (dynamic_cast<SortDescriptor*>(desc.get()) == nullptr);
+        REALM_ASSERT(desc.get()->is_valid());
+        return dynamic_cast<SortDescriptor*>(desc.get()) == nullptr;
     });
 }
 
@@ -365,8 +361,8 @@ void RowIndexes::do_sort(const DescriptorOrdering& ordering) {
     const int num_descriptors = int(ordering.size());
     for (int desc_ndx = 0; desc_ndx < num_descriptors; ++desc_ndx) {
         const CommonDescriptor* common_descr = ordering[desc_ndx];
-        const SortDescriptor* sort_descr = dynamic_cast<const SortDescriptor*>(common_descr);
-        if (sort_descr) {
+
+        if (const auto* sort_descr = dynamic_cast<const SortDescriptor*>(common_descr)) {
 
             SortDescriptor::Sorter sort_predicate = sort_descr->sorter(m_row_indexes);
 

@@ -52,7 +52,7 @@ public:
     // `column_indices` must be non-empty, and each vector within it must also
     // be non-empty.
     CommonDescriptor(Table const& table, std::vector<std::vector<size_t>> column_indices);
-    virtual CommonDescriptor* clone() const;
+    virtual std::unique_ptr<CommonDescriptor> clone() const;
 
     // returns whether this descriptor is valid and can be used to sort
     bool is_valid() const noexcept
@@ -84,9 +84,8 @@ public:
                    std::vector<bool> ascending = {});
     SortDescriptor() = default;
     ~SortDescriptor() = default;
-    CommonDescriptor* clone() const override;
+    std::unique_ptr<CommonDescriptor> clone() const override;
 
-    CommonDescriptor& operator()() = delete;
     void merge_with(SortDescriptor&& other);
 
     Sorter sorter(IntegerColumn const& row_indexes) const override;

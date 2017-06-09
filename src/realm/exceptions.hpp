@@ -211,10 +211,7 @@ public:
         column_does_not_exist,
 
         /// You can not add index on a subtable of a subtable
-        subtable_of_subtable_index,
-
-        /// An out of bounds access to a distinct or sort descriptor
-        descriptor_out_of_range
+        subtable_of_subtable_index
     };
 
     LogicError(ErrorKind message);
