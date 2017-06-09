@@ -238,6 +238,7 @@
     <ClInclude Include="..\test\util\verified_string.hpp" />
     <ClInclude Include="..\test\pthread_test.hpp" />
     <ClInclude Include="..\test\testsettings.hpp" />
+    <ClInclude Include="..\src\realm\util\interprocess_condvar.hpp" />
     <ClInclude Include="..\src\realm\util\overload.hpp" />
   </ItemGroup>
   <ItemGroup>

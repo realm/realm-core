@@ -1884,7 +1884,7 @@ TEST(Query_size)
 
     auto set_links = [](LinkViewRef lv, const std::vector<int64_t>& value_list) {
         for (auto v : value_list) {
-            lv->add(v);
+            lv->add(size_t(v));
         }
     };
     set_links(table1->get_linklist(3, 0), std::vector<Int>({0, 1, 2, 3, 4, 5}));
