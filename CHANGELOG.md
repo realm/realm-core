@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixes bug in encryption that could cause deadlocks/hangs and possibly
+  other bugs too. Fixes https://github.com/realm/realm-core/pull/2650
 
 ### Breaking changes
 
