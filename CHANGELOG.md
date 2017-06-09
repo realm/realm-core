@@ -2,7 +2,10 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Attemp to open a smal unencrypted realm file with an encryption key would
+  produce an empty encrypted realm file. Fixed by detecting the case and
+  throwing an exception.
+  PR [#2645](https://github.com/realm/realm-core/pull/2645)
 
 ### Breaking changes
 
