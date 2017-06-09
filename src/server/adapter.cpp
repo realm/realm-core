@@ -209,7 +209,7 @@ public:
         select(m_selected_table_name, m_selected_object_schema, m_selected_table, m_selected_primary);
     }
 
-    void operator()(const Instruction::SelectLinkList& instr)
+    void operator()(const Instruction::SelectContainer& instr)
     {
         REALM_ASSERT(m_selected_object_schema);
 
@@ -402,49 +402,54 @@ public:
     }
 
     // Must have linklist selected:
-    void operator()(const Instruction::LinkListSet& instr)
+    void operator()(const Instruction::ContainerSet& instr)
     {
         if (!m_list_property)
             return; // FIXME
+
+        // FIXME: Support arrays of primitives
 
         add_instruction(Adapter::InstructionType::ListSet, {
             {"identity", m_list_parent_identity},
             {"property", m_list_property->name},
-            {"list_index", instr.link_ndx},
-            {"object_identity", get_identity(instr.value, *m_list_target_table, m_list_target_primary)}
+            {"list_index", instr.ndx},
+            {"object_identity", get_identity(instr.payload.data.link.target, *m_list_target_table, m_list_target_primary)}
         });
     }
 
-    void operator()(const Instruction::LinkListInsert& instr)
+    void operator()(const Instruction::ContainerInsert& instr)
     {
         if (!m_list_property)
             return; // FIXME
+
+
+        // FIXME: Support arrays of primitives
 
         add_instruction(Adapter::InstructionType::ListInsert, {
             {"identity", m_list_parent_identity},
             {"property", m_list_property->name},
-            {"list_index", instr.link_ndx},
-            {"object_identity", get_identity(instr.value, *m_list_target_table, m_list_target_primary)}
+            {"list_index", instr.ndx},
+            {"object_identity", get_identity(instr.payload.data.link.target, *m_list_target_table, m_list_target_primary)}
         });
     }
 
-    void operator()(const Instruction::LinkListMove&)
+    void operator()(const Instruction::ContainerMove&)
     {
         if (!m_list_property)
             return; // FIXME
 
-        REALM_TERMINATE("LinkListMove not supported by adapter.");
+        REALM_TERMINATE("ContainerMove not supported by adapter.");
     }
 
-    void operator()(const Instruction::LinkListSwap&)
+    void operator()(const Instruction::ContainerSwap&)
     {
         if (!m_list_property)
             return; // FIXME
 
-        REALM_TERMINATE("LinkListSwap not supported by adapter.");
+        REALM_TERMINATE("ContainerSwap not supported by adapter.");
     }
 
-    void operator()(const Instruction::LinkListErase& instr)
+    void operator()(const Instruction::ContainerErase& instr)
     {
         if (!m_list_property)
             return; // FIXME
@@ -452,11 +457,11 @@ public:
         add_instruction(Adapter::InstructionType::ListErase, {
             {"identity", m_list_parent_identity},
             {"property", m_list_property->name},
-            {"list_index", instr.link_ndx},
+            {"list_index", instr.ndx},
         });
     }
 
-    void operator()(const Instruction::LinkListClear&)
+    void operator()(const Instruction::ContainerClear&)
     {
         if (!m_list_property)
             return; // FIXME
