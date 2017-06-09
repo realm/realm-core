@@ -57,6 +57,12 @@ if(WINDOWS_STORE AND CMAKE_SYSTEM_VERSION STREQUAL 10.0)
     add_definitions(-DREALM_UWP=1 -D_SCL_SECURE_NO_WARNINGS)
 endif()
 
+if(MSVC)
+    add_compile_options(
+        /MP # Enable multi-processor compilation
+    )
+endif()
+
 # Platform-specific build configuration
 if(APPLE)
     find_library(Foundation Foundation)
