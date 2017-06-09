@@ -2270,7 +2270,7 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
 
 size_t Table::add_row_with_key(size_t key_col_ndx, int64_t key)
 {
-    size_t num_cols = m_spec.get_column_count();
+    size_t num_cols = m_spec->get_column_count();
     size_t row_ndx = m_size;
 
     REALM_ASSERT(is_attached());
