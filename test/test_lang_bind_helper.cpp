@@ -13177,7 +13177,7 @@ TEST(LangBindHelper_MixedTimestampTransaction)
     CHECK(t->get_mixed(0, 1) == neg_time);
 }
 
-ONLY(LangBindHelper_OpenAsEncrypted)
+TEST(LangBindHelper_OpenAsEncrypted)
 {
 
     {
@@ -13195,23 +13195,16 @@ ONLY(LangBindHelper_OpenAsEncrypted)
         }
 
         sg_clear.close();
-    }
 
-    {
-        SHARED_GROUP_TEST_PATH(path);
         const char* key = crypt_key();
         std::unique_ptr<Replication> hist_encrypt(make_in_realm_history(path));
-        SharedGroup sg_encrypt(*hist_encrypt, SharedGroupOptions(key));
-
-        {
-            ReadTransaction rt(sg_encrypt);
-            const Group& group = rt.get_group();
-            CHECK_EQUAL(1, group.size());
-            ConstTableRef target = group.get_table("table");
-            CHECK_EQUAL(1, target->size());
+        bool is_okay = false;
+        try {
+            SharedGroup sg_encrypt(*hist_encrypt, SharedGroupOptions(key));
+        } catch (std::runtime_error&) {
+            is_okay = true;
         }
-
-        sg_encrypt.close();
+        CHECK(is_okay);
     }
 }
 
