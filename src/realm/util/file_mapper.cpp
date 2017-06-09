@@ -117,58 +117,70 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, int fd, size_t file_o
         int err = errno; // Eliminate any risk of clobbering
         throw std::runtime_error(get_errno_msg("fstat() failed: ", err));
     }
-
-    if (st.st_size > 0 && static_cast<size_t>(st.st_size) < page_size())
+    File::SizeType content_size = data_size_to_encrypted_size(st.st_size);
+    File::SizeType cast_page_size;
+    bool did_overflow = int_cast_with_overflow_detect(page_size(), cast_page_size);
+    REALM_ASSERT_EX(!did_overflow, cast_page_size, page_size());
+    if (content_size > 0 && content_size < cast_page_size)
         throw DecryptionFailed();
 
-    LockGuard lock(mapping_mutex);
-
-    std::vector<mappings_for_file>::iterator it;
-    for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
-        if (it->inode == st.st_ino && it->device == st.st_dev)
-            break;
-    }
-
-    // Get the potential memory allocation out of the way so that mappings_by_addr.push_back can't throw
-    mappings_by_addr.reserve(mappings_by_addr.size() + 1);
-
-    if (it == mappings_by_file.end()) {
-        mappings_by_file.reserve(mappings_by_file.size() + 1);
-
-        fd = dup(fd);
-        if (fd == -1) {
-            int err = errno; // Eliminate any risk of clobbering
-            throw std::runtime_error(get_errno_msg("dup() failed: ", err));
-        }
-
-        mappings_for_file f;
-        f.device = st.st_dev;
-        f.inode = st.st_ino;
-        try {
-            f.info = new SharedFileInfo(reinterpret_cast<const uint8_t*>(encryption_key), fd);
-        }
-        catch (...) {
-            ::close(fd);
-            throw;
-        }
-
-        mappings_by_file.push_back(f); // can't throw due to reserve() above
-        it = mappings_by_file.end() - 1;
-    }
+    UniqueLock lock(mapping_mutex, defer_lock_tag());
 
     try {
-        mapping_and_addr m;
-        m.addr = addr;
-        m.size = size;
-        EncryptedFileMapping* m_ptr = new EncryptedFileMapping(*it->info, file_offset, addr, size, access);
-        m.mapping = m_ptr;
-        mappings_by_addr.push_back(m); // can't throw due to reserve() above
-        return m_ptr;
+        lock.lock();
+        std::vector<mappings_for_file>::iterator it;
+        for (it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
+            if (it->inode == st.st_ino && it->device == st.st_dev)
+                break;
+        }
+
+        // Get the potential memory allocation out of the way so that mappings_by_addr.push_back can't throw
+        mappings_by_addr.reserve(mappings_by_addr.size() + 1);
+
+        if (it == mappings_by_file.end()) {
+            mappings_by_file.reserve(mappings_by_file.size() + 1);
+
+            fd = dup(fd);
+            if (fd == -1) {
+                int err = errno; // Eliminate any risk of clobbering
+                throw std::runtime_error(get_errno_msg("dup() failed: ", err));
+            }
+
+            mappings_for_file f;
+            f.device = st.st_dev;
+            f.inode = st.st_ino;
+            try {
+                f.info = new SharedFileInfo(reinterpret_cast<const uint8_t*>(encryption_key), fd);
+            }
+            catch (...) {
+                ::close(fd);
+                throw;
+            }
+
+            mappings_by_file.push_back(f); // can't throw due to reserve() above
+            it = mappings_by_file.end() - 1;
+        }
+
+        try {
+            mapping_and_addr m;
+            m.addr = addr;
+            m.size = size;
+            EncryptedFileMapping* m_ptr = new EncryptedFileMapping(*it->info, file_offset, addr, size, access);
+            m.mapping = m_ptr;
+            mappings_by_addr.push_back(m); // can't throw due to reserve() above
+            return m_ptr;
+        }
+        catch (...) {
+            if (it->info->mappings.empty()) {
+                ::close(it->info->fd);
+                mappings_by_file.erase(it);
+            }
+            throw;
+        }
     }
     catch (...) {
-        if (it->info->mappings.empty()) {
-            ::close(it->info->fd);
-            mappings_by_file.erase(it);
+        if (lock.holds_lock()) {
+            lock.unlock();
         }
         throw;
     }
@@ -177,7 +189,7 @@ EncryptedFileMapping* add_mapping(void* addr, size_t size, int fd, size_t file_o
 void remove_mapping(void* addr, size_t size)
 {
     size = round_up_to_page_size(size);
-    LockGuard lock(mapping_mutex);
+    UniqueLock lock(mapping_mutex);
     mapping_and_addr* m = find_mapping_for_addr(addr, size);
     if (!m)
         return;
@@ -187,9 +199,11 @@ void remove_mapping(void* addr, size_t size)
     for (std::vector<mappings_for_file>::iterator it = mappings_by_file.begin(); it != mappings_by_file.end(); ++it) {
         if (it->info->mappings.empty()) {
             if (::close(it->info->fd) != 0) {
-                int err = errno;                // Eliminate any risk of clobbering
-                if (err == EBADF || err == EIO) // FIXME: how do we handle EINTR?
+                int err = errno;                 // Eliminate any risk of clobbering
+                if (err == EBADF || err == EIO) {// FIXME: how do we handle EINTR?
+                    lock.unlock();
                     throw std::runtime_error(get_errno_msg("close() failed: ", err));
+                }
             }
             mappings_by_file.erase(it);
             break;
@@ -287,7 +301,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::
 {
 #if REALM_ENABLE_ENCRYPTION
     if (encryption_key) {
-        LockGuard lock(mapping_mutex);
+        UniqueLock lock(mapping_mutex);
         size_t rounded_old_size = round_up_to_page_size(old_size);
         if (mapping_and_addr* m = find_mapping_for_addr(old_addr, rounded_old_size)) {
             size_t rounded_new_size = round_up_to_page_size(new_size);
@@ -301,6 +315,7 @@ void* mremap(int fd, size_t file_offset, void* old_addr, size_t old_size, File::
             m->size = rounded_new_size;
             if (i != 0) {
                 int err = errno;
+                lock.unlock();
                 throw std::runtime_error(get_errno_msg("munmap() failed: ", err));
             }
             return new_addr;
