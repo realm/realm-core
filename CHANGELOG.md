@@ -16,7 +16,38 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Fix an assert that prevented `Group::commit()` from discarding history from a
+  Realm file opened in nonshared mode (via `Group::open()`, as opposed to
+  `SharedGroup::open()`).
+  PR [#2655](https://github.com/realm/realm-core/pull/2655).
+* Improve ASAN and TSAN build modes (`sh build.sh asan` and `sh build.sh tsan`)
+  such that they do not clobber the files produced during regular builds, and
+  also do not clobber each others files. Also `UNITTEST_THREADS` and
+  `UNITTEST_PROGRESS` options are no longer hard-coded in ASAN and TSAN build
+  modes.
+  PR [#2660](https://github.com/realm/realm-core/pull/2660).
+
+----------------------------------------------
+
+# 2.8.3 Release notes
+
+### Internals
+
+* Disabled a sleep in debug mode that was impairing external tests.
+  PR [#2651](https://github.com/realm/realm-core/pull/2651).
+
+----------------------------------------------
+
+# 2.8.2 Release notes
+
+### Bugfixes
+
+* Now rejecting a Realm file specifying a history schema version that is newer
+  than the one expected by the code.
+  PR [#2642](https://github.com/realm/realm-core/pull/2642).
+* No longer triggering a history schema upgrade when opening an empty Realm file
+  (when `top_ref` is zero).
+  PR [#2642](https://github.com/realm/realm-core/pull/2642).
 
 ----------------------------------------------
 
