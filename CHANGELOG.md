@@ -25,6 +25,7 @@
   also do not clobber each others files. Also `UNITTEST_THREADS` and
   `UNITTEST_PROGRESS` options are no longer hard-coded in ASAN and TSAN build
   modes.
+  PR [#2660](https://github.com/realm/realm-core/pull/2660).
 
 ----------------------------------------------
 
