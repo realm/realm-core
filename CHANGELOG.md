@@ -31,6 +31,9 @@
   take place for *all* subtables in a subtable column. There is no way to add
   or remove it from single individual subtables.
   PR [#2561](https://github.com/realm/realm-core/pull/2561).
+* Add more overloads with realm::null - PR [#2669](https://github.com/realm/realm-core/pull/2669)
+  - `size_t Table::find_first(size_t col_ndx, null)`
+  - `OutputStream& operator<<(OutputStream& os, const null&)`
 
 -----------
 
