@@ -27,6 +27,13 @@
 #include <functional>
 
 #ifdef _MSC_VER
+#if REALM_UWP
+struct timeval {
+    long tv_sec;
+    long tv_usec;
+};
+#endif
+#include <windows.h>
 #include <intrin.h>
 #endif
 
@@ -114,6 +121,11 @@ void* round_down(void* p, size_t align);
 size_t round_up(size_t p, size_t align);
 size_t round_down(size_t p, size_t align);
 void millisleep(unsigned long milliseconds);
+
+#ifdef _WIN32
+int gettimeofday(struct timeval * tp, struct timezone * tzp);
+#endif
+
 
 #ifdef REALM_SLAB_ALLOC_TUNE
 void process_mem_usage(double& vm_usage, double& resident_set);

@@ -6,10 +6,31 @@
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Support for size query on LinkedList removed. This is perhaps not so 
+  breaking after all since it is probably not used.
+  PR [#2532](https://github.com/realm/realm-core/pull/2532).
+* Replication interface changed. The search index functions now operate
+  on a descriptor and not a table.
+  PR [#2561](https://github.com/realm/realm-core/pull/2561).
 
 ### Enhancements
 
+* Enhanced support for query in subtables:
+  Query q = table->column<SubTable>(0).list<Int>() == 5;
+  Query q = table->column<SubTable>(0).list<Int>().min() >= 2;
+  Query q = table->column<SubTable>(1).list<String>().begins_with("Bar");
+  PR [#2532](https://github.com/realm/realm-core/pull/2532).
+* Subtable column can now be nullable. You can use `is_null()` and `set_null()`
+  on a subtable element.
+  PR [#2560](https://github.com/realm/realm-core/pull/2560).
+* Support for search index on subtable columns. Only one level of subtables
+  are currently supported, that is, you cannot create a search index in a
+  subtable of a subtable (will throw exception). NOTE: Core versions prior to
+  this version will not be able to open .realm files of this Core version if
+  this Core version has added such indexes. Adding or removing an index will
+  take place for *all* subtables in a subtable column. There is no way to add
+  or remove it from single individual subtables.
+  PR [#2561](https://github.com/realm/realm-core/pull/2561).
 * Add more overloads with realm::null - PR [#2669](https://github.com/realm/realm-core/pull/2669)
   - `size_t Table::find_first(size_t col_ndx, null)`
   - `OutputStream& operator<<(OutputStream& os, const null&)`
@@ -18,6 +39,17 @@
 
 ### Internals
 
+* The RuntimeLibrary of the Windows build is changed from MultiThreadedDLL to
+  just MultiThreaded so as to statically link the Visual C++ runtime libraries,
+  removing the onus on end-users to have the correct runtime redistributable
+  package or satellite assembly pack installed. Libraries that link against Core
+  on Windows will have to adjust their compiler flags accordingly.
+  PR [#2611](https://github.com/realm/realm-core/pull/2611).
+* Win32+UWP: Switched from pthread-win32 to native API.
+  PR [#2602](https://github.com/realm/realm-core/pull/2602).
+* Implemented inter-process CondVars on Windows (Win32 + UWP). They should be
+  fair and robust.
+  PR [#2497](https://github.com/realm/realm-core/pull/2497).
 * Fix an assert that prevented `Group::commit()` from discarding history from a
   Realm file opened in nonshared mode (via `Group::open()`, as opposed to
   `SharedGroup::open()`).
@@ -64,7 +96,7 @@
 * Fix missing symbols for some overloads of Table::find_first
   in some configurations.
   PR [#2624](https://github.com/realm/realm-core/pull/2624).
-
+  
 ----------------------------------------------
 
 # 2.8.0 Release notes

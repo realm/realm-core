@@ -22,6 +22,9 @@
 #include <streambuf>
 #include <fstream>
 #include <tuple>
+#include <iostream>
+#include <fstream>
+#include <thread>
 
 // Need fork() and waitpid() for Shared_RobustAgainstDeathDuringWrite
 #ifndef _WIN32
@@ -91,6 +94,35 @@ using unit_test::TestContext;
 // check-testcase` (or one of its friends) from the command line.
 
 
+#ifdef _WIN32
+namespace {
+    // NOTE: Unit tests must use NONCONCURRENT_TEST() macro if they use wínfork!
+    //
+    // NOTE: This does not work like on POSIX: The child will begin execution from
+    // the unit test entry point, not from where fork() took place.
+    //
+    DWORD winfork(std::string unit_test_name)
+    {
+        if (getenv("REALM_FORKED"))
+            return GetCurrentProcessId();
+
+        remove("winfork.bat");
+        std::ofstream myfile("winfork.bat");
+        myfile << "set UNITTEST_FILTER=" << unit_test_name << "\n";
+        myfile << "set REALM_FORKED=1\n";
+        char buf[1024] = { 0 };
+        DWORD ret = GetModuleFileNameA(NULL, buf, sizeof(buf));
+        myfile << "\"" << buf << "\"\n";
+        myfile.close();
+        int64_t nRet = (int64_t)ShellExecuteA(0, "open", "winfork.bat", 0, 0, SW_SHOWNORMAL);
+        if (nRet <= 32) {
+            return -1;
+        }
+        return 0;
+    }
+}
+#endif
+
 TEST(Shared_Unattached)
 {
     SharedGroup sg((SharedGroup::unattached_tag()));
@@ -138,7 +170,7 @@ void writer(std::string path, int id)
             if (i & 1) {
                 t1->add_int(0, id, 1);
             }
-            sched_yield(); // increase chance of signal arriving in the middle of a transaction
+            std::this_thread::yield(); // increase chance of signal arriving in the middle of a transaction
             wt.commit();
         }
         // std::cerr << "Ended pid " << getpid() << std::endl;
@@ -282,7 +314,7 @@ TEST(Shared_CompactingOnTheFly)
             // make sure writer has started:
             bool waiting = true;
             while (waiting) {
-                sched_yield();
+                std::this_thread::yield();
                 ReadTransaction rt(sg);
                 auto t1 = rt.get_table("test");
                 waiting = t1->get_int(0, 41) == 0;
@@ -587,6 +619,7 @@ TEST(Shared_1)
     }
 }
 
+
 TEST(Shared_try_begin_write)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -660,7 +693,6 @@ TEST(Shared_try_begin_write)
         CHECK(gr.get_table(1)->get_name() == StringData("table 2"));
     }
 }
-
 
 TEST(Shared_Rollback)
 {
@@ -2082,10 +2114,99 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #endif // !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
-#if !defined(_WIN32)
-// this test does not work with valgrind:
-#if 0
+#ifdef _WIN32
 
+#if 1
+
+TEST(Shared_WaitForChangeAfterOwnCommit)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    SharedGroup* sg = new SharedGroup(path);
+    sg->begin_write();
+    sg->commit();
+    bool b = sg->wait_for_change();
+}
+
+
+NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
+{
+    // We can't use SHARED_GROUP_TEST_PATH() because it will attempt to clean up the .realm file at the end,
+    // and hence throw if the other processstill has the .realm file open
+    std::string path = get_test_path("Shared_InterprocessWaitForChange", ".realm");
+
+    // This works differently from POSIX: Here, the child process begins execution from the start of this unit
+    // test and not from the place of fork().
+    DWORD pid = winfork("Shared_InterprocessWaitForChange");
+
+    if (pid == -1) {
+        CHECK(false);
+        return;
+    }
+
+    std::unique_ptr<SharedGroup> sg(new SharedGroup(path));
+
+    // An old .realm file with random contents can exist (such as a leftover from earlier crash) with random
+    // data, so we always initialize the database
+    {
+        Group& g = sg->begin_write();
+        if (g.size() == 1) {
+            g.remove_table("data");
+            TableRef table = g.add_table("data");
+            table->add_column(type_Int, "ints");
+            table->add_empty_row();
+            table->set_int(0, 0, 0);
+        }
+        sg->commit();
+        sg->wait_for_change();
+    }
+
+    bool first = false;
+    fastrand(time(0), true);
+
+    // By turn, incremenet the counter and wait for the other to increment it too
+    for (int i = 0; i < 10; i++)
+    {
+        Group& g = sg->begin_write();
+        if (g.size() == 1) {
+            TableRef table = g.get_table("data");
+            int64_t v = table->get_int(0, 0);
+
+            if (i == 0 && v == 0)
+                first = true;
+
+            // Note: If this fails in child process (pid != 0) it might go undetected. This is not
+            // critical since it will most likely result in a failure in the parent process also.
+            CHECK_EQUAL(v - (first ? 0 : 1), 2 * i);
+            table->set_int(0, 0, v + 1);
+        }
+
+        // millisleep(0) might yield time slice on certain OS'es, so we use fastrand() to get cases 
+        // of 0 delay, because non-yieldig is also an important test case.
+        if(fastrand(1))
+            millisleep((time(0) % 10) * 10);
+
+        sg->commit();
+
+        if (fastrand(1))
+            millisleep((time(0) % 10) * 10);
+
+        sg->wait_for_change();
+
+        if (fastrand(1))
+            millisleep((time(0) % 10) * 10);
+    }
+
+    // Wake up other process so it will exit too
+    sg->begin_write();
+    sg->commit();
+}
+
+#endif
+
+#endif
+
+// FIXME: This test does not work with valgrind
 // This test will hang infinitely instead of failing!!!
 TEST(Shared_WaitForChange)
 {
@@ -2210,10 +2331,6 @@ TEST(Shared_WaitForChange)
         sgs[j] = 0;
     }
 }
-
-
-#endif // test is disabled
-#endif // endif not on windows
 
 
 TEST(Shared_MultipleSharersOfStreamingFormat)
