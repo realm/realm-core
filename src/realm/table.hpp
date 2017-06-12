@@ -549,6 +549,7 @@ public:
     void clear_subtable(size_t column_ndx, size_t row_ndx);
 
     // Backlinks
+    size_t get_backlink_count(size_t row_ndx) const noexcept;
     size_t get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept;
     size_t get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
         noexcept;
