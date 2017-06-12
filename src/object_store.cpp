@@ -102,6 +102,8 @@ void add_index(Table& table, size_t col)
 
 DataType to_core_type(PropertyType type)
 {
+    REALM_ASSERT(type != PropertyType::Object); // Link columns have to be handled differently
+    REALM_ASSERT(type != PropertyType::Any); // Mixed columns can't be created
     switch (type & ~PropertyType::Flags) {
         case PropertyType::Int:    return type_Int;
         case PropertyType::Bool:   return type_Bool;
@@ -110,8 +112,7 @@ DataType to_core_type(PropertyType type)
         case PropertyType::String: return type_String;
         case PropertyType::Date:   return type_Timestamp;
         case PropertyType::Data:   return type_Binary;
-        case PropertyType::Object: return type_Link;
-        default: REALM_TERMINATE("unknown type");
+        default: REALM_COMPILER_HINT_UNREACHABLE();
     }
 }
 

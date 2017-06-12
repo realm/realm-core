@@ -73,7 +73,7 @@ PropertyType ObjectSchema::from_core_type(Descriptor const& table, size_t col)
         case type_Link:      return PropertyType::Object | PropertyType::Nullable;
         case type_LinkList:  return PropertyType::Object | PropertyType::Array;
         case type_Table:     return from_core_type(*table.get_subdescriptor(col), 0) | PropertyType::Array;
-        default: REALM_UNREACHABLE(); // FIXME
+        default: REALM_UNREACHABLE();
     }
 }
 
