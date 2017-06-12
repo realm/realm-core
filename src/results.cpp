@@ -59,9 +59,7 @@ Results::Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q, SortDes
         m_query = std::move(*q);
         m_mode = Mode::Query;
     }
-    if (s.is_valid()) {
-        m_descriptor_ordering.append_sort(std::move(s));
-    }
+    m_descriptor_ordering.append_sort(std::move(s));
 }
 
 Results::Results(SharedRealm r, TableView tv, DescriptorOrdering o)
