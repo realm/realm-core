@@ -79,7 +79,7 @@ private:
 
     // MUST be of type char because of coherence issues when writing inside mutex and reading outside 
     // it. FIXME: We're investigating if this is good enough, or if we need further mechanisms
-    std::vector<bool> m_up_to_date_pages;
+    std::vector<char> m_up_to_date_pages;
     std::vector<bool> m_dirty_pages;
 
     File::AccessMode m_access;
