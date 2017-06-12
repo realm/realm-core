@@ -6,6 +6,12 @@
 
 ### Breaking changes
 
+* Added support for compound sort and distinct queries.
+    - Multiple consecutive calls to sort or distinct compound on each other
+      in the order applied rather than replacing the previous one.
+    - The order that sort and distinct are applied can change the query result.
+    - Applying an empty sort or distinct descriptor is now a no-op, this
+      could previously be used to clear a sort or distinct operation.
 * Support for size query on LinkedList removed. This is perhaps not so 
   breaking after all since it is probably not used.
   PR [#2532](https://github.com/realm/realm-core/pull/2532).
