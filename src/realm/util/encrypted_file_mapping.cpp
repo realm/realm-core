@@ -532,6 +532,9 @@ void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_
     m_dirty_pages.clear();
 
     m_up_to_date_pages.resize(num_pages, false);
+
+    m_up_to_date_pages.reserve(1000);
+
     m_dirty_pages.resize(num_pages, false);
 }
 
