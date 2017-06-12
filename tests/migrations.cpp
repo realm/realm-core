@@ -575,7 +575,7 @@ TEST_CASE("migration: Automatic") {
                 realm->read_group().get_table("class_object")->add_column(type_Table, "subtable");
                 realm->commit_transaction();
             }
-            // close and reopen the Realm tu ensure it rereads the schema from
+            // close and reopen the Realm to ensure it rereads the schema from
             // the group
 
             auto realm = Realm::get_shared_realm(config);
