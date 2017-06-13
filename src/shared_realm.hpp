@@ -145,7 +145,6 @@ public:
         // User-supplied encryption key. Must be either empty or 64 bytes.
         std::vector<char> encryption_key;
 
-
         bool in_memory = false;
         SchemaMode schema_mode = SchemaMode::Automatic;
 
@@ -229,6 +228,8 @@ public:
     void cancel_transaction();
     bool is_in_transaction() const noexcept;
     bool is_in_read_transaction() const { return !!m_group; }
+
+    bool is_in_migration() const noexcept { return m_in_migration; }
 
     bool refresh();
     void set_auto_refresh(bool auto_refresh) { m_auto_refresh = auto_refresh; }
@@ -341,6 +342,11 @@ private:
     // True while sending the notifications caused by advancing the read
     // transaction version, to avoid recursive notifications where possible
     bool m_is_sending_notifications = false;
+
+    // True while we're performing a schema migration via this Realm instance
+    // to allow for different behavior (such as allowing modifications to
+    // primary key values)
+    bool m_in_migration = false;
 
     void begin_read(VersionID);
 

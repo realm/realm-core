@@ -42,7 +42,11 @@ void Object::set_property_value(ContextType& ctx, StringData prop_name, ValueTyp
     verify_attached();
     m_realm->verify_in_write();
     auto& property = property_for_name(prop_name);
-    if (property.is_primary)
+
+    // Modifying primary keys is allowed in migrations to make it possible to
+    // add a new primary key to a type (or change the property type), but it
+    // is otherwise considered the immutable identity of the row
+    if (property.is_primary && !m_realm->is_in_migration())
         throw std::logic_error("Cannot modify primary key after creation");
 
     set_property_value_impl(ctx, property, value, try_update);
@@ -185,6 +189,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
     size_t row_index = realm::not_found;
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), object_schema.name);
 
+    bool skip_primary = false;
     if (auto primary_prop = object_schema.primary_key_property()) {
         // search for existing object based on primary key type
         auto primary_value = ctx.value_for_property(value, primary_prop->name,
@@ -215,8 +220,18 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                                   ctx.template unbox<StringData>(*primary_value));
         }
         else if (!try_update) {
-            throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'.",
-                                                object_schema.name, ctx.print(*primary_value)));
+            if (realm->is_in_migration()) {
+                // Creating objects with duplicate primary keys is allowed in migrations
+                // as long as there are no duplicates at the end, as adding an entirely
+                // new column which is the PK will inherently result in duplicates at first
+                row_index = table->add_empty_row();
+                created = true;
+                skip_primary = false;
+            }
+            else {
+                throw std::logic_error(util::format("Attempting to create an object of type '%1' with an existing primary key value '%2'.",
+                                                    object_schema.name, ctx.print(*primary_value)));
+            }
         }
     }
     else {
@@ -230,7 +245,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
         *out_row = object.row();
     for (size_t i = 0; i < object_schema.persisted_properties.size(); ++i) {
         auto& prop = object_schema.persisted_properties[i];
-        if (prop.is_primary)
+        if (skip_primary && prop.is_primary)
             continue;
 
         auto v = ctx.value_for_property(value, prop.name, i);

@@ -895,6 +895,39 @@ TEST_CASE("migration: Automatic") {
                 REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
             });
         }
+
+        SECTION("change primary key property type") {
+            schema = set_type(schema, "all types", "pk", PropertyType::String);
+            realm->update_schema(schema, 2, [](auto, auto new_realm, auto&) {
+                Object obj(new_realm, "all types", 0);
+
+                CppContext ctx(new_realm);
+                obj.set_property_value(ctx, "pk", util::Any("1"s), false);
+            });
+        }
+
+        SECTION("set primary key to duplicate values in migration") {
+            auto bad_migration = [&](auto, auto new_realm, Schema&) {
+                // shoud be able to create a new object with the same PK
+                REQUIRE_NOTHROW(Object::create(ctx, new_realm, "all types", values, false));
+                REQUIRE(get_table(new_realm, "all types")->size() == 2);
+
+                // but it'll fail at the end
+            };
+            REQUIRE_THROWS_AS(realm->update_schema(schema, 2, bad_migration), DuplicatePrimaryKeyValueException);
+            REQUIRE(get_table(realm, "all types")->size() == 1);
+
+            auto good_migration = [&](auto, auto new_realm, Schema&) {
+                REQUIRE_NOTHROW(Object::create(ctx, new_realm, "all types", values, false));
+
+                // Change the old object's PK to elminate the duplication
+                Object old_obj(new_realm, "all types", 0);
+                CppContext ctx(new_realm);
+                old_obj.set_property_value(ctx, "pk", util::Any(INT64_C(5)), false);
+            };
+            REQUIRE_NOTHROW(realm->update_schema(schema, 2, good_migration));
+            REQUIRE(get_table(realm, "all types")->size() == 2);
+        }
     }
 
     SECTION("property renaming") {
