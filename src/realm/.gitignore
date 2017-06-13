@@ -14,6 +14,22 @@
 /impl/*.gcno
 /impl/*.gcda
 
+# ASAN
+/*-asan
+/*-asan-noinst
+/*-asan-dbg
+/*-asan-dbg-noinst
+/*-asan-cov
+/*-asan-cov-noinst
+
+# TSAN
+/*-tsan
+/*-tsan-noinst
+/*-tsan-dbg
+/*-tsan-dbg-noinst
+/*-tsan-cov
+/*-tsan-cov-noinst
+
 /librealm*.a
 /librealm*.so
 /librealm*.so.*

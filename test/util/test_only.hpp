@@ -25,7 +25,7 @@
     realm::test_util::SetTestOnly realm_set_test_only__##name(#name);                                                \
     TEST(name)
 
-#define NONCUNCURRENT_ONLY(name)                                                                                     \
+#define NONCONCURRENT_ONLY(name)                                                                                     \
     realm::test_util::SetTestOnly realm_set_test_only__##name(#name);                                                \
     NONCONCURRENT_TEST(name)
 
