@@ -77,7 +77,7 @@ private:
 
     size_t m_first_page;
 
-    std::vector<bool> m_up_to_date_pages;
+    std::vector<char> m_up_to_date_pages;
     std::vector<bool> m_dirty_pages;
 
     File::AccessMode m_access;
@@ -113,45 +113,6 @@ inline bool EncryptedFileMapping::contains_page(size_t page_in_file) const
     return page_in_file >= m_first_page && page_in_file - m_first_page < m_up_to_date_pages.size();
 }
 
-inline void EncryptedFileMapping::read_barrier(const void* addr, size_t size, UniqueLock& lock,
-                                               Header_to_size header_to_size)
-{
-    size_t first_accessed_local_page = get_local_index_of_address(addr);
-
-    // make sure the first page is available
-    // Checking before taking the lock is important to performance.
-   // if (!m_up_to_date_pages[first_accessed_local_page]) {
-        if (!lock.holds_lock())
-            lock.lock();
-        // after taking the lock, we must repeat the check so that we never
-        // call refresh_page() on a page which is already up to date.
-        if (!m_up_to_date_pages[first_accessed_local_page])
-            refresh_page(first_accessed_local_page);
-   // }
-
-    if (header_to_size) {
-
-        // We know it's an array, and array headers are 8-byte aligned, so it is
-        // included in the first page which was handled above.
-        size = header_to_size(static_cast<const char*>(addr));
-    }
-
-    size_t last_idx = get_local_index_of_address(addr, size == 0 ? 0 : size - 1);
-    size_t up_to_date_pages_size = m_up_to_date_pages.size();
-
-    // We already checked first_accessed_local_page above, so we start the loop
-    // at first_accessed_local_page + 1 to check the following page.
-    for (size_t idx = first_accessed_local_page + 1; idx <= last_idx && idx < up_to_date_pages_size; ++idx) {
-//        if (!m_up_to_date_pages[idx]) {
-            if (!lock.holds_lock())
-                lock.lock();
-            // after taking the lock, we must repeat the check so that we never
-            // call refresh_page() on a page which is already up to date.
-            if (!m_up_to_date_pages[idx])
-                refresh_page(idx);
-        }
-   // }
-}
 }
 }
 
