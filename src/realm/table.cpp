@@ -294,8 +294,8 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
 
 size_t Table::get_backlink_count(size_t row_ndx) const noexcept
 {
-    size_t first_backlink_column = m_spec.first_backlink_column_index();
-    size_t last_backlink_column = first_backlink_column + m_spec.backlink_column_count();
+    size_t first_backlink_column = m_spec->first_backlink_column_index();
+    size_t last_backlink_column = first_backlink_column + m_spec->backlink_column_count();
     size_t ref_count = 0;
 
     for (size_t i = first_backlink_column; i != last_backlink_column; ++i) {
