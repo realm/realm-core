@@ -47,8 +47,8 @@ set(REALM_SOURCES
     util/encrypted_file_mapping.cpp
     util/file.cpp
     util/file_mapper.cpp
-    # util/interprocess_condvar.cpp
-    # util/interprocess_mutex.cpp
+    util/interprocess_condvar.cpp
+    util/interprocess_mutex.cpp
     util/logger.cpp
     util/memory_stream.cpp
     util/misc_errors.cpp
@@ -155,8 +155,8 @@ set(REALM_INSTALL_UTIL_HEADERS
     util/file_mapper.hpp
     util/hex_dump.hpp
     util/inspect.hpp
-    # util/interprocess_condvar.hpp
-    # util/interprocess_mutex.hpp
+    util/interprocess_condvar.hpp
+    util/interprocess_mutex.hpp
     util/logger.hpp
     util/memory_stream.hpp
     util/misc_errors.hpp

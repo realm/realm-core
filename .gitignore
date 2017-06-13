@@ -31,32 +31,7 @@ CMakeScripts
 Thumbs.db
 
 # Ignore files build by Visual Studio
-*.obj
-*.exe
-*.pdb
-*.aps
-*.pch
-*.vspscc
-*_i.c
-*_p.c
-*.tlb
-*.tlh
-*.bak
-*.cache
-*.ilk
-*.log
-[Bb]in
-[Dd]ebug*/
-*.lib
-*.sbr
-obj/
-ipch/
-[Rr]elease*/
-_ReSharper*/
-[Tt]est[Rr]esult*
-Static library*/
-*.opensdf
-*.sdf
+/.vs
 
 *.dSYM
 

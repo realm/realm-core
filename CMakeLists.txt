@@ -82,6 +82,10 @@ option(REALM_ENABLE_ENCRYPTION "Enable encryption." ON)
 option(REALM_ENABLE_MEMDEBUG "Add additional memory checks" OFF)
 set(REALM_MAX_BPNODE_SIZE "1000" CACHE STRING "Max B+ tree node size.")
 
+if (CMAKE_SYSTEM_NAME MATCHES "^Windows")
+	set(REALM_ENABLE_ENCRYPTION OFF)
+endif()
+
 check_include_files(malloc.h HAVE_MALLOC_H)
 
 # Store configuration in header file
