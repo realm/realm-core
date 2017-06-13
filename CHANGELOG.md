@@ -11,7 +11,8 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Add method to get total count of backlinks for a row.
+  PR [#2672](https://github.com/realm/realm-core/pull/2672).
 
 -----------
 
