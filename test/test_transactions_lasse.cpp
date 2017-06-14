@@ -23,13 +23,6 @@
 #include <iostream>
 #include <thread>
 
-#ifdef _WIN32
-#include <windows.h> // Sleep(), sched_yield()
-#else
-#include <sched.h>  // sched_yield()
-#include <unistd.h> // usleep()
-#endif
-
 #include <realm.hpp>
 #include <realm/column.hpp>
 #include <realm/utilities.hpp>
@@ -102,19 +95,11 @@ REALM_FORCEINLINE void rand_sleep(Random& random)
     }
     else if (r <= 254) {
 // Release current time slice and get time slice according to normal scheduling
-#ifdef _MSC_VER
-        Sleep(0);
-#else
-        usleep(0);
-#endif
+        millisleep(0);
     }
     else {
 // Release time slices for at least 200 ms
-#ifdef _MSC_VER
-        Sleep(200);
-#else
-        usleep(200);
-#endif
+        millisleep(200);
     }
 }
 
