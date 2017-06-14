@@ -287,7 +287,7 @@ TEST_IF(Shared_PipelinedWritesWithKills, false)
         killer(test_context, pid, path, num_processes - 1);
     }
     // We need to wait cleaning up til the killed processes have exited.
-    sleep(1);
+    millisleep(1000);
 }
 #endif
 
@@ -1905,7 +1905,7 @@ TEST_IF(Shared_Async, allow_async)
 
     // Wait for async_commit process to shutdown
     // FIXME: we need a way to determine properly if the daemon has shot down instead of just sleeping
-    sleep(1);
+    millisleep(1000);
 
     // Read the db again in normal mode to verify
     {
@@ -2020,7 +2020,7 @@ void multiprocess_make_table(std::string path, std::string lock_path, std::strin
 #endif
     // Wait for async_commit process to shutdown
     // FIXME: No good way of doing this
-    sleep(1);
+    millisleep(1000);
 #else
     {
         Group g(alone_path, Group::mode_ReadWrite);
@@ -2076,7 +2076,7 @@ void multiprocess_validate_and_clear(TestContext& test_context, std::string path
     // Wait for async_commit process to shutdown
     // FIXME: this is not apropriate
     static_cast<void>(lock_path);
-    sleep(1);
+    millisleep(1000);
 
     // Verify - once more, in sync mode - that the changes were made
     {
@@ -2118,7 +2118,7 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
     SHARED_GROUP_TEST_PATH(alone_path);
 
     // wait for any daemon hanging around to exit
-    usleep(100); // FIXME: Is this really acceptable?
+    millisleep(1); // FIXME: Is this really acceptable?
 
 #if TEST_DURATION < 1
     multiprocess_make_table(path, path.get_lock_path(), alone_path, 4);

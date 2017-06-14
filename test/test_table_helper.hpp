@@ -19,8 +19,6 @@
 #ifndef TEST_TEST_TABLE_HELPER_HPP_
 #define TEST_TEST_TABLE_HELPER_HPP_
 
-namespace {
-
 enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
 
 class TestTable : public realm::Table {
@@ -31,84 +29,84 @@ public:
 };
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, int value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, int value, bool is_default)
 {
     set_int(column_ndx, row_ndx, value, is_default);
 }
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, unsigned value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, unsigned value, bool is_default)
 {
     set_int(column_ndx, row_ndx, value, is_default);
 }
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, bool value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, bool value, bool is_default)
 {
     set_bool(column_ndx, row_ndx, value, is_default);
 }
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, uint64_t value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, uint64_t value, bool is_default)
 {
     set_int(column_ndx, row_ndx, value, is_default);
 }
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, int64_t value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, int64_t value, bool is_default)
 {
     set_int(column_ndx, row_ndx, value, is_default);
 }
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, double value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, double value, bool is_default)
 {
     set_double(column_ndx, row_ndx, value, is_default);
 }
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, float value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, float value, bool is_default)
 {
     set_float(column_ndx, row_ndx, value, is_default);
 }
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, const char* value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, const char* value, bool is_default)
 {
     set_string(column_ndx, row_ndx, realm::StringData(value), is_default);
 }
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, realm::BinaryData value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, realm::BinaryData value, bool is_default)
 {
     set_binary(column_ndx, row_ndx, value, is_default);
 }
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, realm::OldDateTime value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, realm::OldDateTime value, bool is_default)
 {
     set_olddatetime(column_ndx, row_ndx, value, is_default);
 }
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, realm::Timestamp value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, realm::Timestamp value, bool is_default)
 {
     set_timestamp(column_ndx, row_ndx, value, is_default);
 }
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, Days value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, Days value, bool is_default)
 {
     set_int(column_ndx, row_ndx, value, is_default);
 }
 
 template <>
-void TestTable::set(size_t, size_t, decltype(nullptr), bool)
+inline void TestTable::set(size_t, size_t, decltype(nullptr), bool)
 {
 }
 
 template <>
-void TestTable::set(size_t column_ndx, size_t row_ndx, realm::Mixed value, bool is_default)
+inline void TestTable::set(size_t column_ndx, size_t row_ndx, realm::Mixed value, bool is_default)
 {
     set_mixed(column_ndx, row_ndx, value, is_default);
 }
@@ -173,7 +171,5 @@ void set(realm::TableRef r, size_t row_ndx, Head v, Tail... tail)
     TestTable& t = *static_cast<TestTable*>(r.get());
     set2(t, 0, row_ndx, v, tail...);
 }
-
-} // anonymous namespace
 
 #endif /* TEST_TEST_TABLE_HELPER_HPP_ */

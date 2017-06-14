@@ -2,10 +2,18 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixes bug in encryption that could cause deadlocks/hangs and possibly
+  other bugs too. Fixes https://github.com/realm/realm-core/pull/2650
+  PR [#2668](https://github.com/realm/realm-core/pull/2668)
 
 ### Breaking changes
 
+* Added support for compound sort and distinct queries.
+    - Multiple consecutive calls to sort or distinct compound on each other
+      in the order applied rather than replacing the previous one.
+    - The order that sort and distinct are applied can change the query result.
+    - Applying an empty sort or distinct descriptor is now a no-op, this
+      could previously be used to clear a sort or distinct operation.
 * Support for size query on LinkedList removed. This is perhaps not so 
   breaking after all since it is probably not used.
   PR [#2532](https://github.com/realm/realm-core/pull/2532).
@@ -33,7 +41,10 @@
   PR [#2561](https://github.com/realm/realm-core/pull/2561).
 * Support for encryption on Windows (Win32 + UWP).
   PR [#2643](https://github.com/realm/realm-core/pull/2643).
- 
+* Add more overloads with realm::null - PR [#2669](https://github.com/realm/realm-core/pull/2669)
+  - `size_t Table::find_first(size_t col_ndx, null)`
+  - `OutputStream& operator<<(OutputStream& os, const null&)`
+
 -----------
 
 ### Internals
@@ -49,6 +60,16 @@
 * Implemented inter-process CondVars on Windows (Win32 + UWP). They should be
   fair and robust.
   PR [#2497](https://github.com/realm/realm-core/pull/2497).
+* Fix an assert that prevented `Group::commit()` from discarding history from a
+  Realm file opened in nonshared mode (via `Group::open()`, as opposed to
+  `SharedGroup::open()`).
+  PR [#2655](https://github.com/realm/realm-core/pull/2655).
+* Improve ASAN and TSAN build modes (`sh build.sh asan` and `sh build.sh tsan`)
+  such that they do not clobber the files produced during regular builds, and
+  also do not clobber each others files. Also `UNITTEST_THREADS` and
+  `UNITTEST_PROGRESS` options are no longer hard-coded in ASAN and TSAN build
+  modes.
+  PR [#2660](https://github.com/realm/realm-core/pull/2660).
 
 ----------------------------------------------
 
