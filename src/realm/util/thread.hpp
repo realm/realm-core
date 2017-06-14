@@ -121,6 +121,18 @@ public:
     /// legal and will not cause any system resources to be leaked.
     Mutex(process_shared_tag);
 
+    struct recursive_tag {
+    };
+    Mutex(recursive_tag)
+    {
+        pthread_mutexattr_t attr;
+        pthread_mutexattr_init(&attr);
+        pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
+        int r = pthread_mutex_init(&m_impl, &attr);
+        if (REALM_UNLIKELY(r != 0))
+            init_failed(r);
+    }
+
     // Disable copying.
     Mutex(const Mutex&) = delete;
     Mutex& operator=(const Mutex&) = delete;
@@ -140,6 +152,10 @@ protected:
     Mutex(no_init_tag)
     {
     }
+
+
+
+
 
     void init_as_regular();
     void init_as_process_shared(bool robust_if_available);

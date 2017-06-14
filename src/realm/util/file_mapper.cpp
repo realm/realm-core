@@ -93,7 +93,7 @@ struct mapping_and_addr {
 };
 
 // prevent destruction at exit (which can lead to races if other threads are still running)
-util::Mutex& mapping_mutex = *new Mutex;
+util::Mutex& mapping_mutex = *new Mutex(Mutex::recursive_tag());
 std::vector<mapping_and_addr>& mappings_by_addr = *new std::vector<mapping_and_addr>;
 std::vector<mappings_for_file>& mappings_by_file = *new std::vector<mappings_for_file>;
 
