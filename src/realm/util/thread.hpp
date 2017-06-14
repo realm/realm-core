@@ -20,6 +20,7 @@
 #define REALM_UTIL_THREAD_HPP
 
 #include <exception>
+#include <iostream>
 
 #ifdef _WIN32
 #include <win32/pthread/pthread.h>
@@ -131,6 +132,8 @@ public:
         int r = pthread_mutex_init(&m_impl, &attr);
         if (REALM_UNLIKELY(r != 0))
             init_failed(r);
+
+        m_recursive = true;
     }
 
     // Disable copying.
@@ -154,9 +157,6 @@ protected:
     }
 
 
-
-
-
     void init_as_regular();
     void init_as_process_shared(bool robust_if_available);
 
@@ -166,6 +166,9 @@ protected:
     REALM_NORETURN static void lock_failed(int) noexcept;
 
     friend class CondVar;
+
+    bool m_recursive = false;
+    std::atomic<int> m_recursive_lock_count = { 0 };
 };
 
 
@@ -466,6 +469,8 @@ inline void Mutex::init_as_regular()
 inline void Mutex::lock() noexcept
 {
     int r = pthread_mutex_lock(&m_impl);
+    m_recursive_lock_count++;
+    std::cerr << "locked " << m_recursive_lock_count << " times\n";
     if (REALM_LIKELY(r == 0))
         return;
     lock_failed(r);
@@ -478,6 +483,9 @@ inline bool Mutex::try_lock() noexcept
         return false;
     }
     else if (r == 0) {
+        m_recursive_lock_count++;
+        std::cerr << "locked " << m_recursive_lock_count << " times\n";
+
         return true;
     }
     lock_failed(r);
@@ -486,6 +494,9 @@ inline bool Mutex::try_lock() noexcept
 inline void Mutex::unlock() noexcept
 {
     int r = pthread_mutex_unlock(&m_impl);
+    m_recursive_lock_count--;
+    std::cerr << "locked " << m_recursive_lock_count << " times\n";
+
     REALM_ASSERT(r == 0);
 }
 
