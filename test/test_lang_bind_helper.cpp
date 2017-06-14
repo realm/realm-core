@@ -13177,35 +13177,6 @@ TEST(LangBindHelper_MixedTimestampTransaction)
     CHECK(t->get_mixed(0, 1) == neg_time);
 }
 
-TEST(Open_Encrypted)
-{
-    SHARED_GROUP_TEST_PATH(path);
-    const char* key = crypt_key();
-    std::unique_ptr<Replication> hist(make_in_realm_history(path));
-    SharedGroup sg(*hist, SharedGroupOptions(key));
-
-    Group& group = const_cast<Group&>(sg.begin_read());
-    {
-        LangBindHelper::promote_to_write(sg);
-        for (size_t i = 0; i < 100; ++i) {
-            std::string table_name = "table_" + util::to_string(i);
-            TableRef table = group.get_or_add_table(table_name);
-            for (size_t j = 0; j < 25; ++j) {
-                std::string column_name = "column_" + util::to_string(j);
-                table->add_column(type_Int, column_name);
-            }
-            table->add_empty_row();
-        }
-        LangBindHelper::commit_and_continue_as_read(sg);
-    }
-
-    LangBindHelper::advance_read(sg);
-    {
-        CHECK_EQUAL(group.size(), 100);
-        ConstTableRef table = group.get_table("table_0");
-        CHECK_EQUAL(table->size(), 1);
-    }
-}
 
 ONLY(Open_Old_Realm_File)
 {
@@ -13230,5 +13201,38 @@ ONLY(Open_Old_Realm_File)
     }
 }
 
+
+TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
+{
+    // Create a Realm file with a history (history_type !=
+    // Reaplication::hist_None).
+    SHARED_GROUP_TEST_PATH(path);
+    {
+        std::unique_ptr<Replication> history(make_in_realm_history(path));
+        SharedGroup sg{*history};
+        WriteTransaction wt{sg};
+        wt.add_table("foo");
+        wt.commit();
+    }
+
+    // Since the stored history type is now Replication::hist_InRealm, it should
+    // now be impossible to open in shared mode with no replication plugin
+    // (Replication::hist_None).
+    CHECK_THROW(SharedGroup{path}, IncompatibleHistories);
+
+    // Now modify the file in nonshared mode, which will discard the history (as
+    // nonshared mode does not understand how to update it correctly).
+    {
+        const char* crypt_key = nullptr;
+        Group group{path, crypt_key, Group::mode_ReadWriteNoCreate};
+        group.commit();
+    }
+
+    // Check the the history was actually discarded (reset to
+    // Replication::hist_None).
+    SharedGroup sg{path};
+    ReadTransaction rt{sg};
+    CHECK(rt.has_table("foo"));
+}
 
 #endif

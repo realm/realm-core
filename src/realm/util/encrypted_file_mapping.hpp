@@ -77,7 +77,7 @@ private:
 
     size_t m_first_page;
 
-    std::vector<bool> m_up_to_date_pages;
+    std::vector<char> m_up_to_date_pages;
     std::vector<bool> m_dirty_pages;
 
     File::AccessMode m_access;

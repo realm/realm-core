@@ -186,6 +186,10 @@ def doBuildInDocker(String command) {
 
       def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       def environment = environment()
+      if (command.contains('sanitizer')) {
+          environment << 'UNITTEST_THREADS=1'
+          environment << 'UNITTEST_PROGRESS=1'
+      }
       withEnv(environment) {
         buildEnv.inside {
           sh 'sh build.sh config'

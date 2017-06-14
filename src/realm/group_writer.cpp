@@ -224,8 +224,9 @@ GroupWriter::GroupWriter(Group& group)
         }
     }
     else { // !is_shared
+        // Discard free-space versions and history information.
         if (top.size() > 5) {
-            REALM_ASSERT(top.size() == 7);
+            REALM_ASSERT(top.size() >= 7);
             top.truncate_and_destroy_children(5);
         }
     }
@@ -293,8 +294,14 @@ ref_type GroupWriter::write_group()
     top.set(0, value_1); // Throws
     top.set(1, value_2); // Throws
 
+    // If file has a history and is opened in shared mode, write the new history
+    // to the file. If the file has a history, but si not opened in shared mode,
+    // discard the history, as it could otherwise be left in an inconsisten
+    // state.
     if (top.size() >= 8) {
         REALM_ASSERT(top.size() >= 10);
+        // In nonshared mode, history must already have been discarded by GroupWriter constructor.
+        REALM_ASSERT(is_shared);
         if (ref_type history_ref = top.get_as_ref(8)) {
             Allocator& alloc = top.get_alloc();
             ref_type new_history_ref = Array::write(history_ref, alloc, *this, only_if_modified); // Throws
