@@ -470,7 +470,6 @@ inline void Mutex::lock() noexcept
 {
     int r = pthread_mutex_lock(&m_impl);
     m_recursive_lock_count++;
-    std::cerr << "locked " << m_recursive_lock_count << " times\n";
     if (REALM_LIKELY(r == 0))
         return;
     lock_failed(r);
@@ -484,8 +483,6 @@ inline bool Mutex::try_lock() noexcept
     }
     else if (r == 0) {
         m_recursive_lock_count++;
-        std::cerr << "locked " << m_recursive_lock_count << " times\n";
-
         return true;
     }
     lock_failed(r);
@@ -495,8 +492,6 @@ inline void Mutex::unlock() noexcept
 {
     int r = pthread_mutex_unlock(&m_impl);
     m_recursive_lock_count--;
-    std::cerr << "locked " << m_recursive_lock_count << " times\n";
-
     REALM_ASSERT(r == 0);
 }
 
