@@ -270,7 +270,8 @@ void IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result
 
         for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
             const size_t row_ndx = to_size_t(*it);
-            result.add(row_ndx);
+            size_t insertion_ndx = result.lower_bound(row_ndx);
+            result.insert(insertion_ndx, row_ndx);
         }
         return;
     }
@@ -281,8 +282,10 @@ void IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result
         const size_t row_ndx = to_size_t(*it);
         StringData str = column->get_index_data(row_ndx, buffer);
         auto upper_str = case_map(str, true);
-        if (upper_str == upper_value)
-            result.add(row_ndx);
+        if (upper_str == upper_value) {
+            size_t insertion_ndx = result.lower_bound(row_ndx);
+            result.insert(insertion_ndx, row_ndx);
+        }
     }
 
     return;
@@ -474,7 +477,8 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
             const StringData str = column->get_index_data(row_ndx, buffer);
             const util::Optional<std::string> upper_str = case_map(str, true);
             if (upper_str == upper_value) {
-                result.add(row_ndx);
+                size_t insertion_ndx = result.lower_bound(row_ndx);
+                result.insert(insertion_ndx, row_ndx);
             }
             continue;
         }
