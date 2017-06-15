@@ -10278,4 +10278,21 @@ TEST(Query_CaseInsensitiveIndexEquality_CommonNumericPrefix)
 }
 
 
+TEST(Query_Rover)
+{
+    Table table;
+    size_t col_ndx = table.add_column(type_String, "name");
+    table.add_search_index(col_ndx);
+
+    table.add_empty_row(2);
+    table.set_string(col_ndx, 0, "ROVER");
+    table.set_string(col_ndx, 1, "Rover");
+
+    Query q = table.where().equal(col_ndx, "rover", false);
+    CHECK_EQUAL(q.count(), 2);
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+}
+
+
 #endif // TEST_QUERY
