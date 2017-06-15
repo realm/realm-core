@@ -1995,4 +1995,26 @@ TEST_TYPES(StringIndex_Insensitive_Numbers, non_nullable, nullable)
 }
 
 
+TEST_TYPES(StringIndex_Rover, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+    const StringIndex& ndx = *col.create_search_index();
+
+    col.add("ROVER");
+    col.add("Rover");
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+
+    ndx.find_all(results, "rover", true);
+    CHECK_EQUAL(results.size(), 2);
+
+    results.destroy();
+    col.destroy();
+}
+
+
 #endif // TEST_INDEX_STRING
