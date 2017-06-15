@@ -68,6 +68,14 @@ using namespace realm::test_util;
 // check-testcase` (or one of its friends) from the command line.
 
 
+namespace {
+
+using nullable = std::true_type;
+using non_nullable = std::false_type;
+
+} // unnamed namespace
+
+
 TEST(Query_NoConditions)
 {
     Table table;
@@ -10278,10 +10286,12 @@ TEST(Query_CaseInsensitiveIndexEquality_CommonNumericPrefix)
 }
 
 
-TEST(Query_Rover)
+TEST_TYPES(Query_Rover, non_nullable, nullable)
 {
+    constexpr bool nullable = TEST_TYPE::value;
+
     Table table;
-    size_t col_ndx = table.add_column(type_String, "name");
+    size_t col_ndx = table.add_column(type_String, "name", nullable);
     table.add_search_index(col_ndx);
 
     table.add_empty_row(2);
