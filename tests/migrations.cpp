@@ -78,6 +78,11 @@ void verify_schema(Realm& r, int line)
     }
 }
 
+TableRef get_table(std::shared_ptr<Realm> const& realm, StringData object_type)
+{
+    return ObjectStore::table_for_object_type(realm->read_group(), object_type);
+}
+
 // Helper functions for modifying Schema objects, mostly for the sake of making
 // it clear what exactly is different about the 2+ schema objects used in
 // various tests
@@ -485,7 +490,7 @@ TEST_CASE("migration: Automatic") {
             realm->commit_transaction();
 
             realm->update_schema(set_optional(schema, "object", "value", true), 2);
-            for (size_t i = 0; i < 10; ++i)
+            for (int64_t i = 0; i < 10; ++i)
                 REQUIRE(table->get_int(0, i) == i);
         }
 
@@ -572,7 +577,7 @@ TEST_CASE("migration: Automatic") {
                 auto realm = Realm::get_shared_realm(config);
                 realm->update_schema(schema, 1);
                 realm->begin_transaction();
-                realm->read_group().get_table("class_object")->add_column(type_Table, "subtable");
+                get_table(realm, "object")->add_column(type_Table, "subtable");
                 realm->commit_transaction();
             }
             // close and reopen the Realm to ensure it rereads the schema from
@@ -581,7 +586,7 @@ TEST_CASE("migration: Automatic") {
             auto realm = Realm::get_shared_realm(config);
             realm->update_schema(add_property(schema, "object", {"value 2", PropertyType::Int}), 2);
 
-            auto& table = *realm->read_group().get_table("class_object");
+            auto& table = *get_table(realm, "object");
             REQUIRE(table.get_column_type(1) == type_Table);
             REQUIRE(table.get_column_count() == 3);
         }
@@ -1380,34 +1385,34 @@ TEST_CASE("migration: Manual") {
     SECTION("add property to table") {
         REQUIRE_MIGRATION(add_property(schema, "object", {"new", PropertyType::Int, "", "", false, false, false}),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              realm->read_group().get_table("class_object")->add_column(type_Int, "new");
+                              get_table(realm, "object")->add_column(type_Int, "new");
                           });
     }
     SECTION("remove property from table") {
         REQUIRE_MIGRATION(remove_property(schema, "object", "value"),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              realm->read_group().get_table("class_object")->remove_column(1);
+                              get_table(realm, "object")->remove_column(1);
                           });
     }
     SECTION("add primary key to table") {
         REQUIRE_MIGRATION(set_primary_key(schema, "link origin", "not a pk"),
                           [](SharedRealm, SharedRealm realm, Schema&) {
                               ObjectStore::set_primary_key_for_object(realm->read_group(), "link origin", "not a pk");
-                              realm->read_group().get_table("class_link origin")->add_search_index(0);
+                              get_table(realm, "link origin")->add_search_index(0);
                           });
     }
     SECTION("remove primary key from table") {
         REQUIRE_MIGRATION(set_primary_key(schema, "object", ""),
                           [](SharedRealm, SharedRealm realm, Schema&) {
                               ObjectStore::set_primary_key_for_object(realm->read_group(), "object", "");
-                              realm->read_group().get_table("class_object")->remove_search_index(0);
+                              get_table(realm, "object")->remove_search_index(0);
                           });
     }
     SECTION("change primary key") {
         REQUIRE_MIGRATION(set_primary_key(schema, "object", "value"),
                           [](SharedRealm, SharedRealm realm, Schema&) {
                               ObjectStore::set_primary_key_for_object(realm->read_group(), "object", "value");
-                              auto table = realm->read_group().get_table("class_object");
+                              auto table = get_table(realm, "object");
                               table->remove_search_index(0);
                               table->add_search_index(1);
                           });
@@ -1415,7 +1420,7 @@ TEST_CASE("migration: Manual") {
     SECTION("change property type") {
         REQUIRE_MIGRATION(set_type(schema, "object", "value", PropertyType::Date),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              auto table = realm->read_group().get_table("class_object");
+                              auto table = get_table(realm, "object");
                               table->remove_column(1);
                               size_t col = table->add_column(type_Timestamp, "value");
                               table->add_search_index(col);
@@ -1424,7 +1429,7 @@ TEST_CASE("migration: Manual") {
     SECTION("change link target") {
         REQUIRE_MIGRATION(set_target(schema, "link origin", "object", "link origin"),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              auto table = realm->read_group().get_table("class_link origin");
+                              auto table = get_table(realm, "link origin");
                               table->remove_column(1);
                               table->add_column_link(type_Link, "object", *table);
                           });
@@ -1432,7 +1437,7 @@ TEST_CASE("migration: Manual") {
     SECTION("change linklist target") {
         REQUIRE_MIGRATION(set_target(schema, "link origin", "array", "link origin"),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              auto table = realm->read_group().get_table("class_link origin");
+                              auto table = get_table(realm, "link origin");
                               table->remove_column(2);
                               table->add_column_link(type_LinkList, "array", *table);
                           });
@@ -1440,7 +1445,7 @@ TEST_CASE("migration: Manual") {
     SECTION("make property optional") {
         REQUIRE_MIGRATION(set_optional(schema, "object", "value", true),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              auto table = realm->read_group().get_table("class_object");
+                              auto table = get_table(realm, "object");
                               table->remove_column(1);
                               size_t col = table->add_column(type_Int, "value", true);
                               table->add_search_index(col);
@@ -1449,7 +1454,7 @@ TEST_CASE("migration: Manual") {
     SECTION("make property required") {
         REQUIRE_MIGRATION(set_optional(schema, "object", "optional", false),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              auto table = realm->read_group().get_table("class_object");
+                              auto table = get_table(realm, "object");
                               table->remove_column(2);
                               table->add_column(type_Int, "optional", false);
                           });
@@ -1457,13 +1462,13 @@ TEST_CASE("migration: Manual") {
     SECTION("add index") {
         REQUIRE_MIGRATION(set_indexed(schema, "object", "optional", true),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              realm->read_group().get_table("class_object")->add_search_index(2);
+                              get_table(realm, "object")->add_search_index(2);
                           });
     }
     SECTION("remove index") {
         REQUIRE_MIGRATION(set_indexed(schema, "object", "value", false),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              realm->read_group().get_table("class_object")->remove_search_index(1);
+                              get_table(realm, "object")->remove_search_index(1);
                           });
     }
     SECTION("reorder properties") {

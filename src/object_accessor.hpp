@@ -163,6 +163,16 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
 
 template<typename ValueType, typename ContextType>
 Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
+                      StringData object_type, ValueType value,
+                      bool try_update, Row* out_row)
+{
+    auto object_schema = realm->schema().find(object_type);
+    REALM_ASSERT(object_schema != realm->schema().end());
+    return create(ctx, realm, *object_schema, value, try_update, out_row);
+}
+
+template<typename ValueType, typename ContextType>
+Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                       ObjectSchema const& object_schema, ValueType value,
                       bool try_update, Row* out_row)
 {
@@ -240,6 +250,15 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
             object.set_property_value_impl(ctx, prop, *v, try_update, is_default);
     }
     return object;
+}
+
+template<typename ValueType, typename ContextType>
+Object Object::get_for_primary_key(ContextType& ctx, std::shared_ptr<Realm> const& realm,
+                      StringData object_type, ValueType primary_value)
+{
+    auto object_schema = realm->schema().find(object_type);
+    REALM_ASSERT(object_schema != realm->schema().end());
+    return get_for_primary_key(ctx, realm, *object_schema, primary_value);
 }
 
 template<typename ValueType, typename ContextType>
