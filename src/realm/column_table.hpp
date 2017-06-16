@@ -252,6 +252,7 @@ public:
     bool compare_table(const SubtableColumn&) const;
 
     void refresh_accessor_tree(size_t, const Spec&) override;
+    void refresh_subtable_map();
 
 #ifdef REALM_DEBUG
     void verify(const Table&, size_t) const override;
@@ -609,6 +610,11 @@ inline void SubtableColumn::refresh_accessor_tree(size_t col_ndx, const Spec& sp
 {
     SubtableColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
     m_subspec_ndx = spec.get_subspec_ndx(col_ndx);
+    m_subtable_map.refresh_accessor_tree(); // Throws
+}
+
+inline void SubtableColumn::refresh_subtable_map()
+{
     m_subtable_map.refresh_accessor_tree(); // Throws
 }
 

@@ -13222,5 +13222,38 @@ TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
     CHECK(rt.has_table("foo"));
 }
 
+TEST(LangBindHelper_UpdateSubtableMap)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* key = nullptr;
+    std::unique_ptr<Replication> hist_r(make_in_realm_history(path));
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_r(*hist_r, SharedGroupOptions(key));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(key));
+    Group& g = const_cast<Group&>(sg_w.begin_write());
+
+    TableRef target = g.add_table("target");
+    DescriptorRef subdescr;
+    target->add_column(type_Table, "subtables", true, &subdescr);
+    subdescr->add_column(type_Int, "integers", nullptr, true);
+
+    TableRef origin = g.add_table("origin");
+    target->add_empty_row(10);
+    origin->add_column_link(type_LinkList, "teilmjdtkiipajq", *target);
+
+    // Make sure to create an entry in the subtable map
+    TableRef sub = target->get_subtable(0, 6);
+    sub->clear();
+    sub->add_empty_row(1);
+    sub->set_int(0, 0, 53, false);
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    // This will have the effect that the spec of the target table will be updated
+    // but not the columns. The cached table pointer to entry 6 must be updated.
+    g.insert_table(0, "another");
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    g.verify();
+}
 
 #endif

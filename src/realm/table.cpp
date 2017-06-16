@@ -4942,6 +4942,7 @@ void Table::write(std::ostream& out, size_t offset, size_t slice_size, StringDat
 void Table::update_from_parent(size_t old_baseline) noexcept
 {
     REALM_ASSERT(is_attached());
+    bool spec_might_have_changed = false;
 
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
@@ -4956,6 +4957,8 @@ void Table::update_from_parent(size_t old_baseline) noexcept
                 using df = _impl::DescriptorFriend;
                 df::detach_subdesc_accessors(*desc);
             }
+            // and remember to update mappings in subtable columns
+            spec_might_have_changed = true;
         }
     }
     else {
@@ -4965,13 +4968,21 @@ void Table::update_from_parent(size_t old_baseline) noexcept
     if (!m_columns.is_attached())
         return; // Degenerate subtable
 
-    if (!m_columns.update_from_parent(old_baseline))
-        return;
-
-    // Update column accessors
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->update_from_parent(old_baseline);
+    if (m_columns.update_from_parent(old_baseline)) {
+        // Update column accessors
+        for (auto& col : m_cols) {
+            if (col != nullptr) {
+                col->update_from_parent(old_baseline);
+            }
+        }
+    }
+    else if (spec_might_have_changed) {
+        size_t sz = m_cols.size();
+        for (size_t i = 0; i < sz; i++) {
+            // Only relevant for subtable columns
+            if (auto col = dynamic_cast<SubtableColumn*>(m_cols[i])) {
+                col->refresh_subtable_map();
+            }
         }
     }
 }
