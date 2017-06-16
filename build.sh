@@ -242,11 +242,10 @@ if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
     else
         if [ -r "/proc/cpuinfo" ]; then
             NUM_PROCESSORS="$(cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l)" || exit 1
-            LIMIT_LOAD_AVERAGE=YES
         fi
     fi
     if [ "$NUM_PROCESSORS" ]; then
-        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS ${LIMIT_LOAD_AVERAGE:+-l$MAX_LOAD_AVERAGE}" || exit 1
+        word_list_prepend MAKEFLAGS "-j -l${NUM_PROCESSORS}" || exit 1
         export MAKEFLAGS
 
         if ! [ "$UNITTEST_THREADS" ]; then
@@ -1130,17 +1129,9 @@ EOF
         # To get symbolized stack traces (file names and line numbers) with GCC, you at least version 4.9.
         check_mode="$(printf "%s\n" "$MODE" | sed 's/asan/check/')" || exit 1
         auto_configure || exit 1
-        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
         export ASAN_OPTIONS="detect_odr_violation=2"
         export REALM_HAVE_CONFIG="1"
-        error=""
-        if ! UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=address" EXTRA_LDFLAGS="-fsanitize=address" "$check_mode"; then
-            error="1"
-        fi
-        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
-        if [ "$error" ]; then
-            exit 1
-        fi
+        $MAKE BASE_DENOM="asan" EXTRA_CFLAGS="-fsanitize=address" EXTRA_LDFLAGS="-fsanitize=address" "$check_mode" || exit 1
         echo "Test passed"
         exit 0
         ;;
@@ -1150,16 +1141,8 @@ EOF
         # To get symbolized stack traces (file names and line numbers) with GCC, you at least version 4.9.
         check_mode="$(printf "%s\n" "$MODE" | sed 's/tsan/check/')" || exit 1
         auto_configure || exit 1
-        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
         export REALM_HAVE_CONFIG="1"
-        error=""
-        if ! UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=thread" EXTRA_LDFLAGS="-fsanitize=thread" "$check_mode"; then
-            error="1"
-        fi
-        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
-        if [ "$error" ]; then
-            exit 1
-        fi
+        $MAKE BASE_DENOM="tsan" EXTRA_CFLAGS="-fsanitize=thread" EXTRA_LDFLAGS="-fsanitize=thread" "$check_mode" || exit 1
         echo "Test passed"
         exit 0
         ;;

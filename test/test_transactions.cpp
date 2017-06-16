@@ -73,7 +73,6 @@ using realm::test_util::crypt_key;
 // check-testcase` (or one of its friends) from the command line.
 
 
-namespace {
 
 enum MyEnum { moja, mbili, tatu, nne, tano, sita, saba, nane, tisa, kumi, kumi_na_moja, kumi_na_mbili, kumi_na_tatu };
 
@@ -89,6 +88,8 @@ void TestTable::set(size_t column_ndx, size_t row_ndx, MyEnum value, bool is_def
 {
     set_int(column_ndx, row_ndx, value, is_default);
 }
+
+namespace {
 
 constexpr size_t col_value = 0;
 constexpr size_t col_binary = 1;
