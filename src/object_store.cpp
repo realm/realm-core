@@ -321,14 +321,14 @@ struct SchemaDifferenceExplainer {
     void operator()(schema_change::ChangePrimaryKey op)
     {
         if (op.property && !op.object->primary_key.empty()) {
-            errors.emplace_back("Primary Key for class '%1 has changed from '%2' to '%3'.",
+            errors.emplace_back("Primary Key for class '%1' has changed from '%2' to '%3'.",
                                 op.object->name, op.object->primary_key, op.property->name);
         }
         else if (op.property) {
-            errors.emplace_back("Primary Key for class '%1 has been added.", op.object->name);
+            errors.emplace_back("Primary Key for class '%1' has been added.", op.object->name);
         }
         else {
-            errors.emplace_back("Primary Key for class '%1 has been removed.", op.object->name);
+            errors.emplace_back("Primary Key for class '%1' has been removed.", op.object->name);
         }
     }
 
