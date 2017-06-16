@@ -490,8 +490,8 @@ inline bool Mutex::try_lock() noexcept
 
 inline void Mutex::unlock() noexcept
 {
-    int r = pthread_mutex_unlock(&m_impl);
-    m_recursive_lock_count--;
+	m_recursive_lock_count--;
+	int r = pthread_mutex_unlock(&m_impl);
     REALM_ASSERT(r == 0);
 }
 
