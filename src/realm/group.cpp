@@ -1339,6 +1339,11 @@ public:
         return true;
     }
 
+    bool add_row_with_key(size_t, size_t, size_t, int64_t) noexcept
+    {
+        return true;
+    }
+
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool unordered) noexcept
     {
         if (unordered) {

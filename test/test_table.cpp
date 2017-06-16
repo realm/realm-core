@@ -8127,5 +8127,21 @@ TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
     check_column_sizes(10 * REALM_MAX_BPNODE_SIZE);
 }
 
+TEST(Table_KeyRow)
+{
+    Table table;
+    table.add_column(type_Int, "int");
+    table.add_column(type_String, "string");
+    table.add_search_index(0);
+
+    size_t ndx = table.add_row_with_key(0, 123);
+    table.set_string(1, ndx, "Hello, ");
+    table.add_row_with_key(0, 456);
+
+    size_t i = table.find_first_int(0, 123);
+    CHECK_EQUAL(i, 0);
+    i = table.find_first_int(0, 456);
+    CHECK_EQUAL(i, 1);
+}
 
 #endif // TEST_TABLE

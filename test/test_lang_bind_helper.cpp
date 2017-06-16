@@ -2643,9 +2643,8 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
         TableRef parent_w = wt.add_table("parent");
         parent_w->add_column(type_Int, "a");
         parent_w->add_search_index(0);
-        parent_w->add_empty_row(2);
-        parent_w->set_int(0, 0, 27);
-        parent_w->set_int(0, 1, 227);
+        parent_w->add_row_with_key(0, 27);
+        parent_w->add_row_with_key(0, 227);
         wt.commit();
     }
     LangBindHelper::advance_read(sg);
@@ -2682,6 +2681,7 @@ TEST(LangBindHelper_AdvanceReadTransact_RowAccessors)
     CHECK_EQUAL(3, row_2.get_index());
     CHECK_EQUAL(27, row_1.get_int(0));
     CHECK_EQUAL(227, row_2.get_int(0));
+
     {
         WriteTransaction wt(sg_w);
         TableRef parent_w = wt.get_table("parent");
@@ -7755,6 +7755,10 @@ public:
         return false;
     }
     bool insert_empty_rows(size_t, size_t, size_t, bool)
+    {
+        return false;
+    }
+    bool add_row_with_key(size_t, size_t, size_t, int64_t)
     {
         return false;
     }

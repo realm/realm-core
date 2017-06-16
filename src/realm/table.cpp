@@ -2268,6 +2268,38 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
     }
 }
 
+size_t Table::add_row_with_key(size_t key_col_ndx, int64_t key)
+{
+    size_t num_cols = m_spec->get_column_count();
+    size_t row_ndx = m_size;
+
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(key_col_ndx, <, num_cols);
+    REALM_ASSERT(!is_nullable(key_col_ndx));
+
+    bump_version();
+
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        if (col_ndx == key_col_ndx) {
+            IntegerColumn& col = get_column(key_col_ndx);
+            col.insert(row_ndx, key, 1);
+        }
+        else {
+            ColumnBase& col = get_column_base(col_ndx);
+            bool insert_nulls = is_nullable(col_ndx);
+            col.insert_rows(row_ndx, 1, m_size, insert_nulls); // Throws
+        }
+    }
+    m_size++;
+
+    if (Replication* repl = get_repl()) {
+        size_t prior_num_rows = m_size - 1;
+        repl->add_row_with_key(this, row_ndx, prior_num_rows, key_col_ndx, key); // Throws
+    }
+
+    return row_ndx;
+}
+
 
 void Table::erase_row(size_t row_ndx, bool is_move_last_over)
 {
