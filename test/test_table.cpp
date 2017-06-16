@@ -6230,6 +6230,10 @@ TEST(Table_RowAccessorLinks)
     CHECK(source_row_2.linklist_is_empty(1));
     CHECK_EQUAL(0, source_row_1.get_link_count(1));
     CHECK_EQUAL(0, source_row_2.get_link_count(1));
+    CHECK_EQUAL(0, target_table->get(7).get_backlink_count());
+    CHECK_EQUAL(0, target_table->get(13).get_backlink_count());
+    CHECK_EQUAL(0, target_table->get(11).get_backlink_count());
+    CHECK_EQUAL(0, target_table->get(15).get_backlink_count());
     CHECK_EQUAL(0, target_table->get(7).get_backlink_count(*origin_table, 0));
     CHECK_EQUAL(0, target_table->get(13).get_backlink_count(*origin_table, 0));
     CHECK_EQUAL(0, target_table->get(11).get_backlink_count(*origin_table, 1));
@@ -6265,12 +6269,18 @@ TEST(Table_RowAccessorLinks)
     CHECK(!source_row_2.linklist_is_empty(1));
     CHECK_EQUAL(1, source_row_1.get_link_count(1));
     CHECK_EQUAL(2, source_row_2.get_link_count(1));
+    CHECK_EQUAL(1, target_table->get(11).get_backlink_count());
+    CHECK_EQUAL(2, target_table->get(15).get_backlink_count());
     CHECK_EQUAL(1, target_table->get(11).get_backlink_count(*origin_table, 1));
     CHECK_EQUAL(2, target_table->get(15).get_backlink_count(*origin_table, 1));
     CHECK_EQUAL(1, target_table->get(11).get_backlink(*origin_table, 1, 0));
     size_t back_link_1 = target_table->get(15).get_backlink(*origin_table, 1, 0);
     size_t back_link_2 = target_table->get(15).get_backlink(*origin_table, 1, 1);
     CHECK((back_link_1 == 0 && back_link_2 == 1) || (back_link_1 == 1 && back_link_2 == 0));
+
+    // Links from multiple columns (count total)
+    source_row_1.set_link(0, 15);
+    CHECK_EQUAL(3, target_table->get(15).get_backlink_count());
 
     // Clear link lists
     link_list_1->clear();
