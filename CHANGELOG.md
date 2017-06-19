@@ -2,9 +2,7 @@
 
 ### Bugfixes
 
-* Fixes bug in encryption that could cause deadlocks/hangs and possibly
-  other bugs too. Fixes https://github.com/realm/realm-core/pull/2650
-  PR [#2668](https://github.com/realm/realm-core/pull/2668)
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -64,6 +62,22 @@
 * Implemented inter-process CondVars on Windows (Win32 + UWP). They should be
   fair and robust.
   PR [#2497](https://github.com/realm/realm-core/pull/2497).
+
+----------------------------------------------
+
+# 2.8.4 Release notes
+
+### Bugfixes
+
+* Fixes bug in encryption that could cause deadlocks/hangs and possibly
+  other bugs too.
+  Fixes issue [#2650](https://github.com/realm/realm-core/pull/2650).
+  PR [#2668](https://github.com/realm/realm-core/pull/2668).
+
+-----------
+
+### Internals
+
 * Fix an assert that prevented `Group::commit()` from discarding history from a
   Realm file opened in nonshared mode (via `Group::open()`, as opposed to
   `SharedGroup::open()`).
