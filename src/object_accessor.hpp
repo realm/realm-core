@@ -189,7 +189,7 @@ Object Object::create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
     size_t row_index = realm::not_found;
     TableRef table = ObjectStore::table_for_object_type(realm->read_group(), object_schema.name);
 
-    bool skip_primary = false;
+    bool skip_primary = true;
     if (auto primary_prop = object_schema.primary_key_property()) {
         // search for existing object based on primary key type
         auto primary_value = ctx.value_for_property(value, primary_prop->name,
