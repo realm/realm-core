@@ -469,6 +469,7 @@ inline void Mutex::init_as_regular()
 inline void Mutex::lock() noexcept
 {
     int r = pthread_mutex_lock(&m_impl);
+	__sync_synchronize();
     //m_recursive_lock_count++;
     if (REALM_LIKELY(r == 0))
         return;
@@ -482,6 +483,7 @@ inline bool Mutex::try_lock() noexcept
         return false;
     }
     else if (r == 0) {
+		__sync_synchronize();
 //        m_recursive_lock_count++;
         return true;
     }
@@ -491,6 +493,7 @@ inline bool Mutex::try_lock() noexcept
 inline void Mutex::unlock() noexcept
 {
 //	m_recursive_lock_count--;
+	__sync_synchronize();
 	int r = pthread_mutex_unlock(&m_impl);
     REALM_ASSERT(r == 0);
 }
