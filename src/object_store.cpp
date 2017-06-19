@@ -21,6 +21,7 @@
 #include "object_schema.hpp"
 #include "schema.hpp"
 #include "shared_realm.hpp"
+#include "sync/sync_features.hpp"
 #include "util/format.hpp"
 
 #include <realm/group.hpp>
@@ -28,9 +29,9 @@
 #include <realm/table_view.hpp>
 #include <realm/util/assert.hpp>
 
-#if REALM_ENABLE_SYNC
+#if REALM_HAVE_SYNC_STABLE_IDS
 #include <realm/sync/object.hpp>
-#endif // REALM_ENABLE_SYNC
+#endif // REALM_HAVE_SYNC_STABLE_IDS
 
 #include <string.h>
 
@@ -139,7 +140,7 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     auto name = ObjectStore::table_name_for_object_type(object_schema.name);
 
     TableRef table;
-#if REALM_ENABLE_SYNC
+#if REALM_HAVE_SYNC_STABLE_IDS
     if (object_schema.primary_key.size()) {
         const Property* pk_property = object_schema.primary_key_property();
         table = sync::create_table_with_primary_key(group, name, DataType(pk_property->type),
@@ -150,7 +151,7 @@ TableRef create_table(Group& group, ObjectSchema const& object_schema)
     }
 #else
     table = group.get_or_add_table(name);
-#endif // REALM_ENABLE_SYNC
+#endif // REALM_HAVE_SYNC_STABLE_IDS
 
     ObjectStore::set_primary_key_for_object(group, object_schema.name, object_schema.primary_key);
 
@@ -163,12 +164,12 @@ void add_initial_columns(Group& group, ObjectSchema const& object_schema)
     TableRef table = group.get_table(name);
 
     for (auto const& prop : object_schema.persisted_properties) {
-#if REALM_ENABLE_SYNC
+#if REALM_HAVE_SYNC_STABLE_IDS
         // The sync::create_table* functions create the PK column for us.
         if (object_schema.primary_key.size() && prop.is_primary) {
             continue;
         }
-#endif // REALM_ENABLE_SYNC
+#endif // REALM_HAVE_SYNC_STABLE_IDS
         add_column(group, *table, prop);
     }
 }
@@ -275,13 +276,13 @@ void ObjectStore::set_primary_key_for_object(Group& group, StringData object_typ
 
     size_t row = table->find_first_string(c_primaryKeyObjectClassColumnIndex, object_type);
 
-#if REALM_ENABLE_SYNC
+#if REALM_HAVE_SYNC_STABLE_IDS
     // sync::create_table* functions should have already updated the pk table.
     if (primary_key.size() && sync::has_object_ids(group)) {
         REALM_ASSERT(row != not_found);
         REALM_ASSERT(table->get_string(c_primaryKeyPropertyNameColumnIndex, row) == primary_key);
     }
-#endif // REALM_ENABLE_SYNC
+#endif // REALM_HAVE_SYNC_STABLE_IDS
 
     if (row == not_found && primary_key.size()) {
         row = table->add_empty_row();
