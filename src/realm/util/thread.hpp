@@ -168,7 +168,7 @@ protected:
     friend class CondVar;
 
     bool m_recursive = false;
-    std::atomic<int> m_recursive_lock_count = { 0 };
+  //  std::atomic<int> m_recursive_lock_count = { 0 };
 };
 
 
@@ -469,7 +469,7 @@ inline void Mutex::init_as_regular()
 inline void Mutex::lock() noexcept
 {
     int r = pthread_mutex_lock(&m_impl);
-    m_recursive_lock_count++;
+    //m_recursive_lock_count++;
     if (REALM_LIKELY(r == 0))
         return;
     lock_failed(r);
@@ -482,7 +482,7 @@ inline bool Mutex::try_lock() noexcept
         return false;
     }
     else if (r == 0) {
-        m_recursive_lock_count++;
+//        m_recursive_lock_count++;
         return true;
     }
     lock_failed(r);
@@ -490,7 +490,7 @@ inline bool Mutex::try_lock() noexcept
 
 inline void Mutex::unlock() noexcept
 {
-	m_recursive_lock_count--;
+//	m_recursive_lock_count--;
 	int r = pthread_mutex_unlock(&m_impl);
     REALM_ASSERT(r == 0);
 }
