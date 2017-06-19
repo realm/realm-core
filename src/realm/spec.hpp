@@ -148,14 +148,14 @@ private:
 
     Spec(Allocator&) noexcept; // Unattached
 
-    void init(ref_type) noexcept;
+    bool init(ref_type) noexcept;
     void init(MemRef) noexcept;
     void update_has_strong_link_columns() noexcept;
     void reset_subspec_ptrs();
     void adj_subspec_ptrs();
 
-    // Similar in function to Array::init_from_parent().
-    void init_from_parent() noexcept;
+    // Returns true in case the ref has changed.
+    bool init_from_parent() noexcept;
 
     ref_type get_ref() const noexcept;
 
@@ -240,10 +240,10 @@ inline const Spec* Spec::get_subspec_by_ndx(size_t subspec_ndx) const noexcept
     return const_cast<Spec*>(this)->get_subspec_by_ndx(subspec_ndx);
 }
 
-inline void Spec::init_from_parent() noexcept
+inline bool Spec::init_from_parent() noexcept
 {
     ref_type ref = m_top.get_ref_from_parent();
-    init(ref);
+    return init(ref);
 }
 
 inline void Spec::destroy() noexcept

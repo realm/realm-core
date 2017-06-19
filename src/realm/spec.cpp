@@ -31,14 +31,16 @@ Spec::~Spec() noexcept
     }
 }
 
-void Spec::init(ref_type ref) noexcept
+bool Spec::init(ref_type ref) noexcept
 {
     // Needs only initialization if not previously initialized
     // or if the ref has changed
     if (!m_top.is_attached() || m_top.get_ref() != ref) {
         MemRef mem(ref, get_alloc());
         init(mem);
+        return true;
     }
+    return false;
 }
 
 void Spec::init(MemRef mem) noexcept

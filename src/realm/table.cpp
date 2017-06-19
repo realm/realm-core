@@ -4952,8 +4952,7 @@ void Table::update_from_parent(size_t old_baseline) noexcept
         // subspecs may be deleted here ...
         if (m_spec->update_from_parent(old_baseline)) {
             // ... so get rid of cached entries here
-            DescriptorRef desc = m_descriptor.lock();
-            if (desc) {
+            if (DescriptorRef desc = m_descriptor.lock()) {
                 using df = _impl::DescriptorFriend;
                 df::detach_subdesc_accessors(*desc);
             }
@@ -6066,7 +6065,14 @@ void Table::refresh_accessor_tree()
         // Root table (free-standing table, group-level table, or subtable with
         // independent descriptor)
         m_top.init_from_parent();
-        m_spec->init_from_parent();
+        // subspecs may be deleted here ...
+        if (m_spec->init_from_parent()) {
+            // ... so get rid of cached entries here
+            if (DescriptorRef desc = m_descriptor.lock()) {
+                using df = _impl::DescriptorFriend;
+                df::detach_subdesc_accessors(*desc);
+            }
+        }
         m_columns.init_from_parent();
     }
     else {
