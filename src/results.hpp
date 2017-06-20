@@ -28,8 +28,6 @@
 #include <realm/util/optional.hpp>
 
 namespace realm {
-template<typename T> class BasicRowExpr;
-using RowExpr = BasicRowExpr<Table>;
 class Mixed;
 class ObjectSchema;
 
@@ -75,7 +73,6 @@ public:
     StringData get_object_type() const noexcept;
 
     PropertyType get_type() const;
-    bool is_optional() const noexcept;
 
     // Get the LinkView this Results is derived from, if any
     LinkViewRef get_linkview() const { return m_link_view; }
@@ -267,18 +264,7 @@ NotificationToken Results::async(Func&& target)
 template<typename Fn>
 auto Results::dispatch(Fn&& fn) const
 {
-    using Type = PropertyType;
-    switch (get_type()) {
-        case Type::Int:    return is_optional() ? fn((util::Optional<int64_t>*)0) : fn((int64_t*)0);
-        case Type::Bool:   return is_optional() ? fn((util::Optional<bool>*)0)    : fn((bool*)0);
-        case Type::Float:  return is_optional() ? fn((util::Optional<float>*)0)   : fn((float*)0);
-        case Type::Double: return is_optional() ? fn((util::Optional<double>*)0)  : fn((double*)0);
-        case Type::String: return fn((StringData*)0);
-        case Type::Data:   return fn((BinaryData*)0);
-        case Type::Object: return fn((RowExpr*)0);
-        case Type::Date:   return fn((Timestamp*)0);
-        default: REALM_COMPILER_HINT_UNREACHABLE();
-    }
+    return switch_on_type(get_type(), std::forward<Fn>(fn));
 }
 
 template<typename Context>

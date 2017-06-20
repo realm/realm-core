@@ -32,8 +32,6 @@
 #include <memory>
 
 namespace realm {
-using RowExpr = BasicRowExpr<Table>;
-
 class ObjectSchema;
 class Query;
 class Realm;
@@ -64,7 +62,6 @@ public:
 
     // Get the type of the values contained in this List
     PropertyType get_type() const;
-    bool is_optional() const noexcept;
 
     // Get the ObjectSchema of the values in this List
     // Only valid if get_type() returns PropertyType::Object
@@ -170,18 +167,7 @@ private:
 template<typename Fn>
 auto List::dispatch(Fn&& fn) const
 {
-    using PT = PropertyType;
-    switch (get_type()) {
-        case PT::Int:    return is_optional() ? fn((util::Optional<int64_t>*)0) : fn((int64_t*)0);
-        case PT::Bool:   return is_optional() ? fn((util::Optional<bool>*)0)    : fn((bool*)0);
-        case PT::Float:  return is_optional() ? fn((util::Optional<float>*)0)   : fn((float*)0);
-        case PT::Double: return is_optional() ? fn((util::Optional<double>*)0)  : fn((double*)0);
-        case PT::String: return fn((StringData*)0);
-        case PT::Data:   return fn((BinaryData*)0);
-        case PT::Date:   return fn((Timestamp*)0);
-        case PT::Object: return fn((RowExpr*)0);
-        default: REALM_COMPILER_HINT_UNREACHABLE();
-    }
+    return switch_on_type(get_type(), std::forward<Fn>(fn));
 }
 
 template<typename Context>

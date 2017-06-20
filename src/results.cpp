@@ -487,11 +487,6 @@ PropertyType Results::get_type() const
     }
 }
 
-bool Results::is_optional() const noexcept
-{
-    return m_table && m_table->is_attached() && m_table->is_nullable(0);
-}
-
 Query Results::get_query() const
 {
     validate_read();

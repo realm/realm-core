@@ -310,10 +310,6 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         REQUIRE(results.get_type() == TestType::property_type());
     }
 
-    SECTION("is_optional()") {
-        REQUIRE_FALSE(list.is_optional());
-    }
-
     SECTION("is_valid()") {
         REQUIRE(list.is_valid());
         REQUIRE(results.is_valid());

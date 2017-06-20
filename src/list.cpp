@@ -159,11 +159,6 @@ PropertyType List::get_type() const
                        : ObjectSchema::from_core_type(*m_table->get_descriptor(), 0);
 }
 
-bool List::is_optional() const noexcept
-{
-    return m_table->is_nullable(0);
-}
-
 namespace {
 template<typename T>
 auto get(Table& table, size_t row)
