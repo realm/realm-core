@@ -1407,7 +1407,6 @@ void Table::create_degen_subtab_columns()
         // Create empty search index if required and add it to m_columns
         if (attr & col_attr_Indexed) {
             m_columns.add(StringIndex::create_empty(get_alloc()));
-            m_spec->set_column_attr(i, ColumnAttr(attr & col_attr_Indexed));
         }
     }
 
