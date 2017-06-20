@@ -16,7 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifdef REALM_OS_SYNC_FEATURES_HPP
+#ifndef REALM_OS_SYNC_FEATURES_HPP
 #define REALM_OS_SYNC_FEATURES_HPP
 
 #if REALM_ENABLE_SYNC
