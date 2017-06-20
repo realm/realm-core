@@ -25,6 +25,8 @@
 #include "property.hpp"
 #include "schema.hpp"
 
+#include "impl/object_accessor_impl.hpp"
+
 #include <realm/descriptor.hpp>
 #include <realm/group.hpp>
 #include <realm/table.hpp>
@@ -76,6 +78,11 @@ void verify_schema(Realm& r, int line)
             REQUIRE(prop.is_primary == (prop.name == primary_key));
         }
     }
+}
+
+TableRef get_table(std::shared_ptr<Realm> const& realm, StringData object_type)
+{
+    return ObjectStore::table_for_object_type(realm->read_group(), object_type);
 }
 
 // Helper functions for modifying Schema objects, mostly for the sake of making
@@ -485,7 +492,7 @@ TEST_CASE("migration: Automatic") {
             realm->commit_transaction();
 
             realm->update_schema(set_optional(schema, "object", "value", true), 2);
-            for (size_t i = 0; i < 10; ++i)
+            for (int64_t i = 0; i < 10; ++i)
                 REQUIRE(table->get_int(0, i) == i);
         }
 
@@ -558,6 +565,32 @@ TEST_CASE("migration: Automatic") {
             REQUIRE_NOTHROW(realm->update_schema({}, 2, [](SharedRealm, SharedRealm realm, Schema&) {
                 ObjectStore::delete_data_for_object(realm->read_group(), "foo");
             }));
+        }
+
+        SECTION("subtables columns are not modified by unrelated changes") {
+            config.in_memory = false;
+            Schema schema = {
+                {"object", {
+                    {"value", PropertyType::Int},
+                }},
+            };
+
+            {
+                auto realm = Realm::get_shared_realm(config);
+                realm->update_schema(schema, 1);
+                realm->begin_transaction();
+                get_table(realm, "object")->add_column(type_Table, "subtable");
+                realm->commit_transaction();
+            }
+            // close and reopen the Realm to ensure it rereads the schema from
+            // the group
+
+            auto realm = Realm::get_shared_realm(config);
+            realm->update_schema(add_property(schema, "object", {"value 2", PropertyType::Int}), 2);
+
+            auto& table = *get_table(realm, "object");
+            REQUIRE(table.get_column_type(1) == type_Table);
+            REQUIRE(table.get_column_count() == 3);
         }
     }
 
@@ -643,6 +676,257 @@ TEST_CASE("migration: Automatic") {
             auto& properties = schema2.find("object")->persisted_properties;
             std::swap(properties[0], properties[1]);
             VERIFY_SCHEMA_IN_MIGRATION(schema2);
+        }
+    }
+
+    SECTION("object accessors inside migrations") {
+        using namespace std::string_literals;
+
+        Schema schema{
+            {"all types", {
+                {"pk", PropertyType::Int, "", "", true},
+                {"bool", PropertyType::Bool},
+                {"int", PropertyType::Int},
+                {"float", PropertyType::Float},
+                {"double", PropertyType::Double},
+                {"string", PropertyType::String},
+                {"data", PropertyType::Data},
+                {"date", PropertyType::Date},
+                {"object", PropertyType::Object, "link target", "", false, false, true},
+                {"array", PropertyType::Array, "array target"},
+            }},
+            {"link target", {
+                {"value", PropertyType::Int},
+            }, {
+                {"origin", PropertyType::LinkingObjects, "all types", "object"},
+            }},
+            {"array target", {
+                {"value", PropertyType::Int},
+            }},
+        };
+
+        InMemoryTestFile config;
+        config.schema_mode = SchemaMode::Automatic;
+        config.schema = schema;
+        auto realm = Realm::get_shared_realm(config);
+
+        CppContext ctx(realm);
+        util::Any values = AnyDict{
+            {"pk", INT64_C(1)},
+            {"bool", true},
+            {"int", INT64_C(5)},
+            {"float", 2.2f},
+            {"double", 3.3},
+            {"string", "hello"s},
+            {"data", "olleh"s},
+            {"date", Timestamp(10, 20)},
+            {"object", AnyDict{{"value", INT64_C(10)}}},
+            {"array", AnyVector{AnyDict{{"value", INT64_C(20)}}}},
+        };
+        realm->begin_transaction();
+        Object::create(ctx, realm, *realm->schema().find("all types"), values, false);
+        realm->commit_transaction();
+
+        SECTION("read values from old realm") {
+            Schema schema{
+                {"all types", {
+                    {"pk", PropertyType::Int, "", "", true},
+                }},
+            };
+            realm->update_schema(schema, 2, [](auto old_realm, auto new_realm, Schema&) {
+                CppContext ctx(old_realm);
+                Object obj = Object::get_for_primary_key(ctx, old_realm, "all types",
+                                                         util::Any(INT64_C(1)));
+                REQUIRE(obj.is_valid());
+
+                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == true);
+                REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "int")) == 5);
+                REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(ctx, "float")) == 2.2f);
+                REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(ctx, "double")) == 3.3);
+                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "hello");
+                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "olleh");
+                REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(10, 20));
+
+                auto link = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+                REQUIRE(link.is_valid());
+                REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(ctx, "value")) == 10);
+
+                auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
+                REQUIRE(list.size() == 1);
+
+                CppContext list_ctx(ctx, *obj.get_object_schema().property_for_name("array"));
+                link = any_cast<Object>(list.get(list_ctx, 0));
+                REQUIRE(link.is_valid());
+                REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(list_ctx, "value")) == 20);
+
+                CppContext ctx2(new_realm);
+                obj = Object::get_for_primary_key(ctx, new_realm, "all types",
+                                                  util::Any(INT64_C(1)));
+                REQUIRE(obj.is_valid());
+                REQUIRE_THROWS(obj.get_property_value<util::Any>(ctx, "bool"));
+            });
+        }
+
+        SECTION("cannot mutate old realm") {
+            realm->update_schema(schema, 2, [](auto old_realm, auto, Schema&) {
+                CppContext ctx(old_realm);
+                Object obj = Object::get_for_primary_key(ctx, old_realm, "all types",
+                                                         util::Any(INT64_C(1)));
+                REQUIRE(obj.is_valid());
+                REQUIRE_THROWS(obj.set_property_value(ctx, "bool", util::Any(false), false));
+                REQUIRE_THROWS(old_realm->begin_transaction());
+            });
+        }
+
+        SECTION("cannot read values for removed properties from new realm") {
+            Schema schema{
+                {"all types", {
+                    {"pk", PropertyType::Int, "", "", true},
+                }},
+            };
+            realm->update_schema(schema, 2, [](auto, auto new_realm, Schema&) {
+                CppContext ctx(new_realm);
+                Object obj = Object::get_for_primary_key(ctx, new_realm, "all types",
+                                                         util::Any(INT64_C(1)));
+                REQUIRE(obj.is_valid());
+                REQUIRE_THROWS(obj.get_property_value<util::Any>(ctx, "bool"));
+                REQUIRE_THROWS(obj.get_property_value<util::Any>(ctx, "object"));
+                REQUIRE_THROWS(obj.get_property_value<util::Any>(ctx, "array"));
+            });
+        }
+
+        SECTION("read values from new object") {
+            realm->update_schema(schema, 2, [](auto, auto new_realm, Schema&) {
+                CppContext ctx(new_realm);
+                Object obj = Object::get_for_primary_key(ctx, new_realm, "all types",
+                                                         util::Any(INT64_C(1)));
+                REQUIRE(obj.is_valid());
+
+
+                auto link = any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object"));
+                REQUIRE(link.is_valid());
+                REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(ctx, "value")) == 10);
+
+                auto list = any_cast<List>(obj.get_property_value<util::Any>(ctx, "array"));
+                REQUIRE(list.size() == 1);
+
+                CppContext list_ctx(ctx, *obj.get_object_schema().property_for_name("array"));
+                link = any_cast<Object>(list.get(list_ctx, 0));
+                REQUIRE(link.is_valid());
+                REQUIRE(any_cast<int64_t>(link.get_property_value<util::Any>(list_ctx, "value")) == 20);
+            });
+        }
+
+        SECTION("read and write values in new object") {
+            realm->update_schema(schema, 2, [](auto, auto new_realm, Schema&) {
+                CppContext ctx(new_realm);
+                Object obj = Object::get_for_primary_key(ctx, new_realm, "all types",
+                                                         util::Any(INT64_C(1)));
+                REQUIRE(obj.is_valid());
+
+                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == true);
+                obj.set_property_value(ctx, "bool", util::Any(false), false);
+                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
+
+                REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "int")) == 5);
+                obj.set_property_value(ctx, "int", util::Any(INT64_C(6)), false);
+                REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "int")) == 6);
+
+                REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(ctx, "float")) == 2.2f);
+                obj.set_property_value(ctx, "float", util::Any(1.23f), false);
+                REQUIRE(any_cast<float>(obj.get_property_value<util::Any>(ctx, "float")) == 1.23f);
+
+                REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(ctx, "double")) == 3.3);
+                obj.set_property_value(ctx, "double", util::Any(1.23), false);
+                REQUIRE(any_cast<double>(obj.get_property_value<util::Any>(ctx, "double")) == 1.23);
+
+                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "hello");
+                obj.set_property_value(ctx, "string", util::Any("abc"s), false);
+                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "string")) == "abc");
+
+                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "olleh");
+                obj.set_property_value(ctx, "data", util::Any("abc"s), false);
+                REQUIRE(any_cast<std::string>(obj.get_property_value<util::Any>(ctx, "data")) == "abc");
+
+                REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(10, 20));
+                obj.set_property_value(ctx, "date", util::Any(Timestamp(1, 2)), false);
+                REQUIRE(any_cast<Timestamp>(obj.get_property_value<util::Any>(ctx, "date")) == Timestamp(1, 2));
+
+                Object linked_obj(new_realm, "link target", 0);
+                Object new_obj(new_realm, "link target", get_table(new_realm, "link target")->add_empty_row());
+
+                auto linking = any_cast<Results>(linked_obj.get_property_value<util::Any>(ctx, "origin"));
+                REQUIRE(linking.size() == 1);
+
+                REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).row().get_index()
+                        == linked_obj.row().get_index());
+                obj.set_property_value(ctx, "object", util::Any(new_obj), false);
+                REQUIRE(any_cast<Object>(obj.get_property_value<util::Any>(ctx, "object")).row().get_index()
+                        == new_obj.row().get_index());
+
+                REQUIRE(linking.size() == 0);
+            });
+        }
+
+        SECTION("create object in new realm") {
+            realm->update_schema(schema, 2, [&values](auto, auto new_realm, Schema&) {
+                REQUIRE(new_realm->is_in_transaction());
+
+                CppContext ctx(new_realm);
+                any_cast<AnyDict&>(values)["pk"] = INT64_C(2);
+                Object obj = Object::create(ctx, new_realm, "all types", values, false);
+
+                REQUIRE(get_table(new_realm, "all types")->size() == 2);
+                REQUIRE(get_table(new_realm, "link target")->size() == 2);
+                REQUIRE(get_table(new_realm, "array target")->size() == 2);
+                REQUIRE(any_cast<int64_t>(obj.get_property_value<util::Any>(ctx, "pk")) == 2);
+            });
+        }
+
+        SECTION("upsert in new realm") {
+            realm->update_schema(schema, 2, [&values](auto, auto new_realm, Schema&) {
+                REQUIRE(new_realm->is_in_transaction());
+                CppContext ctx(new_realm);
+                any_cast<AnyDict&>(values)["bool"] = false;
+                Object obj = Object::create(ctx, new_realm, "all types", values, true);
+                REQUIRE(get_table(new_realm, "all types")->size() == 1);
+                REQUIRE(get_table(new_realm, "link target")->size() == 2);
+                REQUIRE(get_table(new_realm, "array target")->size() == 2);
+                REQUIRE(any_cast<bool>(obj.get_property_value<util::Any>(ctx, "bool")) == false);
+            });
+        }
+
+        SECTION("change primary key property type") {
+            schema = set_type(schema, "all types", "pk", PropertyType::String);
+            realm->update_schema(schema, 2, [](auto, auto new_realm, auto&) {
+                Object obj(new_realm, "all types", 0);
+
+                CppContext ctx(new_realm);
+                obj.set_property_value(ctx, "pk", util::Any("1"s), false);
+            });
+        }
+
+        SECTION("set primary key to duplicate values in migration") {
+            auto bad_migration = [&](auto, auto new_realm, Schema&) {
+                // shoud be able to create a new object with the same PK
+                REQUIRE_NOTHROW(Object::create(ctx, new_realm, "all types", values, false));
+                REQUIRE(get_table(new_realm, "all types")->size() == 2);
+
+                // but it'll fail at the end
+            };
+            REQUIRE_THROWS_AS(realm->update_schema(schema, 2, bad_migration), DuplicatePrimaryKeyValueException);
+            REQUIRE(get_table(realm, "all types")->size() == 1);
+
+            auto good_migration = [&](auto, auto new_realm, Schema&) {
+                REQUIRE_NOTHROW(Object::create(ctx, new_realm, "all types", values, false));
+
+                // Change the old object's PK to elminate the duplication
+                Object old_obj(new_realm, "all types", 0);
+                CppContext ctx(new_realm);
+                old_obj.set_property_value(ctx, "pk", util::Any(INT64_C(5)), false);
+            };
+            REQUIRE_NOTHROW(realm->update_schema(schema, 2, good_migration));
+            REQUIRE(get_table(realm, "all types")->size() == 2);
         }
     }
 
@@ -1354,34 +1638,34 @@ TEST_CASE("migration: Manual") {
     SECTION("add property to table") {
         REQUIRE_MIGRATION(add_property(schema, "object", {"new", PropertyType::Int, "", "", false, false, false}),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              realm->read_group().get_table("class_object")->add_column(type_Int, "new");
+                              get_table(realm, "object")->add_column(type_Int, "new");
                           });
     }
     SECTION("remove property from table") {
         REQUIRE_MIGRATION(remove_property(schema, "object", "value"),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              realm->read_group().get_table("class_object")->remove_column(1);
+                              get_table(realm, "object")->remove_column(1);
                           });
     }
     SECTION("add primary key to table") {
         REQUIRE_MIGRATION(set_primary_key(schema, "link origin", "not a pk"),
                           [](SharedRealm, SharedRealm realm, Schema&) {
                               ObjectStore::set_primary_key_for_object(realm->read_group(), "link origin", "not a pk");
-                              realm->read_group().get_table("class_link origin")->add_search_index(0);
+                              get_table(realm, "link origin")->add_search_index(0);
                           });
     }
     SECTION("remove primary key from table") {
         REQUIRE_MIGRATION(set_primary_key(schema, "object", ""),
                           [](SharedRealm, SharedRealm realm, Schema&) {
                               ObjectStore::set_primary_key_for_object(realm->read_group(), "object", "");
-                              realm->read_group().get_table("class_object")->remove_search_index(0);
+                              get_table(realm, "object")->remove_search_index(0);
                           });
     }
     SECTION("change primary key") {
         REQUIRE_MIGRATION(set_primary_key(schema, "object", "value"),
                           [](SharedRealm, SharedRealm realm, Schema&) {
                               ObjectStore::set_primary_key_for_object(realm->read_group(), "object", "value");
-                              auto table = realm->read_group().get_table("class_object");
+                              auto table = get_table(realm, "object");
                               table->remove_search_index(0);
                               table->add_search_index(1);
                           });
@@ -1389,7 +1673,7 @@ TEST_CASE("migration: Manual") {
     SECTION("change property type") {
         REQUIRE_MIGRATION(set_type(schema, "object", "value", PropertyType::Date),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              auto table = realm->read_group().get_table("class_object");
+                              auto table = get_table(realm, "object");
                               table->remove_column(1);
                               size_t col = table->add_column(type_Timestamp, "value");
                               table->add_search_index(col);
@@ -1398,7 +1682,7 @@ TEST_CASE("migration: Manual") {
     SECTION("change link target") {
         REQUIRE_MIGRATION(set_target(schema, "link origin", "object", "link origin"),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              auto table = realm->read_group().get_table("class_link origin");
+                              auto table = get_table(realm, "link origin");
                               table->remove_column(1);
                               table->add_column_link(type_Link, "object", *table);
                           });
@@ -1406,7 +1690,7 @@ TEST_CASE("migration: Manual") {
     SECTION("change linklist target") {
         REQUIRE_MIGRATION(set_target(schema, "link origin", "array", "link origin"),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              auto table = realm->read_group().get_table("class_link origin");
+                              auto table = get_table(realm, "link origin");
                               table->remove_column(2);
                               table->add_column_link(type_LinkList, "array", *table);
                           });
@@ -1414,7 +1698,7 @@ TEST_CASE("migration: Manual") {
     SECTION("make property optional") {
         REQUIRE_MIGRATION(set_optional(schema, "object", "value", true),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              auto table = realm->read_group().get_table("class_object");
+                              auto table = get_table(realm, "object");
                               table->remove_column(1);
                               size_t col = table->add_column(type_Int, "value", true);
                               table->add_search_index(col);
@@ -1423,7 +1707,7 @@ TEST_CASE("migration: Manual") {
     SECTION("make property required") {
         REQUIRE_MIGRATION(set_optional(schema, "object", "optional", false),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              auto table = realm->read_group().get_table("class_object");
+                              auto table = get_table(realm, "object");
                               table->remove_column(2);
                               table->add_column(type_Int, "optional", false);
                           });
@@ -1431,13 +1715,13 @@ TEST_CASE("migration: Manual") {
     SECTION("add index") {
         REQUIRE_MIGRATION(set_indexed(schema, "object", "optional", true),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              realm->read_group().get_table("class_object")->add_search_index(2);
+                              get_table(realm, "object")->add_search_index(2);
                           });
     }
     SECTION("remove index") {
         REQUIRE_MIGRATION(set_indexed(schema, "object", "value", false),
                           [](SharedRealm, SharedRealm realm, Schema&) {
-                              realm->read_group().get_table("class_object")->remove_search_index(1);
+                              get_table(realm, "object")->remove_search_index(1);
                           });
     }
     SECTION("reorder properties") {

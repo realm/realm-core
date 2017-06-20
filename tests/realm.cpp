@@ -1130,5 +1130,9 @@ TEST_CASE("SharedRealm: compact on launch") {
 
     // Validate that the file still contains what it should
     REQUIRE(r->read_group().get_table("class_object")->size() == count);
+
+    // Registering for a collection notification shouldn't crash when compact on launch is used.
+    Results results(r, *r->read_group().get_table("class_object"));
+    results.async([](std::exception_ptr) { });
 }
 #endif

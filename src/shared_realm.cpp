@@ -161,7 +161,7 @@ void Realm::open_with_config(const Config& config,
             };
             shared_group = std::make_unique<SharedGroup>(*history, options);
 
-            if (config.should_compact_on_launch_function) {
+            if (realm && config.should_compact_on_launch_function) {
                 size_t free_space = -1;
                 size_t used_space = -1;
                 // getting stats requires committing a write transaction beforehand.
@@ -432,9 +432,11 @@ void Realm::update_schema(Schema schema, uint64_t version,
         // migration function needs to see the target schema on the "new" Realm
         std::swap(m_schema, schema);
         std::swap(m_schema_version, version);
+        m_in_migration = true;
         auto restore = util::make_scope_exit([&]() noexcept {
             std::swap(m_schema, schema);
             std::swap(m_schema_version, version);
+            m_in_migration = false;
         });
 
         ObjectStore::apply_schema_changes(read_group(), version, m_schema, m_schema_version,

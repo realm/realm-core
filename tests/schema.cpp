@@ -22,6 +22,7 @@
 #include "property.hpp"
 #include "schema.hpp"
 
+#include <realm/descriptor.hpp>
 #include <realm/group.hpp>
 #include <realm/table.hpp>
 
@@ -111,6 +112,9 @@ TEST_CASE("ObjectSchema") {
         table->add_column(type_Binary, "data?", true);
         table->add_column(type_Timestamp, "date?", true);
 
+        size_t col = table->add_column(type_Table, "subtable");
+        table->get_subdescriptor(col)->add_column(type_Int, "value");
+
         size_t indexed_start = table->get_column_count();
         table->add_column(type_Int, "indexed int");
         table->add_column(type_Bool, "indexed bool");
@@ -159,6 +163,10 @@ TEST_CASE("ObjectSchema") {
         REQUIRE_PROPERTY("string?", String, "", "", false, false, true);
         REQUIRE_PROPERTY("data?", Data, "", "", false, false, true);
         REQUIRE_PROPERTY("date?", Date, "", "", false, false, true);
+
+        // Unsupported column type should be skipped entirely
+        REQUIRE(os.property_for_name("subtable") == nullptr);
+        ++expected_col;
 
         REQUIRE_PROPERTY("indexed int", Int, "", "", false, true, false);
         REQUIRE_PROPERTY("indexed bool", Bool, "", "", false, true, false);

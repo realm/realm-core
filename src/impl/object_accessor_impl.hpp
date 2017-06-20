@@ -138,6 +138,7 @@ private:
 
 inline util::Any CppContext::box(RowExpr row) const
 {
+    REALM_ASSERT(object_schema);
     return Object(realm, *object_schema, row);
 }
 
