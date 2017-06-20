@@ -857,18 +857,18 @@ void Table::do_add_search_index(Descriptor& descr, size_t column_ndx)
 
         size_t sz = root_table.size();
         for (size_t r = 0; r < sz; r++) {
-            // Clear index bit from shared spec because we're now going to operate on the next subtable
-            // object which has no index yet (because various method calls may crash if attributes are
-            // wrong)
-            spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
-
             TableRef sub = root_table.get_subtable(parent_col, r);
-            sub->_add_search_index(column_ndx);
+            // No reason to create search index for a degenerate table
+            if (!sub->is_degenerate()) {
+                sub->_add_search_index(column_ndx);
+                // Clear index bit from shared spec because we're now going to operate on the next subtable
+                // object which has no index yet (because various method calls may crash if attributes are
+                // wrong)
+                spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+            }
         }
     }
 
-    // Set shared attributes here also, in case there was no rows to iterate through in the for-loop
-    // above
     spec.set_column_attr(column_ndx, ColumnAttr(attr | col_attr_Indexed)); // Throws
 
     if (Replication* repl = root_table.get_repl())
@@ -907,20 +907,20 @@ void Table::do_remove_search_index(Descriptor& descr, size_t column_ndx)
         // for-loop are safe to call despite of this.
         size_t sz = root_table.size();
         for (size_t r = 0; r < sz; r++) {
-            // Set index bit from shared spec because we're now going to operate on the next subtable
-            // object which still has an index (because various method calls may crash if attributes are
-            // wrong)
-            spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
-
             // Destroy search index. This will update shared attributes in case refresh_column_accessors()
             // should depend on them being correct
             TableRef sub = root_table.get_subtable(parent_col, r);
-            sub->_remove_search_index(column_ndx);
+            // No reason to remove search index for a degenerate table
+            if (!sub->is_degenerate()) {
+                sub->_remove_search_index(column_ndx);
+                // Set index bit from shared spec because we're now going to operate on the next subtable
+                // object which still has an index (because various method calls may crash if attributes are
+                // wrong)
+                spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+            }
         }
     }
 
-    // Set shared attributes here also, in case there was no rows to iterate through in the for-loop
-    // above
     spec.set_column_attr(column_ndx, ColumnAttr(attr & ~col_attr_Indexed)); // Throws
 
     if (Replication* repl = root_table.get_repl())
