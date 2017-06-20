@@ -16,7 +16,9 @@
 
 ### Internals
 
-* Lorem ipsum.
+* Disabled strict aliasing due to warning from gcc 7.x (see
+  https://github.com/realm/realm-core/issues/2665). We have so far been unable
+  to determine if it's a bug in gcc or in Core.
 
 ----------------------------------------------
 
