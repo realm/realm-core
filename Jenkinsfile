@@ -158,6 +158,10 @@ def doBuildInDocker(String buildType) {
 
             def buildEnv = docker.build 'realm-core:snapshot'
             def environment = environment()
+            if (buildType.contains('sanitizer')) {
+                environment << 'UNITTEST_THREADS=1'
+                environment << 'UNITTEST_PROGRESS=1'
+            }
             withEnv(environment) {
                 buildEnv.inside {
                     try {
