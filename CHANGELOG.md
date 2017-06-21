@@ -16,7 +16,7 @@
 
 ### Internals
 
-* Lorem ipsum.
+* `_impl::GroupFriend::get_top_ref()` was added.
 
 ----------------------------------------------
 
