@@ -270,8 +270,7 @@ void IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result
 
         for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
             const size_t row_ndx = to_size_t(*it);
-            size_t insertion_ndx = result.lower_bound(row_ndx);
-            result.insert(insertion_ndx, row_ndx);
+            result.add(row_ndx);
         }
         return;
     }
@@ -283,8 +282,7 @@ void IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result
         StringData str = column->get_index_data(row_ndx, buffer);
         auto upper_str = case_map(str, true);
         if (upper_str == upper_value) {
-            size_t insertion_ndx = result.lower_bound(row_ndx);
-            result.insert(insertion_ndx, row_ndx);
+            result.add(row_ndx);
         }
     }
 
@@ -477,8 +475,7 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
             const StringData str = column->get_index_data(row_ndx, buffer);
             const util::Optional<std::string> upper_str = case_map(str, true);
             if (upper_str == upper_value) {
-                size_t insertion_ndx = result.lower_bound(row_ndx);
-                result.insert(insertion_ndx, row_ndx);
+                result.add(row_ndx);
             }
             continue;
         }
@@ -495,6 +492,16 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
 
         // Recurse into sub-index;
         search_list.add_all_for_level(sub_header, string_offset + 4);
+    }
+    std::vector<int64_t> results_copy;
+    const size_t num_results = result.size();
+    results_copy.reserve(num_results);
+    for (size_t i = 0; i < num_results; ++i) {
+        results_copy.push_back(result.get(i));
+    }
+    std::sort(results_copy.begin(), results_copy.end());
+    for (size_t i = 0; i < num_results; ++i) {
+        result.set(i, results_copy[i]);
     }
 }
 
