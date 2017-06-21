@@ -130,11 +130,11 @@ CommonDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> con
                                  std::vector<bool> const& ascending, IntegerColumn const& row_indexes)
 {
     REALM_ASSERT(!columns.empty());
+    REALM_ASSERT_EX(columns.size() == ascending.size(), columns.size(), ascending.size());
     size_t num_rows = row_indexes.size();
 
     m_columns.reserve(columns.size());
     for (size_t i = 0; i < columns.size(); ++i) {
-		REALM_ASSERT_RELEASE_EX(i < ascending.size(), i, ascending.size());
         m_columns.push_back({{}, {}, columns[i].back(), ascending[i]});
         REALM_ASSERT_EX(!columns[i].empty(), i);
         if (columns[i].size() == 1) { // no link chain
@@ -184,7 +184,7 @@ std::vector<bool> SortDescriptor::export_order() const
 CommonDescriptor::Sorter CommonDescriptor::sorter(IntegerColumn const& row_indexes) const
 {
     REALM_ASSERT(!m_columns.empty());
-    std::vector<bool> ascending(true, m_columns.size());
+    std::vector<bool> ascending(m_columns.size(), true);
     return Sorter(m_columns, ascending, row_indexes);
 }
 
