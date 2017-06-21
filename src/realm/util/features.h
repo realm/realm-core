@@ -23,7 +23,7 @@
 #pragma warning(disable : 4800) // Visual Studio int->bool performance warnings
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(NOMINMAX)
 #define NOMINMAX
 #endif
 

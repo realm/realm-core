@@ -549,7 +549,9 @@ int test_all(int argc, char* argv[], util::Logger* logger)
     }
 
 #ifdef _MSC_VER
-    getchar(); // wait for key
+    // We don't want forked processes (see winfork() to require user interaction).
+    if(!getenv("REALM_FORKED"))
+        getchar(); // wait for key
 #endif
 
     return success || no_error_exit_staus ? EXIT_SUCCESS : EXIT_FAILURE;
