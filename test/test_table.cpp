@@ -1392,6 +1392,35 @@ TEST(Table_MoveAllTypes)
     }
 }
 
+TEST(Table_SubtableNull)
+{
+    Table parent;
+
+    {
+        DescriptorRef subdescr;
+        parent.add_column(type_Table, "integers", true, &subdescr);
+        subdescr->add_column(type_Int, "list");
+    }
+
+    parent.add_empty_row(2);
+    CHECK(parent.is_null(0, 0));
+    parent.get_subtable(0, 0)->add_empty_row(0);
+    TableRef table = parent.get_subtable(0, 1); // Preserve accessor
+    CHECK(table->is_attached());
+    CHECK(table->is_degenerate());
+    table->add_empty_row(0);
+    CHECK(!table->is_degenerate());
+    CHECK(!parent.is_null(0, 0));
+    CHECK(!parent.is_null(0, 1));
+    CHECK(table->is_attached());
+    parent.set_null(0, 0);
+    parent.set_null(0, 1);
+    CHECK(parent.is_null(0, 0));
+    CHECK(parent.is_null(0, 1));
+    CHECK(table->is_attached());
+    CHECK(table->is_degenerate());
+}
+
 
 TEST(Table_DegenerateSubtableSearchAndAggregate)
 {
@@ -1533,6 +1562,30 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     size_t res;
     degen_child->where().equal(5, "hello").average_int(0, &res);
     CHECK_EQUAL(0, res);
+}
+
+TEST(Table_SpecUpdateWhenInsertingTable)
+{
+    Group g;
+
+    TableRef table_first = g.add_table("first");
+    TableRef table_second = g.add_table("second");
+
+    DescriptorRef subdescr;
+    table_first->add_column(type_Table, "subtables", true, &subdescr);
+    subdescr->add_column(type_Int, "integers", nullptr, false);
+    table_first->add_empty_row(5);
+
+    table_second->add_column_link(type_Link, "links", *table_first);
+
+    TableRef sub = table_first->get_subtable(0, 2);
+    sub->clear();
+    sub->add_empty_row(1);
+
+    g.insert_table(0, "third");
+    sub->set_int(0, 0, 1, false);
+
+    g.verify();
 }
 
 TEST(Table_Range)
@@ -2812,6 +2865,194 @@ TEST(Table_Spec)
         CHECK_EQUAL(1, subtable2->size());
         CHECK_EQUAL(42, subtable2->get_int(0, 0));
         CHECK_EQUAL("test", subtable2->get_string(1, 0));
+    }
+}
+
+TEST(Table_SubtableIndex)
+{
+    GROUP_TEST_PATH(path);
+
+    {
+        Group group;
+        DescriptorRef sub_1;
+        TableRef table = group.add_table("test");
+
+        // Create specification with sub-table
+        table->add_column(type_String, "first");
+        table->add_column(type_Table, "second", &sub_1);
+
+        sub_1->add_column(type_Int, "sub_first");
+        sub_1->add_column(type_String, "sub_second");
+
+        // Add search index to `degenerate` subtable (subtable which does not yet exist because it has
+        // no rows yet, so it's just a 0-ref in the ColumnTable object). Important to test because the
+        // search index is then constructed in a different place in the source code
+        sub_1->add_search_index(0);
+        CHECK(sub_1->has_search_index(0));
+        sub_1->remove_search_index(0);
+        CHECK(!sub_1->has_search_index(0));
+        sub_1->add_search_index(0);
+        CHECK(sub_1->has_search_index(0));
+
+        CHECK_EQUAL(2, table->get_column_count());
+
+        // Add two rows to parent table
+        table->add_empty_row();
+        table->add_empty_row();
+        table->set_string(0, 0, "Hello");
+
+        // Add rows to first subtable
+        TableRef subtable = table->get_subtable(1, 0);
+        CHECK(subtable->is_empty());
+        subtable->add_empty_row();
+        subtable->set_int(0, 0, 42);
+        subtable->set_string(1, 0, "testsub1");
+        subtable->add_empty_row();
+        subtable->set_int(0, 1, 43);
+        subtable->set_string(1, 1, "testsub2");
+        CHECK_THROW_ANY(subtable->remove_search_index(0));
+        CHECK_THROW_ANY(subtable->add_search_index(0));
+
+        // Add rows to second subtable
+        subtable = table->get_subtable(1, 1);
+        CHECK(subtable->is_empty());
+        subtable->add_empty_row();
+        subtable->set_int(0, 0, 66);
+        subtable->set_string(1, 0, "testsub3");
+        subtable->add_empty_row();
+        subtable->set_int(0, 1, 77);
+        subtable->set_string(1, 1, "testsub4");
+
+        int64_t tt = subtable.get()->get_int(0, 0);
+        CHECK_EQUAL(tt, 66);
+
+        subtable = table->get_subtable(1, 0);
+        CHECK(subtable.get()->has_search_index(0));
+
+        size_t match;
+
+        match = subtable.get()->where().equal(0, 43).find();
+        CHECK_EQUAL(match, 1);
+        match = subtable.get()->where().equal(1, "testsub2").find();
+        CHECK_EQUAL(match, 1);
+
+        // group.verify();
+        // group.to_dot("group.dot");
+
+        subtable = table->get_subtable(1, 1);
+
+        match = subtable.get()->where().equal(0, 77).find();
+        CHECK_EQUAL(match, 1);
+
+        // Query column that follows indexed column to test if refresh_column_accessors()
+        // has worked
+        match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        sub_1->remove_search_index(1);
+        CHECK(!subtable.get()->has_search_index(1));
+
+        // Query column that follows indexed column to test if refresh_column_accessors()
+        // has worked
+        match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+
+        match = subtable.get()->where().equal(0, 77).find();
+        CHECK_EQUAL(match, 1);
+
+        // Tests non-degenerate construction of index
+        sub_1->add_search_index(1);
+
+        match = subtable.get()->where().equal(0, 77).find();
+        CHECK_EQUAL(match, 1);
+        match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        // Add more data and see if that works
+        subtable.get()->add_empty_row();
+        match = subtable.get()->where().equal(0, 0).find();
+        CHECK_EQUAL(match, 2);
+
+        group.write(path);
+    }
+
+    {
+        // Check persistence
+        Group g2(path);
+        DescriptorRef sub_1;
+        TableRef table = g2.get_table("test");
+
+        TableRef subtable = table->get_subtable(1, 0);
+        CHECK(subtable.get()->has_search_index(0));
+
+        size_t match;
+
+        match = subtable.get()->where().equal(0, 43).find();
+        CHECK_EQUAL(match, 1);
+        match = subtable.get()->where().equal(1, "testsub2").find();
+        CHECK_EQUAL(match, 1);
+
+        subtable = table->get_subtable(1, 1);
+
+        match = subtable.get()->where().equal(0, 77).find();
+        CHECK_EQUAL(match, 1);
+        match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        DescriptorRef subsub;
+        DescriptorRef sub = table.get()->get_subdescriptor(1);
+        sub->add_column(type_Table, "foobar", &subsub);
+        CHECK_THROW_ANY(subsub->add_search_index(0));
+    }
+
+    {
+        // Check that you are not allowed to add index to subtable of subtable
+        Group g2(path);
+        DescriptorRef sub_1;
+        TableRef table = g2.get_table("test");
+        DescriptorRef subsub;
+        DescriptorRef sub = table.get()->get_subdescriptor(1);
+        sub->add_column(type_Table, "baz", &subsub);
+        CHECK_THROW_ANY(subsub->add_search_index(0));
+    }
+
+    {
+        // Check correct updating of other subtable accessors than the one you called add_search_index() on
+        Group g2(path);
+        DescriptorRef des;
+        TableRef table = g2.get_table("test");
+        TableRef sub1 = table->get_subtable(1, 0);
+        TableRef sub2 = table->get_subtable(1, 1);
+
+        size_t match;
+
+        des = table->get_subdescriptor(1);
+
+        des->remove_search_index(0);
+
+        CHECK(!sub1->has_search_index(0));
+        match = sub1->where().equal(1, "testsub2").find();
+        CHECK_EQUAL(match, 1);
+
+        CHECK(!sub2->has_search_index(0));
+        match = sub2->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        des->add_search_index(0);
+
+        CHECK(sub1->has_search_index(0));
+        match = sub1->where().equal(1, "testsub2").find();
+        CHECK_EQUAL(match, 1);
+
+        CHECK(sub2->has_search_index(0));
+        match = sub2->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        // Check what happens if user given column index is out of range
+        CHECK_THROW(des->add_search_index(100), LogicError);
+        CHECK_THROW(des->remove_search_index(100), LogicError);
+        CHECK(!des->has_search_index(100));
     }
 }
 
@@ -5989,6 +6230,10 @@ TEST(Table_RowAccessorLinks)
     CHECK(source_row_2.linklist_is_empty(1));
     CHECK_EQUAL(0, source_row_1.get_link_count(1));
     CHECK_EQUAL(0, source_row_2.get_link_count(1));
+    CHECK_EQUAL(0, target_table->get(7).get_backlink_count());
+    CHECK_EQUAL(0, target_table->get(13).get_backlink_count());
+    CHECK_EQUAL(0, target_table->get(11).get_backlink_count());
+    CHECK_EQUAL(0, target_table->get(15).get_backlink_count());
     CHECK_EQUAL(0, target_table->get(7).get_backlink_count(*origin_table, 0));
     CHECK_EQUAL(0, target_table->get(13).get_backlink_count(*origin_table, 0));
     CHECK_EQUAL(0, target_table->get(11).get_backlink_count(*origin_table, 1));
@@ -6024,12 +6269,18 @@ TEST(Table_RowAccessorLinks)
     CHECK(!source_row_2.linklist_is_empty(1));
     CHECK_EQUAL(1, source_row_1.get_link_count(1));
     CHECK_EQUAL(2, source_row_2.get_link_count(1));
+    CHECK_EQUAL(1, target_table->get(11).get_backlink_count());
+    CHECK_EQUAL(2, target_table->get(15).get_backlink_count());
     CHECK_EQUAL(1, target_table->get(11).get_backlink_count(*origin_table, 1));
     CHECK_EQUAL(2, target_table->get(15).get_backlink_count(*origin_table, 1));
     CHECK_EQUAL(1, target_table->get(11).get_backlink(*origin_table, 1, 0));
     size_t back_link_1 = target_table->get(15).get_backlink(*origin_table, 1, 0);
     size_t back_link_2 = target_table->get(15).get_backlink(*origin_table, 1, 1);
     CHECK((back_link_1 == 0 && back_link_2 == 1) || (back_link_1 == 1 && back_link_2 == 0));
+
+    // Links from multiple columns (count total)
+    source_row_1.set_link(0, 15);
+    CHECK_EQUAL(3, target_table->get(15).get_backlink_count());
 
     // Clear link lists
     link_list_1->clear();
@@ -6877,6 +7128,46 @@ TEST(Table_MultipleLinkColumnsMoveTablesCrossLinks)
     g.verify();
     _impl::TableFriend::move_column(*t->get_descriptor(), 1, 0);
     g.verify();
+}
+
+
+TEST(Table_MoveSubtables)
+{
+    Group g;
+    TableRef t = g.add_table("A");
+    TableRef t2 = g.add_table("B");
+    {
+        DescriptorRef subdesc;
+
+        t->add_column(type_Table, "sub1", &subdesc);
+        subdesc->add_column(type_Int, "integers");
+
+        t->add_column_link(type_Link, "link", *t2);
+
+        t->add_column(type_Table, "sub2", &subdesc);
+        subdesc->add_column(type_String, "strings");
+    }
+
+    {
+        DescriptorRef sub1 = t->get_subdescriptor(0);
+        DescriptorRef sub2 = t->get_subdescriptor(2);
+        CHECK_EQUAL(sub1->get_column_name(0), "integers");
+        CHECK_EQUAL(sub2->get_column_name(0), "strings");
+    }
+    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 2);
+    {
+        DescriptorRef sub1 = t->get_subdescriptor(2);
+        DescriptorRef sub2 = t->get_subdescriptor(1);
+        CHECK_EQUAL(sub1->get_column_name(0), "integers");
+        CHECK_EQUAL(sub2->get_column_name(0), "strings");
+    }
+    _impl::TableFriend::move_column(*t->get_descriptor(), 2, 0);
+    {
+        DescriptorRef sub1 = t->get_subdescriptor(0);
+        DescriptorRef sub2 = t->get_subdescriptor(2);
+        CHECK_EQUAL(sub1->get_column_name(0), "integers");
+        CHECK_EQUAL(sub2->get_column_name(0), "strings");
+    }
 }
 
 
@@ -7846,5 +8137,21 @@ TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
     check_column_sizes(10 * REALM_MAX_BPNODE_SIZE);
 }
 
+TEST(Table_KeyRow)
+{
+    Table table;
+    table.add_column(type_Int, "int");
+    table.add_column(type_String, "string");
+    table.add_search_index(0);
+
+    size_t ndx = table.add_row_with_key(0, 123);
+    table.set_string(1, ndx, "Hello, ");
+    table.add_row_with_key(0, 456);
+
+    size_t i = table.find_first_int(0, 123);
+    CHECK_EQUAL(i, 0);
+    i = table.find_first_int(0, 456);
+    CHECK_EQUAL(i, 1);
+}
 
 #endif // TEST_TABLE

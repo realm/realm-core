@@ -430,6 +430,8 @@
 		B159814A18CF560000E3C5DF /* demangle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B159814718CF560000E3C5DF /* demangle.cpp */; };
 		B159814B18CF560000E3C5DF /* demangle.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159814818CF560000E3C5DF /* demangle.hpp */; };
 		B159814C18CF560000E3C5DF /* super_int.hpp in Headers */ = {isa = PBXBuildFile; fileRef = B159814918CF560000E3C5DF /* super_int.hpp */; };
+		B68DB60C1ECC2AEF0076E7A4 /* test_upgrade_database_1000_7_to_8.realm in Resources */ = {isa = PBXBuildFile; fileRef = B68DB60B1ECC2AAB0076E7A4 /* test_upgrade_database_1000_7_to_8.realm */; };
+		B68DB60D1ECC2AF30076E7A4 /* test_upgrade_database_4_7_to_8.realm in Resources */ = {isa = PBXBuildFile; fileRef = B68DB60A1ECC2AAB0076E7A4 /* test_upgrade_database_4_7_to_8.realm */; };
 		B6BA82051E7C0A150080DEE9 /* query_expression.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B6BA82041E7C0A150080DEE9 /* query_expression.cpp */; };
 		B6BA82061E7C0A360080DEE9 /* query_expression.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B6BA82041E7C0A150080DEE9 /* query_expression.cpp */; };
 		B6BA82071E7C0A370080DEE9 /* query_expression.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B6BA82041E7C0A150080DEE9 /* query_expression.cpp */; };
@@ -1006,6 +1008,8 @@
 		B159814D18CF562600E3C5DF /* test_safe_int_ops.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_safe_int_ops.cpp; sourceTree = "<group>"; };
 		B647249B1D225C87006AB240 /* test_util_type_list.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_type_list.cpp; sourceTree = "<group>"; };
 		B67A2D381D1D5C1F00F0A0E7 /* test_util_to_string.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_to_string.cpp; sourceTree = "<group>"; };
+		B68DB60A1ECC2AAB0076E7A4 /* test_upgrade_database_4_7_to_8.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_4_7_to_8.realm; sourceTree = "<group>"; };
+		B68DB60B1ECC2AAB0076E7A4 /* test_upgrade_database_1000_7_to_8.realm */ = {isa = PBXFileReference; lastKnownFileType = file; path = test_upgrade_database_1000_7_to_8.realm; sourceTree = "<group>"; };
 		B6BA82041E7C0A150080DEE9 /* query_expression.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = query_expression.cpp; path = realm/query_expression.cpp; sourceTree = "<group>"; };
 		B6F92D3A1D4611D900887B4E /* test_util_file.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = test_util_file.cpp; sourceTree = "<group>"; };
 		C008FF991B67F02F0042669E /* liblibrealm watchos.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "liblibrealm watchos.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -1518,6 +1522,8 @@
 		651AEEAA1B319F810048C8EE /* test_files */ = {
 			isa = PBXGroup;
 			children = (
+				B68DB60A1ECC2AAB0076E7A4 /* test_upgrade_database_4_7_to_8.realm */,
+				B68DB60B1ECC2AAB0076E7A4 /* test_upgrade_database_1000_7_to_8.realm */,
 				65ED1B521B31AD3D0041EBD1 /* expect_json.json */,
 				65ED1B761B31B1510041EBD1 /* expect_string.txt */,
 				65ED1B6C1B31AEFC0041EBD1 /* expected_json_link_cycles1.json */,
@@ -2111,6 +2117,7 @@
 				65ED1B771B31B17C0041EBD1 /* expect_string.txt in Resources */,
 				65ED1B711B31AF090041EBD1 /* expected_json_link_cycles1.json in Resources */,
 				65ED1B721B31AF090041EBD1 /* expected_json_link_cycles2.json in Resources */,
+				B68DB60D1ECC2AF30076E7A4 /* test_upgrade_database_4_7_to_8.realm in Resources */,
 				65ED1B731B31AF090041EBD1 /* expected_json_link_cycles3.json in Resources */,
 				65ED1B741B31AF090041EBD1 /* expected_json_link_cycles4.json in Resources */,
 				65ED1B751B31AF090041EBD1 /* expected_json_link_cycles5.json in Resources */,
@@ -2124,6 +2131,7 @@
 				65ED1B671B31AEBA0041EBD1 /* expected_json_linklist_cycle2.json in Resources */,
 				65ED1B681B31AEBA0041EBD1 /* expected_json_linklist_cycle3.json in Resources */,
 				65ED1B691B31AEBA0041EBD1 /* expected_json_linklist_cycle4.json in Resources */,
+				B68DB60C1ECC2AEF0076E7A4 /* test_upgrade_database_1000_7_to_8.realm in Resources */,
 				65ED1B6A1B31AEBA0041EBD1 /* expected_json_linklist_cycle5.json in Resources */,
 				65ED1B6B1B31AEBA0041EBD1 /* expected_json_linklist_cycle6.json in Resources */,
 				F45013BF1B01022800CD4A7E /* Images.xcassets in Resources */,
