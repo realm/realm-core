@@ -68,7 +68,6 @@ using namespace realm::test_util;
 // check-testcase` (or one of its friends) from the command line.
 
 
-
 TEST(Query_NoConditions)
 {
     Table table;

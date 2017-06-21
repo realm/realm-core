@@ -1692,18 +1692,12 @@ namespace {
 // results returned by the index should be in ascending row order
 // this requirement is assumed by the query system which runs find_gte
 // and this will return wrong results unless the results are ordered
-auto check_result_order = [](const IntegerColumn& results, TestContext& test_context) {
-    std::vector<int64_t> indices;
+void check_result_order(const IntegerColumn& results, TestContext& test_context) {
     const size_t num_results = results.size();
-    indices.reserve(num_results);
-    for (size_t i = 0; i < num_results; ++i) {
-        indices.push_back(results.get(i));
+    for (size_t i = 1; i < num_results; ++i) {
+        CHECK(results.get(i - 1) < results.get(i));
     }
-    std::sort(indices.begin(), indices.end());
-    for (size_t i = 0; i < num_results; ++i) {
-        CHECK_EQUAL(results.get(i), indices[i]);
-    }
-};
+}
 
 } // end anonymous namespace
 
