@@ -134,6 +134,7 @@ CommonDescriptor::Sorter::Sorter(std::vector<std::vector<const ColumnBase*>> con
 
     m_columns.reserve(columns.size());
     for (size_t i = 0; i < columns.size(); ++i) {
+		REALM_ASSERT_RELEASE_EX(i < ascending.size(), i, ascending.size());
         m_columns.push_back({{}, {}, columns[i].back(), ascending[i]});
         REALM_ASSERT_EX(!columns[i].empty(), i);
         if (columns[i].size() == 1) { // no link chain
