@@ -66,6 +66,7 @@ enum INS {
     REMOVE_TABLE,
     INSERT_ROW,
     ADD_EMPTY_ROW,
+    ADD_ROW_WITH_KEY,
     INSERT_COLUMN,
     RENAME_COLUMN,
     ADD_COLUMN,
@@ -431,6 +432,26 @@ void parse_and_apply_instructions(std::string& in, const std::string& path, util
                         }
                         g.get_table(table_ndx)->add_empty_row(num_rows % add_empty_row_max);
                     }
+                }
+            }
+            else if (instr == ADD_ROW_WITH_KEY && g.size() > 0) {
+                size_t table_ndx = get_next(s) % g.size();
+                TableRef table = g.get_table(table_ndx);
+                size_t nb_columns = table->get_column_count();
+                size_t col = 0;
+                while (col < nb_columns) {
+                    if (table->get_column_type(col) == type_Int && !table->is_nullable(col)) {
+                        break;
+                    }
+                    col++;
+                }
+                if (col < nb_columns) {
+                    int64_t value = get_int64(s);
+                    if (log) {
+                        *log << "g.get_table(" << table_ndx << ")->add_row_with_key"
+                             << "(" << col << ", " << value << ");\n";
+                    }
+                    g.get_table(table_ndx)->add_row_with_key(col, value);
                 }
             }
             else if (instr == ADD_COLUMN && g.size() > 0) {

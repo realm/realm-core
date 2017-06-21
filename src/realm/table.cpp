@@ -292,6 +292,20 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
 }
 
 
+size_t Table::get_backlink_count(size_t row_ndx) const noexcept
+{
+    size_t backlink_columns_begin = m_spec->first_backlink_column_index();
+    size_t backlink_columns_end = backlink_columns_begin + m_spec->backlink_column_count();
+    size_t ref_count = 0;
+
+    for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
+        const BacklinkColumn& backlink_col = get_column_backlink(i);
+        ref_count += backlink_col.get_backlink_count(row_ndx);
+    }
+
+    return ref_count;
+}
+
 size_t Table::get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept
 {
     size_t origin_table_ndx = origin.get_index_in_group();
@@ -2266,6 +2280,38 @@ void Table::insert_empty_row(size_t row_ndx, size_t num_rows)
         size_t prior_num_rows = m_size - num_rows;
         repl->insert_empty_rows(this, row_ndx, num_rows_to_insert, prior_num_rows); // Throws
     }
+}
+
+size_t Table::add_row_with_key(size_t key_col_ndx, int64_t key)
+{
+    size_t num_cols = m_spec->get_column_count();
+    size_t row_ndx = m_size;
+
+    REALM_ASSERT(is_attached());
+    REALM_ASSERT_3(key_col_ndx, <, num_cols);
+    REALM_ASSERT(!is_nullable(key_col_ndx));
+
+    bump_version();
+
+    for (size_t col_ndx = 0; col_ndx != num_cols; ++col_ndx) {
+        if (col_ndx == key_col_ndx) {
+            IntegerColumn& col = get_column(key_col_ndx);
+            col.insert(row_ndx, key, 1);
+        }
+        else {
+            ColumnBase& col = get_column_base(col_ndx);
+            bool insert_nulls = is_nullable(col_ndx);
+            col.insert_rows(row_ndx, 1, m_size, insert_nulls); // Throws
+        }
+    }
+    m_size++;
+
+    if (Replication* repl = get_repl()) {
+        size_t prior_num_rows = m_size - 1;
+        repl->add_row_with_key(this, row_ndx, prior_num_rows, key_col_ndx, key); // Throws
+    }
+
+    return row_ndx;
 }
 
 

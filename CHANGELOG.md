@@ -2,9 +2,7 @@
 
 ### Bugfixes
 
-* Fixes bug in encryption that could cause deadlocks/hangs and possibly
-  other bugs too. Fixes https://github.com/realm/realm-core/pull/2650
-  PR [#2668](https://github.com/realm/realm-core/pull/2668)
+* Lorem ipsum.
 
 ### Breaking changes
 
@@ -20,6 +18,7 @@
 * Replication interface changed. The search index functions now operate
   on a descriptor and not a table.
   PR [#2561](https://github.com/realm/realm-core/pull/2561).
+* New replication instruction: instr_AddRowWithKey
 
 ### Enhancements
 
@@ -41,9 +40,14 @@
   PR [#2561](https://github.com/realm/realm-core/pull/2561).
 * Support for encryption on Windows (Win32 + UWP).
   PR [#2643](https://github.com/realm/realm-core/pull/2643).
+* Add Table::add_row_with_key(). Adds a row and fills an integer column with
+  a value in one operation.
+  PR [#2596](https://github.com/realm/realm-core/pull/2596)
+  Issue [#2585](https://github.com/realm/realm-core/issues/2585)
 * Add more overloads with realm::null - PR [#2669](https://github.com/realm/realm-core/pull/2669)
   - `size_t Table::find_first(size_t col_ndx, null)`
   - `OutputStream& operator<<(OutputStream& os, const null&)`
+* Add method to get total count of backlinks for a row
 
 -----------
 
@@ -60,6 +64,23 @@
 * Implemented inter-process CondVars on Windows (Win32 + UWP). They should be
   fair and robust.
   PR [#2497](https://github.com/realm/realm-core/pull/2497).
+* `_impl::GroupFriend::get_top_ref()` was added.
+
+----------------------------------------------
+
+# 2.8.4 Release notes
+
+### Bugfixes
+
+* Fixes bug in encryption that could cause deadlocks/hangs and possibly
+  other bugs too.
+  Fixes issue [#2650](https://github.com/realm/realm-core/pull/2650).
+  PR [#2668](https://github.com/realm/realm-core/pull/2668).
+
+-----------
+
+### Internals
+
 * Fix an assert that prevented `Group::commit()` from discarding history from a
   Realm file opened in nonshared mode (via `Group::open()`, as opposed to
   `SharedGroup::open()`).

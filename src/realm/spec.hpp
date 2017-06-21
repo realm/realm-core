@@ -86,7 +86,11 @@ public:
     // Links
     size_t get_opposite_link_table_ndx(size_t column_ndx) const noexcept;
     void set_opposite_link_table_ndx(size_t column_ndx, size_t table_ndx);
+
+    // Backlinks
     bool has_backlinks() const noexcept;
+    size_t first_backlink_column_index() const noexcept;
+    size_t backlink_column_count() const noexcept;
     void set_backlink_origin_column(size_t backlink_col_ndx, size_t origin_col_ndx);
     size_t get_origin_column_ndx(size_t backlink_col_ndx) const noexcept;
     size_t find_backlink_column(size_t origin_table_ndx, size_t origin_col_ndx) const noexcept;
@@ -357,6 +361,16 @@ inline bool Spec::has_backlinks() const noexcept
     // Fixme: It's bad design that backlinks are stored and recognized like this. Backlink columns
     // should be a column type like any other, and we should find another way to hide them away from
     // the user.
+}
+
+inline size_t Spec::first_backlink_column_index() const noexcept
+{
+    return m_names.size();
+}
+
+inline size_t Spec::backlink_column_count() const noexcept
+{
+    return m_types.size() - m_names.size();
 }
 
 // Spec will have a subspec when it contains a column which is one of:
