@@ -63,6 +63,7 @@
   fair and robust.
   PR [#2497](https://github.com/realm/realm-core/pull/2497).
 * `_impl::GroupFriend::get_top_ref()` was added.
+  PR [#2683](https://github.com/realm/realm-core/pull/2683).
 
 ----------------------------------------------
 
