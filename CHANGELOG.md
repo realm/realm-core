@@ -17,6 +17,7 @@
 ### Internals
 
 * `_impl::GroupFriend::get_top_ref()` was added.
+  PR [#2683](https://github.com/realm/realm-core/pull/2683).
 
 ----------------------------------------------
 
