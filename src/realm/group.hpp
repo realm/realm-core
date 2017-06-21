@@ -1087,6 +1087,16 @@ public:
         return group.m_alloc;
     }
 
+    static const Allocator& get_alloc(const Group& group) noexcept
+    {
+        return group.m_alloc;
+    }
+
+    static ref_type get_top_ref(const Group& group) noexcept
+    {
+        return group.m_top.get_ref();
+    }
+
     static Table& get_table(Group& group, size_t ndx_in_group)
     {
         Group::DescMatcher desc_matcher = 0;                           // Do not check descriptor
@@ -1192,12 +1202,12 @@ public:
             group.create_empty_group(); // Throws
     }
 
-    static void get_version_and_history_info(Allocator& alloc, ref_type top_ref,
+    static void get_version_and_history_info(const Allocator& alloc, ref_type top_ref,
                                              _impl::History::version_type& version,
                                              int& history_type,
                                              int& history_schema_version) noexcept
     {
-        Array top(alloc);
+        Array top{const_cast<Allocator&>(alloc)};
         if (top_ref != 0)
             top.init_from_ref(top_ref);
         Group::get_version_and_history_info(top, version, history_type, history_schema_version);
