@@ -1,3 +1,25 @@
+# NEXT RELEASE
+
+### Bugfixes
+
+* Lorem ipsum.
+
+### Breaking changes
+
+* Lorem ipsum.
+
+### Enhancements
+
+* Lorem ipsum.
+
+-----------
+
+### Internals
+
+* Lorem ipsum.
+
+----------------------------------------------
+
 # 2.8.5 Release notes
 
 ### Internals
