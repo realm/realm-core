@@ -58,15 +58,15 @@ def isPublishingLatestRun
 
   stage('check') {
     parallelExecutors = [
-      checkLinuxRelease: doBuildInDocker('check'),
-      checkLinuxDebug: doBuildInDocker('check-debug'),
-      buildCocoa: doBuildCocoa(isPublishingRun, isPublishingLatestRun),
-      buildNodeLinux: doBuildNodeInDocker(isPublishingRun, isPublishingLatestRun),
-      buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
-      buildAndroid: doBuildAndroid(isPublishingRun),
-      buildWindows: doBuildWindows(false, version, isPublishingRun),
-      buildWindowsUniversal: doBuildWindows(true, version, isPublishingRun),
-      buildOsxDylibs: doBuildOsxDylibs(version, isPublishingRun, isPublishingLatestRun),
+      releaseCheckLinux: doBuildInDocker('check'),
+      debugCheckLinux: doBuildInDocker('check-debug'),
+      cocoaBuild: doBuildCocoa(isPublishingRun, isPublishingLatestRun),
+      linuxBuildNode: doBuildNodeInDocker(isPublishingRun, isPublishingLatestRun),
+      osxBuildNode: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
+      androidBuild: doBuildAndroid(isPublishingRun),
+      windowsBuild: doBuildWindows(false, version, isPublishingRun),
+      universalWindowsBuild: doBuildWindows(true, version, isPublishingRun),
+      osxDylibsBuild: doBuildOsxDylibs(version, isPublishingRun, isPublishingLatestRun),
       addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
       //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
     ]
