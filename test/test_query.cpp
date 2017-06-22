@@ -10278,4 +10278,23 @@ TEST(Query_CaseInsensitiveIndexEquality_CommonNumericPrefix)
 }
 
 
+TEST_TYPES(Query_Rover, std::true_type, std::false_type)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    Table table;
+    size_t col_ndx = table.add_column(type_String, "name", nullable);
+    table.add_search_index(col_ndx);
+
+    table.add_empty_row(2);
+    table.set_string(col_ndx, 0, "ROVER");
+    table.set_string(col_ndx, 1, "Rover");
+
+    Query q = table.where().equal(col_ndx, "rover", false);
+    CHECK_EQUAL(q.count(), 2);
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+}
+
+
 #endif // TEST_QUERY
