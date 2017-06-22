@@ -168,7 +168,7 @@ protected:
     friend class CondVar;
 
     bool m_recursive = false;
-    std::atomic<int> m_recursive_lock_count = { 0 };
+    volatile int m_recursive_lock_count = { 0 };
 };
 
 
