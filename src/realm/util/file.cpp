@@ -249,7 +249,7 @@ std::string make_temp_dir()
 
 size_t page_size()
 {
-    return cached_page_size;
+	return 4096;// cached_page_size;
 }
 
 

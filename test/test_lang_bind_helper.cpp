@@ -81,6 +81,29 @@ using unit_test::TestContext;
 // check-testcase` (or one of its friends) from the command line.
 
 
+ONLY(Open_Old_Realm_File)
+{
+	char key[64];
+
+	for (size_t i = 0; i < 64; ++i) {
+		key[i] = 1;
+	}
+
+	std::string path = test_util::get_test_resource_path() + "0.98.0-alltypes-default-encrypted.realm";
+	SHARED_GROUP_TEST_PATH(temp_copy);
+	File::copy(path, temp_copy);
+	auto hist = make_in_realm_history(temp_copy);
+
+	SharedGroup sg(*hist, SharedGroupOptions(key));
+	Group& group = const_cast<Group&>(sg.begin_read());
+	LangBindHelper::advance_read(sg);
+	{
+		CHECK(group.size() > 0);
+	}
+}
+
+
+
 // FIXME: Move this test to test_table.cpp
 TEST(LangBindHelper_SetSubtable)
 {
