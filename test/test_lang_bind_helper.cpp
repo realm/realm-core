@@ -89,17 +89,22 @@ ONLY(Open_Old_Realm_File)
 		key[i] = 1;
 	}
 
-	std::string path = test_util::get_test_resource_path() + "0.98.0-alltypes-default-encrypted.realm";
-	SHARED_GROUP_TEST_PATH(temp_copy);
-	File::copy(path, temp_copy);
-	auto hist = make_in_realm_history(temp_copy);
 
-	SharedGroup sg(*hist, SharedGroupOptions(key));
-	Group& group = const_cast<Group&>(sg.begin_read());
-	LangBindHelper::advance_read(sg);
-	{
-		CHECK(group.size() > 0);
-	}
+    
+    for (int iter = 0;iter < 100;iter++) {
+        std::string path = test_util::get_test_resource_path() + "0.98.0-alltypes-default-encrypted.realm";
+        SHARED_GROUP_TEST_PATH(temp_copy);
+        File::copy(path, temp_copy);
+        auto hist = make_in_realm_history(temp_copy);
+
+        SharedGroup sg(*hist, SharedGroupOptions(key));
+        Group& group = const_cast<Group&>(sg.begin_read());
+        LangBindHelper::advance_read(sg);
+        {
+            CHECK(group.size() > 0);
+        }
+        std::cerr << iter;
+    }
 }
 
 
