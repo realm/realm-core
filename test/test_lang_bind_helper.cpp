@@ -13185,19 +13185,23 @@ ONLY(Open_Old_Realm_File)
         key[i] = 1;
     }
 
-    std::string path = test_util::get_test_resource_path() + "0.98.0-alltypes-default-encrypted.realm";
-    SHARED_GROUP_TEST_PATH(temp_copy);
-    File::copy(path, temp_copy);
+    for (int i = 0; i < 100; i++) {
 
-    auto hist = make_in_realm_history(temp_copy);
-    SharedGroup sg(*hist, SharedGroupOptions(key));
+        std::string path = test_util::get_test_resource_path() + "0.98.0-alltypes-default-encrypted.realm";
+        SHARED_GROUP_TEST_PATH(temp_copy);
+        File::copy(path, temp_copy);
 
-    Group& group = const_cast<Group&>(sg.begin_read());
+        auto hist = make_in_realm_history(temp_copy);
+        SharedGroup sg(*hist, SharedGroupOptions(key));
 
-    LangBindHelper::advance_read(sg);
+        Group& group = const_cast<Group&>(sg.begin_read());
 
-    {
-        CHECK(group.size() > 0);
+        LangBindHelper::advance_read(sg);
+
+        {
+            CHECK(group.size() > 0);
+        }
+
     }
 }
 
