@@ -253,7 +253,7 @@ size_t IndexArray::index_string(StringData value, InternalFindResult& result_ref
 }
 
 
-void IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result, const IntegerColumn& rows,
+void IndexArray::from_list_all_ins(StringData upper_value, std::vector<size_t>& result, const IntegerColumn& rows,
                                    ColumnBase* column) const
 {
     // The buffer is needed when for when this is an integer index.
@@ -270,7 +270,7 @@ void IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result
 
         for (IntegerColumn::const_iterator it = rows.cbegin(); it != rows.cend(); ++it) {
             const size_t row_ndx = to_size_t(*it);
-            result.add(row_ndx);
+            result.push_back(row_ndx);
         }
         return;
     }
@@ -282,7 +282,7 @@ void IndexArray::from_list_all_ins(StringData upper_value, IntegerColumn& result
         StringData str = column->get_index_data(row_ndx, buffer);
         auto upper_str = case_map(str, true);
         if (upper_str == upper_value) {
-            result.add(row_ndx);
+            result.push_back(row_ndx);
         }
     }
 
@@ -419,10 +419,10 @@ private:
 
 void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, ColumnBase* column) const
 {
-
     const util::Optional<std::string> upper_value = case_map(value, true);
     const util::Optional<std::string> lower_value = case_map(value, false);
     SearchList search_list(upper_value, lower_value);
+    std::vector<size_t> tmp_result;
 
     const char* top_header = get_header_from_data(m_data);
     search_list.add_all_for_level(top_header, 0);
@@ -475,7 +475,7 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
             const StringData str = column->get_index_data(row_ndx, buffer);
             const util::Optional<std::string> upper_str = case_map(str, true);
             if (upper_str == upper_value) {
-                result.add(row_ndx);
+                tmp_result.push_back(row_ndx);
             }
             continue;
         }
@@ -486,22 +486,18 @@ void IndexArray::index_string_all_ins(StringData value, IntegerColumn& result, C
         // List of row indices with common prefix up to this point, in sorted order.
         if (!sub_isindex) {
             const IntegerColumn sub(m_alloc, to_ref(ref));
-            from_list_all_ins(upper_value, result, sub, column);
+            from_list_all_ins(upper_value, tmp_result, sub, column);
             continue;
         }
 
         // Recurse into sub-index;
         search_list.add_all_for_level(sub_header, string_offset + 4);
     }
-    std::vector<int64_t> results_copy;
-    const size_t num_results = result.size();
-    results_copy.reserve(num_results);
-    for (size_t i = 0; i < num_results; ++i) {
-        results_copy.push_back(result.get(i));
-    }
-    std::sort(results_copy.begin(), results_copy.end());
-    for (size_t i = 0; i < num_results; ++i) {
-        result.set(i, results_copy[i]);
+
+    // sort the result and return as IntegerColumn
+    std::sort(tmp_result.begin(), tmp_result.end());
+    for (size_t row_ndx : tmp_result) {
+        result.add(row_ndx);
     }
 }
 
