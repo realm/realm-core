@@ -31,7 +31,7 @@ void Columns<Link>::evaluate(size_t index, ValueBase& destination)
     destination.import(v);
 }
 
-void Columns<SubTable>::evaluate(size_t index, ValueBase& destination)
+void Columns<SubTable>::evaluate_internal(size_t index, ValueBase& destination, size_t nb_elements)
 {
     REALM_ASSERT_DEBUG(dynamic_cast<Value<ConstTableRef>*>(&destination) != nullptr);
     Value<ConstTableRef>* d = static_cast<Value<ConstTableRef>*>(&destination);
@@ -44,28 +44,85 @@ void Columns<SubTable>::evaluate(size_t index, ValueBase& destination)
         if (m_link_map.only_unary_links()) {
             ConstTableRef val;
             if (sz == 1) {
-                val = ConstTableRef(m_column->get_subtable_ptr(links[0]));
+                val = m_column->get(links[0]);
             }
             d->init(false, 1, val);
         }
         else {
             d->init(true, sz);
             for (size_t t = 0; t < sz; t++) {
-                const Table* table = m_column->get_subtable_ptr(links[t]);
-                d->m_storage.set(t, ConstTableRef(table));
+                d->m_storage.set(t, m_column->get(links[t]));
             }
         }
     }
     else {
-        // Adding zero to ValueBase::default_size to avoid taking the address
-        size_t rows = std::min(m_column->size() - index, ValueBase::default_size + 0);
+        size_t rows = std::min(m_column->size() - index, nb_elements);
 
         d->init(false, rows);
 
         for (size_t t = 0; t < rows; t++) {
-            const Table* table = m_column->get_subtable_ptr(index + t);
-            d->m_storage.set(t, ConstTableRef(table));
+            d->m_storage.set(t, m_column->get(index + t));
         }
     }
+}
+
+Query Subexpr2<StringData>::equal(StringData sd, bool case_sensitive)
+{
+    return string_compare<StringData, Equal, EqualIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<StringData>::equal(const Subexpr2<StringData>& col, bool case_sensitive)
+{
+    return string_compare<Equal, EqualIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<StringData>::not_equal(StringData sd, bool case_sensitive)
+{
+    return string_compare<StringData, NotEqual, NotEqualIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<StringData>::not_equal(const Subexpr2<StringData>& col, bool case_sensitive)
+{
+    return string_compare<NotEqual, NotEqualIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<StringData>::begins_with(StringData sd, bool case_sensitive)
+{
+    return string_compare<StringData, BeginsWith, BeginsWithIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<StringData>::begins_with(const Subexpr2<StringData>& col, bool case_sensitive)
+{
+    return string_compare<BeginsWith, BeginsWithIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<StringData>::ends_with(StringData sd, bool case_sensitive)
+{
+    return string_compare<StringData, EndsWith, EndsWithIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<StringData>::ends_with(const Subexpr2<StringData>& col, bool case_sensitive)
+{
+    return string_compare<EndsWith, EndsWithIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<StringData>::contains(StringData sd, bool case_sensitive)
+{
+    return string_compare<StringData, Contains, ContainsIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<StringData>::contains(const Subexpr2<StringData>& col, bool case_sensitive)
+{
+    return string_compare<Contains, ContainsIns>(*this, col, case_sensitive);
+}
+
+Query Subexpr2<StringData>::like(StringData sd, bool case_sensitive)
+{
+    return string_compare<StringData, Like, LikeIns>(*this, sd, case_sensitive);
+}
+
+Query Subexpr2<StringData>::like(const Subexpr2<StringData>& col, bool case_sensitive)
+{
+    return string_compare<Like, LikeIns>(*this, col, case_sensitive);
 }
 }
