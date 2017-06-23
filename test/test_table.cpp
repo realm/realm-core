@@ -3056,6 +3056,34 @@ TEST(Table_SubtableIndex)
     }
 }
 
+TEST(LangBindHelper_SubtableSizeIncorrect)
+{
+    // Based on finding from AFL
+    // Problem was that creating a subtable if both search index and nullable flag
+    // was set in column attributes would clear the nullable flag. This would prevent
+    // accessors to already existing subtables to be created correctly (IntegerColumn on
+    // a IntNullColumn structure).
+    Table table;
+    DescriptorRef subdescr;
+    table.add_column(type_Table, "col", true, &subdescr);
+    // add int column that is nullable
+    subdescr->add_column(type_Int, "integers", nullptr, true);
+    table.add_empty_row(2);
+    // Create subtable entry
+    table.get_subtable(0, 1)->clear();
+    // Now we have one degenerate and one proper table
+    table.get_subdescriptor(0)->add_search_index(0);
+    table.add_empty_row();
+
+    // Before the fix this operation cleared the nullable flag in the spec
+    table.get_subtable(0, 2)->clear();
+    // Create subtable accessor
+    TableRef sub1 = table.get_subtable(0, 1);
+    CHECK_EQUAL(sub1->size(), 0);
+    sub1->add_empty_row(1);
+    sub1->set_int(0, 0, 7, false);
+}
+
 TEST(Table_SpecColumnPath)
 {
     Group group;

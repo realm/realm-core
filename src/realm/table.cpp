@@ -871,18 +871,18 @@ void Table::do_add_search_index(Descriptor& descr, size_t column_ndx)
 
         size_t sz = root_table.size();
         for (size_t r = 0; r < sz; r++) {
-            // Clear index bit from shared spec because we're now going to operate on the next subtable
-            // object which has no index yet (because various method calls may crash if attributes are
-            // wrong)
-            spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
-
             TableRef sub = root_table.get_subtable(parent_col, r);
-            sub->_add_search_index(column_ndx);
+            // No reason to create search index for a degenerate table
+            if (!sub->is_degenerate()) {
+                sub->_add_search_index(column_ndx);
+                // Clear index bit from shared spec because we're now going to operate on the next subtable
+                // object which has no index yet (because various method calls may crash if attributes are
+                // wrong)
+                spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+            }
         }
     }
 
-    // Set shared attributes here also, in case there was no rows to iterate through in the for-loop
-    // above
     spec.set_column_attr(column_ndx, ColumnAttr(attr | col_attr_Indexed)); // Throws
 
     if (Replication* repl = root_table.get_repl())
@@ -921,20 +921,20 @@ void Table::do_remove_search_index(Descriptor& descr, size_t column_ndx)
         // for-loop are safe to call despite of this.
         size_t sz = root_table.size();
         for (size_t r = 0; r < sz; r++) {
-            // Set index bit from shared spec because we're now going to operate on the next subtable
-            // object which still has an index (because various method calls may crash if attributes are
-            // wrong)
-            spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
-
             // Destroy search index. This will update shared attributes in case refresh_column_accessors()
             // should depend on them being correct
             TableRef sub = root_table.get_subtable(parent_col, r);
-            sub->_remove_search_index(column_ndx);
+            // No reason to remove search index for a degenerate table
+            if (!sub->is_degenerate()) {
+                sub->_remove_search_index(column_ndx);
+                // Set index bit from shared spec because we're now going to operate on the next subtable
+                // object which still has an index (because various method calls may crash if attributes are
+                // wrong)
+                spec.set_column_attr(column_ndx, ColumnAttr(attr)); // Throws
+            }
         }
     }
 
-    // Set shared attributes here also, in case there was no rows to iterate through in the for-loop
-    // above
     spec.set_column_attr(column_ndx, ColumnAttr(attr & ~col_attr_Indexed)); // Throws
 
     if (Replication* repl = root_table.get_repl())
@@ -1421,7 +1421,6 @@ void Table::create_degen_subtab_columns()
         // Create empty search index if required and add it to m_columns
         if (attr & col_attr_Indexed) {
             m_columns.add(StringIndex::create_empty(get_alloc()));
-            m_spec->set_column_attr(i, ColumnAttr(attr & col_attr_Indexed));
         }
     }
 
@@ -4956,6 +4955,7 @@ void Table::write(std::ostream& out, size_t offset, size_t slice_size, StringDat
 void Table::update_from_parent(size_t old_baseline) noexcept
 {
     REALM_ASSERT(is_attached());
+    bool spec_might_have_changed = false;
 
     // There is no top for sub-tables sharing spec
     if (m_top.is_attached()) {
@@ -4965,11 +4965,12 @@ void Table::update_from_parent(size_t old_baseline) noexcept
         // subspecs may be deleted here ...
         if (m_spec->update_from_parent(old_baseline)) {
             // ... so get rid of cached entries here
-            DescriptorRef desc = m_descriptor.lock();
-            if (desc) {
+            if (DescriptorRef desc = m_descriptor.lock()) {
                 using df = _impl::DescriptorFriend;
                 df::detach_subdesc_accessors(*desc);
             }
+            // and remember to update mappings in subtable columns
+            spec_might_have_changed = true;
         }
     }
     else {
@@ -4979,13 +4980,21 @@ void Table::update_from_parent(size_t old_baseline) noexcept
     if (!m_columns.is_attached())
         return; // Degenerate subtable
 
-    if (!m_columns.update_from_parent(old_baseline))
-        return;
-
-    // Update column accessors
-    for (auto& col : m_cols) {
-        if (col != nullptr) {
-            col->update_from_parent(old_baseline);
+    if (m_columns.update_from_parent(old_baseline)) {
+        // Update column accessors
+        for (auto& col : m_cols) {
+            if (col != nullptr) {
+                col->update_from_parent(old_baseline);
+            }
+        }
+    }
+    else if (spec_might_have_changed) {
+        size_t sz = m_cols.size();
+        for (size_t i = 0; i < sz; i++) {
+            // Only relevant for subtable columns
+            if (auto col = dynamic_cast<SubtableColumn*>(m_cols[i])) {
+                col->refresh_subtable_map();
+            }
         }
     }
 }
@@ -6069,7 +6078,14 @@ void Table::refresh_accessor_tree()
         // Root table (free-standing table, group-level table, or subtable with
         // independent descriptor)
         m_top.init_from_parent();
-        m_spec->init_from_parent();
+        // subspecs may be deleted here ...
+        if (m_spec->init_from_parent()) {
+            // ... so get rid of cached entries here
+            if (DescriptorRef desc = m_descriptor.lock()) {
+                using df = _impl::DescriptorFriend;
+                df::detach_subdesc_accessors(*desc);
+            }
+        }
         m_columns.init_from_parent();
     }
     else {
