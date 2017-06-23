@@ -250,7 +250,9 @@ TEST_CASE("sync: token refreshing", "[sync]") {
                                         bind_function_called = true;
                                         return s_test_token;
                                     },
-                                    [](auto, auto) { },
+                                    [](auto, SyncError err) {
+                                        printf("DEBUG: test received an error: %s\n", err.message.c_str());
+                                    },
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         REQUIRE(!session->is_in_error_state());

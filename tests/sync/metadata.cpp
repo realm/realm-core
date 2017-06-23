@@ -244,10 +244,10 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]") {
 
     SECTION("can be properly constructed") {
         const auto original_name = tmp_dir() + "foobar/test1";
-        auto user_metadata = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, original_name, url_1, identity_1);
+        auto user_metadata = SyncFileActionMetadata(manager, SyncAction::BackUpThenDeleteRealm, original_name, url_1, identity_1);
         REQUIRE(user_metadata.original_name() == original_name);
         REQUIRE(user_metadata.new_name() == none);
-        REQUIRE(user_metadata.action() == SyncAction::HandleRealmForClientReset);
+        REQUIRE(user_metadata.action() == SyncAction::BackUpThenDeleteRealm);
         REQUIRE(user_metadata.url() == url_1);
         REQUIRE(user_metadata.user_identity() == identity_1);
     }
@@ -256,10 +256,10 @@ TEST_CASE("sync_metadata: file action metadata", "[sync]") {
         const auto original_name = tmp_dir() + "foobar/test2a";
         const std::string new_name_1 = tmp_dir() + "foobar/test2b";
         const std::string new_name_2 = tmp_dir() + "foobar/test2c";
-        auto user_metadata_1 = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, original_name, url_1, identity_1, new_name_1);
+        auto user_metadata_1 = SyncFileActionMetadata(manager, SyncAction::BackUpThenDeleteRealm, original_name, url_1, identity_1, new_name_1);
         REQUIRE(user_metadata_1.original_name() == original_name);
         REQUIRE(user_metadata_1.new_name() == new_name_1);
-        REQUIRE(user_metadata_1.action() == SyncAction::HandleRealmForClientReset);
+        REQUIRE(user_metadata_1.action() == SyncAction::BackUpThenDeleteRealm);
         REQUIRE(user_metadata_1.url() == url_1);
         REQUIRE(user_metadata_1.user_identity() == identity_1);
 
@@ -282,9 +282,9 @@ TEST_CASE("sync_metadata: file action metadata APIs", "[sync]") {
         const auto filename1 = tmp_dir() + "foobar/file1";
         const auto filename2 = tmp_dir() + "foobar/file2";
         const auto filename3 = tmp_dir() + "foobar/file3";
-        auto first = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, filename1, "asdf", "realm://realm.example.com/1");
-        auto second = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, filename2, "asdf", "realm://realm.example.com/2");
-        auto third = SyncFileActionMetadata(manager, SyncAction::HandleRealmForClientReset, filename3, "asdf", "realm://realm.example.com/3");
+        auto first = SyncFileActionMetadata(manager, SyncAction::BackUpThenDeleteRealm, filename1, "asdf", "realm://realm.example.com/1");
+        auto second = SyncFileActionMetadata(manager, SyncAction::BackUpThenDeleteRealm, filename2, "asdf", "realm://realm.example.com/2");
+        auto third = SyncFileActionMetadata(manager, SyncAction::BackUpThenDeleteRealm, filename3, "asdf", "realm://realm.example.com/3");
         auto actions = manager.all_pending_actions();
         REQUIRE(actions.size() == 3);
         REQUIRE(results_contains_original_name(actions, filename1));
