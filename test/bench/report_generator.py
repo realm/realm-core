@@ -23,15 +23,17 @@ class TagFormatter(Formatter):
             return ''
         return str(self.tags[ind])
 
-def writeReport(outputDirectory, summary):
+def writeReport(outputDirectory, summary, stats):
     html = """
         <html>
         <head>
             <style type=\"text/css\">
                 h1.pass { background-color: lightgreen; }
                 h1.fail { background-color: darksalmon; }
+                h1.stat { background-color: lightblue; }
                 a.pass { color: green; }
                 a.fail { color: red; }
+                a.stat { color: blue; }
             </style>
         </head>
         <body>
@@ -50,6 +52,8 @@ def writeReport(outputDirectory, summary):
     html += "<ol>"
     for title, values in summary.iteritems():
         html += "<li><a class=\"" + values['status'] + "\" href=#" + title + ">" + title + "</a></li>"
+    for title, values in stats.iteritems():
+        html += "<li><a class=\"stat\" href=#" + title.replace(' ', '_') + ">" + title + "</a></li>"
     html += "</ol><br>"
 
     # generate each graph section
@@ -57,6 +61,10 @@ def writeReport(outputDirectory, summary):
         html += "<h1 class=\"" + values['status'] + "\" id=\"" + title +"\">" + title + "</h1>"
         html += "<p>Threshold:  " + str(values['threshold']) + " (2 standard deviations)</p>"
         html += "<p>Last Value: " + str(values['last_value']) + " (" + str(values['last_std']) + " standard deviations)</p>"
+        html += "<img align=\"middle\" src=\"" + values['src'] + "\"/>"
+
+    for title, values in stats.iteritems():
+        html += "<h1 class=\"stat\" id=\"" + title.replace(' ', '_') + "\">" + title + "</h1>"
         html += "<img align=\"middle\" src=\"" + values['src'] + "\"/>"
 
     html += """
@@ -127,7 +135,44 @@ def makeSummaryGraph(outputDirectory, summary):
 
     return summaryGraphName
 
-def generateReport(outputDirectory, csvFiles):
+def generateStats(outputDirectory, statsfiles):
+    summary = {}
+    colors = ['yellow', 'indigo', 'orange', 'lightblue', 'green', 'violet', 'orangered', 'gray', 'lightblue', 'limegreen', 'navy']
+    for index, fname in enumerate(statsfiles):
+        bench_data = csv2rec(fname)
+        bench_data = np.sort(bench_data, order='tag')
+        print "generating stats graph: " + str(index + 1) + "/" + str(len(statsfiles)) + " (" + fname + ")"
+        formatter = TagFormatter(bench_data['tag'])
+        fig, ax = plt.subplots()
+        ax.xaxis.set_major_formatter(formatter)
+        tick_spacing = 1
+        ax.xaxis.set_major_locator(MultipleLocator(tick_spacing))
+        plt.grid(True)
+        exclusions = ['sha', 'tag']
+        lines = []
+        for ndx, col in enumerate(bench_data.dtype.names):
+            if col not in exclusions:
+                line, = plt.plot(bench_data[col], lw=2.5, color=colors[ndx % len(colors)])
+                line.set_label(col)
+                lines.append(line)
+        autoscale_based_on(ax, lines)
+        plt.legend(loc='upper left', fancybox=True, framealpha=0.7)
+        plt.xlabel('Build')
+        plt.ylabel('')
+        # rotate x axis labels for readability
+        fig.autofmt_xdate()
+        title = splitext(basename(fname))[0]
+        plt.title(title, fontsize=18, ha='center')
+        imgName = str(title) + '.png'
+        fig.set_size_inches(12, 6)
+        plt.tight_layout()
+        plt.savefig(outputDirectory + imgName)
+        # refresh axis and don't store these in memory
+        plt.close(fig)
+        summary[title] = {'title': title, 'src': imgName}
+    return summary
+
+def generateReport(outputDirectory, csvFiles, statsfiles):
     metrics = ['min', 'max', 'med', 'avg']
     colors = {'min': '#1f77b4', 'max': '#aec7e8', 'med': '#ff7f0e', 'avg': '#ffbb78', 'threshold': '#ff1111'}
 
@@ -176,6 +221,7 @@ def generateReport(outputDirectory, csvFiles):
         summary[title] = {'title': title, 'src': imgName, 'threshold': threshold,
                           'last_value': last_value, 'last_std': last_std, 'status': status}
 
+    stats = OrderedDict(sorted(generateStats(outputDirectory, statsfiles).items()))
     summary = OrderedDict(sorted(summary.items()))
-    writeReport(outputDirectory, summary)
+    writeReport(outputDirectory, summary, stats)
 

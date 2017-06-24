@@ -70,11 +70,11 @@ fi
 echo "HEAD"
 sh gen_bench.sh HEAD
 
-# remove csv files not generated in this run, namely other
-# HEAD versions. This means we only keep files noted in
+# remove csv and stats files not generated in this run, namely
+# other HEAD versions. This means we only keep files noted in
 # revs_to_benchmark. The git sha of HEAD is different per run.
 results_dir=$(head -n 1 recent_results.txt)
-for file in ${results_dir}/*.csv; do
+for file in ${results_dir}/*.csv ${results_dir}/*.stats; do
   grep -q -F "${file}" recent_results.txt || (rm "${file}" && echo "removed old result: ${file}")
 done
 
