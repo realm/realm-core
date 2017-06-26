@@ -37,6 +37,11 @@ struct timeval {
 #include <intrin.h>
 #endif
 
+#if defined(_MSC_VER)
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
+
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
 #include <realm/util/safe_int_ops.hpp>
@@ -294,6 +299,13 @@ struct PlacementDelete {
         v->~T();
     }
 };
+
+#ifdef _WIN32
+typedef void* FileDesc;
+#else
+typedef int FileDesc;
+#endif
+
 
 } // namespace realm
 

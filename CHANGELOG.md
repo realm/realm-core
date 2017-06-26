@@ -38,6 +38,8 @@
   take place for *all* subtables in a subtable column. There is no way to add
   or remove it from single individual subtables.
   PR [#2561](https://github.com/realm/realm-core/pull/2561).
+* Support for encryption on Windows (Win32 + UWP).
+  PR [#2643](https://github.com/realm/realm-core/pull/2643).
 * Add Table::add_row_with_key(). Adds a row and fills an integer column with
   a value in one operation.
   PR [#2596](https://github.com/realm/realm-core/pull/2596)
