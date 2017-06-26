@@ -361,8 +361,9 @@ TEST(Shared_CompactingOnTheFly)
 TEST(Shared_EncryptedRemap)
 {
     // Attempts to trigger code coverage in util::mremap() for the case where the file is encrypted.
-    // This requires a database size which is non-divisible by page_size() *and* is bigger than
-    // current allocated section. Following row count and payload seems to work on both Windows+Linux
+    // This requires a "non-encrypted database size" (not physical file sise) which is non-divisible
+    // by page_size() *and* is bigger than current allocated section. Following row count and payload
+    // seems to work on both Windows+Linux
     const int64_t rows = 12;
     SHARED_GROUP_TEST_PATH(path);
     {
