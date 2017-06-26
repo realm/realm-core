@@ -624,14 +624,21 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
     }
 }
 
-static void apply_post_migration_changes(Group& group, std::vector<SchemaChange> const& changes, Schema const& initial_schema)
+enum class DidRereadSchema { Yes, No };
+
+static void apply_post_migration_changes(Group& group, std::vector<SchemaChange> const& changes, Schema const& initial_schema,
+                                         DidRereadSchema did_reread_schema)
 {
     using namespace schema_change;
     struct Applier {
-        Applier(Group& group, Schema const& initial_schema) : group{group}, initial_schema(initial_schema), table(group) { }
+        Applier(Group& group, Schema const& initial_schema, DidRereadSchema did_reread_schema)
+        : group{group}, initial_schema(initial_schema), table(group)
+        , did_reread_schema(did_reread_schema == DidRereadSchema::Yes)
+        { }
         Group& group;
         Schema const& initial_schema;
         TableHelper table;
+        bool did_reread_schema;
 
         void operator()(RemoveProperty op)
         {
@@ -649,7 +656,16 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
         }
 
         void operator()(AddTable op) { create_table(group, *op.object); }
-        void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
+
+        void operator()(AddInitialProperties op) {
+            if (did_reread_schema) {
+                add_initial_columns(group, *op.object);
+            } else {
+                // If we didn't re-read the schema then AddInitialProperties was already taken care of
+                // during apply_pre_migration_changes.
+            }
+        }
+
         void operator()(AddIndex op) { add_index(table(op.object), op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
 
@@ -657,7 +673,7 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
         void operator()(MakePropertyNullable) { }
         void operator()(MakePropertyRequired) { }
         void operator()(AddProperty) { }
-    } applier{group, initial_schema};
+    } applier{group, initial_schema, did_reread_schema};
 
     for (auto& change : changes) {
         change.visit(applier);
@@ -713,11 +729,11 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
 
         // Migration function may have changed the schema, so we need to re-read it
         auto schema = schema_from_group(group);
-        apply_post_migration_changes(group, schema.compare(target_schema), old_schema);
+        apply_post_migration_changes(group, schema.compare(target_schema), old_schema, DidRereadSchema::Yes);
         validate_primary_column_uniqueness(group);
     }
     else {
-        apply_post_migration_changes(group, changes, {});
+        apply_post_migration_changes(group, changes, {}, DidRereadSchema::No);
     }
 
     set_schema_version(group, target_schema_version);

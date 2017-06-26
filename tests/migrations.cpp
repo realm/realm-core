@@ -352,6 +352,25 @@ TEST_CASE("migration: Automatic") {
             };
             REQUIRE_MIGRATION_NEEDED(*realm, schema, set_primary_key(schema, "object", ""));
         }
+
+        SECTION("adding column and table in same migration doesn't add duplicate columns") {
+            auto realm = Realm::get_shared_realm(config);
+
+            Schema schema1 = {
+                {"object", {
+                    {"col1", PropertyType::Int, "", "", false, false, false},
+                }},
+            };
+            auto schema2 = add_table(add_property(schema1, "object",
+                                        {"col2", PropertyType::Int, "", "", false, false, false}),
+                                     {"object2", {
+                                         {"value", PropertyType::Int, "", "", false, false, false}}});
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
+            REQUIRE_UPDATE_SUCCEEDS(*realm, schema2, 1);
+
+            auto& table = *get_table(realm, "object2");
+            REQUIRE(table.get_column_count() == 1);
+        }
     }
 
     SECTION("migration block invocations") {
