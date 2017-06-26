@@ -55,11 +55,6 @@ const size_t c_zeroRowIndex = 0;
 const char c_object_table_prefix[] = "class_";
 
 void create_metadata_tables(Group& group) {
-    // FIXME: the order of the creation of the two tables seems to
-    // matter for some Android devices. The reason is unclear, and
-    // further investigation is required.
-    // See https://github.com/realm/realm-java/issues/3651
-
     // The tables 'pk' and 'metadata' are treated specially by Sync. The 'pk' table
     // is populated by `sync::create_table` and friends, while the 'metadata' table
     // is simply ignored.
