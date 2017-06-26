@@ -48,7 +48,6 @@ set(REALM_SOURCES
     util/file.cpp
     util/file_mapper.cpp
     util/interprocess_condvar.cpp
-    util/interprocess_mutex.cpp
     util/logger.cpp
     util/memory_stream.cpp
     util/misc_errors.cpp
@@ -181,8 +180,7 @@ set(REALM_OTHER_UTIL_HEADERS
 ) # REALM_OTHER_UTIL_HEADERS
 
 if(NOT MSVC)
-    list(APPEND REALM_SOURCES util/interprocess_condvar.cpp util/interprocess_mutex.cpp)
-    list(APPEND REALM_INSTALL_UTIL_HEADERS util/interprocess_condvar.hpp util/interprocess_mutex.hpp)
+    list(APPEND REALM_SOURCES util/interprocess_mutex.cpp)
 endif()
 
 add_library(realm-objects OBJECT ${REALM_SOURCES})
