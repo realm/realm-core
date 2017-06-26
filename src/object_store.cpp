@@ -550,7 +550,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         // not-quite-correct files produced by other things and has no obvious
         // downside.
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
-        void operator()(RemoveProperty) { }
+        void operator()(RemoveProperty op) { table(op.object).remove_column(op.property->table_column); }
         void operator()(MakePropertyNullable op) { make_property_optional(group, table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
         void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? StringData{op.property->name} : ""); }
