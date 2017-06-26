@@ -16,7 +16,6 @@ cat >"$TEST_DIR/$APP.gyp" <<EOF
         'CLANG_ENABLE_OBJC_ARC': 'YES',
         'OTHER_CPLUSPLUSFLAGS': [
             '\$(OTHER_CFLAGS)' ,
-            '-DREALM_HAVE_CONFIG',
             $OTHER_CPLUSPLUSFLAGS
         ]
     },

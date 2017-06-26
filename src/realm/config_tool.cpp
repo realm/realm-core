@@ -65,9 +65,6 @@ void flush()
 void emit_flags()
 {
     if (emit_cflags) {
-#ifdef REALM_HAVE_CONFIG
-        emit_flags("-DREALM_HAVE_CONFIG");
-#endif
 #ifdef REALM_DEBUG
         emit_flags("-DREALM_DEBUG");
 #endif
@@ -198,7 +195,7 @@ int main(int argc, char* argv[])
             emit_flags();
             break;
         case func_ShowVersion:
-            std::cout << REALM_VER_STRING "\n";
+            std::cout << REALM_VERSION_STRING "\n";
             break;
         case func_ShowPrefix:
             std::cout << REALM_INSTALL_PREFIX "\n";
