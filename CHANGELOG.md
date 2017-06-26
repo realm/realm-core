@@ -2,7 +2,8 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Fixed a bug where case insensitive queries wouldn't return all results.
+  PR [#2675](https://github.com/realm/realm-core/pull/2675).
 
 ### Breaking changes
 
@@ -64,6 +65,13 @@
 * Implemented inter-process CondVars on Windows (Win32 + UWP). They should be
   fair and robust.
   PR [#2497](https://github.com/realm/realm-core/pull/2497).
+
+----------------------------------------------
+
+# 2.8.5 Release notes
+
+### Internals
+
 * `_impl::GroupFriend::get_top_ref()` was added.
   PR [#2683](https://github.com/realm/realm-core/pull/2683).
 

@@ -1687,6 +1687,22 @@ TEST(StringIndex_Fuzzy)
 }
 
 
+namespace {
+
+// results returned by the index should be in ascending row order
+// this requirement is assumed by the query system which runs find_gte
+// and this will return wrong results unless the results are ordered
+void check_result_order(const IntegerColumn& results, TestContext& test_context)
+{
+    const size_t num_results = results.size();
+    for (size_t i = 1; i < num_results; ++i) {
+        CHECK(results.get(i - 1) < results.get(i));
+    }
+}
+
+} // end anonymous namespace
+
+
 TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
@@ -1722,6 +1738,7 @@ TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
         CHECK_EQUAL(2, results.size());
         CHECK_EQUAL(col.get(size_t(results.get(0))), strings[0]);
         CHECK_EQUAL(col.get(size_t(results.get(1))), strings[0]);
+        check_result_order(results, test_context);
         results.clear();
     }
 
@@ -1736,6 +1753,7 @@ TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
             CHECK_EQUAL(upper_result, upper_needle);
 
         }
+        check_result_order(results, test_context);
         results.clear();
     }
 
@@ -1760,6 +1778,7 @@ TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
         for (const TestData& t : td) {
             ndx.find_all(results, t.needle, t.case_insensitive);
             CHECK_EQUAL(t.result_size, results.size());
+            check_result_order(results, test_context);
             results.clear();
         }
     }
@@ -1904,6 +1923,7 @@ TEST_TYPES(StringIndex_Insensitive_Fuzz, non_nullable, nullable)
             IntegerColumn res(Allocator::get_default(), results_ref);
 
             ndx.find_all(res, needle.c_str(), true);
+            check_result_order(res, test_context);
 
             // Check that all items in 'res' point at a match in 'col'
             auto needle_upper = case_map(needle, true);
@@ -1954,6 +1974,7 @@ TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, non_nullable, nullable)
 
     ndx.find_all(results, long1.c_str(), true);
     CHECK_EQUAL(results.size(), 4);
+    check_result_order(results, test_context);
     results.clear();
     ndx.find_all(results, long2.c_str(), true);
     CHECK_EQUAL(results.size(), 3);
@@ -1987,6 +2008,29 @@ TEST_TYPES(StringIndex_Insensitive_Numbers, non_nullable, nullable)
 
     ndx.find_all(results, number_string_16, true);
     CHECK_EQUAL(results.size(), 1);
+
+    results.destroy();
+    col.destroy();
+}
+
+
+TEST_TYPES(StringIndex_Rover, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+    const StringIndex& ndx = *col.create_search_index();
+
+    col.add("ROVER");
+    col.add("Rover");
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+
+    ndx.find_all(results, "rover", true);
+    CHECK_EQUAL(results.size(), 2);
+    check_result_order(results, test_context);
 
     results.destroy();
     col.destroy();
