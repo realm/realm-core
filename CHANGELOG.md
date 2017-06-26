@@ -1,4 +1,4 @@
-# NEXT RELEASE
+# 3.0.0-rc2 Release notes
 
 ### Bugfixes
 
@@ -13,6 +13,7 @@
     - The order that sort and distinct are applied can change the query result.
     - Applying an empty sort or distinct descriptor is now a no-op, this
       could previously be used to clear a sort or distinct operation.
+  PR [#2644](https://github.com/realm/realm-core/pull/2644)
 * Support for size query on LinkedList removed. This is perhaps not so 
   breaking after all since it is probably not used.
   PR [#2532](https://github.com/realm/realm-core/pull/2532).
@@ -49,6 +50,7 @@
   - `size_t Table::find_first(size_t col_ndx, null)`
   - `OutputStream& operator<<(OutputStream& os, const null&)`
 * Add method to get total count of backlinks for a row
+  PR [#2672](https://github.com/realm/realm-core/pull/2672)
 
 -----------
 
