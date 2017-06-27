@@ -194,12 +194,12 @@ if(COMMAND set_target_xcode_attributes)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    add_dependencies(realm-objects pthread_win32 getopt_win32)
+    add_dependencies(realm-objects sha_win32 getopt_win32)
     set_property(TARGET realm-objects APPEND PROPERTY COMPILE_DEFINITIONS PTW32_STATIC_LIB)
     include_directories(realm-objects INTERFACE
                         ${CMAKE_SOURCE_DIR}/src/win32
-                        ${CMAKE_SOURCE_DIR}/src/win32/pthread)
-    list(APPEND REALM_EXTRA_LIBS pthread_win32 getopt_win32)
+                        ${CMAKE_SOURCE_DIR}/src/win32/kalven-sha2)
+    list(APPEND REALM_EXTRA_LIBS sha_win32 getopt_win32)
 elseif(ANDROID)
     list(APPEND REALM_EXTRA_LIBS atomic)
 endif()
