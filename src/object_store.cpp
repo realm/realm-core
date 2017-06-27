@@ -87,19 +87,6 @@ auto table_for_object_schema(Group& group, ObjectSchema const& object_schema)
     return ObjectStore::table_for_object_type(group, object_schema.name);
 }
 
-void add_index(Table& table, size_t col)
-{
-    try {
-        table.add_search_index(col);
-    }
-    catch (LogicError const&) {
-        throw std::logic_error(util::format("Cannot index property '%1.%2': indexing properties of type '%3' is not yet implemented.",
-                                            ObjectStore::object_type_for_table_name(table.get_name()),
-                                            table.get_column_name(col),
-                                            string_for_property_type((PropertyType)table.get_column_type(col))));
-    }
-}
-
 DataType to_core_type(PropertyType type)
 {
     REALM_ASSERT(type != PropertyType::Object); // Link columns have to be handled differently
@@ -132,7 +119,7 @@ void insert_column(Group& group, Table& table, Property const& property, size_t 
     else {
         table.insert_column(col_ndx, to_core_type(property.type), property.name, is_nullable(property.type));
         if (property.requires_index())
-            add_index(table, col_ndx);
+            table.add_search_index(col_ndx);
     }
 }
 
@@ -544,7 +531,7 @@ static void apply_non_migration_changes(Group& group, std::vector<SchemaChange> 
 
         void operator()(AddTable op) { create_table(group, *op.object); }
         void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
-        void operator()(AddIndex op) { add_index(table(op.object), op.property->table_column); }
+        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
     } applier{group};
     verify_no_errors<SchemaMismatchException>(applier, changes);
@@ -571,7 +558,7 @@ static void create_initial_tables(Group& group, std::vector<SchemaChange> const&
         void operator()(MakePropertyNullable op) { make_property_optional(group, table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
         void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name, op.property ? StringData{op.property->name} : ""); }
-        void operator()(AddIndex op) { add_index(table(op.object), op.property->table_column); }
+        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
 
         void operator()(ChangePropertyType op)
@@ -598,7 +585,7 @@ static void apply_additive_changes(Group& group, std::vector<SchemaChange> const
         void operator()(AddTable op) { create_table(group, *op.object); }
         void operator()(AddInitialProperties op) { add_initial_columns(group, *op.object); }
         void operator()(AddProperty op) { add_column(group, table(op.object), *op.property); }
-        void operator()(AddIndex op) { if (update_indexes) add_index(table(op.object), op.property->table_column); }
+        void operator()(AddIndex op) { if (update_indexes) table(op.object).add_search_index(op.property->table_column); }
         void operator()(RemoveIndex op) { if (update_indexes) table(op.object).remove_search_index(op.property->table_column); }
         void operator()(RemoveProperty) { }
 
@@ -630,7 +617,7 @@ static void apply_pre_migration_changes(Group& group, std::vector<SchemaChange> 
         void operator()(MakePropertyNullable op) { make_property_optional(group, table(op.object), *op.property); }
         void operator()(MakePropertyRequired op) { make_property_required(group, table(op.object), *op.property); }
         void operator()(ChangePrimaryKey op) { ObjectStore::set_primary_key_for_object(group, op.object->name.c_str(), op.property ? op.property->name.c_str() : ""); }
-        void operator()(AddIndex op) { add_index(table(op.object), op.property->table_column); }
+        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
     } applier{group};
 
@@ -673,15 +660,15 @@ static void apply_post_migration_changes(Group& group, std::vector<SchemaChange>
         void operator()(AddTable op) { create_table(group, *op.object); }
 
         void operator()(AddInitialProperties op) {
-            if (did_reread_schema) {
+            if (did_reread_schema)
                 add_initial_columns(group, *op.object);
-            } else {
+            else {
                 // If we didn't re-read the schema then AddInitialProperties was already taken care of
                 // during apply_pre_migration_changes.
             }
         }
 
-        void operator()(AddIndex op) { add_index(table(op.object), op.property->table_column); }
+        void operator()(AddIndex op) { table(op.object).add_search_index(op.property->table_column); }
         void operator()(RemoveIndex op) { table(op.object).remove_search_index(op.property->table_column); }
 
         void operator()(ChangePropertyType) { }
