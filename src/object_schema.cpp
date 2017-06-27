@@ -180,7 +180,7 @@ static void validate_property(Schema const& schema,
 
     // check primary keys
     if (prop.is_primary) {
-        if (!prop.type_is_indexable()) {
+        if (prop.type != PropertyType::Int && prop.type != PropertyType::String) {
             exceptions.emplace_back("Property '%1.%2' of type '%3' cannot be made the primary key.",
                                     object_name, prop.name, string_for_property_type(prop.type));
         }
