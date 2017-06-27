@@ -1692,7 +1692,8 @@ namespace {
 // results returned by the index should be in ascending row order
 // this requirement is assumed by the query system which runs find_gte
 // and this will return wrong results unless the results are ordered
-void check_result_order(const IntegerColumn& results, TestContext& test_context) {
+void check_result_order(const IntegerColumn& results, TestContext& test_context)
+{
     const size_t num_results = results.size();
     for (size_t i = 1; i < num_results; ++i) {
         CHECK(results.get(i - 1) < results.get(i));
@@ -1735,8 +1736,8 @@ TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
         // case sensitive
         ndx.find_all(results, strings[0]);
         CHECK_EQUAL(2, results.size());
-        CHECK_EQUAL(col.get(results.get(0)), strings[0]);
-        CHECK_EQUAL(col.get(results.get(1)), strings[0]);
+        CHECK_EQUAL(col.get(size_t(results.get(0))), strings[0]);
+        CHECK_EQUAL(col.get(size_t(results.get(1))), strings[0]);
         check_result_order(results, test_context);
         results.clear();
     }
@@ -1748,7 +1749,7 @@ TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
         ndx.find_all(results, needle, case_insensitive);
         CHECK_EQUAL(17, results.size());
         for (size_t i = 0; i < results.size(); ++i) {
-            auto upper_result = case_map(col.get(results.get(i)), true);
+            auto upper_result = case_map(col.get(size_t(results.get(i))), true);
             CHECK_EQUAL(upper_result, upper_needle);
 
         }
@@ -1885,7 +1886,7 @@ namespace {
 
 std::string create_random_a_string(size_t max_len) {
     std::string s;
-    size_t len = fastrand(max_len);
+    size_t len = size_t(fastrand(max_len));
     for (size_t p = 0; p < len; p++) {
         s += fastrand(1) == 0 ? 'a' : 'A';
     }
@@ -1893,7 +1894,6 @@ std::string create_random_a_string(size_t max_len) {
 }
 
 }
-
 
 TEST_TYPES(StringIndex_Insensitive_Fuzz, non_nullable, nullable)
 {
@@ -1906,7 +1906,7 @@ TEST_TYPES(StringIndex_Insensitive_Fuzz, non_nullable, nullable)
         ref_type ref = StringColumn::create(Allocator::get_default());
         StringColumn col(Allocator::get_default(), ref, nullable);
 
-        size_t rows = fastrand(2 * REALM_MAX_BPNODE_SIZE - 1);
+        size_t rows = size_t(fastrand(2 * REALM_MAX_BPNODE_SIZE - 1));
 
         // Add 'rows' number of rows in the column
         for (size_t t = 0; t < rows; t++) {
@@ -1944,7 +1944,6 @@ TEST_TYPES(StringIndex_Insensitive_Fuzz, non_nullable, nullable)
         col.destroy();
     }
 }
-
 
 // Exercise the StringIndex case insensitive search for strings with very long, common prefixes
 // to cover the special case code paths where different strings are stored in a list.

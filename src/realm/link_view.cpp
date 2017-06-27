@@ -310,13 +310,15 @@ void LinkView::sort(size_t column_index, bool ascending)
 }
 
 
-void LinkView::sort(const SortDescriptor& order)
+void LinkView::sort(SortDescriptor&& order)
 {
     if (Replication* repl = get_repl()) {
         // todo, write to the replication log that we're doing a sort
         repl->set_link_list(*this, m_row_indexes); // Throws
     }
-    do_sort(order, {});
+    DescriptorOrdering ordering;
+    ordering.append_sort(std::move(order));
+    do_sort(ordering);
 }
 
 TableView LinkView::get_sorted_view(SortDescriptor order) const
