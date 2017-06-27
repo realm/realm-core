@@ -55,6 +55,7 @@ struct SchemaChangePrinter {
     REALM_SC_PRINT(AddIndex, v.object, v.property)
     REALM_SC_PRINT(AddProperty, v.object, v.property)
     REALM_SC_PRINT(AddTable, v.object)
+    REALM_SC_PRINT(AddInitialProperties, v.object)
     REALM_SC_PRINT(ChangePrimaryKey, v.object, v.property)
     REALM_SC_PRINT(ChangePropertyType, v.object, v.old_property, v.new_property)
     REALM_SC_PRINT(MakePropertyNullable, v.object, v.property)
@@ -321,7 +322,9 @@ TEST_CASE("Schema") {
                     {"int", PropertyType::Int, "", "", false, false, false},
                 }}
             };
-            REQUIRE(schema1.compare(schema2) == vec{AddTable{&*schema2.find("object 2")}});
+            auto obj = &*schema2.find("object 2");
+            auto expected = vec{AddTable{obj}, AddInitialProperties{obj}};
+            REQUIRE(schema1.compare(schema2) == expected);
         }
 
         SECTION("add property") {
