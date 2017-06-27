@@ -146,19 +146,9 @@ inline constexpr bool is_nullable(PropertyType a)
 static const char *string_for_property_type(PropertyType type)
 {
     if (is_array(type)) {
-        switch (type & ~PropertyType::Flags) {
-            case PropertyType::String: return "[string]";
-            case PropertyType::Int: return "[int]";
-            case PropertyType::Bool: return "[bool]";
-            case PropertyType::Date: return "[date]";
-            case PropertyType::Data: return "[data]";
-            case PropertyType::Double: return "[double]";
-            case PropertyType::Float: return "[float]";
-            case PropertyType::Object: return "[object]";
-            case PropertyType::Any: return "[any]";
-            case PropertyType::LinkingObjects: return "[linking objects]";
-            default: REALM_COMPILER_HINT_UNREACHABLE();
-        }
+        if (type == PropertyType::LinkingObjects)
+            return "linking objects";
+        return "array";
     }
     switch (type & ~PropertyType::Flags) {
         case PropertyType::String: return "string";
@@ -209,8 +199,13 @@ inline bool Property::type_is_nullable() const
 
 inline std::string Property::type_string() const
 {
-    if (is_array(type))
-        return "array<" + object_type + ">";
+    if (is_array(type)) {
+        if (type == PropertyType::Object)
+            return "array<" + object_type + ">";
+        if (type == PropertyType::LinkingObjects)
+            return "linking objects<" + object_type + ">";
+        return std::string("array<") + string_for_property_type(type & ~PropertyType::Flags) + ">";
+    }
     switch (auto base_type = (type & ~PropertyType::Flags)) {
         case PropertyType::Object:
             return "<" + object_type + ">";

@@ -161,7 +161,7 @@ static void validate_property(Schema const& schema,
     if (is_array(prop.type)) {
         if (prop.type != PropertyType::Object && prop.type != PropertyType::LinkingObjects) {
             exceptions.emplace_back("Property '%1.%2' has unsupported type '%3'.",
-                                    object_name, prop.name, string_for_property_type(prop.type));
+                                    object_name, prop.name, prop.type_string());
         }
     }
     else if (prop.type == PropertyType::LinkingObjects) {
@@ -175,7 +175,7 @@ static void validate_property(Schema const& schema,
                                 object_name, prop.name, string_for_property_type(prop.type));
     }
     else if (prop.type == PropertyType::Object && !is_nullable(prop.type) && !is_array(prop.type)) {
-        exceptions.emplace_back("Property '%1.%2' of type 'Object' must be nullable.", object_name, prop.name);
+        exceptions.emplace_back("Property '%1.%2' of type 'object' must be nullable.", object_name, prop.name);
     }
 
     // check primary keys
@@ -185,7 +185,7 @@ static void validate_property(Schema const& schema,
                                     object_name, prop.name, string_for_property_type(prop.type));
         }
         if (*primary) {
-            exceptions.emplace_back("Properties'%1' and '%2' are both marked as the primary key of '%3'.",
+            exceptions.emplace_back("Properties '%1' and '%2' are both marked as the primary key of '%3'.",
                                     prop.name, (*primary)->name, object_name);
         }
         *primary = &prop;
