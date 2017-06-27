@@ -108,12 +108,12 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <ClCompile>
-      <AdditionalOptions>/bigobj -D_SCL_SECURE_NO_WARNINGS %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj -D_SCL_SECURE_NO_WARNINGS /DREALM_ENABLE_ENCRYPTION %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\..\..\realm-core\src</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalOptions>"..\..\..\realm-core\Visual Studio\lib\Realm UWP Debug static lib x64.lib" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>"..\..\..\realm-core\Visual Studio\lib\realm-uwp-arm-dbg.lib" %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -142,7 +142,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
     <ClCompile>
-      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/bigobj  /DREALM_ENABLE_ENCRYPTION %(AdditionalOptions)</AdditionalOptions>
       <DisableSpecificWarnings>4453;28204</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>$(ProjectDir);$(GeneratedFilesDir);$(IntDir);%(AdditionalIncludeDirectories); ..\..\..\realm-core\src</AdditionalIncludeDirectories>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -152,7 +152,7 @@
       </InlineFunctionExpansion>
     </ClCompile>
     <Link>
-      <AdditionalOptions>"..\..\..\realm-core\Visual Studio\ARM\UWP Release static lib\Realm\Realm UWP Release static lib ARM.lib" %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>"..\..\..\realm-core\Visual Studio\lib\realm-uwp-arm.lib" %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -171,6 +171,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="0.98.0_alltypes_default_encrypted.realm.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="App.xaml.h">
       <DependentUpon>App.xaml</DependentUpon>
