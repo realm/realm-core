@@ -92,6 +92,7 @@ get_machid
 basedir="${REALM_BENCH_DIR}/${BENCH_VERSION}/${machid}"
 mkdir -p "${basedir}"
 outputfile="${basedir}/${unixtime}_${remoteref}.csv"
+statsfile="${basedir}/${unixtime}_${remoteref}.stats"
 
 # if the file doesn't exist, create it and write the output dir as the first line
 if [ ! -e "recent_results.txt" ] ; then
@@ -115,8 +116,11 @@ else
             ls -lah
             exit 0
         fi
+        mkdir -p "../bench/core-builds/${remoteref}/src/test/bench/stats/"
+        cp ../bench/stats/main.cpp ../bench/stats/collect_stats.py "../bench/core-builds/${remoteref}/src/test/bench/stats/"
         cd ../benchmark-common-tasks
-        cp main.cpp compatibility.hpp Makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
+        cp main.cpp compatibility.hpp "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
+        cp compatibility_makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/Makefile"
         echo "unix timestamp of build is ${unixtime}"
         # The breaking change of SharedGroup construction syntax occured after tags/v2.0.0-rc2, we must use a legacy
         # adaptor for constructing SharedGroups in revisions of core before this time.
@@ -128,7 +132,8 @@ else
             cp compatibility.cpp "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/"
         fi
         cd ../benchmark-crud
-        cp main.cpp Makefile "../bench/core-builds/${remoteref}/src/test/benchmark-crud/"
+        cp main.cpp "../bench/core-builds/${remoteref}/src/test/benchmark-crud/"
+        cp compatibility_makefile "../bench/core-builds/${remoteref}/src/test/benchmark-crud/Makefile"
         cd ../util
         cp benchmark_results.hpp benchmark_results.cpp "../bench/core-builds/${remoteref}/src/test/util/"
         cd "../bench/core-builds/${remoteref}/src/"
@@ -146,6 +151,9 @@ else
     # print contents, add _EncryptionOff tag to names without encryption (backwards compatibility)
     tail -n +2 "bench_results/benchmark-common-tasks/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> "${outputfile}"
     tail -n +2 "bench_results/benchmark-crud/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> "${outputfile}"
+
+    # copy the statistics file to the results directory
+    cp "bench_results/stats/stats.txt" "${statsfile}"
 
     if [ "${headref}" != "${remoteref}" ]; then
         cd ../..

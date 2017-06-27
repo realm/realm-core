@@ -1,4 +1,4 @@
-import os
+import os, sys, getopt
 
 def get_file_size(filename):
     statinfo = os.stat(filename)
@@ -52,4 +52,34 @@ def do_collect_stats(rootBuildDir, rootSourceDir):
     outputDirectory = "./"
     with open(outputDirectory + str('stats.txt'), 'w+') as outputFile:
         outputFile.write(output)
+
+def print_useage():
+    print "This program gives statistics about the current realm-core build."
+    print "Two arguments are required, the source code root directory and the build root directory."
+    print "collect_stats.py -b <build-root-dir> -s <source-root-dir>"
+
+def main(argv):
+    source = ''
+    build = ''
+    try:
+        opts, args = getopt.getopt(argv,"hb:s:",["build-root-dir=","source-root-dir="])
+    except getopt.GetoptError:
+        print_useage()
+        sys.exit(2)
+    for opt, arg in opts:
+        if opt == '-h':
+            print_useage()
+            sys.exit()
+        elif opt in ("-b", "--build-root-dir"):
+            source = arg
+        elif opt in ("-s", "--source-root-dir"):
+            build = arg
+    if not source or not build:
+        print_useage()
+        sys.exit(2)
+
+    do_collect_stats(build, source)
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
 

@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <stdio.h>
 #include <string>
 #include <iostream>
 
@@ -17,9 +18,7 @@ void print_useage(std::string program_name) {
 
 void delete_file_if_exists(std::string file_name)
 {
-    if (File::exists(file_name)) {
-        File::remove(file_name);
-    }
+    remove(file_name.c_str());
 }
 
 void create_realm_with_data(std::string file_name, size_t data_size)
