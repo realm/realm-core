@@ -764,7 +764,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
         bool disable_sync = get_disable_sync_to_disk();
         if (!disable_sync)
             m_file_mappings->m_file.sync(); // Throws
-
+		 
         size = initial_size;
     }
     ref_type top_ref;
