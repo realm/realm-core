@@ -641,8 +641,8 @@ Results::OutOfBoundsIndexException::OutOfBoundsIndexException(size_t r, size_t c
 
 Results::UnsupportedColumnTypeException::UnsupportedColumnTypeException(size_t column, const Table* table, const char* operation)
 : std::logic_error(util::format("Cannot %1 property '%2': operation not supported for '%3' properties",
-                                  operation, table->get_column_name(column),
-                                  string_for_property_type(static_cast<PropertyType>(table->get_column_type(column)))))
+                                operation, table->get_column_name(column),
+                                string_for_property_type(ObjectSchema::from_core_type(*table->get_descriptor(), column))))
 , column_index(column)
 , column_name(table->get_column_name(column))
 , column_type(table->get_column_type(column))
