@@ -86,6 +86,8 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
     }
 
     if (is_array(property.type)) {
+        if (property.type == PropertyType::LinkingObjects)
+            throw ReadOnlyPropertyException(m_object_schema->name, property.name);
         REALM_ASSERT(property.type == PropertyType::Object);
 
         List list(m_realm, m_row.get_linklist(col));
@@ -130,8 +132,6 @@ void Object::set_property_value_impl(ContextType& ctx, const Property &property,
             table.set_link(col, row, link.get_index(), is_default);
             break;
         }
-        case PropertyType::LinkingObjects:
-            throw ReadOnlyPropertyException(m_object_schema->name, property.name);
         default:
             REALM_COMPILER_HINT_UNREACHABLE();
     }
