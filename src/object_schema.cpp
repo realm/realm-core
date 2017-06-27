@@ -158,9 +158,15 @@ static void validate_property(Schema const& schema,
                               std::vector<ObjectSchemaValidationException>& exceptions)
 {
     // currently only arrays of objects are allowed
-    if (is_array(prop.type) && prop.type != PropertyType::Object) {
-        exceptions.emplace_back("Property '%1.%2' has unsupported type '%3'.",
-                                object_name, prop.name, string_for_property_type(prop.type));
+    if (is_array(prop.type)) {
+        if (prop.type != PropertyType::Object && prop.type != PropertyType::LinkingObjects) {
+            exceptions.emplace_back("Property '%1.%2' has unsupported type '%3'.",
+                                    object_name, prop.name, string_for_property_type(prop.type));
+        }
+    }
+    else if (prop.type == PropertyType::LinkingObjects) {
+        exceptions.emplace_back("Linking Objects property '%1.%2' must be an array.",
+                                object_name, prop.name);
     }
 
     // check nullablity

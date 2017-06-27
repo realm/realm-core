@@ -275,7 +275,7 @@ TEST_CASE("migration: Automatic") {
                 }},
             };
             Schema schema2 = remove_property(schema1, "object", "link");
-            Property new_property{"link", PropertyType::LinkingObjects, "object2", "inverse"};
+            Property new_property{"link", PropertyType::LinkingObjects|PropertyType::Array, "object2", "inverse"};
             schema2.find("object")->computed_properties.emplace_back(new_property);
 
             REQUIRE_UPDATE_SUCCEEDS(*realm, schema1, 0);
@@ -720,7 +720,7 @@ TEST_CASE("migration: Automatic") {
             {"link target", {
                 {"value", PropertyType::Int},
             }, {
-                {"origin", PropertyType::LinkingObjects, "all types", "object"},
+                {"origin", PropertyType::LinkingObjects|PropertyType::Array, "all types", "object"},
             }},
             {"array target", {
                 {"value", PropertyType::Int},

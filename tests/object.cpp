@@ -97,7 +97,7 @@ TEST_CASE("object") {
         {"link target", {
             {"value", PropertyType::Int},
         }, {
-            {"origin", PropertyType::LinkingObjects, "all types", "object"},
+            {"origin", PropertyType::LinkingObjects|PropertyType::Array, "all types", "object"},
         }},
         {"array target", {
             {"value", PropertyType::Int},

@@ -148,7 +148,7 @@ ValueType Object::get_property_value_impl(ContextType& ctx, const Property &prop
         return ctx.null_value();
     }
 
-    if (is_array(property.type)) {
+    if (is_array(property.type) && property.type != PropertyType::LinkingObjects) {
         REALM_ASSERT(property.type == PropertyType::Object);
         return ctx.box(List(m_realm, m_row.get_linklist(column)));
     }

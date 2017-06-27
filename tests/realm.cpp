@@ -145,7 +145,7 @@ TEST_CASE("SharedRealm: get_shared_realm()") {
         config.schema = Schema{
             {"object",
                 {{"value", PropertyType::Int}},
-                {{"invalid backlink", PropertyType::LinkingObjects, "object", "value"}}
+                {{"invalid backlink", PropertyType::LinkingObjects|PropertyType::Array, "object", "value"}}
             }
         };
         REQUIRE_THROWS_WITH(Realm::get_shared_realm(config),

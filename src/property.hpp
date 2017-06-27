@@ -33,12 +33,13 @@ enum class PropertyType : unsigned char {
     Date   = 4,
     Float  = 5,
     Double = 6,
-    Object = 7,
-    LinkingObjects = 8, // Implies Array
+    Object = 7, // currently must be either Array xor Nullable
+    LinkingObjects = 8, // currently must be Array and not Nullable
 
     // deprecated and remains only for reading old files
     Any    = 9,
 
+    // Flags which can be combined with any of the above types except as noted
     Required  = 0,
     Nullable  = 64,
     Array     = 128,
@@ -203,7 +204,7 @@ inline bool Property::type_is_indexable() const
 
 inline bool Property::type_is_nullable() const
 {
-    return !(is_array(type) && type == PropertyType::Object);
+    return !(is_array(type) && type == PropertyType::Object) && type != PropertyType::LinkingObjects;
 }
 
 inline std::string Property::type_string() const
