@@ -210,7 +210,7 @@ static void validate_property(Schema const& schema,
     if (prop.type != PropertyType::Object && prop.type != PropertyType::LinkingObjects) {
         if (!prop.object_type.empty()) {
             exceptions.emplace_back("Property '%1.%2' of type '%3' cannot have an object type.",
-                                    object_name, prop.name, string_for_property_type(prop.type));
+                                    object_name, prop.name, prop.type_string());
         }
         return;
     }

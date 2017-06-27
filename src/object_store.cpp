@@ -352,8 +352,8 @@ struct SchemaDifferenceExplainer {
     {
         errors.emplace_back("Property '%1.%2' has been changed from '%3' to '%4'.",
                             op.object->name, op.new_property->name,
-                            string_for_property_type(op.old_property->type),
-                            string_for_property_type(op.new_property->type));
+                            op.old_property->type_string(),
+                            op.new_property->type_string());
     }
 
     void operator()(schema_change::MakePropertyNullable op)

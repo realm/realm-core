@@ -427,7 +427,7 @@ void do_add_comparison_to_query(Query &query, Predicate::Comparison cmp,
             add_link_constraint_to_query(query, cmp.op, expr, link_argument(lhs, rhs, args));
             break;
         default:
-            throw std::logic_error(util::format("Object type '%1' not supported", string_for_property_type(type)));
+            throw std::logic_error(util::format("Object type '%1' not supported", expr.prop->type_string()));
     }
 }
 
@@ -511,7 +511,7 @@ void do_add_null_comparison_to_query(Query &query, Predicate::Comparison cmp, co
         case realm::PropertyType::Array:
             throw std::logic_error("Comparing Lists to 'null' is not supported");
         default:
-            throw std::logic_error(util::format("Object type '%1' not supported", string_for_property_type(type)));
+            throw std::logic_error(util::format("Object type '%1' not supported", expr.prop->type_string()));
     }
 }
 
