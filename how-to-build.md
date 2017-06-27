@@ -56,13 +56,13 @@ Run the following commands to configure, build and test core:
 
 Building for Android required the NDK r10e installed.
 
-These targets can be built using the build.sh command:
+These targets can be built using the cross_compile.sh command:
 
-    ./build.sh -o android -a armeabi-v7a -t Release -v <X.Y.Z>
+    tools/cross_compile.sh -o android -a armeabi-v7a -t Release -v <X.Y.Z>
 
 The command shows the available options simply with:
 
-    ./build.sh
+    tools/cross_compile.sh
 
 These commands produce a tarball containing the realm static library
 and its include files.
