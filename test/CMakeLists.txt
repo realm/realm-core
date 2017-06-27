@@ -2,7 +2,6 @@ add_subdirectory(util)
 add_subdirectory(fuzzy)
 add_subdirectory(benchmark-common-tasks)
 add_subdirectory(benchmark-crud)
-add_subdirectory(bench/stats)
 # FIXME: Add other benchmarks
 
 set(NORMAL_TESTS

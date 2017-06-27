@@ -90,11 +90,11 @@ if [ "$build_system" == "cmake" ]; then
     exit 1
   fi
   make realm-stats
-  if [ -x ./test/bench/stats/realm-stats ]; then
-    pushd test/bench/stats
+  if [ -x ./test/benchmark-common-tasks/realm-stats ]; then
+    pushd test/benchmark-common-tasks/
     python collect_stats.py --build-root-dir "../../" --source-root-dir "../../../"
     popd
-  else
+else
     echo "Could not run realm-stats!"
     exit 1
   fi
@@ -105,25 +105,13 @@ if [ "$build_system" == "cmake" ]; then
 elif [ "$build_system" == "shell" ]; then
 
   sh build.sh build # we need to generate librealm.a for stats
-  # the stats program never existed in early versions
-  # so we need to spoof the build by piggy-backing off
-  # off benchmark-common-tasks which links the same way
-  pushd test/benchmark-common-tasks/
-  mv main.cpp main.orig
-  cp ../bench/stats/main.cpp .
-  popd
-  sh build.sh benchmark-common-tasks
-  pushd test/benchmark-common-tasks
-  mv bench-tasks ../bench/stats/realm-stats
-  rm *.o
-  mv main.orig main.cpp
-  popd
-  pushd test/bench/stats/
-  # the build dir is same as root dir in sh versions
-  python collect_stats.py --build-root-dir "../../../" --source-root-dir "../../../"
-  popd
 
   sh build.sh benchmark-common-tasks
+
+  pushd test/benchmark-common-tasks/
+  python collect_stats.py --build-root-dir "../../" --source-root-dir "../../"
+  popd
+
   sh build.sh benchmark-crud
   result_prefix="."
 else
@@ -136,8 +124,7 @@ popd # ${directory}
 # copy result files to destination
 mkdir -p "${dest}/benchmark-common-tasks"
 mkdir -p "${dest}/benchmark-crud"
-mkdir -p "${dest}/stats"
 cp "${directory}/${result_prefix}"/test/benchmark-common-tasks/results* "${dest}/benchmark-common-tasks/"
+cp "${directory}/${result_prefix}"/test/benchmark-common-tasks/stats.txt "${dest}/benchmark-common-tasks/"
 cp "${directory}/${result_prefix}"/test/benchmark-crud/results* "${dest}/benchmark-crud/"
-cp "${directory}/${result_prefix}"/test/bench/stats/stats.txt "${dest}/stats/"
 

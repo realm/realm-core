@@ -116,10 +116,8 @@ else
             ls -lah
             exit 0
         fi
-        mkdir -p "../bench/core-builds/${remoteref}/src/test/bench/stats/"
-        cp ../bench/stats/main.cpp ../bench/stats/collect_stats.py "../bench/core-builds/${remoteref}/src/test/bench/stats/"
         cd ../benchmark-common-tasks
-        cp main.cpp compatibility.hpp "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
+        cp main.cpp compatibility.hpp stats.cpp collect_stats.py "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
         cp compatibility_makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/Makefile"
         echo "unix timestamp of build is ${unixtime}"
         # The breaking change of SharedGroup construction syntax occured after tags/v2.0.0-rc2, we must use a legacy
@@ -153,7 +151,7 @@ else
     tail -n +2 "bench_results/benchmark-crud/results.latest.csv" | perl -wpe "s/^\"(((?!EncryptionO[nf]+).)*)\"/\"\$1_EncryptionOff\"/" >> "${outputfile}"
 
     # copy the statistics file to the results directory
-    cp "bench_results/stats/stats.txt" "${statsfile}"
+    cp "bench_results/benchmark-common-tasks/stats.txt" "${statsfile}"
 
     if [ "${headref}" != "${remoteref}" ]; then
         cd ../..

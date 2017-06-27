@@ -1,0 +1,12 @@
+# This is the Makefile for the build.sh system
+# we need this so the performance scripts can
+# benchmark old core versions.
+check_PROGRAMS = bench-tasks realm-stats
+ 
+bench_tasks_SOURCES = main.cpp compatibility.cpp
+bench_tasks_LIBS = ../util/test-util.a
+
+realm_stats_SOURCES = stats.cpp
+realm_stats_LIBS = ../util/test-util.a
+ 
+include ../../src/generic.mk

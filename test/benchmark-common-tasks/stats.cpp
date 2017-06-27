@@ -49,7 +49,7 @@ int main(int argc, const char* argv[])
         create_realm_with_data(file_name, static_cast<size_t>(data_size));
     } else {
         print_useage(argv[0]);
-        return 1;
+        return 0;
     }
     return 0;
 }

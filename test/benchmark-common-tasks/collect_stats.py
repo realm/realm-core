@@ -14,7 +14,6 @@ def get_loc(directory, recursive = True):
         for filename in files:
             if (filename.endswith('.hpp') or filename.endswith('.cpp')):
                 fullpath = os.path.join(root, filename)
-                print fullpath
                 with open(fullpath, 'r') as f:
                     loc += len(list(filter(lambda x: x.strip(), f))) # excludes empty lines
     return loc
@@ -28,7 +27,7 @@ def get_lines_of_test_code(rootSourceDir):
     return loc
 
 def get_realm_sizes(rootBuildDir):
-    pathPrefix = os.path.join(rootBuildDir, "test/bench/stats/")
+    pathPrefix = os.path.join(rootBuildDir, "test/benchmark-common-tasks/")
     results = []
     sizes = [0, 1000, 2000, 4000, 8000, 10000]
     for size in sizes:
@@ -71,9 +70,9 @@ def main(argv):
             print_useage()
             sys.exit()
         elif opt in ("-b", "--build-root-dir"):
-            source = arg
-        elif opt in ("-s", "--source-root-dir"):
             build = arg
+        elif opt in ("-s", "--source-root-dir"):
+            source = arg
     if not source or not build:
         print_useage()
         sys.exit(2)
