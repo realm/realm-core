@@ -33,7 +33,7 @@ def get_realm_sizes(rootBuildDir):
     for size in sizes:
         name = str(size) + "bytes.realm"
         os.system(pathPrefix + "realm-stats " + name + " " + str(size))
-        results.append((str(size) + " bytes", get_file_size(name)))
+        results.append((str(size) + " byte blob", get_file_size(name)))
     return results
 
 def format(description, values):
@@ -41,7 +41,7 @@ def format(description, values):
 
 def do_collect_stats(rootBuildDir, rootSourceDir):
     stats = [("Realm Library Size", [("librealm.a", get_library_size(rootBuildDir))]),
-             ("Disk Space Used by Realm (bytes)", get_realm_sizes(rootBuildDir)),
+             ("Size of a Realm File Containing Blobs of Different Sizes", get_realm_sizes(rootBuildDir)),
              ("Lines of Code", [("Realm Code", get_lines_of_code(rootSourceDir)),
                                 ("Test Code", get_lines_of_test_code(rootSourceDir))])]
     output = ""

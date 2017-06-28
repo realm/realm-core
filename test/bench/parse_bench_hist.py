@@ -154,6 +154,24 @@ def transform(inputdir, destination, filelist, handler):
                          'tag': tag}
                 handler(info)
 
+def transform_stats(inputdir, destination, filelist):
+    for inputfile in filelist:
+        file_name = os.path.splitext(os.path.basename(inputfile))[0].split("_")
+        if len(file_name) != 2:
+            print "Expecting input files of format 'timestamp_sha.stats'"
+            exit()
+        timestamp = file_name[0]
+        sha = file_name[1]
+        tag = getReadableSha(sha)
+        print "column sha:" + sha
+        with open(inputfile) as fin:
+            lines = fin.readlines()
+            for line in lines:
+                parts = line.strip().split(':')
+                if len(parts) == 2:
+                    info = { 'function':parts[0], 'value':parts[1], 'sha':sha, 'tag':tag, 'time':timestamp, 'dest':destination }
+                    handle_stats(info)
+
 # remove existing files (old results) but only the
 # first time since we need to open and append to files
 # this allows us to run the script multiple times in the
@@ -166,6 +184,24 @@ def refresh_file_once(filename):
         except:
             pass
     existing.append(filename)
+
+def handle_stats(info):
+    outfilename = info['dest'] + info['function'] + ".stats"
+    refresh_file_once(outfilename)
+    keys = ['sha', 'tag']
+    cols = eval(info['value'])
+    for v in cols:
+        if len(v) == 2:
+            keys.append(v[0])
+            info[v[0]] = v[1]
+        else:
+            print "unhandled column" + str(v)
+    header = ''
+    if not os.path.exists(outfilename):
+        header = ','.join(map(str, keys)) + "\n"
+    with open(outfilename, 'a') as fout:
+        fout.write(header)
+        fout.write(','.join([str(info[e]) for e in keys]) + "\n")
 
 # format is: sha, tag, min, max, med, avg,
 #            sha1, ...
@@ -240,9 +276,10 @@ def transform_local(html=False):
     files = getFilesByName(inputdir)
 
     transform(inputdir, outputdir, files, handle_local_vertical)
+    transform_stats(inputdir, outputdir, getFilesByName(inputdir, ".stats"))
 
     if html is True:
-        generateReport(outputdir, getFilesByName(outputdir))
+        generateReport(outputdir, getFilesByName(outputdir), getFilesByName(outputdir, ".stats"))
 
 def transform_remote():
     machid = getMachId()
