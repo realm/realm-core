@@ -57,25 +57,26 @@ elif [ $# -eq 2 ]; then
   dest=$2
 fi
 
-pushd "${directory}"
+topdir="$(pwd)"
+cd "${directory}" || exit 1
 
 build_system="shell"
 if [ -e "CMakeLists.txt" ] && [ ! -e "build.sh" ]; then
   build_system="cmake"
 fi
 
-if [ "$build_system" == "cmake" ]; then
+if [ "$build_system" = "cmake" ]; then
   # for cmake we operate in a separate build directory
   mkdir -p build
-  pushd build
+  cd build || exit 1
   # for consistency with pre cmake builds we don't benchmark with encryption
   cmake -D REALM_ENABLE_ENCRYPTION=OFF -D CMAKE_BUILD_TYPE=Release ..
   make realm-benchmark-common-tasks
   # -x flag checks if the file exists and is executable
   if [ -x ./test/benchmark-common-tasks/realm-benchmark-common-tasks ]; then
-    pushd test/benchmark-common-tasks
+    cd test/benchmark-common-tasks || exit 1
     ./realm-benchmark-common-tasks
-    popd
+    cd ../../ || exit 1
   else
     echo "Could not run benchmark-common-tasks!"
     pwd
@@ -83,35 +84,35 @@ if [ "$build_system" == "cmake" ]; then
   fi
   make realm-benchmark-crud
   if [ -x ./test/benchmark-crud/realm-benchmark-crud ]; then
-    pushd test/benchmark-crud
+    cd test/benchmark-crud || exit 1
     ./realm-benchmark-crud
-    popd
+    cd ../.. || exit 1
   else
     echo "Could not run benchmark-crud!"
     exit 1
   fi
   make realm-stats
   if [ -x ./test/benchmark-common-tasks/realm-stats ]; then
-    pushd test/benchmark-common-tasks/
+    cd test/benchmark-common-tasks/ || exit 1
     python collect_stats.py --build-root-dir "../../" --source-root-dir "../../../"
-    popd
+    cd ../.. || exit 1
 else
     echo "Could not run realm-stats!"
     exit 1
   fi
-  popd # build
+  cd .. || exit 1 # build
 
   result_prefix="build"
 
-elif [ "$build_system" == "shell" ]; then
+elif [ "$build_system" = "shell" ]; then
 
   sh build.sh build # we need to generate librealm.a for stats
 
   sh build.sh benchmark-common-tasks
 
-  pushd test/benchmark-common-tasks/
+  cd test/benchmark-common-tasks/ || exit 1
   python collect_stats.py --build-root-dir "../../" --source-root-dir "../../"
-  popd
+  cd ../.. || exit 1
 
   sh build.sh benchmark-crud
   result_prefix="."
@@ -120,7 +121,7 @@ else
   exit 1
 fi
 
-popd # ${directory}
+cd "${topdir}" || exit 1
 
 # copy result files to destination
 mkdir -p "${dest}/benchmark-common-tasks"

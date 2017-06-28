@@ -82,7 +82,7 @@ if [ $ret -gt 0 ]; then
     echo "could not parse ref ${ref} exiting"
     exit 1
 fi
-unixtime=$(git show -s --format=%at ${remoteref})
+unixtime=$(git show -s --format=%at "${remoteref}")
 
 if [ -z "$REALM_BENCH_DIR" ]; then
     REALM_BENCH_DIR=~/.realm/core/benchmarks
@@ -107,7 +107,7 @@ else
     build_bench_script=$(pwd)/util/build_benchmarks.sh
     if [ "${headref}" = "${remoteref}" ]; then
         echo "building HEAD"
-        cd ../..
+        cd ../.. || exit 1
     else
         rootdir=$(git rev-parse --show-toplevel)
         REALM_BENCH_CHECKOUT_ONLY=1 sh ./util/build_core.sh "${remoteref}" "${rootdir}"
@@ -116,7 +116,7 @@ else
             ls -lah
             exit 0
         fi
-        cd ../benchmark-common-tasks
+        cd ../benchmark-common-tasks || exit 1
         cp main.cpp compatibility.hpp stats.cpp collect_stats.py "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
         cp compatibility_makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/Makefile"
         echo "unix timestamp of build is ${unixtime}"
@@ -129,12 +129,12 @@ else
             echo "Using normal compatibility of SharedGroup"
             cp compatibility.cpp "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/"
         fi
-        cd ../benchmark-crud
+        cd ../benchmark-crud || exit 1
         cp main.cpp "../bench/core-builds/${remoteref}/src/test/benchmark-crud/"
         cp compatibility_makefile "../bench/core-builds/${remoteref}/src/test/benchmark-crud/Makefile"
-        cd ../util
+        cd ../util || exit 1
         cp benchmark_results.hpp benchmark_results.cpp "../bench/core-builds/${remoteref}/src/test/util/"
-        cd "../bench/core-builds/${remoteref}/src/"
+        cd "../bench/core-builds/${remoteref}/src/" || exit 1
     fi
     # input 1: path to top level of checkout to build, input 2: destination for results
     sh "${build_bench_script}" . bench_results
@@ -154,7 +154,7 @@ else
     cp "bench_results/benchmark-common-tasks/stats.txt" "${statsfile}"
 
     if [ "${headref}" != "${remoteref}" ]; then
-        cd ../..
+        cd ../.. || exit 1
         pwd
         echo "cleaning up: ${remoteref}"
         rm -rf "${remoteref}"
