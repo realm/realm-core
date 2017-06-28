@@ -118,7 +118,10 @@ else
         fi
         cd ../benchmark-common-tasks || exit 1
         cp main.cpp compatibility.hpp stats.cpp collect_stats.py "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks"
+        # we need to modify the build rules to build stats on old core versions
+        # we will either need the makefile (with build.sh) or the CMakeLists.txt (with cmake)
         cp compatibility_makefile "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/Makefile"
+        cp CMakeLists.txt "../bench/core-builds/${remoteref}/src/test/benchmark-common-tasks/"
         echo "unix timestamp of build is ${unixtime}"
         # The breaking change of SharedGroup construction syntax occured after tags/v2.0.0-rc2, we must use a legacy
         # adaptor for constructing SharedGroups in revisions of core before this time.
