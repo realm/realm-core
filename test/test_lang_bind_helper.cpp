@@ -13177,6 +13177,10 @@ TEST(LangBindHelper_MixedTimestampTransaction)
     CHECK(t->get_mixed(0, 1) == neg_time);
 }
 
+
+// This test verifies that small unencrypted files are treated correctly if
+// opened as encrypted. 
+#ifdef REALM_ENABLE_ENCRYPTION
 TEST(LangBindHelper_OpenAsEncrypted)
 {
 
@@ -13196,7 +13200,7 @@ TEST(LangBindHelper_OpenAsEncrypted)
 
         sg_clear.close();
 
-        const char* key = crypt_key();
+        const char* key = crypt_key(true);
         std::unique_ptr<Replication> hist_encrypt(make_in_realm_history(path));
         bool is_okay = false;
         try {
@@ -13207,6 +13211,8 @@ TEST(LangBindHelper_OpenAsEncrypted)
         CHECK(is_okay);
     }
 }
+#endif
+
 
 TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
 {
