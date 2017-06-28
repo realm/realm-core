@@ -11,6 +11,11 @@ foreach(LINE IN LISTS DEPENDENCIES)
     set(DEP_${KEY} ${VALUE})
 endforeach()
 
+if(${CMAKE_EXTRA_GENERATOR} MATCHES "Eclipse CDT4")
+    set(CMAKE_CXX_COMPILER_ARG1 "-std=c++14" CACHE STRING "C++ version for eclipse" FORCE)
+    set(CMAKE_ECLIPSE_VERSION "4.6.2" CACHE STRING "Eclipse version" FORCE)
+endif()
+
 project(realm VERSION ${DEP_VERSION})
 
 # Include general CMake modules
