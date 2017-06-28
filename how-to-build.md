@@ -1,10 +1,6 @@
 This file explains how to build and install the Realm core library.
 
-_NOTE_: This is going to change very soon as a new build system based
-on CMake will be introduced.
-
-Prerequisites
--------------
+## Prerequisites
 
 To build the Realm core library, you need the standard set of build
 tools. This includes a C/C++ compiler and GNU make. Realm is
@@ -46,110 +42,64 @@ On OS X, Clang is used as the C/C++ compiler by default. Clang is installed
 as part of Xcode. Xcode 7.0 or newer is required, and can be installed via
 the Mac App Store.
 
-Configure, build & test
--------------------------
+## Configure, build & test
 
 Run the following commands to configure, build and test core:
 
-    sh build.sh config
-    sh build.sh build
-    sh build.sh test
+    mkdir build-dir # create a build folder
+    cd build-dir
+    cmake ..
+    cmake --build .
+    ctest
 
+## Building for Android, iOS, watchOS and tvOS
 
-Building for Android
---------------------
+Building for Android required the NDK r10e installed.
 
-Building for Android required the NDK of version >= r10d installed.
+These targets can be built using the cross_compile.sh command:
 
-It can be built using the following command:
+    tools/cross_compile.sh -o android -a armeabi-v7a -t Release -v <X.Y.Z>
 
-    sh build.sh build-android
+The command shows the available options simply with:
 
-Building for iOS, watchOS and tvOS
-----------------------------------
+    tools/cross_compile.sh
 
-Realm core may be built for iOS, watchOS and tvOS from an OS X machine.
-See the OS X section of [Prerequisites](#prerequisites) above for information
-about the version of Xcode that is required.
+These commands produce a tarball containing the realm static library
+and its include files.
 
-To build for iOS:
-
-    sh build.sh build-ios
-
-This produces the following files and directories:
-
-    ios-lib/include/
-    ios-lib/librealm-ios.a
-    ios-lib/librealm-ios-dbg.a
-    ios-lib/realm-config
-    ios-lib/realm-config-dbg
-
-The `include` directory holds a copy of the header files, which are
-identical to the ones installed by `sh build.sh install`. There are
-two versions of the static library, one that is compiled with
-optimization, and one that is compiled for debugging. Each one
-contains code compiled for both iOS devices and the iOS simulator.
-Each one also comes with a `config` program that can be used to
-enquire about required compiler and linker flags.
-
-To build for watchOS:
-
-    sh build.sh build-watchos
-
-The output is placed in watchos-lib, and is structured the same as
-is described for iOS above.
-
-To build for tvOS:
-
-    sh build.sh build-tvos
-
-The output is placed in tvos-lib, and is structured the same as
-is described for iOS above.
-
-Configuration
--------------
+## Configuration
 
 It is possible to install into a non-default location by running the
 following command before building and installing:
 
-    sh build.sh config [PREFIX]
+    cmake -D CMAKE_INSTALL_PREFIX=/your/dir ..
 
-Here, `PREFIX` is the installation prefix. If it is not specified, it
-defaults to `/usr/local`.
+Here, `CMAKE_INSTALL_PREFIX` is the installation prefix. If it is not specified, it
+defaults to `/usr/local` on Linux and macOS.
 
-Normally the Realm version is taken to be what is returned by `git
-describe`. To override this, set `REALM_VERSION` as in the following
-examples:
+CMake can automatically detect your compiler and its location but it allows
+all kinds of customizations. For a brief overview you can reference to this
+CMake [wiki page](http://www.vtk.org/Wiki/CMake_Useful_Variables#Compilers_and_Tools)
 
-    REALM_VERSION=0.1.4 sh build.sh config
-    REALM_VERSION=0.1.4 sh build.sh bin-dist all
-
-To use a nondefault compiler, or a compiler in a nondefault location,
-set the environment variable `CC` before calling `sh build.sh build`
-or `sh build.sh bin-dist`, as in the following example:
-
-    CC=clang sh build.sh bin-dist all
-
-Testing
--------
+## Testing
 
 The core library comes with a suite of unit tests. You can run it in one of the
 following ways:
 
-    sh build.sh check
-    sh build.sh check-debug
-    sh build.sh memcheck
-    sh build.sh memcheck-debug
+    ctest
 
-The `mem` versions will run the suite inside Valgrind.
+or
+
+    cd build-dir/test
+    ./realm-tests
 
 There are a number of environment variable that can be use the customize the
 execution. For example, here is how to run only the `Foo` test and those whose
 names start with `Bar`, then how run all tests whose names start with `Foo`,
 except `Foo2` and those whose names end with an `X`:
 
-    UNITTEST_FILTER="Foo Bar*" sh build.sh check-debug
-    UNITTEST_FILTER="Foo* - Foo2 *X" sh build.sh check-debug
+    UNITTEST_FILTER="Foo Bar*" ./realm-tests
+    UNITTEST_FILTER="Foo* - Foo2 *X" ./realm-tests
 
 These are the available variables:
 
@@ -203,7 +153,7 @@ These are the available variables:
    testing process as soon as a check fails or an unexpected exception is thrown
    in a test.
 
-Memory debugging:
+### Memory debugging:
 
 Realm currently allows for uninitialized data to be written to a database
 file. This is not an error (technically), but it does cause Valgrind to report
@@ -211,35 +161,22 @@ errors. To avoid these 'false positives' during testing and debugging, set
 `REALM_ENABLE_ALLOC_SET_ZERO` to a nonempty value during configuration as in the
 following example:
 
-    REALM_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config
+    cmake -D REALM_ENABLE_ALLOC_SET_ZERO=ON -D CMAKE_BUILD_TYPE=Debug ..
 
-Measuring test coverage:
+### Measuring test coverage:
 
 You can measure how much of the code is tested by executing:
 
-    sh build.sh lcov
+    cd test
+    ./realm-tests
+    gcovr --filter='.*src/realm.*'
 
-It will generate a html page under cover_html directory. Be aware that the lcov
-tool will not generate correct results if you build from a directory path that contains
-symlinked elements.
+## Install
 
-Packaging for OS X
--------------------
-
-You can create a framework for Mac OS X after you have built the
-core library (the `build` target). The framework is useful when
-creating OS X application. The command is:
-
-    sh build.sh build-osx-framework
-
-
-Install
--------
-
-You can install core itself on linux if needed, but be aware that the API exposed
+You can install core itself on Linux if needed, but be aware that the API exposed
 is not stable or supported!
 
-    sudo sh build.sh install
+    sudo cmake --build --target install
 
 Headers will be installed in:
 
@@ -252,19 +189,15 @@ Except for `realm.hpp` which is installed as:
 The following libraries will be installed:
 
     /usr/local/lib/librealm.so
-    /usr/local/lib/librealm-dbg.so
     /usr/local/lib/librealm.a
 
-Note: '.so' is replaced by '.dylib' on OS X.
+_Note: '.so' is replaced by '.dylib' on OS X._
 
 The following programs will be installed:
 
     /usr/local/bin/realm-import
-    /usr/local/bin/realm-import-dbg
     /usr/local/bin/realm-config
-    /usr/local/bin/realm-config-dbg
     /usr/local/libexec/realmd
-    /usr/local/libexec/realmd-dbg
 
 The `realm-import` tool lets you load files containing
 comma-separated values into Realm. The next two are used
@@ -276,12 +209,14 @@ line compatible with GCC. Here is an example:
 
     g++  my_app.cpp  `realm-config --cflags --libs`
 
-Here is a more comple set of build-related commands:
+The CMake build system supports a big variety of features and targets
+that go beyond the purpose of this document. It supports the creation of projects
+in several formats:
 
-    sh build.sh config
-    sh build.sh clean
-    sh build.sh build
-    sh build.sh show-install
-    sudo sh build.sh install
-    sh build.sh test-intalled
-    sudo sh build.sh uninstall
+ - make
+ - ninja
+ - Xcode
+ - Visual Studio
+
+In CMake jargon these are called generators are are described
+[here](https://cmake.org/cmake/help/v3.7/manual/cmake-generators.7.html)

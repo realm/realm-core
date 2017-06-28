@@ -6,6 +6,10 @@
 #include "test.hpp"
 #include <cstdio>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 using namespace realm;
 using namespace realm::util;
 
@@ -40,6 +44,11 @@ using namespace realm::util;
 
 TEST(Utils_File_dir)
 {
+    if (getuid() == 0) {
+        std::cout << "Utils_File_dir test skipped because you are running it as root\n\n";
+        return;
+    }
+
     std::string dir_name = File::resolve("tempdir", test_util::get_test_path_prefix());
 
     // Create directory
