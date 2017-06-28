@@ -131,7 +131,6 @@ else
         fi
         cd ../benchmark-crud || exit 1
         cp main.cpp "../bench/core-builds/${remoteref}/src/test/benchmark-crud/"
-        cp compatibility_makefile "../bench/core-builds/${remoteref}/src/test/benchmark-crud/Makefile"
         cd ../util || exit 1
         cp benchmark_results.hpp benchmark_results.cpp "../bench/core-builds/${remoteref}/src/test/util/"
         cd "../bench/core-builds/${remoteref}/src/" || exit 1
