@@ -68,7 +68,8 @@ if [ "$build_system" == "cmake" ]; then
   # for cmake we operate in a separate build directory
   mkdir -p build
   pushd build
-  cmake ..
+  # for consistency with pre cmake builds we don't benchmark with encryption
+  cmake -D REALM_ENABLE_ENCRYPTION=OFF -D CMAKE_BUILD_TYPE=Release ..
   make realm-benchmark-common-tasks
   # -x flag checks if the file exists and is executable
   if [ -x ./test/benchmark-common-tasks/realm-benchmark-common-tasks ]; then
