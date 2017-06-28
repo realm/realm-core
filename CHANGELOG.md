@@ -6,6 +6,8 @@
   produce an empty encrypted Realm file. Fixed by detecting the case and
   throwing an exception.
   PR [#2645](https://github.com/realm/realm-core/pull/2645)
+* Fixed a bug where case insensitive queries wouldn't return all results.
+  PR [#2675](https://github.com/realm/realm-core/pull/2675).
 
 ### Breaking changes
 
@@ -13,7 +15,34 @@
 
 ### Enhancements
 
+* Add method to get total count of backlinks for a row.
+  PR [#2672](https://github.com/realm/realm-core/pull/2672).
+
+-----------
+
+### Internals
+
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 2.8.5 Release notes
+
+### Internals
+
+* `_impl::GroupFriend::get_top_ref()` was added.
+  PR [#2683](https://github.com/realm/realm-core/pull/2683).
+
+----------------------------------------------
+
+# 2.8.4 Release notes
+
+### Bugfixes
+
+* Fixes bug in encryption that could cause deadlocks/hangs and possibly
+  other bugs too.
+  Fixes issue [#2650](https://github.com/realm/realm-core/pull/2650).
+  PR [#2668](https://github.com/realm/realm-core/pull/2668).
 
 -----------
 

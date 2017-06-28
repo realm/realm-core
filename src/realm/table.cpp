@@ -16,7 +16,6 @@
  *
  **************************************************************************/
 
-#define _CRT_SECURE_NO_WARNINGS
 #include <limits>
 #include <stdexcept>
 
@@ -291,6 +290,20 @@ void Table::insert_column_link(size_t col_ndx, DataType type, StringData name, T
     get_descriptor()->insert_column_link(col_ndx, type, name, target, link_type); // Throws
 }
 
+
+size_t Table::get_backlink_count(size_t row_ndx) const noexcept
+{
+    size_t backlink_columns_begin = m_spec.first_backlink_column_index();
+    size_t backlink_columns_end = backlink_columns_begin + m_spec.backlink_column_count();
+    size_t ref_count = 0;
+
+    for (size_t i = backlink_columns_begin; i != backlink_columns_end; ++i) {
+        const BacklinkColumn& backlink_col = get_column_backlink(i);
+        ref_count += backlink_col.get_backlink_count(row_ndx);
+    }
+
+    return ref_count;
+}
 
 size_t Table::get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept
 {
