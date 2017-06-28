@@ -38,34 +38,45 @@
 # single csv file is parsed.
 #
 # Results will be curled to the specified ip address in the format:
-# function,machine=${machid} min=x,max=y,median=z,avg=w,sha=${gitsha} unixtimestamp
+# function,machine=${id} min=x,max=y,median=z,avg=w,sha=${gitsha} unixtimestamp
 
 from stat import S_ISREG, ST_MTIME, ST_MODE
 from report_generator import generateReport
-import csv, errno, os, subprocess, sys, time
+import csv
+import errno
+import os
+import subprocess
+import sys
+import time
+
 
 def printUseageAndQuit():
     print ("This python script can produce local csv files or "
-          "send benchmark stats to a remote influx database.")
+           "send benchmark stats to a remote influx database.")
     print "Useage:"
     print "./parse_bench_hist.py --local [outputdir [inputdir]]"
     print "./parse_bench_hist.py --local-html [outputdir [inputdir]]"
     print "./parse_bench_hist.py --remote ip_address [inputdir [inputfile]]"
     exit()
 
+
 def getFilesByModDate(dirpath, suffix='.csv'):
     # get all entries in the directory w/ stats
-    entries = (os.path.join(dirpath, fn) for fn in os.listdir(dirpath) if fn.endswith(suffix))
+    entries = (os.path.join(dirpath, fn)
+               for fn in os.listdir(dirpath) if fn.endswith(suffix))
     entries = ((os.stat(path), path) for path in entries)
     # leave only regular files, insert creation date
     # uses `ST_MTIME` to sort by a modification date
     entries = ((stat[ST_MTIME], path)
-           for stat, path in entries if S_ISREG(stat[ST_MODE]))
+               for stat, path in entries if S_ISREG(stat[ST_MODE]))
     return sorted(entries)
 
+
 def getFilesByName(dirpath, suffix='.csv'):
-    entries = (os.path.join(dirpath, fn) for fn in os.listdir(dirpath) if fn.endswith(suffix))
+    entries = (os.path.join(dirpath, fn)
+               for fn in os.listdir(dirpath) if fn.endswith(suffix))
     return sorted(entries)
+
 
 def mkdirs(path):
     try:
@@ -75,6 +86,7 @@ def mkdirs(path):
             pass
         else:
             raise
+
 
 def getMachId():
     try:
@@ -90,10 +102,12 @@ def getMachId():
             with open("/etc/hostname") as f:
                 machid = f.readline().strip()
         else:
-            machid = os.popen('ifconfig en0 | awk \'/ether/{print $2}\'').read().strip()
+            ifconfigcmd = 'ifconfig en0 | awk \'/ether/{print $2}\''
+            machid = os.popen(ifconfigcmd).read().strip()
     if not machid.strip():
         machid = "unknown"
     return machid
+
 
 # The version of these benchmark scripts is set in the file
 # "benchmark_version" see that file for more details.
@@ -103,6 +117,7 @@ def getBenchmarkVersion():
         benchmark_version = f.readline().strip()
     return benchmark_version
 
+
 def find_ndx(inlist, item):
     ndx = 0
     try:
@@ -111,13 +126,16 @@ def find_ndx(inlist, item):
         ndx = -1
     return ndx
 
+
 def getReadableSha(verboseSha):
-    process = subprocess.Popen(["git", "describe", verboseSha], stdout=subprocess.PIPE)
+    process = subprocess.Popen(["git", "describe", verboseSha],
+                               stdout=subprocess.PIPE)
     output = process.communicate()[0]
     output = output.replace('\n', '')
     if not output:
         return verboseSha
     return output
+
 
 def transform(inputdir, destination, filelist, handler):
     for inputfile in filelist:
@@ -135,8 +153,8 @@ def transform(inputdir, destination, filelist, handler):
             try:
                 header = csvr.next()
             except StopIteration:
-               print "skipping empty file: " + str(inputfile)
-               continue;
+                print "skipping empty file: " + str(inputfile)
+                continue
             min_ndx = find_ndx(header, "min")
             max_ndx = find_ndx(header, "max")
             med_ndx = find_ndx(header, "median")
@@ -149,10 +167,11 @@ def transform(inputdir, destination, filelist, handler):
                 row_max = row[max_ndx] if max_ndx >= 0 else ""
                 row_med = row[med_ndx] if med_ndx >= 0 else ""
                 row_avg = row[avg_ndx] if avg_ndx >= 0 else ""
-                info = { 'min':row_min, 'max':row_max, 'med':row_med, 'avg':row_avg,
-                         'function':benchmark, 'sha':sha, 'time':timestamp, 'dest':destination,
-                         'tag': tag}
+                info = {'min': row_min, 'max': row_max, 'med': row_med,
+                        'avg': row_avg, 'function': benchmark, 'sha': sha,
+                        'time': timestamp, 'dest': destination, 'tag': tag}
                 handler(info)
+
 
 def transform_stats(inputdir, destination, filelist):
     for inputfile in filelist:
@@ -169,14 +188,19 @@ def transform_stats(inputdir, destination, filelist):
             for line in lines:
                 parts = line.strip().split(':')
                 if len(parts) == 2:
-                    info = { 'function':parts[0], 'value':parts[1], 'sha':sha, 'tag':tag, 'time':timestamp, 'dest':destination }
+                    info = {'function': parts[0], 'value': parts[1],
+                            'sha': sha, 'tag': tag, 'time': timestamp,
+                            'dest': destination}
                     handle_stats(info)
+
 
 # remove existing files (old results) but only the
 # first time since we need to open and append to files
 # this allows us to run the script multiple times in the
 # same output directory
 existing = []
+
+
 def refresh_file_once(filename):
     if filename not in existing:
         try:
@@ -184,6 +208,7 @@ def refresh_file_once(filename):
         except:
             pass
     existing.append(filename)
+
 
 def handle_stats(info):
     outfilename = info['dest'] + info['function'] + ".stats"
@@ -203,6 +228,7 @@ def handle_stats(info):
         fout.write(header)
         fout.write(','.join([str(info[e]) for e in keys]) + "\n")
 
+
 # format is: sha, tag, min, max, med, avg,
 #            sha1, ...
 #            ..., ...
@@ -219,6 +245,7 @@ def handle_local_vertical(info):
         data = ','.join([info[e] for e in keys]) + endline
         fout.write(data)
 
+
 # format is sha, sha1,sha2,sha3...
 #           min, ...
 #           max, ...
@@ -228,32 +255,37 @@ def handle_local_horizontal(info):
     outfilename = info['dest'] + info['function'] + ".csv"
     refresh_file_once(outfilename)
     # make the file if not exist and read contents
-    lines = ['','','','','']
+    lines = ['', '', '', '', '']
     if not os.path.exists(outfilename):
         open(outfilename, 'w+').close()
     with open(outfilename, 'r') as fout:
         fout.seek(0)
         lines = [line.rstrip('\n') for line in fout]
         if len(lines) < 5:
-            lines = ['','','','','']
+            lines = ['', '', '', '', '']
     endline = ",\n"
     with open(outfilename, 'w+') as fout:
         fout.seek(0)
-	keys = ['sha', 'min', 'max', 'med', 'avg']
-	for idx in xrange(len(keys)):
-		newrow = lines[idx] + info[keys[idx]] + endline
-		fout.write(newrow)
+    keys = ['sha', 'min', 'max', 'med', 'avg']
+    for idx in xrange(len(keys)):
+        newrow = lines[idx] + info[keys[idx]] + endline
+        fout.write(newrow)
+    fout.truncate()
 
-        fout.truncate()
 
 def handle_remote(info):
     info['mach'] = getMachId()
     info['nanotime'] = str(info['time']) + "000000000"
-    #function,machine="${machid}" min=x,max=y,median=z,avg=w,sha="${gitsha}" unix_timestamp_in_nanoseconds
-    #note that string types must be quoted
-    payload = "%(function)s,machine=\"%(mach)s\" min=%(min)s,max=%(max)s,med=%(med)s,avg=%(avg)s,sha=\"%(sha)s\" %(nanotime)s" % info
-    #curl -i -XPOST 'remote_ip' --data-binary 'payload'
-    subprocess.call(['curl', '-i', '-XPOST', info['dest'], '--data-binary', payload])
+    # function,machine="${machid}" min=x,max=y,median=z,avg=w,sha="${gitsha}"
+    # unix_timestamp_in_nanoseconds
+    # note that string types must be quoted
+    payload = ("%(function)s,machine=\"%(mach)s\" "
+               "min=%(min)s,max=%(max)s,med=%(med)s,avg=%(avg)s,"
+               "sha=\"%(sha)s\" %(nanotime)s") % info
+    # curl -i -XPOST 'remote_ip' --data-binary 'payload'
+    subprocess.call(['curl', '-i', '-XPOST', info['dest'],
+                     '--data-binary', payload])
+
 
 def transform_local(html=False):
     machid = getMachId()
@@ -279,7 +311,9 @@ def transform_local(html=False):
     transform_stats(inputdir, outputdir, getFilesByName(inputdir, ".stats"))
 
     if html is True:
-        generateReport(outputdir, getFilesByName(outputdir), getFilesByName(outputdir, ".stats"))
+        generateReport(outputdir, getFilesByName(outputdir),
+                       getFilesByName(outputdir, ".stats"))
+
 
 def transform_remote():
     machid = getMachId()
@@ -294,13 +328,14 @@ def transform_remote():
     inputdir = os.path.expanduser(inputdir)
     files = []
     if len(sys.argv) > 4:
-        files = [ sys.argv[4] ]
+        files = [sys.argv[4]]
     else:
         files = getFilesByName(inputdir)
     if len(sys.argv) > 5:
         print "Unexpected extra arguments."
         printUseageAndQuit()
     transform(inputdir, remoteip, files, handle_remote)
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
@@ -314,6 +349,8 @@ if __name__ == "__main__":
     elif locality == "--remote":
         transform_remote()
     else:
-        print "Expecting either '--local', '--local-html', or '--remote' as the second argument."
+        print ("Expecting either '--local', '--local-html', "
+               "or '--remote' as the second argument.")
         printUseageAndQuit()
+
 
