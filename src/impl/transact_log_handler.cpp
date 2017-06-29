@@ -227,7 +227,7 @@ struct MarkDirtyMixin  {
     bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return true; }
     bool set_string_unique(size_t, size_t, size_t, StringData) { return true; }
 
-    bool add_row_with_key(size_t, size_t, size_t, size_t) { return true; }
+    bool add_row_with_key(size_t, size_t, size_t, int64_t) { return true; }
 };
 
 class TransactLogValidationMixin {
@@ -499,7 +499,7 @@ public:
         return true;
     }
 
-    bool add_row_with_key(size_t row_ndx, size_t prior_num_rows, size_t key_col, size_t)
+    bool add_row_with_key(size_t row_ndx, size_t prior_num_rows, size_t key_col, int64_t)
     {
         insert_empty_rows(row_ndx, 1, prior_num_rows, false);
         m_active_table->modify(row_ndx, key_col);
