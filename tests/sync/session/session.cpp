@@ -20,11 +20,11 @@
 
 #include "sync/session/session_util.hpp"
 
+#include "feature_checks.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "property.hpp"
 #include "schema.hpp"
-#include "sync/sync_features.hpp"
 
 #include "util/event_loop.hpp"
 #include "util/time.hpp"

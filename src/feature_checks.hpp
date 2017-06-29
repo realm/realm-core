@@ -16,8 +16,12 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
-#ifndef REALM_OS_SYNC_FEATURES_HPP
-#define REALM_OS_SYNC_FEATURES_HPP
+#ifndef REALM_OS_FEATURE_CHECKS_HPP
+#define REALM_OS_FEATURE_CHECKS_HPP
+
+#include <realm/version.hpp>
+
+#define REALM_HAVE_COMPOSABLE_DISTINCT (REALM_VER_MAJOR > 2)
 
 #if REALM_ENABLE_SYNC
 
@@ -30,4 +34,4 @@
 
 #endif // REALM_ENABLE_SYNC
 
-#endif // REALM_OS_SYNC_FEATURES_HPP
+#endif // REALM_OS_FEATURE_CHECKS_HPP

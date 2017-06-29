@@ -23,11 +23,11 @@
 #include "util/index_helpers.hpp"
 #include "util/test_file.hpp"
 
+#include "feature_checks.hpp"
 #include "collection_notifications.hpp"
 #include "object_accessor.hpp"
 #include "property.hpp"
 #include "schema.hpp"
-#include "sync/sync_features.hpp"
 
 #include "impl/realm_coordinator.hpp"
 #include "impl/object_accessor_impl.hpp"

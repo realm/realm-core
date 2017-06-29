@@ -27,7 +27,9 @@ set(SOURCES
 set(HEADERS
     binding_callback_thread_observer.hpp
     collection_notifications.hpp
+    descriptor_ordering.hpp
     execution_context_id.hpp
+    feature_checks.hpp
     index_set.hpp
     list.hpp
     object.hpp
