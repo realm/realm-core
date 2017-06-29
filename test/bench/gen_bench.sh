@@ -99,6 +99,7 @@ if [ ! -e "recent_results.txt" ] ; then
     echo "${basedir}" > recent_results.txt
 fi
 echo "${outputfile}" >> recent_results.txt
+echo "${statsfile}" >> recent_results.txt
 
 if [ -f "${outputfile}" ]; then
     echo "found results, skipping ${outputfile}"
