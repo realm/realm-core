@@ -1778,6 +1778,9 @@ SharedGroup::version_type SharedGroup::commit()
 
     version_type new_version = do_commit(); // Throws
 
+    // We need to set m_read_lock in order for wait_for_change to work.
+    // To set it, we grab a readlock on the latest available snapshot
+    // and release it again.
     VersionID version_id = VersionID();      // Latest available snapshot
     ReadLockInfo lock_after_commit;
     grab_read_lock(lock_after_commit, version_id);
