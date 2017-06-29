@@ -685,6 +685,19 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // If the file has already been mapped by another thread, reuse all relevant data
     // from the earlier mapping.
     if (m_file_mappings->m_success) {
+        // check that encryption keys match if they're used:
+        const char* earlier_used_key = m_file_mappings->m_file.get_encryption_key();
+        if (earlier_used_key != nullptr || cfg.encryption_key != nullptr) {
+            if (earlier_used_key == nullptr && cfg.encryption_key != nullptr) {
+                throw std::runtime_error("Encryption key provided, but file already opened as non-encrypted");
+            }
+            if (earlier_used_key != nullptr && cfg.encryption_key == nullptr) {
+                throw std::runtime_error("Missing encryption key, but file already opened with encryption key");
+            }
+            if (memcmp(earlier_used_key, cfg.encryption_key, 64)) {
+                throw std::runtime_error("Encryption key mismatch");
+            }
+        }
         m_data = m_file_mappings->m_initial_mapping.get_addr();
         m_file_format_version = get_committed_file_format_version();
         m_initial_chunk_size = m_file_mappings->m_initial_mapping.get_size();
@@ -713,8 +726,10 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // the session initiator. Another process may have the session initiator.
 
     m_file_mappings->m_file.open(path.c_str(), access, create, 0); // Throws
-    if (cfg.encryption_key)
+    auto physical_file_size = m_file_mappings->m_file.get_size();
+    if (cfg.encryption_key) {
         m_file_mappings->m_file.set_encryption_key(cfg.encryption_key);
+    }
     File::CloseGuard fcg(m_file_mappings->m_file);
 
     size_t size = 0;
@@ -722,6 +737,11 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // size_t.
     if (REALM_UNLIKELY(int_cast_with_overflow_detect(m_file_mappings->m_file.get_size(), size)))
         throw InvalidDatabase("Realm file too large", path);
+    if (cfg.encryption_key && size == 0 && physical_file_size != 0) {
+        // The opened file holds data, but is so small it cannot have
+        // been created with encryption
+        throw std::runtime_error("Attempt to open unencrypted file with encryption key");
+    }
 
     // FIXME: This initialization procedure does not provide sufficient
     // robustness given that processes may be abruptly terminated at any point

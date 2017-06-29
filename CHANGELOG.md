@@ -2,9 +2,12 @@
 
 ### Bugfixes
 
-* Work around a bug in macOS which could cause a deadlock when trying to obtain a shared lock
-  using flock(). PR [#2552](https://github.com/realm/realm-core/pull/2552),
-  issue [#2434](https://github.com/realm/realm-core/issues/2434).
+* Attempting to open a small unencrypted Realm file with an encryption key would
+  produce an empty encrypted Realm file. Fixed by detecting the case and
+  throwing an exception.
+  PR [#2645](https://github.com/realm/realm-core/pull/2645)
+* Fixed a bug where case insensitive queries wouldn't return all results.
+  PR [#2675](https://github.com/realm/realm-core/pull/2675).
 
 ### Breaking changes
 
@@ -12,13 +15,177 @@
 
 ### Enhancements
 
-* Lorem ipsum.
+* Add method to get total count of backlinks for a row.
+  PR [#2672](https://github.com/realm/realm-core/pull/2672).
 
 -----------
 
 ### Internals
 
 * Lorem ipsum.
+
+----------------------------------------------
+
+# 2.8.5 Release notes
+
+### Internals
+
+* `_impl::GroupFriend::get_top_ref()` was added.
+  PR [#2683](https://github.com/realm/realm-core/pull/2683).
+
+----------------------------------------------
+
+# 2.8.4 Release notes
+
+### Bugfixes
+
+* Fixes bug in encryption that could cause deadlocks/hangs and possibly
+  other bugs too.
+  Fixes issue [#2650](https://github.com/realm/realm-core/pull/2650).
+  PR [#2668](https://github.com/realm/realm-core/pull/2668).
+
+-----------
+
+### Internals
+
+* Fix an assert that prevented `Group::commit()` from discarding history from a
+  Realm file opened in nonshared mode (via `Group::open()`, as opposed to
+  `SharedGroup::open()`).
+  PR [#2655](https://github.com/realm/realm-core/pull/2655).
+* Improve ASAN and TSAN build modes (`sh build.sh asan` and `sh build.sh tsan`)
+  such that they do not clobber the files produced during regular builds, and
+  also do not clobber each others files. Also `UNITTEST_THREADS` and
+  `UNITTEST_PROGRESS` options are no longer hard-coded in ASAN and TSAN build
+  modes.
+  PR [#2660](https://github.com/realm/realm-core/pull/2660).
+
+----------------------------------------------
+
+# 2.8.3 Release notes
+
+### Internals
+
+* Disabled a sleep in debug mode that was impairing external tests.
+  PR [#2651](https://github.com/realm/realm-core/pull/2651).
+
+----------------------------------------------
+
+# 2.8.2 Release notes
+
+### Bugfixes
+
+* Now rejecting a Realm file specifying a history schema version that is newer
+  than the one expected by the code.
+  PR [#2642](https://github.com/realm/realm-core/pull/2642).
+* No longer triggering a history schema upgrade when opening an empty Realm file
+  (when `top_ref` is zero).
+  PR [#2642](https://github.com/realm/realm-core/pull/2642).
+
+----------------------------------------------
+
+# 2.8.1 Release notes
+
+### Bugfixes
+
+* Add #include <realm/util/safe_int_ops.hpp> in alloc.hpp.
+  PR [#2622](https://github.com/realm/realm-core/pull/2622).
+* Fix crash in large (>4GB) encrypted Realm files.
+  PR [#2572](https://github.com/realm/realm-core/pull/2572).
+* Fix missing symbols for some overloads of Table::find_first
+  in some configurations.
+  PR [#2624](https://github.com/realm/realm-core/pull/2624).
+
+----------------------------------------------
+
+# 2.8.0 Release notes
+
+### Bugfixes
+
+* Fix a race condition in encrypted files which can lead to
+  crashes on devices using OpenSSL (Android).
+  PR [#2616](https://github.com/realm/realm-core/pull/2616).
+
+### Enhancements
+
+* Enable encryption on watchOS.
+  Cocoa issue [#2876](https://github.com/realm/realm-cocoa/issues/2876).
+  PR [#2598](https://github.com/realm/realm-core/pull/2598).
+* Enforce consistent use of encryption keys across all threads.
+  PR [#2558](https://github.com/realm/realm-core/pull/2558).
+
+----------------------------------------------
+
+# 2.7.0 Release notes
+
+### Bugfixes
+
+* Fix for creating process-shared mutex objects in the wrong kernel object namespace on UWP.
+  PR [#2579](https://github.com/realm/realm-core/pull/2579).
+
+### Enhancements
+
+* Add `Group::compute_aggregated_byte_size()` and
+  `Table::compute_aggregated_byte_size()` for debugging/diagnostics purposes.
+  PR [#2591](https://github.com/realm/realm-core/pull/2591).
+* `Table` and `TableView` refactoring and improvements.
+  PR [#2571](https://github.com/realm/realm-core/pull/2571).
+  * Add a templated version of `Table::set()` to go with `Table::get()`.
+  * Add `TableView::find_first_timestamp()`.
+  * Add `TableView::find_first<T>()`.
+  * Make `Table::find_first<T>()` public and add support for most column types.
+  * Add wrappers for `Table::set<T>()` to `Row`.
+  * Add support for all column types in `Table::get<T>()`.
+
+-----------
+
+### Internals
+
+* Make `Array::stats()` available in release mode builds (not just in debug mode
+  builds).
+  PR [#2591](https://github.com/realm/realm-core/pull/2591).
+
+----------------------------------------------
+
+# 2.6.2 Release notes
+
+### Bugfixes
+
+* Fix for incorrect, redundant string index tree traversal for case insensitive searches
+  for strings with some characters being identical in upper and lower case (e.g. numbers).
+  PR [#2578](https://github.com/realm/realm-core/pull/2578),
+  Cocoa issue [#4895](https://github.com/realm/realm-cocoa/issues/4895)
+
+----------------------------------------------
+
+# 2.6.1 Release notes
+
+### Bugfixes
+
+* `mkfifo` on external storage fails with `EINVAL` on some devices with Android 7.x,
+  which caused crash when opening Realm.
+  PR[#2574](https://github.com/realm/realm-core/pull/2574),
+  Issue [#4461](https://github.com/realm/realm-java/issues/4461).
+
+----------------------------------------------
+
+# 2.6.0 Release notes
+
+### Bugfixes
+
+* Work around a bug in macOS which could cause a deadlock when trying to obtain a shared lock
+  using flock(). PR [#2552](https://github.com/realm/realm-core/pull/2552),
+  issue [#2434](https://github.com/realm/realm-core/issues/2434).
+
+### Enhancements
+
+* Add support for `SharedGroup::try_begin_write()` and corresponding `try_lock()`
+  functionality in low level Mutex classes.
+  PR [#2547](https://github.com/realm/realm-core/pull/2547/files)
+  Fixes issue [#2538](https://github.com/realm/realm-core/issues/2538)
+* New file system utility functions: `util::remove_dir_recursive()` and
+  `util::File::for_each()`. PR [#2556](https://github.com/realm/realm-core/pull/2556).
+* Made case insensitive queries use the new index based case insensitive search.
+  PR [#2486](https://github.com/realm/realm-core/pull/2486)
 
 ----------------------------------------------
 

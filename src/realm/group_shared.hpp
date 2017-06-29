@@ -54,10 +54,15 @@ struct IncompatibleLockFile : std::runtime_error {
     }
 };
 
-/// Thrown by SharedGroup::open() if the realm database was generated with a
-/// format for Realm Mobile Platform but is being opened as a Realm Mobile
-/// Database or vice versa, or of the history schema in the Realm file could not
-/// be upgraded to the needed version.
+/// Thrown by SharedGroup::open() if the type of history
+/// (Replication::HistoryType) in the opened Realm file is incompatible with the
+/// mode in which the Realm file is opened. For example, if there is a mismatch
+/// between the history type in the file, and the history type associated with
+/// the replication plugin passed to SharedGroup::open().
+///
+/// This exception will also be thrown if the history schema version is lower
+/// than required, and no migration is possible
+/// (Replication::is_upgradable_history_schema()).
 struct IncompatibleHistories : util::File::AccessError {
     IncompatibleHistories(const std::string& msg, const std::string& path)
         : util::File::AccessError("Incompatible histories. " + msg, path)
@@ -356,6 +361,11 @@ public:
     const Group& begin_read(VersionID version = VersionID());
     void end_read() noexcept;
     Group& begin_write();
+    // Return true (and take the write lock) if there is no other write
+    // in progress. In case of contention return false immediately.
+    // If the write lock is obtained, also provide the Group associated
+    // with the SharedGroup for further operations.
+    bool try_begin_write(Group*& group);
     version_type commit();
     void rollback() noexcept;
     // report statistics of last commit done on THIS shared group.
@@ -600,6 +610,8 @@ private:
 
     void do_begin_read(VersionID, bool writable);
     void do_end_read() noexcept;
+    /// return true if write transaction can commence, false otherwise.
+    bool do_try_begin_write();
     void do_begin_write();
     version_type do_commit();
     void do_end_write() noexcept;
@@ -648,6 +660,9 @@ private:
     _impl::History* get_history();
 
     int get_file_format_version() const noexcept;
+
+    /// finish up the process of starting a write transaction. Internal use only.
+    void finish_begin_write();
 
     friend class _impl::SharedGroupFriend;
 };

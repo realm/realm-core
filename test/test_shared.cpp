@@ -36,6 +36,8 @@
 #include <windows.h>
 #endif
 
+#include <realm/history.hpp>
+#include <realm/lang_bind_helper.hpp>
 #include <realm.hpp>
 #include <realm/util/features.h>
 #include <realm/util/safe_int_ops.hpp>
@@ -582,6 +584,80 @@ TEST(Shared_1)
             Timestamp third_timestamp_value{3, 3};
             CHECK_EQUAL(third_timestamp_value, t3->get_timestamp(4, 2));
         }
+    }
+}
+
+TEST(Shared_try_begin_write)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    // Create a new shared db
+    SharedGroup sg(path, false, SharedGroupOptions(crypt_key()));
+    std::mutex thread_obtains_write_lock;
+    bool init_complete = false;
+
+    auto do_async = [&]() {
+        SharedGroup sg2(path, false, SharedGroupOptions(crypt_key()));
+        Group* gw = nullptr;
+        bool success = sg2.try_begin_write(gw);
+        CHECK(success);
+        CHECK(gw != nullptr);
+        init_complete = true;
+        TableRef t = gw->add_table(StringData("table"));
+        t->insert_column(0, type_String, StringData("string_col"));
+        t->add_empty_row(1000);
+        thread_obtains_write_lock.lock();
+        sg2.commit();
+        thread_obtains_write_lock.unlock();
+    };
+
+    thread_obtains_write_lock.lock();
+    Thread async_writer;
+    async_writer.start(do_async);
+
+    // wait for the thread to start a write transaction
+    while (!init_complete) { millisleep(1); }
+
+    // Try to also obtain a write lock. This should fail but not block.
+    Group* g = nullptr;
+    bool success = sg.try_begin_write(g);
+    CHECK(!success);
+    CHECK(g == nullptr);
+
+    // Let the async thread finish its write transaction.
+    thread_obtains_write_lock.unlock();
+    async_writer.join();
+
+    {
+        // Verify that the thread transaction commit succeeded.
+        ReadTransaction rt(sg);
+        const Group& gr = rt.get_group();
+        ConstTableRef t = gr.get_table(0);
+        CHECK(t->get_name() == StringData("table"));
+        CHECK(t->get_column_name(0) == StringData("string_col"));
+        CHECK(t->size() == 1000);
+    }
+
+    // Now try to start a transaction without any contenders.
+    success = sg.try_begin_write(g);
+    CHECK(success);
+    CHECK(g != nullptr);
+
+    {
+        // make sure we still get a useful error message when trying to
+        // obtain two write locks on the same thread
+        CHECK_LOGIC_ERROR(sg.try_begin_write(g), LogicError::wrong_transact_state);
+    }
+
+    // Add some data and finish the transaction.
+    g->add_table(StringData("table 2"));
+    sg.commit();
+
+    {
+        // Verify that the main thread transaction now succeeded.
+        ReadTransaction rt(sg);
+        const Group& gr = rt.get_group();
+        CHECK(gr.size() == 2);
+        CHECK(gr.get_table(1)->get_name() == StringData("table 2"));
     }
 }
 
@@ -2307,6 +2383,61 @@ TEST(Shared_MixedWithNonShared)
 #endif
 }
 
+
+#if REALM_ENABLE_ENCRYPTION
+// verify that even though different threads share the same encrypted pages,
+// a thread will not get access without the key.
+TEST(Shared_EncryptionKeyCheck)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroupOptions(crypt_key(true)));
+    bool ok = false;
+    try {
+        SharedGroup sg_2(path, false, SharedGroupOptions());
+    } catch (std::runtime_error&) {
+        ok = true;
+    }
+    CHECK(ok);
+    SharedGroup sg3(path, false, SharedGroupOptions(crypt_key(true)));
+}
+
+// opposite - if opened unencrypted, attempt to share it encrypted
+// will throw an error.
+TEST(Shared_EncryptionKeyCheck_2)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    SharedGroup sg(path, false, SharedGroupOptions());
+    bool ok = false;
+    try {
+        SharedGroup sg_2(path, false, SharedGroupOptions(crypt_key(true)));
+    } catch (std::runtime_error&) {
+        ok = true;
+    }
+    CHECK(ok);
+    SharedGroup sg3(path, false, SharedGroupOptions());
+}
+
+// if opened by one key, it cannot be opened by a different key
+TEST(Shared_EncryptionKeyCheck_3)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    const char* first_key = crypt_key(true);
+    char second_key[32];
+    memcpy(second_key, first_key, 32);
+    second_key[3] = ~second_key[3];
+    SharedGroup sg(path, false, SharedGroupOptions(first_key));
+    bool ok = false;
+    try {
+        SharedGroup sg_2(path, false, SharedGroupOptions(second_key));
+    } catch (std::runtime_error&) {
+        ok = true;
+    }
+    CHECK(ok);
+    SharedGroup sg3(path, false, SharedGroupOptions(first_key));
+}
+
+#endif
+
 TEST(Shared_VersionCount)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2965,6 +3096,64 @@ TEST(Shared_StaticFuzzTestRunSanityCheck)
         }
     }
 }
+
+
+// This test checks what happens when a version is pinned and there are many
+// large write transactions that grow the file quickly. It takes a long time
+// and can make very very large files so it is not suited to automatic testing.
+TEST_IF(Shared_encrypted_pin_and_write, false)
+{
+    const size_t num_rows = 1000;
+    const size_t num_transactions = 1000000;
+    const size_t num_writer_threads = 8;
+    SHARED_GROUP_TEST_PATH(path);
+
+    { // initial table structure setup on main thread
+        SharedGroup sg(path, false, SharedGroupOptions(crypt_key(true)));
+        WriteTransaction wt(sg);
+        Group& group = wt.get_group();
+        TableRef t = group.add_table("table");
+        t->add_column(type_String, "string_col", true);
+        t->add_empty_row(num_rows);
+        wt.commit();
+    }
+
+    SharedGroup sg_reader(path, false, SharedGroupOptions(crypt_key(true)));
+    ReadTransaction rt(sg_reader); // hold first version
+
+    auto do_many_writes = [&]() {
+        SharedGroup sg(path, false, SharedGroupOptions(crypt_key(true)));
+        const size_t base_size = 100000;
+        std::string base(base_size, 'a');
+        // write many transactions to grow the file
+        // around 4.6 GB seems to be the breaking size
+        for (size_t t = 0; t < num_transactions; ++t) {
+            std::vector<std::string> rows(num_rows);
+            // change a character so there's no storage optimizations
+            for (size_t row = 0; row < num_rows; ++row) {
+                base[(t * num_rows + row)%base_size] = 'a' + (row % 52);
+                rows[row] = base;
+            }
+            WriteTransaction wt(sg);
+            Group& g = wt.get_group();
+            TableRef table = g.get_table(0);
+            for (size_t row = 0; row < num_rows; ++row) {
+                StringData c(rows[row]);
+                table->set_string(0, row, c);
+            }
+            wt.commit();
+        }
+    };
+
+    Thread threads[num_writer_threads];
+    for (size_t i = 0; i < num_writer_threads; ++i)
+        threads[i].start(do_many_writes);
+
+    for (size_t i = 0; i < num_writer_threads; ++i) {
+        threads[i].join();
+    }
+}
+
 
 // Scaled down stress test. (Use string length ~15MB for max stress)
 NONCONCURRENT_TEST(Shared_BigAllocations)

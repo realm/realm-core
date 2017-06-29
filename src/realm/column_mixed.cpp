@@ -16,11 +16,13 @@
  *
  **************************************************************************/
 
-#include <iomanip>
-#include <ostream>
+#include <realm/column_mixed.hpp>
+
+#include <realm/column_binary.hpp>
+#include <realm/column_timestamp.hpp>
 
 #include <memory>
-#include <realm/column_mixed.hpp>
+#include <ostream>
 
 using namespace realm;
 using namespace realm::util;

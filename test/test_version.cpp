@@ -58,10 +58,9 @@ using namespace realm;
 
 TEST(Version_General)
 {
-    CHECK_EQUAL(REALM_VER_MAJOR, Version::get_major());
-    CHECK_EQUAL(REALM_VER_MINOR, Version::get_minor());
-    CHECK_EQUAL(REALM_VER_PATCH, Version::get_patch());
-    CHECK_EQUAL(REALM_VER_PATCH, Version::get_patch());
+    CHECK_EQUAL(REALM_VERSION_MAJOR, Version::get_major());
+    CHECK_EQUAL(REALM_VERSION_MINOR, Version::get_minor());
+    CHECK_EQUAL(REALM_VERSION_PATCH, Version::get_patch());
 
     CHECK_EQUAL(true, Version::is_at_least(0, 0, 0));
     CHECK_EQUAL(true, Version::is_at_least(0, 1, 5));
@@ -71,6 +70,6 @@ TEST(Version_General)
     CHECK_EQUAL(true, Version::is_at_least(1, 0, 0));
     CHECK_EQUAL(true, Version::is_at_least(2, 0, 0));
     CHECK_EQUAL(false, Version::is_at_least(3, 0, 0));
-    CHECK_EQUAL(false, Version::is_at_least(REALM_VER_MAJOR, 99, 0));
-    CHECK_EQUAL(false, Version::is_at_least(REALM_VER_MAJOR, REALM_VER_MINOR, 99));
+    CHECK_EQUAL(false, Version::is_at_least(REALM_VERSION_MAJOR, 99, 0));
+    CHECK_EQUAL(false, Version::is_at_least(REALM_VERSION_MAJOR, REALM_VERSION_MINOR, 99));
 }

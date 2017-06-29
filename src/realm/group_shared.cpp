@@ -1018,14 +1018,14 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                         break;
                     case Replication::hist_SyncClient:
                         good_history_type = ((stored_hist_type == Replication::hist_SyncClient) ||
-                                             (stored_hist_type == Replication::hist_None && top_ref == 0));
+                                             (top_ref == 0));
                         if (!good_history_type)
                             throw IncompatibleHistories(
                                 "Expected an empty Realm or a Realm written by Realm Mobile Platform", path);
                         break;
                     case Replication::hist_SyncServer:
                         good_history_type = ((stored_hist_type == Replication::hist_SyncServer) ||
-                                             (stored_hist_type == Replication::hist_None && top_ref == 0));
+                                             (top_ref == 0));
                         if (!good_history_type)
                             throw IncompatibleHistories("Expected a Realm containining "
                                                         "a server-side history", path);
@@ -1033,7 +1033,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                 }
 
                 REALM_ASSERT(stored_hist_schema_version <= openers_hist_schema_version);
-                if (stored_hist_schema_version < openers_hist_schema_version) {
+                if (stored_hist_schema_version > openers_hist_schema_version)
+                    throw IncompatibleHistories("Unexpected future history schema version", path);
+                bool need_hist_schema_upgrade =
+                    (stored_hist_schema_version < openers_hist_schema_version && top_ref != 0);
+                if (need_hist_schema_upgrade) {
                     Replication* repl = gf::get_replication(m_group);
                     if (!repl->is_upgradable_history_schema(stored_hist_schema_version))
                         throw IncompatibleHistories("Nonupgradable history schema", path);
@@ -1535,7 +1539,12 @@ void SharedGroup::upgrade_file_format(bool allow_file_format_upgrade,
 // a simple thread barrier that makes sure the threads meet here, to
 // increase the likelyhood of detecting any potential race problems.
 // See the unit test for details.
-        millisleep(200);
+//
+// NOTE: This sleep has been disabled because no problems have been found with
+// this code in a long while, and it was dramatically slowing down a unit test
+// in realm-sync.
+
+        // millisleep(200);
 #endif
 
         WriteTransaction wt(*this);
@@ -1728,6 +1737,37 @@ Group& SharedGroup::begin_write()
     return m_group;
 }
 
+bool SharedGroup::try_begin_write(Group* &group)
+{
+    if (m_transact_stage != transact_Ready)
+        throw LogicError(LogicError::wrong_transact_state);
+
+    bool success = do_try_begin_write(); // Throws
+    if (!success) return false;
+    try {
+        // We can be sure that do_begin_read() will bind to the latest snapshot,
+        // since no other write transaction can be initated while we hold the
+        // write mutex.
+        VersionID version_id = VersionID(); // Latest available snapshot
+        bool writable = true;
+        do_begin_read(version_id, writable); // Throws
+
+        if (Replication* repl = m_group.get_replication()) {
+            version_type current_version = m_read_lock.m_version;
+            bool history_updated = false;
+            repl->initiate_transact(current_version, history_updated); // Throws
+        }
+    }
+    catch (...) {
+        do_end_write();
+        throw;
+    }
+
+    m_transact_stage = transact_Writing;
+    group = &m_group;
+    return true;
+}
+
 
 SharedGroup::version_type SharedGroup::commit()
 {
@@ -1823,9 +1863,24 @@ void SharedGroup::do_end_read() noexcept
 }
 
 
+
+bool SharedGroup::do_try_begin_write()
+{
+    // In the non-blocking case, we will only succeed if there is no contention for
+    // the write mutex. For this case we are trivially fair and can ignore the
+    // fairness machinery.
+    bool got_the_lock = m_writemutex.try_lock();
+    if (got_the_lock) {
+        finish_begin_write();
+    }
+    return got_the_lock;
+}
+
+
 void SharedGroup::do_begin_write()
 {
     SharedInfo* info = m_file_map.get_addr();
+
     // Get write lock - the write lock is held until do_end_write().
     //
     // We use a ticketing scheme to ensure fairness wrt performing write transactions.
@@ -1884,7 +1939,12 @@ void SharedGroup::do_begin_write()
     // should take this situation into account by comparing with '>' instead of '!='
     info->next_served = my_ticket;
 #endif
+    finish_begin_write();
+}
 
+void SharedGroup::finish_begin_write()
+{
+    SharedInfo* info = m_file_map.get_addr();
     if (info->commit_in_critical_phase) {
         m_writemutex.unlock();
         throw std::runtime_error("Crash of other process detected, session restart required");

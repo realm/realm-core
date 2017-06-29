@@ -139,6 +139,15 @@ public:
     /// change the association between the Group instance and the file
     /// that was specified in the call to open().
     ///
+    /// A Realm file that contains a history (see Replication::HistoryType) may
+    /// be opened via Group::open(), as long as the application can ensure that
+    /// there is no concurrent access to the file (see below for more on
+    /// concurrency), but if the file is modified via Group::commit() the
+    /// history will be discarded. To retain the history, the application must
+    /// instead access the file in shared mode, i.e., via SharedGroup, and
+    /// supply the right kind of replication plugin (see
+    /// Replication::get_history_type()).
+    ///
     /// A file that is passed to Group::open(), may not be modified by
     /// a third party until after the Group object is
     /// destroyed. Behavior is undefined if a file is modified by a
@@ -509,6 +518,16 @@ public:
     {
         return !(*this == g);
     }
+
+    /// Compute the sum of the sizes in number of bytes of all the array nodes
+    /// that currently make up this group. When this group represents a snapshot
+    /// in a Realm file (such as during a read transaction via a SharedGroup
+    /// instance), this function computes the footprint of that snapshot within
+    /// the Realm file.
+    ///
+    /// If this group accessor is the detached state, this function returns
+    /// zero.
+    size_t compute_aggregated_byte_size() const noexcept;
 
     void verify() const;
 #ifdef REALM_DEBUG
@@ -1068,6 +1087,16 @@ public:
         return group.m_alloc;
     }
 
+    static const Allocator& get_alloc(const Group& group) noexcept
+    {
+        return group.m_alloc;
+    }
+
+    static ref_type get_top_ref(const Group& group) noexcept
+    {
+        return group.m_top.get_ref();
+    }
+
     static Table& get_table(Group& group, size_t ndx_in_group)
     {
         Group::DescMatcher desc_matcher = 0;                           // Do not check descriptor
@@ -1173,12 +1202,12 @@ public:
             group.create_empty_group(); // Throws
     }
 
-    static void get_version_and_history_info(Allocator& alloc, ref_type top_ref,
+    static void get_version_and_history_info(const Allocator& alloc, ref_type top_ref,
                                              _impl::History::version_type& version,
                                              int& history_type,
                                              int& history_schema_version) noexcept
     {
-        Array top(alloc);
+        Array top{const_cast<Allocator&>(alloc)};
         if (top_ref != 0)
             top.init_from_ref(top_ref);
         Group::get_version_and_history_info(top, version, history_type, history_schema_version);

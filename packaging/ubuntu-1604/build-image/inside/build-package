@@ -7,140 +7,126 @@ set -e
 # to delete them from our host.
 trap 'chown -R --reference /inside/build-package /out/' EXIT
 
-clean_binaries() {
-  # Remove unneeded information from binaries
-  for path in $*; do
-    cd "$path"
-
-    rm -rf usr/{lib,libexec,bin}/*-dbg*
-
-    for file in usr/{lib,libexec,bin}/*; do
-        if [ -f "$file"  ];then
-            strip --strip-debug --strip-unneeded "$file"
-            chrpath -d "$file" || true
-        fi
-    done
-
-    cd - >/dev/null
-  done
-}
-
 # the source directory is mounted read-only to prevent issues where the build
 # could alter the source; we should copy it somewhere inside the container
 cp -a /source /tmp/build
 cd /tmp/build
 
-# Configure the build
-REALM_ENABLE_ENCRYPTION=yes sh build.sh config /usr
-# Build and install
-sh build.sh build
-sh build.sh build-node
-DESTDIR=/prod sh build.sh install-prod
-find /prod
-
-DESTDIR=/devel sh build.sh install-devel
-find /devel
-
-mkdir -p /node-devel/usr/lib
-cp src/realm/librealm-node* /node-devel/usr/lib
-
-clean_binaries /prod /devel /node-devel
-
-# Reorganise a few files
-mkdir -p /utils/usr/bin
-mv /prod/usr/bin/realm-import /utils/usr/bin
-mv /prod/usr/lib/*.so /devel/usr/lib
-
-# Realm-node package
-doc_folder=usr/share/doc/realm-node-$VERSION
-mkdir -p /node/$doc_folder
-echo "The realm-node package is empty at the moment." > /node/$doc_folder/README
+rm -rf build-dir
+mkdir build-dir
+cd build-dir
+cmake -DREALM_ENABLE_ENCRYPTION=1 \
+      -DREALM_NO_TESTS=1 \
+      -DCMAKE_INSTALL_PREFIX=/prod \
+      -DCMAKE_BUILD_TYPE=Release \
+      -GNinja ..
+ninja
+ninja install/strip
 
 echo "ldconfig" > /tmp/post-ldconf
 echo "echo >/dev/null" >> /tmp/post-ldconf
 
+(
 cd /out
-
-# don't forget to list all runtime dependencies for your package (i.e. all the
-# shared libraries you link to!)
 
 fpm \
     -t deb \
     -s dir \
     -n librealm \
-    --license "Realm License" \
-    --version ${VERSION} \
-    --iteration ${ITERATION} \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
     --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    --after-install /tmp/post-ldconf \
-    --after-remove /tmp/post-ldconf \
-    -C /prod \
-    usr/lib usr/libexec
+    --after-install "/tmp/post-ldconf" \
+    --after-remove "/tmp/post-ldconf" \
+    -d "libssl1.0.0" \
+    -C "/prod" \
+    lib/librealm.so=/usr/lib/librealm.so \
+    libexec=/usr
 
 fpm \
     -t deb \
     -s dir \
     -n librealm-dev \
-    --license "Realm License" \
-    --version ${VERSION} \
-    --iteration ${ITERATION} \
-    --description "Development headers and tools for the realm-core database component" \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
     --url "https://realm.io" \
     --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
     -d "librealm = ${VERSION}-${ITERATION}" \
     -d "libssl-dev" \
-    -C /devel \
-    usr/lib usr/include usr/bin
-
-fpm \
-    -t deb \
-    -s dir \
-    -n librealm-node \
-    --license "Realm License" \
-    --version ${VERSION} \
-    --iteration ${ITERATION} \
-    --description "Realm-core database component for node" \
-    --url "https://realm.io" \
-    --category "System Environment/Libraries" \
-    --vendor "Realm" \
-    --maintainer "Realm <help@realm.io>" \
-    -C /node \
-    $doc_folder
-
-fpm \
-    -t deb \
-    -s dir \
-    -n librealm-node-dev \
-    --license "Realm License" \
-    --version ${VERSION} \
-    --iteration ${ITERATION} \
-    --description "Development realm-core database component for node" \
-    --url "https://realm.io" \
-    --category "System Environment/Libraries" \
-    --vendor "Realm" \
-    --maintainer "Realm <help@realm.io>" \
-    -d "librealm-dev = ${VERSION}-${ITERATION}" \
-    -C /node-devel \
-    usr/lib
+    -C "/prod" \
+    /include=/usr \
+    /lib/librealm.a=/usr/lib/librealm.a \
+    /bin/realm-config=/usr/bin/realm-config
 
 fpm \
     -t deb \
     -s dir \
     -n realm-utils \
-    --license "Realm License" \
-    --version ${VERSION} \
-    --iteration ${ITERATION} \
-    --description "Utilities to work with Realm files" \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
     --url "https://realm.io" \
-    --category "Applications/Databases" \
+    --category "System Environment/Libraries" \
     --vendor "Realm" \
     --maintainer "Realm <help@realm.io>" \
-    -d "librealm = ${VERSION}-${ITERATION}" \
-    -C /utils \
-    usr/bin
+    -d "librealm" \
+    -C "/prod" \
+    /bin/realm-importer=/usr/bin/realm-importer
+)
+
+rm -rf -- * /prod/*
+cmake -DREALM_ENABLE_ENCRYPTION=1 \
+      -DREALM_NO_TESTS=1 \
+      -DCMAKE_INSTALL_PREFIX=/prod \
+      -DCMAKE_BUILD_TYPE=Debug \
+      -GNinja ..
+ninja
+ninja install
+
+cd /out
+
+fpm \
+    -t deb \
+    -s dir \
+    -n librealm-dbg \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
+    --url "https://realm.io" \
+    --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Realm <help@realm.io>" \
+    --after-install "/tmp/post-ldconf" \
+    --after-remove "/tmp/post-ldconf" \
+    -d "libssl1.0.0" \
+    -C "/prod" \
+    lib/librealm-dbg.so=/usr/lib/librealm-dbg.so \
+    libexec=/usr
+
+fpm \
+    -t deb \
+    -s dir \
+    -n librealm-dev-dbg \
+    --license "Apache 2.0" \
+    --version "${VERSION}" \
+    --iteration "${ITERATION}" \
+    --description "Realm is a mobile database: a replacement for Core Data & SQLite" \
+    --url "https://realm.io" \
+    --category "System Environment/Libraries" \
+    --vendor "Realm" \
+    --maintainer "Realm <help@realm.io>" \
+    -d "librealm-dev = ${VERSION}-${ITERATION}" \
+    -d "libssl-dev" \
+    -C "/prod" \
+    lib/librealm-dbg.so=/usr/lib/librealm-dbg.a
