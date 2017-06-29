@@ -24,6 +24,7 @@
 #include "object_store.hpp"
 #include "property.hpp"
 #include "schema.hpp"
+#include "sync/sync_features.hpp"
 
 #include "util/event_loop.hpp"
 #include "util/time.hpp"
@@ -250,7 +251,9 @@ TEST_CASE("sync: token refreshing", "[sync]") {
                                         bind_function_called = true;
                                         return s_test_token;
                                     },
-                                    [](auto, auto) { },
+                                    [](auto, SyncError err) {
+                                        printf("DEBUG: test received an error: %s\n", err.message.c_str());
+                                    },
                                     SyncSessionStopPolicy::AfterChangesUploaded);
         EventLoop::main().run_until([&] { return sessions_are_active(*session); });
         REQUIRE(!session->is_in_error_state());
@@ -567,3 +570,33 @@ TEST_CASE("sync: encrypt local realm file", "[sync]") {
         }
     }
 }
+
+#if REALM_HAVE_SYNC_STABLE_IDS
+
+TEST_CASE("sync: stable IDs", "[sync]") {
+    if (!EventLoop::has_implementation())
+        return;
+
+    auto cleanup = util::make_scope_exit([=]() noexcept { SyncManager::shared().reset_for_testing(); });
+    SyncServer server;
+    // Disable file-related functionality and metadata functionality for testing purposes.
+    SyncManager::shared().configure_file_system(tmp_dir(), SyncManager::MetadataMode::NoMetadata);
+
+    SECTION("ID column isn't visible in schema read from Group") {
+        SyncTestFile config(server, "schema-test");
+        config.schema_version = 1;
+        config.schema = Schema{
+            {"object", {
+                {"value", PropertyType::Int, "", "", false, false, false}
+            }},
+        };
+
+        auto realm = Realm::get_shared_realm(config);
+
+        ObjectSchema object_schema(realm->read_group(), "object");
+        REQUIRE(object_schema.property_for_name(sync::object_id_column_name) == nullptr);
+        REQUIRE(object_schema == *config.schema->find("object"));
+    }
+}
+
+#endif // REALM_HAVE_SYNC_STABLE_IDS

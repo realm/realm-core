@@ -36,6 +36,7 @@ class Object {
 public:
     Object();
     Object(std::shared_ptr<Realm> r, ObjectSchema const& s, RowExpr const& o);
+    Object(std::shared_ptr<Realm> r, StringData object_type, size_t ndx);
 
     Object(Object const&);
     Object(Object&&);
@@ -70,12 +71,23 @@ public:
     template<typename ValueType, typename ContextType>
     static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
                          const ObjectSchema &object_schema, ValueType value,
-                         bool try_update, Row* = nullptr);
+                         bool try_update = false, Row* = nullptr);
+
+    template<typename ValueType, typename ContextType>
+    static Object create(ContextType& ctx, std::shared_ptr<Realm> const& realm,
+                         StringData object_type, ValueType value,
+                         bool try_update = false, Row* = nullptr);
 
     template<typename ValueType, typename ContextType>
     static Object get_for_primary_key(ContextType& ctx,
                                       std::shared_ptr<Realm> const& realm,
                                       const ObjectSchema &object_schema,
+                                      ValueType primary_value);
+
+    template<typename ValueType, typename ContextType>
+    static Object get_for_primary_key(ContextType& ctx,
+                                      std::shared_ptr<Realm> const& realm,
+                                      StringData object_type,
                                       ValueType primary_value);
 
 private:

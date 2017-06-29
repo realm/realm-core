@@ -349,7 +349,6 @@ struct sync_session_states::Inactive : public SyncSession::State {
         }
         session.m_completion_wait_packages.clear();
         session.m_session = nullptr;
-        session.m_server_url = util::none;
         session.unregister(lock);
     }
 
@@ -413,10 +412,36 @@ std::string SyncSession::get_recovery_file_path()
                                           util::create_timestamped_template("recovered_realm"));
 }
 
+void SyncSession::update_error_and_mark_file_for_deletion(SyncError& error, ShouldBackup should_backup)
+{
+    // Add a SyncFileActionMetadata marking the Realm as needing to be deleted.
+    std::string recovery_path;
+    auto original_path = path();
+    error.user_info[SyncError::c_original_file_path_key] = original_path;
+    if (should_backup == ShouldBackup::yes) {
+        recovery_path = get_recovery_file_path();
+        error.user_info[SyncError::c_recovery_file_path_key] = recovery_path;
+    }
+    using Action = SyncFileActionMetadata::Action;
+    auto action = should_backup == ShouldBackup::yes ? Action::BackUpThenDeleteRealm : Action::DeleteRealm;
+    SyncManager::shared().perform_metadata_update([this,
+                                                   action,
+                                                   original_path=std::move(original_path),
+                                                   recovery_path=std::move(recovery_path)](const auto& manager) {
+        SyncFileActionMetadata(manager,
+                               action,
+                               original_path,
+                               m_config.realm_url,
+                               m_config.user->identity(),
+                               util::Optional<std::string>(std::move(recovery_path)));
+    });
+}
+
 // This method should only be called from within the error handler callback registered upon the underlying `m_session`.
 void SyncSession::handle_error(SyncError error)
 {
-    bool should_invalidate_session = error.is_fatal;
+    enum class NextStateAfterError { none, inactive, error };
+    auto next_state = error.is_fatal ? NextStateAfterError::error : NextStateAfterError::none;
     auto error_code = error.error_code;
 
     {
@@ -462,7 +487,7 @@ void SyncSession::handle_error(SyncError error)
             }
             case ProtocolError::bad_authentication: {
                 std::shared_ptr<SyncUser> user_to_invalidate;
-                should_invalidate_session = false;
+                next_state = NextStateAfterError::none;
                 {
                     std::unique_lock<std::mutex> lock(m_state_mutex);
                     user_to_invalidate = user();
@@ -474,30 +499,20 @@ void SyncSession::handle_error(SyncError error)
             }
             case ProtocolError::illegal_realm_path:
             case ProtocolError::no_such_realm:
-            case ProtocolError::permission_denied:
+                break;
+            case ProtocolError::permission_denied: {
+                next_state = NextStateAfterError::inactive;
+                update_error_and_mark_file_for_deletion(error, ShouldBackup::no);
+                break;
+            }
             case ProtocolError::bad_client_version:
                 break;
             case ProtocolError::bad_server_file_ident:
             case ProtocolError::bad_client_file_ident:
             case ProtocolError::bad_server_version:
-            case ProtocolError::diverging_histories: {
-                // Add a SyncFileActionMetadata marking the Realm as needing to be deleted.
-                auto recovery_path = get_recovery_file_path();
-                auto original_path = path();
-                error.user_info[SyncError::c_original_file_path_key] = original_path;
-                error.user_info[SyncError::c_recovery_file_path_key] = recovery_path;
-                SyncManager::shared().perform_metadata_update([this,
-                                                               original_path=std::move(original_path),
-                                                               recovery_path=std::move(recovery_path)](const auto& manager) {
-                    SyncFileActionMetadata(manager,
-                                           SyncFileActionMetadata::Action::HandleRealmForClientReset,
-                                           original_path,
-                                           m_config.realm_url,
-                                           m_config.user->identity(),
-                                           util::Optional<std::string>(std::move(recovery_path)));
-                });
+            case ProtocolError::diverging_histories:
+                update_error_and_mark_file_for_deletion(error, ShouldBackup::yes);
                 break;
-            }
             case ProtocolError::bad_changeset:
                 break;
         }
@@ -532,9 +547,19 @@ void SyncSession::handle_error(SyncError error)
         // Unrecognized error code; just ignore it.
         return;
     }
-    if (should_invalidate_session) {
-        std::unique_lock<std::mutex> lock(m_state_mutex);
-        advance_state(lock, State::error);
+    switch (next_state) {
+        case NextStateAfterError::none:
+            break;
+        case NextStateAfterError::inactive: {
+            std::unique_lock<std::mutex> lock(m_state_mutex);
+            advance_state(lock, State::inactive);
+            break;
+        }
+        case NextStateAfterError::error: {
+            std::unique_lock<std::mutex> lock(m_state_mutex);
+            advance_state(lock, State::error);
+            break;
+        }
     }
     if (m_error_handler) {
         m_error_handler(shared_from_this(), std::move(error));

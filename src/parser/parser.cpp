@@ -201,7 +201,7 @@ template< typename Rule >
 struct action : nothing< Rule > {};
 
 #ifdef REALM_PARSER_PRINT_TOKENS
-    #define DEBUG_PRINT_TOKEN(string) do { std::cout << string << std::endl; while (0)
+    #define DEBUG_PRINT_TOKEN(string) do { std::cout << string << std::endl; } while (0)
 #else
     #define DEBUG_PRINT_TOKEN(string) do { static_cast<void>(string); } while (0)
 #endif

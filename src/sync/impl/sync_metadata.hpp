@@ -93,7 +93,7 @@ public:
         // The Realm files at the given directory will be deleted.
         DeleteRealm,
         // The Realm file will be copied to a 'recovery' directory, and the original Realm files will be deleted.
-        HandleRealmForClientReset
+        BackUpThenDeleteRealm
     };
 
     static util::Optional<SyncFileActionMetadata> metadata_for_path(const std::string&, const SyncMetadataManager&);
@@ -102,7 +102,7 @@ public:
     std::string original_name() const;
 
     // The meaning of this parameter depends on the `Action` specified.
-    // For `HandleRealmForClientReset`, it is the absolute path where the backup copy 
+    // For `BackUpThenDeleteRealm`, it is the absolute path where the backup copy 
     // of the Realm file found at `original_name()` will be placed. 
     // For all other `Action`s, it is ignored.
     util::Optional<std::string> new_name() const;
@@ -170,6 +170,10 @@ public:
 
     // Return a Results object containing all pending actions.
     SyncFileActionMetadataResults all_pending_actions() const;
+
+    // Delete an existing metadata action given the original name of the Realm it involves.
+    // Returns true iff there was an existing metadata action and it was deleted.
+    bool delete_metadata_action(const std::string&) const;
 
     Realm::Config get_configuration() const;
 

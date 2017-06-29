@@ -172,6 +172,23 @@ SyncFileActionMetadataResults SyncMetadataManager::all_pending_actions() const
     return SyncFileActionMetadataResults(std::move(results), std::move(realm), m_file_action_schema);
 }
 
+bool SyncMetadataManager::delete_metadata_action(const std::string& original_name) const
+{
+    auto shared_realm = Realm::get_shared_realm(get_configuration());
+
+    // Retrieve the row for this object.
+    TableRef table = ObjectStore::table_for_object_type(shared_realm->read_group(), c_sync_fileActionMetadata);
+    shared_realm->begin_transaction();
+    size_t row_idx = table->find_first_string(m_file_action_schema.idx_original_name, original_name);
+    if (row_idx == not_found) {
+        shared_realm->cancel_transaction();
+        return false;
+    }
+    table->move_last_over(row_idx);
+    shared_realm->commit_transaction();
+    return true;
+}
+
 // MARK: - Sync user metadata
 
 SyncUserMetadata::SyncUserMetadata(Schema schema, SharedRealm realm, RowExpr row)

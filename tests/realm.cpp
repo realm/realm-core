@@ -674,8 +674,7 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
 
     r1->begin_transaction();
     auto table = r1->read_group().get_table("class_object");
-    auto row_idx = table->add_empty_row(1);
-    auto table_idx = table->get_index_in_group();
+    table->add_empty_row();
     r1->commit_transaction();
 
     // Cannot be a member var of Context since Realm.close will free the context.
@@ -733,6 +732,8 @@ TEST_CASE("ShareRealm: realm closed in did_change callback") {
 
         REQUIRE_FALSE(r1->refresh());
     }
+
+    shared_realm = nullptr;
 }
 
 TEST_CASE("RealmCoordinator: schema cache") {
@@ -1129,5 +1130,9 @@ TEST_CASE("SharedRealm: compact on launch") {
 
     // Validate that the file still contains what it should
     REQUIRE(r->read_group().get_table("class_object")->size() == count);
+
+    // Registering for a collection notification shouldn't crash when compact on launch is used.
+    Results results(r, *r->read_group().get_table("class_object"));
+    results.async([](std::exception_ptr) { });
 }
 #endif

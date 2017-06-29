@@ -171,7 +171,7 @@ bool SyncManager::run_file_action(const SyncFileActionMetadata& md)
             // Delete all the files for the given Realm.
             m_file_manager->remove_realm(md.original_name());
             return true;
-        case SyncFileActionMetadata::Action::HandleRealmForClientReset:
+        case SyncFileActionMetadata::Action::BackUpThenDeleteRealm:
             // Copy the primary Realm file to the recovery dir, and then delete the Realm.
             auto new_name = md.new_name();
             auto original_name = md.original_name();

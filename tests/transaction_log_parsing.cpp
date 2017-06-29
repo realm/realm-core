@@ -579,7 +579,8 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             auto info = track_changes({false, false, true}, [&] {
                 table.set_int_unique(0, 0, 20);
             });
-            REQUIRE(info.tables.empty());
+            REQUIRE(info.tables.size() == 3);
+            REQUIRE(info.tables[2].empty());
         }
 
         SECTION("SetDefault does not mark a row as modified") {
@@ -587,7 +588,8 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
                 bool is_default = true;
                 table.set_int(0, 0, 1, is_default);
             });
-            REQUIRE(info.tables.empty());
+            REQUIRE(info.tables.size() == 3);
+            REQUIRE(info.tables[2].empty());
         }
     }
 
@@ -1207,6 +1209,35 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             }
             REQUIRE_INDICES(changes.insertions, 10, 11, 12);
         }
+
+        SECTION("schema changes in subtable column on origin") {
+            VALIDATE_CHANGES(changes) {
+                origin->insert_column(0, type_Table, "subtable");
+                auto subdesc = origin->get_subdescriptor(0);
+                subdesc->insert_column(0, type_Int, "value");
+
+                lv->add(0);
+                origin->get_subtable(0, lv->get_origin_row_index())->add_empty_row();
+                lv->add(0);
+            }
+            REQUIRE_INDICES(changes.insertions, 10, 11);
+        }
+
+        SECTION("schema change in origin following schema change in subtable") {
+            VALIDATE_CHANGES(changes) {
+                lv->add(0);
+
+                origin->insert_column(0, type_Table, "subtable");
+                auto subdesc = origin->get_subdescriptor(0);
+                subdesc->insert_column(0, type_Int, "value");
+                origin->insert_column(0, type_Int, "new col");
+
+                lv->add(0);
+                origin->get_subtable(1, lv->get_origin_row_index())->add_empty_row();
+                lv->add(0);
+            }
+            REQUIRE_INDICES(changes.insertions, 10, 11, 12);
+        }
     }
 
     SECTION("object change information") {
@@ -1727,6 +1758,31 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE(changes.modified(0, 1));
         }
 
+        SECTION("modifying a subtable in an observed table does not produce a notification") {
+            Row r = target->get(0);
+            auto changes = observe({r}, [&] {
+                target->insert_column(0, type_Table, "subtable");
+                auto subdesc = target->get_subdescriptor(0);
+                subdesc->insert_column(0, type_Int, "value");
+                r.get_subtable(0)->add_empty_row();
+            });
+            REQUIRE_FALSE(changes.modified(0, 0));
+            REQUIRE_FALSE(changes.modified(0, 1));
+        }
+
+        SECTION("modifying a subtable in an observed table does not interfere with notifications for other columns") {
+            Row r = target->get(0);
+            auto changes = observe({r}, [&] {
+                target->insert_column(0, type_Table, "subtable");
+                auto subdesc = target->get_subdescriptor(0);
+                subdesc->insert_column(0, type_Int, "value");
+                r.get_subtable(0)->add_empty_row();
+                r.set_int(1, r.get_int(1) + 1);
+            });
+            REQUIRE_FALSE(changes.modified(0, 0));
+            REQUIRE(changes.modified(0, 1));
+        }
+
         using Kind = BindingContext::ColumnInfo::Kind;
         SECTION("array: add()") {
             Row r = origin->get(0);
@@ -2147,5 +2203,30 @@ TEST_CASE("DeepChangeChecker") {
         REQUIRE(checker(1));
         REQUIRE(checker(2));
         REQUIRE(checker(3));
+    }
+
+    SECTION("changes made to subtables do not mark containing row as modified") {
+        {
+            std::unique_ptr<Replication> history;
+            std::unique_ptr<SharedGroup> shared_group;
+            std::unique_ptr<Group> read_only_group;
+            Realm::open_with_config(config, history, shared_group, read_only_group, nullptr);
+
+            WriteTransaction wt(*shared_group);
+            auto table = wt.get_table("class_table");
+            table->insert_column(0, type_Table, "subtable");
+            table->get_subdescriptor(0)->insert_column(0, type_Int, "value");
+            wt.commit();
+        }
+
+        r->refresh();
+        tables.clear();
+        _impl::DeepChangeChecker::find_related_tables(tables, *table);
+
+        auto info = track_changes([&] {
+            table->get_subtable(0, 0)->add_empty_row();
+        });
+        _impl::DeepChangeChecker checker(info, *table, tables);
+        REQUIRE_FALSE(checker(0));
     }
 }
