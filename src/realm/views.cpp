@@ -86,12 +86,12 @@ std::unique_ptr<CommonDescriptor> SortDescriptor::clone() const
 
 void SortDescriptor::merge_with(SortDescriptor&& other)
 {
-    m_columns.insert(m_columns.end(),
+    m_columns.insert(m_columns.begin(),
                      std::make_move_iterator(other.m_columns.begin()),
                      std::make_move_iterator(other.m_columns.end()));
     // Do not use a move iterator on a vector of bools!
     // It will form a reference to a temporary and return incorrect results.
-    m_ascending.insert(m_ascending.end(),
+    m_ascending.insert(m_ascending.begin(),
                        other.m_ascending.begin(),
                        other.m_ascending.end());
 }
