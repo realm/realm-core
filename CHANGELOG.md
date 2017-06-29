@@ -2,6 +2,10 @@
 
 ### Bugfixes
 
+* Attempting to open a small unencrypted Realm file with an encryption key would
+  produce an empty encrypted Realm file. Fixed by detecting the case and
+  throwing an exception.
+  PR [#2645](https://github.com/realm/realm-core/pull/2645)
 * Fixed a bug where case insensitive queries wouldn't return all results.
   PR [#2675](https://github.com/realm/realm-core/pull/2675).
 

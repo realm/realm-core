@@ -13178,6 +13178,42 @@ TEST(LangBindHelper_MixedTimestampTransaction)
 }
 
 
+// This test verifies that small unencrypted files are treated correctly if
+// opened as encrypted. 
+#ifdef REALM_ENABLE_ENCRYPTION
+TEST(LangBindHelper_OpenAsEncrypted)
+{
+
+    {
+        SHARED_GROUP_TEST_PATH(path);
+        ShortCircuitHistory hist(path);
+        SharedGroup sg_clear(hist);
+
+        {
+            WriteTransaction wt(sg_clear);
+            Group& group = wt.get_group();
+            TableRef target = group.add_table("table");
+            target->add_column(type_String, "mixed_col");
+            target->add_empty_row();
+            wt.commit();
+        }
+
+        sg_clear.close();
+
+        const char* key = crypt_key(true);
+        std::unique_ptr<Replication> hist_encrypt(make_in_realm_history(path));
+        bool is_okay = false;
+        try {
+            SharedGroup sg_encrypt(*hist_encrypt, SharedGroupOptions(key));
+        } catch (std::runtime_error&) {
+            is_okay = true;
+        }
+        CHECK(is_okay);
+    }
+}
+#endif
+
+
 TEST(LangBindHelper_NonsharedAccessToRealmWithHistory)
 {
     // Create a Realm file with a history (history_type !=
