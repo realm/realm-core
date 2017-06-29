@@ -728,8 +728,10 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // the session initiator. Another process may have the session initiator.
 
     m_file_mappings->m_file.open(path.c_str(), access, create, 0); // Throws
-    if (cfg.encryption_key)
+    auto physical_file_size = m_file_mappings->m_file.get_size();
+    if (cfg.encryption_key) {
         m_file_mappings->m_file.set_encryption_key(cfg.encryption_key);
+    }
     File::CloseGuard fcg(m_file_mappings->m_file);
 
     size_t size = 0;
@@ -737,6 +739,11 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // size_t.
     if (REALM_UNLIKELY(int_cast_with_overflow_detect(m_file_mappings->m_file.get_size(), size)))
         throw InvalidDatabase("Realm file too large", path);
+    if (cfg.encryption_key && size == 0 && physical_file_size != 0) {
+        // The opened file holds data, but is so small it cannot have
+        // been created with encryption
+        throw std::runtime_error("Attempt to open unencrypted file with encryption key");
+    }
 
     // FIXME: This initialization procedure does not provide sufficient
     // robustness given that processes may be abruptly terminated at any point
