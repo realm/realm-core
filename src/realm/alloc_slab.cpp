@@ -726,7 +726,7 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
     // the session initiator. Another process may have the session initiator.
 
     m_file_mappings->m_file.open(path.c_str(), access, create, 0); // Throws
-    size_t physical_file_size = m_file_mappings->m_file.get_size();
+    auto physical_file_size = m_file_mappings->m_file.get_size();
     if (cfg.encryption_key) {
         m_file_mappings->m_file.set_encryption_key(cfg.encryption_key);
     }
