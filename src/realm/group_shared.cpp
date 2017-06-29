@@ -1777,9 +1777,18 @@ SharedGroup::version_type SharedGroup::commit()
     REALM_ASSERT(m_group.is_attached());
 
     version_type new_version = do_commit(); // Throws
+
+    // We need to set m_read_lock in order for wait_for_change to work.
+    // To set it, we grab a readlock on the latest available snapshot
+    // and release it again.
+    VersionID version_id = VersionID();      // Latest available snapshot
+    ReadLockInfo lock_after_commit;
+    grab_read_lock(lock_after_commit, version_id);
+    release_read_lock(lock_after_commit);
+    
     do_end_write();
     do_end_read();
-
+    m_read_lock = lock_after_commit;
     m_transact_stage = transact_Ready;
     return new_version;
 }
