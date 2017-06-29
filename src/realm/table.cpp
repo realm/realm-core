@@ -4845,7 +4845,7 @@ inline void out_olddatetime(std::ostream& out, OldDateTime value)
 inline void out_timestamp(std::ostream& out, Timestamp value)
 {
     // FIXME: Do we want to output the full precision to json?
-    time_t rawtime = value.get_seconds();
+    time_t rawtime = time_t(value.get_seconds());
     struct tm* t = gmtime(&rawtime);
     if (t) {
         // We need a buffer for formatting dates (and binary to hex). Max
