@@ -332,9 +332,9 @@ TEST_CASE("list") {
         }
 
         SECTION("changes are reported correctly for multiple tables") {
-            List lst2(r, other_lv);
+            List list2(r, other_lv);
             CollectionChangeSet other_changes;
-            auto token1 = lst2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            auto token1 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 other_changes = std::move(c);
             });
             auto token2 = require_change();
@@ -380,8 +380,8 @@ TEST_CASE("list") {
             r2->read_group().get_table("class_other_target")->set_int(0, 1, 10);
             r2->commit_transaction();
 
-            List lst2(r2, r2->read_group().get_table("class_other_origin")->get_linklist(0, 0));
-            auto token2 = lst2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
+            List list2(r2, r2->read_group().get_table("class_other_origin")->get_linklist(0, 0));
+            auto token2 = list2.add_notification_callback([&](CollectionChangeSet c, std::exception_ptr) {
                 changes2 = std::move(c);
             });
 
