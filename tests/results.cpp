@@ -2221,6 +2221,23 @@ TEST_CASE("distinct") {
         REQUIRE(second.size() == 2);
     }
 
+    SECTION("Chaining sort") {
+        using cols_0_3 = std::pair<size_t, size_t>;
+        Results first = results.sort(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
+        Results second = first.sort(SortDescriptor(first.get_tableview().get_parent(), {{3}}));
+
+        REQUIRE(second.size() == 10);
+        // results are ordered first by the last sorted column
+        // if any duplicates exist in that column, they are resolved by sorting the
+        // previously sorted column. Eg. sort(a).sort(b) == sort(b, a)
+        std::vector<cols_0_3> results
+            = {{0, 0}, {0, 0}, {1, 0}, {2, 0}, {2, 0}, {0, 1}, {0, 1}, {1, 1}, {1, 1}, {2, 1}};
+        for (size_t i = 0; i < results.size(); ++i) {
+            REQUIRE(second.get(i).get_int(0) == results[i].first);
+            REQUIRE(second.get(i).get_int(3) == results[i].second);
+        }
+    }
+
     SECTION("Distinct is carried over to new queries") {
         Results unique = results.distinct(SortDescriptor(results.get_tableview().get_parent(), {{0}}));
         // unique:
