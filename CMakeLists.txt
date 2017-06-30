@@ -16,6 +16,7 @@ if(${CMAKE_EXTRA_GENERATOR} MATCHES "Eclipse CDT4")
     set(CMAKE_ECLIPSE_VERSION "4.6.2" CACHE STRING "Eclipse version" FORCE)
 endif()
 
+string(REGEX REPLACE "-rc" "." DEP_VERSION ${DEP_VERSION})
 project(realm VERSION ${DEP_VERSION})
 
 # Include general CMake modules
