@@ -53,19 +53,19 @@ fi
 rm -rf core
 mkdir core
 
-filename=$(find "build-macos-Release" -maxdepth 1 -type f -name "realm-core-Release-*-Darwin-devel.tar.xz")
-tar -C core -Jxvf "${filename}" include LICENSE CHANGELOG.md
+filename=$(find "build-macos-Release" -maxdepth 1 -type f -name "realm-core-Release-*-Darwin-devel.tar.gz")
+tar -C core -zxvf "${filename}" include LICENSE CHANGELOG.md
 
 for bt in "${BUILD_TYPES[@]}"; do
     [[ "$bt" = "Release" ]] && suffix="" || suffix="-dbg"
     for p in "${PLATFORMS[@]}"; do
         [[ $p = "macos" ]] && infix="macosx" || infix="${p}"
         [[ $p != "macos" && $bt = "Debug" ]] && prefix="MinSize" || prefix=""
-        filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*-devel.tar.xz")
+        filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*-devel.tar.gz")
         if [[ -z $filename ]]; then
-            filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*.tar.xz")
+            filename=$(find "build-${p}-${prefix}${bt}" -maxdepth 1 -type f -name "realm-core-*.tar.gz")
         fi
-        tar -C core -Jxvf "${filename}" "lib/librealm${suffix}.a"
+        tar -C core -zxvf "${filename}" "lib/librealm${suffix}.a"
         mv "core/lib/librealm${suffix}.a" "core/librealm-${infix}${suffix}.a"
         rm -rf core/lib
     done
