@@ -2146,10 +2146,9 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #endif // !defined(_WIN32) && !REALM_PLATFORM_APPLE
 
-#ifdef _WIN32
 
-#if 1
-
+#if 0
+// FIXME: This unittest seems wrong or perhaps unfinished
 TEST(Shared_WaitForChangeAfterOwnCommit)
 {
     SHARED_GROUP_TEST_PATH(path);
@@ -2159,8 +2158,10 @@ TEST(Shared_WaitForChangeAfterOwnCommit)
     sg->commit();
     bool b = sg->wait_for_change();
 }
+#endif
 
 
+#ifdef _WIN32
 NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
 {
     // We can't use SHARED_GROUP_TEST_PATH() because it will attempt to clean up the .realm file at the end,
@@ -2233,8 +2234,6 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
     sg->begin_write();
     sg->commit();
 }
-
-#endif
 
 #endif
 
