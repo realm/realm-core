@@ -76,6 +76,7 @@ ln -s core/librealm-macosx-dbg.a core/librealm-dbg.a
 
 if [[ ! -z $COPY ]]; then
     rm -rf "${DESTINATION}/core"
+    mkdir -p "${DESTINATION}"
     cp -R core "${DESTINATION}"
 fi
 
