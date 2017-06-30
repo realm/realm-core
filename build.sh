@@ -20,15 +20,6 @@ cd "$dir" || exit 1
 REALM_HOME="$(pwd)" || exit 1
 export REALM_HOME
 
-# Install pre-push hook to prevent pushing to the wrong remote
-PRE_PUSH_HOOK_SOURCE='tools/pre-push'
-PRE_PUSH_HOOK_DESTINATION='.git/hooks/pre-push'
-if ! [ -x "$PRE_PUSH_HOOK_DESTINATION" ] || ! diff "$PRE_PUSH_HOOK_DESTINATION" "$PRE_PUSH_HOOK_SOURCE" >/dev/null; then
-    echo >&2 'Installing pre-push hook to prevent pushing to the wrong remote'
-    cp "$PRE_PUSH_HOOK_SOURCE" "$PRE_PUSH_HOOK_DESTINATION"
-    chmod +x "$PRE_PUSH_HOOK_DESTINATION"
-fi
-
 # Set mode to first argument and shift the argument array
 MODE="$1"
 [ $# -gt 0 ] && shift
@@ -229,16 +220,11 @@ download_openssl()
     fi
 
     echo 'Downloading OpenSSL...'
-    openssl_ver='1.0.1t'
+    openssl_ver='1.0.2k'
     curl -L -s "http://www.openssl.org/source/openssl-${openssl_ver}.tar.gz" -o openssl.tar.gz || return 1
     tar -xzf openssl.tar.gz || return 1
     mv openssl-$openssl_ver openssl || return 1
     rm openssl.tar.gz || return 1
-
-    # A function we don't use calls OPENSSL_cleanse, which has all sorts of
-    # dependencies due to being written in asm
-    sed '/OPENSSL_cleanse/d' 'openssl/crypto/sha/sha256.c' > sha_tmp
-    mv sha_tmp 'openssl/crypto/sha/sha256.c'
 }
 
 # Setup OS specific stuff
@@ -256,11 +242,10 @@ if ! printf "%s\n" "$MODE" | grep -q '^\(src-\|bin-\)\?dist'; then
     else
         if [ -r "/proc/cpuinfo" ]; then
             NUM_PROCESSORS="$(cat /proc/cpuinfo | grep -E 'processor[[:space:]]*:' | wc -l)" || exit 1
-            LIMIT_LOAD_AVERAGE=YES
         fi
     fi
     if [ "$NUM_PROCESSORS" ]; then
-        word_list_prepend MAKEFLAGS "-j$NUM_PROCESSORS ${LIMIT_LOAD_AVERAGE:+-l$MAX_LOAD_AVERAGE}" || exit 1
+        word_list_prepend MAKEFLAGS "-j -l${NUM_PROCESSORS}" || exit 1
         export MAKEFLAGS
 
         if ! [ "$UNITTEST_THREADS" ]; then
@@ -293,7 +278,7 @@ build_apple()
     for x in $sdks; do
         sdk="$(printf "%s\n" "$x" | cut -d: -f1)" || exit 1
         archs="$(printf "%s\n" "$x" | cut -d: -f2 | sed 's/,/ /g')" || exit 1
-        cflags_arch="-stdlib=libc++ -m$os_name-version-min=$min_version"
+        cflags_arch="-stdlib=libc++ -m$os_name-version-min=$min_version -fvisibility-inlines-hidden"
         for y in $archs; do
             word_list_append "cflags_arch" "-arch $y" || exit 1
         done
@@ -381,10 +366,10 @@ build_cocoa()
         ln -sf librealm-macosx-dbg.a "$tmpdir/$dir_basename"/librealm-dbg.a
     fi
 
-    cp tools/LICENSE "$tmpdir/$dir_basename" || exit 1
+    cp LICENSE "$tmpdir/$dir_basename" || exit 1
     if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
         command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
-        pandoc -f markdown -t plain -o "$tmpdir/$dir_basename/release_notes.txt" release_notes.md || exit 1
+        pandoc -f markdown -t plain -o "$tmpdir/$dir_basename/CHANGELOG.txt" CHANGELOG.md || exit 1
     fi
 
     echo "Create zip file: '$file_basename-$realm_version.zip'"
@@ -474,6 +459,7 @@ find_android_ndk()
 }
 
 CONFIG_MK="src/config.mk"
+CONFIG_TMP="src/config.tmp"
 
 require_config()
 {
@@ -704,7 +690,7 @@ case "$MODE" in
             android_ndk_home="$(find_android_ndk)" || android_ndk_home="none"
         fi
 
-        cat >"$CONFIG_MK" <<EOF
+        cat >"$CONFIG_TMP" <<EOF
 CONFIG_VERSION        = ${CONFIG_VERSION}
 REALM_VERSION         = $realm_version
 INSTALL_PREFIX        = $install_prefix
@@ -730,8 +716,14 @@ TVOS_SDKS             = ${tvos_sdks:-none}
 TVOS_SDKS_AVAIL       = $tvos_sdks_avail
 ANDROID_NDK_HOME      = $android_ndk_home
 EOF
+        CONFIG_STATUS="Existing"
+        if ! [ -e $CONFIG_MK ] || [ "$(diff $CONFIG_TMP $CONFIG_MK)" ]; then
+            cp $CONFIG_TMP $CONFIG_MK
+            CONFIG_STATUS="New"
+        fi
+        rm $CONFIG_TMP
         if ! [ "$INTERACTIVE" ]; then
-            echo "New configuration in $CONFIG_MK:"
+            echo "$CONFIG_STATUS configuration in $CONFIG_MK:"
             cat "$CONFIG_MK" | sed 's/^/    /' || exit 1
             echo "Done configuring"
         fi
@@ -971,13 +963,6 @@ EOF
                         AR="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ar")" || exit 1
                         RANLIB="$(echo "$temp_dir/bin/$android_prefix-linux-*-gcc-ranlib")" || exit 1
                         $AR x "$repodir/$ANDROID_DIR/$libcrypto_name" || exit 1
-                        find \
-                          . ! -name 'aes*' \
-                          -a ! -name cbc128.o \
-                          -a ! -name sha256.o \
-                          -a ! -name sha256-586.o \
-                          -delete || exit 1
-                        rm -f aes_wrap.o
                         $AR x "$repodir/src/realm/$lib_name" || exit 1
                         $AR r "$repodir/$ANDROID_DIR/$lib_name" *.o || exit 1
                         $RANLIB "$repodir/$ANDROID_DIR/$lib_name"
@@ -1109,10 +1094,10 @@ EOF
         (cd "$REALM_HOME/$node_directory/include/realm" && tar xzmf "$temp_dir/headers.tar.gz") || exit 1
         rm -rf "$temp_dir" || exit 1
 
-        cp tools/LICENSE "$node_directory" || exit 1
+        cp LICENSE "$node_directory" || exit 1
         if ! [ "$REALM_DISABLE_MARKDOWN_CONVERT" ]; then
             command -v pandoc >/dev/null 2>&1 || { echo "Pandoc is required but it's not installed.  Aborting." >&2; exit 1; }
-            pandoc -f markdown -t plain -o "$node_directory/release_notes.txt" release_notes.md || exit 1
+            pandoc -f markdown -t plain -o "$node_directory/CHANGELOG.txt" CHANGELOG.md || exit 1
         fi
 
         realm_version="$(sh build.sh get-version)" || exit
@@ -1144,17 +1129,9 @@ EOF
         # To get symbolized stack traces (file names and line numbers) with GCC, you at least version 4.9.
         check_mode="$(printf "%s\n" "$MODE" | sed 's/asan/check/')" || exit 1
         auto_configure || exit 1
-        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
         export ASAN_OPTIONS="detect_odr_violation=2"
         export REALM_HAVE_CONFIG="1"
-        error=""
-        if ! UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=address" EXTRA_LDFLAGS="-fsanitize=address" "$check_mode"; then
-            error="1"
-        fi
-        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
-        if [ "$error" ]; then
-            exit 1
-        fi
+        $MAKE BASE_DENOM="asan" EXTRA_CFLAGS="-fsanitize=address" EXTRA_LDFLAGS="-fsanitize=address" "$check_mode" || exit 1
         echo "Test passed"
         exit 0
         ;;
@@ -1164,16 +1141,8 @@ EOF
         # To get symbolized stack traces (file names and line numbers) with GCC, you at least version 4.9.
         check_mode="$(printf "%s\n" "$MODE" | sed 's/tsan/check/')" || exit 1
         auto_configure || exit 1
-        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
         export REALM_HAVE_CONFIG="1"
-        error=""
-        if ! UNITTEST_THREADS="1" UNITTEST_PROGRESS="1" $MAKE EXTRA_CFLAGS="-fsanitize=thread" EXTRA_LDFLAGS="-fsanitize=thread" "$check_mode"; then
-            error="1"
-        fi
-        touch "$CONFIG_MK" || exit 1 # Force complete rebuild
-        if [ "$error" ]; then
-            exit 1
-        fi
+        $MAKE BASE_DENOM="tsan" EXTRA_CFLAGS="-fsanitize=thread" EXTRA_LDFLAGS="-fsanitize=thread" "$check_mode" || exit 1
         echo "Test passed"
         exit 0
         ;;
@@ -1319,6 +1288,7 @@ EOF
     "lldb"|"lldb-debug"|\
     "lldb-testcase"|"lldb-testcase-debug"|\
     "performance"|"benchmark"|"benchmark-"*|\
+    "fuzz"|"fuzz-debug"|\
     "check-cover"|"check-cover-norun"|"lcov"|"gcovr")
         auto_configure || exit 1
         export REALM_HAVE_CONFIG="1"
@@ -1340,14 +1310,14 @@ EOF
 
     "release-notes-prerelease")
         RELEASE_HEADER="# $(sh build.sh get-version) Release notes" || exit 1
-        sed -i.bak "1s/.*/$RELEASE_HEADER/" release_notes.md || exit 1
-        rm release_notes.md.bak
+        sed -i.bak "1s/.*/$RELEASE_HEADER/" CHANGELOG.md || exit 1
+        rm CHANGELOG.md.bak
         exit 0
         ;;
 
     "release-notes-postrelease")
-        cat doc/release_notes_template.md release_notes.md > release_notes.md.new || exit 1
-        mv release_notes.md.new release_notes.md || exit 1
+        cat doc/CHANGELOG_template.md CHANGELOG.md > CHANGELOG.md.new || exit 1
+        mv CHANGELOG.md.new CHANGELOG.md || exit 1
         exit 0
         ;;
 
@@ -3062,7 +3032,7 @@ EOF
         # Run by Jenkins. Relies on the WORKSPACE environment variable provided by Jenkins itself
         REALM_ENABLE_ALLOC_SET_ZERO=1 sh build.sh config || exit 1
         sh build.sh clean || exit 1
-        VALGRIND_FLAGS="--tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --xml=yes --xml-file=${WORKSPACE}/realm-tests-dbg.%p.memreport" sh build.sh memcheck || exit 1
+        VALGRIND_FLAGS="--tool=memcheck --leak-check=full --undef-value-errors=yes --track-origins=yes --child-silent-after-fork=no --trace-children=yes --xml=yes --suppressions=${WORKSPACE}/test/valgrind.suppress --xml-file=${WORKSPACE}/realm-tests-dbg.%p.memreport" sh build.sh memcheck || exit 1
         exit 0
         ;;
 

@@ -23,12 +23,10 @@
 
 #include <realm/util/safe_int_ops.hpp>
 #include <realm/util/string_buffer.hpp>
+#include <realm/utilities.hpp>
 
 using namespace realm;
 using namespace realm::util;
-
-
-char StringBuffer::m_zero = 0;
 
 
 void StringBuffer::append(const char* append_data, size_t append_data_size)
@@ -37,7 +35,7 @@ void StringBuffer::append(const char* append_data, size_t append_data_size)
     if (int_add_with_overflow_detect(new_size, append_data_size))
         throw util::BufferSizeOverflow();
     reserve(new_size); // Throws
-    std::copy(append_data, append_data + append_data_size, m_buffer.data() + m_size);
+    realm::safe_copy_n(append_data, append_data_size, m_buffer.data() + m_size);
     m_size = new_size;
     m_buffer[new_size] = 0; // Add zero termination
 }

@@ -16,11 +16,13 @@
  *
  **************************************************************************/
 
-#include <iomanip>
-#include <ostream>
+#include <realm/column_mixed.hpp>
+
+#include <realm/column_binary.hpp>
+#include <realm/column_timestamp.hpp>
 
 #include <memory>
-#include <realm/column_mixed.hpp>
+#include <ostream>
 
 using namespace realm;
 using namespace realm::util;
@@ -81,7 +83,10 @@ void MixedColumn::create(Allocator& alloc, ref_type ref, Table* table, size_t co
     // TimestampColumn is only there if needed
     if (top->size() >= 4) {
         ref_type timestamp_ref = top->get_as_ref(3);
-        timestamp_data.reset(new TimestampColumn(alloc, timestamp_ref)); // Throws
+        // When adding/creating a Mixed column the user cannot specify nullability, so the "true" below
+        // makes it implicitly nullable, which may not be wanted. But it's OK since Mixed columns are not
+        // publicly supported
+        timestamp_data.reset(new TimestampColumn(true /*FIXME*/, alloc, timestamp_ref)); // Throws
         timestamp_data->set_parent(top.get(), 3);
     }
 
@@ -116,7 +121,10 @@ void MixedColumn::ensure_timestamp_column()
 
     constexpr bool nullable = true;
     ref_type ref = TimestampColumn::create(m_array->get_alloc(), 0, nullable); // Throws
-    m_timestamp_data.reset(new TimestampColumn(m_array->get_alloc(), ref));    // Throws
+    // When adding/creating a Mixed column the user cannot specify nullability, so the "true" below
+    // makes it implicitly nullable, which may not be wanted. But it's OK since Mixed columns are not
+    // publicly supported
+    m_timestamp_data.reset(new TimestampColumn(true /*FIXME*/, m_array->get_alloc(), ref)); // Throws
     REALM_ASSERT_3(m_array->size(), ==, 3);
     m_array->add(ref); // Throws
     m_timestamp_data->set_parent(m_array.get(), 3);

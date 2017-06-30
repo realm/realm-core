@@ -22,6 +22,7 @@
 #include <stddef.h>
 #include <cmath>
 #include <cstring>
+#include <memory>
 #include <algorithm>
 #include <vector>
 #include <list>
@@ -359,16 +360,17 @@ protected:
 };
 
 
-/// Generates output that is compatible with the XML output of
-/// UnitTest++. Caller receives ownership of the returned reporter.
-///
-/// FIXME: Consider producing output that conforms to
-/// http://windyroad.com.au/dl/Open%20Source/JUnit.xsd.
-Reporter* create_xml_reporter(std::ostream&);
+/// Generates output that is compatible with the XML output of UnitTest++.
+std::unique_ptr<Reporter> create_xml_reporter(std::ostream&);
 
+/// Generates output that is compatible with the XML output of JUnit. See
+/// http://llg.cubic.org/docs/junit/
+std::unique_ptr<Reporter> create_junit_reporter(std::ostream&);
+
+std::unique_ptr<Reporter> create_twofold_reporter(Reporter& subreporter_1, Reporter& subreporter_2);
 
 /// Run only those tests whose name is both included and not
-/// excluded. Caller receives ownership of the returned filter.
+/// excluded.
 ///
 /// EBNF:
 ///
@@ -390,7 +392,7 @@ Reporter* create_xml_reporter(std::ostream&);
 /// whose names start with `Bar`. Another example is `Foo* - Foo2 *X`,
 /// which will include all tests whose names start with `Foo`, except
 /// `Foo2` and those whose names end with an `X`.
-Filter* create_wildcard_filter(const std::string&);
+std::unique_ptr<Filter> create_wildcard_filter(const std::string&);
 
 
 class TestContext {
@@ -468,6 +470,8 @@ public:
                               const char* exception_cond_text);
     void throw_any_failed(const char* file, long line, const char* expr_text);
 
+    std::string get_test_name() const;
+
     TestContext(const TestContext&) = delete;
     TestContext& operator=(const TestContext&) = delete;
 
@@ -535,7 +539,7 @@ protected:
 
     /// Short hand for test_context.logger.info().
     template <class... Params>
-    void log(const char* message, Params...);
+    void log(const char* message, Params&&...);
 
     TestBase(TestContext&);
 };
@@ -845,9 +849,9 @@ inline TestBase::TestBase(TestContext& context)
 }
 
 template <class... Params>
-inline void TestBase::log(const char* message, Params... params)
+inline void TestBase::log(const char* message, Params&&... params)
 {
-    test_context.logger.info(message, params...); // Throws
+    test_context.logger.info(message, std::forward<Params>(params)...); // Throws
 }
 
 

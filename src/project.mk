@@ -53,8 +53,13 @@ endif
 
 PROJECT_CFLAGS_DEBUG = -DREALM_DEBUG
 PROJECT_CFLAGS_COVER = -DREALM_DEBUG -DREALM_COVER \
-                       -fno-inline -fno-inline-small-functions \
-                       -fno-default-inline -fno-elide-constructors
+                       -fno-elide-constructors
+
+ifeq ($(COMPILER_IS),gcc)
+  PROJECT_CFLAGS_COVER += -fno-inline \
+                          -fno-inline-small-functions \
+                          -fno-default-inline
+endif
 
 # Load dynamic configuration
 ifneq ($(REALM_HAVE_CONFIG),)
@@ -75,10 +80,10 @@ ifneq ($(REALM_HAVE_CONFIG),)
 endif
 
 ifneq ($(REALM_ANDROID),)
-  PROJECT_CFLAGS += -fPIC -DPIC
+  PROJECT_CFLAGS += -fPIC -DPIC -Wno-maybe-uninitialized
   # android.toolchain.cmake has `-fsigned-char` by default, we have to use the same
   # to avoid lto linking problems.
-  CFLAGS_OPTIM = -Os -flto -ffunction-sections -fdata-sections -DNDEBUG -fsigned-char -fvisibility=hidden
+  CFLAGS_OPTIM = -Os -ffunction-sections -fdata-sections -DNDEBUG -fsigned-char -fvisibility=hidden
   ifeq ($(ENABLE_ENCRYPTION),yes)
     PROJECT_CFLAGS += -I../../openssl/include
   endif

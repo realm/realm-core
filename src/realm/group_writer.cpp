@@ -90,7 +90,7 @@ size_t GroupWriter::MapWindow::get_window_size(util::File& f, ref_type start_ref
     if (window_size < intended_alignment)
         window_size = intended_alignment;
     // but never map beyond end of file
-    size_t file_size = f.get_size();
+    size_t file_size = to_size_t(f.get_size());
     REALM_ASSERT_DEBUG_EX(start_ref + size <= file_size, start_ref + size, file_size);
     if (window_size > file_size - base_ref)
         window_size = file_size - base_ref;
@@ -166,6 +166,8 @@ GroupWriter::GroupWriter(Group& group)
     m_free_lengths.set_parent(&top, 4);
     m_free_versions.set_parent(&top, 5);
 
+    // Expand top array from 3 to 5 elements. Only Realms written using
+    // Group::write() are allowed to have less than 5 elements.
     if (top.size() < 5) {
         REALM_ASSERT(top.size() == 3);
         // m_free_positions
@@ -197,6 +199,8 @@ GroupWriter::GroupWriter(Group& group)
     if (is_shared) {
         SharedGroup::version_type initial_version = 0;
 
+        // Expand top array from 5 to 7 elements. Only nonshared Realms are
+        // allowed to have less than 7 elements.
         if (top.size() < 7) {
             REALM_ASSERT(top.size() == 5);
             // m_free_versions
@@ -220,24 +224,19 @@ GroupWriter::GroupWriter(Group& group)
         }
     }
     else { // !is_shared
+        // Discard free-space versions and history information.
         if (top.size() > 5) {
-            REALM_ASSERT(top.size() == 7);
+            REALM_ASSERT(top.size() >= 7);
             top.truncate_and_destroy_children(5);
         }
     }
 }
 
-GroupWriter::~GroupWriter()
-{
-    for (auto& window : m_map_windows) {
-        delete window;
-    }
-    m_map_windows.clear();
-}
+GroupWriter::~GroupWriter() = default;
 
 size_t GroupWriter::get_file_size() const noexcept
 {
-    return m_alloc.get_file().get_size();
+    return to_size_t(m_alloc.get_file().get_size());
 }
 
 void GroupWriter::sync_all_mappings()
@@ -253,28 +252,22 @@ void GroupWriter::sync_all_mappings()
 // used policy. Entries in the cache are kept in MRU order.
 GroupWriter::MapWindow* GroupWriter::get_window(ref_type start_ref, size_t size)
 {
-    MapWindow* found_window = nullptr;
-    for (unsigned int i = 0; i < m_map_windows.size(); ++i) {
-        if (m_map_windows[i]->matches(start_ref, size) ||
-            m_map_windows[i]->extends_to_match(m_alloc.get_file(), start_ref, size)) {
-            found_window = m_map_windows[i];
-            // move matching window to top (to keep LRU order):
-            for (int k = i; k; --k)
-                m_map_windows[k] = m_map_windows[k - 1];
-            m_map_windows[0] = found_window;
-            return found_window;
-        }
+    auto match = std::find_if(m_map_windows.begin(), m_map_windows.end(), [=](auto& window) {
+        return window->matches(start_ref, size) || window->extends_to_match(m_alloc.get_file(), start_ref, size);
+    });
+    if (match != m_map_windows.end()) {
+        // move matching window to top (to keep LRU order)
+        std::rotate(m_map_windows.begin(), match, match + 1);
+        return m_map_windows[0].get();
     }
     // no window found, make room for a new one at the top
     if (m_map_windows.size() == num_map_windows) {
-        MapWindow* last_window = m_map_windows.back();
-        last_window->sync();
-        delete last_window;
+        m_map_windows.back()->sync();
         m_map_windows.pop_back();
     }
-    MapWindow* new_window = new MapWindow(m_alloc.get_file(), start_ref, size);
-    m_map_windows.insert(m_map_windows.begin(), new_window);
-    return new_window;
+    auto new_window = std::make_unique<MapWindow>(m_alloc.get_file(), start_ref, size);
+    m_map_windows.insert(m_map_windows.begin(), std::move(new_window));
+    return m_map_windows[0].get();
 }
 
 ref_type GroupWriter::write_group()
@@ -283,7 +276,6 @@ ref_type GroupWriter::write_group()
 
     Array& top = m_group.m_top;
     bool is_shared = m_group.m_is_shared;
-
     REALM_ASSERT_3(m_free_positions.size(), ==, m_free_lengths.size());
     REALM_ASSERT(!is_shared || m_free_versions.size() == m_free_lengths.size());
 
@@ -302,8 +294,14 @@ ref_type GroupWriter::write_group()
     top.set(0, value_1); // Throws
     top.set(1, value_2); // Throws
 
+    // If file has a history and is opened in shared mode, write the new history
+    // to the file. If the file has a history, but si not opened in shared mode,
+    // discard the history, as it could otherwise be left in an inconsisten
+    // state.
     if (top.size() >= 8) {
-        REALM_ASSERT(top.size() >= 9);
+        REALM_ASSERT(top.size() >= 10);
+        // In nonshared mode, history must already have been discarded by GroupWriter constructor.
+        REALM_ASSERT(is_shared);
         if (ref_type history_ref = top.get_as_ref(8)) {
             Allocator& alloc = top.get_alloc();
             ref_type new_history_ref = Array::write(history_ref, alloc, *this, only_if_modified); // Throws
@@ -332,6 +330,7 @@ ref_type GroupWriter::write_group()
     m_free_lengths.copy_on_write();   // Throws
     if (is_shared)
         m_free_versions.copy_on_write();                                            // Throws
+    m_group.m_alloc.consolidate_free_read_only();                                   // Throws
     const SlabAlloc::chunks& new_free_space = m_group.m_alloc.get_free_read_only(); // Throws
     max_free_list_size += new_free_space.size();
 
@@ -353,11 +352,9 @@ ref_type GroupWriter::write_group()
     max_free_list_size += 80;
 
     int num_free_lists = is_shared ? 3 : 2;
-    int max_top_size = 3 + num_free_lists;
-    if (is_shared)
-        ++max_top_size; // database version (a.k.a. transaction number)
     size_t max_free_space_needed =
-        Array::get_max_byte_size(max_top_size) + num_free_lists * Array::get_max_byte_size(max_free_list_size);
+        Array::get_max_byte_size(top.size()) +
+        num_free_lists * Array::get_max_byte_size(max_free_list_size);
 
     // Reserve space for remaining arrays. We ask for one extra byte beyond the
     // maximum number that is required. This ensures that even if we end up
@@ -370,7 +367,7 @@ ref_type GroupWriter::write_group()
     // the free-lists any free space created during the current transaction (or
     // since last commit). Had we added it earlier, we would have risked
     // clobering the previous database version. Note, however, that this risk
-    // would only have been present in the non-transactionl case where there is
+    // would only have been present in the non-transactional case where there is
     // no version tracking on the free-space chunks.
     for (const auto& free_space : new_free_space) {
         ref_type ref = free_space.ref;
@@ -379,6 +376,15 @@ ref_type GroupWriter::write_group()
         // ascending position) to facilitate merge of adjacent segments. We
         // can find the correct insert postion by binary search
         size_t ndx = m_free_positions.lower_bound_int(ref);
+        if (ndx > 0) {
+            ref_type prev_ref = to_ref(m_free_positions.get(ndx - 1));
+            size_t prev_size = to_size_t(m_free_lengths.get(ndx - 1));
+            REALM_ASSERT_RELEASE(prev_ref + prev_size <= ref);
+        }
+        if (ndx < m_free_positions.size()) {
+            ref_type after_ref = to_ref(m_free_positions.get(ndx));
+            REALM_ASSERT_RELEASE(ref + size <= after_ref);
+        }
         m_free_positions.insert(ndx, ref); // Throws
         m_free_lengths.insert(ndx, size);  // Throws
         if (is_shared)
@@ -473,6 +479,17 @@ ref_type GroupWriter::write_group()
     return top_ref;
 }
 
+size_t GroupWriter::get_free_space() {
+    if (m_free_lengths.is_attached()) {
+        size_t sum = 0;
+        for (size_t j = 0; j < m_free_lengths.size(); ++j) {
+            sum += to_size_t(m_free_lengths.get(j));
+        }
+        return sum;
+    } else {
+        return 0;
+    }
+}
 
 void GroupWriter::merge_free_space()
 {
@@ -576,11 +593,13 @@ std::pair<size_t, size_t> GroupWriter::search_free_space_in_part_of_freelist(siz
 {
     bool is_shared = m_group.m_is_shared;
     SlabAlloc& alloc = m_group.m_alloc;
-    for (size_t i = begin; i != end; ++i) {
-        size_t chunk_size = to_size_t(m_free_lengths.get(i));
-        if (chunk_size < size) {
-            continue;
+    for (size_t next_start = begin; next_start < end;) {
+        size_t i = m_free_lengths.find_first<Greater>(size - 1, next_start);
+        if (i == not_found) {
+            break;
         }
+
+        next_start = i + 1;
 
         // Only chunks that are not occupied by current readers
         // are allowed to be used.
@@ -590,6 +609,8 @@ std::pair<size_t, size_t> GroupWriter::search_free_space_in_part_of_freelist(siz
                 continue;
             }
         }
+
+        size_t chunk_size = to_size_t(m_free_lengths.get(i));
 
         // search through the chunk, finding a place within it,
         // where an allocation will not cross a mmap boundary
@@ -711,7 +732,7 @@ void GroupWriter::write(const char* data, size_t size)
     MapWindow* window = get_window(pos, size);
     char* dest_addr = window->translate(pos);
     window->encryption_read_barrier(dest_addr, size);
-    std::copy(data, data + size, dest_addr);
+    realm::safe_copy_n(data, size, dest_addr);
     window->encryption_write_barrier(dest_addr, size);
 }
 
@@ -744,7 +765,7 @@ void GroupWriter::write_array_at(MapWindow* window, ref_type ref, const char* da
     // REALM_ASSERT_3(pos + size, <=, m_file_map.get_size());
     char* dest_addr = window->translate(pos);
 
-    uint32_t dummy_checksum = 41414141UL; // "AAAA" in ASCII
+    uint32_t dummy_checksum = 0x41414141UL; // "AAAA" in ASCII
     memcpy(dest_addr, &dummy_checksum, 4);
     memcpy(dest_addr + 4, data + 4, size - 4);
 }
@@ -765,7 +786,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     int slot_selector = ((new_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
 
     // Update top ref and file format version
-    int file_format_version = m_alloc.get_file_format_version();
+    int file_format_version = m_group.get_file_format_version();
     using type_1 = std::remove_reference<decltype(file_header.m_file_format[0])>::type;
     REALM_ASSERT(!util::int_cast_has_overflow<type_1>(file_format_version));
     file_header.m_top_ref[slot_selector] = new_top_ref;

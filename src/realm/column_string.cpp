@@ -161,7 +161,7 @@ StringData StringColumn::get(size_t ndx) const noexcept
     }
 
     // Non-leaf root
-    std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
+    std::pair<MemRef, size_t> p = static_cast<BpTreeNode*>(m_array.get())->get_bptree_leaf(ndx);
     const char* leaf_header = p.first.get_addr();
     size_t ndx_in_leaf = p.second;
     bool long_strings = Array::get_hasrefs_from_header(leaf_header);
@@ -244,18 +244,10 @@ std::unique_ptr<StringIndex> StringColumn::release_search_index() noexcept
 }
 
 
-void StringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
-                                        bool allow_duplicate_valaues)
+void StringColumn::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index.reset(
-        new StringIndex(ref, parent, ndx_in_parent, this, !allow_duplicate_valaues, m_array->get_alloc())); // Throws
-}
-
-
-void StringColumn::set_search_index_allow_duplicate_values(bool allow) noexcept
-{
-    m_search_index->set_allow_duplicate_values(allow);
+    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, m_array->get_alloc())); // Throws
 }
 
 
@@ -302,7 +294,7 @@ void StringColumn::update_from_parent(size_t old_baseline) noexcept
 
 namespace {
 
-class SetLeafElem : public Array::UpdateHandler {
+class SetLeafElem : public BpTreeNode::UpdateHandler {
 public:
     Allocator& m_alloc;
     const StringData m_value;
@@ -415,11 +407,11 @@ void StringColumn::set(size_t ndx, StringData value)
     }
 
     SetLeafElem set_leaf_elem(m_array->get_alloc(), value, m_nullable);
-    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
+    static_cast<BpTreeNode*>(m_array.get())->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
 
-class StringColumn::EraseLeafElem : public Array::EraseHandler {
+class StringColumn::EraseLeafElem : public BpTreeNode::EraseHandler {
 public:
     StringColumn& m_column;
     EraseLeafElem(StringColumn& column, bool nullable) noexcept
@@ -557,7 +549,7 @@ void StringColumn::do_erase(size_t ndx, bool is_last)
     // Non-leaf root
     size_t ndx_2 = is_last ? npos : ndx;
     EraseLeafElem erase_leaf_elem(*this, m_nullable);
-    Array::erase_bptree_elem(m_array.get(), ndx_2, erase_leaf_elem); // Throws
+    BpTreeNode::erase_bptree_elem(static_cast<BpTreeNode*>(m_array.get()), ndx_2, erase_leaf_elem); // Throws
 }
 
 
@@ -583,7 +575,7 @@ void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     // Copying string data from a column to itself requires an
     // intermediate copy of the data (constr:bptree-copy-to-self).
     std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
-    std::copy(value.data(), value.data() + value.size(), buffer.get());
+    realm::safe_copy_n(value.data(), value.size(), buffer.get());
     StringData copy_of_value(value.is_null() ? nullptr : buffer.get(), value.size());
 
     if (m_search_index) {
@@ -622,10 +614,11 @@ void StringColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
     }
 
     // Non-leaf root
-    SetLeafElem set_leaf_elem(m_array->get_alloc(), copy_of_value, m_nullable);
-    m_array->update_bptree_elem(row_ndx, set_leaf_elem); // Throws
+    BpTreeNode* node = static_cast<BpTreeNode*>(m_array.get());
+    SetLeafElem set_leaf_elem(node->get_alloc(), copy_of_value, m_nullable);
+    node->update_bptree_elem(row_ndx, set_leaf_elem); // Throws
     EraseLeafElem erase_leaf_elem(*this, m_nullable);
-    Array::erase_bptree_elem(m_array.get(), realm::npos, erase_leaf_elem); // Throws
+    BpTreeNode::erase_bptree_elem(node, realm::npos, erase_leaf_elem); // Throws
 }
 
 void StringColumn::do_swap_rows(size_t row_ndx_1, size_t row_ndx_2)
@@ -735,9 +728,10 @@ size_t StringColumn::count(StringData value) const
     // FIXME: It would be better to always require that 'end' is
     // specified explicitely, since Table has the size readily
     // available, and Array::get_bptree_size() is deprecated.
-    size_t begin = 0, end = m_array->get_bptree_size();
+    BpTreeNode* node = static_cast<BpTreeNode*>(m_array.get());
+    size_t begin = 0, end = node->get_bptree_size();
     while (begin < end) {
-        std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(begin);
+        std::pair<MemRef, size_t> p = node->get_bptree_leaf(begin);
         MemRef leaf_mem = p.first;
         REALM_ASSERT_3(p.second, ==, 0);
         bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
@@ -802,14 +796,15 @@ size_t StringColumn::find_first(StringData value, size_t begin, size_t end) cons
     // Non-leaf root
     //
     // FIXME: It would be better to always require that 'end' is
-    // specified explicitely, since Table has the size readily
+    // specified explicitly, since Table has the size readily
     // available, and Array::get_bptree_size() is deprecated.
+    BpTreeNode* node = static_cast<BpTreeNode*>(m_array.get());
     if (end == npos)
-        end = m_array->get_bptree_size();
+        end = node->get_bptree_size();
 
     size_t ndx_in_tree = begin;
     while (ndx_in_tree < end) {
-        std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
+        std::pair<MemRef, size_t> p = node->get_bptree_leaf(ndx_in_tree);
         MemRef leaf_mem = p.first;
         size_t ndx_in_leaf = p.second, end_in_leaf;
         size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
@@ -892,12 +887,13 @@ void StringColumn::find_all(IntegerColumn& result, StringData value, size_t begi
     // FIXME: It would be better to always require that 'end' is
     // specified explicitely, since Table has the size readily
     // available, and Array::get_bptree_size() is deprecated.
+    BpTreeNode* node = static_cast<BpTreeNode*>(m_array.get());
     if (end == npos)
-        end = m_array->get_bptree_size();
+        end = node->get_bptree_size();
 
     size_t ndx_in_tree = begin;
     while (ndx_in_tree < end) {
-        std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx_in_tree);
+        std::pair<MemRef, size_t> p = node->get_bptree_leaf(ndx_in_tree);
         MemRef leaf_mem = p.first;
         size_t ndx_in_leaf = p.second, end_in_leaf;
         size_t leaf_offset = ndx_in_tree - ndx_in_leaf;
@@ -935,8 +931,12 @@ void StringColumn::find_all(IntegerColumn& result, StringData value, size_t begi
 
 FindRes StringColumn::find_all_no_copy(StringData value, InternalFindResult& result) const
 {
-    REALM_ASSERT_DEBUG(!(!m_nullable && value.is_null()));
     REALM_ASSERT(m_search_index);
+
+    if (value.is_null() && !m_nullable) {
+        // Early out if looking for null but we aren't nullable.
+        return FindRes::FindRes_not_found;
+    }
 
     return m_search_index->find_all_no_copy(value, result);
 }
@@ -1096,8 +1096,8 @@ void StringColumn::do_insert(size_t row_ndx, StringData value, size_t num_rows, 
 void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_rows)
 {
     REALM_ASSERT(row_ndx == realm::npos || row_ndx < size());
-    ref_type new_sibling_ref;
-    Array::TreeInsert<StringColumn> state;
+    ref_type new_sibling_ref = 0;
+    BpTreeNode::TreeInsert<StringColumn> state;
     for (size_t i = 0; i != num_rows; ++i) {
         size_t row_ndx_2 = row_ndx == realm::npos ? realm::npos : row_ndx + i;
         if (root_is_leaf()) {
@@ -1108,35 +1108,35 @@ void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_ro
                     // Small strings root leaf
                     ArrayString* leaf = static_cast<ArrayString*>(m_array.get());
                     new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state); // Throws
-                    goto insert_done;
+                    break;
                 }
                 case leaf_type_Medium: {
                     // Medium strings root leaf
                     ArrayStringLong* leaf = static_cast<ArrayStringLong*>(m_array.get());
                     new_sibling_ref = leaf->bptree_leaf_insert(row_ndx_2, value, state); // Throws
-                    goto insert_done;
+                    break;
                 }
                 case leaf_type_Big: {
                     // Big strings root leaf
                     ArrayBigBlobs* leaf = static_cast<ArrayBigBlobs*>(m_array.get());
                     new_sibling_ref = leaf->bptree_leaf_insert_string(row_ndx_2, value, state); // Throws
-                    goto insert_done;
+                    break;
                 }
             }
-            REALM_ASSERT(false);
-        }
-
-        // Non-leaf root
-        state.m_value = value;
-        state.m_nullable = m_nullable;
-        if (row_ndx_2 == realm::npos) {
-            new_sibling_ref = m_array->bptree_append(state); // Throws
         }
         else {
-            new_sibling_ref = m_array->bptree_insert(row_ndx_2, state); // Throws
+            // Non-leaf root
+            BpTreeNode* node = static_cast<BpTreeNode*>(m_array.get());
+            state.m_value = value;
+            state.m_nullable = m_nullable;
+            if (row_ndx_2 == realm::npos) {
+                new_sibling_ref = node->bptree_append(state); // Throws
+            }
+            else {
+                new_sibling_ref = node->bptree_insert(row_ndx_2, state); // Throws
+            }
         }
 
-    insert_done:
         if (REALM_UNLIKELY(new_sibling_ref)) {
             bool is_append = row_ndx_2 == realm::npos;
             introduce_new_root(new_sibling_ref, state, is_append); // Throws
@@ -1146,7 +1146,7 @@ void StringColumn::bptree_insert(size_t row_ndx, StringData value, size_t num_ro
 
 
 ref_type StringColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t ndx_in_parent, Allocator& alloc,
-                                   size_t insert_ndx, Array::TreeInsert<StringColumn>& state)
+                                   size_t insert_ndx, BpTreeNode::TreeInsert<StringColumn>& state)
 {
     bool long_strings = Array::get_hasrefs_from_header(leaf_mem.get_addr());
     if (long_strings) {
@@ -1291,7 +1291,8 @@ StringColumn::LeafType StringColumn::get_block(size_t ndx, ArrayParent** ap, siz
         return leaf_type_Small;
     }
 
-    std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
+    BpTreeNode* node = static_cast<BpTreeNode*>(m_array.get());
+    std::pair<MemRef, size_t> p = node->get_bptree_leaf(ndx);
     off = ndx - p.second;
     bool long_strings = Array::get_hasrefs_from_header(p.first.get_addr());
     if (long_strings) {

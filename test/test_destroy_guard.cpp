@@ -87,7 +87,7 @@ public:
     {
     }
 
-    MemRef do_alloc(size_t size) override
+    MemRef do_alloc(const size_t size) override
     {
         ref_type ref = m_offset;
         char*& addr = m_map[ref]; // Throws

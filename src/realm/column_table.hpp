@@ -62,6 +62,10 @@ public:
     {
         return nullptr;
     }
+    bool is_null(size_t ndx) const noexcept override
+    {
+        return get_as_ref(ndx) == 0;
+    }
 
     void verify() const override;
     void verify(const Table&, size_t) const override;
@@ -103,11 +107,12 @@ protected:
         bool adj_move_over(size_t from_row_ndx, size_t to_row_ndx) noexcept;
         template <bool fix_ndx_in_parent>
         void adj_swap_rows(size_t row_ndx_1, size_t row_ndx_2) noexcept;
+        void adj_set_null(size_t row_ndx) noexcept;
 
         void update_accessors(const size_t* col_path_begin, const size_t* col_path_end,
                               _impl::TableFriend::AccessorUpdater&);
         void recursive_mark() noexcept;
-        void refresh_accessor_tree(size_t spec_ndx_in_parent);
+        void refresh_accessor_tree();
 
     private:
         struct SubtableEntry {
@@ -179,6 +184,7 @@ protected:
 
 class SubtableColumn : public SubtableColumnBase {
 public:
+    using value_type = ConstTableRef;
     /// Create a subtable column accessor and attach it to a
     /// preexisting underlying structure of arrays.
     ///
@@ -199,6 +205,9 @@ public:
     {
     }
 
+    // Overriding method in Table::Parent
+    Spec* get_subtable_spec() noexcept override;
+
     size_t get_subtable_size(size_t ndx) const noexcept;
 
     /// Get a pointer to the accessor of the specified subtable. The
@@ -207,6 +216,18 @@ public:
     /// The returned table pointer must **always** end up being
     /// wrapped in some instantiation of BasicTableRef<>.
     Table* get_subtable_ptr(size_t subtable_ndx);
+
+    /// This is to be used by the query system that does not need to
+    /// modify the subtable. Will return a ref object containing a
+    /// nullptr if there is no table object yet.
+    ConstTableRef get(size_t subtable_ndx) const
+    {
+        int64_t ref = IntegerColumn::get(subtable_ndx);
+        if (ref)
+            return ConstTableRef(get_subtable_ptr(subtable_ndx));
+        else
+            return {};
+    }
 
     const Table* get_subtable_ptr(size_t subtable_ndx) const;
 
@@ -220,6 +241,7 @@ public:
     void insert(size_t ndx, const Table* value = nullptr);
     void set(size_t ndx, const Table*);
     void clear_table(size_t ndx);
+    void set_null(size_t ndx) override;
 
     using SubtableColumnBase::insert;
 
@@ -230,6 +252,7 @@ public:
     bool compare_table(const SubtableColumn&) const;
 
     void refresh_accessor_tree(size_t, const Spec&) override;
+    void refresh_subtable_map();
 
 #ifdef REALM_DEBUG
     void verify(const Table&, size_t) const override;
@@ -251,12 +274,10 @@ private:
 // Implementation
 
 // Overriding virtual method of Column.
-inline void SubtableColumnBase::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows,
-                                            bool insert_nulls)
+inline void SubtableColumnBase::insert_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool)
 {
     REALM_ASSERT_DEBUG(prior_num_rows == size());
     REALM_ASSERT(row_ndx <= prior_num_rows);
-    REALM_ASSERT(!insert_nulls);
 
     size_t row_ndx_2 = (row_ndx == prior_num_rows ? realm::npos : row_ndx);
     int_fast64_t value = 0;
@@ -493,6 +514,13 @@ void SubtableColumnBase::SubtableMap::adj_swap_rows(size_t row_ndx_1, size_t row
     }
 }
 
+inline void SubtableColumnBase::SubtableMap::adj_set_null(size_t row_ndx) noexcept
+{
+    Table* table = find(row_ndx);
+    if (table)
+        _impl::TableFriend::refresh_accessor_tree(*table);
+}
+
 inline SubtableColumnBase::SubtableColumnBase(Allocator& alloc, ref_type ref, Table* table, size_t column_ndx)
     : IntegerColumn(alloc, ref, column_ndx) // Throws
     , m_table(table)
@@ -501,7 +529,7 @@ inline SubtableColumnBase::SubtableColumnBase(Allocator& alloc, ref_type ref, Ta
 
 inline void SubtableColumnBase::update_child_ref(size_t child_ndx, ref_type new_ref)
 {
-    set(child_ndx, new_ref);
+    set_as_ref(child_ndx, new_ref);
 }
 
 inline ref_type SubtableColumnBase::get_child_ref(size_t child_ndx) const noexcept
@@ -582,17 +610,27 @@ inline void SubtableColumn::refresh_accessor_tree(size_t col_ndx, const Spec& sp
 {
     SubtableColumnBase::refresh_accessor_tree(col_ndx, spec); // Throws
     m_subspec_ndx = spec.get_subspec_ndx(col_ndx);
-    m_subtable_map.refresh_accessor_tree(m_subspec_ndx); // Throws
+    m_subtable_map.refresh_accessor_tree(); // Throws
+}
+
+inline void SubtableColumn::refresh_subtable_map()
+{
+    m_subtable_map.refresh_accessor_tree(); // Throws
 }
 
 inline size_t SubtableColumn::get_subspec_ndx() const noexcept
 {
     if (REALM_UNLIKELY(m_subspec_ndx == realm::npos)) {
         typedef _impl::TableFriend tf;
-        const Spec& spec = tf::get_spec(*m_table);
-        m_subspec_ndx = spec.get_subspec_ndx(get_column_index());
+        m_subspec_ndx = tf::get_spec(*m_table).get_subspec_ndx(get_column_index());
     }
     return m_subspec_ndx;
+}
+
+inline Spec* SubtableColumn::get_subtable_spec() noexcept
+{
+    typedef _impl::TableFriend tf;
+    return tf::get_spec(*m_table).get_subtable_spec(get_column_index());
 }
 
 

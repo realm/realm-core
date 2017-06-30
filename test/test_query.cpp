@@ -28,9 +28,10 @@
 #include <realm/lang_bind_helper.hpp>
 #include <realm/column.hpp>
 #include <realm/history.hpp>
-#include <realm/query_engine.hpp>
+#include <realm/query_expression.hpp>
 
 #include "test.hpp"
+#include "test_table_helper.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -65,47 +66,6 @@ using namespace realm::test_util;
 // Another way to debug a particular test, is to copy that test into
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
-
-
-namespace {
-
-REALM_TABLE_2(TwoIntTable, first, Int, second, Int)
-
-REALM_TABLE_1(SingleStringTable, first, String)
-
-REALM_TABLE_3(TripleTable, first, String, second, String, third, Int)
-
-REALM_TABLE_1(OneIntTable, first, Int)
-
-REALM_TABLE_2(TupleTableType, first, Int, second, String)
-
-REALM_TABLE_5(DateIntStringFloatDouble, first, Int, second, String, third, OldDateTime, fourth, Float, fifth, Double)
-
-REALM_TABLE_2(TupleTableTypeBin, first, Int, second, Binary)
-
-REALM_TABLE_2(BoolTupleTable, first, Int, second, Bool)
-
-REALM_TABLE_5(PeopleTable, name, String, age, Int, male, Bool, hired, OldDateTime, photo, Binary)
-
-REALM_TABLE_2(FloatTable, col_float, Float, col_double, Double)
-
-REALM_TABLE_3(FloatTable3, col_float, Float, col_double, Double, col_int, Int)
-
-REALM_TABLE_3(PHPMinimumCrash, firstname, String, lastname, String, salary, Int)
-
-REALM_TABLE_3(TableViewSum, col_float, Float, col_double, Double, col_int, Int)
-
-REALM_TABLE_5(GATable, user_id, String, country, String, build, String, event_1, Int, event_2, Int)
-
-REALM_TABLE_2(PeopleTable2, name, String, age, Int)
-
-REALM_TABLE_5(ThreeColTable, first, Int, second, Float, third, Double, fourth, Bool, fifth, String)
-
-REALM_TABLE_3(Books, title, String, author, String, pages, Int)
-
-REALM_TABLE_3(Types, ints, Int, strings, String, doubles, Double)
-
-} // anonymous namespace
 
 
 TEST(Query_NoConditions)
@@ -168,30 +128,33 @@ TEST(Query_Count)
 
 TEST(Query_NextGenSyntaxTypedString)
 {
-    Books books;
+    TestTable books;
+    books.add_column(type_String, "1");
+    books.add_column(type_String, "2");
+    books.add_column(type_Int, "3");
 
-    books.add("Computer Architecture and Organization", "B. Govindarajalu", 752);
-    books.add("Introduction to Quantum Mechanics", "David Griffiths", 480);
-    books.add("Biophysics: Searching for Principles", "William Bialek", 640);
+    add(books, "Computer Architecture and Organization", "B. Govindarajalu", 752);
+    add(books, "Introduction to Quantum Mechanics", "David Griffiths", 480);
+    add(books, "Biophysics: Searching for Principles", "William Bialek", 640);
 
     // Typed table:
-    Query q = books.column().pages >= 200 && books.column().author == "David Griffiths";
+    Query q = books.column<Int>(2) >= 200 && books.column<String>(1) == "David Griffiths";
     size_t match = q.find();
     CHECK_EQUAL(1, match);
     // You don't need to create a query object first:
-    match = (books.column().pages >= 200 && books.column().author == "David Griffiths").find();
+    match = (books.column<Int>(2) >= 200 && books.column<String>(1) == "David Griffiths").find();
     CHECK_EQUAL(1, match);
 
     // You can also create column objects and use them in expressions:
-    Columns<Int> pages = books.column().pages;
-    Columns<String> author = books.column().author;
+    Columns<Int> pages = books.column<Int>(2);
+    Columns<String> author = books.column<String>(1);
     match = (pages >= 200 && author == "David Griffiths").find();
     CHECK_EQUAL(1, match);
 }
 
 TEST(Query_NextGenSyntax)
 {
-    volatile size_t match;
+    size_t match;
 
     // Setup untyped table
     Table untyped;
@@ -213,11 +176,15 @@ TEST(Query_NextGenSyntax)
     untyped.set_bool(3, 1, false);
     untyped.set_string(4, 1, "world");
 
-    // Setup typed table, same contents as untyped
-    ThreeColTable typed;
-    typed.add(20, 19.9f, 3.0, true, "hello");
-    typed.add(20, 20.1f, 4.0, false, "world");
+    TestTable typed;
+    typed.add_column(type_Int, "1");
+    typed.add_column(type_Float, "2");
+    typed.add_column(type_Double, "3");
+    typed.add_column(type_Bool, "4");
+    typed.add_column(type_String, "5");
 
+    add(typed, 20, 19.9f, 3.0, true, "hello");
+    add(typed, 20, 20.1f, 4.0, false, "world");
 
     match = (untyped.column<String>(4) == "world").find();
     CHECK_EQUAL(match, 1);
@@ -259,11 +226,11 @@ TEST(Query_NextGenSyntax)
 
 
     // Small typed table test:
-    match = (typed.column().second + 100 > 120 && typed.column().first > 2).find();
+    match = (typed.column<float>(1) + 100 > 120 && typed.column<int64_t>(0) > 2).find();
     CHECK_EQUAL(match, 1);
 
     // internal negation (rewrite of test above):
-    match = (!(!(typed.column().second + 100 > 120) || !(typed.column().first > 2))).find();
+    match = (!(!(typed.column<float>(1) + 100 > 120) || !(typed.column<int64_t>(0) > 2))).find();
     CHECK_EQUAL(match, 1);
 
 
@@ -349,23 +316,23 @@ TEST(Query_NextGenSyntax)
 
 
     // Typed, direct column addressing
-    Query q1 = typed.column().second + typed.column().first > 40;
+    Query q1 = typed.column<float>(1) + typed.column<Int>(0) > 40;
     match = q1.find();
     CHECK_EQUAL(match, 1);
 
 
-    match = (typed.column().first + typed.column().second > 40).find();
+    match = (typed.column<Int>(0) + typed.column<float>(1) > 40).find();
     CHECK_EQUAL(match, 1);
 
 
-    Query tq1 = typed.column().first + typed.column().second >= typed.column().first + typed.column().second;
+    Query tq1 = typed.column<Int>(0) + typed.column<float>(1) >= typed.column<Int>(0) + typed.column<float>(1);
     match = tq1.find();
     CHECK_EQUAL(match, 0);
 
 
     // Typed, column objects
-    Columns<int64_t> t0 = typed.column().first;
-    Columns<float> t1 = typed.column().second;
+    Columns<int64_t> t0 = typed.column<Int>(0);
+    Columns<float> t1 = typed.column<float>(1);
 
     match = (t0 + t1 > 40).find();
     CHECK_EQUAL(match, 1);
@@ -393,61 +360,6 @@ TEST(Query_NextGenSyntax)
 
     match = (u0 + u1 > 40).find();
     CHECK_EQUAL(match, 1);
-
-    // No longer supported
-    /*
-    // Flexible language binding style
-    Subexpr* first = new Columns<int64_t>(0);
-    Subexpr* second = new Columns<float>(1);
-    Subexpr* third = new Columns<double>(2);
-    Subexpr* constant = new Value<int64_t>(40);
-    Subexpr* plus = new Operator<Plus<float>>(*first, *second);
-    Expression *e = new Compare<Greater, float>(*plus, *constant);
-
-
-    // Bind table and do search
-    match = untyped.where().expression(e).find();
-    CHECK_EQUAL(match, 1);
-
-    Query q9 = untyped.where().expression(e);
-    match = q9.find();
-    CHECK_EQUAL(match, 1);
-
-
-    Subexpr* first2 = new Columns<int64_t>(0);
-    Subexpr* second2 = new Columns<float>(1);
-    Subexpr* third2 = new Columns<double>(2);
-    Subexpr* constant2 = new Value<int64_t>(40);
-    Subexpr* plus2 = new Operator<Plus<float>>(*first, *second);
-    Expression *e2 = new Compare<Greater, float>(*plus, *constant);
-
-    match = untyped.where().expression(e).expression(e2).find();
-    CHECK_EQUAL(match, 1);
-
-    Query q10 = untyped.where().and_query(q9).expression(e2);
-    match = q10.find();
-    CHECK_EQUAL(match, 1);
-
-
-    Query tq3 = tq1;
-    match = tq3.find();
-    CHECK_EQUAL(match, 0);
-
-    delete e;
-    delete plus;
-    delete constant;
-    delete third;
-    delete second;
-    delete first;
-
-
-    delete e2;
-    delete plus2;
-    delete constant2;
-    delete third2;
-    delete second2;
-    delete first2;
-    */
 }
 
 
@@ -559,6 +471,25 @@ TEST(Query_NextGen_StringConditions)
     m = table1->column<String>(0).ends_with(table1->column<String>(1), true).find();
     CHECK_EQUAL(m, 2);
 
+    // Like (wildcard matching)
+    m = table1->column<String>(0).like("b*", true).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).like("b*", false).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).like("*r", false).find();
+    CHECK_EQUAL(m, 2);
+
+    m = table1->column<String>(0).like("f?o", false).find();
+    CHECK_EQUAL(m, 0);
+
+    m = (table1->column<String>(0).like("f*", false) && table1->column<String>(0) == "foo").find();
+    CHECK_EQUAL(m, 0);
+
+    m = table1->column<String>(0).like(table1->column<String>(1), true).find();
+    CHECK_EQUAL(m, not_found);
+
     // Test various compare operations with null
     TableRef table2 = group.add_table("table2");
     table2->add_column(type_String, "str1", true);
@@ -599,6 +530,9 @@ TEST(Query_NextGen_StringConditions)
     m = table2->column<String>(0).contains(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
 
+    m = table2->column<String>(0).like(StringData(""), false).count();
+    CHECK_EQUAL(m, 1);
+
     m = table2->column<String>(0).begins_with(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
 
@@ -619,6 +553,9 @@ TEST(Query_NextGen_StringConditions)
 
     m = table2->column<String>(0).contains(realm::null(), false).count();
     CHECK_EQUAL(m, 4);
+
+    m = table2->column<String>(0).like(realm::null(), false).count();
+    CHECK_EQUAL(m, 1);
 
     TableRef table3 = group.add_table(StringData("table3"));
     table3->add_column_link(type_Link, "link1", *table2);
@@ -659,6 +596,9 @@ TEST(Query_NextGen_StringConditions)
     m = table3->link(0).column<String>(0).contains(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
 
+    m = table3->link(0).column<String>(0).like(StringData(""), false).count();
+    CHECK_EQUAL(m, 1);
+
     m = table3->link(0).column<String>(0).begins_with(StringData(""), false).count();
     CHECK_EQUAL(m, 4);
 
@@ -679,6 +619,19 @@ TEST(Query_NextGen_StringConditions)
 
     m = table3->link(0).column<String>(0).contains(realm::null(), false).count();
     CHECK_EQUAL(m, 4);
+    
+    // Test long string contains search (where needle is longer than 255 chars)
+    table2->add_empty_row();
+    table2->set_string(0, 0, "This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, needle, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!");
+    
+    m = table2->column<String>(0).contains("This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, needle", false).count();
+    CHECK_EQUAL(m, 1);
+    
+    m = table2->column<String>(0).contains("This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, This is a long search string that does not contain the word being searched for!, needle", true).count();
+    CHECK_EQUAL(m, 1);
+    
+    m = table3->link(0).column<String>(0).like(realm::null(), false).count();
+    CHECK_EQUAL(m, 1);
 }
 
 
@@ -1366,17 +1319,19 @@ TEST(Query_MergeQueriesMonkeyOverloads)
 
 TEST(Query_CountLimit)
 {
-    PeopleTable2 table;
+    TestTable table;
+    table.add_column(type_String, "1");
+    table.add_column(type_Int, "2");
 
-    table.add("Mary", 14);
-    table.add("Joe", 17);
-    table.add("Alice", 42);
-    table.add("Jack", 22);
-    table.add("Bob", 50);
-    table.add("Frank", 12);
+    add(table, "Mary", 14);
+    add(table, "Joe", 17);
+    add(table, "Alice", 42);
+    add(table, "Jack", 22);
+    add(table, "Bob", 50);
+    add(table, "Frank", 12);
 
     // Select rows where age < 18
-    PeopleTable2::Query query = table.where().age.less(18);
+    Query query = table.where().less(1, 18);
 
     // Count all matching rows of entire table
     size_t count1 = query.count();
@@ -1580,7 +1535,7 @@ TEST(Query_Expressions0)
     table.add_empty_row(1);
 
     table.set_int(0, 0, 20);
-    table.set_float(1, 0, 3.0);
+    table.set_float(1, 0, 3.0f);
     table.set_double(2, 0, 3.0);
 
     match = (1 / second == 1 / second).find();
@@ -1635,9 +1590,9 @@ TEST(Query_LimitUntyped2)
     table.set_int(0, 1, 30000);
     table.set_int(0, 2, 40000);
 
-    table.set_float(1, 0, 10000.);
-    table.set_float(1, 1, 30000.);
-    table.set_float(1, 2, 40000.);
+    table.set_float(1, 0, 10000.f);
+    table.set_float(1, 1, 30000.f);
+    table.set_float(1, 2, 40000.f);
 
     table.set_double(2, 0, 10000.);
     table.set_double(2, 1, 30000.);
@@ -1861,6 +1816,262 @@ TEST(Query_StrIndexCrash)
     }
 }
 
+TEST(Query_size)
+{
+    Group g;
+
+    TableRef table1 = g.add_table("primary");
+    TableRef table2 = g.add_table("secondary");
+    TableRef table3 = g.add_table("top");
+
+    table1->add_column(type_String, "strings");
+    table1->add_column(type_Binary, "binaries", true);
+    DescriptorRef subdesc;
+    table1->add_column(type_Table, "intlist", false, &subdesc);
+    subdesc->add_column(type_Int, "list", nullptr, true);
+    table1->add_column_link(type_LinkList, "linklist", *table2);
+
+    table2->add_column(type_Int, "integers");
+
+    table3->add_column_link(type_Link, "link", *table1);
+    table3->add_column_link(type_LinkList, "linklist", *table1);
+    table3->add_empty_row(10);
+
+    Columns<String> strings = table1->column<String>(0);
+    Columns<Binary> binaries = table1->column<Binary>(1);
+    Columns<SubTable> intlist = table1->column<SubTable>(2);
+    Columns<LinkList> linklist = table1->column<LinkList>(3);
+
+    table1->add_empty_row(10);
+    table2->add_empty_row(10);
+
+    for (size_t i = 0; i < 10; i++) {
+        table2->set_int(0, i, i);
+    }
+
+    // Leave the last one null
+    for (unsigned i = 0; i < 9; i++) {
+        table3->set_link(0, i, i % 4);
+    }
+
+    for (unsigned i = 0; i < 10; i++) {
+        auto lv = table3->get_linklist(1, i);
+        for (unsigned j = 0; j < i % 5; j++) {
+            lv->add(j);
+        }
+    }
+
+    table1->set_string(0, 0, StringData("Hi"));
+    table1->set_string(0, 1, StringData("world"));
+
+    std::string bin1(100, 'a');
+    std::string bin2(500, '5');
+    table1->set_binary(1, 0, BinaryData(bin1));
+    table1->set_binary(1, 1, BinaryData(bin2));
+
+    auto set_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
+        size_t sz = value_list.size();
+        subtable->clear();
+        subtable->add_empty_row(sz);
+        for (size_t i = 0; i < sz; i++) {
+            subtable->set_int(0, i, value_list[i]);
+        }
+    };
+    set_list(table1->get_subtable(2, 0), std::vector<Int>({100, 200, 300, 400, 500}));
+    set_list(table1->get_subtable(2, 1), std::vector<Int>({1, 2, 3}));
+    set_list(table1->get_subtable(2, 2), std::vector<Int>({1, 2, 3, 4, 5}));
+    set_list(table1->get_subtable(2, 3), std::vector<Int>({1, 2, 3, 4, 5, 6, 7, 8, 9}));
+
+    auto set_links = [](LinkViewRef lv, const std::vector<int64_t>& value_list) {
+        for (auto v : value_list) {
+            lv->add(size_t(v));
+        }
+    };
+    set_links(table1->get_linklist(3, 0), std::vector<Int>({0, 1, 2, 3, 4, 5}));
+    set_links(table1->get_linklist(3, 1), std::vector<Int>({6, 7, 8, 9}));
+
+    Query q;
+    Query q1;
+    size_t match;
+    TableView tv;
+
+    q = strings.size() == 5;
+    q1 = table1->where().size_equal(0, 5);
+    match = q.find();
+    CHECK_EQUAL(1, match);
+    match = q1.find();
+    CHECK_EQUAL(1, match);
+
+    // Check that the null values are handled correctly
+    q = binaries.size() == realm::null();
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 8);
+    CHECK_EQUAL(tv.get_source_ndx(0), 2);
+
+    // Here the null values should not be included in the search
+    q = binaries.size() < 500;
+    q1 = table1->where().size_less(1, 500);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    tv = q1.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+
+    q = intlist.size() > 3;
+    q1 = table1->where().size_greater(2, 3);
+    tv = q.find_all();
+    CHECK_EQUAL(3, tv.size());
+    tv = q1.find_all();
+    CHECK_EQUAL(3, tv.size());
+    q1 = table1->where().size_between(2, 3, 7);
+    tv = q1.find_all();
+    CHECK_EQUAL(3, tv.size());
+
+    q = intlist.size() == 3;
+    match = q.find();
+    CHECK_EQUAL(1, match);
+
+    q1 = table1->where().size_not_equal(3, 6);
+    match = q1.find();
+    CHECK_EQUAL(1, match);
+
+    q = intlist.size() > strings.size();
+    tv = q.find_all();
+    CHECK_EQUAL(3, tv.size());
+    CHECK_EQUAL(0, tv.get_source_ndx(0));
+
+    // Single links
+    q = table3->link(0).column<SubTable>(2).size() == 5;
+    tv = q.find_all();
+    CHECK_EQUAL(5, tv.size());
+
+    // Multiple links
+    q = table3->link(1).column<SubTable>(2).size() == 3;
+    tv = q.find_all();
+    CHECK_EQUAL(6, tv.size());
+}
+
+TEST(Query_SubtableExpression)
+{
+    Group g;
+
+    TableRef table = g.add_table("foo");
+
+    DescriptorRef subdescr;
+    table->add_column(type_Table, "integers", &subdescr);
+    subdescr->add_column(type_Int, "list");
+    table->add_column(type_Table, "strings", &subdescr);
+    subdescr->add_column(type_String, "list", nullptr, true);
+    table->add_column(type_String, "other");
+
+    table->add_empty_row(4);
+
+    auto set_int_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
+        size_t sz = value_list.size();
+        subtable->clear();
+        if (sz) {
+            subtable->add_empty_row(sz);
+            for (size_t i = 0; i < sz; i++) {
+                subtable->set_int(0, i, value_list[i]);
+            }
+        }
+    };
+    auto set_string_list = [](TableRef subtable, const std::vector<int64_t>& value_list) {
+        size_t sz = value_list.size();
+        subtable->clear();
+        subtable->add_empty_row(sz);
+        for (size_t i = 0; i < sz; i++) {
+            if (value_list[i] < 100) {
+                std::string str("Str_");
+                str += util::to_string(value_list[i]);
+                subtable->set_string(0, i, str);
+            }
+        }
+    };
+    set_int_list(table->get_subtable(0, 0), std::vector<Int>({0, 1}));
+    set_int_list(table->get_subtable(0, 1), std::vector<Int>({2, 3, 4, 5}));
+    set_int_list(table->get_subtable(0, 2), std::vector<Int>({6, 7, 8, 9}));
+    set_int_list(table->get_subtable(0, 3), std::vector<Int>({}));
+    set_string_list(table->get_subtable(1, 0), std::vector<Int>({0, 1}));
+    set_string_list(table->get_subtable(1, 1), std::vector<Int>({2, 3, 4, 5}));
+    set_string_list(table->get_subtable(1, 2), std::vector<Int>({6, 7, 100, 8, 9}));
+    table->set_string(2, 0, StringData("foo"));
+    table->set_string(2, 1, StringData("str"));
+    table->set_string(2, 2, StringData("str_9_baa"));
+
+    Query q;
+    TableView tv;
+    q = table->column<SubTable>(0).list<Int>() == 5;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 1);
+    q = table->column<SubTable>(1).list<String>() == "Str_5";
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 1);
+
+    q = table->column<SubTable>(1).list<String>().begins_with("Str");
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 3);
+    q = table->column<SubTable>(1).list<String>().ends_with("_8");
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 2);
+    q = table->column<SubTable>(1).list<String>().begins_with(table->column<String>(2), false);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 1);
+    q = table->column<String>(2).begins_with(table->column<SubTable>(1).list<String>(), false);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 2);
+
+    q = table->column<SubTable>(0).list<Int>().min() >= 2;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_source_ndx(0), 1);
+    CHECK_EQUAL(tv.get_source_ndx(1), 2);
+    q = table->column<SubTable>(0).list<Int>().max() > 6;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 2);
+    q = table->column<SubTable>(0).list<Int>().sum() == 14;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 1);
+    q = table->column<SubTable>(0).list<Int>().average() < 4;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv.get_source_ndx(0), 0);
+    CHECK_EQUAL(tv.get_source_ndx(1), 1);
+
+    TableRef baa = g.add_table("baa");
+    baa->add_column_link(type_Link, "link", *table);
+    baa->add_column_link(type_LinkList, "linklist", *table);
+    baa->add_empty_row(3);
+    baa->set_link(0, 0, 1);
+    baa->set_link(0, 1, 0);
+    auto lv = baa->get_linklist(1, 0);
+    lv->add(0);
+    lv->add(1);
+    lv = baa->get_linklist(1, 1);
+    lv->add(1);
+    lv->add(2);
+    lv->add(3);
+
+    q = baa->link(0).column<SubTable>(0).list<Int>() == 5;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv.get_source_ndx(0), 0);
+
+    q = baa->link(1).column<SubTable>(1).list<String>() == "Str_5";
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+
+    q = baa->link(1).column<SubTable>(0).list<Int>().average() >= 2.0;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+}
+
 TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
 {
     Group group;
@@ -1918,7 +2129,6 @@ TEST_TYPES(Query_StringIndexCommonPrefix, std::true_type, std::false_type)
     test_prefix_find(std_max);
     test_prefix_find(std_over_max);
     test_prefix_find(std_under_max);
-
 }
 
 
@@ -2039,28 +2249,28 @@ TEST(Query_TwoColsVaryOperators)
     table.add_empty_row();
     table.set_int(0, 0, 5);
     table.set_int(1, 0, 10);
-    table.set_float(2, 0, 5);
-    table.set_float(3, 0, 10);
-    table.set_double(4, 0, 5);
-    table.set_double(5, 0, 10);
+    table.set_float(2, 0, 5.0f);
+    table.set_float(3, 0, 10.0f);
+    table.set_double(4, 0, 5.0);
+    table.set_double(5, 0, 10.0);
 
     // row 1
     table.add_empty_row();
     table.set_int(0, 1, 10);
     table.set_int(1, 1, 5);
-    table.set_float(2, 1, 10);
-    table.set_float(3, 1, 5);
-    table.set_double(4, 1, 10);
-    table.set_double(5, 1, 5);
+    table.set_float(2, 1, 10.0f);
+    table.set_float(3, 1, 5.0f);
+    table.set_double(4, 1, 10.0);
+    table.set_double(5, 1, 5.0);
 
     // row 2
     table.add_empty_row();
     table.set_int(0, 2, -10);
     table.set_int(1, 2, -5);
-    table.set_float(2, 2, -10);
-    table.set_float(3, 2, -5);
-    table.set_double(4, 2, -10);
-    table.set_double(5, 2, -5);
+    table.set_float(2, 2, -10.0f);
+    table.set_float(3, 2, -5.0f);
+    table.set_double(4, 2, -10.0);
+    table.set_double(5, 2, -5.0);
 
 
     CHECK_EQUAL(not_found, table.where().equal_int(size_t(0), size_t(1)).find());
@@ -2208,8 +2418,12 @@ TEST(Query_Huge)
         // to run all successive runs
         random.seed(N + 123);
 
-        TripleTable tt;
-        TripleTable::View v;
+        Table tt;
+        tt.add_column(type_String, "1");
+        tt.add_column(type_String, "2");
+        tt.add_column(type_Int, "3");
+
+        TableView v;
         bool long1 = false;
         bool long2 = false;
 
@@ -2292,9 +2506,9 @@ TEST(Query_Huge)
             else
                 third = 2;
 
-            tt[row].first = first;
-            tt[row].second = second;
-            tt[row].third = third;
+            tt[row].set_string(0, first);
+            tt[row].set_string(1, second);
+            tt[row].set_int(2, third);
 
             if ((row >= start && row < end && limit > res1) && (first == "A" && second == "A" && third == 1))
                 res1++;
@@ -2328,54 +2542,53 @@ TEST(Query_Huge)
             if (t == 1)
                 tt.optimize();
             else if (t == 2)
-                tt.column().first.add_search_index();
+                tt.add_search_index(0);
             else if (t == 3)
-                tt.column().second.add_search_index();
+                tt.add_search_index(1);
 
 
-            v = tt.where().first.equal("A").second.equal("A").third.equal(1).find_all(start, end, limit);
+            v = tt.where().equal(0, "A").equal(1, "A").equal(2, 1).find_all(start, end, limit);
             CHECK_EQUAL(res1, v.size());
 
-            v = tt.where().second.equal("A").first.equal("A").third.equal(1).find_all(start, end, limit);
+            v = tt.where().equal(1, "A").equal(0, "A").equal(2, 1).find_all(start, end, limit);
             CHECK_EQUAL(res1, v.size());
 
-            v = tt.where().third.equal(1).second.equal("A").first.equal("A").find_all(start, end, limit);
+            v = tt.where().equal(2, 1).equal(1, "A").equal(0, "A").find_all(start, end, limit);
             CHECK_EQUAL(res1, v.size());
 
-            v = tt.where().group().first.equal("A").Or().second.equal("A").end_group().third.equal(1).find_all(
+            v = tt.where().group().equal(0, "A").Or().equal(1, "A").end_group().equal(2, 1).find_all(
                 start, end, limit);
             CHECK_EQUAL(res2, v.size());
 
-            v = tt.where().first.equal("A").group().second.equal("A").Or().third.equal(1).end_group().find_all(
+            v = tt.where().equal(0, "A").group().equal(1, "A").Or().equal(2, 1).end_group().find_all(
                 start, end, limit);
             CHECK_EQUAL(res3, v.size());
 
-            TripleTable::Query q =
-                tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A");
+            Query q = tt.where().group().equal(0, "A").Or().equal(2, 1).end_group().equal(1, "A");
             v = q.find_all(start, end, limit);
             CHECK_EQUAL(res4, v.size());
 
-            v = tt.where().group().first.equal("A").Or().third.equal(1).end_group().second.equal("A").find_all(
+            v = tt.where().group().equal(0, "A").Or().equal(2, 1).end_group().equal(1, "A").find_all(
                 start, end, limit);
             CHECK_EQUAL(res4, v.size());
 
-            v = tt.where().first.equal("A").Or().second.equal("A").Or().third.equal(1).find_all(start, end, limit);
+            v = tt.where().equal(0, "A").Or().equal(1, "A").Or().equal(2, 1).find_all(start, end, limit);
             CHECK_EQUAL(res5, v.size());
 
-            v = tt.where().first.not_equal("A").second.equal("A").third.equal(1).find_all(start, end, limit);
+            v = tt.where().not_equal(0, "A").equal(1, "A").equal(2, 1).find_all(start, end, limit);
             CHECK_EQUAL(res6, v.size());
 
             v = tt.where()
-                    .first.not_equal("longlonglonglonglonglonglong A")
-                    .second.equal("A")
-                    .third.equal(1)
+                    .not_equal(0, "longlonglonglonglonglonglong A")
+                    .equal(1, "A")
+                    .equal(2, 1)
                     .find_all(start, end, limit);
             CHECK_EQUAL(res7, v.size());
 
             v = tt.where()
-                    .first.not_equal("longlonglonglonglonglonglong A")
-                    .second.equal("A")
-                    .third.equal(2)
+                    .not_equal(0, "longlonglonglonglonglonglong A")
+                    .equal(1, "A")
+                    .equal(2, 2)
                     .find_all(start, end, limit);
             CHECK_EQUAL(res8, v.size());
         }
@@ -2389,7 +2602,9 @@ TEST(Query_OnTableView_where)
 
     for (int iter = 0; iter < 50 * (1 + TEST_DURATION * TEST_DURATION); iter++) {
         random.seed(164);
-        OneIntTable oti;
+        TestTable oti;
+        oti.add_column(type_Int, "1");
+
         size_t cnt1 = 0;
         size_t cnt0 = 0;
         size_t limit = random.draw_int_max(REALM_MAX_BPNODE_SIZE * 10);
@@ -2406,16 +2621,15 @@ TEST(Query_OnTableView_where)
             if (v != 0 && i >= lbound && i < ubound)
                 cnt0++;
 
-            oti.add(v);
+            add(oti, v);
         }
 
-        OneIntTable::View v = oti.where().first.not_equal(0).find_all(lbound, ubound, limit);
-        size_t cnt2 = oti.where(&v).first.equal(1).count();
+        TableView v = oti.where().not_equal(0, 0).find_all(lbound, ubound, limit);
+        size_t cnt2 = oti.where(&v).equal(0, 1).count();
 
         CHECK_EQUAL(cnt1, cnt2);
     }
 }
-
 
 TEST(Query_StrIndex3)
 {
@@ -2430,7 +2644,9 @@ TEST(Query_StrIndex3)
 #else
     for (int N = 0; N < 20; N++) {
 #endif
-        TupleTableType ttt;
+        TestTable ttt;
+        ttt.add_column(type_Int, "1");
+        ttt.add_column(type_String, "2");
 
         std::vector<size_t> vec;
         size_t row = 0;
@@ -2454,39 +2670,39 @@ TEST(Query_StrIndex3)
             for (int j = 0; j < REALM_MAX_BPNODE_SIZE * 2 + REALM_MAX_BPNODE_SIZE / 5; j++) {
                 if (random.chance(1, f1)) {
                     if (random.chance(1, f2)) {
-                        ttt.add(0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA");
+                        add(ttt, 0, longstrings ? "AAAAAAAAAAAAAAAAAAAAAAAA" : "AA");
                         if (!longstrings) {
                             n++;
                             vec.push_back(row);
                         }
                     }
                     else {
-                        ttt.add(0, "BB");
+                        add(ttt, 0, "BB");
                     }
                 }
                 else {
                     if (random.chance(1, f2)) {
-                        ttt.add(1, "AA");
+                        add(ttt, 1, "AA");
                     }
                     else {
-                        ttt.add(1, "BB");
+                        add(ttt, 1, "BB");
                     }
                 }
                 ++row;
             }
         }
 
-        TupleTableType::View v;
+        TableView v;
 
         // Both linear scans
-        v = ttt.where().second.equal("AA").first.equal(0).find_all();
+        v = ttt.where().equal(1, "AA").equal(0, 0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
         for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
         v.clear();
         vec.clear();
 
-        v = ttt.where().first.equal(0).second.equal("AA").find_all();
+        v = ttt.where().equal(0, 0).equal(1, "AA").find_all();
         CHECK_EQUAL(vec.size(), v.size());
         for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
@@ -2496,31 +2712,31 @@ TEST(Query_StrIndex3)
         ttt.optimize();
 
         // Linear scan over enum, plus linear integer column scan
-        v = ttt.where().second.equal("AA").first.equal(0).find_all();
+        v = ttt.where().equal(1, "AA").equal(0, 0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
         for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
         v.clear();
         vec.clear();
 
-        v = ttt.where().first.equal(0).second.equal("AA").find_all();
+        v = ttt.where().equal(0, 0).equal(1, "AA").find_all();
         CHECK_EQUAL(vec.size(), v.size());
         for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
         v.clear();
         vec.clear();
 
-        ttt.column().second.add_search_index();
+        ttt.add_search_index(1);
 
         // Index lookup, plus linear integer column scan
-        v = ttt.where().second.equal("AA").first.equal(0).find_all();
+        v = ttt.where().equal(1, "AA").equal(0, 0).find_all();
         CHECK_EQUAL(vec.size(), v.size());
         for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
         v.clear();
         vec.clear();
 
-        v = ttt.where().first.equal(0).second.equal("AA").find_all();
+        v = ttt.where().equal(0, 0).equal(1, "AA").find_all();
         CHECK_EQUAL(vec.size(), v.size());
         for (size_t t = 0; t < vec.size(); t++)
             CHECK_EQUAL(vec[t], v.get_source_ndx(t));
@@ -2532,23 +2748,25 @@ TEST(Query_StrIndex3)
 
 TEST(Query_StrIndex2)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
     int64_t s;
 
     for (int i = 0; i < 100; ++i) {
-        ttt.add(1, "AA");
+        add(ttt, 1, "AA");
     }
-    ttt.add(1, "BB");
-    ttt.column().second.add_search_index();
+    add(ttt, 1, "BB");
+    ttt.add_search_index(1);
 
-    s = ttt.where().second.equal("AA").count();
+    s = ttt.where().equal(1, "AA").count();
     CHECK_EQUAL(100, s);
 
-    s = ttt.where().second.equal("BB").count();
+    s = ttt.where().equal(1, "BB").count();
     CHECK_EQUAL(1, s);
 
-    s = ttt.where().second.equal("CC").count();
+    s = ttt.where().equal(1, "CC").count();
     CHECK_EQUAL(0, s);
 }
 
@@ -2556,7 +2774,9 @@ TEST(Query_StrIndex2)
 TEST(Query_StrEnum)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
     int aa;
     int64_t s;
@@ -2566,15 +2786,15 @@ TEST(Query_StrEnum)
         aa = 0;
         for (size_t t = 0; t < REALM_MAX_BPNODE_SIZE * 2; ++t) {
             if (random.chance(1, 3)) {
-                ttt.add(1, "AA");
+                add(ttt, 1, "AA");
                 ++aa;
             }
             else {
-                ttt.add(1, "BB");
+                add(ttt, 1, "BB");
             }
         }
         ttt.optimize();
-        s = ttt.where().second.equal("AA").count();
+        s = ttt.where().equal(1, "AA").count();
         CHECK_EQUAL(aa, s);
     }
 }
@@ -2596,58 +2816,66 @@ TEST(Query_StrIndex)
     int64_t s;
 
     for (size_t i = 0; i < itera; i++) {
-        TupleTableType ttt;
+        TestTable ttt;
+        ttt.add_column(type_Int, "1");
+        ttt.add_column(type_String, "2");
+
         aa = 0;
         for (size_t t = 0; t < iterb; t++) {
             if (random.chance(1, 3)) {
-                ttt.add(1, "AA");
+                add(ttt, 1, "AA");
                 aa++;
             }
             else {
-                ttt.add(1, "BB");
+                add(ttt, 1, "BB");
             }
         }
 
-        s = ttt.where().second.equal("AA").count();
+        s = ttt.where().equal(1, "AA").count();
         CHECK_EQUAL(aa, s);
 
         ttt.optimize();
-        s = ttt.where().second.equal("AA").count();
+        s = ttt.where().equal(1, "AA").count();
         CHECK_EQUAL(aa, s);
 
-        ttt.column().second.add_search_index();
-        s = ttt.where().second.equal("AA").count();
+        ttt.add_search_index(1);
+        s = ttt.where().equal(1, "AA").count();
         CHECK_EQUAL(aa, s);
     }
 }
 
 
-TEST(Query_GameAnalytics)
+TEST(Query_GA_Crash)
 {
     GROUP_TEST_PATH(path);
     Random random(random_int<unsigned long>()); // Seed from slow global generator
     {
         Group g;
-        GATable::Ref t = g.add_table<GATable>("firstevents");
+        TableRef t = g.add_table("firstevents");
+        t->add_column(type_String, "1");
+    	t->add_column(type_String, "2");
+	    t->add_column(type_String, "3");
+	    t->add_column(type_Int, "4");
+	    t->add_column(type_Int, "5");
 
         for (size_t i = 0; i < 100; ++i) {
             int64_t r1 = random.draw_int_mod(100);
             int64_t r2 = random.draw_int_mod(100);
 
-            t->add("10", "US", "1.0", r1, r2);
+            add(t, "10", "US", "1.0", r1, r2);
         }
         t->optimize();
         g.write(path);
     }
 
     Group g(path);
-    GATable::Ref t = g.get_table<GATable>("firstevents");
+    TableRef t = g.get_table("firstevents");
 
-    GATable::Query q = t->where().country.equal("US");
+    Query q = t->where().equal(1, "US");
 
     size_t c1 = 0;
     for (size_t i = 0; i < 100; ++i)
-        c1 += t->column().country.count("US");
+        c1 += t.get()->count_string(1, "US");
 
     size_t c2 = 0;
     for (size_t i = 0; i < 100; ++i)
@@ -2660,119 +2888,129 @@ TEST(Query_GameAnalytics)
 
 TEST(Query_Float3)
 {
-    FloatTable3 t;
+    TestTable t;
+    t.add_column(type_Float, "1");
+    t.add_column(type_Double, "2");
+    t.add_column(type_Int, "3");
 
-    t.add(float(1.1), double(2.1), 1);
-    t.add(float(1.2), double(2.2), 2);
-    t.add(float(1.3), double(2.3), 3);
-    t.add(float(1.4), double(2.4), 4); // match
-    t.add(float(1.5), double(2.5), 5); // match
-    t.add(float(1.6), double(2.6), 6); // match
-    t.add(float(1.7), double(2.7), 7);
-    t.add(float(1.8), double(2.8), 8);
-    t.add(float(1.9), double(2.9), 9);
+    add(t, float(1.1), double(2.1), 1);
+    add(t, float(1.2), double(2.2), 2);
+    add(t, float(1.3), double(2.3), 3);
+    add(t, float(1.4), double(2.4), 4); // match
+    add(t, float(1.5), double(2.5), 5); // match
+    add(t, float(1.6), double(2.6), 6); // match
+    add(t, float(1.7), double(2.7), 7);
+    add(t, float(1.8), double(2.8), 8);
+    add(t, float(1.9), double(2.9), 9);
 
-    FloatTable3::Query q1 = t.where().col_float.greater(1.35f).col_double.less(2.65);
-    int64_t a1 = q1.col_int.sum();
+    Query q1 = t.where().greater(0, 1.35f).less(1, 2.65);
+    int64_t a1 = q1.sum_int(2);
     CHECK_EQUAL(15, a1);
 
-    FloatTable3::Query q2 = t.where().col_double.less(2.65).col_float.greater(1.35f);
-    int64_t a2 = q2.col_int.sum();
+    Query q2 = t.where().less(1, 2.65).greater(0, 1.35f);
+    int64_t a2 = q2.sum_int(2);
     CHECK_EQUAL(15, a2);
 
-    FloatTable3::Query q3 = t.where().col_double.less(2.65).col_float.greater(1.35f);
-    double a3 = q3.col_float.sum();
+    Query q3 = t.where().less(1, 2.65).greater(0, 1.35f);
+    double a3 = q3.sum_float(0);
     double sum3 = double(1.4f) + double(1.5f) + double(1.6f);
     CHECK_EQUAL(sum3, a3);
 
-    FloatTable3::Query q4 = t.where().col_float.greater(1.35f).col_double.less(2.65);
-    double a4 = q4.col_float.sum();
+    Query q4 = t.where().greater(0, 1.35f).less(1, 2.65);
+    double a4 = q4.sum_float(0);
     CHECK_EQUAL(sum3, a4);
 
-    FloatTable3::Query q5 = t.where().col_int.greater_equal(4).col_double.less(2.65);
-    double a5 = q5.col_float.sum();
+    Query q5 = t.where().greater_equal(2, 4).less(1, 2.65);
+    double a5 = q5.sum_float(0);
     CHECK_EQUAL(sum3, a5);
 
-    FloatTable3::Query q6 = t.where().col_double.less(2.65).col_int.greater_equal(4);
-    double a6 = q6.col_float.sum();
+    Query q6 = t.where().less(1, 2.65).greater_equal(2, 4);
+    double a6 = q6.sum_float(0);
     CHECK_EQUAL(sum3, a6);
 
-    FloatTable3::Query q7 = t.where().col_int.greater(3).col_int.less(7);
-    int64_t a7 = q7.col_int.sum();
+    Query q7 = t.where().greater(2, 3).less(2, 7);
+    int64_t a7 = q7.sum_int(2);
     CHECK_EQUAL(15, a7);
-    FloatTable3::Query q8 = t.where().col_int.greater(3).col_int.less(7);
-    int64_t a8 = q8.col_int.sum();
+    Query q8 = t.where().greater(2, 3).less(2, 7);
+    int64_t a8 = q8.sum_int(2);
     CHECK_EQUAL(15, a8);
 }
 
 TEST(Query_Float3_where)
 {
     // Sum on query on tableview
-    FloatTable3 t;
+    TestTable t;
+    t.add_column(type_Float, "1");
+    t.add_column(type_Double, "2");
+    t.add_column(type_Int, "3");
 
-    t.add(float(1.1), double(2.1), 1);
-    t.add(float(1.2), double(2.2), 2);
-    t.add(float(1.3), double(2.3), 3);
-    t.add(float(1.4), double(2.4), 4); // match
-    t.add(float(1.5), double(2.5), 5); // match
-    t.add(float(1.6), double(2.6), 6); // match
-    t.add(float(1.7), double(2.7), 7);
-    t.add(float(1.8), double(2.8), 8);
-    t.add(float(1.9), double(2.9), 9);
+    add(t, float(1.1), double(2.1), 1);
+    add(t, float(1.2), double(2.2), 2);
+    add(t, float(1.3), double(2.3), 3);
+    add(t, float(1.4), double(2.4), 4); // match
+    add(t, float(1.5), double(2.5), 5); // match
+    add(t, float(1.6), double(2.6), 6); // match
+    add(t, float(1.7), double(2.7), 7);
+    add(t, float(1.8), double(2.8), 8);
+    add(t, float(1.9), double(2.9), 9);
 
-    FloatTable3::View v = t.where().find_all();
+    TableView v = t.where().find_all();
 
-    FloatTable3::Query q1 = t.where(&v).col_float.greater(1.35f).col_double.less(2.65);
-    int64_t a1 = q1.col_int.sum();
+    Query q1 = t.where(&v).greater(0, 1.35f).less(1, 2.65);
+    int64_t a1 = q1.sum_int(2);
     CHECK_EQUAL(15, a1);
 
-    FloatTable3::Query q2 = t.where(&v).col_double.less(2.65).col_float.greater(1.35f);
-    int64_t a2 = q2.col_int.sum();
+    Query q2 = t.where(&v).less(1, 2.65).greater(0, 1.35f);
+    int64_t a2 = q2.sum_int(2);
     CHECK_EQUAL(15, a2);
 
-    FloatTable3::Query q3 = t.where(&v).col_double.less(2.65).col_float.greater(1.35f);
-    double a3 = q3.col_float.sum();
+    Query q3 = t.where(&v).less(1, 2.65).greater(0, 1.35f);
+    double a3 = q3.sum_float(0);
     double sum3 = double(1.4f) + double(1.5f) + double(1.6f);
     CHECK_EQUAL(sum3, a3);
 
-    FloatTable3::Query q4 = t.where(&v).col_float.greater(1.35f).col_double.less(2.65);
-    double a4 = q4.col_float.sum();
+    Query q4 = t.where(&v).greater(0, 1.35f).less(1, 2.65);
+    double a4 = q4.sum_float(0);
     CHECK_EQUAL(sum3, a4);
 
-    FloatTable3::Query q5 = t.where(&v).col_int.greater_equal(4).col_double.less(2.65);
-    double a5 = q5.col_float.sum();
+    Query q5 = t.where(&v).greater_equal(2, 4).less(1, 2.65);
+    double a5 = q5.sum_float(0);
     CHECK_EQUAL(sum3, a5);
 
-    FloatTable3::Query q6 = t.where(&v).col_double.less(2.65).col_int.greater_equal(4);
-    double a6 = q6.col_float.sum();
+    Query q6 = t.where(&v).less(1, 2.65).greater_equal(2, 4);
+    double a6 = q6.sum_float(0);
     CHECK_EQUAL(sum3, a6);
 
-    FloatTable3::Query q7 = t.where(&v).col_int.greater(3).col_int.less(7);
-    int64_t a7 = q7.col_int.sum();
+    Query q7 = t.where(&v).greater(2, 3).less(2, 7);
+    int64_t a7 = q7.sum_int(2);
     CHECK_EQUAL(15, a7);
-    FloatTable3::Query q8 = t.where(&v).col_int.greater(3).col_int.less(7);
-    int64_t a8 = q8.col_int.sum();
+    Query q8 = t.where(&v).greater(2, 3).less(2, 7);
+    int64_t a8 = q8.sum_int(2);
     CHECK_EQUAL(15, a8);
 }
 
 TEST(Query_TableViewSum)
 {
-    TableViewSum ttt;
+    TestTable ttt;
 
-    ttt.add(1.0, 1.0, 1);
-    ttt.add(2.0, 2.0, 2);
-    ttt.add(3.0, 3.0, 3);
-    ttt.add(4.0, 4.0, 4);
-    ttt.add(5.0, 5.0, 5);
-    ttt.add(6.0, 6.0, 6);
-    ttt.add(7.0, 7.0, 7);
-    ttt.add(8.0, 8.0, 8);
-    ttt.add(9.0, 9.0, 9);
-    ttt.add(10.0, 10.0, 10);
+    ttt.add_column(type_Float, "1");
+    ttt.add_column(type_Double, "2");
+    ttt.add_column(type_Int, "3");
 
-    TableViewSum::Query q1 = ttt.where().col_int.between(5, 9);
-    TableViewSum::View tv1 = q1.find_all();
-    int64_t s = tv1.column().col_int.sum();
+    add(ttt, 1.0f, 1.0, 1);
+    add(ttt, 2.0f, 2.0, 2);
+    add(ttt, 3.0f, 3.0, 3);
+    add(ttt, 4.0f, 4.0, 4);
+    add(ttt, 5.0f, 5.0, 5);
+    add(ttt, 6.0f, 6.0, 6);
+    add(ttt, 7.0f, 7.0, 7);
+    add(ttt, 8.0f, 8.0, 8);
+    add(ttt, 9.0f, 9.0, 9);
+    add(ttt, 10.0f, 10.0, 10);
+
+    Query q1 = ttt.where().between(2, 5, 9);
+    TableView tv1 = q1.find_all();
+    int64_t s = tv1.sum_int(2);
     CHECK_EQUAL(5 + 6 + 7 + 8 + 9, s);
 }
 
@@ -2780,202 +3018,194 @@ TEST(Query_TableViewSum)
 TEST(Query_JavaMinimumCrash)
 {
     // Test that triggers a bug that was discovered through Java intnerface and has been fixed
-    PHPMinimumCrash ttt;
+    TestTable ttt;
 
-    ttt.add("Joe", "John", 1);
-    ttt.add("Jane", "Doe", 2);
-    ttt.add("Bob", "Hanson", 3);
+    ttt.add_column(type_String, "1");
+	ttt.add_column(type_String, "2");
+	ttt.add_column(type_Int, "3");
 
-    PHPMinimumCrash::Query q1 = ttt.where().firstname.equal("Joe").Or().firstname.equal("Bob");
-    int64_t m = q1.salary.minimum();
+    add(ttt, "Joe", "John", 1);
+    add(ttt, "Jane", "Doe", 2);
+    add(ttt, "Bob", "Hanson", 3);
+
+    Query q1 = ttt.where().equal(0, "Joe").Or().equal(0, "Bob");
+    int64_t m = q1.minimum_int(2);
     CHECK_EQUAL(1, m);
 }
 
 
 TEST(Query_Float4)
 {
-    FloatTable3 t;
+    TestTable t;
 
-    t.add(std::numeric_limits<float>::max(), std::numeric_limits<double>::max(), 11111);
-    t.add(std::numeric_limits<float>::infinity(), std::numeric_limits<double>::infinity(), 11111);
-    t.add(12345.0, 12345.0, 11111);
+    t.add_column(type_Float, "1");
+    t.add_column(type_Double, "2");
+    t.add_column(type_Int, "3");
 
-    FloatTable3::Query q1 = t.where();
-    float a1 = q1.col_float.maximum();
-    double a2 = q1.col_double.maximum();
+    add(t, std::numeric_limits<float>::max(), std::numeric_limits<double>::max(), 11111);
+    add(t, std::numeric_limits<float>::infinity(), std::numeric_limits<double>::infinity(), 11111);
+    add(t, 12345.0f, 12345.0, 11111);
+
+    Query q1 = t.where();
+    float a1 = q1.maximum_float(0);
+    double a2 = q1.maximum_double(1);
     CHECK_EQUAL(std::numeric_limits<float>::infinity(), a1);
     CHECK_EQUAL(std::numeric_limits<double>::infinity(), a2);
 
 
-    FloatTable3::Query q2 = t.where();
-    float a3 = q1.col_float.minimum();
-    double a4 = q1.col_double.minimum();
+    Query q2 = t.where();
+    float a3 = q1.minimum_float(0);
+    double a4 = q1.minimum_double(1);
     CHECK_EQUAL(12345.0, a3);
     CHECK_EQUAL(12345.0, a4);
 }
 
 TEST(Query_Float)
 {
-    FloatTable t;
+    TestTable t;
+    t.add_column(type_Float, "1");
+    t.add_column(type_Double, "2");    
 
-    t.add(1.10f, 2.20);
-    t.add(1.13f, 2.21);
-    t.add(1.13f, 2.22);
-    t.add(1.10f, 2.20);
-    t.add(1.20f, 3.20);
+    add(t, 1.10f, 2.20);
+    add(t, 1.13f, 2.21);
+    add(t, 1.13f, 2.22);
+    add(t, 1.10f, 2.20);
+    add(t, 1.20f, 3.20);
 
     // Test find_all()
-    FloatTable::View v = t.where().col_float.equal(1.13f).find_all();
+    TableView v = t.where().equal(0, 1.13f).find_all();
     CHECK_EQUAL(2, v.size());
-    CHECK_EQUAL(1.13f, v[0].col_float.get());
-    CHECK_EQUAL(1.13f, v[1].col_float.get());
+    CHECK_EQUAL(1.13f, v[0].get_float(0));
+    CHECK_EQUAL(1.13f, v[1].get_float(0));
 
-    FloatTable::View v2 = t.where().col_double.equal(3.2).find_all();
+    TableView v2 = t.where().equal(1, 3.2).find_all();
     CHECK_EQUAL(1, v2.size());
-    CHECK_EQUAL(3.2, v2[0].col_double.get());
+    CHECK_EQUAL(3.2, v2[0].get_double(1));
 
     // Test operators (and count)
-    CHECK_EQUAL(2, t.where().col_float.equal(1.13f).count());
-    CHECK_EQUAL(3, t.where().col_float.not_equal(1.13f).count());
-    CHECK_EQUAL(3, t.where().col_float.greater(1.1f).count());
-    CHECK_EQUAL(3, t.where().col_float.greater_equal(1.13f).count());
-    CHECK_EQUAL(4, t.where().col_float.less_equal(1.13f).count());
-    CHECK_EQUAL(2, t.where().col_float.less(1.13f).count());
-    CHECK_EQUAL(3, t.where().col_float.between(1.13f, 1.2f).count());
+    CHECK_EQUAL(2, t.where().equal(0, 1.13f).count());
+    CHECK_EQUAL(3, t.where().not_equal(0, 1.13f).count());
+    CHECK_EQUAL(3, t.where().greater(0, 1.1f).count());
+    CHECK_EQUAL(3, t.where().greater_equal(0, 1.13f).count());
+    CHECK_EQUAL(4, t.where().less_equal(0, 1.13f).count());
+    CHECK_EQUAL(2, t.where().less(0, 1.13f).count());
+    CHECK_EQUAL(3, t.where().between(0, 1.13f, 1.2f).count());
 
-    CHECK_EQUAL(2, t.where().col_double.equal(2.20).count());
-    CHECK_EQUAL(3, t.where().col_double.not_equal(2.20).count());
-    CHECK_EQUAL(2, t.where().col_double.greater(2.21).count());
-    CHECK_EQUAL(3, t.where().col_double.greater_equal(2.21).count());
-    CHECK_EQUAL(4, t.where().col_double.less_equal(2.22).count());
-    CHECK_EQUAL(3, t.where().col_double.less(2.22).count());
-    CHECK_EQUAL(4, t.where().col_double.between(2.20, 2.22).count());
+    CHECK_EQUAL(2, t.where().equal(1, 2.20).count());
+    CHECK_EQUAL(3, t.where().not_equal(1, 2.20).count());
+    CHECK_EQUAL(2, t.where().greater(1, 2.21).count());
+    CHECK_EQUAL(3, t.where().greater_equal(1, 2.21).count());
+    CHECK_EQUAL(4, t.where().less_equal(1, 2.22).count());
+    CHECK_EQUAL(3, t.where().less(1, 2.22).count());
+    CHECK_EQUAL(4, t.where().between(1, 2.20, 2.22).count());
 
     double epsilon = std::numeric_limits<double>::epsilon();
 
     // ------ Test sum()
     // ... NO conditions
     double sum1_d = 2.20 + 2.21 + 2.22 + 2.20 + 3.20;
-    CHECK_APPROXIMATELY_EQUAL(sum1_d, t.where().col_double.sum(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_d, t.where().sum_double(1), 10 * epsilon);
 
     // Note: sum of float is calculated by having a double aggregate to where each float is added
     // (thereby getting casted to double).
     double sum1_f = double(1.10f) + double(1.13f) + double(1.13f) + double(1.10f) + double(1.20f);
-    double res = t.where().col_float.sum();
+    double res = t.where().sum_float(0);
     CHECK_APPROXIMATELY_EQUAL(sum1_f, res, 10 * epsilon);
 
     // ... with conditions
     double sum2_f = double(1.13f) + double(1.20f);
     double sum2_d = 2.21 + 3.20;
-    FloatTable::Query q2 = t.where().col_float.between(1.13f, 1.20f).col_double.not_equal(2.22);
-    CHECK_APPROXIMATELY_EQUAL(sum2_f, q2.col_float.sum(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum2_d, q2.col_double.sum(), 10 * epsilon);
+    Query q2 = t.where().between(0, 1.13f, 1.20f).not_equal(1, 2.22);
+    CHECK_APPROXIMATELY_EQUAL(sum2_f, q2.sum_float(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_d, q2.sum_double(1), 10 * epsilon);
 
     // ------ Test average()
 
     // ... NO conditions
-    CHECK_APPROXIMATELY_EQUAL(sum1_f / 5, t.where().col_float.average(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum1_d / 5, t.where().col_double.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_f / 5, t.where().average_float(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum1_d / 5, t.where().average_double(1), 10 * epsilon);
     // ... with conditions
-    CHECK_APPROXIMATELY_EQUAL(sum2_f / 2, q2.col_float.average(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(sum2_d / 2, q2.col_double.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_f / 2, q2.average_float(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(sum2_d / 2, q2.average_double(1), 10 * epsilon);
 
     // -------- Test minimum(), maximum()
 
     size_t ndx = not_found;
 
     // ... NO conditions
-    CHECK_EQUAL(1.20f, t.where().col_float.maximum());
-    t.where().col_float.maximum(nullptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(1.20f, t.where().maximum_float(0));
+    t.where().maximum_float(0, nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(4, ndx);
 
-    CHECK_EQUAL(1.10f, t.where().col_float.minimum());
-    t.where().col_float.minimum(nullptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(1.10f, t.where().minimum_float(0));
+    t.where().minimum_float(0, nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(3.20, t.where().col_double.maximum());
-    CHECK_EQUAL(3.20, t.where().col_double.maximum(nullptr, 0, not_found, not_found, &ndx));
+    CHECK_EQUAL(3.20, t.where().maximum_double(1));
+    CHECK_EQUAL(3.20, t.where().maximum_double(1, nullptr, 0, not_found, not_found, &ndx));
 
-    CHECK_EQUAL(2.20, t.where().col_double.minimum());
-    t.where().col_double.minimum(nullptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(2.20, t.where().minimum_double(1));
+    t.where().minimum_double(1, nullptr, 0, not_found, not_found, &ndx);
 
     // ... with conditions
-    CHECK_EQUAL(1.20f, q2.col_float.maximum());
-    q2.col_float.maximum(nullptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(1.20f, q2.maximum_float(0));
+    q2.maximum_float(0, nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(4, ndx);
 
-    CHECK_EQUAL(1.13f, q2.col_float.minimum());
-    q2.col_float.minimum(nullptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(1.13f, q2.minimum_float(0));
+    q2.minimum_float(0, nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(1, ndx);
 
-    CHECK_EQUAL(3.20, q2.col_double.maximum());
-    q2.col_double.maximum(nullptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(3.20, q2.maximum_double(1));
+    q2.maximum_double(1, nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(4, ndx);
 
-    CHECK_EQUAL(2.21, q2.col_double.minimum());
-    q2.col_double.minimum(nullptr, 0, not_found, not_found, &ndx);
+    CHECK_EQUAL(2.21, q2.minimum_double(1));
+    q2.minimum_double(1, nullptr, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(1, ndx);
 
     size_t count = 0;
     // ... NO conditions
-    CHECK_EQUAL(1.20f, t.where().col_float.maximum(&count));
+    CHECK_EQUAL(1.20f, t.where().maximum_float(0, &count));
     CHECK_EQUAL(5, count);
-    t.where().col_float.maximum(&count, 0, not_found, not_found, &ndx);
+    t.where().maximum_float(0, &count, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(4, ndx);
 
-    CHECK_EQUAL(1.10f, t.where().col_float.minimum(&count));
+    CHECK_EQUAL(1.10f, t.where().minimum_float(0, &count));
     CHECK_EQUAL(5, count);
-    t.where().col_float.minimum(&count, 0, not_found, not_found, &ndx);
+    t.where().minimum_float(0, &count, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
-    CHECK_EQUAL(3.20, t.where().col_double.maximum(&count));
+    CHECK_EQUAL(3.20, t.where().maximum_double(1, &count));
     CHECK_EQUAL(5, count);
-    t.where().col_double.maximum(&count, 0, not_found, not_found, &ndx);
+    t.where().maximum_double(1, &count, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(4, ndx);
 
-    CHECK_EQUAL(2.20, t.where().col_double.minimum(&count));
+    CHECK_EQUAL(2.20, t.where().minimum_double(1, &count));
     CHECK_EQUAL(5, count);
-    t.where().col_double.minimum(&count, 0, not_found, not_found, &ndx);
+    t.where().minimum_double(1, &count, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(0, ndx);
 
     // ... with conditions
-    CHECK_EQUAL(1.20f, q2.col_float.maximum(&count));
+    CHECK_EQUAL(1.20f, q2.maximum_float(0, &count));
     CHECK_EQUAL(2, count);
-    q2.col_float.maximum(&count, 0, not_found, not_found, &ndx);
+    q2.maximum_float(0, &count, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(4, ndx);
 
-    CHECK_EQUAL(1.13f, q2.col_float.minimum(&count));
+    CHECK_EQUAL(1.13f, q2.minimum_float(0, &count));
     CHECK_EQUAL(2, count);
-    q2.col_float.minimum(&count, 0, not_found, not_found, &ndx);
+    q2.minimum_float(0, &count, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(1, ndx);
 
-    CHECK_EQUAL(3.20, q2.col_double.maximum(&count));
+    CHECK_EQUAL(3.20, q2.maximum_double(1, &count));
     CHECK_EQUAL(2, count);
-    q2.col_double.maximum(&count, 0, not_found, not_found, &ndx);
+    q2.maximum_double(1, &count, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(4, ndx);
 
-    CHECK_EQUAL(2.21, q2.col_double.minimum(&count));
+    CHECK_EQUAL(2.21, q2.minimum_double(1, &count));
     CHECK_EQUAL(2, count);
-    q2.col_double.minimum(&count, 0, not_found, not_found, &ndx);
+    q2.minimum_double(1, &count, 0, not_found, not_found, &ndx);
     CHECK_EQUAL(1, ndx);
-}
-
-
-TEST(Query_DateQuery)
-{
-    PeopleTable table;
-
-    table.add("Mary", 28, false, realm::OldDateTime(2012, 1, 24), realm::BinaryData("bin \0\n data 1", 13));
-    table.add("Frank", 56, true, realm::OldDateTime(2008, 4, 15), realm::BinaryData("bin \0\n data 2", 13));
-    table.add("Bob", 24, true, realm::OldDateTime(2010, 12, 1), realm::BinaryData("bin \0\n data 3", 13));
-
-    // Find people where hired year == 2012 (hour:minute:second is default initialized to 00:00:00)
-    PeopleTable::View view5 = table.where()
-                                  .hired.greater_equal(realm::OldDateTime(2012, 1, 1).get_olddatetime())
-                                  .hired.less(realm::OldDateTime(2013, 1, 1).get_olddatetime())
-                                  .find_all();
-    CHECK_EQUAL(1, view5.size());
-    CHECK_EQUAL("Mary", view5[0].name);
 }
 
 
@@ -2991,8 +3221,8 @@ TEST(Query_DoubleCoordinates)
 
     for (size_t t = 0; t < 100000; t++) {
         table->add_empty_row(1);
-        table->set_double(0, t, (t * 12345) % 1000);
-        table->set_double(1, t, (t * 12345) % 1000);
+        table->set_double(0, t, double((t * 12345) % 1000));
+        table->set_double(1, t, double((t * 12345) % 1000));
 
         if (table->get_double(0, t) >= 100. && table->get_double(0, t) <= 110. && table->get_double(1, t) >= 100. &&
             table->get_double(1, t) <= 110.) {
@@ -3015,80 +3245,86 @@ TEST(Query_DoubleCoordinates)
 
 TEST(Query_StrIndexedEnum)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
     for (size_t t = 0; t < 10; t++) {
-        ttt.add(1, "a");
-        ttt.add(4, "b");
-        ttt.add(7, "c");
-        ttt.add(10, "a");
-        ttt.add(1, "b");
-        ttt.add(4, "c");
+        add(ttt, 1, "a");
+        add(ttt, 4, "b");
+        add(ttt, 7, "c");
+        add(ttt, 10, "a");
+        add(ttt, 1, "b");
+        add(ttt, 4, "c");
     }
 
     ttt.optimize();
 
-    ttt.column().second.add_search_index();
+    ttt.add_search_index(1);
 
-    int64_t s = ttt.where().second.equal("a").first.sum();
+    int64_t s = ttt.where().equal(1, "a").sum_int(0);
     CHECK_EQUAL(10 * 11, s);
 
-    s = ttt.where().second.equal("a").first.equal(10).first.sum();
+    s = ttt.where().equal(1, "a").equal(0, 10).sum_int(0);
     CHECK_EQUAL(100, s);
 
-    s = ttt.where().first.equal(10).second.equal("a").first.sum();
+    s = ttt.where().equal(0, 10).equal(1, "a").sum_int(0);
     CHECK_EQUAL(100, s);
 
-    TupleTableType::View tv = ttt.where().second.equal("a").find_all();
+    TableView tv = ttt.where().equal(1, "a").find_all();
     CHECK_EQUAL(10 * 2, tv.size());
 }
 
 
 TEST(Query_StrIndexedNonEnum)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
     for (size_t t = 0; t < 10; t++) {
-        ttt.add(1, "a");
-        ttt.add(4, "b");
-        ttt.add(7, "c");
-        ttt.add(10, "a");
-        ttt.add(1, "b");
-        ttt.add(4, "c");
+        add(ttt, 1, "a");
+        add(ttt, 4, "b");
+        add(ttt, 7, "c");
+        add(ttt, 10, "a");
+        add(ttt, 1, "b");
+        add(ttt, 4, "c");
     }
 
-    ttt.column().second.add_search_index();
+    ttt.add_search_index(1);
 
-    int64_t s = ttt.where().second.equal("a").first.sum();
+    int64_t s = ttt.where().equal(1, "a").sum_int(0);
     CHECK_EQUAL(10 * 11, s);
 
-    s = ttt.where().second.equal("a").first.equal(10).first.sum();
+    s = ttt.where().equal(1, "a").equal(0, 10).sum_int(0);
     CHECK_EQUAL(100, s);
 
-    s = ttt.where().first.equal(10).second.equal("a").first.sum();
+    s = ttt.where().equal(0, 10).equal(1, "a").sum_int(0);
     CHECK_EQUAL(100, s);
 
-    TupleTableType::View tv = ttt.where().second.equal("a").find_all();
+    TableView tv = ttt.where().equal(1, "a").find_all();
     CHECK_EQUAL(10 * 2, tv.size());
 }
 
 TEST(Query_FindAllContains2_2)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(0, "foo");
-    ttt.add(1, "foobar");
-    ttt.add(2, "hellofoobar");
-    ttt.add(3, "foO");
-    ttt.add(4, "foObar");
-    ttt.add(5, "hellofoObar");
-    ttt.add(6, "hellofo");
-    ttt.add(7, "fobar");
-    ttt.add(8, "oobar");
+    add(ttt, 0, "foo");
+    add(ttt, 1, "foobar");
+    add(ttt, 2, "hellofoobar");
+    add(ttt, 3, "foO");
+    add(ttt, 4, "foObar");
+    add(ttt, 5, "hellofoObar");
+    add(ttt, 6, "hellofo");
+    add(ttt, 7, "fobar");
+    add(ttt, 8, "oobar");
 
     // FIXME: UTF-8 case handling is only implemented on msw for now
-    TupleTableType::Query q1 = ttt.where().second.contains("foO", false);
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().contains(1, "foO", false);
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(6, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
     CHECK_EQUAL(1, tv1.get_source_ndx(1));
@@ -3096,8 +3332,8 @@ TEST(Query_FindAllContains2_2)
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
     CHECK_EQUAL(4, tv1.get_source_ndx(4));
     CHECK_EQUAL(5, tv1.get_source_ndx(5));
-    TupleTableType::Query q2 = ttt.where().second.contains("foO", true);
-    TupleTableType::View tv2 = q2.find_all();
+    Query q2 = ttt.where().contains(1, "foO", true);
+    TableView tv2 = q2.find_all();
     CHECK_EQUAL(3, tv2.size());
     CHECK_EQUAL(3, tv2.get_source_ndx(0));
     CHECK_EQUAL(4, tv2.get_source_ndx(1));
@@ -3107,76 +3343,109 @@ TEST(Query_FindAllContains2_2)
 TEST(Query_SumNewAggregates)
 {
     // test the new ACTION_FIND_PATTERN() method in array
-    OneIntTable t;
+	Table t;
+	t.add_column(type_Int, "1");
     for (size_t i = 0; i < 1000; i++) {
-        t.add(1);
-        t.add(2);
-        t.add(4);
-        t.add(6);
+		t.add_empty_row();
+        t.set_int(0, t.size() - 1, 1);
+
+		t.add_empty_row();
+        t.set_int(0, t.size() - 1, 2);
+
+		t.add_empty_row();
+        t.set_int(0, t.size() - 1, 4);
+
+		t.add_empty_row();
+        t.set_int(0, t.size() - 1, 6);
     }
-    size_t c = t.where().first.equal(2).count();
+    size_t c = t.where().equal(0, 2).count();
     CHECK_EQUAL(1000, c);
 
-    c = t.where().first.greater(2).count();
+    c = t.where().greater(0, 2).count();
     CHECK_EQUAL(2000, c);
 }
 
 
 TEST(Query_SumMinMaxAvgForeignCol)
 {
-    TwoIntTable t;
-    t.add(1, 10);
-    t.add(2, 20);
-    t.add(2, 30);
-    t.add(3, 40);
+	Table t;
+	t.add_column(type_Int, "1");
+	t.add_column(type_Int, "2");
+	t.add_empty_row(4);
+	t.set_int(0, 0, 1);
+	t.set_int(1, 0, 10);
 
-    CHECK_EQUAL(50, t.where().first.equal(2).second.sum());
+	t.set_int(0, 1, 2);
+	t.set_int(1, 1, 20);
+
+	t.set_int(0, 2, 2);
+	t.set_int(1, 2, 30);
+
+	t.set_int(0, 3, 4);
+	t.set_int(1, 3, 40);
+
+    CHECK_EQUAL(50, t.where().equal(0, 2).sum_int(1));
 }
 
 
 TEST(Query_AggregateSingleCond)
 {
-    OneIntTable ttt;
+	Table t;
+	t.add_column(type_Int, "1");
 
-    ttt.add(1);
-    ttt.add(2);
-    ttt.add(2);
-    ttt.add(3);
-    ttt.add(3);
-    ttt.add(4);
+	t.add_empty_row();
+    t.set_int(0, t.size() - 1, 1);
 
-    int64_t s = ttt.where().first.equal(2).first.sum();
+	t.add_empty_row();
+    t.set_int(0, t.size() - 1, 2);
+
+	t.add_empty_row();
+    t.set_int(0, t.size() - 1, 2);
+
+	t.add_empty_row();
+    t.set_int(0, t.size() - 1, 3);
+
+	t.add_empty_row();
+    t.set_int(0, t.size() - 1, 3);
+
+	t.add_empty_row();
+    t.set_int(0, t.size() - 1, 4);
+
+    int64_t s = t.where().equal(0, 2).sum_int(0);
     CHECK_EQUAL(4, s);
 
-    s = ttt.where().first.greater(2).first.sum();
+    s = t.where().greater(0, 2).sum_int(0);
     CHECK_EQUAL(10, s);
 
-    s = ttt.where().first.less(3).first.sum();
+    s = t.where().less(0, 3).sum_int(0);
     CHECK_EQUAL(5, s);
 
-    s = ttt.where().first.not_equal(3).first.sum();
+    s = t.where().not_equal(0, 3).sum_int(0);
     CHECK_EQUAL(9, s);
 }
 
+
 TEST(Query_FindAllRange1)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(4, "a");
-    ttt.add(7, "a");
-    ttt.add(10, "a");
-    ttt.add(1, "a");
-    ttt.add(4, "a");
-    ttt.add(7, "a");
-    ttt.add(10, "a");
-    ttt.add(1, "a");
-    ttt.add(4, "a");
-    ttt.add(7, "a");
-    ttt.add(10, "a");
+    add(ttt, 1, "a");
+    add(ttt, 4, "a");
+    add(ttt, 7, "a");
+    add(ttt, 10, "a");
+    add(ttt, 1, "a");
+    add(ttt, 4, "a");
+    add(ttt, 7, "a");
+    add(ttt, 10, "a");
+    add(ttt, 1, "a");
+    add(ttt, 4, "a");
+    add(ttt, 7, "a");
+    add(ttt, 10, "a");
 
-    TupleTableType::Query q1 = ttt.where().second.equal("a");
-    TupleTableType::View tv1 = q1.find_all(4, 10);
+    Query q1 = ttt.where().equal(1, "a");
+    TableView tv1 = q1.find_all(4, 10);
     CHECK_EQUAL(6, tv1.size());
 }
 
@@ -3189,7 +3458,10 @@ TEST(Query_FindAllRangeOrMonkey2)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
     for (size_t u = 0; u < ITER; u++) {
-        TwoIntTable tit;
+        TestTable tit;
+        tit.add_column(type_Int, "1");
+        tit.add_column(type_Int, "2");
+
         ArrayInteger a(Allocator::get_default());
         a.create(Array::type_Normal);
         size_t start = random.draw_int_max(ROWS);
@@ -3201,14 +3473,14 @@ TEST(Query_FindAllRangeOrMonkey2)
         for (size_t t = 0; t < ROWS; t++) {
             int64_t r1 = random.draw_int_mod(10);
             int64_t r2 = random.draw_int_mod(10);
-            tit.add(r1, r2);
+            add(tit, r1, r2);
         }
 
-        TwoIntTable::Query q1 = tit.where().group().first.equal(3).Or().first.equal(7).end_group().second.greater(5);
-        TwoIntTable::View tv1 = q1.find_all(start, end);
+        Query q1 = tit.where().group().equal(0, 3).Or().equal(0, 7).end_group().greater(1, 5);
+        TableView tv1 = q1.find_all(start, end);
 
         for (size_t t = start; t < end; t++) {
-            if ((tit[t].first == 3 || tit[t].first == 7) && tit[t].second > 5)
+            if ((tit[t].get_int(0) == 3 || tit[t].get_int(0) == 7) && tit[t].get_int(1) > 5)
                 a.add(t);
         }
         size_t s1 = a.size();
@@ -3227,71 +3499,78 @@ TEST(Query_FindAllRangeOrMonkey2)
 
 TEST(Query_FindAllRangeOr)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "b");
-    ttt.add(2, "a"); //// match
-    ttt.add(3, "b"); //
-    ttt.add(1, "a"); //// match
-    ttt.add(2, "b"); //// match
-    ttt.add(3, "a");
-    ttt.add(1, "b");
-    ttt.add(2, "a"); //// match
-    ttt.add(3, "b"); //
+    add(ttt, 1, "b");
+    add(ttt, 2, "a"); //// match
+    add(ttt, 3, "b"); //
+    add(ttt, 1, "a"); //// match
+    add(ttt, 2, "b"); //// match
+    add(ttt, 3, "a");
+    add(ttt, 1, "b");
+    add(ttt, 2, "a"); //// match
+    add(ttt, 3, "b"); //
 
-    TupleTableType::Query q1 = ttt.where().group().first.greater(1).Or().second.equal("a").end_group().first.less(3);
-    TupleTableType::View tv1 = q1.find_all(1, 8);
+    Query q1 = ttt.where().group().greater(0, 1).Or().equal(1, "a").end_group().less(0, 3);
+    TableView tv1 = q1.find_all(1, 8);
     CHECK_EQUAL(4, tv1.size());
 
-    TupleTableType::View tv2 = q1.find_all(2, 8);
+    TableView  tv2 = q1.find_all(2, 8);
     CHECK_EQUAL(3, tv2.size());
 
-    TupleTableType::View tv3 = q1.find_all(1, 7);
+    TableView  tv3 = q1.find_all(1, 7);
     CHECK_EQUAL(3, tv3.size());
 }
 
 
 TEST(Query_SimpleStr)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "X");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "X");
-    ttt.add(6, "X");
-    TupleTableType::Query q = ttt.where().second.equal("X");
+    add(ttt, 1, "X");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "X");
+    add(ttt, 6, "X");
+    Query q = ttt.where().equal(1, "X");
     size_t c = q.count();
 
     CHECK_EQUAL(4, c);
 }
 
+
 TEST(Query_Delete)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "X");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "X");
-    ttt.add(6, "X");
+    add(ttt, 1, "X");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "X");
+    add(ttt, 6, "X");
 
-    TupleTableType::Query q = ttt.where().second.equal("X");
+    Query q = ttt.where().equal(1, "X");
     size_t r = q.remove();
 
     CHECK_EQUAL(4, r);
     CHECK_EQUAL(2, ttt.size());
-    CHECK_EQUAL(2, ttt[0].first);
-    CHECK_EQUAL(4, ttt[1].first);
+    CHECK_EQUAL(2, ttt[0].get_int(0));
+    CHECK_EQUAL(4, ttt[1].get_int(0));
 
     // test remove of all
     ttt.clear();
-    ttt.add(1, "X");
-    ttt.add(2, "X");
-    ttt.add(3, "X");
-    TupleTableType::Query q2 = ttt.where().second.equal("X");
+    add(ttt, 1, "X");
+    add(ttt, 2, "X");
+    add(ttt, 3, "X");
+    Query q2 = ttt.where().equal(1, "X");
     r = q2.remove();
     CHECK_EQUAL(3, r);
     CHECK_EQUAL(0, ttt.size());
@@ -3300,47 +3579,54 @@ TEST(Query_Delete)
 
 TEST(Query_Simple)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
 
-    TupleTableType::Query q1 = ttt.where().first.equal(2);
+    Query q1 = ttt.where().equal(0, 2);
 
-    TupleTableType::View tv1 = q1.find_all();
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
 
 TEST(Query_Not2)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
 
-    TupleTableType::Query q1 = ttt.where().Not().second.equal("a");
+    Query q1 = ttt.where().Not().equal(1, "a");
 
-    TupleTableType::View tv1 = q1.find_all();
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(2, tv1.get_source_ndx(0));
 }
 
 TEST(Query_SimpleBugDetect)
 {
-    TupleTableType ttt;
-    ttt.add(1, "a");
-    ttt.add(2, "a");
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    TupleTableType::Query q1 = ttt.where();
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
 
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where();
+
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
 
-    TupleTableType::View resView = tv1.column().second.find_all("Foo");
+    TableView resView = tv1.find_all_string(1, "Foo");
 
     // This previously crashed:
     // TableView resView = TableView(tv1);
@@ -3488,36 +3774,59 @@ TEST(Query_SubtableBug)
     CHECK_EQUAL(1, t1.size());
 }
 
+
 TEST(Query_Sort1)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a"); // 0
-    ttt.add(2, "a"); // 1
-    ttt.add(3, "X"); // 2
-    ttt.add(1, "a"); // 3
-    ttt.add(2, "a"); // 4
-    ttt.add(3, "X"); // 5
-    ttt.add(9, "a"); // 6
-    ttt.add(8, "a"); // 7
-    ttt.add(7, "X"); // 8
+    add(ttt, 1, "a"); // 0
+    add(ttt, 2, "a"); // 1
+    add(ttt, 3, "X"); // 2
+    add(ttt, 1, "a"); // 3
+    add(ttt, 2, "a"); // 4
+    add(ttt, 3, "X"); // 5
+    add(ttt, 9, "a"); // 6
+    add(ttt, 8, "a"); // 7
+    add(ttt, 7, "X"); // 8
 
     // tv.get_source_ndx()  = 0, 2, 3, 5, 6, 7, 8
     // Vals         = 1, 3, 1, 3, 9, 8, 7
     // result       = 3, 0, 5, 2, 8, 7, 6
 
-    TupleTableType::Query q = ttt.where().first.not_equal(2);
-    TupleTableType::View tv = q.find_all();
-    tv.column().first.sort();
+    Query q = ttt.where().not_equal(0, 2);
+    TableView tv = q.find_all();
+    tv.sort(0);
 
-    CHECK(tv.size() == 7);
-    CHECK(tv[0].first == 1);
-    CHECK(tv[1].first == 1);
-    CHECK(tv[2].first == 3);
-    CHECK(tv[3].first == 3);
-    CHECK(tv[4].first == 7);
-    CHECK(tv[5].first == 8);
-    CHECK(tv[6].first == 9);
+    CHECK_EQUAL(tv.size(), 7);
+    CHECK_EQUAL(tv[0].get_int(0), 1);
+    CHECK_EQUAL(tv[1].get_int(0), 1);
+    CHECK_EQUAL(tv[2].get_int(0), 3);
+    CHECK_EQUAL(tv[3].get_int(0), 3);
+    CHECK_EQUAL(tv[4].get_int(0), 7);
+    CHECK_EQUAL(tv[5].get_int(0), 8);
+    CHECK_EQUAL(tv[6].get_int(0), 9);
+
+    CHECK_EQUAL(tv[0].get_index(), 0);
+    CHECK_EQUAL(tv[1].get_index(), 3);
+    CHECK_EQUAL(tv[2].get_index(), 2);
+    CHECK_EQUAL(tv[3].get_index(), 5);
+    CHECK_EQUAL(tv[4].get_index(), 8);
+    CHECK_EQUAL(tv[5].get_index(), 7);
+    CHECK_EQUAL(tv[6].get_index(), 6);
+
+    tv = q.find_all();
+    tv.sort(0, false);
+
+    CHECK_EQUAL(tv.size(), 7);
+    CHECK_EQUAL(tv[0].get_index(), 6);
+    CHECK_EQUAL(tv[1].get_index(), 7);
+    CHECK_EQUAL(tv[2].get_index(), 8);
+    CHECK_EQUAL(tv[3].get_index(), 2);
+    CHECK_EQUAL(tv[4].get_index(), 5);
+    CHECK_EQUAL(tv[5].get_index(), 0);
+    CHECK_EQUAL(tv[6].get_index(), 3);
 }
 
 
@@ -3526,18 +3835,20 @@ TEST(Query_QuickSort)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
     // Triggers QuickSort because range > len
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
     for (size_t t = 0; t < 1000; t++)
-        ttt.add(random.draw_int_mod(1100), "a"); // 0
+        add(ttt, random.draw_int_mod(1100), "a"); // 0
 
-    TupleTableType::Query q = ttt.where();
-    TupleTableType::View tv = q.find_all();
-    tv.column().first.sort();
+    Query q = ttt.where();
+    TableView tv = q.find_all();
+    tv.sort(0);
 
     CHECK(tv.size() == 1000);
     for (size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t].first >= tv[t - 1].first);
+        CHECK(tv[t].get_int(0) >= tv[t - 1].get_int(0));
     }
 }
 
@@ -3546,18 +3857,20 @@ TEST(Query_CountSort)
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
     // Triggers CountSort because range <= len
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
     for (size_t t = 0; t < 1000; t++)
-        ttt.add(random.draw_int_mod(900), "a"); // 0
+        add(ttt, random.draw_int_mod(900), "a"); // 0
 
-    TupleTableType::Query q = ttt.where();
-    TupleTableType::View tv = q.find_all();
-    tv.column().first.sort();
+    Query q = ttt.where();
+    TableView tv = q.find_all();
+    tv.sort(0);
 
     CHECK(tv.size() == 1000);
     for (size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t].first >= tv[t - 1].first);
+        CHECK(tv[t].get_int(0) >= tv[t - 1].get_int(0));
     }
 }
 
@@ -3566,18 +3879,20 @@ TEST(Query_SortDescending)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
     for (size_t t = 0; t < 1000; t++)
-        ttt.add(random.draw_int_mod(1100), "a"); // 0
+        add(ttt, random.draw_int_mod(1100), "a"); // 0
 
-    TupleTableType::Query q = ttt.where();
-    TupleTableType::View tv = q.find_all();
-    tv.column().first.sort(false);
+    Query q = ttt.where();
+    TableView tv = q.find_all();
+    tv.sort(0, false);
 
     CHECK(tv.size() == 1000);
     for (size_t t = 1; t < tv.size(); t++) {
-        CHECK(tv[t].first <= tv[t - 1].first);
+        CHECK(tv[t].get_int(0) <= tv[t - 1].get_int(0));
     }
 }
 
@@ -3677,6 +3992,7 @@ TEST(Query_SortLinks)
     }
 
     // Check that you can sort on a regular link column
+    tv = t1->where().find_all();
     tv.sort(t1_link_t2_col);
     CHECK_EQUAL(tv.size(), num_rows);
     for (size_t i = 0; i < tv.size(); ++i) {
@@ -3754,6 +4070,7 @@ TEST(Query_SortLinkChains)
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
     }
+    tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]);
@@ -3761,11 +4078,13 @@ TEST(Query_SortLinkChains)
 
     // Test basic one link chain
     std::vector<size_t> results2 = {3, 4, 2, 1, 5, 0};
+    tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
     CHECK_EQUAL(tv.size(), results2.size());
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
     }
+    tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[results2.size() - 1 - i]);
@@ -3773,12 +4092,14 @@ TEST(Query_SortLinkChains)
 
     // Test link chain through two links with nulls
     std::vector<size_t> results3 = {1, 0, 2, 5};
+    tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {true}));
     // No guarantees about nullified links except they are at the end.
     CHECK(tv.size() >= results3.size());
     for (size_t i = 0; i < results3.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
     }
+    tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
     // No guarantees about nullified links except they are at the beginning.
     size_t num_nulls = tv.size() - results3.size();
@@ -3788,22 +4109,26 @@ TEST(Query_SortLinkChains)
 
     // Test link chain with nulls and a single local column
     std::vector<size_t> results4 = {1, 0, 2, 5, 3, 4};
+    tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}));
     CHECK_EQUAL(tv.size(), results4.size());
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4[i]);
     }
     std::vector<size_t> results4_rev = {1, 0, 2, 5, 4, 3};
+    tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {true, false}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev[i]);
     }
     std::vector<size_t> results4_rev2 = {3, 4, 5, 2, 0, 1};
+    tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, true}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev2[i]);
     }
     std::vector<size_t> results4_rev3 = {4, 3, 5, 2, 0, 1};
+    tv = t1->where().less(t1_int_col, 6).find_all();
     tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}, {t1_int_col}}, {false, false}));
     for (size_t i = 0; i < tv.size(); ++i) {
         CHECK_EQUAL(tv.get_int(t1_int_col, i), results4_rev3[i]);
@@ -3827,6 +4152,470 @@ TEST(Query_LinkChainSortErrors)
     CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{t1_linklist_col, t2_string_col}}), LogicError::type_mismatch);
     CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{backlink_ndx, t2_string_col}}), LogicError::type_mismatch);
     CHECK_LOGIC_ERROR(SortDescriptor(*t1, {{t1_int_col, t2_string_col}}), LogicError::type_mismatch);
+}
+
+
+TEST(Query_EmptyDescriptors)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+
+    t1->add_empty_row(4);
+    t1->set_int(t1_int_col, 0, 4);
+    t1->set_int(t1_int_col, 1, 3);
+    t1->set_int(t1_int_col, 2, 2);
+    t1->set_int(t1_int_col, 3, 3);
+
+    std::vector<size_t> results = {4, 3, 2, 3}; // original order
+
+    {   // Sorting with an empty sort descriptor is a no-op
+        TableView tv = t1->where().find_all();
+        tv.sort(SortDescriptor(*t1, {}));
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+    {   // Distinct with an empty descriptor is a no-op
+        TableView tv = t1->where().find_all();
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+    {   // Empty sort, empty distinct is still a no-op
+        TableView tv = t1->where().find_all();
+        tv.sort(SortDescriptor(*t1, {}));
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+    {   // Arbitrary compounded empty sort and distinct is still a no-op
+        TableView tv = t1->where().find_all();
+        tv.sort(SortDescriptor(*t1, {}));
+        tv.sort(SortDescriptor(*t1, {}));
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        tv.sort(SortDescriptor(*t1, {}));
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+    {   // Empty distinct compounded on a valid distinct is a no-op
+        TableView tv = t1->where().find_all();
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {}));
+        results = {4, 3, 2};
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+    {   // Empty sort compounded on a valid sort is a no-op
+        TableView tv = t1->where().find_all();
+        tv.sort(SortDescriptor(*t1, {}));
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}));
+        tv.sort(SortDescriptor(*t1, {}));
+        results = {2, 3, 3, 4};
+        for (size_t i = 0; i < results.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), results[i]);
+        }
+    }
+}
+
+
+TEST(Query_DescriptorsWillApply)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_str_col = t1->add_column(type_String, "t1_str");
+    t1->add_empty_row(1);
+
+    DescriptorOrdering ordering;
+
+    CHECK(!ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+
+    ordering.append_sort(SortDescriptor());
+    CHECK(!ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+
+    ordering.append_distinct(DistinctDescriptor());
+    CHECK(!ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+
+    ordering.append_sort(SortDescriptor(*t1, {{t1_int_col}}));
+    CHECK(ordering.will_apply_sort());
+    CHECK(!ordering.will_apply_distinct());
+
+    ordering.append_distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+
+    ordering.append_distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+
+    ordering.append_sort(SortDescriptor(*t1, {{t1_str_col}}));
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+
+    DescriptorOrdering ordering_copy = ordering;
+    CHECK(ordering.will_apply_sort());
+    CHECK(ordering.will_apply_distinct());
+    CHECK(ordering_copy.will_apply_sort());
+    CHECK(ordering_copy.will_apply_distinct());
+}
+
+
+TEST(Query_DistinctAndSort)
+{
+    Group g;
+    TableRef t1 = g.add_table("t1");
+    TableRef t2 = g.add_table("t2");
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_str_col = t1->add_column(type_String, "t1_str");
+    size_t t1_link_col = t1->add_column_link(type_Link, "t1_link_t2", *t2);
+    size_t t2_int_col = t2->add_column(type_Int, "t2_int");
+    t1->add_empty_row(6);
+    t2->add_empty_row(6);
+
+    t1->set_int(0, 0, 1); t1->set_string(1, 0, "A"); t1->set_link(2, 0, 1);
+    t1->set_int(0, 1, 1); t1->set_string(1, 1, "A"); t1->set_link(2, 1, 0);
+    t1->set_int(0, 2, 1); t1->set_string(1, 2, "B"); t1->set_link(2, 2, 2);
+    t1->set_int(0, 3, 2); t1->set_string(1, 3, "B"); t1->set_link(2, 3, 3);
+    t1->set_int(0, 4, 2); t1->set_string(1, 4, "A"); t1->set_link(2, 4, 5);
+    t1->set_int(0, 5, 2); t1->set_string(1, 5, "A"); t1->set_link(2, 5, 4);
+
+    t2->set_int(0, 0, 0);
+    t2->set_int(0, 1, 0);
+    t2->set_int(0, 2, 1);
+    t2->set_int(0, 3, 1);
+    t2->set_int(0, 4, 2);
+    t2->set_int(0, 5, 2);
+
+    //     T1                              T2
+    //   | t1_int   t1_str   t1_link_t2  | t2_int  |
+    //   ===========================================
+    // 0 | 1        "A"      1           | 0       |
+    // 1 | 1        "A"      0           | 0       |
+    // 2 | 1        "B"      2           | 1       |
+    // 3 | 2        "B"      3           | 1       |
+    // 4 | 2        "A"      5           | 2       |
+    // 5 | 2        "A"      4           | 2       |
+
+    using ResultList = std::vector<std::pair<size_t, size_t>>; // value, index
+    {   // distinct with no sort keeps original order
+        TableView tv = t1->where().find_all();
+        ResultList expected = {{1, 0}, {2, 3}};
+        tv.distinct(t1_int_col);
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // distinct on a sorted view retains sorted order
+        TableView tv = t1->where().find_all();
+        ResultList expected = {{1, 0}, {2, 4}};
+        tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}}));
+        tv.distinct(t1_int_col);
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // distinct on a view sorted descending retains sorted order
+        TableView tv = t1->where().find_all();
+        ResultList expected = {{2, 3}, {1, 2}};
+        tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}},
+                            {false /* descending */, false /* descending */}));
+        tv.distinct(t1_int_col);
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // distinct on a sorted view (different from table order) retains sorted order
+        TableView tv = t1->where().find_all();
+        ResultList expected = {{2, 3}, {1, 0}};
+        tv.sort(t1_int_col, false /* descending */);
+        tv.distinct(t1_int_col);
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // distinct across links on an unsorted view retains original order
+        TableView tv = t1->where().find_all();
+        ResultList expected = {{1, 0}, {1, 2}, {2, 4}};
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // distinct on a view sorted across links retains sorted order
+        TableView tv = t1->where().find_all();
+        ResultList expected = {{1, 0}, {2, 3}};
+        tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
+        tv.distinct(t1_int_col);
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+    {   // distinct across links and sort across links
+        TableView tv = t1->where().find_all();
+        ResultList expected = {{1, 0}, {1, 2}, {2, 4}};
+        tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
+        CHECK_EQUAL(tv.size(), expected.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(t1_int_col, i), expected[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), expected[i].second);
+        }
+    }
+}
+
+
+TEST(Query_SortDistinctOrderThroughHandover) {
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    Group& g = sg_w.begin_write();
+
+    TableRef t1 = g.add_table("t1");
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_str_col = t1->add_column(type_String, "t1_str");
+    t1->add_empty_row(5);
+    t1->set_int(0, 0, 100); t1->set_string(1, 0, "A");
+    t1->set_int(0, 1, 200); t1->set_string(1, 1, "A");
+    t1->set_int(0, 2, 300); t1->set_string(1, 2, "A");
+    t1->set_int(0, 3, 300); t1->set_string(1, 3, "A");
+    t1->set_int(0, 4, 400); t1->set_string(1, 4, "A");
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    SharedGroup::VersionID version_id = sg_w.get_version_of_current_transaction();
+    using HandoverPtr = std::unique_ptr<SharedGroup::Handover<TableView>>;
+    using ResultList = std::vector<std::pair<std::string, size_t>>;
+
+    auto check_across_handover = [&](ResultList results, HandoverPtr handover) {
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+        sg.begin_read();
+        LangBindHelper::advance_read(sg, version_id);
+        auto tv = sg.import_from_handover(std::move(handover));
+        tv->sync_if_needed();
+        CHECK(tv->is_in_sync());
+        CHECK_EQUAL(tv->size(), results.size());
+        for (size_t i = 0; i < tv->size(); ++i) {
+            CHECK_EQUAL(tv->get_string(1, i), results[i].first);
+            CHECK_EQUAL(tv->get_source_ndx(i), results[i].second);
+        }
+        sg.end_read();
+    };
+
+    //     T1
+    //   | t1_int     t1_str   |
+    //   =======================
+    // 0 | 100        "A"      |
+    // 1 | 200        "A"      |
+    // 2 | 300        "A"      |
+    // 3 | 300        "A"      |
+    // 4 | 400        "A"      |
+
+    {   // sort descending then distinct
+        TableView tv = t1->where().find_all();
+        ResultList results = {{"A", 4}};
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
+
+        CHECK_EQUAL(tv.size(), results.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_string(1, i), results[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), results[i].second);
+        }
+        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+    }
+    {   // distinct then sort descending
+        TableView tv = t1->where().find_all();
+        std::vector<std::pair<std::string, size_t>> results = {{"A", 0}};
+        tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        CHECK_EQUAL(tv.size(), results.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_string(1, i), results[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), results[i].second);
+        }
+        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+    }
+    {   // sort descending then multicolumn distinct
+        TableView tv = t1->where().find_all();
+        std::vector<std::pair<std::string, size_t>> results =
+            {{"A", 4}, {"A", 2}, {"A", 1}, {"A", 0}};
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}, {t1_int_col}}));
+        CHECK_EQUAL(tv.size(), results.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_string(1, i), results[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), results[i].second);
+        }
+        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+    }
+    {   // multicolumn distinct then sort descending
+        TableView tv = t1->where().find_all();
+        std::vector<std::pair<std::string, size_t>> results =
+        {{"A", 4}, {"A", 2}, {"A", 1}, {"A", 0}};
+        tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}, {t1_int_col}}));
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        CHECK_EQUAL(tv.size(), results.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_string(1, i), results[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), results[i].second);
+        }
+        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+    }
+}
+
+
+TEST(Query_CompoundDescriptors) {
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    Group& g = sg_w.begin_write();
+
+    TableRef t1 = g.add_table("t1");
+    size_t t1_int_col = t1->add_column(type_Int, "t1_int");
+    size_t t1_str_col = t1->add_column(type_String, "t1_str");
+    t1->add_empty_row(6);
+
+    t1->set_int(0, 0, 1); t1->set_string(1, 0, "A");
+    t1->set_int(0, 1, 1); t1->set_string(1, 1, "A");
+    t1->set_int(0, 2, 1); t1->set_string(1, 2, "B");
+    t1->set_int(0, 3, 2); t1->set_string(1, 3, "B");
+    t1->set_int(0, 4, 2); t1->set_string(1, 4, "A");
+    t1->set_int(0, 5, 2); t1->set_string(1, 5, "A");
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    SharedGroup::VersionID version_id = sg_w.get_version_of_current_transaction();
+    using HandoverPtr = std::unique_ptr<SharedGroup::Handover<TableView>>;
+    using ResultList = std::vector<std::pair<size_t, size_t>>; // value, index
+
+    auto check_across_handover = [&](ResultList results, HandoverPtr handover) {
+        std::unique_ptr<Replication> hist(make_in_realm_history(path));
+        SharedGroup sg(*hist, SharedGroupOptions(crypt_key()));
+        sg.begin_read();
+        LangBindHelper::advance_read(sg, version_id);
+        auto tv = sg.import_from_handover(std::move(handover));
+        tv->sync_if_needed();
+        CHECK(tv->is_in_sync());
+        CHECK_EQUAL(tv->size(), results.size());
+        for (size_t i = 0; i < tv->size(); ++i) {
+            CHECK_EQUAL(tv->get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv->get_source_ndx(i), results[i].second);
+        }
+        sg.end_read();
+    };
+
+    //     T1
+    //   | t1_int   t1_str  |
+    //   ====================
+    // 0 | 1        "A"     |
+    // 1 | 1        "A"     |
+    // 2 | 1        "B"     |
+    // 3 | 2        "B"     |
+    // 4 | 2        "A"     |
+    // 5 | 2        "A"     |
+
+    {   // sorting twice should the same as a single sort with both criteria
+        // but reversed: sort(a).sort(b) == sort(b, a)
+        ResultList results = {{2, 3}, {1, 2}, {2, 4}, {2, 5}, {1, 0}, {1, 1}};
+        TableView tv = t1->where().find_all();
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        tv.sort(SortDescriptor(*t1, {{t1_str_col}}, {false}));
+        CHECK_EQUAL(tv.size(), results.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), results[i].second);
+        }
+        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+
+        tv = t1->where().find_all();
+        tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}}, {false, false}));
+        CHECK_EQUAL(tv.size(), results.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), results[i].second);
+        }
+        hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+    }
+
+    {   // two distincts are not the same as a single distinct with both criteria
+        ResultList results = {{1, 0}, {2, 3}};
+        TableView tv = t1->where().find_all();
+        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));
+        CHECK_EQUAL(tv.size(), results.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), results[i].second);
+        }
+        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+
+        results = {{1, 0}, {1, 2}, {2, 3}, {2, 4}};
+        tv = t1->where().find_all();
+        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}, {t1_str_col}}));
+        CHECK_EQUAL(tv.size(), results.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), results[i].second);
+        }
+        hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+    }
+
+    {   // check results of sort-distinct-sort-distinct
+        TableView tv = t1->where().find_all();
+        tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}}, {true, true}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
+        ResultList results = {{1, 0}, {2, 4}};
+        CHECK_EQUAL(tv.size(), results.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), results[i].second);
+        }
+        HandoverPtr hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+
+        tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false})); // = {{2, 4}, {1, 0}}
+        tv.distinct(DistinctDescriptor(*t1, {{t1_str_col}}));  // = {{2, 4}}
+        results = {{2, 4}};
+        CHECK_EQUAL(tv.size(), results.size());
+        for (size_t i = 0; i < tv.size(); ++i) {
+            CHECK_EQUAL(tv.get_int(0, i), results[i].first);
+            CHECK_EQUAL(tv.get_source_ndx(i), results[i].second);
+        }
+        hp = sg_w.export_for_handover(tv, ConstSourcePayload::Stay);
+        check_across_handover(results, std::move(hp));
+    }
 }
 
 
@@ -3896,19 +4685,22 @@ TEST(Query_DistinctThroughLinks)
 
         // Test original funcionality through chain class
         std::vector<size_t> results1 = {0, 1, 2, 3, 4, 5};
-        tv.distinct(SortDescriptor(*t1, {{t1_int_col}}, {true}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
         CHECK_EQUAL(tv.size(), results1.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]);
         }
-        tv.distinct(SortDescriptor(*t1, {{t1_int_col}}, {false}));
+        tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.distinct(DistinctDescriptor(*t1, {{t1_int_col}}));
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // results haven't been sorted
         }
+        tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {true}));
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[i]); // still same order here by conincidence
         }
+        tv = t1->where().less(t1_int_col, 6).find_all();
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results1[results1.size() - 1 - i]); // now its reversed
@@ -3916,28 +4708,26 @@ TEST(Query_DistinctThroughLinks)
     }
 
     {
-        TableView tv = t1->where().less(t1_int_col, 6).find_all(); // fresh unsorted view
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
 
         // Test basic one link chain
         std::vector<size_t> results2 = {0, 1, 2, 4};
-        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}));
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         CHECK_EQUAL(tv.size(), results2.size());
         for (size_t i = 0; i < tv.size(); ++i) {
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
-        }
-        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
-        CHECK_EQUAL(tv.size(), results2.size());
-        for (size_t i = 0; i < tv.size(); ++i) {
-            // no difference even though false on distinct was specified
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results2[i]);
         }
 
         std::vector<size_t> results2_sorted_link = {0, 4, 2, 1};
+        tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {true}));
         CHECK_EQUAL(tv.size(), results2_sorted_link.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results2_sorted_link[i]);
         }
+        tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_int_col}}, {false}));
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results2_sorted_link[results2_sorted_link.size() - 1 - i]);
@@ -3945,29 +4735,28 @@ TEST(Query_DistinctThroughLinks)
     }
 
     {
-        TableView tv = t1->where().less(t1_int_col, 6).find_all(); // fresh unsorted view
+        TableView tv = t1->where().less(t1_int_col, 6).find_all();
 
         // Test link chain through two links with nulls
         std::vector<size_t> results3 = {0, 1, 2, 5};
-        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
+        tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         // Nullified links are excluded from distinct.
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
         }
-        tv.distinct(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
-        CHECK_EQUAL(tv.size(), results3.size());
-        for (size_t i = 0; i < results3.size(); ++i) {
-            // same order as before
-            CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
-        }
 
         results3 = {1, 0, 2, 5}; // sorted order on t3_col_int { null, 3, 4, 7 }
+        tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
             CHECK_EQUAL(tv.get_int(t1_int_col, i), results3[i]);
         }
+        tv = t1->where().less(t1_int_col, 6).find_all();
+        tv.distinct(DistinctDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}));
         tv.sort(SortDescriptor(*t1, {{t1_link_col, t2_link_col, t3_int_col}}, {false}));
         CHECK_EQUAL(tv.size(), results3.size());
         for (size_t i = 0; i < results3.size(); ++i) {
@@ -3979,80 +4768,84 @@ TEST(Query_DistinctThroughLinks)
 
 TEST(Query_Sort_And_Requery_Typed1)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a"); // 0 *
-    ttt.add(2, "a"); // 1
-    ttt.add(3, "X"); // 2
-    ttt.add(1, "a"); // 3 *
-    ttt.add(2, "a"); // 4
-    ttt.add(3, "X"); // 5
-    ttt.add(9, "a"); // 6 *
-    ttt.add(8, "a"); // 7 *
-    ttt.add(7, "X"); // 8
+    add(ttt, 1, "a"); // 0 *
+    add(ttt, 2, "a"); // 1
+    add(ttt, 3, "X"); // 2
+    add(ttt, 1, "a"); // 3 *
+    add(ttt, 2, "a"); // 4
+    add(ttt, 3, "X"); // 5
+    add(ttt, 9, "a"); // 6 *
+    add(ttt, 8, "a"); // 7 *
+    add(ttt, 7, "X"); // 8
 
     // tv.get_source_ndx()  = 0, 2, 3, 5, 6, 7, 8
     // Vals         = 1, 3, 1, 3, 9, 8, 7
     // result       = 3, 0, 5, 2, 8, 7, 6
 
-    TupleTableType::Query q = ttt.where().first.not_equal(2);
-    TupleTableType::View tv = q.find_all();
+    Query q = ttt.where().not_equal(0, 2);
+    TableView tv = q.find_all();
 
-    size_t match = ttt.where(&tv).first.equal(7).find();
+    size_t match = ttt.where(&tv).equal(0, 7).find();
     CHECK_EQUAL(match, 8);
 
-    tv.column().first.sort();
+    tv.sort(0);
 
     CHECK(tv.size() == 7);
-    CHECK(tv[0].first == 1);
-    CHECK(tv[1].first == 1);
-    CHECK(tv[2].first == 3);
-    CHECK(tv[3].first == 3);
-    CHECK(tv[4].first == 7);
-    CHECK(tv[5].first == 8);
-    CHECK(tv[6].first == 9);
+    CHECK(tv[0].get_int(0) == 1);
+    CHECK(tv[1].get_int(0) == 1);
+    CHECK(tv[2].get_int(0) == 3);
+    CHECK(tv[3].get_int(0) == 3);
+    CHECK(tv[4].get_int(0) == 7);
+    CHECK(tv[5].get_int(0) == 8);
+    CHECK(tv[6].get_int(0) == 9);
 
-    TupleTableType::Query q2 = ttt.where(&tv).second.not_equal("X");
-    TupleTableType::View tv2 = q2.find_all();
+    Query q2 = ttt.where(&tv).not_equal(1, "X");
+    TableView tv2 = q2.find_all();
 
     CHECK_EQUAL(4, tv2.size());
-    CHECK_EQUAL(1, tv2[0].first);
-    CHECK_EQUAL(1, tv2[1].first);
-    CHECK_EQUAL(8, tv2[2].first); // 8, 9 (sort order) instead of 9, 8 (table order)
-    CHECK_EQUAL(9, tv2[3].first);
+    CHECK_EQUAL(1, tv2[0].get_int(0));
+    CHECK_EQUAL(1, tv2[1].get_int(0));
+    CHECK_EQUAL(8, tv2[2].get_int(0)); // 8, 9 (sort order) instead of 9, 8 (table order)
+    CHECK_EQUAL(9, tv2[3].get_int(0));
 
-    match = ttt.where(&tv).second.not_equal("X").find();
+    match = ttt.where(&tv).not_equal(1, "X").find();
     CHECK_EQUAL(match, 0);
 
-    match = ttt.where(&tv).second.not_equal("X").find(1);
+    match = ttt.where(&tv).not_equal(1, "X").find(1);
     CHECK_EQUAL(match, 3);
 
-    match = ttt.where(&tv).second.not_equal("X").find(2);
+    match = ttt.where(&tv).not_equal(1, "X").find(2);
     CHECK_EQUAL(match, 3);
 
-    match = ttt.where(&tv).second.not_equal("X").find(6);
+    match = ttt.where(&tv).not_equal(1, "X").find(6);
     CHECK_EQUAL(match, 7);
 }
 
 
 TEST(Query_Sort_And_Requery_FindFirst)
 {
-    TwoIntTable ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_Int, "2");
 
-    ttt.add(1, 60);
-    ttt.add(2, 50); // **
-    ttt.add(3, 40); // *
-    ttt.add(1, 30);
-    ttt.add(2, 20); // **
-    ttt.add(3, 10); // **
+    add(ttt, 1, 60);
+    add(ttt, 2, 50); // **
+    add(ttt, 3, 40); // *
+    add(ttt, 1, 30);
+    add(ttt, 2, 20); // **
+    add(ttt, 3, 10); // **
 
-    TwoIntTable::Query q = ttt.where().first.greater(1);
-    TwoIntTable::View tv = q.find_all();
-    tv.column().second.sort();
+    Query q = ttt.where().greater(0, 1);
+    TableView tv = q.find_all();
+    tv.sort(1);
 
     // 3, 2, 1, 3, 2, 1
-    size_t t = ttt.where(&tv).first.equal(3).find();
-    int64_t s = ttt.where(&tv).second.not_equal(40).first.sum();
+    size_t t = ttt.where(&tv).equal(0, 3).find();
+    int64_t s = ttt.where(&tv).not_equal(1, 40).sum_int(0);
 
     static_cast<void>(s);
     static_cast<void>(t);
@@ -4377,26 +5170,28 @@ TEST(Query_Sort_And_Requery_Untyped_Monkey2)
 
 TEST(Query_Threads)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
     // Spread query search hits in an odd way to test more edge cases
     // (thread job size is THREAD_CHUNK_SIZE = 10)
     for (int i = 0; i < 30; i++) {
         for (int j = 0; j < 10; j++) {
-            ttt.add(5, "a");
-            ttt.add(j, "b");
-            ttt.add(6, "c");
-            ttt.add(6, "a");
-            ttt.add(6, "b");
-            ttt.add(6, "c");
-            ttt.add(6, "a");
+            add(ttt, 5, "a");
+            add(ttt, j, "b");
+            add(ttt, 6, "c");
+            add(ttt, 6, "a");
+            add(ttt, 6, "b");
+            add(ttt, 6, "c");
+            add(ttt, 6, "a");
         }
     }
-    TupleTableType::Query q1 = ttt.where().first.equal(2).second.equal("b");
+    Query q1 = ttt.where().equal(0, 2).equal(1, "b");
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
     // q1.set_threads(5);
-    TupleTableType::View tv = q1.find_all();
+    TableView tv = q1.find_all();
 
     CHECK_EQUAL(30, tv.size());
     for (int i = 0; i < 30; i++) {
@@ -4409,26 +5204,28 @@ TEST(Query_Threads)
 
 TEST(Query_LongString)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
     // Spread query search hits in an odd way to test more edge cases
     // (thread job size is THREAD_CHUNK_SIZE = 10)
     for (int i = 0; i < 30; i++) {
         for (int j = 0; j < 10; j++) {
-            ttt.add(5, "aaaaaaaaaaaaaaaaaa");
-            ttt.add(j, "bbbbbbbbbbbbbbbbbb");
-            ttt.add(6, "cccccccccccccccccc");
-            ttt.add(6, "aaaaaaaaaaaaaaaaaa");
-            ttt.add(6, "bbbbbbbbbbbbbbbbbb");
-            ttt.add(6, "cccccccccccccccccc");
-            ttt.add(6, "aaaaaaaaaaaaaaaaaa");
+            add(ttt, 5, "aaaaaaaaaaaaaaaaaa");
+            add(ttt, j, "bbbbbbbbbbbbbbbbbb");
+            add(ttt, 6, "cccccccccccccccccc");
+            add(ttt, 6, "aaaaaaaaaaaaaaaaaa");
+            add(ttt, 6, "bbbbbbbbbbbbbbbbbb");
+            add(ttt, 6, "cccccccccccccccccc");
+            add(ttt, 6, "aaaaaaaaaaaaaaaaaa");
         }
     }
-    TupleTableType::Query q1 = ttt.where().first.equal(2).second.equal("bbbbbbbbbbbbbbbbbb");
+    Query q1 = ttt.where().equal(0, 2).equal(1, "bbbbbbbbbbbbbbbbbb");
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
     // q1.set_threads(5);
-    TupleTableType::View tv = q1.find_all();
+    TableView tv = q1.find_all();
 
     CHECK_EQUAL(30, tv.size());
     for (int i = 0; i < 30; i++) {
@@ -4441,27 +5238,29 @@ TEST(Query_LongString)
 
 TEST(Query_LongEnum)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
     // Spread query search hits in an odd way to test more edge cases
     // (thread job size is THREAD_CHUNK_SIZE = 10)
     for (int i = 0; i < 30; i++) {
         for (int j = 0; j < 10; j++) {
-            ttt.add(5, "aaaaaaaaaaaaaaaaaa");
-            ttt.add(j, "bbbbbbbbbbbbbbbbbb");
-            ttt.add(6, "cccccccccccccccccc");
-            ttt.add(6, "aaaaaaaaaaaaaaaaaa");
-            ttt.add(6, "bbbbbbbbbbbbbbbbbb");
-            ttt.add(6, "cccccccccccccccccc");
-            ttt.add(6, "aaaaaaaaaaaaaaaaaa");
+            add(ttt, 5, "aaaaaaaaaaaaaaaaaa");
+            add(ttt, j, "bbbbbbbbbbbbbbbbbb");
+            add(ttt, 6, "cccccccccccccccccc");
+            add(ttt, 6, "aaaaaaaaaaaaaaaaaa");
+            add(ttt, 6, "bbbbbbbbbbbbbbbbbb");
+            add(ttt, 6, "cccccccccccccccccc");
+            add(ttt, 6, "aaaaaaaaaaaaaaaaaa");
         }
     }
     ttt.optimize();
-    TupleTableType::Query q1 = ttt.where().first.equal(2).second.not_equal("aaaaaaaaaaaaaaaaaa");
+    Query q1 = ttt.where().equal(0, 2).not_equal(1, "aaaaaaaaaaaaaaaaaa");
 
     // Note, set THREAD_CHUNK_SIZE to 1.000.000 or more for performance
     // q1.set_threads(5);
-    TupleTableType::View tv = q1.find_all();
+    TableView tv = q1.find_all();
 
     CHECK_EQUAL(30, tv.size());
     for (int i = 0; i < 30; i++) {
@@ -4473,37 +5272,42 @@ TEST(Query_LongEnum)
 
 TEST(Query_BigString)
 {
-    TupleTableType ttt;
-    ttt.add(1, "a");
-    size_t res1 = ttt.where().second.equal("a").find();
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
+
+    add(ttt, 1, "a");
+    size_t res1 = ttt.where().equal(1, "a").find();
     CHECK_EQUAL(0, res1);
 
-    ttt.add(2, "40 chars  40 chars  40 chars  40 chars  ");
-    size_t res2 = ttt.where().second.equal("40 chars  40 chars  40 chars  40 chars  ").find();
+    add(ttt, 2, "40 chars  40 chars  40 chars  40 chars  ");
+    size_t res2 = ttt.where().equal(1, "40 chars  40 chars  40 chars  40 chars  ").find();
     CHECK_EQUAL(1, res2);
 
-    ttt.add(1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
+    add(ttt, 1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ");
     size_t res3 =
-        ttt.where().second.equal("70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ").find();
+        ttt.where().equal(1, "70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  70 chars  ").find();
     CHECK_EQUAL(2, res3);
 }
 
 TEST(Query_Simple2)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
 
-    TupleTableType::Query q1 = ttt.where().first.equal(2);
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().equal(0, 2);
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
     CHECK_EQUAL(4, tv1.get_source_ndx(1));
@@ -4513,64 +5317,68 @@ TEST(Query_Simple2)
 
 TEST(Query_Limit)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a"); //
-    ttt.add(3, "X");
-    ttt.add(1, "a");
-    ttt.add(2, "a"); //
-    ttt.add(3, "X");
-    ttt.add(1, "a");
-    ttt.add(2, "a"); //
-    ttt.add(3, "X");
-    ttt.add(1, "a");
-    ttt.add(2, "a"); //
-    ttt.add(3, "X");
-    ttt.add(1, "a");
-    ttt.add(2, "a"); //
-    ttt.add(3, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a"); //
+    add(ttt, 3, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a"); //
+    add(ttt, 3, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a"); //
+    add(ttt, 3, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a"); //
+    add(ttt, 3, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a"); //
+    add(ttt, 3, "X");
 
-    TupleTableType::Query q1 = ttt.where().first.equal(2);
+    Query q1 = ttt.where().equal(0, 2);
 
-    TupleTableType::View tv1 = q1.find_all(0, size_t(-1), 2);
+    TableView tv1 = q1.find_all(0, size_t(-1), 2);
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
     CHECK_EQUAL(4, tv1.get_source_ndx(1));
 
-    TupleTableType::View tv2 = q1.find_all(tv1.get_source_ndx(tv1.size() - 1) + 1, size_t(-1), 2);
+    TableView tv2 = q1.find_all(tv1.get_source_ndx(tv1.size() - 1) + 1, size_t(-1), 2);
     CHECK_EQUAL(2, tv2.size());
     CHECK_EQUAL(7, tv2.get_source_ndx(0));
     CHECK_EQUAL(10, tv2.get_source_ndx(1));
 
-    TupleTableType::View tv3 = q1.find_all(tv2.get_source_ndx(tv2.size() - 1) + 1, size_t(-1), 2);
+    TableView tv3 = q1.find_all(tv2.get_source_ndx(tv2.size() - 1) + 1, size_t(-1), 2);
     CHECK_EQUAL(1, tv3.size());
     CHECK_EQUAL(13, tv3.get_source_ndx(0));
 
 
-    TupleTableType::Query q2 = ttt.where();
-    TupleTableType::View tv4 = q2.find_all(0, 5, 3);
+    Query q2 = ttt.where();
+    TableView tv4 = q2.find_all(0, 5, 3);
     CHECK_EQUAL(3, tv4.size());
 
-    TupleTableType::Query q3 = ttt.where();
-    TupleTableType::View tv5 = q3.find_all(0, 3, 5);
+    Query q3 = ttt.where();
+    TableView tv5 = q3.find_all(0, 3, 5);
     CHECK_EQUAL(3, tv5.size());
 }
 
 
 TEST(Query_FindNext)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "a");
-    ttt.add(6, "X");
-    ttt.add(7, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "a");
+    add(ttt, 6, "X");
+    add(ttt, 7, "X");
 
-    TupleTableType::Query q1 = ttt.where().second.equal("X").first.greater(4);
+    Query q1 = ttt.where().equal(1, "X").greater(0, 4);
 
     const size_t res1 = q1.find();
     const size_t res2 = q1.find(res1 + 1);
@@ -4581,9 +5389,9 @@ TEST(Query_FindNext)
     CHECK_EQUAL(not_found, res3); // no more matches
 
     // Do same searches with new query every time
-    const size_t res4 = ttt.where().second.equal("X").first.greater(4).find();
-    const size_t res5 = ttt.where().second.equal("X").first.greater(4).find(res1 + 1);
-    const size_t res6 = ttt.where().second.equal("X").first.greater(4).find(res2 + 1);
+    const size_t res4 = ttt.where().equal(1, "X").greater(0, 4).find();
+    const size_t res5 = ttt.where().equal(1, "X").greater(0, 4).find(res1 + 1);
+    const size_t res6 = ttt.where().equal(1, "X").greater(0, 4).find(res2 + 1);
 
     CHECK_EQUAL(5, res4);
     CHECK_EQUAL(6, res5);
@@ -4593,15 +5401,17 @@ TEST(Query_FindNext)
 
 TEST(Query_FindNextBackwards)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
     // Create multiple leaves
     for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 4; i++) {
-        ttt.add(6, "X");
-        ttt.add(7, "X");
+        add(ttt, 6, "X");
+        add(ttt, 7, "X");
     }
 
-    TupleTableType::Query q = ttt.where().first.greater(4);
+    Query q = ttt.where().greater(0, 4);
 
     // Check if leaf caching works correctly in the case you go backwards. 'res' result is not so important
     // in this test; this test tests if we assert errorneously. Next test (TestQueryFindRandom) is more exhaustive
@@ -4618,7 +5428,10 @@ TEST(Query_FindRandom)
 {
     Random random(random_int<unsigned long>()); // Seed from slow global generator
 
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
+
     int64_t search = REALM_MAX_BPNODE_SIZE / 2;
     size_t rows = REALM_MAX_BPNODE_SIZE * 20;
 
@@ -4626,10 +5439,10 @@ TEST(Query_FindRandom)
     for (size_t i = 0; i < rows; i++) {
         // This value distribution makes us sometimes cross a leaf boundary, and sometimes not, with both having
         // a fair probability of happening
-        ttt.add(random.draw_int_mod(REALM_MAX_BPNODE_SIZE), "X");
+        add(ttt, random.draw_int_mod(REALM_MAX_BPNODE_SIZE), "X");
     }
 
-    TupleTableType::Query q = ttt.where().first.equal(search);
+    Query q = ttt.where().equal(0, search);
 
     for (size_t t = 0; t < 100; t++) {
         size_t begin = random.draw_int_mod(rows);
@@ -4638,7 +5451,7 @@ TEST(Query_FindRandom)
         // Find correct match position manually in a for-loop
         size_t expected = not_found;
         for (size_t u = begin; u < rows; u++) {
-            if (ttt.column().first[u] == search) {
+            if (ttt.get_int(0, u) == search) {
                 expected = u;
                 break;
             }
@@ -4651,17 +5464,19 @@ TEST(Query_FindRandom)
 
 TEST(Query_FindNext2)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "a");
-    ttt.add(6, "X");
-    ttt.add(7, "X"); // match
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "a");
+    add(ttt, 6, "X");
+    add(ttt, 7, "X"); // match
 
-    TupleTableType::Query q1 = ttt.where().second.equal("X").first.greater(4);
+    Query q1 = ttt.where().equal(1, "X").greater(0, 4);
 
     const size_t res1 = q1.find(6);
     CHECK_EQUAL(6, res1);
@@ -4669,57 +5484,63 @@ TEST(Query_FindNext2)
 
 TEST(Query_FindAll1)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "a");
-    ttt.add(6, "X");
-    ttt.add(7, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "a");
+    add(ttt, 6, "X");
+    add(ttt, 7, "X");
 
-    TupleTableType::Query q1 = ttt.where().second.equal("a").first.greater(2).first.not_equal(4);
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().equal(1, "a").greater(0, 2).not_equal(0, 4);
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.get_source_ndx(0));
 
-    TupleTableType::Query q2 = ttt.where().second.equal("X").first.greater(4);
-    TupleTableType::View tv2 = q2.find_all();
+    Query q2 = ttt.where().equal(1, "X").greater(0, 4);
+    TableView tv2 = q2.find_all();
     CHECK_EQUAL(5, tv2.get_source_ndx(0));
     CHECK_EQUAL(6, tv2.get_source_ndx(1));
 }
 
 TEST(Query_FindAll2)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "a");
-    ttt.add(11, "X");
-    ttt.add(0, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "a");
+    add(ttt, 11, "X");
+    add(ttt, 0, "X");
 
-    TupleTableType::Query q2 = ttt.where().second.not_equal("a").first.less(3);
-    TupleTableType::View tv2 = q2.find_all();
+    Query q2 = ttt.where().not_equal(1, "a").less(0, 3);
+    TableView tv2 = q2.find_all();
     CHECK_EQUAL(6, tv2.get_source_ndx(0));
 }
 
 TEST(Query_FindAllBetween)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "a");
-    ttt.add(11, "X");
-    ttt.add(3, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "a");
+    add(ttt, 11, "X");
+    add(ttt, 3, "X");
 
-    TupleTableType::Query q2 = ttt.where().first.between(3, 5);
-    TupleTableType::View tv2 = q2.find_all();
+    Query q2 = ttt.where().between(0, 3, 5);
+    TableView tv2 = q2.find_all();
     CHECK_EQUAL(2, tv2.get_source_ndx(0));
     CHECK_EQUAL(3, tv2.get_source_ndx(1));
     CHECK_EQUAL(4, tv2.get_source_ndx(2));
@@ -4729,33 +5550,37 @@ TEST(Query_FindAllBetween)
 
 TEST(Query_FindAllRange)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(5, "a");
-    ttt.add(5, "a");
-    ttt.add(5, "a");
+    add(ttt, 5, "a");
+    add(ttt, 5, "a");
+    add(ttt, 5, "a");
 
-    TupleTableType::Query q1 = ttt.where().second.equal("a").first.greater(2).first.not_equal(4);
-    TupleTableType::View tv1 = q1.find_all(1, 2);
+    Query q1 = ttt.where().equal(1, "a").greater(0, 2).not_equal(0, 4);
+    TableView tv1 = q1.find_all(1, 2);
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
 
 
 TEST(Query_FindAllOr)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "a");
-    ttt.add(6, "a");
-    ttt.add(7, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "a");
+    add(ttt, 6, "a");
+    add(ttt, 7, "X");
 
     // first == 5 || second == X
-    TupleTableType::Query q1 = ttt.where().first.equal(5).Or().second.equal("X");
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().equal(0, 5).Or().equal(1, "X");
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(2, tv1.get_source_ndx(0));
     CHECK_EQUAL(4, tv1.get_source_ndx(1));
@@ -4765,19 +5590,21 @@ TEST(Query_FindAllOr)
 
 TEST(Query_FindAllParens1)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "a");
-    ttt.add(11, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "a");
+    add(ttt, 11, "X");
 
     // first > 3 && (second == X)
-    TupleTableType::Query q1 = ttt.where().first.greater(3).group().second.equal("X").end_group();
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().greater(0, 3).group().equal(1, "X").end_group();
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(6, tv1.get_source_ndx(0));
 }
@@ -4785,20 +5612,22 @@ TEST(Query_FindAllParens1)
 
 TEST(Query_FindAllOrParan)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X"); //
-    ttt.add(4, "a");
-    ttt.add(5, "a"); //
-    ttt.add(6, "a");
-    ttt.add(7, "X"); //
-    ttt.add(2, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X"); //
+    add(ttt, 4, "a");
+    add(ttt, 5, "a"); //
+    add(ttt, 6, "a");
+    add(ttt, 7, "X"); //
+    add(ttt, 2, "X");
 
     // (first == 5 || second == X && first > 2)
-    TupleTableType::Query q1 = ttt.where().group().first.equal(5).Or().second.equal("X").first.greater(2).end_group();
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().group().equal(0, 5).Or().equal(1, "X").greater(0, 2).end_group();
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(2, tv1.get_source_ndx(0));
     CHECK_EQUAL(4, tv1.get_source_ndx(1));
@@ -4808,20 +5637,22 @@ TEST(Query_FindAllOrParan)
 
 TEST(Query_FindAllOrNested0)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "a");
-    ttt.add(11, "X");
-    ttt.add(8, "Y");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "a");
+    add(ttt, 11, "X");
+    add(ttt, 8, "Y");
 
     // first > 3 && (first == 5 || second == X)
-    TupleTableType::Query q1 = ttt.where().first.greater(3).group().first.equal(5).Or().second.equal("X").end_group();
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().greater(0, 3).group().equal(0, 5).Or().equal(1, "X").end_group();
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(5, tv1.get_source_ndx(0));
     CHECK_EQUAL(6, tv1.get_source_ndx(1));
@@ -4829,21 +5660,23 @@ TEST(Query_FindAllOrNested0)
 
 TEST(Query_FindAllOrNested)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "a");
-    ttt.add(11, "X");
-    ttt.add(8, "Y");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "a");
+    add(ttt, 11, "X");
+    add(ttt, 8, "Y");
 
     // first > 3 && (first == 5 || second == X || second == Y)
-    TupleTableType::Query q1 =
-        ttt.where().first.greater(3).group().first.equal(5).Or().second.equal("X").Or().second.equal("Y").end_group();
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 =
+        ttt.where().greater(0, 3).group().equal(0, 5).Or().equal(1, "X").Or().equal(1, "Y").end_group();
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(5, tv1.get_source_ndx(0));
     CHECK_EQUAL(6, tv1.get_source_ndx(1));
     CHECK_EQUAL(7, tv1.get_source_ndx(2));
@@ -4851,30 +5684,32 @@ TEST(Query_FindAllOrNested)
 
 TEST(Query_FindAllOrNestedInnerGroup)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "a");
-    ttt.add(11, "X");
-    ttt.add(8, "Y");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "a");
+    add(ttt, 11, "X");
+    add(ttt, 8, "Y");
 
     // first > 3 && (first == 5 || (second == X || second == Y))
-    TupleTableType::Query q1 = ttt.where()
-                                   .first.greater(3)
+    Query q1 = ttt.where()
+                                   .greater(0, 3)
                                    .group()
-                                   .first.equal(5)
+                                   .equal(0, 5)
                                    .Or()
                                    .group()
-                                   .second.equal("X")
+                                   .equal(1, "X")
                                    .Or()
-                                   .second.equal("Y")
+                                   .equal(1, "Y")
                                    .end_group()
                                    .end_group();
-    TupleTableType::View tv1 = q1.find_all();
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(5, tv1.get_source_ndx(0));
     CHECK_EQUAL(6, tv1.get_source_ndx(1));
     CHECK_EQUAL(7, tv1.get_source_ndx(2));
@@ -4882,54 +5717,60 @@ TEST(Query_FindAllOrNestedInnerGroup)
 
 TEST(Query_FindAllOrPHP)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "Joe");
-    ttt.add(2, "Sara");
-    ttt.add(3, "Jim");
+    add(ttt, 1, "Joe");
+    add(ttt, 2, "Sara");
+    add(ttt, 3, "Jim");
 
     // (second == Jim || second == Joe) && first = 1
-    TupleTableType::Query q1 =
-        ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(1);
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 =
+        ttt.where().group().equal(1, "Jim").Or().equal(1, "Joe").end_group().equal(0, 1);
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
 }
 
 TEST(Query_FindAllOr2)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "Joe");
-    ttt.add(2, "Sara");
-    ttt.add(3, "Jim");
+    add(ttt, 1, "Joe");
+    add(ttt, 2, "Sara");
+    add(ttt, 3, "Jim");
 
     // (second == Jim || second == Joe) && first = 1
-    TupleTableType::Query q1 =
-        ttt.where().group().second.equal("Jim").Or().second.equal("Joe").end_group().first.equal(3);
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 =
+        ttt.where().group().equal(1, "Jim").Or().equal(1, "Joe").end_group().equal(0, 3);
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.get_source_ndx(0));
 }
 
 
 TEST(Query_FindAllParens2)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "a");
-    ttt.add(11, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "a");
+    add(ttt, 11, "X");
 
     // ()((first > 3()) && (()))
-    TupleTableType::Query q1 = ttt.where()
+    Query q1 = ttt.where()
                                    .group()
                                    .end_group()
                                    .group()
                                    .group()
-                                   .first.greater(3)
+                                   .greater(0, 3)
                                    .group()
                                    .end_group()
                                    .end_group()
@@ -4938,7 +5779,7 @@ TEST(Query_FindAllParens2)
                                    .end_group()
                                    .end_group()
                                    .end_group();
-    TupleTableType::View tv1 = q1.find_all();
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(3, tv1.size());
     CHECK_EQUAL(4, tv1.get_source_ndx(0));
     CHECK_EQUAL(5, tv1.get_source_ndx(1));
@@ -4947,53 +5788,59 @@ TEST(Query_FindAllParens2)
 
 TEST(Query_FindAllParens4)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
-    ttt.add(3, "X");
-    ttt.add(4, "a");
-    ttt.add(5, "a");
-    ttt.add(11, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
+    add(ttt, 3, "X");
+    add(ttt, 4, "a");
+    add(ttt, 5, "a");
+    add(ttt, 11, "X");
 
     // ()
-    TupleTableType::Query q1 = ttt.where().group().end_group();
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().group().end_group();
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(7, tv1.size());
 }
 
 
 TEST(Query_FindAllBool)
 {
-    BoolTupleTable btt;
+    TestTable btt;
+    btt.add_column(type_Int, "1");
+    btt.add_column(type_Bool, "2");
 
-    btt.add(1, true);
-    btt.add(2, false);
-    btt.add(3, true);
-    btt.add(3, false);
+    add(btt, 1, true);
+    add(btt, 2, false);
+    add(btt, 3, true);
+    add(btt, 3, false);
 
-    BoolTupleTable::Query q1 = btt.where().second.equal(true);
-    BoolTupleTable::View tv1 = q1.find_all();
+    Query q1 = btt.where().equal(1, true);
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
     CHECK_EQUAL(2, tv1.get_source_ndx(1));
 
-    BoolTupleTable::Query q2 = btt.where().second.equal(false);
-    BoolTupleTable::View tv2 = q2.find_all();
+    Query q2 = btt.where().equal(1, false);
+    TableView tv2 = q2.find_all();
     CHECK_EQUAL(1, tv2.get_source_ndx(0));
     CHECK_EQUAL(3, tv2.get_source_ndx(1));
 }
 
 TEST(Query_FindAllBegins)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(0, "fo");
-    ttt.add(0, "foo");
-    ttt.add(0, "foobar");
+    add(ttt, 0, "fo");
+    add(ttt, 0, "foo");
+    add(ttt, 0, "foobar");
 
-    TupleTableType::Query q1 = ttt.where().second.begins_with("foo");
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().begins_with(1, "foo");
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
     CHECK_EQUAL(2, tv1.get_source_ndx(1));
@@ -5002,14 +5849,16 @@ TEST(Query_FindAllBegins)
 TEST(Query_FindAllEnds)
 {
 
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(0, "barfo");
-    ttt.add(0, "barfoo");
-    ttt.add(0, "barfoobar");
+    add(ttt, 0, "barfo");
+    add(ttt, 0, "barfoo");
+    add(ttt, 0, "barfoobar");
 
-    TupleTableType::Query q1 = ttt.where().second.ends_with("foo");
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().ends_with(1, "foo");
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
 }
@@ -5017,18 +5866,79 @@ TEST(Query_FindAllEnds)
 
 TEST(Query_FindAllContains)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(0, "foo");
-    ttt.add(0, "foobar");
-    ttt.add(0, "barfoo");
-    ttt.add(0, "barfoobaz");
-    ttt.add(0, "fo");
-    ttt.add(0, "fobar");
-    ttt.add(0, "barfo");
+    add(ttt, 0, "foo");
+    add(ttt, 0, "foobar");
+    add(ttt, 0, "barfoo");
+    add(ttt, 0, "barfoobaz");
+    add(ttt, 0, "fo");
+    add(ttt, 0, "fobar");
+    add(ttt, 0, "barfo");
 
-    TupleTableType::Query q1 = ttt.where().second.contains("foo");
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().contains(1, "foo");
+    TableView tv1 = q1.find_all();
+    CHECK_EQUAL(4, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_ndx(1));
+    CHECK_EQUAL(2, tv1.get_source_ndx(2));
+    CHECK_EQUAL(3, tv1.get_source_ndx(3));
+}
+
+TEST(Query_FindAllLike)
+{
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
+
+    add(ttt, 0, "foo");
+    add(ttt, 0, "foobar");
+    add(ttt, 0, "barfoo");
+    add(ttt, 0, "barfoobaz");
+    add(ttt, 0, "fo");
+    add(ttt, 0, "fobar");
+    add(ttt, 0, "barfo");
+
+    Query q1 = ttt.where().like(1, "*foo*");
+    TableView tv1 = q1.find_all();
+    CHECK_EQUAL(4, tv1.size());
+    CHECK_EQUAL(0, tv1.get_source_ndx(0));
+    CHECK_EQUAL(1, tv1.get_source_ndx(1));
+    CHECK_EQUAL(2, tv1.get_source_ndx(2));
+    CHECK_EQUAL(3, tv1.get_source_ndx(3));
+}
+
+TEST(Query_FindAllLikeStackOverflow)
+{
+    std::string str(100000, 'x');
+    StringData sd(str);
+
+    Table table;
+    table.add_column(type_String, "strings");
+    table.add_empty_row();
+    table.set_string(0, 0, sd);
+
+    table.where().like(0, sd).find();
+}
+
+TEST(Query_FindAllLikeCaseInsensitive)
+{
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
+
+    add(ttt, 0, "Foo");
+    add(ttt, 0, "FOOBAR");
+    add(ttt, 0, "BaRfOo");
+    add(ttt, 0, "barFOObaz");
+    add(ttt, 0, "Fo");
+    add(ttt, 0, "Fobar");
+    add(ttt, 0, "baRFo");
+
+    Query q1 = ttt.where().like(1, "*foo*", false);
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
     CHECK_EQUAL(1, tv1.get_source_ndx(1));
@@ -5038,7 +5948,9 @@ TEST(Query_FindAllContains)
 
 TEST(Query_Binary)
 {
-    TupleTableTypeBin t;
+    TestTable t;
+    t.add_column(type_Int, "1");
+    t.add_column(type_Binary, "2");
 
     const char bin[64] = {6, 3, 9, 5, 9, 7, 6, 3, 2, 6, 0, 0, 5, 4, 2, 4, 5, 7, 9, 5, 7, 1,
                           1, 2, 0, 8, 3, 8, 0, 9, 6, 8, 4, 7, 3, 4, 9, 5, 2, 3, 6, 2, 7, 4,
@@ -5046,47 +5958,47 @@ TEST(Query_Binary)
 
     const char bin_2[4] = {6, 6, 6, 6}; // Not occuring above
 
-    t.add(0, BinaryData(bin + 0, 16));
-    t.add(0, BinaryData(bin + 0, 32));
-    t.add(0, BinaryData(bin + 0, 48));
-    t.add(0, BinaryData(bin + 0, 64));
-    t.add(0, BinaryData(bin + 16, 48));
-    t.add(0, BinaryData(bin + 32, 32));
-    t.add(0, BinaryData(bin + 48, 16));
-    t.add(0, BinaryData(bin + 24, 16)); // The "odd ball"
-    t.add(0, BinaryData(bin + 0, 32));  // Repeat an entry
+    add(t, 0, BinaryData(bin + 0, 16));
+    add(t, 0, BinaryData(bin + 0, 32));
+    add(t, 0, BinaryData(bin + 0, 48));
+    add(t, 0, BinaryData(bin + 0, 64));
+    add(t, 0, BinaryData(bin + 16, 48));
+    add(t, 0, BinaryData(bin + 32, 32));
+    add(t, 0, BinaryData(bin + 48, 16));
+    add(t, 0, BinaryData(bin + 24, 16)); // The "odd ball"
+    add(t, 0, BinaryData(bin + 0, 32));  // Repeat an entry
 
-    CHECK_EQUAL(0, t.where().second.equal(BinaryData(bin + 16, 16)).count());
-    CHECK_EQUAL(1, t.where().second.equal(BinaryData(bin + 0, 16)).count());
-    CHECK_EQUAL(1, t.where().second.equal(BinaryData(bin + 48, 16)).count());
-    CHECK_EQUAL(2, t.where().second.equal(BinaryData(bin + 0, 32)).count());
+    CHECK_EQUAL(0, t.where().equal(1, BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(1, t.where().equal(1, BinaryData(bin + 0, 16)).count());
+    CHECK_EQUAL(1, t.where().equal(1, BinaryData(bin + 48, 16)).count());
+    CHECK_EQUAL(2, t.where().equal(1, BinaryData(bin + 0, 32)).count());
 
-    CHECK_EQUAL(9, t.where().second.not_equal(BinaryData(bin + 16, 16)).count());
-    CHECK_EQUAL(8, t.where().second.not_equal(BinaryData(bin + 0, 16)).count());
+    CHECK_EQUAL(9, t.where().not_equal(1, BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(8, t.where().not_equal(1, BinaryData(bin + 0, 16)).count());
 
-    CHECK_EQUAL(0, t.where().second.begins_with(BinaryData(bin + 8, 16)).count());
-    CHECK_EQUAL(1, t.where().second.begins_with(BinaryData(bin + 16, 16)).count());
-    CHECK_EQUAL(4, t.where().second.begins_with(BinaryData(bin + 0, 32)).count());
-    CHECK_EQUAL(5, t.where().second.begins_with(BinaryData(bin + 0, 16)).count());
-    CHECK_EQUAL(1, t.where().second.begins_with(BinaryData(bin + 48, 16)).count());
-    CHECK_EQUAL(9, t.where().second.begins_with(BinaryData(bin + 0, 0)).count());
+    CHECK_EQUAL(0, t.where().begins_with(1, BinaryData(bin + 8, 16)).count());
+    CHECK_EQUAL(1, t.where().begins_with(1, BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(4, t.where().begins_with(1, BinaryData(bin + 0, 32)).count());
+    CHECK_EQUAL(5, t.where().begins_with(1, BinaryData(bin + 0, 16)).count());
+    CHECK_EQUAL(1, t.where().begins_with(1, BinaryData(bin + 48, 16)).count());
+    CHECK_EQUAL(9, t.where().begins_with(1, BinaryData(bin + 0, 0)).count());
 
-    CHECK_EQUAL(0, t.where().second.ends_with(BinaryData(bin + 40, 16)).count());
-    CHECK_EQUAL(1, t.where().second.ends_with(BinaryData(bin + 32, 16)).count());
-    CHECK_EQUAL(3, t.where().second.ends_with(BinaryData(bin + 32, 32)).count());
-    CHECK_EQUAL(4, t.where().second.ends_with(BinaryData(bin + 48, 16)).count());
-    CHECK_EQUAL(1, t.where().second.ends_with(BinaryData(bin + 0, 16)).count());
-    CHECK_EQUAL(9, t.where().second.ends_with(BinaryData(bin + 64, 0)).count());
+    CHECK_EQUAL(0, t.where().ends_with(1, BinaryData(bin + 40, 16)).count());
+    CHECK_EQUAL(1, t.where().ends_with(1, BinaryData(bin + 32, 16)).count());
+    CHECK_EQUAL(3, t.where().ends_with(1, BinaryData(bin + 32, 32)).count());
+    CHECK_EQUAL(4, t.where().ends_with(1, BinaryData(bin + 48, 16)).count());
+    CHECK_EQUAL(1, t.where().ends_with(1, BinaryData(bin + 0, 16)).count());
+    CHECK_EQUAL(9, t.where().ends_with(1, BinaryData(bin + 64, 0)).count());
 
-    CHECK_EQUAL(0, t.where().second.contains(BinaryData(bin_2)).count());
-    CHECK_EQUAL(5, t.where().second.contains(BinaryData(bin + 0, 16)).count());
-    CHECK_EQUAL(5, t.where().second.contains(BinaryData(bin + 16, 16)).count());
-    CHECK_EQUAL(4, t.where().second.contains(BinaryData(bin + 24, 16)).count());
-    CHECK_EQUAL(4, t.where().second.contains(BinaryData(bin + 32, 16)).count());
-    CHECK_EQUAL(9, t.where().second.contains(BinaryData(bin + 0, 0)).count());
+    CHECK_EQUAL(0, t.where().contains(1, BinaryData(bin_2)).count());
+    CHECK_EQUAL(5, t.where().contains(1, BinaryData(bin + 0, 16)).count());
+    CHECK_EQUAL(5, t.where().contains(1, BinaryData(bin + 16, 16)).count());
+    CHECK_EQUAL(4, t.where().contains(1, BinaryData(bin + 24, 16)).count());
+    CHECK_EQUAL(4, t.where().contains(1, BinaryData(bin + 32, 16)).count());
+    CHECK_EQUAL(9, t.where().contains(1, BinaryData(bin + 0, 0)).count());
 
     {
-        TupleTableTypeBin::View tv = t.where().second.equal(BinaryData(bin + 0, 32)).find_all();
+        TableView tv = t.where().equal(1, BinaryData(bin + 0, 32)).find_all();
         if (tv.size() == 2) {
             CHECK_EQUAL(1, tv.get_source_ndx(0));
             CHECK_EQUAL(8, tv.get_source_ndx(1));
@@ -5096,7 +6008,7 @@ TEST(Query_Binary)
     }
 
     {
-        TupleTableTypeBin::View tv = t.where().second.contains(BinaryData(bin + 24, 16)).find_all();
+        TableView tv = t.where().contains(1, BinaryData(bin + 24, 16)).find_all();
         if (tv.size() == 4) {
             CHECK_EQUAL(2, tv.get_source_ndx(0));
             CHECK_EQUAL(3, tv.get_source_ndx(1));
@@ -5111,20 +6023,22 @@ TEST(Query_Binary)
 
 TEST(Query_Enums)
 {
-    TupleTableType table;
+    TestTable t;
+    t.add_column(type_Int, "1");
+    t.add_column(type_String, "2");
 
     for (size_t i = 0; i < 5; ++i) {
-        table.add(1, "abd");
-        table.add(2, "eftg");
-        table.add(5, "hijkl");
-        table.add(8, "mnopqr");
-        table.add(9, "stuvxyz");
+        add(t, 1, "abd");
+        add(t, 2, "eftg");
+        add(t, 5, "hijkl");
+        add(t, 8, "mnopqr");
+        add(t, 9, "stuvxyz");
     }
 
-    table.optimize();
+    t.optimize();
 
-    TupleTableType::Query q1 = table.where().second.equal("eftg");
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = t.where().equal(1, "eftg");
+    TableView tv1 = q1.find_all();
 
     CHECK_EQUAL(5, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
@@ -5145,79 +6059,100 @@ TEST(Query_Enums)
 #define ua "\x0c3\x0a5"       // danish lower case a with ring above (as in blaabaergroed)
 #define uad "\x061\x0cc\x08a" // decomposed form (a (41) followed by ring)
 
-TEST(Query_CaseSensitivity)
+TEST_TYPES(Query_CaseSensitivity, std::true_type, std::false_type)
 {
-    TupleTableType ttt;
+    constexpr bool nullable = TEST_TYPE::value;
 
-    ttt.add(1, "BLAAbaergroed");
-    ttt.add(1, "BLAAbaergroedandMORE");
-    ttt.add(1, "BLAAbaergroed2");
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2", nullable);
 
-    TupleTableType::Query q1 = ttt.where().second.equal("blaabaerGROED", false);
-    TupleTableType::View tv1 = q1.find_all();
+    add(ttt, 1, "BLAAbaergroed");
+    add(ttt, 1, "BLAAbaergroedandMORE");
+    add(ttt, 1, "BLAAbaergroedZ");
+    add(ttt, 1, "BLAAbaergroedZ");
+    add(ttt, 1, "BLAAbaergroedZ");
+
+    Query q1 = ttt.where().equal(1, "blaabaerGROED", false);
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
+
+    Query q2 = ttt.where().equal(1, "blaabaerGROEDz", false);
+    TableView tv2 = q2.find_all();
+    CHECK_EQUAL(3, tv2.size());
+
+    ttt.add_search_index(1);
+
+    Query q3 = ttt.where().equal(1, "blaabaerGROEDz", false);
+    TableView tv3 = q3.find_all();
+    CHECK_EQUAL(3, tv3.size());
 }
 
 #if (defined(_WIN32) || defined(__WIN32__) || defined(_WIN64))
 
 TEST(Query_Unicode2)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, uY);
-    ttt.add(1, uYd);
-    ttt.add(1, uy);
-    ttt.add(1, uyd);
+    add(ttt, 1, uY);
+    add(ttt, 1, uYd);
+    add(ttt, 1, uy);
+    add(ttt, 1, uyd);
 
-    TupleTableType::Query q1 = ttt.where().second.equal(uY, false);
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().equal(1, uY, false);
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
     CHECK_EQUAL(2, tv1.get_source_ndx(1));
 
-    TupleTableType::Query q2 = ttt.where().second.equal(uYd, false);
-    TupleTableType::View tv2 = q2.find_all();
+    Query q2 = ttt.where().equal(1, uYd, false);
+    TableView tv2 = q2.find_all();
     CHECK_EQUAL(2, tv2.size());
     CHECK_EQUAL(1, tv2.get_source_ndx(0));
     CHECK_EQUAL(3, tv2.get_source_ndx(1));
 
-    TupleTableType::Query q3 = ttt.where().second.equal(uYd, true);
-    TupleTableType::View tv3 = q3.find_all();
+    Query q3 = ttt.where().equal(1, uYd, true);
+    TableView tv3 = q3.find_all();
     CHECK_EQUAL(1, tv3.size());
     CHECK_EQUAL(1, tv3.get_source_ndx(0));
 }
 
+
 TEST(Query_Unicode3)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(1, uA);
-    ttt.add(1, uAd);
-    ttt.add(1, ua);
-    ttt.add(1, uad);
+    add(ttt, 1, uA);
+    add(ttt, 1, uAd);
+    add(ttt, 1, ua);
+    add(ttt, 1, uad);
 
-    TupleTableType::Query q1 = ttt.where().second.equal(uA, false);
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().equal(1, uA, false);
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
     CHECK_EQUAL(2, tv1.get_source_ndx(1));
 
-    TupleTableType::Query q2 = ttt.where().second.equal(ua, false);
-    TupleTableType::View tv2 = q2.find_all();
+    Query q2 = ttt.where().equal(1, ua, false);
+    TableView tv2 = q2.find_all();
     CHECK_EQUAL(2, tv2.size());
     CHECK_EQUAL(0, tv2.get_source_ndx(0));
     CHECK_EQUAL(2, tv2.get_source_ndx(1));
 
 
-    TupleTableType::Query q3 = ttt.where().second.equal(uad, false);
-    TupleTableType::View tv3 = q3.find_all();
+    Query q3 = ttt.where().equal(1, uad, false);
+    TableView tv3 = q3.find_all();
     CHECK_EQUAL(2, tv3.size());
     CHECK_EQUAL(1, tv3.get_source_ndx(0));
     CHECK_EQUAL(3, tv3.get_source_ndx(1));
 
-    TupleTableType::Query q4 = ttt.where().second.equal(uad, true);
-    TupleTableType::View tv4 = q4.find_all();
+    Query q4 = ttt.where().equal(1, uad, true);
+    TableView tv4 = q4.find_all();
     CHECK_EQUAL(1, tv4.size());
     CHECK_EQUAL(3, tv4.get_source_ndx(0));
 }
@@ -5226,14 +6161,16 @@ TEST(Query_Unicode3)
 
 TEST(Query_FindAllBeginsUnicode)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(0, uad "fo");
-    ttt.add(0, uad "foo");
-    ttt.add(0, uad "foobar");
+    add(ttt, 0, uad "fo");
+    add(ttt, 0, uad "foo");
+    add(ttt, 0, uad "foobar");
 
-    TupleTableType::Query q1 = ttt.where().second.begins_with(uad "foo");
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().begins_with(1, uad "foo");
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(2, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
     CHECK_EQUAL(2, tv1.get_source_ndx(1));
@@ -5242,19 +6179,21 @@ TEST(Query_FindAllBeginsUnicode)
 
 TEST(Query_FindAllEndsUnicode)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(0, "barfo");
-    ttt.add(0, "barfoo" uad);
-    ttt.add(0, "barfoobar");
+    add(ttt, 0, "barfo");
+    add(ttt, 0, "barfoo" uad);
+    add(ttt, 0, "barfoobar");
 
-    TupleTableType::Query q1 = ttt.where().second.ends_with("foo" uad);
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().ends_with(1, "foo" uad);
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(1, tv1.size());
     CHECK_EQUAL(1, tv1.get_source_ndx(0));
 
-    TupleTableType::Query q2 = ttt.where().second.ends_with("foo" uAd, false);
-    TupleTableType::View tv2 = q2.find_all();
+    Query q2 = ttt.where().ends_with(1, "foo" uAd, false);
+    TableView tv2 = q2.find_all();
     CHECK_EQUAL(1, tv2.size());
     CHECK_EQUAL(1, tv2.get_source_ndx(0));
 }
@@ -5262,26 +6201,28 @@ TEST(Query_FindAllEndsUnicode)
 
 TEST(Query_FindAllContainsUnicode)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
 
-    ttt.add(0, uad "foo");
-    ttt.add(0, uad "foobar");
-    ttt.add(0, "bar" uad "foo");
-    ttt.add(0, uad "bar" uad "foobaz");
-    ttt.add(0, uad "fo");
-    ttt.add(0, uad "fobar");
-    ttt.add(0, uad "barfo");
+    add(ttt, 0, uad "foo");
+    add(ttt, 0, uad "foobar");
+    add(ttt, 0, "bar" uad "foo");
+    add(ttt, 0, uad "bar" uad "foobaz");
+    add(ttt, 0, uad "fo");
+    add(ttt, 0, uad "fobar");
+    add(ttt, 0, uad "barfo");
 
-    TupleTableType::Query q1 = ttt.where().second.contains(uad "foo");
-    TupleTableType::View tv1 = q1.find_all();
+    Query q1 = ttt.where().contains(1, uad "foo");
+    TableView tv1 = q1.find_all();
     CHECK_EQUAL(4, tv1.size());
     CHECK_EQUAL(0, tv1.get_source_ndx(0));
     CHECK_EQUAL(1, tv1.get_source_ndx(1));
     CHECK_EQUAL(2, tv1.get_source_ndx(2));
     CHECK_EQUAL(3, tv1.get_source_ndx(3));
 
-    TupleTableType::Query q2 = ttt.where().second.contains(uAd "foo", false);
-    TupleTableType::View tv2 = q1.find_all();
+    Query q2 = ttt.where().contains(1, uAd "foo", false);
+    TableView tv2 = q1.find_all();
     CHECK_EQUAL(4, tv2.size());
     CHECK_EQUAL(0, tv2.get_source_ndx(0));
     CHECK_EQUAL(1, tv2.get_source_ndx(1));
@@ -5291,34 +6232,37 @@ TEST(Query_FindAllContainsUnicode)
 
 TEST(Query_SyntaxCheck)
 {
-    TupleTableType ttt;
+    TestTable ttt;
+    ttt.add_column(type_Int, "1");
+    ttt.add_column(type_String, "2");
+
     std::string s;
 
-    ttt.add(1, "a");
-    ttt.add(2, "a");
-    ttt.add(3, "X");
+    add(ttt, 1, "a");
+    add(ttt, 2, "a");
+    add(ttt, 3, "X");
 
-    TupleTableType::Query q1 = ttt.where().first.equal(2).end_group();
+    Query q1 = ttt.where().equal(0, 2).end_group();
     s = q1.validate();
     CHECK(s != "");
 
-    TupleTableType::Query q2 = ttt.where().group().group().first.equal(2).end_group();
+    Query q2 = ttt.where().group().group().equal(0, 2).end_group();
     s = q2.validate();
     CHECK(s != "");
 
-    TupleTableType::Query q3 = ttt.where().first.equal(2).Or();
+    Query q3 = ttt.where().equal(0, 2).Or();
     s = q3.validate();
     CHECK(s != "");
 
-    TupleTableType::Query q4 = ttt.where().Or().first.equal(2);
+    Query q4 = ttt.where().Or().equal(0, 2);
     s = q4.validate();
     CHECK(s != "");
 
-    TupleTableType::Query q5 = ttt.where().first.equal(2);
+    Query q5 = ttt.where().equal(0, 2);
     s = q5.validate();
     CHECK(s == "");
 
-    TupleTableType::Query q6 = ttt.where().group().first.equal(2);
+    Query q6 = ttt.where().group().equal(0, 2);
     s = q6.validate();
     CHECK(s != "");
 
@@ -5326,7 +6270,7 @@ TEST(Query_SyntaxCheck)
     // indenepdent case folding as defined by Unicode. Reenable this test
     // when is becomes available.
     /*
-    TupleTableType::Query q7 = ttt.where().second.equal("\xa0", false);
+    Query q7 = ttt.where().equal(1, "\xa0", false);
 #ifdef REALM_DEBUG
     s = q7.verify();
     CHECK(s != "");
@@ -5414,328 +6358,309 @@ TEST(Query_SubtableSyntaxCheck)
 TEST(Query_TestTV_where)
 {
     // When using .where(&tv), tv can have any order, and the resulting view will retain its order
-    TupleTableType t;
-    t.add(1, "a");
-    t.add(2, "a");
-    t.add(3, "c");
+    TestTable t;
+    t.add_column(type_Int, "1");
+    t.add_column(type_String, "2");
 
-    TupleTableType::View v = t.where().first.greater(1).find_all();
+    add(t, 1, "a");
+    add(t, 2, "a");
+    add(t, 3, "c");
 
-    TupleTableType::Query q1 = t.where(&v);
+    TableView v = t.where().greater(0, 1).find_all();
+
+    Query q1 = t.where(&v);
     CHECK_EQUAL(2, q1.count());
 
-    TupleTableType::Query q3 = t.where(&v).second.equal("a");
+    Query q3 = t.where(&v).equal(1, "a");
     CHECK_EQUAL(1, q3.count());
 
-    TupleTableType::Query q4 = t.where(&v).first.between(3, 6);
+    Query q4 = t.where(&v).between(0, 3, 6);
     CHECK_EQUAL(1, q4.count());
 }
 
 TEST(Query_SumMinMaxAvg)
 {
-    DateIntStringFloatDouble t;
+    TestTable t;
 
-    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
-    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
-    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
-    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
-    t.add(2, "b", OldDateTime(300), 3.0f, 3.0);
-    t.add(3, "c", OldDateTime(50), 5.0f, 5.0);
-    t.add(0, "a", OldDateTime(100), 1.0f, 1.0);
-    t.add(0, "b", OldDateTime(3000), 30.0f, 30.0);
-    t.add(0, "c", OldDateTime(5), 0.5f, 0.5);
+    t.add_column(type_Int, "1");
+    t.add_column(type_String, "2");
+    t.add_column(type_OldDateTime, "3");
+    t.add_column(type_Float, "4");
+    t.add_column(type_Double, "5");
 
-    CHECK_EQUAL(9, t.where().first.sum());
+    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
+    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
+    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
+    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
+    add(t, 2, "b", OldDateTime(300), 3.0f, 3.0);
+    add(t, 3, "c", OldDateTime(50), 5.0f, 5.0);
+    add(t, 0, "a", OldDateTime(100), 1.0f, 1.0);
+    add(t, 0, "b", OldDateTime(3000), 30.0f, 30.0);
+    add(t, 0, "c", OldDateTime(5), 0.5f, 0.5);
 
-    CHECK_EQUAL(0, t.where().first.minimum());
-    CHECK_EQUAL(3, t.where().first.maximum());
+    CHECK_EQUAL(9, t.where().sum_int(0));
+
+    CHECK_EQUAL(0, t.where().minimum_int(0));
+    CHECK_EQUAL(3, t.where().maximum_int(0));
 
     size_t resindex = not_found;
 
-    t.where().first.maximum(nullptr, 0, -1, -1, &resindex);
+    t.where().maximum_int(0, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(5, resindex);
 
-    t.where().first.minimum(nullptr, 0, -1, -1, &resindex);
+    t.where().minimum_int(0, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(6, resindex);
 
-    t.where().third.maximum(nullptr, 0, -1, -1, &resindex);
+    t.where().maximum_float(3, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where().third.minimum(nullptr, 0, -1, -1, &resindex);
+    t.where().minimum_float(3, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(8, resindex);
 
-    t.where().fourth.maximum(nullptr, 0, -1, -1, &resindex);
+    t.where().maximum_double(4, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where().fourth.minimum(nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(8, resindex);
-
-    t.where().fifth.maximum(nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(7, resindex);
-
-    t.where().fifth.minimum(nullptr, 0, -1, -1, &resindex);
+    t.where().minimum_double(4, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(8, resindex);
 
     // Now with condition (tests another code path in Array::minmax())
-    t.where().first.not_equal(0).fifth.minimum(nullptr, 0, -1, -1, &resindex);
+    t.where().not_equal(0, 0).minimum_double(4, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(0, resindex);
 
-    t.where().first.not_equal(0).fourth.minimum(nullptr, 0, -1, -1, &resindex);
+    t.where().not_equal(0, 0).minimum_float(3, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(0, resindex);
 
-    t.where().first.not_equal(0).third.minimum(nullptr, 0, -1, -1, &resindex);
+    t.where().not_equal(0, 0).minimum_olddatetime(2, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(5, resindex);
 
-    t.where().first.not_equal(0).third.maximum(nullptr, 0, -1, -1, &resindex);
+    t.where().not_equal(0, 0).maximum_olddatetime(2, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(4, resindex);
 
-    CHECK_APPROXIMATELY_EQUAL(1, t.where().first.average(), 0.001);
+    CHECK_APPROXIMATELY_EQUAL(1, t.where().average_int(0), 0.001);
 
-    CHECK_EQUAL(OldDateTime(3000), t.where().third.maximum());
-    CHECK_EQUAL(OldDateTime(5), t.where().third.minimum());
+    CHECK_EQUAL(OldDateTime(3000), t.where().maximum_olddatetime(2));
+    CHECK_EQUAL(OldDateTime(5), t.where().minimum_olddatetime(2));
 
     size_t cnt;
-    CHECK_EQUAL(0, t.where().first.sum(&cnt, 0, 0));
+    CHECK_EQUAL(0, t.where().sum_int(0, &cnt, 0, 0));
     CHECK_EQUAL(0, cnt);
-    CHECK_EQUAL(0, t.where().first.sum(&cnt, 1, 1));
+    CHECK_EQUAL(0, t.where().sum_int(0, &cnt, 1, 1));
     CHECK_EQUAL(0, cnt);
-    CHECK_EQUAL(0, t.where().first.sum(&cnt, 2, 2));
+    CHECK_EQUAL(0, t.where().sum_int(0, &cnt, 2, 2));
     CHECK_EQUAL(0, cnt);
 
-    CHECK_EQUAL(1, t.where().first.sum(&cnt, 0, 1));
+    CHECK_EQUAL(1, t.where().sum_int(0, &cnt, 0, 1));
     CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(2, t.where().first.sum(&cnt, 4, 5));
+    CHECK_EQUAL(2, t.where().sum_int(0, &cnt, 4, 5));
     CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(3, t.where().first.sum(&cnt, 5, 6));
+    CHECK_EQUAL(3, t.where().sum_int(0, &cnt, 5, 6));
     CHECK_EQUAL(1, cnt);
 
-    CHECK_EQUAL(2, t.where().first.sum(&cnt, 0, 2));
+    CHECK_EQUAL(2, t.where().sum_int(0, &cnt, 0, 2));
     CHECK_EQUAL(2, cnt);
-    CHECK_EQUAL(5, t.where().first.sum(&cnt, 1, 5));
+    CHECK_EQUAL(5, t.where().sum_int(0, &cnt, 1, 5));
     CHECK_EQUAL(4, cnt);
 
-    CHECK_EQUAL(3, t.where().first.sum(&cnt, 0, 3));
+    CHECK_EQUAL(3, t.where().sum_int(0, &cnt, 0, 3));
     CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(9, t.where().first.sum(&cnt, 0, size_t(-1)));
+    CHECK_EQUAL(9, t.where().sum_int(0, &cnt, 0, size_t(-1)));
     CHECK_EQUAL(9, cnt);
 }
 
 TEST(Query_SumMinMaxAvg_where)
 {
-    DateIntStringFloatDouble t;
+    TestTable t;
 
-    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
-    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
-    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
-    t.add(1, "a", OldDateTime(100), 1.0f, 1.0);
-    t.add(2, "b", OldDateTime(300), 3.0f, 3.0);
-    t.add(3, "c", OldDateTime(50), 5.0f, 5.0);
-    t.add(0, "a", OldDateTime(100), 1.0f, 1.0);
-    t.add(0, "b", OldDateTime(3000), 30.0f, 30.0);
-    t.add(0, "c", OldDateTime(5), 0.5f, 0.5);
+    t.add_column(type_Int, "1");
+    t.add_column(type_String, "2");
+    t.add_column(type_OldDateTime, "3");
+    t.add_column(type_Float, "4");
+    t.add_column(type_Double, "5");
 
-    DateIntStringFloatDouble::View v = t.where().find_all();
+    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
+    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
+    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
+    add(t, 1, "a", OldDateTime(100), 1.0f, 1.0);
+    add(t, 2, "b", OldDateTime(300), 3.0f, 3.0);
+    add(t, 3, "c", OldDateTime(50), 5.0f, 5.0);
+    add(t, 0, "a", OldDateTime(100), 1.0f, 1.0);
+    add(t, 0, "b", OldDateTime(3000), 30.0f, 30.0);
+    add(t, 0, "c", OldDateTime(5), 0.5f, 0.5);
 
-    CHECK_EQUAL(9, t.where(&v).first.sum());
+    TableView v = t.where().find_all();
 
-    CHECK_EQUAL(0, t.where(&v).first.minimum());
-    CHECK_EQUAL(3, t.where(&v).first.maximum());
+    CHECK_EQUAL(9, t.where(&v).sum_int(0));
+
+    CHECK_EQUAL(0, t.where(&v).minimum_int(0));
+    CHECK_EQUAL(3, t.where(&v).maximum_int(0));
 
     size_t resindex = not_found;
 
-    t.where(&v).first.maximum(nullptr, 0, -1, -1, &resindex);
+    t.where(&v).maximum_int(0, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(5, resindex);
 
-    t.where(&v).first.minimum(nullptr, 0, -1, -1, &resindex);
+    t.where(&v).minimum_int(0, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(6, resindex);
 
-    t.where(&v).third.maximum(nullptr, 0, -1, -1, &resindex);
+    t.where(&v).maximum_float(3, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where(&v).third.minimum(nullptr, 0, -1, -1, &resindex);
+    t.where(&v).minimum_float(3, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(8, resindex);
 
-    t.where(&v).fourth.maximum(nullptr, 0, -1, -1, &resindex);
+    t.where(&v).maximum_double(4, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(7, resindex);
 
-    t.where(&v).fourth.minimum(nullptr, 0, -1, -1, &resindex);
+    t.where(&v).minimum_double(4, nullptr, 0, -1, -1, &resindex);
     CHECK_EQUAL(8, resindex);
 
-    t.where(&v).fifth.maximum(nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(7, resindex);
-
-    t.where(&v).fifth.minimum(nullptr, 0, -1, -1, &resindex);
-    CHECK_EQUAL(8, resindex);
-
-    CHECK_APPROXIMATELY_EQUAL(1, t.where(&v).first.average(), 0.001);
-
-    CHECK_EQUAL(OldDateTime(3000), t.where(&v).third.maximum());
-    CHECK_EQUAL(OldDateTime(5), t.where(&v).third.minimum());
+    CHECK_APPROXIMATELY_EQUAL(1, t.where(&v).average_int(0), 0.001);
 
     size_t cnt;
-    CHECK_EQUAL(0, t.where(&v).first.sum(&cnt, 0, 0));
+    CHECK_EQUAL(0, t.where(&v).sum_int(0, &cnt, 0, 0));
     CHECK_EQUAL(0, cnt);
-    CHECK_EQUAL(0, t.where(&v).first.sum(&cnt, 1, 1));
+    CHECK_EQUAL(0, t.where(&v).sum_int(0, &cnt, 1, 1));
     CHECK_EQUAL(0, cnt);
-    CHECK_EQUAL(0, t.where(&v).first.sum(&cnt, 2, 2));
+    CHECK_EQUAL(0, t.where(&v).sum_int(0, &cnt, 2, 2));
     CHECK_EQUAL(0, cnt);
 
-    CHECK_EQUAL(1, t.where(&v).first.sum(&cnt, 0, 1));
+    CHECK_EQUAL(1, t.where(&v).sum_int(0, &cnt, 0, 1));
     CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(2, t.where(&v).first.sum(&cnt, 4, 5));
+    CHECK_EQUAL(2, t.where(&v).sum_int(0, &cnt, 4, 5));
     CHECK_EQUAL(1, cnt);
-    CHECK_EQUAL(3, t.where(&v).first.sum(&cnt, 5, 6));
+    CHECK_EQUAL(3, t.where(&v).sum_int(0, &cnt, 5, 6));
     CHECK_EQUAL(1, cnt);
 
-    CHECK_EQUAL(2, t.where(&v).first.sum(&cnt, 0, 2));
+    CHECK_EQUAL(2, t.where(&v).sum_int(0, &cnt, 0, 2));
     CHECK_EQUAL(2, cnt);
-    CHECK_EQUAL(5, t.where(&v).first.sum(&cnt, 1, 5));
+    CHECK_EQUAL(5, t.where(&v).sum_int(0, &cnt, 1, 5));
     CHECK_EQUAL(4, cnt);
 
-    CHECK_EQUAL(3, t.where(&v).first.sum(&cnt, 0, 3));
+    CHECK_EQUAL(3, t.where(&v).sum_int(0, &cnt, 0, 3));
     CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(9, t.where(&v).first.sum(&cnt, 0, size_t(-1)));
+    CHECK_EQUAL(9, t.where(&v).sum_int(0, &cnt, 0, size_t(-1)));
     CHECK_EQUAL(9, cnt);
 }
 
 TEST(Query_Avg)
 {
-    TupleTableType t;
+    TestTable t;
+    t.add_column(type_Int, "1");
+    t.add_column(type_String, "2");
+
     size_t cnt;
-    t.add(10, "a");
-    CHECK_EQUAL(10, t.where().first.average());
-    t.add(30, "b");
-    CHECK_EQUAL(20, t.where().first.average());
+    add(t, 10, "a");
+    CHECK_EQUAL(10, t.where().average_int(0));
+    add(t, 30, "b");
+    CHECK_EQUAL(20, t.where().average_int(0));
 
-    CHECK_EQUAL(0, t.where().first.average(nullptr, 0, 0));   // none
-    CHECK_EQUAL(0, t.where().first.average(nullptr, 1, 1));   // none
-    CHECK_EQUAL(20, t.where().first.average(nullptr, 0, 2));  // both
-    CHECK_EQUAL(20, t.where().first.average(nullptr, 0, -1)); // both
+    CHECK_EQUAL(0, t.where().average_int(0, nullptr, 0, 0));   // none
+    CHECK_EQUAL(0, t.where().average_int(0, nullptr, 1, 1));   // none
+    CHECK_EQUAL(20, t.where().average_int(0, nullptr, 0, 2));  // both
+    CHECK_EQUAL(20, t.where().average_int(0, nullptr, 0, -1)); // both
 
-    CHECK_EQUAL(10, t.where().first.average(&cnt, 0, 1)); // first
+    CHECK_EQUAL(10, t.where().average_int(0, &cnt, 0, 1)); // first
 
-    CHECK_EQUAL(30, t.where().first.sum(nullptr, 1, 2));     // second
-    CHECK_EQUAL(30, t.where().first.average(nullptr, 1, 2)); // second
+    CHECK_EQUAL(30, t.where().sum_int(0, nullptr, 1, 2));     // second
+    CHECK_EQUAL(30, t.where().average_int(0, nullptr, 1, 2)); // second
 }
 
 TEST(Query_Avg2)
 {
-    TupleTableType t;
+    TestTable t;
+    t.add_column(type_Int, "1");
+    t.add_column(type_String, "2");
+
     size_t cnt;
 
-    t.add(10, "a");
-    t.add(100, "b");
-    t.add(20, "a");
-    t.add(100, "b");
-    t.add(100, "b");
-    t.add(30, "a");
-    TupleTableType::Query q = t.where().second.equal("a");
+    add(t, 10, "a");
+    add(t, 100, "b");
+    add(t, 20, "a");
+    add(t, 100, "b");
+    add(t, 100, "b");
+    add(t, 30, "a");
+    Query q = t.where().equal(1, "a");
     CHECK_EQUAL(3, q.count());
-    q.first.sum();
+    q.sum_int(0);
 
-    CHECK_EQUAL(60, t.where().second.equal("a").first.sum());
+    CHECK_EQUAL(60, t.where().equal(1, "a").sum_int(0));
 
-    CHECK_EQUAL(0, t.where().second.equal("a").first.average(&cnt, 0, 0));
-    CHECK_EQUAL(0, t.where().second.equal("a").first.average(&cnt, 1, 1));
-    CHECK_EQUAL(0, t.where().second.equal("a").first.average(&cnt, 2, 2));
+    CHECK_EQUAL(0, t.where().equal(1, "a").average_int(0, &cnt, 0, 0));
+    CHECK_EQUAL(0, t.where().equal(1, "a").average_int(0, &cnt, 1, 1));
+    CHECK_EQUAL(0, t.where().equal(1, "a").average_int(0, &cnt, 2, 2));
     CHECK_EQUAL(0, cnt);
 
-    CHECK_EQUAL(10, t.where().second.equal("a").first.average(&cnt, 0, 1));
-    CHECK_EQUAL(20, t.where().second.equal("a").first.average(&cnt, 1, 5));
-    CHECK_EQUAL(30, t.where().second.equal("a").first.average(&cnt, 5, 6));
+    CHECK_EQUAL(10, t.where().equal(1, "a").average_int(0, &cnt, 0, 1));
+    CHECK_EQUAL(20, t.where().equal(1, "a").average_int(0, &cnt, 1, 5));
+    CHECK_EQUAL(30, t.where().equal(1, "a").average_int(0, &cnt, 5, 6));
     CHECK_EQUAL(1, cnt);
 
-    CHECK_EQUAL(15, t.where().second.equal("a").first.average(&cnt, 0, 3));
-    CHECK_EQUAL(20, t.where().second.equal("a").first.average(&cnt, 2, 5));
+    CHECK_EQUAL(15, t.where().equal(1, "a").average_int(0, &cnt, 0, 3));
+    CHECK_EQUAL(20, t.where().equal(1, "a").average_int(0, &cnt, 2, 5));
     CHECK_EQUAL(1, cnt);
 
-    CHECK_EQUAL(20, t.where().second.equal("a").first.average(&cnt));
+    CHECK_EQUAL(20, t.where().equal(1, "a").average_int(0, &cnt));
     CHECK_EQUAL(3, cnt);
-    CHECK_EQUAL(15, t.where().second.equal("a").first.average(&cnt, 0, 3));
+    CHECK_EQUAL(15, t.where().equal(1, "a").average_int(0, &cnt, 0, 3));
     CHECK_EQUAL(2, cnt);
-    CHECK_EQUAL(20, t.where().second.equal("a").first.average(&cnt, 0, size_t(-1)));
+    CHECK_EQUAL(20, t.where().equal(1, "a").average_int(0, &cnt, 0, size_t(-1)));
     CHECK_EQUAL(3, cnt);
 }
 
 
 TEST(Query_OfByOne)
 {
-    TupleTableType t;
+    TestTable t;
+    t.add_column(type_Int, "1");
+    t.add_column(type_String, "2");
+
     for (size_t i = 0; i < REALM_MAX_BPNODE_SIZE * 2; ++i) {
-        t.add(1, "a");
+        add(t, 1, "a");
     }
 
     // Top
-    t[0].first = 0;
-    size_t res = t.where().first.equal(0).find();
+    t[0].set_int(0, 0);
+    size_t res = t.where().equal(0, 0).find();
     CHECK_EQUAL(0, res);
-    t[0].first = 1; // reset
+    t[0].set_int(0, 1); // reset
 
     // Before split
-    t[REALM_MAX_BPNODE_SIZE - 1].first = 0;
-    res = t.where().first.equal(0).find();
+    t[REALM_MAX_BPNODE_SIZE - 1].set_int(0, 0);
+    res = t.where().equal(0, 0).find();
     CHECK_EQUAL(REALM_MAX_BPNODE_SIZE - 1, res);
-    t[REALM_MAX_BPNODE_SIZE - 1].first = 1; // reset
+    t[REALM_MAX_BPNODE_SIZE - 1].set_int(0, 1); // reset
 
     // After split
-    t[REALM_MAX_BPNODE_SIZE].first = 0;
-    res = t.where().first.equal(0).find();
+    t[REALM_MAX_BPNODE_SIZE].set_int(0, 0);
+    res = t.where().equal(0, 0).find();
     CHECK_EQUAL(REALM_MAX_BPNODE_SIZE, res);
-    t[REALM_MAX_BPNODE_SIZE].first = 1; // reset
+    t[REALM_MAX_BPNODE_SIZE].set_int(0, 1); // reset
 
     // Before end
     const size_t last_pos = (REALM_MAX_BPNODE_SIZE * 2) - 1;
-    t[last_pos].first = 0;
-    res = t.where().first.equal(0).find();
+    t[last_pos].set_int(0, 0);
+    res = t.where().equal(0, 0).find();
     CHECK_EQUAL(last_pos, res);
 }
 
 TEST(Query_Const)
 {
-    TupleTableType t;
-    t.add(10, "a");
-    t.add(100, "b");
-    t.add(20, "a");
+    TestTable t;
+    t.add_column(type_Int, "1");
+    t.add_column(type_String, "2");
 
-    const TupleTableType& const_table = t;
+    add(t, 10, "a");
+    add(t, 100, "b");
+    add(t, 20, "a");
 
-    const size_t count = const_table.where().second.equal("a").count();
+    const Table& const_table = t;
+
+    const size_t count = const_table.where().equal(1, "a").count();
     CHECK_EQUAL(2, count);
 
     // TODO: Should not be possible
-    const_table.where().second.equal("a").remove();
+    const_table.where().equal(1, "a").remove();
 }
-
-namespace {
-
-REALM_TABLE_2(PhoneTable, type, String, number, String)
-
-REALM_TABLE_4(EmployeeTable, name, String, age, Int, hired, Bool, phones, Subtable<PhoneTable>)
-
-} // anonymous namespace
-
-TEST(Query_SubtablesTyped)
-{
-    // Create table
-    EmployeeTable employees;
-
-    // Add initial rows
-    employees.add("joe", 42, false, nullptr);
-    employees[0].phones->add("home", "324-323-3214");
-    employees[0].phones->add("work", "321-564-8678");
-
-    employees.add("jessica", 22, true, nullptr);
-    employees[1].phones->add("mobile", "434-426-4646");
-    employees[1].phones->add("school", "345-543-5345");
-
-    // Do a query
-    EmployeeTable::Query q = employees.where().hired.equal(true);
-    EmployeeTable::View view = q.find_all();
-
-    // Verify result
-    CHECK(view.size() == 1 && view[0].name == "jessica");
-}
-
 
 TEST(Query_AllTypesDynamicallyTyped)
 {
@@ -5759,7 +6684,7 @@ TEST(Query_AllTypesDynamicallyTyped)
         const char bin[4] = {0, 1, 2, 3};
         BinaryData bin1(bin, sizeof bin / 2);
         BinaryData bin2(bin, sizeof bin);
-        int_fast64_t time_now = time(0);
+        int_fast64_t time_now = time(nullptr);
         Mixed mix_int(int64_t(1));
         Mixed mix_subtab((Mixed::subtable_tag()));
 
@@ -5854,84 +6779,6 @@ TEST(Query_AggregateSortedView)
 }
 
 
-namespace {
-
-REALM_TABLE_1(TestQuerySub, age, Int)
-
-REALM_TABLE_9(TestQueryAllTypes, bool_col, Bool, int_col, Int, float_col, Float, double_col, Double, string_col,
-              String, binary_col, Binary, date_col, OldDateTime, table_col, Subtable<TestQuerySub>, mixed_col, Mixed)
-
-} // unnamed namespace
-
-
-TEST(Query_AllTypesStaticallyTyped)
-{
-    TestQueryAllTypes table;
-
-    const char bin[4] = {0, 1, 2, 3};
-    BinaryData bin1(bin, sizeof bin / 2);
-    BinaryData bin2(bin, sizeof bin);
-    int_fast64_t time_now = time(0);
-    TestQuerySub subtab;
-    subtab.add(100);
-    Mixed mix_int(int64_t(1));
-    Mixed mix_subtab((Mixed::subtable_tag()));
-
-    table.add(false, 54, 0.7f, 0.8, "foo", bin1, 0, 0, mix_int);
-    table.add(true, 506, 7.7f, 8.8, "banach", bin2, time_now, &subtab, mix_subtab);
-
-    CHECK_EQUAL(1, table.where().bool_col.equal(false).count());
-    CHECK_EQUAL(1, table.where().int_col.equal(54).count());
-    CHECK_EQUAL(1, table.where().float_col.equal(0.7f).count());
-    CHECK_EQUAL(1, table.where().double_col.equal(0.8).count());
-    CHECK_EQUAL(1, table.where().string_col.equal("foo").count());
-    CHECK_EQUAL(1, table.where().binary_col.equal(bin1).count());
-    CHECK_EQUAL(1, table.where().date_col.equal(0).count());
-    //    CHECK_EQUAL(1, table.where().table_col.equal(subtab).count());
-    //    CHECK_EQUAL(1, table.where().mixed_col.equal(mix_int).count());
-    // FIXME: It's not possible to construct a subtable query. .table_col.subtable() does not return an object with
-    // 'age':
-    //    CHECK_EQUAL(1, table.where().table_col.subtable().age.end_subtable().count());
-
-    TestQueryAllTypes::Query query = table.where().bool_col.equal(false);
-
-    size_t ndx = not_found;
-
-    CHECK_EQUAL(54, query.int_col.minimum());
-    query.int_col.minimum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    CHECK_EQUAL(54, query.int_col.maximum());
-    query.int_col.maximum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    CHECK_EQUAL(54, query.int_col.sum());
-    CHECK_EQUAL(54, query.int_col.average());
-
-    CHECK_EQUAL(0.7f, query.float_col.minimum());
-    query.float_col.minimum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    CHECK_EQUAL(0.7f, query.float_col.maximum());
-    query.float_col.maximum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    CHECK_EQUAL(0.7f, query.float_col.sum());
-    CHECK_EQUAL(0.7f, query.float_col.average());
-
-    CHECK_EQUAL(0.8, query.double_col.minimum());
-    query.double_col.minimum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    CHECK_EQUAL(0.8, query.double_col.maximum());
-    query.double_col.maximum(nullptr, 0, not_found, not_found, &ndx);
-    CHECK_EQUAL(0, ndx);
-
-    CHECK_EQUAL(0.8, query.double_col.sum());
-    CHECK_EQUAL(0.8, query.double_col.average());
-}
-
-
 TEST(Query_RefCounting)
 {
     Table* t = LangBindHelper::new_table();
@@ -5954,14 +6801,17 @@ TEST(Query_DeepCopy)
     // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an
     // end_group(). Run Query::validate() to see if it's fully constructed.
 
-    Types t;
+    TestTable t;
+    t.add_column(type_Int, "1");
+    t.add_column(type_String, "2");
+    t.add_column(type_Double, "3");
 
-    t.add(1, "1", 1.1);
-    t.add(2, "2", 2.2);
-    t.add(3, "3", 3.3);
-    t.add(4, "4", 4.4);
+    add(t, 1, "1", 1.1);
+    add(t, 2, "2", 2.2);
+    add(t, 3, "3", 3.3);
+    add(t, 4, "4", 4.4);
 
-    Query q = t.column().ints >
+    Query q = t.column<Int>(0) >
               Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine.
 
 
@@ -5992,14 +6842,14 @@ TEST(Query_DeepCopy)
     delete q4;
 
     // See if we can append a criteria to a query
-    Query q5 = t.column().ints >
+    Query q5 = t.column<Int>(0) >
                Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
     q5.greater(2, 4.0);
     CHECK_EQUAL(3, q5.find());
 
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_expression integer node.
-    Query q6 = t.column().ints >
+    Query q6 = t.column<Int>(0) >
                Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
     Query q7(q6);
 
@@ -6010,7 +6860,7 @@ TEST(Query_DeepCopy)
 
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_engine integer node.
-    Query q8 = t.column().ints > 2;
+    Query q8 = t.column<Int>(0) > 2;
     Query q9(q8);
 
     q9.greater(2, 4.0);
@@ -6020,7 +6870,7 @@ TEST(Query_DeepCopy)
 
     // See if we can append a criteria to a copy without modifying the original (copy should not contain references
     // to original). Tests query_engine string node.
-    Query q10 = t.column().strings != "2";
+    Query q10 = t.column<String>(1) != "2";
     Query q11(q10);
 
     q11.greater(2, 4.0);
@@ -6028,25 +6878,28 @@ TEST(Query_DeepCopy)
     CHECK_EQUAL(0, q10.find());
 
     // Test and_query() on a copy
-    Query q12 = t.column().ints > 2;
+    Query q12 = t.column<Int>(0) > 2;
     Query q13(q12);
 
-    q13.and_query(t.column().strings != "3");
+    q13.and_query(t.column<String>(1) != "3");
     CHECK_EQUAL(3, q13.find());
     CHECK_EQUAL(2, q12.find());
 }
 
 TEST(Query_TableViewMoveAssign1)
 {
-    Types t;
+    TestTable t;
+    t.add_column(type_Int, "1");
+    t.add_column(type_String, "2");
+    t.add_column(type_Double, "3");
 
-    t.add(1, "1", 1.1);
-    t.add(2, "2", 2.2);
-    t.add(3, "3", 3.3);
-    t.add(4, "4", 4.4);
+    add(t, 1, "1", 1.1);
+    add(t, 2, "2", 2.2);
+    add(t, 3, "3", 3.3);
+    add(t, 4, "4", 4.4);
 
     // temporary query is created, then q makes and stores a deep copy and then temporary is destructed
-    Query q = t.column().ints >
+    Query q = t.column<Int>(0) >
               Value<Int>(2); // Explicit use of Value<>() makes query_expression node instead of query_engine
 
     // now deep copy should be destructed and replaced by new temporary
@@ -6059,14 +6912,12 @@ TEST(Query_TableViewMoveAssign1)
 
 TEST(Query_TableViewMoveAssignLeak2)
 {
-    Types t;
+    Table t;
+    t.add_column(type_Int, "1");
+    t.add_column(type_String, "2");
+    t.add_column(type_Double, "3");
 
-    t.add(1, "1", 1.1);
-    t.add(2, "2", 2.2);
-    t.add(3, "3", 3.3);
-    t.add(4, "4", 4.4);
-
-    Query q = t.column().ints < t.column().doubles && t.column().strings == "4";
+    Query q = t.column<Int>(0) < t.column<double>(2) && t.column<String>(1) == "4";
     TableView tv = q.find_all();
 
     // Upon each find_all() call, tv copies the query 'q' into itself. See if this copying works
@@ -6080,7 +6931,7 @@ TEST(Query_TableViewMoveAssignLeak2)
 
     tv = q.find_all();
 
-    Query q2 = t.column().ints <= t.column().doubles;
+    Query q2 = t.column<Int>(0) <= t.column<double>(2);
     tv = q2.find_all();
     q.and_query(q2);
     tv = q.find_all();
@@ -6104,7 +6955,7 @@ TEST(Query_TableViewMoveAssignLeak2)
 
     Query q3;
 
-    q2 = t.column().ints <= t.column().doubles;
+    q2 = t.column<Int>(0) <= t.column<double>(2);
     q3 = q2;
 
     q3.find();
@@ -6117,16 +6968,19 @@ TEST(Query_DeepCopyLeak1)
     // NOTE: You can only create a copy of a fully constructed; i.e. you cannot copy a query which is missing an
     // end_group(). Run Query::validate() to see if it's fully constructed.
 
-    Types t;
+    TestTable t;
+    t.add_column(type_Int, "1");
+    t.add_column(type_String, "2");
+    t.add_column(type_Double, "3");
 
-    t.add(1, "1", 1.1);
-    t.add(2, "2", 2.2);
-    t.add(3, "3", 3.3);
-    t.add(4, "4", 4.4);
+    add(t, 1, "1", 1.1);
+    add(t, 2, "2", 2.2);
+    add(t, 3, "3", 3.3);
+    add(t, 4, "4", 4.4);
 
     // See if copying of a mix of query_expression and query_engine nodes will leak
-    Query q = !(t.column().ints > Value<Int>(2) && t.column().ints > 2 && t.column().doubles > 2.2) ||
-              t.column().ints == 4 || t.column().ints == Value<Int>(4);
+    Query q = !(t.column<Int>(0) > Value<Int>(2) && t.column<Int>(0) > 2 && t.column<double>(2) > 2.2) ||
+              t.column<Int>(0) == 4 || t.column<Int>(0) == Value<Int>(4);
     Query q2(q);
     Query q3(q2);
 }
@@ -7445,6 +8299,7 @@ TEST(Query_Null_Sort)
         CHECK_EQUAL(tv.get_source_ndx(1), 0);
         CHECK_EQUAL(tv.get_source_ndx(2), 2);
 
+        tv = table->where().find_all();
         tv.sort(i, false);
         CHECK_EQUAL(tv.get_source_ndx(0), 2);
         CHECK_EQUAL(tv.get_source_ndx(1), 0);
@@ -8377,11 +9232,11 @@ TEST(Query_AverageNullableColumns)
     table.set_int(col_int, 0, 2);
     table.set_int(col_int, 1, 4);
 
-    table.set_float(col_float, 0, 2);
-    table.set_float(col_float, 1, 4);
+    table.set_float(col_float, 0, 2.0f);
+    table.set_float(col_float, 1, 4.0f);
 
-    table.set_double(col_double, 1, 4);
-    table.set_double(col_double, 0, 2);
+    table.set_double(col_double, 1, 4.0);
+    table.set_double(col_double, 0, 2.0);
 
     CHECK_EQUAL(3, table.where().average_int(col_int));
     CHECK_EQUAL(3, table.where().average_float(col_float));
@@ -8668,7 +9523,7 @@ TEST(Query_MaximumSumAverage)
             CHECK_EQUAL(d, 7.);
 
             dbl = table1->where().not_equal(2, 1234.).sum_double(2);
-            CHECK_APPROXIMATELY_EQUAL(d, 7., 0.001);
+            CHECK_APPROXIMATELY_EQUAL(dbl, 7., 0.001);
 
 
             // Those with criteria now only include some rows, whereof none are null
@@ -9316,6 +10171,15 @@ struct HandoverQuery {
         return ret;
     }
 };
+struct SelfHandoverQuery {
+    template <typename Next>
+    auto operator()(Query& q, Next&& next)
+    {
+        // Export the query and then re-import it to the same SG
+        auto handover = next.state.sg->export_for_handover(q, ConstSourcePayload::Copy);
+        return next(*next.state.sg->import_from_handover(std::move(handover)));
+    }
+};
 struct InsertColumn {
     template <typename Next>
     auto operator()(Query& q, Next&& next)
@@ -9375,11 +10239,13 @@ void QueryInitHelper::operator()(Func&& fn)
     CHECK_EQUAL(count, (run<Func, CopyQuery>(fn)));
     CHECK_EQUAL(count, (run<Func, AndQuery>(fn)));
     CHECK_EQUAL(count, (run<Func, HandoverQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, SelfHandoverQuery>(fn)));
 
     // run, copy the query, rerun
     CHECK_EQUAL(count, (run<Func, PreRun, CopyQuery>(fn)));
     CHECK_EQUAL(count, (run<Func, PreRun, AndQuery>(fn)));
     CHECK_EQUAL(count, (run<Func, PreRun, HandoverQuery>(fn)));
+    CHECK_EQUAL(count, (run<Func, PreRun, SelfHandoverQuery>(fn)));
 
     // copy the query, insert column, then run
     CHECK_EQUAL(count, (run<Func, CopyQuery, InsertColumn>(fn)));
@@ -9460,11 +10326,15 @@ TEST(Query_TableInitialization)
     size_t col_table = table.add_column(type_Table, "table", &subdesc);
     subdesc->add_column(type_Int, "col");
 
+    std::string str(5, 'z');
     table.add_empty_row(20);
     for (size_t i = 0; i < 10; ++i) {
+        table.set_binary(col_binary, i, BinaryData(str), false);
         table.set_link(col_link, i, i);
         table.get_linklist(col_list, i)->add(i);
-        table.get_subtable(col_table, i)->add_empty_row();
+        auto subtable = table.get_subtable(col_table, i);
+        auto row = subtable->add_empty_row();
+        subtable->set_int(0, row, i);
     }
     LangBindHelper::commit_and_continue_as_read(sg);
 
@@ -9589,24 +10459,28 @@ TEST(Query_TableInitialization)
     helper([&](Query& q, auto&& test) { test(q.begins_with(col_string, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.ends_with(col_string, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.contains(col_string, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.like(col_string, StringData{})); });
 
     helper([&](Query& q, auto&& test) { test(q.equal(col_string, StringData{}, false)); });
     helper([&](Query& q, auto&& test) { test(q.not_equal(col_string, StringData{}, false)); });
     helper([&](Query& q, auto&& test) { test(q.begins_with(col_string, StringData{}, false)); });
     helper([&](Query& q, auto&& test) { test(q.ends_with(col_string, StringData{}, false)); });
     helper([&](Query& q, auto&& test) { test(q.contains(col_string, StringData{}, false)); });
+    helper([&](Query& q, auto&& test) { test(q.like(col_string, StringData{}, false)); });
 
     helper([&](Query& q, auto&& test) { test(q.equal(col_string_enum, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.not_equal(col_string_enum, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.begins_with(col_string_enum, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.ends_with(col_string_enum, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.contains(col_string_enum, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.like(col_string_enum, StringData{})); });
 
     helper([&](Query& q, auto&& test) { test(q.equal(col_string_indexed, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.not_equal(col_string_indexed, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.begins_with(col_string_indexed, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.ends_with(col_string_indexed, StringData{})); });
     helper([&](Query& q, auto&& test) { test(q.contains(col_string_indexed, StringData{})); });
+    helper([&](Query& q, auto&& test) { test(q.like(col_string_indexed, StringData{})); });
 
     // Conditions: binary data
     helper([&](Query& q, auto&& test) { test(q.equal(col_binary, BinaryData{})); });
@@ -9651,12 +10525,14 @@ TEST(Query_TableInitialization)
         test_operator([](auto&& a, auto&& b) { return a.begins_with(b); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.ends_with(b); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.contains(b); }, string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.like(b); }, string_col, StringData());
 
         test_operator([](auto&& a, auto&& b) { return a.equal(b, false); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.not_equal(b, false); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.begins_with(b, false); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.ends_with(b, false); }, string_col, StringData());
         test_operator([](auto&& a, auto&& b) { return a.contains(b, false); }, string_col, StringData());
+        test_operator([](auto&& a, auto&& b) { return a.like(b, false); }, string_col, StringData());
 
         auto null_string_col = [&] { return get_table().template column<String>(col_string_null); };
         test_operator(std::equal_to<>(), null_string_col, null());
@@ -9665,6 +10541,7 @@ TEST(Query_TableInitialization)
         auto binary_col = [&] { return get_table().template column<Binary>(col_binary); };
         helper([&](Query&, auto&& test) { test(binary_col() == BinaryData()); });
         helper([&](Query&, auto&& test) { test(binary_col() != BinaryData()); });
+        helper([&](Query&, auto&& test) { test(binary_col().size() != 0); });
 
         auto link_col = [&] { return get_table().template column<Link>(col_link); };
         auto list_col = [&] { return get_table().template column<Link>(col_list); };
@@ -9684,6 +10561,14 @@ TEST(Query_TableInitialization)
         helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).min() > 0); });
         helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).sum() > 0); });
         helper([&](Query&, auto&& test) { test(list_col().column<Int>(col_int).average() > 0); });
+
+        auto list_table = [&] { return get_table().template column<SubTable>(col_table); };
+        helper([&](Query&, auto&& test) { test(list_table().size() == 1); });
+        helper([&](Query&, auto&& test) { test(list_table().list<Int>() > 0); });
+        helper([&](Query&, auto&& test) { test(list_table().list<Int>().max() > 0); });
+        helper([&](Query&, auto&& test) { test(list_table().list<Int>().min() > 0); });
+        helper([&](Query&, auto&& test) { test(list_table().list<Int>().sum() > 0); });
+        helper([&](Query&, auto&& test) { test(list_table().list<Int>().average() > 0); });
     };
 
     // Test all of the query expressions directly, over a link, over a backlink
@@ -9719,5 +10604,314 @@ TEST(Query_TableInitialization)
         test(helper.table->column<LinkList>(col_list, q.equal_int(col_int, 0)).count() > 0);
     });
 }
+/*
+
+// These tests fail on Windows due to lack of tolerance for invalid UTF-8 in the case mapping methods
+ 
+TEST(Query_UTF8_Contains)
+{
+    Group group;
+    TableRef table1 = group.add_table("table1");
+    table1->add_column(type_String, "str1");
+    table1->add_empty_row();
+    table1->set_string(0, 0, StringData("\x0ff\x000", 2));
+    size_t m = table1->column<String>(0).contains(StringData("\x0ff\x000", 2), false).count();
+    CHECK_EQUAL(1, m);
+}
+
+
+TEST(Query_UTF8_Contains_Fuzzy)
+{
+    Table table;
+    table.add_column(type_String, "str1");
+    table.add_empty_row();
+
+    for (size_t t = 0; t < 10000; t++) {
+        char haystack[10];
+        char needle[7];
+
+        for (size_t c = 0; c < 10; c++)
+            haystack[c] = char(fastrand());
+
+        for (size_t c = 0; c < 7; c++)
+            needle[c] = char(fastrand());
+
+        table.set_string(0, 0, StringData(haystack, 10));
+
+        table.column<String>(0).contains(StringData(needle, fastrand(7)), false).count();
+        table.column<String>(0).contains(StringData(needle, fastrand(7)), true).count();
+    }
+}
+*/
+        
+TEST(Query_ArrayLeafRelocate) 
+{
+    for (size_t iter = 0; iter < 10; iter++) {
+        // Tests crash where a query node would have a SequentialGetter that pointed to an old array leaf
+        // that was relocated. https://github.com/realm/realm-core/issues/2269
+        Group group;
+
+        TableRef contact = group.add_table("contact");
+        TableRef contact_type = group.add_table("contact_type");
+
+        contact_type->add_column(type_Int, "id");
+        contact_type->add_column(type_String, "str");
+        contact->add_column_link(type_LinkList, "link", *contact_type);
+
+        contact_type.get()->add_empty_row(10);
+        contact.get()->add_empty_row(10);
+
+        Query q1 = (contact.get()->link(0).column<Int>(0) == 0);
+        Query q2 = contact_type.get()->where().equal(0, 0);
+        Query q3 = (contact_type.get()->column<Int>(0) + contact_type.get()->column<Int>(0) == 0);
+        Query q4 = (contact_type.get()->column<Int>(0) == 0);
+        Query q5 = (contact_type.get()->column<String>(1) == "hejsa");
+
+        TableView tv = q1.find_all();
+        TableView tv2 = q2.find_all();
+        TableView tv3 = q3.find_all();
+        TableView tv4 = q4.find_all();
+        TableView tv5 = q5.find_all();
+
+        contact.get()->insert_column(0, type_Float, "extra");
+        contact_type.get()->insert_column(0, type_Float, "extra");
+
+        for (size_t t = 0; t < REALM_MAX_BPNODE_SIZE + 1; t++) {
+            contact.get()->add_empty_row();
+            contact_type.get()->add_empty_row();
+            //  contact_type.get()->set_string(1, t, "hejsa");
+
+            LinkViewRef lv = contact.get()->get_linklist(1, contact.get()->size() - 1);
+            lv->add(contact_type.get()->size() - 1);
+
+            if (t == 0 || t == REALM_MAX_BPNODE_SIZE) {
+                tv.sync_if_needed();
+                tv2.sync_if_needed();
+                tv3.sync_if_needed();
+                tv4.sync_if_needed();
+                tv5.sync_if_needed();
+            }
+        }
+    }
+}
+
+TEST(Query_ColumnDeletionSimple)
+{
+    Table foo;
+    foo.add_column(type_Int, "a");
+    foo.add_column(type_Int, "b");
+    foo.add_empty_row(10);
+    foo.set_int(0, 3, 123);
+    foo.set_int(0, 4, 123);
+    foo.set_int(0, 7, 123);
+    foo.set_int(1, 2, 456);
+    foo.set_int(1, 4, 456);
+
+    auto q1 = foo.column<Int>(0) == 123;
+    auto q2 = foo.column<Int>(1) == 456;
+    auto q3 = q1 || q2;
+    TableView tv1 = q1.find_all();
+    TableView tv2 = q2.find_all();
+    TableView tv3 = q3.find_all();
+    CHECK_EQUAL(tv1.size(), 3);
+    CHECK_EQUAL(tv2.size(), 2);
+    CHECK_EQUAL(tv3.size(), 4);
+
+    foo.remove_column(0);
+
+    size_t x = 0;
+    CHECK_LOGIC_ERROR(x = q1.count(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_EQUAL(x, 0);
+    CHECK_EQUAL(tv1.size(), 0);
+
+    // This one should succeed in spite the column index is 1 and we
+    x = q2.count();
+    tv2.sync_if_needed();
+    CHECK_EQUAL(x, 2);
+    CHECK_EQUAL(tv2.size(), 2);
+
+    x = 0;
+    CHECK_LOGIC_ERROR(x = q3.count(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv3.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_EQUAL(x, 0);
+    CHECK_EQUAL(tv3.size(), 0);
+}
+
+TEST(Query_ColumnDeletionExpression)
+{
+    Table foo;
+    foo.add_column(type_Int, "a");
+    foo.add_column(type_Int, "b");
+    foo.add_column(type_Timestamp, "c");
+    foo.add_column(type_Timestamp, "d");
+    foo.add_column(type_String, "e");
+    foo.add_column(type_Float, "f");
+    foo.add_column(type_Binary, "g");
+    foo.add_empty_row(5);
+    foo.set_int(0, 0, 0);
+    foo.set_int(0, 1, 1);
+    foo.set_int(0, 2, 2);
+    foo.set_int(0, 3, 3);
+    foo.set_int(0, 4, 4);
+    foo.set_int(1, 0, 0);
+    foo.set_int(1, 1, 0);
+    foo.set_int(1, 2, 3);
+    foo.set_int(1, 3, 5);
+    foo.set_int(1, 4, 3);
+    foo.set_timestamp(2, 0, Timestamp(100, 100));
+    foo.set_timestamp(3, 0, Timestamp(200, 100));
+    foo.set_string(4, 0, StringData("Hello, world"));
+    foo.set_float(5, 0, 3.141592f);
+    foo.set_float(5, 1, 1.0f);
+    foo.set_binary(6, 0, BinaryData("Binary", 6));
+
+    // Expression
+    auto q = foo.column<Int>(0) == foo.column<Int>(1) + 1;
+    // TwoColumnsNode
+    auto q1 = foo.column<Int>(0) == foo.column<Int>(1);
+    TableView tv = q.find_all();
+    TableView tv1 = q1.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    CHECK_EQUAL(tv1.size(), 1);
+
+    foo.remove_column(0);
+    size_t x = 0;
+    CHECK_LOGIC_ERROR(x = q.count(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_EQUAL(x, 0);
+    CHECK_EQUAL(tv.size(), 0);
+
+    q = foo.column<Timestamp>(1) < foo.column<Timestamp>(2);
+    // TimestampNode
+    q1 = foo.column<Timestamp>(2) == Timestamp(200, 100);
+    tv = q.find_all();
+    tv1 = q1.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv1.size(), 1);
+    foo.remove_column(2);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+
+    // StringNodeBase
+    q = foo.column<String>(2) == StringData("Hello, world");
+    q1 = !(foo.column<String>(2) == StringData("Hello, world"));
+    tv = q.find_all();
+    tv1 = q1.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv1.size(), 4);
+    foo.remove_column(2);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(tv1.sync_if_needed(), LogicError::column_does_not_exist);
+
+    // FloatDoubleNode
+    q = foo.column<Float>(2) > 0.0f;
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+    foo.remove_column(2);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+
+    // BinaryNode
+    q = foo.column<Binary>(2) != BinaryData("Binary", 6);
+    tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 4);
+    foo.remove_column(2);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+}
+
+TEST(Query_ColumnDeletionLinks)
+{
+    Group g;
+    TableRef foo = g.add_table("foo");
+    TableRef bar = g.add_table("bar");
+    TableRef foobar = g.add_table("foobar");
+
+    foobar->add_column(type_Int, "int");
+
+    bar->add_column(type_Int, "int");
+    bar->add_column_link(type_Link, "link", *foobar);
+
+    foo->add_column_link(type_Link, "link", *bar);
+    DescriptorRef subdesc;
+    foo->add_column(type_Table, "sub", &subdesc);
+    subdesc->add_column(type_Int, "int");
+
+    foobar->add_empty_row(5);
+    bar->add_empty_row(5);
+    foo->add_empty_row(10);
+    for (size_t i = 0; i < 5; i++) {
+        foobar->set_int(0, i, i);
+        bar->set_int(0, i, i);
+        bar->set_link(1, i, i);
+        foo->set_link(0, i, i);
+        auto sub = foo->get_subtable(1, 0);
+        auto r = sub->add_empty_row();
+        sub->set_int(0, r, i);
+    }
+    auto q = foo->link(0).link(1).column<Int>(0) == 2;
+    auto q1 = foo->column<Link>(0).is_null();
+    auto q2 = foo->column<Link>(0) == bar->get(2);
+    auto q3 = foo->where().subtable(1).greater(0, 3).end_subtable();
+    auto tv = q.find_all();
+    auto cnt = q1.count();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(cnt, 5);
+    cnt = q2.count();
+    CHECK_EQUAL(cnt, 1);
+    cnt = q3.count();
+    CHECK_EQUAL(cnt, 1);
+    // remove integer column, should not affect query
+    bar->remove_column(0);
+    tv.sync_if_needed();
+    CHECK_EQUAL(tv.size(), 1);
+    // remove link column, disaster
+    bar->remove_column(0);
+    CHECK_LOGIC_ERROR(tv.sync_if_needed(), LogicError::column_does_not_exist);
+    foo->remove_column(0);
+    CHECK_LOGIC_ERROR(q1.count(), LogicError::column_does_not_exist);
+    CHECK_LOGIC_ERROR(q2.count(), LogicError::column_does_not_exist);
+    // Remove subtable column
+    foo->remove_column(0);
+    CHECK_LOGIC_ERROR(q3.count(), LogicError::column_does_not_exist);
+}
+
+
+TEST(Query_CaseInsensitiveIndexEquality_CommonNumericPrefix)
+{
+    Table table;
+    size_t col_ndx = table.add_column(type_String, "id");
+    table.add_search_index(col_ndx);
+
+    table.add_empty_row(2);
+    table.set_string(col_ndx, 0, "111111111111111111111111");
+    table.set_string(col_ndx, 1, "111111111111111111111112");
+
+    Query q = table.where().equal(col_ndx, "111111111111111111111111", false);
+    CHECK_EQUAL(q.count(), 1);
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 1);
+    CHECK_EQUAL(tv[0].get_index(), 0);
+}
+
+
+TEST_TYPES(Query_Rover, std::true_type, std::false_type)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    Table table;
+    size_t col_ndx = table.add_column(type_String, "name", nullable);
+    table.add_search_index(col_ndx);
+
+    table.add_empty_row(2);
+    table.set_string(col_ndx, 0, "ROVER");
+    table.set_string(col_ndx, 1, "Rover");
+
+    Query q = table.where().equal(col_ndx, "rover", false);
+    CHECK_EQUAL(q.count(), 2);
+    TableView tv = q.find_all();
+    CHECK_EQUAL(tv.size(), 2);
+}
+
 
 #endif // TEST_QUERY

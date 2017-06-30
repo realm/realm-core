@@ -65,10 +65,11 @@ inline MemRef BasicArray<T>::create_array(Array::Type type, bool context_flag, s
     if (init_size) {
         BasicArray<T> tmp(allocator);
         tmp.init_from_mem(mem);
-        for (size_t i = 0; i < init_size; ++i) {
-            tmp.set(i, value);
+        T* p = reinterpret_cast<T*>(tmp.m_data);
+        T* end = p + init_size;
+        while (p < end) {
+            *p++ = value;
         }
-        return tmp.get_mem();
     }
     return mem;
 }
@@ -151,6 +152,8 @@ template <class T>
 inline void BasicArray<T>::set(size_t ndx, T value)
 {
     REALM_ASSERT_3(ndx, <, m_size);
+    if (get(ndx) == value)
+        return;
 
     // Check if we need to copy before modifying
     copy_on_write(); // Throws
@@ -206,7 +209,7 @@ void BasicArray<T>::erase(size_t ndx)
         char* dst_begin = m_data + ndx * m_width;
         const char* src_begin = dst_begin + m_width;
         const char* src_end = m_data + m_size * m_width;
-        std::copy(src_begin, src_end, dst_begin);
+        realm::safe_copy_n(src_begin, src_end - src_begin, dst_begin);
     }
 
     // Update size (also in header)
@@ -242,7 +245,7 @@ bool BasicArray<T>::compare(const BasicArray<T>& a) const
         return false;
     const T* data_1 = reinterpret_cast<const T*>(m_data);
     const T* data_2 = reinterpret_cast<const T*>(a.m_data);
-    return std::equal(data_1, data_1 + n, data_2);
+    return realm::safe_equal(data_1, data_1 + n, data_2);
 }
 
 

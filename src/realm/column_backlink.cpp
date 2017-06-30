@@ -455,8 +455,7 @@ void BacklinkColumn::get_backlinks(std::vector<VerifyPair>& pairs)
 
 std::pair<ref_type, size_t> BacklinkColumn::get_to_dot_parent(size_t ndx_in_parent) const
 {
-    std::pair<MemRef, size_t> p = get_root_array()->get_bptree_leaf(ndx_in_parent);
-    return std::make_pair(p.first.get_ref(), p.second);
+    return IntegerColumn::get_to_dot_parent(ndx_in_parent);
 }
 
 // LCOV_EXCL_STOP ignore debug functions

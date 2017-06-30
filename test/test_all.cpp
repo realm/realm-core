@@ -65,7 +65,7 @@ using namespace realm::test_util;
 using namespace realm::test_util::unit_test;
 
 // Random seed for various random number generators used by fuzzying unit tests.
-unsigned long unit_test_random_seed;
+unsigned int unit_test_random_seed;
 
 namespace {
 
@@ -414,25 +414,29 @@ bool run_tests(util::Logger* logger)
     // Set up reporter
     std::ofstream xml_file;
     bool xml;
-#ifdef REALM_MOBILE
+#if REALM_MOBILE
     xml = true;
 #else
     const char* xml_str = getenv("UNITTEST_XML");
     xml = (xml_str && strlen(xml_str) != 0);
 #endif
-    std::unique_ptr<Reporter> reporter;
+    std::vector<std::unique_ptr<Reporter>> reporters;
+    {
+        const char* str = getenv("UNITTEST_PROGRESS");
+        bool report_progress = str && strlen(str) != 0;
+        std::unique_ptr<Reporter> reporter = std::make_unique<CustomReporter>(report_progress);
+        reporters.push_back(std::move(reporter));
+    }
     if (xml) {
         std::string path = get_test_path_prefix();
         std::string xml_path = path + "unit-test-report.xml";
         xml_file.open(xml_path.c_str());
-        reporter.reset(create_xml_reporter(xml_file));
+        std::unique_ptr<Reporter> reporter_1 = create_junit_reporter(xml_file);
+        std::unique_ptr<Reporter> reporter_2 = create_twofold_reporter(*reporters.back(), *reporter_1);
+        reporters.push_back(std::move(reporter_1));
+        reporters.push_back(std::move(reporter_2));
     }
-    else {
-        const char* str = getenv("UNITTEST_PROGRESS");
-        bool report_progress = str && strlen(str) != 0;
-        reporter.reset(new CustomReporter(report_progress));
-    }
-    config.reporter = reporter.get();
+    config.reporter = reporters.back().get();
 
     // Set up filter
     const char* filter_str = getenv("UNITTEST_FILTER");
@@ -441,7 +445,7 @@ bool run_tests(util::Logger* logger)
         filter_str = test_only;
     std::unique_ptr<Filter> filter;
     if (filter_str && strlen(filter_str) != 0)
-        filter.reset(create_wildcard_filter(filter_str));
+        filter = create_wildcard_filter(filter_str);
     config.filter = filter.get();
 
     // Set intra test log level threshold
@@ -490,8 +494,7 @@ bool run_tests(util::Logger* logger)
     if (test_only)
         std::cout << "\n*** BE AWARE THAT MOST TESTS WERE EXCLUDED DUE TO USING 'ONLY' MACRO ***\n";
 
-    if (!xml)
-        std::cout << "\n";
+    std::cout << "\n";
 
     return success;
 }
@@ -515,9 +518,12 @@ int test_all(int argc, char* argv[], util::Logger* logger)
     bool no_error_exit_staus = 2 <= argc && strcmp(argv[1], "--no-error-exitcode") == 0;
 
 #ifdef _MSC_VER
-    // we're in /build/ on Windows if we're in the Visual Studio IDE
-    set_test_resource_path("../../test/");
-    set_test_path_prefix("../../test/");
+    // we're in /build/ on Windows if we're in the Visual Studio IDE. Some Github clients on Windows will interfere
+    // with the .realm files created by unit tests, so we need to make a special directory for them and add it to
+    // .gitignore
+    util::try_make_dir("../test/tmp");
+    set_test_resource_path("../test/");
+    set_test_path_prefix("../test/tmp/");
 #endif
 
     set_random_seed();
@@ -543,7 +549,9 @@ int test_all(int argc, char* argv[], util::Logger* logger)
     }
 
 #ifdef _MSC_VER
-    getchar(); // wait for key
+    // We don't want forked processes (see winfork() to require user interaction).
+    if(!getenv("REALM_FORKED"))
+        getchar(); // wait for key
 #endif
 
     return success || no_error_exit_staus ? EXIT_SUCCESS : EXIT_FAILURE;

@@ -73,7 +73,7 @@ BinaryColumn::BinaryColumn(Allocator& alloc, ref_type ref, bool nullable, size_t
 
 namespace {
 
-struct SetLeafElem : Array::UpdateHandler {
+struct SetLeafElem : BpTreeNode::UpdateHandler {
     Allocator& m_alloc;
     const BinaryData m_value;
     const bool m_add_zero_term;
@@ -134,7 +134,7 @@ BinaryData BinaryColumn::get_at(size_t ndx, size_t& pos) const noexcept
     }
     else {
         // Non-leaf root
-        std::pair<MemRef, size_t> p = m_array->get_bptree_leaf(ndx);
+        std::pair<MemRef, size_t> p = static_cast<BpTreeNode*>(m_array.get())->get_bptree_leaf(ndx);
         const char* leaf_header = p.first.get_addr();
         bool is_big = Array::get_context_flag_from_header(leaf_header);
         if (!is_big) {
@@ -174,7 +174,7 @@ void BinaryColumn::set(size_t ndx, BinaryData value, bool add_zero_term)
 
     // Non-leaf root
     SetLeafElem set_leaf_elem(m_array->get_alloc(), value, add_zero_term);
-    m_array->update_bptree_elem(ndx, set_leaf_elem); // Throws
+    static_cast<BpTreeNode*>(m_array.get())->update_bptree_elem(ndx, set_leaf_elem); // Throws
 }
 
 
@@ -220,13 +220,14 @@ void BinaryColumn::do_insert(size_t row_ndx, BinaryData value, bool add_zero_ter
         }
         else {
             // Non-leaf root
+            BpTreeNode* node = static_cast<BpTreeNode*>(m_array.get());
             state.m_value = value;
             state.m_add_zero_term = add_zero_term;
             if (row_ndx_2 == realm::npos) {
-                new_sibling_ref = m_array->bptree_append(state);
+                new_sibling_ref = node->bptree_append(state);
             }
             else {
-                new_sibling_ref = m_array->bptree_insert(row_ndx_2, state);
+                new_sibling_ref = node->bptree_insert(row_ndx_2, state);
             }
         }
         if (REALM_UNLIKELY(new_sibling_ref)) {
@@ -238,7 +239,7 @@ void BinaryColumn::do_insert(size_t row_ndx, BinaryData value, bool add_zero_ter
 
 
 ref_type BinaryColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t ndx_in_parent, Allocator& alloc,
-                                   size_t insert_ndx, Array::TreeInsert<BinaryColumn>& state)
+                                   size_t insert_ndx, BpTreeNode::TreeInsert<BinaryColumn>& state)
 {
     InsertState& state_2 = static_cast<InsertState&>(state);
     bool is_big = Array::get_context_flag_from_header(leaf_mem.get_addr());
@@ -264,7 +265,7 @@ ref_type BinaryColumn::leaf_insert(MemRef leaf_mem, ArrayParent& parent, size_t 
 }
 
 
-class BinaryColumn::EraseLeafElem : public Array::EraseHandler {
+class BinaryColumn::EraseLeafElem : public BpTreeNode::EraseHandler {
 public:
     BinaryColumn& m_column;
     EraseLeafElem(BinaryColumn& column) noexcept
@@ -359,7 +360,7 @@ void BinaryColumn::erase(size_t ndx, bool is_last)
     // Non-leaf root
     size_t ndx_2 = is_last ? npos : ndx;
     EraseLeafElem erase_leaf_elem(*this);
-    Array::erase_bptree_elem(m_array.get(), ndx_2, erase_leaf_elem); // Throws
+    BpTreeNode::erase_bptree_elem(static_cast<BpTreeNode*>(m_array.get()), ndx_2, erase_leaf_elem); // Throws
 }
 
 
@@ -388,7 +389,7 @@ void BinaryColumn::do_move_last_over(size_t row_ndx, size_t last_row_ndx)
         // Copying binary data from a column to itself requires an
         // intermediate copy of the data (constr:bptree-copy-to-self).
         std::unique_ptr<char[]> buffer(new char[value.size()]); // Throws
-        std::copy(value.data(), value.data() + value.size(), buffer.get());
+        realm::safe_copy_n(value.data(), value.size(), buffer.get());
         BinaryData copy_of_value(buffer.get(), value.size());
         set(row_ndx, copy_of_value); // Throws
     }
@@ -414,8 +415,8 @@ void BinaryColumn::swap_rows(size_t row_ndx_1, size_t row_ndx_2)
 
     std::unique_ptr<char[]> buffer_1(new char[value_1.size()]); // Throws
     std::unique_ptr<char[]> buffer_2(new char[value_2.size()]); // Throws
-    std::copy(value_1.data(), value_1.data() + value_1.size(), buffer_1.get());
-    std::copy(value_2.data(), value_2.data() + value_2.size(), buffer_2.get());
+    realm::safe_copy_n(value_1.data(), value_1.size(), buffer_1.get());
+    realm::safe_copy_n(value_2.data(), value_2.size(), buffer_2.get());
 
     if (value_1.is_null()) {
         set(row_ndx_2, BinaryData());

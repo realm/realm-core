@@ -19,20 +19,18 @@
 #ifndef REALM_STRING_HPP
 #define REALM_STRING_HPP
 
-#include <cstddef>
-#include <algorithm>
-#include <string>
-#include <ostream>
-#include <cstring>
-
-#include <cfloat>
-#include <cmath>
-
+#include <realm/null.hpp>
 #include <realm/util/features.h>
 #include <realm/util/optional.hpp>
-#include <realm/utilities.hpp>
-#include <realm/null.hpp>
-#include <realm/owned_data.hpp>
+
+#include <algorithm>
+#include <array>
+#include <cfloat>
+#include <cmath>
+#include <cstddef>
+#include <cstring>
+#include <ostream>
+#include <string>
 
 namespace realm {
 
@@ -90,7 +88,7 @@ public:
 
     // StringData does not store data, callers must manage their own strings.
     template <class T, class A>
-    StringData(std::basic_string<char, T, A>&&) = delete;
+    StringData(const std::basic_string<char, T, A>&&) = delete;
 
     template <class T, class A>
     StringData(const util::Optional<std::basic_string<char, T, A>>&);
@@ -138,6 +136,11 @@ public:
     bool begins_with(StringData) const noexcept;
     bool ends_with(StringData) const noexcept;
     bool contains(StringData) const noexcept;
+    bool contains(StringData d, const std::array<uint8_t, 256> &charmap) const noexcept;
+    
+    // Wildcard matching ('?' for single char, '*' for zero or more chars)
+    // case insensitive version in unicode.hpp
+    bool like(StringData) const noexcept;
 
     //@{
     /// Undefined behavior if \a n, \a i, or <tt>i+n</tt> is greater than
@@ -156,6 +159,13 @@ public:
 private:
     const char* m_data;
     size_t m_size;
+
+    static bool matchlike(const StringData& text, const StringData& pattern) noexcept;
+    static bool matchlike_ins(const StringData& text, const StringData& pattern_upper,
+                              const StringData& pattern_lower) noexcept;
+
+    friend bool string_like_ins(StringData, StringData) noexcept;
+    friend bool string_like_ins(StringData, StringData, StringData) noexcept;
 };
 
 
@@ -283,6 +293,52 @@ inline bool StringData::contains(StringData d) const noexcept
         return false;
 
     return d.m_size == 0 || std::search(m_data, m_data + m_size, d.m_data, d.m_data + d.m_size) != m_data + m_size;
+}
+
+/// This method takes an array that maps chars to distance that can be moved (and zero for chars not in needle),
+/// allowing the method to apply Boyer-Moore for quick substring search
+/// The map is calculated in the StringNode<Contains> class (so it can be reused across searches)
+inline bool StringData::contains(StringData d, const std::array<uint8_t, 256> &charmap) const noexcept
+{
+    if (is_null() && !d.is_null())
+        return false;
+    
+    size_t needle_size = d.size();
+    if (needle_size == 0)
+        return true;
+    
+    // Prepare vars to avoid lookups in loop
+    size_t last_char_pos = d.size()-1;
+    unsigned char lastChar = d[last_char_pos];
+    
+    // Do Boyer-Moore search
+    size_t p = last_char_pos;
+    while (p < m_size) {
+        unsigned char c = m_data[p]; // Get candidate for last char
+        
+        if (c == lastChar) {
+            StringData candidate = substr(p-needle_size+1, needle_size);
+            if (candidate == d)
+                return true; // text found!
+        }
+        
+        // If we don't have a match, see how far we can move char_pos
+        if (charmap[c] == 0)
+            p += needle_size; // char was not present in search string
+        else
+            p += charmap[c];
+    }
+    
+    return false;
+}
+    
+inline bool StringData::like(StringData d) const noexcept
+{
+    if (is_null() || d.is_null()) {
+        return (is_null() && d.is_null());
+    }
+
+    return matchlike(*this, d);
 }
 
 inline StringData StringData::prefix(size_t n) const noexcept

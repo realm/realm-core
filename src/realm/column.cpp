@@ -218,11 +218,13 @@ size_t ColumnBase::get_size_from_type_and_ref(ColumnType type, ref_type ref, All
 ref_type ColumnBaseSimple::write(const Array* root, size_t slice_offset, size_t slice_size, size_t table_size,
                                  SliceHandler& handler, _impl::OutputStream& out)
 {
-    return BpTreeBase::write_subtree(*root, slice_offset, slice_size, table_size, handler, out);
+    REALM_ASSERT(root->is_inner_bptree_node());
+    return BpTreeBase::write_subtree(static_cast<const BpTreeNode&>(*root), slice_offset, slice_size, table_size,
+                                     handler, out);
 }
 
 
-void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeInsertBase& state, bool is_append)
+void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, TreeInsertBase& state, bool is_append)
 {
     // At this point the original root and its new sibling is either
     // both leaves, or both inner nodes on the same form, compact or
@@ -232,8 +234,8 @@ void ColumnBaseSimple::introduce_new_root(ref_type new_sibling_ref, Array::TreeI
 
     Array* orig_root = get_root_array();
     Allocator& alloc = get_alloc();
-    std::unique_ptr<Array> new_root(new Array(alloc)); // Throws
-    new_root->create(Array::type_InnerBptreeNode);     // Throws
+    std::unique_ptr<Array> new_root(new BpTreeNode(alloc)); // Throws
+    new_root->create(Array::type_InnerBptreeNode);          // Throws
     new_root->set_parent(orig_root->get_parent(), orig_root->get_ndx_in_parent());
     new_root->update_parent(); // Throws
     bool compact_form = is_append && (!orig_root->is_inner_bptree_node() || orig_root->get(0) % 2 != 0);
@@ -359,12 +361,10 @@ void ColumnBaseWithIndex::destroy_search_index() noexcept
     m_search_index.reset();
 }
 
-void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
-                                               bool allow_duplicate_valaues)
+void ColumnBaseWithIndex::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index.reset(
-        new StringIndex(ref, parent, ndx_in_parent, this, !allow_duplicate_valaues, get_alloc())); // Throws
+    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, get_alloc())); // Throws
 }
 
 

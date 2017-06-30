@@ -1,0 +1,8 @@
+v7
+
+The first line of this file describes the current benchmarking tool version.
+It is used as a folder prefix to handle storing multiple versions of performance results.
+If the functionality of the existing benchmarks changes (ie benchmark-common-tasks or benchmark-crud)
+Then the version here should be bumped so that that benchmark is re-run on old versions of core again,
+while still retaining the old version results. If the version is not bumped these scripts will use the
+old numbers and produce misleading results for old versions.

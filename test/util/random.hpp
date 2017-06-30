@@ -61,7 +61,7 @@ void random_seed(unsigned long) noexcept;
 /// pseudorandom number genrator.
 ///
 /// This function is thread safe.
-unsigned long produce_nondeterministic_random_seed();
+unsigned int produce_nondeterministic_random_seed();
 
 
 /// Simple pseudorandom number generator.

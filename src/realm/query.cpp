@@ -16,16 +16,19 @@
  *
  **************************************************************************/
 
-#include <cstdio>
-#include <algorithm>
+#include <realm/query.hpp>
 
 #include <realm/array.hpp>
 #include <realm/column_fwd.hpp>
-#include <realm/query.hpp>
-#include <realm/query_engine.hpp>
 #include <realm/descriptor.hpp>
-#include <realm/table_view.hpp>
+#include <realm/group_shared.hpp>
 #include <realm/link_view.hpp>
+#include <realm/query_engine.hpp>
+#include <realm/query_expression.hpp>
+#include <realm/table_view.hpp>
+
+#include <algorithm>
+
 
 using namespace realm;
 
@@ -201,7 +204,8 @@ void Query::set_table(TableRef tr)
     m_table = tr;
     if (m_table) {
         fetch_descriptor();
-        if (ParentNode* root = root_node())
+        ParentNode* root = root_node();
+        if (root && !m_table->is_degenerate())
             root->set_table(*m_table);
     }
     else {
@@ -230,7 +234,13 @@ void Query::apply_patch(HandoverPatch& patch, Group& dest_group)
     // not going through Table::create_from_and_consume_patch because we need to use
     // set_table() to update all table references
     if (patch.m_table) {
-        set_table(dest_group.get_table(patch.m_table->m_table_num));
+        if (patch.m_table->m_is_sub_table) {
+            auto parent_table = dest_group.get_table(patch.m_table->m_table_num);
+            set_table(parent_table->get_subtable(patch.m_table->m_col_ndx, patch.m_table->m_row_ndx));
+        }
+        else {
+            set_table(dest_group.get_table(patch.m_table->m_table_num));
+        }
     }
     REALM_ASSERT(patch.m_node_data.empty());
 }
@@ -367,6 +377,29 @@ std::unique_ptr<ParentNode> make_condition_node(const Descriptor& descriptor, si
     }
 }
 
+template <class Cond>
+std::unique_ptr<ParentNode> make_size_condition_node(const Descriptor& descriptor, size_t column_ndx, int64_t value)
+{
+    DataType type = descriptor.get_column_type(column_ndx);
+    switch (type) {
+        case type_String: {
+            return std::unique_ptr<ParentNode>{new SizeNode<StringColumn, Cond>(value, column_ndx)};
+        }
+        case type_Binary: {
+            return std::unique_ptr<ParentNode>{new SizeNode<BinaryColumn, Cond>(value, column_ndx)};
+        }
+        case type_LinkList: {
+            return std::unique_ptr<ParentNode>{new SizeNode<LinkListColumn, Cond>(value, column_ndx)};
+        }
+        case type_Table: {
+            return std::unique_ptr<ParentNode>{new SizeNode<SubtableColumn, Cond>(value, column_ndx)};
+        }
+        default: {
+            throw LogicError{LogicError::type_mismatch};
+        }
+    }
+}
+
 } // anonymous namespace
 
 void Query::fetch_descriptor()
@@ -384,6 +417,16 @@ Query& Query::add_condition(size_t column_ndx, T value)
 {
     REALM_ASSERT_DEBUG(m_current_descriptor);
     auto node = make_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
+    add_node(std::move(node));
+    return *this;
+}
+
+
+template <typename TConditionFunction>
+Query& Query::add_size_condition(size_t column_ndx, int64_t value)
+{
+    REALM_ASSERT_DEBUG(m_current_descriptor);
+    auto node = make_size_condition_node<TConditionFunction>(*m_current_descriptor, column_ndx, value);
     add_node(std::move(node));
     return *this;
 }
@@ -722,6 +765,39 @@ Query& Query::less(size_t column_ndx, Timestamp value)
     return add_condition<Less>(column_ndx, value);
 }
 
+// ------------- size
+Query& Query::size_equal(size_t column_ndx, int64_t value)
+{
+    return add_size_condition<Equal>(column_ndx, value);
+}
+Query& Query::size_not_equal(size_t column_ndx, int64_t value)
+{
+    return add_size_condition<NotEqual>(column_ndx, value);
+}
+Query& Query::size_greater(size_t column_ndx, int64_t value)
+{
+    return add_size_condition<Greater>(column_ndx, value);
+}
+Query& Query::size_greater_equal(size_t column_ndx, int64_t value)
+{
+    return add_size_condition<GreaterEqual>(column_ndx, value);
+}
+Query& Query::size_less_equal(size_t column_ndx, int64_t value)
+{
+    return add_size_condition<LessEqual>(column_ndx, value);
+}
+Query& Query::size_less(size_t column_ndx, int64_t value)
+{
+    return add_size_condition<Less>(column_ndx, value);
+}
+Query& Query::size_between(size_t column_ndx, int64_t from, int64_t to)
+{
+    group();
+    size_greater_equal(column_ndx, from);
+    size_less_equal(column_ndx, to);
+    end_group();
+    return *this;
+}
 
 // Strings, StringData()
 
@@ -763,6 +839,14 @@ Query& Query::not_equal(size_t column_ndx, StringData value, bool case_sensitive
         add_condition<NotEqual>(column_ndx, value);
     else
         add_condition<NotEqualIns>(column_ndx, value);
+    return *this;
+}
+Query& Query::like(size_t column_ndx, StringData value, bool case_sensitive)
+{
+    if (case_sensitive)
+        add_condition<Like>(column_ndx, value);
+    else
+        add_condition<LikeIns>(column_ndx, value);
     return *this;
 }
 
@@ -1444,11 +1528,6 @@ size_t Query::find_internal(size_t start, size_t end) const
         return not_found;
     else
         return r;
-}
-
-bool Query::comp(const std::pair<size_t, size_t>& a, const std::pair<size_t, size_t>& b)
-{
-    return a.first < b.first;
 }
 
 void Query::add_node(std::unique_ptr<ParentNode> node)

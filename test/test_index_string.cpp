@@ -23,6 +23,7 @@
 #include <realm/index_string.hpp>
 #include <realm/column_linklist.hpp>
 #include <realm/column_string.hpp>
+#include <realm/query_expression.hpp>
 #include <realm/util/to_string.hpp>
 #include <set>
 #include "test.hpp"
@@ -81,13 +82,8 @@ const char s7[] = "Sam";
 const int64_t ints[] = {0x1111,     0x11112222, 0x11113333, 0x1111333, 0x111122223333ull, 0x1111222233334ull,
                         0x22223333, 0x11112227, 0x11112227, 0x78923};
 
-struct nullable {
-    static constexpr bool value = true;
-};
-
-struct non_nullable {
-    static constexpr bool value = false;
-};
+using nullable = std::true_type;
+using non_nullable = std::false_type;
 
 } // anonymous namespace
 
@@ -299,8 +295,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
         if (fr != FindRes_column)
             return;
 
-        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
-        matches.get_root_array()->init_from_ref(result.payload);
+        IntegerColumn matches(col.get_alloc(), result.payload);
 
         CHECK_EQUAL(3, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(3, matches.size());
@@ -319,8 +314,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
         if (fr != FindRes_column)
             return;
 
-        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
-        matches.get_root_array()->init_from_ref(result.payload);
+        IntegerColumn matches(col.get_alloc(), result.payload);
 
         CHECK_EQUAL(3, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(3, matches.size());
@@ -339,8 +333,7 @@ TEST_TYPES(StringIndex_MoveLastOver, non_nullable, nullable)
         if (fr != FindRes_column)
             return;
 
-        IntegerColumn matches(IntegerColumn::unattached_root_tag(), col.get_alloc());
-        matches.get_root_array()->init_from_ref(result.payload);
+        IntegerColumn matches(col.get_alloc(), result.payload);
 
         CHECK_EQUAL(2, result.end_ndx - result.start_ndx);
         CHECK_EQUAL(2, matches.size());
@@ -781,8 +774,8 @@ TEST(StringIndex_FindAllNoCopyCommonPrefixStrings)
         const IntegerColumn results_c(Allocator::get_default(), ref_type(results.payload));
         CHECK_EQUAL(results_c.get(results.start_ndx), start_row + 1);
         CHECK_EQUAL(results_c.get(results.start_ndx + 1), start_row + 2);
-        CHECK_EQUAL(col.get(results_c.get(results.start_ndx)), spc);
-        CHECK_EQUAL(col.get(results_c.get(results.start_ndx + 1)), spc);
+        CHECK_EQUAL(col.get(size_t(results_c.get(results.start_ndx))), spc);
+        CHECK_EQUAL(col.get(size_t(results_c.get(results.start_ndx + 1))), spc);
 
         res = ndx.find_all_no_copy(spd, results);
         CHECK_EQUAL(res, FindRes_not_found);
@@ -794,9 +787,9 @@ TEST(StringIndex_FindAllNoCopyCommonPrefixStrings)
         CHECK_EQUAL(results_e.get(results.start_ndx), start_row + 3);
         CHECK_EQUAL(results_e.get(results.start_ndx + 1), start_row + 4);
         CHECK_EQUAL(results_e.get(results.start_ndx + 2), start_row + 5);
-        CHECK_EQUAL(col.get(results_e.get(results.start_ndx)), spe);
-        CHECK_EQUAL(col.get(results_e.get(results.start_ndx + 1)), spe);
-        CHECK_EQUAL(col.get(results_e.get(results.start_ndx + 2)), spe);
+        CHECK_EQUAL(col.get(size_t(results_e.get(results.start_ndx))), spe);
+        CHECK_EQUAL(col.get(size_t(results_e.get(results.start_ndx + 1))), spe);
+        CHECK_EQUAL(col.get(size_t(results_e.get(results.start_ndx + 2))), spe);
     };
 
     std::string std_max(StringIndex::s_max_offset, 'a');
@@ -965,7 +958,15 @@ namespace {
 StringData create_string_with_nuls(const size_t bits, const size_t length, char* tmp, Random& random)
 {
     for (size_t i = 0; i < length; ++i) {
-        tmp[i] = (bits & (1 << i)) == 0 ? '\0' : static_cast<char>(random.draw_int<int>(CHAR_MIN, CHAR_MAX));
+        bool insert_nul_at_pos = (bits & (size_t(1) << i)) == 0;
+        if (insert_nul_at_pos) {
+            tmp[i] = '\0';
+        }
+        else {
+            // Avoid stray \0 chars, since we are already testing all combinations.
+            // All casts are necessary to preserve the bitpattern.
+            tmp[i] = static_cast<char>(static_cast<unsigned char>(random.draw_int<unsigned int>(1, UCHAR_MAX)));
+        }
     }
     return StringData(tmp, length);
 }
@@ -977,6 +978,7 @@ StringData create_string_with_nuls(const size_t bits, const size_t length, char*
 TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
 {
     constexpr bool nullable = TEST_TYPE::value;
+    constexpr unsigned int seed = 42;
 
     // String index
     ref_type ref = StringColumn::create(Allocator::get_default());
@@ -989,8 +991,8 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
     for (size_t length = 1; length <= MAX_LENGTH; ++length) {
 
         {
-            Random random(42);
-            const size_t combinations = 1 << length;
+            Random random(seed);
+            const size_t combinations = size_t(1) << length;
             for (size_t i = 0; i < combinations; ++i) {
                 StringData str = create_string_with_nuls(i, length, tmp, random);
                 col.add(str);
@@ -1000,8 +1002,8 @@ TEST_TYPES(StringIndex_EmbeddedZeroesCombinations, non_nullable, nullable)
         // check index up to this length
         size_t expected_index = 0;
         for (size_t l = 1; l <= length; ++l) {
-            Random random(42);
-            const size_t combinations = 1 << l;
+            Random random(seed);
+            const size_t combinations = size_t(1) << l;
             for (size_t i = 0; i < combinations; ++i) {
                 StringData needle = create_string_with_nuls(i, l, tmp, random);
                 CHECK_EQUAL(ndx.find_first(needle), expected_index);
@@ -1381,53 +1383,6 @@ TEST(StringIndex_MoveLastOver_DoUpdateRef)
     col.destroy();
 }
 
-TEST(StringIndex_Deny_Duplicates)
-{
-    ref_type ref = StringColumn::create(Allocator::get_default());
-    StringColumn col(Allocator::get_default(), ref, true);
-    StringData duplicate("duplicate");
-    // create subindex of repeated elements on a leaf
-    size_t num_repeats = 100;
-    for (size_t i = 0; i < num_repeats; ++i) {
-        col.add(duplicate);
-    }
-
-    // Create a new index on column
-    const StringIndex& ndx = *col.create_search_index();
-
-    CHECK(ndx.has_duplicate_values());
-
-    col.set_search_index_allow_duplicate_values(false);
-    CHECK(ndx.has_duplicate_values());
-
-    size_t ndx_count = ndx.count(duplicate);
-    CHECK_THROW(col.add(duplicate), realm::LogicError);
-    CHECK(ndx_count == ndx.count(duplicate));
-
-    col.clear();
-    CHECK(!ndx.has_duplicate_values());
-
-    col.add(duplicate);
-    CHECK_THROW(col.add(duplicate), realm::LogicError);
-    CHECK(!ndx.has_duplicate_values());
-
-    col.clear();
-    col.set_search_index_allow_duplicate_values(true);
-    CHECK(!ndx.has_duplicate_values());
-
-    // Populate tree with duplicates through insert() at back
-    for (size_t i = 0; i < num_repeats; ++i) {
-        col.insert(col.size(), duplicate);
-    }
-    CHECK(ndx.has_duplicate_values());
-    CHECK(col.get(0) == duplicate);
-    CHECK(col.get(col.size() - 1) == duplicate);
-    CHECK(col.count(duplicate) == num_repeats);
-
-    col.destroy();
-}
-
-
 TEST(StringIndex_MaxBytes)
 {
     std::string std_max(StringIndex::s_max_offset, 'a');
@@ -1637,7 +1592,7 @@ TEST(StringIndex_Fuzzy)
     constexpr size_t chunkcount = 50;
     constexpr size_t rowcount = 100 + 1000 * TEST_DURATION;
 
-    for (size_t main_rounds = 0; main_rounds < 1 + 10 * TEST_DURATION; main_rounds++) {
+    for (size_t main_rounds = 0; main_rounds < 2 + 10 * TEST_DURATION; main_rounds++) {
 
         Group g;
 
@@ -1674,10 +1629,10 @@ TEST(StringIndex_Fuzzy)
             t->set_string(0, t->size() - 1, str);
             t->set_string(1, t->size() - 1, str);
         }
-        
+
         for (size_t rounds = 0; rounds < 1 + 10 * TEST_DURATION; rounds++) {
             for (size_t r = 0; r < t->size(); r++) {
-                
+
                 TableView tv0 = (t->column<String>(0) == t->get_string(0, r)).find_all();
                 TableView tv1 = (t->column<String>(1) == t->get_string(1, r)).find_all();
 
@@ -1688,14 +1643,40 @@ TEST(StringIndex_Fuzzy)
                 }
             }
 
+
+            for (size_t r = 0; r < 5 + 1000 * TEST_DURATION; r++) {
+                size_t chunks;
+                if (fastrand() % 2 == 0)
+                    chunks = fastrand() % 4;
+                else
+                    chunks = 2;
+
+                std::string str;
+
+                for (size_t c = 0; c < chunks; c++) {
+                    str += strings[fastrand() % chunkcount];
+                }
+
+                TableView tv0 = (t->column<String>(0) == str).find_all();
+                TableView tv1 = (t->column<String>(1) == str).find_all();
+
+                CHECK_EQUAL(tv0.size(), tv1.size());
+
+                for (size_t v = 0; v < tv0.size(); v++) {
+                    CHECK_EQUAL(tv0.get_source_ndx(v), tv1.get_source_ndx(v));
+                }
+            }
             if (t->size() > 10)
                 t->remove(0);
 
             size_t r1 = fastrand() % t->size();
             size_t r2 = fastrand() % t->size();
 
-            t->set_string(0, r1, t->get_string(0, r2));
-            t->set_string(1, r1, t->get_string(1, r2));
+            std::string str1 = t->get_string(0, r2);
+            std::string str2 = t->get_string(0, r2);
+
+            t->set_string(0, r1, StringData(str1));
+            t->set_string(1, r1, StringData(str2));
 
             r1 = fastrand() % t->size();
             r2 = fastrand() % t->size();
@@ -1703,6 +1684,356 @@ TEST(StringIndex_Fuzzy)
             t.get()->swap_rows(r1, r2);
         }
     }
+}
+
+
+namespace {
+
+// results returned by the index should be in ascending row order
+// this requirement is assumed by the query system which runs find_gte
+// and this will return wrong results unless the results are ordered
+void check_result_order(const IntegerColumn& results, TestContext& test_context)
+{
+    const size_t num_results = results.size();
+    for (size_t i = 1; i < num_results; ++i) {
+        CHECK(results.get(i - 1) < results.get(i));
+    }
+}
+
+} // end anonymous namespace
+
+
+TEST_TYPES(StringIndex_Insensitive, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    // Create a column with string values
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+
+    const char* strings[] = {
+        "john", "John", "jOhn", "JOhn", "joHn", "JoHn", "jOHn", "JOHn", "johN", "JohN", "jOhN", "JOhN", "joHN", "JoHN", "jOHN", "JOHN", "john" /* yes, an extra to test the "bucket" case as well */,
+        "hans", "Hansapark", "george", "billion dollar startup",
+        "abcde", "abcdE", "Abcde", "AbcdE",
+        "common", "common"
+    };
+
+    for (const char* string : strings) {
+        col.add(string);
+    }
+
+    // Generate 255 strings with 1..255 'a' chars
+    for (int i = 1; i < 256; ++i) {
+        col.add(std::string(i, 'a').c_str());
+    }
+
+    // Create a new index on column
+    const StringIndex& ndx = *col.create_search_index();
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+    {
+        // case sensitive
+        ndx.find_all(results, strings[0]);
+        CHECK_EQUAL(2, results.size());
+        CHECK_EQUAL(col.get(size_t(results.get(0))), strings[0]);
+        CHECK_EQUAL(col.get(size_t(results.get(1))), strings[0]);
+        check_result_order(results, test_context);
+        results.clear();
+    }
+
+    {
+        constexpr bool case_insensitive = true;
+        const char* needle = "john";
+        auto upper_needle = case_map(needle, true);
+        ndx.find_all(results, needle, case_insensitive);
+        CHECK_EQUAL(17, results.size());
+        for (size_t i = 0; i < results.size(); ++i) {
+            auto upper_result = case_map(col.get(size_t(results.get(i))), true);
+            CHECK_EQUAL(upper_result, upper_needle);
+
+        }
+        check_result_order(results, test_context);
+        results.clear();
+    }
+
+
+    {
+        struct TestData {
+            const bool case_insensitive;
+            const char* const needle;
+            const size_t result_size;
+        };
+
+        TestData td[] = {
+            {true, "Hans", 1},
+            {true, "Geor", 0},
+            {true, "George", 1},
+            {true, "geoRge", 1},
+            {true, "Billion Dollar Startup", 1},
+            {true, "ABCDE", 4},
+            {true, "commON", 2},
+        };
+
+        for (const TestData& t : td) {
+            ndx.find_all(results, t.needle, t.case_insensitive);
+            CHECK_EQUAL(t.result_size, results.size());
+            check_result_order(results, test_context);
+            results.clear();
+        }
+    }
+
+    // Test generated 'a'-strings
+    for (int i = 1; i < 256; ++i) {
+        const std::string str = std::string(i, 'A');
+        ndx.find_all(results, str.c_str(), false);
+        CHECK_EQUAL(0, results.size());
+        ndx.find_all(results, str.c_str(), true);
+        CHECK_EQUAL(1, results.size());
+        results.clear();
+    }
+
+    // Clean up
+    results.destroy();
+    col.destroy();
+}
+
+
+/* Disabled until we have better support for case mapping unicode characters
+
+TEST_TYPES(StringIndex_Insensitive_Unicode, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    // Create a column with string values
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+
+    const char* strings[] = {
+        "æøå", "ÆØÅ",
+    };
+
+    for (const char* string : strings) {
+        col.add(string);
+    }
+
+    // Create a new index on column
+    const StringIndex& ndx = *col.create_search_index();
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+
+    {
+        struct TestData {
+            const bool case_insensitive;
+            const char* const needle;
+            const size_t result_size;
+        };
+
+        TestData td[] = {
+            {false, "æøå", 1},
+            {false, "ÆØÅ", 1},
+            {true, "æøå", 2},
+            {true, "Æøå", 2},
+            {true, "æØå", 2},
+            {true, "ÆØå", 2},
+            {true, "æøÅ", 2},
+            {true, "ÆøÅ", 2},
+            {true, "æØÅ", 2},
+            {true, "ÆØÅ", 2},
+        };
+
+        for (const TestData& t : td) {
+            ndx.find_all(results, t.needle, t.case_insensitive);
+            CHECK_EQUAL(t.result_size, results.size());
+            results.clear();
+        }
+    }
+
+    // Clean up
+    results.destroy();
+    col.destroy();
+}
+
+*/
+
+
+TEST_TYPES(StringIndex_45, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+    const StringIndex& ndx = *col.create_search_index();
+    std::string a4 = std::string(4, 'a');
+    std::string A5 = std::string(5, 'A');
+
+    col.add(a4);
+    col.add(a4);
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn res(Allocator::get_default(), results_ref);
+
+    ndx.find_all(res, A5.c_str(), true);
+    CHECK_EQUAL(res.size(), 0);
+
+    res.destroy();
+    col.destroy();
+}
+
+
+namespace {
+
+std::string create_random_a_string(size_t max_len) {
+    std::string s;
+    size_t len = size_t(fastrand(max_len));
+    for (size_t p = 0; p < len; p++) {
+        s += fastrand(1) == 0 ? 'a' : 'A';
+    }
+    return s;
+}
+
+}
+
+TEST_TYPES(StringIndex_Insensitive_Fuzz, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    const size_t max_str_len = 9;
+    const size_t iters = 10;
+
+    for (size_t iter = 0; iter < iters; iter++) {
+        ref_type ref = StringColumn::create(Allocator::get_default());
+        StringColumn col(Allocator::get_default(), ref, nullable);
+
+        size_t rows = size_t(fastrand(2 * REALM_MAX_BPNODE_SIZE - 1));
+
+        // Add 'rows' number of rows in the column
+        for (size_t t = 0; t < rows; t++) {
+            std::string str = create_random_a_string(max_str_len);
+            col.add(str);
+        }
+
+        const StringIndex& ndx = *col.create_search_index();
+
+        for (size_t t = 0; t < 1000; t++) {
+            std::string needle = create_random_a_string(max_str_len);
+
+            ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+            IntegerColumn res(Allocator::get_default(), results_ref);
+
+            ndx.find_all(res, needle.c_str(), true);
+            check_result_order(res, test_context);
+
+            // Check that all items in 'res' point at a match in 'col'
+            auto needle_upper = case_map(needle, true);
+            for (size_t res_ndx = 0; res_ndx < res.size(); res_ndx++) {
+                auto res_upper = case_map(col.get(to_size_t(res.get(res_ndx))), true);
+                CHECK_EQUAL(res_upper, needle_upper);
+            }
+
+            // Check that all matches in 'col' exist in 'res'
+            for (size_t col_ndx = 0; col_ndx < col.size(); col_ndx++) {
+                auto str_upper = case_map(col.get(col_ndx), true);
+                if (str_upper == needle_upper) {
+                    CHECK(res.find_first(col_ndx) != npos);
+                }
+            }
+            res.destroy();
+        }
+        col.destroy();
+    }
+}
+
+// Exercise the StringIndex case insensitive search for strings with very long, common prefixes
+// to cover the special case code paths where different strings are stored in a list.
+TEST_TYPES(StringIndex_Insensitive_VeryLongStrings, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+    const StringIndex& ndx = *col.create_search_index();
+
+    std::string long1 = std::string(StringIndex::s_max_offset + 10, 'a');
+    std::string long2 = long1 + "b";
+    std::string long3 = long1 + "c";
+
+    // Add the strings in a "random" order
+    col.add(long1);
+    col.add(long2);
+    col.add(long2);
+    col.add(long1);
+    col.add(long3);
+    col.add(long2);
+    col.add(long1);
+    col.add(long1);
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+
+    ndx.find_all(results, long1.c_str(), true);
+    CHECK_EQUAL(results.size(), 4);
+    check_result_order(results, test_context);
+    results.clear();
+    ndx.find_all(results, long2.c_str(), true);
+    CHECK_EQUAL(results.size(), 3);
+    results.clear();
+    ndx.find_all(results, long3.c_str(), true);
+    CHECK_EQUAL(results.size(), 1);
+    results.clear();
+
+    results.destroy();
+    col.destroy();
+}
+
+
+// Bug with case insensitive search on numbers that gives duplicate results
+TEST_TYPES(StringIndex_Insensitive_Numbers, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+    const StringIndex& ndx = *col.create_search_index();
+
+    constexpr const char* number_string_16 = "1111111111111111";
+    constexpr const char* number_string_17 = "11111111111111111";
+
+    col.add(number_string_16);
+    col.add(number_string_17);
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+
+    ndx.find_all(results, number_string_16, true);
+    CHECK_EQUAL(results.size(), 1);
+
+    results.destroy();
+    col.destroy();
+}
+
+
+TEST_TYPES(StringIndex_Rover, non_nullable, nullable)
+{
+    constexpr bool nullable = TEST_TYPE::value;
+
+    ref_type ref = StringColumn::create(Allocator::get_default());
+    StringColumn col(Allocator::get_default(), ref, nullable);
+    const StringIndex& ndx = *col.create_search_index();
+
+    col.add("ROVER");
+    col.add("Rover");
+
+    ref_type results_ref = IntegerColumn::create(Allocator::get_default());
+    IntegerColumn results(Allocator::get_default(), results_ref);
+
+    ndx.find_all(results, "rover", true);
+    CHECK_EQUAL(results.size(), 2);
+    check_result_order(results, test_context);
+
+    results.destroy();
+    col.destroy();
 }
 
 

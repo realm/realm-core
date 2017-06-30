@@ -41,6 +41,7 @@ static const mode_t2 MS_MODE_MASK = 0x0000ffff;
 #include <realm/util/file.hpp>
 
 #include "test.hpp"
+#include "test_table_helper.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -78,11 +79,23 @@ using namespace realm::test_util;
 
 namespace {
 
-enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
+template <class T>
+void test_table_add_columns(T t)
+{
+    t->add_column(type_String, "first");
+    t->add_column(type_Int, "second");
+    t->add_column(type_Bool, "third");
+    t->add_column(type_Int, "fourth");
+}
 
-REALM_TABLE_4(TestTableGroup, first, String, second, Int, third, Bool, fourth, Enum<Days>)
-
-REALM_TABLE_3(TestTableGroup2, first, Mixed, second, Subtable<TestTableGroup>, third, Subtable<TestTableGroup>)
+template <class T>
+void setup_table(T t)
+{
+    add(t, "a", 1, true, Wed);
+    add(t, "b", 15, true, Wed);
+    add(t, "ccc", 10, true, Wed);
+    add(t, "dddd", 20, true, Wed);
+}
 
 } // Anonymous namespace
 
@@ -106,10 +119,10 @@ TEST(Group_UnattachedErrorHandling)
     CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.add_table("foo", false), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.insert_table(0, "foo", false), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>(0), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>("foo"), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.add_table<TestTableGroup>("foo", false), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(group.insert_table<TestTableGroup>(0, "foo", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table(0), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.get_table("foo"), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.add_table("foo", false), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(group.insert_table(0, "foo", false), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.remove_table("foo"), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.remove_table(0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(group.rename_table("foo", "bar", false), LogicError::detached_accessor);
@@ -121,15 +134,15 @@ TEST(Group_UnattachedErrorHandling)
         const Group& const_group = group;
         CHECK_LOGIC_ERROR(const_group.get_table(0), LogicError::detached_accessor);
         CHECK_LOGIC_ERROR(const_group.get_table("foo"), LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(const_group.get_table<TestTableGroup>(0), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(const_group.get_table(0), LogicError::detached_accessor);
     }
 
     {
         bool f = false;
         CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f), LogicError::detached_accessor);
         CHECK_LOGIC_ERROR(group.get_or_insert_table(0, "foo", &f), LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(group.get_or_add_table<TestTableGroup>("foo", &f), LogicError::detached_accessor);
-        CHECK_LOGIC_ERROR(group.get_or_insert_table<TestTableGroup>(0, "foo", &f), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_add_table("foo", &f), LogicError::detached_accessor);
+        CHECK_LOGIC_ERROR(group.get_or_insert_table(0, "foo", &f), LogicError::detached_accessor);
     }
     {
         std::ostringstream out;
@@ -272,8 +285,7 @@ TEST(Group_Permissions)
 }
 #endif
 
-// FIXME: Fails on Windows
-#ifndef _MSC_VER
+
 TEST(Group_BadFile)
 {
     GROUP_TEST_PATH(path_1);
@@ -298,7 +310,7 @@ TEST(Group_BadFile)
         CHECK(group.is_attached());
     }
 }
-#endif
+
 
 TEST(Group_OpenBuffer)
 {
@@ -529,52 +541,6 @@ TEST(Group_GetOrInsertTable)
     group.get_or_insert_table(1, "foo", &was_inserted);
     CHECK_EQUAL(1, group.size());
     CHECK_NOT(was_inserted);
-}
-
-
-TEST(Group_StaticallyTypedTables)
-{
-    Group group;
-    const Group& cgroup = group;
-
-    TestTableGroup::Ref table_1 = group.add_table<TestTableGroup>("table_1");
-    TestTableGroup2::Ref table_2 = group.add_table<TestTableGroup2>("table_2");
-
-    CHECK_THROW(group.add_table("table_2"), TableNameInUse);
-    CHECK_THROW(group.add_table<TestTableGroup>("table_2"), TableNameInUse);
-    CHECK_THROW(group.add_table<TestTableGroup2>("table_2"), TableNameInUse);
-
-    CHECK_NOT(group.get_table("foo"));
-    CHECK_NOT(cgroup.get_table("foo"));
-    CHECK_NOT(group.get_table<TestTableGroup>("foo"));
-    CHECK_NOT(cgroup.get_table<TestTableGroup>("foo"));
-    CHECK_NOT(group.get_table<TestTableGroup2>("foo"));
-    CHECK_NOT(cgroup.get_table<TestTableGroup2>("foo"));
-
-    CHECK_EQUAL(table_1, group.get_table<TestTableGroup>(table_1->get_index_in_group()));
-    CHECK_EQUAL(table_1, cgroup.get_table<TestTableGroup>(table_1->get_index_in_group()));
-    CHECK_EQUAL(table_2, group.get_table<TestTableGroup2>(table_2->get_index_in_group()));
-    CHECK_EQUAL(table_2, cgroup.get_table<TestTableGroup2>(table_2->get_index_in_group()));
-    CHECK_THROW(group.get_table<TestTableGroup2>(table_1->get_index_in_group()), DescriptorMismatch);
-    CHECK_THROW(cgroup.get_table<TestTableGroup2>(table_1->get_index_in_group()), DescriptorMismatch);
-    CHECK_THROW(group.get_table<TestTableGroup>(table_2->get_index_in_group()), DescriptorMismatch);
-    CHECK_THROW(cgroup.get_table<TestTableGroup>(table_2->get_index_in_group()), DescriptorMismatch);
-
-    CHECK_EQUAL(table_1, group.get_table<TestTableGroup>("table_1"));
-    CHECK_EQUAL(table_1, cgroup.get_table<TestTableGroup>("table_1"));
-    CHECK_EQUAL(table_2, group.get_table<TestTableGroup2>("table_2"));
-    CHECK_EQUAL(table_2, cgroup.get_table<TestTableGroup2>("table_2"));
-    CHECK_THROW(group.get_table<TestTableGroup2>("table_1"), DescriptorMismatch);
-    CHECK_THROW(cgroup.get_table<TestTableGroup2>("table_1"), DescriptorMismatch);
-    CHECK_THROW(group.get_table<TestTableGroup>("table_2"), DescriptorMismatch);
-    CHECK_THROW(cgroup.get_table<TestTableGroup>("table_2"), DescriptorMismatch);
-
-    CHECK_EQUAL(table_1, group.get_or_add_table<TestTableGroup>("table_1"));
-    CHECK_EQUAL(table_2, group.get_or_add_table<TestTableGroup2>("table_2"));
-    CHECK_THROW(group.get_or_add_table<TestTableGroup2>("table_1"), DescriptorMismatch);
-    CHECK_THROW(group.get_or_add_table<TestTableGroup>("table_2"), DescriptorMismatch);
-
-    CHECK_LOGIC_ERROR(group.get_table<TestTableGroup>(3), LogicError::table_index_out_of_range);
 }
 
 
@@ -911,32 +877,22 @@ TEST(Group_MoveTableImmediatelyAfterOpen)
 }
 
 
-namespace {
-
-void setup_table(TestTableGroup::Ref t)
-{
-    t->add("a", 1, true, Wed);
-    t->add("b", 15, true, Wed);
-    t->add("ccc", 10, true, Wed);
-    t->add("dddd", 20, true, Wed);
-}
-
-} // anonymous namespace
-
-
 TEST(Group_Equal)
 {
     Group g1, g2, g3;
     CHECK(g1 == g2);
-    TestTableGroup::Ref t1 = g1.add_table<TestTableGroup>("TABLE1");
+    auto t1 = g1.add_table("TABLE1");
+    test_table_add_columns(t1);
     CHECK_NOT(g1 == g2);
     setup_table(t1);
-    TestTableGroup::Ref t2 = g2.add_table<TestTableGroup>("TABLE1");
+    auto t2 = g2.add_table("TABLE1");
+    test_table_add_columns(t2);
     setup_table(t2);
     CHECK(g1 == g2);
-    t2->add("hey", 2, false, Thu);
+    add(t2, "hey", 2, false, Thu);
     CHECK(g1 != g2);
-    TestTableGroup::Ref t3 = g3.add_table<TestTableGroup>("TABLE3");
+    auto t3 = g3.add_table("TABLE3");
+    test_table_add_columns(t3);
     setup_table(t3);
     CHECK(g1 != g3);
 }
@@ -960,6 +916,67 @@ TEST(Group_TableAccessorLeftBehind)
 }
 
 
+TEST(Group_SubtableDescriptors)
+{
+    // This test originally only failed when checked with valgrind as the
+    // problem was that memory was read after being freed.
+    GROUP_TEST_PATH(path);
+
+    // Create new database
+    Group g(path, crypt_key(), Group::mode_ReadWrite);
+
+    TableRef table = g.add_table("first");
+    {
+        DescriptorRef subdescr;
+        table->add_column(type_Table, "sub", false, &subdescr);
+        subdescr->add_column(type_Int, "integers", nullptr, false);
+    }
+    table->add_empty_row(125);
+
+    TableRef sub = table->get_subtable(0, 3);
+    sub->clear();
+    sub->add_empty_row(5);
+    sub->set_int(0, 0, 127, false);
+    sub->set_int(0, 1, 127, false);
+    sub->set_int(0, 2, 255, false);
+    sub->set_int(0, 3, 128, false);
+    sub->set_int(0, 4, 4, false);
+
+    // this will keep a subdescriptor alive during the commit
+    int64_t val = sub->get_int(0, 2);
+    TableView tv = sub->where().equal(0, val).find_all();
+
+    table->get_subdescriptor(0)->add_search_index(0);
+    g.commit();
+    table->get_subdescriptor(0)->remove_search_index(0);
+}
+
+TEST(Group_UpdateSubtableDescriptorsAccessors)
+{
+    GROUP_TEST_PATH(path);
+    Group g(path, crypt_key(), Group::mode_ReadWrite);
+
+    TableRef table = g.add_table("first");
+
+    {
+        DescriptorRef subdescr;
+        table->add_column(type_Table, "sub1", true, &subdescr);
+        subdescr->add_column(type_Int, "integers", nullptr, false);
+    }
+
+    {
+        DescriptorRef subdescr;
+        table->add_column(type_Table, "sub2", true, &subdescr);
+        subdescr->add_column(type_Int, "integers", nullptr, false);
+    }
+
+    g.commit();
+
+    table->get_subdescriptor(1)->remove_search_index(0);
+    table->remove_column(0);
+    table->get_subdescriptor(0)->add_search_index(0);
+}
+
 TEST(Group_Invalid1)
 {
     GROUP_TEST_PATH(path);
@@ -974,11 +991,7 @@ TEST(Group_Invalid2)
 {
     // Try to open buffer with invalid data
     const char* const str = "invalid data";
-    const size_t size = strlen(str);
-    char* const data = new char[strlen(str)];
-    std::copy(str, str + size, data);
-    CHECK_THROW(Group(BinaryData(data, size)), InvalidDatabase);
-    delete[] data;
+    CHECK_THROW(Group(BinaryData(str, strlen(str))), InvalidDatabase);
 }
 
 
@@ -1014,18 +1027,19 @@ TEST(Group_Serialize0)
         Group from_disk(path, crypt_key());
 
         // Create new table in group
-        TestTableGroup::Ref t = from_disk.add_table<TestTableGroup>("test");
+        auto t = from_disk.add_table("test");
+        test_table_add_columns(t);
 
         CHECK_EQUAL(4, t->get_column_count());
         CHECK_EQUAL(0, t->size());
 
         // Modify table
-        t->add("Test", 1, true, Wed);
+        add(t, "Test", 1, true, Wed);
 
-        CHECK_EQUAL("Test", t[0].first);
-        CHECK_EQUAL(1, t[0].second);
-        CHECK_EQUAL(true, t[0].third);
-        CHECK_EQUAL(Wed, t[0].fourth);
+        CHECK_EQUAL("Test", t->get_string(0, 0));
+        CHECK_EQUAL(1, t->get_int(1, 0));
+        CHECK_EQUAL(true, t->get_bool(2, 0));
+        CHECK_EQUAL(Wed, t->get_int(3, 0));
     }
     {
         // Load the group and let it clean up without loading
@@ -1041,17 +1055,18 @@ TEST(Group_Serialize1)
     {
         // Create group with one table
         Group to_disk;
-        TestTableGroup::Ref table = to_disk.add_table<TestTableGroup>("test");
-        table->add("", 1, true, Wed);
-        table->add("", 15, true, Wed);
-        table->add("", 10, true, Wed);
-        table->add("", 20, true, Wed);
-        table->add("", 11, true, Wed);
-        table->add("", 45, true, Wed);
-        table->add("", 10, true, Wed);
-        table->add("", 0, true, Wed);
-        table->add("", 30, true, Wed);
-        table->add("", 9, true, Wed);
+        auto table = to_disk.add_table("test");
+        test_table_add_columns(table);
+        add(table, "", 1, true, Wed);
+        add(table, "", 15, true, Wed);
+        add(table, "", 10, true, Wed);
+        add(table, "", 20, true, Wed);
+        add(table, "", 11, true, Wed);
+        add(table, "", 45, true, Wed);
+        add(table, "", 10, true, Wed);
+        add(table, "", 0, true, Wed);
+        add(table, "", 30, true, Wed);
+        add(table, "", 9, true, Wed);
 
 #ifdef REALM_DEBUG
         to_disk.verify();
@@ -1062,7 +1077,7 @@ TEST(Group_Serialize1)
 
         // Load the table
         Group from_disk(path, crypt_key());
-        TestTableGroup::Ref t = from_disk.get_table<TestTableGroup>("test");
+        auto t = from_disk.get_table("test");
 
         CHECK_EQUAL(4, t->get_column_count());
         CHECK_EQUAL(10, t->size());
@@ -1071,10 +1086,11 @@ TEST(Group_Serialize1)
         CHECK(*table == *t);
 
         // Modify both tables
-        table[0].first = "test";
-        t[0].first = "test";
-        table->insert(5, "hello", 100, false, Mon);
-        t->insert(5, "hello", 100, false, Mon);
+        table->set_string(0, 0, "test");
+        t->set_string(0, 0, "test");
+
+        insert(table, 5, "hello", 100, false, Mon);
+        insert(t, 5, "hello", 100, false, Mon);
         table->remove(1);
         t->remove(1);
 
@@ -1099,14 +1115,16 @@ TEST(Group_Serialize2)
 
     // Create group with two tables
     Group to_disk;
-    TestTableGroup::Ref table1 = to_disk.add_table<TestTableGroup>("test1");
-    table1->add("", 1, true, Wed);
-    table1->add("", 15, true, Wed);
-    table1->add("", 10, true, Wed);
+    TableRef table1 = to_disk.add_table("test1");
+    test_table_add_columns(table1);
+    add(table1, "", 1, true, Wed);
+    add(table1, "", 15, true, Wed);
+    add(table1, "", 10, true, Wed);
 
-    TestTableGroup::Ref table2 = to_disk.add_table<TestTableGroup>("test2");
-    table2->add("hey", 0, true, Tue);
-    table2->add("hello", 3232, false, Sun);
+    TableRef table2 = to_disk.add_table("test2");
+    test_table_add_columns(table2);
+    add(table2, "hey", 0, true, Tue);
+    add(table2, "hello", 3232, false, Sun);
 
 #ifdef REALM_DEBUG
     to_disk.verify();
@@ -1117,8 +1135,8 @@ TEST(Group_Serialize2)
 
     // Load the tables
     Group from_disk(path, crypt_key());
-    TestTableGroup::Ref t1 = from_disk.get_table<TestTableGroup>("test1");
-    TestTableGroup::Ref t2 = from_disk.get_table<TestTableGroup>("test2");
+    TableRef t1 = from_disk.get_table("test1");
+    TableRef t2 = from_disk.get_table("test2");
 
     // Verify that original values are there
     CHECK(*table1 == *t1);
@@ -1137,9 +1155,10 @@ TEST(Group_Serialize3)
 
     // Create group with one table (including long strings
     Group to_disk;
-    TestTableGroup::Ref table = to_disk.add_table<TestTableGroup>("test");
-    table->add("1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1", 1, true, Wed);
-    table->add("2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
+    TableRef table = to_disk.add_table("test");
+    test_table_add_columns(table);
+    add(table, "1 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 1", 1, true, Wed);
+    add(table, "2 xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx xxxxxxxx 2", 15, true, Wed);
 
 #ifdef REALM_DEBUG
     to_disk.verify();
@@ -1150,7 +1169,7 @@ TEST(Group_Serialize3)
 
     // Load the table
     Group from_disk(path, crypt_key());
-    TestTableGroup::Ref t = from_disk.get_table<TestTableGroup>("test");
+    TableRef t = from_disk.get_table("test");
 
     // Verify that original values are there
     CHECK(*table == *t);
@@ -1165,17 +1184,18 @@ TEST(Group_Serialize_Mem)
 {
     // Create group with one table
     Group to_mem;
-    TestTableGroup::Ref table = to_mem.add_table<TestTableGroup>("test");
-    table->add("", 1, true, Wed);
-    table->add("", 15, true, Wed);
-    table->add("", 10, true, Wed);
-    table->add("", 20, true, Wed);
-    table->add("", 11, true, Wed);
-    table->add("", 45, true, Wed);
-    table->add("", 10, true, Wed);
-    table->add("", 0, true, Wed);
-    table->add("", 30, true, Wed);
-    table->add("", 9, true, Wed);
+    TableRef table = to_mem.add_table("test");
+    test_table_add_columns(table);
+    add(table, "", 1, true, Wed);
+    add(table, "", 15, true, Wed);
+    add(table, "", 10, true, Wed);
+    add(table, "", 20, true, Wed);
+    add(table, "", 11, true, Wed);
+    add(table, "", 45, true, Wed);
+    add(table, "", 10, true, Wed);
+    add(table, "", 0, true, Wed);
+    add(table, "", 30, true, Wed);
+    add(table, "", 9, true, Wed);
 
 #ifdef REALM_DEBUG
     to_mem.verify();
@@ -1186,7 +1206,7 @@ TEST(Group_Serialize_Mem)
 
     // Load the table
     Group from_mem(buffer);
-    TestTableGroup::Ref t = from_mem.get_table<TestTableGroup>("test");
+    TableRef t = from_mem.get_table("test");
 
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(10, t->size());
@@ -1203,9 +1223,10 @@ TEST(Group_Serialize_Mem)
 TEST(Group_Close)
 {
     Group to_mem;
-    TestTableGroup::Ref table = to_mem.add_table<TestTableGroup>("test");
-    table->add("", 1, true, Wed);
-    table->add("", 2, true, Wed);
+    TableRef table = to_mem.add_table("test");
+    test_table_add_columns(table);
+    add(table, "", 1, true, Wed);
+    add(table, "", 2, true, Wed);
 
     // Serialize to memory (we now own the buffer)
     BinaryData buffer = to_mem.write_to_mem();
@@ -1218,14 +1239,15 @@ TEST(Group_Serialize_Optimized)
 {
     // Create group with one table
     Group to_mem;
-    TestTableGroup::Ref table = to_mem.add_table<TestTableGroup>("test");
+    TableRef table = to_mem.add_table("test");
+    test_table_add_columns(table);
 
     for (size_t i = 0; i < 5; ++i) {
-        table->add("abd", 1, true, Mon);
-        table->add("eftg", 2, true, Tue);
-        table->add("hijkl", 5, true, Wed);
-        table->add("mnopqr", 8, true, Thu);
-        table->add("stuvxyz", 9, true, Fri);
+        add(table, "abd", 1, true, Mon);
+        add(table, "eftg", 2, true, Tue);
+        add(table, "hijkl", 5, true, Wed);
+        add(table, "mnopqr", 8, true, Thu);
+        add(table, "stuvxyz", 9, true, Fri);
     }
 
     table->optimize();
@@ -1239,7 +1261,7 @@ TEST(Group_Serialize_Optimized)
 
     // Load the table
     Group from_mem(buffer);
-    TestTableGroup::Ref t = from_mem.get_table<TestTableGroup>("test");
+    TableRef t = from_mem.get_table("test");
 
     CHECK_EQUAL(4, t->get_column_count());
 
@@ -1247,9 +1269,9 @@ TEST(Group_Serialize_Optimized)
     CHECK(*table == *t);
 
     // Add a row with a known (but unique) value
-    table->add("search_target", 9, true, Fri);
+    add(table, "search_target", 9, true, Fri);
 
-    const size_t res = table->column().first.find_first("search_target");
+    const size_t res = table->find_first_string(0, "search_target");
     CHECK_EQUAL(table->size() - 1, res);
 
 #ifdef REALM_DEBUG
@@ -1761,6 +1783,15 @@ TEST(Group_CommitSubtable)
     subtable = table->get_subtable(0, 0);
     subtable->add_empty_row();
     group.commit();
+    group.verify();
+
+    TableRef table1 = group.add_table("other");
+    table1->add_column_link(type_LinkList, "linkList", *table);
+    group.commit();
+    group.verify();
+    table->insert_column_link(0, type_Link, "link", *table);
+    group.commit();
+    group.verify();
 }
 
 
@@ -1809,36 +1840,43 @@ TEST(Group_CommitDegenerateSubtable)
     CHECK(subtab->is_degenerate());
 }
 
-
 TEST(Group_InvalidateTables)
 {
-    TestTableGroup2::Ref table;
+    TableRef table;
     TableRef subtable1;
-    TestTableGroup::Ref subtable2;
-    TestTableGroup::Ref subtable3;
+    TableRef subtable2;
+    TableRef subtable3;
     {
         Group group;
-        table = group.add_table<TestTableGroup2>("foo");
+        table = group.add_table("foo");
+        table->add_column(type_Mixed, "first");
+        DescriptorRef descr1;
+        DescriptorRef descr2;
+        table->add_column(type_Table, "second", &descr1);
+        test_table_add_columns(descr1);
+        table->add_column(type_Table, "third", &descr2);
+        test_table_add_columns(descr2);
         CHECK(table->is_attached());
-        table->add(Mixed::subtable_tag(), 0, 0);
+        table->add_empty_row();
+        table->set_mixed(0, 0, Mixed::subtable_tag());
         CHECK(table->is_attached());
-        subtable1 = table[0].first.get_subtable();
+        subtable1 = table->get_subtable(0, 0);
         CHECK(table->is_attached());
         CHECK(subtable1);
         CHECK(subtable1->is_attached());
-        subtable2 = table[0].second;
+        subtable2 = table->get_subtable(1, 0);
         CHECK(table->is_attached());
         CHECK(subtable1->is_attached());
         CHECK(subtable2);
         CHECK(subtable2->is_attached());
-        subtable3 = table[0].third;
+        subtable3 = table->get_subtable(2, 0);
         CHECK(table->is_attached());
         CHECK(subtable1->is_attached());
         CHECK(subtable2->is_attached());
         CHECK(subtable3);
         CHECK(subtable3->is_attached());
-        subtable3->add("alpha", 79542, true, Wed);
-        subtable3->add("beta", 97, false, Mon);
+        add(subtable3, "alpha", 79542, true, Wed);
+        add(subtable3, "beta", 97, false, Mon);
         CHECK(table->is_attached());
         CHECK(subtable1->is_attached());
         CHECK(subtable2->is_attached());
@@ -1854,10 +1892,11 @@ TEST(Group_InvalidateTables)
 TEST(Group_ToJSON)
 {
     Group g;
-    TestTableGroup::Ref table = g.add_table<TestTableGroup>("test");
+    TableRef table = g.add_table("test");
+    test_table_add_columns(table);
 
-    table->add("jeff", 1, true, Wed);
-    table->add("jim", 1, true, Wed);
+    add(table, "jeff", 1, true, Wed);
+    add(table, "jim", 1, true, Wed);
     std::ostringstream out;
     g.to_json(out);
     std::string str = out.str();
@@ -1871,10 +1910,11 @@ TEST(Group_ToJSON)
 TEST(Group_ToString)
 {
     Group g;
-    TestTableGroup::Ref table = g.add_table<TestTableGroup>("test");
+    TableRef table = g.add_table("test");
+    test_table_add_columns(table);
 
-    table->add("jeff", 1, true, Wed);
-    table->add("jim", 1, true, Wed);
+    add(table, "jeff", 1, true, Wed);
+    add(table, "jim", 1, true, Wed);
     std::ostringstream out;
     g.to_string(out);
     std::string str = out.str();
@@ -1886,33 +1926,34 @@ TEST(Group_ToString)
 TEST(Group_IndexString)
 {
     Group to_mem;
-    TestTableGroup::Ref table = to_mem.add_table<TestTableGroup>("test");
+    TableRef table = to_mem.add_table("test");
+    test_table_add_columns(table);
 
-    table->add("jeff", 1, true, Wed);
-    table->add("jim", 1, true, Wed);
-    table->add("jennifer", 1, true, Wed);
-    table->add("john", 1, true, Wed);
-    table->add("jimmy", 1, true, Wed);
-    table->add("jimbo", 1, true, Wed);
-    table->add("johnny", 1, true, Wed);
-    table->add("jennifer", 1, true, Wed); // duplicate
+    add(table, "jeff", 1, true, Wed);
+    add(table, "jim", 1, true, Wed);
+    add(table, "jennifer", 1, true, Wed);
+    add(table, "john", 1, true, Wed);
+    add(table, "jimmy", 1, true, Wed);
+    add(table, "jimbo", 1, true, Wed);
+    add(table, "johnny", 1, true, Wed);
+    add(table, "jennifer", 1, true, Wed); // duplicate
 
-    table->column().first.add_search_index();
-    CHECK(table->column().first.has_search_index());
+    table->add_search_index(0);
+    CHECK(table->has_search_index(0));
 
-    size_t r1 = table->column().first.find_first("jimmi");
+    size_t r1 = table->find_first_string(0, "jimmi");
     CHECK_EQUAL(not_found, r1);
 
-    size_t r2 = table->column().first.find_first("jeff");
-    size_t r3 = table->column().first.find_first("jim");
-    size_t r4 = table->column().first.find_first("jimbo");
-    size_t r5 = table->column().first.find_first("johnny");
+    size_t r2 = table->find_first_string(0, "jeff");
+    size_t r3 = table->find_first_string(0, "jim");
+    size_t r4 = table->find_first_string(0, "jimbo");
+    size_t r5 = table->find_first_string(0, "johnny");
     CHECK_EQUAL(0, r2);
     CHECK_EQUAL(1, r3);
     CHECK_EQUAL(5, r4);
     CHECK_EQUAL(6, r5);
 
-    size_t c1 = table->column().first.count("jennifer");
+    size_t c1 = table->count_string(0, "jennifer");
     CHECK_EQUAL(2, c1);
 
     // Serialize to memory (we now own the buffer)
@@ -1920,34 +1961,34 @@ TEST(Group_IndexString)
 
     // Load the table
     Group from_mem(buffer);
-    TestTableGroup::Ref t = from_mem.get_table<TestTableGroup>("test");
+    TableRef t = from_mem.get_table("test");
     CHECK_EQUAL(4, t->get_column_count());
     CHECK_EQUAL(8, t->size());
 
-    CHECK(t->column().first.has_search_index());
+    CHECK(t->has_search_index(0));
 
-    size_t m1 = t->column().first.find_first("jimmi");
+    size_t m1 = t->find_first_string(0, "jimmi");
     CHECK_EQUAL(not_found, m1);
 
-    size_t m2 = t->column().first.find_first("jeff");
-    size_t m3 = t->column().first.find_first("jim");
-    size_t m4 = t->column().first.find_first("jimbo");
-    size_t m5 = t->column().first.find_first("johnny");
+    size_t m2 = t->find_first_string(0, "jeff");
+    size_t m3 = t->find_first_string(0, "jim");
+    size_t m4 = t->find_first_string(0, "jimbo");
+    size_t m5 = t->find_first_string(0, "johnny");
     CHECK_EQUAL(0, m2);
     CHECK_EQUAL(1, m3);
     CHECK_EQUAL(5, m4);
     CHECK_EQUAL(6, m5);
 
-    size_t m6 = t->column().first.count("jennifer");
+    size_t m6 = t->count_string(0, "jennifer");
     CHECK_EQUAL(2, m6);
 
     // Remove the search index and verify
-    t->column().first.remove_search_index();
-    CHECK(!t->column().first.has_search_index());
+    t->remove_search_index(0);
+    CHECK(!t->has_search_index(0));
     from_mem.verify();
 
-    size_t m7 = t->column().first.find_first("jimmi");
-    size_t m8 = t->column().first.find_first("johnny");
+    size_t m7 = t->find_first_string(0, "jimmi");
+    size_t m8 = t->find_first_string(0, "johnny");
     CHECK_EQUAL(not_found, m7);
     CHECK_EQUAL(6, m8);
 }
@@ -2430,17 +2471,18 @@ TEST(Group_ToDot)
     // Create table with all column types
     TableRef table = mygroup.add_table("test");
     DescriptorRef subdesc;
-    s.add_column(type_Int, "int");
-    s.add_column(type_Bool, "bool");
-    s.add_column(type_OldDateTime, "date");
-    s.add_column(type_String, "string");
-    s.add_column(type_String, "string_long");
-    s.add_column(type_String, "string_enum"); // becomes StringEnumColumn
-    s.add_column(type_Binary, "binary");
-    s.add_column(type_Mixed, "mixed");
-    s.add_column(type_Table, "tables", &subdesc);
+    table->add_column(type_Int, "int");
+    table->add_column(type_Bool, "bool");
+    table->add_column(type_OldDateTime, "date");
+    table->add_column(type_String, "string");
+    table->add_column(type_String, "string_long");
+    table->add_column(type_String, "string_enum"); // becomes StringEnumColumn
+    table->add_column(type_Binary, "binary");
+    table->add_column(type_Mixed, "mixed");
+    table->add_column(type_Table, "tables", &subdesc);
     subdesc->add_column(type_Int, "sub_first");
     subdesc->add_column(type_String, "sub_second");
+    subdesc.reset();
 
     // Add some rows
     for (size_t i = 0; i < 15; ++i) {
@@ -2468,7 +2510,7 @@ TEST(Group_ToDot)
                 break;
         }
 
-        table->set_binary(6, i, "binary", 7);
+        table->set_binary(6, i, BinaryData("binary", 7));
 
         switch (i % 3) {
             case 0:
@@ -2482,26 +2524,22 @@ TEST(Group_ToDot)
                 break;
         }
 
-        table->set_subtable(8, i);
-
         // Add sub-tables
         if (i == 2) {
             // To mixed column
-            table->set_mixed(7, i, Mixed(type_Table));
-            Table subtable = table->GetMixedTable(7, i);
+            table->set_mixed(7, i, Mixed::subtable_tag());
+            TableRef st = table->get_subtable(7, i);
 
-            Spec s = subtable->get_spec();
-            s.add_column(type_Int, "first");
-            s.add_column(type_String, "second");
-            subtable->UpdateFromSpec(s.get_ref());
+            st->add_column(type_Int, "first");
+            st->add_column(type_String, "second");
 
-            subtable->insert_empty_row(0);
-            subtable->set_int(0, 0, 42);
-            subtable->set_string(1, 0, "meaning");
+            st->insert_empty_row(0);
+            st->set_int(0, 0, 42);
+            st->set_string(1, 0, "meaning");
 
             // To table column
-            Table subtable2 = table->get_subtable(8, i);
-            subtable2->set_empty_row(0);
+            TableRef subtable2 = table->get_subtable(8, i);
+            subtable2->add_empty_row();
             subtable2->set_int(0, 0, 42);
             subtable2->set_string(1, 0, "meaning");
         }
@@ -2513,14 +2551,14 @@ TEST(Group_ToDot)
 #if 1
     // Write array graph to std::cout
     std::stringstream ss;
-    mygroup.ToDot(ss);
+    mygroup.to_dot(ss);
     std::cout << ss.str() << std::endl;
 #endif
 
     // Write array graph to file in dot format
-    std::ofstream fs("realm_graph.dot", ios::out | ios::binary);
+    std::ofstream fs("realm_graph.dot", std::ios::out | std::ios::binary);
     if (!fs.is_open())
-        std::cout << "file open error " << strerror << std::endl;
+        std::cout << "file open error " << strerror(errno) << std::endl;
     mygroup.to_dot(fs);
     fs.close();
 }

@@ -39,7 +39,7 @@ TransactLogConvenientEncoder::TransactLogConvenientEncoder(TransactLogStream& st
 bool TransactLogEncoder::select_table(size_t group_level_ndx, size_t levels, const size_t* path)
 {
     const size_t* path_end = path + (levels * 2);
-    append_variable_size_instr(instr_SelectTable, util::tuple(levels, group_level_ndx), path, path_end); // Throws
+    append_simple_instr(instr_SelectTable, levels, group_level_ndx, std::make_tuple(path, path_end)); // Throws
     return true;
 }
 
@@ -118,7 +118,7 @@ void TransactLogConvenientEncoder::do_select_desc(const Descriptor& desc)
 
 bool TransactLogEncoder::select_link_list(size_t col_ndx, size_t row_ndx, size_t link_target_group_level_ndx)
 {
-    append_simple_instr(instr_SelectLinkList, util::tuple(col_ndx, row_ndx, link_target_group_level_ndx)); // Throws
+    append_simple_instr(instr_SelectLinkList, col_ndx, row_ndx, link_target_group_level_ndx); // Throws
     return true;
 }
 
@@ -126,12 +126,12 @@ bool TransactLogEncoder::select_link_list(size_t col_ndx, size_t row_ndx, size_t
 void TransactLogConvenientEncoder::do_select_link_list(const LinkView& list)
 {
     select_table(list.m_origin_table.get());
-    size_t col_ndx = list.m_origin_column.get_column_index();
+    size_t col_ndx = list.m_origin_column->get_column_index();
     size_t row_ndx = list.get_origin_row_index();
 
     size_t* link_target_path_begin;
     size_t* link_target_path_end;
-    record_subtable_path(list.m_origin_column.get_target_table(), link_target_path_begin, link_target_path_end);
+    record_subtable_path(list.m_origin_column->get_target_table(), link_target_path_begin, link_target_path_end);
     size_t link_target_levels = (link_target_path_end - link_target_path_begin) / 2;
     static_cast<void>(link_target_levels);
     REALM_ASSERT_3(link_target_levels, ==, 0);

@@ -1,4 +1,4 @@
-FROM realm-core-centos-6-base
+FROM ci/realm-core:centos-6-base
 
 # whatever is required for building should be installed in this image; just
 # like BuildRequires: for RPM specs
@@ -10,7 +10,6 @@ RUN touch /var/lib/rpm/* \
         which \
         chrpath \
         openssl-devel \
-        python-cheetah \
         devtoolset-3-gcc \
         devtoolset-3-gcc-c++ \
         devtoolset-3-binutils \

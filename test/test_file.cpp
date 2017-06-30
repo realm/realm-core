@@ -71,7 +71,8 @@ TEST(File_ExistsAndRemove)
     CHECK(!File::try_remove(path));
 }
 
-
+// FIXME: Not yet supported on Windows 10 UWP
+#if !REALM_UWP
 TEST(File_IsSame)
 {
     TEST_PATH(path_1);
@@ -87,6 +88,7 @@ TEST(File_IsSame)
         CHECK(!f2.is_same_file(f3));
     }
 }
+#endif
 
 
 TEST(File_Streambuf)
@@ -237,7 +239,12 @@ TEST(File_Offset)
 TEST(File_MultipleWriters)
 {
     const size_t count = 4096 / sizeof(size_t) * 256 * 2;
-
+#if defined(_WIN32) && defined(REALM_ENABLE_ENCRYPTION)
+    // This test runs really slow on Windows with encryption
+    const size_t increments = 3000;
+#else
+    const size_t increments = 100;
+#endif
     TEST_PATH(path);
 
     {
@@ -252,7 +259,7 @@ TEST(File_MultipleWriters)
         File::Map<size_t> map1(w1, File::access_ReadWrite, count * sizeof(size_t));
         File::Map<size_t> map2(w2, File::access_ReadWrite, count * sizeof(size_t));
 
-        for (size_t i = 0; i < count; i += 100) {
+        for (size_t i = 0; i < count; i += increments) {
             realm::util::encryption_read_barrier(map1, i);
             ++map1.get_addr()[i];
             realm::util::encryption_write_barrier(map1, i);
@@ -267,7 +274,7 @@ TEST(File_MultipleWriters)
 
     File::Map<size_t> read(reader, File::access_ReadOnly, count * sizeof(size_t));
     realm::util::encryption_read_barrier(read, 0, count);
-    for (size_t i = 0; i < count; i += 100) {
+    for (size_t i = 0; i < count; i += increments) {
         CHECK_EQUAL(read.get_addr()[i], 2);
         if (read.get_addr()[i] != 2)
             return;
@@ -289,8 +296,6 @@ TEST(File_SetEncryptionKey)
 }
 
 
-#ifndef _WIN32
-
 TEST(File_ReadWrite)
 {
     TEST_PATH(path);
@@ -307,8 +312,6 @@ TEST(File_ReadWrite)
         CHECK_EQUAL(i, read);
     }
 }
-
-#endif
 
 
 TEST(File_Resize)

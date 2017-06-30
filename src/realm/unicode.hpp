@@ -23,7 +23,6 @@
 #include <cstdint>
 #include <string>
 
-#include <realm/util/safe_int_ops.hpp>
 #include <realm/string_data.hpp>
 #include <realm/util/features.h>
 #include <realm/utilities.hpp>
@@ -82,7 +81,7 @@ bool set_string_compare_method(string_compare_method_t method, StringCompareCall
 size_t sequence_length(char lead);
 
 // Limitations for case insensitive string search
-// Case insensitive search (equal, begins_with, ends_with and contains)
+// Case insensitive search (equal, begins_with, ends_with, like and contains)
 // only works for unicodes 0...0x7f which is the same as the 0...127
 // ASCII character set (letters a-z and A-Z).
 
@@ -137,6 +136,18 @@ inline bool equal_sequence(const char*& begin, const char* end, const char* begi
 /// Returns none if invalid UTF-8 encoding was encountered.
 util::Optional<std::string> case_map(StringData source, bool upper);
 
+#if REALM_UWP
+// Converts unicodes 0...last_greek_unicode to their respective lower case characters using a popular
+// UnicodeData.txtfile (http://www.opensource.apple.com/source/Heimdal/Heimdal-247.9/lib/wind/UnicodeData.txt) that
+// contains case conversion information. The conversion does not take your current locale in count; it can be
+// slightly wrong in some countries! If the input is already lower case, or outside range 0...last_greek_unicode, then input value
+// is returned untouched.
+//
+// The method is called from case_map() on Windows 10 UWP only, because CharLowerW() / CharUpperW() is not supported
+// on early Windows 10 devices (it's supported on newer versions though).
+unsigned int unicode_case_convert(unsigned int unicode, bool upper);
+#endif
+
 enum IgnoreErrorsTag { IgnoreErrors };
 std::string case_map(StringData source, bool upper, IgnoreErrorsTag);
 
@@ -149,6 +160,15 @@ bool equal_case_fold(StringData haystack, const char* needle_upper, const char* 
 /// both equal to \a needle_size. Returns haystack.size() if the
 /// needle was not found.
 size_t search_case_fold(StringData haystack, const char* needle_upper, const char* needle_lower, size_t needle_size);
+    
+/// Assumes that the sizes of \a needle_upper and \a needle_lower are
+/// both equal to \a needle_size. Returns false if the
+/// needle was not found.
+bool contains_ins(StringData haystack, const char* needle_upper, const char* needle_lower, size_t needle_size, const std::array<uint8_t, 256> &charmap);
+
+/// Case insensitive wildcard matching ('?' for single char, '*' for zero or more chars)
+bool string_like_ins(StringData text, StringData pattern) noexcept;
+bool string_like_ins(StringData text, StringData upper, StringData lower) noexcept;
 
 } // namespace realm
 

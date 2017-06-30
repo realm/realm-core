@@ -1495,4 +1495,33 @@ TEST(Array_FindGTE)
     }
 }
 
+TEST(Array_AdjustGEFuzzy)
+{
+    for (int iter = 0; iter < 100 + 100000 * TEST_DURATION; iter++) {
+        Array c(Allocator::get_default());
+        c.create(Array::type_Normal);
+        std::vector<int64_t> v;
+
+        for (size_t t = 0; t < 2; t++) {
+            int64_t r = fastrand(18) - 9;
+            c.add(r);
+            v.push_back(r);
+        }
+
+        int64_t limit = fastrand(18) - 9;
+        int64_t diff = fastrand(18) - 9;
+
+        c.adjust_ge(limit, diff);
+        for (size_t t = 0; t < 2; t++) {
+            if (v[t] >= limit)
+                v[t] += diff;
+        }
+
+        for (size_t t = 0; t < 2; t++) {
+            CHECK_EQUAL(v[t], c.get(t));
+        }
+
+        c.destroy();
+    }
+}
 #endif // TEST_ARRAY

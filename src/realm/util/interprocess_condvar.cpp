@@ -23,9 +23,16 @@
 #include <sstream>
 
 #ifdef REALM_CONDVAR_EMULATION
+#ifndef _WIN32
 #include <unistd.h>
 #include <poll.h>
 #endif
+#endif
+
+#ifndef _WIN32
+#include <sys/time.h>
+#endif
+
 
 using namespace realm;
 using namespace realm::util;
@@ -33,6 +40,14 @@ using namespace realm::util;
 #ifdef REALM_CONDVAR_EMULATION
 
 namespace {
+
+// Return difference in miliseconds between tv1 and tv2. Positive if tv1 < tv2.
+int64_t timediff(const timeval& tv1, const timespec& ts2)
+{
+    return int64_t(ts2.tv_sec - tv1.tv_sec) * 1000 + (ts2.tv_nsec / 1000000) - (tv1.tv_usec / 1000);
+}
+
+#ifndef _WIN32
 
 // Write a byte to a pipe to notify anyone waiting for data on the pipe
 void notify_fd(int fd)
@@ -53,6 +68,9 @@ void notify_fd(int fd)
         continue;
     }
 }
+
+#endif
+
 } // anonymous namespace
 #endif // REALM_CONDVAR_EMULATION
 
@@ -64,14 +82,18 @@ InterprocessCondVar::InterprocessCondVar()
 
 void InterprocessCondVar::close() noexcept
 {
-    if (uses_emulation) { // true if emulating a process shared condvar
-        uses_emulation = false;
 #ifdef REALM_CONDVAR_EMULATION
+#ifndef _WIN32
+    if (m_fd_read != -1) {
         ::close(m_fd_read);
-        ::close(m_fd_write);
-#endif
-        return; // we don't need to clean up the SharedPart
+        m_fd_read = -1;
     }
+    if (m_fd_write != -1) {
+        ::close(m_fd_write);
+        m_fd_write = -1;
+    }
+#endif
+#endif
     // we don't do anything to the shared part, other CondVars may share it
     m_shared_part = nullptr;
 }
@@ -82,17 +104,32 @@ InterprocessCondVar::~InterprocessCondVar() noexcept
     close();
 }
 
+#ifdef REALM_CONDVAR_EMULATION
+#ifndef _WIN32
+static void make_non_blocking(int fd)
+{
+    // Make reading or writing from the file descriptor return -1 when the file descriptor's buffer is empty
+    // rather than blocking until there's data available.
+    int ret = fcntl(fd, F_SETFL, O_NONBLOCK);
+    if (ret == -1) {
+        throw std::system_error(errno, std::system_category());
+    }
+}
+#endif
+#endif
 
 void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string base_path, std::string condvar_name,
                                           std::string tmp_path)
 {
     close();
-    uses_emulation = true;
     m_shared_part = &shared_part;
     static_cast<void>(base_path);
     static_cast<void>(condvar_name);
     static_cast<void>(tmp_path);
 #ifdef REALM_CONDVAR_EMULATION
+
+#ifndef _WIN32
+
 #if !REALM_TVOS
     m_resource_path = base_path + "." + condvar_name + ".cv";
 
@@ -100,7 +137,7 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
     int ret = mkfifo(m_resource_path.c_str(), 0600);
     if (ret == -1) {
         int err = errno;
-        if (err == ENOTSUP || err == EACCES) {
+        if (err == ENOTSUP || err == EACCES || err == EPERM || err == EINVAL) {
             // Filesystem doesn't support named pipes, so try putting it in tmp instead
             // Hash collisions are okay here because they just result in doing
             // extra work, as opposed to correctness problems
@@ -129,15 +166,11 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
         }
     }
 
-    m_fd_write = open(m_resource_path.c_str(), O_RDWR);
-    if (m_fd_write == -1) {
-        throw std::system_error(errno, std::system_category());
-    }
-
-    m_fd_read = open(m_resource_path.c_str(), O_RDONLY);
+    m_fd_read = open(m_resource_path.c_str(), O_RDWR);
     if (m_fd_read == -1) {
         throw std::system_error(errno, std::system_category());
     }
+    m_fd_write = -1;
 
 #else // !REALM_TVOS
 
@@ -153,29 +186,54 @@ void InterprocessCondVar::set_shared_part(SharedPart& shared_part, std::string b
 
 #endif // REALM_TVOS
 
-    // Make writing to the pipe return -1 when the pipe's buffer is full
-    // rather than blocking until there's space available
-    ret = fcntl(m_fd_write, F_SETFL, O_NONBLOCK);
-    if (ret == -1) {
-        throw std::system_error(errno, std::system_category());
+    if (m_fd_read != -1) {
+        make_non_blocking(m_fd_read);
+    }
+    if (m_fd_write != -1) {
+        make_non_blocking(m_fd_write);
     }
 
-    // Make reading from the pipe return -1 when the pipe's buffer is empty
-    // rather than blocking until there's data available
-    ret = fcntl(m_fd_read, F_SETFL, O_NONBLOCK);
-    if (ret == -1) {
-        throw std::system_error(errno, std::system_category());
-    }
+#else // _WIN32
+    // If the named objects are alive in the Windows kernel space, then their handles are cloned and
+    // you get returned a new HANDLE number (differs from that of other processes) which represents the 
+    // same object. If not then they are created. When the last process that has handles to an object 
+    // terminates, the objects are destructed automatically by the kernel, so there will be no handle 
+    // leaks or other kinds of leak.
+    std::string sem = "realm_sema_" + base_path + condvar_name;
+    std::string eve = "realm_event_" + base_path + condvar_name;
 
-#endif
+    // UWP only has W versions of API.
+    std::wstring se = std::wstring(sem.begin(), sem.end());
+    std::wstring ev = std::wstring(eve.begin(), eve.end());
+
+    m_sema = CreateSemaphoreW(
+        nullptr,     // no security
+        0,           // initially 0
+        0x7fffffff,  // max count
+        LPWSTR(se.c_str()));
+
+    m_waiters_done = CreateEventW(
+        nullptr,    // no security
+        false,      // auto-reset
+        false,      // non-signaled initially
+        LPWSTR(ev.c_str()));
+
+#endif // _WIN32
+#endif // REALM_CONDVAR_EMULATION
 }
 
 
 void InterprocessCondVar::init_shared_part(SharedPart& shared_part)
 {
 #ifdef REALM_CONDVAR_EMULATION
+#ifdef _WIN32
+    shared_part.m_waiters_countlock.init_as_process_shared(true);
+    shared_part.m_waiters_count = 0;
+    shared_part.m_was_broadcast = 0;
+#else
     shared_part.wait_counter = 0;
     shared_part.signal_counter = 0;
+#endif
 #else
     new (&shared_part) CondVar(CondVar::process_shared_tag());
 #endif // REALM_CONDVAR_EMULATION
@@ -185,8 +243,11 @@ void InterprocessCondVar::init_shared_part(SharedPart& shared_part)
 void InterprocessCondVar::release_shared_part()
 {
 #ifdef REALM_CONDVAR_EMULATION
+#ifndef _WIN32
     File::try_remove(m_resource_path);
+#endif
 #else
+    // For future platforms, remember to check if additional code should go here.
 #endif
 }
 
@@ -202,8 +263,53 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
     // postcondition: regardless of cause for return (timeout or notification),
     // the lock is held.
     REALM_ASSERT(m_shared_part);
+
 #ifdef REALM_CONDVAR_EMULATION
 
+#ifdef _WIN32
+    int64_t wait_milliseconds = INFINITE;
+
+    if (tp) {
+        timeval tp2;
+        gettimeofday(&tp2, nullptr);
+        wait_milliseconds = timediff(tp2, *tp);
+        if (wait_milliseconds < 0)
+            wait_milliseconds = 0;
+    }
+
+    m_shared_part->m_waiters_countlock.lock();
+    m_shared_part->m_waiters_count++;
+    m_shared_part->m_waiters_countlock.unlock();
+
+    m.unlock();
+    WaitForSingleObject(m_sema, DWORD(wait_milliseconds));
+
+    // Reacquire lock to avoid race conditions.
+    m_shared_part->m_waiters_countlock.lock();
+
+    // We're no longer waiting...
+    m_shared_part->m_waiters_count--;
+
+    // Check to see if we're the last waiter after notify_all().
+    bool last_waiter = m_shared_part->m_was_broadcast && m_shared_part->m_waiters_count == 0;
+
+    m_shared_part->m_waiters_countlock.unlock();
+
+    // If we're the last waiter thread during this particular broadcast then let all the other threads proceed.
+    if (last_waiter) {
+        // This call atomically signals the <m_waiters_done> event and waits until it can acquire the 
+        // external mutex. This is required to ensure fairness. This need to signal an event back means
+        // that we cannot take m.lock earlier and this in turn forces us to add an additional mutex, 
+        // m_waiters_countlock.
+        SetEvent(m_waiters_done);
+        m.lock();
+    }
+    else {
+        // Always regain the external mutex since that's the guarantee we give to our callers. 
+        m.lock();
+    }
+    return;
+#else
     // indicate arrival of a new waiter (me) and get our own number in the
     // line of waiters. We later use this number to determine if a wakeup
     // is done because of valid signaling or should be ignored. We also use
@@ -236,9 +342,17 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
         int r;
         {
             if (tp) {
-                long miliseconds = tp->tv_sec * 1000 + tp->tv_nsec / 1000000;
-                REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<int>(miliseconds));
-                int timeout = int(miliseconds);
+                // poll requires a timeout in millisecs, but we get the timeout
+                // as an absolute point in time, so we need to convert.
+                timeval tv;
+                gettimeofday(&tv, nullptr);
+
+                int64_t milliseconds = timediff(tv, *tp);
+                if (milliseconds < 0) { // negative timeout will mean no timeout. We don't want that.
+                    milliseconds = 0;
+                }
+                REALM_ASSERT_DEBUG(!util::int_cast_has_overflow<int64_t>(milliseconds));
+                int timeout = int(milliseconds);
                 r = poll(&poll_d, 1, timeout);
             }
             else
@@ -290,9 +404,13 @@ void InterprocessCondVar::wait(InterprocessMutex& m, const struct timespec* tp)
             continue; // FIXME: If the invariants hold, this is unreachable
         return;
     }
+
+#endif // _WIN32
+
 #else
     m_shared_part->wait(*m.m_shared_part, []() {}, tp);
 #endif
+
 }
 
 
@@ -305,10 +423,21 @@ void InterprocessCondVar::notify() noexcept
 {
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION
+#ifdef _WIN32
+    m_shared_part->m_waiters_countlock.lock();
+    bool have_waiters = m_shared_part->m_waiters_count > 0;
+    m_shared_part->m_waiters_countlock.unlock();
+
+    // If there aren't any waiters, then this is a no-op.  
+    if (have_waiters) {
+        ReleaseSemaphore(m_sema, 1, 0);
+    }
+#else
     if (m_shared_part->wait_counter > m_shared_part->signal_counter) {
         m_shared_part->signal_counter++;
-        notify_fd(m_fd_write);
+        notify_fd(m_fd_write != -1 ? m_fd_write : m_fd_read);
     }
+#endif
 #else
     m_shared_part->notify();
 #endif
@@ -324,10 +453,42 @@ void InterprocessCondVar::notify_all() noexcept
 {
     REALM_ASSERT(m_shared_part);
 #ifdef REALM_CONDVAR_EMULATION
+#ifdef _WIN32
+    // This is needed to ensure that <m_waiters_count> and <m_was_broadcast> are
+    // consistent relative to each other.
+    m_shared_part->m_waiters_countlock.lock();
+    bool have_waiters = false;
+
+    if (m_shared_part->m_waiters_count > 0) {
+        // We are broadcasting, even if there is just one waiter...
+        // Record that we are broadcasting, which helps optimize
+        // wait() for the non-broadcast case.
+        m_shared_part->m_was_broadcast = 1;
+        have_waiters = true;
+    }
+
+    if (have_waiters) {
+        // Wake up all the waiters atomically.
+        ReleaseSemaphore(m_sema, m_shared_part->m_waiters_count, 0);
+        m_shared_part->m_waiters_countlock.unlock();
+
+        // Wait for all the awakened threads to acquire the counting
+        // semaphore. 
+        WaitForSingleObject(m_waiters_done, INFINITE);
+
+        // This assignment is okay, even without the <m_waiters_countlock> held 
+        // because no other waiter threads can wake up to access it.
+        m_shared_part->m_was_broadcast = 0;
+    }
+    else {
+        m_shared_part->m_waiters_countlock.unlock();
+    }
+#else
     while (m_shared_part->wait_counter > m_shared_part->signal_counter) {
         m_shared_part->signal_counter++;
-        notify_fd(m_fd_write);
+        notify_fd(m_fd_write != -1 ? m_fd_write : m_fd_read);
     }
+#endif
 #else
     m_shared_part->notify_all();
 #endif

@@ -89,8 +89,8 @@ public:
     /// returns `not_found`.
     size_t get_column_index(StringData name) const noexcept;
 
-    /// Get the index of the column to which links in the column at the
-    /// specified index refer.
+    /// Get the index of the table to which links in the column at the specified
+    /// index refer.
     ///
     /// The consequences of specifying a column index that is out of
     /// range, are undefined.
@@ -216,6 +216,14 @@ public:
     /// \sa is_root()
     /// \sa Table::rename_column()
     void rename_column(size_t col_ndx, StringData new_name);
+
+    /// If the descriptor is describing a subtable column, the add_search_index()
+    /// and remove_search_index() will add or remove search indexes of *all*
+    /// subtables of the subtable column. This may take a while if there are many
+    /// subtables with many rows each.
+    bool has_search_index(size_t column_ndx) const noexcept;
+    void add_search_index(size_t column_ndx);
+    void remove_search_index(size_t column_ndx);
 
     /// There are two kinds of links, 'weak' and 'strong'. A strong link is one
     /// that implies ownership, i.e., that the origin row (parent) owns the
@@ -762,6 +770,11 @@ public:
     static void detach(Descriptor& desc) noexcept
     {
         desc.detach();
+    }
+
+    static void detach_subdesc_accessors(Descriptor& desc) noexcept
+    {
+        desc.detach_subdesc_accessors();
     }
 
     static Table& get_root_table(Descriptor& desc) noexcept

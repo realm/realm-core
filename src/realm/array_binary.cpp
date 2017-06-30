@@ -54,8 +54,7 @@ size_t ArrayBinary::read(size_t ndx, size_t pos, char* buffer, size_t max_size) 
 
         size_t size_to_copy = (pos > sz) ? 0 : std::min(max_size, sz - pos);
         const char* begin = m_blob.get(begin_idx) + pos;
-        const char* end = m_blob.get(begin_idx) + pos + size_to_copy;
-        std::copy(begin, end, buffer);
+        realm::safe_copy_n(begin, size_to_copy, buffer);
         return size_to_copy;
     }
 }
@@ -94,7 +93,7 @@ void ArrayBinary::set(size_t ndx, BinaryData value, bool add_zero_term)
     if (add_zero_term)
         ++stored_size;
     int_fast64_t diff = (start + stored_size) - current_end;
-    m_blob.replace(start, current_end, value.data(), value.size(), add_zero_term);
+    m_blob.replace(to_size_t(start), to_size_t(current_end), value.data(), value.size(), add_zero_term);
     m_offsets.adjust(ndx, m_offsets.size(), diff);
 
     if (!legacy_array_type())

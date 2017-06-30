@@ -71,11 +71,19 @@ benchmark-common-tasks: check-norun/subdir/src
 benchmark-history-types: check-norun/subdir/src
 	@$(MAKE) -C test benchmark-history-types
 
+# Build and run the afl fuzz test programs
+.PHONY: fuzz
+fuzz: check-norun/subdir/src
+	@$(MAKE) -C test fuzz
+.PHONY: fuzz-debug
+fuzz-debug: check-debug-norun/subdir/src
+	@$(MAKE) -C test fuzz-debug
+
 # Run coverage analysis after building everything, this time using LCOV
 .PHONY: lcov
 lcov: check-cover
 	lcov --capture --directory . --output-file /tmp/realm.lcov
-	lcov --extract /tmp/realm.lcov '$(abspath .)/src/*' --output-file /tmp/realm-clean.lcov
+	lcov --extract /tmp/realm.lcov '$(abspath .)/src/*' --extract /tmp/realm.lcov '$(abspath .)/test/fuzz_group*' --output-file /tmp/realm-clean.lcov
 	rm -fr cover_html
 	genhtml --prefix $(abspath .) --output-directory cover_html /tmp/realm-clean.lcov
 

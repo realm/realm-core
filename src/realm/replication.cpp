@@ -142,8 +142,10 @@ public:
     {
         if (REALM_LIKELY(REALM_COVER_ALWAYS(check_set_cell(col_ndx, row_ndx)))) {
             log("table->set_binary(%1, %2, %3);", col_ndx, row_ndx, value); // Throws
-            m_table->set_binary(col_ndx, row_ndx, value);                   // Throws
-            return true;
+            if (value.size() <= ArrayBlob::max_binary_size) {
+                m_table->set_binary(col_ndx, row_ndx, value); // Throws
+                return true;
+            }
         }
         return false;
     }
@@ -273,6 +275,15 @@ public:
         return true;
     }
 
+    bool add_row_with_key(size_t, size_t, size_t key_col_ndx, int64_t key)
+    {
+        if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
+            return false;
+        log("table->add_row_with_key(%1, %2);", key_col_ndx, key); // Throws
+        m_table->add_row_with_key(key_col_ndx, key);               // Throws
+        return true;
+    }
+
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool unordered)
     {
         static_cast<void>(num_rows_to_erase);
@@ -309,15 +320,15 @@ public:
         return true;
     }
 
-    bool change_link_targets(size_t row_ndx, size_t new_row_ndx)
+    bool merge_rows(size_t row_ndx, size_t new_row_ndx)
     {
         if (REALM_UNLIKELY(REALM_COVER_NEVER(!m_table)))
             return false;
         if (REALM_UNLIKELY(REALM_COVER_NEVER(row_ndx >= m_table->size() || new_row_ndx >= m_table->size())))
             return false;
-        log("table->change_link_targets(%1, %2);", row_ndx, new_row_ndx); // Throws
+        log("table->merge_rows(%1, %2);", row_ndx, new_row_ndx); // Throws
         using tf = _impl::TableFriend;
-        tf::do_change_link_targets(*m_table, row_ndx, new_row_ndx); // Throws
+        tf::do_merge_rows(*m_table, row_ndx, new_row_ndx); // Throws
         return true;
     }
 
@@ -367,13 +378,12 @@ public:
 
     bool add_search_index(size_t col_ndx)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(!m_table->has_shared_type()))) {
-                if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
-                    log("table->add_search_index(%1);", col_ndx); // Throws
-                    m_table->add_search_index(col_ndx);           // Throws
-                    return true;
-                }
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
+                log("desc->add_search_index(%1);", col_ndx); // Throws
+                using tf = _impl::TableFriend;
+                tf::add_search_index(*m_desc, col_ndx); // Throws
+                return true;
             }
         }
         return false;
@@ -381,13 +391,12 @@ public:
 
     bool remove_search_index(size_t col_ndx)
     {
-        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_table && m_table->is_attached()))) {
-            if (REALM_LIKELY(REALM_COVER_ALWAYS(!m_table->has_shared_type()))) {
-                if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_table->get_column_count()))) {
-                    log("table->remove_search_index(%1);", col_ndx); // Throws
-                    m_table->remove_search_index(col_ndx);           // Throws
-                    return true;
-                }
+        if (REALM_LIKELY(REALM_COVER_ALWAYS(m_desc))) {
+            if (REALM_LIKELY(REALM_COVER_ALWAYS(col_ndx < m_desc->get_column_count()))) {
+                log("desc->remove_search_index(%1);", col_ndx); // Throws
+                using tf = _impl::TableFriend;
+                tf::remove_search_index(*m_desc, col_ndx); // Throws
+                return true;
             }
         }
         return false;
@@ -873,5 +882,5 @@ void TrivialReplication::do_clear_interrupt() noexcept
 void TrivialReplication::transact_log_append(const char* data, size_t size, char** new_begin, char** new_end)
 {
     internal_transact_log_reserve(size, new_begin, new_end);
-    *new_begin = std::copy(data, data + size, *new_begin);
+    *new_begin = realm::safe_copy_n(data, size, *new_begin);
 }

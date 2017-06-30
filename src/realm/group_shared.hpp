@@ -19,17 +19,11 @@
 #ifndef REALM_GROUP_SHARED_HPP
 #define REALM_GROUP_SHARED_HPP
 
-#ifdef REALM_DEBUG
-#include <ctime> // usleep()
-#endif
-
 #include <functional>
 #include <limits>
 #include <realm/util/features.h>
 #include <realm/util/thread.hpp>
-#ifndef _WIN32
 #include <realm/util/interprocess_condvar.hpp>
-#endif
 #include <realm/util/interprocess_mutex.hpp>
 #include <realm/group.hpp>
 #include <realm/group_shared_options.hpp>
@@ -54,6 +48,21 @@ struct IncompatibleLockFile : std::runtime_error {
     }
 };
 
+/// Thrown by SharedGroup::open() if the type of history
+/// (Replication::HistoryType) in the opened Realm file is incompatible with the
+/// mode in which the Realm file is opened. For example, if there is a mismatch
+/// between the history type in the file, and the history type associated with
+/// the replication plugin passed to SharedGroup::open().
+///
+/// This exception will also be thrown if the history schema version is lower
+/// than required, and no migration is possible
+/// (Replication::is_upgradable_history_schema()).
+struct IncompatibleHistories : util::File::AccessError {
+    IncompatibleHistories(const std::string& msg, const std::string& path)
+        : util::File::AccessError("Incompatible histories. " + msg, path)
+    {
+    }
+};
 
 /// A SharedGroup facilitates transactions.
 ///
@@ -161,6 +170,11 @@ public:
     SharedGroup(unattached_tag) noexcept;
 
     ~SharedGroup() noexcept;
+
+    // Disable copying to prevent accessor errors. If you really want another
+    // instance, open another SharedGroup object on the same file.
+    SharedGroup(const SharedGroup&) = delete;
+    SharedGroup& operator=(const SharedGroup&) = delete;
 
     /// Attach this SharedGroup instance to the specified database file.
     ///
@@ -341,9 +355,20 @@ public:
     const Group& begin_read(VersionID version = VersionID());
     void end_read() noexcept;
     Group& begin_write();
+    // Return true (and take the write lock) if there is no other write
+    // in progress. In case of contention return false immediately.
+    // If the write lock is obtained, also provide the Group associated
+    // with the SharedGroup for further operations.
+    bool try_begin_write(Group*& group);
     version_type commit();
     void rollback() noexcept;
-
+    // report statistics of last commit done on THIS shared group.
+    // The free space reported is what can be expected to be freed
+    // by compact(). This may not correspond to the space which is free
+    // at the point where get_stats() is called, since that will include
+    // memory required to hold older versions of data, which still
+    // needs to be available.
+    void get_stats(size_t& free_space, size_t& used_space);
     //@}
 
     enum TransactStage {
@@ -383,6 +408,9 @@ public:
     /// FIXME: This function is not yet implemented in an exception-safe manner,
     /// therefore, if it throws, the application should not attempt to
     /// continue. If may not even be safe to destroy the SharedGroup object.
+    ///
+    /// WARNING / FIXME: compact() should NOT be exposed publicly on Windows
+    /// because it's not crash safe! It may corrupt your database if something fails
     bool compact();
 
 #ifdef REALM_DEBUG
@@ -510,6 +538,8 @@ private:
     class ReadLockUnlockGuard;
 
     // Member variables
+    size_t m_free_space = 0;
+    size_t m_used_space = 0;
     Group m_group;
     ReadLockInfo m_read_lock;
     uint_fast32_t m_local_max_entry;
@@ -528,14 +558,13 @@ private:
     util::InterprocessMutex m_balancemutex;
 #endif
     util::InterprocessMutex m_controlmutex;
-#ifndef _WIN32
 #ifdef REALM_ASYNC_DAEMON
     util::InterprocessCondVar m_room_to_write;
     util::InterprocessCondVar m_work_to_do;
     util::InterprocessCondVar m_daemon_becomes_ready;
 #endif
     util::InterprocessCondVar m_new_commit_available;
-#endif
+    util::InterprocessCondVar m_pick_next_writer;
     std::function<void(int, int)> m_upgrade_callback;
 
     void do_open(const std::string& file, bool no_create, bool is_backend, const SharedGroupOptions options);
@@ -573,6 +602,8 @@ private:
 
     void do_begin_read(VersionID, bool writable);
     void do_end_read() noexcept;
+    /// return true if write transaction can commence, false otherwise.
+    bool do_try_begin_write();
     void do_begin_write();
     version_type do_commit();
     void do_end_write() noexcept;
@@ -595,7 +626,9 @@ private:
 
     void do_async_commits();
 
-    void upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version);
+    /// Upgrade file format and/or history schema
+    void upgrade_file_format(bool allow_file_format_upgrade, int target_file_format_version,
+                             int current_hist_schema_version, int target_hist_schema_version);
 
     //@{
     /// See LangBindHelper.
@@ -620,8 +653,17 @@ private:
 
     int get_file_format_version() const noexcept;
 
+    /// finish up the process of starting a write transaction. Internal use only.
+    void finish_begin_write();
+
     friend class _impl::SharedGroupFriend;
 };
+
+
+inline void SharedGroup::get_stats(size_t& free_space, size_t& used_space) {
+    free_space = m_free_space;
+    used_space = m_used_space;
+}
 
 
 class ReadTransaction {
@@ -650,12 +692,6 @@ public:
     ConstTableRef get_table(StringData name) const
     {
         return get_group().get_table(name); // Throws
-    }
-
-    template <class T>
-    BasicTableRef<const T> get_table(StringData name) const
-    {
-        return get_group().get_table<T>(name); // Throws
     }
 
     const Group& get_group() const noexcept;
@@ -705,24 +741,6 @@ public:
     TableRef get_or_add_table(StringData name, bool* was_added = nullptr) const
     {
         return get_group().get_or_add_table(name, was_added); // Throws
-    }
-
-    template <class T>
-    BasicTableRef<T> get_table(StringData name) const
-    {
-        return get_group().get_table<T>(name); // Throws
-    }
-
-    template <class T>
-    BasicTableRef<T> add_table(StringData name, bool require_unique_name = true) const
-    {
-        return get_group().add_table<T>(name, require_unique_name); // Throws
-    }
-
-    template <class T>
-    BasicTableRef<T> get_or_add_table(StringData name, bool* was_added = nullptr) const
-    {
-        return get_group().get_or_add_table<T>(name, was_added); // Throws
     }
 
     Group& get_group() const noexcept;
@@ -1013,6 +1031,11 @@ inline bool SharedGroup::do_advance_read(O* observer, VersionID version_id, _imp
         version_type new_version = new_read_lock.m_version;
         size_t new_file_size = new_read_lock.m_file_size;
         ref_type new_top_ref = new_read_lock.m_top_ref;
+
+        // Synchronize readers view of the file
+        SlabAlloc& alloc = m_group.m_alloc;
+        alloc.update_reader_view(new_file_size);
+
         hist.update_early_from_top_ref(new_version, new_file_size, new_top_ref); // Throws
     }
 

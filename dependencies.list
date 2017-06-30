@@ -1,1 +1,2 @@
-VERSION=2.0.0-rc8
+PACKAGE_NAME=realm-core
+VERSION=3.0.0-rc2patch1

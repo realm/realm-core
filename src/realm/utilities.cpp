@@ -23,9 +23,10 @@
 #include <fstream>
 
 #ifdef _WIN32
-#define NOMINMAX
 #include "windows.h"
 #include "psapi.h"
+#include <chrono>
+#include <thread>
 #else
 #include <unistd.h>
 #endif
@@ -259,10 +260,10 @@ uint64_t fastrand(uint64_t max, bool is_seed)
 }
 
 
-void millisleep(size_t milliseconds)
+void millisleep(unsigned long milliseconds)
 {
 #ifdef _WIN32
-    _sleep(milliseconds);
+    std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
 #else
     // sleep() takes seconds and usleep() is deprecated, so use nanosleep()
     timespec ts;
@@ -303,6 +304,24 @@ void process_mem_usage(double& vm_usage, double& resident_set)
     vm_usage = vsize / 1024.0;
     resident_set = rss * page_size_kb;
 #endif
+}
+#endif
+
+#ifdef _WIN32
+int gettimeofday(struct timeval * tp, struct timezone * tzp)
+{
+    FILETIME	file_time;
+    SYSTEMTIME	system_time;
+    ULARGE_INTEGER ularge;
+
+    GetSystemTime(&system_time);
+    SystemTimeToFileTime(&system_time, &file_time);
+    ularge.LowPart = file_time.dwLowDateTime;
+    ularge.HighPart = file_time.dwHighDateTime;
+    const uint64_t epoch = 116444736000000000;
+    tp->tv_sec = (long)((ularge.QuadPart - epoch) / 10000000L);
+    tp->tv_usec = (long)(system_time.wMilliseconds * 1000);
+    return 0;
 }
 #endif
 

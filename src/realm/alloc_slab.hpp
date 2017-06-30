@@ -60,6 +60,10 @@ public:
     ~SlabAlloc() noexcept override;
     SlabAlloc();
 
+    // Disable copying. Copying an allocator can produce double frees.
+    SlabAlloc(const SlabAlloc&) = delete;
+    SlabAlloc& operator=(const SlabAlloc&) = delete;
+
     /// \struct Config
     /// \brief Storage for combining setup flags for initialization to
     /// the SlabAlloc.
@@ -122,15 +126,7 @@ public:
     /// instance), the caller (SharedGroup::do_open()) must take steps to ensure
     /// cross-process mutual exclusion.
     ///
-    /// If the attached file contains an empty Realm (one whose top-ref is
-    /// zero), the file format version may remain undecided upon return from
-    /// this function. The file format is undecided if, and only if
-    /// get_file_format_version() returns zero. The caller is required to check
-    /// for this case, and decide on a file format version. This must happen
-    /// before the Realm opening process completes, and the decided file format
-    /// must be set in the allocator by calling set_file_format_version().
-    ///
-    /// Except for \a path, the parameters are passed in through a
+    /// Except for \a file_path, the parameters are passed in through a
     /// configuration object.
     ///
     /// \return The `ref` of the root node, or zero if there is none.
@@ -145,21 +141,13 @@ public:
     ///
     /// \throw util::File::AccessError
     /// \throw SlabAlloc::Retry
-    ref_type attach_file(const std::string& path, Config& cfg);
+    ref_type attach_file(const std::string& file_path, Config& cfg);
 
     /// Get the attached file. Only valid when called on an allocator with
     /// an attached file.
     util::File& get_file();
 
     /// Attach this allocator to the specified memory buffer.
-    ///
-    /// If the attached buffer contains an empty Realm (one whose top-ref is
-    /// zero), the file format version may remain undecided upon return from
-    /// this function. The file format is undecided if, and only if
-    /// get_file_format_version() returns zero. The caller is required to check
-    /// for this case, and decide on a file format version. This must happen
-    /// before the Realm opening process completes, and the decided file format
-    /// must be set in the allocator by calling set_file_format_version().
     ///
     /// It is an error to call this function on an attached
     /// allocator. Doing so will result in undefined behavor.
@@ -176,12 +164,6 @@ public:
     int get_committed_file_format_version() const noexcept;
 
     /// Attach this allocator to an empty buffer.
-    ///
-    /// Upon return from this function, the file format is undecided
-    /// (get_file_format_version() returns zero). The caller is required to
-    /// decide on a file format version. This must happen before the Realm
-    /// opening process completes, and the decided file format must be set in
-    /// the allocator by calling set_file_format_version().
     ///
     /// It is an error to call this function on an attached
     /// allocator. Doing so will result in undefined behavor.
@@ -257,7 +239,7 @@ public:
 
     /// Get the size of the attached database file or buffer in number
     /// of bytes. This size is not affected by new allocations. After
-    /// attachment, it can only be modified by a call to remap().
+    /// attachment, it can only be modified by a call to update_reader_view().
     ///
     /// It is an error to call this function on a detached allocator,
     /// or one that was attached using attach_empty(). Doing so will
@@ -275,6 +257,8 @@ public:
     /// space.
     void reset_free_space_tracking();
 
+    /// Update the readers view of the file:
+    ///
     /// Remap the attached file such that a prefix of the specified
     /// size becomes available in memory. If sucessfull,
     /// get_baseline() will return the specified new file size.
@@ -288,24 +272,15 @@ public:
     /// guaranteed to be mapped as a contiguous address range. The allocation
     /// of memory in the file must ensure that no allocation crosses the
     /// boundary between two sections.
-    void remap(size_t file_size);
+    ///
+    /// Clears any allocator specicific caching of address translations
+    /// and force any later address translations to trigger decryption if required.
+    void update_reader_view(size_t file_size);
 
     /// Returns true initially, and after a call to reset_free_space_tracking()
     /// up until the point of the first call to SlabAlloc::alloc(). Note that a
     /// call to SlabAlloc::alloc() corresponds to a mutation event.
     bool is_free_space_clean() const noexcept;
-
-    /// \brief Update the file format version field of the allocator.
-    ///
-    /// This must be done during the opening of the Realm if the stored file
-    /// format version is zero (empty Realm), or after the file format is
-    /// upgraded.
-    ///
-    /// Note that this does not modify the attached file, only the "cached"
-    /// value subsequenty returned by get_file_format_version().
-    ///
-    /// \sa get_file_format_version()
-    void set_file_format_version(int) noexcept;
 
     void verify() const override;
 #ifdef REALM_DEBUG
@@ -324,9 +299,9 @@ protected:
     // FIXME: It would be very nice if we could detect an invalid free operation in debug mode
     void do_free(ref_type, const char*) noexcept override;
     char* do_translate(ref_type) const noexcept override;
-    void invalidate_cache() noexcept;
 
 private:
+    void internal_invalidate_cache() noexcept;
     enum AttachMode {
         attach_None,        // Nothing is attached
         attach_OwnedBuffer, // We own the buffer (m_data = nullptr for empty buffer)
@@ -398,7 +373,6 @@ private:
     std::unique_ptr<size_t[]> m_section_bases;
     size_t m_num_section_bases = 0;
     AttachMode m_attach_mode = attach_None;
-    bool m_file_on_streaming_form = false;
     enum FeeeSpaceState {
         free_space_Clean,
         free_space_Dirty,
@@ -431,16 +405,19 @@ private:
     mutable size_t version = 1;
 
     /// Throws if free-lists are no longer valid.
+    void consolidate_free_read_only();
+    /// Throws if free-lists are no longer valid.
     const chunks& get_free_read_only() const;
 
     /// Throws InvalidDatabase if the file is not a Realm file, if the file is
     /// corrupted, or if the specified encryption key is incorrect. This
     /// function will not detect all forms of corruption, though.
-    void validate_buffer(const char* data, size_t len, const std::string& path, bool is_shared);
+    void validate_buffer(const char* data, size_t len, const std::string& path);
 
+    static bool is_file_on_streaming_form(const Header& header);
     /// Read the top_ref from the given buffer and set m_file_on_streaming_form
     /// if the buffer contains a file in streaming form
-    ref_type get_top_ref(const char* data, size_t len);
+    static ref_type get_top_ref(const char* data, size_t len);
 
     class ChunkRefEq;
     class ChunkRefEndEq;
@@ -487,10 +464,11 @@ private:
     size_t find_section_in_range(size_t start_pos, size_t free_chunk_size, size_t request_size) const noexcept;
 
     friend class Group;
+    friend class SharedGroup;
     friend class GroupWriter;
 };
 
-inline void SlabAlloc::invalidate_cache() noexcept
+inline void SlabAlloc::internal_invalidate_cache() noexcept
 {
     ++version;
 }

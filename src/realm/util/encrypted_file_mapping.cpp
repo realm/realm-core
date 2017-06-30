@@ -30,9 +30,18 @@
 #endif
 
 #include <cstring>
-#include <pthread.h>
+
+#if defined(_WIN32)
+#include <Windows.h>
+// 224-bit AES-2 from https://github.com/kalven/sha-2 - Public Domain. Native API
+// does not exist for 224 bits (only 128, 256, etc).
+#include <win32/kalven-sha2/sha224.hpp>
+#include <bcrypt.h>
+#else
 #include <sys/mman.h>
 #include <unistd.h>
+#include <pthread.h>
+#endif
 
 #include <realm/util/encrypted_file_mapping.hpp>
 #include <realm/util/terminate.hpp>
@@ -40,7 +49,7 @@
 namespace realm {
 namespace util {
 
-SharedFileInfo::SharedFileInfo(const uint8_t* key, int file_descriptor)
+SharedFileInfo::SharedFileInfo(const uint8_t* key, FileDesc file_descriptor)
     : fd(file_descriptor)
     , cryptor(key)
 {
@@ -89,7 +98,7 @@ Int real_offset(Int pos)
     REALM_ASSERT(pos >= 0);
     const size_t index = static_cast<size_t>(pos) / block_size;
     const size_t metadata_page_count = index / blocks_per_metadata_block + 1;
-    return pos + metadata_page_count * block_size;
+    return Int(pos + metadata_page_count * block_size);
 }
 
 // map a location in the file to the offset in the data
@@ -109,30 +118,47 @@ off_t iv_table_pos(off_t pos)
     const size_t index = static_cast<size_t>(pos) / block_size;
     const size_t metadata_block = index / blocks_per_metadata_block;
     const size_t metadata_index = index & (blocks_per_metadata_block - 1);
-    return metadata_block * (blocks_per_metadata_block + 1) * block_size + metadata_index * metadata_size;
+    return off_t(metadata_block * (blocks_per_metadata_block + 1) * block_size + metadata_index * metadata_size);
 }
 
-void check_write(int fd, off_t pos, const void* data, size_t len)
+void check_write(FileDesc fd, off_t pos, const void* data, size_t len)
 {
-    ssize_t ret = pwrite(fd, data, len, pos);
-    REALM_ASSERT(ret >= 0 && static_cast<size_t>(ret) == len);
+    uint64_t orig = File::get_file_pos(fd);
+    File::seek_static(fd, pos);
+    File::write_static(fd, static_cast<const char*>(data), len);
+    File::seek_static(fd, orig);
 }
 
-size_t check_read(int fd, off_t pos, void* dst, size_t len)
+size_t check_read(FileDesc fd, off_t pos, void* dst, size_t len)
 {
-    ssize_t ret = pread(fd, dst, len, pos);
-    REALM_ASSERT(ret >= 0);
-    return ret < 0 ? 0 : static_cast<size_t>(ret);
+    uint64_t orig = File::get_file_pos(fd);
+    File::seek_static(fd, pos);
+    size_t ret = File::read_static(fd, static_cast<char*>(dst), len);
+    File::seek_static(fd, orig);
+    return ret;
 }
 
 } // anonymous namespace
 
 AESCryptor::AESCryptor(const uint8_t* key)
-    : m_rw_buffer(new char[block_size])
+    : m_rw_buffer(new char[block_size]),
+      m_dst_buffer(new char[block_size])
 {
 #if REALM_PLATFORM_APPLE
     CCCryptorCreate(kCCEncrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_encr);
     CCCryptorCreate(kCCDecrypt, kCCAlgorithmAES, 0 /* options */, key, kCCKeySizeAES256, 0 /* IV */, &m_decr);
+#elif defined(_WIN32)
+    BCRYPT_ALG_HANDLE hAesAlg = NULL;
+    int ret;
+    ret = BCryptOpenAlgorithmProvider(&hAesAlg, BCRYPT_AES_ALGORITHM, NULL, 0);
+    REALM_ASSERT_RELEASE_EX(ret == 0 && "BCryptOpenAlgorithmProvider()", ret);
+
+    ret = BCryptSetProperty(hAesAlg, BCRYPT_CHAINING_MODE, (PBYTE)BCRYPT_CHAIN_MODE_CBC,
+                            sizeof(BCRYPT_CHAIN_MODE_CBC), 0);
+    REALM_ASSERT_RELEASE_EX(ret == 0 && "BCryptSetProperty()", ret);
+
+    ret = BCryptGenerateSymmetricKey(hAesAlg, &m_aes_key_handle, nullptr, 0, (PBYTE)key, 32, 0);
+    REALM_ASSERT_RELEASE_EX(ret == 0 && "BCryptGenerateSymmetricKey()", ret);
 #else
     AES_set_encrypt_key(key, 256 /* key size in bits */, &m_ectx);
     AES_set_decrypt_key(key, 256 /* key size in bits */, &m_dctx);
@@ -156,7 +182,7 @@ void AESCryptor::set_file_size(off_t new_size)
     m_iv_buffer.reserve((block_count + blocks_per_metadata_block - 1) & ~(blocks_per_metadata_block - 1));
 }
 
-iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) noexcept
+iv_table& AESCryptor::get_iv_table(FileDesc fd, off_t data_pos) noexcept
 {
     REALM_ASSERT(!int_cast_has_overflow<size_t>(data_pos));
     size_t data_pos_casted = size_t(data_pos);
@@ -170,7 +196,7 @@ iv_table& AESCryptor::get_iv_table(int fd, off_t data_pos) noexcept
     m_iv_buffer.resize(new_block_count * blocks_per_metadata_block);
 
     for (size_t i = old_size; i < new_block_count * blocks_per_metadata_block; i += blocks_per_metadata_block) {
-        size_t bytes = check_read(fd, iv_table_pos(i * block_size), &m_iv_buffer[i], block_size);
+        size_t bytes = check_read(fd, iv_table_pos(off_t(i * block_size)), &m_iv_buffer[i], block_size);
         if (bytes < block_size)
             break; // rest is zero-filled by resize()
     }
@@ -190,7 +216,7 @@ bool AESCryptor::check_hmac(const void* src, size_t len, const uint8_t* hmac) co
     return result == 0;
 }
 
-bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size)
+bool AESCryptor::read(FileDesc fd, off_t pos, char* dst, size_t size)
 {
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
@@ -233,7 +259,21 @@ bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size)
             }
         }
 
-        crypt(mode_Decrypt, pos, dst, m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
+        // We may expect some adress ranges of the destination buffer of
+        // AESCryptor::read() to stay unmodified, i.e. being overwritten with
+        // the same bytes as already present, and may have read-access to these
+        // from other threads while decryption is taking place.
+        //
+        // However, some implementations of AES_cbc_encrypt(), in particular
+        // OpenSSL, will put garbled bytes as an intermediate step during the
+        // operation which will lead to incorrect data being read by other
+        // readers concurrently accessing that page. Incorrect data leads to
+        // crashes.
+        //
+        // We therefore decrypt to a temporary buffer first and then copy the
+        // completely decrypted data after.
+        crypt(mode_Decrypt, pos, m_dst_buffer.get(), m_rw_buffer.get(), reinterpret_cast<const char*>(&iv.iv1));
+        memcpy(dst, m_dst_buffer.get(), block_size);
 
         pos += block_size;
         dst += block_size;
@@ -242,7 +282,7 @@ bool AESCryptor::read(int fd, off_t pos, char* dst, size_t size)
     return true;
 }
 
-void AESCryptor::write(int fd, off_t pos, const char* src, size_t size) noexcept
+void AESCryptor::write(FileDesc fd, off_t pos, const char* src, size_t size) noexcept
 {
     REALM_ASSERT(size % block_size == 0);
     while (size > 0) {
@@ -285,6 +325,26 @@ void AESCryptor::crypt(EncryptionMode mode, off_t pos, char* dst, const char* sr
     CCCryptorStatus err = CCCryptorUpdate(cryptor, src, block_size, dst, block_size, &bytesEncrypted);
     REALM_ASSERT(err == kCCSuccess);
     REALM_ASSERT(bytesEncrypted == block_size);
+#elif defined(_WIN32)
+    ULONG cbData;
+    int i;
+
+    if (mode == mode_Encrypt) {
+        i = BCryptEncrypt(m_aes_key_handle, (PUCHAR)src, block_size, nullptr, (PUCHAR)iv, sizeof(iv), (PUCHAR)dst,
+                          block_size, &cbData, 0);
+        REALM_ASSERT_RELEASE_EX(i == 0 && "BCryptEncrypt()", i);
+        REALM_ASSERT_RELEASE_EX(cbData == block_size && "BCryptEncrypt()", cbData);
+    }
+    else if (mode == mode_Decrypt) {
+        i = BCryptDecrypt(m_aes_key_handle, (PUCHAR)src, block_size, nullptr, (PUCHAR)iv, sizeof(iv), (PUCHAR)dst,
+                          block_size, &cbData, 0);
+        REALM_ASSERT_RELEASE_EX(i == 0 && "BCryptDecrypt()", i);
+        REALM_ASSERT_RELEASE_EX(cbData == block_size && "BCryptDecrypt()", cbData);
+    }
+    else {
+        REALM_UNREACHABLE();
+    }
+
 #else
     AES_cbc_encrypt(reinterpret_cast<const uint8_t*>(src), reinterpret_cast<uint8_t*>(dst), block_size,
                     mode == mode_Encrypt ? &m_ectx : &m_dctx, iv, mode);
@@ -296,8 +356,6 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
 #if REALM_PLATFORM_APPLE
     CCHmac(kCCHmacAlgSHA224, key, 32, src, len, dst);
 #else
-    SHA256_CTX ctx;
-
     uint8_t ipad[64];
     for (size_t i = 0; i < 32; ++i)
         ipad[i] = key[i] ^ 0x36;
@@ -309,6 +367,19 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
     memset(opad + 32, 0x5C, 32);
 
     // Full hmac operation is sha224(opad + sha224(ipad + data))
+#ifdef _WIN32
+    sha224_state s;
+    sha_init(s);
+    sha_process(s, ipad, 64);
+    sha_process(s, static_cast<const uint8_t*>(src), uint32_t(len));
+    sha_done(s, dst);
+
+    sha_init(s);
+    sha_process(s, opad, 64);
+    sha_process(s, dst, 28); // 28 == SHA224_DIGEST_LENGTH
+    sha_done(s, dst);
+#else
+    SHA256_CTX ctx;
     SHA224_Init(&ctx);
     SHA256_Update(&ctx, ipad, 64);
     SHA256_Update(&ctx, static_cast<const uint8_t*>(src), len);
@@ -319,16 +390,18 @@ void AESCryptor::calc_hmac(const void* src, size_t len, uint8_t* dst, const uint
     SHA256_Update(&ctx, dst, SHA224_DIGEST_LENGTH);
     SHA256_Final(dst, &ctx);
 #endif
+
+#endif
 }
 
 EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_offset, void* addr, size_t size,
                                            File::AccessMode access)
     : m_file(file)
     , m_page_shift(log2(realm::util::page_size()))
-    , m_blocks_per_page((1 << m_page_shift) / block_size)
+    , m_blocks_per_page((1ULL << m_page_shift) / block_size)
     , m_access(access)
 #ifdef REALM_DEBUG
-    , m_validate_buffer(new char[1 << m_page_shift])
+    , m_validate_buffer(new char[1ULL << m_page_shift])
 #endif
 {
     REALM_ASSERT(m_blocks_per_page * block_size == (1ULL << m_page_shift));
@@ -338,130 +411,150 @@ EncryptedFileMapping::EncryptedFileMapping(SharedFileInfo& file, size_t file_off
 
 EncryptedFileMapping::~EncryptedFileMapping()
 {
-    flush();
-    sync();
+    if (m_access == File::access_ReadWrite) {
+        flush();
+        sync();
+    }
     m_file.mappings.erase(remove(m_file.mappings.begin(), m_file.mappings.end(), this));
 }
 
-char* EncryptedFileMapping::page_addr(size_t i) const noexcept
+char* EncryptedFileMapping::page_addr(size_t local_page_ndx) const noexcept
 {
-    return reinterpret_cast<char*>((m_first_page + i) << m_page_shift);
+    REALM_ASSERT_EX(local_page_ndx < m_up_to_date_pages.size(), local_page_ndx, m_up_to_date_pages.size());
+    return (reinterpret_cast<char*>(local_page_ndx << m_page_shift) + reinterpret_cast<uintptr_t>(m_addr));
 }
 
-void EncryptedFileMapping::mark_outdated(size_t i) noexcept
+void EncryptedFileMapping::mark_outdated(size_t local_page_ndx) noexcept
 {
-    if (i >= m_page_count)
+    if (local_page_ndx >= m_dirty_pages.size())
         return;
 
-    if (m_dirty_pages[i])
+    if (m_dirty_pages[local_page_ndx])
         flush();
 
-    if (m_up_to_date_pages[i]) {
-        m_up_to_date_pages[i] = false;
-    }
+    m_up_to_date_pages[local_page_ndx] = false;
 }
 
-void EncryptedFileMapping::mark_up_to_date(size_t i) noexcept
+bool EncryptedFileMapping::copy_up_to_date_page(size_t local_page_ndx) noexcept
 {
-    if (i >= m_up_to_date_pages.size() || m_up_to_date_pages[i])
-        return;
-
-    m_up_to_date_pages[i] = true;
-}
-
-bool EncryptedFileMapping::copy_up_to_date_page(size_t page) noexcept
-{
+    REALM_ASSERT_EX(local_page_ndx < m_up_to_date_pages.size(), local_page_ndx, m_up_to_date_pages.size());
+    // Precondition: this method must never be called for a page which
+    // is already up to date.
+    REALM_ASSERT(!m_up_to_date_pages[local_page_ndx]);
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
-        if (m == this || page >= m->m_page_count)
+        size_t page_ndx_in_file = local_page_ndx + m_first_page;
+        if (m == this || !m->contains_page(page_ndx_in_file))
             continue;
 
-        if (m->m_up_to_date_pages[page]) {
-            memcpy(page_addr(page), m->page_addr(page), 1 << m_page_shift);
+        size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
+        if (m->m_up_to_date_pages[shadow_mapping_local_ndx]) {
+            memcpy(page_addr(local_page_ndx), m->page_addr(shadow_mapping_local_ndx), 1ULL << m_page_shift);
             return true;
         }
     }
     return false;
 }
 
-void EncryptedFileMapping::refresh_page(size_t i)
+void EncryptedFileMapping::refresh_page(size_t local_page_ndx)
 {
-    char* addr = page_addr(i);
+    REALM_ASSERT_EX(local_page_ndx < m_up_to_date_pages.size(), local_page_ndx, m_up_to_date_pages.size());
 
-    if (!copy_up_to_date_page(i))
-        m_file.cryptor.read(m_file.fd, i << m_page_shift, addr, 1 << m_page_shift);
+    char* addr = page_addr(local_page_ndx);
 
-    m_up_to_date_pages[i] = true;
+    if (!copy_up_to_date_page(local_page_ndx)) {
+        size_t page_ndx_in_file = local_page_ndx + m_first_page;
+        m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), addr, 1ULL << m_page_shift);
+    }
+
+    m_up_to_date_pages[local_page_ndx] = true;
 }
 
-void EncryptedFileMapping::write_page(size_t page) noexcept
+void EncryptedFileMapping::write_page(size_t local_page_ndx) noexcept
 {
     // Go through all other mappings of this file and mark
     // the page outdated in those mappings:
+    size_t page_ndx_in_file = local_page_ndx + m_first_page;
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
-        if (m != this && page < m->m_page_count) {
-            m->mark_outdated(page);
-            // if (m->m_up_to_date_pages[page])
-            //    memcpy(m->page_addr(page), page_addr(page), m_page_size);
+        if (m != this && m->contains_page(page_ndx_in_file)) {
+            size_t shadow_local_page_ndx = page_ndx_in_file - m->m_first_page;
+            m->mark_outdated(shadow_local_page_ndx);
         }
     }
 
-    m_dirty_pages[page] = true;
+    m_dirty_pages[local_page_ndx] = true;
 }
 
-void EncryptedFileMapping::validate_page(size_t page) noexcept
+void EncryptedFileMapping::validate_page(size_t local_page_ndx) noexcept
 {
 #ifdef REALM_DEBUG
-    if (!m_up_to_date_pages[page])
+    REALM_ASSERT(local_page_ndx < m_up_to_date_pages.size());
+    if (!m_up_to_date_pages[local_page_ndx])
         return;
 
-    if (!m_file.cryptor.read(m_file.fd, page << m_page_shift, m_validate_buffer.get(), 1 << m_page_shift))
+    const size_t page_ndx_in_file = local_page_ndx + m_first_page;
+    if (!m_file.cryptor.read(m_file.fd, off_t(page_ndx_in_file << m_page_shift), m_validate_buffer.get(),
+                             1ULL << m_page_shift))
         return;
 
     for (size_t i = 0; i < m_file.mappings.size(); ++i) {
         EncryptedFileMapping* m = m_file.mappings[i];
-        if (m != this && page < m->m_page_count && m->m_dirty_pages[page]) {
-            memcpy(m_validate_buffer.get(), m->page_addr(page), 1 << m_page_shift);
+        size_t shadow_mapping_local_ndx = page_ndx_in_file - m->m_first_page;
+        if (m != this && m->contains_page(page_ndx_in_file) && m->m_dirty_pages[shadow_mapping_local_ndx]) {
+            memcpy(m_validate_buffer.get(), m->page_addr(shadow_mapping_local_ndx), 1ULL << m_page_shift);
             break;
         }
     }
 
-    if (memcmp(m_validate_buffer.get(), page_addr(page), 1 << m_page_shift)) {
-        std::cerr << "mismatch " << this << ": fd(" << m_file.fd << ") page(" << page << "/" << m_page_count << ") "
-                  << m_validate_buffer.get() << " " << page_addr(page) << std::endl;
+    if (memcmp(m_validate_buffer.get(), page_addr(local_page_ndx), 1ULL << m_page_shift)) {
+        std::cerr << "mismatch " << this << ": fd(" << m_file.fd << ")"
+                  << "page(" << local_page_ndx << "/" << m_up_to_date_pages.size() << ") "
+                  << m_validate_buffer.get() << " " << page_addr(local_page_ndx) << std::endl;
         REALM_TERMINATE("");
     }
 #else
-    static_cast<void>(page);
+    static_cast<void>(local_page_ndx);
 #endif
 }
 
 void EncryptedFileMapping::validate() noexcept
 {
 #ifdef REALM_DEBUG
-    for (size_t i = 0; i < m_page_count; ++i)
-        validate_page(i);
+    const size_t num_local_pages = m_up_to_date_pages.size();
+    for (size_t local_page_ndx = 0; local_page_ndx < num_local_pages; ++local_page_ndx)
+        validate_page(local_page_ndx);
 #endif
 }
 
 void EncryptedFileMapping::flush() noexcept
 {
-    for (size_t i = 0; i < m_page_count; ++i) {
-        if (!m_dirty_pages[i]) {
-            validate_page(i);
+    const size_t num_dirty_pages = m_dirty_pages.size();
+    for (size_t local_page_ndx = 0; local_page_ndx < num_dirty_pages; ++local_page_ndx) {
+        if (!m_dirty_pages[local_page_ndx]) {
+            validate_page(local_page_ndx);
             continue;
         }
 
-        m_file.cryptor.write(m_file.fd, i << m_page_shift, page_addr(i), 1 << m_page_shift);
-        m_dirty_pages[i] = false;
+        size_t page_ndx_in_file = local_page_ndx + m_first_page;
+        m_file.cryptor.write(m_file.fd, off_t(page_ndx_in_file << m_page_shift), page_addr(local_page_ndx),
+                             1ULL << m_page_shift);
+        m_dirty_pages[local_page_ndx] = false;
     }
 
     validate();
 }
 
+#ifdef _MSC_VER
+#pragma warning(disable : 4297) // throw in noexcept
+#endif
 void EncryptedFileMapping::sync() noexcept
 {
+#ifdef _WIN32
+    if (FlushFileBuffers(m_file.fd))
+        return;
+    throw std::runtime_error("FlushFileBuffers() failed");
+#else
     fsync(m_file.fd);
     // FIXME: on iOS/OSX fsync may not be enough to ensure crash safety.
     // Consider adding fcntl(F_FULLFSYNC). This most likely also applies to msync.
@@ -472,20 +565,21 @@ void EncryptedFileMapping::sync() noexcept
     // See also
     // https://developer.apple.com/library/ios/documentation/Cocoa/Conceptual/CoreData/Articles/cdPersistentStores.html
     // for a discussion of this related to core data.
+#endif
 }
-
+#ifdef _MSC_VER
+#pragma warning(default : 4297)
+#endif
 
 void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 {
     REALM_ASSERT(m_access == File::access_ReadWrite);
 
-    size_t first_accessed_page = reinterpret_cast<uintptr_t>(addr) >> m_page_shift;
-    size_t last_accessed_page = (reinterpret_cast<uintptr_t>(addr) + size - 1) >> m_page_shift;
+    size_t first_accessed_local_page = get_local_index_of_address(addr);
+    size_t last_accessed_local_page = get_local_index_of_address(addr, size == 0 ? 0 : size - 1);
+    size_t up_to_date_pages_size = m_up_to_date_pages.size();
 
-    size_t first_idx = first_accessed_page - m_first_page;
-    size_t last_idx = last_accessed_page - m_first_page;
-
-    for (size_t idx = first_idx; idx <= last_idx; ++idx) {
+    for (size_t idx = first_accessed_local_page; idx <= last_accessed_local_page && idx < up_to_date_pages_size; ++idx) {
         // Pages written must earlier on have been decrypted
         // by a call to read_barrier().
         REALM_ASSERT(m_up_to_date_pages[idx]);
@@ -495,24 +589,23 @@ void EncryptedFileMapping::write_barrier(const void* addr, size_t size) noexcept
 
 void EncryptedFileMapping::set(void* new_addr, size_t new_size, size_t new_file_offset)
 {
-    REALM_ASSERT(new_file_offset % (1 << m_page_shift) == 0);
-    REALM_ASSERT(new_size % (1 << m_page_shift) == 0);
+    REALM_ASSERT(new_file_offset % (1ULL << m_page_shift) == 0);
+    REALM_ASSERT(new_size % (1ULL << m_page_shift) == 0);
     REALM_ASSERT(new_size > 0);
 
-    m_file.cryptor.set_file_size(new_size + new_file_offset);
+    m_file.cryptor.set_file_size(off_t(new_size + new_file_offset));
 
     flush();
     m_addr = new_addr;
-    m_file_offset = new_file_offset;
 
-    m_first_page = (reinterpret_cast<uintptr_t>(m_addr) - m_file_offset) >> m_page_shift;
-    m_page_count = (new_size + m_file_offset) >> m_page_shift;
+    m_first_page = new_file_offset >> m_page_shift;
+    size_t num_pages = new_size >> m_page_shift;
 
     m_up_to_date_pages.clear();
     m_dirty_pages.clear();
 
-    m_up_to_date_pages.resize(m_page_count, false);
-    m_dirty_pages.resize(m_page_count, false);
+    m_up_to_date_pages.resize(num_pages, false);
+    m_dirty_pages.resize(num_pages, false);
 }
 
 File::SizeType encrypted_size_to_data_size(File::SizeType size) noexcept

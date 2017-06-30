@@ -1,11 +1,9 @@
 nobase_subinclude_HEADERS = \
 util/features.h \
-util/meta.hpp \
 util/inspect.hpp \
 util/assert.hpp \
 util/terminate.hpp \
 util/type_list.hpp \
-util/tuple.hpp \
 util/type_traits.hpp \
 util/safe_int_ops.hpp \
 util/bind_ptr.hpp \
@@ -19,6 +17,7 @@ util/basic_system_errors.hpp \
 util/thread.hpp \
 util/file.hpp \
 util/optional.hpp \
+util/overload.hpp \
 util/utf8.hpp \
 util/priority_queue.hpp \
 util/interprocess_condvar.hpp \
@@ -36,6 +35,7 @@ utilities.hpp \
 alloc.hpp \
 alloc_slab.hpp \
 array.hpp \
+array_direct.hpp \
 array_integer.hpp \
 array_string.hpp \
 bptree.hpp \
@@ -58,12 +58,7 @@ owned_data.hpp \
 timestamp.hpp \
 table.hpp \
 table_ref.hpp \
-table_basic_fwd.hpp \
-table_accessors.hpp \
-table_basic.hpp \
 table_view.hpp \
-table_view_basic.hpp \
-table_macros.hpp \
 row.hpp \
 descriptor_fwd.hpp \
 descriptor.hpp \
@@ -117,12 +112,13 @@ column_type_traits.hpp \
 group_writer.hpp \
 index_string.hpp \
 query_engine.hpp \
-query_expression.hpp
+query_expression.hpp \
+query_operators.hpp
 
 lib_LIBRARIES    = librealm.a
 libexec_PROGRAMS = realmd
 bin_PROGRAMS     = realm-import realm-schema-dump
-DEV_PROGRAMS     = realm-config
+DEV_PROGRAMS     = realm-config realm-trawler
 
 librealm_a_SOURCES = \
 util/encrypted_file_mapping.cpp \
@@ -164,7 +160,6 @@ exceptions.cpp \
 group.cpp \
 group_shared.cpp \
 group_writer.cpp \
-impl/continuous_transactions_history.cpp \
 impl/output_stream.cpp \
 impl/transact_log.cpp \
 impl/simulated_failure.cpp \
@@ -173,8 +168,10 @@ lang_bind_helper.cpp \
 link_view.cpp \
 query.cpp \
 query_engine.cpp \
+query_expression.cpp \
 row.cpp \
 spec.cpp \
+string_data.cpp \
 table.cpp \
 table_view.cpp \
 unicode.cpp \
@@ -208,6 +205,8 @@ librealm_a_VERSION = 9:0:0
 
 realm_config_SOURCES = config_tool.cpp
 
+realm_trawler_SOURCES = realm_trawler.cpp
+
 realmd_SOURCES = realmd.cpp
 realmd_LIBS = librealm.a
 
@@ -225,13 +224,6 @@ nobase_subinclude_HEADERS += $(CONFIG_H)
 GENERATED_SOURCES += $(CONFIG_H)
 $(CONFIG_H): ../config.mk $(CONFIG_SH)
 	$(SHELL) $(CONFIG_SH) $< $@
-endif
-
-
-ifeq ($(DISABLE_CHEETAH_CODE_GEN),)
-GENERATED_SOURCES += table_macros.hpp
-table_macros.hpp: table_macros.hpp.cheetah cheetah.sh
-	$(SHELL) cheetah.sh $< $@
 endif
 
 

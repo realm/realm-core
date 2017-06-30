@@ -25,20 +25,20 @@ background services is a no-brainer. Plus, there are no guarantees that
 services would run in time to reply to queries on memory and power-constrained
 devices.
 
-This being said, Realm isn't a *relational* database. There's no SQL, schemas
-can get quite a bit more complex than what you'd get in the relational world,
-etc. This is an important notion to keep in mind.
+This being said, Realm isn't a *relational* database. There's no SQL. It's API
+(publicly available through the SDK's that builds on the core) has an Object API
+well integrated into the programming languages.
 
 ## Realm distributions ##
 
-There are currently two official Realm distributions: one for [iOS
-platforms][realm-cocoa] and one for [Android platforms][realm-java]. These
-distributions are called "bindings". All the bindings are fully Open Source
-(Apache). A C# version is currently in the works (at the time of writing).
+There are currently four official Realm distributions: one for [iOS/macOS
+platforms][realm-cocoa], one for [Android platforms][realm-java], one for
+[Xamarin](realn-dotnet) and one for [React-Native](realm-js). These
+distributions are called "SDK's". They are fully Open Source (Apache).
 
-The bindings, regardless of their platform, rely on Realm's Core library, a
+The SDK's, regardless of their platform, rely on Realm's Core library, a
 high-performance C++ library that provides all the abstractions and know-how to
-use Realm databases. The bindings use this library directly through the native
+use Realm databases. The SDK's use this library directly through the native
 interface provided on each platform.
 
 \dot
@@ -46,21 +46,18 @@ digraph realm {
   librealm [shape=box, label="librealm\n(C++)"];
   realm_java [shape=box, label="realm-java"];
   realm_cocoa [shape=box, label="realm-cocoa\n(Swift & Obj-C)"];
+  realm_dotnet [shape=box, label="realm-dotnet"];
+  realm_js [shape=box, label="realm-js"];
 
   librealm -> realm_java;
   librealm -> realm_cocoa;
-
-  realm_dotnet [shape=box, label="realm-dotnet\n(C#)", style=dashed];
-  edge [style=dashed];
-
   librealm -> realm_dotnet;
+  librealm -> realm_js;
 }
 \enddot
 
-There are currently no public releases of C or C++ bindings for Realm, but
-those could be imagined. Please note that even though the current Realm
-bindings are Open Source, the Core is *not*. This is something that is being
-worked on (at a business level), and should be addressed in the near future.
+There are currently no public releases of C or C++ API's for Realm, but
+those could be imagined.
 
 # Core Architecture #
 
@@ -140,11 +137,8 @@ indepently from the other columns. We can apply transformations to a column
 based on another column. We can use column *X* as the look-up table to look
 iterate through column *Y*.
 
-If you tried your hand at the coding challenge, trying to squeeze ints in
-fractional bits is probably still fresh in your mind. This is what it all
-comes down to. By having each column live in its own space, we can apply
-specific compression algorithms to it, and save precious space when the
-column is saved to disk.
+By having each column live in its own space, we can apply specific compression
+algorithms to it, and save precious space when the column is saved to disk.
 
 ## Realm-specific lingo ##
 
@@ -239,5 +233,7 @@ run 'sh build.sh lcov' which generates a html coverage report for the project.
 
 [realm-cocoa]: https://github.com/realm/realm-cocoa
 [realm-java]: https://github.com/realm/realm-java
+[realm-dotnet]: https://github.com/realm/realm-dotnet
+[realm-js]: https://github.com/realm/realm-js
 [test-shared]: https://github.com/realm/realm-core/blob/master/test/test_shared.cpp
 [test-table]: https://github.com/realm/realm-core/blob/master/test/test_table.cpp

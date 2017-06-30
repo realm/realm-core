@@ -18,7 +18,6 @@
 
 #include <cstdlib>
 #include <functional>
-#include <memory>
 #include <stdexcept>
 #include <map>
 #include <string>
@@ -71,7 +70,7 @@ public:
     {
     }
 
-    ~XmlReporter() noexcept
+    ~XmlReporter() noexcept override
     {
     }
 
@@ -104,46 +103,36 @@ public:
     {
         m_out << "<?xml version=\"1.0\"?>\n"
                  "<unittest-results "
-                 "tests=\""
-              << results_summary.num_executed_tests << "\" "
-                                                       "failedtests=\""
-              << results_summary.num_failed_tests << "\" "
-                                                     "checks=\""
-              << results_summary.num_executed_checks << "\" "
-                                                        "failures=\""
-              << results_summary.num_failed_checks << "\" "
-                                                      "time=\""
-              << results_summary.elapsed_seconds << "\">\n";
-        std::ostringstream out;
-        out.imbue(std::locale::classic());
+                 "tests=\"" << results_summary.num_executed_tests << "\" "
+                 "failedtests=\"" << results_summary.num_failed_tests << "\" "
+                 "checks=\"" << results_summary.num_executed_checks << "\" "
+                 "failures=\"" << results_summary.num_failed_checks << "\" "
+                 "time=\"" << results_summary.elapsed_seconds << "\">\n";
+
         for (const auto& p : m_tests) {
             auto key = p.first;
             const test& t = p.second;
             size_t test_index = key.first;
             int recurrence_index = key.second;
             const TestDetails details = context.test_list.get_test_details(test_index);
-            out.str(std::string());
-            out << details.test_name;
-            if (context.num_recurrences > 1)
-                out << '#' << (recurrence_index + 1);
-            std::string test_name = out.str();
+            std::string test_name{details.test_name};
+            if (context.num_recurrences > 1) {
+                test_name = test_name + "#" + util::to_string(recurrence_index + 1);
+            }
+
             m_out << "  <test suite=\"" << xml_escape(details.suite_name) << "\" "
-                                                                             "name=\""
-                  << xml_escape(test_name) << "\" "
-                                              "time=\""
-                  << t.elapsed_seconds << "\"";
+                     "name=\"" << xml_escape(test_name) << "\" "
+                     "time=\"" << t.elapsed_seconds << "\"";
             if (t.failures.empty()) {
                 m_out << "/>\n";
                 continue;
             }
             m_out << ">\n";
-            typedef std::vector<failure>::const_iterator fail_iter;
-            fail_iter fails_end = t.failures.end();
-            for (fail_iter i_2 = t.failures.begin(); i_2 != fails_end; ++i_2) {
-                std::string msg = xml_escape(i_2->message);
-                m_out << "    <failure message=\"" << i_2->file_name << ""
-                                                                        "("
-                      << i_2->line_number << ") : " << msg << "\"/>\n";
+
+            for (auto& i_2 : t.failures) {
+                std::string msg = xml_escape(i_2.message);
+                m_out << "    <failure message=\"" << i_2.file_name
+                      << "(" << i_2.line_number << ") : " << msg << "\"/>\n";
             }
             m_out << "  </test>\n";
         }
@@ -166,6 +155,104 @@ protected:
     std::map<key_type, test> m_tests;
 
     std::ostream& m_out;
+};
+
+
+class JUnitReporter : public XmlReporter
+{
+public:
+    JUnitReporter(std::ostream& out)
+    : XmlReporter(out)
+    {
+    }
+
+    ~JUnitReporter() noexcept override
+    {
+    }
+    void summary(const SharedContext& context, const Summary& results_summary) override
+    {
+        m_out << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+
+        m_out << "<testsuites>\n"
+              << "  <testsuite "
+              << "name=\"realm-core-tests\" "
+              << "tests=\"" << results_summary.num_executed_tests << "\" "
+              << "disabled=\"" << results_summary.num_excluded_tests << "\" "
+              << "failures=\"" << results_summary.num_failed_tests << "\" "
+              << "id=\"0\" "
+              << "time=\"" << results_summary.elapsed_seconds << "\""
+              << ">\n";
+
+        for (const auto& p : m_tests) {
+            auto key = p.first;
+            const test& t = p.second;
+            size_t test_index = key.first;
+            int recurrence_index = key.second;
+            const TestDetails details = context.test_list.get_test_details(test_index);
+            std::string test_name{details.test_name};
+            if (context.num_recurrences > 1) {
+                test_name = test_name + "#" + util::to_string(recurrence_index + 1);
+            }
+
+            m_out << "    <testcase name=\"" << xml_escape(test_name) << "\" "
+                  << "status=\"" << (t.failures.size() > 0 ? "failed" : "passed") << "\" "
+                  << "classname=\"" << xml_escape(test_name) << "\" "
+                  << "time=\"" << t.elapsed_seconds << "\"";
+
+            if (t.failures.empty()) {
+                m_out << "/>\n";
+            }
+            else {
+                m_out << ">\n";
+
+                for (auto& i_2 : t.failures) {
+                    std::string msg = xml_escape(i_2.message);
+                    m_out << "      <failure type=\"assertion failed\" "
+                          << "message=\"" << i_2.file_name << "(" << i_2.line_number << ") : " << msg << "\"/>\n";
+                }
+                m_out << "    </testcase>\n";
+            }
+        }
+        m_out << "  </testsuite>\n</testsuites>\n";
+    }
+};
+
+
+class ManifoldReporter : public Reporter {
+public:
+    ManifoldReporter(std::initializer_list<Reporter*> subreporters)
+    {
+        for (Reporter* r : subreporters)
+            m_subreporters.push_back(r);
+    }
+
+    void begin(const TestContext& context) override
+    {
+        for (Reporter* r : m_subreporters)
+            r->begin(context);
+    }
+
+    void fail(const TestContext& context, const char* file_name, long line_number,
+              const std::string& message) override
+    {
+        for (Reporter* r : m_subreporters)
+            r->fail(context, file_name, line_number, message);
+    }
+
+    void end(const TestContext& context, double elapsed_seconds) override
+    {
+        for (Reporter* r : m_subreporters)
+            r->end(context, elapsed_seconds);
+    }
+
+    void summary(const SharedContext& context, const Summary& results_summary) override
+    {
+        for (Reporter* r : m_subreporters)
+            r->summary(context, results_summary);
+    }
+
+protected:
+    std::vector<Reporter*> m_subreporters;
 };
 
 
@@ -736,6 +823,18 @@ void TestContext::throw_any_failed(const char* file, long line, const char* expr
     check_failed(file, line, out.str());
 }
 
+namespace {
+std::locale locale_classic = std::locale::classic();
+}
+
+std::string TestContext::get_test_name() const
+{
+    std::ostringstream out;
+    out.imbue(locale_classic);
+    out << test_details.test_name << '.' << (recurrence_index + 1);
+    return out.str();
+}
+
 
 void Reporter::thread_begin(const ThreadContext&)
 {
@@ -885,16 +984,26 @@ void SimpleReporter::summary(const SharedContext& context, const Summary& result
     }
 }
 
-
-Reporter* create_xml_reporter(std::ostream& out)
+std::unique_ptr<Reporter> create_junit_reporter(std::ostream& out)
 {
-    return new XmlReporter(out);
+    return std::make_unique<JUnitReporter>(out);
+}
+
+std::unique_ptr<Reporter> create_xml_reporter(std::ostream& out)
+{
+    return std::make_unique<XmlReporter>(out);
+}
+
+std::unique_ptr<Reporter> create_twofold_reporter(Reporter& subreporter_1, Reporter& subreporter_2)
+{
+    using list = std::initializer_list<Reporter*>;
+    return std::make_unique<ManifoldReporter>(list{&subreporter_1, &subreporter_2});
 }
 
 
-Filter* create_wildcard_filter(const std::string& filter)
+std::unique_ptr<Filter> create_wildcard_filter(const std::string& filter)
 {
-    return new WildcardFilter(filter);
+    return std::make_unique<WildcardFilter>(filter);
 }
 
 

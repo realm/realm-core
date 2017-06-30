@@ -12,7 +12,7 @@ The file is memory mapped, and objects in it are referenced with an offset from 
 
 The switch bit tells which top pointer is used. It is used so the database will always be readable, no matter when it fails during the update of the top pointer.
 
-First, the top pointer is updated and then the switch bit is updated. If that fails, you will loose all the recent changes, but the database will still be readable.
+First, the top pointer is updated and then the switch bit is updated. If that fails, you will lose all the recent changes, but the database will still be readable.
 
 ### Entries
 

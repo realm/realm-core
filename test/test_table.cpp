@@ -34,6 +34,7 @@
 #include "util/misc.hpp"
 
 #include "test.hpp"
+#include "test_table_helper.hpp"
 
 using namespace realm;
 using namespace realm::util;
@@ -69,13 +70,6 @@ using unit_test::TestContext;
 // Another way to debug a particular test, is to copy that test into
 // `experiments/testcase.cpp` and then run `sh build.sh
 // check-testcase` (or one of its friends) from the command line.
-
-
-namespace {
-
-REALM_TABLE_2(TupleTableType, first, Int, second, String)
-
-} // anonymous namespace
 
 
 #ifdef JAVA_MANY_COLUMNS_CRASH
@@ -251,11 +245,506 @@ TEST(Table_DeleteCrash)
 TEST(Table_OptimizeCrash)
 {
     // This will crash at the .add() method
-    TupleTableType ttt;
+    Table ttt;
+    ttt.add_column(type_Int, "first");
+    ttt.add_column(type_String, "second");
     ttt.optimize();
-    ttt.column().second.add_search_index();
+    ttt.add_search_index(1);
     ttt.clear();
-    ttt.add(1, "AA");
+    ttt.add_empty_row(1);
+    ttt.set_int(0, 0, 1);
+    ttt.set_string(1, 0, "AA");
+}
+
+TEST(Table_DateTimeMinMax)
+{
+    Group g;
+    TableRef table = g.add_table("test_table");
+
+    table->insert_column(0, type_Timestamp, "time", true);
+
+    // We test different code paths of the internal Core minmax method. First a null value as initial "best candidate",
+    // then non-null first. For each case we then try both a substitution of best candidate, then non-substitution. 4
+    // permutations in total.
+    
+    table->add_empty_row(3);
+    table->set_null(0, 0);
+    table->set_timestamp(0, 1, {0, 0});
+    table->set_timestamp(0, 2, {2, 2});
+
+    CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
+    CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
+
+    table->clear();
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->add_empty_row(3);
+    table->set_null(0, 0);
+    table->set_timestamp(0, 1, {0, 0});
+    table->set_timestamp(0, 2, {2, 2});
+
+    size_t idx; // tableview entry that points at the max/min value
+
+    CHECK_EQUAL(table->maximum_timestamp(0, &idx), Timestamp(2, 2));
+    CHECK_EQUAL(idx, 2);
+    CHECK_EQUAL(table->minimum_timestamp(0, &idx), Timestamp(0, 0));
+    CHECK_EQUAL(idx, 1);
+
+    table->clear();
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->add_empty_row(3);
+    table->set_null(0, 0);
+    table->set_timestamp(0, 1, {0, 0});
+    table->set_timestamp(0, 2, {2, 2});
+
+    CHECK_EQUAL(table->maximum_timestamp(0), Timestamp(2, 2));
+    CHECK_EQUAL(table->minimum_timestamp(0), Timestamp(0, 0));
+
+    table->clear();
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->add_empty_row(3);
+    table->set_null(0, 0);
+    table->set_timestamp(0, 1, {0, 0});
+    table->set_timestamp(0, 2, {2, 2});
+
+    CHECK_EQUAL(table->maximum_timestamp(0, &idx), Timestamp(2, 2));
+    CHECK_EQUAL(idx, 2);
+    CHECK_EQUAL(table->minimum_timestamp(0, &idx), Timestamp(0, 0));
+    CHECK_EQUAL(idx, 1);
+}
+
+TEST(Table_MinMaxSingleNullRow)
+{
+    // To illustrate/document behaviour
+    Group g;
+    TableRef table = g.add_table("test_table");
+
+    table->insert_column(0, type_Timestamp, "time", true);
+    table->insert_column(1, type_Int, "int", true);
+    table->insert_column(2, type_Float, "float", true);
+    table->add_empty_row();
+
+    size_t ret;
+
+    // NOTE: Return-values of method calls are undefined if you have only null-entries in the table.
+    // The return-value is not necessarily a null-object. Always test the return_ndx argument!
+
+    // Maximum
+    {
+        table->maximum_timestamp(0, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().maximum_timestamp(0, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().maximum_timestamp(0, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->maximum_int(1, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().maximum_int(1, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().maximum_int(1, nullptr, 0, npos, npos, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->maximum_float(2, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().maximum_float(2, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().maximum_float(2, nullptr, 0, npos, npos, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->add_empty_row();
+
+        CHECK(table->maximum_timestamp(0).is_null()); // max on table
+        table.get()->where().find_all().maximum_timestamp(0, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().maximum_timestamp(0, &ret); // max on query
+        CHECK(ret == npos);
+    }
+
+    // Minimum
+    {
+        table->minimum_timestamp(0, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().minimum_timestamp(0, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().minimum_timestamp(0, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->minimum_int(1, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().minimum_int(1, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().minimum_int(1, nullptr, 0, npos, npos, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->minimum_float(2, &ret); // max on table
+        CHECK(ret == npos);
+        table.get()->where().find_all().minimum_float(2, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().minimum_float(2, nullptr, 0, npos, npos, &ret); // max on query
+        CHECK(ret == npos);
+
+        table->add_empty_row();
+
+        CHECK(table->minimum_timestamp(0).is_null()); // max on table
+        table.get()->where().find_all().minimum_timestamp(0, &ret); // max on tableview
+        CHECK(ret == npos);
+        table.get()->where().minimum_timestamp(0, &ret); // max on query
+        CHECK(ret == npos);
+    }
+
+
+}
+
+TEST(TableView_AggregateBugs)
+{
+    // Tests against various aggregate bugs on TableViews: https://github.com/realm/realm-core/pull/2360
+    {
+        Table table;
+        table.add_column(type_Int, "ints", true);
+        table.add_empty_row(4);
+
+        table.set_int(0, 0, 1);
+        table.set_int(0, 1, 2);
+        table.set_null(0, 2);
+        table.set_int(0, 3, 42);
+
+        table.add_column(type_Double, "doubles", true);
+        table.set_double(1, 0, 1.);
+        table.set_double(1, 1, 2.);
+        table.set_null(1, 2);
+        table.set_double(1, 3, 42.);
+
+        auto tv = table.where().not_equal(0, 42).find_all();
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(tv.maximum_int(0), 2);
+
+        // average == sum / rows, where rows does *not* include values with null.
+        size_t vc; // number of non-null values that the average was computed from
+        CHECK_APPROXIMATELY_EQUAL(table.average_int(0, &vc), double(1 + 2 + 42) / 3, 0.001);
+        CHECK_EQUAL(vc, 3);
+
+        // There are currently 3 ways of doing average: on tableview, table and query:
+        CHECK_EQUAL(table.average_int(0), table.where().average_int(0, &vc));
+        CHECK_EQUAL(vc, 3);
+        CHECK_EQUAL(table.average_int(0), table.where().find_all().average_int(0, &vc));
+        CHECK_EQUAL(vc, 3);
+
+        // Core has an optimization where it executes average directly on the column if there
+        // are no query conditions. Bypass that here.
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(0, 1).find_all().average_int(0, &vc), double(2 + 42) / 2, 0.001);
+        CHECK_EQUAL(vc, 2);
+
+        // Add Double column and do same tests on that
+        table.add_column(type_Double, "doubles", true);
+        table.set_double(1, 0, 1.);
+        table.set_double(1, 1, 2.);
+        table.set_null(1, 2);
+        table.set_double(1, 3, 42.);
+
+        tv = table.where().not_equal(1, 42.).find_all();
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(tv.maximum_double(1), 2.);
+
+        // average == sum / rows, where rows does *not* include values with null.
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(1, &vc), double(1. + 2. + 42.) / 3, 0.001);
+        CHECK_EQUAL(vc, 3);
+
+        // There are currently 3 ways of doing average: on tableview, table and query:
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(1), table.where().average_double(1, &vc), 0.001);
+        CHECK_EQUAL(vc, 3);
+
+        CHECK_APPROXIMATELY_EQUAL(table.average_double(1), table.where().find_all().average_double(1, &vc), 0.001);
+        CHECK_EQUAL(vc, 3);
+
+        // Core has an optimization where it executes average directly on the column if there
+        // are no query conditions. Bypass that here.
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(1, 1.).find_all().average_double(1, &vc), (2. + 42.) / 2, 0.001);
+        CHECK_EQUAL(vc, 2);
+    }
+
+    // Same as above, with null entry first
+    {
+        Table table;
+        table.add_column(type_Int, "value", true);
+        table.add_empty_row(4);
+        table.set_null(0, 0);
+        table.set_int(0, 1, 1);
+        table.set_int(0, 2, 2);
+        table.set_int(0, 3, 42);
+
+        auto tv = table.where().not_equal(0, 42).find_all();
+        CHECK_EQUAL(tv.size(), 3);
+        CHECK_EQUAL(tv.maximum_int(0), 2);
+
+        // average == sum / rows, where rows does *not* include values with null.
+        CHECK_APPROXIMATELY_EQUAL(table.average_int(0), double(1 + 2 + 42) / 3, 0.001);
+
+        // There are currently 3 ways of doing average: on tableview, table and query:
+        CHECK_EQUAL(table.average_int(0), table.where().average_int(0));
+        CHECK_EQUAL(table.average_int(0), table.where().find_all().average_int(0));
+
+        // Core has an optimization where it executes average directly on the column if there
+        // are no query conditions. Bypass that here.
+        CHECK_APPROXIMATELY_EQUAL(table.where().not_equal(0, 1).find_all().average_int(0), double(2 + 42) / 2, 0.001);
+    }
+}
+
+
+TEST(Table_AggregateFuzz)
+{
+    // Tests sum, avg, min, max on Table, TableView, Query, for types float, Timestamp, int
+    for(int iter = 0; iter < 50 + 1000 * TEST_DURATION; iter++)
+    {
+        Group g;
+        TableRef table = g.add_table("test_table");
+
+        table->insert_column(0, type_Timestamp, "time", true);
+        table->insert_column(1, type_Int, "int", true);
+        table->insert_column(2, type_Float, "float", true);
+
+        size_t rows = size_t(fastrand(10));
+        table->add_empty_row(rows);
+        int64_t largest = 0;
+        int64_t smallest = 0;
+        size_t largest_pos = npos;
+        size_t smallest_pos = npos;
+
+        double avg = 0;
+        int64_t sum = 0;
+        size_t nulls = 0;
+
+        // Create some rows with values and some rows with just nulls
+        for (size_t t = 0; t < rows; t++) {
+            bool null = (fastrand(1) == 0);
+            if (!null) {
+                int64_t value = fastrand(10);
+                sum += value;
+                if (largest_pos == npos || value > largest) {
+                    largest = value;
+                    largest_pos = t;
+                }
+                if (smallest_pos == npos || value < smallest) {
+                    smallest = value;
+                    smallest_pos = t;
+                }
+                table.get()->set_timestamp(0, t, Timestamp(value, 0));
+                table.get()->set_int(1, t, value);
+                table.get()->set_float(2, t, float(value));
+            }
+            else {
+                nulls++;
+            }
+        }
+
+        avg = double(sum) / (rows - nulls == 0 ? 1 : rows - nulls);
+
+        size_t ret;
+        float f;
+        int64_t i;
+        Timestamp ts;
+
+        // Test methods on Table
+        {
+            // Table::max
+            ret = 123;
+            f = table.get()->maximum_float(2, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, largest_pos));
+
+            ret = 123;
+            i = table.get()->maximum_int(1, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, largest_pos));
+
+            ret = 123;
+            ts = table.get()->maximum_timestamp(0, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest_pos));
+
+            // Table::min
+            ret = 123;
+            f = table.get()->minimum_float(2, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, smallest_pos));
+
+            ret = 123;
+            i = table.get()->minimum_int(1, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, smallest_pos));
+
+            ret = 123;
+            ts = table.get()->minimum_timestamp(0, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, smallest_pos));
+
+            // Table::avg
+            double d;
+
+            // number of non-null values used in computing the avg or sum
+            ret = 123;
+
+            // Table::avg
+            d = table.get()->average_float(2, &ret);
+            CHECK_EQUAL(ret, (rows - nulls));
+            if (ret != 0)
+                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+
+            ret = 123;
+            d = table.get()->average_int(1, &ret);
+            CHECK_EQUAL(ret, (rows - nulls));
+            if (ret != 0)
+                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+
+            // Table::sum
+            d = table.get()->sum_float(2);
+            CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
+
+            i = table.get()->sum_int(1);
+            CHECK_EQUAL(i, sum);
+        }
+
+        // Test methods on TableView
+        {
+            // TableView::max
+            ret = 123;
+            f = table.get()->where().find_all().maximum_float(2, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, largest_pos));
+
+            ret = 123;
+            i = table.get()->where().find_all().maximum_int(1, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, largest_pos));
+
+            ret = 123;
+            ts = table.get()->where().find_all().maximum_timestamp(0, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest_pos));
+
+            // TableView::min
+            ret = 123;
+            f = table.get()->where().find_all().minimum_float(2, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, smallest_pos));
+
+            ret = 123;
+            i = table.get()->where().find_all().minimum_int(1, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, smallest_pos));
+
+            ret = 123;
+            ts = table.get()->where().find_all().minimum_timestamp(0, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, smallest_pos));
+
+            // TableView::avg
+            double d;
+
+            // number of non-null values used in computing the avg or sum
+            ret = 123;
+
+            // TableView::avg
+            d = table.get()->where().find_all().average_float(2, &ret);
+            CHECK_EQUAL(ret, (rows - nulls));
+            if (ret != 0)
+                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+
+            ret = 123;
+            d = table.get()->where().find_all().average_int(1, &ret);
+            CHECK_EQUAL(ret, (rows - nulls));
+            if (ret != 0)
+                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+
+            // TableView::sum
+            d = table.get()->where().find_all().sum_float(2);
+            CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
+
+            i = table.get()->where().find_all().sum_int(1);
+            CHECK_EQUAL(i, sum);
+
+        }
+
+
+        // Test methods on Query
+        {
+            // TableView::max
+            ret = 123;
+            f = table.get()->where().maximum_float(2, nullptr, 0, npos, npos, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, largest_pos));
+
+            ret = 123;
+            i = table.get()->where().maximum_int(1, nullptr, 0, npos, npos, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, largest_pos));
+
+            ret = 123;
+            // Note: Method arguments different from metholds on other column types
+            ts = table.get()->where().maximum_timestamp(0, &ret);
+            CHECK_EQUAL(ret, largest_pos);
+            if (largest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, largest_pos)); 
+
+            // TableView::min
+            ret = 123;
+            f = table.get()->where().minimum_float(2, nullptr, 0, npos, npos, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(f, table.get()->get_float(2, smallest_pos));
+
+            ret = 123;
+            i = table.get()->where().minimum_int(1, nullptr, 0, npos, npos, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(i, table.get()->get_int(1, smallest_pos));
+
+            ret = 123;
+            // Note: Method arguments different from metholds on other column types
+            ts = table.get()->where().minimum_timestamp(0, &ret);
+            CHECK_EQUAL(ret, smallest_pos);
+            if (smallest_pos != npos)
+                CHECK_EQUAL(ts, table.get()->get_timestamp(0, smallest_pos));
+
+            // TableView::avg
+            double d;
+
+            // number of non-null values used in computing the avg or sum
+            ret = 123;
+
+            // TableView::avg
+            d = table.get()->where().average_float(2, &ret);
+            CHECK_EQUAL(ret, (rows - nulls));
+            if (ret != 0)
+                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+
+            ret = 123;
+            d = table.get()->where().average_int(1, &ret);
+            CHECK_EQUAL(ret, (rows - nulls));
+            if (ret != 0)
+                CHECK_APPROXIMATELY_EQUAL(d, avg, 0.001);
+
+            // TableView::sum
+            d = table.get()->where().sum_float(2);
+            CHECK_APPROXIMATELY_EQUAL(d, double(sum), 0.001);
+
+            i = table.get()->where().sum_int(1);
+            CHECK_EQUAL(i, sum);
+        }
+    }
 }
 
 
@@ -346,6 +835,12 @@ TEST(Table_StringOrBinaryTooBig)
     table.set_binary(1, 0, BinaryData(large_buf.get(), large_bin_size - 1));
     table.set_mixed(2, 0, Mixed(StringData(large_buf.get(), large_str_size - 1)));
     table.set_mixed(3, 0, Mixed(BinaryData(large_buf.get(), large_bin_size - 1)));
+    table.set_binary_big(1, 0, BinaryData(large_buf.get(), large_bin_size));
+    size_t pos = 0;
+    table.get_binary_at(1, 0, pos);
+    CHECK_EQUAL(pos, 0xFFFFF0);
+    table.get_binary_at(1, 0, pos);
+    CHECK_EQUAL(pos, 0);
 }
 
 
@@ -386,22 +881,22 @@ TEST(Table_Floats)
     // Test adding a single empty row
     // and filling it with values
     size_t ndx = table.add_empty_row();
-    table.set_float(0, ndx, float(1.12));
-    table.set_double(1, ndx, double(102.13));
+    table.set_float(0, ndx, 1.12f);
+    table.set_double(1, ndx, 102.13);
 
-    CHECK_EQUAL(float(1.12), table.get_float(0, ndx));
-    CHECK_EQUAL(double(102.13), table.get_double(1, ndx));
+    CHECK_EQUAL(1.12f, table.get_float(0, ndx));
+    CHECK_EQUAL(102.13, table.get_double(1, ndx));
 
     // Test adding multiple rows
     ndx = table.add_empty_row(7);
     for (size_t i = ndx; i < 7; ++i) {
-        table.set_float(0, i, float(1.12) + 100 * i);
-        table.set_double(1, i, double(102.13) * 200 * i);
+        table.set_float(0, i, 1.12f + 100 * i);
+        table.set_double(1, i, 102.13 * 200 * i);
     }
 
     for (size_t i = ndx; i < 7; ++i) {
-        const float v1 = float(1.12) + 100 * i;
-        const double v2 = double(102.13) * 200 * i;
+        const float v1 = 1.12f + 100 * i;
+        const double v2 = 102.13 * 200 * i;
         CHECK_EQUAL(v1, table.get_float(0, i));
         CHECK_EQUAL(v2, table.get_double(1, i));
     }
@@ -413,23 +908,37 @@ TEST(Table_Floats)
 
 namespace {
 
-enum Days { Mon, Tue, Wed, Thu, Fri, Sat, Sun };
-
-REALM_TABLE_4(TestTable, first, Int, second, Int, third, Bool, fourth, Enum<Days>)
+class TestTable01 : public TestTable {
+public:
+    TestTable01(Allocator& a)
+        : TestTable(a)
+    {
+        init();
+    }
+    TestTable01()
+    {
+        init();
+    }
+    void init()
+    {
+        add_column(type_Int, "first");
+        add_column(type_Int, "second");
+        add_column(type_Bool, "third");
+        add_column(type_Int, "fourth");
+    }
+};
 
 } // anonymous namespace
 
 TEST(Table_2)
 {
-    TestTable table;
+    TestTable01 table;
+    add(table, 0, 10, true, Wed);
 
-    table.add(0, 10, true, Wed);
-    const TestTable::Cursor r = table.back(); // last item
-
-    CHECK_EQUAL(0, r.first);
-    CHECK_EQUAL(10, r.second);
-    CHECK_EQUAL(true, r.third);
-    CHECK_EQUAL(Wed, r.fourth);
+    CHECK_EQUAL(0, table.get_int(0, 0));
+    CHECK_EQUAL(10, table.get_int(1, 0));
+    CHECK_EQUAL(true, table.get_bool(2, 0));
+    CHECK_EQUAL(Wed, table.get_int(3, 0));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -438,21 +947,21 @@ TEST(Table_2)
 
 TEST(Table_3)
 {
-    TestTable table;
+    TestTable01 table;
 
     for (size_t i = 0; i < 100; ++i) {
-        table.add(0, 10, true, Wed);
+        add(table, 0, 10, true, Wed);
     }
 
     // Test column searching
-    CHECK_EQUAL(size_t(0), table.column().first.find_first(0));
-    CHECK_EQUAL(size_t(-1), table.column().first.find_first(1));
-    CHECK_EQUAL(size_t(0), table.column().second.find_first(10));
-    CHECK_EQUAL(size_t(-1), table.column().second.find_first(100));
-    CHECK_EQUAL(size_t(0), table.column().third.find_first(true));
-    CHECK_EQUAL(size_t(-1), table.column().third.find_first(false));
-    CHECK_EQUAL(size_t(0), table.column().fourth.find_first(Wed));
-    CHECK_EQUAL(size_t(-1), table.column().fourth.find_first(Mon));
+    CHECK_EQUAL(size_t(0), table.find_first_int(0, 0));
+    CHECK_EQUAL(size_t(-1), table.find_first_int(0, 1));
+    CHECK_EQUAL(size_t(0), table.find_first_int(1, 10));
+    CHECK_EQUAL(size_t(-1), table.find_first_int(1, 100));
+    CHECK_EQUAL(size_t(0), table.find_first_bool(2, true));
+    CHECK_EQUAL(size_t(-1), table.find_first_bool(2, false));
+    CHECK_EQUAL(size_t(0), table.find_first_int(3, Wed));
+    CHECK_EQUAL(size_t(-1), table.find_first_int(3, Mon));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -461,7 +970,14 @@ TEST(Table_3)
 
 namespace {
 
-REALM_TABLE_2(TestTableEnum, first, Enum<Days>, second, String)
+class TestTableEnum : public TestTable {
+public:
+    TestTableEnum()
+    {
+        add_column(type_Int, "first");
+        add_column(type_String, "second");
+    }
+};
 
 } // anonymous namespace
 
@@ -469,17 +985,17 @@ TEST(Table_4)
 {
     TestTableEnum table;
 
-    table.add(Mon, "Hello");
-    table.add(Mon, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
-    const TestTableEnum::Cursor r = table.back(); // last item
+    add(table, Mon, "Hello");
+    add(table, Mon, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello");
 
-    CHECK_EQUAL(Mon, r.first);
-    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello", r.second);
+    CHECK_EQUAL(Mon, table.get_int(0, 0));
+    CHECK_EQUAL("HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello",
+                table.get_string(1, 1));
 
     // Test string column searching
-    CHECK_EQUAL(size_t(1), table.column().second.find_first(
-                               "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
-    CHECK_EQUAL(size_t(-1), table.column().second.find_first("Foo"));
+    CHECK_EQUAL(size_t(1), table.find_first_string(
+                               1, "HelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHelloHello"));
+    CHECK_EQUAL(size_t(-1), table.find_first_string(1, "Foo"));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -488,7 +1004,14 @@ TEST(Table_4)
 
 namespace {
 
-REALM_TABLE_2(TestTableFloats, first, Float, second, Double)
+class TestTableFloats : public TestTable {
+public:
+    TestTableFloats()
+    {
+        add_column(type_Float, "first");
+        add_column(type_Double, "second");
+    }
+};
 
 } // anonymous namespace
 
@@ -496,12 +1019,11 @@ TEST(Table_Float2)
 {
     TestTableFloats table;
 
-    table.add(1.1f, 2.2);
-    table.add(1.1f, 2.2);
-    const TestTableFloats::Cursor r = table.back(); // last item
+    add(table, 1.1f, 2.2);
+    add(table, 1.1f, 2.2);
 
-    CHECK_EQUAL(1.1f, r.first);
-    CHECK_EQUAL(2.2, r.second);
+    CHECK_EQUAL(1.1f, table.get_float(0, 0));
+    CHECK_EQUAL(2.2, table.get_double(1, 1));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -511,23 +1033,23 @@ TEST(Table_Float2)
 
 TEST(Table_Delete)
 {
-    TestTable table;
+    TestTable01 table;
 
-    for (size_t i = 0; i < 10; ++i) {
-        table.add(0, i, true, Wed);
+    for (int i = 0; i < 10; ++i) {
+        add(table, 0, i, true, Wed);
     }
 
     table.remove(0);
     table.remove(4);
     table.remove(7);
 
-    CHECK_EQUAL(1, table[0].second);
-    CHECK_EQUAL(2, table[1].second);
-    CHECK_EQUAL(3, table[2].second);
-    CHECK_EQUAL(4, table[3].second);
-    CHECK_EQUAL(6, table[4].second);
-    CHECK_EQUAL(7, table[5].second);
-    CHECK_EQUAL(8, table[6].second);
+    CHECK_EQUAL(1, table.get_int(1, 0));
+    CHECK_EQUAL(2, table.get_int(1, 1));
+    CHECK_EQUAL(3, table.get_int(1, 2));
+    CHECK_EQUAL(4, table.get_int(1, 3));
+    CHECK_EQUAL(6, table.get_int(1, 4));
+    CHECK_EQUAL(7, table.get_int(1, 5));
+    CHECK_EQUAL(8, table.get_int(1, 6));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -780,15 +1302,15 @@ TEST(Table_LowLevelCopy)
 
 TEST(Table_HighLevelCopy)
 {
-    TestTable table;
-    table.add(10, 120, false, Mon);
-    table.add(12, 100, true, Tue);
+    TestTable01 table;
+    add(table, 10, 120, false, Mon);
+    add(table, 12, 100, true, Tue);
 
 #ifdef REALM_DEBUG
     table.verify();
 #endif
 
-    TestTable table2 = table;
+    TestTable01 table2 = table;
 
 #ifdef REALM_DEBUG
     table2.verify();
@@ -796,7 +1318,7 @@ TEST(Table_HighLevelCopy)
 
     CHECK(table2 == table);
 
-    TestTable::Ref table3 = table.copy();
+    auto table3 = table.copy();
 
 #ifdef REALM_DEBUG
     table3->verify();
@@ -868,6 +1390,35 @@ TEST(Table_MoveAllTypes)
         table.move_last_over(target_row_ndx);
         table.verify();
     }
+}
+
+TEST(Table_SubtableNull)
+{
+    Table parent;
+
+    {
+        DescriptorRef subdescr;
+        parent.add_column(type_Table, "integers", true, &subdescr);
+        subdescr->add_column(type_Int, "list");
+    }
+
+    parent.add_empty_row(2);
+    CHECK(parent.is_null(0, 0));
+    parent.get_subtable(0, 0)->add_empty_row(0);
+    TableRef table = parent.get_subtable(0, 1); // Preserve accessor
+    CHECK(table->is_attached());
+    CHECK(table->is_degenerate());
+    table->add_empty_row(0);
+    CHECK(!table->is_degenerate());
+    CHECK(!parent.is_null(0, 0));
+    CHECK(!parent.is_null(0, 1));
+    CHECK(table->is_attached());
+    parent.set_null(0, 0);
+    parent.set_null(0, 1);
+    CHECK(parent.is_null(0, 0));
+    CHECK(parent.is_null(0, 1));
+    CHECK(table->is_attached());
+    CHECK(table->is_degenerate());
 }
 
 
@@ -1013,6 +1564,30 @@ TEST(Table_DegenerateSubtableSearchAndAggregate)
     CHECK_EQUAL(0, res);
 }
 
+TEST(Table_SpecUpdateWhenInsertingTable)
+{
+    Group g;
+
+    TableRef table_first = g.add_table("first");
+    TableRef table_second = g.add_table("second");
+
+    DescriptorRef subdescr;
+    table_first->add_column(type_Table, "subtables", true, &subdescr);
+    subdescr->add_column(type_Int, "integers", nullptr, false);
+    table_first->add_empty_row(5);
+
+    table_second->add_column_link(type_Link, "links", *table_first);
+
+    TableRef sub = table_first->get_subtable(0, 2);
+    sub->clear();
+    sub->add_empty_row(1);
+
+    g.insert_table(0, "third");
+    sub->set_int(0, 0, 1, false);
+
+    g.verify();
+}
+
 TEST(Table_Range)
 {
     Table table;
@@ -1024,6 +1599,13 @@ TEST(Table_Range)
     CHECK_EQUAL(10, tv.size());
     for (size_t i = 0; i < tv.size(); ++i)
         CHECK_EQUAL(int64_t(i + 10), tv.get_int(0, i));
+
+    for (size_t i = 0; i < 5; ++i)
+        table.insert_empty_row(0);
+
+    CHECK(tv.sync_if_needed());
+    for (size_t i = 0; i < tv.size(); ++i)
+        CHECK_EQUAL(int64_t(i + 5), tv.get_int(0, i));
 }
 
 TEST(Table_RangeConst)
@@ -1108,10 +1690,10 @@ st...  enum2          7 bytes     -1     [3]\n";
 
 TEST(Table_FindInt)
 {
-    TestTable table;
+    TestTable01 table;
 
     for (int i = 1000; i >= 0; --i) {
-        table.add(0, i, true, Wed);
+        add(table, 0, i, true, Wed);
     }
 
     CHECK_EQUAL(size_t(0),    table.column().second.find_first(1000));
@@ -1155,25 +1737,25 @@ TEST(Table_6)
 
 TEST(Table_FindAllInt)
 {
-    TestTable table;
+    TestTable01 table;
 
-    table.add(0, 10, true, Wed);
-    table.add(0, 20, true, Wed);
-    table.add(0, 10, true, Wed);
-    table.add(0, 20, true, Wed);
-    table.add(0, 10, true, Wed);
-    table.add(0, 20, true, Wed);
-    table.add(0, 10, true, Wed);
-    table.add(0, 20, true, Wed);
-    table.add(0, 10, true, Wed);
-    table.add(0, 20, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 20, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 20, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 20, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 20, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 20, true, Wed);
 
     // Search for a value that does not exits
-    const TestTable::View v0 = table.column().second.find_all(5);
+    auto v0 = table.find_all_int(1, 5);
     CHECK_EQUAL(0, v0.size());
 
     // Search for a value with several matches
-    const TestTable::View v = table.column().second.find_all(20);
+    auto v = table.find_all_int(1, 20);
 
     CHECK_EQUAL(5, v.size());
     CHECK_EQUAL(1, v.get_source_ndx(0));
@@ -1189,21 +1771,21 @@ TEST(Table_FindAllInt)
 
 TEST(Table_SortedInt)
 {
-    TestTable table;
+    TestTable01 table;
 
-    table.add(0, 10, true, Wed); // 0: 4
-    table.add(0, 20, true, Wed); // 1: 7
-    table.add(0, 0, true, Wed);  // 2: 0
-    table.add(0, 40, true, Wed); // 3: 8
-    table.add(0, 15, true, Wed); // 4: 6
-    table.add(0, 11, true, Wed); // 5: 5
-    table.add(0, 6, true, Wed);  // 6: 3
-    table.add(0, 4, true, Wed);  // 7: 2
-    table.add(0, 99, true, Wed); // 8: 9
-    table.add(0, 2, true, Wed);  // 9: 1
+    add(table, 0, 10, true, Wed); // 0: 4
+    add(table, 0, 20, true, Wed); // 1: 7
+    add(table, 0, 0, true, Wed);  // 2: 0
+    add(table, 0, 40, true, Wed); // 3: 8
+    add(table, 0, 15, true, Wed); // 4: 6
+    add(table, 0, 11, true, Wed); // 5: 5
+    add(table, 0, 6, true, Wed);  // 6: 3
+    add(table, 0, 4, true, Wed);  // 7: 2
+    add(table, 0, 99, true, Wed); // 8: 9
+    add(table, 0, 2, true, Wed);  // 9: 1
 
     // Search for a value that does not exits
-    TestTable::View v = table.column().second.get_sorted_view();
+    auto v = table.get_sorted_view(1);
     CHECK_EQUAL(table.size(), v.size());
 
     CHECK_EQUAL(2, v.get_source_ndx(0));
@@ -1226,32 +1808,32 @@ TEST(Table_SortedInt)
 TEST(Table_Sorted_Query_where)
 {
     // Using where(tv) instead of tableview(tv)
-    TestTable table;
+    TestTable01 table;
 
-    table.add(0, 10, true, Wed);  // 0: 4
-    table.add(0, 20, false, Wed); // 1: 7
-    table.add(0, 0, false, Wed);  // 2: 0
-    table.add(0, 40, false, Wed); // 3: 8
-    table.add(0, 15, false, Wed); // 4: 6
-    table.add(0, 11, true, Wed);  // 5: 5
-    table.add(0, 6, true, Wed);   // 6: 3
-    table.add(0, 4, true, Wed);   // 7: 2
-    table.add(0, 99, true, Wed);  // 8: 9
-    table.add(0, 2, true, Wed);   // 9: 1
+    add(table, 0, 10, true, Wed);  // 0: 4
+    add(table, 0, 20, false, Wed); // 1: 7
+    add(table, 0, 0, false, Wed);  // 2: 0
+    add(table, 0, 40, false, Wed); // 3: 8
+    add(table, 0, 15, false, Wed); // 4: 6
+    add(table, 0, 11, true, Wed);  // 5: 5
+    add(table, 0, 6, true, Wed);   // 6: 3
+    add(table, 0, 4, true, Wed);   // 7: 2
+    add(table, 0, 99, true, Wed);  // 8: 9
+    add(table, 0, 2, true, Wed);   // 9: 1
 
     // Count booleans
-    size_t count_original = table.where().third.equal(false).count();
+    size_t count_original = table.where().equal(2, false).count();
     CHECK_EQUAL(4, count_original);
 
     // Get a view containing the complete table
-    TestTable::View v = table.column().first.find_all(0);
+    auto v = table.find_all_int(0, 0);
     CHECK_EQUAL(table.size(), v.size());
 
     // Count booleans
-    size_t count_view = table.where(&v).third.equal(false).count();
+    size_t count_view = table.where(&v).equal(2, false).count();
     CHECK_EQUAL(4, count_view);
 
-    TestTable::View v_sorted = table.column().second.get_sorted_view();
+    auto v_sorted = table.get_sorted_view(1);
     CHECK_EQUAL(table.size(), v_sorted.size());
 
 #ifdef REALM_DEBUG
@@ -1316,31 +1898,31 @@ TEST(Table_IndexString)
 {
     TestTableEnum table;
 
-    table.add(Mon, "jeff");
-    table.add(Tue, "jim");
-    table.add(Wed, "jennifer");
-    table.add(Thu, "john");
-    table.add(Fri, "jimmy");
-    table.add(Sat, "jimbo");
-    table.add(Sun, "johnny");
-    table.add(Mon, "jennifer"); // duplicate
+    add(table, Mon, "jeff");
+    add(table, Tue, "jim");
+    add(table, Wed, "jennifer");
+    add(table, Thu, "john");
+    add(table, Fri, "jimmy");
+    add(table, Sat, "jimbo");
+    add(table, Sun, "johnny");
+    add(table, Mon, "jennifer"); // duplicate
 
-    table.column().second.add_search_index();
-    CHECK(table.column().second.has_search_index());
+    table.add_search_index(1);
+    CHECK(table.has_search_index(1));
 
-    const size_t r1 = table.column().second.find_first("jimmi");
+    const size_t r1 = table.find_first_string(1, "jimmi");
     CHECK_EQUAL(not_found, r1);
 
-    const size_t r2 = table.column().second.find_first("jeff");
-    const size_t r3 = table.column().second.find_first("jim");
-    const size_t r4 = table.column().second.find_first("jimbo");
-    const size_t r5 = table.column().second.find_first("johnny");
+    const size_t r2 = table.find_first_string(1, "jeff");
+    const size_t r3 = table.find_first_string(1, "jim");
+    const size_t r4 = table.find_first_string(1, "jimbo");
+    const size_t r5 = table.find_first_string(1, "johnny");
     CHECK_EQUAL(0, r2);
     CHECK_EQUAL(1, r3);
     CHECK_EQUAL(5, r4);
     CHECK_EQUAL(6, r5);
 
-    const size_t c1 = table.column().second.count("jennifer");
+    const size_t c1 = table.count_string(1, "jennifer");
     CHECK_EQUAL(2, c1);
 }
 
@@ -1349,19 +1931,19 @@ TEST(Table_IndexStringTwice)
 {
     TestTableEnum table;
 
-    table.add(Mon, "jeff");
-    table.add(Tue, "jim");
-    table.add(Wed, "jennifer");
-    table.add(Thu, "john");
-    table.add(Fri, "jimmy");
-    table.add(Sat, "jimbo");
-    table.add(Sun, "johnny");
-    table.add(Mon, "jennifer"); // duplicate
+    add(table, Mon, "jeff");
+    add(table, Tue, "jim");
+    add(table, Wed, "jennifer");
+    add(table, Thu, "john");
+    add(table, Fri, "jimmy");
+    add(table, Sat, "jimbo");
+    add(table, Sun, "johnny");
+    add(table, Mon, "jennifer"); // duplicate
 
-    table.column().second.add_search_index();
-    CHECK_EQUAL(true, table.column().second.has_search_index());
-    table.column().second.add_search_index();
-    CHECK_EQUAL(true, table.column().second.has_search_index());
+    table.add_search_index(1);
+    CHECK_EQUAL(true, table.has_search_index(1));
+    table.add_search_index(1);
+    CHECK_EQUAL(true, table.has_search_index(1));
 }
 
 
@@ -1597,23 +2179,120 @@ TEST(Table_SetUniqueAccessorUpdating)
 }
 
 
+TEST(Table_SetUniqueLoserAccessorUpdates)
+{
+    Group g;
+    TableRef origin = g.add_table("origin");
+    TableRef target = g.add_table("target");
+
+    target->add_column(type_Int, "col");
+    target->add_empty_row(6);
+    size_t int_col = origin->add_column(type_Int, "pk");
+    size_t ll_col = origin->add_column_link(type_LinkList, "list", *target);
+    size_t str_col = origin->add_column(type_String, "description");
+    origin->add_search_index(0);
+    origin->add_search_index(2);
+
+    origin->add_empty_row(4);
+    origin->set_int_unique(int_col, 0, 1);
+    origin->set_int_unique(int_col, 1, 2);
+    origin->set_string(str_col, 0, "zero");
+    origin->set_string(str_col, 1, "one");
+    origin->set_string(str_col, 2, "two");
+    origin->set_string(str_col, 3, "three");
+
+    Row row_0 = (*origin)[0];
+    Row row_1 = (*origin)[1];
+    Row row_2 = (*origin)[2];
+    LinkViewRef lv_0 = origin->get_linklist(ll_col, 0);
+    LinkViewRef lv_1 = origin->get_linklist(ll_col, 1);
+    lv_0->add(0); // one link
+    lv_1->add(1); // two links
+    lv_1->add(2);
+
+    CHECK_EQUAL(origin->size(), 4);
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(row_0.get_string(str_col), "zero");
+    CHECK_EQUAL(row_1.get_string(str_col), "one");
+    CHECK_EQUAL(row_2.get_string(str_col), "two");
+
+    // leaves row 0 as winner, move last over of 2
+    origin->set_int_unique(int_col, 2, 1);
+
+    CHECK_EQUAL(origin->size(), 3);
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK(row_2.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 0);
+    CHECK_EQUAL(row_1.get_index(), 1);
+    CHECK_EQUAL(row_2.get_index(), 0);
+    CHECK_EQUAL(row_0.get_string(str_col), "zero");
+    CHECK_EQUAL(row_1.get_string(str_col), "one");
+    CHECK_EQUAL(row_2.get_string(str_col), "zero");
+    CHECK_EQUAL(row_0.get_linklist(ll_col)->size(), 1);
+    CHECK_EQUAL(row_1.get_linklist(ll_col)->size(), 2);
+    CHECK_EQUAL(row_2.get_linklist(ll_col)->size(), 1); // subsumed
+    CHECK_EQUAL(lv_0->size(), 1);
+    CHECK_EQUAL(lv_1->size(), 2);
+
+    CHECK(lv_0->is_attached());
+    CHECK(lv_1->is_attached());
+    CHECK(lv_0 == origin->get_linklist(1, 0));
+    CHECK(lv_1 == origin->get_linklist(1, 1));
+}
+
+
+TEST(Table_AccessorsUpdateAfterMergeRows)
+{
+    Group g;
+    TableRef origin = g.add_table("origin");
+    TableRef target = g.add_table("target");
+
+    target->add_column(type_Int, "col");
+    target->add_empty_row(6);
+
+    origin->add_column_link(type_Link, "link_column", *target);
+    origin->add_empty_row(3);
+    origin->set_link(0, 0, 0);
+    origin->set_link(0, 1, 1);
+    origin->set_link(0, 2, 2);
+
+    Row row_0 = (*origin)[0];
+    Row row_1 = (*origin)[1];
+
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 0);
+    CHECK_EQUAL(row_1.get_index(), 1);
+
+    origin->merge_rows(1, 2);
+
+    CHECK(row_0.is_attached());
+    CHECK(row_1.is_attached());
+    CHECK_EQUAL(row_0.get_index(), 0);
+    CHECK_EQUAL(row_1.get_index(), 2);
+}
+
+
 TEST(Table_Distinct)
 {
     TestTableEnum table;
 
-    table.add(Mon, "A");
-    table.add(Tue, "B");
-    table.add(Wed, "C");
-    table.add(Thu, "B");
-    table.add(Fri, "C");
-    table.add(Sat, "D");
-    table.add(Sun, "D");
-    table.add(Mon, "D");
+    add(table, Mon, "A");
+    add(table, Tue, "B");
+    add(table, Wed, "C");
+    add(table, Thu, "B");
+    add(table, Fri, "C");
+    add(table, Sat, "D");
+    add(table, Sun, "D");
+    add(table, Mon, "D");
 
-    table.column().second.add_search_index();
-    CHECK(table.column().second.has_search_index());
+    table.add_search_index(1);
+    CHECK(table.has_search_index(1));
 
-    TestTableEnum::View view = table.column().second.get_distinct_view();
+    auto view = table.get_distinct_view(1);
 
     CHECK_EQUAL(4, view.size());
     CHECK_EQUAL(0, view.get_source_ndx(0));
@@ -1626,19 +2305,19 @@ TEST(Table_Distinct)
 TEST(Table_DistinctEnums)
 {
     TestTableEnum table;
-    table.add(Mon, "A");
-    table.add(Tue, "B");
-    table.add(Wed, "C");
-    table.add(Thu, "B");
-    table.add(Fri, "C");
-    table.add(Sat, "D");
-    table.add(Sun, "D");
-    table.add(Mon, "D");
+    add(table, Mon, "A");
+    add(table, Tue, "B");
+    add(table, Wed, "C");
+    add(table, Thu, "B");
+    add(table, Fri, "C");
+    add(table, Sat, "D");
+    add(table, Sun, "D");
+    add(table, Mon, "D");
 
-    table.column().first.add_search_index();
-    CHECK(table.column().first.has_search_index());
+    table.add_search_index(0);
+    CHECK(table.has_search_index(0));
 
-    TestTableEnum::View view = table.column().first.get_distinct_view();
+    auto view = table.get_distinct_view(0);
 
     CHECK_EQUAL(7, view.size());
     CHECK_EQUAL(0, view.get_source_ndx(0));
@@ -1788,82 +2467,82 @@ TEST(Table_DistinctFromPersistedTable)
 
 TEST(Table_IndexInt)
 {
-    TestTable table;
+    TestTable01 table;
 
-    table.add(0, 1, true, Wed);
-    table.add(0, 15, true, Wed);
-    table.add(0, 10, true, Wed);
-    table.add(0, 20, true, Wed);
-    table.add(0, 11, true, Wed);
-    table.add(0, 45, true, Wed);
-    table.add(0, 10, true, Wed);
-    table.add(0, 0, true, Wed);
-    table.add(0, 30, true, Wed);
-    table.add(0, 9, true, Wed);
+    add(table, 0, 1, true, Wed);
+    add(table, 0, 15, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 20, true, Wed);
+    add(table, 0, 11, true, Wed);
+    add(table, 0, 45, true, Wed);
+    add(table, 0, 10, true, Wed);
+    add(table, 0, 0, true, Wed);
+    add(table, 0, 30, true, Wed);
+    add(table, 0, 9, true, Wed);
 
     // Create index for column two
-    table.column().second.add_search_index();
+    table.add_search_index(1);
 
     // Search for a value that does not exits
-    const size_t r1 = table.column().second.find_first(2);
+    const size_t r1 = table.find_first_int(1, 2);
     CHECK_EQUAL(npos, r1);
 
     // Find existing values
-    CHECK_EQUAL(0, table.column().second.find_first(1));
-    CHECK_EQUAL(1, table.column().second.find_first(15));
-    CHECK_EQUAL(2, table.column().second.find_first(10));
-    CHECK_EQUAL(3, table.column().second.find_first(20));
-    CHECK_EQUAL(4, table.column().second.find_first(11));
-    CHECK_EQUAL(5, table.column().second.find_first(45));
-    // CHECK_EQUAL(6, table.column().second.find_first(10)); // only finds first match
-    CHECK_EQUAL(7, table.column().second.find_first(0));
-    CHECK_EQUAL(8, table.column().second.find_first(30));
-    CHECK_EQUAL(9, table.column().second.find_first(9));
+    CHECK_EQUAL(0, table.find_first_int(1, 1));
+    CHECK_EQUAL(1, table.find_first_int(1, 15));
+    CHECK_EQUAL(2, table.find_first_int(1, 10));
+    CHECK_EQUAL(3, table.find_first_int(1, 20));
+    CHECK_EQUAL(4, table.find_first_int(1, 11));
+    CHECK_EQUAL(5, table.find_first_int(1, 45));
+    // CHECK_EQUAL(6, table.find_first_int(1, 10)); // only finds first match
+    CHECK_EQUAL(7, table.find_first_int(1, 0));
+    CHECK_EQUAL(8, table.find_first_int(1, 30));
+    CHECK_EQUAL(9, table.find_first_int(1, 9));
 
     // Change some values
-    table[2].second = 13;
-    table[9].second = 100;
+    table.set_int(1, 2, 13);
+    table.set_int(1, 9, 100);
 
-    CHECK_EQUAL(0, table.column().second.find_first(1));
-    CHECK_EQUAL(1, table.column().second.find_first(15));
-    CHECK_EQUAL(2, table.column().second.find_first(13));
-    CHECK_EQUAL(3, table.column().second.find_first(20));
-    CHECK_EQUAL(4, table.column().second.find_first(11));
-    CHECK_EQUAL(5, table.column().second.find_first(45));
-    CHECK_EQUAL(6, table.column().second.find_first(10));
-    CHECK_EQUAL(7, table.column().second.find_first(0));
-    CHECK_EQUAL(8, table.column().second.find_first(30));
-    CHECK_EQUAL(9, table.column().second.find_first(100));
+    CHECK_EQUAL(0, table.find_first_int(1, 1));
+    CHECK_EQUAL(1, table.find_first_int(1, 15));
+    CHECK_EQUAL(2, table.find_first_int(1, 13));
+    CHECK_EQUAL(3, table.find_first_int(1, 20));
+    CHECK_EQUAL(4, table.find_first_int(1, 11));
+    CHECK_EQUAL(5, table.find_first_int(1, 45));
+    CHECK_EQUAL(6, table.find_first_int(1, 10));
+    CHECK_EQUAL(7, table.find_first_int(1, 0));
+    CHECK_EQUAL(8, table.find_first_int(1, 30));
+    CHECK_EQUAL(9, table.find_first_int(1, 100));
 
     // Insert values
-    table.add(0, 29, true, Wed);
+    add(table, 0, 29, true, Wed);
     // TODO: More than add
 
-    CHECK_EQUAL(0, table.column().second.find_first(1));
-    CHECK_EQUAL(1, table.column().second.find_first(15));
-    CHECK_EQUAL(2, table.column().second.find_first(13));
-    CHECK_EQUAL(3, table.column().second.find_first(20));
-    CHECK_EQUAL(4, table.column().second.find_first(11));
-    CHECK_EQUAL(5, table.column().second.find_first(45));
-    CHECK_EQUAL(6, table.column().second.find_first(10));
-    CHECK_EQUAL(7, table.column().second.find_first(0));
-    CHECK_EQUAL(8, table.column().second.find_first(30));
-    CHECK_EQUAL(9, table.column().second.find_first(100));
-    CHECK_EQUAL(10, table.column().second.find_first(29));
+    CHECK_EQUAL(0, table.find_first_int(1, 1));
+    CHECK_EQUAL(1, table.find_first_int(1, 15));
+    CHECK_EQUAL(2, table.find_first_int(1, 13));
+    CHECK_EQUAL(3, table.find_first_int(1, 20));
+    CHECK_EQUAL(4, table.find_first_int(1, 11));
+    CHECK_EQUAL(5, table.find_first_int(1, 45));
+    CHECK_EQUAL(6, table.find_first_int(1, 10));
+    CHECK_EQUAL(7, table.find_first_int(1, 0));
+    CHECK_EQUAL(8, table.find_first_int(1, 30));
+    CHECK_EQUAL(9, table.find_first_int(1, 100));
+    CHECK_EQUAL(10, table.find_first_int(1, 29));
 
     // Delete some values
     table.remove(0);
     table.remove(5);
     table.remove(8);
 
-    CHECK_EQUAL(0, table.column().second.find_first(15));
-    CHECK_EQUAL(1, table.column().second.find_first(13));
-    CHECK_EQUAL(2, table.column().second.find_first(20));
-    CHECK_EQUAL(3, table.column().second.find_first(11));
-    CHECK_EQUAL(4, table.column().second.find_first(45));
-    CHECK_EQUAL(5, table.column().second.find_first(0));
-    CHECK_EQUAL(6, table.column().second.find_first(30));
-    CHECK_EQUAL(7, table.column().second.find_first(100));
+    CHECK_EQUAL(0, table.find_first_int(1, 15));
+    CHECK_EQUAL(1, table.find_first_int(1, 13));
+    CHECK_EQUAL(2, table.find_first_int(1, 20));
+    CHECK_EQUAL(3, table.find_first_int(1, 11));
+    CHECK_EQUAL(4, table.find_first_int(1, 45));
+    CHECK_EQUAL(5, table.find_first_int(1, 0));
+    CHECK_EQUAL(6, table.find_first_int(1, 30));
+    CHECK_EQUAL(7, table.find_first_int(1, 100));
 
 #ifdef REALM_DEBUG
     table.verify();
@@ -1873,7 +2552,16 @@ TEST(Table_IndexInt)
 
 namespace {
 
-REALM_TABLE_4(TestTableAE, first, Int, second, String, third, Bool, fourth, Enum<Days>)
+class TestTableAE : public TestTable {
+public:
+    TestTableAE()
+    {
+        add_column(type_Int, "first");
+        add_column(type_String, "second");
+        add_column(type_Bool, "third");
+        add_column(type_Int, "fourth");
+    }
+};
 
 } // anonymous namespace
 
@@ -1882,48 +2570,48 @@ TEST(Table_AutoEnumeration)
     TestTableAE table;
 
     for (size_t i = 0; i < 5; ++i) {
-        table.add(1, "abd", true, Mon);
-        table.add(2, "eftg", true, Tue);
-        table.add(5, "hijkl", true, Wed);
-        table.add(8, "mnopqr", true, Thu);
-        table.add(9, "stuvxyz", true, Fri);
+        add(table, 1, "abd", true, Mon);
+        add(table, 2, "eftg", true, Tue);
+        add(table, 5, "hijkl", true, Wed);
+        add(table, 8, "mnopqr", true, Thu);
+        add(table, 9, "stuvxyz", true, Fri);
     }
 
     table.optimize();
 
     for (size_t i = 0; i < 5; ++i) {
         const size_t n = i * 5;
-        CHECK_EQUAL(1, table[0 + n].first);
-        CHECK_EQUAL(2, table[1 + n].first);
-        CHECK_EQUAL(5, table[2 + n].first);
-        CHECK_EQUAL(8, table[3 + n].first);
-        CHECK_EQUAL(9, table[4 + n].first);
+        CHECK_EQUAL(1, table.get_int(0, 0 + n));
+        CHECK_EQUAL(2, table.get_int(0, 1 + n));
+        CHECK_EQUAL(5, table.get_int(0, 2 + n));
+        CHECK_EQUAL(8, table.get_int(0, 3 + n));
+        CHECK_EQUAL(9, table.get_int(0, 4 + n));
 
-        CHECK_EQUAL("abd", table[0 + n].second);
-        CHECK_EQUAL("eftg", table[1 + n].second);
-        CHECK_EQUAL("hijkl", table[2 + n].second);
-        CHECK_EQUAL("mnopqr", table[3 + n].second);
-        CHECK_EQUAL("stuvxyz", table[4 + n].second);
+        CHECK_EQUAL("abd", table.get_string(1, 0 + n));
+        CHECK_EQUAL("eftg", table.get_string(1, 1 + n));
+        CHECK_EQUAL("hijkl", table.get_string(1, 2 + n));
+        CHECK_EQUAL("mnopqr", table.get_string(1, 3 + n));
+        CHECK_EQUAL("stuvxyz", table.get_string(1, 4 + n));
 
-        CHECK_EQUAL(true, table[0 + n].third);
-        CHECK_EQUAL(true, table[1 + n].third);
-        CHECK_EQUAL(true, table[2 + n].third);
-        CHECK_EQUAL(true, table[3 + n].third);
-        CHECK_EQUAL(true, table[4 + n].third);
+        CHECK_EQUAL(true, table.get_bool(2, 0 + n));
+        CHECK_EQUAL(true, table.get_bool(2, 1 + n));
+        CHECK_EQUAL(true, table.get_bool(2, 2 + n));
+        CHECK_EQUAL(true, table.get_bool(2, 3 + n));
+        CHECK_EQUAL(true, table.get_bool(2, 4 + n));
 
-        CHECK_EQUAL(Mon, table[0 + n].fourth);
-        CHECK_EQUAL(Tue, table[1 + n].fourth);
-        CHECK_EQUAL(Wed, table[2 + n].fourth);
-        CHECK_EQUAL(Thu, table[3 + n].fourth);
-        CHECK_EQUAL(Fri, table[4 + n].fourth);
+        CHECK_EQUAL(Mon, table.get_int(3, 0 + n));
+        CHECK_EQUAL(Tue, table.get_int(3, 1 + n));
+        CHECK_EQUAL(Wed, table.get_int(3, 2 + n));
+        CHECK_EQUAL(Thu, table.get_int(3, 3 + n));
+        CHECK_EQUAL(Fri, table.get_int(3, 4 + n));
     }
 
     // Verify counts
-    const size_t count1 = table.column().second.count("abd");
-    const size_t count2 = table.column().second.count("eftg");
-    const size_t count3 = table.column().second.count("hijkl");
-    const size_t count4 = table.column().second.count("mnopqr");
-    const size_t count5 = table.column().second.count("stuvxyz");
+    const size_t count1 = table.count_string(1, "abd");
+    const size_t count2 = table.count_string(1, "eftg");
+    const size_t count3 = table.count_string(1, "hijkl");
+    const size_t count4 = table.count_string(1, "mnopqr");
+    const size_t count5 = table.count_string(1, "stuvxyz");
     CHECK_EQUAL(5, count1);
     CHECK_EQUAL(5, count2);
     CHECK_EQUAL(5, count3);
@@ -1937,68 +2625,70 @@ TEST(Table_AutoEnumerationFindFindAll)
     TestTableAE table;
 
     for (size_t i = 0; i < 5; ++i) {
-        table.add(1, "abd", true, Mon);
-        table.add(2, "eftg", true, Tue);
-        table.add(5, "hijkl", true, Wed);
-        table.add(8, "mnopqr", true, Thu);
-        table.add(9, "stuvxyz", true, Fri);
+        add(table, 1, "abd", true, Mon);
+        add(table, 2, "eftg", true, Tue);
+        add(table, 5, "hijkl", true, Wed);
+        add(table, 8, "mnopqr", true, Thu);
+        add(table, 9, "stuvxyz", true, Fri);
     }
 
     table.optimize();
 
-    size_t t = table.column().second.find_first("eftg");
+    size_t t = table.find_first_string(1, "eftg");
     CHECK_EQUAL(1, t);
 
-    TestTableAE::View tv = table.column().second.find_all("eftg");
+    auto tv = table.find_all_string(1, "eftg");
     CHECK_EQUAL(5, tv.size());
-    CHECK_EQUAL("eftg", tv[0].second);
-    CHECK_EQUAL("eftg", tv[1].second);
-    CHECK_EQUAL("eftg", tv[2].second);
-    CHECK_EQUAL("eftg", tv[3].second);
-    CHECK_EQUAL("eftg", tv[4].second);
+    CHECK_EQUAL("eftg", tv.get_string(1, 0));
+    CHECK_EQUAL("eftg", tv.get_string(1, 1));
+    CHECK_EQUAL("eftg", tv.get_string(1, 2));
+    CHECK_EQUAL("eftg", tv.get_string(1, 3));
+    CHECK_EQUAL("eftg", tv.get_string(1, 4));
 }
-
-namespace {
-
-REALM_TABLE_4(TestTableEnum4, col1, String, col2, String, col3, String, col4, String)
-
-} // anonymous namespace
 
 TEST(Table_AutoEnumerationOptimize)
 {
-    TestTableEnum4 t;
+    Table t;
+    t.add_column(type_String, "col1");
+    t.add_column(type_String, "col2");
+    t.add_column(type_String, "col3");
+    t.add_column(type_String, "col4");
 
     // Insert non-optimzable strings
     std::string s;
     for (size_t i = 0; i < 10; ++i) {
-        t.add(s.c_str(), s.c_str(), s.c_str(), s.c_str());
+        auto ndx = t.add_empty_row(1);
+        t.set_string(0, ndx, s.c_str());
+        t.set_string(1, ndx, s.c_str());
+        t.set_string(2, ndx, s.c_str());
+        t.set_string(3, ndx, s.c_str());
         s += "x";
     }
     t.optimize();
 
     // AutoEnumerate in reverse order
     for (size_t i = 0; i < 10; ++i) {
-        t[i].col4 = "test";
+        t.set_string(3, i, "test");
     }
     t.optimize();
     for (size_t i = 0; i < 10; ++i) {
-        t[i].col3 = "test";
+        t.set_string(2, i, "test");
     }
     t.optimize();
     for (size_t i = 0; i < 10; ++i) {
-        t[i].col2 = "test";
+        t.set_string(1, i, "test");
     }
     t.optimize();
     for (size_t i = 0; i < 10; ++i) {
-        t[i].col1 = "test";
+        t.set_string(0, i, "test");
     }
     t.optimize();
 
     for (size_t i = 0; i < 10; ++i) {
-        CHECK_EQUAL("test", t[i].col1);
-        CHECK_EQUAL("test", t[i].col2);
-        CHECK_EQUAL("test", t[i].col3);
-        CHECK_EQUAL("test", t[i].col4);
+        CHECK_EQUAL("test", t.get_string(0, i));
+        CHECK_EQUAL("test", t.get_string(1, i));
+        CHECK_EQUAL("test", t.get_string(2, i));
+        CHECK_EQUAL("test", t.get_string(3, i));
     }
 
 #ifdef REALM_DEBUG
@@ -2006,34 +2696,32 @@ TEST(Table_AutoEnumerationOptimize)
 #endif
 }
 
-namespace {
-
-REALM_TABLE_1(TestSubtabEnum2, str, String)
-REALM_TABLE_1(TestSubtabEnum1, subtab, Subtable<TestSubtabEnum2>)
-
-} // anonymous namespace
-
 TEST(Table_OptimizeSubtable)
 {
-    TestSubtabEnum1 t;
-    t.add();
-    t.add();
+    Table t;
+    DescriptorRef descr;
+    t.add_column(type_Table, "sub", false, &descr);
+    descr->add_column(type_String, "str");
+    t.add_empty_row();
+    t.add_empty_row();
 
     {
         // Non-enumerable
-        TestSubtabEnum2::Ref r = t[0].subtab;
+        auto r = t.get_subtable(0, 0);
         std::string s;
         for (int i = 0; i < 100; ++i) {
-            r->add(s.c_str());
+            auto ndx = r->add_empty_row();
+            r->set_string(0, ndx, s.c_str());
             s += 'x';
         }
     }
 
     {
         // Enumerable
-        TestSubtabEnum2::Ref r = t[1].subtab;
+        auto r = t.get_subtable(0, 1);
         for (int i = 0; i < 100; ++i) {
-            r->add("foo");
+            auto ndx = r->add_empty_row();
+            r->set_string(0, ndx, "foo");
         }
         r->optimize();
     }
@@ -2041,40 +2729,45 @@ TEST(Table_OptimizeSubtable)
     // Verify
     {
         // Non-enumerable
-        TestSubtabEnum2::Ref r = t[0].subtab;
+        auto r = t.get_subtable(0, 0);
         std::string s;
         for (size_t i = 0; i < r->size(); ++i) {
-            CHECK_EQUAL(s.c_str(), r[i].str);
+            CHECK_EQUAL(s.c_str(), r->get_string(0, i));
             s += 'x';
         }
     }
     {
         // Non-enumerable
-        TestSubtabEnum2::Ref r = t[1].subtab;
+        auto r = t.get_subtable(0, 1);
         for (size_t i = 0; i < r->size(); ++i) {
-            CHECK_EQUAL("foo", r[i].str);
+            CHECK_EQUAL("foo", r->get_string(0, i));
         }
     }
 }
 
 TEST(Table_OptimizeCompare)
 {
-    TestSubtabEnum2 t1, t2;
+    Table t1, t2;
+    t1.add_column(type_String, "str");
+    t2.add_column(type_String, "str");
+
+    t1.add_empty_row(100);
     for (int i = 0; i < 100; ++i) {
-        t1.add("foo");
+        t1.set_string(0, i, "foo");
     }
+    t2.add_empty_row(100);
     for (int i = 0; i < 100; ++i) {
-        t2.add("foo");
+        t2.set_string(0, i, "foo");
     }
     t1.optimize();
     CHECK(t1 == t2);
-    t1[50].str = "bar";
+    t1.set_string(0, 50, "bar");
     CHECK(t1 != t2);
-    t1[50].str = "foo";
+    t1.set_string(0, 50, "foo");
     CHECK(t1 == t2);
-    t2[50].str = "bar";
+    t2.set_string(0, 50, "bar");
     CHECK(t1 != t2);
-    t2[50].str = "foo";
+    t2.set_string(0, 50, "foo");
     CHECK(t1 == t2);
 }
 
@@ -2083,22 +2776,21 @@ TEST(Table_SlabAlloc)
 {
     SlabAlloc alloc;
     alloc.attach_empty();
-    TestTable table(alloc);
+    TestTable01 table(alloc);
 
-    table.add(0, 10, true, Wed);
-    const TestTable::Cursor r = table.back(); // last item
+    add(table, 0, 10, true, Wed);
 
-    CHECK_EQUAL(0, r.first);
-    CHECK_EQUAL(10, r.second);
-    CHECK_EQUAL(true, r.third);
-    CHECK_EQUAL(Wed, r.fourth);
+    CHECK_EQUAL(0, table.get_int(0, 0));
+    CHECK_EQUAL(10, table.get_int(1, 0));
+    CHECK_EQUAL(true, table.get_bool(2, 0));
+    CHECK_EQUAL(Wed, table.get_int(3, 0));
 
     // Add some more rows
-    table.add(1, 10, true, Wed);
-    table.add(2, 20, true, Wed);
-    table.add(3, 10, true, Wed);
-    table.add(4, 20, true, Wed);
-    table.add(5, 10, true, Wed);
+    add(table, 1, 10, true, Wed);
+    add(table, 2, 20, true, Wed);
+    add(table, 3, 10, true, Wed);
+    add(table, 4, 20, true, Wed);
+    add(table, 5, 10, true, Wed);
 
     // Delete some rows
     table.remove(2);
@@ -2174,6 +2866,222 @@ TEST(Table_Spec)
         CHECK_EQUAL(42, subtable2->get_int(0, 0));
         CHECK_EQUAL("test", subtable2->get_string(1, 0));
     }
+}
+
+TEST(Table_SubtableIndex)
+{
+    GROUP_TEST_PATH(path);
+
+    {
+        Group group;
+        DescriptorRef sub_1;
+        TableRef table = group.add_table("test");
+
+        // Create specification with sub-table
+        table->add_column(type_String, "first");
+        table->add_column(type_Table, "second", &sub_1);
+
+        sub_1->add_column(type_Int, "sub_first");
+        sub_1->add_column(type_String, "sub_second");
+
+        // Add search index to `degenerate` subtable (subtable which does not yet exist because it has
+        // no rows yet, so it's just a 0-ref in the ColumnTable object). Important to test because the
+        // search index is then constructed in a different place in the source code
+        sub_1->add_search_index(0);
+        CHECK(sub_1->has_search_index(0));
+        sub_1->remove_search_index(0);
+        CHECK(!sub_1->has_search_index(0));
+        sub_1->add_search_index(0);
+        CHECK(sub_1->has_search_index(0));
+
+        CHECK_EQUAL(2, table->get_column_count());
+
+        // Add two rows to parent table
+        table->add_empty_row();
+        table->add_empty_row();
+        table->set_string(0, 0, "Hello");
+
+        // Add rows to first subtable
+        TableRef subtable = table->get_subtable(1, 0);
+        CHECK(subtable->is_empty());
+        subtable->add_empty_row();
+        subtable->set_int(0, 0, 42);
+        subtable->set_string(1, 0, "testsub1");
+        subtable->add_empty_row();
+        subtable->set_int(0, 1, 43);
+        subtable->set_string(1, 1, "testsub2");
+        CHECK_THROW_ANY(subtable->remove_search_index(0));
+        CHECK_THROW_ANY(subtable->add_search_index(0));
+
+        // Add rows to second subtable
+        subtable = table->get_subtable(1, 1);
+        CHECK(subtable->is_empty());
+        subtable->add_empty_row();
+        subtable->set_int(0, 0, 66);
+        subtable->set_string(1, 0, "testsub3");
+        subtable->add_empty_row();
+        subtable->set_int(0, 1, 77);
+        subtable->set_string(1, 1, "testsub4");
+
+        int64_t tt = subtable.get()->get_int(0, 0);
+        CHECK_EQUAL(tt, 66);
+
+        subtable = table->get_subtable(1, 0);
+        CHECK(subtable.get()->has_search_index(0));
+
+        size_t match;
+
+        match = subtable.get()->where().equal(0, 43).find();
+        CHECK_EQUAL(match, 1);
+        match = subtable.get()->where().equal(1, "testsub2").find();
+        CHECK_EQUAL(match, 1);
+
+        // group.verify();
+        // group.to_dot("group.dot");
+
+        subtable = table->get_subtable(1, 1);
+
+        match = subtable.get()->where().equal(0, 77).find();
+        CHECK_EQUAL(match, 1);
+
+        // Query column that follows indexed column to test if refresh_column_accessors()
+        // has worked
+        match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        sub_1->remove_search_index(1);
+        CHECK(!subtable.get()->has_search_index(1));
+
+        // Query column that follows indexed column to test if refresh_column_accessors()
+        // has worked
+        match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+
+        match = subtable.get()->where().equal(0, 77).find();
+        CHECK_EQUAL(match, 1);
+
+        // Tests non-degenerate construction of index
+        sub_1->add_search_index(1);
+
+        match = subtable.get()->where().equal(0, 77).find();
+        CHECK_EQUAL(match, 1);
+        match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        // Add more data and see if that works
+        subtable.get()->add_empty_row();
+        match = subtable.get()->where().equal(0, 0).find();
+        CHECK_EQUAL(match, 2);
+
+        group.write(path);
+    }
+
+    {
+        // Check persistence
+        Group g2(path);
+        DescriptorRef sub_1;
+        TableRef table = g2.get_table("test");
+
+        TableRef subtable = table->get_subtable(1, 0);
+        CHECK(subtable.get()->has_search_index(0));
+
+        size_t match;
+
+        match = subtable.get()->where().equal(0, 43).find();
+        CHECK_EQUAL(match, 1);
+        match = subtable.get()->where().equal(1, "testsub2").find();
+        CHECK_EQUAL(match, 1);
+
+        subtable = table->get_subtable(1, 1);
+
+        match = subtable.get()->where().equal(0, 77).find();
+        CHECK_EQUAL(match, 1);
+        match = subtable.get()->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        DescriptorRef subsub;
+        DescriptorRef sub = table.get()->get_subdescriptor(1);
+        sub->add_column(type_Table, "foobar", &subsub);
+        CHECK_THROW_ANY(subsub->add_search_index(0));
+    }
+
+    {
+        // Check that you are not allowed to add index to subtable of subtable
+        Group g2(path);
+        DescriptorRef sub_1;
+        TableRef table = g2.get_table("test");
+        DescriptorRef subsub;
+        DescriptorRef sub = table.get()->get_subdescriptor(1);
+        sub->add_column(type_Table, "baz", &subsub);
+        CHECK_THROW_ANY(subsub->add_search_index(0));
+    }
+
+    {
+        // Check correct updating of other subtable accessors than the one you called add_search_index() on
+        Group g2(path);
+        DescriptorRef des;
+        TableRef table = g2.get_table("test");
+        TableRef sub1 = table->get_subtable(1, 0);
+        TableRef sub2 = table->get_subtable(1, 1);
+
+        size_t match;
+
+        des = table->get_subdescriptor(1);
+
+        des->remove_search_index(0);
+
+        CHECK(!sub1->has_search_index(0));
+        match = sub1->where().equal(1, "testsub2").find();
+        CHECK_EQUAL(match, 1);
+
+        CHECK(!sub2->has_search_index(0));
+        match = sub2->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        des->add_search_index(0);
+
+        CHECK(sub1->has_search_index(0));
+        match = sub1->where().equal(1, "testsub2").find();
+        CHECK_EQUAL(match, 1);
+
+        CHECK(sub2->has_search_index(0));
+        match = sub2->where().equal(1, "testsub4").find();
+        CHECK_EQUAL(match, 1);
+
+        // Check what happens if user given column index is out of range
+        CHECK_THROW(des->add_search_index(100), LogicError);
+        CHECK_THROW(des->remove_search_index(100), LogicError);
+        CHECK(!des->has_search_index(100));
+    }
+}
+
+TEST(LangBindHelper_SubtableSizeIncorrect)
+{
+    // Based on finding from AFL
+    // Problem was that creating a subtable if both search index and nullable flag
+    // was set in column attributes would clear the nullable flag. This would prevent
+    // accessors to already existing subtables to be created correctly (IntegerColumn on
+    // a IntNullColumn structure).
+    Table table;
+    DescriptorRef subdescr;
+    table.add_column(type_Table, "col", true, &subdescr);
+    // add int column that is nullable
+    subdescr->add_column(type_Int, "integers", nullptr, true);
+    table.add_empty_row(2);
+    // Create subtable entry
+    table.get_subtable(0, 1)->clear();
+    // Now we have one degenerate and one proper table
+    table.get_subdescriptor(0)->add_search_index(0);
+    table.add_empty_row();
+
+    // Before the fix this operation cleared the nullable flag in the spec
+    table.get_subtable(0, 2)->clear();
+    // Create subtable accessor
+    TableRef sub1 = table.get_subtable(0, 1);
+    CHECK_EQUAL(sub1->size(), 0);
+    sub1->add_empty_row(1);
+    sub1->set_int(0, 0, 7, false);
 }
 
 TEST(Table_SpecColumnPath)
@@ -2910,29 +3818,26 @@ TEST(Table_Mixed)
 #endif
 }
 
-
-namespace {
-REALM_TABLE_1(TestTableMX, first, Mixed)
-} // anonymous namespace
-
 TEST(Table_Mixed2)
 {
-    TestTableMX table;
+    Table table;
+    table.add_column(type_Mixed, "first");
 
-    table.add(int64_t(1));
-    table.add(true);
-    table.add(OldDateTime(1234));
-    table.add("test");
+    table.add_empty_row(4);
+    table.set_mixed(0, 0, int64_t(1));
+    table.set_mixed(0, 1, true);
+    table.set_mixed(0, 2, OldDateTime(1234));
+    table.set_mixed(0, 3, "test");
 
-    CHECK_EQUAL(type_Int, table[0].first.get_type());
-    CHECK_EQUAL(type_Bool, table[1].first.get_type());
-    CHECK_EQUAL(type_OldDateTime, table[2].first.get_type());
-    CHECK_EQUAL(type_String, table[3].first.get_type());
+    CHECK_EQUAL(type_Int, table.get_mixed_type(0, 0));
+    CHECK_EQUAL(type_Bool, table.get_mixed_type(0, 1));
+    CHECK_EQUAL(type_OldDateTime, table.get_mixed_type(0, 2));
+    CHECK_EQUAL(type_String, table.get_mixed_type(0, 3));
 
-    CHECK_EQUAL(1, table[0].first.get_int());
-    CHECK_EQUAL(true, table[1].first.get_bool());
-    CHECK_EQUAL(1234, table[2].first.get_olddatetime());
-    CHECK_EQUAL("test", table[3].first.get_string());
+    CHECK_EQUAL(1, table.get_mixed(0, 0));
+    CHECK_EQUAL(true, table.get_mixed(0, 1));
+    CHECK_EQUAL(OldDateTime(1234), table.get_mixed(0, 2));
+    CHECK_EQUAL("test", table.get_mixed(0, 3));
 }
 
 
@@ -3089,177 +3994,135 @@ TEST(Table_LowLevelSubtables)
 
 
 namespace {
-REALM_TABLE_2(MyTable1, val, Int, val2, Int)
 
-REALM_TABLE_2(MyTable2, val, Int, subtab, Subtable<MyTable1>)
+template <class T>
+void my_table_1_add_columns(T t)
+{
+    t->add_column(type_Int, "val");
+    t->add_column(type_Int, "val2");
+}
 
-REALM_TABLE_1(MyTable3, subtab, Subtable<MyTable2>)
+template <class T>
+void my_table_2_add_columns(T t)
+{
+    DescriptorRef sub_descr;
+    t->add_column(type_Int, "val");
+    t->add_column(type_Table, "subtab", &sub_descr);
+    my_table_1_add_columns(sub_descr);
+}
 
-REALM_TABLE_1(MyTable4, mix, Mixed)
+template <class T>
+void my_table_3_add_columns(T t)
+{
+    DescriptorRef sub_descr;
+    t->add_column(type_Table, "subtab", &sub_descr);
+    my_table_2_add_columns(sub_descr);
+}
+
 } // anonymous namespace
-
 
 TEST(Table_HighLevelSubtables)
 {
-    MyTable3 t;
+    Table t;
+    my_table_3_add_columns(&t);
     {
-        MyTable3::Ref r1 = t.get_table_ref();
-        MyTable3::ConstRef r2 = t.get_table_ref();
-        MyTable3::ConstRef r3 = r2->get_table_ref();
+        TableRef r1 = t.get_table_ref();
+        ConstTableRef r2 = t.get_table_ref();
+        ConstTableRef r3 = r2->get_table_ref();
         r3 = t.get_table_ref(); // Also test assigment that converts to const
         static_cast<void>(r1);
         static_cast<void>(r3);
     }
 
-    t.add();
-    const MyTable3& ct = t;
+    t.add_empty_row();
+    const Table& ct = t;
     {
-        MyTable2::Ref s1 = t[0].subtab;
-        MyTable2::ConstRef s2 = t[0].subtab;
-        MyTable2::Ref s3 = t[0].subtab->get_table_ref();
-        MyTable2::ConstRef s4 = t[0].subtab->get_table_ref();
-        MyTable2::Ref s5 = t.column().subtab[0];
-        MyTable2::ConstRef s6 = t.column().subtab[0];
-        MyTable2::Ref s7 = t.column().subtab[0]->get_table_ref();
-        MyTable2::ConstRef s8 = t.column().subtab[0]->get_table_ref();
-        MyTable2::ConstRef cs1 = ct[0].subtab;
-        MyTable2::ConstRef cs2 = ct[0].subtab->get_table_ref();
-        MyTable2::ConstRef cs3 = ct.column().subtab[0];
-        MyTable2::ConstRef cs4 = ct.column().subtab[0]->get_table_ref();
-        s1 = t[0].subtab;
-        s2 = t[0].subtab; // Also test assigment that converts to const
+        TableRef s1 = t.get_subtable(0, 0);
+        ConstTableRef s2 = t.get_subtable(0, 0);
+        TableRef s3 = t.get_subtable(0, 0)->get_table_ref();
+        ConstTableRef s4 = t.get_subtable(0, 0)->get_table_ref();
+
+        ConstTableRef cs1 = ct.get_subtable(0, 0);
+        ConstTableRef cs2 = ct.get_subtable(0, 0)->get_table_ref();
+
         static_cast<void>(s1);
         static_cast<void>(s2);
         static_cast<void>(s3);
         static_cast<void>(s4);
-        static_cast<void>(s5);
-        static_cast<void>(s6);
-        static_cast<void>(s7);
-        static_cast<void>(s8);
         static_cast<void>(cs1);
         static_cast<void>(cs2);
-        static_cast<void>(cs3);
-        static_cast<void>(cs4);
     }
 
-    t[0].subtab->add();
+    t.get_subtable(0, 0)->add_empty_row();
     {
-        MyTable1::Ref s1 = t[0].subtab[0].subtab;
-        MyTable1::ConstRef s2 = t[0].subtab[0].subtab;
-        MyTable1::Ref s3 = t[0].subtab[0].subtab->get_table_ref();
-        MyTable1::ConstRef s4 = t[0].subtab[0].subtab->get_table_ref();
-        MyTable1::Ref s5 = t.column().subtab[0]->column().subtab[0];
-        MyTable1::ConstRef s6 = t.column().subtab[0]->column().subtab[0];
-        MyTable1::Ref s7 = t.column().subtab[0]->column().subtab[0]->get_table_ref();
-        MyTable1::ConstRef s8 = t.column().subtab[0]->column().subtab[0]->get_table_ref();
-        MyTable1::ConstRef cs1 = ct[0].subtab[0].subtab;
-        MyTable1::ConstRef cs2 = ct[0].subtab[0].subtab->get_table_ref();
-        MyTable1::ConstRef cs3 = ct.column().subtab[0]->column().subtab[0];
-        MyTable1::ConstRef cs4 = ct.column().subtab[0]->column().subtab[0]->get_table_ref();
-        s1 = t[0].subtab[0].subtab;
-        s2 = t[0].subtab[0].subtab; // Also test assigment that converts to const
+        TableRef s1 = t.get_subtable(0, 0)->get_subtable(1, 0);
+        ConstTableRef s2 = t.get_subtable(0, 0)->get_subtable(1, 0);
+        TableRef s3 = t.get_subtable(0, 0)->get_subtable(1, 0)->get_table_ref();
+        ConstTableRef s4 = t.get_subtable(0, 0)->get_subtable(1, 0)->get_table_ref();
+
+        ConstTableRef cs1 = ct.get_subtable(0, 0)->get_subtable(1, 0);
+        ConstTableRef cs2 = ct.get_subtable(0, 0)->get_subtable(1, 0)->get_table_ref();
+
         static_cast<void>(s1);
         static_cast<void>(s2);
         static_cast<void>(s3);
         static_cast<void>(s4);
-        static_cast<void>(s5);
-        static_cast<void>(s6);
-        static_cast<void>(s7);
-        static_cast<void>(s8);
         static_cast<void>(cs1);
         static_cast<void>(cs2);
-        static_cast<void>(cs3);
-        static_cast<void>(cs4);
     }
 
-    t[0].subtab[0].val = 1;
-    CHECK_EQUAL(t[0].subtab[0].val, 1);
-    CHECK_EQUAL(t.column().subtab[0]->column().val[0], 1);
-    CHECK_EQUAL(t[0].subtab->column().val[0], 1);
-    CHECK_EQUAL(t.column().subtab[0][0].val, 1);
-
-    t.column().subtab[0]->column().val[0] = 2;
-    CHECK_EQUAL(t[0].subtab[0].val, 2);
-    CHECK_EQUAL(t.column().subtab[0]->column().val[0], 2);
-    CHECK_EQUAL(t[0].subtab->column().val[0], 2);
-    CHECK_EQUAL(t.column().subtab[0][0].val, 2);
-
-    t[0].subtab->column().val[0] = 3;
-    CHECK_EQUAL(t[0].subtab[0].val, 3);
-    CHECK_EQUAL(t.column().subtab[0]->column().val[0], 3);
-    CHECK_EQUAL(t[0].subtab->column().val[0], 3);
-    CHECK_EQUAL(t.column().subtab[0][0].val, 3);
-
-    t.column().subtab[0][0].val = 4;
-    CHECK_EQUAL(t[0].subtab[0].val, 4);
-    CHECK_EQUAL(t.column().subtab[0]->column().val[0], 4);
-    CHECK_EQUAL(t[0].subtab->column().val[0], 4);
-    CHECK_EQUAL(t.column().subtab[0][0].val, 4);
-    CHECK_EQUAL(ct[0].subtab[0].val, 4);
-    CHECK_EQUAL(ct.column().subtab[0]->column().val[0], 4);
-    CHECK_EQUAL(ct[0].subtab->column().val[0], 4);
-    CHECK_EQUAL(ct.column().subtab[0][0].val, 4);
-
-    t[0].subtab[0].subtab->add();
-    t[0].subtab[0].subtab[0].val = 5;
-    CHECK_EQUAL(t[0].subtab[0].subtab[0].val, 5);
-    CHECK_EQUAL(t.column().subtab[0]->column().subtab[0]->column().val[0], 5);
-    CHECK_EQUAL(ct[0].subtab[0].subtab[0].val, 5);
-    CHECK_EQUAL(ct.column().subtab[0]->column().subtab[0]->column().val[0], 5);
-
-    t.column().subtab[0]->column().subtab[0]->column().val[0] = 6;
-    CHECK_EQUAL(t[0].subtab[0].subtab[0].val, 6);
-    CHECK_EQUAL(t.column().subtab[0]->column().subtab[0]->column().val[0], 6);
-    CHECK_EQUAL(ct[0].subtab[0].subtab[0].val, 6);
-    CHECK_EQUAL(ct.column().subtab[0]->column().subtab[0]->column().val[0], 6);
-
-    /*
-      Idea for compile time failure tests:
-
-        const MyTable2 t;
-#if    TEST_INDEX == 0
-        t[0].val = 7;
-#elsif TEST_INDEX == 1
-        t.column().val[0] = 7;
-#elsif TEST_INDEX == 2
-        t[0].subtab[0].val = 7;
-#elsif TEST_INDEX == 3
-        t[0].subtab->column().val[0] = 7;
-#endif
-    */
+    t.get_subtable(0, 0)->set_int(0, 0, 1);
+    CHECK_EQUAL(t.get_subtable(0, 0)->get_int(0, 0), 1);
 }
 
 
 TEST(Table_SubtableCopyOnSetAndInsert)
 {
-    MyTable1 t1;
-    t1.add(7, 8);
-    MyTable2 t2;
-    t2.add(9, &t1);
-    MyTable1::Ref r1 = t2[0].subtab;
+    TestTable t1;
+    my_table_1_add_columns(&t1);
+    add(t1, 7, 8);
+
+    Table t2;
+    my_table_2_add_columns(&t2);
+    t2.add_empty_row();
+    t2.set_subtable(1, 0, &t1);
+
+    TableRef r1 = t2.get_subtable(1, 0);
     CHECK(t1 == *r1);
-    MyTable4 t4;
-    t4.add();
-    t4[0].mix.set_subtable(t2);
-    MyTable2::Ref r2 = unchecked_cast<MyTable2>(t4[0].mix.get_subtable());
+
+    Table t4;
+    t4.add_column(type_Mixed, "mix");
+    t4.add_empty_row();
+    t4.set_mixed_subtable(0, 0, &t2);
+    auto r2 = t4.get_subtable(0, 0);
     CHECK(t2 == *r2);
 }
 
 
 TEST(Table_SetMethod)
 {
-    MyTable1 t;
-    t.add(8, 9);
-    CHECK_EQUAL(t[0].val, 8);
-    CHECK_EQUAL(t[0].val2, 9);
-    t.set(0, 2, 4);
-    CHECK_EQUAL(t[0].val, 2);
-    CHECK_EQUAL(t[0].val2, 4);
+    TestTable t;
+    my_table_1_add_columns(&t);
+    add(t, 8, 9);
+    CHECK_EQUAL(t.get_int(0, 0), 8);
+    CHECK_EQUAL(t.get_int(1, 0), 9);
+    set(t, 0, 2, 4);
+    CHECK_EQUAL(t.get_int(0, 0), 2);
+    CHECK_EQUAL(t.get_int(1, 0), 4);
 }
 
 
 namespace {
-REALM_TABLE_2(TableDateAndBinary, date, OldDateTime, bin, Binary)
+
+class TableDateAndBinary : public TestTable {
+public:
+    TableDateAndBinary()
+    {
+        add_column(type_OldDateTime, "date");
+        add_column(type_Binary, "bin");
+    }
+};
+
 } // anonymous namespace
 
 TEST(Table_DateAndBinary)
@@ -3271,10 +4134,11 @@ TEST(Table_DateAndBinary)
         char data[size];
         for (size_t i = 0; i < size; ++i)
             data[i] = static_cast<char>(i);
-        t.add(8, BinaryData(data, size));
-        CHECK_EQUAL(t[0].date, 8);
-        CHECK_EQUAL(t[0].bin.size(), size);
-        CHECK(std::equal(t[0].bin.data(), t[0].bin.data() + size, data));
+        add(t, 8, BinaryData(data, size));
+        CHECK_EQUAL(t.get_olddatetime(0, 0), 8);
+        BinaryData bin = t.get_binary(1, 0);
+        CHECK_EQUAL(bin.size(), size);
+        CHECK(std::equal(bin.data(), bin.data() + size, data));
     }
 
     // Test that 64-bit dates are preserved
@@ -3283,8 +4147,8 @@ TEST(Table_DateAndBinary)
 
         int64_t date = std::numeric_limits<int64_t>::max() - 400;
 
-        t.add(date, BinaryData(""));
-        CHECK_EQUAL(t[0].date.get().get_olddatetime(), date);
+        add(t, date, BinaryData(""));
+        CHECK_EQUAL(t.get_olddatetime(0, 0), date);
     }
 }
 
@@ -3449,33 +4313,28 @@ TEST(Table_SetSubTableByExample2)
 
 TEST(Table_HasSharedSpec)
 {
-    MyTable2 table1;
-    CHECK(!table1.has_shared_type());
     Group g;
-    MyTable2::Ref table2 = g.add_table<MyTable2>("foo");
+    auto table2 = g.add_table("foo");
+    my_table_2_add_columns(table2);
     CHECK(!table2->has_shared_type());
-    table2->add();
-    CHECK(table2[0].subtab->has_shared_type());
+    table2->add_empty_row();
+    CHECK(table2->get_subtable(1, 0)->has_shared_type());
 
     // Subtable in mixed column
-    TestTableMX::Ref table3 = g.add_table<TestTableMX>("bar");
+    auto table3 = g.add_table("bar");
+    table3->add_column(type_Mixed, "first");
+
     CHECK(!table3->has_shared_type());
-    table3->add();
-    table3[0].first.set_subtable<MyTable2>();
-    MyTable2::Ref table4 = table3[0].first.get_subtable<MyTable2>();
+    table3->add_empty_row();
+    table3->clear_subtable(0, 0);
+    TableRef table4 = table3->get_subtable(0, 0);
     CHECK(table4);
     CHECK(!table4->has_shared_type());
-    table4->add();
+    my_table_2_add_columns(table4);
+    table4->add_empty_row();
     CHECK(!table4->has_shared_type());
-    CHECK(table4[0].subtab->has_shared_type());
+    CHECK(table4->get_subtable(1, 0)->has_shared_type());
 }
-
-
-namespace {
-REALM_TABLE_3(TableAgg, c_int, Int, c_float, Float, c_double, Double)
-
-// TODO: Bool? OldDateTime
-} // anonymous namespace
 
 #if TEST_DURATION > 0
 #define TBL_SIZE REALM_MAX_BPNODE_SIZE * 10
@@ -3485,20 +4344,23 @@ REALM_TABLE_3(TableAgg, c_int, Int, c_float, Float, c_double, Double)
 
 TEST(Table_Aggregates)
 {
-    TableAgg table;
+    TestTable table;
+    table.add_column(type_Int, "c_int");
+    table.add_column(type_Float, "c_float");
+    table.add_column(type_Double, "c_double");
     int64_t i_sum = 0;
     double f_sum = 0;
     double d_sum = 0;
 
     for (int i = 0; i < TBL_SIZE; i++) {
-        table.add(5987654, 4.0f, 3.0);
+        add(table, 5987654, 4.0f, 3.0);
         i_sum += 5987654;
         f_sum += 4.0f;
         d_sum += 3.0;
     }
-    table.add(1, 1.1f, 1.2);
-    table.add(987654321, 11.0f, 12.0);
-    table.add(5, 4.0f, 3.0);
+    add(table, 1, 1.1f, 1.2);
+    add(table, 987654321, 11.0f, 12.0);
+    add(table, 5, 4.0f, 3.0);
     i_sum += 1 + 987654321 + 5;
     f_sum += double(1.1f) + double(11.0f) + double(4.0f);
     d_sum += 1.2 + 12.0 + 3.0;
@@ -3507,42 +4369,39 @@ TEST(Table_Aggregates)
     double epsilon = std::numeric_limits<double>::epsilon();
 
     // minimum
-    CHECK_EQUAL(1, table.column().c_int.minimum());
-    CHECK_EQUAL(1.1f, table.column().c_float.minimum());
-    CHECK_EQUAL(1.2, table.column().c_double.minimum());
+    CHECK_EQUAL(1, table.minimum_int(0));
+    CHECK_EQUAL(1.1f, table.minimum_float(1));
+    CHECK_EQUAL(1.2, table.minimum_double(2));
     // maximum
-    CHECK_EQUAL(987654321, table.column().c_int.maximum());
-    CHECK_EQUAL(11.0f, table.column().c_float.maximum());
-    CHECK_EQUAL(12.0, table.column().c_double.maximum());
+    CHECK_EQUAL(987654321, table.maximum_int(0));
+    CHECK_EQUAL(11.0f, table.maximum_float(1));
+    CHECK_EQUAL(12.0, table.maximum_double(2));
     // sum
-    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.column().c_int.sum()), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(f_sum, table.column().c_float.sum(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(d_sum, table.column().c_double.sum(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(double(i_sum), double(table.sum_int(0)), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum, table.sum_float(1), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum, table.sum_double(2), 10 * epsilon);
     // average
-    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.column().c_int.average(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.column().c_float.average(), 10 * epsilon);
-    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.column().c_double.average(), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(i_sum / size, table.average_int(0), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(f_sum / size, table.average_float(1), 10 * epsilon);
+    CHECK_APPROXIMATELY_EQUAL(d_sum / size, table.average_double(2), 10 * epsilon);
 }
-
-namespace {
-REALM_TABLE_1(TableAgg2, c_count, Int)
-} // anonymous namespace
 
 
 TEST(Table_Aggregates2)
 {
-    TableAgg2 table;
+    TestTable table;
+    table.add_column(type_Int, "c_count");
     int c = -420;
     int s = 0;
     while (c < -20) {
-        table.add(c);
+        add(table, c);
         s += c;
         c++;
     }
 
-    CHECK_EQUAL(-420, table.column().c_count.minimum());
-    CHECK_EQUAL(-21, table.column().c_count.maximum());
-    CHECK_EQUAL(s, table.column().c_count.sum());
+    CHECK_EQUAL(-420, table.minimum_int(0));
+    CHECK_EQUAL(-21, table.maximum_int(0));
+    CHECK_EQUAL(s, table.sum_int(0));
 }
 
 // Test Table methods max, min, avg, sum, on both nullable and non-nullable columns
@@ -3792,16 +4651,13 @@ TEST(Table_FormerLeakCase)
 }
 
 
-namespace {
-
-REALM_TABLE_3(TablePivotAgg, sex, String, age, Int, hired, Bool)
-
-} // anonymous namespace
-
 TEST(Table_Pivot)
 {
     size_t count = 1717;
-    TablePivotAgg table;
+    TestTable table;
+    table.add_column(type_String, "sex");
+    table.add_column(type_Int, "age");
+    table.add_column(type_Bool, "hired");
     int64_t age_sum[2] = {0, 0};
     int64_t age_cnt[2] = {0, 0};
     int64_t age_min[2];
@@ -3811,7 +4667,7 @@ TEST(Table_Pivot)
     for (size_t i = 0; i < count; ++i) {
         size_t sex = i % 2;
         int64_t age = 3 + (i % 117);
-        table.add((sex == 0) ? "Male" : "Female", age, true);
+        add(table, (sex == 0) ? "Male" : "Female", age, true);
 
         age_sum[sex] += age;
         age_cnt[sex] += 1;
@@ -5402,6 +6258,10 @@ TEST(Table_RowAccessorLinks)
     CHECK(source_row_2.linklist_is_empty(1));
     CHECK_EQUAL(0, source_row_1.get_link_count(1));
     CHECK_EQUAL(0, source_row_2.get_link_count(1));
+    CHECK_EQUAL(0, target_table->get(7).get_backlink_count());
+    CHECK_EQUAL(0, target_table->get(13).get_backlink_count());
+    CHECK_EQUAL(0, target_table->get(11).get_backlink_count());
+    CHECK_EQUAL(0, target_table->get(15).get_backlink_count());
     CHECK_EQUAL(0, target_table->get(7).get_backlink_count(*origin_table, 0));
     CHECK_EQUAL(0, target_table->get(13).get_backlink_count(*origin_table, 0));
     CHECK_EQUAL(0, target_table->get(11).get_backlink_count(*origin_table, 1));
@@ -5437,12 +6297,18 @@ TEST(Table_RowAccessorLinks)
     CHECK(!source_row_2.linklist_is_empty(1));
     CHECK_EQUAL(1, source_row_1.get_link_count(1));
     CHECK_EQUAL(2, source_row_2.get_link_count(1));
+    CHECK_EQUAL(1, target_table->get(11).get_backlink_count());
+    CHECK_EQUAL(2, target_table->get(15).get_backlink_count());
     CHECK_EQUAL(1, target_table->get(11).get_backlink_count(*origin_table, 1));
     CHECK_EQUAL(2, target_table->get(15).get_backlink_count(*origin_table, 1));
     CHECK_EQUAL(1, target_table->get(11).get_backlink(*origin_table, 1, 0));
     size_t back_link_1 = target_table->get(15).get_backlink(*origin_table, 1, 0);
     size_t back_link_2 = target_table->get(15).get_backlink(*origin_table, 1, 1);
     CHECK((back_link_1 == 0 && back_link_2 == 1) || (back_link_1 == 1 && back_link_2 == 0));
+
+    // Links from multiple columns (count total)
+    source_row_1.set_link(0, 15);
+    CHECK_EQUAL(3, target_table->get(15).get_backlink_count());
 
     // Clear link lists
     link_list_1->clear();
@@ -6293,6 +7159,46 @@ TEST(Table_MultipleLinkColumnsMoveTablesCrossLinks)
 }
 
 
+TEST(Table_MoveSubtables)
+{
+    Group g;
+    TableRef t = g.add_table("A");
+    TableRef t2 = g.add_table("B");
+    {
+        DescriptorRef subdesc;
+
+        t->add_column(type_Table, "sub1", &subdesc);
+        subdesc->add_column(type_Int, "integers");
+
+        t->add_column_link(type_Link, "link", *t2);
+
+        t->add_column(type_Table, "sub2", &subdesc);
+        subdesc->add_column(type_String, "strings");
+    }
+
+    {
+        DescriptorRef sub1 = t->get_subdescriptor(0);
+        DescriptorRef sub2 = t->get_subdescriptor(2);
+        CHECK_EQUAL(sub1->get_column_name(0), "integers");
+        CHECK_EQUAL(sub2->get_column_name(0), "strings");
+    }
+    _impl::TableFriend::move_column(*t->get_descriptor(), 0, 2);
+    {
+        DescriptorRef sub1 = t->get_subdescriptor(2);
+        DescriptorRef sub2 = t->get_subdescriptor(1);
+        CHECK_EQUAL(sub1->get_column_name(0), "integers");
+        CHECK_EQUAL(sub2->get_column_name(0), "strings");
+    }
+    _impl::TableFriend::move_column(*t->get_descriptor(), 2, 0);
+    {
+        DescriptorRef sub1 = t->get_subdescriptor(0);
+        DescriptorRef sub2 = t->get_subdescriptor(2);
+        CHECK_EQUAL(sub1->get_column_name(0), "integers");
+        CHECK_EQUAL(sub2->get_column_name(0), "strings");
+    }
+}
+
+
 TEST(Table_AddColumnWithThreeLevelBptree)
 {
     Table table;
@@ -6679,7 +7585,7 @@ TEST(Table_RowAccessor_Null)
         row.set_bool(col_bool, true);
         row.set_int(col_int, 1);
         row.set_string(col_string, "1");
-        row.set_float(col_float, 1.0);
+        row.set_float(col_float, 1.0f);
         row.set_double(col_double, 1.0);
         row.set_olddatetime(col_date, OldDateTime(1));
         row.set_binary(col_binary, BinaryData("a"));
@@ -6779,7 +7685,7 @@ TEST(Table_MixedCrashValues)
 }
 
 
-TEST(Table_ChangeLinkTargets_Links)
+TEST(Table_MergeRows_Links)
 {
     Group g;
 
@@ -6787,23 +7693,24 @@ TEST(Table_ChangeLinkTargets_Links)
     TableRef t1 = g.add_table("t1");
     t0->add_column_link(type_Link, "link", *t1);
     t1->add_column(type_Int, "int");
-    t0->add_empty_row(10);
-    t1->add_empty_row(10);
-    for (int i = 0; i < 10; ++i) {
+    t0->add_empty_row(2);
+    t1->add_empty_row(2);
+    for (int i = 0; i < 2; ++i) {
         t0->set_link(0, i, i);
         t1->set_int(0, i, i);
     }
+    t1->add_empty_row();
 
     Row replaced_row = t1->get(0);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 1);
-    t1->change_link_targets(0, 9);
+    t1->merge_rows(0, 2);
     CHECK(replaced_row.is_attached());
-    CHECK_EQUAL(t0->get_link(0, 0), 9);
+    CHECK_EQUAL(t0->get_link(0, 0), 2);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
 }
 
 
-TEST(Table_ChangeLinkTargets_LinkLists)
+TEST(Table_MergeRows_LinkLists)
 {
     Group g;
 
@@ -6819,18 +7726,19 @@ TEST(Table_ChangeLinkTargets_LinkLists)
         links->add((i + 1) % 10);
         t1->set_int(0, i, i);
     }
+    t1->add_empty_row();
 
     Row replaced_row = t1->get(0);
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 2);
-    t1->change_link_targets(0, 9);
+    t1->merge_rows(0, 10);
     CHECK(replaced_row.is_attached());
     CHECK_EQUAL(t1->get_backlink_count(0, *t0, 0), 0);
     CHECK_EQUAL(t0->get_linklist(0, 0)->size(), 2);
-    CHECK_EQUAL(t0->get_linklist(0, 0)->get(0).get_index(), 9);
+    CHECK_EQUAL(t0->get_linklist(0, 0)->get(0).get_index(), 10);
     CHECK_EQUAL(t0->get_linklist(0, 0)->get(1).get_index(), 1);
     CHECK_EQUAL(t0->get_linklist(0, 9)->size(), 2);
     CHECK_EQUAL(t0->get_linklist(0, 9)->get(0).get_index(), 9);
-    CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 9);
+    CHECK_EQUAL(t0->get_linklist(0, 9)->get(1).get_index(), 10);
 }
 
 // Minimal test case causing an assertion error because
@@ -6987,7 +7895,7 @@ TEST(Table_DetachedAccessor)
     CHECK_LOGIC_ERROR(table->clear(), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->add_search_index(0), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->remove_search_index(0), LogicError::detached_accessor);
-    CHECK_LOGIC_ERROR(table->change_link_targets(0, 1), LogicError::detached_accessor);
+    CHECK_LOGIC_ERROR(table->merge_rows(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->swap_rows(0, 1), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_string(1, 0, ""), LogicError::detached_accessor);
     CHECK_LOGIC_ERROR(table->set_string_unique(1, 0, ""), LogicError::detached_accessor);
@@ -7257,5 +8165,21 @@ TEST_TYPES(Table_ColumnSizeFromRef, std::true_type, std::false_type)
     check_column_sizes(10 * REALM_MAX_BPNODE_SIZE);
 }
 
+TEST(Table_KeyRow)
+{
+    Table table;
+    table.add_column(type_Int, "int");
+    table.add_column(type_String, "string");
+    table.add_search_index(0);
+
+    size_t ndx = table.add_row_with_key(0, 123);
+    table.set_string(1, ndx, "Hello, ");
+    table.add_row_with_key(0, 456);
+
+    size_t i = table.find_first_int(0, 123);
+    CHECK_EQUAL(i, 0);
+    i = table.find_first_int(0, 456);
+    CHECK_EQUAL(i, 1);
+}
 
 #endif // TEST_TABLE

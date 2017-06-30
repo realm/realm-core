@@ -19,6 +19,10 @@
 #ifndef REALM_VERSION_ID_HPP
 #define REALM_VERSION_ID_HPP
 
+#if defined(_WIN32) && !defined(__STDC_LIMIT_MACROS)
+#define __STDC_LIMIT_MACROS
+#endif
+
 #include <limits>
 
 namespace realm {

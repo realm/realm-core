@@ -1,9 +1,14 @@
 #!groovy
 
-try {
-  def gitTag
-  def gitSha
-  def dependencies
+@Library('realm-ci') _
+
+
+def gitTag
+def gitSha
+def version
+def dependencies
+def isPublishingRun
+def isPublishingLatestRun
 
   stage('gather-info') {
     node {
@@ -14,21 +19,21 @@ try {
         extensions: scm.extensions + [[$class: 'CleanCheckout']],
         userRemoteConfigs: scm.userRemoteConfigs
       ])
-      sh 'git archive -o core.zip HEAD'
-      stash includes: 'core.zip', name: 'core-source'
+      stash includes: '**', name: 'core-source'
 
       dependencies = readProperties file: 'dependencies.list'
       echo "VERSION: ${dependencies.VERSION}"
 
       gitTag = readGitTag()
       gitSha = readGitSha()
+      version = get_version()
       echo "tag: ${gitTag}"
       if (gitTag == "") {
         echo "No tag given for this build"
         setBuildName(gitSha)
       } else {
         if (gitTag != "v${dependencies.VERSION}") {
-          echo "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
+          error "Git tag '${gitTag}' does not match v${dependencies.VERSION}"
         } else {
           echo "Building release: '${gitTag}'"
           setBuildName("Tag ${gitTag}")
@@ -36,25 +41,39 @@ try {
       }
     }
 
+    isPublishingRun = gitTag != ""
+    echo "Publishing Run: ${isPublishingRun}"
+
+    isPublishingLatestRun = ['master'].contains(env.BRANCH_NAME)
+
     rpmVersion = dependencies.VERSION.replaceAll("-", "_")
     echo "rpm version: ${rpmVersion}"
+
+    if (['master'].contains(env.BRANCH_NAME)) {
+      // If we're on master, instruct the docker image builds to push to the
+      // cache registry
+      env.DOCKER_PUSH = "1"
+    }
   }
 
   stage('check') {
     parallelExecutors = [
       checkLinuxRelease: doBuildInDocker('check'),
       checkLinuxDebug: doBuildInDocker('check-debug'),
-      buildCocoa: doBuildCocoa(),
-      buildNodeLinux: doBuildNodeInDocker(),
-      buildNodeOsx: doBuildNodeInOsx(),
-      buildDotnetOsx: doBuildDotNetOsx(),
-      buildAndroid: doBuildAndroid(),
+      buildCocoa: doBuildCocoa(isPublishingRun, isPublishingLatestRun),
+      buildNodeLinux: doBuildNodeInDocker(isPublishingRun, isPublishingLatestRun),
+      buildNodeOsx: doBuildNodeInOsx(isPublishingRun, isPublishingLatestRun),
+      buildAndroid: doBuildAndroid(isPublishingRun),
+      buildWindows: doBuildWindows(false, version, isPublishingRun),
+      buildWindowsUniversal: doBuildWindows(true, version, isPublishingRun),
+      buildOsxDylibs: doBuildOsxDylibs(version, isPublishingRun, isPublishingLatestRun),
       addressSanitizer: doBuildInDocker('jenkins-pipeline-address-sanitizer')
       //threadSanitizer: doBuildInDocker('jenkins-pipeline-thread-sanitizer')
     ]
 
     if (env.CHANGE_TARGET) {
       parallelExecutors['diffCoverage'] = buildDiffCoverage()
+      parallelExecutors['performance'] = buildPerformance()
     }
 
     parallel parallelExecutors
@@ -69,45 +88,61 @@ try {
     )
   }
 
-  if (['master', 'next-major'].contains(env.BRANCH_NAME) || gitTag != "") {
+  if (isPublishingRun) {
     stage('publish-packages') {
       parallel(
         generic: doPublishGeneric(),
         centos7: doPublish('centos-7', 'rpm', 'el', 7),
         centos6: doPublish('centos-6', 'rpm', 'el', 6),
-        ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial')
+        ubuntu1604: doPublish('ubuntu-1604', 'deb', 'ubuntu', 'xenial'),
+        others: doPublishLocalArtifacts()
       )
     }
   }
-} catch(Exception e) {
-  e.printStackTrace()
-  throw e
+
+
+def buildDockerEnv(name) {
+  docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
+    env.DOCKER_REGISTRY = '012067661104.dkr.ecr.eu-west-1.amazonaws.com'
+    sh "./packaging/docker_build.sh $name ."
+  }
+
+  return docker.image(name)
 }
 
-def doBuildCocoa() {
+def doBuildCocoa(def isPublishingRun, def isPublishingLatestRun) {
   return {
-    node('osx_vegas') {
+    node('macos || osx_vegas') {
       getArchive()
 
       try {
         withEnv([
-          'PATH=$PATH:/usr/local/bin',
-          'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer',
+          'PATH+EXTRA=/usr/local/bin',
           'REALM_ENABLE_ENCRYPTION=yes',
           'REALM_ENABLE_ASSERTIONS=yes',
-          'MAKEFLAGS=\'CFLAGS_DEBUG=-Oz\'',
+          'MAKEFLAGS=CFLAGS_DEBUG\\=-Oz',
           'UNITTEST_SHUFFLE=1',
           'UNITTEST_REANDOM_SEED=random',
           'UNITTEST_XML=1',
-          'UNITTEST_THREADS=1'
+          'UNITTEST_THREADS=1',
+          'DEVELOPER_DIR=/Applications/Xcode-8.2.app/Contents/Developer/'
         ]) {
             sh '''
               dir=$(pwd)
               sh build.sh config $dir/install
-              sh build.sh build-cocoa
-              sh build.sh check-debug
+            '''
 
-              # Repack the release with just what we need so that it's not a 1 GB download
+            runAndCollectWarnings(
+                parser: 'clang',
+                script: '''
+                   sh build.sh build-cocoa 2>&1
+                   sh build.sh check-debug 2>&1
+                '''
+            )
+
+            sh '''
+              dir=$(pwd)
+              # Repack the release with just what we need so that it is not a 1 GB download
               version=$(sh build.sh get-version)
               tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
               (
@@ -118,99 +153,93 @@ def doBuildCocoa() {
                   # the debug build of core, so remove that slice
                   lipo -remove armv7s core/librealm-ios-dbg.a -o core/librealm-ios-dbg.a
 
-                  tar cf "$dir/core-$version.tar.xz" --xz core || exit 1
+                  tar cf "$dir/realm-core-$version.tar.xz" --xz core || exit 1
               )
               rm -rf "$tmpdir" || exit 1
 
-              cp core-*.tar.xz realm-core-latest.tar.xz
+              cp realm-core-*.tar.xz realm-core-latest.tar.xz
             '''
-            archive '*core-*.*.*.tar.xz'
+
+            if (isPublishingRun) {
+              stash includes: '*core-*.*.*.tar.xz', name: 'cocoa-package'
+            }
+	    archiveArtifacts artifacts: '*core-*.*.*.tar.xz'
 
             sh 'sh build.sh clean'
         }
       } finally {
-        collectCompilerWarnings('clang')
         recordTests('check-debug-cocoa')
         withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          sh 's3cmd -c $s3cfg_config_file put realm-core-latest.tar.xz s3://static.realm.io/downloads/core'
+          if (isPublishingLatestRun) {
+            sh 's3cmd -c $s3cfg_config_file put realm-core-latest.tar.xz s3://static.realm.io/downloads/core/'
+          }
         }
       }
     }
   }
 }
-
-def doBuildDotNetOsx() {
-  return {
-    node('osx_vegas') {
-      getArchive()
-
-      try {
-        withEnv([
-          'PATH=$PATH:/usr/local/bin',
-          'DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer',
-          'REALM_ENABLE_ENCRYPTION=yes',
-          'REALM_ENABLE_ASSERTIONS=yes',
-          'MAKEFLAGS=\'CFLAGS_DEBUG=-Oz\'',
-          'UNITTEST_SHUFFLE=1',
-          'UNITTEST_REANDOM_SEED=random',
-          'UNITTEST_XML=1',
-          'UNITTEST_THREADS=1'
-        ]) {
-            sh '''
-              dir=$(pwd)
-              sh build.sh config $dir/install
-              sh build.sh build-dotnet-cocoa
-
-              # Repack the release with just what we need so that it's not a 1 GB download
-              version=$(sh build.sh get-version)
-              tmpdir=$(mktemp -d /tmp/$$.XXXXXX) || exit 1
-              (
-                  cd $tmpdir || exit 1
-                  unzip -qq "$dir/realm-core-dotnet-cocoa-$version.zip" || exit 1
-
-                  # We only need an armv7s slice for CocoaPods, and the podspec never uses
-                  # the debug build of core, so remove that slice
-                  lipo -remove armv7s core/librealm-ios-no-bitcode-dbg.a -o core/librealm-ios-no-bitcode-dbg.a
-
-                  tar cjf "$dir/realm-core-dotnet-cocoa-$version.tar.bz2" core || exit 1
-              )
-              rm -rf "$tmpdir" || exit 1
-
-              cp realm-core-dotnet-cocoa-*.tar.bz2 realm-core-dotnet-cocoa-latest.tar.bz2
-            '''
-            archive '*core-*.*.*.tar.bz2'
-
-            sh 'sh build.sh clean'
-        }
-      } finally {
-        collectCompilerWarnings('clang')
-        withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-          sh 's3cmd -c $s3cfg_config_file put realm-core-dotnet-cocoa-latest.tar.bz2 s3://static.realm.io/downloads/core'
-        }
-      }
-    }
-  }
-}
-
 
 def doBuildInDocker(String command) {
   return {
     node('docker') {
       getArchive()
 
-      def buildEnv = docker.build 'realm-core:snapshot'
+      def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       def environment = environment()
+      if (command.contains('sanitizer')) {
+          environment << 'UNITTEST_THREADS=1'
+          environment << 'UNITTEST_PROGRESS=1'
+      }
       withEnv(environment) {
         buildEnv.inside {
           sh 'sh build.sh config'
           try {
-              sh "sh build.sh ${command}"
+            runAndCollectWarnings(script: "sh build.sh ${command} 2>&1")
           } finally {
-            collectCompilerWarnings('gcc')
             recordTests(command)
           }
         }
       }
+    }
+  }
+}
+
+def doBuildWindows(boolean isUniversal, String version, boolean isPublishingRun) {
+  def configuration = isUniversal ? 'UWP' : '8.1'
+  def packageName = isUniversal ? 'windows-universal' : 'windows'
+  def platforms = isUniversal ? ['Win32', 'x64', 'ARM'] : ['Win32', 'x64'];
+  return {
+    node('windows') {
+      getArchive()
+        for (platform in platforms) {
+          runAndCollectWarnings(
+            parser: 'msbuild',
+            isWindows: true,
+            failOnWarning: false,
+            script: """
+              \"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Debug static lib\" /p:Platform=${platform} 2>&1
+              \"${tool 'msbuild'}\" \"Visual Studio\\Realm.sln\" /p:Configuration=\"${configuration} Release static lib\" /p:Platform=${platform} 2>&1
+            """
+          )
+        }
+        dir('Visual Studio') {
+          stash includes: 'lib/*.lib', name: 'windows-libs'
+        }
+        dir('src') {
+          stash includes: '**/*.h', name: 'windows-c-includes'
+          stash includes: '**/*.hpp', name: 'windows-cxx-includes'
+        }
+        dir('packaging-tmp') {
+          unstash 'windows-libs'
+          dir('include') {
+            unstash 'windows-c-includes'
+            unstash 'windows-cxx-includes'
+          }
+        }
+        zip dir:'packaging-tmp', zipFile:"realm-core-${packageName}-${version}.zip", archive:true
+        if (isPublishingRun) {
+          stash includes:"realm-core-${packageName}-${version}.zip", name:"${packageName}-package"
+        }
     }
   }
 }
@@ -226,7 +255,7 @@ def buildDiffCoverage() {
         userRemoteConfigs: scm.userRemoteConfigs
       ])
 
-      def buildEnv = docker.build 'realm-core:snapshot'
+      def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
       def environment = environment()
       withEnv(environment) {
         buildEnv.inside {
@@ -263,25 +292,39 @@ def buildDiffCoverage() {
   }
 }
 
-def doBuildNodeInDocker() {
+def buildPerformance() {
   return {
-    node('docker') {
-      getArchive()
+    // Select docker-cph-X.  We want docker, metal (brix) and only one executor
+    // (exclusive), if the machine changes also change REALM_BENCH_MACHID below
+    node('docker && brix && exclusive') {
+      getSourceArchive()
+      def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
+      // REALM_BENCH_DIR tells the gen_bench_hist.sh script where to place results
+      // REALM_BENCH_MACHID gives the results an id - results are organized by hardware to prevent mixing cached results with runs on different machines
+      // MPLCONFIGDIR gives the python matplotlib library a config directory, otherwise it will try to make one on the user home dir which fails in docker
+      buildEnv.inside {
+        withEnv(["REALM_BENCH_DIR=${env.WORKSPACE}/test/bench/core-benchmarks", "REALM_BENCH_MACHID=docker-brix","MPLCONFIGDIR=${env.WORKSPACE}/test/bench/config"]) {
+          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+              sh 's3cmd -c $s3cfg_config_file get s3://static.realm.io/downloads/core/core-benchmarks.zip core-benchmarks.zip'
+          }
+          sh 'unzip core-benchmarks.zip -d test/bench/'
+          sh 'rm core-benchmarks.zip'
 
-      def buildEnv = docker.build 'realm-core:snapshot'
-      def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
-      withEnv(environment) {
-        buildEnv.inside {
-          sh 'sh build.sh config'
-          try {
-              sh 'sh build.sh build-node-package'
-              sh 'cp realm-core-node-*.tar.gz realm-core-node-linux-latest.tar.gz'
-              archive '*realm-core-node-linux-*.*.*.tar.gz'
-              withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-                sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core'
-              }
-          } finally {
-            collectCompilerWarnings('gcc')
+          sh """
+            cd test/bench
+            mkdir -p core-benchmarks results
+            ./gen_bench_hist.sh origin/${env.CHANGE_TARGET}
+            ./parse_bench_hist.py --local-html results/ core-benchmarks/
+          """
+          zip dir: 'test/bench', glob: 'core-benchmarks/**/*', zipFile: 'core-benchmarks.zip'
+          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+            sh 's3cmd -c $s3cfg_config_file put core-benchmarks.zip s3://static.realm.io/downloads/core/'
+          }
+          publishHTML(target: [allowMissing: false, alwaysLinkToLastBuild: false, keepAll: true, reportDir: 'test/bench/results', reportFiles: 'report.html', reportName: 'Performance Report'])
+          withCredentials([[$class: 'StringBinding', credentialsId: 'bot-github-token', variable: 'githubToken']]) {
+              sh "curl -H \"Authorization: token ${env.githubToken}\" " +
+                 "-d '{ \"body\": \"Check the performance result here: ${env.BUILD_URL}Performance_Report\"}' " +
+                 "\"https://api.github.com/repos/realm/realm-core/issues/${env.CHANGE_ID}/comments\""
           }
         }
       }
@@ -289,33 +332,98 @@ def doBuildNodeInDocker() {
   }
 }
 
-def doBuildNodeInOsx() {
+def doBuildNodeInDocker(def isPublishingRun, def isPublishingLatestRun) {
   return {
-    node('osx_vegas') {
+    node('docker') {
+      getArchive()
+
+      def buildEnv = buildDockerEnv('ci/realm-core:snapshot')
+      def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
+      withEnv(environment) {
+        buildEnv.inside {
+          sh 'sh build.sh config'
+          runAndCollectWarnings(script: 'sh build.sh build-node-package 2>&1')
+          sh 'cp realm-core-node-*.tar.gz realm-core-node-linux-latest.tar.gz'
+          if (isPublishingRun) {
+            stash includes: '*realm-core-node-linux-*.*.*.tar.gz', name: 'node-linux-package'
+          }
+          archiveArtifacts artifacts: '*realm-core-node-linux-*.*.*.tar.gz'
+          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+            if (isPublishingLatestRun) {
+              sh 's3cmd -c $s3cfg_config_file put realm-core-node-linux-latest.tar.gz s3://static.realm.io/downloads/core/'
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+def doBuildNodeInOsx(def isPublishingRun, def isPublishingLatestRun) {
+  return {
+    node('macos || osx_vegas') {
       getArchive()
 
       def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes']
       withEnv(environment) {
         sh 'sh build.sh config'
-        try {
-          sh 'sh build.sh build-node-package'
-          sh 'cp realm-core-node-*.tar.gz realm-core-node-osx-latest.tar.gz'
-          archive '*realm-core-node-osx-*.*.*.tar.gz'
+        runAndCollectWarnings(parser: 'clang', script: 'sh build.sh build-node-package 2>&1')
+        sh 'cp realm-core-node-*.tar.gz realm-core-node-osx-latest.tar.gz'
+        if (isPublishingRun) {
+          stash includes: '*realm-core-node-osx-*.*.*.tar.gz', name: 'node-cocoa-package'
+        }
+        archiveArtifacts artifacts: '*realm-core-node-osx-*.*.*.tar.gz'
 
-          sh 'sh build.sh clean'
+        sh 'sh build.sh clean'
 
-          withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
-            sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core'
+        withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+          if (isPublishingLatestRun) {
+            sh 's3cmd -c $s3cfg_config_file put realm-core-node-osx-latest.tar.gz s3://static.realm.io/downloads/core/'
           }
-        } finally {
-          collectCompilerWarnings('clang')
         }
       }
     }
   }
 }
 
-def doBuildAndroid() {
+def doBuildOsxDylibs(def version, def isPublishingRun, def isPublishingLatestRun) {
+  return {
+    node('macos || osx_vegas') {
+      getArchive()
+
+      def environment = ['REALM_ENABLE_ENCRYPTION=yes', 'REALM_ENABLE_ASSERTIONS=yes', 'UNITTEST_SHUFFLE=1',
+        'UNITTEST_XML=1', 'UNITTEST_THREADS=1']
+      withEnv(environment) {
+        sh 'sh build.sh config'
+        runAndCollectWarnings(parser: 'clang', script: '''
+          sh build.sh build 2>&1
+          sh build.sh check-debug 2>&1
+        ''')
+
+        dir('src/realm') {
+          sh "zip --symlink ../../realm-core-dylib-osx-${version}.zip librealm*.dylib"
+        }
+
+        sh 'cp realm-core-dylib-osx-*.zip realm-core-dylib-osx-latest.zip'
+
+        if (isPublishingRun) {
+          stash includes: '*realm-core-dylib-osx-*.*.*.zip', name: 'dylib-osx-package'
+        }
+        archiveArtifacts artifacts: '*realm-core-dylib-osx-*.*.*.zip'
+
+        sh 'sh build.sh clean'
+
+        withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+          if (isPublishingLatestRun) {
+            sh 's3cmd -c $s3cfg_config_file put realm-core-dylib-osx-latest.zip s3://static.realm.io/downloads/core/'
+          }
+        }
+      }
+    }
+  }
+}
+
+def doBuildAndroid(def isPublishingRun) {
     def target = 'build-android'
     def buildName = "android-${target}-with-encryption"
 
@@ -331,9 +439,12 @@ def doBuildAndroid() {
 
             withEnv(environment) {
               sh "sh build.sh config '${pwd()}/install'"
-              sh "sh build.sh ${target}"
+              runAndCollectWarnings(script: "sh build.sh ${target} 2>&1")
             }
-            archive 'realm-core-android-*.tar.gz'
+            if (isPublishingRun) {
+              stash includes: 'realm-core-android-*.tar.gz', name: 'android-package'
+            }
+            archiveArtifacts artifacts: 'realm-core-android-*.tar.gz'
 
             dir('test/android') {
                 sh '$ANDROID_HOME/tools/android update project -p . --target android-9'
@@ -348,7 +459,6 @@ def doBuildAndroid() {
                     }
                 }
             }
-            collectCompilerWarnings('gcc')
           }
         }
 
@@ -399,62 +509,9 @@ def doBuildAndroid() {
 
 def recordTests(tag) {
     def tests = readFile('test/unit-test-report.xml')
-    def modifiedTests = tests.replaceAll('DefaultSuite', tag)
+    def modifiedTests = tests.replaceAll('realm-core-tests', tag)
     writeFile file: 'test/modified-test-report.xml', text: modifiedTests
-
-    step([
-        $class: 'XUnitBuilder',
-        testTimeMargin: '3000',
-        thresholdMode: 1,
-        thresholds: [
-        [
-        $class: 'FailedThreshold',
-        failureNewThreshold: '0',
-        failureThreshold: '0',
-        unstableNewThreshold: '0',
-        unstableThreshold: '0'
-        ], [
-        $class: 'SkippedThreshold',
-        failureNewThreshold: '0',
-        failureThreshold: '0',
-        unstableNewThreshold: '0',
-        unstableThreshold: '0'
-        ]
-        ],
-        tools: [[
-        $class: 'UnitTestJunitHudsonTestType',
-        deleteOutputFiles: true,
-        failIfNotNew: true,
-        pattern: 'test/modified-test-report.xml',
-        skipNoTestFiles: false,
-        stopProcessingIfError: true
-        ]]
-    ])
-}
-
-def collectCompilerWarnings(compiler) {
-    def parserName
-    if (compiler == 'gcc') {
-        parserName = 'GNU Make + GNU C Compiler (gcc)'
-    } else if ( compiler == 'clang' ) {
-        parserName = 'Clang (LLVM based)'
-    }
-    step([
-        $class: 'WarningsPublisher',
-        canComputeNew: false,
-        canResolveRelativePaths: false,
-        consoleParsers: [[parserName: parserName]],
-        defaultEncoding: '',
-        excludePattern: '',
-        failedTotalAll: '0',
-        failedTotalHigh: '0',
-        failedTotalLow: '0',
-        failedTotalNormal: '0',
-        healthy: '',
-        includePattern: '',
-        messagesPattern: '',
-        unHealthy: ''
-    ])
+    junit 'test/modified-test-report.xml'
 }
 
 def environment() {
@@ -508,12 +565,15 @@ def doBuildPackage(distribution, fileType) {
     node('docker') {
       getSourceArchive()
 
-      withCredentials([[$class: 'StringBinding', credentialsId: 'packagecloud-sync-devel-master-token', variable: 'PACKAGECLOUD_MASTER_TOKEN']]) {
-        sh "sh packaging/package.sh ${distribution}"
+      docker.withRegistry("https://012067661104.dkr.ecr.eu-west-1.amazonaws.com", "ecr:eu-west-1:aws-ci-user") {
+        env.DOCKER_REGISTRY = '012067661104.dkr.ecr.eu-west-1.amazonaws.com'
+        withCredentials([[$class: 'StringBinding', credentialsId: 'packagecloud-sync-devel-master-token', variable: 'PACKAGECLOUD_MASTER_TOKEN']]) {
+          sh "sh packaging/package.sh ${distribution}"
+        }
       }
 
       dir('packaging/out') {
-        step([$class: 'ArtifactArchiver', artifacts: "${distribution}/*.${fileType}", fingerprint: true])
+        archiveArtifacts artifacts: "${distribution}/*.${fileType}"
         stash includes: "${distribution}/*.${fileType}", name: "packages-${distribution}"
       }
     }
@@ -546,7 +606,7 @@ def doPublishGeneric() {
         unstash "packages-generic"
       }
       dir("core/v${version}/linux") {
-        sh "mv ${topdir}/packaging/out/generic/realm-core-*.tgz ./"
+        sh "mv ${topdir}/packaging/out/generic/realm-core-*.tgz ./realm-core-${version}.tgz"
       }
 
       step([
@@ -572,14 +632,34 @@ def doPublishGeneric() {
   }
 }
 
+def doPublishLocalArtifacts() {
+  // TODO create a Dockerfile for an image only containing s3cmd
+  return {
+    node('aws') {
+      deleteDir()
+      unstash 'cocoa-package'
+      unstash 'node-linux-package'
+      unstash 'node-cocoa-package'
+      unstash 'android-package'
+      unstash 'dylib-osx-package'
+      unstash 'windows-package'
+      unstash 'windows-universal-package'
+
+      withCredentials([[$class: 'FileBinding', credentialsId: 'c0cc8f9e-c3f1-4e22-b22f-6568392e26ae', variable: 's3cfg_config_file']]) {
+        sh 'find . -type f -name "*.tar.*" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
+        sh 'find . -type f -name "*.zip" -maxdepth 1 -exec s3cmd -c $s3cfg_config_file put {} s3://static.realm.io/downloads/core/ \\;'
+      }
+    }
+  }
+}
+
 def setBuildName(newBuildName) {
   currentBuild.displayName = "${currentBuild.displayName} - ${newBuildName}"
 }
 
 def getArchive() {
-    sh 'rm -rf *'
+    deleteDir()
     unstash 'core-source'
-    sh 'unzip -o -q core.zip'
 }
 
 def getSourceArchive() {

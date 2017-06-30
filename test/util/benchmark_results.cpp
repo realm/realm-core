@@ -330,7 +330,7 @@ void BenchmarkResults::try_load_baseline_results()
 
 void BenchmarkResults::save_results()
 {
-    time_t now = time(0);
+    time_t now = time(nullptr);
     localtime(&now);
     struct tm local;
     localtime_r(&now, &local);
@@ -367,13 +367,13 @@ void BenchmarkResults::save_results()
     std::string baseline_file = m_results_file_stem;
     std::string latest_csv_file = m_results_file_stem + ".latest.csv";
     baseline_file += ".baseline";
-    int r;
     if (!util::File::exists(baseline_file)) {
-        r = link(name.c_str(), baseline_file.c_str());
+        int r = link(name.c_str(), baseline_file.c_str());
+        static_cast<void>(r); // FIXME: Display if error
     }
     if (util::File::exists(latest_csv_file)) {
-        r = unlink(latest_csv_file.c_str());
+        (void)unlink(latest_csv_file.c_str());
     }
-    r = link(csv_name.c_str(), latest_csv_file.c_str());
+    int r = link(csv_name.c_str(), latest_csv_file.c_str());
     static_cast<void>(r); // FIXME: Display if error
 }

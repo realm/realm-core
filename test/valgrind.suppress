@@ -1,57 +1,61 @@
 {
-   <valgrind open problem>
-   drd:ConflictingAccess
-   fun:open
+   <AllocSlab::all_files and AllocSlab::all_files_mutex intentionally not destructed to prevent races>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:_Znwm
+   fun:_GLOBAL__sub_I_alloc_slab.cpp
+   fun:call_init.part.0
+   fun:call_init
+   fun:_dl_init
    ...
-   obj:/usr/lib/valgrind/vgpreload_drd-amd64-linux.so
-   fun:start_thread
-   fun:clone
 }
 {
-   <valgrind close problem>
-   drd:ConflictingAccess
-   fun:close
+   <Entries added to the AllocSlab::all_files map are not freed namely `p = std::make_shared<MappedFile>();`>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:_Znwm
+   fun:_ZNSt8_Rb_treeISsSt4pairIKSsSt8weak_ptrIN5realm9SlabAlloc10MappedFileEEESt10_Select1stIS7_ESt4lessISsESaIS7_EE22_M_emplace_hint_uniqueIIRKSt21piecewise_construct_tSt5tupleIIRS1_EESI_IIEEEEESt17_Rb_tree_iteratorIS7_ESt23_Rb_tree_const_iteratorIS7_EDpOT_
+   fun:_ZN5realm9SlabAlloc11attach_fileERKSsRNS0_6ConfigE
+   fun:_ZN5realm5Group4openERKSsPKcNS0_8OpenModeE
    ...
-   obj:/usr/lib/valgrind/vgpreload_drd-amd64-linux.so
-   fun:start_thread
-   fun:clone
 }
 {
-   <valgrind waitpid problem (presumed)>
-   drd:ConflictingAccess
-   fun:waitpid
-   fun:_Z12spawn_daemonRKSs
+   <std weak pointer allocated for entries in AllocSlab::all_files as above>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:_Znwm
+   fun:_ZNSt8_Rb_treeISsSt4pairIKSsSt8weak_ptrIN5realm9SlabAlloc10MappedFileEEESt10_Select1stIS7_ESt4lessISsESaIS7_EE22_M_emplace_hint_uniqueIIRKSt21piecewise_construct_tSt5tupleIIRS1_EESI_IIEEEEESt17_Rb_tree_iteratorIS7_ESt23_Rb_tree_const_iteratorIS7_EDpOT_
+   fun:_ZN5realm9SlabAlloc11attach_fileERKSsRNS0_6ConfigE
+   fun:_ZN5realm11SharedGroup7do_openERKSsbbNS_18SharedGroupOptionsE
+   fun:_ZN5realm11SharedGroupC2ERKSsbNS_18SharedGroupOptionsE.constprop.432
    ...
-   obj:/usr/lib/valgrind/vgpreload_drd-amd64-linux.so
-   fun:start_thread
-   fun:clone
 }
 {
-   <valgrind fork problem (presumed)>
-   drd:ConflictingAccess
-   fun:__reclaim_stacks
-   fun:fork
-   fun:_Z12spawn_daemonRKSs
+   <We construct shared pointers with new. This covers two instances: `m_local_mappings.reset(new ...` and `new_mappings.reset(new ...`>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:_Znwm
+   fun:_ZN5realm9SlabAlloc11attach_fileERKSsRNS0_6ConfigE
    ...
-   obj:/usr/lib/valgrind/vgpreload_drd-amd64-linux.so
-   fun:start_thread
-   fun:clone
 }
 {
-   <mutex destruction - presumed valgrind problem>
-   drd:MutexErr
-   fun:pthread_mutex_destroy
-   fun:_ZN7realm11SharedGroup16do_async_commitsEv
-   fun:_ZN7realm11SharedGroup4openERKSsbNS0_15DurabilityLevelEb
-   fun:main
+   <SlabAlloc makes a deep copy of the realm file_path string which is still reachable as the keys of the all_files map>
+   Memcheck:Leak
+   fun:_Znwm
+   fun:_ZNSs4_Rep9_S_createEmmRKSaIcE
+   ...
+   fun:_ZN5realm9SlabAlloc11attach_fileERKSsRNS0_6ConfigE
+   ...
 }
 {
-   <valgrind fsync problem (presumed)>
-   drd:ConflictingAccess
-   fun:fsync
-   fun:_ZN7realm4File4syncEv
-   fun:_ZN7realm11GroupWriter17extend_free_spaceEm
-   fun:_ZN7realm11GroupWriter18reserve_free_spaceEm
-   fun:_ZN7realm11GroupWriter14get_free_spaceEm
+   <Supposed valgrind false positives>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   obj:/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.21
+   fun:call_init.part.0
+   fun:call_init
+   fun:_dl_init
+   obj:/lib/x86_64-linux-gnu/ld-2.21.so
    ...
 }

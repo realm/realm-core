@@ -22,7 +22,7 @@
 namespace realm {
 
 
-TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx)
+TimestampColumn::TimestampColumn(bool nullable, Allocator& alloc, ref_type ref, size_t col_ndx)
     : ColumnBaseSimple(col_ndx)
 {
     std::unique_ptr<Array> top;
@@ -46,6 +46,7 @@ TimestampColumn::TimestampColumn(Allocator& alloc, ref_type ref, size_t col_ndx)
     m_array = std::move(top);
     m_seconds = std::move(seconds);
     m_nanoseconds = std::move(nanoseconds);
+    m_nullable = nullable;
 }
 
 
@@ -108,13 +109,17 @@ size_t TimestampColumn::size() const noexcept
 /// Whether or not this column is nullable.
 bool TimestampColumn::is_nullable() const noexcept
 {
-    return true;
+    return m_nullable;
 }
 
 /// Whether or not the value at \a row_ndx is NULL. If the column is not
 /// nullable, always returns false.
 bool TimestampColumn::is_null(size_t row_ndx) const noexcept
 {
+    // If this assert triggers, this column object was instantiated with bad nullability flag in the
+    // constructor, compared to what it was created with by the static ::create() method
+    REALM_ASSERT_DEBUG(!(!m_nullable && m_seconds->is_null(row_ndx)));
+
     return m_seconds->is_null(row_ndx);
 }
 
@@ -271,12 +276,10 @@ void TimestampColumn::destroy_search_index() noexcept
     m_search_index.reset();
 }
 
-void TimestampColumn::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent,
-                                           bool allow_duplicate_values)
+void TimestampColumn::set_search_index_ref(ref_type ref, ArrayParent* parent, size_t ndx_in_parent)
 {
     REALM_ASSERT(!m_search_index);
-    m_search_index.reset(
-        new StringIndex(ref, parent, ndx_in_parent, this, !allow_duplicate_values, get_alloc())); // Throws
+    m_search_index.reset(new StringIndex(ref, parent, ndx_in_parent, this, get_alloc())); // Throws
 }
 
 

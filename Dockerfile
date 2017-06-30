@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     pandoc \
     python-cheetah \
+    python-matplotlib \
     python-pip \
     pkg-config \
     ruby \
