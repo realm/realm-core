@@ -71,8 +71,8 @@ for bt in "${BUILD_TYPES[@]}"; do
     done
 done
 
-ln -s core/librealm-macosx.a core/librealm.a
-ln -s core/librealm-macosx-dbg.a core/librealm-dbg.a
+ln -s librealm-macosx.a core/librealm.a
+ln -s librealm-macosx-dbg.a core/librealm-dbg.a
 
 if [[ ! -z $COPY ]]; then
     rm -rf "${DESTINATION}/core"
