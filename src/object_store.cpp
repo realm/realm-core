@@ -704,7 +704,9 @@ void ObjectStore::apply_schema_changes(Group& group, uint64_t schema_version,
 
     if (mode == SchemaMode::Manual) {
         set_schema_columns(group, target_schema);
-        migration_function();
+        if (migration_function) {
+            migration_function();
+        }
 
         verify_no_changes_required(schema_from_group(group).compare(target_schema));
         validate_primary_column_uniqueness(group);

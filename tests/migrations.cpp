@@ -1765,4 +1765,9 @@ TEST_CASE("migration: Manual") {
         REQUIRE_NOTHROW(realm2->update_schema(schema));
         REQUIRE_THROWS(realm2->update_schema(remove_property(schema, "object", "value")));
     }
+
+    SECTION("null migration callback should throw SchemaMismatchException") {
+        Schema new_schema = remove_property(schema, "object", "value");
+        REQUIRE_THROWS_AS(realm->update_schema(new_schema, 1, nullptr), SchemaMismatchException);
+    }
 }
