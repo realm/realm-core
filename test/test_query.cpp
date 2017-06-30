@@ -4542,8 +4542,9 @@ TEST(Query_CompoundDescriptors) {
     // 4 | 2        "A"     |
     // 5 | 2        "A"     |
 
-    {   // sorting twice should be the same as a single sort with both criteria
-        ResultList results = {{2, 3}, {2, 4}, {2, 5}, {1, 2}, {1, 0}, {1, 1}};
+    {   // sorting twice should the same as a single sort with both criteria
+        // but reversed: sort(a).sort(b) == sort(b, a)
+        ResultList results = {{2, 3}, {1, 2}, {2, 4}, {2, 5}, {1, 0}, {1, 1}};
         TableView tv = t1->where().find_all();
         tv.sort(SortDescriptor(*t1, {{t1_int_col}}, {false}));
         tv.sort(SortDescriptor(*t1, {{t1_str_col}}, {false}));
@@ -4556,7 +4557,7 @@ TEST(Query_CompoundDescriptors) {
         check_across_handover(results, std::move(hp));
 
         tv = t1->where().find_all();
-        tv.sort(SortDescriptor(*t1, {{t1_int_col}, {t1_str_col}}, {false, false}));
+        tv.sort(SortDescriptor(*t1, {{t1_str_col}, {t1_int_col}}, {false, false}));
         CHECK_EQUAL(tv.size(), results.size());
         for (size_t i = 0; i < tv.size(); ++i) {
             CHECK_EQUAL(tv.get_int(0, i), results[i].first);
