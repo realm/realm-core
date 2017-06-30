@@ -520,6 +520,65 @@ TableView Results::get_tableview()
     REALM_UNREACHABLE();
 }
 
+static std::vector<size_t> parse_keypath(StringData keypath, Schema const& schema, const ObjectSchema *object_schema)
+{
+    auto check = [&](bool condition, const char* fmt, auto... args) {
+        if (!condition) {
+            throw std::invalid_argument(util::format("Cannot sort on key path '%1': %2.",
+                                                     keypath, util::format(fmt, args...)));
+        }
+    };
+    auto sortable_type = [](PropertyType type) {
+        return !is_array(type) && type != PropertyType::LinkingObjects && type != PropertyType::Data;
+    };
+
+    const char* begin = keypath.data();
+    const char* end = keypath.data() + keypath.size();
+    check(begin != end, "missing property name");
+    check(std::find(begin, end, '@') == end, "sorting on collection operators is not implemented");
+
+    std::vector<size_t> indices;
+    while (begin != end) {
+        auto sep = std::find(begin, end, '.');
+        check(sep != begin && sep + 1 != end, "missing property name");
+        StringData key(begin, sep - begin);
+        begin = sep + (sep != end);
+
+        auto prop = object_schema->property_for_name(key);
+        check(prop, "property '%1.%2' does not exist", object_schema->name, key);
+        check(sortable_type(prop->type), "property '%1.%2' is of unsupported type '%3'",
+              object_schema->name, key, string_for_property_type(prop->type));
+        if (prop->type == PropertyType::Object)
+            check(begin != end, "property '%1.%2' of type 'object' cannot be the final property in the key path",
+                  object_schema->name, key);
+        else
+            check(begin == end, "property '%1.%2' of type '%3' must be the final property in the key path",
+                  object_schema->name, key, prop->type_string());
+
+        indices.push_back(prop->table_column);
+        if (prop->type == PropertyType::Object)
+            object_schema = &*schema.find(prop->object_type);
+    }
+    return indices;
+}
+
+Results Results::sort(std::vector<std::pair<std::string, bool>> const& keypaths) const
+{
+    if (keypaths.empty())
+        return *this;
+
+    std::vector<std::vector<size_t>> column_indices;
+    std::vector<bool> ascending;
+    column_indices.reserve(keypaths.size());
+    ascending.reserve(keypaths.size());
+
+    for (auto& keypath : keypaths) {
+        column_indices.push_back(parse_keypath(keypath.first, m_realm->schema(), &get_object_schema()));
+        ascending.push_back(keypath.second);
+    }
+    return sort({*m_table, std::move(column_indices), std::move(ascending)});
+}
+
 Results Results::sort(realm::SortDescriptor&& sort) const
 {
     DescriptorOrdering new_order = m_descriptor_ordering;

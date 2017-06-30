@@ -119,6 +119,7 @@ public:
     // Create a new Results by further filtering or sorting this Results
     Results filter(Query&& q) const;
     Results sort(SortDescriptor&& sort) const;
+    Results sort(std::vector<std::pair<std::string, bool>> const& keypaths) const;
 
     // Create a new Results by removing duplicates
     Results distinct(DistinctDescriptor&& uniqueness);

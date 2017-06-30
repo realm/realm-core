@@ -2102,7 +2102,7 @@ TEST_CASE("results: snapshots") {
 }
 
 #if REALM_HAVE_COMPOSABLE_DISTINCT
-TEST_CASE("distinct") {
+TEST_CASE("results: distinct") {
     const int N = 10;
     InMemoryTestFile config;
     config.cache = false;
@@ -2300,7 +2300,7 @@ TEST_CASE("distinct") {
     }
 }
 #else // !REALM_HAVE_COMPOSABLE_DISTINCT
-TEST_CASE("distinct") {
+TEST_CASE("results: distinct") {
     const int N = 10;
     InMemoryTestFile config;
     config.cache = false;
@@ -2480,6 +2480,126 @@ TEST_CASE("distinct") {
 }
 #endif // !REALM_HAVE_COMPOSABLE_DISTINCT
 
+TEST_CASE("results: sort") {
+    InMemoryTestFile config;
+    config.cache = false;
+    config.schema = Schema{
+        {"object", {
+            {"value", PropertyType::Int},
+            {"bool", PropertyType::Bool},
+            {"data prop", PropertyType::Data},
+            {"link", PropertyType::Object|PropertyType::Nullable, "object 2"},
+            {"array", PropertyType::Object|PropertyType::Array, "object 2"},
+        }},
+        {"object 2", {
+            {"value", PropertyType::Int},
+            {"link", PropertyType::Object|PropertyType::Nullable, "object"},
+        }},
+    };
+
+    auto realm = Realm::get_shared_realm(config);
+    auto table = realm->read_group().get_table("class_object");
+    auto table2 = realm->read_group().get_table("class_object 2");
+    Results r(realm, *table);
+
+    SECTION("invalid keypaths") {
+        SECTION("empty property name") {
+            REQUIRE_THROWS_WITH(r.sort({{"", true}}), "Cannot sort on key path '': missing property name.");
+            REQUIRE_THROWS_WITH(r.sort({{".", true}}), "Cannot sort on key path '.': missing property name.");
+            REQUIRE_THROWS_WITH(r.sort({{"link.", true}}), "Cannot sort on key path 'link.': missing property name.");
+            REQUIRE_THROWS_WITH(r.sort({{".value", true}}), "Cannot sort on key path '.value': missing property name.");
+            REQUIRE_THROWS_WITH(r.sort({{"link..value", true}}), "Cannot sort on key path 'link..value': missing property name.");
+        }
+        SECTION("bad property name") {
+            REQUIRE_THROWS_WITH(r.sort({{"not a property", true}}),
+                                "Cannot sort on key path 'not a property': property 'object.not a property' does not exist.");
+            REQUIRE_THROWS_WITH(r.sort({{"link.not a property", true}}),
+                                "Cannot sort on key path 'link.not a property': property 'object 2.not a property' does not exist.");
+        }
+        SECTION("collection operator") {
+            REQUIRE_THROWS_WITH(r.sort({{"@count", true}}),
+                                "Cannot sort on key path '@count': sorting on collection operators is not implemented.");
+        }
+        SECTION("subscript primitive") {
+            REQUIRE_THROWS_WITH(r.sort({{"value.link", true}}),
+                                "Cannot sort on key path 'value.link': property 'object.value' of type 'int' must be the final property in the key path.");
+        }
+        SECTION("end in link") {
+            REQUIRE_THROWS_WITH(r.sort({{"link", true}}),
+                                "Cannot sort on key path 'link': property 'object.link' of type 'object' cannot be the final property in the key path.");
+            REQUIRE_THROWS_WITH(r.sort({{"link.link", true}}),
+                                "Cannot sort on key path 'link.link': property 'object 2.link' of type 'object' cannot be the final property in the key path.");
+        }
+        SECTION("sort involving bad property types") {
+            REQUIRE_THROWS_WITH(r.sort({{"array", true}}),
+                                "Cannot sort on key path 'array': property 'object.array' is of unsupported type 'array'.");
+            REQUIRE_THROWS_WITH(r.sort({{"array.value", true}}),
+                                "Cannot sort on key path 'array.value': property 'object.array' is of unsupported type 'array'.");
+            REQUIRE_THROWS_WITH(r.sort({{"link.link.array.value", true}}),
+                                "Cannot sort on key path 'link.link.array.value': property 'object.array' is of unsupported type 'array'.");
+            REQUIRE_THROWS_WITH(r.sort({{"data prop", true}}),
+                                "Cannot sort on key path 'data prop': property 'object.data prop' is of unsupported type 'data'.");
+        }
+    }
+
+    realm->begin_transaction();
+    table->add_empty_row(4);
+    table2->add_empty_row(4);
+    for (int i = 0; i < 4; ++i) {
+        table->set_int(0, i, (i + 2) % 4);
+        table->set_bool(1, i, i % 2);
+        table->set_link(3, i, 3 - i);
+
+        table2->set_int(0, i, (i + 1) % 4);
+        table2->set_link(1, i, i);
+    }
+    realm->commit_transaction();
+    /*
+     | index | value | bool | link.value | link.link.value |
+     |-------|-------|------|------------|-----------------|
+     | 0     | 2     | 0    | 0          | 1               |
+     | 1     | 3     | 1    | 3          | 0               |
+     | 2     | 0     | 0    | 2          | 3               |
+     | 3     | 1     | 1    | 1          | 2               |
+     */
+
+    #define REQUIRE_ORDER(sort, ...) do { \
+        std::vector<size_t> expected = {__VA_ARGS__}; \
+        auto results = sort; \
+        for (size_t i = 0; i < 4; ++i) \
+            REQUIRE(results.get(i).get_index() == expected[i]); \
+    } while (0)
+
+    SECTION("sort on single property") {
+        REQUIRE_ORDER((r.sort({{"value", true}})),
+                      2, 3, 0, 1);
+        REQUIRE_ORDER((r.sort({{"value", false}})),
+                      1, 0, 3, 2);
+    }
+
+    SECTION("sort on two properties") {
+        REQUIRE_ORDER((r.sort({{"bool", true}, {"value", true}})),
+                      2, 0, 3, 1);
+        REQUIRE_ORDER((r.sort({{"bool", false}, {"value", true}})),
+                      3, 1, 2, 0);
+        REQUIRE_ORDER((r.sort({{"bool", true}, {"value", false}})),
+                      0, 2, 1, 3);
+        REQUIRE_ORDER((r.sort({{"bool", false}, {"value", false}})),
+                      1, 3, 0, 2);
+    }
+    SECTION("sort over link") {
+        REQUIRE_ORDER((r.sort({{"link.value", true}})),
+                      0, 3, 2, 1);
+        REQUIRE_ORDER((r.sort({{"link.value", false}})),
+                      1, 2, 3, 0);
+    }
+    SECTION("sort over two links") {
+        REQUIRE_ORDER((r.sort({{"link.link.value", true}})),
+                      1, 0, 3, 2);
+        REQUIRE_ORDER((r.sort({{"link.link.value", false}})),
+                      2, 3, 0, 1);
+    }
+}
 
 struct ResultsFromTable {
     static Results call(std::shared_ptr<Realm> r, Table* table) {

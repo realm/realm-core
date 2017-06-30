@@ -221,6 +221,12 @@ Results List::sort(SortDescriptor order) const
     return Results(m_realm, m_link_view, util::none, std::move(order));
 }
 
+Results List::sort(std::vector<std::pair<std::string, bool>> const& keypaths) const
+{
+    verify_attached();
+    return as_results().sort(keypaths);
+}
+
 Results List::filter(Query q) const
 {
     verify_attached();
