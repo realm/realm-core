@@ -2148,8 +2148,7 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 
 #if 0
->>>>>>> b82661e1fe58b43c8cbc5fbd97cefa2fac83dcec
-
+// FIXME: This unittest seems wrong or perhaps unfinished
 TEST(Shared_WaitForChangeAfterOwnCommit)
 {
     SHARED_GROUP_TEST_PATH(path);
