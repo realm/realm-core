@@ -1,3 +1,14 @@
+# 3.0.0-rc2patch1 Release notes
+
+### Bugfixes
+
+* Fix chained sort behaviour.
+  PR [#2704](https://github.com/realm/realm-core/pull/2704).
+
+**Note: This is a hotfix release built on top of 3.0.0-rc2 (without cmake)
+
+----------------------------------------------
+
 # 3.0.0-rc2 Release notes
 
 ### Bugfixes
