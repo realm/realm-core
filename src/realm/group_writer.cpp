@@ -786,7 +786,7 @@ void GroupWriter::commit(ref_type new_top_ref)
     int slot_selector = ((new_flags & SlabAlloc::flags_SelectBit) != 0 ? 1 : 0);
 
     // Update top ref and file format version
-    int file_format_version = m_alloc.get_file_format_version();
+    int file_format_version = m_group.get_file_format_version();
     using type_1 = std::remove_reference<decltype(file_header.m_file_format[0])>::type;
     REALM_ASSERT(!util::int_cast_has_overflow<type_1>(file_format_version));
     file_header.m_top_ref[slot_selector] = new_top_ref;

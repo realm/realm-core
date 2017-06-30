@@ -56,44 +56,21 @@
 using namespace realm;
 using namespace realm::util;
 
-
-namespace {
-
-// Valgrind can show still-reachable leaks for pthread_create() on many systems (AIX, Debian, etc) because
-// glibc declares a static memory pool for threads which are free'd by the OS on process termination. See
-// http://www.network-theory.co.uk/docs/valgrind/valgrind_20.html under --run-libc-freeres=<yes|no>.
-// This can give false positives because of missing suppression, etc (not real leaks!). It's also a problem
-// on Windows, so we have written our own clean-up method for the Windows port.
-#if defined _WIN32 && defined REALM_DEBUG
-void free_threadpool();
-
-class Initialization {
-public:
-    ~Initialization()
-    {
-        free_threadpool();
-    }
-};
-
-Initialization initialization;
-
-void free_threadpool()
-{
-    pthread_cleanup();
-}
-#endif
-
-} // anonymous namespace
-
-
 void Thread::join()
 {
     if (!m_joinable)
         throw std::runtime_error("Thread is not joinable");
+
+#ifdef _WIN32
+    // Returns void; error handling not possible
+    m_std_thread.join();
+#else
     void** value_ptr = nullptr; // Ignore return value
     int r = pthread_join(m_id, value_ptr);
     if (REALM_UNLIKELY(r != 0))
         join_failed(r); // Throws
+#endif
+
     m_joinable = false;
 }
 
@@ -154,6 +131,32 @@ REALM_NORETURN void Thread::join_failed(int)
 
 void Mutex::init_as_process_shared(bool robust_if_available)
 {
+    // IF YOU PAGEFAULT HERE, IT'S LIKELY CAUSED BY DATABASE RESIDING ON NETWORK SHARE (WINDOWS + *NIX). Memory 
+    // mapping is not coherent there. Note that this issue is NOT pthread related. Only reason why it happens in 
+    // this mutex->is_shared is that mutex coincidentally happens to be the first member that shared group accesses.
+    m_is_shared = true; // <-- look above!
+    // ^^^^ Look above
+
+#ifdef _WIN32
+    GUID guid;
+    HANDLE h;
+
+    // Create unique and random mutex name. UuidCreate() needs linking with Rpcrt4.lib, so we use CoCreateGuid() 
+    // instead. That way end-user won't need to mess with Visual Studio project settings
+    CoCreateGuid(&guid);
+    sprintf_s(m_shared_name, sizeof(m_shared_name), "Local\\%08X%04X%04X%02X%02X%02X%02X%02X", 
+              guid.Data1, guid.Data2, guid.Data3, 
+              guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3], guid.Data4[4]);
+
+    h = CreateMutexA(NULL, 0, m_shared_name);
+    if (h == NULL)
+        REALM_ASSERT_RELEASE("CreateMutexA() failed" && false);
+
+    m_cached_handle = h;
+    m_cached_pid = GetCurrentProcessId();
+    return;
+#endif
+
 #ifdef REALM_HAVE_PTHREAD_PROCESS_SHARED
     pthread_mutexattr_t attr;
     int r = pthread_mutexattr_init(&attr);
@@ -234,6 +237,12 @@ bool RobustMutex::is_robust_on_this_platform() noexcept
 
 bool RobustMutex::low_level_lock()
 {
+#ifdef _WIN32
+    REALM_ASSERT_RELEASE(Mutex::m_is_shared);
+    // Returns void. Error handling takes place inside lock()
+    Mutex::lock();
+    return true;
+#else
     int r = pthread_mutex_lock(&m_impl);
     if (REALM_LIKELY(r == 0))
         return true;
@@ -244,10 +253,15 @@ bool RobustMutex::low_level_lock()
         throw NotRecoverable();
 #endif
     lock_failed(r);
+#endif // _WIN32
 }
 
 int RobustMutex::try_low_level_lock()
 {
+#ifdef _WIN32
+    REALM_ASSERT_RELEASE(Mutex::m_is_shared);
+    return Mutex::try_lock();
+#else
     int r = pthread_mutex_trylock(&m_impl);
     if (REALM_LIKELY(r == 0))
         return 1;
@@ -260,10 +274,22 @@ int RobustMutex::try_low_level_lock()
         throw NotRecoverable();
 #endif
     lock_failed(r);
+#endif // _WIN32
 }
 
 bool RobustMutex::is_valid() noexcept
 {
+#ifdef _WIN32    
+    REALM_ASSERT_RELEASE(Mutex::m_is_shared);
+    HANDLE h = OpenMutexA(MUTEX_ALL_ACCESS, 1, m_shared_name);
+    if (h) {
+        CloseHandle(h);
+        return true;
+    }
+    else {
+        return false;
+    }
+#else
     // FIXME: This check tries to lock the mutex, and only unlocks it if the
     // return value is zero. If pthread_mutex_trylock() fails with EOWNERDEAD,
     // this leads to deadlock during the following propper attempt to lock. This
@@ -277,6 +303,7 @@ bool RobustMutex::is_valid() noexcept
         return true;
     }
     return r != EINVAL;
+#endif
 }
 
 
@@ -303,7 +330,7 @@ CondVar::CondVar(process_shared_tag)
     REALM_ASSERT(r2 == 0);
     if (REALM_UNLIKELY(r != 0))
         init_failed(r);
-#else // !REALM_HAVE_PTHREAD_PROCESS_SHARED
+#else
     throw std::runtime_error("No support for process-shared condition variables");
 #endif
 }

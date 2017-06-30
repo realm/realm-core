@@ -602,6 +602,36 @@ TEST(Transactions_General)
     // End of read transaction
 }
 
+TEST(Transactions_RollbackAddRows)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    std::unique_ptr<Replication> hist_w(make_in_realm_history(path));
+    SharedGroup sg_w(*hist_w, SharedGroupOptions(crypt_key()));
+    WriteTransaction wt(sg_w);
+    Group& g = wt.get_group();
+
+    g.insert_table(0, "t0");
+    g.get_table(0)->add_column(type_Int, "integers");
+
+    LangBindHelper::commit_and_continue_as_read(sg_w);
+    LangBindHelper::promote_to_write(sg_w);
+
+    g.get_table(0)->add_empty_row();
+    g.get_table(0)->add_row_with_key(0, 45);
+    Row r0 = g.get_table(0)->get(0);
+    Row r1 = g.get_table(0)->get(1);
+    CHECK(r0.is_attached());
+    CHECK(r1.is_attached());
+    LangBindHelper::rollback_and_continue_as_read(sg_w);
+
+    CHECK(!r0.is_attached());
+    CHECK(!r1.is_attached());
+    g.verify();
+
+    LangBindHelper::promote_to_write(sg_w);
+
+    CHECK_EQUAL(g.get_table(0)->size(), 0);
+}
 
 // Rollback a table move operation and check accessors.
 // This case checks column accessors when a table is inserted, moved, rolled back.
