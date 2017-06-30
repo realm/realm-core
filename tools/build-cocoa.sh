@@ -11,7 +11,7 @@ function usage {
     echo "Arguments:"
     echo "   -b : build from source. If absent it will expect prebuilt packages"
     echo "   -m : build for macOS only"
-    echo "   -c : copy core to the specified folder"
+    echo "   -c : copy core to the specified folder instead of packaging it"
     exit 1;
 }
 
@@ -78,8 +78,8 @@ if [[ ! -z $COPY ]]; then
     rm -rf "${DESTINATION}/core"
     mkdir -p "${DESTINATION}"
     cp -R core "${DESTINATION}"
+else
+    v=$(git describe --tags)
+    rm -f "realm-core-cocoa-${v}.tar.xz"
+    tar -cJvf "realm-core-cocoa-${v}.tar.xz" core
 fi
-
-v=$(git describe --tags)
-rm -f "realm-core-cocoa-${v}.tar.xz"
-tar -cJvf "realm-core-cocoa-${v}.tar.xz" core
