@@ -528,14 +528,13 @@ static std::vector<size_t> parse_keypath(StringData keypath, Schema const& schem
                                                      keypath, util::format(fmt, args...)));
         }
     };
-    auto sortable_type = [](PropertyType type) {
+    auto is_sortable_type = [](PropertyType type) {
         return !is_array(type) && type != PropertyType::LinkingObjects && type != PropertyType::Data;
     };
 
     const char* begin = keypath.data();
     const char* end = keypath.data() + keypath.size();
     check(begin != end, "missing property name");
-    check(std::find(begin, end, '@') == end, "sorting on collection operators is not implemented");
 
     std::vector<size_t> indices;
     while (begin != end) {
@@ -546,13 +545,13 @@ static std::vector<size_t> parse_keypath(StringData keypath, Schema const& schem
 
         auto prop = object_schema->property_for_name(key);
         check(prop, "property '%1.%2' does not exist", object_schema->name, key);
-        check(sortable_type(prop->type), "property '%1.%2' is of unsupported type '%3'",
+        check(is_sortable_type(prop->type), "property '%1.%2' is of unsupported type '%3'",
               object_schema->name, key, string_for_property_type(prop->type));
         if (prop->type == PropertyType::Object)
             check(begin != end, "property '%1.%2' of type 'object' cannot be the final property in the key path",
                   object_schema->name, key);
         else
-            check(begin == end, "property '%1.%2' of type '%3' must be the final property in the key path",
+            check(begin == end, "property '%1.%2' of type '%3' may only be the final property in the key path",
                   object_schema->name, key, prop->type_string());
 
         indices.push_back(prop->table_column);

@@ -2516,13 +2516,9 @@ TEST_CASE("results: sort") {
             REQUIRE_THROWS_WITH(r.sort({{"link.not a property", true}}),
                                 "Cannot sort on key path 'link.not a property': property 'object 2.not a property' does not exist.");
         }
-        SECTION("collection operator") {
-            REQUIRE_THROWS_WITH(r.sort({{"@count", true}}),
-                                "Cannot sort on key path '@count': sorting on collection operators is not implemented.");
-        }
         SECTION("subscript primitive") {
             REQUIRE_THROWS_WITH(r.sort({{"value.link", true}}),
-                                "Cannot sort on key path 'value.link': property 'object.value' of type 'int' must be the final property in the key path.");
+                                "Cannot sort on key path 'value.link': property 'object.value' of type 'int' may only be the final property in the key path.");
         }
         SECTION("end in link") {
             REQUIRE_THROWS_WITH(r.sort({{"link", true}}),
