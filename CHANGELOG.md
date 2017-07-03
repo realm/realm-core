@@ -2,15 +2,98 @@
 
 ### Bugfixes
 
-* Lorem ipsum.
+* Attempting to open a small unencrypted Realm file with an encryption key would
+  produce an empty encrypted Realm file. Fixed by detecting the case and
+  throwing an exception.
+  PR [#2645](https://github.com/realm/realm-core/pull/2645)
+* Fixed a bug where case insensitive queries wouldn't return all results.
+  PR [#2675](https://github.com/realm/realm-core/pull/2675).
+* Querying SharedGroup::wait_for_change() immediately after a commit()
+  would return instead of waiting for the next change.
+  PR [#2563](https://github.com/realm/realm-core/pull/2563).
 
 ### Breaking changes
 
-* Lorem ipsum.
+* Added support for compound sort and distinct queries.
+    - Multiple consecutive calls to sort or distinct compound on each other
+      in the order applied rather than replacing the previous one.
+    - The order that sort and distinct are applied can change the query result.
+    - Applying an empty sort or distinct descriptor is now a no-op, this
+      could previously be used to clear a sort or distinct operation.
+  PR [#2644](https://github.com/realm/realm-core/pull/2644)
+* Support for size query on LinkedList removed. This is perhaps not so 
+  breaking after all since it is probably not used.
+  PR [#2532](https://github.com/realm/realm-core/pull/2532).
+* Replication interface changed. The search index functions now operate
+  on a descriptor and not a table.
+  PR [#2561](https://github.com/realm/realm-core/pull/2561).
+* New replication instruction: instr_AddRowWithKey
 
 ### Enhancements
 
-* Lorem ipsum.
+* Enhanced support for query in subtables:
+  Query q = table->column<SubTable>(0).list<Int>() == 5;
+  Query q = table->column<SubTable>(0).list<Int>().min() >= 2;
+  Query q = table->column<SubTable>(1).list<String>().begins_with("Bar");
+  PR [#2532](https://github.com/realm/realm-core/pull/2532).
+* Subtable column can now be nullable. You can use `is_null()` and `set_null()`
+  on a subtable element.
+  PR [#2560](https://github.com/realm/realm-core/pull/2560).
+* Support for search index on subtable columns. Only one level of subtables
+  are currently supported, that is, you cannot create a search index in a
+  subtable of a subtable (will throw exception). NOTE: Core versions prior to
+  this version will not be able to open .realm files of this Core version if
+  this Core version has added such indexes. Adding or removing an index will
+  take place for *all* subtables in a subtable column. There is no way to add
+  or remove it from single individual subtables.
+  PR [#2561](https://github.com/realm/realm-core/pull/2561).
+* Support for encryption on Windows (Win32 + UWP).
+  PR [#2643](https://github.com/realm/realm-core/pull/2643).
+* Add Table::add_row_with_key(). Adds a row and fills an integer column with
+  a value in one operation.
+  PR [#2596](https://github.com/realm/realm-core/pull/2596)
+  Issue [#2585](https://github.com/realm/realm-core/issues/2585)
+* Add more overloads with realm::null - PR [#2669](https://github.com/realm/realm-core/pull/2669)
+  - `size_t Table::find_first(size_t col_ndx, null)`
+  - `OutputStream& operator<<(OutputStream& os, const null&)`
+* Add method to get total count of backlinks for a row
+  PR [#2672](https://github.com/realm/realm-core/pull/2672)
+
+-----------
+
+### Internals
+
+* The RuntimeLibrary of the Windows build is changed from MultiThreadedDLL to
+  just MultiThreaded so as to statically link the Visual C++ runtime libraries,
+  removing the onus on end-users to have the correct runtime redistributable
+  package or satellite assembly pack installed. Libraries that link against Core
+  on Windows will have to adjust their compiler flags accordingly.
+  PR [#2611](https://github.com/realm/realm-core/pull/2611).
+* Win32+UWP: Switched from pthread-win32 to native API.
+  PR [#2602](https://github.com/realm/realm-core/pull/2602).
+* Implemented inter-process CondVars on Windows (Win32 + UWP). They should be
+  fair and robust.
+  PR [#2497](https://github.com/realm/realm-core/pull/2497).
+
+----------------------------------------------
+
+# 2.8.5 Release notes
+
+### Internals
+
+* `_impl::GroupFriend::get_top_ref()` was added.
+  PR [#2683](https://github.com/realm/realm-core/pull/2683).
+
+----------------------------------------------
+
+# 2.8.4 Release notes
+
+### Bugfixes
+
+* Fixes bug in encryption that could cause deadlocks/hangs and possibly
+  other bugs too.
+  Fixes issue [#2650](https://github.com/realm/realm-core/pull/2650).
+  PR [#2668](https://github.com/realm/realm-core/pull/2668).
 
 -----------
 
@@ -62,7 +145,7 @@
 * Fix missing symbols for some overloads of Table::find_first
   in some configurations.
   PR [#2624](https://github.com/realm/realm-core/pull/2624).
-
+  
 ----------------------------------------------
 
 # 2.8.0 Release notes
