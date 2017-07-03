@@ -8,6 +8,9 @@
   PR [#2645](https://github.com/realm/realm-core/pull/2645)
 * Fixed a bug where case insensitive queries wouldn't return all results.
   PR [#2675](https://github.com/realm/realm-core/pull/2675).
+* Querying SharedGroup::wait_for_change() immediately after a commit()
+  would return instead of waiting for the next change.
+  PR [#2563](https://github.com/realm/realm-core/pull/2563).
 
 ### Breaking changes
 

@@ -96,29 +96,29 @@ using unit_test::TestContext;
 
 #ifdef _WIN32
 namespace {
-    // NOTE: Unit tests must use NONCONCURRENT_TEST() macro if they use wínfork!
-    //
-    // NOTE: This does not work like on POSIX: The child will begin execution from
-    // the unit test entry point, not from where fork() took place.
-    //
-    DWORD winfork(std::string unit_test_name)
-    {
-        if (getenv("REALM_FORKED"))
-            return GetCurrentProcessId();
+// NOTE: Unit tests must use NONCONCURRENT_TEST() macro if they use winfork!
+//
+// NOTE: This does not work like on POSIX: The child will begin execution from
+// the unit test entry point, not from where fork() took place.
+//
+DWORD winfork(std::string unit_test_name)
+{
+    if (getenv("REALM_FORKED"))
+        return GetCurrentProcessId();
 
-        remove("winfork.bat");
-        std::ofstream myfile("winfork.bat");
-        myfile << "set UNITTEST_FILTER=" << unit_test_name << "\n";
-        myfile << "set REALM_FORKED=1\n";
-        char buf[1024] = { 0 };
-        DWORD ret = GetModuleFileNameA(NULL, buf, sizeof(buf));
-        myfile << "\"" << buf << "\"\n";
-        myfile.close();
-        int64_t nRet = (int64_t)ShellExecuteA(0, "open", "winfork.bat", 0, 0, SW_SHOWNORMAL);
-        if (nRet <= 32) {
-            return -1;
-        }
-        return 0;
+    remove("winfork.bat");
+    std::ofstream myfile("winfork.bat");
+    myfile << "set UNITTEST_FILTER=" << unit_test_name << "\n";
+    myfile << "set REALM_FORKED=1\n";
+    char buf[1024] = {0};
+    DWORD ret = GetModuleFileNameA(NULL, buf, sizeof(buf));
+    myfile << "\"" << buf << "\"\n";
+    myfile.close();
+    int64_t nRet = (int64_t)ShellExecuteA(0, "open", "winfork.bat", 0, 0, SW_SHOWNORMAL);
+    if (nRet <= 32) {
+        return -1;
+    }
+    return 0;
     }
 }
 #endif
