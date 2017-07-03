@@ -181,7 +181,8 @@ protected:
 
 private:
     bool m_is_shared = false;
-
+    bool m_recursive = false;
+    std::atomic<int> m_recursive_lock_count = { 0 };
 #ifdef _WIN32
     // All below members are used for interprocess Windows-API mutexes only. Needs to be declared unconditionally
     // because these are setup on runtime through Mutex(process_shared_tag).
