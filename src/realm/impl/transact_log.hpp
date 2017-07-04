@@ -79,6 +79,7 @@ enum Instruction {
     instr_LinkListNullify = 36, // Remove an entry from a link list due to linked row being erased
     instr_LinkListClear = 37,   // Ramove all entries from a link list
     instr_LinkListSetAll = 38,  // Assign to link list entry
+    instr_AddRowWithKey = 39,   // Insert a row with a given key
 };
 
 class TransactLogStream {
@@ -153,6 +154,10 @@ public:
 
     // Must have table selected:
     bool insert_empty_rows(size_t, size_t, size_t, bool)
+    {
+        return true;
+    }
+    bool add_row_with_key(size_t, size_t, size_t, int64_t)
     {
         return true;
     }
@@ -334,6 +339,7 @@ public:
 
     /// Must have table selected.
     bool insert_empty_rows(size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows, bool unordered);
+    bool add_row_with_key(size_t row_ndx, size_t prior_num_rows, size_t key_col_ndx, int64_t key);
     bool erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows, bool unordered);
     bool swap_rows(size_t row_ndx_1, size_t row_ndx_2);
     bool merge_rows(size_t row_ndx, size_t new_row_ndx);
@@ -499,6 +505,8 @@ public:
     /// \param prior_num_rows The number of rows in the table prior to the
     /// modification.
     virtual void insert_empty_rows(const Table*, size_t row_ndx, size_t num_rows_to_insert, size_t prior_num_rows);
+    virtual void add_row_with_key(const Table* t, size_t row_ndx, size_t prior_num_rows, size_t key_col_ndx,
+                                  int64_t key);
 
     /// \param prior_num_rows The number of rows in the table prior to the
     /// modification.
@@ -507,8 +515,8 @@ public:
 
     virtual void swap_rows(const Table*, size_t row_ndx_1, size_t row_ndx_2);
     virtual void merge_rows(const Table*, size_t row_ndx, size_t new_row_ndx);
-    virtual void add_search_index(const Table*, size_t col_ndx);
-    virtual void remove_search_index(const Table*, size_t col_ndx);
+    virtual void add_search_index(const Descriptor&, size_t col_ndx);
+    virtual void remove_search_index(const Descriptor&, size_t col_ndx);
     virtual void set_link_type(const Table*, size_t col_ndx, LinkType);
     virtual void clear_table(const Table*);
     virtual void optimize_table(const Table*);
@@ -1461,6 +1469,20 @@ inline void TransactLogConvenientEncoder::insert_empty_rows(const Table* t, size
     m_encoder.insert_empty_rows(row_ndx, num_rows_to_insert, prior_num_rows, unordered); // Throws
 }
 
+inline bool TransactLogEncoder::add_row_with_key(size_t row_ndx, size_t prior_num_rows, size_t key_col_ndx,
+                                                 int64_t key)
+{
+    append_simple_instr(instr_AddRowWithKey, row_ndx, prior_num_rows, key_col_ndx, key); // Throws
+    return true;
+}
+
+inline void TransactLogConvenientEncoder::add_row_with_key(const Table* t, size_t row_ndx, size_t prior_num_rows,
+                                                           size_t key_col_ndx, int64_t key)
+{
+    select_table(t);                                          // Throws
+    m_encoder.add_row_with_key(row_ndx, prior_num_rows, key_col_ndx, key); // Throws
+}
+
 inline bool TransactLogEncoder::erase_rows(size_t row_ndx, size_t num_rows_to_erase, size_t prior_num_rows,
                                            bool unordered)
 {
@@ -1508,9 +1530,9 @@ inline bool TransactLogEncoder::add_search_index(size_t col_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::add_search_index(const Table* t, size_t col_ndx)
+inline void TransactLogConvenientEncoder::add_search_index(const Descriptor& desc, size_t col_ndx)
 {
-    select_table(t);                     // Throws
+    select_desc(desc);                   // Throws
     m_encoder.add_search_index(col_ndx); // Throws
 }
 
@@ -1521,9 +1543,9 @@ inline bool TransactLogEncoder::remove_search_index(size_t col_ndx)
     return true;
 }
 
-inline void TransactLogConvenientEncoder::remove_search_index(const Table* t, size_t col_ndx)
+inline void TransactLogConvenientEncoder::remove_search_index(const Descriptor& desc, size_t col_ndx)
 {
-    select_table(t);                        // Throws
+    select_desc(desc);                      // Throws
     m_encoder.remove_search_index(col_ndx); // Throws
 }
 
@@ -1869,6 +1891,15 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             return;
         }
+        case instr_AddRowWithKey: {
+            size_t row_ndx = read_int<size_t>();                         // Throws
+            size_t prior_num_rows = read_int<size_t>();                  // Throws
+            size_t key_col_ndx = read_int<size_t>();                     // Throws
+            int64_t key = read_int<int64_t>();                           // Throws
+            if (!handler.add_row_with_key(row_ndx, prior_num_rows, key_col_ndx, key)) // Throws
+                parser_error();
+            return;
+        }
         case instr_EraseRows: {
             size_t row_ndx = read_int<size_t>();                                            // Throws
             size_t num_rows_to_erase = read_int<size_t>();                                  // Throws
@@ -2013,8 +2044,8 @@ void TransactLogParser::parse_one(InstructionHandler& handler)
                 parser_error();
             StringData name = read_string(m_string_buffer); // Throws
             bool nullable = (Instruction(instr) == instr_InsertNullableColumn);
-            if (REALM_UNLIKELY(nullable && (type == type_Table || type == type_Mixed))) {
-                // Nullability not supported for Table and Mixed columns.
+            if (REALM_UNLIKELY(nullable && (type == type_Mixed))) {
+                // Nullability not supported for Mixed columns.
                 parser_error();
             }
             if (!handler.insert_column(col_ndx, DataType(type), name, nullable)) // Throws
@@ -2412,6 +2443,14 @@ public:
         size_t num_rows_to_erase = num_rows_to_insert;
         size_t prior_num_rows_2 = prior_num_rows + num_rows_to_insert;
         m_encoder.erase_rows(row_ndx, num_rows_to_erase, prior_num_rows_2, unordered); // Throws
+        append_instruction();
+        return true;
+    }
+
+    bool add_row_with_key(size_t row_ndx, size_t prior_num_rows, size_t, int64_t)
+    {
+        bool unordered = true;
+        m_encoder.erase_rows(row_ndx, 1, prior_num_rows + 1, unordered); // Throws
         append_instruction();
         return true;
     }
