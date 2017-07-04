@@ -7,6 +7,10 @@ set -e
 # to delete them from our host.
 trap 'chown -R --reference /inside/build-package /out/' EXIT
 
+# RPMs do not allow dashes in the version string, so we replace it here with an underscore.
+# This would have been done automatically by fpm, but not for dependencies.
+VERSION=${VERSION/-/_}
+
 # the source directory is mounted read-only to prevent issues where the build
 # could alter the source; we should copy it somewhere inside the container
 cp -a /source /tmp/build
