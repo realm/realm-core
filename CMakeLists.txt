@@ -16,7 +16,26 @@ if(${CMAKE_EXTRA_GENERATOR} MATCHES "Eclipse CDT4")
     set(CMAKE_ECLIPSE_VERSION "4.6.2" CACHE STRING "Eclipse version" FORCE)
 endif()
 
-project(realm VERSION ${DEP_VERSION})
+#check version format
+string(REGEX MATCH "^[0-9]+\.[0-9]+\.[0-9]+$" CONFIG_VERSION ${DEP_VERSION})
+if (NOT CONFIG_VERSION)
+    string(REGEX MATCH "^[0-9]+\.[0-9]+\.[0-9]+-.+$" CONFIG_VERSION ${DEP_VERSION})
+    if (NOT CONFIG_VERSION)
+        message(FATAL_ERROR "Wrong version number format: ${DEP_VERSION}.")
+    endif()
+    set(extended_version 1)
+endif()
+
+# Split "x.y.z-t" into a list x;y;z;t
+string(REGEX MATCHALL "[^.-]+" VERSION_LIST ${CONFIG_VERSION})
+list(GET VERSION_LIST 0 CONFIG_VERSION_MAJOR)
+list(GET VERSION_LIST 1 CONFIG_VERSION_MINOR)
+list(GET VERSION_LIST 2 CONFIG_VERSION_PATCH)
+if (extended_version)
+    list(GET VERSION_LIST 3 CONFIG_VERSION_TWEAK)
+endif()
+
+project(realm)
 
 # Include general CMake modules
 include(GNUInstallDirs)
