@@ -76,7 +76,8 @@ KVOAdapter::KVOAdapter(std::vector<BindingContext::ObserverState>& observers, Bi
     for (auto& observer : observers) {
         auto table = group.get_table(observer.table_ndx);
         for (size_t i = 0, count = table->get_column_count(); i < count; ++i) {
-            if (table->get_column_type(i) != type_LinkList)
+            auto type = table->get_column_type(i);
+            if (type != type_LinkList && type != type_Table)
                 continue;
             m_lists.push_back({&observer, i, {}});
         }
