@@ -432,8 +432,8 @@ public:
         if (len == 1) {
             // Mark the cell containing the subtable as modified since selecting
             // a table is always followed by a modification of some sort
-            size_t row = path[0];
-            size_t col = path[1];
+            size_t col = path[0];
+            size_t row = path[1];
             mark_dirty(row, col);
 
             m_active_table = nullptr;
