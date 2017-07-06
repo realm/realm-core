@@ -202,7 +202,7 @@ void CollectionChangeBuilder::insert(size_t index, size_t count, bool track_move
 
     for (auto& move : moves) {
         if (move.to >= index)
-            ++move.to;
+            move.to += count;
     }
 
     if (m_move_mapping.empty())

@@ -435,10 +435,11 @@ public:
             size_t col = path[1];
             mark_dirty(row, col);
 
+            m_active_table = nullptr;
+            m_is_top_level_table = false;
             if (auto table = find_list(current_table(), col, row)) {
                 m_active_table = table;
                 m_need_move_info = true;
-                m_is_top_level_table = false;
             }
         }
         return true;
