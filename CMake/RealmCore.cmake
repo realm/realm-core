@@ -86,9 +86,6 @@ function(use_realm_core enable_sync core_prefix sync_prefix)
             clone_and_build_realm_core("v${REALM_CORE_VERSION}")
         endif()
     endif()
-
-    set(REALM_CORE_INCLUDE_DIR ${REALM_CORE_INCLUDE_DIR} PARENT_SCOPE)
-    set(REALM_SYNC_INCLUDE_DIR ${REALM_SYNC_INCLUDE_DIR} PARENT_SCOPE)
 endfunction()
 
 function(download_realm_tarball url target libraries)
@@ -123,76 +120,11 @@ function(download_realm_tarball url target libraries)
             COMMAND "${CMAKE_COMMAND}" -E chdir "${target}" "${CMAKE_COMMAND}" -E tar xf "${tarball_path}"
             COMMAND "${CMAKE_COMMAND}" -E touch_nocreate ${libraries})
     endif()
-
 endfunction()
-
-macro(define_realm_core_target was_downloaded core_directory)
-    if(${was_downloaded})
-        set(library_directory "")
-        set(include_directory "include/")
-    else()
-        set(library_directory "src/realm/")
-        set(include_directory "src/")
-    endif()
-      
-    if(APPLE)
-        set(core_platform "-macosx")
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-        set(library_directory "lib")
-        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-            set(core_platform "-x64")
-        else()
-            set(core_platform "-x86")
-        endif()
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "WindowsStore")
-        set(library_directory "lib")
-        set(core_platform "-uwp-x86")
-        if(CMAKE_GENERATOR_PLATFORM MATCHES "^[Xx]64$")
-            set(core_platform "-uwp-x64")
-        elseif(CMAKE_GENERATOR_PLATFORM MATCHES "^[Aa][Rr][Mm]$")
-            set(core_platform "-uwp-arm")
-        endif()
-    elseif(REALM_PLATFORM STREQUAL "Android")
-        if(ANDROID_ABI STREQUAL "armeabi-v7a") # Realm Core still uses this name
-            set(core_platform "-android-arm-v7a")
-        else()
-            set(core_platform "-android-${ANDROID_ABI}")
-        endif()
-    endif()
-
-    set(core_library_debug ${core_directory}/${library_directory}/${CMAKE_STATIC_LIBRARY_PREFIX}realm${core_platform}-dbg${CMAKE_STATIC_LIBRARY_SUFFIX})
-    set(core_library_release ${core_directory}/${library_directory}/${CMAKE_STATIC_LIBRARY_PREFIX}realm${core_platform}${CMAKE_STATIC_LIBRARY_SUFFIX})
-    set(core_libraries ${core_library_debug} ${core_library_release})
-
-    if(${was_downloaded})
-        add_custom_target(realm-core DEPENDS ${core_libraries})
-    else()
-        ExternalProject_Add_Step(realm-core ensure-libraries
-            COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${core_libraries}
-            OUTPUT ${core_libraries}
-            DEPENDEES build
-            )
-    endif()
-
-    add_library(realm STATIC IMPORTED)
-    add_dependencies(realm realm-core)
-    set_property(TARGET realm PROPERTY IMPORTED_LOCATION_DEBUG ${core_library_debug})
-    set_property(TARGET realm PROPERTY IMPORTED_LOCATION_COVERAGE ${core_library_debug})
-    set_property(TARGET realm PROPERTY IMPORTED_LOCATION_RELEASE ${core_library_release})
-    set_property(TARGET realm PROPERTY IMPORTED_LOCATION ${core_library_release})
-
-    set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES Threads::Threads ${CRYPTO_LIBRARIES})
-
-    set(REALM_CORE_INCLUDE_DIR ${core_directory}/${include_directory} PARENT_SCOPE)
-endmacro()
 
 function(download_realm_core core_version)
     if(APPLE)
-        if(core_version VERSION_GREATER_EQUAL "3.0.0")
-            set(basename "realm-core-cocoa")
-        else()
-            set(basename "realm-core")
-        endif()
+        set(basename "realm-core-cocoa")
         set(compression "tar.xz")
         set(platform "-macosx")
     elseif(REALM_PLATFORM STREQUAL "Android")
@@ -224,13 +156,7 @@ function(download_realm_core core_version)
         endif()
     endif()
 
-    if(core_version VERSION_GREATER_EQUAL "3.0.0")
-        set(tarball_version_prefix "v")
-    else()
-        set(tarball_version_prefix "")
-    endif()
-
-    set(tarball_name "${basename}-${tarball_version_prefix}${core_version}.${compression}")
+    set(tarball_name "${basename}-v${core_version}.${compression}")
     set(url "https://static.realm.io/downloads/core/${tarball_name}")
     set(temp_tarball "/tmp/${tarball_name}")
     set(core_directory_parent "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}")
@@ -242,86 +168,92 @@ function(download_realm_core core_version)
     set(core_libraries ${core_library_debug} ${core_library_release})
 
     download_realm_tarball(${url} ${core_directory} "${core_libraries}")
-    define_realm_core_target(YES ${core_directory})
-endfunction()
 
-function(download_realm_sync sync_version)
-    if(APPLE)
-        set(basename "realm-sync-cocoa")
-        set(compression "xz")
-        set(platform "-macosx")
-    elseif(REALM_PLATFORM STREQUAL "Android")
-        set(basename "realm-sync-android")
-        set(compression "gz")
-        if(ANDROID_ABI STREQUAL "armeabi-v7a")
-            set(platform "-android-arm-v7a")
-        else()
-            set(platform "-android-${ANDROID_ABI}")
-        endif()
-    endif()
-    set(tarball_name "${basename}-${sync_version}.tar.${compression}")
-    set(url "https://static.realm.io/downloads/sync/${tarball_name}")
-    set(temp_tarball "/tmp/${tarball_name}")
-    set(sync_directory_parent "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}")
-    set(sync_directory "${sync_directory_parent}/realm-sync-${sync_version}")
-    set(tarball "${sync_directory_parent}/${tarball_name}")
+    add_custom_target(realm-core DEPENDS ${core_libraries})
 
-    set(core_library_debug ${sync_directory}/librealm${platform}-dbg.a)
-    set(core_library_release ${sync_directory}/librealm${platform}.a)
-    set(core_libraries ${core_library_debug} ${core_library_release})
+    add_library(realm STATIC IMPORTED)
+    add_dependencies(realm realm-core)
+    set_property(TARGET realm PROPERTY IMPORTED_LOCATION_DEBUG ${core_library_debug})
+    set_property(TARGET realm PROPERTY IMPORTED_LOCATION_COVERAGE ${core_library_debug})
+    set_property(TARGET realm PROPERTY IMPORTED_LOCATION_RELEASE ${core_library_release})
+    set_property(TARGET realm PROPERTY IMPORTED_LOCATION ${core_library_release})
 
-    download_realm_tarball(${url} ${sync_directory} "${core_libraries}")
-    define_realm_core_target(YES ${sync_directory})
+    set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES Threads::Threads ${CRYPTO_LIBRARIES})
 
-    add_library(realm-sync INTERFACE)
-    add_dependencies(realm-sync realm)
-
-    # FIXME: Where should we be getting librealm-sync-server.a from?
-    # We can't build the unit tests with sync enabled without it.
-    add_library(realm-sync-server INTERFACE)
-    set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES})
+    # Create directories that are included in INTERFACE_INCLUDE_DIRECTORIES, as CMake requires they exist at
+    # configure time, when they'd otherwise not be created until we download and extract core.
+    file(MAKE_DIRECTORY ${core_directory}/include)
+    set_property(TARGET realm PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${core_directory}/include)
 endfunction()
 
 macro(build_realm_core)
     set(core_prefix_directory "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
-    
-    if(REALM_PLATFORM STREQUAL "Android")
-        set(build_cmd sh build.sh build-android)
-    else()
-        set(build_cmd make -C src/realm librealm.a librealm-dbg.a ${MAKE_FLAGS})
-    endif()
 
     ExternalProject_Add(realm-core
         PREFIX ${core_prefix_directory}
         BUILD_IN_SOURCE 1
-        BUILD_COMMAND ${build_cmd}
         INSTALL_COMMAND ""
-        CONFIGURE_COMMAND ""
+        CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
+                  COMMAND cd build.debug
+                  COMMAND cmake -D CMAKE_BUILD_TYPE=Debug -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
+                  COMMAND cd ..
+                  COMMAND ${CMAKE_COMMAND} -E make_directory build.release
+                  COMMAND cd build.release
+                  COMMAND cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
+
+        BUILD_COMMAND cd build.debug
+              COMMAND cmake --build .
+              COMMAND cd ..
+              COMMAND cd build.release
+              COMMAND cmake --build .
         ${USES_TERMINAL_BUILD}
-        ${ARGV}
+        ${ARGN}
         )
     ExternalProject_Get_Property(realm-core SOURCE_DIR)
-    define_realm_core_target(NO ${SOURCE_DIR})
+
+    set(core_debug_binary_dir "${SOURCE_DIR}/build.debug")
+    set(core_release_binary_dir "${SOURCE_DIR}/build.release")
+    set(core_library_debug "${core_debug_binary_dir}/src/realm/${CMAKE_STATIC_LIBRARY_PREFIX}realm-dbg${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    set(core_library_release "${core_release_binary_dir}/src/realm/${CMAKE_STATIC_LIBRARY_PREFIX}realm${CMAKE_STATIC_LIBRARY_SUFFIX}")
+
+    ExternalProject_Add_Step(realm-core ensure-libraries
+        DEPENDEES build
+        BYPRODUCTS ${core_library_debug} ${core_library_release}
+        )
+
+    set(core_generated_headers_dir_debug "${core_debug_binary_dir}/src")
+    set(core_generated_headers_dir_release "${core_release_binary_dir}/src")
+
+    add_library(realm STATIC IMPORTED)
+    add_dependencies(realm realm-core)
+    set_property(TARGET realm PROPERTY IMPORTED_LOCATION_DEBUG ${core_library_debug})
+    set_property(TARGET realm PROPERTY IMPORTED_LOCATION_COVERAGE ${core_library_debug})
+    set_property(TARGET realm PROPERTY IMPORTED_LOCATION_RELEASE ${core_library_release})
+    set_property(TARGET realm PROPERTY IMPORTED_LOCATION ${core_library_release})
+
+    set_property(TARGET realm PROPERTY INTERFACE_LINK_LIBRARIES Threads::Threads ${CRYPTO_LIBRARIES})
+
+    # Create directories that are included in INTERFACE_INCLUDE_DIRECTORIES, as CMake requires they exist at
+    # configure time, when they'd otherwise not be created until we download and build core.
+    file(MAKE_DIRECTORY "${core_generated_headers_dir_debug}" "${core_generated_headers_dir_release}" "${SOURCE_DIR}/src")
+
+    set_property(TARGET realm PROPERTY INTERFACE_INCLUDE_DIRECTORIES
+        ${SOURCE_DIR}/src
+        $<IF:$<CONFIG:Debug>,${core_generated_headers_dir_debug},${core_generated_headers_dir_release}>
+    )
 endmacro()
 
 function(clone_and_build_realm_core branch)
-    if(REALM_PLATFORM STREQUAL "Android")
-        set(config_cmd REALM_ENABLE_ENCRYPTION=YES REALM_ENABLE_ASSERTIONS= sh build.sh config)
-    else()
-        set(config_cmd REALM_ENABLE_ENCRYPTION=YES REALM_ENABLE_ASSERTIONS=YES sh build.sh config)
-    endif()
     build_realm_core(GIT_REPOSITORY "https://github.com/realm/realm-core.git"
                      GIT_TAG ${branch}
-                     CONFIGURE_COMMAND test -f src/config.mk || ${config_cmd}
                      )
 endfunction()
 
 function(build_existing_realm_core core_directory)
     get_filename_component(core_directory ${core_directory} ABSOLUTE)
-    set(core_prefix_directory "${CMAKE_CURRENT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/realm-core")
 
-    build_realm_core(URL ""
-                     SOURCE_DIR ${core_directory}
+    build_realm_core(SOURCE_DIR ${core_directory}
+                     URL ""
                      BUILD_ALWAYS 1
                      )
 endfunction()
@@ -342,11 +274,11 @@ macro(build_realm_sync)
         CONFIGURE_COMMAND ""
         INSTALL_COMMAND ""
         ${USES_TERMINAL_BUILD}
-        ${ARGV}
+        ${ARGN}
         )
 
     if(APPLE)
-        set(platform "-macosx")
+        set(platform "")
     elseif(REALM_PLATFORM STREQUAL "Android")
         if(ANDROID_ABI STREQUAL "armeabi-v7a")
             set(platform "-android-arm-v7a")
@@ -369,8 +301,7 @@ macro(build_realm_sync)
     set(sync_libraries ${sync_library_debug} ${sync_library_release})
 
     ExternalProject_Add_Step(realm-sync-lib ensure-libraries
-        COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${sync_libraries}
-        OUTPUT ${sync_libraries}
+        BYPRODUCTS ${sync_libraries}
         DEPENDEES build
         )
 
@@ -384,14 +315,18 @@ macro(build_realm_sync)
 
     set_property(TARGET realm-sync PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES})
 
+    # Create directories that are included in INTERFACE_INCLUDE_DIRECTORIES, as CMake requires they exist at
+    # configure time, when they'd otherwise not be created until we download and build sync.
+    file(MAKE_DIRECTORY ${sync_directory}/src)
+    set_property(TARGET realm-sync PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${sync_directory}/src)
+
     # Sync server library is built as part of the sync library build
     set(sync_server_library_debug ${sync_library_directory}/librealm-server${platform}-dbg.a)
     set(sync_server_library_release ${sync_library_directory}/librealm-server${platform}.a)
     set(sync_server_libraries ${sync_server_library_debug} ${sync_server_library_release})
 
     ExternalProject_Add_Step(realm-sync-lib ensure-server-libraries
-        COMMAND ${CMAKE_COMMAND} -E touch_nocreate ${sync_server_libraries}
-        OUTPUT ${sync_server_libraries}
+        BYPRODUCTS ${sync_server_libraries}
         DEPENDEES build
         )
 
@@ -406,8 +341,6 @@ macro(build_realm_sync)
     find_package(PkgConfig)
     pkg_check_modules(YAML QUIET yaml-cpp)
     set_property(TARGET realm-sync-server PROPERTY INTERFACE_LINK_LIBRARIES ${SSL_LIBRARIES} ${YAML_LDFLAGS})
-
-    set(REALM_SYNC_INCLUDE_DIR ${sync_directory}/src PARENT_SCOPE)
 endmacro()
 
 function(build_existing_realm_sync sync_directory)

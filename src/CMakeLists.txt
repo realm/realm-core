@@ -90,14 +90,9 @@ if(NOT APPLE AND NOT REALM_PLATFORM STREQUAL "Android")
 endif()
 
 set(INCLUDE_DIRS
-    ${REALM_CORE_INCLUDE_DIR}
     ${PEGTL_INCLUDE_DIR}
     ${UV_INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR})
-
-if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    list(APPEND INCLUDE_DIRS ${REALM_CORE_INCLUDE_DIR}/win32/pthread)
-endif()
 
 if(REALM_ENABLE_SYNC)
     # Add the sync files separately to reduce merge conflicts.
@@ -123,7 +118,7 @@ if(REALM_ENABLE_SYNC)
             sync/impl/apple/system_configuration.cpp)
     endif()
     find_package(ZLIB REQUIRED)
-    list(APPEND INCLUDE_DIRS ${REALM_SYNC_INCLUDE_DIR} ${ZLIB_INCLUDE_DIRS})
+    list(APPEND INCLUDE_DIRS ${ZLIB_INCLUDE_DIRS})
 endif()
 
 add_library(realm-object-store STATIC ${SOURCES} ${HEADERS})
