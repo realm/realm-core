@@ -39,9 +39,8 @@ if(APPLE)
     set(CRYPTO_LIBRARIES "")
     set(SSL_LIBRARIES ${FOUNDATION_FRAMEWORK} ${SECURITY_FRAMEWORK})
 elseif(REALM_PLATFORM STREQUAL "Android")
-    # The Android core and sync libraries include the necessary portions of OpenSSL.
-    set(CRYPTO_LIBRARIES "")
-    set(SSL_LIBRARIES "")
+    set(CRYPTO_LIBRARIES crypto)
+    set(SSL_LIBRARIES ssl)
 elseif(CMAKE_SYSTEM_NAME MATCHES "^Windows")
     # Windows doesn't do crypto right now, but that is subject to change
     set(CRYPTO_LIBRARIES "")
@@ -122,6 +121,26 @@ function(download_realm_tarball url target libraries)
     endif()
 endfunction()
 
+function(download_android_openssl)
+    if(ANDROID)
+        string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE)
+        set(OPENSSL_FILENAME "openssl-${BUILD_TYPE}-${ANDROID_OPENSSL_VERSION}-Android-${ANDROID_ABI}")
+        set(OPENSSL_URL "http://static.realm.io/downloads/openssl/${ANDROID_OPENSSL_VERSION}/Android/${ANDROID_ABI}/${OPENSSL_FILENAME}.tar.gz")
+
+        message(STATUS "Downloading OpenSSL...")
+        file(DOWNLOAD "${OPENSSL_URL}" "${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}.tar.gz")
+
+        message(STATUS "Uncompressing OpenSSL...")
+        execute_process(COMMAND ${CMAKE_COMMAND} -E tar xfz "${OPENSSL_FILENAME}.tar.gz")
+
+        message(STATUS "Importing OpenSSL...")
+        include(${CMAKE_BINARY_DIR}/${OPENSSL_FILENAME}/openssl.cmake)
+        get_target_property(OPENSSL_INCLUDE_DIR crypto INTERFACE_INCLUDE_DIRECTORIES)
+        get_target_property(CRYPTO_LIB crypto IMPORTED_LOCATION)
+        get_target_property(SSL_LIB ssl IMPORTED_LOCATION)
+    endif()
+endfunction()
+
 function(download_realm_core core_version)
     if(APPLE)
         set(basename "realm-core-cocoa")
@@ -168,6 +187,7 @@ function(download_realm_core core_version)
     set(core_libraries ${core_library_debug} ${core_library_release})
 
     download_realm_tarball(${url} ${core_directory} "${core_libraries}")
+    download_android_openssl()
 
     add_custom_target(realm-core DEPENDS ${core_libraries})
 
