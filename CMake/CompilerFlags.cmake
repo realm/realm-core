@@ -50,13 +50,6 @@ if(MSVC)
     add_compile_options(
         /MP # Enable multi-processor compilation
     )
-
-    if(NOT ${CMAKE_SYSTEM_NAME} STREQUAL "WindowsStore")
-        # Use statically-linked runtime, consistent with how core is built.
-        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /MTd")
-        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT")
-        set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /MT")
-    endif()
 endif()
 
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
