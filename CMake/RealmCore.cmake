@@ -194,18 +194,18 @@ macro(build_realm_core)
         BUILD_IN_SOURCE 1
         INSTALL_COMMAND ""
         CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
-                  COMMAND cd build.debug
-                  COMMAND cmake -D CMAKE_BUILD_TYPE=Debug -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
-                  COMMAND cd ..
-                  COMMAND ${CMAKE_COMMAND} -E make_directory build.release
-                  COMMAND cd build.release
-                  COMMAND cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
+                        && cd build.debug
+                        && cmake -D CMAKE_BUILD_TYPE=Debug -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
+                        && cd ..
+                        && ${CMAKE_COMMAND} -E make_directory build.release
+                        && cd build.release
+                        && cmake -D CMAKE_BUILD_TYPE=RelWithDebInfo -DREALM_BUILD_LIB_ONLY=YES -G Ninja ..
 
         BUILD_COMMAND cd build.debug
-              COMMAND cmake --build .
-              COMMAND cd ..
-              COMMAND cd build.release
-              COMMAND cmake --build .
+                   && cmake --build .
+                   && cd ..
+                   && cd build.release
+                   && cmake --build .
         ${USES_TERMINAL_BUILD}
         ${ARGN}
         )
