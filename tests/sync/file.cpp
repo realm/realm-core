@@ -55,6 +55,20 @@ TEST_CASE("sync_file: percent-encoding APIs", "[sync]") {
         auto actual = make_raw_string(encoded_string);
         REQUIRE(actual == expected);
     }
+
+    SECTION("properly encodes non-latin characters") {
+        const std::string expected = "\%D0\%BF\%D1\%80\%D0\%B8\%D0\%B2\%D0\%B5\%D1\%82";
+        const std::string raw_string = "\xd0\xbf\xd1\x80\xd0\xb8\xd0\xb2\xd0\xb5\xd1\x82";
+        auto actual = make_percent_encoded_string(raw_string);
+        REQUIRE(actual == expected);
+    }
+
+    SECTION("properly decodes non-latin characters") {
+        const std::string expected = "\xd0\xbf\xd1\x80\xd0\xb8\xd0\xb2\xd0\xb5\xd1\x82";
+        const std::string encoded_string = "\%D0\%BF\%D1\%80\%D0\%B8\%D0\%B2\%D0\%B5\%D1\%82";
+        auto actual = make_raw_string(encoded_string);
+        REQUIRE(actual == expected);
+    }
 }
 
 TEST_CASE("sync_file: URL manipulation APIs", "[sync]") {
