@@ -239,7 +239,8 @@ macro(build_realm_core)
 
     set_property(TARGET realm PROPERTY INTERFACE_INCLUDE_DIRECTORIES
         ${SOURCE_DIR}/src
-        $<IF:$<CONFIG:Debug>,${core_generated_headers_dir_debug},${core_generated_headers_dir_release}>
+        $<$<CONFIG:Debug>:${core_generated_headers_dir_debug}>
+        $<$<NOT:$<CONFIG:Debug>>:${core_generated_headers_dir_release}>
     )
 endmacro()
 
