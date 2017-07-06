@@ -85,6 +85,9 @@ public:
     Results sort(SortDescriptor order) const;
     Results filter(Query q) const;
 
+    // Return a Results representing a live view of this List.
+    Results as_results() const;
+
     // Return a Results representing a snapshot of this List.
     Results snapshot() const;
 
