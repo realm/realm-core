@@ -16,6 +16,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////
 
+#include <atomic>
 #include <uv.h>
 
 namespace realm {
@@ -23,22 +24,33 @@ namespace util {
 template<typename Callback>
 class EventLoopSignal {
 public:
+    struct Data {
+        Callback callback;
+        std::atomic<bool> close_requested;
+    };
+
     EventLoopSignal(Callback&& callback)
     {
-        m_handle->data = new Callback(std::move(callback));
+        m_handle->data = new Data { std::move(callback), {false} };
 
         // This assumes that only one thread matters: the main thread (default loop).
         uv_async_init(uv_default_loop(), m_handle, [](uv_async_t* handle) {
-            (*static_cast<Callback*>(handle->data))();
+            auto& data = *static_cast<Data*>(handle->data);
+            if (data.close_requested) {
+                uv_close(reinterpret_cast<uv_handle_t*>(handle), [](uv_handle_t* handle) {
+                    delete reinterpret_cast<Data*>(handle->data);
+                    delete reinterpret_cast<uv_async_t*>(handle);
+                });
+            } else {
+                data.callback();
+            }
         });
     }
 
     ~EventLoopSignal()
     {
-        uv_close((uv_handle_t*)m_handle, [](uv_handle_t* handle) {
-            delete static_cast<Callback*>(handle->data);
-            delete reinterpret_cast<uv_async_t*>(handle);
-        });
+        static_cast<Data*>(m_handle->data)->close_requested = true;
+        uv_async_send(m_handle);
     }
 
     EventLoopSignal(EventLoopSignal&&) = delete;
