@@ -215,13 +215,13 @@ void List::delete_all()
     m_link_view->remove_all_target_rows();
 }
 
-Results List::sort(SortDescriptor order)
+Results List::sort(SortDescriptor order) const
 {
     verify_attached();
     return Results(m_realm, m_link_view, util::none, std::move(order));
 }
 
-Results List::filter(Query q)
+Results List::filter(Query q) const
 {
     verify_attached();
     return Results(m_realm, m_link_view, get_query().and_query(std::move(q)));
