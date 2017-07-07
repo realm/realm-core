@@ -21,6 +21,10 @@
 
 #include <realm/version.hpp>
 
+#ifndef REALM_VERSION_MAJOR
+#define REALM_VERSION_MAJOR REALM_VER_MAJOR
+#endif
+
 #define REALM_HAVE_COMPOSABLE_DISTINCT (REALM_VERSION_MAJOR > 2)
 
 #if REALM_ENABLE_SYNC
