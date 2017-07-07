@@ -226,6 +226,8 @@ struct MarkDirtyMixin  {
 
     bool set_int_unique(size_t, size_t, size_t, int_fast64_t) { return true; }
     bool set_string_unique(size_t, size_t, size_t, StringData) { return true; }
+
+    bool add_row_with_key(size_t, size_t, size_t, int64_t) { return true; }
 };
 
 class TransactLogValidationMixin {
@@ -494,6 +496,12 @@ public:
             if (list.table_ndx == current_table() && list.row_ndx >= row_ndx)
                 list.row_ndx += num_rows_to_insert;
         }
+        return true;
+    }
+
+    bool add_row_with_key(size_t row_ndx, size_t prior_num_rows, size_t, int64_t)
+    {
+        insert_empty_rows(row_ndx, 1, prior_num_rows, false);
         return true;
     }
 

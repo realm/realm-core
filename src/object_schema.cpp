@@ -18,10 +18,10 @@
 
 #include "object_schema.hpp"
 
+#include "feature_checks.hpp"
 #include "object_store.hpp"
 #include "property.hpp"
 #include "schema.hpp"
-#include "sync/sync_features.hpp"
 
 #include "util/format.hpp"
 

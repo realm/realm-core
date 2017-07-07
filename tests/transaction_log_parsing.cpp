@@ -460,6 +460,15 @@ TEST_CASE("Transaction log parsing: changeset calcuation") {
             REQUIRE_INDICES(info.tables[2].modifications, 10);
         }
 
+        SECTION("adding a new row with primary key set is not reported as a modification") {
+            auto info = track_changes({false, false, true}, [&] {
+                table.add_row_with_key(0, 10);
+            });
+            REQUIRE(info.tables.size() == 3);
+            REQUIRE_INDICES(info.tables[2].insertions, 10);
+            REQUIRE(info.tables[2].modifications.empty());
+        }
+
         SECTION("move_last_over() does not shift rows other than the last one") {
             auto info = track_changes({false, false, true}, [&] {
                 table.move_last_over(2);

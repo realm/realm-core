@@ -22,12 +22,12 @@
 
 #include "object.hpp"
 
+#include "feature_checks.hpp"
 #include "list.hpp"
 #include "object_schema.hpp"
 #include "object_store.hpp"
 #include "results.hpp"
 #include "schema.hpp"
-#include "sync/sync_features.hpp"
 #include "util/format.hpp"
 
 #include <realm/link_view.hpp>

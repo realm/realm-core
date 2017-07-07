@@ -33,12 +33,11 @@ using namespace realm;
 Results::Results() = default;
 Results::~Results() = default;
 
-Results::Results(SharedRealm r, Query q, SortDescriptor s, SortDescriptor d)
+Results::Results(SharedRealm r, Query q, DescriptorOrdering o)
 : m_realm(std::move(r))
 , m_query(std::move(q))
 , m_table(m_query.get_table())
-, m_sort(std::move(s))
-, m_distinct(std::move(d))
+, m_descriptor_ordering(std::move(o))
 , m_mode(Mode::Query)
 {
 }
@@ -53,7 +52,6 @@ Results::Results(SharedRealm r, Table& table)
 Results::Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q, SortDescriptor s)
 : m_realm(std::move(r))
 , m_link_view(lv)
-, m_sort(std::move(s))
 , m_mode(Mode::LinkView)
 {
     m_table.reset(&lv->get_target_table());
@@ -61,13 +59,13 @@ Results::Results(SharedRealm r, LinkViewRef lv, util::Optional<Query> q, SortDes
         m_query = std::move(*q);
         m_mode = Mode::Query;
     }
+    m_descriptor_ordering.append_sort(std::move(s));
 }
 
-Results::Results(SharedRealm r, TableView tv, SortDescriptor s, SortDescriptor d)
+Results::Results(SharedRealm r, TableView tv, DescriptorOrdering o)
 : m_realm(std::move(r))
 , m_table_view(std::move(tv))
-, m_sort(std::move(s))
-, m_distinct(std::move(d))
+, m_descriptor_ordering(std::move(o))
 , m_mode(Mode::TableView)
 {
     m_table.reset(&m_table_view.get_parent());
@@ -83,8 +81,7 @@ Results::Results(Results&& other)
 , m_table_view(std::move(other.m_table_view))
 , m_link_view(std::move(other.m_link_view))
 , m_table(std::move(other.m_table))
-, m_sort(std::move(other.m_sort))
-, m_distinct(std::move(other.m_distinct))
+, m_descriptor_ordering(std::move(other.m_descriptor_ordering))
 , m_notifier(std::move(other.m_notifier))
 , m_mode(other.m_mode)
 , m_update_policy(other.m_update_policy)
@@ -137,7 +134,7 @@ size_t Results::size()
         case Mode::LinkView: return m_link_view->size();
         case Mode::Query:
             m_query.sync_view_if_needed();
-            if (!m_distinct)
+            if (!m_descriptor_ordering.will_apply_distinct())
                 return m_query.count();
             REALM_FALLTHROUGH;
         case Mode::TableView:
@@ -253,7 +250,7 @@ bool Results::update_linkview()
 {
     REALM_ASSERT(m_update_policy == UpdatePolicy::Auto);
 
-    if (m_sort || m_distinct) {
+    if (!m_descriptor_ordering.is_empty()) {
         m_query = get_query();
         m_mode = Mode::Query;
         update_tableview();
@@ -277,11 +274,16 @@ void Results::update_tableview(bool wants_notifications)
         case Mode::Query:
             m_query.sync_view_if_needed();
             m_table_view = m_query.find_all();
-            if (m_sort) {
-                m_table_view.sort(m_sort);
-            }
-            if (m_distinct) {
-                m_table_view.distinct(m_distinct);
+            if (!m_descriptor_ordering.is_empty()) {
+#if REALM_HAVE_COMPOSABLE_DISTINCT
+                m_table_view.apply_descriptor_ordering(m_descriptor_ordering);
+#else
+                if (m_descriptor_ordering.sort)
+                    m_table_view.sort(m_descriptor_ordering.sort);
+
+                if (m_descriptor_ordering.distinct)
+                    m_table_view.distinct(m_descriptor_ordering.distinct);
+#endif
             }
             m_mode = Mode::TableView;
             REALM_FALLTHROUGH;
@@ -335,7 +337,7 @@ size_t Results::index_of(size_t row_ndx)
 size_t Results::index_of(Query&& q)
 {
     size_t row;
-    if (!m_sort) {
+    if (!m_descriptor_ordering.will_apply_sort()) {
         auto query = get_query().and_query(std::move(q));
         query.sync_view_if_needed();
         row = query.find();
@@ -520,24 +522,21 @@ TableView Results::get_tableview()
 
 Results Results::sort(realm::SortDescriptor&& sort) const
 {
-    return Results(m_realm, get_query(), std::move(sort), m_distinct);
+    DescriptorOrdering new_order = m_descriptor_ordering;
+    new_order.append_sort(std::move(sort));
+    return Results(m_realm, get_query(), std::move(new_order));
 }
 
 Results Results::filter(Query&& q) const
 {
-    return Results(m_realm, get_query().and_query(std::move(q)), m_sort, m_distinct);
+    return Results(m_realm, get_query().and_query(std::move(q)), m_descriptor_ordering);
 }
 
-
-// FIXME: The current implementation of distinct() breaks the Results API.
-// This is tracked by the following issues:
-// - https://github.com/realm/realm-object-store/issues/266
-// - https://github.com/realm/realm-core/issues/2332
-Results Results::distinct(realm::SortDescriptor&& uniqueness)
+Results Results::distinct(realm::DistinctDescriptor&& uniqueness)
 {
-    auto tv = get_tableview();
-    tv.distinct(uniqueness);
-    return Results(m_realm, std::move(tv), m_sort, std::move(uniqueness));
+    DescriptorOrdering new_order = m_descriptor_ordering;
+    new_order.append_distinct(std::move(uniqueness));
+    return Results(m_realm, get_query(), std::move(new_order));
 }
 
 Results Results::snapshot() const &
@@ -613,7 +612,7 @@ bool Results::is_in_table_order() const
         case Mode::LinkView:
             return false;
         case Mode::Query:
-            return m_query.produces_results_in_table_order() && !m_sort;
+            return m_query.produces_results_in_table_order() && !m_descriptor_ordering.will_apply_sort();
         case Mode::TableView:
             return m_table_view.is_in_table_order();
     }

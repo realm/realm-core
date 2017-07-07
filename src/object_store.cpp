@@ -18,10 +18,10 @@
 
 #include "object_store.hpp"
 
+#include "feature_checks.hpp"
 #include "object_schema.hpp"
 #include "schema.hpp"
 #include "shared_realm.hpp"
-#include "sync/sync_features.hpp"
 #include "util/format.hpp"
 
 #include <realm/group.hpp>

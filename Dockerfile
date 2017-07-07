@@ -14,3 +14,10 @@ RUN mkdir -p /tmp/android-ndk && \
     rm -rf /tmp/android-ndk
 
 ENV ANDROID_NDK_PATH /opt/android-ndk
+
+# Ensure a new enough version of CMake is available.
+RUN cd /opt \
+    && wget https://cmake.org/files/v3.7/cmake-3.7.2-Linux-x86_64.tar.gz \
+        && tar zxvf cmake-3.7.2-Linux-x86_64.tar.gz
+
+ENV PATH "/opt/cmake-3.7.2-Linux-x86_64/bin:$PATH"
