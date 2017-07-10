@@ -52,8 +52,10 @@ struct Base {
 
     static PropertyType property_type() { return prop_type; }
     static std::vector<int64_t> values() { return {3, 1, 2}; }
-    static Wrapped unwrap(T value) { return value; }
     static util::Any to_any(T value) { return value; }
+
+    template<typename Fn>
+    static auto unwrap(T value, Fn&& fn) { return fn(value); }
 
     static T min() { abort(); }
     static T max() { abort(); }
@@ -130,6 +132,9 @@ struct BoxedOptional : Base {
     }
     static auto unwrap(Type value) { return *value; }
     static util::Any to_any(Type value) { return value ? util::Any(*value) : util::Any(); }
+
+    template<typename Fn>
+    static auto unwrap(Type value, Fn&& fn) { return value ? fn(*value) : fn(null()); }
 };
 
 template<typename Base>
@@ -310,6 +315,10 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         REQUIRE(results.get_type() == TestType::property_type());
     }
 
+    SECTION("get_object_type()") {
+        REQUIRE(results.get_object_type() == StringData());
+    }
+
     SECTION("is_valid()") {
         REQUIRE(list.is_valid());
         REQUIRE(results.is_valid());
@@ -464,6 +473,10 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
             REQUIRE(any_cast<Boxed>(list.get(ctx, i)) == Boxed(values[i]));
             REQUIRE(any_cast<Boxed>(results.get(ctx, i)) == Boxed(values[i]));
         }
+        REQUIRE_THROWS(list.get<T>(values.size()));
+        REQUIRE_THROWS(results.get<T>(values.size()));
+        REQUIRE_THROWS(list.get(ctx, values.size()));
+        REQUIRE_THROWS(results.get(ctx, values.size()));
     }
 
     SECTION("first()") {
@@ -506,6 +519,10 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
 
             REQUIRE(list.find(ctx, TestType::to_any(values[i])) == i);
             REQUIRE(results.index_of(ctx, TestType::to_any(values[i])) == i);
+
+            auto q = TestType::unwrap(values[i], [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) == v; });
+            REQUIRE(list.find(Query(q)) == i);
+            REQUIRE(results.index_of(std::move(q)) == i);
         }
 
         list.remove(0);
@@ -516,8 +533,34 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         REQUIRE(results.index_of(ctx, TestType::to_any(values[0])) == npos);
     }
 
-    SECTION("index_of()") {
+    SECTION("sorted index_of()") {
+        auto subtable = table->get_subtable(0, 0);
+
+        auto sorted = list.sort(SortDescriptor(*subtable, {{0}}, {true}));
+        std::sort(begin(values), end(values), std::less<>());
+        for (size_t i = 0; i < values.size(); ++i) {
+            CAPTURE(i);
+            auto q = TestType::unwrap(values[i], [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) == v; });
+            REQUIRE(sorted.index_of(std::move(q)) == i);
+        }
+
+        sorted = list.sort(SortDescriptor(*subtable, {{0}}, {false}));
+        std::sort(begin(values), end(values), std::greater<>());
+        for (size_t i = 0; i < values.size(); ++i) {
+            CAPTURE(i);
+            auto q = TestType::unwrap(values[i], [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) == v; });
+            REQUIRE(sorted.index_of(std::move(q)) == i);
+        }
+    }
+
+    SECTION("filtered index_of()") {
         REQUIRE_THROWS(results.index_of(table->get(0)));
+        auto q = TestType::unwrap(values[0], [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) != v; });
+        auto filtered = list.filter(std::move(q));
+        for (size_t i = 1; i < values.size(); ++i) {
+            CAPTURE(i);
+            REQUIRE(filtered.index_of(static_cast<T>(values[i])) == i - 1);
+        }
     }
 
     SECTION("sort()") {
@@ -540,10 +583,12 @@ TEMPLATE_TEST_CASE("primitive list", ::Int, ::Bool, ::Float, ::Double, ::String,
         T v = values.front();
         values.erase(values.begin());
 
-        Results filtered = list.filter(table->get_subtable(0, 0)->column<W>(0) != TestType::unwrap(v));
+        auto q = TestType::unwrap(v, [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) != v; });
+        Results filtered = list.filter(std::move(q));
         REQUIRE(filtered == values);
 
-        filtered = list.filter(table->get_subtable(0, 0)->column<W>(0) == TestType::unwrap(v));
+        q = TestType::unwrap(v, [&] (auto v) { return table->get_subtable(0, 0)->column<W>(0) == v; });
+        filtered = list.filter(std::move(q));
         REQUIRE(filtered.size() == 1);
         REQUIRE(*filtered.first<T>() == v);
     }
