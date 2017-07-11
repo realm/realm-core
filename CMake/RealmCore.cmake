@@ -238,6 +238,7 @@ macro(build_realm_core)
     ExternalProject_Add(realm-core
         PREFIX ${core_prefix_directory}
         BUILD_IN_SOURCE 1
+        UPDATE_DISCONNECTED 1
         INSTALL_COMMAND ""
         CONFIGURE_COMMAND ${CMAKE_COMMAND} -E make_directory build.debug
                         && cd build.debug
@@ -317,6 +318,7 @@ macro(build_realm_sync)
         DEPENDS realm-core
         PREFIX ${cmake_files}/realm-sync
         BUILD_IN_SOURCE 1
+        UPDATE_DISCONNECTED 1
         BUILD_COMMAND ${build_cmd}
         CONFIGURE_COMMAND ""
         INSTALL_COMMAND ""
