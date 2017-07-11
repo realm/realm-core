@@ -179,11 +179,20 @@ set(REALM_OTHER_UTIL_HEADERS
     util/errno.hpp
 ) # REALM_OTHER_UTIL_HEADERS
 
+set(REALM_INSTALL_ALL_HEADERS
+    ${REALM_INSTALL_GENERAL_HEADERS}
+    ${REALM_INSTALL_UTIL_HEADERS}
+    ${REALM_INSTALL_IMPL_HEADERS}
+    ${REALM_OTHER_UTIL_HEADERS}
+)
+
 if(NOT MSVC)
     list(APPEND REALM_SOURCES util/interprocess_mutex.cpp)
 endif()
 
-add_library(realm-objects OBJECT ${REALM_SOURCES})
+# We add the headers to the library only so they show up in dev
+# environments. It won't actually affect compilation process.
+add_library(realm-objects OBJECT ${REALM_SOURCES} ${REALM_INSTALL_ALL_HEADERS})
 target_compile_definitions(realm-objects PUBLIC
   "PIC"
   "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
