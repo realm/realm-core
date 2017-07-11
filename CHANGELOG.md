@@ -9,6 +9,8 @@
 * Querying SharedGroup::wait_for_change() immediately after a commit()
   would return instead of waiting for the next change.
   PR [#2563](https://github.com/realm/realm-core/pull/2563).
+* Fix a bug in the history schema upgrade logic left behind by PR #2637.
+  PR [#2729](https://github.com/realm/realm-core/pull/2729)
 
 ### Breaking changes
 
