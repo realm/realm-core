@@ -97,14 +97,14 @@ def doAndroidDockerBuild() {
   }
 }
 
-def doBuild(String nodeSpec, String flavor, Boolean enableSync) {
-  def sync = enableSync ? "sync" : ""
-  def label = "${flavor}${enableSync ? '-sync' : 'false'}"
+def doBuild(String nodeSpec, String flavor, Boolean enableSync, String version) {
+  def sync = enableSync ? "sync" : "false"
+  def label = "${flavor}${enableSync ? '-sync' : ''}"
   return {
     node(nodeSpec) {
       getSourceArchive()
       sshagent(['realm-ci-ssh']) {
-        sh "./workflow/test_coverage.sh ${sync} && mv coverage.build ${label}.build"
+        sh "./workflow/test_coverage.sh ${sync} ${version} && mv coverage.build ${label}.build"
       }
       echo "Stashing coverage-${label}"
       stash includes: "${label}.build/coverage.xml", name: "coverage-${label}"
@@ -171,8 +171,9 @@ stage('unit-tests') {
     linux: doDockerBuild('linux', true, false),
     linux_sync: doDockerBuild('linux', true, true),
     android: doAndroidDockerBuild(),
-    macos: doBuild('osx', 'macOS', false),
-    macos_sync: doBuild('osx', 'macOS', true),
+    macos: doBuild('osx', 'macOS', false, ''),
+    macos_1_x: doBuild('osx', 'macOS', false, '-1.x'),
+    macos_sync: doBuild('osx', 'macOS', true, ''),
     win32: doWindowsBuild(),
     windows_universal: doWindowsUniversalBuild()
   )
