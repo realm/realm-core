@@ -56,6 +56,18 @@ Realm::Realm(Config config, std::shared_ptr<_impl::RealmCoordinator> coordinator
         m_schema = ObjectStore::schema_from_group(*m_group);
     }
     else if (!coordinator || !coordinator->get_cached_schema(m_schema, m_schema_version, m_schema_transaction_version)) {
+        if (m_config.should_compact_on_launch_function) {
+            size_t free_space = -1;
+            size_t used_space = -1;
+            // getting stats requires committing a write transaction beforehand.
+            Group* group = nullptr;
+            if (m_shared_group->try_begin_write(group)) {
+                m_shared_group->commit();
+                m_shared_group->get_stats(free_space, used_space);
+                if (m_config.should_compact_on_launch_function(free_space + used_space, used_space))
+                    compact();
+            }
+        }
         read_group();
         if (coordinator)
             coordinator->cache_schema(m_schema, m_schema_version, m_schema_transaction_version);
@@ -160,19 +172,6 @@ void Realm::open_with_config(const Config& config,
                 }
             };
             shared_group = std::make_unique<SharedGroup>(*history, options);
-
-            if (realm && config.should_compact_on_launch_function) {
-                size_t free_space = -1;
-                size_t used_space = -1;
-                // getting stats requires committing a write transaction beforehand.
-                Group* group = nullptr;
-                if (shared_group->try_begin_write(group)) {
-                    shared_group->commit();
-                    shared_group->get_stats(free_space, used_space);
-                    if (config.should_compact_on_launch_function(free_space + used_space, used_space))
-                        realm->compact();
-                }
-            }
         }
     }
     catch (realm::FileFormatUpgradeRequired const&) {
