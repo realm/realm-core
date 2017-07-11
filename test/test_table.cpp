@@ -7240,6 +7240,55 @@ TEST(Table_IndexStringDelete)
     }
 }
 
+TEST(Table_NullableChecks)
+{
+    Table t;
+    TableView tv;
+    constexpr bool nullable = true;
+    size_t str_col = t.add_column(type_String, "str", nullable);
+    size_t int_col = t.add_column(type_Int, "int", nullable);
+    size_t bool_col = t.add_column(type_Bool, "bool", nullable);
+    size_t ts_col = t.add_column(type_Timestamp, "timestamp", nullable);
+    size_t float_col = t.add_column(type_Float, "float", nullable);
+    size_t double_col = t.add_column(type_Double, "double", nullable);
+    size_t binary_col = t.add_column(type_Binary, "binary", nullable);
+
+    t.add_empty_row();
+    StringData sd; // construct a null reference
+    Timestamp ts; // null
+    BinaryData bd;; // null
+    t.set(str_col, 0, sd);
+    t.set(int_col, 0, realm::null());
+    t.set(bool_col, 0, realm::null());
+    t.set(ts_col, 0, ts);
+    t.set(float_col, 0, realm::null());
+    t.set(double_col, 0, realm::null());
+    t.set(binary_col, 0, bd);
+
+    // is_null is always reliable regardless of type
+    CHECK(t.is_null(str_col, 0));
+    CHECK(t.is_null(int_col, 0));
+    CHECK(t.is_null(bool_col, 0));
+    CHECK(t.is_null(ts_col, 0));
+    CHECK(t.is_null(float_col, 0));
+    CHECK(t.is_null(double_col, 0));
+    CHECK(t.is_null(binary_col, 0));
+
+    StringData str0 = t.get_string(str_col, 0);
+    CHECK(str0.is_null());
+    util::Optional<int64_t> int0 = t.get<util::Optional<int64_t>>(int_col, 0);
+    CHECK(!int0);
+    util::Optional<bool> bool0 = t.get<util::Optional<bool>>(bool_col, 0);
+    CHECK(!bool0);
+    Timestamp ts0 = t.get_timestamp(ts_col, 0);
+    CHECK(ts0.is_null());
+    util::Optional<float> float0 = t.get<util::Optional<float>>(float_col, 0);
+    CHECK(!float0);
+    util::Optional<double> double0 = t.get<util::Optional<double>>(double_col, 0);
+    CHECK(!double0);
+    BinaryData binary0 = t.get_binary(binary_col, 0);
+    CHECK(binary0.is_null());
+}
 
 TEST(Table_Nulls)
 {
