@@ -380,8 +380,8 @@ void Realm::set_schema_subset(Schema schema)
     set_schema(m_schema, std::move(schema));
 }
 
-void Realm::update_schema(Schema schema, uint64_t version,
-                          MigrationFunction migration_function, bool in_transaction)
+void Realm::update_schema(Schema schema, uint64_t version, MigrationFunction migration_function,
+                          DataInitializationFunction initialization_function, bool in_transaction)
 {
     schema.validate();
 
@@ -419,6 +419,7 @@ void Realm::update_schema(Schema schema, uint64_t version,
             cancel_transaction();
     });
 
+    uint64_t old_schema_version = m_schema_version;
     bool additive = m_config.schema_mode == SchemaMode::Additive;
     if (migration_function && !additive) {
         auto wrapper = [&] {
@@ -446,6 +447,10 @@ void Realm::update_schema(Schema schema, uint64_t version,
         ObjectStore::apply_schema_changes(read_group(), m_schema_version, schema, version,
                                           m_config.schema_mode, required_changes);
         REALM_ASSERT_DEBUG(additive || (required_changes = ObjectStore::schema_from_group(read_group()).compare(schema)).empty());
+    }
+
+    if (initialization_function && old_schema_version == ObjectStore::NotVersioned) {
+        initialization_function(shared_from_this());
     }
 
     if (!in_transaction) {
