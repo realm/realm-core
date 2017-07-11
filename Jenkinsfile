@@ -99,7 +99,7 @@ def doAndroidDockerBuild() {
 
 def doBuild(String nodeSpec, String flavor, Boolean enableSync) {
   def sync = enableSync ? "sync" : ""
-  def label = "${flavor}${enableSync ? '-sync' : ''}"
+  def label = "${flavor}${enableSync ? '-sync' : 'false'}"
   return {
     node(nodeSpec) {
       getSourceArchive()
