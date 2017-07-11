@@ -1124,7 +1124,18 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                 // Even though this session participant is not the session
                 // initiator, it may be the one that has to perform the history
                 // schema upgrade. See upgrade_file_format().
-                stored_hist_schema_version = gf::get_history_schema_version(alloc, top_ref);
+                if (top_ref != 0) {
+                    stored_hist_schema_version = gf::get_history_schema_version(alloc, top_ref);
+                }
+                else {
+                    // When `top_ref == 0`, there is no history yet, but the
+                    // type and initial version of the history has been decided
+                    // by the session initiator. Note: Due to a preceding check,
+                    // `openers_hist_schema_version` is known to be equal to the
+                    // initial version decided by the session initiator
+                    // (`info->history_schema_version`).
+                    stored_hist_schema_version = openers_hist_schema_version;
+                }
             }
 
 #ifndef _WIN32
