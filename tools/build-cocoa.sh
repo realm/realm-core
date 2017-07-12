@@ -39,6 +39,7 @@ if [[ ! -z $BUILD ]]; then
             mkdir -p "${folder_name}"
             (
                 cd "${folder_name}" || exit 1
+                rm -f realm-core-*-devel.tar.gz
                 cmake -D CMAKE_TOOLCHAIN_FILE="../tools/cmake/${p}.toolchain.cmake" \
                       -D CMAKE_BUILD_TYPE="${prefix}${bt}" \
                       -D REALM_VERSION="$(git describe)" \
