@@ -118,8 +118,9 @@ configure_file(src/realm/util/config.h.in src/realm/util/config.h)
 # Configure source code to use right version number
 configure_file(src/realm/version.hpp.in src/realm/version.hpp)
 
-if(EXISTS "${CMAKE_SOURCE_DIR}/src/realm/util/config.h")
-    message(FATAL_ERROR "config.h exists in the source directory, and will take precedence over the generated configuration in the build directory. Please remove it before continuing.")
+set(DEPRECATED_CONFIG_FILE "${CMAKE_SOURCE_DIR}/src/realm/util/config.h")
+if(EXISTS "${DEPRECATED_CONFIG_FILE}")
+    message(FATAL_ERROR "${DEPRECATED_CONFIG_FILE} exists in the source directory, and will take precedence over the generated configuration in the build directory. Please remove this file before continuing. Alternatively, you can also clean your realm-core to remove this and other stale files: git clean -xfd")
 endif()
 
 # Tell the build system where to find the sources (and generated sources)
