@@ -35,6 +35,7 @@ Thumbs.db
 
 # Ignore files build by Visual Studio
 /.vs
+/Visual\ Studio
 
 *.dSYM
 

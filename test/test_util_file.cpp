@@ -44,10 +44,12 @@ using namespace realm::util;
 
 TEST(Utils_File_dir)
 {
+#ifndef _WIN32
     if (getuid() == 0) {
         std::cout << "Utils_File_dir test skipped because you are running it as root\n\n";
         return;
     }
+#endif
 
     std::string dir_name = File::resolve("tempdir", test_util::get_test_path_prefix());
 
