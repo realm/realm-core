@@ -27,20 +27,25 @@
 #include <functional>
 
 #ifdef _MSC_VER
+
 #if REALM_UWP
 struct timeval {
     long tv_sec;
     long tv_usec;
 };
 #endif
+
 #include <windows.h>
 #include <intrin.h>
+#include <BaseTsd.h>
+
+#if !defined(_SSIZE_T_) && !defined(_SSIZE_T_DEFINED)
+typedef SSIZE_T ssize_t;
+#define _SSIZE_T_
+#define _SSIZE_T_DEFINED
 #endif
 
-#if defined(_MSC_VER)
-#include <BaseTsd.h>
-typedef SSIZE_T ssize_t;
-#endif
+#endif // _MSC_VER
 
 #include <realm/util/features.h>
 #include <realm/util/assert.hpp>
