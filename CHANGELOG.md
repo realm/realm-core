@@ -61,6 +61,8 @@
 
 ### Internals
 
+* On Apple platforms, use `os_log` instead of `asl_log` when possible.
+  PR [#2722](https://github.com/realm/realm-core/pull/2722).
 * The RuntimeLibrary of the Windows build is changed from MultiThreadedDLL to
   just MultiThreaded so as to statically link the Visual C++ runtime libraries,
   removing the onus on end-users to have the correct runtime redistributable
