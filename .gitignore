@@ -22,6 +22,7 @@ CTestTestfile.cmake
 Makefile
 Realm.xcodeproj
 CMakeScripts
+/build*
 
 # Ignore all user files except one which includes execution path for test
 *.user
@@ -36,6 +37,9 @@ Thumbs.db
 # Ignore files build by Visual Studio
 /.vs
 
+# Ignore Eclipse settings
+/.settings
+
 *.dSYM
 
 # Ignore KDevelop4 user files
@@ -43,13 +47,6 @@ Thumbs.db
 
 # ref doc
 /doc/ref_cpp/html/*
-
-# Rakefile default build dirs
-build.make.*
-build.apple
-
-# sh build.sh config
-/src/config.mk
 
 # sh build.sh build-cocoa
 /core-*.zip
@@ -82,6 +79,4 @@ build.apple
 
 # Ignore python compiled files
 *.pyc
-/build.android.*
-/build.cocoa
 /test/android/jni/#Android.mk#
