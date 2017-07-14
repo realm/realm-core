@@ -242,6 +242,7 @@ private:
                                     const char* name,
                                     Int agg_int, Float agg_float,
                                     Double agg_double, Timestamp agg_timestamp);
+    void prepare_for_aggregate(size_t column, const char* name);
 
     void set_table_view(TableView&& tv);
 };

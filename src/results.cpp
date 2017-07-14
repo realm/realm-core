@@ -320,6 +320,30 @@ size_t Results::index_of(Query&& q)
     return row != realm::not_found ? index_of(row) : row;
 }
 
+void Results::prepare_for_aggregate(size_t column, const char* name)
+{
+    if (column > m_table->get_column_count())
+        throw OutOfBoundsIndexException{column, m_table->get_column_count()};
+    switch (m_mode) {
+        case Mode::Empty: break;
+        case Mode::Table: break;
+        case Mode::LinkView:
+            m_query = this->get_query();
+            m_mode = Mode::Query;
+            REALM_FALLTHROUGH;
+        case Mode::Query:
+        case Mode::TableView:
+            update_tableview();
+            break;
+        default:
+            REALM_COMPILER_HINT_UNREACHABLE();
+    }
+    switch (m_table->get_column_type(column)) {
+        case type_Timestamp: case type_Double: case type_Float: case type_Int: break;
+        default: throw UnsupportedColumnTypeException{column, m_table.get(), name};
+    }
+}
+
 template<typename Int, typename Float, typename Double, typename Timestamp>
 util::Optional<Mixed> Results::aggregate(size_t column,
                                          const char* name,
@@ -329,36 +353,17 @@ util::Optional<Mixed> Results::aggregate(size_t column,
     validate_read();
     if (!m_table)
         return none;
-    if (column > m_table->get_column_count())
-        throw OutOfBoundsIndexException{column, m_table->get_column_count()};
+    prepare_for_aggregate(column, name);
 
-    auto do_agg = [&](auto const& getter) -> util::Optional<Mixed> {
-        switch (m_mode) {
-            case Mode::Empty:
-                return none;
-            case Mode::Table:
-                return util::Optional<Mixed>(getter(*m_table));
-            case Mode::LinkView:
-                m_query = this->get_query();
-                m_mode = Mode::Query;
-                REALM_FALLTHROUGH;
-            case Mode::Query:
-            case Mode::TableView:
-                this->update_tableview();
-                return util::Optional<Mixed>(getter(m_table_view));
-        }
-
-        REALM_UNREACHABLE();
+    auto do_agg = [&](auto const& getter) {
+        return Mixed(m_mode == Mode::Table ? getter(*m_table) : getter(m_table_view));
     };
-
-    switch (m_table->get_column_type(column))
-    {
+    switch (m_table->get_column_type(column)) {
         case type_Timestamp: return do_agg(agg_timestamp);
-        case type_Double: return do_agg(agg_double);
-        case type_Float: return do_agg(agg_float);
-        case type_Int: return do_agg(agg_int);
-        default:
-            throw UnsupportedColumnTypeException{column, m_table.get(), name};
+        case type_Double:    return do_agg(agg_double);
+        case type_Float:     return do_agg(agg_float);
+        case type_Int:       return do_agg(agg_int);
+        default: REALM_COMPILER_HINT_UNREACHABLE();
     }
 }
 
@@ -390,18 +395,17 @@ util::Optional<Mixed> Results::sum(size_t column)
                      [=](auto const& table) { return table.sum_int(column); },
                      [=](auto const& table) { return table.sum_float(column); },
                      [=](auto const& table) { return table.sum_double(column); },
-                     [=](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table.get(), "sum"}; });
+                     [=](auto const&) -> Timestamp { throw UnsupportedColumnTypeException{column, m_table.get(), "sum"}; });
 }
 
 util::Optional<Mixed> Results::average(size_t column)
 {
-    // Initial value to make gcc happy
     size_t value_count = 0;
     auto results = aggregate(column, "average",
                              [&](auto const& table) { return table.average_int(column, &value_count); },
                              [&](auto const& table) { return table.average_float(column, &value_count); },
                              [&](auto const& table) { return table.average_double(column, &value_count); },
-                             [&](auto const&) -> util::None { throw UnsupportedColumnTypeException{column, m_table.get(), "average"}; });
+                             [&](auto const&) -> Timestamp { throw UnsupportedColumnTypeException{column, m_table.get(), "average"}; });
     return value_count == 0 ? none : results;
 }
 
