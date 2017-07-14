@@ -166,7 +166,9 @@ public:
                 out_object_schema = &*object_schema;
                 out_table = ObjectStore::table_for_object_type(m_group, object_type);
                 out_primary = out_object_schema->primary_key_property();
-                REALM_ASSERT(out_primary);
+                if (!out_primary) {
+                    throw std::runtime_error("Only object types with primary keys can be used in the adapter");
+                }
             }
         }
     }
