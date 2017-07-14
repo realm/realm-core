@@ -94,13 +94,13 @@ public:
 
     // Get the min/max/average/sum of the given column
     // All but sum() returns none when there are zero matching rows
-    // sum() returns 0, except for when it returns none
+    // sum() returns 0,
     // Throws UnsupportedColumnTypeException for sum/average on timestamp or non-numeric column
     // Throws OutOfBoundsIndexException for an out-of-bounds column
     util::Optional<Mixed> max(size_t column);
     util::Optional<Mixed> min(size_t column);
-    util::Optional<Mixed> average(size_t column);
-    util::Optional<Mixed> sum(size_t column);
+    util::Optional<double> average(size_t column);
+    Mixed sum(size_t column);
 
     bool operator==(List const& rgt) const noexcept;
 

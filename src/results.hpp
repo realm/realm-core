@@ -135,7 +135,7 @@ public:
     // Throws OutOfBoundsIndexException for an out-of-bounds column
     util::Optional<Mixed> max(size_t column);
     util::Optional<Mixed> min(size_t column);
-    util::Optional<Mixed> average(size_t column);
+    util::Optional<double> average(size_t column);
     util::Optional<Mixed> sum(size_t column);
 
     enum class Mode {

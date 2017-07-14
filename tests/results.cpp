@@ -2759,9 +2759,9 @@ TEMPLATE_TEST_CASE("results: aggregate", ResultsFromTable, ResultsFromQuery, Res
         }
 
         SECTION("average") {
-            REQUIRE(results.average(0)->get_double() == 1.0);
-            REQUIRE(results.average(1)->get_double() == 1.0);
-            REQUIRE(results.average(2)->get_double() == 1.0);
+            REQUIRE(results.average(0) == 1.0);
+            REQUIRE(results.average(1) == 1.0);
+            REQUIRE(results.average(2) == 1.0);
             REQUIRE_THROWS_AS(results.average(3), Results::UnsupportedColumnTypeException);
         }
 

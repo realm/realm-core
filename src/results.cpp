@@ -398,7 +398,7 @@ util::Optional<Mixed> Results::sum(size_t column)
                      [=](auto const&) -> Timestamp { throw UnsupportedColumnTypeException{column, m_table.get(), "sum"}; });
 }
 
-util::Optional<Mixed> Results::average(size_t column)
+util::Optional<double> Results::average(size_t column)
 {
     size_t value_count = 0;
     auto results = aggregate(column, "average",
@@ -406,7 +406,7 @@ util::Optional<Mixed> Results::average(size_t column)
                              [&](auto const& table) { return table.average_float(column, &value_count); },
                              [&](auto const& table) { return table.average_double(column, &value_count); },
                              [&](auto const&) -> Timestamp { throw UnsupportedColumnTypeException{column, m_table.get(), "average"}; });
-    return value_count == 0 ? none : results;
+    return value_count == 0 ? none : util::make_optional(results->get_double());
 }
 
 void Results::clear()
