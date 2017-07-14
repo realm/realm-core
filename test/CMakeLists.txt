@@ -92,7 +92,15 @@ else()
     set(MAIN_FILE main.cpp)
 endif()
 
-add_executable(realm-tests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES})
+# here we add the realm-objects dependency directly to patch
+# a quirk when generating Xcode projects. Otherwise changing
+# a source file in the Realm library would not rebuild the
+# static library when the unit tests are rerun.
+add_executable(realm-tests
+               $<TARGET_OBJECTS:realm-objects>
+               ${TESTS}
+               ${MAIN_FILE}
+               ${REQUIRED_TEST_FILES})
 
 if(CMAKE_GENERATOR STREQUAL Xcode)
     set_target_properties(realm-tests PROPERTIES
