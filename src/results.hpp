@@ -190,7 +190,8 @@ public:
     // Create an async query from this Results
     // The query will be run on a background thread and delivered to the callback,
     // and then rerun after each commit (if needed) and redelivered if it changed
-    NotificationToken async(std::function<void (std::exception_ptr)> target);
+    template<typename Func>
+    NotificationToken async(Func&& target);
     NotificationToken add_notification_callback(CollectionChangeCallback cb) &;
 
     bool wants_background_updates() const { return m_wants_background_updates; }
@@ -268,6 +269,14 @@ auto Results::last(Context& ctx)
 {
     auto row = last();
     return row ? ctx.box(*row) : ctx.no_value();
+}
+
+template<typename Func>
+NotificationToken Results::async(Func&& target)
+{
+    return add_notification_callback([target = std::forward<Func>(target)](CollectionChangeSet const&, std::exception_ptr e) {
+        target(e);
+    });
 }
 }
 

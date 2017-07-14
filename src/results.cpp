@@ -600,7 +600,6 @@ Results Results::distinct(realm::DistinctDescriptor&& uniqueness)
 Results Results::snapshot() const &
 {
     validate_read();
-
     return Results(*this).snapshot();
 }
 
@@ -646,13 +645,6 @@ void Results::prepare_async()
     m_wants_background_updates = true;
     m_notifier = std::make_shared<_impl::ResultsNotifier>(*this);
     _impl::RealmCoordinator::register_notifier(m_notifier);
-}
-
-NotificationToken Results::async(std::function<void (std::exception_ptr)> target)
-{
-    prepare_async();
-    auto wrap = [=](CollectionChangeSet, std::exception_ptr e) { target(e); };
-    return {m_notifier, m_notifier->add_callback(wrap)};
 }
 
 NotificationToken Results::add_notification_callback(CollectionChangeCallback cb) &
