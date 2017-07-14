@@ -235,6 +235,8 @@ private:
 
     void prepare_async();
 
+    util::Optional<RowExpr> try_get(size_t);
+
     template<typename Int, typename Float, typename Double, typename Timestamp>
     util::Optional<Mixed> aggregate(size_t column,
                                     const char* name,

@@ -168,7 +168,7 @@ StringData Results::get_object_type() const noexcept
     return ObjectStore::object_type_for_table_name(m_table->get_name());
 }
 
-RowExpr Results::get(size_t row_ndx)
+util::Optional<RowExpr> Results::try_get(size_t row_ndx)
 {
     validate_read();
     switch (m_mode) {
@@ -190,60 +190,30 @@ RowExpr Results::get(size_t row_ndx)
             if (row_ndx >= m_table_view.size())
                 break;
             if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(row_ndx))
-                return {};
+                return RowExpr();
             return m_table_view.get(row_ndx);
     }
+    return util::none;
+}
 
+RowExpr Results::get(size_t row_ndx)
+{
+    if (auto row = try_get(row_ndx))
+        return *row;
     throw OutOfBoundsIndexException{row_ndx, size()};
 }
 
 util::Optional<RowExpr> Results::first()
 {
-    validate_read();
-    switch (m_mode) {
-        case Mode::Empty:
-            return none;
-        case Mode::Table:
-            return m_table->size() == 0 ? util::none : util::make_optional(m_table->front());
-        case Mode::LinkView:
-            if (update_linkview())
-                return m_link_view->size() == 0 ? util::none : util::make_optional(m_link_view->get(0));
-            REALM_FALLTHROUGH;
-        case Mode::Query:
-        case Mode::TableView:
-            update_tableview();
-            if (m_table_view.size() == 0)
-                return util::none;
-            else if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(0))
-                return RowExpr();
-            return m_table_view.front();
-    }
-    REALM_UNREACHABLE();
+    return try_get(0);
 }
 
 util::Optional<RowExpr> Results::last()
 {
     validate_read();
-    switch (m_mode) {
-        case Mode::Empty:
-            return none;
-        case Mode::Table:
-            return m_table->size() == 0 ? util::none : util::make_optional(m_table->back());
-        case Mode::LinkView:
-            if (update_linkview())
-                return m_link_view->size() == 0 ? util::none : util::make_optional(m_link_view->get(m_link_view->size() - 1));
-            REALM_FALLTHROUGH;
-        case Mode::Query:
-        case Mode::TableView:
-            update_tableview();
-            auto s = m_table_view.size();
-            if (s == 0)
-                return util::none;
-            else if (m_update_policy == UpdatePolicy::Never && !m_table_view.is_row_attached(s - 1))
-                return RowExpr();
-            return m_table_view.back();
-    }
-    REALM_UNREACHABLE();
+    if (m_mode == Mode::Query)
+        update_tableview(); // avoid running the query twice (for size() and for get())
+    return try_get(size() - 1);
 }
 
 bool Results::update_linkview()
