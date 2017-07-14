@@ -166,6 +166,7 @@ public:
                 out_object_schema = &*object_schema;
                 out_table = ObjectStore::table_for_object_type(m_group, object_type);
                 out_primary = out_object_schema->primary_key_property();
+		        REALM_ASSERT(out_primary);
             }
         }
     }
@@ -616,9 +617,9 @@ public:
 
 Adapter::Adapter(std::function<void(std::string)> realm_changed,
                  std::string local_root_dir, std::string server_base_url,
-                 std::shared_ptr<SyncUser> user)
+                 std::shared_ptr<SyncUser> user, std::regex regex)
 : m_global_notifier(GlobalNotifier::shared_notifier(
-    std::make_unique<Adapter::Callback>([=](auto info) { realm_changed(info.second); }),
+    std::make_unique<Adapter::Callback>([=](auto info) { realm_changed(info.second); }, regex),
                                         local_root_dir, server_base_url, user,
                                         std::make_shared<ChangesetCooker>()))
 {
@@ -628,7 +629,7 @@ Adapter::Adapter(std::function<void(std::string)> realm_changed,
 std::vector<bool> Adapter::Callback::available(std::vector<GlobalNotifier::RealmInfo> realms) {
     std::vector<bool> watch;
     for (size_t i = 0; i < realms.size(); i++) {
-        watch.push_back(true);
+        watch.push_back(std::regex_match(realms[i].second, m_regex));
     }
     return watch;
 }

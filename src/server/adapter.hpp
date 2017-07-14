@@ -24,6 +24,7 @@
 
 #include <json.hpp>
 #include <set>
+#include <regex>
 
 namespace realm {
 
@@ -32,7 +33,7 @@ class SyncUser;
 class Adapter {
 public:
     Adapter(std::function<void(std::string)> realm_changed, std::string local_root_dir,
-            std::string server_base_url, std::shared_ptr<SyncUser> user);
+            std::string server_base_url, std::shared_ptr<SyncUser> user, std::regex regex);
 
     enum class InstructionType {
         Insert,
@@ -87,12 +88,13 @@ private:
 
     class Callback : public GlobalNotifier::Callback {
     public:
-        Callback(std::function<void(GlobalNotifier::RealmInfo)> changed) : m_realm_changed(changed) {}
+        Callback(std::function<void(GlobalNotifier::RealmInfo)> changed, std::regex regex) : m_realm_changed(changed), m_regex(regex) {}
         virtual std::vector<bool> available(std::vector<GlobalNotifier::RealmInfo> realms);
         virtual void realm_changed(GlobalNotifier::ChangeNotification changes);
 
     private:
         std::function<void(GlobalNotifier::RealmInfo)> m_realm_changed;
+	    std::regex m_regex;
     };
 };
 
