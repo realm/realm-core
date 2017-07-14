@@ -783,7 +783,7 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
 
     int current_file_format_version;
     int target_file_format_version;
-    int stored_hist_schema_version;
+    int stored_hist_schema_version = -1; // Signals undetermined
 
     for (;;) {
         m_file.open(m_lockfile_path, File::access_ReadWrite, File::create_Auto, 0); // Throws
@@ -1077,7 +1077,8 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                         break;
                 }
 
-                REALM_ASSERT(stored_hist_schema_version <= openers_hist_schema_version);
+                REALM_ASSERT(stored_hist_schema_version >= 0 &&
+                             stored_hist_schema_version <= openers_hist_schema_version);
                 if (stored_hist_schema_version > openers_hist_schema_version)
                     throw IncompatibleHistories("Unexpected future history schema version", path);
                 bool need_hist_schema_upgrade =
@@ -1173,10 +1174,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
                 if (info->sync_agent_present && opener_is_sync_agent)
                     throw MultipleSyncAgents{};
 
-                // Even though this session participant is not the session
-                // initiator, it may be the one that has to perform the history
-                // schema upgrade. See upgrade_file_format().
-                stored_hist_schema_version = gf::get_history_schema_version(alloc, top_ref);
+                // Even though this session participant is not the session initiator,
+                // it may be the one that has to perform the history schema upgrade.
+                // See upgrade_file_format(). However we cannot get the actual value
+                // at this point as the allocator is not synchronized with the file.
+                // The value will be read in a ReadTransaction later.
             }
 
             m_new_commit_available.set_shared_part(info->new_commit_available, m_lockfile_prefix, "new_commit",
@@ -1247,6 +1249,11 @@ void SharedGroup::do_open(const std::string& path, bool no_create_file, bool is_
     // Upgrade file format and/or history schema
     try {
         using gf = _impl::GroupFriend;
+        if (stored_hist_schema_version == -1) {
+            // current_hist_schema_version has not been read. Read it now
+            ReadTransaction rt(*this);
+            stored_hist_schema_version = gf::get_history_schema_version(m_group.m_alloc, m_read_lock.m_top_ref);
+        }
         if (current_file_format_version == 0) {
             // If the current file format is still undecided, no upgrade is
             // necessary, but we still need to make the chosen file format
