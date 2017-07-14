@@ -92,7 +92,10 @@ else()
     set(MAIN_FILE main.cpp)
 endif()
 
-add_executable(realm-tests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES})
+add_executable(realm-tests
+               ${TESTS}
+               ${MAIN_FILE}
+               ${REQUIRED_TEST_FILES})
 
 if(CMAKE_GENERATOR STREQUAL Xcode)
     set_target_properties(realm-tests PROPERTIES
