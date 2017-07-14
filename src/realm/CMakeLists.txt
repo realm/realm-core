@@ -192,31 +192,22 @@ endif()
 
 # We add the headers to the library only so they show up in dev
 # environments. It won't actually affect compilation process.
-add_library(realm-objects OBJECT ${REALM_SOURCES} ${REALM_INSTALL_ALL_HEADERS})
-target_compile_definitions(realm-objects PUBLIC
+add_library(realm STATIC ${REALM_SOURCES} ${REALM_INSTALL_ALL_HEADERS})
+target_compile_definitions(realm PUBLIC
   "PIC"
   "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
   "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>")
 
-if(COMMAND set_target_xcode_attributes)
-    set_target_xcode_attributes(realm-objects)
-endif()
-
 if(CMAKE_SYSTEM_NAME MATCHES "^Windows")
-    add_dependencies(realm-objects pthread_win32 getopt_win32)
-    set_property(TARGET realm-objects APPEND PROPERTY COMPILE_DEFINITIONS PTW32_STATIC_LIB)
-    include_directories(realm-objects INTERFACE
+    add_dependencies(realm pthread_win32 getopt_win32)
+    set_property(TARGET realm APPEND PROPERTY COMPILE_DEFINITIONS PTW32_STATIC_LIB)
+    include_directories(realm INTERFACE
                         ${CMAKE_SOURCE_DIR}/src/win32
                         ${CMAKE_SOURCE_DIR}/src/win32/pthread)
     list(APPEND REALM_EXTRA_LIBS pthread_win32 getopt_win32)
 elseif(ANDROID)
     list(APPEND REALM_EXTRA_LIBS atomic)
 endif()
-
-# The placeholder file is needed in order to make builds work on Xcode
-# The issue is described in the last sentence here:
-# https://cmake.org/cmake/help/v3.7/command/add_library.html#object-libraries
-add_library(realm STATIC $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
 
 target_link_libraries(
         realm
@@ -229,7 +220,11 @@ if(ANDROID OR CMAKE_SYSTEM_NAME MATCHES "^Windows")
 endif()
 
 if(NOT REALM_SKIP_SHARED_LIB)
-    add_library(realm-shared SHARED $<TARGET_OBJECTS:realm-objects> placeholder.cpp)
+    add_library(realm-shared SHARED ${REALM_SOURCES} ${REALM_INSTALL_ALL_HEADERS})
+    target_compile_definitions(realm-shared PUBLIC
+        "PIC"
+        "$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>"
+        "$<$<CXX_COMPILER_ID:MSVC>:_SCL_SECURE_NO_WARNINGS>")
 
     set_target_properties(
             realm-shared PROPERTIES
@@ -261,7 +256,7 @@ if(REALM_ENABLE_ENCRYPTION AND NOT APPLE)
         get_target_property(CRYPTO_LIB crypto IMPORTED_LOCATION)
         get_target_property(SSL_LIB ssl IMPORTED_LOCATION)
 
-        target_include_directories(realm-objects PUBLIC ${OPENSSL_INCLUDE_DIR})
+        target_include_directories(realm PUBLIC ${OPENSSL_INCLUDE_DIR})
         target_link_libraries(realm crypto)
     else()
         include(FindOpenSSL)
