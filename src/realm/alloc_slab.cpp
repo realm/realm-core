@@ -715,9 +715,14 @@ ref_type SlabAlloc::attach_file(const std::string& file_path, Config& cfg)
             }
         }
         else {
+            // TODO: m_file_mappings->m_initial_mapping.get_size() may not represent the actual file size
             m_baseline = m_file_mappings->m_initial_mapping.get_size();
         }
         ref_type top_ref = 0;
+        // top_ref is useless unless in shared mode as the allocator is not updated to reflect
+        // the maybe updated file. So it cannot be used to translate the ref.
+        // cfg.read_only implies !cfg.is_shared, so one check if enough
+        REALM_ASSERT_DEBUG(!(cfg.read_only && cfg.is_shared));
         if (cfg.read_only)
             top_ref = get_top_ref(m_data, to_size_t(m_file_mappings->m_file.get_size()));
         return top_ref;

@@ -26,6 +26,7 @@
 #include <realm/util/features.h>
 #include <realm/util/file.hpp>
 #include <realm/replication.hpp>
+#include <realm/history.hpp>
 
 #include "test.hpp"
 #include "test_table_helper.hpp"
@@ -141,7 +142,65 @@ private:
     std::vector<Buffer<char>> m_changesets;
 };
 
-namespace {
+class ReplSyncClient : public MyTrivialReplication {
+public:
+    ReplSyncClient(const std::string& path, int history_schema_version)
+        : MyTrivialReplication(path)
+        , m_history_schema_version(history_schema_version)
+    {
+    }
+
+    void initialize(SharedGroup& sg) override
+    {
+        TrivialReplication::initialize(sg);
+        using sgf = _impl::SharedGroupFriend;
+        m_group = &sgf::get_group(sg);
+    }
+
+    version_type prepare_changeset(const char*, size_t, version_type) override
+    {
+        if (!m_arr) {
+            using gf = _impl::GroupFriend;
+            Allocator& alloc = gf::get_alloc(*m_group);
+            m_arr = std::make_unique<Array>(alloc);
+            m_arr->create(Array::type_Normal);
+            gf::prepare_history_parent(*m_group, *m_arr, hist_SyncClient, m_history_schema_version);
+            m_arr->update_parent(); // Throws
+        }
+        return 1;
+    }
+
+    bool is_upgraded() const
+    {
+        return m_upgraded;
+    }
+
+    bool is_upgradable_history_schema(int) const noexcept override
+    {
+        return true;
+    }
+
+    void upgrade_history_schema(int) override
+    {
+        m_upgraded = true;
+    }
+
+    HistoryType get_history_type() const noexcept override
+    {
+        return hist_SyncClient;
+    }
+
+    int get_history_schema_version() const noexcept override
+    {
+        return m_history_schema_version;
+    }
+
+private:
+    int m_history_schema_version;
+    bool m_upgraded = false;
+    Group* m_group = nullptr;
+    std::unique_ptr<Array> m_arr;
+};
 
 void my_table_add_columns(TableRef t)
 {
@@ -163,8 +222,8 @@ void my_table_add_columns(TableRef t)
 
     sub_descr2->add_column(type_Int, "first");
 }
-}
 
+} // anonymous namespace
 
 TEST(Replication_General)
 {
@@ -3286,7 +3345,7 @@ TEST(Replication_LinkListSelfLinkNullification)
 }
 
 
-TEST(LangBindHelper_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
+TEST(Replication_AdvanceReadTransact_CascadeRemove_ColumnLinkList)
 {
     SHARED_GROUP_TEST_PATH(path_1);
     SHARED_GROUP_TEST_PATH(path_2);
@@ -3733,6 +3792,57 @@ TEST(Replication_MoveSelectedLinkView)
 }
 
 
-} // anonymous namespace
+TEST(Replication_HistorySchemaVersionNormal)
+{
+    SHARED_GROUP_TEST_PATH(path);
+    ReplSyncClient repl(path, 1);
+    SharedGroup sg_1(repl);
+    // it should be possible to have two open shared groups on the same thread
+    // without any read/write transactions in between
+    SharedGroup sg_2(repl);
+}
+
+TEST(Replication_HistorySchemaVersionDuringWT)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    ReplSyncClient repl(path, 1);
+    SharedGroup sg_1(repl);
+    {
+        // Do an empty commit to force the file format version to be established.
+        WriteTransaction wt(sg_1);
+        wt.commit();
+    }
+
+    WriteTransaction wt(sg_1);
+
+    // It should be possible to open a second SharedGroup at the same path
+    // while a WriteTransaction is active via another SharedGroup.
+    SharedGroup sg_2(repl);
+}
+
+TEST(Replication_HistorySchemaVersionUpgrade)
+{
+    SHARED_GROUP_TEST_PATH(path);
+
+    {
+        ReplSyncClient repl(path, 1);
+        SharedGroup sg(repl);
+        {
+            // Do an empty commit to force the file format version to be established.
+            WriteTransaction wt(sg);
+            wt.commit();
+        }
+    }
+
+    ReplSyncClient repl(path, 2);
+    SharedGroup sg_1(repl); // This will be the session initiater
+    CHECK(repl.is_upgraded());
+    WriteTransaction wt(sg_1);
+    // When this one is opened, the file should have been upgraded
+    // If this was not the case we would have triggered another upgrade
+    // and the test would hang
+    SharedGroup sg_2(repl);
+}
 
 #endif // TEST_REPLICATION
