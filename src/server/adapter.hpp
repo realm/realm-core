@@ -94,7 +94,7 @@ private:
 
     private:
         std::function<void(GlobalNotifier::RealmInfo)> m_realm_changed;
-	    std::regex m_regex;
+        std::regex m_regex;
     };
 };
 
