@@ -9,6 +9,10 @@
 * Querying SharedGroup::wait_for_change() immediately after a commit()
   would return instead of waiting for the next change.
   PR [#2563](https://github.com/realm/realm-core/pull/2563).
+* Opening a second SharedGroup may trigger a file format upgrade if the history
+  schema version is non-zero.
+  Fixes issue [#2724](https://github.com/realm/realm-core/issues/2724).
+  PR [#2726](https://github.com/realm/realm-core/pull/2726).
 
 ### Breaking changes
 
@@ -24,7 +28,8 @@
 
 ### Internals
 
-* Lorem ipsum.
+* On Apple platforms, use `os_log` instead of `asl_log` when possible.
+  PR [#2722](https://github.com/realm/realm-core/pull/2722).
 
 ----------------------------------------------
 

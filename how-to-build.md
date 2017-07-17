@@ -2,10 +2,11 @@ This file explains how to build and install the Realm core library.
 
 ## Prerequisites
 
-To build the Realm core library, you need the standard set of build
-tools. This includes a C/C++ compiler and GNU make. Realm is
-thoroughly tested with both GCC and Clang. It is known to work with
-GCC 4.2 and newer, as well as with Clang 3.0 and newer.
+To build the Realm core library, you need CMake 3.4 or newer and a
+standard set of build tools. This includes a C/C++ compiler and a
+build system like GNU make. Realm is thoroughly tested with both GCC
+and Clang. It is known to work with GCC 4.9 and newer, as well as with
+Clang 3.9 (Apple Clang 8.0) and newer. Your compiler must support C++14.
 
 To run the benchmarking suite (make benchmark) on Linux, you will need
 the development part of the 'procps' library.
@@ -13,34 +14,45 @@ the development part of the 'procps' library.
 The following is a suggestion of how to install the prerequisites on
 each of our major platforms:
 
-### Ubuntu 10.04 and 12.04
+### Linux Mint 18-18.2, Ubuntu 16.04
 
     sudo apt-get install build-essential
-    sudo apt-get install libproc-dev
+    sudo apt-get install libprocps4-dev
     sudo apt-get install libssl-dev
+    sudo apt-get install cmake
 
-### Linux Mint 15, 16, Ubuntu 13.04, 13.10
-
-    sudo apt-get install build-essential
-    sudo apt-get install libprocps0-dev
-    sudo apt-get install libssl-dev
-
-### Linux Mint 17, 17.1, Ubuntu 14.04
+### Linux Mint 17-17.3, Ubuntu 14.04
 
     sudo apt-get install build-essential
     sudo apt-get install libprocps3-dev
     sudo apt-get install libssl-dev
+    sudo apt-get install cmake3
 
-### Fedora 17, 18, 19, 20, Amazon Linux 2012.09
+### Fedora 24, 25, 26
 
-    sudo yum install gcc gcc-c++
-    sudo yum install procps-devel
+    sudo dnf install gcc-c++
+    sudo dnf install procps-devel
+    sudo dnf install openssl-devel
+    sudo dnf install cmake
 
-### OS X 10.10 and 10.11
+### OS X 10.10, 10.11, 10.12
 
 On OS X, Clang is used as the C/C++ compiler by default. Clang is installed
 as part of Xcode. Xcode 7.0 or newer is required, and can be installed via
 the Mac App Store.
+
+Setting up a development environment can convienently be achieved using a
+package manager called brew. See https://brew.sh for install instructions.
+
+    brew install cmake
+
+### Windows
+
+On Windows, navigate to the following websites in your browser
+to download the appropriate installers.
+
+- Visual Studio 2017: https://www.visualstudio.com/
+- CMake: https://cmake.org/download/
 
 ## Configure, build & test
 

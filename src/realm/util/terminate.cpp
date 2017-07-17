@@ -24,7 +24,13 @@
 #include <realm/util/thread.hpp>
 
 #if REALM_PLATFORM_APPLE
+
+#if REALM_APPLE_OS_LOG
+#include <os/log.h>
+#else
 #include <asl.h>
+#endif
+
 #include <dlfcn.h>
 #include <execinfo.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -52,10 +58,17 @@ namespace {
 #if REALM_PLATFORM_APPLE
 void nslog(const char* message) noexcept
 {
-    // Standard error goes nowhere for applications managed by launchd, so log to ASL as well.
+    // Standard error goes nowhere for applications managed by launchd,
+    // so log to ASL/unified logging system logs as well.
     fputs(message, stderr);
+#if REALM_APPLE_OS_LOG
+    // The unified logging system considers dynamic strings to be private in
+    // order to protect users. This means we must specify "%{public}s" to get
+    // the message here. See `man os_log` for more details.
+    os_log_error(OS_LOG_DEFAULT, "%{public}s", message);
+#else
     asl_log(nullptr, nullptr, ASL_LEVEL_ERR, "%s", message);
-
+#endif
     // Log the message to Crashlytics if it's loaded into the process
     void* addr = dlsym(RTLD_DEFAULT, "CLSLog");
     if (addr) {
