@@ -46,11 +46,11 @@ echo "Minimizing and converting $num_files found crashes and hangs"
 for file in "${files[@]}"; do
 	# Let AFL try to minimize each input before converting to .cpp
 	minimized_file="$file.minimized"
-    afl-tmin -t "$time_out" -m "$memory" -i "$file" -o "$minimized_file" "${ROOT_DIR}/${BUILD_DIR}/test/fuzzy/fuzz-$executable_path" @@
+    afl-tmin -t "$time_out" -m "$memory" -i "$file" -o "$minimized_file" "${ROOT_DIR}/${BUILD_DIR}/test/fuzzy/$executable_path" @@
     test $? -eq 1 && exit 1 # terminate if afl-tmin is being terminated
 
     # Convert into cpp file
     cpp_file="$unit_tests_path$(basename $file).cpp"
-    "${ROOT_DIR}/${BUILD_DIR}/test/fuzzy/fuzz-$executable_path" "$minimized_file" --log > "$cpp_file"
+    "${ROOT_DIR}/${BUILD_DIR}/test/fuzzy/$executable_path" "$minimized_file" --log > "$cpp_file"
     test $? -eq 1 && exit 1 # terminate if afl-tmin is being terminated
 done
