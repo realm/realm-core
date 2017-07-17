@@ -145,7 +145,7 @@ bool try_make_dir(const std::string& path)
 
 void make_dir(const std::string& path)
 {
-    if (try_make_dir(path))
+    if (try_make_dir(path)) // Throws
         return;
     std::string msg = get_errno_msg("make_dir() failed: ", EEXIST);
     throw File::Exists(msg, path);
@@ -154,7 +154,7 @@ void make_dir(const std::string& path)
 
 void remove_dir(const std::string& path)
 {
-    if (try_remove_dir(path))
+    if (try_remove_dir(path)) // Throws
         return;
     int err = ENOENT;
     std::string msg = get_errno_msg("remove() failed: ", err);
@@ -191,30 +191,32 @@ bool try_remove_dir(const std::string& path)
 
 void remove_dir_recursive(const std::string& path)
 {
+    if (try_remove_dir_recursive(path)) // Throws
+        return;
+
+    int err = ENOENT;
+    std::string msg = get_errno_msg("remove_dir_recursive() failed: ", err);
+    throw File::NotFound(msg, path);
+}
+
+
+bool try_remove_dir_recursive(const std::string& path)
+{
     {
-        DirScanner ds{path}; // Throws
+        bool allow_missing = true;
+        DirScanner ds{path, allow_missing}; // Throws
         std::string name;
         while (ds.next(name)) { // Throws
             std::string subpath = File::resolve(name, path); // Throws
             if (File::is_dir(subpath)) { // Throws
-                remove_dir_recursive(subpath); // Throws
+                try_remove_dir_recursive(subpath); // Throws
             }
             else {
                 File::remove(subpath); // Throws
             }
         }
     }
-    remove_dir(path); // Throws
-}
-
-
-bool try_remove_dir_recursive(const std::string& path)
-{
-    if (File::exists(path)) {
-        remove_dir_recursive(path);
-        return true;
-    }
-    return false;
+    return try_remove_dir(path); // Throws
 }
 
 
