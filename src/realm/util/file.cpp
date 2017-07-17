@@ -145,7 +145,7 @@ bool try_make_dir(const std::string& path)
 
 void make_dir(const std::string& path)
 {
-    if (try_make_dir(path))
+    if (try_make_dir(path)) // Throws
         return;
     std::string msg = get_errno_msg("make_dir() failed: ", EEXIST);
     throw File::Exists(msg, path);
@@ -154,12 +154,22 @@ void make_dir(const std::string& path)
 
 void remove_dir(const std::string& path)
 {
+    if (try_remove_dir(path)) // Throws
+        return;
+    int err = ENOENT;
+    std::string msg = get_errno_msg("remove() failed: ", err);
+    throw File::NotFound(msg, path);
+}
+
+
+bool try_remove_dir(const std::string& path)
+{
 #ifdef _WIN32
     if (_rmdir(path.c_str()) == 0)
-        return;
+        return true;
 #else // POSIX
     if (::rmdir(path.c_str()) == 0)
-        return;
+        return true;
 #endif
     int err = errno; // Eliminate any risk of clobbering
     std::string msg = get_errno_msg("remove_dir() failed: ", err);
@@ -172,7 +182,7 @@ void remove_dir(const std::string& path)
         case ENOTEMPTY:
             throw File::PermissionDenied(msg, path);
         case ENOENT:
-            throw File::NotFound(msg, path);
+            return false;
         default:
             throw File::AccessError(msg, path); // LCOV_EXCL_LINE
     }
@@ -181,20 +191,32 @@ void remove_dir(const std::string& path)
 
 void remove_dir_recursive(const std::string& path)
 {
+    if (try_remove_dir_recursive(path)) // Throws
+        return;
+
+    int err = ENOENT;
+    std::string msg = get_errno_msg("remove_dir_recursive() failed: ", err);
+    throw File::NotFound(msg, path);
+}
+
+
+bool try_remove_dir_recursive(const std::string& path)
+{
     {
-        DirScanner ds{path}; // Throws
+        bool allow_missing = true;
+        DirScanner ds{path, allow_missing}; // Throws
         std::string name;
         while (ds.next(name)) { // Throws
             std::string subpath = File::resolve(name, path); // Throws
             if (File::is_dir(subpath)) { // Throws
-                remove_dir_recursive(subpath); // Throws
+                try_remove_dir_recursive(subpath); // Throws
             }
             else {
                 File::remove(subpath); // Throws
             }
         }
     }
-    remove_dir(path); // Throws
+    return try_remove_dir(path); // Throws
 }
 
 
@@ -241,7 +263,7 @@ std::string make_temp_dir()
     if (mkdtemp(buffer.get()) == 0) {
         throw std::runtime_error("mkdtemp() failed"); // LCOV_EXCL_LINE
     }
-    return std::string(buffer.get()); 
+    return std::string(buffer.get());
 #endif
 
 #endif

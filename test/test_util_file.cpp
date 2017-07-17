@@ -95,6 +95,15 @@ TEST(Utils_File_dir)
         dir_exists = false;
     }
     CHECK_NOT(dir_exists);
+
+    // try_remove_dir missing directory
+    dir_exists = try_remove_dir(dir_name);
+    CHECK_NOT(dir_exists);
+
+    // try_remove_dir existing directory
+    make_dir(dir_name);
+    dir_exists = try_remove_dir(dir_name);
+    CHECK(dir_exists);
 }
 
 TEST(Utils_File_resolve)
@@ -155,6 +164,32 @@ TEST(Utils_File_RemoveDirRecursive)
     touch(file_4);
     remove_dir_recursive(dir_1);
     remove_dir(dir_0);
+}
+
+TEST(Utils_File_TryRemoveDirRecursive)
+{
+    TEST_DIR(dir_0);
+    bool did_exist = false;
+
+    std::string dir_1  = File::resolve("dir_1",  dir_0);
+    make_dir(dir_1);
+    did_exist = try_remove_dir_recursive(dir_1);
+    CHECK(did_exist);
+
+    std::string dir_2  = File::resolve("dir_2",  dir_0);
+    did_exist = try_remove_dir_recursive(dir_2);
+    CHECK(!did_exist);
+
+    std::string dir_3  = File::resolve("dir_3",  dir_0);
+    make_dir(dir_3);
+    std::string file_1 = File::resolve("file_1", dir_3);
+    File(file_1, File::mode_Write);
+    did_exist = try_remove_dir_recursive(dir_3);
+    CHECK(did_exist);
+
+    // Try to remove dir_3 again;
+    did_exist = try_remove_dir_recursive(dir_3);
+    CHECK(!did_exist);
 }
 
 TEST(Utils_File_ForEach)
