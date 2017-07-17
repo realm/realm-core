@@ -1373,6 +1373,9 @@ struct CascadeState : Group::CascadeNotification {
     /// If false, the links field is not needed, so any work done just for that
     /// can be skipped.
     bool track_link_nullifications = false;
+
+    /// If false, weak links are followed too
+    bool only_strong_links = true;
 };
 
 inline bool Group::CascadeNotification::row::operator==(const row& r) const noexcept

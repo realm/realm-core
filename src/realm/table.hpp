@@ -368,6 +368,9 @@ public:
     /// vacated slot. This operation assumes that the table is unordered, and it
     /// may therfore be used on tables with link columns.
     ///
+    /// remove_recursive() will delete linked rows if the removed link was the
+    /// last one holding on to the row in question. This will be done recursively.
+    ///
     /// The removal of a row from an unordered table (move_last_over()) may
     /// cause other linked rows to be cascade-removed. The clearing of a table
     /// may also cause linked rows to be cascade-removed, but in this respect,
@@ -378,6 +381,7 @@ public:
     void insert_empty_row(size_t row_ndx, size_t num_rows = 1);
     size_t add_row_with_key(size_t col_ndx, int64_t key);
     void remove(size_t row_ndx);
+    void remove_recursive(size_t row_ndx);
     void remove_last();
     void move_last_over(size_t row_ndx);
     void clear();
@@ -568,7 +572,7 @@ public:
     void clear_subtable(size_t column_ndx, size_t row_ndx);
 
     // Backlinks
-    size_t get_backlink_count(size_t row_ndx) const noexcept;
+    size_t get_backlink_count(size_t row_ndx, bool only_strong_links = false) const noexcept;
     size_t get_backlink_count(size_t row_ndx, const Table& origin, size_t origin_col_ndx) const noexcept;
     size_t get_backlink(size_t row_ndx, const Table& origin, size_t origin_col_ndx, size_t backlink_ndx) const
         noexcept;
@@ -1314,8 +1318,6 @@ private:
     static bool is_link_type(ColumnType) noexcept;
 
     void connect_opposite_link_columns(size_t link_col_ndx, Table& target_table, size_t backlink_col_ndx) noexcept;
-
-    size_t get_num_strong_backlinks(size_t row_ndx) const noexcept;
 
     //@{
 
@@ -2472,9 +2474,9 @@ public:
         table.do_set_link(col_ndx, row_ndx, target_row_ndx); // Throws
     }
 
-    static size_t get_num_strong_backlinks(const Table& table, size_t row_ndx) noexcept
+    static size_t get_backlink_count(const Table& table, size_t row_ndx, bool only_strong_links) noexcept
     {
-        return table.get_num_strong_backlinks(row_ndx);
+        return table.get_backlink_count(row_ndx, only_strong_links);
     }
 
     static void cascade_break_backlinks_to(Table& table, size_t row_ndx, CascadeState& state)
