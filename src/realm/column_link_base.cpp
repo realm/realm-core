@@ -47,7 +47,7 @@ void LinkColumnBase::check_cascade_break_backlinks_to(size_t target_table_ndx, s
     // Stop if there are any remaining strong links to this row (this scheme
     // fails to discover orphaned cycles)
     typedef _impl::TableFriend tf;
-    size_t num_remaining = tf::get_num_strong_backlinks(*m_target_table, target_row_ndx);
+    size_t num_remaining = tf::get_backlink_count(*m_target_table, target_row_ndx, state.only_strong_links);
     if (num_remaining > 0)
         return;
 
