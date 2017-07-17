@@ -59,7 +59,8 @@
   - `size_t Table::find_first(size_t col_ndx, null)`
   - `OutputStream& operator<<(OutputStream& os, const null&)`
 * Add method to get total count of backlinks for a row
-  PR [#2672](https://github.com/realm/realm-core/pull/2672)
+  PR [#2672](https://github.com/realm/realm-core/pull/2672).
+* Add try_remove_dir() and try_remove_dir_recursive() functions.
 
 -----------
 
