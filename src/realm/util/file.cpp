@@ -210,13 +210,11 @@ void remove_dir_recursive(const std::string& path)
 
 bool try_remove_dir_recursive(const std::string& path)
 {
-    try {
+    if (File::exists(path)) {
         remove_dir_recursive(path);
+        return true;
     }
-    catch (const File::NotFound&) {
-        return false;
-    }
-    return true;
+    return false;
 }
 
 

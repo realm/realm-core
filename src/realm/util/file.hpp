@@ -79,12 +79,18 @@ bool try_remove_dir(const std::string& path);
 ///
 /// \throw File::AccessError If removal of the directory, or any of its contents
 /// fail.
+///
+/// remove_dir_recursive() assumes that no other process or thread is making
+/// simultaneous changes in the directory.
 void remove_dir_recursive(const std::string& path);
 
 /// Same as remove_dir_recursive() except that this one returns false, rather
 /// than throwing an exception, if the specified directory did not
 /// exist. If the directory did exist, and was deleted, this function
 /// returns true.
+///
+/// try_remove_dir_recursive() assumes that no other process or thread is making
+/// simultaneous changes in the directory.
 bool try_remove_dir_recursive(const std::string& path);
 
 /// Create a new unique directory for temporary files. The absolute
