@@ -1336,6 +1336,22 @@ TEST_CASE("notifications: results") {
             r->notify();
             REQUIRE(notification_calls == 1);
         }
+
+        SECTION("inserting a non-matching row at the beginning does not produce a notification") {
+            write([&] {
+                table->insert_empty_row(1);
+            });
+            REQUIRE(notification_calls == 1);
+        }
+
+        SECTION("inserting a matching row at the beginning marks just it as inserted") {
+            write([&] {
+                table->insert_empty_row(0);
+                table->set_int(0, 0, 5);
+            });
+            REQUIRE(notification_calls == 2);
+            REQUIRE_INDICES(change.insertions, 0);
+        }
     }
 
     SECTION("before/after change callback") {

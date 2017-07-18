@@ -115,14 +115,14 @@ void ResultsNotifier::calculate_changes()
         if (changes) {
             auto const& moves = changes->moves;
             for (auto& idx : m_previous_rows) {
-                auto it = lower_bound(begin(moves), end(moves), idx,
-                                      [](auto const& a, auto b) { return a.from < b; });
-                if (it != moves.end() && it->from == idx)
-                    idx = it->to;
-                else if (changes->deletions.contains(idx))
-                    idx = npos;
+                if (changes->deletions.contains(idx)) {
+                    // check if this deletion was actually a move
+                    auto it = lower_bound(begin(moves), end(moves), idx,
+                                          [](auto const& a, auto b) { return a.from < b; });
+                    idx = it != moves.end() && it->from == idx ? it->to : npos;
+                }
                 else
-                    REALM_ASSERT_DEBUG(!changes->insertions.contains(idx));
+                    idx = changes->insertions.shift(changes->deletions.unshift(idx));
             }
             if (m_target_is_in_table_order && !m_descriptor_ordering.will_apply_sort())
                 move_candidates = changes->insertions;
