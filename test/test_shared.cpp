@@ -2148,7 +2148,7 @@ TEST_IF(Shared_AsyncMultiprocess, allow_async)
 
 #ifdef _WIN32
 
-#if 1
+#if 0
 
 TEST(Shared_WaitForChangeAfterOwnCommit)
 {
@@ -2160,6 +2160,7 @@ TEST(Shared_WaitForChangeAfterOwnCommit)
     bool b = sg->wait_for_change();
 }
 
+#endif
 
 NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
 {
@@ -2233,8 +2234,6 @@ NONCONCURRENT_TEST(Shared_InterprocessWaitForChange)
     sg->begin_write();
     sg->commit();
 }
-
-#endif
 
 #endif
 

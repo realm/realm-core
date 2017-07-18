@@ -26,7 +26,6 @@ set(NORMAL_TESTS
     test_descriptor.cpp
     test_destroy_guard.cpp
     test_destructor_thread_safety.cpp
-    test_encrypted_file_mapping.cpp
     test_file.cpp
     test_file_locks.cpp
     test_group.cpp
@@ -62,6 +61,10 @@ set(NORMAL_TESTS
     test_util_type_list.cpp
     test_version.cpp)
 
+if (REALM_ENABLE_ENCRYPTION)
+	list(APPEND NORMAL_TESTS test_encrypted_file_mapping.cpp)
+endif()
+
 set(LARGE_TESTS
     large_tests/test_column_large.cpp
     large_tests/test_strings.cpp)
@@ -90,6 +93,10 @@ if(CMAKE_GENERATOR STREQUAL Xcode)
     set(MAIN_FILE main.mm)
 else()
     set(MAIN_FILE main.cpp)
+endif()
+
+if (MSVC)
+    set_source_files_properties(test_query.cpp PROPERTIES COMPILE_FLAGS /bigobj)
 endif()
 
 add_executable(realm-tests ${TESTS} ${MAIN_FILE} ${REQUIRED_TEST_FILES})

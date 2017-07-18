@@ -3,7 +3,6 @@ set(TEST_UTIL_SOURCES
     mem.cpp
     timer.cpp
     random.cpp
-    benchmark_results.cpp
     quote.cpp
     wildcard.cpp
     unit_test.cpp
@@ -16,6 +15,10 @@ set(TEST_UTIL_SOURCES
     resource_limits.cpp
     jsmn.cpp
 ) # TEST_UTIL_SOURCES
+
+if (NOT MSVC)
+    list(APPEND TEST_UTIL_SOURCES benchmark_results.cpp)
+endif()
 
 add_library(test-util ${TEST_UTIL_SOURCES})
 
