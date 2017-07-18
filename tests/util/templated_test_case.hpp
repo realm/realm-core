@@ -111,7 +111,7 @@
     REALM_TEMPLATE_TEST_CASE_SECTION(fn, T) \
     REALM_TEMPLATE_TEST_CASE_19(fn, __VA_ARGS__)
 
-#if 0 // code to generate the above
+/* // code to generate the above
 count = 20
 
 template = r'''
@@ -139,10 +139,10 @@ test_case = r'''
     REALM_TEMPLATE_TEST_CASE_{1}(fn, __VA_ARGS__)
 '''
 
-print template.format(', '.join(map(str, reversed(range(count)))),
+print template.format(', '.join(map(str, range(count, 0, -1))),
                       ', '.join(('T' + str(x) for x in range(count)))),
 
 for i in range(1, count):
     print test_case.format(i + 1, i),
-#endif
+*/
 
