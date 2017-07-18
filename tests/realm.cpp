@@ -1158,7 +1158,7 @@ struct ModeManual {
 };
 struct ModeResetFile {
     static SchemaMode mode() { return SchemaMode::ResetFile; }
-    static bool should_call_init_on_version_bump() { return false; }
+    static bool should_call_init_on_version_bump() { return true; }
 };
 
 TEMPLATE_TEST_CASE("SharedRealm: update_schema with initialization_function",
